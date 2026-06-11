@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GhostStackOrchestrationState",
+  "type": "object",
+  "properties": {
+    "workflow_id": { "type": "string" },
+    "active_agents": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "state": { "type": "string" },
+    "started_at": { "type": "string" }
+  },
+  "required": ["workflow_id", "state"]
+}

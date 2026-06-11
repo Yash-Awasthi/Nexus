@@ -1,0 +1,367 @@
+package io.github.hectorvent.floci.services.stepfunctions;
+
+import io.github.hectorvent.floci.core.common.AwsErrorResponse;
+import io.github.hectorvent.floci.core.common.AwsException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.github.hectorvent.floci.services.stepfunctions.model.Activity;
+import io.github.hectorvent.floci.services.stepfunctions.model.ActivityTask;
+import io.github.hectorvent.floci.services.stepfunctions.model.Execution;
+import io.github.hectorvent.floci.services.stepfunctions.model.HistoryEvent;
+import io.github.hectorvent.floci.services.stepfunctions.model.StateMachine;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.core.Response;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@ApplicationScoped
+public class StepFunctionsJsonHandler {
+
+    private final StepFunctionsService service;
+    private final ObjectMapper objectMapper;
+
+    @Inject
+    public StepFunctionsJsonHandler(StepFunctionsService service, ObjectMapper objectMapper) {
+        this.service = service;
+        this.objectMapper = objectMapper;
+    }
+
+    public Response handle(String action, JsonNode request, String region) {
+        return switch (action) {
+            case "CreateStateMachine" -> handleCreateStateMachine(request, region);
+            case "DescribeStateMachine" -> handleDescribeStateMachine(request);
+            case "ListStateMachines" -> handleListStateMachines(request, region);
+            case "DeleteStateMachine" -> handleDeleteStateMachine(request);
+            case "ValidateStateMachineDefinition" -> handleValidateStateMachineDefinition(request);
+            case "StartExecution" -> handleStartExecution(request, region);
+            case "StartSyncExecution" -> handleStartSyncExecution(request, region);
+            case "DescribeExecution" -> handleDescribeExecution(request);
+            case "ListExecutions" -> handleListExecutions(request);
+            case "StopExecution" -> handleStopExecution(request);
+            case "GetExecutionHistory" -> handleGetExecutionHistory(request);
+            case "SendTaskSuccess" -> handleSendTaskSuccess(request);
+            case "SendTaskFailure" -> handleSendTaskFailure(request);
+            case "SendTaskHeartbeat" -> handleSendTaskHeartbeat(request);
+            case "CreateActivity" -> handleCreateActivity(request, region);
+            case "DeleteActivity" -> handleDeleteActivity(request);
+            case "DescribeActivity" -> handleDescribeActivity(request);
+            case "ListActivities" -> handleListActivities(request, region);
+            case "GetActivityTask" -> handleGetActivityTask(request);
+            case "ListTagsForResource" -> handleListTagsForResource(request);
+            case "TagResource" -> handleTagResource(request);
+            case "UntagResource" -> handleUntagResource(request);
+            default -> Response.status(400)
+                    .entity(new AwsErrorResponse("UnsupportedOperation", "Operation " + action + " is not supported."))
+                    .build();
+        };
+    }
+
+    private Response handleCreateStateMachine(JsonNode request, String region) {
+        StateMachine sm = service.createStateMachine(
+                request.path("name").asText(),
+                request.path("definition").asText(),
+                request.path("roleArn").asText(),
+                request.path("type").asText(null),
+                region,
+                parseTagsArray(request.path("tags"))
+        );
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("stateMachineArn", sm.getStateMachineArn());
+        response.put("creationDate", sm.getCreationDate());
+        return Response.ok(response).build();
+    }
+
+    private Response handleDescribeStateMachine(JsonNode request) {
+        StateMachine sm = service.describeStateMachine(request.path("stateMachineArn").asText());
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("stateMachineArn", sm.getStateMachineArn());
+        response.put("name", sm.getName());
+        response.put("definition", sm.getDefinition());
+        response.put("roleArn", sm.getRoleArn());
+        response.put("type", sm.getType());
+        response.put("status", sm.getStatus());
+        response.put("creationDate", sm.getCreationDate());
+        return Response.ok(response).build();
+    }
+
+    private Response handleListStateMachines(JsonNode request, String region) {
+        List<StateMachine> list = service.listStateMachines(region);
+        ObjectNode response = objectMapper.createObjectNode();
+        ArrayNode array = response.putArray("stateMachines");
+        for (StateMachine sm : list) {
+            ObjectNode item = array.addObject();
+            item.put("stateMachineArn", sm.getStateMachineArn());
+            item.put("name", sm.getName());
+            item.put("type", sm.getType());
+            item.put("creationDate", sm.getCreationDate());
+        }
+        return Response.ok(response).build();
+    }
+
+    private Response handleDeleteStateMachine(JsonNode request) {
+        service.deleteStateMachine(request.path("stateMachineArn").asText());
+        return Response.ok(objectMapper.createObjectNode()).build();
+    }
+
+    private Response handleValidateStateMachineDefinition(JsonNode request) {
+        String definition = request.path("definition").asText(null);
+        String type = request.path("type").asText(null);
+        String severity = request.path("severity").asText(null);
+        Integer maxResults = parseOptionalInt(request, "maxResults");
+
+        StepFunctionsService.ValidationResult result =
+                service.validateStateMachineDefinition(definition, type, severity, maxResults);
+
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("result", result.valid() ? "OK" : "FAIL");
+        ArrayNode diags = response.putArray("diagnostics");
+        for (StepFunctionsService.Diagnostic d : result.diagnostics()) {
+            ObjectNode node = objectMapper.createObjectNode();
+            node.put("severity", d.severity());
+            node.put("code", d.code());
+            node.put("message", d.message());
+            if (d.location() != null) {
+                node.put("location", d.location());
+            }
+            diags.add(node);
+        }
+        response.put("truncated", result.truncated());
+        return Response.ok(response).build();
+    }
+
+    private Response handleStartExecution(JsonNode request, String region) {
+        Execution exec = service.startExecution(
+                request.path("stateMachineArn").asText(),
+                request.path("name").asText(null),
+                request.path("input").asText(null),
+                region
+        );
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("executionArn", exec.getExecutionArn());
+        response.put("startDate", exec.getStartDate());
+        return Response.ok(response).build();
+    }
+
+    private Response handleStartSyncExecution(JsonNode request, String region) {
+        Execution exec = service.startSyncExecution(
+                request.path("stateMachineArn").asText(),
+                request.path("name").asText(null),
+                request.path("input").asText(null),
+                region
+        );
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("executionArn", exec.getExecutionArn());
+        response.put("stateMachineArn", exec.getStateMachineArn());
+        response.put("name", exec.getName());
+        response.put("status", exec.getStatus());
+        response.put("startDate", exec.getStartDate());
+        if (exec.getStopDate() != null) response.put("stopDate", exec.getStopDate());
+        if (exec.getInput() != null) response.put("input", exec.getInput());
+        if (exec.getOutput() != null) response.put("output", exec.getOutput());
+        if (exec.getError() != null) response.put("error", exec.getError());
+        if (exec.getCause() != null) response.put("cause", exec.getCause());
+        return Response.ok(response).build();
+    }
+
+    private Response handleDescribeExecution(JsonNode request) {
+        Execution exec = service.describeExecution(request.path("executionArn").asText());
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("executionArn", exec.getExecutionArn());
+        response.put("stateMachineArn", exec.getStateMachineArn());
+        response.put("name", exec.getName());
+        response.put("status", exec.getStatus());
+        response.put("startDate", exec.getStartDate());
+        if (exec.getStopDate() != null) response.put("stopDate", exec.getStopDate());
+        if (exec.getInput() != null) response.put("input", exec.getInput());
+        if (exec.getOutput() != null) response.put("output", exec.getOutput());
+        if (exec.getError() != null) response.put("error", exec.getError());
+        if (exec.getCause() != null) response.put("cause", exec.getCause());
+        return Response.ok(response).build();
+    }
+
+    private Response handleListExecutions(JsonNode request) {
+        List<Execution> list = service.listExecutions(request.path("stateMachineArn").asText());
+        ObjectNode response = objectMapper.createObjectNode();
+        ArrayNode array = response.putArray("executions");
+        for (Execution e : list) {
+            ObjectNode item = array.addObject();
+            item.put("executionArn", e.getExecutionArn());
+            item.put("stateMachineArn", e.getStateMachineArn());
+            item.put("name", e.getName());
+            item.put("status", e.getStatus());
+            item.put("startDate", e.getStartDate());
+            if (e.getStopDate() != null) item.put("stopDate", e.getStopDate());
+        }
+        return Response.ok(response).build();
+    }
+
+    private Response handleStopExecution(JsonNode request) {
+        service.stopExecution(
+                request.path("executionArn").asText(),
+                request.path("cause").asText(null),
+                request.path("error").asText(null)
+        );
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("stopDate", System.currentTimeMillis() / 1000.0);
+        return Response.ok(response).build();
+    }
+
+    private Response handleGetExecutionHistory(JsonNode request) {
+        List<HistoryEvent> events = service.getExecutionHistory(request.path("executionArn").asText());
+        ObjectNode response = objectMapper.createObjectNode();
+        ArrayNode array = response.putArray("events");
+        for (HistoryEvent e : events) {
+            ObjectNode item = array.addObject();
+            item.put("id", e.getId());
+            item.put("timestamp", e.getTimestamp());
+            item.put("type", e.getType());
+            if (e.getPreviousEventId() != null) item.put("previousEventId", e.getPreviousEventId());
+            if (e.getDetails() != null) {
+                item.set(e.getType() + "EventDetails", objectMapper.valueToTree(e.getDetails()));
+            }
+        }
+        return Response.ok(response).build();
+    }
+
+    private Response handleSendTaskSuccess(JsonNode request) {
+        service.sendTaskSuccess(request.path("taskToken").asText(), request.path("output").asText());
+        return Response.ok(objectMapper.createObjectNode()).build();
+    }
+
+    private Response handleSendTaskFailure(JsonNode request) {
+        service.sendTaskFailure(
+                request.path("taskToken").asText(),
+                request.path("cause").asText(null),
+                request.path("error").asText(null)
+        );
+        return Response.ok(objectMapper.createObjectNode()).build();
+    }
+
+    private Response handleSendTaskHeartbeat(JsonNode request) {
+        service.sendTaskHeartbeat(request.path("taskToken").asText());
+        return Response.ok(objectMapper.createObjectNode()).build();
+    }
+
+    private Response handleCreateActivity(JsonNode request, String region) {
+        Activity activity = service.createActivity(request.path("name").asText(), region, parseTagsArray(request.path("tags")));
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("activityArn", activity.getActivityArn());
+        response.put("creationDate", activity.getCreationDate());
+        return Response.ok(response).build();
+    }
+
+    private Response handleDeleteActivity(JsonNode request) {
+        service.deleteActivity(request.path("activityArn").asText());
+        return Response.ok(objectMapper.createObjectNode()).build();
+    }
+
+    private Response handleDescribeActivity(JsonNode request) {
+        Activity activity = service.describeActivity(request.path("activityArn").asText());
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("activityArn", activity.getActivityArn());
+        response.put("name", activity.getName());
+        response.put("creationDate", activity.getCreationDate());
+        return Response.ok(response).build();
+    }
+
+    private Response handleListActivities(JsonNode request, String region) {
+        List<Activity> list = service.listActivities(region);
+        ObjectNode response = objectMapper.createObjectNode();
+        ArrayNode array = response.putArray("activities");
+        for (Activity a : list) {
+            ObjectNode item = array.addObject();
+            item.put("activityArn", a.getActivityArn());
+            item.put("name", a.getName());
+            item.put("creationDate", a.getCreationDate());
+        }
+        return Response.ok(response).build();
+    }
+
+    private Response handleGetActivityTask(JsonNode request) {
+        String activityArn = request.path("activityArn").asText();
+        String workerName = request.path("workerName").asText(null);
+        ActivityTask task = service.getActivityTask(activityArn, workerName);
+        ObjectNode response = objectMapper.createObjectNode();
+        if (task != null) {
+            response.put("taskToken", task.getTaskToken());
+            response.put("input", task.getInput());
+        }
+        return Response.ok(response).build();
+    }
+
+    private Response handleListTagsForResource(JsonNode request) {
+        java.util.Map<String, String> tags = service.listTags(request.path("resourceArn").asText());
+        ObjectNode response = objectMapper.createObjectNode();
+        ArrayNode array = response.putArray("tags");
+        tags.forEach((k, v) -> {
+            ObjectNode entry = array.addObject();
+            entry.put("key", k);
+            entry.put("value", v);
+        });
+        return Response.ok(response).build();
+    }
+
+    private Response handleTagResource(JsonNode request) {
+        String arn = request.path("resourceArn").asText();
+        JsonNode tagsNode = request.path("tags");
+        if (!tagsNode.isArray()) {
+            return Response.status(400)
+                    .entity(new AwsErrorResponse("ValidationException", "Parameter 'tags' must be a list"))
+                    .build();
+        }
+        service.tagResource(arn, parseTagsArray(tagsNode));
+        return Response.ok(objectMapper.createObjectNode()).build();
+    }
+
+    private Response handleUntagResource(JsonNode request) {
+        String arn = request.path("resourceArn").asText();
+        JsonNode keysNode = request.path("tagKeys");
+        if (!keysNode.isArray()) {
+            return Response.status(400)
+                    .entity(new AwsErrorResponse("ValidationException", "Parameter 'tagKeys' must be a list"))
+                    .build();
+        }
+        java.util.List<String> tagKeys = new java.util.ArrayList<>();
+        for (JsonNode key : keysNode) {
+            tagKeys.add(key.asText());
+        }
+        service.untagResource(arn, tagKeys);
+        return Response.ok(objectMapper.createObjectNode()).build();
+    }
+
+    private Map<String, String> parseTagsArray(JsonNode tagsNode) {
+        Map<String, String> tags = new HashMap<>();
+        if (tagsNode != null && tagsNode.isArray()) {
+            for (JsonNode entry : tagsNode) {
+                tags.put(entry.path("key").asText(), entry.path("value").asText());
+            }
+        }
+        return tags;
+    }
+
+    /**
+     * Reads an optional integer field from the JSON request, rejecting wrong types
+     * with a typed ValidationException. JsonNode.asInt() silently coerces strings,
+     * fractional numbers, and explicit nulls to 0, which would let invalid payloads
+     * slip through as 0 (and thus be treated as "use default" by the service).
+     * Returns null when the field is absent or explicitly null in the JSON.
+     */
+    private static Integer parseOptionalInt(JsonNode request, String fieldName) {
+        JsonNode node = request.get(fieldName);
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        if (!node.isIntegralNumber()) {
+            throw new AwsException("ValidationException",
+                    "Value '" + node + "' at '" + fieldName
+                            + "' failed to satisfy constraint: Member must be an integer.", 400);
+        }
+        return node.intValue();
+    }
+
+}
