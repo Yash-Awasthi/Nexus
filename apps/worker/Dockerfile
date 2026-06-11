@@ -2,7 +2,7 @@
 # @nexus/worker — multi-stage Docker build
 # Build: docker build -t nexus-worker -f apps/worker/Dockerfile .
 
-FROM node:20.18.0-alpine AS deps
+FROM node:26.3.0-alpine AS deps
 WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@9.14.4 --activate
@@ -39,7 +39,7 @@ RUN pnpm --filter @nexus/shared build && \
     pnpm --filter @nexus/telemetry build && \
     pnpm --filter @nexus/worker build
 
-FROM node:20.18.0-alpine AS runner
+FROM node:26.3.0-alpine AS runner
 WORKDIR /app
 
 RUN addgroup -g 1001 nexus && adduser -u 1001 -G nexus -s /bin/sh -D nexus
