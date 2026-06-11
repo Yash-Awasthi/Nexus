@@ -4,14 +4,31 @@
  * Task types: ingest.scrape, ingest.scrape-batch
  */
 
-import { defineAdapter, requireEnv, AdapterHttpError, type IExecutionContext } from "@nexus/plugin-sdk";
-import type { ScrapeRequest, BatchScrapeRequest, ScrapeResponse, BatchScrapeResponse } from "@nexus/contracts";
+import type {
+  ScrapeRequest,
+  BatchScrapeRequest,
+  ScrapeResponse,
+  BatchScrapeResponse,
+} from "@nexus/contracts";
+import {
+  defineAdapter,
+  requireEnv,
+  AdapterHttpError,
+  type IExecutionContext,
+} from "@nexus/plugin-sdk";
 
-export interface IngestScrapeTask extends ScrapeRequest { taskType: "ingest.scrape"; }
-export interface IngestScrapeBatchTask extends BatchScrapeRequest { taskType: "ingest.scrape-batch"; }
+export interface IngestScrapeTask extends ScrapeRequest {
+  taskType: "ingest.scrape";
+}
+export interface IngestScrapeBatchTask extends BatchScrapeRequest {
+  taskType: "ingest.scrape-batch";
+}
 export type IngestTask = IngestScrapeTask | IngestScrapeBatchTask;
 
-async function execute(task: IngestTask, ctx: IExecutionContext): Promise<ScrapeResponse | BatchScrapeResponse> {
+async function execute(
+  task: IngestTask,
+  ctx: IExecutionContext,
+): Promise<ScrapeResponse | BatchScrapeResponse> {
   const ingestUrl = requireEnv(ctx, "NEXUS_INGEST_URL");
 
   if (task.taskType === "ingest.scrape") {
@@ -22,7 +39,8 @@ async function execute(task: IngestTask, ctx: IExecutionContext): Promise<Scrape
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!response.ok) throw new AdapterHttpError("nexus-adapter-ingest", response.status, await response.text());
+    if (!response.ok)
+      throw new AdapterHttpError("nexus-adapter-ingest", response.status, await response.text());
     return response.json() as Promise<ScrapeResponse>;
   }
 
@@ -34,12 +52,15 @@ async function execute(task: IngestTask, ctx: IExecutionContext): Promise<Scrape
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new AdapterHttpError("nexus-adapter-ingest", response.status, await response.text());
+  if (!response.ok)
+    throw new AdapterHttpError("nexus-adapter-ingest", response.status, await response.text());
   return response.json() as Promise<BatchScrapeResponse>;
 }
 
 export const ingestAdapter = defineAdapter<IngestTask, ScrapeResponse | BatchScrapeResponse>({
-  name: "nexus-adapter-ingest", version: "0.1.0", capabilities: ["scraping.financial"],
+  name: "nexus-adapter-ingest",
+  version: "0.1.0",
+  capabilities: ["scraping.financial"],
   taskTypes: ["ingest.scrape", "ingest.scrape-batch"],
   execute,
 });

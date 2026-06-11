@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # @nexus/shared
 
 Shared types, Zod schemas, model registry, and error classes used across all NEXUS packages.

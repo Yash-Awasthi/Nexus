@@ -965,7 +965,8 @@ components:
 
     AuditLogEntry:
       type: object
-      required: [id, sequence, entity_type, entity_id, action, actor, payload_hash, chain_hash, created_at]
+      required:
+        [id, sequence, entity_type, entity_id, action, actor, payload_hash, chain_hash, created_at]
       properties:
         id:
           type: string

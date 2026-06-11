@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # NEXUS CLI Reference
 
 **Package:** `@nexus/cli`  
@@ -23,10 +24,10 @@ nexus --version
 
 ## Global options
 
-| Option | Description |
-|--------|-------------|
-| `--version` | Print CLI version |
-| `--help` | Show help for any command |
+| Option      | Description               |
+| ----------- | ------------------------- |
+| `--version` | Print CLI version         |
+| `--help`    | Show help for any command |
 
 ---
 
@@ -47,12 +48,12 @@ nexus health
 
 List runtime tasks.
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `--status` | string | — | Filter: `queued`, `running`, `completed`, `failed`, `cancelled`, `awaiting_approval` |
-| `--priority` | string | — | Filter: `low`, `medium`, `high` |
-| `--limit` | number | 20 | Max results |
-| `--offset` | number | 0 | Pagination offset |
+| Option       | Type   | Default | Description                                                                          |
+| ------------ | ------ | ------- | ------------------------------------------------------------------------------------ |
+| `--status`   | string | —       | Filter: `queued`, `running`, `completed`, `failed`, `cancelled`, `awaiting_approval` |
+| `--priority` | string | —       | Filter: `low`, `medium`, `high`                                                      |
+| `--limit`    | number | 20      | Max results                                                                          |
+| `--offset`   | number | 0       | Pagination offset                                                                    |
 
 ```bash
 nexus tasks list --status queued
@@ -63,11 +64,11 @@ nexus tasks list --status failed --limit 50
 
 Submit a new task for execution.
 
-| Option | Required | Description |
-|--------|----------|-------------|
-| `--type` | ✅ | Task type, e.g. `github.create-issue` |
-| `--payload` | ✅ | JSON string payload |
-| `--priority` | — | `low`, `medium`, `high` (default: `medium`) |
+| Option       | Required | Description                                 |
+| ------------ | -------- | ------------------------------------------- |
+| `--type`     | ✅       | Task type, e.g. `github.create-issue`       |
+| `--payload`  | ✅       | JSON string payload                         |
+| `--priority` | —        | `low`, `medium`, `high` (default: `medium`) |
 
 ```bash
 nexus tasks submit \
@@ -100,10 +101,10 @@ nexus tasks cancel 550e8400-e29b-41d4-a716-446655440000
 
 List governance approval requests.
 
-| Option | Default | Description |
-|--------|---------|-------------|
+| Option     | Default   | Description                                  |
+| ---------- | --------- | -------------------------------------------- |
 | `--status` | `pending` | `pending`, `approved`, `rejected`, `expired` |
-| `--limit` | 20 | Max results |
+| `--limit`  | 20        | Max results                                  |
 
 ```bash
 nexus approvals list
@@ -114,10 +115,10 @@ nexus approvals list --status approved --limit 100
 
 Approve a pending request.
 
-| Option | Required | Description |
-|--------|----------|-------------|
-| `--by` | ✅ | Your identity (name or email) |
-| `--reason` | — | Optional justification |
+| Option     | Required | Description                   |
+| ---------- | -------- | ----------------------------- |
+| `--by`     | ✅       | Your identity (name or email) |
+| `--reason` | —        | Optional justification        |
 
 ```bash
 nexus approvals approve 550e8400-e29b-41d4-a716-446655440001 \
@@ -143,12 +144,12 @@ nexus approvals reject 550e8400-e29b-41d4-a716-446655440001 \
 
 Run a council deliberation (calls all 14 archetypes via Groq).
 
-| Option | Required | Description |
-|--------|----------|-------------|
-| `--title` | ✅ | Proposal title |
-| `--desc` | — | Proposal description |
-| `--budget` | — | LLM cost cap in USD (default: `0.10`) |
-| `--signal-id` | — | Link to existing signal UUID |
+| Option        | Required | Description                           |
+| ------------- | -------- | ------------------------------------- |
+| `--title`     | ✅       | Proposal title                        |
+| `--desc`      | —        | Proposal description                  |
+| `--budget`    | —        | LLM cost cap in USD (default: `0.10`) |
+| `--signal-id` | —        | Link to existing signal UUID          |
 
 ```bash
 nexus council deliberate \
@@ -177,13 +178,13 @@ nexus council verdict 550e8400-e29b-41d4-a716-446655440002
 
 Submit a raw event for ingestion.
 
-| Option | Required | Description |
-|--------|----------|-------------|
-| `--source` | ✅ | Adapter source, e.g. `github`, `gmail`, `slack` |
-| `--type` | ✅ | Event type, e.g. `pr.opened`, `email.received` |
-| `--payload` | ✅ | JSON string |
-| `--priority` | — | Queue tier: `high`, `medium`, `low` |
-| `--key` | — | Idempotency key (prevents duplicate processing) |
+| Option       | Required | Description                                     |
+| ------------ | -------- | ----------------------------------------------- |
+| `--source`   | ✅       | Adapter source, e.g. `github`, `gmail`, `slack` |
+| `--type`     | ✅       | Event type, e.g. `pr.opened`, `email.received`  |
+| `--payload`  | ✅       | JSON string                                     |
+| `--priority` | —        | Queue tier: `high`, `medium`, `low`             |
+| `--key`      | —        | Idempotency key (prevents duplicate processing) |
 
 ```bash
 nexus ingest event \
@@ -222,16 +223,16 @@ nexus audit verify
 
 ## Environment variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `NEXUS_API_URL` | — | Base URL, default `http://localhost:3000` |
-| `NEXUS_API_KEY` | — | Bearer token (required if API auth enabled) |
+| Variable        | Required | Description                                 |
+| --------------- | -------- | ------------------------------------------- |
+| `NEXUS_API_URL` | —        | Base URL, default `http://localhost:3000`   |
+| `NEXUS_API_KEY` | —        | Bearer token (required if API auth enabled) |
 
 ---
 
 ## Exit codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | Error (HTTP failure, chain broken, parse error) |
+| Code | Meaning                                         |
+| ---- | ----------------------------------------------- |
+| 0    | Success                                         |
+| 1    | Error (HTTP failure, chain broken, parse error) |

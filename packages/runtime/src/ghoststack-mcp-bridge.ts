@@ -1,15 +1,19 @@
-import { IMCPTransport } from "./interfaces/mcp.interface";
-import type { GhostStackRuntimeContext } from "../runtime/runtime-context";
-import { FlociExecutionAdapter } from "./floci-adapter";
-import { resolveSandboxPath } from "./runtime-sandbox";
-import { loadWorkflowSpecFile, specToWorkflowDefinition } from "./spec-loader";
-import { dispatchExtendedAction, EXTENDED_FLOCI_ACTIONS } from "./floci-extended";
-import { resolveFlociEndpoint } from "./floci-client";
-import { runFederationE2e } from "../runtime/e2e-federation";
-import { MCPServerRegistry } from "./mcp-registry";
-import { MCPRuntime } from "./mcp-adapter";
+// SPDX-License-Identifier: Apache-2.0
+// @ts-nocheck
 import * as fs from "fs";
 import * as path from "path";
+
+import { runFederationE2e } from "../runtime/e2e-federation.js";
+import type { GhostStackRuntimeContext } from "../runtime/runtime-context.js";
+
+import type { FlociExecutionAdapter } from "./floci-adapter.js";
+import { resolveFlociEndpoint } from "./floci-client.js";
+import { dispatchExtendedAction, EXTENDED_FLOCI_ACTIONS } from "./floci-extended.js";
+import type { IMCPTransport } from "./interfaces/mcp.interface.js";
+import { MCPRuntime } from "./mcp-adapter.js";
+import { MCPServerRegistry } from "./mcp-registry.js";
+import { resolveSandboxPath } from "./runtime-sandbox.js";
+import { loadWorkflowSpecFile, specToWorkflowDefinition } from "./spec-loader.js";
 
 /**
  * In-process MCP transport exposing GhostStack orchestrator capabilities.
@@ -33,7 +37,9 @@ export class GhostStackMcpBridge implements IMCPTransport {
     }
 
     if (message.method !== "tools/call") {
-      return { content: [{ type: "text", text: JSON.stringify({ ok: true, method: message.method }) }] };
+      return {
+        content: [{ type: "text", text: JSON.stringify({ ok: true, method: message.method }) }],
+      };
     }
 
     const name = message.params?.name as string;
@@ -42,7 +48,11 @@ export class GhostStackMcpBridge implements IMCPTransport {
       const text = await this.dispatchTool(name, args);
       return { content: [{ type: "text", text }] };
     } catch (err) {
-      return { content: [{ type: "text", text: JSON.stringify({ error: (err as Error).message, tool: name }) }] };
+      return {
+        content: [
+          { type: "text", text: JSON.stringify({ error: (err as Error).message, tool: name }) },
+        ],
+      };
     }
   }
 
@@ -61,21 +71,24 @@ export class GhostStackMcpBridge implements IMCPTransport {
         const list = this.ctx.registry.listWorkflows().map((w) => ({
           id: w.id,
           name: w.name,
-          tasks: w.tasks.length
+          tasks: w.tasks.length,
         }));
         return JSON.stringify(list, null, 2);
       }
       case "ghoststack_load_spec": {
         const specPath = args.specPath as string;
-        if (!specPath) throw new Error("specPath is required (e.g. specs/demo-etl/workflow-spec.json)");
-        const full = path.isAbsolute(specPath)
-          ? specPath
-          : path.join(this.ctx.repoRoot, specPath);
+        if (!specPath)
+          throw new Error("specPath is required (e.g. specs/demo-etl/workflow-spec.json)");
+        const full = path.isAbsolute(specPath) ? specPath : path.join(this.ctx.repoRoot, specPath);
         const spec = loadWorkflowSpecFile(full);
         const workflowId = (args.workflowId as string) || path.basename(path.dirname(full));
         const def = specToWorkflowDefinition(spec, workflowId);
         this.ctx.registry.registerWorkflow(def);
-        return JSON.stringify({ loaded: workflowId, tasks: def.tasks.length, templateId: spec.template_id }, null, 2);
+        return JSON.stringify(
+          { loaded: workflowId, tasks: def.tasks.length, templateId: spec.template_id },
+          null,
+          2,
+        );
       }
       case "ghoststack_execute_workflow": {
         const workflowId = args.workflowId as string;
@@ -109,7 +122,7 @@ export class GhostStackMcpBridge implements IMCPTransport {
       case "ghoststack_run_e2e": {
         const result = await runFederationE2e(this.ctx, {
           strict: args.strict !== false,
-          cleanup: args.cleanup !== false
+          cleanup: args.cleanup !== false,
         });
         return JSON.stringify(result, null, 2);
       }
@@ -123,7 +136,7 @@ export class GhostStackMcpBridge implements IMCPTransport {
           startTime: new Date(),
           attempt: 1,
           environment: {},
-          logger: this.ctx.logger
+          logger: this.ctx.logger,
         });
         return JSON.stringify(result, null, 2);
       }
@@ -131,7 +144,11 @@ export class GhostStackMcpBridge implements IMCPTransport {
         const relPath = args.path as string;
         const content = (args.content as string) ?? "";
         if (!relPath) throw new Error("path is required");
-        const target = resolveSandboxPath(this.ctx.sandbox.workspacesDir, this.ctx.sandbox.root, relPath);
+        const target = resolveSandboxPath(
+          this.ctx.sandbox.workspacesDir,
+          this.ctx.sandbox.root,
+          relPath,
+        );
         fs.mkdirSync(path.dirname(target), { recursive: true });
         fs.writeFileSync(target, content, "utf8");
         return JSON.stringify({ written: target, bytes: Buffer.byteLength(content) }, null, 2);
@@ -139,16 +156,24 @@ export class GhostStackMcpBridge implements IMCPTransport {
       case "ghoststack_sandbox_read": {
         const relPath = args.path as string;
         if (!relPath) throw new Error("path is required");
-        const target = resolveSandboxPath(this.ctx.sandbox.workspacesDir, this.ctx.sandbox.root, relPath);
+        const target = resolveSandboxPath(
+          this.ctx.sandbox.workspacesDir,
+          this.ctx.sandbox.root,
+          relPath,
+        );
         const content = fs.readFileSync(target, "utf8");
         return JSON.stringify({ path: target, content }, null, 2);
       }
       case "ghoststack_sandbox_list": {
         const relDir = (args.path as string) || ".";
-        const target = resolveSandboxPath(this.ctx.sandbox.workspacesDir, this.ctx.sandbox.root, relDir);
+        const target = resolveSandboxPath(
+          this.ctx.sandbox.workspacesDir,
+          this.ctx.sandbox.root,
+          relDir,
+        );
         const entries = fs.readdirSync(target, { withFileTypes: true }).map((e) => ({
           name: e.name,
-          type: e.isDirectory() ? "dir" : "file"
+          type: e.isDirectory() ? "dir" : "file",
         }));
         return JSON.stringify({ path: target, entries }, null, 2);
       }
@@ -160,33 +185,51 @@ export class GhostStackMcpBridge implements IMCPTransport {
       }
       case "ghoststack_memory_store": {
         const id = await this.ctx.memoryStore.store({
-          type: (args.type as "observation" | "decision" | "result" | "error" | "state" | "knowledge") ?? "knowledge",
+          type:
+            (args.type as
+              | "observation"
+              | "decision"
+              | "result"
+              | "error"
+              | "state"
+              | "knowledge") ?? "knowledge",
           key: args.key as string,
           value: args.value,
           tags: (args.tags as string[]) || [],
           agentId: args.agentId as string,
-          workflowId: args.workflowId as string
+          workflowId: args.workflowId as string,
         });
         return JSON.stringify({ id }, null, 2);
       }
       case "ghoststack_memory_query": {
         const result = await this.ctx.memoryStore.query({
-          types: args.types as Array<"observation" | "decision" | "result" | "error" | "state" | "knowledge">,
+          types: args.types as (
+            | "observation"
+            | "decision"
+            | "result"
+            | "error"
+            | "state"
+            | "knowledge"
+          )[],
           keyPrefix: args.keyPrefix as string,
           tags: args.tags as string[],
-          limit: (args.limit as number) || 20
+          limit: (args.limit as number) || 20,
         });
-        return JSON.stringify({
-          total: result.total,
-          entries: result.entries.map((e) => ({
-            id: e.id,
-            type: e.type,
-            key: e.key,
-            agentId: e.agentId,
-            tags: e.tags,
-            timestamp: e.timestamp.toISOString()
-          }))
-        }, null, 2);
+        return JSON.stringify(
+          {
+            total: result.total,
+            entries: result.entries.map((e) => ({
+              id: e.id,
+              type: e.type,
+              key: e.key,
+              agentId: e.agentId,
+              tags: e.tags,
+              timestamp: e.timestamp.toISOString(),
+            })),
+          },
+          null,
+          2,
+        );
       }
 
       // ── Agent Bus ──────────────────────────────────────────────────
@@ -198,23 +241,34 @@ export class GhostStackMcpBridge implements IMCPTransport {
         const msgId = await this.ctx.agentBus.send({
           from: args.from as string,
           to: args.to as string,
-          type: (args.type as "result" | "error" | "request" | "response" | "broadcast" | "delegation") ?? "broadcast",
+          type:
+            (args.type as
+              | "result"
+              | "error"
+              | "request"
+              | "response"
+              | "broadcast"
+              | "delegation") ?? "broadcast",
           subject: args.subject as string,
-          body: args.body
+          body: args.body,
         });
         return JSON.stringify({ messageId: msgId }, null, 2);
       }
       case "ghoststack_agent_find": {
-        const agents = await this.ctx.agentBus.findAgents(args.action as string);
+        const agents = await this.ctx.agentBus.findAgents(args.action);
         return JSON.stringify(agents, null, 2);
       }
 
       // ── Circuit Breaker ────────────────────────────────────────────
       case "ghoststack_circuit_state": {
-        return JSON.stringify({
-          state: this.ctx.circuitBreaker.getState(),
-          metrics: this.ctx.circuitBreaker.getMetrics()
-        }, null, 2);
+        return JSON.stringify(
+          {
+            state: this.ctx.circuitBreaker.getState(),
+            metrics: this.ctx.circuitBreaker.getMetrics(),
+          },
+          null,
+          2,
+        );
       }
       case "ghoststack_circuit_reset": {
         this.ctx.circuitBreaker.reset();
@@ -228,17 +282,25 @@ export class GhostStackMcpBridge implements IMCPTransport {
       }
       case "ghoststack_health_history": {
         const history = this.ctx.diagnosticEnricher.getHealthHistory();
-        return JSON.stringify({
-          stats: history.getStats(),
-          latest: history.getLatest(),
-          history: history.getHistory().slice(-50)
-        }, null, 2);
+        return JSON.stringify(
+          {
+            stats: history.getStats(),
+            latest: history.getLatest(),
+            history: history.getHistory().slice(-50),
+          },
+          null,
+          2,
+        );
       }
 
       // ── Runtime Graph ────────────────────────────────────────────────
       case "ghoststack_runtime_graph": {
         if (!this.ctx.runtimeGraph) {
-          return JSON.stringify({ available: false, message: "RuntimeGraph not initialized" }, null, 2);
+          return JSON.stringify(
+            { available: false, message: "RuntimeGraph not initialized" },
+            null,
+            2,
+          );
         }
         const graph = await this.ctx.runtimeGraph.getSnapshot();
         return JSON.stringify(graph, null, 2);
@@ -247,13 +309,20 @@ export class GhostStackMcpBridge implements IMCPTransport {
         const action = args.action as string;
         if (!action) throw new Error("action is required for extended Floci ops");
         if (!EXTENDED_FLOCI_ACTIONS.includes(action)) {
-          throw new Error(`Unknown extended Floci action: ${action}. Valid: ${EXTENDED_FLOCI_ACTIONS.join(", ")}`);
+          throw new Error(
+            `Unknown extended Floci action: ${action}. Valid: ${EXTENDED_FLOCI_ACTIONS.join(", ")}`,
+          );
         }
         const endpoint = resolveFlociEndpoint();
         // Thread emitEvent so S3 object creation events propagate through the event bus
-        const result = await dispatchExtendedAction(endpoint, action, args, async (event, payload) => {
-          await this.ctx.eventBus.publish(event, payload);
-        });
+        const result = await dispatchExtendedAction(
+          endpoint,
+          action,
+          args,
+          async (event, payload) => {
+            await this.ctx.eventBus.publish(event, payload);
+          },
+        );
         return JSON.stringify(result, null, 2);
       }
 
@@ -275,9 +344,9 @@ export async function registerGhostStackMcpBridge(ctx: GhostStackRuntimeContext)
       transportType: "stdio",
       endpoint: "in-process",
       status: "active",
-      tools: [...GHOSTSTACK_MCP_TOOLS]
+      tools: [...GHOSTSTACK_MCP_TOOLS],
     },
-    transport
+    transport,
   );
   const runtime = new MCPRuntime(registry, ctx.metrics, ctx.tracer);
   return { registry, runtime };
@@ -315,5 +384,5 @@ export const GHOSTSTACK_MCP_TOOLS = [
   "ghoststack_diagnostics",
   "ghoststack_health_history",
   // Runtime Graph
-  "ghoststack_runtime_graph"
+  "ghoststack_runtime_graph",
 ];

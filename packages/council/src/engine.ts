@@ -11,9 +11,11 @@
  */
 
 import { randomUUID } from "crypto";
+
 import type { CouncilRequest, CouncilResponse, ProposalResult, ModelVote } from "@nexus/contracts";
 import { BudgetExceededError } from "@nexus/shared";
-import { summonArchetypes, type Archetype, type TaskCategory } from "./archetypes.js";
+
+import { summonArchetypes, type TaskCategory } from "./archetypes.js";
 
 // ── LLM transport interface ───────────────────────────────────────────────────
 
@@ -30,7 +32,10 @@ export interface ILLMResponse {
 }
 
 export interface ILLMTransport {
-  chat(messages: ILLMMessage[], options?: { model?: string; temperature?: number; maxTokens?: number }): Promise<ILLMResponse>;
+  chat(
+    messages: ILLMMessage[],
+    options?: { model?: string; temperature?: number; maxTokens?: number },
+  ): Promise<ILLMResponse>;
 }
 
 // ── Engine config ─────────────────────────────────────────────────────────────
@@ -55,17 +60,17 @@ const NO_PATTERNS = /\b(no|reject|oppose|disagree|against|decline)\b/i;
 
 function parseVote(content: string): "yes" | "no" | "abstain" {
   const lower = content.toLowerCase();
-  const yesScore = (lower.match(YES_PATTERNS) ?? []).length;
-  const noScore = (lower.match(NO_PATTERNS) ?? []).length;
+  const yesScore = (YES_PATTERNS.exec(lower) ?? []).length;
+  const noScore = (NO_PATTERNS.exec(lower) ?? []).length;
   if (yesScore === 0 && noScore === 0) return "abstain";
   return yesScore >= noScore ? "yes" : "no";
 }
 
 function parseConfidence(content: string): number {
   // Look for explicit confidence statements: "confidence: 0.8", "80% confident", etc.
-  const pct = content.match(/(\d{1,3})\s*%\s*confident/i);
+  const pct = /(\d{1,3})\s*%\s*confident/i.exec(content);
   if (pct?.[1]) return Math.min(1, parseInt(pct[1], 10) / 100);
-  const dec = content.match(/confidence[:\s]+([0-9.]+)/i);
+  const dec = /confidence[:\s]+([0-9.]+)/i.exec(content);
   if (dec?.[1]) {
     const v = parseFloat(dec[1]);
     return v > 1 ? v / 100 : v;
@@ -83,7 +88,7 @@ export class DeliberationEngine {
     this.config = {
       defaultCouncilSize: 5,
       defaultModel: "llama-3.3-70b-versatile",
-      inputCostPer1k: 0.0006,   // Groq llama-3.3-70b default
+      inputCostPer1k: 0.0006, // Groq llama-3.3-70b default
       outputCostPer1k: 0.0008,
       ...config,
     };
@@ -112,17 +117,28 @@ export class DeliberationEngine {
     const votePromises = archetypes.map(async (archetype) => {
       const voteStart = Date.now();
       try {
+        // Explicit timer handle so we can clear it when the LLM resolves first,
+        // preventing the leaked setTimeout from keeping the event loop alive
+        // (resource exhaustion via accumulated timers in high-concurrency runs).
+        let voteTimer: ReturnType<typeof setTimeout> | undefined;
         const response = await Promise.race([
-          this.config.llm.chat(
-            [
-              { role: "system", content: archetype.systemPrompt },
-              { role: "user", content: userPrompt },
-            ],
-            { model: this.config.defaultModel, temperature: 0.7, maxTokens: 512 },
-          ),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("Vote timeout")), timeoutMs),
-          ),
+          this.config.llm
+            .chat(
+              [
+                { role: "system", content: archetype.systemPrompt },
+                { role: "user", content: userPrompt },
+              ],
+              { model: this.config.defaultModel, temperature: 0.7, maxTokens: 512 },
+            )
+            .then((r) => {
+              clearTimeout(voteTimer);
+              return r;
+            }),
+          new Promise<never>((_, reject) => {
+            voteTimer = setTimeout(() => {
+              reject(new Error("Vote timeout"));
+            }, timeoutMs);
+          }),
         ]);
 
         const costUsd =
@@ -159,18 +175,19 @@ export class DeliberationEngine {
     votes.push(...rawVotes);
 
     // Tally
-    const yesVotes = votes.filter(v => v.vote === "yes").length;
-    const noVotes = votes.filter(v => v.vote === "no").length;
+    const yesVotes = votes.filter((v) => v.vote === "yes").length;
+    const noVotes = votes.filter((v) => v.vote === "no").length;
     const totalNonAbstain = yesVotes + noVotes;
     const consensus = totalNonAbstain > 0 ? yesVotes / totalNonAbstain : 0;
-    const majority: "yes" | "no" | "tie" = yesVotes > noVotes ? "yes" : noVotes > yesVotes ? "no" : "tie";
+    const majority: "yes" | "no" | "tie" =
+      yesVotes > noVotes ? "yes" : noVotes > yesVotes ? "no" : "tie";
 
     const outcome: ProposalResult["outcome"] =
       majority === "yes" && consensus >= 0.6
         ? "approved"
         : majority === "no"
-        ? "rejected"
-        : "deferred";
+          ? "rejected"
+          : "deferred";
 
     const result: ProposalResult = {
       proposalId,
@@ -225,9 +242,9 @@ export class DeliberationEngine {
     votes: ModelVote[],
     majority: "yes" | "no" | "tie",
   ): string {
-    const yesCount = votes.filter(v => v.vote === "yes").length;
-    const noCount = votes.filter(v => v.vote === "no").length;
-    const abstainCount = votes.filter(v => v.vote === "abstain").length;
+    const yesCount = votes.filter((v) => v.vote === "yes").length;
+    const noCount = votes.filter((v) => v.vote === "no").length;
+    const abstainCount = votes.filter((v) => v.vote === "abstain").length;
     return `Council ${outcome}. ${yesCount} YES / ${noCount} NO / ${abstainCount} ABSTAIN. Majority: ${majority.toUpperCase()}.`;
   }
 }

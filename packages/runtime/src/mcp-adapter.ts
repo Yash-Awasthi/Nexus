@@ -1,6 +1,12 @@
-import { IMCPRuntime, IMCPTask, IMCPExecutionResult, IMCPRuntimeMetrics } from "./interfaces/mcp.interface";
-import { IMCPServerRegistry } from "./interfaces/mcp.interface";
-import { IMetricsCollector, ITraceRecorder } from "./interfaces/observability.interface";
+// SPDX-License-Identifier: Apache-2.0
+import type {
+  IMCPRuntime,
+  IMCPTask,
+  IMCPExecutionResult,
+  IMCPRuntimeMetrics,
+  IMCPServerRegistry,
+} from "./interfaces/mcp.interface.js";
+import type { IMetricsCollector, ITraceRecorder } from "./interfaces/observability.interface.js";
 
 export class MCPRuntime implements IMCPRuntime {
   private registry: IMCPServerRegistry;
@@ -20,13 +26,20 @@ export class MCPRuntime implements IMCPRuntime {
     registry: IMCPServerRegistry,
     metricsCollector?: IMetricsCollector,
     tracer?: ITraceRecorder,
-    customBlocklist?: string[]
+    customBlocklist?: string[],
   ) {
     this.registry = registry;
     this.metricsCollector = metricsCollector;
     this.tracer = tracer;
     this.blocklist = new Set(
-      customBlocklist || ["shell_execute", "execute_command", "write_system_file", "eval", "delete_directory", "rmrf"]
+      customBlocklist || [
+        "shell_execute",
+        "execute_command",
+        "write_system_file",
+        "eval",
+        "delete_directory",
+        "rmrf",
+      ],
     );
   }
 
@@ -39,7 +52,7 @@ export class MCPRuntime implements IMCPRuntime {
       taskId: task.id,
       serverName: task.serverName,
       toolName: task.toolName,
-      correlationId: task.correlationId
+      correlationId: task.correlationId,
     });
 
     // 1. Tool Blocklist Validation
@@ -51,7 +64,7 @@ export class MCPRuntime implements IMCPRuntime {
         success: false,
         error: `Tool execution blocked by safety policy: ${task.toolName}`,
         durationMs: Date.now() - startTimeMs,
-        correlationId: task.correlationId
+        correlationId: task.correlationId,
       };
 
       this.executionsLog.push(res);
@@ -70,7 +83,7 @@ export class MCPRuntime implements IMCPRuntime {
         success: false,
         error: `Server not found: ${task.serverName}`,
         durationMs: Date.now() - startTimeMs,
-        correlationId: task.correlationId
+        correlationId: task.correlationId,
       };
 
       this.executionsLog.push(res);
@@ -96,8 +109,8 @@ export class MCPRuntime implements IMCPRuntime {
           method: "tools/call",
           params: {
             name: task.toolName,
-            arguments: task.arguments
-          }
+            arguments: task.arguments,
+          },
         });
         return res;
       } finally {
@@ -125,7 +138,7 @@ export class MCPRuntime implements IMCPRuntime {
         success: true,
         output,
         durationMs,
-        correlationId: task.correlationId
+        correlationId: task.correlationId,
       };
 
       this.executionsLog.push(res);
@@ -151,7 +164,7 @@ export class MCPRuntime implements IMCPRuntime {
         success: false,
         error: errorMessage,
         durationMs,
-        correlationId: task.correlationId
+        correlationId: task.correlationId,
       };
 
       this.executionsLog.push(res);
@@ -168,7 +181,7 @@ export class MCPRuntime implements IMCPRuntime {
       successes: this.totalSuccesses,
       failures: this.totalFailures,
       timeouts: this.totalTimeouts,
-      avgDurationMs: this.totalInvocations > 0 ? this.accumDurationMs / this.totalInvocations : 0
+      avgDurationMs: this.totalInvocations > 0 ? this.accumDurationMs / this.totalInvocations : 0,
     };
   }
 

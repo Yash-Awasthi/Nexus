@@ -19,7 +19,7 @@
  *   @asyncapi/cli       (npm i -g @asyncapi/cli)                     [optional]
  */
 
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
@@ -38,12 +38,16 @@ if (!existsSync(openapiSpec)) {
 }
 
 if (!existsSync(asyncapiSpec)) {
-  console.warn(`[generate-clients] WARN: AsyncAPI spec not found at ${asyncapiSpec} — async docs will be skipped`);
+  console.warn(
+    `[generate-clients] WARN: AsyncAPI spec not found at ${asyncapiSpec} — async docs will be skipped`,
+  );
 }
 
 // ─── Forward CLI args to shell script ─────────────────────────────────────────
 
-const forwardedArgs = process.argv.slice(2).join(" ");
+// Use spawnSync with an explicit args array (not a shell string) to prevent
+// indirect command-line injection from user-supplied CLI arguments.
+const scriptArgs = process.argv.slice(2);
 const scriptPath = resolve(__dirname, "codegen/generate-types.sh");
 
 console.log("[generate-clients] Starting NEXUS codegen pipeline…");
@@ -51,14 +55,20 @@ console.log(`[generate-clients] OpenAPI spec : ${openapiSpec}`);
 console.log(`[generate-clients] AsyncAPI spec: ${asyncapiSpec}`);
 console.log("");
 
-try {
-  execSync(`bash "${scriptPath}" ${forwardedArgs}`, {
-    stdio: "inherit",
-    cwd: repoRoot,
-  });
-  console.log("[generate-clients] Done.");
-} catch (err) {
-  const code = (err as NodeJS.ErrnoException & { status?: number }).status ?? 1;
-  console.error(`[generate-clients] Codegen failed with exit code ${code}`);
-  process.exit(code);
+const result = spawnSync("bash", [scriptPath, ...scriptArgs], {
+  stdio: "inherit",
+  cwd: repoRoot,
+});
+
+if (result.error) {
+  console.error("[generate-clients] Failed to spawn codegen process:", result.error.message);
+  process.exit(1);
 }
+
+const exitCode = result.status ?? 1;
+if (exitCode !== 0) {
+  console.error(`[generate-clients] Codegen failed with exit code ${exitCode}`);
+  process.exit(exitCode);
+}
+
+console.log("[generate-clients] Done.");

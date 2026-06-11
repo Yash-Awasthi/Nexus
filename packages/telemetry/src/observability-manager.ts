@@ -1,15 +1,24 @@
-import { IMetricsCollector, ITraceRecorder, ITraceSpan } from "./interfaces/observability.interface";
+// SPDX-License-Identifier: Apache-2.0
+import type {
+  IMetricsCollector,
+  ITraceRecorder,
+  ITraceSpan,
+} from "./interfaces/observability.interface.js";
 
 // ─── Histogram for percentile calculations ───────────────────────────
 
 export class Histogram {
-  private buckets: Map<number, number> = new Map();
+  private buckets = new Map<number, number>();
   private count = 0;
   private sum = 0;
   private minVal = Infinity;
   private maxVal = -Infinity;
 
-  constructor(private readonly bucketDefs: number[] = [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000]) {
+  constructor(
+    private readonly bucketDefs: number[] = [
+      1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
+    ],
+  ) {
     for (const b of bucketDefs) {
       this.buckets.set(b, 0);
     }
@@ -56,7 +65,7 @@ export class Histogram {
       p90: this.percentile(90),
       p95: this.percentile(95),
       p99: this.percentile(99),
-      buckets: bucketObj
+      buckets: bucketObj,
     };
   }
 
@@ -64,7 +73,9 @@ export class Histogram {
     if (this.count === 0) return 0;
     const target = Math.ceil((p / 100) * this.count);
     let cumulative = 0;
-    for (const [boundary, count] of Array.from(this.buckets.entries()).sort((a, b) => a[0] - b[0])) {
+    for (const [boundary, count] of Array.from(this.buckets.entries()).sort(
+      (a, b) => a[0] - b[0],
+    )) {
       cumulative += count;
       if (cumulative >= target) return boundary;
     }
@@ -90,7 +101,7 @@ export class MetricsCollector implements IMetricsCollector {
   private histograms: Record<string, Histogram> = {};
   private timestamps: Record<string, number> = {};
 
-  increment(metricName: string, amount: number = 1, _tags?: Record<string, string>): void {
+  increment(metricName: string, amount = 1, _tags?: Record<string, string>): void {
     if (!this.counters[metricName]) {
       this.counters[metricName] = 0;
     }
@@ -160,10 +171,10 @@ export class TraceRecorder implements ITraceRecorder {
   startSpan(name: string, parentId?: string, metadata?: Record<string, any>): ITraceSpan {
     const span: ITraceSpan = {
       spanId: `${name}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
-      parentId,
+      ...(parentId !== undefined ? { parentId } : {}),
       name,
       startTime: new Date(),
-      metadata: metadata ? { ...metadata } : {}
+      metadata: metadata ? { ...metadata } : {},
     };
     this.spans.push(span);
     return span;
@@ -190,7 +201,7 @@ export class TraceRecorder implements ITraceRecorder {
         .map((s) => ({
           ...s,
           durationMs: s.endTime ? s.endTime.getTime() - s.startTime.getTime() : undefined,
-          children: buildTree(s.spanId)
+          children: buildTree(s.spanId),
         }));
     };
     return buildTree();
@@ -218,7 +229,7 @@ export class TraceRecorder implements ITraceRecorder {
       totalSpans: this.spans.length,
       totalDurationMs: totalDuration,
       spanNames: Array.from(names),
-      errors
+      errors,
     };
   }
 
@@ -230,9 +241,9 @@ export class TraceRecorder implements ITraceRecorder {
 // ─── Telemetry Exporter ──────────────────────────────────────────────
 
 export class TelemetryExporter {
-  private exportQueue: Array<{ timestamp: Date; type: string; payload: unknown }> = [];
+  private exportQueue: { timestamp: Date; type: string; payload: unknown }[] = [];
 
-  constructor(private exportIntervalMs: number = 60000) {
+  constructor(private exportIntervalMs = 60000) {
     if (exportIntervalMs > 0) {
       const timer = setInterval(() => this.flush(), exportIntervalMs);
       timer.unref();
@@ -243,7 +254,7 @@ export class TelemetryExporter {
     this.exportQueue.push({ timestamp: new Date(), type, payload });
   }
 
-  flush(): Array<{ timestamp: Date; type: string; payload: unknown }> {
+  flush(): { timestamp: Date; type: string; payload: unknown }[] {
     const batch = this.exportQueue;
     this.exportQueue = [];
     return batch;
@@ -297,7 +308,13 @@ export class HealthHistory {
   } {
     const total = this.records.length;
     if (total === 0) {
-      return { totalRecords: 0, healthyCount: 0, degradedCount: 0, unhealthyCount: 0, uptimePercent: 100 };
+      return {
+        totalRecords: 0,
+        healthyCount: 0,
+        degradedCount: 0,
+        unhealthyCount: 0,
+        uptimePercent: 100,
+      };
     }
     const healthyCount = this.records.filter((r) => r.status === "healthy").length;
     const degradedCount = this.records.filter((r) => r.status === "degraded").length;
@@ -307,7 +324,7 @@ export class HealthHistory {
       healthyCount,
       degradedCount,
       unhealthyCount,
-      uptimePercent: Math.round((healthyCount / total) * 100)
+      uptimePercent: Math.round((healthyCount / total) * 100),
     };
   }
 
@@ -324,7 +341,7 @@ export class DiagnosticEnricher {
   constructor(
     private metrics: MetricsCollector,
     private tracer: TraceRecorder,
-    healthHistory?: HealthHistory
+    healthHistory?: HealthHistory,
   ) {
     this.healthHistory = healthHistory ?? new HealthHistory();
   }
@@ -360,18 +377,18 @@ export class DiagnosticEnricher {
       healthHistory: {
         stats: this.healthHistory.getStats(),
         latest: this.healthHistory.getLatest(),
-        recent: this.healthHistory.getHistory().slice(-20)
+        recent: this.healthHistory.getHistory().slice(-20),
       },
       system: {
         memoryUsage: {
           heapUsed: process.memoryUsage().heapUsed,
           heapTotal: process.memoryUsage().heapTotal,
-          rss: process.memoryUsage().rss
+          rss: process.memoryUsage().rss,
         },
         uptimeSeconds: process.uptime(),
         nodeVersion: process.version,
-        platform: process.platform
-      }
+        platform: process.platform,
+      },
     };
   }
 }

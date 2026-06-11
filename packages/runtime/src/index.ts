@@ -13,11 +13,7 @@ export { RedisQueueBackend } from "./redis-queue-backend.js";
 export type { RedisQueueBackendOptions } from "./redis-queue-backend.js";
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
-export type {
-  IQueueBackend,
-  QueueJob,
-  RetryPolicy,
-} from "./interfaces/queue.interface.js";
+export type { IQueueBackend, QueueJob, RetryPolicy } from "./interfaces/queue.interface.js";
 export type {
   IMetricsCollector,
   ITraceRecorder,
@@ -76,8 +72,4 @@ export type {
 
 // ── Runtime wiring factory ────────────────────────────────────────────────────
 export { createNexusRuntime } from "./runtime-wiring.js";
-export type {
-  NexusRuntime,
-  NexusRuntimeConfig,
-  QueueBackendType,
-} from "./runtime-wiring.js";
+export type { NexusRuntime, NexusRuntimeConfig, QueueBackendType } from "./runtime-wiring.js";

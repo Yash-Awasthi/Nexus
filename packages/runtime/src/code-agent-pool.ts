@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * CodeAgentPool — a pool of specialised code-focused execution agents.
  *
@@ -14,10 +15,11 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { IExecutionContext } from "./interfaces/execution.interface";
-import { ILanguageModel, ChatMessage } from "./interfaces/language-model.interface";
-import { createLanguageModel } from "./language-model";
-import { WebSearchEngine } from "./web-search-engine";
+
+import type { IExecutionContext } from "./interfaces/execution.interface.js";
+import type { ILanguageModel, ChatMessage } from "./interfaces/language-model.interface.js";
+import { createLanguageModel } from "./language-model.js";
+import { WebSearchEngine } from "./web-search-engine.js";
 
 // ─── Shared LLM accessor ──────────────────────────────────────────────────────
 
@@ -88,9 +90,8 @@ export class FilePickerAgent {
 
     context.logger.info(`FilePickerAgent: "${prompt.slice(0, 60)}"`);
 
-    const searchRoot = directories.length > 0
-      ? directories.map((d: string) => path.resolve(rootDir, d))
-      : [rootDir];
+    const searchRoot =
+      directories.length > 0 ? directories.map((d: string) => path.resolve(rootDir, d)) : [rootDir];
 
     const treeParts = searchRoot.map((dir) => buildFileTree(dir, 4, 150));
     const treeText = treeParts.join("\n---\n");
@@ -113,12 +114,12 @@ Return at most 12 most relevant files. Paths must be relative to the project roo
 
     try {
       const result = await this.llm.generateObject<{
-        files: Array<{ path: string; reason: string }>;
+        files: { path: string; reason: string }[];
         summary: string;
       }>({
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: prompt }
+          { role: "user", content: prompt },
         ],
         schema: {
           type: "object",
@@ -127,12 +128,12 @@ Return at most 12 most relevant files. Paths must be relative to the project roo
               type: "array",
               items: {
                 type: "object",
-                properties: { path: { type: "string" }, reason: { type: "string" } }
-              }
+                properties: { path: { type: "string" }, reason: { type: "string" } },
+              },
             },
-            summary: { type: "string" }
-          }
-        }
+            summary: { type: "string" },
+          },
+        },
       });
 
       // Read actual file contents for top 5
@@ -152,7 +153,7 @@ Return at most 12 most relevant files. Paths must be relative to the project roo
         files: result.files,
         filesWithContent,
         summary: result.summary,
-        rootDir
+        rootDir,
       };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -225,34 +226,40 @@ Make ALL changes in one response.`;
 
     try {
       const result = await this.llm.generateObject<{
-        changes: Array<{
+        changes: {
           path: string;
           operation: "str_replace" | "write_file";
           oldString?: string;
           newString?: string;
           content?: string;
-        }>;
+        }[];
         explanation: string;
       }>({
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: request }
+          { role: "user", content: request },
         ],
         schema: {
           type: "object",
           properties: {
             changes: { type: "array" },
-            explanation: { type: "string" }
-          }
-        }
+            explanation: { type: "string" },
+          },
+        },
       });
 
       // Apply changes
       const applied: string[] = [];
       const failed: string[] = [];
 
+      const rootDirNormalized = path.resolve(rootDir) + path.sep;
       for (const change of result.changes) {
         const absPath = path.resolve(rootDir, change.path);
+        // Reject path traversal attempts: resolved path must stay within rootDir.
+        if (!absPath.startsWith(rootDirNormalized)) {
+          failed.push(`${change.path}: path traversal rejected`);
+          continue;
+        }
         try {
           fs.mkdirSync(path.dirname(absPath), { recursive: true });
           if (change.operation === "write_file" && change.content) {
@@ -278,7 +285,7 @@ Make ALL changes in one response.`;
         applied,
         failed,
         explanation: result.explanation,
-        changesCount: result.changes.length
+        changesCount: result.changes.length,
       };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -310,7 +317,8 @@ export class CodeReviewerAgent {
     const rootDir: string = payload.rootDir ?? process.cwd();
     const filePaths: string[] = Array.isArray(payload.filePaths) ? payload.filePaths : [];
     const diff: string = payload.diff ?? "";
-    const request: string = payload.request ?? payload.query ?? "Review the provided code for issues.";
+    const request: string =
+      payload.request ?? payload.query ?? "Review the provided code for issues.";
 
     context.logger.info(`CodeReviewerAgent: ${filePaths.length} files`);
 
@@ -352,21 +360,21 @@ Respond as JSON:
     try {
       const result = await this.llm.generateObject<{
         approved: boolean;
-        issues: Array<{ severity: string; file: string; line: string; suggestion: string }>;
+        issues: { severity: string; file: string; line: string; suggestion: string }[];
         summary: string;
       }>({
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `${request}\n\n${context_text}` }
+          { role: "user", content: `${request}\n\n${context_text}` },
         ],
         schema: {
           type: "object",
           properties: {
             approved: { type: "boolean" },
             issues: { type: "array" },
-            summary: { type: "string" }
-          }
-        }
+            summary: { type: "string" },
+          },
+        },
       });
 
       return {
@@ -375,7 +383,7 @@ Respond as JSON:
         issues: result.issues,
         issueCount: result.issues.length,
         criticalCount: result.issues.filter((i) => i.severity === "critical").length,
-        summary: result.summary
+        summary: result.summary,
       };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -398,7 +406,7 @@ export class ResearcherAgent {
     this.searchEngine = new WebSearchEngine({
       llm: model,
       tavilyApiKey: process.env.TAVILY_API_KEY,
-      maxIterations: 3
+      maxIterations: 3,
     });
   }
 
@@ -421,7 +429,7 @@ export class ResearcherAgent {
         answer: result.answer,
         findings: result.findings.slice(0, 8),
         queriesUsed: result.queriesUsed,
-        findingsCount: result.findings.length
+        findingsCount: result.findings.length,
       };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -473,10 +481,10 @@ ${contextText ? `Context provided:\n${contextText}\n\n` : ""}Be thorough. Show y
         messages: [
           { role: "system", content: systemPrompt },
           ...history.slice(-6),
-          { role: "user", content: prompt }
+          { role: "user", content: prompt },
         ],
         maxTokens: 2048,
-        temperature: 0.3
+        temperature: 0.3,
       });
 
       return { success: true, answer, prompt };
@@ -493,11 +501,11 @@ ${contextText ? `Context provided:\n${contextText}\n\n` : ""}Be thorough. Show y
  * Acts as a single IExecutionAdapter that dispatches to the right agent.
  */
 export class CodeAgentPool {
-  private agents: Array<{
+  private agents: {
     canExecute(t: string): boolean;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     execute(task: any, ctx: IExecutionContext): Promise<Record<string, unknown>>;
-  }>;
+  }[];
 
   constructor(llm?: ILanguageModel) {
     const model = llm ?? defaultLLM();
@@ -506,7 +514,7 @@ export class CodeAgentPool {
       new CodeEditorAgent(model),
       new CodeReviewerAgent(model),
       new ResearcherAgent(model),
-      new ThinkerAgent(model)
+      new ThinkerAgent(model),
     ];
   }
 
@@ -531,10 +539,15 @@ export class CodeAgentPool {
   /** All task types handled by this pool */
   static readonly TASK_TYPES = [
     "code",
-    "code_explore", "file_picker",
-    "code_edit", "edit",
-    "code_review", "review",
-    "research", "web_research",
-    "reason", "think"
+    "code_explore",
+    "file_picker",
+    "code_edit",
+    "edit",
+    "code_review",
+    "review",
+    "research",
+    "web_research",
+    "reason",
+    "think",
   ] as const;
 }

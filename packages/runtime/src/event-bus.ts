@@ -1,6 +1,7 @@
-import { IEventStore } from "./interfaces/event-store.interface";
-export { IEventStore };
-import { ILogger } from "./interfaces/logger.interface";
+// SPDX-License-Identifier: Apache-2.0
+import type { IEventStore } from "./interfaces/event-store.interface.js";
+export type { IEventStore };
+import type { ILogger } from "./interfaces/logger.interface.js";
 
 export interface EventSubscription {
   unsubscribe(): void;
@@ -32,7 +33,11 @@ export interface EventBusConfig {
 }
 
 export interface IEventBus {
-  publish(event: string, payload: any, options?: { causeEventId?: string; dedupKey?: string }): Promise<void>;
+  publish(
+    event: string,
+    payload: any,
+    options?: { causeEventId?: string; dedupKey?: string },
+  ): Promise<void>;
   subscribe(event: string, handler: (payload: any) => void | Promise<void>): EventSubscription;
   getActiveSubscriptionCount(): number;
   getDeduplicationCount(): number;
@@ -107,7 +112,7 @@ export class LocalEventBus implements IEventBus {
   async publish(
     event: string,
     payload: any,
-    options?: { causeEventId?: string; dedupKey?: string }
+    options?: { causeEventId?: string; dedupKey?: string },
   ): Promise<void> {
     // ── Backpressure: wait if too many pending ────────────────────────
     const maxWaitMs = 5000;
@@ -121,7 +126,11 @@ export class LocalEventBus implements IEventBus {
       this.backpressureCount++;
       this.backpressureTotalWaitMs += waited;
       const bpMsg = `[EventBus] Backpressure threshold exceeded for event: ${event}. Dropping (pending=${this.pendingCount}, wait=${waited}ms, totalDrops=${this.backpressureCount}).`;
-      if (this.logger) { this.logger.warn(bpMsg); } else { console.error(bpMsg); }
+      if (this.logger) {
+        this.logger.warn(bpMsg);
+      } else {
+        console.error(bpMsg);
+      }
       return;
     }
     if (waited > 0) {
@@ -137,7 +146,10 @@ export class LocalEventBus implements IEventBus {
       }
       this.recentDedupKeys.add(options.dedupKey);
       // Prune dedup keys after the dedup window
-      setTimeout(() => this.recentDedupKeys.delete(options.dedupKey!), this.DEDUP_WINDOW_MS).unref();
+      setTimeout(
+        () => this.recentDedupKeys.delete(options.dedupKey!),
+        this.DEDUP_WINDOW_MS,
+      ).unref();
     }
 
     // ── Causal Chain & Sequence ──────────────────────────────────────
@@ -156,7 +168,7 @@ export class LocalEventBus implements IEventBus {
       timestamp: new Date().toISOString(),
       sequenceNumber: this.sequenceCounter,
       causeChain: previousIds.length > 0 ? previousIds : undefined,
-      dedupKey: options?.dedupKey
+      dedupKey: options?.dedupKey,
     };
 
     // ── Durable persistence (write-before-dispatch) ──────────────────
@@ -201,7 +213,7 @@ export class LocalEventBus implements IEventBus {
                 console.error(`[EventBus] Error in handler for ${event}:`, err);
               }
             }
-          })()
+          })(),
         );
       }
     }
@@ -221,7 +233,7 @@ export class LocalEventBus implements IEventBus {
                 console.error(`[EventBus] Error in wildcard handler for ${event}:`, err);
               }
             }
-          })()
+          })(),
         );
       }
     }
@@ -247,7 +259,7 @@ export class LocalEventBus implements IEventBus {
           }
         }
         this.subscriptionCount--;
-      }
+      },
     };
   }
 
@@ -261,9 +273,7 @@ export class LocalEventBus implements IEventBus {
 
   /** Return all history events since a given timestamp for replay. */
   replayEvents(since: Date): EventEnvelope[] {
-    return this.history.filter(
-      (e) => new Date(e.timestamp).getTime() >= since.getTime()
-    );
+    return this.history.filter((e) => new Date(e.timestamp).getTime() >= since.getTime());
   }
 
   /**
@@ -277,8 +287,8 @@ export class LocalEventBus implements IEventBus {
     const sorted = [...this.history].sort((a, b) => a.sequenceNumber - b.sequenceNumber);
 
     for (let i = 1; i < sorted.length; i++) {
-      const prev = sorted[i - 1].sequenceNumber;
-      const curr = sorted[i].sequenceNumber;
+      const prev = sorted[i - 1]?.sequenceNumber ?? 0;
+      const curr = sorted[i]?.sequenceNumber ?? 0;
 
       if (curr - prev > 1) {
         const missing: number[] = [];
@@ -287,7 +297,7 @@ export class LocalEventBus implements IEventBus {
         }
         gaps.push({
           expectedSequence: curr,
-          missingSequenceNumbers: missing
+          missingSequenceNumbers: missing,
         });
       }
     }
@@ -322,7 +332,7 @@ export class LocalEventBus implements IEventBus {
           missingCauseEvents: [event.eventId],
           orphanChains,
           cycleDetected: true,
-          valid: false
+          valid: false,
         };
       }
 
@@ -347,7 +357,7 @@ export class LocalEventBus implements IEventBus {
       missingCauseEvents: [...new Set(missingCauseEvents)],
       orphanChains,
       cycleDetected: false,
-      valid: missingCauseEvents.length === 0
+      valid: missingCauseEvents.length === 0,
     };
   }
 
@@ -360,7 +370,11 @@ export class LocalEventBus implements IEventBus {
     this.recentDedupKeys.clear();
     if (cleared > 0) {
       const msg = `[EventBus] Compacted ${cleared} dedup key(s)`;
-      if (this.logger) { this.logger.info(msg); } else { console.log(msg); }
+      if (this.logger) {
+        this.logger.info(msg);
+      } else {
+        console.log(msg);
+      }
     }
     return { dedupKeysCleared: cleared };
   }
@@ -369,13 +383,15 @@ export class LocalEventBus implements IEventBus {
   compactHistory(maxAgeMs: number): { prunedCount: number } {
     const cutoff = Date.now() - maxAgeMs;
     const before = this.history.length;
-    this.history = this.history.filter(
-      (e) => new Date(e.timestamp).getTime() >= cutoff
-    );
+    this.history = this.history.filter((e) => new Date(e.timestamp).getTime() >= cutoff);
     const pruned = before - this.history.length;
     if (pruned > 0) {
       const msg = `[EventBus] Compacted history: pruned ${pruned} event(s) older than ${maxAgeMs}ms`;
-      if (this.logger) { this.logger.info(msg); } else { console.log(msg); }
+      if (this.logger) {
+        this.logger.info(msg);
+      } else {
+        console.log(msg);
+      }
     }
     return { prunedCount: pruned };
   }
@@ -390,7 +406,7 @@ export class LocalEventBus implements IEventBus {
       sequenceCounter: this.sequenceCounter,
       dedupKeysInWindow: this.recentDedupKeys.size,
       historySize: this.history.length,
-      persistedEventCount: this.persistedEventCount
+      persistedEventCount: this.persistedEventCount,
     };
   }
 
@@ -402,3 +418,6 @@ export class LocalEventBus implements IEventBus {
     return this.dedupCount;
   }
 }
+
+// Backward-compatible alias — consumers that `import { EventBus }` continue to work.
+export { LocalEventBus as EventBus };

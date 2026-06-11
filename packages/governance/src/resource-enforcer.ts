@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Resource Enforcer — Runtime Capability & Resource Enforcement
  *
@@ -10,60 +11,60 @@
  * Integrates with existing FilesystemSandbox, path-boundary, and security-utils.
  */
 
-import { isSafeUrl } from "./security-utils";
-import { assertPathDescendsFrom } from "./path-boundary";
-import type { IExecutionEnvironment } from "./interfaces/environment.interface";
+import type { IExecutionEnvironment } from "./interfaces/environment.interface.js";
+import { assertPathDescendsFrom } from "./path-boundary.js";
+import { isSafeUrl } from "./security-utils.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
 /** Granular capability descriptor for resource-level enforcement. */
 export type ResourceCapability =
-  | "network:egress"       // Outbound HTTP/S connections
-  | "process:spawn"        // Spawn child processes
-  | "env:read"             // Read environment variables
-  | "fs:write"             // Filesystem write (checked by sandbox)
-  | "fs:read"              // Filesystem read (checked by sandbox)
-  | "browser:interact"     // Browser automation
-  | "execution:compute";   // CPU-bound computation
+  | "network:egress" // Outbound HTTP/S connections
+  | "process:spawn" // Spawn child processes
+  | "env:read" // Read environment variables
+  | "fs:write" // Filesystem write (checked by sandbox)
+  | "fs:read" // Filesystem read (checked by sandbox)
+  | "browser:interact" // Browser automation
+  | "execution:compute"; // CPU-bound computation
 
-export type NetworkEgressRule = {
-  allowedHosts: string[];           // e.g. ["api.example.com"]
-  allowedPorts: number[];           // e.g. [443]
+export interface NetworkEgressRule {
+  allowedHosts: string[]; // e.g. ["api.example.com"]
+  allowedPorts: number[]; // e.g. [443]
   allowedProtocols: ("http" | "https" | "ws" | "wss")[];
-  blockPrivateRanges: boolean;      // Block 10.x, 192.168.x, 172.16-31.x
-  blockLoopback: boolean;           // Block localhost, 127.0.0.1
-};
+  blockPrivateRanges: boolean; // Block 10.x, 192.168.x, 172.16-31.x
+  blockLoopback: boolean; // Block localhost, 127.0.0.1
+}
 
-export type ProcessSpawnRule = {
-  maxProcesses: number;             // Max concurrent child processes (0 = disallow)
-  allowedBinaries: string[];        // e.g. ["node", "python3", "ffmpeg"]
-  allowedEnvpPrefixes: string[];    // Environment var prefixes to pass to children
-  sandboxCwd: boolean;              // Force cwd inside sandbox root
-};
+export interface ProcessSpawnRule {
+  maxProcesses: number; // Max concurrent child processes (0 = disallow)
+  allowedBinaries: string[]; // e.g. ["node", "python3", "ffmpeg"]
+  allowedEnvpPrefixes: string[]; // Environment var prefixes to pass to children
+  sandboxCwd: boolean; // Force cwd inside sandbox root
+}
 
-export type EnvAccessRule = {
+export interface EnvAccessRule {
   mode: "allowlist" | "blocklist";
-  entries: string[];                 // e.g. ["PATH", "HOME", "NODE_ENV"]
-};
+  entries: string[]; // e.g. ["PATH", "HOME", "NODE_ENV"]
+}
 
-export type ExecutionTimeBudget = {
-  maxWallClockMs: number;            // Max wall-clock per execution scope
-  maxCpuMs: number;                  // Max CPU time per execution scope (best-effort)
-};
+export interface ExecutionTimeBudget {
+  maxWallClockMs: number; // Max wall-clock per execution scope
+  maxCpuMs: number; // Max CPU time per execution scope (best-effort)
+}
 
-export type ResourceEnforcerConfig = {
+export interface ResourceEnforcerConfig {
   networkEgress?: NetworkEgressRule;
   processSpawn?: ProcessSpawnRule;
   envAccess?: EnvAccessRule;
   timeBudget?: ExecutionTimeBudget;
-};
+}
 
-export type ResourceViolation = {
+export interface ResourceViolation {
   type: "network_egress" | "process_spawn" | "env_access" | "time_budget";
   detail: string;
   severity: "warn" | "critical";
-  blocked: boolean;                  // true = operation prevented, false = just logged
-};
+  blocked: boolean; // true = operation prevented, false = just logged
+}
 
 // ── Defaults ─────────────────────────────────────────────────────────
 
@@ -76,7 +77,7 @@ const DEFAULT_NETWORK_EGRESS: NetworkEgressRule = {
 };
 
 const DEFAULT_PROCESS_SPAWN: ProcessSpawnRule = {
-  maxProcesses: 0,                   // No process spawning by default
+  maxProcesses: 0, // No process spawning by default
   allowedBinaries: [],
   allowedEnvpPrefixes: [],
   sandboxCwd: true,
@@ -88,8 +89,8 @@ const DEFAULT_ENV_ACCESS: EnvAccessRule = {
 };
 
 const DEFAULT_TIME_BUDGET: ExecutionTimeBudget = {
-  maxWallClockMs: 60_000,            // 1 minute
-  maxCpuMs: 30_000,                  // 30 seconds
+  maxWallClockMs: 60_000, // 1 minute
+  maxCpuMs: 30_000, // 30 seconds
 };
 
 // ── Resource Enforcer ────────────────────────────────────────────────
@@ -103,10 +104,7 @@ export class ResourceEnforcer {
   private startTime: number | null = null;
   private processCount = 0;
 
-  constructor(
-    capabilities: ResourceCapability[],
-    config?: ResourceEnforcerConfig
-  ) {
+  constructor(capabilities: ResourceCapability[], config?: ResourceEnforcerConfig) {
     this.capabilities = new Set(capabilities);
     this.networkEgress = { ...DEFAULT_NETWORK_EGRESS, ...config?.networkEgress };
     this.processSpawn = { ...DEFAULT_PROCESS_SPAWN, ...config?.processSpawn };
@@ -196,7 +194,11 @@ export class ResourceEnforcer {
     if (this.networkEgress.allowedPorts.length > 0) {
       try {
         const parsed = new URL(urlStr);
-        const port = parsed.port ? parseInt(parsed.port, 10) : (parsed.protocol === "https:" ? 443 : 80);
+        const port = parsed.port
+          ? parseInt(parsed.port, 10)
+          : parsed.protocol === "https:"
+            ? 443
+            : 80;
         if (!this.networkEgress.allowedPorts.includes(port)) {
           return {
             type: "network_egress",
@@ -218,7 +220,11 @@ export class ResourceEnforcer {
   /**
    * Check if spawning a child process is allowed.
    */
-  checkProcessSpawn(binaryName: string, cwd?: string, sandboxRoot?: string): ResourceViolation | null {
+  checkProcessSpawn(
+    binaryName: string,
+    cwd?: string,
+    sandboxRoot?: string,
+  ): ResourceViolation | null {
     if (!this.hasCapability("process:spawn")) {
       return {
         type: "process_spawn",
@@ -327,7 +333,7 @@ export class ResourceEnforcer {
       }
     } else if (this.envAccess.mode === "allowlist") {
       const allowed = this.envAccess.entries.some(
-        (a) => nameUpper === a.toUpperCase() || nameUpper.startsWith(a.toUpperCase() + "_")
+        (a) => nameUpper === a.toUpperCase() || nameUpper.startsWith(a.toUpperCase() + "_"),
       );
       if (!allowed) {
         return {
@@ -370,7 +376,7 @@ export class ResourceEnforcer {
    */
   static fromEnvironment(
     env: IExecutionEnvironment,
-    config?: ResourceEnforcerConfig
+    config?: ResourceEnforcerConfig,
   ): ResourceEnforcer {
     const caps: ResourceCapability[] = [];
 

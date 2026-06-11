@@ -16,21 +16,28 @@ const ROOT = new URL("..", import.meta.url).pathname;
 const EXTENSIONS = new Set([".ts", ".tsx", ".py", ".sql"]);
 
 const SPDX_PATTERNS: Record<string, RegExp> = {
-  ".ts":  /^\/\/ SPDX-License-Identifier: Apache-2\.0/,
-  ".tsx": /^\/\/ SPDX-License-Identifier: Apache-2\.0/,
-  ".py":  /^# SPDX-License-Identifier: Apache-2\.0/,
-  ".sql": /^-- SPDX-License-Identifier: Apache-2\.0/,
+  ".ts": /^\/\/ SPDX-License-Identifier: Apache-2\.0/m,
+  ".tsx": /^\/\/ SPDX-License-Identifier: Apache-2\.0/m,
+  ".py": /^# SPDX-License-Identifier: Apache-2\.0/m,
+  ".sql": /^-- SPDX-License-Identifier: Apache-2\.0/m,
 };
 
 const IGNORE_DIRS = new Set([
-  "node_modules", "dist", "coverage", ".turbo", ".git",
-  ".changeset", "vendor", ".venv", "__pycache__",
+  "node_modules",
+  "dist",
+  "coverage",
+  ".turbo",
+  ".git",
+  ".changeset",
+  "vendor",
+  ".venv",
+  "__pycache__",
 ]);
 
 const IGNORE_PATTERNS = [
-  /\.gen\.(ts|py)$/,        // generated files
-  /\.d\.ts$/,               // declaration files
-  /migrations\/\d+_/,       // DB migrations (Drizzle-generated)
+  /\.gen\.(ts|py)$/, // generated files
+  /\.d\.ts$/, // declaration files
+  /migrations\/\d+_/, // DB migrations (Drizzle-generated)
 ];
 
 function shouldIgnore(filePath: string): boolean {

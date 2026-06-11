@@ -13,6 +13,7 @@
  */
 
 import type { CouncilRequest, CouncilResponse, ProposalResult, ModelVote } from "@nexus/contracts";
+
 import { DeliberationEngine, type ILLMTransport } from "./engine.js";
 import { GroqTransport } from "./groq-transport.js";
 
@@ -57,11 +58,13 @@ export class CouncilService {
     this.engine = new DeliberationEngine({
       llm: transport,
       defaultCouncilSize: config.defaultCouncilSize ?? 5,
-      defaultModel: config.defaultModel,
-      inputCostPer1k: config.inputCostPer1k,
-      outputCostPer1k: config.outputCostPer1k,
+      ...(config.defaultModel !== undefined ? { defaultModel: config.defaultModel } : {}),
+      ...(config.inputCostPer1k !== undefined ? { inputCostPer1k: config.inputCostPer1k } : {}),
+      ...(config.outputCostPer1k !== undefined ? { outputCostPer1k: config.outputCostPer1k } : {}),
     });
-    this.onResult = config.onResult;
+    if (config.onResult !== undefined) {
+      this.onResult = config.onResult;
+    }
   }
 
   /**
@@ -80,7 +83,7 @@ export class CouncilService {
 
       // Compute total cost from vote token estimates
       // (engine tracks this internally; we approximate here)
-      const totalCostUsd = result.votes.reduce((acc, v) => {
+      const totalCostUsd = result.votes.reduce((acc, _v) => {
         // Each vote's cost is embedded in reasoning if engine exposed it — safe fallback to 0
         return acc;
       }, 0);
@@ -88,11 +91,11 @@ export class CouncilService {
       await this.onResult({
         result,
         votes: result.votes,
-        signalId: opts?.signalId,
+        ...(opts?.signalId !== undefined ? { signalId: opts.signalId } : {}),
         totalCostUsd,
-      }).catch((err: unknown) =>
-        console.error("[CouncilService] onResult persistence failed:", err),
-      );
+      }).catch((err: unknown) => {
+        console.error("[CouncilService] onResult persistence failed:", err);
+      });
     }
 
     return response;

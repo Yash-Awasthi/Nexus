@@ -1,5 +1,10 @@
-import { IPlanningEngine, ICognitiveTrace, ITaskSynthesisResult } from "./interfaces/governance.interface";
-import { ILanguageModel } from "./interfaces/language-model.interface";
+// SPDX-License-Identifier: Apache-2.0
+import type {
+  IPlanningEngine,
+  ICognitiveTrace,
+  ITaskSynthesisResult,
+} from "./interfaces/governance.interface.js";
+import type { ILanguageModel } from "./interfaces/language-model.interface.js";
 
 // ─── Task template & blueprint types ─────────────────────────────────────────
 
@@ -28,21 +33,21 @@ const PLAN_BLUEPRINTS: Record<string, PlanBlueprint> = {
         action: "create_s3_bucket",
         defaultArguments: { bucketName: "news-scraper-archive", encrypted: true },
         governanceMetadata: { dangerous: false, costEstimate: 0.02, resourceScope: "aws:s3" },
-        dependsOnActions: []
+        dependsOnActions: [],
       },
       {
         action: "create_sqs_queue",
         defaultArguments: { queueName: "news-ingestion-jobs" },
         governanceMetadata: { dangerous: false, costEstimate: 0.01, resourceScope: "aws:sqs" },
-        dependsOnActions: ["create_s3_bucket"]
+        dependsOnActions: ["create_s3_bucket"],
       },
       {
         action: "create_dynamodb_table",
         defaultArguments: { tableName: "scraper-headlines", primaryKey: "id" },
         governanceMetadata: { dangerous: false, costEstimate: 0.05, resourceScope: "aws:dynamodb" },
-        dependsOnActions: ["create_sqs_queue"]
-      }
-    ]
+        dependsOnActions: ["create_sqs_queue"],
+      },
+    ],
   },
 
   scraper: {
@@ -52,21 +57,21 @@ const PLAN_BLUEPRINTS: Record<string, PlanBlueprint> = {
         action: "create_s3_bucket",
         defaultArguments: { bucketName: "scraper-output", encrypted: true },
         governanceMetadata: { dangerous: false, costEstimate: 0.02, resourceScope: "aws:s3" },
-        dependsOnActions: []
+        dependsOnActions: [],
       },
       {
         action: "deploy_scraper_lambda",
         defaultArguments: { runtime: "nodejs20.x", memoryMb: 512, timeoutSec: 60 },
         governanceMetadata: { dangerous: false, costEstimate: 0.03, resourceScope: "aws:lambda" },
-        dependsOnActions: ["create_s3_bucket"]
+        dependsOnActions: ["create_s3_bucket"],
       },
       {
         action: "configure_eventbridge_schedule",
         defaultArguments: { scheduleExpression: "rate(1 hour)" },
         governanceMetadata: { dangerous: false, costEstimate: 0.005, resourceScope: "aws:events" },
-        dependsOnActions: ["deploy_scraper_lambda"]
-      }
-    ]
+        dependsOnActions: ["deploy_scraper_lambda"],
+      },
+    ],
   },
 
   backup: {
@@ -76,21 +81,25 @@ const PLAN_BLUEPRINTS: Record<string, PlanBlueprint> = {
         action: "create_iam_role",
         defaultArguments: { roleName: "BackupAdministrator", permissions: ["s3:*", "glacier:*"] },
         governanceMetadata: { dangerous: true, costEstimate: 0.0, resourceScope: "aws:iam" },
-        dependsOnActions: []
+        dependsOnActions: [],
       },
       {
         action: "create_s3_bucket",
-        defaultArguments: { bucketName: "secure-backups-archive", versioning: true, lifecycle: "glacier-90d" },
+        defaultArguments: {
+          bucketName: "secure-backups-archive",
+          versioning: true,
+          lifecycle: "glacier-90d",
+        },
         governanceMetadata: { dangerous: false, costEstimate: 0.1, resourceScope: "aws:s3" },
-        dependsOnActions: ["create_iam_role"]
+        dependsOnActions: ["create_iam_role"],
       },
       {
         action: "enable_backup_policy",
         defaultArguments: { retentionDays: 90, crossRegion: false },
         governanceMetadata: { dangerous: false, costEstimate: 0.02, resourceScope: "aws:backup" },
-        dependsOnActions: ["create_s3_bucket"]
-      }
-    ]
+        dependsOnActions: ["create_s3_bucket"],
+      },
+    ],
   },
 
   etl: {
@@ -100,21 +109,25 @@ const PLAN_BLUEPRINTS: Record<string, PlanBlueprint> = {
         action: "create_glue_job",
         defaultArguments: { jobName: "etl-transform", workerType: "G.1X", numberOfWorkers: 2 },
         governanceMetadata: { dangerous: false, costEstimate: 0.44, resourceScope: "aws:glue" },
-        dependsOnActions: []
+        dependsOnActions: [],
       },
       {
         action: "create_dynamodb_table",
-        defaultArguments: { tableName: "etl-output", primaryKey: "id", billingMode: "PAY_PER_REQUEST" },
+        defaultArguments: {
+          tableName: "etl-output",
+          primaryKey: "id",
+          billingMode: "PAY_PER_REQUEST",
+        },
         governanceMetadata: { dangerous: false, costEstimate: 0.05, resourceScope: "aws:dynamodb" },
-        dependsOnActions: []
+        dependsOnActions: [],
       },
       {
         action: "configure_glue_trigger",
         defaultArguments: { triggerType: "SCHEDULED", schedule: "cron(0 2 * * ? *)" },
         governanceMetadata: { dangerous: false, costEstimate: 0.01, resourceScope: "aws:glue" },
-        dependsOnActions: ["create_glue_job", "create_dynamodb_table"]
-      }
-    ]
+        dependsOnActions: ["create_glue_job", "create_dynamodb_table"],
+      },
+    ],
   },
 
   research: {
@@ -124,15 +137,19 @@ const PLAN_BLUEPRINTS: Record<string, PlanBlueprint> = {
         action: "create_s3_bucket",
         defaultArguments: { bucketName: "research-artifacts", encrypted: true },
         governanceMetadata: { dangerous: false, costEstimate: 0.02, resourceScope: "aws:s3" },
-        dependsOnActions: []
+        dependsOnActions: [],
       },
       {
         action: "deploy_research_agent",
         defaultArguments: { agentType: "web-research", maxDepth: 3, outputFormat: "json" },
-        governanceMetadata: { dangerous: false, costEstimate: 0.1, resourceScope: "agent:research" },
-        dependsOnActions: ["create_s3_bucket"]
-      }
-    ]
+        governanceMetadata: {
+          dangerous: false,
+          costEstimate: 0.1,
+          resourceScope: "agent:research",
+        },
+        dependsOnActions: ["create_s3_bucket"],
+      },
+    ],
   },
 
   dangerous: {
@@ -141,16 +158,24 @@ const PLAN_BLUEPRINTS: Record<string, PlanBlueprint> = {
       {
         action: "request_approval",
         defaultArguments: { reason: "Dangerous operation requires human approval", timeout: 3600 },
-        governanceMetadata: { dangerous: false, costEstimate: 0.0, resourceScope: "governance:approval" },
-        dependsOnActions: []
+        governanceMetadata: {
+          dangerous: false,
+          costEstimate: 0.0,
+          resourceScope: "governance:approval",
+        },
+        dependsOnActions: [],
       },
       {
         action: "execute_privileged_operation",
         defaultArguments: { scope: "restricted" },
-        governanceMetadata: { dangerous: true, costEstimate: 0.0, resourceScope: "system:privileged" },
-        dependsOnActions: ["request_approval"]
-      }
-    ]
+        governanceMetadata: {
+          dangerous: true,
+          costEstimate: 0.0,
+          resourceScope: "system:privileged",
+        },
+        dependsOnActions: ["request_approval"],
+      },
+    ],
   },
 
   delete: {
@@ -160,21 +185,25 @@ const PLAN_BLUEPRINTS: Record<string, PlanBlueprint> = {
         action: "list_resources_for_deletion",
         defaultArguments: { dryRun: true },
         governanceMetadata: { dangerous: false, costEstimate: 0.0, resourceScope: "aws:all" },
-        dependsOnActions: []
+        dependsOnActions: [],
       },
       {
         action: "request_approval",
         defaultArguments: { reason: "Deletion requires human approval", timeout: 3600 },
-        governanceMetadata: { dangerous: false, costEstimate: 0.0, resourceScope: "governance:approval" },
-        dependsOnActions: ["list_resources_for_deletion"]
+        governanceMetadata: {
+          dangerous: false,
+          costEstimate: 0.0,
+          resourceScope: "governance:approval",
+        },
+        dependsOnActions: ["list_resources_for_deletion"],
       },
       {
         action: "delete_resources",
         defaultArguments: { scope: "listed", force: false },
         governanceMetadata: { dangerous: true, costEstimate: 0.0, resourceScope: "system:root" },
-        dependsOnActions: ["request_approval"]
-      }
-    ]
+        dependsOnActions: ["request_approval"],
+      },
+    ],
   },
 
   search: {
@@ -185,9 +214,9 @@ const PLAN_BLUEPRINTS: Record<string, PlanBlueprint> = {
         defaultArguments: { mode: "balanced" },
         governanceMetadata: { dangerous: false, costEstimate: 0.01, resourceScope: "web:search" },
         dependsOnActions: [],
-        adapterType: "search"
-      }
-    ]
+        adapterType: "search",
+      },
+    ],
   },
 
   code: {
@@ -198,9 +227,9 @@ const PLAN_BLUEPRINTS: Record<string, PlanBlueprint> = {
         defaultArguments: { maxIterations: 5 },
         governanceMetadata: { dangerous: false, costEstimate: 0.05, resourceScope: "agent:code" },
         dependsOnActions: [],
-        adapterType: "code"
-      }
-    ]
+        adapterType: "code",
+      },
+    ],
   },
 
   inference: {
@@ -209,11 +238,15 @@ const PLAN_BLUEPRINTS: Record<string, PlanBlueprint> = {
       {
         action: "local_inference",
         defaultArguments: { maxNewTokens: 300 },
-        governanceMetadata: { dangerous: false, costEstimate: 0.0, resourceScope: "local:inference" },
+        governanceMetadata: {
+          dangerous: false,
+          costEstimate: 0.0,
+          resourceScope: "local:inference",
+        },
         dependsOnActions: [],
-        adapterType: "inference"
-      }
-    ]
+        adapterType: "inference",
+      },
+    ],
   },
 
   default: {
@@ -223,16 +256,27 @@ const PLAN_BLUEPRINTS: Record<string, PlanBlueprint> = {
         action: "generic_execution",
         defaultArguments: {},
         governanceMetadata: { dangerous: false, costEstimate: 0.01, resourceScope: "generic" },
-        dependsOnActions: []
-      }
-    ]
-  }
+        dependsOnActions: [],
+      },
+    ],
+  },
 };
 
 // Priority-ordered blueprint keys — first whole-word match wins.
 // "search" is intentionally listed before "research" so a standalone "search"
 // objective does not accidentally match the research blueprint via substring.
-const PRIORITY_ORDER = ["ingestion", "scraper", "backup", "etl", "search", "research", "code", "inference", "dangerous", "delete"];
+const PRIORITY_ORDER = [
+  "ingestion",
+  "scraper",
+  "backup",
+  "etl",
+  "search",
+  "research",
+  "code",
+  "inference",
+  "dangerous",
+  "delete",
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -247,6 +291,7 @@ function extractArgumentOverrides(objective: string): Record<string, unknown> {
   while ((match = kvPattern.exec(objective)) !== null) {
     const key = match[1];
     const raw = match[2];
+    if (!key || !raw) continue;
     // Coerce numeric strings; leave the rest as strings
     const asNumber = Number(raw);
     overrides[key] = Number.isNaN(asNumber) ? raw : asNumber;
@@ -257,16 +302,19 @@ function extractArgumentOverrides(objective: string): Record<string, unknown> {
 /** Returns the best-matching blueprint for the given normalised objective string. */
 // Pre-compiled whole-word regexes for each blueprint key
 const BLUEPRINT_WORD_REGEXES: Record<string, RegExp> = Object.fromEntries(
-  PRIORITY_ORDER.map((key) => [key, new RegExp(`\\b${key}\\b`)])
+  PRIORITY_ORDER.map((key) => [key, new RegExp(`\\b${key}\\b`)]),
 );
 
 function selectBlueprint(normObjective: string): PlanBlueprint {
   for (const key of PRIORITY_ORDER) {
-    if (BLUEPRINT_WORD_REGEXES[key].test(normObjective)) {
-      return PLAN_BLUEPRINTS[key];
+    const regex = BLUEPRINT_WORD_REGEXES[key];
+    const bp = PLAN_BLUEPRINTS[key];
+    if (regex && bp && regex.test(normObjective)) {
+      return bp;
     }
   }
-  return PLAN_BLUEPRINTS.default;
+  const fallbackKey = PRIORITY_ORDER[0] ?? "default";
+  return (PLAN_BLUEPRINTS.default ?? PLAN_BLUEPRINTS[fallbackKey])!;
 }
 
 /**
@@ -278,7 +326,7 @@ function synthesisFromBlueprint(
   planId: string,
   blueprint: PlanBlueprint,
   argumentOverrides: Record<string, unknown>,
-  objective: string
+  objective: string,
 ): ITaskSynthesisResult[] {
   // Build action → taskId index first so dependency resolution is O(n)
   const actionToTaskId = new Map<string, string>();
@@ -306,14 +354,14 @@ function synthesisFromBlueprint(
       dependencies,
       priority: i === 0 ? "high" : "medium",
       adapterType: template.adapterType ?? "floci",
-      governanceMetadata: { ...template.governanceMetadata }
+      governanceMetadata: { ...template.governanceMetadata },
     } satisfies ITaskSynthesisResult;
   });
 }
 
 // ─── PlanningEngine ───────────────────────────────────────────────────────────
 
-const BLUEPRINT_KEYS = Object.keys(PLAN_BLUEPRINTS) as Array<keyof typeof PLAN_BLUEPRINTS>;
+const BLUEPRINT_KEYS = Object.keys(PLAN_BLUEPRINTS);
 
 export class PlanningEngine implements IPlanningEngine {
   private readonly llm?: ILanguageModel;
@@ -335,13 +383,18 @@ export class PlanningEngine implements IPlanningEngine {
       ? await this._llmSelectBlueprint(objective, normObj)
       : selectBlueprint(normObj);
 
-    const synthesisResults = synthesisFromBlueprint(planId, blueprint, argumentOverrides, objective);
+    const synthesisResults = synthesisFromBlueprint(
+      planId,
+      blueprint,
+      argumentOverrides,
+      objective,
+    );
 
     return {
       planId,
       objective,
       synthesisResults,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
   }
 
@@ -356,25 +409,25 @@ export class PlanningEngine implements IPlanningEngine {
         schema: {
           type: "object",
           properties: {
-            blueprintKey: { type: "string", enum: BLUEPRINT_KEYS }
+            blueprintKey: { type: "string", enum: BLUEPRINT_KEYS },
           },
-          required: ["blueprintKey"]
+          required: ["blueprintKey"],
         },
         messages: [
           {
             role: "system",
             content: `You are an AI workflow planner. Given a user objective, select the most appropriate execution blueprint.
-Available blueprints: ${BLUEPRINT_KEYS.map((k) => `"${k}" (${PLAN_BLUEPRINTS[k].label})`).join(", ")}.
-Respond with a JSON object: { "blueprintKey": "<chosen key>" }.`
+Available blueprints: ${BLUEPRINT_KEYS.map((k) => `"${k}" (${PLAN_BLUEPRINTS[k]?.label ?? ""})`).join(", ")}.
+Respond with a JSON object: { "blueprintKey": "<chosen key>" }.`,
           },
           {
             role: "user",
-            content: `Objective: ${objective}`
-          }
-        ]
+            content: `Objective: ${objective}`,
+          },
+        ],
       });
 
-      const chosen = result?.blueprintKey as keyof typeof PLAN_BLUEPRINTS;
+      const chosen = result?.blueprintKey;
       if (chosen && PLAN_BLUEPRINTS[chosen]) {
         return PLAN_BLUEPRINTS[chosen];
       }

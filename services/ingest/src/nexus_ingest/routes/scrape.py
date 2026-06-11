@@ -51,7 +51,6 @@ def _event_to_out(event: Any) -> FinEventOut:
 
 async def _run_scraper(source: ScrapeSource, max_articles: int, max_age_hours: float) -> ScrapeResponse:
     """Run a single scraper in a thread pool (scrapers are sync)."""
-    settings = get_settings()
     scraper_cls = get_scraper_class(source)
     if scraper_cls is None:
         raise HTTPException(status_code=404, detail=f"No scraper registered for source: {source}")
@@ -67,7 +66,9 @@ async def _run_scraper(source: ScrapeSource, max_articles: int, max_age_hours: f
         scraper = scraper_cls(max_articles=max_articles)
         articles = await loop.run_in_executor(None, scraper.scrape_news)
     except Exception as exc:
-        logger.error("Scraper %s failed: %s", source, exc, exc_info=True)
+        # Sanitize source value to prevent log injection via newline chars
+        safe_source = str(source.value).replace("\n", "\\n").replace("\r", "\\r")
+        logger.error("Scraper %s failed: %s", safe_source, exc, exc_info=True)
         raise HTTPException(status_code=502, detail=f"Scraper {source} failed: {exc}") from exc
 
     duration_ms = (time.monotonic() - start) * 1000
@@ -129,7 +130,8 @@ async def scrape_batch(body: BatchScrapeRequest) -> BatchScrapeResponse:
     scrape_responses: list[ScrapeResponse] = []
     for i, result in enumerate(results):
         if isinstance(result, Exception):
-            logger.error("Batch scraper %s failed: %s", body.sources[i], result)
+            safe_src = str(body.sources[i].value).replace("\n", "\\n").replace("\r", "\\r")
+            logger.error("Batch scraper %s failed: %s", safe_src, result)
             # Return empty result for failed source
             scrape_responses.append(ScrapeResponse(
                 source=body.sources[i],

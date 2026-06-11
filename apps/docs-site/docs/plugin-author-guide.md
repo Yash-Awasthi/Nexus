@@ -166,7 +166,7 @@ async function execute(task: MyServiceTask, ctx: IExecutionContext): Promise<unk
 export const myServiceAdapter = defineAdapter<MyServiceTask, unknown>({
   name: "nexus-adapter-myservice",
   version: "0.1.0",
-  capabilities: ["communication.chat"],   // pick from AdapterCapability union
+  capabilities: ["communication.chat"], // pick from AdapterCapability union
   taskTypes: ["myservice.send", "myservice.get"],
   execute,
 });
@@ -183,12 +183,16 @@ Pick the appropriate capability from this union (defined in `@nexus/plugin-sdk`)
 ```typescript
 type AdapterCapability =
   | "llm.inference"
-  | "storage.read" | "storage.write"
+  | "storage.read"
+  | "storage.write"
   | "search.web"
-  | "communication.email" | "communication.chat"
-  | "database.query" | "database.execute"
+  | "communication.email"
+  | "communication.chat"
+  | "database.query"
+  | "database.execute"
   | "secrets.read"
-  | "monitoring.log" | "monitoring.alert"
+  | "monitoring.log"
+  | "monitoring.alert"
   | "deploy.trigger"
   | "scraping.financial"
   | "deliberation.council"
@@ -202,15 +206,16 @@ type AdapterCapability =
 The `IExecutionContext` gives you:
 
 ```typescript
-ctx.logger           // structured logger (info/warn/error/debug)
-ctx.env              // read-only env var map
-ctx.traceId          // distributed trace ID for correlation
-ctx.workspaceId      // tenant isolation
-ctx.requestId        // unique request ID
+ctx.logger; // structured logger (info/warn/error/debug)
+ctx.env; // read-only env var map
+ctx.traceId; // distributed trace ID for correlation
+ctx.workspaceId; // tenant isolation
+ctx.requestId; // unique request ID
 ```
 
 **Never** use `process.env` directly — always go through `requireEnv(ctx, "KEY")` or `ctx.env`.
 This ensures:
+
 - Values are validated at call time, not at import time
 - Secrets are never logged
 - Tests can inject mock contexts
@@ -220,16 +225,26 @@ This ensures:
 ## 7. Error handling
 
 ```typescript
-import { AdapterHttpError, AdapterTimeoutError, AdapterConfigError, withTimeout } from "@nexus/plugin-sdk";
+import {
+  AdapterHttpError,
+  AdapterTimeoutError,
+  AdapterConfigError,
+  withTimeout,
+} from "@nexus/plugin-sdk";
 
 // HTTP errors
 if (!res.ok) throw new AdapterHttpError("nexus-adapter-myservice", res.status, body);
 
 // Timeout guard (30 seconds)
-const result = await withTimeout(someSlowCall(), 30_000, "nexus-adapter-myservice", "myservice.send");
+const result = await withTimeout(
+  someSlowCall(),
+  30_000,
+  "nexus-adapter-myservice",
+  "myservice.send",
+);
 
 // Missing config
-const key = requireEnv(ctx, "MYSERVICE_API_KEY");  // throws AdapterConfigError if missing
+const key = requireEnv(ctx, "MYSERVICE_API_KEY"); // throws AdapterConfigError if missing
 ```
 
 All three error classes are caught by the runtime and routed to the DLQ with full metadata.
@@ -269,6 +284,7 @@ describe("myServiceAdapter", () => {
 ```
 
 Run tests:
+
 ```bash
 pnpm --filter @nexus/adapter-myservice test
 ```
@@ -303,10 +319,10 @@ See `CONTRIBUTING.md` for DCO sign-off requirements.
 
 ## Reference adapters (study these)
 
-| Adapter | Complexity | Patterns demonstrated |
-|---------|-----------|----------------------|
-| `packages/adapters/groq` | Low | LLM inference, single API call |
-| `packages/adapters/github` | Medium | Multi-task-type switch, CRUD operations |
-| `packages/adapters/gmail` | Medium | RFC 2822 construction, base64 encoding |
-| `packages/adapters/linear` | Medium | GraphQL API |
-| `packages/adapters/neon` | Low | SQL via HTTP API (no driver) |
+| Adapter                    | Complexity | Patterns demonstrated                   |
+| -------------------------- | ---------- | --------------------------------------- |
+| `packages/adapters/groq`   | Low        | LLM inference, single API call          |
+| `packages/adapters/github` | Medium     | Multi-task-type switch, CRUD operations |
+| `packages/adapters/gmail`  | Medium     | RFC 2822 construction, base64 encoding  |
+| `packages/adapters/linear` | Medium     | GraphQL API                             |
+| `packages/adapters/neon`   | Low        | SQL via HTTP API (no driver)            |

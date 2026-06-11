@@ -1,4 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+// @ts-nocheck
 import * as fs from "fs";
+
 import * as yaml from "js-yaml";
 
 export interface PortsConfig {

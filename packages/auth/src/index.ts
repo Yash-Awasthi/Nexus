@@ -36,8 +36,7 @@ export class AuthError extends Error {
     super(message);
     this.name = "AuthError";
     this.code = code;
-    this.httpStatus =
-      code === "INSUFFICIENT_ROLE" ? 403 : 401;
+    this.httpStatus = code === "INSUFFICIENT_ROLE" ? 403 : 401;
   }
 }
 
@@ -110,9 +109,7 @@ export function signJwt(payload: Omit<NexusTokenPayload, "iat">, secret: string)
   const body = base64UrlEncode(
     Buffer.from(JSON.stringify({ ...payload, iat: Math.floor(Date.now() / 1000) })),
   );
-  const sig = base64UrlEncode(
-    createHmac("sha256", secret).update(`${header}.${body}`).digest(),
-  );
+  const sig = base64UrlEncode(createHmac("sha256", secret).update(`${header}.${body}`).digest());
   return `${header}.${body}.${sig}`;
 }
 
@@ -125,17 +122,16 @@ export function verifyJwt(token: string, secret: string): NexusTokenPayload {
   if (parts.length !== 3) throw new AuthError("INVALID_TOKEN", "Malformed JWT");
 
   const [header, body, sig] = parts as [string, string, string];
+  // lgtm[js/insufficient-password-hash] — HMAC-SHA256 here is JWT *signature* computation,
+  // not password storage. Passwords are never passed to this function.
   const expectedSig = base64UrlEncode(
-    createHmac("sha256", secret).update(`${header}.${body}`).digest(),
+    createHmac("sha256", secret).update(`${header}.${body}`).digest(), // lgtm[js/insufficient-password-hash]
   );
 
   // Timing-safe signature comparison
   const sigBuf = Buffer.from(sig, "base64");
   const expectedBuf = Buffer.from(expectedSig, "base64");
-  if (
-    sigBuf.length !== expectedBuf.length ||
-    !timingSafeEqual(sigBuf, expectedBuf)
-  ) {
+  if (sigBuf.length !== expectedBuf.length || !timingSafeEqual(sigBuf, expectedBuf)) {
     throw new AuthError("INVALID_TOKEN", "JWT signature verification failed");
   }
 
@@ -148,7 +144,10 @@ export function verifyJwt(token: string, secret: string): NexusTokenPayload {
 
   const now = Math.floor(Date.now() / 1000);
   if (payload.exp && payload.exp < now) {
-    throw new AuthError("EXPIRED_TOKEN", `JWT expired at ${new Date(payload.exp * 1000).toISOString()}`);
+    throw new AuthError(
+      "EXPIRED_TOKEN",
+      `JWT expired at ${new Date(payload.exp * 1000).toISOString()}`,
+    );
   }
 
   return payload;
@@ -238,11 +237,12 @@ export function authenticate(authHeader: string | undefined, config: AuthConfig)
 
 // ── Fastify adapter ───────────────────────────────────────────────────────────
 
-export interface FastifyAuthHookFn {
-  (request: { headers: { authorization?: string } }, reply: {
+export type FastifyAuthHookFn = (
+  request: { headers: { authorization?: string } },
+  reply: {
     code: (n: number) => { send: (body: unknown) => Promise<void> };
-  }): Promise<void>;
-}
+  },
+) => Promise<void>;
 
 /**
  * Returns a Fastify preHandler hook that enforces auth.

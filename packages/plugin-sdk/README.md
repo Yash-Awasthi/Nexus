@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # @nexus/plugin-sdk
 
 First-class adapter plugin SDK for NEXUS.
@@ -52,15 +53,15 @@ export const githubAdapter = defineAdapter<GitHubWebhookPayload, NexusEvent>({
 
 ## `defineAdapter(definition)`
 
-| Field | Type | Description |
-|---|---|---|
-| `id` | `string` | Unique adapter identifier |
-| `version` | `string` | Semver — used for compatibility checks |
-| `capabilities` | `AdapterCapability[]` | Declared capabilities (see below) |
-| `description` | `string` | Human-readable description |
-| `setup(ctx)` | `async fn` | One-time initialisation; return config object |
-| `execute(ctx, input)` | `async fn` | Per-event handler; return `NexusEvent` |
-| `teardown?(ctx)` | `async fn` | Optional cleanup on shutdown |
+| Field                 | Type                  | Description                                   |
+| --------------------- | --------------------- | --------------------------------------------- |
+| `id`                  | `string`              | Unique adapter identifier                     |
+| `version`             | `string`              | Semver — used for compatibility checks        |
+| `capabilities`        | `AdapterCapability[]` | Declared capabilities (see below)             |
+| `description`         | `string`              | Human-readable description                    |
+| `setup(ctx)`          | `async fn`            | One-time initialisation; return config object |
+| `execute(ctx, input)` | `async fn`            | Per-event handler; return `NexusEvent`        |
+| `teardown?(ctx)`      | `async fn`            | Optional cleanup on shutdown                  |
 
 ## `AdapterCapability`
 
@@ -96,12 +97,12 @@ interface IExecutionContext {
 
 ## Error types
 
-| Class | When thrown |
-|---|---|
-| `NexusAdapterError` | Base class for all adapter errors |
-| `AdapterTimeoutError` | `withTimeout` deadline exceeded |
-| `AdapterConfigError` | Missing required config / env var |
-| `AdapterHttpError` | Upstream HTTP error (includes `statusCode`) |
+| Class                 | When thrown                                 |
+| --------------------- | ------------------------------------------- |
+| `NexusAdapterError`   | Base class for all adapter errors           |
+| `AdapterTimeoutError` | `withTimeout` deadline exceeded             |
+| `AdapterConfigError`  | Missing required config / env var           |
+| `AdapterHttpError`    | Upstream HTTP error (includes `statusCode`) |
 
 ## `AdapterRegistry`
 

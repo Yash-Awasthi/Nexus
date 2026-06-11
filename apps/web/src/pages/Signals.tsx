@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useEffect, useState } from "react";
+
 import { api } from "../lib/api.js";
 
 interface Signal {
@@ -33,7 +34,9 @@ export default function Signals() {
 
   useEffect(() => {
     const query =
-      filter !== "all" ? `/ingest/signals?priority=${filter}&limit=100` : "/ingest/signals?limit=100";
+      filter !== "all"
+        ? `/ingest/signals?priority=${filter}&limit=100`
+        : "/ingest/signals?limit=100";
     api
       .get<{ signals: Signal[]; limit: number; offset: number }>(query)
       .then((data) => {
@@ -50,7 +53,14 @@ export default function Signals() {
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 24,
+        }}
+      >
         <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>⚡ Signals</h1>
         <div style={{ display: "flex", gap: 6 }}>
           {priorities.map((p) => (
@@ -60,7 +70,7 @@ export default function Signals() {
               style={{
                 padding: "4px 12px",
                 borderRadius: 6,
-                border: `1px solid ${filter === p ? priorityColor[p] ?? "#7c3aed" : "#1e2535"}`,
+                border: `1px solid ${filter === p ? (priorityColor[p] ?? "#7c3aed") : "#1e2535"}`,
                 background: filter === p ? (priorityColor[p] ?? "#7c3aed") + "22" : "transparent",
                 color: filter === p ? (priorityColor[p] ?? "#c4b5fd") : "#64748b",
                 fontSize: 12,
@@ -121,7 +131,9 @@ export default function Signals() {
             </span>
             <span style={{ color: "#c4b5fd", fontSize: 12 }}>{s.signal_type}</span>
             {s.source_ref && (
-              <span style={{ color: "#475569", fontSize: 11, marginLeft: "auto" }}>{s.source_ref}</span>
+              <span style={{ color: "#475569", fontSize: 11, marginLeft: "auto" }}>
+                {s.source_ref}
+              </span>
             )}
           </div>
           <p style={{ color: "#94a3b8", fontSize: 13, margin: 0 }}>{s.summary}</p>

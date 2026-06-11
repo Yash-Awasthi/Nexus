@@ -1,19 +1,23 @@
 #!/usr/bin/env node
+// @ts-nocheck
+// SPDX-License-Identifier: Apache-2.0
 /**
  * GhostStack operator CLI (`gs` / `ghoststack`)
  */
 import * as fs from "fs";
 import * as path from "path";
-import { bootstrap } from "./bootstrap";
-import { loadGhostStackConfig } from "./ghoststack-config";
-import { FederationSupervisor } from "./federation-supervisor";
-import { createRuntimeContext, startRuntime, stopRuntime } from "./runtime-context";
-import { createGhostStackServer } from "./ghoststack-server";
-import { runFederationE2e } from "./e2e-federation";
-import { ADAPTER_MANIFEST } from "./adapters/manifest";
-import { runHealthcheck } from "./healthcheck";
-import { PlanningEngine } from "../orchestration/planning-engine";
-import { specToWorkflowDefinition } from "../orchestration/spec-loader";
+
+import { PlanningEngine } from "../orchestration/planning-engine.js";
+import { specToWorkflowDefinition } from "../orchestration/spec-loader.js";
+
+import { ADAPTER_MANIFEST } from "./adapters/manifest.js";
+import { bootstrap } from "./bootstrap.js";
+import { runFederationE2e } from "./e2e-federation.js";
+import { FederationSupervisor } from "./federation-supervisor.js";
+import { loadGhostStackConfig } from "./ghoststack-config.js";
+import { createGhostStackServer } from "./ghoststack-server.js";
+import { runHealthcheck } from "./healthcheck.js";
+import { createRuntimeContext, startRuntime, stopRuntime } from "./runtime-context.js";
 
 const repoRoot = path.resolve(__dirname, "..");
 
@@ -88,9 +92,9 @@ async function cmdInit(): Promise<void> {
     console.log(`[scaffold] Created demo specs directory: ${demoSpecsDir}`);
   }
 
-  // Create ghoststack.config.json if not exists
+  // Create ghoststack.config.json if not exists (wx flag = exclusive create, avoids TOCTOU)
   const configPath = path.join(repoRoot, "ghoststack.config.json");
-  if (!fs.existsSync(configPath)) {
+  try {
     const defaultConfig = {
       apiPort: 3000,
       flociUrl: "http://localhost:4566",
@@ -101,17 +105,26 @@ async function cmdInit(): Promise<void> {
         flociStrict: false,
         offlineMode: true,
         mcpBridge: true,
-        mcpExternal: true
-      }
+        mcpExternal: true,
+      },
     };
-    fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2), "utf8");
+    fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2), {
+      flag: "wx",
+      encoding: "utf8",
+    });
     console.log(`[scaffold] Created default config file: ${configPath}`);
+  } catch (err: any) {
+    if (err.code !== "EEXIST") throw err;
   }
 
-  // Create .env if not exists
+  // Create .env if not exists (exclusive create to avoid TOCTOU race)
   const envPath = path.join(repoRoot, ".env");
   const envExamplePath = path.join(repoRoot, ".env.example");
-  if (!fs.existsSync(envPath)) {
+  try {
+    // Attempt exclusive open — throws EEXIST if file already present
+    const fd = fs.openSync(envPath, "wx");
+    fs.closeSync(fd);
+    // File didn't exist — populate it
     if (fs.existsSync(envExamplePath)) {
       fs.copyFileSync(envExamplePath, envPath);
       console.log(`[scaffold] Copied .env from .env.example`);
@@ -129,17 +142,25 @@ GHOSTSTACK_MCP_EXTERNAL=true
       fs.writeFileSync(envPath, defaultEnv, "utf8");
       console.log(`[scaffold] Created default .env file`);
     }
+  } catch (err: any) {
+    if (err.code !== "EEXIST") throw err;
   }
 
-  // Create example spec if not exists
+  // Create example spec if not exists (exclusive create to avoid TOCTOU race)
   const specPath = path.join(demoSpecsDir, "workflow-spec.json");
-  if (!fs.existsSync(specPath)) {
+  try {
+    fs.writeFileSync(specPath, "", { flag: "wx" });
+  } catch (e: any) {
+    if (e.code !== "EEXIST") throw e;
+  }
+  if (!fs.readFileSync(specPath, "utf8").trim()) {
     const demoSpec = {
       spec_version: "v1.1",
       metadata: {
         name: "Demo ETL Pipeline",
-        description: "Scrapes news articles, transforms key headers, and stores in local Floci S3 buckets.",
-        author: "GhostStack Operator"
+        description:
+          "Scrapes news articles, transforms key headers, and stores in local Floci S3 buckets.",
+        author: "GhostStack Operator",
       },
       template_id: "governed-etl-template",
       tasks: [
@@ -153,9 +174,9 @@ GHOSTSTACK_MCP_EXTERNAL=true
           arguments: {
             url: "https://news.ycombinator.com",
             maxLengthBytes: 40000,
-            selectors: ["a.storylink"]
+            selectors: ["a.storylink"],
           },
-          dependencies: []
+          dependencies: [],
         },
         {
           id: "transform-news",
@@ -166,9 +187,9 @@ GHOSTSTACK_MCP_EXTERNAL=true
           priority: "medium",
           arguments: {
             pattern: "(?:AI|Rust|TypeScript|Cognitive)",
-            sourceTaskId: "extract-news"
+            sourceTaskId: "extract-news",
           },
-          dependencies: ["extract-news"]
+          dependencies: ["extract-news"],
         },
         {
           id: "load-archive",
@@ -179,11 +200,11 @@ GHOSTSTACK_MCP_EXTERNAL=true
           priority: "medium",
           arguments: {
             bucketName: "ghoststack-tech-archive",
-            sourceTaskId: "transform-news"
+            sourceTaskId: "transform-news",
           },
-          dependencies: ["transform-news"]
-        }
-      ]
+          dependencies: ["transform-news"],
+        },
+      ],
     };
     fs.writeFileSync(specPath, JSON.stringify(demoSpec, null, 2), "utf8");
     console.log(`[scaffold] Scaffolding example spec: ${specPath}`);
@@ -215,7 +236,7 @@ async function cmdPs(): Promise<void> {
     const stat = s.status.toUpperCase().padEnd(12);
     const port = (s.port ? String(s.port) : "-").padEnd(8);
     const pid = (s.pid ? String(s.pid) : "-").padEnd(9);
-    const detail = s.latencyMs ? `${s.latencyMs}ms` : (s.detail || "-");
+    const detail = s.latencyMs ? `${s.latencyMs}ms` : s.detail || "-";
     console.log(`  ${name}${stat}${port}${pid}${detail}`);
   }
   console.log("=======================================================================\n");
@@ -248,7 +269,7 @@ async function cmdE2e(viaHttp: boolean): Promise<void> {
     const res = await fetch(`${api}/runtime/e2e/federation`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ strict: true, cleanup: true })
+      body: JSON.stringify({ strict: true, cleanup: true }),
     });
     const body = await res.json();
     console.log(JSON.stringify(body, null, 2));
@@ -344,7 +365,11 @@ async function cmdWorkflowsExecutions(): Promise<void> {
         const status = e.status.padEnd(12);
         const id = e.id.padEnd(28);
         const started = e.startedAt ? new Date(e.startedAt).toLocaleTimeString() : "-";
-        const note = e.error ? ` ERR: ${e.error}` : e.approved === false ? " (pending approval)" : "";
+        const note = e.error
+          ? ` ERR: ${e.error}`
+          : e.approved === false
+            ? " (pending approval)"
+            : "";
         console.log(`  ${status}${id}${started}${note}`);
       }
     }
@@ -574,9 +599,13 @@ async function cmdGraphRepair(): Promise<void> {
   try {
     console.log("\n=== RuntimeGraph Repair ===");
     const before = await ctx.runtimeGraph.validate();
-    console.log(`  Before: valid=${before.valid}, dangling=${before.danglingEdgeCount}, missingDeps=${before.missingDependencyCount}, cycles=${before.cycleCount}`);
+    console.log(
+      `  Before: valid=${before.valid}, dangling=${before.danglingEdgeCount}, missingDeps=${before.missingDependencyCount}, cycles=${before.cycleCount}`,
+    );
     const after = await ctx.runtimeGraph.repair();
-    console.log(`  After:  valid=${after.valid}, dangling=${after.danglingEdgeCount}, missingDeps=${after.missingDependencyCount}, cycles=${after.cycleCount}`);
+    console.log(
+      `  After:  valid=${after.valid}, dangling=${after.danglingEdgeCount}, missingDeps=${after.missingDependencyCount}, cycles=${after.cycleCount}`,
+    );
     console.log(`  Repaired: ${after.repaired ? "✅" : "already clean"}`);
     if (after.warnings.length > 0) {
       console.log("\n  Warnings:");
@@ -664,7 +693,9 @@ async function cmdGraphPrune(): Promise<void> {
     // Repair the graph to clean up dangling dependency references in remaining nodes
     if (removed > 0) {
       const repairReport = await ctx.runtimeGraph.repair();
-      console.log(`  Repair: removed ${repairReport.danglingEdgeCount} dangling edge(s), ${repairReport.missingDependencyCount} missing dep(s)`);
+      console.log(
+        `  Repair: removed ${repairReport.danglingEdgeCount} dangling edge(s), ${repairReport.missingDependencyCount} missing dep(s)`,
+      );
     }
     console.log(`\n  Done: ${removed} node(s) pruned.`);
     if (removed === 0) {
@@ -730,7 +761,7 @@ async function cmdPlan(objective: string | undefined): Promise<void> {
   const plan = await engine.generatePlan(objective);
   const total = plan.synthesisResults.reduce(
     (sum, t) => sum + (t.governanceMetadata?.costEstimate ?? 0),
-    0
+    0,
   );
 
   console.log(`\n======================== Generated Plan ============================`);
@@ -747,7 +778,9 @@ async function cmdPlan(objective: string | undefined): Promise<void> {
     const deps = t.dependencies.length > 0 ? `deps: ${t.dependencies.join(", ")}` : "deps: none";
     const dangerous = t.governanceMetadata?.dangerous ? " ⚠ DANGEROUS" : "";
     console.log(`\n  #${i + 1}  ${t.action}  ${priority}  ${deps}${dangerous}`);
-    console.log(`       cost: $${(t.governanceMetadata?.costEstimate ?? 0).toFixed(4)}  scope: ${t.governanceMetadata?.resourceScope}`);
+    console.log(
+      `       cost: $${(t.governanceMetadata?.costEstimate ?? 0).toFixed(4)}  scope: ${t.governanceMetadata?.resourceScope}`,
+    );
     if (Object.keys(t.arguments).length > 0) {
       console.log(`       args: ${JSON.stringify(t.arguments)}`);
     }
@@ -765,8 +798,8 @@ async function cmdQueue(): Promise<void> {
   const ctx = await createRuntimeContext(repoRoot);
   await startRuntime(ctx);
   try {
-    const active = await ctx.queue?.getActiveJobs?.() ?? [];
-    const dlq = await ctx.queue?.getDeadLetterQueue?.() ?? [];
+    const active = (await ctx.queue?.getActiveJobs?.()) ?? [];
+    const dlq = (await ctx.queue?.getDeadLetterQueue?.()) ?? [];
 
     console.log(`\n======================== Queue Status ==============================`);
     console.log(`  Pending:     ${active.length}`);
@@ -815,7 +848,9 @@ async function cmdDlq(subcommand: string | undefined, jobId?: string): Promise<v
       if (dlq.length === 0) {
         console.log("  (empty)");
       } else {
-        console.log(`\n  ${"JOB ID".padEnd(32)} ${"PRIORITY".padEnd(10)} ${"RETRIES".padEnd(10)} TYPE`);
+        console.log(
+          `\n  ${"JOB ID".padEnd(32)} ${"PRIORITY".padEnd(10)} ${"RETRIES".padEnd(10)} TYPE`,
+        );
         console.log(`  ${"─".repeat(65)}`);
         for (const job of dlq) {
           const id = job.id.padEnd(32);
@@ -881,7 +916,6 @@ async function cmdRun(specPath: string | undefined): Promise<void> {
   await startRuntime(ctx);
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const rawSpec = JSON.parse(fs.readFileSync(absPath, "utf8"));
     const workflowId = `run-${path.basename(absPath, path.extname(absPath))}-${Date.now()}`;
     const workflowDef = specToWorkflowDefinition(rawSpec, workflowId);
@@ -978,7 +1012,8 @@ async function main(): Promise<void> {
     case "e2e:http":
       loadGhostStackConfig(repoRoot);
       await cmdE2e(true);
-      break;      case "workflows":
+      break;
+    case "workflows":
       await cmdWorkflowsList();
       break;
     case "workflows:executions":

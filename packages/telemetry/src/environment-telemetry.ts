@@ -1,4 +1,5 @@
-import { IEnvironmentTelemetry } from "./interfaces/environment.interface";
+// SPDX-License-Identifier: Apache-2.0
+import type { IEnvironmentTelemetry } from "./interfaces/environment.interface.js";
 
 export class EnvironmentTelemetry implements IEnvironmentTelemetry {
   browserSessionsActive = 0;

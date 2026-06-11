@@ -24,9 +24,10 @@
  *  Always call `close()` before process exit to drain connections cleanly.
  */
 
-import { Queue, QueueEvents } from "bullmq";
+import { Queue } from "bullmq";
 import type { ConnectionOptions } from "bullmq";
-import { IQueueBackend, QueueJob } from "./interfaces/queue.interface.js";
+
+import type { IQueueBackend, QueueJob } from "./interfaces/queue.interface.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -228,10 +229,7 @@ export class RedisQueueBackend implements IQueueBackend {
    * Must be called before process.exit() to avoid hanging connections.
    */
   async close(): Promise<void> {
-    await Promise.all([
-      ...Object.values(this.queues).map((q) => q.close()),
-      this.dlq.close(),
-    ]);
+    await Promise.all([...Object.values(this.queues).map((q) => q.close()), this.dlq.close()]);
   }
 
   /**

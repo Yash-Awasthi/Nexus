@@ -4,7 +4,12 @@
  * Task types: calendar.create-event, calendar.list-events, calendar.delete-event
  */
 
-import { defineAdapter, requireEnv, AdapterHttpError, type IExecutionContext } from "@nexus/plugin-sdk";
+import {
+  defineAdapter,
+  requireEnv,
+  AdapterHttpError,
+  type IExecutionContext,
+} from "@nexus/plugin-sdk";
 
 const CAL_BASE = "https://www.googleapis.com/calendar/v3";
 
@@ -14,7 +19,7 @@ export interface CalendarCreateEventTask {
   summary: string;
   description?: string;
   start: string; // ISO 8601
-  end: string;   // ISO 8601
+  end: string; // ISO 8601
   attendees?: string[];
   timeZone?: string;
 }
@@ -33,7 +38,10 @@ export interface CalendarDeleteEventTask {
   eventId: string;
 }
 
-export type CalendarTask = CalendarCreateEventTask | CalendarListEventsTask | CalendarDeleteEventTask;
+export type CalendarTask =
+  | CalendarCreateEventTask
+  | CalendarListEventsTask
+  | CalendarDeleteEventTask;
 
 export interface CalendarEventResult {
   id: string;
@@ -48,9 +56,14 @@ export interface CalendarListResult {
   nextPageToken?: string;
 }
 
-async function execute(task: CalendarTask, ctx: IExecutionContext): Promise<CalendarEventResult | CalendarListResult | { ok: boolean }> {
+async function execute(
+  task: CalendarTask,
+  ctx: IExecutionContext,
+): Promise<CalendarEventResult | CalendarListResult | { ok: boolean }> {
   const token = requireEnv(ctx, "GOOGLE_ACCESS_TOKEN");
-  const calendarId = encodeURIComponent(("calendarId" in task ? task.calendarId : undefined) ?? "primary");
+  const calendarId = encodeURIComponent(
+    ("calendarId" in task ? task.calendarId : undefined) ?? "primary",
+  );
 
   if (task.taskType === "calendar.create-event") {
     ctx.logger.info("calendar.create-event", { summary: task.summary });
@@ -59,16 +72,29 @@ async function execute(task: CalendarTask, ctx: IExecutionContext): Promise<Cale
       description: task.description,
       start: { dateTime: task.start, timeZone: task.timeZone ?? "UTC" },
       end: { dateTime: task.end, timeZone: task.timeZone ?? "UTC" },
-      attendees: task.attendees?.map(email => ({ email })),
+      attendees: task.attendees?.map((email) => ({ email })),
     };
     const response = await fetch(`${CAL_BASE}/calendars/${calendarId}/events`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!response.ok) throw new AdapterHttpError("nexus-adapter-calendar", response.status, await response.text());
-    const data = await response.json() as { id: string; summary: string; htmlLink: string; start: { dateTime: string }; end: { dateTime: string } };
-    return { id: data.id, summary: data.summary, htmlLink: data.htmlLink, start: data.start.dateTime, end: data.end.dateTime };
+    if (!response.ok)
+      throw new AdapterHttpError("nexus-adapter-calendar", response.status, await response.text());
+    const data = (await response.json()) as {
+      id: string;
+      summary: string;
+      htmlLink: string;
+      start: { dateTime: string };
+      end: { dateTime: string };
+    };
+    return {
+      id: data.id,
+      summary: data.summary,
+      htmlLink: data.htmlLink,
+      start: data.start.dateTime,
+      end: data.end.dateTime,
+    };
   }
 
   if (task.taskType === "calendar.list-events") {
@@ -80,10 +106,26 @@ async function execute(task: CalendarTask, ctx: IExecutionContext): Promise<Cale
     url.searchParams.set("singleEvents", "true");
     url.searchParams.set("orderBy", "startTime");
     const response = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
-    if (!response.ok) throw new AdapterHttpError("nexus-adapter-calendar", response.status, await response.text());
-    const data = await response.json() as { items: Array<{ id: string; summary: string; htmlLink: string; start: { dateTime: string }; end: { dateTime: string } }>; nextPageToken?: string };
+    if (!response.ok)
+      throw new AdapterHttpError("nexus-adapter-calendar", response.status, await response.text());
+    const data = (await response.json()) as {
+      items: {
+        id: string;
+        summary: string;
+        htmlLink: string;
+        start: { dateTime: string };
+        end: { dateTime: string };
+      }[];
+      nextPageToken?: string;
+    };
     return {
-      events: (data.items ?? []).map(e => ({ id: e.id, summary: e.summary, htmlLink: e.htmlLink, start: e.start.dateTime, end: e.end.dateTime })),
+      events: (data.items ?? []).map((e) => ({
+        id: e.id,
+        summary: e.summary,
+        htmlLink: e.htmlLink,
+        start: e.start.dateTime,
+        end: e.end.dateTime,
+      })),
       nextPageToken: data.nextPageToken,
     };
   }
@@ -94,12 +136,18 @@ async function execute(task: CalendarTask, ctx: IExecutionContext): Promise<Cale
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!response.ok && response.status !== 204) throw new AdapterHttpError("nexus-adapter-calendar", response.status, await response.text());
+  if (!response.ok && response.status !== 204)
+    throw new AdapterHttpError("nexus-adapter-calendar", response.status, await response.text());
   return { ok: true };
 }
 
-export const calendarAdapter = defineAdapter<CalendarTask, CalendarEventResult | CalendarListResult | { ok: boolean }>({
-  name: "nexus-adapter-calendar", version: "0.1.0", capabilities: ["storage.read", "storage.write"],
+export const calendarAdapter = defineAdapter<
+  CalendarTask,
+  CalendarEventResult | CalendarListResult | { ok: boolean }
+>({
+  name: "nexus-adapter-calendar",
+  version: "0.1.0",
+  capabilities: ["storage.read", "storage.write"],
   taskTypes: ["calendar.create-event", "calendar.list-events", "calendar.delete-event"],
   execute,
 });

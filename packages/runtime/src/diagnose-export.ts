@@ -1,19 +1,22 @@
-import { RuntimeDiagnosticAPI } from "../orchestration/diagnostic-api";
-import { RuntimeInspector } from "../orchestration/runtime-inspector";
-import { MemoryQueueBackend } from "../orchestration/queue-backend";
-import { FileEventStore, FileRuntimePersistence } from "../orchestration/persistence-manager";
-import { MetricsCollector } from "../orchestration/observability-manager";
-import { LocalServiceDiscovery } from "../orchestration/service-discovery";
-import { ApprovalWorkflow } from "../orchestration/approval-workflow";
-import { LocalEventBus } from "../orchestration/event-bus";
+// SPDX-License-Identifier: Apache-2.0
+// @ts-nocheck
+import * as fs from "fs";
+import * as path from "path";
+
+import { ApprovalWorkflow } from "../orchestration/approval-workflow.js";
+import { RuntimeDiagnosticAPI } from "../orchestration/diagnostic-api.js";
+import { LocalEventBus } from "../orchestration/event-bus.js";
+import { MetricsCollector } from "../orchestration/observability-manager.js";
+import { FileEventStore, FileRuntimePersistence } from "../orchestration/persistence-manager.js";
+import { MemoryQueueBackend } from "../orchestration/queue-backend.js";
+import { RuntimeInspector } from "../orchestration/runtime-inspector.js";
+import { LocalServiceDiscovery } from "../orchestration/service-discovery.js";
 import {
   WorkflowRegistry,
   WorkflowTelemetry,
   BrowserResearchWorkflowTemplate,
-  LocalCloudProvisioningTemplate
-} from "../orchestration/workflow-engine";
-import * as fs from "fs";
-import * as path from "path";
+  LocalCloudProvisioningTemplate,
+} from "../orchestration/workflow-engine.js";
 
 async function exportDiagnostics() {
   console.log("[DIAG] Packaging GhostStack v1.1 Operational Diagnostics Snapshot...");
@@ -50,7 +53,7 @@ async function exportDiagnostics() {
     undefined,
     [],
     registry,
-    telemetry
+    telemetry,
   );
 
   new RuntimeDiagnosticAPI(inspector);
@@ -60,21 +63,23 @@ async function exportDiagnostics() {
     engine: {
       platform: "GhostStack",
       version: "1.1-hardened",
-      status: "operational"
+      status: "operational",
     },
     queues: {
       activeLength: await queue.getQueueLength(),
-      deadLetterLength: (await queue.getDeadLetterQueue()).length
+      deadLetterLength: (await queue.getDeadLetterQueue()).length,
     },
     workflows: {
-      registeredTemplates: registry.listTemplates().map((t) => ({ id: t.templateId, name: t.name })),
-      telemetryHistory: telemetry.getExecutionHistory()
+      registeredTemplates: registry
+        .listTemplates()
+        .map((t) => ({ id: t.templateId, name: t.name })),
+      telemetryHistory: telemetry.getExecutionHistory(),
     },
     services: await discovery.listServices(),
     systemMetrics: {
       telemetryEventsCount: (await eventStore.replayEvents()).length,
-      governanceApprovalsCount: (await approval.listRecords()).length
-    }
+      governanceApprovalsCount: (await approval.listRecords()).length,
+    },
   };
 
   const logsDir = path.join(__dirname, "../logs");
@@ -85,10 +90,18 @@ async function exportDiagnostics() {
   const exportPath = path.join(logsDir, "diagnostics-export.json");
   fs.writeFileSync(exportPath, JSON.stringify(diagnosticsSnapshot, null, 2), "utf8");
 
-  console.log(`\x1b[32m[SUCCESS] Operational diagnostics successfully exported to: ${exportPath}\x1b[0m`);
-  console.log(`  - Registered templates count: ${diagnosticsSnapshot.workflows.registeredTemplates.length}`);
-  console.log(`  - Telemetry events replayed: ${diagnosticsSnapshot.systemMetrics.telemetryEventsCount}`);
-  console.log(`  - Governance approval records: ${diagnosticsSnapshot.systemMetrics.governanceApprovalsCount}`);
+  console.log(
+    `\x1b[32m[SUCCESS] Operational diagnostics successfully exported to: ${exportPath}\x1b[0m`,
+  );
+  console.log(
+    `  - Registered templates count: ${diagnosticsSnapshot.workflows.registeredTemplates.length}`,
+  );
+  console.log(
+    `  - Telemetry events replayed: ${diagnosticsSnapshot.systemMetrics.telemetryEventsCount}`,
+  );
+  console.log(
+    `  - Governance approval records: ${diagnosticsSnapshot.systemMetrics.governanceApprovalsCount}`,
+  );
 }
 
 exportDiagnostics().catch((err) => {

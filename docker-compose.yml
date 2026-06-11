@@ -140,7 +140,7 @@ services:
     depends_on:
       - api
     profiles:
-      - dev  # opt-in: docker compose --profile dev up
+      - dev # opt-in: docker compose --profile dev up
 
   # ── Observability (optional) ─────────────────────────────────────────────────
 
@@ -151,11 +151,11 @@ services:
     volumes:
       - ./infra/otel/config.yaml:/etc/otel/config.yaml:ro
     ports:
-      - "4318:4318"   # OTLP/HTTP
-      - "4317:4317"   # OTLP/gRPC
-      - "8888:8888"   # Prometheus metrics
+      - "4318:4318" # OTLP/HTTP
+      - "4317:4317" # OTLP/gRPC
+      - "8888:8888" # Prometheus metrics
     profiles:
-      - observability  # opt-in
+      - observability # opt-in
 
 volumes:
   postgres_data:

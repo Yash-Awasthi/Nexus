@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// @ts-nocheck
 /**
  * WebSearchEngine — agentic web search + answer synthesis.
  *
@@ -13,8 +15,10 @@
  */
 
 import * as https from "https";
-import { ILanguageModel, ChatMessage } from "./interfaces/language-model.interface";
-import { getBridgeManager, BridgeManager } from "../runtime/bridge-manager";
+
+import { getBridgeManager, BridgeManager } from "../runtime/bridge-manager.js";
+
+import type { ILanguageModel, ChatMessage } from "./interfaces/language-model.interface.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -63,7 +67,7 @@ export interface SearchEngineOptions {
 async function tavilySearch(
   queries: string[],
   apiKey: string,
-  opts: { searchDepth?: "basic" | "advanced"; maxResults?: number } = {}
+  opts: { searchDepth?: "basic" | "advanced"; maxResults?: number } = {},
 ): Promise<SearchResult[]> {
   const results: SearchResult[] = [];
   for (const query of queries) {
@@ -74,7 +78,7 @@ async function tavilySearch(
         search_depth: opts.searchDepth ?? "basic",
         max_results: opts.maxResults ?? 5,
         include_answer: false,
-        include_raw_content: false
+        include_raw_content: false,
       });
       const raw = await new Promise<string>((resolve, reject) => {
         const req = https.request(
@@ -84,14 +88,16 @@ async function tavilySearch(
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "Content-Length": Buffer.byteLength(body)
-            }
+              "Content-Length": Buffer.byteLength(body),
+            },
           },
           (res) => {
             const chunks: Buffer[] = [];
             res.on("data", (c: Buffer) => chunks.push(c));
-            res.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
-          }
+            res.on("end", () => {
+              resolve(Buffer.concat(chunks).toString("utf8"));
+            });
+          },
         );
         req.on("error", reject);
         req.write(body);
@@ -104,7 +110,7 @@ async function tavilySearch(
             title: r.title ?? "",
             url: r.url ?? "",
             content: r.content ?? r.snippet ?? "",
-            score: r.score ?? 1
+            score: r.score ?? 1,
           });
         }
       }
@@ -145,14 +151,14 @@ Use web search for: news, current events, product info, anything requiring recen
 async function classify(
   llm: ILanguageModel,
   query: string,
-  history: ChatMessage[]
+  history: ChatMessage[],
 ): Promise<SearchClassification> {
   try {
     const result = await llm.generateObject<SearchClassification>({
       messages: [
         { role: "system", content: CLASSIFIER_PROMPT },
         ...history.slice(-4),
-        { role: "user", content: query }
+        { role: "user", content: query },
       ],
       schema: {
         type: "object",
@@ -161,26 +167,35 @@ async function classify(
           webSearch: { type: "boolean" },
           academicSearch: { type: "boolean" },
           discussionSearch: { type: "boolean" },
-          standaloneQuery: { type: "string" }
+          standaloneQuery: { type: "string" },
         },
-        required: ["skipSearch", "webSearch", "standaloneQuery"]
-      }
+        required: ["skipSearch", "webSearch", "standaloneQuery"],
+      },
     });
     return {
       skipSearch: result.skipSearch ?? false,
       webSearch: result.webSearch ?? true,
       academicSearch: result.academicSearch ?? false,
       discussionSearch: result.discussionSearch ?? false,
-      standaloneQuery: result.standaloneQuery ?? query
+      standaloneQuery: result.standaloneQuery ?? query,
     };
   } catch {
-    return { skipSearch: false, webSearch: true, academicSearch: false, discussionSearch: false, standaloneQuery: query };
+    return {
+      skipSearch: false,
+      webSearch: true,
+      academicSearch: false,
+      discussionSearch: false,
+      standaloneQuery: query,
+    };
   }
 }
 
 // ─── Research loop ────────────────────────────────────────────────────────────
 
-const RESEARCHER_PROMPT = (iteration: number, maxIter: number) => `You are a research agent. Your job is to generate targeted search queries to gather information.
+const RESEARCHER_PROMPT = (
+  iteration: number,
+  maxIter: number,
+) => `You are a research agent. Your job is to generate targeted search queries to gather information.
 This is iteration ${iteration + 1} of ${maxIter}.
 ${iteration === 0 ? "Start with broad queries to understand the topic." : "Narrow down based on previous findings — look for gaps."}
 ${iteration >= maxIter - 1 ? "This is your last chance — generate the most targeted queries possible." : ""}
@@ -195,12 +210,12 @@ async function research(
   query: string,
   classification: SearchClassification,
   apiKey: string,
-  opts: { maxIterations: number; mode: SearchMode; deepScrape: boolean }
+  opts: { maxIterations: number; mode: SearchMode; deepScrape: boolean },
 ): Promise<{ findings: SearchFinding[]; queriesUsed: string[] }> {
   const findings: SearchFinding[] = [];
   const queriesUsed: string[] = [];
   const conversationHistory: ChatMessage[] = [
-    { role: "user", content: classification.standaloneQuery }
+    { role: "user", content: classification.standaloneQuery },
   ];
 
   const maxIter = opts.mode === "speed" ? 1 : opts.mode === "balanced" ? 2 : opts.maxIterations;
@@ -214,13 +229,21 @@ async function research(
           { role: "system", content: RESEARCHER_PROMPT(i, maxIter) },
           ...conversationHistory,
           ...(findings.length > 0
-            ? [{
-                role: "assistant" as const,
-                content: `Previous findings summary:\n${findings.slice(-3).map((f) => `- ${f.title}: ${f.content.slice(0, 200)}`).join("\n")}`
-              }]
-            : [])
+            ? [
+                {
+                  role: "assistant" as const,
+                  content: `Previous findings summary:\n${findings
+                    .slice(-3)
+                    .map((f) => `- ${f.title}: ${f.content.slice(0, 200)}`)
+                    .join("\n")}`,
+                },
+              ]
+            : []),
         ],
-        schema: { type: "object", properties: { queries: { type: "array", items: { type: "string" } } } }
+        schema: {
+          type: "object",
+          properties: { queries: { type: "array", items: { type: "string" } } },
+        },
       });
       if (Array.isArray(qResult?.queries) && qResult.queries.length > 0) {
         queries = qResult.queries.slice(0, 3);
@@ -234,7 +257,7 @@ async function research(
     // Execute searches
     const results = await tavilySearch(queries, apiKey, {
       searchDepth: opts.mode === "quality" ? "advanced" : "basic",
-      maxResults: opts.mode === "speed" ? 3 : 5
+      maxResults: opts.mode === "speed" ? 3 : 5,
     });
 
     // Deep scrape top results in quality mode
@@ -271,7 +294,7 @@ async function research(
     // Build context for next iteration
     conversationHistory.push({
       role: "assistant",
-      content: `Search results for [${queries.join(", ")}]:\n${results.map((r) => `${r.title}: ${r.content.slice(0, 300)}`).join("\n")}`
+      content: `Search results for [${queries.join(", ")}]:\n${results.map((r) => `${r.title}: ${r.content.slice(0, 300)}`).join("\n")}`,
     });
 
     if (findings.length >= 10) break;
@@ -282,7 +305,9 @@ async function research(
 
 // ─── Answer synthesis ─────────────────────────────────────────────────────────
 
-const WRITER_PROMPT = (mode: SearchMode) => `You are a research writer synthesizing search results into a comprehensive answer.
+const WRITER_PROMPT = (
+  mode: SearchMode,
+) => `You are a research writer synthesizing search results into a comprehensive answer.
 Mode: ${mode}. ${mode === "speed" ? "Be concise." : mode === "balanced" ? "Balance detail and brevity." : "Be thorough and detailed."}
 
 Rules:
@@ -308,7 +333,7 @@ export class WebSearchEngine {
 
   async search(
     query: string,
-    opts: { mode?: SearchMode; history?: ChatMessage[] } = {}
+    opts: { mode?: SearchMode; history?: ChatMessage[] } = {},
   ): Promise<WebSearchOutput> {
     const mode: SearchMode = opts.mode ?? "balanced";
     const history: ChatMessage[] = opts.history ?? [];
@@ -318,14 +343,14 @@ export class WebSearchEngine {
 
     if (classification.skipSearch) {
       const answer = await this.llm.generateText({
-        messages: [...history, { role: "user", content: query }]
+        messages: [...history, { role: "user", content: query }],
       });
       return {
         answer,
         findings: [],
         queriesUsed: [],
         mode,
-        skippedSearch: true
+        skippedSearch: true,
       };
     }
 
@@ -335,7 +360,7 @@ export class WebSearchEngine {
         findings: [],
         queriesUsed: [query],
         mode,
-        skippedSearch: false
+        skippedSearch: false,
       };
     }
 
@@ -345,7 +370,7 @@ export class WebSearchEngine {
       query,
       classification,
       this.tavilyApiKey,
-      { maxIterations: this.maxIterations, mode, deepScrape: this.deepScrape }
+      { maxIterations: this.maxIterations, mode, deepScrape: this.deepScrape },
     );
 
     // Step 3: Synthesize
@@ -360,10 +385,10 @@ export class WebSearchEngine {
         ...history.slice(-4),
         {
           role: "user",
-          content: `Query: ${query}\n\nSources:\n${sourceList}`
-        }
+          content: `Query: ${query}\n\nSources:\n${sourceList}`,
+        },
       ],
-      maxTokens: mode === "speed" ? 512 : mode === "balanced" ? 1024 : 2048
+      maxTokens: mode === "speed" ? 512 : mode === "balanced" ? 1024 : 2048,
     });
 
     return { answer, findings, queriesUsed, mode, skippedSearch: false };

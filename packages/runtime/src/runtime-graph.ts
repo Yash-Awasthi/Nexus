@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Runtime Graph — Unified Topology for GhostStack Resources
  *
@@ -14,8 +15,8 @@
  * - Deepened repair (edge-node ref consistency, duplicate cleanup)
  */
 
-import { IEventBus } from "./event-bus";
-import { IRuntimePersistence } from "./interfaces/persistence.interface";
+import type { IEventBus } from "./event-bus.js";
+import type { IRuntimePersistence } from "./interfaces/persistence.interface.js";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -30,12 +31,7 @@ export type ResourceType =
   | "agent"
   | "task_execution";
 
-export type ResourceStatus =
-  | "active"
-  | "degraded"
-  | "failed"
-  | "pending"
-  | "removed";
+export type ResourceStatus = "active" | "degraded" | "failed" | "pending" | "removed";
 
 export interface ResourceNode {
   id: string;
@@ -113,7 +109,7 @@ export class GraphMutationError extends Error {
   constructor(
     message: string,
     public op: string,
-    public cause?: Error
+    public override cause?: Error,
   ) {
     super(message);
     this.name = "GraphMutationError";
@@ -123,7 +119,7 @@ export class GraphMutationError extends Error {
 export class GraphConsistencyError extends Error {
   constructor(
     message: string,
-    public report: GraphIntegrityReport
+    public report: GraphIntegrityReport,
   ) {
     super(message);
     this.name = "GraphConsistencyError";
@@ -203,7 +199,7 @@ export class RuntimeGraph {
   private recordJournal(
     op: MutationJournalEntry["op"],
     params: Record<string, unknown>,
-    affectedNodeIds: string[]
+    affectedNodeIds: string[],
   ): void {
     const entry: MutationJournalEntry = {
       opId: this.genOpId(),
@@ -273,20 +269,26 @@ export class RuntimeGraph {
           data.nodes.map(([id, node]) => [
             id,
             { ...node, createdAt: new Date(node.createdAt), updatedAt: new Date(node.updatedAt) },
-          ])
+          ]),
         );
         this.edges = data.edges;
       }
       // Load any persisted snapshots
-      const snapshotIds = await this.persistence.getState<string[]>(`${this.STORAGE_KEY}_snapshot_ids`);
+      const snapshotIds = await this.persistence.getState<string[]>(
+        `${this.STORAGE_KEY}_snapshot_ids`,
+      );
       if (snapshotIds) {
         for (const sid of snapshotIds.slice(-this.MAX_SNAPSHOTS)) {
-          const snap = await this.persistence.getState<RuntimeGraphSnapshot>(`${this.SNAPSHOT_PREFIX}${sid}`);
+          const snap = await this.persistence.getState<RuntimeGraphSnapshot>(
+            `${this.SNAPSHOT_PREFIX}${sid}`,
+          );
           if (snap) this.snapshots.push(snap);
         }
       }
       // Load checkpoints
-      const savedCheckpoints = await this.persistence.getState<IntegrityCheckpoint[]>(this.CHECKPOINT_KEY);
+      const savedCheckpoints = await this.persistence.getState<IntegrityCheckpoint[]>(
+        this.CHECKPOINT_KEY,
+      );
       if (savedCheckpoints) {
         this.checkpoints = savedCheckpoints;
       }
@@ -316,7 +318,7 @@ export class RuntimeGraph {
       status?: ResourceStatus;
       metadata?: Record<string, unknown>;
       dependencies?: string[];
-    }
+    },
   ): Promise<ResourceNode> {
     return this.enqueue(async () => {
       await this.ensureLoaded();
@@ -341,7 +343,11 @@ export class RuntimeGraph {
       };
       this.nodes.set(id, node);
       await this.persist();
-      await this.eventBus?.publish("runtime_graph:node_added", { id, type, name }, { causeEventId });
+      await this.eventBus?.publish(
+        "runtime_graph:node_added",
+        { id, type, name },
+        { causeEventId },
+      );
       this.recordJournal("addNode", { id, type, name, ...options }, [id]);
       await this.maybeAutoCheckpoint();
       return node;
@@ -355,7 +361,7 @@ export class RuntimeGraph {
       metadata?: Record<string, unknown>;
       dependencies?: string[];
     },
-    causeEventId?: string
+    causeEventId?: string,
   ): Promise<ResourceNode> {
     const node = this.nodes.get(id)!;
     if (options?.status) node.status = options.status;
@@ -364,7 +370,11 @@ export class RuntimeGraph {
       node.dependencies = [...new Set([...node.dependencies, ...options.dependencies])];
     node.updatedAt = new Date();
     await this.persist();
-    await this.eventBus?.publish("runtime_graph:node_updated", { id, status: node.status }, { causeEventId });
+    await this.eventBus?.publish(
+      "runtime_graph:node_updated",
+      { id, status: node.status },
+      { causeEventId },
+    );
     return node;
   }
 
@@ -372,7 +382,7 @@ export class RuntimeGraph {
     id: string,
     status: ResourceStatus,
     metadata?: Record<string, unknown>,
-    causeEventId?: string
+    causeEventId?: string,
   ): Promise<void> {
     return this.enqueue(async () => {
       await this.ensureLoaded();
@@ -387,7 +397,7 @@ export class RuntimeGraph {
       await this.eventBus?.publish(
         "runtime_graph:node_updated",
         { id, status },
-        { causeEventId: causeEventId || this.genOpId() }
+        { causeEventId: causeEventId || this.genOpId() },
       );
       this.recordJournal("updateNode", { id, status, metadata }, [id]);
       await this.maybeAutoCheckpoint();
@@ -398,7 +408,7 @@ export class RuntimeGraph {
   async updateNodeMetadata(
     id: string,
     metadata: Record<string, unknown>,
-    causeEventId?: string
+    causeEventId?: string,
   ): Promise<void> {
     return this.enqueue(async () => {
       await this.ensureLoaded();
@@ -410,7 +420,7 @@ export class RuntimeGraph {
       await this.eventBus?.publish(
         "runtime_graph:node_updated",
         { id, metadata },
-        { causeEventId: causeEventId || this.genOpId() }
+        { causeEventId: causeEventId || this.genOpId() },
       );
       this.recordJournal("updateNode", { id, metadata }, [id]);
       await this.maybeAutoCheckpoint();
@@ -435,7 +445,7 @@ export class RuntimeGraph {
       await this.eventBus?.publish(
         "runtime_graph:node_removed",
         { id, cascadeRemovedEdges: removedEdges },
-        { causeEventId: causeEventId || this.genOpId() }
+        { causeEventId: causeEventId || this.genOpId() },
       );
       this.recordJournal("removeNode", { id, cascadeRemovedEdges: removedEdges }, [id]);
       await this.maybeAutoCheckpoint();
@@ -447,14 +457,14 @@ export class RuntimeGraph {
    * mutation queue execution, ensuring atomicity.
    */
   async bulkAddNodes(
-    nodes: Array<{
+    nodes: {
       id: string;
       type: ResourceType;
       name: string;
       status?: ResourceStatus;
       metadata?: Record<string, unknown>;
       dependencies?: string[];
-    }>
+    }[],
   ): Promise<ResourceNode[]> {
     return this.enqueue(async () => {
       await this.ensureLoaded();
@@ -483,7 +493,11 @@ export class RuntimeGraph {
       if (addedIds.length > 0) {
         await this.persist();
         for (const addedId of addedIds) {
-          await this.eventBus?.publish("runtime_graph:node_added", { id: addedId }, { causeEventId: this.genOpId() });
+          await this.eventBus?.publish(
+            "runtime_graph:node_added",
+            { id: addedId },
+            { causeEventId: this.genOpId() },
+          );
         }
       }
       if (addedIds.length > 0) {
@@ -500,14 +514,14 @@ export class RuntimeGraph {
     from: string,
     to: string,
     relationship: ResourceEdge["relationship"],
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
   ): Promise<void> {
     return this.enqueue(async () => {
       await this.ensureLoaded();
       if (!this.nodes.has(from)) throw new Error(`Source node not found: ${from}`);
       if (!this.nodes.has(to)) throw new Error(`Target node not found: ${to}`);
       const exists = this.edges.some(
-        (e) => e.from === from && e.to === to && e.relationship === relationship
+        (e) => e.from === from && e.to === to && e.relationship === relationship,
       );
       if (!exists) {
         this.edges.push({ from, to, relationship, metadata });
@@ -518,12 +532,16 @@ export class RuntimeGraph {
     });
   }
 
-  async removeEdge(from: string, to: string, relationship: ResourceEdge["relationship"]): Promise<void> {
+  async removeEdge(
+    from: string,
+    to: string,
+    relationship: ResourceEdge["relationship"],
+  ): Promise<void> {
     return this.enqueue(async () => {
       await this.ensureLoaded();
       const before = this.edges.length;
       this.edges = this.edges.filter(
-        (e) => !(e.from === from && e.to === to && e.relationship === relationship)
+        (e) => !(e.from === from && e.to === to && e.relationship === relationship),
       );
       if (this.edges.length !== before) {
         await this.persist();
@@ -552,9 +570,7 @@ export class RuntimeGraph {
 
   async getDependents(id: string): Promise<ResourceNode[]> {
     await this.ensureLoaded();
-    const dependentIds = this.edges
-      .filter((e) => e.to === id)
-      .map((e) => e.from);
+    const dependentIds = this.edges.filter((e) => e.to === id).map((e) => e.from);
     return dependentIds.map((did) => this.nodes.get(did)).filter(Boolean) as ResourceNode[];
   }
 
@@ -648,7 +664,9 @@ export class RuntimeGraph {
         const snapshotKey = `${this.SNAPSHOT_PREFIX}${snapshot.timestamp.toISOString().replace(/[:.]/g, "-")}`;
         await this.persistence.saveState(snapshotKey, snapshot);
         // Save index of snapshot IDs for faster loading
-        const snapshotIds = this.snapshots.map((s) => s.timestamp.toISOString().replace(/[:.]/g, "-"));
+        const snapshotIds = this.snapshots.map((s) =>
+          s.timestamp.toISOString().replace(/[:.]/g, "-"),
+        );
         await this.persistence.saveState(`${this.STORAGE_KEY}_snapshot_ids`, snapshotIds);
       }
 
@@ -669,7 +687,7 @@ export class RuntimeGraph {
    */
   compareSnapshots(
     before: RuntimeGraphSnapshot,
-    after: RuntimeGraphSnapshot
+    after: RuntimeGraphSnapshot,
   ): {
     addedNodes: ResourceNode[];
     removedNodes: ResourceNode[];
@@ -724,11 +742,19 @@ export class RuntimeGraph {
       this.nodes.clear();
       this.edges = [];
       for (const node of snapshot.nodes) {
-        this.nodes.set(node.id, { ...node, createdAt: new Date(node.createdAt), updatedAt: new Date(node.updatedAt) });
+        this.nodes.set(node.id, {
+          ...node,
+          createdAt: new Date(node.createdAt),
+          updatedAt: new Date(node.updatedAt),
+        });
       }
       this.edges = snapshot.edges.map((e) => ({ ...e }));
       await this.persist();
-      this.recordJournal("bulk", { op: "restoreSnapshot", timestamp: snapshot.timestamp.toISOString() }, []);
+      this.recordJournal(
+        "bulk",
+        { op: "restoreSnapshot", timestamp: snapshot.timestamp.toISOString() },
+        [],
+      );
     });
   }
 
@@ -752,7 +778,7 @@ export class RuntimeGraph {
     // Walk backwards to find the most recent valid checkpoint
     for (let i = this.checkpoints.length - 1; i >= 0; i--) {
       const cp = this.checkpoints[i];
-      if (cp.report.valid) {
+      if (cp?.report.valid) {
         await this.restoreSnapshot(cp.snapshot);
         return cp;
       }
@@ -894,9 +920,7 @@ export class RuntimeGraph {
     }
 
     const isValid =
-      danglingEdgeList.length === 0 &&
-      missingDependencyList.length === 0 &&
-      cycleList.length === 0;
+      danglingEdgeList.length === 0 && missingDependencyList.length === 0 && cycleList.length === 0;
 
     if (!isValid) {
       if (danglingEdgeList.length > 0)
@@ -949,7 +973,7 @@ export class RuntimeGraph {
       // 1. Remove dangling edges
       const originalEdgeCount = this.edges.length;
       const removedDanglingEdges = this.edges.filter(
-        (edge) => !this.nodes.has(edge.from) || !this.nodes.has(edge.to)
+        (edge) => !this.nodes.has(edge.from) || !this.nodes.has(edge.to),
       ).length;
       this.edges = this.edges.filter((edge) => {
         return this.nodes.has(edge.from) && this.nodes.has(edge.to);
@@ -1022,16 +1046,20 @@ export class RuntimeGraph {
             staleRemovedNodes: staleRemovedNodes.length,
           },
         },
-        { causeEventId }
+        { causeEventId },
       );
 
-      this.recordJournal("repair", {
-        removedDanglingEdges,
-        cleanedDependencyRefs: report.missingDependencyCount,
-        deduplicatedEdges: report.duplicateEdgeCount ?? 0,
-        fixedDesyncedEdges: report.desyncedEdgeCount,
-        cleanedStaleRemovedNodes: staleRemovedNodes.length,
-      }, []);
+      this.recordJournal(
+        "repair",
+        {
+          removedDanglingEdges,
+          cleanedDependencyRefs: report.missingDependencyCount,
+          deduplicatedEdges: report.duplicateEdgeCount ?? 0,
+          fixedDesyncedEdges: report.desyncedEdgeCount,
+          cleanedStaleRemovedNodes: staleRemovedNodes.length,
+        },
+        [],
+      );
 
       const finalReport = await this.validateInternal();
       finalReport.repaired = repairedAnything;

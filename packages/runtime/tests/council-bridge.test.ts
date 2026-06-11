@@ -18,7 +18,13 @@ function makeEngine(overrides?: Partial<ICouncilResult>): ICouncilEngine {
     proposalId: "prop-1",
     outcome: "approved",
     votes: [
-      { model: "claude-3", provider: "anthropic", vote: "yes", reasoning: "Looks good", confidence: 0.9 },
+      {
+        model: "claude-3",
+        provider: "anthropic",
+        vote: "yes",
+        reasoning: "Looks good",
+        confidence: 0.9,
+      },
       { model: "gpt-4o", provider: "openai", vote: "yes", reasoning: "Agree", confidence: 0.85 },
       { model: "llama-3", provider: "groq", vote: "no", reasoning: "Disagree", confidence: 0.6 },
     ],
@@ -128,9 +134,9 @@ describe("CouncilBridge", () => {
 
   it("defers on timeout", async () => {
     engine = {
-      deliberate: vi.fn().mockImplementation(
-        () => new Promise((resolve) => setTimeout(resolve, 10_000)),
-      ),
+      deliberate: vi
+        .fn()
+        .mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 10_000))),
     };
     bridge = new CouncilBridge({ engine, eventBus, defaultTimeoutMs: 50 });
     const verdict = await bridge.deliberate(makeSignal());
@@ -157,9 +163,9 @@ describe("CouncilBridge", () => {
   });
 
   it("passes budgetUsd override to engine", async () => {
-    await bridge.deliberate(makeSignal(), { budgetUsd: 0.50 });
+    await bridge.deliberate(makeSignal(), { budgetUsd: 0.5 });
     const deliberateMock = engine.deliberate as ReturnType<typeof vi.fn>;
-    expect(deliberateMock.mock.calls[0][0].budgetUsd).toBe(0.50);
+    expect(deliberateMock.mock.calls[0][0].budgetUsd).toBe(0.5);
   });
 });
 
@@ -212,7 +218,12 @@ describe("PlannerCouncilRouter", () => {
 
   it("routes critical-priority signals to council regardless of cost", async () => {
     const task = makeTask({ governanceMetadata: { dangerous: false, costEstimate: 0.001 } });
-    await router.route(task, { priority: "critical", id: "sig-1", title: "Critical event", description: "!" });
+    await router.route(task, {
+      priority: "critical",
+      id: "sig-1",
+      title: "Critical event",
+      description: "!",
+    });
     const deliberateMock = engine.deliberate as ReturnType<typeof vi.fn>;
     expect(deliberateMock).toHaveBeenCalledOnce();
   });
@@ -227,7 +238,9 @@ describe("PlannerCouncilRouter", () => {
 // ─── Property-based: verdict is always one of the 4 valid decisions ──────────
 
 describe("CouncilBridge — property-based", () => {
-  const outcomeArb = fc.constantFrom("approved", "rejected", "deferred") as fc.Arbitrary<"approved" | "rejected" | "deferred">;
+  const outcomeArb = fc.constantFrom("approved", "rejected", "deferred") as fc.Arbitrary<
+    "approved" | "rejected" | "deferred"
+  >;
   const confidenceArb = fc.float({ min: 0, max: 1 });
 
   it("always returns a valid decision", async () => {

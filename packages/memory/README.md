@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # @nexus/memory
 
 Long-term agent memory with vector search for NEXUS.
@@ -24,7 +25,7 @@ import {
 ```ts
 const memory = new MemoryManager({
   store: new InMemoryStore(),
-  embedder: new FixedEmbedder(128),  // swap for real embedder in production
+  embedder: new FixedEmbedder(128), // swap for real embedder in production
   defaultRecallLimit: 5,
 });
 
@@ -66,7 +67,11 @@ Implement this to swap in any embedding model (OpenAI `text-embedding-3-small`, 
 ```ts
 interface IMemoryStore {
   save(entry: MemoryEntry): Promise<MemoryEntry>;
-  search(queryEmbedding: number[], limit: number, filter?: MemoryFilter): Promise<MemorySearchResult[]>;
+  search(
+    queryEmbedding: number[],
+    limit: number,
+    filter?: MemoryFilter,
+  ): Promise<MemorySearchResult[]>;
   delete(id: string): Promise<void>;
   list(filter?: MemoryFilter): Promise<MemoryEntry[]>;
   purge(filter?: MemoryFilter): Promise<number>;
@@ -78,29 +83,29 @@ interface IMemoryStore {
 ```ts
 interface MemoryFilter {
   metadata?: Record<string, unknown>; // all keys must match
-  excludeExpired?: boolean;           // default: true
+  excludeExpired?: boolean; // default: true
 }
 ```
 
 ## Included implementations
 
-| Class | Use case |
-|---|---|
+| Class           | Use case                                                |
+| --------------- | ------------------------------------------------------- |
 | `FixedEmbedder` | Dev/test — deterministic pseudo-embedding, no API calls |
-| `InMemoryStore` | Dev/test — exact cosine k-NN, O(n) per query |
+| `InMemoryStore` | Dev/test — exact cosine k-NN, O(n) per query            |
 
 For production, implement `IEmbedder` wrapping your model API and `IMemoryStore` wrapping Drizzle + pgvector's `<=>` operator.
 
 ## `MemoryManager` API
 
-| Method | Description |
-|---|---|
-| `remember(text, options?)` | Embed and persist a memory |
+| Method                           | Description                              |
+| -------------------------------- | ---------------------------------------- |
+| `remember(text, options?)`       | Embed and persist a memory               |
 | `recall(query, limit?, filter?)` | Semantic search — returns scored results |
-| `forget(id)` | Remove by id |
-| `list(filter?)` | List all active entries |
-| `purge(filter?)` | Bulk delete by filter, returns count |
-| `stats()` | `{ total, oldest, newest }` |
+| `forget(id)`                     | Remove by id                             |
+| `list(filter?)`                  | List all active entries                  |
+| `purge(filter?)`                 | Bulk delete by filter, returns count     |
+| `stats()`                        | `{ total, oldest, newest }`              |
 
 ## Testing
 

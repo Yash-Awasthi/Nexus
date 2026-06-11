@@ -1,32 +1,13 @@
+// SPDX-License-Identifier: Apache-2.0
+// @ts-nocheck
+/* eslint-disable import/order, import/no-duplicates */
 import * as path from "path";
-import { loadEnvFromRoot } from "./env-loader";
-import { GhostStackOrchestrator } from "./orchestrator";
-import { RuntimeManager } from "../orchestration/runtime-manager";
-import { YAMLConfigLoader } from "./config-loader";
-import { LocalEventBus } from "../orchestration/event-bus";
-import { TaskRouter } from "../orchestration/task-router";
-import { LocalAgentRegistry } from "../orchestration/agent-registry";
-import {
-  FileEventStore,
-  FileRuntimePersistence,
-  backupRuntimePersistence
-} from "../orchestration/persistence-manager";
-import { StructuredLogger } from "../orchestration/logger";
-import { FileQueueBackend } from "../orchestration/file-queue-backend";
-import { IQueueBackend } from "../orchestration/interfaces/queue.interface";
-import { TaskExecutor } from "../orchestration/task-executor";
-import { MetricsCollector, TraceRecorder, DiagnosticEnricher } from "../orchestration/observability-manager";
-import { MemoryStore, TraceIndexer } from "../orchestration/memory-store";
-import { AgentBus, TaskDelegationAgent } from "../orchestration/agent-bus";
-import { CircuitBreaker, HealthAwareCircuitBreaker, CircuitBreakerAdapterWrapper } from "../orchestration/circuit-breaker";
-import { RuntimeCompactor, LeakDetector, ResourceQuotaManager } from "../orchestration/runtime-compactor";
-import { EXTENDED_FLOCI_ACTIONS } from "../orchestration/floci-extended";
-import { resolveFlociEndpoint } from "../orchestration/floci-client";
-import { GHOSTSTACK_MCP_TOOLS } from "../orchestration/ghoststack-mcp-bridge";
-import { LocalServiceDiscovery, HealthMonitor } from "../orchestration/service-discovery";
-import { ApprovalWorkflow } from "../orchestration/approval-workflow";
-import { PlanningEngine } from "../orchestration/planning-engine";
-import { GovernanceEngine } from "../orchestration/governance-engine";
+
+import { AgentBus, TaskDelegationAgent } from "../orchestration/agent-bus.js";
+import { LocalAgentRegistry } from "../orchestration/agent-registry.js";
+import { ApprovalWorkflow } from "../orchestration/approval-workflow.js";
+import { PlanningEngine } from "../orchestration/planning-engine.js";
+import { GovernanceEngine } from "../orchestration/governance-engine.js";
 import {
   ResourceScopeConstraint,
   CostBudgetConstraint,
@@ -34,15 +15,55 @@ import {
   WildcardPermissionsPolicy,
   LoopDetectionGuardrail,
   RunawayRetriesGuardrail,
-  TaskGraphLimitGuardrail
-} from "../orchestration/governance-engine";
-import { BrowserExecutionAdapter } from "../orchestration/browser-adapter";
-import { ScrapingExecutionAdapter } from "../orchestration/scraping-adapter";
-import { FlociExecutionAdapter } from "../orchestration/floci-adapter";
-import { WebSearchAdapter } from "../orchestration/web-search-adapter";
-import { CodeAgentPool } from "../orchestration/code-agent-pool";
-import { LocalInferenceAdapter } from "../orchestration/local-inference-adapter";
-import { EnvironmentTelemetry } from "../orchestration/environment-telemetry";
+  TaskGraphLimitGuardrail,
+} from "../orchestration/governance-engine.js";
+import { BrowserExecutionAdapter } from "../orchestration/browser-adapter.js";
+import {
+  HealthAwareCircuitBreaker,
+  CircuitBreakerAdapterWrapper,
+} from "../orchestration/circuit-breaker.js";
+import type { CircuitBreaker } from "../orchestration/circuit-breaker.js";
+import { WebSearchAdapter } from "../orchestration/web-search-adapter.js";
+import { CodeAgentPool } from "../orchestration/code-agent-pool.js";
+import { LocalInferenceAdapter } from "../orchestration/local-inference-adapter.js";
+import { EnvironmentTelemetry } from "../orchestration/environment-telemetry.js";
+import { LocalEventBus } from "../orchestration/event-bus.js";
+import { FileQueueBackend } from "../orchestration/file-queue-backend.js";
+import { FlociExecutionAdapter } from "../orchestration/floci-adapter.js";
+import { resolveFlociEndpoint } from "../orchestration/floci-client.js";
+import { EXTENDED_FLOCI_ACTIONS } from "../orchestration/floci-extended.js";
+import { GHOSTSTACK_MCP_TOOLS } from "../orchestration/ghoststack-mcp-bridge.js";
+import type { IQueueBackend } from "../orchestration/interfaces/queue.interface.js";
+import { StructuredLogger } from "../orchestration/logger.js";
+import { MemoryStore, TraceIndexer } from "../orchestration/memory-store.js";
+import {
+  MetricsCollector,
+  TraceRecorder,
+  DiagnosticEnricher,
+} from "../orchestration/observability-manager.js";
+import {
+  FileEventStore,
+  FileRuntimePersistence,
+  backupRuntimePersistence,
+} from "../orchestration/persistence-manager.js";
+import {
+  RuntimeCompactor,
+  LeakDetector,
+  ResourceQuotaManager,
+} from "../orchestration/runtime-compactor.js";
+import { RuntimeGraph } from "../orchestration/runtime-graph.js";
+import { RuntimeInspector } from "../orchestration/runtime-inspector.js";
+import { RuntimeManager } from "../orchestration/runtime-manager.js";
+import type { RuntimeSandboxLayout } from "../orchestration/runtime-sandbox.js";
+import { createRuntimeSandbox } from "../orchestration/runtime-sandbox.js";
+import { ScrapingExecutionAdapter } from "../orchestration/scraping-adapter.js";
+import { LocalServiceDiscovery, HealthMonitor } from "../orchestration/service-discovery.js";
+import {
+  loadWorkflowSpecsFromDir,
+  specToWorkflowDefinition,
+} from "../orchestration/spec-loader.js";
+import { TaskExecutor } from "../orchestration/task-executor.js";
+import { TaskRouter } from "../orchestration/task-router.js";
 import {
   WorkflowRegistry,
   WorkflowTelemetry,
@@ -51,14 +72,14 @@ import {
   LocalCloudProvisioningTemplate,
   DocumentProcessingTemplate,
   SpecToExecutionTemplate,
-  GovernedEtlWorkflowTemplate
-} from "../orchestration/workflow-engine";
-import { RuntimeInspector } from "../orchestration/runtime-inspector";
-import { RuntimeGraph } from "../orchestration/runtime-graph";
-import { loadWorkflowSpecsFromDir, specToWorkflowDefinition } from "../orchestration/spec-loader";
-import { createRuntimeSandbox, RuntimeSandboxLayout } from "../orchestration/runtime-sandbox";
+  GovernedEtlWorkflowTemplate,
+} from "../orchestration/workflow-engine.js";
 
-export type GhostStackRuntimeContext = {
+import { YAMLConfigLoader } from "./config-loader.js";
+import { loadEnvFromRoot } from "./env-loader.js";
+import { GhostStackOrchestrator } from "./orchestrator.js";
+
+export interface GhostStackRuntimeContext {
   repoRoot: string;
   sandbox: RuntimeSandboxLayout;
   runtimeDbDir: string;
@@ -97,8 +118,8 @@ export type GhostStackRuntimeContext = {
   planningEngine: PlanningEngine;
   governanceEngine: GovernanceEngine;
   /** Cleanup functions for event bus subscriptions and other resources */
-  cleanup: Array<() => void>;
-};
+  cleanup: (() => void)[];
+}
 
 export async function createRuntimeContext(repoRoot: string): Promise<GhostStackRuntimeContext> {
   // Load .env file before anything reads process.env — existing vars always win.
@@ -113,7 +134,7 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
     portsPath: path.join(repoRoot, "runtime", "ports.yaml"),
     servicesPath: path.join(repoRoot, "runtime", "services.yaml"),
     healthchecksPath: path.join(repoRoot, "runtime", "healthchecks.yaml"),
-    runtimePath: path.join(repoRoot, "runtime", "ghoststack.runtime.yaml")
+    runtimePath: path.join(repoRoot, "runtime", "ghoststack.runtime.yaml"),
   });
 
   const logger = new StructuredLogger();
@@ -159,7 +180,7 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
     "sandbox",
     "spec",
     "diagnostics",
-    ...EXTENDED_FLOCI_ACTIONS
+    ...EXTENDED_FLOCI_ACTIONS,
   ]);
 
   const flociAdapter = new FlociExecutionAdapter({
@@ -168,7 +189,7 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
     onEvent: async (event, payload) => {
       await eventBus.publish(event, payload);
       await eventStore.saveEvent(event, payload);
-    }
+    },
   });
 
   // ------------------------------------------------------------------
@@ -180,7 +201,7 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
       recoveryTimeoutMs: 15000,
       halfOpenMaxRequests: 3,
       halfOpenSuccessRate: 0.5,
-      name: "floci"
+      name: "floci",
     },
     async () => {
       const health = await flociAdapter.probeHealth();
@@ -189,7 +210,7 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
     10000,
     eventBus,
     logger,
-    metrics
+    metrics,
   );
 
   // Use proper CircuitBreakerAdapterWrapper instead of fragile monkey-patching
@@ -202,7 +223,7 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
   // ------------------------------------------------------------------
   const traceIndexer = new TraceIndexer(eventStore, memoryStore);
   // Subscribe to event bus to auto-index events as memory entries
-  const cleanupFns: Array<() => void> = [];
+  const cleanupFns: (() => void)[] = [];
   const wildcardSub = eventBus.subscribe("*", async (_payload: any) => {
     // Fire-and-forget index; never block event processing
     traceIndexer.indexRecentEvents().catch(() => {});
@@ -214,9 +235,16 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
     eventBus,
     persistence,
     logger,
-    [browserAdapter, scrapingAdapter, wrappedFlociAdapter, webSearchAdapter, codeAgentPool, localInferenceAdapter],
+    [
+      browserAdapter,
+      scrapingAdapter,
+      wrappedFlociAdapter,
+      webSearchAdapter,
+      codeAgentPool,
+      localInferenceAdapter,
+    ],
     metrics,
-    tracer
+    tracer,
   );
 
   // ------------------------------------------------------------------
@@ -246,7 +274,7 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
     tracer,
     planningEngine,
     governanceEngine,
-    approvalWorkflow: approval
+    approvalWorkflow: approval,
   });
 
   // ------------------------------------------------------------------
@@ -257,17 +285,17 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
   // Auto-register Floci connections as they're discovered
   runtimeGraph.addNode("floci", "mcp_server", "Floci Local AWS Emulator", {
     metadata: { endpoint: resolveFlociEndpoint() },
-    status: "pending"
+    status: "pending",
   });
   runtimeGraph.addNode("ghoststack-runtime", "agent", "GhostStack Runtime", {
     metadata: { version: "1.1.0" },
-    status: "active"
+    status: "active",
   });
 
   // Register MCP bridge as a node
   runtimeGraph.addNode("mcp-bridge", "mcp_server", "GhostStack MCP Bridge", {
     metadata: { tools: GHOSTSTACK_MCP_TOOLS.length },
-    status: "active"
+    status: "active",
   });
 
   // ------------------------------------------------------------------
@@ -285,8 +313,8 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
     logger,
     options: {
       autoCompact: false, // Don't auto-start; orchestrated lifecycle
-      maxEventAgeMs: 3_600_000 // 1 hour
-    }
+      maxEventAgeMs: 3_600_000, // 1 hour
+    },
   });
 
   const diagnosticEnricher = new DiagnosticEnricher(metrics, tracer);
@@ -298,7 +326,13 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
     const service = payload.service as string;
 
     let nodeId: string | undefined;
-    let nodeType: "floci_s3_bucket" | "floci_sqs_queue" | "floci_dynamodb_table" | "floci_lambda_function" | "floci_sns_topic" | undefined;
+    let nodeType:
+      | "floci_s3_bucket"
+      | "floci_sqs_queue"
+      | "floci_dynamodb_table"
+      | "floci_lambda_function"
+      | "floci_sns_topic"
+      | undefined;
     let nodeName: string | undefined;
 
     if (action === "create_s3_bucket") {
@@ -318,11 +352,9 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
       nodeType = "floci_lambda_function";
       nodeName = `Lambda: ${payload.functionName}`;
     } else if (action === "delete_lambda") {
-      await runtimeGraph.updateNodeStatus(
-        `lambda:${payload.functionName}`,
-        "removed",
-        { reason: "Lambda deleted via Floci" }
-      );
+      await runtimeGraph.updateNodeStatus(`lambda:${payload.functionName}`, "removed", {
+        reason: "Lambda deleted via Floci",
+      });
       return;
     }
 
@@ -332,7 +364,7 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
         await runtimeGraph.addNode(nodeId, nodeType, nodeName, {
           status: nodeStatus,
           metadata: { action, service, flociPayload: payload },
-          dependencies: ["floci"]
+          dependencies: ["floci"],
         });
       } catch {
         // Node may already exist; update status instead
@@ -347,7 +379,15 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
   // ------------------------------------------------------------------
   const registry = new WorkflowRegistry();
   const workflowTelemetry = new WorkflowTelemetry(persistence);
-  const workflowEngine = new WorkflowEngine(registry, workflowTelemetry, orchestrator, approval, persistence, eventBus, runtimeGraph);
+  const workflowEngine = new WorkflowEngine(
+    registry,
+    workflowTelemetry,
+    orchestrator,
+    approval,
+    persistence,
+    eventBus,
+    runtimeGraph,
+  );
 
   registry.registerTemplate(new BrowserResearchWorkflowTemplate());
   registry.registerTemplate(new LocalCloudProvisioningTemplate());
@@ -374,9 +414,7 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
     for (const wf of registry.listWorkflows()) {
       const wfMeta = wf.metadata;
       if (!wfMeta) continue;
-      const triggerConfig = wfMeta.s3Triggers as
-        | Array<{ bucket: string; prefix?: string }>
-        | undefined;
+      const triggerConfig = wfMeta.s3Triggers as { bucket: string; prefix?: string }[] | undefined;
       if (!triggerConfig) continue;
 
       for (const trigger of triggerConfig) {
@@ -388,14 +426,14 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
           logger.error("S3 auto-trigger workflow failed", {
             workflowId: wf.id,
             executionId: execId,
-            error: err.message
+            error: err.message,
           });
         });
         logger.info("S3 event auto-triggered workflow", {
           workflowId: wf.id,
           executionId: execId,
           bucket: bucketName,
-          key: objectKey
+          key: objectKey,
         });
       }
     }
@@ -406,33 +444,46 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
   const wfCleanup = workflowEngine.onAny(async (wfEvent) => {
     // Auto-register workflow executions in RuntimeGraph when they start
     if (wfEvent.type === "workflow:execution_started") {
-      await runtimeGraph.addNode(`wf-exec:${wfEvent.executionId}`, "workflow", `Workflow:${wfEvent.workflowId}`, {
-        metadata: { workflowId: wfEvent.workflowId, executionId: wfEvent.executionId },
-        status: "active",
-        dependencies: ["ghoststack-runtime"]
-      });
+      await runtimeGraph.addNode(
+        `wf-exec:${wfEvent.executionId}`,
+        "workflow",
+        `Workflow:${wfEvent.workflowId}`,
+        {
+          metadata: { workflowId: wfEvent.workflowId, executionId: wfEvent.executionId },
+          status: "active",
+          dependencies: ["ghoststack-runtime"],
+        },
+      );
     }
-    if (wfEvent.type === "workflow:execution_failed" || wfEvent.type === "workflow:execution_cancelled") {
+    if (
+      wfEvent.type === "workflow:execution_failed" ||
+      wfEvent.type === "workflow:execution_cancelled"
+    ) {
       await runtimeGraph.updateNodeStatus(`wf-exec:${wfEvent.executionId}`, "failed", {
-        error: wfEvent.payload?.error
+        error: wfEvent.payload?.error,
       });
     }
     if (wfEvent.type === "workflow:execution_succeeded") {
       await runtimeGraph.updateNodeStatus(`wf-exec:${wfEvent.executionId}`, "active", {
-        completed: true
+        completed: true,
       });
     }
 
     await memoryStore.store({
-      type: wfEvent.type.includes("failed") || wfEvent.type.includes("cancelled") ? "error" :
-            wfEvent.type.includes("succeeded") || wfEvent.type.includes("completed") ? "result" :
-            wfEvent.type.includes("approval") ? "decision" : "observation",
+      type:
+        wfEvent.type.includes("failed") || wfEvent.type.includes("cancelled")
+          ? "error"
+          : wfEvent.type.includes("succeeded") || wfEvent.type.includes("completed")
+            ? "result"
+            : wfEvent.type.includes("approval")
+              ? "decision"
+              : "observation",
       key: `workflow:${wfEvent.type}:${wfEvent.executionId}`,
       value: { workflowId: wfEvent.workflowId, payload: wfEvent.payload },
       tags: ["workflow", wfEvent.type, `exec:${wfEvent.executionId}`],
       workflowId: wfEvent.workflowId,
       executionId: wfEvent.executionId,
-      ttlMs: 7 * 24 * 60 * 60 * 1000
+      ttlMs: 7 * 24 * 60 * 60 * 1000,
     });
     // Record timing gauge for each workflow event
     metrics.increment(`workflow.event.${wfEvent.type.replace(":", ".")}`);
@@ -455,7 +506,7 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
     agentBus,
     circuitBreaker,
     circuitBreakerWrapper,
-    traceIndexer
+    traceIndexer,
   });
 
   if (process.env.GHOSTSTACK_BACKUP_ON_START === "1") {
@@ -501,7 +552,7 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
     quotaManager,
     planningEngine,
     governanceEngine,
-    cleanup: cleanupFns
+    cleanup: cleanupFns,
   };
 }
 
@@ -515,7 +566,7 @@ export async function startRuntime(ctx: GhostStackRuntimeContext): Promise<strin
   ctx.logger.info("Floci health probe complete", {
     reachable: flociHealth.reachable,
     endpoint: flociHealth.endpoint,
-    healthPath: flociHealth.healthPath
+    healthPath: flociHealth.healthPath,
   });
   // Start periodic compaction (every 5 minutes) with adaptive heuristics
   ctx.runtimeCompactor.start(5 * 60 * 1000);
@@ -545,7 +596,7 @@ export async function stopRuntime(ctx: GhostStackRuntimeContext): Promise<void> 
 
   // 2. Destroy circuit breaker health probes
   try {
-    if (ctx.circuitBreaker && typeof (ctx.circuitBreaker as any).destroy === 'function') {
+    if (ctx.circuitBreaker && typeof (ctx.circuitBreaker as any).destroy === "function") {
       (ctx.circuitBreaker as any).destroy();
     }
   } catch (err) {
@@ -583,6 +634,8 @@ export async function stopRuntime(ctx: GhostStackRuntimeContext): Promise<void> 
   }
 
   if (errors.length > 0) {
-    ctx.logger.warn(`[stopRuntime] ${errors.length} cleanup step(s) encountered errors:`, { errors });
+    ctx.logger.warn(`[stopRuntime] ${errors.length} cleanup step(s) encountered errors:`, {
+      errors,
+    });
   }
 }

@@ -1,12 +1,13 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # Security Policy
 
 ## Supported versions
 
-| Version | Supported |
-|---------|-----------|
-| `main` (pre-release) | ✅ |
-| Older tags | ❌ |
+| Version              | Supported |
+| -------------------- | --------- |
+| `main` (pre-release) | ✅        |
+| Older tags           | ❌        |
 
 Once NEXUS reaches v1.0.0, a formal N-2 minor version support policy will be adopted.
 
@@ -20,6 +21,7 @@ Report vulnerabilities via GitHub's private vulnerability reporting:
 Or email: **yashawasthi12032006@gmail.com**
 
 Please include:
+
 - Description of the vulnerability
 - Steps to reproduce
 - Affected versions / components
@@ -28,13 +30,13 @@ Please include:
 
 ## Response timeline
 
-| Action | Target |
-|--------|--------|
-| Acknowledgement | 48 hours |
-| Initial assessment | 5 business days |
-| Patch (Critical/High) | 14 days |
-| Patch (Medium/Low) | 90 days |
-| Public disclosure | After patch ships + 7 days |
+| Action                | Target                     |
+| --------------------- | -------------------------- |
+| Acknowledgement       | 48 hours                   |
+| Initial assessment    | 5 business days            |
+| Patch (Critical/High) | 14 days                    |
+| Patch (Medium/Low)    | 90 days                    |
+| Public disclosure     | After patch ships + 7 days |
 
 ## Cosign public key
 

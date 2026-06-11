@@ -8,10 +8,12 @@
  *   POST   /api/v1/governance/approvals/:approvalId/reject
  */
 
-import type { FastifyInstance } from "fastify";
 import { db } from "@nexus/db";
 import { approvalRequests, runtimeTasks } from "@nexus/db/schema";
-import { eq, and, desc, SQL } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
+import type { FastifyInstance } from "fastify";
+
 import { requireAuth } from "../middleware/auth.js";
 
 export async function governanceRoutes(app: FastifyInstance): Promise<void> {

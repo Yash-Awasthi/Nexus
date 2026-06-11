@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * FileQueueBackend — a persistent IQueueBackend implementation.
  *
@@ -24,8 +25,9 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { IQueueBackend, QueueJob } from "./interfaces/queue.interface";
-import { IMetricsCollector } from "./interfaces/observability.interface";
+
+import type { IMetricsCollector } from "./interfaces/observability.interface.js";
+import type { IQueueBackend, QueueJob } from "./interfaces/queue.interface.js";
 
 const PRIORITY_WEIGHTS: Record<string, number> = { high: 3, medium: 2, low: 1 };
 

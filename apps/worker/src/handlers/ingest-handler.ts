@@ -25,7 +25,11 @@ function classifyEvent(
   eventType: string,
 ): { signalType: string; priority: "low" | "medium" | "high" | "critical" } {
   // Security / high-priority signals
-  if (eventType.includes("security") || eventType.includes("breach") || eventType.includes("alert")) {
+  if (
+    eventType.includes("security") ||
+    eventType.includes("breach") ||
+    eventType.includes("alert")
+  ) {
     return { signalType: `${source}.security-alert`, priority: "critical" };
   }
   if (eventType.includes("deploy") || eventType.includes("release")) {

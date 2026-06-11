@@ -14,10 +14,11 @@
 import { db } from "@nexus/db";
 import { ingestedEvents } from "@nexus/db/schema";
 import { isNull, asc } from "drizzle-orm";
+
 import { handleIngestJob } from "../handlers/ingest-handler.js";
 
-const POLL_INTERVAL_MS = parseInt(process.env["SIGNAL_WORKER_INTERVAL_MS"] ?? "5000", 10);
-const BATCH_SIZE = parseInt(process.env["SIGNAL_WORKER_BATCH_SIZE"] ?? "10", 10);
+const POLL_INTERVAL_MS = parseInt(process.env.SIGNAL_WORKER_INTERVAL_MS ?? "5000", 10);
+const BATCH_SIZE = parseInt(process.env.SIGNAL_WORKER_BATCH_SIZE ?? "10", 10);
 
 export class SignalWorker {
   private running = false;
@@ -27,7 +28,11 @@ export class SignalWorker {
     if (this.running) return;
     this.running = true;
     console.log(
-      JSON.stringify({ level: "info", event: "signal-worker.started", interval_ms: POLL_INTERVAL_MS }),
+      JSON.stringify({
+        level: "info",
+        event: "signal-worker.started",
+        interval_ms: POLL_INTERVAL_MS,
+      }),
     );
     this.schedule();
   }

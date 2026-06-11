@@ -1,13 +1,13 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Unified Memory & Knowledge Layer
- * 
+ *
  * Cross-agent, cross-workflow memory store with searchable execution history,
  * semantic indexing, and trace-based retrieval.
  */
 
-import { IRuntimePersistence } from "./interfaces/persistence.interface";
-import { IEventStore } from "./interfaces/persistence.interface";
-import { ILogger } from "./interfaces/logger.interface";
+import type { ILogger } from "./interfaces/logger.interface.js";
+import type { IRuntimePersistence, IEventStore } from "./interfaces/persistence.interface.js";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -92,11 +92,19 @@ export class MemoryStore implements IMemoryStore {
         const pruned = await this.prune();
         if (pruned > 0) {
           const msg = `[MemoryStore] Auto-prune evicted ${pruned} expired TTL entr(ies)`;
-          if (this.logger) { this.logger.info(msg); } else { console.warn(msg); }
+          if (this.logger) {
+            this.logger.info(msg);
+          } else {
+            console.warn(msg);
+          }
         }
       } catch (err) {
         const errMsg = `[MemoryStore] Auto-prune error: ${(err as Error).message}`;
-        if (this.logger) { this.logger.error(errMsg, err); } else { console.warn(errMsg); }
+        if (this.logger) {
+          this.logger.error(errMsg, err);
+        } else {
+          console.warn(errMsg);
+        }
       }
     }, intervalMs).unref();
   }
@@ -121,18 +129,10 @@ export class MemoryStore implements IMemoryStore {
       }>(this.STORAGE_KEY);
       if (data) {
         this.entries = new Map(data.entries);
-        this.indexByAgent = new Map(
-          data.indexByAgent.map(([k, v]) => [k, new Set(v)])
-        );
-        this.indexByWorkflow = new Map(
-          data.indexByWorkflow.map(([k, v]) => [k, new Set(v)])
-        );
-        this.indexByType = new Map(
-          data.indexByType.map(([k, v]) => [k, new Set(v)])
-        );
-        this.indexByTag = new Map(
-          data.indexByTag.map(([k, v]) => [k, new Set(v)])
-        );
+        this.indexByAgent = new Map(data.indexByAgent.map(([k, v]) => [k, new Set(v)]));
+        this.indexByWorkflow = new Map(data.indexByWorkflow.map(([k, v]) => [k, new Set(v)]));
+        this.indexByType = new Map(data.indexByType.map(([k, v]) => [k, new Set(v)]));
+        this.indexByTag = new Map(data.indexByTag.map(([k, v]) => [k, new Set(v)]));
       }
     }
     this.loaded = true;
@@ -143,9 +143,12 @@ export class MemoryStore implements IMemoryStore {
     await this.persistence.saveState(this.STORAGE_KEY, {
       entries: Array.from(this.entries.entries()),
       indexByAgent: Array.from(this.indexByAgent.entries()).map(([k, v]) => [k, Array.from(v)]),
-      indexByWorkflow: Array.from(this.indexByWorkflow.entries()).map(([k, v]) => [k, Array.from(v)]),
+      indexByWorkflow: Array.from(this.indexByWorkflow.entries()).map(([k, v]) => [
+        k,
+        Array.from(v),
+      ]),
       indexByType: Array.from(this.indexByType.entries()).map(([k, v]) => [k, Array.from(v)]),
-      indexByTag: Array.from(this.indexByTag.entries()).map(([k, v]) => [k, Array.from(v)])
+      indexByTag: Array.from(this.indexByTag.entries()).map(([k, v]) => [k, Array.from(v)]),
     });
   }
 
@@ -155,7 +158,7 @@ export class MemoryStore implements IMemoryStore {
     const full: MemoryEntry = {
       ...entry,
       id,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     this.entries.set(id, full);
@@ -208,7 +211,9 @@ export class MemoryStore implements IMemoryStore {
 
     // Filter by type
     if (query.types && query.types.length > 0) {
-      const typeSets: Set<string>[] = query.types.map((t) => this.indexByType.get(t) || new Set<string>());
+      const typeSets: Set<string>[] = query.types.map(
+        (t) => this.indexByType.get(t) || new Set<string>(),
+      );
       const union = new Set<string>();
       for (const s of typeSets) {
         for (const id of s) union.add(id);
@@ -218,7 +223,9 @@ export class MemoryStore implements IMemoryStore {
 
     // Filter by agent
     if (query.agents && query.agents.length > 0) {
-      const agentSets: Set<string>[] = query.agents.map((a) => this.indexByAgent.get(a) || new Set<string>());
+      const agentSets: Set<string>[] = query.agents.map(
+        (a) => this.indexByAgent.get(a) || new Set<string>(),
+      );
       const union = new Set<string>();
       for (const s of agentSets) {
         for (const id of s) union.add(id);
@@ -228,7 +235,9 @@ export class MemoryStore implements IMemoryStore {
 
     // Filter by workflow
     if (query.workflows && query.workflows.length > 0) {
-      const wfSets: Set<string>[] = query.workflows.map((w) => this.indexByWorkflow.get(w) || new Set<string>());
+      const wfSets: Set<string>[] = query.workflows.map(
+        (w) => this.indexByWorkflow.get(w) || new Set<string>(),
+      );
       const union = new Set<string>();
       for (const s of wfSets) {
         for (const id of s) union.add(id);
@@ -238,7 +247,9 @@ export class MemoryStore implements IMemoryStore {
 
     // Filter by tags
     if (query.tags && query.tags.length > 0) {
-      const tagSets: Set<string>[] = query.tags.map((t) => this.indexByTag.get(t) || new Set<string>());
+      const tagSets: Set<string>[] = query.tags.map(
+        (t) => this.indexByTag.get(t) || new Set<string>(),
+      );
       let tagFiltered = new Set(candidates);
       for (const s of tagSets) {
         tagFiltered = intersect(tagFiltered, s);
@@ -342,15 +353,17 @@ export class MemoryStore implements IMemoryStore {
    *
    * Returns the number of entries evicted.
    */
-  async compact(opts: {
-    keepCount?: number;
-    recentWindowMs?: number;
-    preserveTypes?: MemoryEntry["type"][];
-  } = {}): Promise<number> {
+  async compact(
+    opts: {
+      keepCount?: number;
+      recentWindowMs?: number;
+      preserveTypes?: MemoryEntry["type"][];
+    } = {},
+  ): Promise<number> {
     await this.ensureLoaded();
     const keepCount = opts.keepCount ?? 200;
     const recentWindowMs = opts.recentWindowMs ?? 60 * 60 * 1000; // 1 hour
-    const preserveTypes: Set<string> = new Set(opts.preserveTypes ?? ["decision", "knowledge"]);
+    const preserveTypes = new Set<string>(opts.preserveTypes ?? ["decision", "knowledge"]);
 
     if (this.entries.size <= keepCount) return 0;
 
@@ -362,7 +375,7 @@ export class MemoryStore implements IMemoryStore {
       result: 0.7,
       state: 0.6,
       observation: 0.4,
-      error: 0.3
+      error: 0.3,
     };
 
     // Score each entry
@@ -378,9 +391,7 @@ export class MemoryStore implements IMemoryStore {
     });
 
     // Always keep: recent entries + preserved types
-    const mustKeep = new Set(
-      scored.filter((s) => s.isRecent || s.isPreserved).map((s) => s.id)
-    );
+    const mustKeep = new Set(scored.filter((s) => s.isRecent || s.isPreserved).map((s) => s.id));
 
     // From remaining, keep top-scored up to keepCount
     const remaining = scored.filter((s) => !mustKeep.has(s.id));
@@ -399,7 +410,9 @@ export class MemoryStore implements IMemoryStore {
     }
 
     if (evicted > 0) {
-      this.logger?.info(`MemoryStore.compact: evicted ${evicted} entries, retained ${this.entries.size}`);
+      this.logger?.info(
+        `MemoryStore.compact: evicted ${evicted} entries, retained ${this.entries.size}`,
+      );
       await this.persist();
     }
     return evicted;
@@ -426,7 +439,7 @@ export class MemoryStore implements IMemoryStore {
       totalEntries: this.entries.size,
       byType,
       oldest,
-      newest
+      newest,
     };
   }
 }
@@ -451,7 +464,7 @@ export class TraceIndexer {
 
   constructor(
     private eventStore: IEventStore,
-    private memoryStore: IMemoryStore
+    private memoryStore: IMemoryStore,
   ) {}
 
   async indexRecentEvents(): Promise<number> {
@@ -459,6 +472,7 @@ export class TraceIndexer {
     let indexed = 0;
     for (let i = this.lastIndexed; i < events.length; i++) {
       const event = events[i];
+      if (!event) continue;
       const memType = this.mapEventToMemoryType(event.event);
       if (!memType) continue;
 
@@ -470,7 +484,7 @@ export class TraceIndexer {
         workflowId: (event.payload as Record<string, unknown>)?.workflowId as string | undefined,
         executionId: ((event.payload as Record<string, unknown>)?.executionId ||
           (event.payload as Record<string, unknown>)?.taskId) as string | undefined,
-        ttlMs: 7 * 24 * 60 * 60 * 1000 // 7 day TTL
+        ttlMs: 7 * 24 * 60 * 60 * 1000, // 7 day TTL
       });
       indexed++;
     }

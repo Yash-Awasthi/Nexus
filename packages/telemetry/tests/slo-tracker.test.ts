@@ -19,8 +19,9 @@ describe("percentile", () => {
   });
 
   it("returns correct P99 for large sorted array", () => {
+    // Linear interpolation: idx = 0.99 * 99 = 98.01 → 99 + (100-99)*0.01 = 99.01
     const arr = Array.from({ length: 100 }, (_, i) => i + 1);
-    expect(percentile(arr, 0.99)).toBeCloseTo(99.99, 0);
+    expect(percentile(arr, 0.99)).toBeCloseTo(99.01, 1);
   });
 
   it("interpolates between values", () => {
@@ -74,8 +75,10 @@ describe("SloTracker — basic reporting", () => {
       slo.record({ success: true, latencyMs: ms });
     }
     const report = slo.report();
-    expect(report.latencyP50Ms).toBeCloseTo(50, 0);
-    expect(report.latencyP99Ms).toBeCloseTo(99, 0);
+    // P50: idx=49.5 → sorted[49]=50, sorted[50]=51 → 50 + 0.5 = 50.5
+    // P99: idx=98.01 → sorted[98]=99, sorted[99]=100 → 99 + 0.01 = 99.01
+    expect(report.latencyP50Ms).toBeCloseTo(50.5, 1);
+    expect(report.latencyP99Ms).toBeCloseTo(99.01, 1);
   });
 });
 
@@ -114,10 +117,11 @@ describe("SloTracker — SLO violations", () => {
 
   it("detects P99 latency violation", () => {
     const slo = new SloTracker({
-      targets: { p99LatencyTargetMs: 100 },
+      targets: { availabilityTarget: 0.9, errorRateTarget: 0.5, p99LatencyTargetMs: 100 },
     });
-    for (let i = 0; i < 99; i++) slo.record({ success: true, latencyMs: 10 });
-    slo.record({ success: true, latencyMs: 5000 }); // blows out P99
+    // With 2 samples, P99 idx = 0.99 * 1 = 0.99 → 10 + (5000-10)*0.99 ≈ 4950ms > 100ms
+    slo.record({ success: true, latencyMs: 10 });
+    slo.record({ success: true, latencyMs: 5000 });
     const report = slo.report();
     expect(report.violations.some((v) => v.sli === "p99_latency")).toBe(true);
   });
@@ -125,11 +129,14 @@ describe("SloTracker — SLO violations", () => {
   it("calls onViolation callback exactly once per new violation", () => {
     const spy = vi.fn();
     const slo = new SloTracker({
-      targets: { errorRateTarget: 0.001 },
+      // Explicit targets so only error_rate fires; availability stays above its target
+      targets: { availabilityTarget: 0.5, errorRateTarget: 0.001, p99LatencyTargetMs: 9999 },
       onViolation: spy,
     });
 
-    // First batch: triggers violation
+    // Mix successes and failures: errorRate = 5/15 ≈ 0.33 > 0.001 → error_rate fires
+    // availability = 10/15 ≈ 0.67 > 0.5 → no availability violation
+    for (let i = 0; i < 10; i++) slo.record({ success: true, latencyMs: 10 });
     for (let i = 0; i < 5; i++) slo.record({ success: false, latencyMs: 10 });
     slo.report();
     expect(spy).toHaveBeenCalledOnce();
@@ -141,10 +148,12 @@ describe("SloTracker — SLO violations", () => {
 
   it("violation severity is warning when just over threshold", () => {
     const slo = new SloTracker({
-      targets: { p99LatencyTargetMs: 100 },
+      // Disable other SLIs so only p99_latency can fire
+      targets: { availabilityTarget: 0, errorRateTarget: 1, p99LatencyTargetMs: 100 },
     });
-    for (let i = 0; i < 99; i++) slo.record({ success: true, latencyMs: 10 });
-    slo.record({ success: true, latencyMs: 150 }); // 1.5× over
+    // 2 samples: P99 = 10 + (150-10)*0.99 = 148.6ms — over 100ms but under 200ms → warning
+    slo.record({ success: true, latencyMs: 10 });
+    slo.record({ success: true, latencyMs: 150 });
     const report = slo.report();
     const v = report.violations.find((v) => v.sli === "p99_latency");
     expect(v?.severity).toBe("warning");
@@ -152,10 +161,11 @@ describe("SloTracker — SLO violations", () => {
 
   it("violation severity is critical when 2× over threshold", () => {
     const slo = new SloTracker({
-      targets: { p99LatencyTargetMs: 100 },
+      targets: { availabilityTarget: 0, errorRateTarget: 1, p99LatencyTargetMs: 100 },
     });
-    for (let i = 0; i < 99; i++) slo.record({ success: true, latencyMs: 10 });
-    slo.record({ success: true, latencyMs: 250 }); // 2.5× over
+    // 2 samples: P99 = 10 + (250-10)*0.99 = 247.6ms — over 200ms → critical
+    slo.record({ success: true, latencyMs: 10 });
+    slo.record({ success: true, latencyMs: 250 });
     const report = slo.report();
     const v = report.violations.find((v) => v.sli === "p99_latency");
     expect(v?.severity).toBe("critical");
@@ -185,15 +195,12 @@ describe("SloTracker — rolling window", () => {
 describe("SloTracker — property-based", () => {
   it("availability + errorRate always equals 1.0 (within floating point)", async () => {
     await fc.assert(
-      fc.property(
-        fc.array(fc.boolean(), { minLength: 1, maxLength: 200 }),
-        (outcomes) => {
-          const slo = new SloTracker();
-          for (const ok of outcomes) slo.record({ success: ok, latencyMs: 1 });
-          const report = slo.report();
-          expect(report.availability + report.errorRate).toBeCloseTo(1.0, 10);
-        },
-      ),
+      fc.property(fc.array(fc.boolean(), { minLength: 1, maxLength: 200 }), (outcomes) => {
+        const slo = new SloTracker();
+        for (const ok of outcomes) slo.record({ success: ok, latencyMs: 1 });
+        const report = slo.report();
+        expect(report.availability + report.errorRate).toBeCloseTo(1.0, 10);
+      }),
       { numRuns: 100 },
     );
   });
@@ -202,10 +209,10 @@ describe("SloTracker — property-based", () => {
     const validSlis = new Set(["availability", "error_rate", "p99_latency"]);
     await fc.assert(
       fc.property(
-        fc.array(
-          fc.record({ success: fc.boolean(), latencyMs: fc.nat({ max: 2000 }) }),
-          { minLength: 0, maxLength: 100 },
-        ),
+        fc.array(fc.record({ success: fc.boolean(), latencyMs: fc.nat({ max: 2000 }) }), {
+          minLength: 0,
+          maxLength: 100,
+        }),
         (events) => {
           const slo = new SloTracker({
             targets: { availabilityTarget: 0.95, errorRateTarget: 0.05, p99LatencyTargetMs: 500 },

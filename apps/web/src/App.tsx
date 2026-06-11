@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+
 import Layout from "./components/Layout.js";
-import Dashboard from "./pages/Dashboard.js";
-import Council from "./pages/Council.js";
-import Tasks from "./pages/Tasks.js";
 import Approvals from "./pages/Approvals.js";
-import Signals from "./pages/Signals.js";
 import Audit from "./pages/Audit.js";
+import Council from "./pages/Council.js";
+import Dashboard from "./pages/Dashboard.js";
+import Signals from "./pages/Signals.js";
+import Tasks from "./pages/Tasks.js";
 
 export default function App() {
   return (

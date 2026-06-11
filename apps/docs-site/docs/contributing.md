@@ -27,6 +27,7 @@ git commit -s -m "feat(adapter): add Stripe webhook adapter"
 See the [Plugin Author Guide](./plugin-author-guide) — the full walkthrough takes < 30 minutes.
 
 Open a PR with label `adapter-proposal`. Include:
+
 - The adapter implementation in `packages/adapters/<name>/`
 - Tests with ≥ 80% coverage
 - `README.md` documenting required env vars

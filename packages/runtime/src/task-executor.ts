@@ -1,9 +1,14 @@
-import { ITaskExecutor, IExecutionAdapter, IExecutionContext } from "./interfaces/execution.interface";
-import { IQueueBackend } from "./interfaces/queue.interface";
-import { IEventBus } from "./event-bus";
-import { IRuntimePersistence } from "./interfaces/persistence.interface";
-import { ILogger } from "./interfaces/logger.interface";
-import { IMetricsCollector, ITraceRecorder } from "./interfaces/observability.interface";
+// SPDX-License-Identifier: Apache-2.0
+import type { IEventBus } from "./event-bus.js";
+import type {
+  ITaskExecutor,
+  IExecutionAdapter,
+  IExecutionContext,
+} from "./interfaces/execution.interface.js";
+import type { ILogger } from "./interfaces/logger.interface.js";
+import type { IMetricsCollector, ITraceRecorder } from "./interfaces/observability.interface.js";
+import type { IRuntimePersistence } from "./interfaces/persistence.interface.js";
+import type { IQueueBackend } from "./interfaces/queue.interface.js";
 
 export class TaskExecutor implements ITaskExecutor {
   private queue: IQueueBackend;
@@ -26,7 +31,7 @@ export class TaskExecutor implements ITaskExecutor {
     logger: ILogger,
     adapters: IExecutionAdapter[],
     metrics?: IMetricsCollector,
-    tracer?: ITraceRecorder
+    tracer?: ITraceRecorder,
   ) {
     this.queue = queue;
     this.bus = bus;
@@ -65,11 +70,14 @@ export class TaskExecutor implements ITaskExecutor {
       startTime: new Date(),
       attempt: job.retries + 1,
       environment: {},
-      logger: this.logger
+      logger: this.logger,
     };
 
     this.metrics?.increment("task.executed");
-    const traceSpan = this.tracer?.startSpan("task.execute", undefined, { taskId: job.id, attempt: context.attempt });
+    const traceSpan = this.tracer?.startSpan("task.execute", undefined, {
+      taskId: job.id,
+      attempt: context.attempt,
+    });
 
     await this.bus.publish("execution_started", { taskId: job.id, timestamp: new Date() });
 
@@ -80,7 +88,7 @@ export class TaskExecutor implements ITaskExecutor {
 
       this.metrics?.recordTiming("task.latency", durationMs);
       if (taskType === "floci" && result && typeof result === "object") {
-        const r = result as Record<string, unknown>;
+        const r = result;
         if (typeof r.flociRequestMs === "number") {
           this.metrics?.recordTiming("floci.request_ms", r.flociRequestMs);
         }
@@ -95,14 +103,14 @@ export class TaskExecutor implements ITaskExecutor {
       await this.persistence.saveState(job.id, {
         status: "success",
         result,
-        timestamp: new Date()
+        timestamp: new Date(),
       });
 
       await this.bus.publish("execution_succeeded", {
         taskId: job.id,
         result,
         durationMs,
-        timestamp: new Date()
+        timestamp: new Date(),
       });
 
       if (traceSpan) {
@@ -119,14 +127,14 @@ export class TaskExecutor implements ITaskExecutor {
       await this.persistence.saveState(job.id, {
         status: "failed",
         error: errorMessage,
-        timestamp: new Date()
+        timestamp: new Date(),
       });
 
       await this.bus.publish("execution_failed", {
         taskId: job.id,
         error: errorMessage,
         attempts: context.attempt,
-        timestamp: new Date()
+        timestamp: new Date(),
       });
 
       if (traceSpan) {
@@ -142,7 +150,9 @@ export class TaskExecutor implements ITaskExecutor {
         // Compute exponential backoff: 500ms * 2^(retries-1), capped at 30 s.
         // Stored for runLoop to consume — executeNext itself stays non-blocking.
         this._pendingRetryDelayMs = Math.min(500 * Math.pow(2, job.retries - 1), 30_000);
-        this.logger.info(`Task ${job.id} scheduled for retry ${job.retries}/${job.maxRetries} in ${this._pendingRetryDelayMs}ms`);
+        this.logger.info(
+          `Task ${job.id} scheduled for retry ${job.retries}/${job.maxRetries} in ${this._pendingRetryDelayMs}ms`,
+        );
       }
       await this.queue.push(job); // will trigger dead letter inside push if exhausted
 
@@ -177,7 +187,9 @@ export class TaskExecutor implements ITaskExecutor {
       } else {
         // Apply any backoff delay set by executeNext for a scheduled retry
         if (this._pendingRetryDelayMs > 0) {
-          await new Promise<void>((resolve) => setTimeout(resolve, this._pendingRetryDelayMs).unref());
+          await new Promise<void>((resolve) =>
+            setTimeout(resolve, this._pendingRetryDelayMs).unref(),
+          );
           this._pendingRetryDelayMs = 0;
           consecutiveEmpty = 0;
           continue;
@@ -188,7 +200,10 @@ export class TaskExecutor implements ITaskExecutor {
           // Queue appears drained — confirm with a length check
           const remaining = await this.queue.getQueueLength();
           if (remaining === 0) {
-            this.logger.info("TaskExecutor runLoop: queue drained, exiting", { iterations, successCount });
+            this.logger.info("TaskExecutor runLoop: queue drained, exiting", {
+              iterations,
+              successCount,
+            });
             break;
           }
           consecutiveEmpty = 0;

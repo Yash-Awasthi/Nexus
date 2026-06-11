@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # Contributing to NEXUS
 
 Thank you for your interest in contributing. This guide covers everything you need to go from a fresh clone to a merged pull request.
@@ -22,13 +23,13 @@ Thank you for your interest in contributing. This guide covers everything you ne
 
 ## Prerequisites
 
-| Tool | Version | Install |
-|------|---------|---------|
+| Tool    | Version            | Install                                         |
+| ------- | ------------------ | ----------------------------------------------- |
 | Node.js | 20 LTS (`20.18.0`) | [nvm](https://github.com/nvm-sh/nvm): `nvm use` |
-| pnpm | 9.x | `npm i -g pnpm@9` |
-| Python | 3.11 | [pyenv](https://github.com/pyenv/pyenv) |
-| Docker | 24+ | [docker.com](https://docker.com) |
-| Git | 2.40+ | system package manager |
+| pnpm    | 9.x                | `npm i -g pnpm@9`                               |
+| Python  | 3.11               | [pyenv](https://github.com/pyenv/pyenv)         |
+| Docker  | 24+                | [docker.com](https://docker.com)                |
+| Git     | 2.40+              | system package manager                          |
 
 ---
 
@@ -61,19 +62,19 @@ pnpm dev
 
 ## Running locally
 
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start all apps in watch mode |
-| `pnpm build` | Build all packages |
-| `pnpm test` | Run all unit tests (Vitest) |
-| `pnpm test:e2e` | Run Playwright e2e tests |
-| `pnpm lint` | Run ESLint across the monorepo |
-| `pnpm typecheck` | Run `tsc --noEmit` across all packages |
-| `pnpm format:check` | Check Prettier formatting |
-| `pnpm format` | Auto-fix formatting |
-| `pnpm generate` | Regenerate OpenAPI clients + types |
-| `pnpm db:migrate` | Apply all DB migrations |
-| `pnpm check:headers` | Verify SPDX license headers |
+| Command              | Description                            |
+| -------------------- | -------------------------------------- |
+| `pnpm dev`           | Start all apps in watch mode           |
+| `pnpm build`         | Build all packages                     |
+| `pnpm test`          | Run all unit tests (Vitest)            |
+| `pnpm test:e2e`      | Run Playwright e2e tests               |
+| `pnpm lint`          | Run ESLint across the monorepo         |
+| `pnpm typecheck`     | Run `tsc --noEmit` across all packages |
+| `pnpm format:check`  | Check Prettier formatting              |
+| `pnpm format`        | Auto-fix formatting                    |
+| `pnpm generate`      | Regenerate OpenAPI clients + types     |
+| `pnpm db:migrate`    | Apply all DB migrations                |
+| `pnpm check:headers` | Verify SPDX license headers            |
 
 ---
 
@@ -122,16 +123,16 @@ This repo uses [Conventional Commits](https://www.conventionalcommits.org/). `co
 Signed-off-by: Your Name <your@email.com>
 ```
 
-| Type | When to use |
-|------|-------------|
-| `feat` | New feature or capability |
-| `fix` | Bug fix |
-| `docs` | Documentation only |
+| Type       | When to use                                             |
+| ---------- | ------------------------------------------------------- |
+| `feat`     | New feature or capability                               |
+| `fix`      | Bug fix                                                 |
+| `docs`     | Documentation only                                      |
 | `refactor` | Code change that neither fixes a bug nor adds a feature |
-| `test` | Adding or fixing tests |
-| `chore` | Build system, tooling, CI |
-| `perf` | Performance improvement |
-| `ci` | CI configuration changes |
+| `test`     | Adding or fixing tests                                  |
+| `chore`    | Build system, tooling, CI                               |
+| `perf`     | Performance improvement                                 |
+| `ci`       | CI configuration changes                                |
 
 Scope = package name, e.g. `feat(runtime): add redis queue backend`.
 

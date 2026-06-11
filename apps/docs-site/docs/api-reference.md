@@ -21,6 +21,7 @@ The NEXUS REST API follows the OpenAPI 3.1 spec at [`packages/contracts/openapi/
 Liveness probe. Always returns 200 if the process is alive.
 
 **Response:**
+
 ```json
 { "status": "ok", "version": "0.1.0", "timestamp": "2026-06-11T00:00:00.000Z" }
 ```
@@ -41,6 +42,7 @@ Readiness probe. Checks DB + Redis connectivity.
 Accept a raw event from any adapter. Writes to DB + publishes to BullMQ.
 
 **Body:**
+
 ```json
 {
   "source": "github",
@@ -52,6 +54,7 @@ Accept a raw event from any adapter. Writes to DB + publishes to BullMQ.
 ```
 
 **Response `202`:**
+
 ```json
 { "event_id": "uuid", "job_id": "uuid", "status": "accepted" }
 ```
@@ -65,6 +68,7 @@ Retrieve an ingested event by UUID. Returns `404` if not found.
 Create a processed signal from one or more events.
 
 **Body:**
+
 ```json
 {
   "signal_type": "github.pr-event",
@@ -95,18 +99,20 @@ Get a signal by UUID.
 Run a full multi-model council deliberation. Calls up to 14 Groq LLM archetypes concurrently.
 
 **Body:**
+
 ```json
 {
   "proposal": {
     "title": "Deploy PR #42 to production?",
     "description": "New auth middleware — reviewed, tests pass"
   },
-  "budgetUsd": 0.10,
+  "budgetUsd": 0.1,
   "signal_id": "optional-uuid"
 }
 ```
 
 **Response `200`:**
+
 ```json
 {
   "ok": true,
@@ -114,7 +120,9 @@ Run a full multi-model council deliberation. Calls up to 14 Groq LLM archetypes 
     "proposalId": "uuid",
     "title": "Deploy PR #42 to production?",
     "outcome": "approved",
-    "votes": [{ "model": "llama-3.3-70b-versatile", "vote": "yes", "confidence": 0.85, "reasoning": "..." }],
+    "votes": [
+      { "model": "llama-3.3-70b-versatile", "vote": "yes", "confidence": 0.85, "reasoning": "..." }
+    ],
     "consensus": 0.78,
     "majority": "yes",
     "summary": "Council approved. 7 YES / 2 NO / 0 ABSTAIN.",
@@ -146,6 +154,7 @@ List tasks with optional filters.
 Submit a new task for execution.
 
 **Body:**
+
 ```json
 {
   "type": "github.create-issue",
@@ -200,6 +209,7 @@ Paginated audit log. **Query params:** `since`, `until`, `limit`, `offset`
 Re-derives the HMAC chain and verifies integrity.
 
 **Response:**
+
 ```json
 {
   "valid": true,

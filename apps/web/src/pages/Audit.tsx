@@ -1,15 +1,26 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useEffect, useState } from "react";
+
 import { api } from "../lib/api.js";
 
-interface Entry { id: string; sequence: number; entity_type: string; action: string; actor: string; created_at: string }
+interface Entry {
+  id: string;
+  sequence: number;
+  entity_type: string;
+  action: string;
+  actor: string;
+  created_at: string;
+}
 
 export default function Audit() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [verified, setVerified] = useState<{ valid: boolean; message: string } | null>(null);
 
   useEffect(() => {
-    api.get<{ entries: Entry[] }>("/audit/log?limit=100").then((r) => setEntries(r.entries)).catch(console.error);
+    api
+      .get<{ entries: Entry[] }>("/audit/log?limit=100")
+      .then((r) => setEntries(r.entries))
+      .catch(console.error);
   }, []);
 
   const verify = async () => {
@@ -22,7 +33,14 @@ export default function Audit() {
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24 }}>
         <h1 style={{ fontSize: 24, fontWeight: 700 }}>⛓ Audit Log</h1>
         <button
-          style={{ padding: "6px 16px", background: "#161b27", border: "1px solid #1e2535", borderRadius: 6, color: "#e2e8f0", cursor: "pointer" }}
+          style={{
+            padding: "6px 16px",
+            background: "#161b27",
+            border: "1px solid #1e2535",
+            borderRadius: 6,
+            color: "#e2e8f0",
+            cursor: "pointer",
+          }}
           onClick={verify}
         >
           Verify Chain
@@ -38,7 +56,14 @@ export default function Audit() {
         {entries.map((e) => (
           <div
             key={e.id}
-            style={{ borderBottom: "1px solid #1e2535", padding: "8px 4px", display: "grid", gridTemplateColumns: "40px 120px 160px 1fr auto", gap: 12, color: "#94a3b8" }}
+            style={{
+              borderBottom: "1px solid #1e2535",
+              padding: "8px 4px",
+              display: "grid",
+              gridTemplateColumns: "40px 120px 160px 1fr auto",
+              gap: 12,
+              color: "#94a3b8",
+            }}
           >
             <span style={{ color: "#475569" }}>#{e.sequence}</span>
             <span style={{ color: "#c4b5fd" }}>{e.entity_type}</span>

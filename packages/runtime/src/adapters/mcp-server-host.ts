@@ -1,13 +1,15 @@
-import { spawn, ChildProcess } from "child_process";
-import * as path from "path";
+// SPDX-License-Identifier: Apache-2.0
+import type { ChildProcess } from "child_process";
+import { spawn } from "child_process";
 import * as fs from "fs";
+import * as path from "path";
 
-export type McpServerHostOptions = {
+export interface McpServerHostOptions {
   repoRoot: string;
   apiUrl?: string;
   mcpPort?: number;
   pythonCommand?: string;
-};
+}
 
 /**
  * Manages the optional external MCP Python server (composite federation MCP).
@@ -50,9 +52,9 @@ export class McpServerHost {
         ...process.env,
         GHOSTSTACK_API_URL: this.apiUrl,
         GHOSTSTACK_MCP_PORT: String(this.mcpPort),
-        GHOSTSTACK_MCP_TRANSPORT: "streamable-http"
+        GHOSTSTACK_MCP_TRANSPORT: "streamable-http",
       },
-      stdio: ["ignore", "pipe", "pipe"]
+      stdio: ["ignore", "pipe", "pipe"],
     });
 
     this.proc.stdout?.on("data", (d) => process.stdout.write(`[mcp-server] ${d}`));
@@ -72,7 +74,10 @@ export class McpServerHost {
     return new Promise((resolve, reject) => {
       const tick = async () => {
         try {
-          await fetch(`http://127.0.0.1:${port}/mcp`, { method: "GET", signal: AbortSignal.timeout(1000) });
+          await fetch(`http://127.0.0.1:${port}/mcp`, {
+            method: "GET",
+            signal: AbortSignal.timeout(1000),
+          });
           resolve();
           return;
         } catch {

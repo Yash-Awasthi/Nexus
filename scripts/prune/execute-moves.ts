@@ -35,7 +35,7 @@ interface DecisionRow {
 function parseCsv(content: string): DecisionRow[] {
   const [, ...lines] = content.trim().split("\n");
   return lines
-    .map(line => {
+    .map((line) => {
       const parts = line.split(",");
       return {
         path: parts[0]?.trim() ?? "",
@@ -44,7 +44,7 @@ function parseCsv(content: string): DecisionRow[] {
         rationale: parts[3]?.trim() ?? "",
       };
     })
-    .filter(row => row.path && row.decision);
+    .filter((row) => row.path && row.decision);
 }
 
 let totalMoves = 0;
@@ -61,7 +61,7 @@ for (const csvFile of CSV_FILES) {
   }
 
   const rows = parseCsv(content);
-  const moves = rows.filter(r => r.decision === "MOVE" && r.destination);
+  const moves = rows.filter((r) => r.decision === "MOVE" && r.destination);
 
   console.log(`\n${csvFile}: ${moves.length} MOVE decisions`);
 
@@ -75,7 +75,9 @@ for (const csvFile of CSV_FILES) {
       console.log(`  ✓ ${row.path} → ${row.destination}`);
       totalMoves++;
     } catch (err) {
-      console.warn(`  ⚠ Skip ${row.path}: ${err instanceof Error ? err.message.split("\n")[0] : err}`);
+      console.warn(
+        `  ⚠ Skip ${row.path}: ${err instanceof Error ? err.message.split("\n")[0] : err}`,
+      );
       totalSkips++;
     }
   }

@@ -77,7 +77,11 @@ export interface IMemoryStore {
    * k-NN search — return up to `limit` entries ordered by cosine similarity
    * to the supplied query vector.
    */
-  search(queryEmbedding: number[], limit: number, filter?: MemoryFilter): Promise<MemorySearchResult[]>;
+  search(
+    queryEmbedding: number[],
+    limit: number,
+    filter?: MemoryFilter,
+  ): Promise<MemorySearchResult[]>;
 
   /**
    * Remove a single entry by id. No-op if not found.
@@ -135,7 +139,7 @@ export class FixedEmbedder implements IEmbedder {
     for (let i = 0; i < text.length; i++) {
       const code = text.charCodeAt(i);
       const idx = (code * 31 + i * 7) % this.dimensions;
-      vec[idx] += code / 127;
+      vec[idx] = (vec[idx] ?? 0) + code / 127;
     }
     return normalize(Array.from(vec));
   }
@@ -198,9 +202,7 @@ export class InMemoryStore implements IMemoryStore {
       if (excludeExpired && entry.expiresAt !== undefined && entry.expiresAt < now) continue;
 
       if (filter?.metadata) {
-        const matches = Object.entries(filter.metadata).every(
-          ([k, v]) => entry.metadata[k] === v,
-        );
+        const matches = Object.entries(filter.metadata).every(([k, v]) => entry.metadata[k] === v);
         if (!matches) continue;
       }
 
@@ -261,7 +263,7 @@ export class MemoryManager {
       embedding,
       metadata: options.metadata ?? {},
       createdAt: now,
-      expiresAt: options.ttl !== undefined ? now + options.ttl : undefined,
+      ...(options.ttl !== undefined ? { expiresAt: now + options.ttl } : {}),
     };
 
     try {

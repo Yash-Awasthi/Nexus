@@ -1,4 +1,5 @@
-import { ILogger } from "./logger.interface";
+// SPDX-License-Identifier: Apache-2.0
+import type { ILogger } from "./logger.interface.js";
 
 export interface IExecutionContext {
   taskId: string;

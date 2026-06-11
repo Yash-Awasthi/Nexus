@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # @nexus/adapter-tavily
 
 NEXUS adapter for tavily

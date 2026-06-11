@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-const BASE = import.meta.env["VITE_API_URL"] ?? "";
-const KEY = import.meta.env["VITE_API_KEY"] ?? "";
+const BASE = import.meta.env.VITE_API_URL ?? "";
+const KEY = import.meta.env.VITE_API_KEY ?? "";
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (KEY) headers["Authorization"] = `Bearer ${KEY}`;
+  if (KEY) headers.Authorization = `Bearer ${KEY}`;
   const res = await fetch(`${BASE}${path}`, {
     method,
     headers,

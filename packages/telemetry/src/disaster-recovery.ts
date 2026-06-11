@@ -58,9 +58,9 @@ export interface RuntimeCheckpoint {
 
 interface CheckpointFile {
   version: number;
-  takenAt: string;   // ISO 8601
+  takenAt: string; // ISO 8601
   checkpoint: RuntimeCheckpoint;
-  digest: string;    // SHA-256 hex of JSON.stringify(checkpoint)
+  digest: string; // SHA-256 hex of JSON.stringify(checkpoint)
 }
 
 export interface RestoreResult {
@@ -220,7 +220,7 @@ export class DisasterRecovery {
 // ─── MemoryDisasterRecovery — for tests ──────────────────────────────────────
 
 export class MemoryDisasterRecovery {
-  private checkpoints: Array<{ state: RuntimeCheckpoint; takenAt: Date }> = [];
+  private checkpoints: { state: RuntimeCheckpoint; takenAt: Date }[] = [];
   private readonly max: number;
 
   constructor(max = 5) {

@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # @nexus/runtime
 
 Execution kernel for NEXUS (evolved from GhostStack).
@@ -34,11 +35,11 @@ await runtime.stop();
 
 ### Queue backends
 
-| Class | Use case |
-|---|---|
-| `MemoryQueueBackend` | Unit tests — no external deps |
-| `FileQueueBackend` | Integration tests — persists to disk |
-| `RedisQueueBackend` | Production — BullMQ over Redis |
+| Class                | Use case                             |
+| -------------------- | ------------------------------------ |
+| `MemoryQueueBackend` | Unit tests — no external deps        |
+| `FileQueueBackend`   | Integration tests — persists to disk |
+| `RedisQueueBackend`  | Production — BullMQ over Redis       |
 
 ```ts
 import { RedisQueueBackend } from "@nexus/runtime";
@@ -55,9 +56,9 @@ Three-state FSM: `closed → open → half-open → closed`. Prevents cascade fa
 import { CircuitBreaker } from "@nexus/runtime";
 
 const breaker = new CircuitBreaker({
-  threshold: 5,          // failures before opening
-  timeout: 30_000,       // ms before trying half-open
-  successThreshold: 2,   // successes in half-open before closing
+  threshold: 5, // failures before opening
+  timeout: 30_000, // ms before trying half-open
+  successThreshold: 2, // successes in half-open before closing
 });
 
 const result = await breaker.execute(() => callExternalService());
@@ -94,7 +95,9 @@ In-process pub/sub for decoupled component communication. Swap for a Redis-backe
 import { LocalEventBus } from "@nexus/runtime";
 
 const bus = new LocalEventBus();
-bus.subscribe("nexus.signals.created", async (payload) => { /* ... */ });
+bus.subscribe("nexus.signals.created", async (payload) => {
+  /* ... */
+});
 await bus.publish("nexus.signals.created", { signalId: "..." });
 ```
 

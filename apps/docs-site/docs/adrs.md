@@ -41,11 +41,14 @@ New ADRs follow the template at `docs/adr/_template.md`:
 **Author:** Name
 
 ## Context
+
 What is the situation forcing this decision?
 
 ## Decision
+
 What was decided?
 
 ## Consequences
+
 What are the trade-offs and implications?
 ```

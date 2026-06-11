@@ -1,4 +1,5 @@
-import { IQueueBackend, QueueJob } from "./interfaces/queue.interface";
+// SPDX-License-Identifier: Apache-2.0
+import type { IQueueBackend, QueueJob } from "./interfaces/queue.interface.js";
 
 export class MemoryQueueBackend implements IQueueBackend {
   private activeQueue: QueueJob[] = [];
@@ -7,7 +8,7 @@ export class MemoryQueueBackend implements IQueueBackend {
   private priorityWeights: Record<string, number> = {
     high: 3,
     medium: 2,
-    low: 1
+    low: 1,
   };
 
   async push(job: QueueJob): Promise<void> {

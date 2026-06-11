@@ -24,9 +24,8 @@ export function createMockLogger(): MockLogger {
   const entries: MockLogEntry[] = [];
 
   const log =
-    (level: MockLogEntry["level"]) =>
-    (message: string, context?: Record<string, unknown>) => {
-      entries.push({ level, message, context });
+    (level: MockLogEntry["level"]) => (message: string, context?: Record<string, unknown>) => {
+      entries.push({ level, message, ...(context !== undefined ? { context } : {}) });
     };
 
   return {
@@ -43,9 +42,7 @@ export function createMockLogger(): MockLogger {
 
 // ── Mock context ──────────────────────────────────────────────────────────────
 
-export function createMockContext(
-  overrides: Partial<IExecutionContext> = {},
-): IExecutionContext {
+export function createMockContext(overrides: Partial<IExecutionContext> = {}): IExecutionContext {
   return {
     taskId: overrides.taskId ?? `test-task-${Date.now()}`,
     startTime: overrides.startTime ?? new Date(),

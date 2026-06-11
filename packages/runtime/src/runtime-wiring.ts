@@ -17,16 +17,16 @@
  *   await runtime.shutdown();
  */
 
-import { EventBus } from "./event-bus.js";
 import { CouncilBridge, PlannerCouncilRouter } from "./council-bridge.js";
+import type { ICouncilEngine } from "./council-bridge.js";
 import { CrashRecovery, MemoryRecoveryStore } from "./crash-recovery.js";
-import { NexusOtelTracer } from "./tracing/otel-tracer.js";
+import type { IRecoveryStore, RecoveryResult } from "./crash-recovery.js";
+import { EventBus } from "./event-bus.js";
+import type { IMetricsCollector } from "./interfaces/observability.interface.js";
+import type { IQueueBackend } from "./interfaces/queue.interface.js";
 import { MemoryQueueBackend } from "./queue-backend.js";
 import { RedisQueueBackend } from "./redis-queue-backend.js";
-import type { IQueueBackend } from "./interfaces/queue.interface.js";
-import type { ICouncilEngine } from "./council-bridge.js";
-import type { IRecoveryStore } from "./crash-recovery.js";
-import type { IMetricsCollector } from "./interfaces/observability.interface.js";
+import { NexusOtelTracer } from "./tracing/otel-tracer.js";
 
 // ─── Runtime config ───────────────────────────────────────────────────────────
 
@@ -87,7 +87,7 @@ export interface NexusRuntime {
   /** Crash recovery (already ran at startup) */
   recovery: CrashRecovery;
   /** Recovery result from startup */
-  recoveryResult: import("./crash-recovery.js").RecoveryResult;
+  recoveryResult: RecoveryResult;
   /** Shut down all connections cleanly */
   shutdown(): Promise<void>;
 }
@@ -145,7 +145,7 @@ export async function createNexusRuntime(config: NexusRuntimeConfig): Promise<Ne
       staleThresholdMs: config.recovery?.staleThresholdMs,
     });
 
-    let recoveryResult: import("./crash-recovery.js").RecoveryResult = {
+    let recoveryResult: RecoveryResult = {
       scanned: 0,
       requeued: 0,
       failed: 0,
@@ -164,7 +164,7 @@ export async function createNexusRuntime(config: NexusRuntimeConfig): Promise<Ne
     // Log budget exceeded events
     eventBus.subscribe("nexus.budget.exceeded", (payload) => {
       config.metrics?.increment("nexus.budget.exceeded", 1, {
-        context_type: String((payload as Record<string, unknown>)["context_type"] ?? "unknown"),
+        context_type: String((payload as Record<string, unknown>).context_type ?? "unknown"),
       });
     });
 

@@ -25,7 +25,7 @@ import {
   type NewRuntimeTask,
   type NewApprovalRequest,
   type NewAuditLogEntry,
-} from "../src/index.js";
+} from "../src/schema/index.js";
 
 // ─── Table export shape ───────────────────────────────────────────────────────
 

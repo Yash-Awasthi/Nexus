@@ -163,6 +163,7 @@ Raw events enter via **adapters** (GitHub webhooks, Gmail polling, Slack events,
 ### Execution kernel
 
 `@nexus/runtime` wraps every operation with:
+
 - **Circuit breaker** — open/half-open/closed FSM with configurable thresholds
 - **Crash recovery** — snapshot + WAL-style recovery store, auto-resume on restart
 - **Queue backends** — memory (dev), file (test), Redis (production)
@@ -176,18 +177,18 @@ Any team can add a new data source by implementing `@nexus/plugin-sdk`'s `define
 
 ## Packages
 
-| Package | Version | Description |
-|---|---|---|
-| `@nexus/runtime` | 0.1.0 | Execution kernel: queues, circuit breaker, crash recovery, OTel |
-| `@nexus/auth` | 0.1.0 | API key verification, HS256 JWT, Fastify preHandler hook |
-| `@nexus/memory` | 0.1.0 | Agent memory: vector search, TTL, metadata filtering |
-| `@nexus/pipeline-signal` | 0.1.0 | Ingest → classify → Signal worker with 7 built-in classifier rules |
-| `@nexus/council` | 0.1.0 | Multi-model deliberation: voting, synthesis, guardrails |
-| `@nexus/db` | 0.1.0 | Drizzle ORM: 7 schemas, migrations, typed query helpers |
-| `@nexus/telemetry` | 0.1.0 | OTel bootstrap, HMAC-chained audit log, Prometheus metrics |
-| `@nexus/plugin-sdk` | 0.1.0 | defineAdapter, capability types, testing harness |
-| `@nexus/contracts` | 0.1.0 | OpenAPI 3.1 + AsyncAPI 3.0 machine-readable API specs |
-| `@nexus/shared` | 0.1.0 | Shared types, result type, Zod utilities |
+| Package                  | Version | Description                                                        |
+| ------------------------ | ------- | ------------------------------------------------------------------ |
+| `@nexus/runtime`         | 0.1.0   | Execution kernel: queues, circuit breaker, crash recovery, OTel    |
+| `@nexus/auth`            | 0.1.0   | API key verification, HS256 JWT, Fastify preHandler hook           |
+| `@nexus/memory`          | 0.1.0   | Agent memory: vector search, TTL, metadata filtering               |
+| `@nexus/pipeline-signal` | 0.1.0   | Ingest → classify → Signal worker with 7 built-in classifier rules |
+| `@nexus/council`         | 0.1.0   | Multi-model deliberation: voting, synthesis, guardrails            |
+| `@nexus/db`              | 0.1.0   | Drizzle ORM: 7 schemas, migrations, typed query helpers            |
+| `@nexus/telemetry`       | 0.1.0   | OTel bootstrap, HMAC-chained audit log, Prometheus metrics         |
+| `@nexus/plugin-sdk`      | 0.1.0   | defineAdapter, capability types, testing harness                   |
+| `@nexus/contracts`       | 0.1.0   | OpenAPI 3.1 + AsyncAPI 3.0 machine-readable API specs              |
+| `@nexus/shared`          | 0.1.0   | Shared types, result type, Zod utilities                           |
 
 ---
 
@@ -281,6 +282,7 @@ Coverage floor: **80%** (enforced in CI — see ADR-0017).
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide: local setup, commit conventions, changeset workflow, DCO sign-off, and ADR process.
 
 Key rules:
+
 - Commits follow [Conventional Commits](https://www.conventionalcommits.org/)
 - Every PR needs a [changeset](https://github.com/changesets/changesets) for publishable packages
 - New features need tests; coverage must not drop below 80%
@@ -292,14 +294,14 @@ Key rules:
 
 18 locked ADRs live in [`docs/adr/`](docs/adr/). Notable ones:
 
-| ADR | Decision |
-|---|---|
-| [ADR-0002](docs/adr/0002-postgres-sole-state.md) | PostgreSQL is the sole authoritative state store |
-| [ADR-0006](docs/adr/0006-apache-2-license.md) | Apache 2.0 license (patent grant) |
-| [ADR-0008](docs/adr/0008-plugin-sdk-first-class.md) | Plugin SDK is a first-class citizen |
-| [ADR-0009](docs/adr/0009-versioned-api.md) | API versioning from day one (`/v1/`) |
-| [ADR-0010](docs/adr/0010-hmac-chained-audit-log.md) | HMAC-chained audit log for tamper evidence |
-| [ADR-0017](docs/adr/0017-coverage-floor-80.md) | 80% coverage floor enforced in CI |
+| ADR                                                 | Decision                                         |
+| --------------------------------------------------- | ------------------------------------------------ |
+| [ADR-0002](docs/adr/0002-postgres-sole-state.md)    | PostgreSQL is the sole authoritative state store |
+| [ADR-0006](docs/adr/0006-apache-2-license.md)       | Apache 2.0 license (patent grant)                |
+| [ADR-0008](docs/adr/0008-plugin-sdk-first-class.md) | Plugin SDK is a first-class citizen              |
+| [ADR-0009](docs/adr/0009-versioned-api.md)          | API versioning from day one (`/v1/`)             |
+| [ADR-0010](docs/adr/0010-hmac-chained-audit-log.md) | HMAC-chained audit log for tamper evidence       |
+| [ADR-0017](docs/adr/0017-coverage-floor-80.md)      | 80% coverage floor enforced in CI                |
 
 ---
 

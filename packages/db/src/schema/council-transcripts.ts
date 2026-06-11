@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { pgTable, uuid, jsonb, timestamp, index } from "drizzle-orm/pg-core";
+
 import { verdicts } from "./verdicts.js";
 
 /**

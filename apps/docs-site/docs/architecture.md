@@ -78,15 +78,15 @@ Nexus/
 
 ## Technology stack
 
-| Layer | Technology | Why |
-|-------|-----------|-----|
-| API gateway | Fastify 4 | Performance, TypeScript-first, plugin ecosystem |
-| Queue | BullMQ + Redis 7 | Priority queues, DLQ, job persistence |
-| Database | Postgres 16 + Drizzle ORM | Strong types, migrations, JSONB |
-| LLM | Groq (llama-3.3-70b) | Fast inference, generous free tier |
-| Observability | OTel + Prometheus + Grafana | Standard stack, vendor-neutral |
-| Ingest | FastAPI + uvicorn | Python ecosystem for scrapers |
-| Auth | JWT + HMAC | Stateless, auditable |
+| Layer         | Technology                  | Why                                             |
+| ------------- | --------------------------- | ----------------------------------------------- |
+| API gateway   | Fastify 4                   | Performance, TypeScript-first, plugin ecosystem |
+| Queue         | BullMQ + Redis 7            | Priority queues, DLQ, job persistence           |
+| Database      | Postgres 16 + Drizzle ORM   | Strong types, migrations, JSONB                 |
+| LLM           | Groq (llama-3.3-70b)        | Fast inference, generous free tier              |
+| Observability | OTel + Prometheus + Grafana | Standard stack, vendor-neutral                  |
+| Ingest        | FastAPI + uvicorn           | Python ecosystem for scrapers                   |
+| Auth          | JWT + HMAC                  | Stateless, auditable                            |
 
 ## Key architectural decisions
 

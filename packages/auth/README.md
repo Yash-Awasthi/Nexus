@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # @nexus/auth
 
 Zero-runtime-dependency authentication primitives for NEXUS.
@@ -83,8 +84,8 @@ await app.register(async (api) => {
 ### `AuthError`
 
 ```ts
-err.code       // "MISSING_TOKEN" | "INVALID_TOKEN" | "EXPIRED_TOKEN" | "INSUFFICIENT_ROLE"
-err.httpStatus // 401 or 403
+err.code; // "MISSING_TOKEN" | "INVALID_TOKEN" | "EXPIRED_TOKEN" | "INSUFFICIENT_ROLE"
+err.httpStatus; // 401 or 403
 ```
 
 ## Testing

@@ -19,16 +19,14 @@
  *   nexus audit verify
  */
 
-import { Command } from "commander";
 import chalk from "chalk";
+import { Command } from "commander";
+
 import { api } from "./lib/client.js";
 
 const program = new Command();
 
-program
-  .name("nexus")
-  .description("Nexus autonomous orchestration platform CLI")
-  .version("0.1.0");
+program.name("nexus").description("Nexus autonomous orchestration platform CLI").version("0.1.0");
 
 // ── health ────────────────────────────────────────────────────────────────────
 
@@ -73,7 +71,11 @@ tasks
   .option("--priority <priority>", "low | medium | high", "medium")
   .action(async (opts) => {
     const payload = JSON.parse(opts.payload) as unknown;
-    const data = await api.post("/runtime/tasks", { type: opts.type, payload, priority: opts.priority });
+    const data = await api.post("/runtime/tasks", {
+      type: opts.type,
+      payload,
+      priority: opts.priority,
+    });
     console.log(chalk.green("✓ Task created:"));
     console.log(JSON.stringify(data, null, 2));
   });
@@ -157,10 +159,14 @@ council
       budgetUsd: parseFloat(opts.budget),
       signal_id: opts.signalId,
     });
-    const res = data as { ok: boolean; result?: { outcome: string; consensus: number; summary: string } };
+    const res = data as {
+      ok: boolean;
+      result?: { outcome: string; consensus: number; summary: string };
+    };
     if (res.ok && res.result) {
       const outcome = res.result.outcome;
-      const color = outcome === "approved" ? chalk.green : outcome === "rejected" ? chalk.red : chalk.yellow;
+      const color =
+        outcome === "approved" ? chalk.green : outcome === "rejected" ? chalk.red : chalk.yellow;
       console.log(color(`\n● Outcome: ${outcome.toUpperCase()}`));
       console.log(`  Consensus: ${(res.result.consensus * 100).toFixed(0)}%`);
       console.log(`  Summary:   ${res.result.summary}`);
@@ -220,9 +226,14 @@ audit
   .command("verify")
   .description("Verify HMAC chain integrity")
   .action(async () => {
-    const data = await api.get<{ valid: boolean; checked_count: number; message: string }>("/audit/log/verify");
+    const data = await api.get<{ valid: boolean; checked_count: number; message: string }>(
+      "/audit/log/verify",
+    );
     const icon = data.valid ? chalk.green("✓") : chalk.red("✗");
-    console.log(icon, `Chain ${data.valid ? "intact" : "COMPROMISED"} — ${data.checked_count} entries checked`);
+    console.log(
+      icon,
+      `Chain ${data.valid ? "intact" : "COMPROMISED"} — ${data.checked_count} entries checked`,
+    );
     if (!data.valid) {
       console.error(chalk.red(data.message));
       process.exit(1);

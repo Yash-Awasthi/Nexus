@@ -26,10 +26,10 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { IQueueBackend, QueueJob } from "./interfaces/queue.interface.js";
+
 import type { IEventBus } from "./event-bus.js";
-import type { IMetricsCollector } from "./interfaces/observability.interface.js";
-import type { ITraceRecorder } from "./interfaces/observability.interface.js";
+import type { IMetricsCollector, ITraceRecorder } from "./interfaces/observability.interface.js";
+import type { IQueueBackend, QueueJob } from "./interfaces/queue.interface.js";
 
 // ─── Recovery store interface ─────────────────────────────────────────────────
 
@@ -126,8 +126,12 @@ export class CrashRecovery {
 
       if (!staleRef) {
         // No start time — definitely stale, re-queue it
-        await this.handleStale(task, now);
-        requeued++;
+        const wasRequeued = await this.handleStale(task, now);
+        if (wasRequeued) {
+          requeued++;
+        } else {
+          failed++;
+        }
         continue;
       }
 
@@ -138,8 +142,12 @@ export class CrashRecovery {
         continue;
       }
 
-      await this.handleStale(task, now);
-      requeued++;
+      const wasRequeued = await this.handleStale(task, now);
+      if (wasRequeued) {
+        requeued++;
+      } else {
+        failed++;
+      }
     }
 
     const durationMs = Date.now() - startedAt;
@@ -171,12 +179,13 @@ export class CrashRecovery {
       });
     }
 
-    if (span) this.tracer?.endSpan(span.spanId, result as unknown as Record<string, unknown>);
+    if (span) this.tracer?.endSpan(span.spanId, result);
 
     return result;
   }
 
-  private async handleStale(task: TaskRecord, nowMs: number): Promise<void> {
+  /** Returns true if the task was re-queued, false if it was moved to failed. */
+  private async handleStale(task: TaskRecord, nowMs: number): Promise<boolean> {
     const exceededRetries = task.retries >= task.maxRetries;
 
     if (exceededRetries) {
@@ -190,7 +199,7 @@ export class CrashRecovery {
         error: "Task exceeded max retries during crash recovery",
         retries_exhausted: true,
       });
-      return;
+      return false;
     }
 
     // Increment retry count, reset to queued, re-enqueue
@@ -219,13 +228,14 @@ export class CrashRecovery {
       max_retries: task.maxRetries,
       stale_duration_ms: task.startedAt ? nowMs - task.startedAt.getTime() : null,
     });
+    return true;
   }
 }
 
 // ─── MemoryRecoveryStore — for tests ─────────────────────────────────────────
 
 export class MemoryRecoveryStore implements IRecoveryStore {
-  private tasks: Map<string, TaskRecord> = new Map();
+  private tasks = new Map<string, TaskRecord>();
 
   /** Seed tasks directly for tests */
   seed(task: TaskRecord): void {

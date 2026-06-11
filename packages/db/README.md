@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # @nexus/db
 
 Drizzle ORM schemas, migrations, and typed query client for PostgreSQL 16 + pgvector.
@@ -15,15 +16,15 @@ import { db, schema } from "@nexus/db";
 
 ## Schema (7 tables)
 
-| Table | File | Description |
-|---|---|---|
-| `ingested_events` | `schema/ingested-events.ts` | Raw events from all adapters |
-| `signals` | `schema/signals.ts` | Classified, prioritised signal records |
-| `council_transcripts` | `schema/council-transcripts.ts` | Full deliberation transcripts with per-member votes |
-| `verdicts` | `schema/verdicts.ts` | Final council decisions bound to a task |
-| `runtime_tasks` | `schema/runtime-tasks.ts` | Task lifecycle: queued → running → complete / failed |
-| `approval_requests` | `schema/approval-requests.ts` | Human-in-the-loop approval queue |
-| `audit_log` | `schema/audit-log.ts` | HMAC-SHA256 chained immutable audit trail |
+| Table                 | File                            | Description                                          |
+| --------------------- | ------------------------------- | ---------------------------------------------------- |
+| `ingested_events`     | `schema/ingested-events.ts`     | Raw events from all adapters                         |
+| `signals`             | `schema/signals.ts`             | Classified, prioritised signal records               |
+| `council_transcripts` | `schema/council-transcripts.ts` | Full deliberation transcripts with per-member votes  |
+| `verdicts`            | `schema/verdicts.ts`            | Final council decisions bound to a task              |
+| `runtime_tasks`       | `schema/runtime-tasks.ts`       | Task lifecycle: queued → running → complete / failed |
+| `approval_requests`   | `schema/approval-requests.ts`   | Human-in-the-loop approval queue                     |
+| `audit_log`           | `schema/audit-log.ts`           | HMAC-SHA256 chained immutable audit trail            |
 
 ## Usage
 
@@ -70,6 +71,7 @@ DATABASE_URL=postgresql://user:pass@host:5432/nexus
 ```
 
 pgvector extension must be enabled:
+
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;
 ```

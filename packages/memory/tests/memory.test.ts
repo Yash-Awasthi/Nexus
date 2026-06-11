@@ -238,10 +238,17 @@ describe("MemoryManager", () => {
   });
 
   it("MemoryError thrown when embedder fails", async () => {
-    const badEmbedder = { dimensions: 4, embed: async () => { throw new Error("boom"); } };
+    const badEmbedder = {
+      dimensions: 4,
+      embed: async () => {
+        throw new Error("boom");
+      },
+    };
     const m = new MemoryManager({ store: new InMemoryStore(), embedder: badEmbedder });
     await expect(m.remember("test")).rejects.toThrow(MemoryError);
-    try { await m.remember("test"); } catch (e) {
+    try {
+      await m.remember("test");
+    } catch (e) {
       expect((e as MemoryError).code).toBe("EMBED_FAILED");
     }
   });

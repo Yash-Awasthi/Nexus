@@ -7,13 +7,18 @@
  *  2. SignalWorker — DB polling fallback for unprocessed events
  */
 
-import { createTaskWorkers } from "./workers/task-worker.js";
 import { SignalWorker } from "./workers/signal-worker.js";
+import { createTaskWorkers } from "./workers/task-worker.js";
 
-const REDIS_URL = process.env["REDIS_URL"] ?? "redis://localhost:6379";
+const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
 
 // Parse redis URL into BullMQ ConnectionOptions
-function parseRedisUrl(url: string): { host: string; port: number; password?: string; db?: number } {
+function parseRedisUrl(url: string): {
+  host: string;
+  port: number;
+  password?: string;
+  db?: number;
+} {
   const u = new URL(url);
   return {
     host: u.hostname,
@@ -30,7 +35,9 @@ async function main(): Promise<void> {
 
   // Start BullMQ queue workers
   const workers = createTaskWorkers(connection);
-  console.log(JSON.stringify({ level: "info", event: "worker.queues-started", count: workers.length }));
+  console.log(
+    JSON.stringify({ level: "info", event: "worker.queues-started", count: workers.length }),
+  );
 
   // Start DB-polling signal worker
   const signalWorker = new SignalWorker();

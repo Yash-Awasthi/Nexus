@@ -1,6 +1,7 @@
-import { IApprovalWorkflow, IApprovalRecord } from "./interfaces/governance.interface";
-import { IEventStore } from "./interfaces/persistence.interface";
-import { IEventBus } from "./event-bus";
+// SPDX-License-Identifier: Apache-2.0
+import type { IEventBus } from "./event-bus.js";
+import type { IApprovalWorkflow, IApprovalRecord } from "./interfaces/governance.interface.js";
+import type { IEventStore } from "./interfaces/persistence.interface.js";
 
 export class ApprovalWorkflow implements IApprovalWorkflow {
   private eventStore: IEventStore;
@@ -28,15 +29,27 @@ export class ApprovalWorkflow implements IApprovalWorkflow {
         const payload = e.payload as IApprovalRecord;
         recordsMap.set(payload.approvalId, {
           ...payload,
-          requestTimestamp: new Date(payload.requestTimestamp)
+          requestTimestamp: new Date(payload.requestTimestamp),
         });
-      } else if (e.event === "approval_approved" || e.event === "approval_denied" || e.event === "approval_expired") {
+      } else if (
+        e.event === "approval_approved" ||
+        e.event === "approval_denied" ||
+        e.event === "approval_expired"
+      ) {
         const payload = e.payload as IApprovalRecord;
         const existing = recordsMap.get(payload.approvalId);
         if (existing) {
           existing.status = payload.status;
-          existing.decisionTimestamp = payload.decisionTimestamp ? new Date(payload.decisionTimestamp) : undefined;
-          existing.decidedBy = payload.decidedBy;
+          if (payload.decisionTimestamp) {
+            existing.decisionTimestamp = new Date(payload.decisionTimestamp);
+          } else {
+            delete existing.decisionTimestamp;
+          }
+          if (payload.decidedBy !== undefined) {
+            existing.decidedBy = payload.decidedBy;
+          } else {
+            delete existing.decidedBy;
+          }
         }
       }
     }
@@ -51,7 +64,7 @@ export class ApprovalWorkflow implements IApprovalWorkflow {
       approvalId,
       taskId,
       status: "pending",
-      requestTimestamp: new Date()
+      requestTimestamp: new Date(),
     };
 
     recordsMap.set(approvalId, record);

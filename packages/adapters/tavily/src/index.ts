@@ -4,7 +4,12 @@
  * Task types: tavily.search, tavily.extract
  */
 
-import { defineAdapter, requireEnv, AdapterHttpError, type IExecutionContext } from "@nexus/plugin-sdk";
+import {
+  defineAdapter,
+  requireEnv,
+  AdapterHttpError,
+  type IExecutionContext,
+} from "@nexus/plugin-sdk";
 
 const TAVILY_BASE = "https://api.tavily.com";
 
@@ -29,16 +34,19 @@ export type TavilyTask = TavilySearchTask | TavilyExtractTask;
 export interface TavilySearchResult {
   answer?: string;
   query: string;
-  results: Array<{ title: string; url: string; content: string; score: number; rawContent?: string }>;
+  results: { title: string; url: string; content: string; score: number; rawContent?: string }[];
   responseTime: number;
 }
 
 export interface TavilyExtractResult {
-  results: Array<{ url: string; rawContent: string }>;
+  results: { url: string; rawContent: string }[];
   failedResults: string[];
 }
 
-async function execute(task: TavilyTask, ctx: IExecutionContext): Promise<TavilySearchResult | TavilyExtractResult> {
+async function execute(
+  task: TavilyTask,
+  ctx: IExecutionContext,
+): Promise<TavilySearchResult | TavilyExtractResult> {
   const apiKey = requireEnv(ctx, "TAVILY_API_KEY");
 
   if (task.taskType === "tavily.search") {
@@ -47,7 +55,8 @@ async function execute(task: TavilyTask, ctx: IExecutionContext): Promise<Tavily
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        api_key: apiKey, query: task.query,
+        api_key: apiKey,
+        query: task.query,
         search_depth: task.searchDepth ?? "basic",
         include_answer: task.includeAnswer ?? true,
         include_raw_content: task.includeRawContent ?? false,
@@ -56,7 +65,8 @@ async function execute(task: TavilyTask, ctx: IExecutionContext): Promise<Tavily
         exclude_domains: task.excludeDomains ?? [],
       }),
     });
-    if (!response.ok) throw new AdapterHttpError("nexus-adapter-tavily", response.status, await response.text());
+    if (!response.ok)
+      throw new AdapterHttpError("nexus-adapter-tavily", response.status, await response.text());
     return response.json() as Promise<TavilySearchResult>;
   }
 
@@ -66,7 +76,8 @@ async function execute(task: TavilyTask, ctx: IExecutionContext): Promise<Tavily
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ api_key: apiKey, urls: task.urls }),
   });
-  if (!response.ok) throw new AdapterHttpError("nexus-adapter-tavily", response.status, await response.text());
+  if (!response.ok)
+    throw new AdapterHttpError("nexus-adapter-tavily", response.status, await response.text());
   return response.json() as Promise<TavilyExtractResult>;
 }
 

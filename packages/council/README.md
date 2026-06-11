@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # @nexus/council
 
 Multi-model deliberation engine for NEXUS (evolved from Judica).
@@ -73,7 +74,7 @@ new GroqTransport({
   apiKey: process.env.GROQ_API_KEY,
   model: "llama-3.3-70b-versatile",
   temperature: 0.1,
-})
+});
 ```
 
 ### `summonArchetypes`
@@ -81,7 +82,7 @@ new GroqTransport({
 Returns a list of `Archetype` presets that prime the council with different reasoning perspectives.
 
 ```ts
-summonArchetypes(["deliberative", "analytical", "risk-analyst", "creative"])
+summonArchetypes(["deliberative", "analytical", "risk-analyst", "creative"]);
 ```
 
 Each archetype injects a system prompt that shapes how that council member frames its response.
@@ -103,8 +104,8 @@ interface ILLMTransport {
 
 ## Voting modes
 
-| Mode | Behaviour |
-|---|---|
-| `unanimous` | All providers must agree; disagreement → `defer` |
-| `majority` | Simple majority of provider verdicts wins |
-| `weighted` | Providers have configurable weight; weighted sum determines verdict |
+| Mode        | Behaviour                                                           |
+| ----------- | ------------------------------------------------------------------- |
+| `unanimous` | All providers must agree; disagreement → `defer`                    |
+| `majority`  | Simple majority of provider verdicts wins                           |
+| `weighted`  | Providers have configurable weight; weighted sum determines verdict |

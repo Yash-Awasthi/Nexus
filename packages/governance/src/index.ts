@@ -13,7 +13,7 @@
  *   Guardrails  — runtime checks on plan-level or log-level data (loop detection, cost ceiling)
  */
 
-import { GovernanceViolationError } from "@nexus/shared";
+export { GovernanceViolationError } from "@nexus/shared";
 
 // ── Core types ─────────────────────────────────────────────────────────────────
 
@@ -56,14 +56,19 @@ export interface IExecutionPolicy {
 
 export interface IRuntimeGuardrail {
   name: string;
-  check(tasks: ITaskSynthesisResult[], executionLogs: unknown[]): { success: boolean; reason?: string };
+  check(
+    tasks: ITaskSynthesisResult[],
+    executionLogs: unknown[],
+  ): { success: boolean; reason?: string };
 }
 
 export interface IGovernanceEngine {
   registerConstraint(constraint: IExecutionConstraint): void;
   registerPolicy(policy: IExecutionPolicy): void;
   registerGuardrail(guardrail: IRuntimeGuardrail): void;
-  evaluateTask(task: ITaskSynthesisResult): Promise<{ allowed: boolean; requiresApproval: boolean; reason?: string }>;
+  evaluateTask(
+    task: ITaskSynthesisResult,
+  ): Promise<{ allowed: boolean; requiresApproval: boolean; reason?: string }>;
   evaluatePlan(plan: ICognitiveTrace): Promise<{ allowed: boolean; reason?: string }>;
 }
 
@@ -97,7 +102,10 @@ export class CostBudgetConstraint implements IExecutionConstraint {
   validate(task: ITaskSynthesisResult): { success: boolean; reason?: string } {
     const cost = task.governanceMetadata?.costEstimate ?? 0;
     if (cost > this.maxTaskCost) {
-      return { success: false, reason: `Cost estimate $${cost} exceeds task budget $${this.maxTaskCost}` };
+      return {
+        success: false,
+        reason: `Cost estimate $${cost} exceeds task budget $${this.maxTaskCost}`,
+      };
     }
     return { success: true };
   }
@@ -114,7 +122,10 @@ export class TimeoutConstraint implements IExecutionConstraint {
   validate(task: ITaskSynthesisResult): { success: boolean; reason?: string } {
     const declared = task.governanceMetadata?.maxExecutionMs;
     if (typeof declared === "number" && declared > this.maxExecutionMs) {
-      return { success: false, reason: `Declared maxExecutionMs ${declared}ms exceeds ceiling ${this.maxExecutionMs}ms` };
+      return {
+        success: false,
+        reason: `Declared maxExecutionMs ${declared}ms exceeds ceiling ${this.maxExecutionMs}ms`,
+      };
     }
     return { success: true };
   }
@@ -138,7 +149,7 @@ export class WildcardPermissionsPolicy implements IExecutionPolicy {
   name = "WildcardPermissionsPolicy";
 
   requiresApproval(task: ITaskSynthesisResult): boolean {
-    const perms = task.arguments["permissions"];
+    const perms = task.arguments.permissions;
     return Array.isArray(perms) && perms.includes("*");
   }
 
@@ -157,15 +168,21 @@ export class LoopDetectionGuardrail implements IRuntimeGuardrail {
     this.maxCount = maxCount;
   }
 
-  check(_tasks: ITaskSynthesisResult[], executionLogs: unknown[]): { success: boolean; reason?: string } {
+  check(
+    _tasks: ITaskSynthesisResult[],
+    executionLogs: unknown[],
+  ): { success: boolean; reason?: string } {
     const counts = new Map<string, number>();
     for (const log of executionLogs) {
       const entry = log as Record<string, unknown>;
-      const action = String(entry["action"] ?? entry["event"] ?? "");
+      const action = String(entry.action ?? entry.event ?? "");
       const n = (counts.get(action) ?? 0) + 1;
       counts.set(action, n);
       if (n > this.maxCount) {
-        return { success: false, reason: `Loop detected: action '${action}' invoked ${n} times (max ${this.maxCount})` };
+        return {
+          success: false,
+          reason: `Loop detected: action '${action}' invoked ${n} times (max ${this.maxCount})`,
+        };
       }
     }
     return { success: true };
@@ -180,11 +197,17 @@ export class RunawayRetriesGuardrail implements IRuntimeGuardrail {
     this.maxRetries = maxRetries;
   }
 
-  check(_tasks: ITaskSynthesisResult[], executionLogs: unknown[]): { success: boolean; reason?: string } {
+  check(
+    _tasks: ITaskSynthesisResult[],
+    executionLogs: unknown[],
+  ): { success: boolean; reason?: string } {
     for (const log of executionLogs) {
       const entry = log as Record<string, unknown>;
-      if (typeof entry["retries"] === "number" && entry["retries"] > this.maxRetries) {
-        return { success: false, reason: `Runaway retries: ${entry["retries"]} exceeds max ${this.maxRetries}` };
+      if (typeof entry.retries === "number" && entry.retries > this.maxRetries) {
+        return {
+          success: false,
+          reason: `Runaway retries: ${entry.retries} exceeds max ${this.maxRetries}`,
+        };
       }
     }
     return { success: true };
@@ -201,7 +224,10 @@ export class TaskGraphLimitGuardrail implements IRuntimeGuardrail {
 
   check(tasks: ITaskSynthesisResult[], _logs: unknown[]): { success: boolean; reason?: string } {
     if (tasks.length > this.maxTasks) {
-      return { success: false, reason: `Task graph has ${tasks.length} tasks; ceiling is ${this.maxTasks}` };
+      return {
+        success: false,
+        reason: `Task graph has ${tasks.length} tasks; ceiling is ${this.maxTasks}`,
+      };
     }
     return { success: true };
   }
@@ -218,7 +244,10 @@ export class HighCostPlanGuardrail implements IRuntimeGuardrail {
   check(tasks: ITaskSynthesisResult[], _logs: unknown[]): { success: boolean; reason?: string } {
     const total = tasks.reduce((s, t) => s + (t.governanceMetadata?.costEstimate ?? 0), 0);
     if (total > this.maxPlanCost) {
-      return { success: false, reason: `Plan cost $${total.toFixed(2)} exceeds ceiling $${this.maxPlanCost}` };
+      return {
+        success: false,
+        reason: `Plan cost $${total.toFixed(2)} exceeds ceiling $${this.maxPlanCost}`,
+      };
     }
     return { success: true };
   }
@@ -238,7 +267,10 @@ export class DuplicateActionGuardrail implements IRuntimeGuardrail {
       const n = (counts.get(task.action) ?? 0) + 1;
       counts.set(task.action, n);
       if (n > this.maxDuplicates) {
-        return { success: false, reason: `Duplicate action '${task.action}' appears ${n} times (max ${this.maxDuplicates})` };
+        return {
+          success: false,
+          reason: `Duplicate action '${task.action}' appears ${n} times (max ${this.maxDuplicates})`,
+        };
       }
     }
     return { success: true };
@@ -267,11 +299,17 @@ export class GovernanceEngine implements IGovernanceEngine {
     return this;
   }
 
-  async evaluateTask(task: ITaskSynthesisResult): Promise<{ allowed: boolean; requiresApproval: boolean; reason?: string }> {
+  async evaluateTask(
+    task: ITaskSynthesisResult,
+  ): Promise<{ allowed: boolean; requiresApproval: boolean; reason?: string }> {
     for (const constraint of this.constraints) {
       const res = constraint.validate(task);
       if (!res.success) {
-        return { allowed: false, requiresApproval: false, reason: `${constraint.name}: ${res.reason}` };
+        return {
+          allowed: false,
+          requiresApproval: false,
+          reason: `${constraint.name}: ${res.reason}`,
+        };
       }
     }
 

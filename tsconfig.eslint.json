@@ -1,0 +1,17 @@
+// SPDX-License-Identifier: Apache-2.0
+// tsconfig used exclusively by ESLint's project-service (not tsc builds).
+// Includes test files so @typescript-eslint can type-check them without
+// requiring each package to widen its own tsconfig.
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "packages/*/src/**/*",
+    "packages/*/tests/**/*",
+    "apps/*/src/**/*",
+    "apps/*/tests/**/*",
+    "scripts/**/*"
+  ]
+}

@@ -205,7 +205,9 @@ describe("CrashRecovery", () => {
 // ─── Property-based: recovery is always idempotent ───────────────────────────
 
 describe("CrashRecovery — property-based", () => {
-  const priorityArb = fc.constantFrom("low", "medium", "high") as fc.Arbitrary<"low" | "medium" | "high">;
+  const priorityArb = fc.constantFrom("low", "medium", "high") as fc.Arbitrary<
+    "low" | "medium" | "high"
+  >;
 
   it("second recover() always has 0 requeued (idempotency)", async () => {
     await fc.assert(
@@ -225,10 +227,12 @@ describe("CrashRecovery — property-based", () => {
           const recovery = new CrashRecovery(makeConfig(store, queue, eventBus));
 
           for (const def of taskDefs) {
-            store.seed(makeTask({
-              ...def,
-              startedAt: new Date(Date.now() - 10 * 60 * 1000), // all stale
-            }));
+            store.seed(
+              makeTask({
+                ...def,
+                startedAt: new Date(Date.now() - 10 * 60 * 1000), // all stale
+              }),
+            );
           }
 
           await recovery.recover(); // first run
@@ -259,11 +263,13 @@ describe("CrashRecovery — property-based", () => {
           const recovery = new CrashRecovery(makeConfig(store, queue, eventBus));
 
           for (const def of taskDefs) {
-            store.seed(makeTask({
-              retries: def.retries,
-              maxRetries: def.maxRetries,
-              startedAt: new Date(Date.now() - def.staleDeltaMs),
-            }));
+            store.seed(
+              makeTask({
+                retries: def.retries,
+                maxRetries: def.maxRetries,
+                startedAt: new Date(Date.now() - def.staleDeltaMs),
+              }),
+            );
           }
 
           const result = await recovery.recover();

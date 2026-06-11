@@ -122,15 +122,15 @@ terraform apply
 
 ## 3. Service topology
 
-| Service | Port | Repo path | Healthcheck |
-|---------|------|-----------|-------------|
-| `nexus-api` | 3000 | `apps/api` | `GET /health` |
-| `nexus-worker` | — | `apps/worker` | Process alive + Redis ping |
-| `nexus-web` | 5173 (dev) / 80 (prod) | `apps/web` | Static serve |
-| `nexus-ingest` | 8000 | `services/ingest` | `GET /health` |
-| `postgres` | 5432 | `infra/docker` | `pg_isready` |
-| `redis` | 6379 | `infra/docker` | `PING` |
-| `otel-collector` | 4317 (gRPC) / 4318 (HTTP) | `infra/otel` | `/metrics` |
+| Service          | Port                      | Repo path         | Healthcheck                |
+| ---------------- | ------------------------- | ----------------- | -------------------------- |
+| `nexus-api`      | 3000                      | `apps/api`        | `GET /health`              |
+| `nexus-worker`   | —                         | `apps/worker`     | Process alive + Redis ping |
+| `nexus-web`      | 5173 (dev) / 80 (prod)    | `apps/web`        | Static serve               |
+| `nexus-ingest`   | 8000                      | `services/ingest` | `GET /health`              |
+| `postgres`       | 5432                      | `infra/docker`    | `pg_isready`               |
+| `redis`          | 6379                      | `infra/docker`    | `PING`                     |
+| `otel-collector` | 4317 (gRPC) / 4318 (HTTP) | `infra/otel`      | `/metrics`                 |
 
 ---
 
@@ -215,13 +215,13 @@ curl -s $NEXUS_API_URL/api/v1/audit/log/verify | jq .
 
 ## 5. Scaling guidelines
 
-| Component | Scale trigger | Action |
-|-----------|--------------|--------|
-| `nexus-api` | p99 latency > 500ms | Add replicas; set `HPA minReplicas=2` |
-| `nexus-worker` | Queue depth > 500 sustained | Add worker replicas; increase `concurrency` |
-| `nexus-ingest` | Scrape backlog > 30min | Add ingest replicas; reduce `FINSCRAPE_MAX_ARTICLES` |
-| Postgres | CPU > 70%, connections > 80% | Enable PgBouncer; scale to larger instance |
-| Redis | Memory > 80% | Increase `maxmemory`; enable cluster mode |
+| Component      | Scale trigger                | Action                                               |
+| -------------- | ---------------------------- | ---------------------------------------------------- |
+| `nexus-api`    | p99 latency > 500ms          | Add replicas; set `HPA minReplicas=2`                |
+| `nexus-worker` | Queue depth > 500 sustained  | Add worker replicas; increase `concurrency`          |
+| `nexus-ingest` | Scrape backlog > 30min       | Add ingest replicas; reduce `FINSCRAPE_MAX_ARTICLES` |
+| Postgres       | CPU > 70%, connections > 80% | Enable PgBouncer; scale to larger instance           |
+| Redis          | Memory > 80%                 | Increase `maxmemory`; enable cluster mode            |
 
 ---
 
@@ -351,18 +351,19 @@ docker compose start nexus-api nexus-worker nexus-ingest
 ### 7.3 Redis backup
 
 Redis is ephemeral queue state. On failure:
+
 1. Restart Redis — BullMQ workers will continue from DB-resident state
 2. `SignalWorker` polls `ingested_events` and repopulates the queue automatically
 
 ### 7.4 Recovery time objectives
 
-| Scenario | RTO | RPO |
-|----------|-----|-----|
-| API pod crash | < 30s (container restart) | 0 |
-| Worker pod crash | < 30s | 0 (jobs persisted in Redis) |
-| Redis failure | < 5min | < 5min (in-flight jobs) |
-| Postgres failure | < 1hr | < 24hr (daily backup) |
-| Full datacenter loss | < 4hr | < 24hr |
+| Scenario             | RTO                       | RPO                         |
+| -------------------- | ------------------------- | --------------------------- |
+| API pod crash        | < 30s (container restart) | 0                           |
+| Worker pod crash     | < 30s                     | 0 (jobs persisted in Redis) |
+| Redis failure        | < 5min                    | < 5min (in-flight jobs)     |
+| Postgres failure     | < 1hr                     | < 24hr (daily backup)       |
+| Full datacenter loss | < 4hr                     | < 24hr                      |
 
 ---
 
@@ -409,22 +410,22 @@ pnpm --filter @nexus/db drizzle:migrate:rollback
 
 ## 9. Configuration reference
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `DATABASE_URL` | ✅ | — | Postgres connection string |
-| `REDIS_URL` | ✅ | `redis://localhost:6379` | Redis connection |
-| `NEXUS_API_KEY` | ✅ | — | Bearer token for API auth |
-| `NEXUS_AUDIT_KEY` | ✅ | — | HMAC key for audit chain |
-| `GROQ_API_KEY` | ✅ | — | Groq LLM provider key |
-| `NEXUS_INGEST_API_KEY` | ✅ | — | Key for ingest service |
-| `NEXUS_COUNCIL_URL` | ❌ | `http://localhost:3000` | Council service URL |
-| `NEXUS_INGEST_URL` | ❌ | `http://localhost:8000` | Ingest service URL |
-| `LOG_LEVEL` | ❌ | `info` | `debug`, `info`, `warn`, `error` |
-| `PORT` | ❌ | `3000` | API server port |
-| `SIGNAL_WORKER_INTERVAL_MS` | ❌ | `5000` | Signal worker poll interval |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | ❌ | — | OTel collector endpoint |
-| `ALLOWED_SCRAPE_HOSTS` | ❌ | allowlist | Comma-separated scraper hostnames |
-| `NEXUS_COUNCIL_DEFAULT_BUDGET_USD` | ❌ | `0.10` | Default per-deliberation LLM budget |
+| Variable                           | Required | Default                  | Description                         |
+| ---------------------------------- | -------- | ------------------------ | ----------------------------------- |
+| `DATABASE_URL`                     | ✅       | —                        | Postgres connection string          |
+| `REDIS_URL`                        | ✅       | `redis://localhost:6379` | Redis connection                    |
+| `NEXUS_API_KEY`                    | ✅       | —                        | Bearer token for API auth           |
+| `NEXUS_AUDIT_KEY`                  | ✅       | —                        | HMAC key for audit chain            |
+| `GROQ_API_KEY`                     | ✅       | —                        | Groq LLM provider key               |
+| `NEXUS_INGEST_API_KEY`             | ✅       | —                        | Key for ingest service              |
+| `NEXUS_COUNCIL_URL`                | ❌       | `http://localhost:3000`  | Council service URL                 |
+| `NEXUS_INGEST_URL`                 | ❌       | `http://localhost:8000`  | Ingest service URL                  |
+| `LOG_LEVEL`                        | ❌       | `info`                   | `debug`, `info`, `warn`, `error`    |
+| `PORT`                             | ❌       | `3000`                   | API server port                     |
+| `SIGNAL_WORKER_INTERVAL_MS`        | ❌       | `5000`                   | Signal worker poll interval         |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`      | ❌       | —                        | OTel collector endpoint             |
+| `ALLOWED_SCRAPE_HOSTS`             | ❌       | allowlist                | Comma-separated scraper hostnames   |
+| `NEXUS_COUNCIL_DEFAULT_BUDGET_USD` | ❌       | `0.10`                   | Default per-deliberation LLM budget |
 
 ---
 
@@ -432,12 +433,12 @@ pnpm --filter @nexus/db drizzle:migrate:rollback
 
 See `docs/slos.md` for full SLO declarations. Summary:
 
-| SLO | Target | Alert threshold |
-|-----|--------|----------------|
-| API availability | 99.5% | < 99% over 5min |
-| API p99 latency | < 500ms | > 750ms over 5min |
-| Council deliberation success rate | 99% | < 97% over 15min |
-| Queue job processing rate | < 30s p99 | > 60s p99 over 10min |
-| Audit log chain integrity | 100% | Any breach |
+| SLO                               | Target    | Alert threshold      |
+| --------------------------------- | --------- | -------------------- |
+| API availability                  | 99.5%     | < 99% over 5min      |
+| API p99 latency                   | < 500ms   | > 750ms over 5min    |
+| Council deliberation success rate | 99%       | < 97% over 15min     |
+| Queue job processing rate         | < 30s p99 | > 60s p99 over 10min |
+| Audit log chain integrity         | 100%      | Any breach           |
 
 Alert destinations: PagerDuty (Critical), Slack `#nexus-alerts` (Warning).

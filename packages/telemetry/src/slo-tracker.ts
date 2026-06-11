@@ -71,7 +71,7 @@ export interface SloViolation {
 // ─── Rolling window sample ─────────────────────────────────────────────────────
 
 interface Sample {
-  ts: number;          // timestamp ms
+  ts: number; // timestamp ms
   success: boolean;
   latencyMs: number;
   operation?: string;
@@ -97,7 +97,7 @@ export class SloTracker {
   private readonly onViolation?: (v: SloViolation) => void;
   private readonly criticalBurnRateThreshold: number;
   /** Track which SLIs are currently violated to avoid duplicate callbacks */
-  private activeViolations = new Set<string>();
+  private activeViolations = new Set<SloViolation["sli"]>();
 
   constructor(config: SloTrackerConfig = {}) {
     this.windowMs = config.windowMs ?? 5 * 60 * 1000;
@@ -106,7 +106,9 @@ export class SloTracker {
       errorRateTarget: config.targets?.errorRateTarget ?? 0.001,
       p99LatencyTargetMs: config.targets?.p99LatencyTargetMs ?? 1000,
     };
-    this.onViolation = config.onViolation;
+    if (config.onViolation !== undefined) {
+      this.onViolation = config.onViolation;
+    }
     this.criticalBurnRateThreshold = config.criticalBurnRateThreshold ?? 14.4;
   }
 

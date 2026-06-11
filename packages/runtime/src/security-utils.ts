@@ -1,5 +1,6 @@
-import { URL } from "url";
+// SPDX-License-Identifier: Apache-2.0
 import * as path from "path";
+import { URL } from "url";
 
 /**
  * Checks if a URL is safe to load, preventing path traversal, loopback access,
@@ -25,7 +26,7 @@ export function isSafeUrl(urlStr: string): boolean {
       "169.254.169.254",
       "metadata.google.internal",
       "metadata",
-      "instance-data"
+      "instance-data",
     ]);
 
     if (forbiddenHosts.has(host)) {

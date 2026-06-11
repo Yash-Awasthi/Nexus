@@ -6,8 +6,8 @@
  * dequeued from nexus-high or nexus-medium.
  */
 
-import { CouncilService } from "@nexus/council";
 import type { CouncilRequest } from "@nexus/contracts";
+import { CouncilService } from "@nexus/council";
 
 let _svc: CouncilService | null = null;
 

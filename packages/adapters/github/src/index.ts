@@ -101,9 +101,9 @@ export type GitHubTask =
 function githubFetch(
   path: string,
   token: string,
-  method: string = "GET",
+  method = "GET",
   body?: unknown,
-  baseUrl: string = "https://api.github.com",
+  baseUrl = "https://api.github.com",
 ): Promise<Response> {
   const url = `${baseUrl}${path}`;
   return fetch(url, {
@@ -130,15 +130,27 @@ async function assertOk(res: Response, adapterName: string): Promise<unknown> {
 
 async function execute(task: GitHubTask, ctx: IExecutionContext): Promise<unknown> {
   const token = requireEnv(ctx, "GITHUB_TOKEN");
-  const baseUrl = (ctx.env?.["GITHUB_API_URL"] as string | undefined) ?? "https://api.github.com";
+  const baseUrl =
+    (ctx.environment?.["GITHUB_API_URL"] as string | undefined) ?? "https://api.github.com";
 
   switch (task.taskType) {
     case "github.create-issue": {
-      ctx.logger.info("github.create-issue", { owner: task.owner, repo: task.repo, title: task.title });
+      ctx.logger.info("github.create-issue", {
+        owner: task.owner,
+        repo: task.repo,
+        title: task.title,
+      });
       const res = await githubFetch(
         `/repos/${task.owner}/${task.repo}/issues`,
-        token, "POST",
-        { title: task.title, body: task.body, labels: task.labels, assignees: task.assignees, milestone: task.milestone },
+        token,
+        "POST",
+        {
+          title: task.title,
+          body: task.body,
+          labels: task.labels,
+          assignees: task.assignees,
+          milestone: task.milestone,
+        },
         baseUrl,
       );
       return assertOk(res, "nexus-adapter-github");
@@ -154,36 +166,63 @@ async function execute(task: GitHubTask, ctx: IExecutionContext): Promise<unknow
       });
       const res = await githubFetch(
         `/repos/${task.owner}/${task.repo}/issues?${params}`,
-        token, "GET", undefined, baseUrl,
+        token,
+        "GET",
+        undefined,
+        baseUrl,
       );
       return assertOk(res, "nexus-adapter-github");
     }
 
     case "github.create-pr": {
-      ctx.logger.info("github.create-pr", { owner: task.owner, repo: task.repo, head: task.head, base: task.base });
+      ctx.logger.info("github.create-pr", {
+        owner: task.owner,
+        repo: task.repo,
+        head: task.head,
+        base: task.base,
+      });
       const res = await githubFetch(
         `/repos/${task.owner}/${task.repo}/pulls`,
-        token, "POST",
-        { title: task.title, head: task.head, base: task.base, body: task.body, draft: task.draft ?? false },
+        token,
+        "POST",
+        {
+          title: task.title,
+          head: task.head,
+          base: task.base,
+          body: task.body,
+          draft: task.draft ?? false,
+        },
         baseUrl,
       );
       return assertOk(res, "nexus-adapter-github");
     }
 
     case "github.get-pr": {
-      ctx.logger.info("github.get-pr", { owner: task.owner, repo: task.repo, pull_number: task.pull_number });
+      ctx.logger.info("github.get-pr", {
+        owner: task.owner,
+        repo: task.repo,
+        pull_number: task.pull_number,
+      });
       const res = await githubFetch(
         `/repos/${task.owner}/${task.repo}/pulls/${task.pull_number}`,
-        token, "GET", undefined, baseUrl,
+        token,
+        "GET",
+        undefined,
+        baseUrl,
       );
       return assertOk(res, "nexus-adapter-github");
     }
 
     case "github.merge-pr": {
-      ctx.logger.info("github.merge-pr", { owner: task.owner, repo: task.repo, pull_number: task.pull_number });
+      ctx.logger.info("github.merge-pr", {
+        owner: task.owner,
+        repo: task.repo,
+        pull_number: task.pull_number,
+      });
       const res = await githubFetch(
         `/repos/${task.owner}/${task.repo}/pulls/${task.pull_number}/merge`,
-        token, "PUT",
+        token,
+        "PUT",
         { commit_title: task.commit_title, merge_method: task.merge_method ?? "squash" },
         baseUrl,
       );
@@ -191,10 +230,15 @@ async function execute(task: GitHubTask, ctx: IExecutionContext): Promise<unknow
     }
 
     case "github.create-comment": {
-      ctx.logger.info("github.create-comment", { owner: task.owner, repo: task.repo, issue_number: task.issue_number });
+      ctx.logger.info("github.create-comment", {
+        owner: task.owner,
+        repo: task.repo,
+        issue_number: task.issue_number,
+      });
       const res = await githubFetch(
         `/repos/${task.owner}/${task.repo}/issues/${task.issue_number}/comments`,
-        token, "POST",
+        token,
+        "POST",
         { body: task.body },
         baseUrl,
       );
@@ -205,7 +249,10 @@ async function execute(task: GitHubTask, ctx: IExecutionContext): Promise<unknow
       ctx.logger.info("github.get-repo", { owner: task.owner, repo: task.repo });
       const res = await githubFetch(
         `/repos/${task.owner}/${task.repo}`,
-        token, "GET", undefined, baseUrl,
+        token,
+        "GET",
+        undefined,
+        baseUrl,
       );
       return assertOk(res, "nexus-adapter-github");
     }
@@ -219,7 +266,7 @@ async function execute(task: GitHubTask, ctx: IExecutionContext): Promise<unknow
 
 // ── Export ────────────────────────────────────────────────────────────────────
 
-export const githubAdapter = defineAdapter<GitHubTask, unknown>({
+export const githubAdapter = defineAdapter<GitHubTask>({
   name: "nexus-adapter-github",
   version: "0.1.0",
   capabilities: ["storage.read", "storage.write"],

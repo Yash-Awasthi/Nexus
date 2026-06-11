@@ -7,10 +7,12 @@
  *   PATCH  /api/v1/runtime/tasks/:taskId   (cancel)
  */
 
-import type { FastifyInstance } from "fastify";
 import { db } from "@nexus/db";
 import { runtimeTasks } from "@nexus/db/schema";
-import { eq, desc, and, SQL } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
+import type { FastifyInstance } from "fastify";
+
 import { requireAuth } from "../middleware/auth.js";
 
 export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
@@ -94,30 +96,21 @@ export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{
     Params: { taskId: string };
     Body: { action: "cancel" };
-  }>(
-    "/runtime/tasks/:taskId",
-    { preHandler: requireAuth },
-    async (request, reply) => {
-      const { action } = request.body;
-      if (action !== "cancel") {
-        return reply.code(400).send({ error: "Only 'cancel' action is supported" });
-      }
+  }>("/runtime/tasks/:taskId", { preHandler: requireAuth }, async (request, reply) => {
+    const { action } = request.body;
+    if (action !== "cancel") {
+      return reply.code(400).send({ error: "Only 'cancel' action is supported" });
+    }
 
-      const [updated] = await db
-        .update(runtimeTasks)
-        .set({ status: "cancelled", completedAt: new Date() })
-        .where(
-          and(
-            eq(runtimeTasks.id, request.params.taskId),
-            eq(runtimeTasks.status, "queued"),
-          ),
-        )
-        .returning();
+    const [updated] = await db
+      .update(runtimeTasks)
+      .set({ status: "cancelled", completedAt: new Date() })
+      .where(and(eq(runtimeTasks.id, request.params.taskId), eq(runtimeTasks.status, "queued")))
+      .returning();
 
-      if (!updated) {
-        return reply.code(409).send({ error: "Task cannot be cancelled (not in queued state)" });
-      }
-      return reply.send(updated);
-    },
-  );
+    if (!updated) {
+      return reply.code(409).send({ error: "Task cannot be cancelled (not in queued state)" });
+    }
+    return reply.send(updated);
+  });
 }

@@ -10,12 +10,12 @@ Get the full NEXUS stack running locally in under 5 minutes.
 
 ## Prerequisites
 
-| Tool | Version | Install |
-|------|---------|---------|
-| Docker | 25+ | [docker.com](https://docs.docker.com/get-docker/) |
-| Node.js | 20 LTS | `nvm install 20` |
-| pnpm | 9 | `npm i -g pnpm@9` |
-| Python | 3.11 | `pyenv install 3.11` |
+| Tool    | Version | Install                                           |
+| ------- | ------- | ------------------------------------------------- |
+| Docker  | 25+     | [docker.com](https://docs.docker.com/get-docker/) |
+| Node.js | 20 LTS  | `nvm install 20`                                  |
+| pnpm    | 9       | `npm i -g pnpm@9`                                 |
+| Python  | 3.11    | `pyenv install 3.11`                              |
 
 ## 1. Clone and configure
 
@@ -54,6 +54,7 @@ pnpm dev
 ```
 
 This starts in parallel:
+
 - `nexus-api` → http://localhost:3000
 - `nexus-worker` → background process
 - `nexus-web` → http://localhost:5173

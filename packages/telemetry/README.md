@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # @nexus/telemetry
 
 Observability stack for NEXUS: health aggregation, SLO tracking, structured logging, Prometheus metrics, HMAC-chained audit log, disaster recovery, and OpenTelemetry bootstrap.
@@ -8,12 +9,7 @@ Observability stack for NEXUS: health aggregation, SLO tracking, structured logg
 Internal monorepo package. Consumed by `apps/api` and `apps/worker`.
 
 ```ts
-import {
-  HealthAggregator,
-  SloTracker,
-  ObservabilityManager,
-  createLogger,
-} from "@nexus/telemetry";
+import { HealthAggregator, SloTracker, ObservabilityManager, createLogger } from "@nexus/telemetry";
 ```
 
 ## Components

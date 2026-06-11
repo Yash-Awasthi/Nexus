@@ -83,15 +83,23 @@ export interface AuditStore {
  * Ensures the same payload always produces the same bytes regardless of
  * insertion-time key ordering.
  */
+function normalise(obj: unknown): unknown {
+  if (obj === null || typeof obj !== "object" || Array.isArray(obj)) {
+    return JSON.stringify(obj); // primitives → their JSON string form
+  }
+  const sorted: Record<string, unknown> = {};
+  for (const key of Object.keys(obj as Record<string, unknown>).sort()) {
+    sorted[key] = normalise((obj as Record<string, unknown>)[key]);
+  }
+  return sorted; // objects returned as value, not string
+}
 export function canonicalJson(obj: unknown): string {
+  // Top-level null, array, or primitive: standard JSON serialisation
   if (obj === null || typeof obj !== "object" || Array.isArray(obj)) {
     return JSON.stringify(obj);
   }
-  const sorted: Record<string, unknown> = {};
-  for (const key of Object.keys(obj as object).sort()) {
-    sorted[key] = canonicalJson((obj as Record<string, unknown>)[key]);
-  }
-  return JSON.stringify(sorted);
+  // Plain object: sort keys recursively, stringify primitive leaf values
+  return JSON.stringify(normalise(obj));
 }
 
 /** SHA-256 hex of the canonical JSON encoding of `payload`. */
@@ -148,7 +156,7 @@ export class AuditLog {
     const prevChainHash =
       latestSeq === 0
         ? GENESIS_SENTINEL
-        : (await this.store.chainHashAt(latestSeq)) ?? GENESIS_SENTINEL;
+        : ((await this.store.chainHashAt(latestSeq)) ?? GENESIS_SENTINEL);
 
     const payloadHash = hashPayload(payload);
     const chainHash = computeChainHash(this.hmacKey, prevChainHash, payloadHash);
@@ -197,16 +205,17 @@ export class AuditLog {
       // Re-derive payloadHash from the stored payload for tamper detection
       const recomputedPayloadHash = hashPayload(entry.payload);
       if (recomputedPayloadHash !== entry.payloadHash) {
-        return { valid: false, checkedCount: entries.indexOf(entry), firstBrokenSequence: entry.sequence };
+        return {
+          valid: false,
+          checkedCount: entries.indexOf(entry),
+          firstBrokenSequence: entry.sequence,
+        };
       }
 
       // Timing-safe comparison of the chain hash
       const expectedBuf = Buffer.from(expectedHash, "hex");
       const actualBuf = Buffer.from(entry.chainHash, "hex");
-      if (
-        expectedBuf.length !== actualBuf.length ||
-        !timingSafeEqual(expectedBuf, actualBuf)
-      ) {
+      if (expectedBuf.length !== actualBuf.length || !timingSafeEqual(expectedBuf, actualBuf)) {
         return {
           valid: false,
           checkedCount: entries.indexOf(entry),

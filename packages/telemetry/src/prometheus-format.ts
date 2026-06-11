@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Minimal Prometheus text exposition from in-process MetricsCollector output.
  */
@@ -15,7 +16,7 @@ export function metricsToPrometheus(metrics: Record<string, unknown>): string {
       lines.push(`# TYPE ${safeName} gauge`);
       lines.push(`${safeName} ${value}`);
     } else if (Array.isArray(value) && value.every((v) => typeof v === "number")) {
-      const arr = value as number[];
+      const arr = value;
       const sum = arr.reduce((a, b) => a + b, 0);
       const count = arr.length;
       const max = count ? Math.max(...arr) : 0;
@@ -32,7 +33,11 @@ export function metricsToPrometheus(metrics: Record<string, unknown>): string {
   return lines.join("\n") + "\n";
 }
 
-export function formatMetricLine(name: string, value: number, labels?: Record<string, string>): string {
+export function formatMetricLine(
+  name: string,
+  value: number,
+  labels?: Record<string, string>,
+): string {
   if (!labels || Object.keys(labels).length === 0) {
     return `${name} ${value}`;
   }

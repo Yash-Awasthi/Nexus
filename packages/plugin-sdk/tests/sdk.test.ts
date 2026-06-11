@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, vi } from "vitest";
+
 import {
   defineAdapter,
   AdapterRegistry,
@@ -8,7 +9,6 @@ import {
   AdapterTimeoutError,
   requireEnv,
   withTimeout,
-  type IExecutionAdapter,
 } from "../src/index.js";
 import {
   createMockContext,
@@ -119,12 +119,7 @@ describe("requireEnv", () => {
 
 describe("withTimeout", () => {
   it("resolves when promise completes within timeout", async () => {
-    const result = await withTimeout(
-      Promise.resolve("done"),
-      1000,
-      "test",
-      "test.run",
-    );
+    const result = await withTimeout(Promise.resolve("done"), 1000, "test", "test.run");
     expect(result).toBe("done");
   });
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * ILanguageModel — unified abstraction over any text generation backend.
  *
@@ -35,11 +36,11 @@ export interface ToolDefinition {
 
 export interface TextChunk {
   contentChunk: string;
-  toolCallChunks?: Array<{
+  toolCallChunks?: {
     id: string;
     name: string;
     arguments: Record<string, unknown>;
-  }>;
+  }[];
 }
 
 export interface GenerateTextParams {

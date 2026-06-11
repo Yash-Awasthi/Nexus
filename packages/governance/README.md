@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # @nexus/governance
 
 Policy engine for NEXUS: execution constraints, guardrails, approval workflow, and capability policies.
@@ -24,7 +25,7 @@ import {
 const governance = new GovernanceEngine({
   constraints: [
     new ResourceScopeConstraint({ allowedScopes: ["read", "write:own"] }),
-    new CostBudgetConstraint({ maxUsdPerTask: 0.10 }),
+    new CostBudgetConstraint({ maxUsdPerTask: 0.1 }),
     new TimeoutConstraint({ maxMs: 120_000 }),
   ],
   policies: [
@@ -53,30 +54,30 @@ if (verdict.allowed) {
 
 Hard limits evaluated before the task starts:
 
-| Class | Blocks when |
-|---|---|
-| `ResourceScopeConstraint` | Task requests a scope not in the allowlist |
-| `CostBudgetConstraint` | Estimated cost exceeds the per-task budget |
-| `TimeoutConstraint` | Task declares a timeout exceeding the maximum |
+| Class                     | Blocks when                                   |
+| ------------------------- | --------------------------------------------- |
+| `ResourceScopeConstraint` | Task requests a scope not in the allowlist    |
+| `CostBudgetConstraint`    | Estimated cost exceeds the per-task budget    |
+| `TimeoutConstraint`       | Task declares a timeout exceeding the maximum |
 
 ### Policies
 
 Semantic rules over task content:
 
-| Class | Blocks when |
-|---|---|
-| `DangerousOperationPolicy` | Task payload matches a dangerous-operation blocklist |
+| Class                       | Blocks when                                               |
+| --------------------------- | --------------------------------------------------------- |
+| `DangerousOperationPolicy`  | Task payload matches a dangerous-operation blocklist      |
 | `WildcardPermissionsPolicy` | Task requests `*` permissions rather than specific scopes |
 
 ### Guardrails
 
 Runtime checks that fire during execution:
 
-| Class | Triggers when |
-|---|---|
-| `LoopDetectionGuardrail` | A node in the task graph is visited more than `maxVisits` times |
-| `RunawayRetriesGuardrail` | A task has retried more than `maxRetries` times |
-| `TaskGraphLimitGuardrail` | The task graph exceeds `maxNodes` nodes |
+| Class                     | Triggers when                                                   |
+| ------------------------- | --------------------------------------------------------------- |
+| `LoopDetectionGuardrail`  | A node in the task graph is visited more than `maxVisits` times |
+| `RunawayRetriesGuardrail` | A task has retried more than `maxRetries` times                 |
+| `TaskGraphLimitGuardrail` | The task graph exceeds `maxNodes` nodes                         |
 
 ### `ApprovalWorkflow`
 

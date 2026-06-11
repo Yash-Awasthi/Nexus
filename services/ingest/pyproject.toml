@@ -15,11 +15,14 @@ dependencies = [
   "opentelemetry-sdk>=1.27.0",
   "opentelemetry-exporter-otlp>=1.27.0",
   "prometheus-client>=0.21.0",
-  "finscrape @ file:../../../fin-scrape",
   "redis[hiredis]>=5.0.0",
   "asyncpg>=0.29.0",
 ]
 [project.optional-dependencies]
+# finscrape is a local sibling repo — install manually for local dev:
+#   pip install -e ".[finscrape]"
+# CI skips this extra; scraper endpoints degrade gracefully when absent.
+finscrape = ["finscrape @ file:../../../fin-scrape"]
 dev = [
   "pytest>=8.3.0",
   "pytest-asyncio>=0.24.0",

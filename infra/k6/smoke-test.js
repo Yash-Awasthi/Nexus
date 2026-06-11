@@ -19,16 +19,20 @@ export const options = {
 export default function () {
   // Health
   check(http.get(`${BASE_URL}/health`), { "health ok": (r) => r.status === 200 });
-  check(http.get(`${BASE_URL}/health/ready`), { "ready": (r) => r.status === 200 });
+  check(http.get(`${BASE_URL}/health/ready`), { ready: (r) => r.status === 200 });
 
   // Auth required
-  check(http.get(`${BASE_URL}/api/v1/runtime/tasks`), { "requires auth": (r) => r.status === 401 || r.status === 200 });
+  check(http.get(`${BASE_URL}/api/v1/runtime/tasks`), {
+    "requires auth": (r) => r.status === 401 || r.status === 200,
+  });
 
   // Tasks list
-  check(http.get(`${BASE_URL}/api/v1/runtime/tasks?limit=5`, { headers }),
-    { "tasks 200": (r) => r.status === 200 });
+  check(http.get(`${BASE_URL}/api/v1/runtime/tasks?limit=5`, { headers }), {
+    "tasks 200": (r) => r.status === 200,
+  });
 
   // Audit verify
-  check(http.get(`${BASE_URL}/api/v1/audit/log/verify`, { headers }),
-    { "audit chain": (r) => r.status === 200 });
+  check(http.get(`${BASE_URL}/api/v1/audit/log/verify`, { headers }), {
+    "audit chain": (r) => r.status === 200,
+  });
 }

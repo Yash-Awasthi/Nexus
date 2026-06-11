@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * WebSearchAdapter — routes "search" and "answer" task types through
  * the WebSearchEngine (search classification → research → LLM synthesis).
@@ -6,24 +7,27 @@
  *   { query: string, mode?: "speed"|"balanced"|"quality", history?: ChatMessage[] }
  */
 
-import { IExecutionContext } from "./interfaces/execution.interface";
-import { WebSearchEngine, SearchMode } from "./web-search-engine";
-import { ILanguageModel, ChatMessage } from "./interfaces/language-model.interface";
-import { createLanguageModel } from "./language-model";
+import type { IExecutionContext } from "./interfaces/execution.interface.js";
+import type { ILanguageModel, ChatMessage } from "./interfaces/language-model.interface.js";
+import { createLanguageModel } from "./language-model.js";
+import type { SearchMode } from "./web-search-engine.js";
+import { WebSearchEngine } from "./web-search-engine.js";
 
 export class WebSearchAdapter {
   private engine: WebSearchEngine;
 
   constructor(opts?: { llm?: ILanguageModel; tavilyApiKey?: string; deepScrape?: boolean }) {
-    const llm = opts?.llm ?? createLanguageModel({
-      provider: "groq",
-      groqApiKey: process.env.GROQ_API_KEY
-    });
+    const llm =
+      opts?.llm ??
+      createLanguageModel({
+        provider: "groq",
+        groqApiKey: process.env.GROQ_API_KEY,
+      });
     this.engine = new WebSearchEngine({
       llm,
       tavilyApiKey: opts?.tavilyApiKey ?? process.env.TAVILY_API_KEY,
       deepScrape: opts?.deepScrape ?? false,
-      maxIterations: 3
+      maxIterations: 3,
     });
   }
 
@@ -48,7 +52,7 @@ export class WebSearchAdapter {
     try {
       const result = await this.engine.search(query, { mode, history });
       context.logger.info(
-        `WebSearch complete: ${result.findings.length} findings, ${result.queriesUsed.length} queries`
+        `WebSearch complete: ${result.findings.length} findings, ${result.queriesUsed.length} queries`,
       );
       return {
         success: true,
@@ -57,7 +61,7 @@ export class WebSearchAdapter {
         queriesUsed: result.queriesUsed,
         mode: result.mode,
         skippedSearch: result.skippedSearch,
-        findingsCount: result.findings.length
+        findingsCount: result.findings.length,
       };
     } catch (err: any) {
       context.logger.error(`WebSearch failed: ${err.message}`);

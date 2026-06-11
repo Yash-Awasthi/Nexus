@@ -27,33 +27,33 @@ Most AI agent frameworks bolt on governance and observability as afterthoughts. 
 
 ## What ships today
 
-| Package | Status | Description |
-|---|---|---|
-| `@nexus/runtime` | ✅ v0.1.0 | Queues, circuit breaker, crash recovery, OTel |
-| `@nexus/auth` | ✅ v0.1.0 | API key + HS256 JWT, Fastify hook |
-| `@nexus/memory` | ✅ v0.1.0 | Vector-search agent memory |
-| `@nexus/pipeline-signal` | ✅ v0.1.0 | Ingest → classify → Signal worker |
-| `@nexus/council` | ✅ v0.1.0 | Multi-model deliberation engine |
-| `@nexus/db` | ✅ v0.1.0 | Drizzle ORM, 7 schemas, migrations |
-| `@nexus/telemetry` | ✅ v0.1.0 | Health aggregation, SLOs, Prometheus |
-| `@nexus/governance` | ✅ v0.1.0 | Constraints, policies, guardrails, HITL |
-| `@nexus/plugin-sdk` | ✅ v0.1.0 | defineAdapter, capability types, test harness |
-| `apps/api` | ✅ | Fastify REST gateway — 18 routes |
-| `apps/worker` | ✅ | BullMQ signal + task consumers |
-| `apps/web` | ✅ | React dashboard with real API integration |
-| `apps/cli` | ✅ | Developer CLI |
-| `services/ingest` | ✅ | Python FastAPI ingestion service |
+| Package                  | Status    | Description                                   |
+| ------------------------ | --------- | --------------------------------------------- |
+| `@nexus/runtime`         | ✅ v0.1.0 | Queues, circuit breaker, crash recovery, OTel |
+| `@nexus/auth`            | ✅ v0.1.0 | API key + HS256 JWT, Fastify hook             |
+| `@nexus/memory`          | ✅ v0.1.0 | Vector-search agent memory                    |
+| `@nexus/pipeline-signal` | ✅ v0.1.0 | Ingest → classify → Signal worker             |
+| `@nexus/council`         | ✅ v0.1.0 | Multi-model deliberation engine               |
+| `@nexus/db`              | ✅ v0.1.0 | Drizzle ORM, 7 schemas, migrations            |
+| `@nexus/telemetry`       | ✅ v0.1.0 | Health aggregation, SLOs, Prometheus          |
+| `@nexus/governance`      | ✅ v0.1.0 | Constraints, policies, guardrails, HITL       |
+| `@nexus/plugin-sdk`      | ✅ v0.1.0 | defineAdapter, capability types, test harness |
+| `apps/api`               | ✅        | Fastify REST gateway — 18 routes              |
+| `apps/worker`            | ✅        | BullMQ signal + task consumers                |
+| `apps/web`               | ✅        | React dashboard with real API integration     |
+| `apps/cli`               | ✅        | Developer CLI                                 |
+| `services/ingest`        | ✅        | Python FastAPI ingestion service              |
 
 ## Core concepts
 
-| Concept | Description |
-|---|---|
-| **Signal** | A typed, prioritised event derived from raw ingested data |
-| **Verdict** | The council's decision on a signal (`approve` / `reject` / `defer`) |
-| **Task** | A unit of work routed to an adapter for execution |
-| **Adapter** | A plugin that executes a specific task type |
-| **Approval** | A human gate on a task that governance flagged as requiring review |
-| **Audit log** | Append-only HMAC-SHA256 chained record of every decision |
+| Concept       | Description                                                         |
+| ------------- | ------------------------------------------------------------------- |
+| **Signal**    | A typed, prioritised event derived from raw ingested data           |
+| **Verdict**   | The council's decision on a signal (`approve` / `reject` / `defer`) |
+| **Task**      | A unit of work routed to an adapter for execution                   |
+| **Adapter**   | A plugin that executes a specific task type                         |
+| **Approval**  | A human gate on a task that governance flagged as requiring review  |
+| **Audit log** | Append-only HMAC-SHA256 chained record of every decision            |
 
 ## Architecture summary
 

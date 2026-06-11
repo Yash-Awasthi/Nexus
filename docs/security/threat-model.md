@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # NEXUS Threat Model
 
 **Version:** 1.0  
@@ -57,18 +58,18 @@ Out of scope: third-party LLM providers (Groq, Anthropic, OpenAI), underlying cl
 
 ## 3. Assets (what we protect)
 
-| ID | Asset | Classification | Impact if compromised |
-|----|-------|---------------|----------------------|
-| A1 | API bearer tokens | Secret | Full API access |
-| A2 | Adapter credentials (Groq, Slack, GitHub, …) | Secret | Third-party SaaS abuse |
-| A3 | Database (Postgres) | Confidential | All user data, audit log |
-| A4 | Audit log chain | Integrity-critical | Forgery of compliance record |
-| A5 | LLM prompt content | Confidential | Business logic exposure |
-| A6 | Ingested financial data | Confidential | Market/regulatory risk |
-| A7 | Approval workflow decisions | Integrity-critical | Unauthorized task execution |
-| A8 | Worker task queue (Redis) | Confidential | Job injection / task hijack |
-| A9 | Runtime task graph | Confidential | Workflow reconstruction |
-| A10 | Cosign signing key | Secret | Supply-chain compromise |
+| ID  | Asset                                        | Classification     | Impact if compromised        |
+| --- | -------------------------------------------- | ------------------ | ---------------------------- |
+| A1  | API bearer tokens                            | Secret             | Full API access              |
+| A2  | Adapter credentials (Groq, Slack, GitHub, …) | Secret             | Third-party SaaS abuse       |
+| A3  | Database (Postgres)                          | Confidential       | All user data, audit log     |
+| A4  | Audit log chain                              | Integrity-critical | Forgery of compliance record |
+| A5  | LLM prompt content                           | Confidential       | Business logic exposure      |
+| A6  | Ingested financial data                      | Confidential       | Market/regulatory risk       |
+| A7  | Approval workflow decisions                  | Integrity-critical | Unauthorized task execution  |
+| A8  | Worker task queue (Redis)                    | Confidential       | Job injection / task hijack  |
+| A9  | Runtime task graph                           | Confidential       | Workflow reconstruction      |
+| A10 | Cosign signing key                           | Secret             | Supply-chain compromise      |
 
 ---
 
@@ -76,50 +77,50 @@ Out of scope: third-party LLM providers (Groq, Anthropic, OpenAI), underlying cl
 
 ### 4.1 Client ↔ API gateway
 
-| Threat | Category | Mitigation | Status |
-|--------|----------|------------|--------|
-| Replay attack with stolen token | Spoofing | Short-lived JWT + Bearer rotation | Planned v1.1 |
-| Tampered request body | Tampering | Fastify JSON schema validation on all routes | ✅ |
-| Repudiation of API actions | Repudiation | HMAC audit log (ADR-0010) on every write | ✅ |
-| Enumeration of signal IDs | Info disclosure | UUID v4 opaque IDs, no sequential patterns | ✅ |
-| Volumetric DDoS | DoS | Rate limiter (`@fastify/rate-limit`, 100 req/10s) | Planned v1.0 |
-| Privilege escalation via parameter injection | EoP | Drizzle ORM parameterised queries; no raw SQL | ✅ |
+| Threat                                       | Category        | Mitigation                                        | Status       |
+| -------------------------------------------- | --------------- | ------------------------------------------------- | ------------ |
+| Replay attack with stolen token              | Spoofing        | Short-lived JWT + Bearer rotation                 | Planned v1.1 |
+| Tampered request body                        | Tampering       | Fastify JSON schema validation on all routes      | ✅           |
+| Repudiation of API actions                   | Repudiation     | HMAC audit log (ADR-0010) on every write          | ✅           |
+| Enumeration of signal IDs                    | Info disclosure | UUID v4 opaque IDs, no sequential patterns        | ✅           |
+| Volumetric DDoS                              | DoS             | Rate limiter (`@fastify/rate-limit`, 100 req/10s) | Planned v1.0 |
+| Privilege escalation via parameter injection | EoP             | Drizzle ORM parameterised queries; no raw SQL     | ✅           |
 
 ### 4.2 Ingest service ↔ scraped sites
 
-| Threat | Category | Mitigation | Status |
-|--------|----------|------------|--------|
-| SSRF via attacker-controlled URL | Spoofing | Allowlist (`ALLOWED_SCRAPE_HOSTS`); deny RFC-1918 | Planned v1.0 |
-| Prompt injection via scraped text | Tampering | Guardrails (strip HTML/scripts, 4k token budget) | Partial |
-| Scraped PII exposure | Info disclosure | PII-scrubber filter before DB write | Planned v1.1 |
-| Slow-loris from target site | DoS | Per-request timeout (10s); circuit breaker | ✅ |
+| Threat                            | Category        | Mitigation                                        | Status       |
+| --------------------------------- | --------------- | ------------------------------------------------- | ------------ |
+| SSRF via attacker-controlled URL  | Spoofing        | Allowlist (`ALLOWED_SCRAPE_HOSTS`); deny RFC-1918 | Planned v1.0 |
+| Prompt injection via scraped text | Tampering       | Guardrails (strip HTML/scripts, 4k token budget)  | Partial      |
+| Scraped PII exposure              | Info disclosure | PII-scrubber filter before DB write               | Planned v1.1 |
+| Slow-loris from target site       | DoS             | Per-request timeout (10s); circuit breaker        | ✅           |
 
 ### 4.3 Worker ↔ Redis queue
 
-| Threat | Category | Mitigation | Status |
-|--------|----------|------------|--------|
-| Job injection by unauthenticated client | Spoofing | Redis protected-mode + password auth | Planned v1.0 |
-| Job payload tampering | Tampering | HMAC-signed job envelope | Planned v1.1 |
-| Queue poisoning / DLQ overflow | DoS | Max job size 64kB; DLQ drain at 1k entries | Planned v1.0 |
-| Worker credential leakage via logs | Info disclosure | Token redaction in `requireEnv`; structured logs | ✅ |
+| Threat                                  | Category        | Mitigation                                       | Status       |
+| --------------------------------------- | --------------- | ------------------------------------------------ | ------------ |
+| Job injection by unauthenticated client | Spoofing        | Redis protected-mode + password auth             | Planned v1.0 |
+| Job payload tampering                   | Tampering       | HMAC-signed job envelope                         | Planned v1.1 |
+| Queue poisoning / DLQ overflow          | DoS             | Max job size 64kB; DLQ drain at 1k entries       | Planned v1.0 |
+| Worker credential leakage via logs      | Info disclosure | Token redaction in `requireEnv`; structured logs | ✅           |
 
 ### 4.4 Council ↔ LLM providers
 
-| Threat | Category | Mitigation | Status |
-|--------|----------|------------|--------|
-| Prompt injection via proposal text | Tampering | `GovernanceEngine.guardrails`: LoopDetectionGuardrail, DuplicateActionGuardrail | Partial |
-| API key exfiltration | Info disclosure | Keys read from env/Doppler only; never logged | ✅ |
-| Runaway cost from adversarial budget | DoS | `budgetUsd` hard cap per deliberation | ✅ |
-| Provider impersonation (MitM) | Spoofing | TLS 1.3 + pinned CA on Groq/OpenAI endpoints | Provider-managed |
+| Threat                               | Category        | Mitigation                                                                      | Status           |
+| ------------------------------------ | --------------- | ------------------------------------------------------------------------------- | ---------------- |
+| Prompt injection via proposal text   | Tampering       | `GovernanceEngine.guardrails`: LoopDetectionGuardrail, DuplicateActionGuardrail | Partial          |
+| API key exfiltration                 | Info disclosure | Keys read from env/Doppler only; never logged                                   | ✅               |
+| Runaway cost from adversarial budget | DoS             | `budgetUsd` hard cap per deliberation                                           | ✅               |
+| Provider impersonation (MitM)        | Spoofing        | TLS 1.3 + pinned CA on Groq/OpenAI endpoints                                    | Provider-managed |
 
 ### 4.5 Runtime ↔ adapters
 
-| Threat | Category | Mitigation | Status |
-|--------|----------|------------|--------|
-| Adapter token exfiltration by malicious workflow | EoP | `ResourceScopeConstraint` per-task token scoping | ✅ |
-| Dangerous operation without approval | EoP | `DangerousOperationPolicy` + HITL gate | ✅ |
-| Adapter RCE via spec loader | EoP | JSON Schema validation; no eval; no shell-out | ✅ |
-| Audit bypass | Repudiation | Audit log write is synchronous and mandatory | ✅ |
+| Threat                                           | Category    | Mitigation                                       | Status |
+| ------------------------------------------------ | ----------- | ------------------------------------------------ | ------ |
+| Adapter token exfiltration by malicious workflow | EoP         | `ResourceScopeConstraint` per-task token scoping | ✅     |
+| Dangerous operation without approval             | EoP         | `DangerousOperationPolicy` + HITL gate           | ✅     |
+| Adapter RCE via spec loader                      | EoP         | JSON Schema validation; no eval; no shell-out    | ✅     |
+| Audit bypass                                     | Repudiation | Audit log write is synchronous and mandatory     | ✅     |
 
 ---
 
@@ -133,6 +134,7 @@ Out of scope: third-party LLM providers (Groq, Anthropic, OpenAI), underlying cl
 **Impact:** Critical (council may issue malicious task graph)
 
 **Mitigations:**
+
 1. Strip all HTML/Markdown formatting from scraped text before passing to council
 2. Prefix each archetype prompt with `"You are [archetype]. The following is untrusted external content:"`
 3. `DuplicateActionGuardrail` catches repeated high-risk actions
@@ -150,6 +152,7 @@ Out of scope: third-party LLM providers (Groq, Anthropic, OpenAI), underlying cl
 **Impact:** High (third-party SaaS compromise)
 
 **Mitigations:**
+
 1. `ResourceScopeConstraint` limits each task to its declared scope
 2. `WildcardPermissionsPolicy` blocks `*` scopes
 3. Tokens never included in adapter response payloads
@@ -167,6 +170,7 @@ Out of scope: third-party LLM providers (Groq, Anthropic, OpenAI), underlying cl
 **Impact:** High (compliance violation, legal exposure)
 
 **Mitigations:**
+
 1. HMAC-SHA256 chain (ADR-0010) — any modification breaks all subsequent hashes
 2. `GET /api/v1/audit/log/verify` re-derives chain on demand
 3. DB-level trigger prevents `UPDATE`/`DELETE` on `audit_log` table
@@ -184,6 +188,7 @@ Out of scope: third-party LLM providers (Groq, Anthropic, OpenAI), underlying cl
 **Impact:** High (credential exfiltration, internal service enumeration)
 
 **Mitigations:**
+
 1. `ALLOWED_SCRAPE_HOSTS` env var — allowlist of permitted target domains
 2. Deny outbound to RFC-1918 + link-local CIDRs (100.64/10, 169.254/16, 10/8, 172.16/12, 192.168/16)
 3. Egress proxy (Squid/Envoy) in Kubernetes deployment
@@ -200,6 +205,7 @@ Out of scope: third-party LLM providers (Groq, Anthropic, OpenAI), underlying cl
 **Impact:** Critical (full host compromise)
 
 **Mitigations:**
+
 1. `spec-loader.ts` validates against `workflow-spec.json` (AJV + strict mode)
 2. No `eval`, no `Function()`, no `child_process` without `dangerous` policy + HITL
 3. Sandboxed execution via `FilesystemSandbox` + Node's `--experimental-vm-modules`
@@ -210,31 +216,31 @@ Out of scope: third-party LLM providers (Groq, Anthropic, OpenAI), underlying cl
 
 ## 6. Security controls summary
 
-| Control | Mechanism | Location |
-|---------|-----------|----------|
-| Authentication | Bearer token (NEXUS_API_KEY) | `apps/api/src/middleware/auth.ts` |
-| Authorisation | RBAC (planned) / per-workspace scoping | `packages/governance` |
-| Input validation | Fastify JSON schema + AJV | All API routes |
-| Secrets management | Doppler / env vars (never hardcoded) | `packages/adapters/doppler` |
-| Audit trail | HMAC-SHA256 chain, append-only | `packages/governance/src/audit-log.ts` |
-| Encryption in transit | TLS 1.3 (LB → service) | Kubernetes ingress / Caddy |
-| Encryption at rest | Postgres pgcrypto, Redis AOF encrypted | Infra layer |
-| Dependency scanning | Dependabot + Trivy in CI | `.github/workflows/security.yml` |
-| SAST | CodeQL (JS/TS + Python) | `.github/workflows/codeql.yml` |
-| Secret scanning | gitleaks pre-commit + CI | `.gitleaks.toml` |
-| Container signing | cosign + SBOM | `.github/workflows/release.yml` |
+| Control               | Mechanism                              | Location                               |
+| --------------------- | -------------------------------------- | -------------------------------------- |
+| Authentication        | Bearer token (NEXUS_API_KEY)           | `apps/api/src/middleware/auth.ts`      |
+| Authorisation         | RBAC (planned) / per-workspace scoping | `packages/governance`                  |
+| Input validation      | Fastify JSON schema + AJV              | All API routes                         |
+| Secrets management    | Doppler / env vars (never hardcoded)   | `packages/adapters/doppler`            |
+| Audit trail           | HMAC-SHA256 chain, append-only         | `packages/governance/src/audit-log.ts` |
+| Encryption in transit | TLS 1.3 (LB → service)                 | Kubernetes ingress / Caddy             |
+| Encryption at rest    | Postgres pgcrypto, Redis AOF encrypted | Infra layer                            |
+| Dependency scanning   | Dependabot + Trivy in CI               | `.github/workflows/security.yml`       |
+| SAST                  | CodeQL (JS/TS + Python)                | `.github/workflows/codeql.yml`         |
+| Secret scanning       | gitleaks pre-commit + CI               | `.gitleaks.toml`                       |
+| Container signing     | cosign + SBOM                          | `.github/workflows/release.yml`        |
 
 ---
 
 ## 7. Residual risks
 
-| Risk | Likelihood | Impact | Accepted? | Notes |
-|------|-----------|--------|-----------|-------|
-| LLM provider downtime | High | Medium | Yes | Multi-provider fallback planned v1.2 |
-| Zero-day in Fastify | Low | High | Yes | Dependabot + patch within 14d SLA |
-| Redis key-space exhaustion | Low | Medium | Yes | TTL + DLQ drain policy |
-| Supply-chain compromise via npm | Low | Critical | No | pnpm lockfile + Trivy + cosign |
+| Risk                            | Likelihood | Impact   | Accepted? | Notes                                |
+| ------------------------------- | ---------- | -------- | --------- | ------------------------------------ |
+| LLM provider downtime           | High       | Medium   | Yes       | Multi-provider fallback planned v1.2 |
+| Zero-day in Fastify             | Low        | High     | Yes       | Dependabot + patch within 14d SLA    |
+| Redis key-space exhaustion      | Low        | Medium   | Yes       | TTL + DLQ drain policy               |
+| Supply-chain compromise via npm | Low        | Critical | No        | pnpm lockfile + Trivy + cosign       |
 
 ---
 
-*This document must be reviewed and updated with every major release.*
+_This document must be reviewed and updated with every major release._

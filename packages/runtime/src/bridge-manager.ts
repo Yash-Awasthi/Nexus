@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * BridgeManager — manages Python subprocess bridges for native execution capabilities.
  *
@@ -11,24 +12,25 @@
  *   await mgr.stopAll();
  */
 
-import { spawn, ChildProcess } from "child_process";
-import * as path from "path";
+import type { ChildProcess } from "child_process";
+import { spawn } from "child_process";
 import * as fs from "fs";
 import * as http from "http";
+import * as path from "path";
 
 export type BridgeName = "stealth-browser" | "scraping" | "local-inference" | "mcp-server";
 
 interface BridgeConfig {
-  script: string;  // relative to runtime/bridges/
+  script: string; // relative to runtime/bridges/
   port: number;
   healthPath: string;
 }
 
 const BRIDGE_CONFIGS: Record<BridgeName, BridgeConfig> = {
-  "stealth-browser": { script: "stealth_browser_bridge.py",  port: 7701, healthPath: "/health" },
-  "scraping":        { script: "web_scraping_bridge.py",     port: 7702, healthPath: "/health" },
-  "local-inference": { script: "local_inference_bridge.py",  port: 7703, healthPath: "/health" },
-  "mcp-server":      { script: "mcp_server_bridge.py",       port: 7704, healthPath: "/health" }
+  "stealth-browser": { script: "stealth_browser_bridge.py", port: 7701, healthPath: "/health" },
+  scraping: { script: "web_scraping_bridge.py", port: 7702, healthPath: "/health" },
+  "local-inference": { script: "local_inference_bridge.py", port: 7703, healthPath: "/health" },
+  "mcp-server": { script: "mcp_server_bridge.py", port: 7704, healthPath: "/health" },
 };
 
 const BRIDGES_DIR = path.join(__dirname, "bridges");
@@ -36,8 +38,8 @@ const HEALTH_CHECK_INTERVAL_MS = 500;
 const HEALTH_CHECK_MAX_ATTEMPTS = 20;
 
 export class BridgeManager {
-  private processes: Map<BridgeName, ChildProcess> = new Map();
-  private started: Set<BridgeName> = new Set();
+  private processes = new Map<BridgeName, ChildProcess>();
+  private started = new Set<BridgeName>();
 
   /** Start a bridge by name. No-op if already running. */
   async start(name: BridgeName): Promise<void> {
@@ -54,7 +56,7 @@ export class BridgeManager {
     const proc = spawn(python, [scriptPath, "--port", String(cfg.port)], {
       cwd: BRIDGES_DIR,
       env: { ...process.env },
-      stdio: ["ignore", "pipe", "pipe"]
+      stdio: ["ignore", "pipe", "pipe"],
     });
 
     proc.stdout?.on("data", (d: Buffer) => {
@@ -116,7 +118,7 @@ export class BridgeManager {
       }
     }
     throw new Error(
-      `Bridge "${name}" did not become healthy after ${HEALTH_CHECK_MAX_ATTEMPTS * HEALTH_CHECK_INTERVAL_MS}ms`
+      `Bridge "${name}" did not become healthy after ${HEALTH_CHECK_MAX_ATTEMPTS * HEALTH_CHECK_INTERVAL_MS}ms`,
     );
   }
 
@@ -126,8 +128,13 @@ export class BridgeManager {
         resolve(res.statusCode !== undefined && res.statusCode < 400);
         res.resume();
       });
-      req.on("error", () => resolve(false));
-      req.setTimeout(400, () => { req.destroy(); resolve(false); });
+      req.on("error", () => {
+        resolve(false);
+      });
+      req.setTimeout(400, () => {
+        req.destroy();
+        resolve(false);
+      });
     });
   }
 
@@ -143,8 +150,8 @@ export class BridgeManager {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Content-Length": Buffer.byteLength(payload)
-        }
+          "Content-Length": Buffer.byteLength(payload),
+        },
       };
       const req = http.request(options, (res) => {
         const chunks: Buffer[] = [];

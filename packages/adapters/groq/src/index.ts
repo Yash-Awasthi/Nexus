@@ -36,7 +36,10 @@ export interface GroqInferenceResult {
   usage: { promptTokens: number; completionTokens: number; totalTokens: number };
 }
 
-async function execute(task: GroqInferenceTask, ctx: IExecutionContext): Promise<GroqInferenceResult> {
+async function execute(
+  task: GroqInferenceTask,
+  ctx: IExecutionContext,
+): Promise<GroqInferenceResult> {
   const apiKey = requireEnv(ctx, "GROQ_API_KEY");
   const model = task.model ?? "llama-3.3-70b-versatile";
   ctx.logger.info("groq.inference", { model, messageCount: task.messages.length });
@@ -57,9 +60,10 @@ async function execute(task: GroqInferenceTask, ctx: IExecutionContext): Promise
     throw new AdapterHttpError("nexus-adapter-groq", response.status, await response.text());
   }
 
-  const data = await response.json() as {
-    id: string; model: string;
-    choices: Array<{ message: { content: string }; finish_reason: string }>;
+  const data = (await response.json()) as {
+    id: string;
+    model: string;
+    choices: { message: { content: string }; finish_reason: string }[];
     usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
   };
 
@@ -67,9 +71,15 @@ async function execute(task: GroqInferenceTask, ctx: IExecutionContext): Promise
   if (!choice) throw new AdapterHttpError("nexus-adapter-groq", 200, "No choices returned");
 
   return {
-    id: data.id, model: data.model, content: choice.message.content,
+    id: data.id,
+    model: data.model,
+    content: choice.message.content,
     finishReason: choice.finish_reason,
-    usage: { promptTokens: data.usage.prompt_tokens, completionTokens: data.usage.completion_tokens, totalTokens: data.usage.total_tokens },
+    usage: {
+      promptTokens: data.usage.prompt_tokens,
+      completionTokens: data.usage.completion_tokens,
+      totalTokens: data.usage.total_tokens,
+    },
   };
 }
 

@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # @nexus/contracts
 
 Generated OpenAPI + AsyncAPI clients and JSON Schema types

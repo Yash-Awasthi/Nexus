@@ -84,7 +84,10 @@ const config: Config = {
           items: [
             { label: "GitHub", href: "https://github.com/Yash-Awasthi/Nexus" },
             { label: "Contributing", to: "/docs/contributing" },
-            { label: "Security", href: "https://github.com/Yash-Awasthi/Nexus/blob/main/SECURITY.md" },
+            {
+              label: "Security",
+              href: "https://github.com/Yash-Awasthi/Nexus/blob/main/SECURITY.md",
+            },
           ],
         },
       ],

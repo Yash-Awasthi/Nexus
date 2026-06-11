@@ -203,19 +203,16 @@ describe("AuditLog — property-based", () => {
 
   it("N appends always produce a valid chain", async () => {
     await fc.assert(
-      fc.asyncProperty(
-        fc.array(payloadArb, { minLength: 1, maxLength: 20 }),
-        async (payloads) => {
-          const store = new MemoryAuditStore();
-          const log = new AuditLog(store, TEST_KEY);
-          for (const p of payloads) {
-            await log.append(p);
-          }
-          const result = await log.verifyAll();
-          expect(result.valid).toBe(true);
-          expect(result.checkedCount).toBe(payloads.length);
-        },
-      ),
+      fc.asyncProperty(fc.array(payloadArb, { minLength: 1, maxLength: 20 }), async (payloads) => {
+        const store = new MemoryAuditStore();
+        const log = new AuditLog(store, TEST_KEY);
+        for (const p of payloads) {
+          await log.append(p);
+        }
+        const result = await log.verifyAll();
+        expect(result.valid).toBe(true);
+        expect(result.checkedCount).toBe(payloads.length);
+      }),
       { numRuns: 50 },
     );
   });

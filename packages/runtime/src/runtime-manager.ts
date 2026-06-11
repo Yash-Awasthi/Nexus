@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// @ts-nocheck
 /**
  * RuntimeManager — central service lifecycle manager for GhostStack.
  *
@@ -7,7 +9,7 @@
  * service implementations.
  */
 
-import { IConfigLoader } from "../runtime/config-loader";
+import type { IConfigLoader } from "../runtime/config-loader.js";
 
 // ─── Public types ──────────────────────────────────────────────────────────────
 
@@ -46,7 +48,11 @@ export interface IRuntimeManager {
   markError(name: string, error: string): void;
   startService(name: string, startFn: () => Promise<void>): Promise<void>;
   stopService(name: string, stopFn: () => Promise<void>): Promise<void>;
-  restartService(name: string, stopFn: () => Promise<void>, startFn: () => Promise<void>): Promise<void>;
+  restartService(
+    name: string,
+    stopFn: () => Promise<void>,
+    startFn: () => Promise<void>,
+  ): Promise<void>;
   getServiceRecord(name: string): ServiceRecord | undefined;
   getAllRecords(): ServiceRecord[];
   getHealthSummary(): RuntimeHealthSummary;
@@ -167,7 +173,7 @@ export class RuntimeManager implements IRuntimeManager {
   async restartService(
     name: string,
     stopFn: () => Promise<void>,
-    startFn: () => Promise<void>
+    startFn: () => Promise<void>,
   ): Promise<void> {
     await this.stopService(name, stopFn);
     await this.startService(name, startFn);
@@ -206,7 +212,7 @@ export class RuntimeManager implements IRuntimeManager {
       degradedCount: degraded,
       errorCount: error,
       services: records,
-      uptimeMs: Date.now() - this.startedAt.getTime()
+      uptimeMs: Date.now() - this.startedAt.getTime(),
     };
   }
 

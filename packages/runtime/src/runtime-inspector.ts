@@ -1,16 +1,29 @@
-import { IRuntimeInspector, ITaskSnapshot, IQueueSnapshot, IEventSnapshot } from "./interfaces/observability.interface";
-import { IMetricsCollector } from "./interfaces/observability.interface";
-import { IQueueBackend } from "./interfaces/queue.interface";
-import { IServiceDiscovery } from "./interfaces/discovery.interface";
-import { IEventStore } from "./interfaces/persistence.interface";
-import { IMCPRuntime, IMCPServerRegistry } from "./interfaces/mcp.interface";
-import { IGovernanceEngine, IApprovalWorkflow, ICognitiveTrace } from "./interfaces/governance.interface";
-import { IEnvironmentTelemetry, IFilesystemSandbox, IExecutionEnvironment } from "./interfaces/environment.interface";
-import { IWorkflowRegistry, IWorkflowTelemetry } from "./interfaces/workflow.interface";
-
-import type { IMemoryStore } from "./memory-store";
-import type { IAgentBus, AgentMessage, AgentCapability } from "./agent-bus";
-import type { CircuitBreaker } from "./circuit-breaker";
+// SPDX-License-Identifier: Apache-2.0
+import type { IAgentBus, AgentMessage, AgentCapability } from "./agent-bus.js";
+import type { CircuitBreaker } from "./circuit-breaker.js";
+import type { IServiceDiscovery } from "./interfaces/discovery.interface.js";
+import type {
+  IEnvironmentTelemetry,
+  IFilesystemSandbox,
+  IExecutionEnvironment,
+} from "./interfaces/environment.interface.js";
+import type {
+  IGovernanceEngine,
+  IApprovalWorkflow,
+  ICognitiveTrace,
+} from "./interfaces/governance.interface.js";
+import type { IMCPRuntime, IMCPServerRegistry } from "./interfaces/mcp.interface.js";
+import type {
+  IRuntimeInspector,
+  ITaskSnapshot,
+  IQueueSnapshot,
+  IEventSnapshot,
+  IMetricsCollector,
+} from "./interfaces/observability.interface.js";
+import type { IEventStore } from "./interfaces/persistence.interface.js";
+import type { IQueueBackend } from "./interfaces/queue.interface.js";
+import type { IWorkflowRegistry, IWorkflowTelemetry } from "./interfaces/workflow.interface.js";
+import type { IMemoryStore } from "./memory-store.js";
 
 // Forward reference to avoid circular dependency — context type is used
 // only at construction time via the static factory method.
@@ -86,7 +99,7 @@ export class RuntimeInspector implements IRuntimeInspector {
       ctx.agentBus,
       ctx.circuitBreaker,
       ctx.circuitBreakerWrapper,
-      ctx.traceIndexer
+      ctx.traceIndexer,
     );
   }
 
@@ -110,7 +123,7 @@ export class RuntimeInspector implements IRuntimeInspector {
     agentBus?: IAgentBus,
     circuitBreaker?: CircuitBreaker,
     _circuitBreakerWrapper?: any,
-    _traceIndexer?: any
+    _traceIndexer?: any,
   ) {
     this.metrics = metrics;
     this.queue = queue;
@@ -141,7 +154,7 @@ export class RuntimeInspector implements IRuntimeInspector {
     return {
       status: anyUnhealthy && services.length > 0 ? "degraded" : "healthy",
       uptimeSeconds: Math.floor((Date.now() - this.bootTime.getTime()) / 1000),
-      servicesCount: services.length
+      servicesCount: services.length,
     };
   }
 
@@ -162,7 +175,7 @@ export class RuntimeInspector implements IRuntimeInspector {
           status: String(p.status ?? "queued"),
           priority: String(p.priority ?? "medium"),
           dependencies: Array.isArray(p.dependencies) ? p.dependencies.map(String) : [],
-          retries: Number(p.retries ?? 0)
+          retries: Number(p.retries ?? 0),
         });
       } else if (event.event === "execution_succeeded") {
         const existing = taskMap.get(String(p.taskId ?? ""));
@@ -186,7 +199,7 @@ export class RuntimeInspector implements IRuntimeInspector {
     return replayed.map((r) => ({
       event: r.event,
       timestamp: r.timestamp || new Date(),
-      payload: r.payload
+      payload: r.payload,
     }));
   }
 
@@ -201,8 +214,8 @@ export class RuntimeInspector implements IRuntimeInspector {
       jobs: activeJobs.map((j) => ({
         id: j.id,
         priority: j.priority,
-        retries: j.retries
-      }))
+        retries: j.retries,
+      })),
     };
   }
 
@@ -213,7 +226,7 @@ export class RuntimeInspector implements IRuntimeInspector {
       status: s.status,
       lastCheck: s.lastCheck,
       port: s.details?.port,
-      type: s.details?.type
+      type: s.details?.type,
     }));
   }
 
@@ -225,7 +238,7 @@ export class RuntimeInspector implements IRuntimeInspector {
     return {
       metrics,
       serversCount: list.length,
-      executionsCount: logs.length
+      executionsCount: logs.length,
     };
   }
 
@@ -254,7 +267,7 @@ export class RuntimeInspector implements IRuntimeInspector {
     return {
       constraints: engine.getConstraints ? engine.getConstraints().map((c: any) => c.name) : [],
       policies: engine.getPolicies ? engine.getPolicies().map((p: any) => p.name) : [],
-      guardrails: engine.getGuardrails ? engine.getGuardrails().map((g: any) => g.name) : []
+      guardrails: engine.getGuardrails ? engine.getGuardrails().map((g: any) => g.name) : [],
     };
   }
 
@@ -272,7 +285,7 @@ export class RuntimeInspector implements IRuntimeInspector {
     const guardrails = engine.getGuardrails ? engine.getGuardrails() : [];
     return {
       activeGuardrailsCount: guardrails.length,
-      stormThreshold: 5
+      stormThreshold: 5,
     };
   }
 
@@ -282,7 +295,7 @@ export class RuntimeInspector implements IRuntimeInspector {
     return {
       activeSessions: this.browserTelemetry.browserSessionsActive,
       navigationHistory: this.browserTelemetry.navigationHistory,
-      totalBytesWritten: this.browserTelemetry.totalBytesWritten
+      totalBytesWritten: this.browserTelemetry.totalBytesWritten,
     };
   }
 
@@ -290,14 +303,14 @@ export class RuntimeInspector implements IRuntimeInspector {
     if (!this.scrapingTelemetry) return {};
     return {
       totalBytesFetched: this.scrapingTelemetry.totalBytesFetched,
-      navigationHistory: this.scrapingTelemetry.navigationHistory
+      navigationHistory: this.scrapingTelemetry.navigationHistory,
     };
   }
 
   getSandboxMetrics(): any {
     if (!this.fsSandbox) return {};
     return {
-      writeLog: this.fsSandbox.getWriteLog()
+      writeLog: this.fsSandbox.getWriteLog(),
     };
   }
 
@@ -305,7 +318,7 @@ export class RuntimeInspector implements IRuntimeInspector {
     if (!this.envsList) return [];
     return this.envsList.map((e) => ({
       name: e.name,
-      capabilities: e.capabilities
+      capabilities: e.capabilities,
     }));
   }
 
@@ -316,7 +329,7 @@ export class RuntimeInspector implements IRuntimeInspector {
       id: w.id,
       name: w.name,
       description: w.description,
-      tasksCount: w.tasks.length
+      tasksCount: w.tasks.length,
     }));
   }
 
@@ -342,7 +355,7 @@ export class RuntimeInspector implements IRuntimeInspector {
     return this.workflowRegistry.listTemplates().map((t) => ({
       templateId: t.templateId,
       name: t.name,
-      description: t.description
+      description: t.description,
     }));
   }
 
@@ -354,7 +367,7 @@ export class RuntimeInspector implements IRuntimeInspector {
       succeededCount: history.filter((h) => h.status === "succeeded").length,
       failedCount: history.filter((h) => h.status === "failed").length,
       rejectedCount: history.filter((h) => h.status === "rejected").length,
-      pendingCount: history.filter((h) => h.status === "pending").length
+      pendingCount: history.filter((h) => h.status === "pending").length,
     };
   }
 
@@ -371,7 +384,7 @@ export class RuntimeInspector implements IRuntimeInspector {
       available: true,
       ...stats,
       oldest: stats.oldest?.toISOString(),
-      newest: stats.newest?.toISOString()
+      newest: stats.newest?.toISOString(),
     };
   }
 
@@ -384,7 +397,7 @@ export class RuntimeInspector implements IRuntimeInspector {
     const result = await this.memoryStore.query({
       types: query?.types as any,
       keyPrefix: query?.keyPrefix,
-      limit: query?.limit || 20
+      limit: query?.limit || 20,
     });
     return result.entries.map((e) => ({
       id: e.id,
@@ -393,7 +406,7 @@ export class RuntimeInspector implements IRuntimeInspector {
       agentId: e.agentId,
       workflowId: e.workflowId,
       tags: e.tags,
-      timestamp: e.timestamp.toISOString()
+      timestamp: e.timestamp.toISOString(),
     }));
   }
 
@@ -415,7 +428,7 @@ export class RuntimeInspector implements IRuntimeInspector {
     if (!this.circuitBreaker) return { available: false };
     return {
       available: true,
-      ...this.circuitBreaker.getMetrics()
+      ...this.circuitBreaker.getMetrics(),
     };
   }
 
@@ -433,7 +446,7 @@ export class RuntimeInspector implements IRuntimeInspector {
       mcp: await this.getMCPSummary(),
       governance: await this.getGovernanceInfo(),
       memory: await this.getMemoryStats(),
-      circuitBreaker: this.getCircuitBreakerState()
+      circuitBreaker: this.getCircuitBreakerState(),
     };
   }
 }

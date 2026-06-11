@@ -13,21 +13,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
-          node-version: "20.18.0"
+          node-version: "20.19.0"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - run: pnpm test --passWithNoTests
+      - run: pnpm run test -- --passWithNoTests
+        env:
+          # Schema tests are type-only (no live queries), but the db client
+          # throws at import time without DATABASE_URL.  A placeholder URL
+          # satisfies the guard; no real connection is made.
+          DATABASE_URL: postgresql://test:test@localhost/nexus_ci
       - name: Upload coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         if: always()
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: unit
+          fail_ci_if_error: false
 
   python:
     name: Python tests (nexus-ingest)

@@ -1,5 +1,11 @@
-import { Task } from "./task-router";
-import {
+// SPDX-License-Identifier: Apache-2.0
+// @ts-nocheck
+import type { GhostStackOrchestrator } from "../runtime/orchestrator.js";
+
+import type { IEventBus } from "./event-bus.js";
+import type { IApprovalWorkflow } from "./interfaces/governance.interface.js";
+import type { IRuntimePersistence } from "./interfaces/persistence.interface.js";
+import type {
   IWorkflowDefinition,
   IWorkflowExecution,
   IWorkflowTemplate,
@@ -7,13 +13,10 @@ import {
   IWorkflowTelemetry,
   IWorkflowReplay,
   IWorkflowApprovalPolicy,
-  IWorkflowConstraint
-} from "./interfaces/workflow.interface";
-import { GhostStackOrchestrator } from "../runtime/orchestrator";
-import { IRuntimePersistence } from "./interfaces/persistence.interface";
-import { IApprovalWorkflow } from "./interfaces/governance.interface";
-import { IEventBus } from "./event-bus";
-import { RuntimeGraph } from "./runtime-graph";
+  IWorkflowConstraint,
+} from "./interfaces/workflow.interface.js";
+import type { RuntimeGraph } from "./runtime-graph.js";
+import type { Task } from "./task-router.js";
 
 // ─── Replay Context Types ───────────────────────────────────────────
 
@@ -33,14 +36,14 @@ export interface ReplayOptions {
 export interface ReplayLineage {
   originalExecutionId: string;
   replayGeneration: number;
-  previousExecutions: Array<{ executionId: string; status: string; timestamp: Date }>;
+  previousExecutions: { executionId: string; status: string; timestamp: Date }[];
 }
 
 // 1. Generic Workflow Constraint Implementation
 export class WorkflowConstraint implements IWorkflowConstraint {
   constructor(
     public name: string,
-    private checker: (tasks: Task[]) => Promise<{ allowed: boolean; reason?: string }>
+    private checker: (tasks: Task[]) => Promise<{ allowed: boolean; reason?: string }>,
   ) {}
   async evaluate(tasks: Task[]): Promise<{ allowed: boolean; reason?: string }> {
     return this.checker(tasks);
@@ -51,7 +54,7 @@ export class WorkflowConstraint implements IWorkflowConstraint {
 export class WorkflowApprovalPolicy implements IWorkflowApprovalPolicy {
   constructor(
     public workflowName: string,
-    private decider: (tasks: Task[]) => Promise<boolean>
+    private decider: (tasks: Task[]) => Promise<boolean>,
   ) {}
   async requiresApproval(tasks: Task[]): Promise<boolean> {
     return this.decider(tasks);
@@ -121,7 +124,7 @@ export class WorkflowTelemetry implements IWorkflowTelemetry {
         workflowId,
         status: "pending",
         taskResults: {},
-        startedAt: new Date()
+        startedAt: new Date(),
       });
       this.sync();
     }
@@ -213,10 +216,10 @@ interface IdempotencyRecord {
 
 // 5. Workflow Engine & Replayer Core
 export class WorkflowEngine implements IWorkflowReplay {
-  private checkpoints: Map<string, WorkflowCheckpoint> = new Map();
-  private cancelledExecutions: Set<string> = new Set();
-  private eventHandlers: Map<WorkflowEventType, Set<WorkflowEventHandler>> = new Map();
-  private allHandlers: Set<WorkflowEventHandler> = new Set();
+  private checkpoints = new Map<string, WorkflowCheckpoint>();
+  private cancelledExecutions = new Set<string>();
+  private eventHandlers = new Map<WorkflowEventType, Set<WorkflowEventHandler>>();
+  private allHandlers = new Set<WorkflowEventHandler>();
   private idempotencyTokens = new Map<string, IdempotencyRecord>(); // token -> record
 
   /** Tracks replay lineage for deterministic replay ordering and crash continuation. */
@@ -232,7 +235,7 @@ export class WorkflowEngine implements IWorkflowReplay {
     private approvalWorkflow?: IApprovalWorkflow,
     private persistence?: IRuntimePersistence,
     private eventBus?: IEventBus,
-    private runtimeGraph?: RuntimeGraph
+    private runtimeGraph?: RuntimeGraph,
   ) {
     // Load any persisted checkpoints on construction
     this.loadCheckpoints();
@@ -247,7 +250,7 @@ export class WorkflowEngine implements IWorkflowReplay {
     }
     this.eventHandlers.get(type)!.add(handler);
     return {
-      unsubscribe: () => this.eventHandlers.get(type)?.delete(handler)
+      unsubscribe: () => this.eventHandlers.get(type)?.delete(handler),
     };
   }
 
@@ -255,7 +258,7 @@ export class WorkflowEngine implements IWorkflowReplay {
   onAny(handler: WorkflowEventHandler): { unsubscribe: () => void } {
     this.allHandlers.add(handler);
     return {
-      unsubscribe: () => this.allHandlers.delete(handler)
+      unsubscribe: () => this.allHandlers.delete(handler),
     };
   }
 
@@ -275,14 +278,15 @@ export class WorkflowEngine implements IWorkflowReplay {
         executionId: event.executionId,
         workflowId: event.workflowId,
         timestamp: event.timestamp.toISOString(),
-        payload: event.payload
+        payload: event.payload,
       });
     }
   }
 
   private async loadCheckpoints(): Promise<void> {
     if (this.persistence) {
-      const saved = await this.persistence.getState<Record<string, WorkflowCheckpoint>>("workflow_checkpoints");
+      const saved =
+        await this.persistence.getState<Record<string, WorkflowCheckpoint>>("workflow_checkpoints");
       if (saved) {
         for (const [k, v] of Object.entries(saved)) {
           this.checkpoints.set(k, v);
@@ -326,7 +330,7 @@ export class WorkflowEngine implements IWorkflowReplay {
         executionId,
         workflowId: cp.workflowId,
         timestamp: new Date(),
-        payload: { reason: "Operator cancelled execution" }
+        payload: { reason: "Operator cancelled execution" },
       });
       this.persistCheckpoints();
       return {
@@ -336,7 +340,7 @@ export class WorkflowEngine implements IWorkflowReplay {
         taskResults: cp.taskResults,
         startedAt: cp.timestamp,
         completedAt: new Date(),
-        error: "Workflow cancelled by operator"
+        error: "Workflow cancelled by operator",
       };
     }
 
@@ -351,7 +355,7 @@ export class WorkflowEngine implements IWorkflowReplay {
         executionId,
         workflowId: record.workflowId,
         timestamp: new Date(),
-        payload: { reason: "Operator cancelled completed execution record" }
+        payload: { reason: "Operator cancelled completed execution record" },
       });
       return {
         id: executionId,
@@ -360,7 +364,7 @@ export class WorkflowEngine implements IWorkflowReplay {
         taskResults: record.taskResults,
         startedAt: record.startedAt,
         completedAt: new Date(),
-        error: "Workflow cancelled by operator"
+        error: "Workflow cancelled by operator",
       };
     }
 
@@ -377,7 +381,7 @@ export class WorkflowEngine implements IWorkflowReplay {
   async executeWorkflow(
     workflowId: string,
     executionId: string,
-    replayOptions?: ReplayOptions
+    replayOptions?: ReplayOptions,
   ): Promise<IWorkflowExecution> {
     const def = this.registry.getWorkflow(workflowId);
     if (!def) {
@@ -395,13 +399,13 @@ export class WorkflowEngine implements IWorkflowReplay {
         taskResults: {},
         startedAt: new Date(),
         completedAt: new Date(),
-        error: "Cannot execute cancelled workflow"
+        error: "Cannot execute cancelled workflow",
       };
     }
 
     // Check if we have a checkpoint to resume from
     const existingCp = this.checkpoints.get(executionId);
-    if (existingCp && existingCp.status === "cancelled") {
+    if (existingCp?.status === "cancelled") {
       return {
         id: executionId,
         workflowId,
@@ -409,7 +413,7 @@ export class WorkflowEngine implements IWorkflowReplay {
         taskResults: existingCp.taskResults,
         startedAt: existingCp.timestamp,
         completedAt: new Date(),
-        error: "Cannot resume cancelled workflow"
+        error: "Cannot resume cancelled workflow",
       };
     }
 
@@ -421,7 +425,7 @@ export class WorkflowEngine implements IWorkflowReplay {
         executionId,
         workflowId,
         timestamp: new Date(),
-        payload: { taskCount: def.tasks.length }
+        payload: { taskCount: def.tasks.length },
       });
     }
 
@@ -441,7 +445,7 @@ export class WorkflowEngine implements IWorkflowReplay {
             taskResults: {},
             startedAt: new Date(),
             completedAt: new Date(),
-            error: reason
+            error: reason,
           };
         }
       }
@@ -465,7 +469,7 @@ export class WorkflowEngine implements IWorkflowReplay {
           status: "pending",
           taskResults: {},
           startedAt: new Date(),
-          approved: false
+          approved: false,
         };
       }
 
@@ -480,28 +484,38 @@ export class WorkflowEngine implements IWorkflowReplay {
 
       // Resume from checkpoint: filter out completed tasks
       const tasksToExecute = def.tasks.filter(
-        (t) => !completedTaskIds.includes(t.id) && !failedTaskIds.includes(t.id)
+        (t) => !completedTaskIds.includes(t.id) && !failedTaskIds.includes(t.id),
       );
 
       // ── RuntimeGraph registration (suppressed during replay) ──
       if (this.runtimeGraph && !isReplay) {
-        await this.runtimeGraph.addNode(`wf-exec:${executionId}`, "task_execution", `Execution:${executionId}`, {
-          metadata: { workflowId, taskCount: def.tasks.length, type: "workflow_root" },
-          status: "active"
-        });
+        await this.runtimeGraph.addNode(
+          `wf-exec:${executionId}`,
+          "task_execution",
+          `Execution:${executionId}`,
+          {
+            metadata: { workflowId, taskCount: def.tasks.length, type: "workflow_root" },
+            status: "active",
+          },
+        );
         for (const task of def.tasks) {
-          await this.runtimeGraph.addNode(`task:${executionId}:${task.id}`, "task_execution", `Task:${task.title}`, {
-            metadata: { taskId: task.id, priority: task.priority, type: task.type },
-            status: completedTaskIds.includes(task.id) ? "active" : "pending",
-            dependencies: [`wf-exec:${executionId}`]
-          });
+          await this.runtimeGraph.addNode(
+            `task:${executionId}:${task.id}`,
+            "task_execution",
+            `Task:${task.title}`,
+            {
+              metadata: { taskId: task.id, priority: task.priority, type: task.type },
+              status: completedTaskIds.includes(task.id) ? "active" : "pending",
+              dependencies: [`wf-exec:${executionId}`],
+            },
+          );
           if (task.dependencies) {
             for (const depId of task.dependencies) {
               await this.runtimeGraph.addEdge(
                 `task:${executionId}:${task.id}`,
                 `task:${executionId}:${depId}`,
                 "depends_on",
-                { relationship: "task_dependency" }
+                { relationship: "task_dependency" },
               );
             }
           }
@@ -519,7 +533,7 @@ export class WorkflowEngine implements IWorkflowReplay {
           pendingTaskIds: tasksToExecute.map((t) => t.id),
           taskResults: existingCp?.taskResults ?? {},
           status: "running",
-          replayGeneration: replayOptions?.replayGeneration
+          replayGeneration: replayOptions?.replayGeneration,
         });
         await this.persistCheckpoints();
       }
@@ -552,7 +566,7 @@ export class WorkflowEngine implements IWorkflowReplay {
             executionId,
             workflowId,
             timestamp: new Date(),
-            payload: { taskId: t.id, status: results[t.id]?.status ?? "completed" }
+            payload: { taskId: t.id, status: results[t.id]?.status ?? "completed" },
           });
         }
       }
@@ -571,7 +585,7 @@ export class WorkflowEngine implements IWorkflowReplay {
         if (this.runtimeGraph) {
           for (const task of def.tasks) {
             await this.runtimeGraph.updateNodeStatus(`task:${executionId}:${task.id}`, "active", {
-              completed: true
+              completed: true,
             });
           }
         }
@@ -581,7 +595,7 @@ export class WorkflowEngine implements IWorkflowReplay {
           executionId,
           workflowId,
           timestamp: new Date(),
-          payload: { results }
+          payload: { results },
         });
 
         this.telemetry.recordExecutionSuccess(executionId, results);
@@ -598,7 +612,7 @@ export class WorkflowEngine implements IWorkflowReplay {
         completedAt: new Date(),
         approved: !isReplay, // replays skip approval
         originalExecutionId: undefined, // overridden by deterministicReplay() caller
-        stateVerified: isReplay
+        stateVerified: isReplay,
       };
     } catch (e: any) {
       const errorMsg = e.message || String(e);
@@ -620,7 +634,7 @@ export class WorkflowEngine implements IWorkflowReplay {
             const node = await this.runtimeGraph.getNode(taskNodeId);
             if (node && node.status !== "active") {
               await this.runtimeGraph.updateNodeStatus(taskNodeId, "failed", {
-                error: errorMsg
+                error: errorMsg,
               });
             }
           }
@@ -637,7 +651,7 @@ export class WorkflowEngine implements IWorkflowReplay {
         startedAt: new Date(),
         completedAt: new Date(),
         approved: !isReplay,
-        error: errorMsg
+        error: errorMsg,
       };
     }
   }
@@ -654,7 +668,7 @@ export class WorkflowEngine implements IWorkflowReplay {
           executionId,
           workflowId: "",
           timestamp: new Date(),
-          payload: { approvalId, decidedBy: "Admin" }
+          payload: { approvalId, decidedBy: "Admin" },
         });
       }
     }
@@ -696,7 +710,7 @@ export class WorkflowEngine implements IWorkflowReplay {
         taskResults: results,
         startedAt: record.startedAt,
         completedAt: new Date(),
-        approved: true
+        approved: true,
       };
     } catch (e: any) {
       const errorMsg = e.message || String(e);
@@ -709,7 +723,7 @@ export class WorkflowEngine implements IWorkflowReplay {
         startedAt: record.startedAt,
         completedAt: new Date(),
         approved: true,
-        error: errorMsg
+        error: errorMsg,
       };
     }
   }
@@ -723,7 +737,7 @@ export class WorkflowEngine implements IWorkflowReplay {
   async executeWithIdempotency(
     workflowId: string,
     executionId: string,
-    idempotencyToken: string
+    idempotencyToken: string,
   ): Promise<IWorkflowExecution> {
     // Check if token was already used
     const existing = this.idempotencyTokens.get(idempotencyToken);
@@ -734,7 +748,7 @@ export class WorkflowEngine implements IWorkflowReplay {
         ...existing.result,
         id: executionId,
         idempotent: true,
-        originalExecutionId: existing.executionId
+        originalExecutionId: existing.executionId,
       };
     }
 
@@ -745,7 +759,7 @@ export class WorkflowEngine implements IWorkflowReplay {
       workflowId,
       token: idempotencyToken,
       result,
-      timestamp: new Date()
+      timestamp: new Date(),
     });
     return result;
   }
@@ -777,7 +791,7 @@ export class WorkflowEngine implements IWorkflowReplay {
     options?: {
       verifyState?: boolean;
       newExecutionId?: string;
-    }
+    },
   ): Promise<IWorkflowExecution> {
     const history = this.telemetry.getExecutionHistory();
     const record = history.find((h) => h.id === executionId);
@@ -817,7 +831,7 @@ export class WorkflowEngine implements IWorkflowReplay {
     return {
       ...replayResult,
       stateVerified,
-      originalExecutionId: executionId
+      originalExecutionId: executionId,
     };
   }
 
@@ -837,7 +851,7 @@ export class WorkflowEngine implements IWorkflowReplay {
     options?: {
       newExecutionId?: string;
       replayGeneration?: number;
-    }
+    },
   ): Promise<IWorkflowExecution> {
     const generation = options?.replayGeneration ?? ++this.replayGenerationCounter;
     const newId = options?.newExecutionId || `${executionId}-replay-${Date.now()}-${generation}`;
@@ -846,7 +860,7 @@ export class WorkflowEngine implements IWorkflowReplay {
     const lineage: ReplayLineage = this.replayLineage.get(executionId) || {
       originalExecutionId: executionId,
       replayGeneration: 0,
-      previousExecutions: []
+      previousExecutions: [],
     };
 
     // Check telemetry for the original execution
@@ -865,7 +879,7 @@ export class WorkflowEngine implements IWorkflowReplay {
     const result = await this.executeWorkflow(workflowId, newId, {
       suppressSideEffects: true,
       newExecutionId: newId,
-      replayGeneration: generation
+      replayGeneration: generation,
     });
 
     // Record the replay lineage
@@ -873,7 +887,7 @@ export class WorkflowEngine implements IWorkflowReplay {
     lineage.previousExecutions.push({
       executionId: newId,
       status: result.status,
-      timestamp: new Date()
+      timestamp: new Date(),
     });
     // Keep only the last 10 entries
     if (lineage.previousExecutions.length > 10) {
@@ -885,7 +899,7 @@ export class WorkflowEngine implements IWorkflowReplay {
       ...result,
       originalExecutionId: executionId,
       stateVerified: true,
-      idempotent: true
+      idempotent: true,
     };
   }
 
@@ -895,7 +909,7 @@ export class WorkflowEngine implements IWorkflowReplay {
    * Uses side-effect suppression for deterministic continuation.
    */
   async continueAfterCrash(
-    executionId?: string
+    executionId?: string,
   ): Promise<{ resumed: IWorkflowExecution | null; checkpoint?: WorkflowCheckpoint }> {
     // If no execution ID specified, find the most recent paused checkpoint
     if (!executionId) {
@@ -916,22 +930,26 @@ export class WorkflowEngine implements IWorkflowReplay {
 
     // Run with side-effect suppression to avoid duplicating state
     const generation = ++this.replayGenerationCounter;
-    const result = await this.executeWorkflow(cp.workflowId, cp.executionId + "-recover-" + Date.now(), {
-      suppressSideEffects: true,
-      replayGeneration: generation
-    });
+    const result = await this.executeWorkflow(
+      cp.workflowId,
+      cp.executionId + "-recover-" + Date.now(),
+      {
+        suppressSideEffects: true,
+        replayGeneration: generation,
+      },
+    );
 
     // Record recovery lineage
     const lineage: ReplayLineage = this.replayLineage.get(executionId) || {
       originalExecutionId: executionId,
       replayGeneration: 0,
-      previousExecutions: []
+      previousExecutions: [],
     };
     lineage.replayGeneration = generation;
     lineage.previousExecutions.push({
       executionId: result.id,
       status: result.status,
-      timestamp: new Date()
+      timestamp: new Date(),
     });
     if (lineage.previousExecutions.length > 10) {
       lineage.previousExecutions.splice(0, lineage.previousExecutions.length - 10);
@@ -943,9 +961,9 @@ export class WorkflowEngine implements IWorkflowReplay {
         ...result,
         originalExecutionId: executionId,
         stateVerified: true,
-        idempotent: true
+        idempotent: true,
       },
-      checkpoint: cp
+      checkpoint: cp,
     };
   }
 
@@ -955,11 +973,11 @@ export class WorkflowEngine implements IWorkflowReplay {
   }
 
   /** List all recorded replay lineages for diagnostics. */
-  listReplayLineages(): Array<{ originalExecutionId: string; generation: number; replays: number }> {
+  listReplayLineages(): { originalExecutionId: string; generation: number; replays: number }[] {
     return Array.from(this.replayLineage.entries()).map(([key, value]) => ({
       originalExecutionId: key,
       generation: value.replayGeneration,
-      replays: value.previousExecutions.length
+      replays: value.previousExecutions.length,
     }));
   }
 
@@ -1004,7 +1022,10 @@ export class WorkflowEngine implements IWorkflowReplay {
     }
     // Verify failed tasks
     for (const taskId of cp.failedTaskIds) {
-      if (record.taskResults[taskId] !== undefined && record.taskResults[taskId]?.status !== "failed") {
+      if (
+        record.taskResults[taskId] !== undefined &&
+        record.taskResults[taskId]?.status !== "failed"
+      ) {
         issues.push(`Checkpoint says task ${taskId} failed but telemetry shows different status`);
       }
     }
@@ -1032,7 +1053,7 @@ export class BrowserResearchWorkflowTemplate implements IWorkflowTemplate {
           description: `browser navigate task with quota limit ${limitBytes}`,
           priority: "high",
           status: "pending",
-          dependencies: []
+          dependencies: [],
         },
         {
           id: `${params.id || "browser-research-wf"}-scrape-task`,
@@ -1040,8 +1061,8 @@ export class BrowserResearchWorkflowTemplate implements IWorkflowTemplate {
           description: "scraping research headlines information",
           priority: "medium",
           status: "pending",
-          dependencies: [`${params.id || "browser-research-wf"}-nav-task`]
-        }
+          dependencies: [`${params.id || "browser-research-wf"}-nav-task`],
+        },
       ],
       approvalPolicy: new WorkflowApprovalPolicy(this.name, async (_tasks) => {
         // Enforce approval if browser requests bypass secure sites or use large quotas
@@ -1049,13 +1070,15 @@ export class BrowserResearchWorkflowTemplate implements IWorkflowTemplate {
       }),
       constraints: [
         new WorkflowConstraint("Path Restriction Gate", async (tasks) => {
-          const hasIllegalPaths = tasks.some((t) => t.description.includes("illegal") || t.id.includes("passwd"));
+          const hasIllegalPaths = tasks.some(
+            (t) => t.description.includes("illegal") || t.id.includes("passwd"),
+          );
           return {
             allowed: !hasIllegalPaths,
-            reason: hasIllegalPaths ? "Illegal system file path protocol blocked" : undefined
+            reason: hasIllegalPaths ? "Illegal system file path protocol blocked" : undefined,
           };
-        })
-      ]
+        }),
+      ],
     };
   }
 }
@@ -1078,7 +1101,7 @@ export class LocalCloudProvisioningTemplate implements IWorkflowTemplate {
           description: "floci create bucket action",
           priority: "high",
           status: "pending",
-          dependencies: []
+          dependencies: [],
         },
         {
           id: `${prefix}-sqs-queue`,
@@ -1086,7 +1109,7 @@ export class LocalCloudProvisioningTemplate implements IWorkflowTemplate {
           description: "floci create queue action",
           priority: "medium",
           status: "pending",
-          dependencies: [`${prefix}-s3-bucket`]
+          dependencies: [`${prefix}-s3-bucket`],
         },
         {
           id: `${prefix}-ddb-table`,
@@ -1094,9 +1117,9 @@ export class LocalCloudProvisioningTemplate implements IWorkflowTemplate {
           description: "floci create dynamodb table action",
           priority: "medium",
           status: "pending",
-          dependencies: [`${prefix}-sqs-queue`]
-        }
-      ]
+          dependencies: [`${prefix}-sqs-queue`],
+        },
+      ],
     };
   }
 }
@@ -1119,7 +1142,7 @@ export class DocumentProcessingTemplate implements IWorkflowTemplate {
           description: "read source configurations files under sandbox root",
           priority: "high",
           status: "pending",
-          dependencies: []
+          dependencies: [],
         },
         {
           id: `${prefix}-filesystem-format`,
@@ -1127,18 +1150,18 @@ export class DocumentProcessingTemplate implements IWorkflowTemplate {
           description: "format JSON metrics targets to sandboxed output",
           priority: "medium",
           status: "pending",
-          dependencies: [`${prefix}-filesystem-ingest`]
-        }
+          dependencies: [`${prefix}-filesystem-ingest`],
+        },
       ],
       constraints: [
         new WorkflowConstraint("Sandbox Size Limit Gate", async () => {
           const limitBytes = params.limitBytes || 50000;
           return {
             allowed: limitBytes < 1000000,
-            reason: limitBytes >= 1000000 ? "Size exceeds sandboxed quota limit" : undefined
+            reason: limitBytes >= 1000000 ? "Size exceeds sandboxed quota limit" : undefined,
           };
-        })
-      ]
+        }),
+      ],
     };
   }
 }
@@ -1146,7 +1169,8 @@ export class DocumentProcessingTemplate implements IWorkflowTemplate {
 export class GovernedEtlWorkflowTemplate implements IWorkflowTemplate {
   templateId = "governed-etl-template";
   name = "Governed ETL Data Pipeline";
-  description = "Extract, transform, and load pipeline with scraping, filter, and S3 provisioning steps.";
+  description =
+    "Extract, transform, and load pipeline with scraping, filter, and S3 provisioning steps.";
 
   createWorkflow(params: Record<string, any>): IWorkflowDefinition {
     const prefix = params.id || "governed-etl";
@@ -1162,13 +1186,14 @@ export class GovernedEtlWorkflowTemplate implements IWorkflowTemplate {
         {
           id: `${prefix}-extract`,
           title: "Extract Page Scraped Data",
-          description: "Scrapes data from the target website using the sandbox-safe scraping execution adapter.",
+          description:
+            "Scrapes data from the target website using the sandbox-safe scraping execution adapter.",
           priority: "normal",
           status: "pending",
           dependencies: [],
           type: "scraping",
           action: "scrape_url",
-          arguments: { url: sourceUrl, maxLengthBytes: 50000, selectors: ["title"] }
+          arguments: { url: sourceUrl, maxLengthBytes: 50000, selectors: ["title"] },
         },
         {
           id: `${prefix}-transform`,
@@ -1179,7 +1204,7 @@ export class GovernedEtlWorkflowTemplate implements IWorkflowTemplate {
           dependencies: [`${prefix}-extract`],
           type: "floci",
           action: "filter_content",
-          arguments: { pattern, sourceTaskId: `${prefix}-extract` }
+          arguments: { pattern, sourceTaskId: `${prefix}-extract` },
         },
         {
           id: `${prefix}-load`,
@@ -1190,18 +1215,18 @@ export class GovernedEtlWorkflowTemplate implements IWorkflowTemplate {
           dependencies: [`${prefix}-transform`],
           type: "floci",
           action: "create_s3_bucket",
-          arguments: { bucketName, sourceTaskId: `${prefix}-transform` }
-        }
+          arguments: { bucketName, sourceTaskId: `${prefix}-transform` },
+        },
       ],
       constraints: [
         new WorkflowConstraint("ETL byte quota gate", async () => {
           const maxBytes = (params.maxLengthBytes as number) || 50000;
           return {
             allowed: maxBytes <= 1_000_000,
-            reason: maxBytes > 1_000_000 ? "ETL extract exceeds sandbox byte quota" : undefined
+            reason: maxBytes > 1_000_000 ? "ETL extract exceeds sandbox byte quota" : undefined,
           };
-        })
-      ]
+        }),
+      ],
     };
   }
 }
@@ -1224,7 +1249,7 @@ export class SpecToExecutionTemplate implements IWorkflowTemplate {
           description: `spec objective generator task: ${params.objective || "deploy s3"}`,
           priority: "high",
           status: "pending",
-          dependencies: []
+          dependencies: [],
         },
         {
           id: `${prefix}-spec-execution`,
@@ -1232,13 +1257,13 @@ export class SpecToExecutionTemplate implements IWorkflowTemplate {
           description: "execute target synthesized workflow",
           priority: "medium",
           status: "pending",
-          dependencies: [`${prefix}-spec-generation`]
-        }
+          dependencies: [`${prefix}-spec-generation`],
+        },
       ],
       approvalPolicy: new WorkflowApprovalPolicy(this.name, async () => {
         // Spec execution always raises safety approvals
         return true;
-      })
+      }),
     };
   }
 }

@@ -22,6 +22,7 @@ SLIs and SLOs for each production service. Alert rules reference Prometheus metr
 **Error budget:** 0.5% = ~3.6 hours/month
 
 **Alert rules:**
+
 ```yaml
 # Warn: burn rate 2x over 1h
 - alert: NexusAPIAvailabilityWarn
@@ -60,6 +61,7 @@ SLIs and SLOs for each production service. Alert rules reference Prometheus metr
 **Measurement window:** 5-minute rolling
 
 **Alert rules:**
+
 ```yaml
 - alert: NexusAPILatencyWarn
   expr: |
@@ -92,6 +94,7 @@ SLIs and SLOs for each production service. Alert rules reference Prometheus metr
 **Measurement:** `nexus_council_success_total / nexus_council_attempts_total`
 
 **Alert rules:**
+
 ```yaml
 - alert: NexusCouncilSuccessRateWarn
   expr: |
@@ -122,6 +125,7 @@ SLIs and SLOs for each production service. Alert rules reference Prometheus metr
 **Measurement:** BullMQ job metrics exported to Prometheus via worker instrumentation
 
 **Alert rules:**
+
 ```yaml
 - alert: NexusQueueDepthHigh
   expr: bullmq_queue_waiting{queue="nexus-high"} > 100
@@ -156,6 +160,7 @@ SLIs and SLOs for each production service. Alert rules reference Prometheus metr
 **Measurement:** Run verify probe every 5 minutes
 
 **Alert rules:**
+
 ```yaml
 - alert: NexusAuditChainBroken
   expr: nexus_audit_chain_valid == 0
@@ -171,12 +176,12 @@ SLIs and SLOs for each production service. Alert rules reference Prometheus metr
 
 ## Error budget tracking
 
-| SLO | Budget/month | Burned (track in Grafana) |
-|-----|-------------|--------------------------|
-| API availability | 3.6 hours | — |
-| API latency | Violations × 5min | — |
-| Council success | Failures / total | — |
-| Queue p99 | Violations × 10min | — |
-| Audit integrity | 0 | — |
+| SLO              | Budget/month       | Burned (track in Grafana) |
+| ---------------- | ------------------ | ------------------------- |
+| API availability | 3.6 hours          | —                         |
+| API latency      | Violations × 5min  | —                         |
+| Council success  | Failures / total   | —                         |
+| Queue p99        | Violations × 10min | —                         |
+| Audit integrity  | 0                  | —                         |
 
 Review error budget consumption in weekly ops review. Freeze feature work if >50% of monthly budget consumed by week 2.

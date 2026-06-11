@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # NEXUS Governance
 
 ## Model
@@ -11,13 +12,13 @@ The BDFL has final say on all architectural decisions, ADRs, and release timing.
 
 ## Decision process
 
-| Category | Process |
-|----------|---------|
-| Bug fixes | PR + 1 maintainer approval |
-| Feature additions | PR + ADR (if architectural) + 1 maintainer approval |
-| Breaking changes | RFC issue → discussion period (7 days min) → ADR → BDFL approval |
-| New ADR | Draft in PR, 3-day comment window, BDFL merges |
-| Release | BDFL triggers release workflow |
+| Category          | Process                                                          |
+| ----------------- | ---------------------------------------------------------------- |
+| Bug fixes         | PR + 1 maintainer approval                                       |
+| Feature additions | PR + ADR (if architectural) + 1 maintainer approval              |
+| Breaking changes  | RFC issue → discussion period (7 days min) → ADR → BDFL approval |
+| New ADR           | Draft in PR, 3-day comment window, BDFL merges                   |
+| Release           | BDFL triggers release workflow                                   |
 
 ## Path to lazy consensus
 
@@ -25,11 +26,11 @@ Once NEXUS has ≥ 3 regular contributors (≥ 5 merged PRs each), the project w
 
 ## Roles
 
-| Role | Criteria | Responsibilities |
-|------|----------|-----------------|
-| Contributor | Any merged PR | Follow CONTRIBUTING.md, DCO sign-off |
-| Maintainer | ≥ 10 merged PRs + BDFL nomination | Review PRs, triage issues, cut releases |
-| BDFL | Founder | Final architectural authority, release gating |
+| Role        | Criteria                          | Responsibilities                              |
+| ----------- | --------------------------------- | --------------------------------------------- |
+| Contributor | Any merged PR                     | Follow CONTRIBUTING.md, DCO sign-off          |
+| Maintainer  | ≥ 10 merged PRs + BDFL nomination | Review PRs, triage issues, cut releases       |
+| BDFL        | Founder                           | Final architectural authority, release gating |
 
 ## Conflict resolution
 

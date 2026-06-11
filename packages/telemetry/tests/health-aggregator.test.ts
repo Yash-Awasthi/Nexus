@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { fc } from "@fast-check/vitest";
-import {
-  HealthAggregator,
-  queueDepthProbe,
-  type ProbeFn,
-} from "../src/health-aggregator.js";
+import { HealthAggregator, queueDepthProbe, type ProbeFn } from "../src/health-aggregator.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -167,41 +163,34 @@ describe("queueDepthProbe", () => {
 describe("HealthAggregator — property-based", () => {
   it("ready iff all probes pass", async () => {
     await fc.assert(
-      fc.asyncProperty(
-        fc.array(fc.boolean(), { minLength: 1, maxLength: 8 }),
-        async (outcomes) => {
-          const agg = new HealthAggregator();
-          for (let i = 0; i < outcomes.length; i++) {
-            const probeFn: ProbeFn = () =>
-              Promise.resolve({ ok: outcomes[i]! });
-            agg.register(`probe-${i}`, probeFn, { critical: false });
-          }
-          const result = await agg.check();
-          const allPass = outcomes.every(Boolean);
-          if (allPass) {
-            expect(result.status).toBe("ready");
-          } else {
-            expect(["degraded", "down"]).toContain(result.status);
-          }
-        },
-      ),
+      fc.asyncProperty(fc.array(fc.boolean(), { minLength: 1, maxLength: 8 }), async (outcomes) => {
+        const agg = new HealthAggregator();
+        for (let i = 0; i < outcomes.length; i++) {
+          const probeFn: ProbeFn = () => Promise.resolve({ ok: outcomes[i]! });
+          agg.register(`probe-${i}`, probeFn, { critical: false });
+        }
+        const result = await agg.check();
+        const allPass = outcomes.every(Boolean);
+        if (allPass) {
+          expect(result.status).toBe("ready");
+        } else {
+          expect(["degraded", "down"]).toContain(result.status);
+        }
+      }),
       { numRuns: 40 },
     );
   });
 
   it("checks map always has exactly one entry per registered probe", async () => {
     await fc.assert(
-      fc.asyncProperty(
-        fc.array(fc.boolean(), { minLength: 0, maxLength: 6 }),
-        async (outcomes) => {
-          const agg = new HealthAggregator();
-          for (let i = 0; i < outcomes.length; i++) {
-            agg.register(`probe-${i}`, () => Promise.resolve({ ok: outcomes[i]! }));
-          }
-          const result = await agg.check();
-          expect(Object.keys(result.checks).length).toBe(outcomes.length);
-        },
-      ),
+      fc.asyncProperty(fc.array(fc.boolean(), { minLength: 0, maxLength: 6 }), async (outcomes) => {
+        const agg = new HealthAggregator();
+        for (let i = 0; i < outcomes.length; i++) {
+          agg.register(`probe-${i}`, () => Promise.resolve({ ok: outcomes[i]! }));
+        }
+        const result = await agg.check();
+        expect(Object.keys(result.checks).length).toBe(outcomes.length);
+      }),
       { numRuns: 40 },
     );
   });

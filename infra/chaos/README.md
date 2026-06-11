@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # NEXUS Chaos Engineering Scenarios
 
 Run these scenarios quarterly (or before major releases) to validate resilience.
@@ -13,6 +14,7 @@ Run these scenarios quarterly (or before major releases) to validate resilience.
 **Hypothesis:** When the `nexus-api` container crashes, it restarts within 30 seconds and serves requests normally.
 
 **Actions:**
+
 1. Stop the `nexus-api` container
 2. Wait 30 seconds
 3. Send 10 health-check requests
@@ -37,6 +39,7 @@ done
 **Hypothesis:** When Redis goes down, in-flight jobs are not lost; the SignalWorker DB-polling fallback picks them up on Redis recovery.
 
 **Actions:**
+
 1. Ingest 20 events (all go to DB + Redis)
 2. Kill Redis
 3. Ingest 5 more events (DB only — Redis publish fails gracefully)
@@ -79,6 +82,7 @@ psql $DATABASE_URL -c "SELECT count(*) FROM ingested_events WHERE source='chaos'
 **Hypothesis:** When Postgres is overloaded with connections, the API returns 503 gracefully (not crash).
 
 **Actions:**
+
 1. Open 200 idle connections to Postgres (max_connections typically 100)
 2. Send 10 API requests
 3. Expect: either 503 with clear error, or requests succeed via pool wait
@@ -107,6 +111,7 @@ kill $PGBENCH_PID
 **Hypothesis:** A poisoned job (prototype pollution payload) does not crash the worker or affect subsequent jobs.
 
 **Actions:**
+
 1. Push a crafted job directly to Redis queue
 2. Observe worker processes 5 normal jobs immediately after
 3. Verify no prototype pollution occurred

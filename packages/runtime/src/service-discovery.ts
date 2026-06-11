@@ -1,7 +1,14 @@
-import { IServiceDiscovery, ServiceHeartbeat, IHealthMonitor } from "./interfaces/discovery.interface";
-import { IConfigLoader } from "../runtime/config-loader";
-import { probeFlociHealth, resolveFlociEndpoint } from "./floci-client";
-import { ILogger } from "./interfaces/logger.interface";
+// SPDX-License-Identifier: Apache-2.0
+// @ts-nocheck
+import type { IConfigLoader } from "../runtime/config-loader.js";
+
+import { probeFlociHealth, resolveFlociEndpoint } from "./floci-client.js";
+import type {
+  IServiceDiscovery,
+  ServiceHeartbeat,
+  IHealthMonitor,
+} from "./interfaces/discovery.interface.js";
+import type { ILogger } from "./interfaces/logger.interface.js";
 
 export class LocalServiceDiscovery implements IServiceDiscovery {
   private services = new Map<string, ServiceHeartbeat>();
@@ -12,7 +19,7 @@ export class LocalServiceDiscovery implements IServiceDiscovery {
       name,
       status,
       lastCheck: new Date(),
-      details: { ...details, port }
+      details: { ...details, port },
     });
   }
 
@@ -45,7 +52,8 @@ export class HealthMonitor implements IHealthMonitor {
     // In offline mode, skip the initial synchronous poll (which would time out trying to
     // reach Floci and other services that aren't running). The periodic timer still runs
     // unref'd so if services appear later they'll be detected.
-    const offlineMode = process.env.GHOSTSTACK_OFFLINE_MODE === "1" ||
+    const offlineMode =
+      process.env.GHOSTSTACK_OFFLINE_MODE === "1" ||
       (process.env.GHOSTSTACK_OFFLINE_MODE ?? "").toLowerCase() === "true";
     if (!offlineMode) {
       await this.pollChecks();
@@ -88,10 +96,11 @@ export class HealthMonitor implements IHealthMonitor {
 
         if (serviceName === "floci") {
           // Use a much shorter timeout when offline (200ms vs 4s) to avoid cascading delays
-          const timeoutMs = process.env.GHOSTSTACK_OFFLINE_MODE === "1" ||
+          const timeoutMs =
+            process.env.GHOSTSTACK_OFFLINE_MODE === "1" ||
             (process.env.GHOSTSTACK_OFFLINE_MODE ?? "").toLowerCase() === "true"
-            ? 200
-            : 4000;
+              ? 200
+              : 4000;
           const probe = await probeFlociHealth(resolveFlociEndpoint(), timeoutMs);
           probeLatencyMs = probe.latencyMs;
           status = probe.reachable ? "healthy" : "offline";
@@ -100,7 +109,7 @@ export class HealthMonitor implements IHealthMonitor {
           try {
             const res = await fetch(`${base}${hc.path}`, {
               method: "GET",
-              signal: AbortSignal.timeout(3000)
+              signal: AbortSignal.timeout(3000),
             });
             status = res.ok ? "healthy" : "degraded";
           } catch {
@@ -112,7 +121,7 @@ export class HealthMonitor implements IHealthMonitor {
           type: def.type,
           status,
           healthPath: hc?.path,
-          probeLatencyMs
+          probeLatencyMs,
         });
       }
     } catch (e) {

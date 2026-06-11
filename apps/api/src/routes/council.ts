@@ -6,13 +6,14 @@
  *   GET  /api/v1/council/transcripts/:verdictId
  */
 
-import type { FastifyInstance } from "fastify";
+import type { CouncilRequest } from "@nexus/contracts";
+import { CouncilService } from "@nexus/council";
+import type { CouncilPersistPayload } from "@nexus/council";
 import { db } from "@nexus/db";
 import { verdicts, councilTranscripts } from "@nexus/db/schema";
 import { eq } from "drizzle-orm";
-import { CouncilService } from "@nexus/council";
-import type { CouncilPersistPayload } from "@nexus/council";
-import type { CouncilRequest } from "@nexus/contracts";
+import type { FastifyInstance } from "fastify";
+
 import { requireAuth } from "../middleware/auth.js";
 
 // Lazy singleton — created on first request to avoid cold-start cost
@@ -40,11 +41,7 @@ async function persistCouncilResult(payload: CouncilPersistPayload): Promise<voi
   }
 
   const decision: "approve" | "reject" | "defer" | "escalate" =
-    result.outcome === "approved"
-      ? "approve"
-      : result.outcome === "rejected"
-      ? "reject"
-      : "defer";
+    result.outcome === "approved" ? "approve" : result.outcome === "rejected" ? "reject" : "defer";
 
   const dissents = votes
     .filter((v) => v.vote !== result.majority && v.vote !== "abstain")
@@ -84,26 +81,22 @@ export async function councilRoutes(app: FastifyInstance): Promise<void> {
   // POST /council/deliberate
   app.post<{
     Body: CouncilRequest & { signal_id?: string };
-  }>(
-    "/council/deliberate",
-    { preHandler: requireAuth },
-    async (request, reply) => {
-      const { signal_id, ...councilRequest } = request.body;
-      const svc = getCouncilService();
+  }>("/council/deliberate", { preHandler: requireAuth }, async (request, reply) => {
+    const { signal_id, ...councilRequest } = request.body;
+    const svc = getCouncilService();
 
-      try {
-        const response = await svc.deliberate(councilRequest, { signalId: signal_id });
-        const statusCode = response.ok ? 200 : 500;
-        return reply.code(statusCode).send(response);
-      } catch (err) {
-        request.log.error(err, "council/deliberate failed");
-        return reply.code(500).send({
-          ok: false,
-          error: err instanceof Error ? err.message : "Deliberation failed",
-        });
-      }
-    },
-  );
+    try {
+      const response = await svc.deliberate(councilRequest, { signalId: signal_id });
+      const statusCode = response.ok ? 200 : 500;
+      return reply.code(statusCode).send(response);
+    } catch (err) {
+      request.log.error(err, "council/deliberate failed");
+      return reply.code(500).send({
+        ok: false,
+        error: err instanceof Error ? err.message : "Deliberation failed",
+      });
+    }
+  });
 
   // GET /council/verdicts/:verdictId
   app.get<{ Params: { verdictId: string } }>(

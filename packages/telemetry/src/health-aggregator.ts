@@ -107,9 +107,7 @@ export class HealthAggregator {
     }
 
     // Run all probes in parallel
-    const results = await Promise.all(
-      this.probes.map((probe) => this.runProbe(probe)),
-    );
+    const results = await Promise.all(this.probes.map((probe) => this.runProbe(probe)));
 
     const checks: Record<string, ProbeStatus> = {};
     const messages: Record<string, string> = {};
@@ -142,14 +140,18 @@ export class HealthAggregator {
       const resultOrTimeout = await Promise.race([
         probe.fn(),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("__timeout__")), probe.timeoutMs),
+          setTimeout(() => {
+            reject(new Error("__timeout__"));
+          }, probe.timeoutMs),
         ),
       ]);
 
       const latencyMs = Date.now() - start;
       return {
         status: resultOrTimeout.ok ? "ok" : "fail",
-        message: resultOrTimeout.ok ? undefined : (resultOrTimeout.message ?? "probe returned ok=false"),
+        ...(resultOrTimeout.ok
+          ? {}
+          : { message: resultOrTimeout.message ?? "probe returned ok=false" }),
         latencyMs,
         critical: probe.critical,
       };
@@ -169,7 +171,7 @@ export class HealthAggregator {
     }
   }
 
-  private aggregate(results: Array<ProbeResult & { critical: boolean }>): HealthStatus {
+  private aggregate(results: (ProbeResult & { critical: boolean })[]): HealthStatus {
     const allOk = results.every((r) => r.status === "ok");
     if (allOk) return "ready";
 
@@ -188,9 +190,7 @@ export class HealthAggregator {
  * Create a Postgres connectivity probe using a simple SELECT 1 query.
  * Accepts any object with a `.execute(sql)` method.
  */
-export function postgresProbe(
-  client: { execute: (sql: string) => Promise<unknown> },
-): ProbeFn {
+export function postgresProbe(client: { execute: (sql: string) => Promise<unknown> }): ProbeFn {
   return async () => {
     await client.execute("SELECT 1");
     return { ok: true };
@@ -201,28 +201,26 @@ export function postgresProbe(
  * Create a Redis connectivity probe using a PING command.
  * Accepts any object with a `.ping()` method that resolves to "PONG".
  */
-export function redisProbe(
-  client: { ping: () => Promise<string> },
-): ProbeFn {
+export function redisProbe(client: { ping: () => Promise<string> }): ProbeFn {
   return async () => {
     const pong = await client.ping();
-    return { ok: pong === "PONG", message: pong !== "PONG" ? `Unexpected PING response: ${pong}` : undefined };
+    return {
+      ok: pong === "PONG",
+      ...(pong !== "PONG" ? { message: `Unexpected PING response: ${pong}` } : {}),
+    };
   };
 }
 
 /**
  * Create a queue-depth probe that fails when queue depth exceeds `maxDepth`.
  */
-export function queueDepthProbe(
-  getDepth: () => Promise<number>,
-  maxDepth: number,
-): ProbeFn {
+export function queueDepthProbe(getDepth: () => Promise<number>, maxDepth: number): ProbeFn {
   return async () => {
     const depth = await getDepth();
     const ok = depth <= maxDepth;
     return {
       ok,
-      message: ok ? undefined : `Queue depth ${depth} exceeds limit ${maxDepth}`,
+      ...(ok ? {} : { message: `Queue depth ${depth} exceeds limit ${maxDepth}` }),
     };
   };
 }

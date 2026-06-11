@@ -1,8 +1,9 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+
 ## Summary
 
-<!-- 1–3 bullet points describing what this PR does -->
--
+## <!-- 1–3 bullet points describing what this PR does -->
+
 -
 
 ## Type of change
@@ -16,8 +17,7 @@
 
 ## Affected packages
 
-<!-- List the @nexus/* packages or services touched -->
--
+## <!-- List the @nexus/* packages or services touched -->
 
 ## Test plan
 

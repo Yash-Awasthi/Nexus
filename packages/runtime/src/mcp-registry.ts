@@ -1,7 +1,12 @@
-import { IMCPServerRegistry, IMCPServerInfo, IMCPTransport } from "./interfaces/mcp.interface";
+// SPDX-License-Identifier: Apache-2.0
+import type {
+  IMCPServerRegistry,
+  IMCPServerInfo,
+  IMCPTransport,
+} from "./interfaces/mcp.interface.js";
 
 export class MCPServerRegistry implements IMCPServerRegistry {
-  private servers: Map<string, { info: IMCPServerInfo; transport: IMCPTransport }> = new Map();
+  private servers = new Map<string, { info: IMCPServerInfo; transport: IMCPTransport }>();
 
   async registerServer(info: IMCPServerInfo, transport: IMCPTransport): Promise<void> {
     const mutableInfo = { ...info };
@@ -9,7 +14,9 @@ export class MCPServerRegistry implements IMCPServerRegistry {
     this.servers.set(info.name, { info: mutableInfo, transport });
   }
 
-  async getServer(name: string): Promise<{ info: IMCPServerInfo; transport: IMCPTransport } | undefined> {
+  async getServer(
+    name: string,
+  ): Promise<{ info: IMCPServerInfo; transport: IMCPTransport } | undefined> {
     return this.servers.get(name);
   }
 

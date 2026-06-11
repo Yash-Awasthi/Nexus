@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # apps/cli — nexus CLI
 
 Developer CLI for interacting with a running NEXUS instance. Built with `commander.js`.

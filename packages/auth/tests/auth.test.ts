@@ -42,7 +42,9 @@ describe("extractBearerToken", () => {
 
   it("throws MISSING_TOKEN when header is undefined", () => {
     expect(() => extractBearerToken(undefined)).toThrow(AuthError);
-    try { extractBearerToken(undefined); } catch (e) {
+    try {
+      extractBearerToken(undefined);
+    } catch (e) {
       expect((e as AuthError).code).toBe("MISSING_TOKEN");
     }
   });
@@ -67,7 +69,9 @@ describe("verifyApiKey", () => {
 
   it("throws INVALID_TOKEN for wrong key", () => {
     expect(() => verifyApiKey("wrong-key", KEY)).toThrow(AuthError);
-    try { verifyApiKey("wrong-key", KEY); } catch (e) {
+    try {
+      verifyApiKey("wrong-key", KEY);
+    } catch (e) {
       expect((e as AuthError).code).toBe("INVALID_TOKEN");
     }
   });
@@ -109,7 +113,9 @@ describe("JWT (signJwt + verifyJwt)", () => {
   it("throws INVALID_TOKEN with wrong secret", () => {
     const token = signJwt(PAYLOAD, SECRET);
     expect(() => verifyJwt(token, "wrong-secret")).toThrow(AuthError);
-    try { verifyJwt(token, "wrong-secret"); } catch (e) {
+    try {
+      verifyJwt(token, "wrong-secret");
+    } catch (e) {
       expect((e as AuthError).code).toBe("INVALID_TOKEN");
     }
   });
@@ -121,24 +127,29 @@ describe("JWT (signJwt + verifyJwt)", () => {
   it("throws INVALID_TOKEN for tampered payload", () => {
     const token = signJwt(PAYLOAD, SECRET);
     const [h, , s] = token.split(".");
-    const tampered = Buffer.from(JSON.stringify({ ...PAYLOAD, role: "admin" })).toString("base64url");
+    const tampered = Buffer.from(JSON.stringify({ ...PAYLOAD, role: "admin" })).toString(
+      "base64url",
+    );
     expect(() => verifyJwt(`${h}.${tampered}.${s}`, SECRET)).toThrow(AuthError);
   });
 
   it("throws EXPIRED_TOKEN for expired JWT", () => {
     const expired = signJwt({ ...PAYLOAD, exp: Math.floor(Date.now() / 1000) - 10 }, SECRET);
     expect(() => verifyJwt(expired, SECRET)).toThrow(AuthError);
-    try { verifyJwt(expired, SECRET); } catch (e) {
+    try {
+      verifyJwt(expired, SECRET);
+    } catch (e) {
       expect((e as AuthError).code).toBe("EXPIRED_TOKEN");
     }
   });
 
   it("accepts JWT with no exp field (non-expiring)", () => {
-    const noExp = { sub: "svc", role: "agent" as const, exp: 0 };
-    const token = signJwt(noExp, SECRET);
-    // exp=0 is in the past — should still expire
-    // Instead test with a very large exp
-    const longLived = { sub: "svc", role: "agent" as const, exp: Math.floor(Date.now() / 1000) + 999999 };
+    // exp=0 is in the past — should still expire; test with a far-future exp instead
+    const longLived = {
+      sub: "svc",
+      role: "agent" as const,
+      exp: Math.floor(Date.now() / 1000) + 999999,
+    };
     const t2 = signJwt(longLived, SECRET);
     expect(verifyJwt(t2, SECRET).sub).toBe("svc");
   });
@@ -158,7 +169,10 @@ describe("authenticate", () => {
   });
 
   it("accepts a valid JWT when API key is not configured", () => {
-    const token = signJwt({ sub: "u1", role: "agent", exp: Math.floor(Date.now() / 1000) + 3600 }, JWT_SECRET);
+    const token = signJwt(
+      { sub: "u1", role: "agent", exp: Math.floor(Date.now() / 1000) + 3600 },
+      JWT_SECRET,
+    );
     const result = authenticate(`Bearer ${token}`, { jwtSecret: JWT_SECRET });
     expect(result.authenticated).toBe(true);
     expect(result.method).toBe("jwt");
@@ -166,23 +180,38 @@ describe("authenticate", () => {
   });
 
   it("falls through to JWT when API key doesn't match", () => {
-    const token = signJwt({ sub: "u2", role: "admin", exp: Math.floor(Date.now() / 1000) + 3600 }, JWT_SECRET);
-    const result = authenticate(`Bearer ${token}`, { apiKey: "different-key", jwtSecret: JWT_SECRET });
+    const token = signJwt(
+      { sub: "u2", role: "admin", exp: Math.floor(Date.now() / 1000) + 3600 },
+      JWT_SECRET,
+    );
+    const result = authenticate(`Bearer ${token}`, {
+      apiKey: "different-key",
+      jwtSecret: JWT_SECRET,
+    });
     expect(result.method).toBe("jwt");
     expect(result.role).toBe("admin");
   });
 
   it("throws MISSING_TOKEN when no auth header provided", () => {
     expect(() => authenticate(undefined, { apiKey: API_KEY })).toThrow(AuthError);
-    try { authenticate(undefined, { apiKey: API_KEY }); } catch (e) {
+    try {
+      authenticate(undefined, { apiKey: API_KEY });
+    } catch (e) {
       expect((e as AuthError).code).toBe("MISSING_TOKEN");
     }
   });
 
   it("throws INSUFFICIENT_ROLE when role is too low", () => {
-    const token = signJwt({ sub: "u3", role: "read-only", exp: Math.floor(Date.now() / 1000) + 3600 }, JWT_SECRET);
-    expect(() => authenticate(`Bearer ${token}`, { jwtSecret: JWT_SECRET, requiredRole: "admin" })).toThrow(AuthError);
-    try { authenticate(`Bearer ${token}`, { jwtSecret: JWT_SECRET, requiredRole: "admin" }); } catch (e) {
+    const token = signJwt(
+      { sub: "u3", role: "read-only", exp: Math.floor(Date.now() / 1000) + 3600 },
+      JWT_SECRET,
+    );
+    expect(() =>
+      authenticate(`Bearer ${token}`, { jwtSecret: JWT_SECRET, requiredRole: "admin" }),
+    ).toThrow(AuthError);
+    try {
+      authenticate(`Bearer ${token}`, { jwtSecret: JWT_SECRET, requiredRole: "admin" });
+    } catch (e) {
       expect((e as AuthError).code).toBe("INSUFFICIENT_ROLE");
     }
   });
@@ -209,10 +238,18 @@ describe("makeFastifyAuthHook", () => {
     return {
       code(n: number) {
         statusCode = n;
-        return { send: async (b: unknown) => { body = b; } };
+        return {
+          send: async (b: unknown) => {
+            body = b;
+          },
+        };
       },
-      get statusCode() { return statusCode; },
-      get body() { return body; },
+      get statusCode() {
+        return statusCode;
+      },
+      get body() {
+        return body;
+      },
     };
   }
 
@@ -243,7 +280,10 @@ describe("makeFastifyAuthHook", () => {
 
   it("returns 403 for insufficient role", async () => {
     const JWT_SECRET = "hook-jwt-secret";
-    const token = signJwt({ sub: "low-user", role: "read-only", exp: Math.floor(Date.now() / 1000) + 3600 }, JWT_SECRET);
+    const token = signJwt(
+      { sub: "low-user", role: "read-only", exp: Math.floor(Date.now() / 1000) + 3600 },
+      JWT_SECRET,
+    );
     const hook = makeFastifyAuthHook({ jwtSecret: JWT_SECRET, requiredRole: "admin" });
     const req = { headers: { authorization: `Bearer ${token}` } };
     const reply = makeMockReply();

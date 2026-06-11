@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # @nexus/pipeline-signal
 
 Ingest-to-signal pipeline worker for NEXUS.
@@ -32,15 +33,15 @@ Classifies a raw event into a `{ signalType, priority, tags }` result using prio
 
 ### Built-in rules
 
-| Rule | Matches | Priority |
-|---|---|---|
-| `github.pr` | `source=github`, `type=pull_request` | `high` |
-| `github.security` | `source=github`, `type=security_alert` | `critical` |
-| `gmail.action-required` | `source=gmail`, subject contains "action required" | `high` |
-| `gmail.received` | `source=gmail` | `medium` |
-| `slack.mention` | `source=slack`, `type=mention` | `high` |
-| `linear.issue` | `source=linear` | `medium` |
-| `ingest.scrape` | `source=scrape` | `low` |
+| Rule                    | Matches                                            | Priority   |
+| ----------------------- | -------------------------------------------------- | ---------- |
+| `github.pr`             | `source=github`, `type=pull_request`               | `high`     |
+| `github.security`       | `source=github`, `type=security_alert`             | `critical` |
+| `gmail.action-required` | `source=gmail`, subject contains "action required" | `high`     |
+| `gmail.received`        | `source=gmail`                                     | `medium`   |
+| `slack.mention`         | `source=slack`, `type=mention`                     | `high`     |
+| `linear.issue`          | `source=linear`                                    | `medium`   |
+| `ingest.scrape`         | `source=scrape`                                    | `low`      |
 
 ### Custom rules
 
@@ -62,10 +63,10 @@ Polling worker that drives the pipeline. Implements push-based (`processOnce`) a
 
 ```ts
 const processor = new SignalProcessor({
-  eventSource,  // IEventSource — getUnprocessed(limit) + markProcessed(id)
-  signalSink,   // ISignalSink  — create(signal)
-  classifier,   // optional: defaults to new SignalClassifier()
-  eventBus,     // optional: publishes "nexus.signals.created" after each signal
+  eventSource, // IEventSource — getUnprocessed(limit) + markProcessed(id)
+  signalSink, // ISignalSink  — create(signal)
+  classifier, // optional: defaults to new SignalClassifier()
+  eventBus, // optional: publishes "nexus.signals.created" after each signal
   batchSize: 50,
   pollIntervalMs: 1000,
 });

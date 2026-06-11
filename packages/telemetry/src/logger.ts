@@ -1,5 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
 import * as fs from "fs";
-import { ILogger } from "./interfaces/logger.interface";
+
+import type { ILogger } from "./interfaces/logger.interface.js";
 
 // ─── Log level ordering ────────────────────────────────────────────────────────
 
@@ -9,7 +11,7 @@ const LEVEL_RANK: Record<LogLevel, number> = {
   DEBUG: 0,
   INFO: 1,
   WARN: 2,
-  ERROR: 3
+  ERROR: 3,
 };
 
 function resolveMinLevel(): LogLevel {
@@ -48,7 +50,12 @@ export class StructuredLogger implements ILogger {
   private _format(level: LogLevel, message: string, extra?: any): string {
     const ts = new Date().toISOString();
     if (this.jsonMode) {
-      return JSON.stringify({ ts, level, message, ...(extra !== undefined ? { context: extra } : {}) });
+      return JSON.stringify({
+        ts,
+        level,
+        message,
+        ...(extra !== undefined ? { context: extra } : {}),
+      });
     }
     const ctx = extra !== undefined ? " " + JSON.stringify(extra) : "";
     return `${ts} [${level}] ${message}${ctx}`;
@@ -56,10 +63,18 @@ export class StructuredLogger implements ILogger {
 
   private _emit(level: LogLevel, line: string): void {
     switch (level) {
-      case "DEBUG": console.debug(line); break;
-      case "INFO":  console.log(line);   break;
-      case "WARN":  console.warn(line);  break;
-      case "ERROR": console.error(line); break;
+      case "DEBUG":
+        console.debug(line);
+        break;
+      case "INFO":
+        console.log(line);
+        break;
+      case "WARN":
+        console.warn(line);
+        break;
+      case "ERROR":
+        console.error(line);
+        break;
     }
     if (this.fileSink) {
       this.fileSink.write(line + "\n");
@@ -78,9 +93,15 @@ export class StructuredLogger implements ILogger {
 
   error(message: string, error?: any, context?: any): void {
     if (!this._passes("ERROR")) return;
-    const extra = error !== undefined || context !== undefined
-      ? { ...(error !== undefined ? { error: error instanceof Error ? error.message : error } : {}), ...(context ?? {}) }
-      : undefined;
+    const extra =
+      error !== undefined || context !== undefined
+        ? {
+            ...(error !== undefined
+              ? { error: error instanceof Error ? error.message : error }
+              : {}),
+            ...(context ?? {}),
+          }
+        : undefined;
     this._emit("ERROR", this._format("ERROR", message, extra));
   }
 
@@ -102,12 +123,19 @@ export class StructuredLogger implements ILogger {
 // where console noise would pollute output or assertions.
 
 export class NullLogger implements ILogger {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  info(_message: string, _context?: any): void { /* no-op */ }
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  warn(_message: string, _context?: any): void { /* no-op */ }
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  error(_message: string, _error?: any, _context?: any): void { /* no-op */ }
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  debug(_message: string, _context?: any): void { /* no-op */ }
+  info(_message: string, _context?: any): void {
+    /* no-op */
+  }
+
+  warn(_message: string, _context?: any): void {
+    /* no-op */
+  }
+
+  error(_message: string, _error?: any, _context?: any): void {
+    /* no-op */
+  }
+
+  debug(_message: string, _context?: any): void {
+    /* no-op */
+  }
 }

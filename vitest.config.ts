@@ -5,7 +5,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
-    include: ["packages/*/tests/**/*.test.ts", "packages/*/src/**/*.test.ts", "apps/*/tests/**/*.test.ts"],
+    include: [
+      "packages/*/tests/**/*.test.ts",
+      "packages/*/src/**/*.test.ts",
+      "apps/*/tests/**/*.test.ts",
+    ],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov", "html"],
@@ -15,12 +19,7 @@ export default defineConfig({
         branches: 80,
         statements: 80,
       },
-      exclude: [
-        "**/dist/**",
-        "**/node_modules/**",
-        "**/*.gen.ts",
-        "**/src/index.ts",
-      ],
+      exclude: ["**/dist/**", "**/node_modules/**", "**/*.gen.ts", "**/src/index.ts"],
     },
   },
 });

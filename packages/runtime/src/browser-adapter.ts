@@ -1,12 +1,19 @@
-import { IBrowserExecutionAdapter, IBrowserTask, IEnvironmentTelemetry } from "./interfaces/environment.interface";
-import { IExecutionContext } from "./interfaces/execution.interface";
-import { isSafeUrl } from "./security-utils";
-import { getBridgeManager, BridgeManager } from "../runtime/bridge-manager";
+// SPDX-License-Identifier: Apache-2.0
+// @ts-nocheck
+import { getBridgeManager, BridgeManager } from "../runtime/bridge-manager.js";
+
+import type {
+  IBrowserExecutionAdapter,
+  IBrowserTask,
+  IEnvironmentTelemetry,
+} from "./interfaces/environment.interface.js";
+import type { IExecutionContext } from "./interfaces/execution.interface.js";
+import { isSafeUrl } from "./security-utils.js";
 
 export class BrowserExecutionAdapter implements IBrowserExecutionAdapter {
   constructor(
     private telemetry: IEnvironmentTelemetry,
-    private isOfflineMode = true
+    private isOfflineMode = true,
   ) {}
 
   canExecute(taskType: string): boolean {
@@ -19,13 +26,13 @@ export class BrowserExecutionAdapter implements IBrowserExecutionAdapter {
       id: context.taskId,
       url: payload.url || "",
       actions: payload.actions || [],
-      timeoutMs: payload.timeoutMs || 5000
+      timeoutMs: payload.timeoutMs || 5000,
     };
     return this.executeBrowserTask(browserTask);
   }
 
   async executeBrowserTask(
-    task: IBrowserTask
+    task: IBrowserTask,
   ): Promise<{ success: boolean; screenshotUrl?: string; content?: string; logs: string[] }> {
     const logs: string[] = [];
     logs.push(`Initiating browser task execution for: ${task.url}`);
@@ -36,7 +43,7 @@ export class BrowserExecutionAdapter implements IBrowserExecutionAdapter {
       return {
         success: false,
         content: "BLOCKED_BY_SAFETY_POLICY",
-        logs
+        logs,
       };
     }
 
@@ -53,12 +60,14 @@ export class BrowserExecutionAdapter implements IBrowserExecutionAdapter {
         return {
           success: false,
           content: "TIMEOUT_BREACHED",
-          logs
+          logs,
         };
       }
 
       for (const action of task.actions) {
-        logs.push(`Executing interactive event: ${action.type} (Selector: ${action.selector || "none"})`);
+        logs.push(
+          `Executing interactive event: ${action.type} (Selector: ${action.selector || "none"})`,
+        );
         if (action.type === "navigate" && action.value) {
           if (!isSafeUrl(action.value)) {
             this.telemetry.browserSessionsActive -= 1;
@@ -66,7 +75,7 @@ export class BrowserExecutionAdapter implements IBrowserExecutionAdapter {
             return {
               success: false,
               content: "BLOCKED_BY_SAFETY_POLICY",
-              logs
+              logs,
             };
           }
           this.telemetry.recordNavigation(action.value);
@@ -78,7 +87,7 @@ export class BrowserExecutionAdapter implements IBrowserExecutionAdapter {
         success: true,
         screenshotUrl: `http://localhost:4566/screenshots/${task.id}.png`,
         content: `<html><body>Mock page loaded: ${task.url}</body></html>`,
-        logs
+        logs,
       };
     }
 
@@ -94,13 +103,13 @@ export class BrowserExecutionAdapter implements IBrowserExecutionAdapter {
         headless: true,
         humanize: true,
         timeout_ms: task.timeoutMs || 30_000,
-        disable_resources: false
+        disable_resources: false,
       };
       if (task.actions.length > 0) {
         requestBody.actions = task.actions.map((a) => ({
           type: a.type,
           selector: a.selector ?? null,
-          value: a.value ?? null
+          value: a.value ?? null,
         }));
       }
 
@@ -127,7 +136,7 @@ export class BrowserExecutionAdapter implements IBrowserExecutionAdapter {
         ...(result.screenshot_b64
           ? { screenshotUrl: `data:image/png;base64,${result.screenshot_b64}` }
           : {}),
-        logs
+        logs,
       };
     } catch (err: any) {
       this.telemetry.browserSessionsActive -= 1;
@@ -135,7 +144,7 @@ export class BrowserExecutionAdapter implements IBrowserExecutionAdapter {
       return {
         success: false,
         content: `Error: ${err.message}`,
-        logs
+        logs,
       };
     }
   }

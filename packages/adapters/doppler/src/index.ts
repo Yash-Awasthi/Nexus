@@ -39,7 +39,7 @@ export interface DopplerSecretResult {
 }
 
 export interface DopplerListResult {
-  secrets: Array<{ name: string; value: string }>;
+  secrets: { name: string; value: string }[];
 }
 
 // ── Implementation ────────────────────────────────────────────────────────────

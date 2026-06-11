@@ -8,8 +8,13 @@
  * apps/api or calls the council package directly when co-located.
  */
 
-import { defineAdapter, requireEnv, AdapterHttpError, type IExecutionContext } from "@nexus/plugin-sdk";
 import type { CouncilRequest, CouncilResponse } from "@nexus/contracts";
+import {
+  defineAdapter,
+  requireEnv,
+  AdapterHttpError,
+  type IExecutionContext,
+} from "@nexus/plugin-sdk";
 
 export interface CouncilDeliberateTask {
   taskType: "council.deliberate" | "council.evaluate";
@@ -18,7 +23,10 @@ export interface CouncilDeliberateTask {
   timeoutMs?: number;
 }
 
-async function execute(task: CouncilDeliberateTask, ctx: IExecutionContext): Promise<CouncilResponse> {
+async function execute(
+  task: CouncilDeliberateTask,
+  ctx: IExecutionContext,
+): Promise<CouncilResponse> {
   const councilUrl = requireEnv(ctx, "NEXUS_COUNCIL_URL");
   ctx.logger.info("council.deliberate", { title: task.proposal.title });
 
@@ -43,7 +51,9 @@ async function execute(task: CouncilDeliberateTask, ctx: IExecutionContext): Pro
 }
 
 export const councilAdapter = defineAdapter<CouncilDeliberateTask, CouncilResponse>({
-  name: "nexus-adapter-council", version: "0.1.0", capabilities: ["deliberation.council"],
+  name: "nexus-adapter-council",
+  version: "0.1.0",
+  capabilities: ["deliberation.council"],
   taskTypes: ["council.deliberate", "council.evaluate"],
   execute,
 });

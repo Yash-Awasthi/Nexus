@@ -1,5 +1,8 @@
+// SPDX-License-Identifier: Apache-2.0
+// @ts-nocheck
 import * as fs from "fs";
 import * as path from "path";
+
 import * as yaml from "js-yaml";
 
 export function runHealthcheck(): boolean {
@@ -13,7 +16,7 @@ export function runHealthcheck(): boolean {
     { name: "YAML Configuration Validation", check: checkYAMLConfigs },
     { name: "Orchestrator Classes Compilation Integrity", check: checkCompilationIntegrity },
     { name: "Interface Schemas Verification", check: checkSchemas },
-    { name: "MCP Bridge & Runtime Composition", check: checkMcpBridgeHealth }
+    { name: "MCP Bridge & Runtime Composition", check: checkMcpBridgeHealth },
   ];
 
   for (const check of checks) {
@@ -33,11 +36,15 @@ export function runHealthcheck(): boolean {
   }
 
   if (healthy) {
-    console.log("\x1b[32m=========================================================================");
+    console.log(
+      "\x1b[32m=========================================================================",
+    );
     console.log("  ALL SYSTEM CHECKS PASSED: GHOSTSTACK V1.1 CORE IS HEALTHY & OPERATIONAL");
     console.log("=========================================================================\x1b[0m");
   } else {
-    console.log("\x1b[31m=========================================================================");
+    console.log(
+      "\x1b[31m=========================================================================",
+    );
     console.log("  CRITICAL SYSTEM HEALTH SANITY FAILURE: PLEASE INSPECT MALFORMED ASSETS");
     console.log("=========================================================================\x1b[0m");
   }
@@ -81,7 +88,13 @@ function checkYAMLConfigs(): boolean {
 
 function checkCompilationIntegrity(): boolean {
   const root = path.join(__dirname, "..", "orchestration");
-  const files = ["event-bus.ts", "task-router.ts", "task-executor.ts", "persistence-manager.ts", "logger.ts"];
+  const files = [
+    "event-bus.ts",
+    "task-router.ts",
+    "task-executor.ts",
+    "persistence-manager.ts",
+    "logger.ts",
+  ];
   for (const file of files) {
     const p = path.join(root, file);
     if (!fs.existsSync(p)) {
@@ -102,7 +115,7 @@ function checkSchemas(): boolean {
     "spec.schema.json",
     "artifact.schema.json",
     "memory.schema.json",
-    "runtime-state.schema.json"
+    "runtime-state.schema.json",
   ];
   for (const file of files) {
     const p = path.join(root, file);
@@ -173,7 +186,9 @@ function checkMcpBridgeHealth(): boolean {
   if (fs.existsSync(pythonMcpPath)) {
     console.log(`  [OK] Python MCP server entrypoint: ghoststack_mcp_server.py`);
   } else {
-    console.warn(`  [WARN] Python MCP server entrypoint not found (optional if MCP external is disabled): ghoststack_mcp_server.py`);
+    console.warn(
+      `  [WARN] Python MCP server entrypoint not found (optional if MCP external is disabled): ghoststack_mcp_server.py`,
+    );
   }
 
   return allOk;

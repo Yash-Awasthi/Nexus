@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
 import * as fs from "fs";
 import * as path from "path";
-import { Task } from "./task-router";
-import { IWorkflowDefinition } from "./interfaces/workflow.interface";
+
+import type { IWorkflowDefinition } from "./interfaces/workflow.interface.js";
+import type { Task } from "./task-router.js";
 
 export interface WorkflowSpecTask {
   id: string;
@@ -28,8 +30,13 @@ export interface WorkflowSpecFile {
 }
 
 // Required fields for each task entry
-const TASK_REQUIRED_FIELDS: Array<keyof WorkflowSpecTask> = [
-  "id", "title", "description", "type", "action", "priority"
+const TASK_REQUIRED_FIELDS: (keyof WorkflowSpecTask)[] = [
+  "id",
+  "title",
+  "description",
+  "type",
+  "action",
+  "priority",
 ];
 
 const VALID_PRIORITIES = new Set(["low", "medium", "high", "critical"]);
@@ -66,6 +73,7 @@ export function parseWorkflowSpec(raw: string, sourceLabel: string): WorkflowSpe
 
   for (let i = 0; i < spec.tasks.length; i++) {
     const task = spec.tasks[i];
+    if (!task) continue;
     const label = `tasks[${i}]`;
 
     // Required fields present and non-empty strings
@@ -86,7 +94,9 @@ export function parseWorkflowSpec(raw: string, sourceLabel: string): WorkflowSpe
 
     // Priority must be a known value
     if (task.priority && !VALID_PRIORITIES.has(task.priority)) {
-      errors.push(`${label} (id: "${task.id}"): invalid priority "${task.priority}" — must be one of: ${[...VALID_PRIORITIES].join(", ")}`);
+      errors.push(
+        `${label} (id: "${task.id}"): invalid priority "${task.priority}" — must be one of: ${[...VALID_PRIORITIES].join(", ")}`,
+      );
     }
 
     // dependencies must be an array if present
@@ -106,14 +116,17 @@ export function parseWorkflowSpec(raw: string, sourceLabel: string): WorkflowSpe
 
   if (errors.length > 0) {
     throw new Error(
-      `Workflow spec validation failed (${sourceLabel}):\n  • ${errors.join("\n  • ")}`
+      `Workflow spec validation failed (${sourceLabel}):\n  • ${errors.join("\n  • ")}`,
     );
   }
 
   return spec;
 }
 
-export function specToWorkflowDefinition(spec: WorkflowSpecFile, workflowId: string): IWorkflowDefinition {
+export function specToWorkflowDefinition(
+  spec: WorkflowSpecFile,
+  workflowId: string,
+): IWorkflowDefinition {
   const tasks: Task[] = spec.tasks.map((t) => ({
     id: t.id,
     title: t.title,
@@ -123,14 +136,14 @@ export function specToWorkflowDefinition(spec: WorkflowSpecFile, workflowId: str
     dependencies: t.dependencies ?? [],
     type: t.type,
     action: t.action,
-    arguments: t.arguments
+    arguments: t.arguments,
   }));
 
   return {
     id: workflowId,
     name: spec.metadata.name,
     description: spec.metadata.description ?? "",
-    tasks
+    tasks,
   };
 }
 
@@ -140,7 +153,9 @@ export function loadWorkflowSpecFile(filePath: string): WorkflowSpecFile {
 }
 
 /** Recursively load `workflow-spec.json` files under a specs directory. */
-export function loadWorkflowSpecsFromDir(specsDir: string): { filePath: string; spec: WorkflowSpecFile }[] {
+export function loadWorkflowSpecsFromDir(
+  specsDir: string,
+): { filePath: string; spec: WorkflowSpecFile }[] {
   if (!fs.existsSync(specsDir)) {
     return [];
   }

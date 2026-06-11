@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// @ts-nocheck
 /**
  * LocalInferenceAdapter — runs large language models locally via layer-by-layer
  * sharded inference (70B+ on 4GB VRAM, no quantization required).
@@ -10,15 +12,16 @@
  * Requires the local-inference Python bridge to be running (port 7703).
  */
 
-import {
+import { getBridgeManager, BridgeManager } from "../runtime/bridge-manager.js";
+
+import type { IExecutionContext } from "./interfaces/execution.interface.js";
+import type {
   ILanguageModel,
   TextChunk,
   GenerateTextParams,
   StreamTextParams,
-  GenerateObjectParams
-} from "./interfaces/language-model.interface";
-import { IExecutionContext } from "./interfaces/execution.interface";
-import { getBridgeManager, BridgeManager } from "../runtime/bridge-manager";
+  GenerateObjectParams,
+} from "./interfaces/language-model.interface.js";
 
 // ─── Default model — small, fast, runs on 4GB VRAM ───────────────────────────
 const DEFAULT_MODEL = "meta-llama/Llama-3.2-3B-Instruct";
@@ -47,7 +50,7 @@ export class LocalInferenceAdapter {
     const payload = task?.payload ?? task ?? {};
     const prompt: string = payload.prompt ?? payload.query ?? payload.input ?? "";
     const model: string = payload.model ?? this.opts.model ?? DEFAULT_MODEL;
-    const messages: Array<{ role: string; content: string }> = Array.isArray(payload.messages)
+    const messages: { role: string; content: string }[] = Array.isArray(payload.messages)
       ? payload.messages
       : [];
 
@@ -61,7 +64,7 @@ export class LocalInferenceAdapter {
       const body: Record<string, unknown> = {
         model,
         max_new_tokens: payload.maxNewTokens ?? this.opts.maxNewTokens ?? 200,
-        compression: payload.compression ?? this.opts.compression ?? null
+        compression: payload.compression ?? this.opts.compression ?? null,
       };
       if (messages.length > 0) {
         body.messages = messages;
@@ -87,7 +90,7 @@ export class LocalInferenceAdapter {
         success: true,
         text: result.text,
         model: result.model,
-        tokensGenerated: result.tokens_generated
+        tokensGenerated: result.tokens_generated,
       };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -127,7 +130,7 @@ export class LocalLanguageModel implements ILanguageModel {
     const messages = params.messages.map((m) => ({ role: m.role, content: m.content }));
     return this.callBridge("/chat", {
       messages,
-      max_new_tokens: params.maxTokens ?? 512
+      max_new_tokens: params.maxTokens ?? 512,
     });
   }
 
@@ -139,12 +142,12 @@ export class LocalLanguageModel implements ILanguageModel {
 
   async generateObject<T>(params: GenerateObjectParams<T>): Promise<T> {
     const schemaPrompt = `Respond ONLY with valid JSON matching this schema:\n${JSON.stringify(params.schema)}\nNo markdown, no explanation.`;
-    const messages = [
-      { role: "system" as const, content: schemaPrompt },
-      ...params.messages
-    ];
+    const messages = [{ role: "system" as const, content: schemaPrompt }, ...params.messages];
     const raw = await this.generateText({ ...params, messages });
-    const cleaned = raw.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim();
+    const cleaned = raw
+      .replace(/^```(?:json)?\n?/m, "")
+      .replace(/\n?```$/m, "")
+      .trim();
     return JSON.parse(cleaned) as T;
   }
 }

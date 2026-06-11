@@ -17,18 +17,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy project manifests
 COPY services/ingest/pyproject.toml services/ingest/
 
-# Install production deps into /build/venv (no fin-scrape path dep yet)
+# Install production deps into /build/venv
+# finscrape is an optional [finscrape] extra (local sibling repo); not included in the
+# Docker image — scrapers degrade gracefully when finscrape is absent.
 RUN python -m venv /build/venv
 ENV PATH="/build/venv/bin:$PATH"
-
-# Copy fin-scrape source for the path dependency
-COPY fin-scrape/ /fin-scrape/
 
 # Copy the rest of the ingest service
 COPY services/ingest/ /build/services/ingest/
 
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -e /build/services/ingest/[dev]
+    && pip install --no-cache-dir -e /build/services/ingest/
 
 # ── Final stage ───────────────────────────────────────────────────────────────
 FROM python:${PYTHON_VERSION}-slim AS final
@@ -40,9 +39,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy venv from builder
+# Copy venv and service source from builder
 COPY --from=builder /build/venv /venv
-COPY --from=builder /fin-scrape /fin-scrape
 COPY --from=builder /build/services/ingest /app
 
 ENV PATH="/venv/bin:$PATH" \

@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import logging
 import os
-import time
 import uuid
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Optional
@@ -241,7 +240,8 @@ def create_app() -> FastAPI:
             return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
     except ImportError:
-        pass
+        # prometheus_client is an optional dependency — /metrics is silently disabled when absent
+        logger.debug("prometheus_client not available; /metrics endpoint will not be registered")
 
     return app
 

@@ -18,6 +18,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+
 import type { IEventBus } from "./event-bus.js";
 import type { ITraceRecorder } from "./interfaces/observability.interface.js";
 
@@ -70,7 +71,12 @@ export interface ICouncilResult {
 
 export interface ICouncilEngine {
   deliberate(request: {
-    proposal: { title: string; description: string; context?: Record<string, unknown>; models?: string[] };
+    proposal: {
+      title: string;
+      description: string;
+      context?: Record<string, unknown>;
+      models?: string[];
+    };
     budgetUsd?: number;
     timeoutMs?: number;
   }): Promise<{ ok: boolean; result?: ICouncilResult; error?: string }>;
@@ -121,7 +127,7 @@ export class CouncilBridge {
     this.engine = config.engine;
     this.eventBus = config.eventBus;
     this.tracer = config.tracer;
-    this.defaultBudgetUsd = config.defaultBudgetUsd ?? 0.10;
+    this.defaultBudgetUsd = config.defaultBudgetUsd ?? 0.1;
     this.defaultTimeoutMs = config.defaultTimeoutMs ?? 60_000;
   }
 
@@ -175,7 +181,9 @@ export class CouncilBridge {
           timeoutMs,
         }),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`Council deliberation timed out after ${timeoutMs}ms`)), timeoutMs),
+          setTimeout(() => {
+            reject(new Error(`Council deliberation timed out after ${timeoutMs}ms`));
+          }, timeoutMs),
         ),
       ]);
 

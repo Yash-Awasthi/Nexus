@@ -1,7 +1,9 @@
-import { IEventStore, IRuntimePersistence } from "./interfaces/persistence.interface";
-import { ILogger } from "./interfaces/logger.interface";
+// SPDX-License-Identifier: Apache-2.0
 import * as fs from "fs";
 import * as path from "path";
+
+import type { ILogger } from "./interfaces/logger.interface.js";
+import type { IEventStore, IRuntimePersistence } from "./interfaces/persistence.interface.js";
 
 /**
  * Append-only JSONL event log with best-effort replay.
@@ -24,8 +26,11 @@ export class FileEventStore implements IEventStore {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    if (!fs.existsSync(this.filePath)) {
-      fs.writeFileSync(this.filePath, "", "utf8");
+    // Use exclusive-create flag to avoid TOCTOU race between existsSync + writeFileSync.
+    try {
+      fs.writeFileSync(this.filePath, "", { flag: "wx", encoding: "utf8" });
+    } catch (err: any) {
+      if (err.code !== "EEXIST") throw err; // File already exists — that's fine
     }
   }
 
@@ -37,7 +42,7 @@ export class FileEventStore implements IEventStore {
     const record = {
       event,
       payload,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
     const line = JSON.stringify(record) + "\n";
 
@@ -70,7 +75,11 @@ export class FileEventStore implements IEventStore {
       const quarantinePath = `${this.filePath}.corrupt.${Date.now()}.jsonl`;
       fs.appendFileSync(quarantinePath, corruptLines.join("\n") + "\n", "utf8");
       const msg = `[GhostStack] event log replay skipped ${this.lastReplayCorruptLines} corrupt JSONL line(s); quarantined to ${quarantinePath}`;
-      if (this.logger) { this.logger.warn(msg); } else { console.warn(msg); }
+      if (this.logger) {
+        this.logger.warn(msg);
+      } else {
+        console.warn(msg);
+      }
     }
 
     if (since) {
@@ -132,7 +141,11 @@ export class FileRuntimePersistence implements IRuntimePersistence {
         fs.copyFileSync(this.filePath, corruptPath);
       }
       const corruptMsg = `[GhostStack] state file corrupt; reset to {} (backup: ${corruptPath})`;
-      if (this.logger) { this.logger.warn(corruptMsg); } else { console.warn(corruptMsg); }
+      if (this.logger) {
+        this.logger.warn(corruptMsg);
+      } else {
+        console.warn(corruptMsg);
+      }
       return {};
     }
   }
@@ -159,12 +172,16 @@ export class FileRuntimePersistence implements IRuntimePersistence {
           if (written !== expected) {
             // Write verification failed — attempt a second write
             const verifyMsg = `[GhostStackPersistence] Write-verify mismatch for key: ${key}. Rewriting...`;
-            if (this.logger) { this.logger.warn(verifyMsg); } else { console.warn(verifyMsg); }
+            if (this.logger) {
+              this.logger.warn(verifyMsg);
+            } else {
+              console.warn(verifyMsg);
+            }
             this.writeState(current);
             const verify2 = this.readState();
             if (JSON.stringify(verify2[key]) !== expected) {
               throw new Error(
-                `Persistence write-verify FAILED for key: ${key}. Data may be corrupt.`
+                `Persistence write-verify FAILED for key: ${key}. Data may be corrupt.`,
               );
             }
           }
@@ -214,10 +231,10 @@ export class FileRuntimePersistence implements IRuntimePersistence {
 export function backupRuntimePersistence(
   eventStore: FileEventStore,
   persistence: FileRuntimePersistence,
-  backupsDir: string
+  backupsDir: string,
 ): { eventsBackup: string; stateBackup: string } {
   return {
     eventsBackup: eventStore.backupTo(backupsDir),
-    stateBackup: persistence.backupTo(backupsDir)
+    stateBackup: persistence.backupTo(backupsDir),
   };
 }

@@ -64,13 +64,13 @@ export interface RegressionCheck {
 
 export interface RegressionReport {
   passed: boolean;
-  violations: Array<{ check: RegressionCheck; actual: number }>;
+  violations: { check: RegressionCheck; actual: number }[];
 }
 
 // ─── PerfBenchmark ────────────────────────────────────────────────────────────
 
 export class PerfBenchmark {
-  private readonly results: Map<string, BenchmarkResult> = new Map();
+  private readonly results = new Map<string, BenchmarkResult>();
 
   /**
    * Measure the performance of `fn` and return a BenchmarkResult.
@@ -80,12 +80,7 @@ export class PerfBenchmark {
     fn: () => Promise<T>,
     options: BenchmarkOptions = {},
   ): Promise<BenchmarkResult> {
-    const {
-      iterations = 50,
-      warmupIterations = 5,
-      concurrency = 1,
-      timeoutMs = 30_000,
-    } = options;
+    const { iterations = 50, warmupIterations = 5, concurrency = 1, timeoutMs = 30_000 } = options;
 
     const deadline = Date.now() + timeoutMs;
 
@@ -151,10 +146,10 @@ export class PerfBenchmark {
    * Compare a benchmark result against regression thresholds.
    */
   checkRegression(result: BenchmarkResult, checks: RegressionCheck[]): RegressionReport {
-    const violations: Array<{ check: RegressionCheck; actual: number }> = [];
+    const violations: { check: RegressionCheck; actual: number }[] = [];
 
     for (const check of checks) {
-      const actual = result[check.metric] as number;
+      const actual = result[check.metric];
       const violated =
         check.direction === "below" ? actual > check.threshold : actual < check.threshold;
 
@@ -195,7 +190,7 @@ export class PerfBenchmark {
    * Returns all results for CI assertion.
    */
   async suite(
-    benchmarks: Array<{ name: string; fn: () => Promise<unknown>; options?: BenchmarkOptions }>,
+    benchmarks: { name: string; fn: () => Promise<unknown>; options?: BenchmarkOptions }[],
   ): Promise<BenchmarkResult[]> {
     const results: BenchmarkResult[] = [];
     for (const b of benchmarks) {

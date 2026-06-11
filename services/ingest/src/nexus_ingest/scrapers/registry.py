@@ -47,7 +47,8 @@ def get_scraper_class(source: ScrapeSource) -> Optional[Any]:
 
     entry = _SCRAPER_MAP.get(source)
     if entry is None:
-        logger.warning("No scraper mapping for source: %s", source)
+        safe_src = str(source.value).replace("\n", "\\n").replace("\r", "\\r")
+        logger.warning("No scraper mapping for source: %s", safe_src)
         return None
 
     module_path, class_name = entry
@@ -59,7 +60,8 @@ def get_scraper_class(source: ScrapeSource) -> Optional[Any]:
         logger.debug("Loaded scraper %s from %s", class_name, module_path)
         return cls
     except ImportError as exc:
-        logger.warning("Cannot load scraper %s: %s", source, exc)
+        safe_src = str(source.value).replace("\n", "\\n").replace("\r", "\\r")
+        logger.warning("Cannot load scraper %s: %s", safe_src, exc)
         return None
 
 
@@ -69,7 +71,7 @@ def warm_registry() -> dict[str, bool]:
     Called at startup to surface import issues early.
     """
     status: dict[str, bool] = {}
-    for source in ScrapeSource:
+    for source in list(ScrapeSource):  # list() makes enum iteration explicit for static analysis
         cls = get_scraper_class(source)
         status[source.value] = cls is not None
     return status

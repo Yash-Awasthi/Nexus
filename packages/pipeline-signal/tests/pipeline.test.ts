@@ -25,7 +25,11 @@ describe("SignalClassifier", () => {
   const clf = new SignalClassifier();
 
   it("classifies github PR as code.review-required", () => {
-    const r = clf.classify({ source: "github", eventType: "pr.opened", payload: { title: "Fix bug" } });
+    const r = clf.classify({
+      source: "github",
+      eventType: "pr.opened",
+      payload: { title: "Fix bug" },
+    });
     expect(r.signalType).toBe("code.review-required");
     expect(r.tags).toContain("github");
   });
@@ -74,7 +78,11 @@ describe("SignalClassifier", () => {
   });
 
   it("classifies linear issues", () => {
-    const r = clf.classify({ source: "linear", eventType: "issue.assigned", payload: { title: "Fix login bug" } });
+    const r = clf.classify({
+      source: "linear",
+      eventType: "issue.assigned",
+      payload: { title: "Fix login bug" },
+    });
     expect(r.signalType).toBe("task.assigned");
   });
 });
@@ -139,15 +147,19 @@ describe("SignalProcessor", () => {
     const proc = new SignalProcessor({ eventSource: source, signalSink: sink, eventBus: bus });
     source.seed(makeEvent());
     await proc.processOnce();
-    expect(bus.publish).toHaveBeenCalledWith("nexus.signals.created", expect.objectContaining({
-      signal_type: expect.any(String),
-    }));
+    expect(bus.publish).toHaveBeenCalledWith(
+      "nexus.signals.created",
+      expect.objectContaining({
+        signal_type: expect.any(String),
+      }),
+    );
   });
 
   it("continues processing remaining events when one fails", async () => {
     const badSink: typeof sink = {
       signals: [],
-      create: vi.fn()
+      create: vi
+        .fn()
         .mockRejectedValueOnce(new Error("DB error"))
         .mockImplementation(sink.create.bind(sink)),
     };

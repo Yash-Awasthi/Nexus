@@ -22,28 +22,18 @@ const sidebars: SidebarsConfig = {
       type: "category",
       label: "Guides",
       collapsed: false,
-      items: [
-        "plugin-author-guide",
-        "contributing",
-      ],
+      items: ["plugin-author-guide", "contributing"],
     },
     {
       type: "category",
       label: "Reference",
       collapsed: false,
-      items: [
-        "api-reference",
-        "cli-reference",
-      ],
+      items: ["api-reference", "cli-reference"],
     },
     {
       type: "category",
       label: "Security & Operations",
-      items: [
-        "threat-model",
-        "runbook",
-        "slos",
-      ],
+      items: ["threat-model", "runbook", "slos"],
     },
     {
       type: "doc",

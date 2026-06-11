@@ -7,16 +7,39 @@
  * For full-featured pg usage, DATABASE_URL is available for direct connection.
  */
 
-import { defineAdapter, requireEnv, AdapterHttpError, type IExecutionContext } from "@nexus/plugin-sdk";
+import {
+  defineAdapter,
+  requireEnv,
+  AdapterHttpError,
+  type IExecutionContext,
+} from "@nexus/plugin-sdk";
 
-export interface NeonQueryTask { taskType: "neon.query"; sql: string; params?: unknown[]; }
-export interface NeonExecuteTask { taskType: "neon.execute"; sql: string; params?: unknown[]; }
+export interface NeonQueryTask {
+  taskType: "neon.query";
+  sql: string;
+  params?: unknown[];
+}
+export interface NeonExecuteTask {
+  taskType: "neon.execute";
+  sql: string;
+  params?: unknown[];
+}
 export type NeonTask = NeonQueryTask | NeonExecuteTask;
 
-export interface NeonQueryResult { rows: Array<Record<string, unknown>>; rowCount: number; fields: Array<{ name: string; dataTypeID: number }>; }
-export interface NeonExecuteResult { rowCount: number; command: string; }
+export interface NeonQueryResult {
+  rows: Record<string, unknown>[];
+  rowCount: number;
+  fields: { name: string; dataTypeID: number }[];
+}
+export interface NeonExecuteResult {
+  rowCount: number;
+  command: string;
+}
 
-async function execute(task: NeonTask, ctx: IExecutionContext): Promise<NeonQueryResult | NeonExecuteResult> {
+async function execute(
+  task: NeonTask,
+  ctx: IExecutionContext,
+): Promise<NeonQueryResult | NeonExecuteResult> {
   const connectionUrl = requireEnv(ctx, "DATABASE_URL");
 
   // Neon HTTP API: POST to the connection URL with /sql suffix
@@ -33,9 +56,15 @@ async function execute(task: NeonTask, ctx: IExecutionContext): Promise<NeonQuer
     body: JSON.stringify({ query: task.sql, params: task.params ?? [] }),
   });
 
-  if (!response.ok) throw new AdapterHttpError("nexus-adapter-neon", response.status, await response.text());
+  if (!response.ok)
+    throw new AdapterHttpError("nexus-adapter-neon", response.status, await response.text());
 
-  const data = await response.json() as { rows?: Array<Record<string, unknown>>; rowCount?: number; command?: string; fields?: Array<{ name: string; dataTypeID: number }> };
+  const data = (await response.json()) as {
+    rows?: Record<string, unknown>[];
+    rowCount?: number;
+    command?: string;
+    fields?: { name: string; dataTypeID: number }[];
+  };
 
   if (task.taskType === "neon.query") {
     return { rows: data.rows ?? [], rowCount: data.rowCount ?? 0, fields: data.fields ?? [] };
@@ -44,7 +73,9 @@ async function execute(task: NeonTask, ctx: IExecutionContext): Promise<NeonQuer
 }
 
 export const neonAdapter = defineAdapter<NeonTask, NeonQueryResult | NeonExecuteResult>({
-  name: "nexus-adapter-neon", version: "0.1.0", capabilities: ["database.query", "database.execute"],
+  name: "nexus-adapter-neon",
+  version: "0.1.0",
+  capabilities: ["database.query", "database.execute"],
   taskTypes: ["neon.query", "neon.execute"],
   execute,
 });

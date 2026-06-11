@@ -4,20 +4,16 @@
  * Reads NEXUS_API_URL and NEXUS_API_KEY from env.
  */
 
-const BASE_URL = (process.env["NEXUS_API_URL"] ?? "http://localhost:3000").replace(/\/$/, "");
-const API_KEY = process.env["NEXUS_API_KEY"] ?? "";
+const BASE_URL = (process.env.NEXUS_API_URL ?? "http://localhost:3000").replace(/\/$/, "");
+const API_KEY = process.env.NEXUS_API_KEY ?? "";
 
-async function request<T>(
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const url = `${BASE_URL}${path}`;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "application/json",
   };
-  if (API_KEY) headers["Authorization"] = `Bearer ${API_KEY}`;
+  if (API_KEY) headers.Authorization = `Bearer ${API_KEY}`;
 
   const res = await fetch(url, {
     method,

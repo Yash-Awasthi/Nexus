@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect } from "vitest";
-import { MODEL_REGISTRY, MODEL_KEYS, getModel, type ModelKey } from "../src/models.js";
+import { describe, expect, it } from "vitest";
+
+import { MODEL_KEYS, MODEL_REGISTRY, getModel, type ModelKey } from "../src/models.js";
 
 describe("MODEL_REGISTRY", () => {
   it("has at least 10 entries", () => {
