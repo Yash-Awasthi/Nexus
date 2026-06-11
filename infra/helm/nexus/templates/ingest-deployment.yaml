@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: Apache-2.0
+{{- if .Values.ingest.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nexus.fullname" . }}-ingest
+  labels:
+    {{- include "nexus.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ingest
+spec:
+  replicas: {{ .Values.ingest.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "nexus.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: ingest
+  template:
+    metadata:
+      labels:
+        {{- include "nexus.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: ingest
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: ingest
+          image: "{{ .Values.global.image.registry }}/{{ .Values.ingest.image.repository }}:{{ .Values.ingest.image.tag }}"
+          imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.ingest.service.port }}
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "nexus.fullname" . }}-secrets
+                  key: DATABASE_URL
+            - name: NEXUS_INGEST_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "nexus.fullname" . }}-secrets
+                  key: NEXUS_INGEST_API_KEY
+            - name: REDIS_URL
+              value: {{ .Values.global.env.REDIS_URL | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.global.env.LOG_LEVEL | quote }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.ingest.service.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: {{ .Values.ingest.service.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.ingest.resources | nindent 12 }}
+{{- end }}

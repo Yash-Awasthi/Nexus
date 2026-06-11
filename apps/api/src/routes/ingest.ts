@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * Ingest routes — POST /api/v1/ingest/events, GET /api/v1/ingest/events/:id,
- *                 POST /api/v1/ingest/signals, GET /api/v1/ingest/signals/:id
+ *                 POST /api/v1/ingest/signals, GET /api/v1/ingest/signals,
+ *                 GET /api/v1/ingest/signals/:id
  */
 
 import { randomUUID } from "crypto";
 import type { FastifyInstance } from "fastify";
 import { db } from "@nexus/db";
 import { ingestedEvents, signals } from "@nexus/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, desc, and, SQL } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth.js";
 
 // ── /ingest/events ────────────────────────────────────────────────────────────
@@ -22,6 +23,7 @@ export async function ingestRoutes(app: FastifyInstance): Promise<void> {
       payload: Record<string, unknown>;
       metadata?: Record<string, unknown>;
       idempotency_key?: string;
+      priority?: string;
     };
   }>(
     "/ingest/events",
@@ -42,7 +44,7 @@ export async function ingestRoutes(app: FastifyInstance): Promise<void> {
           .onConflictDoNothing()
           .returning({ id: ingestedEvents.id });
 
-        const eventId = row?.id ?? randomUUID(); // fallback if conflict
+        const eventId = row?.id ?? randomUUID();
         return reply.code(202).send({ event_id: eventId, status: "accepted" });
       } catch (err) {
         request.log.error(err, "ingest/events insert failed");
@@ -56,14 +58,50 @@ export async function ingestRoutes(app: FastifyInstance): Promise<void> {
     "/ingest/events/:eventId",
     { preHandler: requireAuth },
     async (request, reply) => {
-      const { eventId } = request.params;
       const [row] = await db
         .select()
         .from(ingestedEvents)
-        .where(eq(ingestedEvents.id, eventId));
+        .where(eq(ingestedEvents.id, request.params.eventId));
 
       if (!row) return reply.code(404).send({ error: "Event not found" });
       return reply.send(row);
+    },
+  );
+
+  // ── /ingest/signals ─────────────────────────────────────────────────────────
+
+  // GET /ingest/signals?signal_type=&priority=&limit=&offset=
+  app.get<{
+    Querystring: {
+      signal_type?: string;
+      priority?: string;
+      limit?: string;
+      offset?: string;
+    };
+  }>(
+    "/ingest/signals",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const limit = Math.min(parseInt(request.query.limit ?? "50"), 200);
+      const offset = parseInt(request.query.offset ?? "0");
+
+      const conditions: SQL[] = [];
+      if (request.query.signal_type) {
+        conditions.push(eq(signals.signalType, request.query.signal_type));
+      }
+      if (request.query.priority) {
+        conditions.push(eq(signals.priority, request.query.priority as never));
+      }
+
+      const rows = await db
+        .select()
+        .from(signals)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(signals.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      return reply.send({ signals: rows, limit, offset });
     },
   );
 

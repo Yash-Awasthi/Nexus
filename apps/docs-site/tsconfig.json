@@ -1,9 +1,6 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "@docusaurus/tsconfig",
   "compilerOptions": {
-    "outDir": "dist",
-    "rootDir": "src",
-    "noEmit": false
-  },
-  "include": ["src"]
+    "baseUrl": "."
+  }
 }
