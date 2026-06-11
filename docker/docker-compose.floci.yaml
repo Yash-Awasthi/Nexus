@@ -1,0 +1,25 @@
+# Optional Floci emulator for local federation testing.
+# Usage: docker compose -f docker/docker-compose.yaml -f docker/docker-compose.floci.yaml up -d
+version: "3.8"
+
+services:
+  floci:
+    image: floci/floci:latest
+    container_name: ghoststack-floci
+    ports:
+      - "4566:4566"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4566/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  orchestrator:
+    environment:
+      - GHOSTSTACK_FLOCI_URL=http://floci:4566
+      - GHOSTSTACK_FLOCI_STRICT=true
+      - GHOSTSTACK_OFFLINE_MODE=false
+    depends_on:
+      floci:
+        condition: service_healthy

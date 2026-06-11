@@ -1,0 +1,51 @@
+{
+  "spec_version": "v1.1",
+  "metadata": {
+    "name": "Demo ETL Pipeline",
+    "description": "Scrapes news articles, transforms key headers, and stores in local Floci S3 buckets.",
+    "author": "GhostStack Operator"
+  },
+  "template_id": "governed-etl-template",
+  "tasks": [
+    {
+      "id": "extract-news",
+      "title": "Scrape HN news frontpage",
+      "description": "Scrapes Hacker News title metrics",
+      "type": "scraping",
+      "action": "scrape_url",
+      "priority": "high",
+      "arguments": {
+        "url": "https://news.ycombinator.com",
+        "maxLengthBytes": 40000,
+        "selectors": ["a.storylink"]
+      },
+      "dependencies": []
+    },
+    {
+      "id": "transform-news",
+      "title": "Filter and match tech headers",
+      "description": "Runs custom regex transforms on news tags",
+      "type": "floci",
+      "action": "filter_content",
+      "priority": "medium",
+      "arguments": {
+        "pattern": "(?:AI|Rust|TypeScript|Cognitive)",
+        "sourceTaskId": "extract-news"
+      },
+      "dependencies": ["extract-news"]
+    },
+    {
+      "id": "load-archive",
+      "title": "Create persistent storage node",
+      "description": "Ingests transformed artifacts into Floci S3",
+      "type": "floci",
+      "action": "create_s3_bucket",
+      "priority": "medium",
+      "arguments": {
+        "bucketName": "ghoststack-etl-archive",
+        "sourceTaskId": "transform-news"
+      },
+      "dependencies": ["transform-news"]
+    }
+  ]
+}

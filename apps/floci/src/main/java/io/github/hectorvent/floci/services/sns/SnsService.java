@@ -1,0 +1,1020 @@
+package io.github.hectorvent.floci.services.sns;
+
+import io.github.hectorvent.floci.config.EmulatorConfig;
+import io.github.hectorvent.floci.core.common.AwsArnUtils;
+import io.github.hectorvent.floci.core.common.AwsException;
+import io.github.hectorvent.floci.core.common.RegionResolver;
+import io.github.hectorvent.floci.core.storage.StorageBackend;
+import io.github.hectorvent.floci.core.storage.StorageFactory;
+import io.github.hectorvent.floci.services.lambda.LambdaService;
+import io.github.hectorvent.floci.services.lambda.model.InvocationType;
+import io.github.hectorvent.floci.services.sns.model.Subscription;
+import io.github.hectorvent.floci.services.sns.model.Topic;
+import io.github.hectorvent.floci.services.sqs.SqsService;
+import io.github.hectorvent.floci.services.sqs.model.MessageAttributeValue;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.jboss.logging.Logger;
+
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+@ApplicationScoped
+public class SnsService {
+
+    private static final Logger LOG = Logger.getLogger(SnsService.class);
+    private static final Duration FIFO_DEDUP_WINDOW = Duration.ofMinutes(5);
+    private static final int MAX_PUBLISH_SIZE = 262_144;
+    private static final List<String> PENDING_CONFIRMATION_PROTOCOLS =
+            List.of("http", "https", "email", "email-json", "sms");
+
+    private final StorageBackend<String, Topic> topicStore;
+    private final StorageBackend<String, Subscription> subscriptionStore;
+    private final RegionResolver regionResolver;
+    private final SqsService sqsService;
+    private final LambdaService lambdaService;
+    private final String baseUrl;
+    private final ObjectMapper objectMapper;
+    private final Map<String, Instant> fifoDeduplicationCache = new ConcurrentHashMap<>();
+    private static final HexFormat HEX = HexFormat.of();
+    
+    @Inject
+    public SnsService(StorageFactory storageFactory, EmulatorConfig config,
+                      RegionResolver regionResolver, SqsService sqsService,
+                      LambdaService lambdaService, ObjectMapper objectMapper) {
+        this(
+                storageFactory.create("sns", "sns-topics.json",
+                        new TypeReference<Map<String, Topic>>() {
+                        }),
+                storageFactory.create("sns", "sns-subscriptions.json",
+                        new TypeReference<Map<String, Subscription>>() {
+                        }),
+                regionResolver,
+                sqsService,
+                lambdaService,
+                config.effectiveBaseUrl(),
+                objectMapper
+        );
+    }
+
+    /**
+     * Package-private constructor for testing.
+     */
+    SnsService(StorageBackend<String, Topic> topicStore,
+               StorageBackend<String, Subscription> subscriptionStore,
+               RegionResolver regionResolver, SqsService sqsService,
+               LambdaService lambdaService) {
+        this(topicStore, subscriptionStore, regionResolver, sqsService, lambdaService, "http://localhost:4566",
+                new ObjectMapper());
+    }
+
+    SnsService(StorageBackend<String, Topic> topicStore,
+               StorageBackend<String, Subscription> subscriptionStore,
+               RegionResolver regionResolver, SqsService sqsService,
+               LambdaService lambdaService, String baseUrl, ObjectMapper objectMapper) {
+        this.topicStore = topicStore;
+        this.subscriptionStore = subscriptionStore;
+        this.regionResolver = regionResolver;
+        this.sqsService = sqsService;
+        this.lambdaService = lambdaService;
+        this.baseUrl = baseUrl;
+        this.objectMapper = objectMapper;
+    }
+
+    public Topic createTopic(String name, Map<String, String> attributes,
+                             Map<String, String> tags, String region) {
+        if (name == null || name.isBlank()) {
+            throw new AwsException("InvalidParameter", "Topic name is required.", 400);
+        }
+        String topicArn = regionResolver.buildArn("sns", region, name);
+        String key = topicKey(region, topicArn);
+
+        Topic existing = topicStore.get(key).orElse(null);
+        if (existing != null) return existing;
+
+        Topic topic = new Topic(name, topicArn);
+        if (attributes != null) topic.getAttributes().putAll(attributes);
+        if (tags != null) topic.getTags().putAll(tags);
+
+        if (name.endsWith(".fifo")) {
+            topic.getAttributes().put("FifoTopic", "true");
+            topic.getAttributes().putIfAbsent("ContentBasedDeduplication", "false");
+        }
+
+        topicStore.put(key, topic);
+        LOG.infov("Created SNS topic: {0} in region {1}", name, region);
+        return topic;
+    }
+
+    public void deleteTopic(String topicArn, String region) {
+        String key = topicKey(region, topicArn);
+        if (topicStore.get(key).isEmpty()) {
+            throw new AwsException("NotFound", "Topic does not exist.", 404);
+        }
+        List<String> toDelete = new ArrayList<>();
+        String subPrefix = "sub::" + region + "::";
+        for (String subKey : subscriptionStore.keys()) {
+            if (subKey.startsWith(subPrefix)) {
+                subscriptionStore.get(subKey).ifPresent(sub -> {
+                    if (topicArn.equals(sub.getTopicArn())) toDelete.add(subKey);
+                });
+            }
+        }
+        toDelete.forEach(subscriptionStore::delete);
+        topicStore.delete(key);
+        LOG.infov("Deleted SNS topic: {0}", topicArn);
+    }
+
+    public List<Topic> listTopics(String region) {
+        String prefix = "topic::" + region + "::";
+        return topicStore.scan(k -> k.startsWith(prefix));
+    }
+
+    public Map<String, String> getTopicAttributes(String topicArn, String region) {
+        String key = topicKey(region, topicArn);
+        Topic topic = topicStore.get(key)
+                .orElseThrow(() -> new AwsException("NotFound", "Topic does not exist.", 404));
+        var attrs = new java.util.LinkedHashMap<>(topic.getAttributes());
+        List<Subscription> subs = subscriptionsByTopic(topicArn, region);
+        long confirmed = subs.stream()
+                .filter(s -> !"true".equals(s.getAttributes().get("PendingConfirmation")))
+                .count();
+        long pending = subs.stream()
+                .filter(s -> "true".equals(s.getAttributes().get("PendingConfirmation")))
+                .count();
+        attrs.put("SubscriptionsConfirmed", String.valueOf(confirmed));
+        attrs.put("SubscriptionsPending", String.valueOf(pending));
+        attrs.put("SubscriptionsDeleted", "0");
+        attrs.put("TopicArn", topicArn);
+        attrs.putIfAbsent("DisplayName", "");
+        attrs.putIfAbsent("Owner", regionResolver.getAccountId());
+        attrs.putIfAbsent("EffectiveDeliveryPolicy", "{\"http\":{\"defaultHealthyRetryPolicy\":{\"minDelayTarget\":20,\"maxDelayTarget\":20,\"numRetries\":3,\"numMaxDelayRetries\":0,\"numNoDelayRetries\":0,\"numMinDelayRetries\":0,\"backoffFunction\":\"linear\"},\"disableSubscriptionOverrides\":false}}");
+        if (!attrs.containsKey("Policy") || attrs.get("Policy") == null || attrs.get("Policy").isBlank()) {
+            String account = regionResolver.getAccountId();
+            attrs.put("Policy", "{\"Version\":\"2012-10-17\",\"Id\":\"__default_policy_ID\",\"Statement\":[{\"Sid\":\"__default_statement_ID\",\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"*\"},\"Action\":[\"SNS:GetTopicAttributes\",\"SNS:SetTopicAttributes\",\"SNS:AddPermission\",\"SNS:RemovePermission\",\"SNS:DeleteTopic\",\"SNS:Subscribe\",\"SNS:ListSubscriptionsByTopic\",\"SNS:Publish\"],\"Resource\":\"" + topicArn + "\",\"Condition\":{\"StringEquals\":{\"AWS:SourceAccount\":\"" + account + "\"}}}]}");
+        }
+        return attrs;
+    }
+
+    public void setTopicAttributes(String topicArn, String attributeName,
+                                   String attributeValue, String region) {
+        String key = topicKey(region, topicArn);
+        Topic topic = topicStore.get(key)
+                .orElseThrow(() -> new AwsException("NotFound", "Topic does not exist.", 404));
+        topic.getAttributes().put(attributeName, attributeValue);
+        topicStore.put(key, topic);
+    }
+
+    public Subscription subscribe(String topicArn, String protocol, String endpoint, String region, Map<String, String> attributes) {
+        String topicKey = topicKey(region, topicArn);
+        if (topicStore.get(topicKey).isEmpty()) {
+            throw new AwsException("NotFound", "Topic does not exist.", 404);
+        }
+        if (protocol == null || protocol.isBlank()) {
+            throw new AwsException("InvalidParameter", "Protocol is required.", 400);
+        }
+
+        for (Subscription existing : subscriptionsByTopic(topicArn, region)) {
+            if (protocol.equals(existing.getProtocol())
+                    && Objects.equals(endpoint, existing.getEndpoint())) {
+                return existing;
+            }
+        }
+
+        String subscriptionArn = topicArn + ":" + UUID.randomUUID().toString();
+        Subscription subscription = new Subscription(subscriptionArn, topicArn, protocol, endpoint,
+                regionResolver.getAccountId());
+        subscription.setAccountId(regionResolver.getAccountId());
+        if (attributes != null) subscription.getAttributes().putAll(attributes);
+
+        if (PENDING_CONFIRMATION_PROTOCOLS.contains(protocol)) {
+            String token = UUID.randomUUID().toString().replace("-", "")
+                    + UUID.randomUUID().toString().replace("-", "");
+            subscription.getAttributes().put("PendingConfirmation", "true");
+            subscription.getAttributes().put("ConfirmationToken", token);
+            LOG.infov("Subscription pending confirmation for {0} ({1}) to topic {2} in {3}",
+                    endpoint, protocol, topicArn, region);
+        }
+
+        subscriptionStore.put(subKey(region, subscriptionArn), subscription);
+        if (attributes == null || attributes.isEmpty()) {
+            LOG.infov("Subscribed {0} ({1}) to topic {2} in {3}", endpoint, protocol, topicArn, region);
+        } else {
+            LOG.infov("Subscribed {0} ({1}) to topic {2} in {3} with attributes: {4}", endpoint, protocol, topicArn, region, attributes);
+        }
+        return subscription;
+    }
+
+    public String confirmSubscription(String topicArn, String token, String region) {
+        if (topicStore.get(topicKey(region, topicArn)).isEmpty()) {
+            throw new AwsException("NotFound", "Topic does not exist.", 404);
+        }
+        String subPrefix = "sub::" + region + "::";
+        for (String subKey : subscriptionStore.keys()) {
+            if (!subKey.startsWith(subPrefix)) continue;
+            Subscription sub = subscriptionStore.get(subKey).orElse(null);
+            if (sub == null || !topicArn.equals(sub.getTopicArn())) continue;
+            if (token.equals(sub.getAttributes().get("ConfirmationToken"))) {
+                sub.getAttributes().put("PendingConfirmation", "false");
+                sub.getAttributes().remove("ConfirmationToken");
+                subscriptionStore.put(subKey, sub);
+                LOG.infov("Confirmed subscription {0} for topic {1}", sub.getSubscriptionArn(), topicArn);
+                return sub.getSubscriptionArn();
+            }
+        }
+        throw new AwsException("AuthorizationError", "Token is invalid for this topic.", 403);
+    }
+
+    public void unsubscribe(String subscriptionArn, String region) {
+        String key = subKey(region, subscriptionArn);
+        if (subscriptionStore.get(key).isEmpty()) {
+            throw new AwsException("NotFound", "Subscription does not exist.", 404);
+        }
+        subscriptionStore.delete(key);
+        LOG.infov("Unsubscribed: {0}", subscriptionArn);
+    }
+
+    public List<Subscription> listSubscriptions(String region) {
+        String prefix = "sub::" + region + "::";
+        return subscriptionStore.scan(k -> k.startsWith(prefix));
+    }
+
+    public List<Subscription> listSubscriptionsByTopic(String topicArn, String region) {
+        return subscriptionsByTopic(topicArn, region);
+    }
+
+    // Since this method is called by S3 and EventBridge, this doesn't need "phoneNumber" parameter.
+    public String publish(String topicArn, String targetArn, String message,
+                          String subject, String region) {
+        return publish(topicArn, targetArn, null, message, subject, null, null, null, region);
+    }
+
+    public String publish(String topicArn, String targetArn, String phoneNumber, String message,
+                          String subject, Map<String, MessageAttributeValue> messageAttributes, String region) {
+        return publish(topicArn, targetArn, phoneNumber, message, subject, messageAttributes, null, null, region);
+    }
+
+    public String publish(String topicArn, String targetArn, String phoneNumber, String message,
+                          String subject, Map<String, MessageAttributeValue> messageAttributes,
+                          String messageGroupId, String messageDeduplicationId, String region) {
+        int payloadSize = computePublishSize(message, subject, messageAttributes);
+        if (payloadSize > MAX_PUBLISH_SIZE) {
+            throw new AwsException("InvalidParameterException",
+                    "Invalid parameter: Message too long", 400);
+        }
+
+        // Send SMS
+        if (phoneNumber != null) {
+            return UUID.randomUUID().toString();
+        }
+
+        // Send a message to topic or directly to a target ARN
+        String effectiveArn = topicArn != null ? topicArn : targetArn;
+        if (effectiveArn == null) {
+            throw new AwsException("InvalidParameter", "TopicArn or TargetArn is required.", 400);
+        }
+        String topicStoreKey = topicKey(region, effectiveArn);
+        Topic topic = topicStore.get(topicStoreKey)
+                .orElseThrow(() -> new AwsException("NotFound", "Topic does not exist.", 404));
+        if (message == null || message.isBlank()) {
+            throw new AwsException("InvalidParameter", "Message is required.", 400);
+        }
+
+        boolean isFifo = "true".equals(topic.getAttributes().get("FifoTopic"));
+        String dedupId = messageDeduplicationId;
+        if (isFifo) {
+            if (messageGroupId == null || messageGroupId.isBlank()) {
+                throw new AwsException("InvalidParameter",
+                        "MessageGroupId is required for FIFO topics.", 400);
+            }
+            if (dedupId == null && "true".equals(topic.getAttributes().get("ContentBasedDeduplication"))) {
+                dedupId = sha256(message);
+            }
+            if (dedupId != null && isDuplicate(effectiveArn, dedupId)) {
+                LOG.debugv("FIFO dedup: skipping duplicate for topic {0}, dedupId {1}", effectiveArn, dedupId);
+                return UUID.randomUUID().toString();
+            }
+        }
+
+        String messageId = UUID.randomUUID().toString();
+        JsonNode parsedBody = null;
+        boolean bodyParseAttempted = false;
+        for (Subscription sub : subscriptionsByTopic(effectiveArn, region)) {
+            if ("true".equals(sub.getAttributes().get("PendingConfirmation"))) {
+                LOG.debugv("Skipping delivery to pending subscription {0}", sub.getSubscriptionArn());
+                continue;
+            }
+            if (!bodyParseAttempted && isMessageBodyScope(sub)) {
+                parsedBody = tryParseBody(message);
+                bodyParseAttempted = true;
+            }
+            if (!matchesFilterPolicy(sub, parsedBody, messageAttributes)) {
+                continue;
+            }
+            deliverMessage(sub, message, subject, messageAttributes, messageId, effectiveArn, messageGroupId, dedupId);
+        }
+        LOG.infov("Published message {0} to topic {1}", messageId, effectiveArn);
+        return messageId;
+    }
+
+    public Map<String, String> getSubscriptionAttributes(String subscriptionArn, String region) {
+        String key = subKey(region, subscriptionArn);
+        Subscription sub = subscriptionStore.get(key)
+                .orElseThrow(() -> new AwsException("NotFound", "Subscription does not exist.", 404));
+        var attrs = new java.util.LinkedHashMap<>(sub.getAttributes());
+        attrs.put("SubscriptionArn", sub.getSubscriptionArn());
+        attrs.put("TopicArn", sub.getTopicArn());
+        attrs.put("Protocol", sub.getProtocol());
+        attrs.put("Endpoint", sub.getEndpoint() != null ? sub.getEndpoint() : "");
+        attrs.put("Owner", sub.getOwner() != null ? sub.getOwner() : "");
+        attrs.put("RawMessageDelivery", attrs.getOrDefault("RawMessageDelivery", "false"));
+        attrs.putIfAbsent("PendingConfirmation", "false");
+        attrs.putIfAbsent("ConfirmationWasAuthenticated", "false");
+        attrs.putIfAbsent("FilterPolicyScope", "MessageAttributes");
+        attrs.remove("ConfirmationToken");
+        return attrs;
+    }
+
+    public void setSubscriptionAttribute(String subscriptionArn, String attributeName,
+                                         String attributeValue, String region) {
+        String key = subKey(region, subscriptionArn);
+        Subscription sub = subscriptionStore.get(key)
+                .orElseThrow(() -> new AwsException("NotFound", "Subscription does not exist.", 404));
+        sub.getAttributes().put(attributeName, attributeValue);
+        subscriptionStore.put(key, sub);
+    }
+
+    public record BatchPublishResult(List<String[]> successful, List<String[]> failed) {
+    }
+
+    public BatchPublishResult publishBatch(String topicArn, List<Map<String, Object>> entries, String region) {
+        String topicStoreKey = topicKey(region, topicArn);
+        Topic topic = topicStore.get(topicStoreKey)
+                .orElseThrow(() -> new AwsException("NotFound", "Topic does not exist.", 404));
+
+        int batchSize = 0;
+        for (Map<String, Object> entry : entries) {
+            String message = (String) entry.get("Message");
+            String subject = (String) entry.get("Subject");
+            @SuppressWarnings("unchecked")
+            Map<String, MessageAttributeValue> attrs =
+                    (Map<String, MessageAttributeValue>) entry.get("MessageAttributes");
+            batchSize += computePublishSize(message, subject, attrs);
+        }
+        if (batchSize > MAX_PUBLISH_SIZE) {
+            throw new AwsException("BatchRequestTooLong",
+                    "Batch requests cannot be longer than " + MAX_PUBLISH_SIZE + " bytes.", 400);
+        }
+
+        boolean isFifo = "true".equals(topic.getAttributes().get("FifoTopic"));
+        List<String[]> successful = new ArrayList<>();
+        List<String[]> failed = new ArrayList<>();
+        for (Map<String, Object> entry : entries) {
+            String id = (String) entry.get("Id");
+            String message = (String) entry.get("Message");
+            if (message == null || message.isBlank()) {
+                failed.add(new String[]{id, "InvalidParameter", "Message is required.", "true"});
+                continue;
+            }
+            String subject = (String) entry.get("Subject");
+            String messageGroupId = (String) entry.get("MessageGroupId");
+            String messageDeduplicationId = (String) entry.get("MessageDeduplicationId");
+
+            if (isFifo && (messageGroupId == null || messageGroupId.isBlank())) {
+                failed.add(new String[]{id, "InvalidParameter",
+                        "MessageGroupId is required for FIFO topics.", "true"});
+                continue;
+            }
+            // Derive deduplication ID if ContentBasedDeduplication is enabled and not provided
+            if (isFifo && messageDeduplicationId == null && "true".equals(topic.getAttributes().get("ContentBasedDeduplication"))) {
+                messageDeduplicationId = sha256(message);
+            }
+            if (isFifo && messageDeduplicationId != null && isDuplicate(topicArn, messageDeduplicationId)) {
+                successful.add(new String[]{id, UUID.randomUUID().toString()});
+                continue;
+            }
+
+            String messageId = UUID.randomUUID().toString();
+            @SuppressWarnings("unchecked")
+            Map<String, MessageAttributeValue> attrs = (Map<String, MessageAttributeValue>) entry.get("MessageAttributes");
+            JsonNode parsedBody = null;
+            boolean bodyParseAttempted = false;
+            for (Subscription sub : subscriptionsByTopic(topicArn, region)) {
+                if ("true".equals(sub.getAttributes().get("PendingConfirmation"))) continue;
+                if (!bodyParseAttempted && isMessageBodyScope(sub)) {
+                    parsedBody = tryParseBody(message);
+                    bodyParseAttempted = true;
+                }
+                if (!matchesFilterPolicy(sub, parsedBody, attrs)) continue;
+                deliverMessage(sub, message, subject, attrs, messageId, topicArn, messageGroupId, messageDeduplicationId);
+            }
+            LOG.debugv("Batch published message {0} (id={1}) to {2}", messageId, id, topicArn);
+            successful.add(new String[]{id, messageId});
+        }
+        return new BatchPublishResult(successful, failed);
+    }
+
+    public void tagResource(String resourceArn, Map<String, String> tags, String region) {
+        String key = topicKey(region, resourceArn);
+        Topic topic = topicStore.get(key)
+                .orElseThrow(() -> new AwsException("ResourceNotFoundException",
+                        "Resource does not exist.", 404));
+        if (tags != null) topic.getTags().putAll(tags);
+        topicStore.put(key, topic);
+    }
+
+    public void untagResource(String resourceArn, List<String> tagKeys, String region) {
+        String key = topicKey(region, resourceArn);
+        Topic topic = topicStore.get(key)
+                .orElseThrow(() -> new AwsException("ResourceNotFoundException",
+                        "Resource does not exist.", 404));
+        if (tagKeys != null) tagKeys.forEach(topic.getTags()::remove);
+        topicStore.put(key, topic);
+    }
+
+    public Map<String, String> listTagsForResource(String resourceArn, String region) {
+        String key = topicKey(region, resourceArn);
+        Topic topic = topicStore.get(key)
+                .orElseThrow(() -> new AwsException("ResourceNotFoundException",
+                        "Resource does not exist.", 404));
+        return new java.util.LinkedHashMap<>(topic.getTags());
+    }
+
+    /**
+     * Evaluates whether a message satisfies the subscription's filter policy.
+     * Returns {@code true} if no filter policy is set.
+     * Returns {@code false} for malformed filter policies (fail closed).
+     * <p>
+     * {@code FilterPolicyScope=MessageAttributes} (default) evaluates the policy against
+     * the message attribute map. {@code FilterPolicyScope=MessageBody} parses the message
+     * body as JSON and evaluates the policy against the parsed tree (with nested-key
+     * descent and type-aware matching). A body that is not valid JSON fails closed.
+     * <p>
+     * All keys in the policy must match (AND logic). Within each key's rule array,
+     * any matching element is sufficient (OR logic).
+     */
+    private static boolean isMessageBodyScope(Subscription sub) {
+        return "MessageBody".equals(
+                sub.getAttributes().getOrDefault("FilterPolicyScope", "MessageAttributes"));
+    }
+
+    /**
+     * Per AWS SNS docs, {@code exists:true} requires the key to have a non-null and
+     * non-empty value. Empty strings, empty arrays, and empty objects do not count as
+     * "exists". Numbers and booleans are always considered non-empty.
+     */
+    private static boolean isNonEmptyValue(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return false;
+        }
+        if (node.isTextual()) {
+            return !node.asText().isEmpty();
+        }
+        if (node.isContainerNode()) {
+            return !node.isEmpty();
+        }
+        return true;
+    }
+
+    private JsonNode tryParseBody(String message) {
+        if (message == null || message.isEmpty()) {
+            return null;
+        }
+        try {
+            return objectMapper.readTree(message);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    boolean matchesFilterPolicy(Subscription sub, JsonNode parsedBody,
+                                Map<String, MessageAttributeValue> messageAttributes) {
+        String filterPolicyJson = sub.getAttributes().get("FilterPolicy");
+        if (filterPolicyJson == null || filterPolicyJson.isBlank()) {
+            return true;
+        }
+        String scope = sub.getAttributes().getOrDefault("FilterPolicyScope", "MessageAttributes");
+        try {
+            JsonNode filterPolicy = objectMapper.readTree(filterPolicyJson);
+            if (!filterPolicy.isObject()) {
+                LOG.warnv("Invalid FilterPolicy (not a JSON object) for {0}", sub.getSubscriptionArn());
+                return false;
+            }
+            if ("MessageBody".equals(scope)) {
+                if (parsedBody == null) {
+                    LOG.debugv("FilterPolicyScope=MessageBody but body is not valid JSON for {0}; not delivering",
+                            sub.getSubscriptionArn());
+                    return false;
+                }
+                return matchesBodyPolicy(filterPolicy, parsedBody);
+            }
+            Map<String, MessageAttributeValue> attrs = messageAttributes != null ? messageAttributes : Map.of();
+            var fields = filterPolicy.fields();
+            while (fields.hasNext()) {
+                var entry = fields.next();
+                String key = entry.getKey();
+                JsonNode rules = entry.getValue();
+                MessageAttributeValue attr = attrs.get(key);
+                String actualValue = attr != null ? attr.getStringValue() : null;
+                if (!matchesAttributeRules(actualValue, rules)) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            LOG.warnv("Failed to parse filter policy for {0}: {1}", sub.getSubscriptionArn(), e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Evaluates a filter policy object against a parsed JSON body. Each policy key must
+     * match (AND); a key's value is either a rule array (terminal) or an object (nested
+     * descent into the body at the same key).
+     */
+    private boolean matchesBodyPolicy(JsonNode policy, JsonNode body) {
+        if (!policy.isObject()) {
+            return false;
+        }
+        var fields = policy.fields();
+        while (fields.hasNext()) {
+            var entry = fields.next();
+            String key = entry.getKey();
+            JsonNode ruleOrNested = entry.getValue();
+            JsonNode bodyValue = (body != null && body.isObject()) ? body.get(key) : null;
+            if (ruleOrNested.isArray()) {
+                if (!matchesBodyRules(bodyValue, ruleOrNested)) {
+                    return false;
+                }
+            } else if (ruleOrNested.isObject()) {
+                if (!matchesBodyPolicy(ruleOrNested, bodyValue)) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Evaluates a rule array against a body value. When the body value is itself an array,
+     * the rules are applied to each element (OR over elements), with {@code exists:true}
+     * additionally matching the array as a whole.
+     */
+    private boolean matchesBodyRules(JsonNode actual, JsonNode rules) {
+        if (!rules.isArray()) {
+            return false;
+        }
+        if (actual != null && actual.isArray()) {
+            boolean nonEmpty = !actual.isEmpty();
+            for (JsonNode rule : rules) {
+                if (rule.isObject() && rule.has("exists")) {
+                    if (rule.get("exists").asBoolean() == nonEmpty) {
+                        return true;
+                    }
+                } else {
+                    for (JsonNode element : actual) {
+                        if (matchesSingleBodyRule(element, rule)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+        for (JsonNode rule : rules) {
+            if (matchesSingleBodyRule(actual, rule)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesSingleBodyRule(JsonNode actual, JsonNode rule) {
+        if (rule.isTextual()) {
+            return actual != null && actual.isTextual() && rule.asText().equals(actual.asText());
+        }
+        if (rule.isNumber()) {
+            if (actual == null || !actual.isNumber()) {
+                return false;
+            }
+            try {
+                return new BigDecimal(actual.asText()).compareTo(rule.decimalValue()) == 0;
+            } catch (NumberFormatException e) {
+                return false;
+            }
+        }
+        if (rule.isBoolean()) {
+            return actual != null && actual.isBoolean() && rule.booleanValue() == actual.booleanValue();
+        }
+        if (rule.isNull()) {
+            return actual != null && actual.isNull();
+        }
+        if (rule.isObject()) {
+            return matchesObjectRuleForNode(rule, actual);
+        }
+        return false;
+    }
+
+    private boolean matchesObjectRuleForNode(JsonNode rule, JsonNode actual) {
+        if (rule.has("exists")) {
+            return rule.get("exists").asBoolean() == isNonEmptyValue(actual);
+        }
+        boolean present = actual != null && !actual.isMissingNode() && !actual.isNull();
+        String stringValue = present && actual.isTextual() ? actual.asText() : null;
+        if (rule.has("prefix")) {
+            return stringValue != null && stringValue.startsWith(rule.get("prefix").asText());
+        }
+        if (rule.has("anything-but")) {
+            return matchesAnythingButForNode(rule.get("anything-but"), actual, stringValue, present);
+        }
+        if (rule.has("numeric") && present && actual.isNumber()) {
+            return evaluateNumericCondition(actual.decimalValue(), rule.get("numeric"));
+        }
+        return false;
+    }
+
+    private boolean matchesAnythingButForNode(JsonNode anythingBut, JsonNode actual,
+                                              String stringValue, boolean present) {
+        if (!present) {
+            return false;
+        }
+        if (anythingBut.isArray()) {
+            for (JsonNode v : anythingBut) {
+                if (v.isTextual() && stringValue != null && v.asText().equals(stringValue)) {
+                    return false;
+                }
+                if (v.isNumber() && actual.isNumber()
+                        && actual.decimalValue().compareTo(v.decimalValue()) == 0) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (anythingBut.isTextual()) {
+            return stringValue == null || !stringValue.equals(anythingBut.asText());
+        }
+        return false;
+    }
+
+    /**
+     * Checks if an attribute value matches a single filter policy rule set.
+     * Rules must be a JSON array where ANY element matching means the rule passes (OR logic).
+     * Non-array rules are treated as non-matching.
+     */
+    private boolean matchesAttributeRules(String actualValue, JsonNode rules) {
+        if (!rules.isArray()) {
+            return false;
+        }
+        for (JsonNode rule : rules) {
+            if (rule.isTextual() && rule.asText().equals(actualValue)) {
+                return true;
+            }
+            if (rule.isNumber() && actualValue != null) {
+                try {
+                    if (new BigDecimal(actualValue).compareTo(rule.decimalValue()) == 0) {
+                        return true;
+                    }
+                } catch (NumberFormatException ignored) {
+                }
+            }
+            if (rule.isObject() && matchesObjectRule(rule, actualValue)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Evaluates a single object-type filter rule (exists, prefix, anything-but, numeric)
+     * against the actual attribute value.
+     */
+    private boolean matchesObjectRule(JsonNode rule, String actualValue) {
+        if (rule.has("exists")) {
+            boolean shouldExist = rule.get("exists").asBoolean();
+            return shouldExist ? actualValue != null : actualValue == null;
+        }
+        if (rule.has("prefix") && actualValue != null) {
+            return actualValue.startsWith(rule.get("prefix").asText());
+        }
+        if (rule.has("anything-but") && actualValue != null) {
+            return !containsValue(rule.get("anything-but"), actualValue);
+        }
+        if (rule.has("numeric") && actualValue != null) {
+            try {
+                return evaluateNumericCondition(new BigDecimal(actualValue), rule.get("numeric"));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return false;
+    }
+
+    private boolean containsValue(JsonNode node, String value) {
+        if (node.isArray()) {
+            for (JsonNode element : node) {
+                if (element.asText().equals(value)) return true;
+            }
+            return false;
+        }
+        LOG.warnv("FilterPolicy 'anything-but' expected an array but got a scalar; treating as single-value list");
+        return node.asText().equals(value);
+    }
+
+    /**
+     * Evaluates a numeric condition array against a value.
+     * The conditions array contains alternating operator-target pairs (e.g. [">=", 100, "<", 200]).
+     * All pairs must match for the condition to pass (AND logic).
+     */
+    private boolean evaluateNumericCondition(BigDecimal value, JsonNode conditions) {
+        if (!conditions.isArray() || conditions.size() % 2 != 0) {
+            return false;
+        }
+        for (int i = 0; i < conditions.size(); i += 2) {
+            String op = conditions.get(i).asText();
+            BigDecimal target = conditions.get(i + 1).decimalValue();
+            int cmp = value.compareTo(target);
+            boolean matches = switch (op) {
+                case "=" -> cmp == 0;
+                case ">" -> cmp > 0;
+                case ">=" -> cmp >= 0;
+                case "<" -> cmp < 0;
+                case "<=" -> cmp <= 0;
+                default -> false;
+            };
+            if (!matches) return false;
+        }
+        return true;
+    }
+
+    private boolean isDuplicate(String topicArn, String deduplicationId) {
+        String cacheKey = topicArn + ":" + deduplicationId;
+        Instant now = Instant.now();
+        Instant existing = fifoDeduplicationCache.get(cacheKey);
+        if (existing != null && existing.plus(FIFO_DEDUP_WINDOW).isAfter(now)) {
+            return true;
+        }
+        fifoDeduplicationCache.put(cacheKey, now);
+        fifoDeduplicationCache.entrySet().removeIf(e -> e.getValue().plus(FIFO_DEDUP_WINDOW).isBefore(now));
+        return false;
+    }
+
+    /**
+     * Removes all FIFO deduplication cache entries for SNS topics that have an SQS subscription
+     * whose endpoint resolves to the same queue path as {@code queueUrl} (used when purging SQS
+     * with {@code clearFifoDeduplicationCacheOnPurge}).
+     */
+    public void clearFifoDeduplicationCacheForSqsQueueSubscriptions(String queueUrl, String region) {
+        String queuePath = extractQueuePathFromUrl(queueUrl);
+        if (queuePath.isEmpty()) {
+            return;
+        }
+        String subPrefix = "sub::" + region + "::";
+        subscriptionStore.keys().stream()
+                .filter(key -> key.startsWith(subPrefix))
+                .map(key -> subscriptionStore.get(key).orElse(null))
+                .filter(Objects::nonNull)
+                .filter(sub -> "sqs".equals(sub.getProtocol()))
+                .filter(sub -> sqsSubscriptionEndpointMatchesQueuePath(sub.getEndpoint(), queuePath))
+                .map(Subscription::getTopicArn)
+                .forEach(topicArn ->
+                        fifoDeduplicationCache.keySet().removeIf(cacheKey -> cacheKey.startsWith(topicArn + ":")));
+    }
+
+    private boolean sqsSubscriptionEndpointMatchesQueuePath(String endpoint, String queuePath) {
+        if (endpoint == null) {
+            return false;
+        }
+        String asUrl = sqsArnToUrl(endpoint);
+        return extractQueuePathFromUrl(asUrl).equals(queuePath);
+    }
+
+    /**
+     * Same path extraction as {@code SqsService} queue URL normalization ({@code /accountId/queueName}).
+     */
+    private static String extractQueuePathFromUrl(String url) {
+        if (url == null) {
+            return "";
+        }
+        int schemeEnd = url.indexOf("://");
+        if (schemeEnd < 0) {
+            return url;
+        }
+        int pathStart = url.indexOf('/', schemeEnd + 3);
+        if (pathStart < 0) {
+            return url;
+        }
+        return url.substring(pathStart);
+    }
+
+    private List<Subscription> subscriptionsByTopic(String topicArn, String region) {
+        List<Subscription> result = new ArrayList<>();
+        String prefix = "sub::" + region + "::";
+        for (String k : subscriptionStore.keys()) {
+            if (k.startsWith(prefix)) {
+                subscriptionStore.get(k).ifPresent(sub -> {
+                    if (topicArn.equals(sub.getTopicArn())) result.add(sub);
+                });
+            }
+        }
+        return result;
+    }
+
+    private void deliverMessage(Subscription sub, String message, String subject,
+                                Map<String, MessageAttributeValue> messageAttributes, String messageId,
+                                String topicArn, String messageGroupId, String messageDeduplicationId) {
+        try {
+            switch (sub.getProtocol()) {
+                case "sqs" -> {
+                    String region = extractRegionFromArn(sub.getEndpoint());
+                    if (region == null) {
+                        region = extractRegionFromArn(topicArn);
+                    }
+                    String queueUrl = sqsArnToUrl(sub.getEndpoint());
+                    boolean rawDelivery = "true".equalsIgnoreCase(sub.getAttributes().get("RawMessageDelivery"));
+                    String body = rawDelivery
+                            ? message
+                            : buildSnsEnvelope(message, subject, messageAttributes, topicArn, messageId);
+                    Map<String, MessageAttributeValue> sqsAttributes = rawDelivery
+                            ? toSqsMessageAttributes(messageAttributes)
+                            : Collections.emptyMap();
+                    sqsService.sendMessage(queueUrl, body, 0, messageGroupId, messageDeduplicationId, sqsAttributes, region);
+                    LOG.debugv("Delivered SNS message to SQS: {0} ({1}) raw={2}", sub.getEndpoint(), queueUrl, rawDelivery);
+                }
+                case "lambda" -> {
+                    String fnName = extractFunctionName(sub.getEndpoint());
+                    String region = extractRegionFromArn(sub.getEndpoint());
+                    String eventJson = buildSnsLambdaEvent(topicArn, messageId, message,
+                            subject, messageAttributes, sub.getSubscriptionArn());
+                    lambdaService.invoke(region, fnName, eventJson.getBytes(), InvocationType.Event);
+                    LOG.debugv("Delivered SNS message to Lambda: {0}", sub.getEndpoint());
+                }
+                case "email", "email-json" -> LOG.infov("SNS email delivery (stub): to={0}, subject={1}, message={2}",
+                        sub.getEndpoint(), subject, message);
+                case "sms" -> LOG.infov("SNS SMS delivery (stub): to={0}, message={1}", sub.getEndpoint(), message);
+                default -> LOG.debugv("Protocol {0} delivery not implemented, skipping: {1}",
+                        sub.getProtocol(), sub.getEndpoint());
+            }
+        } catch (Exception e) {
+            LOG.warnv("Failed to deliver SNS message to {0}: {1}", sub.getEndpoint(), e.getMessage());
+        }
+    }
+
+    private String buildSnsLambdaEvent(String topicArn, String messageId, String message,
+                                       String subject, Map<String, MessageAttributeValue> messageAttributes,
+                                       String subscriptionArn) {
+        try {
+            String timestamp = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
+            ObjectNode snsNode = objectMapper.createObjectNode();
+            snsNode.put("Type", "Notification");
+            snsNode.put("MessageId", messageId);
+            snsNode.put("TopicArn", topicArn);
+            if (subject != null) {
+                snsNode.put("Subject", subject);
+            } else {
+                snsNode.putNull("Subject");
+            }
+            snsNode.put("Message", message);
+            snsNode.put("Timestamp", timestamp);
+            snsNode.put("SignatureVersion", "1");
+            snsNode.put("Signature", "EXAMPLE");
+            snsNode.put("SigningCertUrl", "EXAMPLE");
+            snsNode.put("UnsubscribeUrl", "EXAMPLE");
+            ObjectNode attrs = snsNode.putObject("MessageAttributes");
+            if (messageAttributes != null) {
+                for (var entry : messageAttributes.entrySet()) {
+                    ObjectNode attr = attrs.putObject(entry.getKey());
+                    attr.put("Type", entry.getValue().getDataType());
+                    attr.put("Value", entry.getValue().getStringValue());
+                }
+            }
+            ObjectNode record = objectMapper.createObjectNode();
+            record.put("EventVersion", "1.0");
+            record.put("EventSubscriptionArn", subscriptionArn);
+            record.put("EventSource", "aws:sns");
+            record.set("Sns", snsNode);
+            ObjectNode root = objectMapper.createObjectNode();
+            root.putArray("Records").add(record);
+            return objectMapper.writeValueAsString(root);
+        } catch (Exception e) {
+            return "{\"Records\":[]}";
+        }
+    }
+
+    private static String extractFunctionName(String functionArn) {
+        int idx = functionArn.lastIndexOf(':');
+        return idx >= 0 ? functionArn.substring(idx + 1) : functionArn;
+    }
+
+    private static String extractRegionFromArn(String arn) {
+        if (arn == null || !arn.startsWith("arn:aws:")) return null;
+        return AwsArnUtils.regionOrDefault(arn, null);
+    }
+
+    /**
+     * Forwards SNS message attributes as SQS MessageAttributeValue objects
+     * when RawMessageDelivery is enabled, preserving the original DataType.
+     */
+    private Map<String, MessageAttributeValue> toSqsMessageAttributes(Map<String, MessageAttributeValue> snsAttributes) {
+        if (snsAttributes == null || snsAttributes.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return new java.util.HashMap<>(snsAttributes);
+    }
+
+    private String buildSnsEnvelope(String message, String subject,
+                                    Map<String, MessageAttributeValue> messageAttributes,
+                                    String topicArn, String messageId) {
+        try {
+            String timestamp = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
+            ObjectNode node = objectMapper.createObjectNode();
+            node.put("Type", "Notification");
+            node.put("MessageId", messageId);
+            node.put("TopicArn", topicArn);
+            node.put("Timestamp", timestamp);
+            if (subject != null) {
+                node.put("Subject", subject);
+            }
+            node.put("Message", message);
+            ObjectNode attrs = node.putObject("MessageAttributes");
+            if (messageAttributes != null) {
+                for (var entry : messageAttributes.entrySet()) {
+                    ObjectNode attr = attrs.putObject(entry.getKey());
+                    attr.put("Type", entry.getValue().getDataType());
+                    attr.put("Value", entry.getValue().getStringValue());
+                }
+            }
+            return objectMapper.writeValueAsString(node);
+        } catch (Exception e) {
+            return "{}";
+        }
+    }
+
+    private String sqsArnToUrl(String arn) {
+        if (arn == null) return null;
+        if (arn.startsWith("http")) return arn;
+        try { AwsArnUtils.parse(arn); } catch (IllegalArgumentException e) { return arn; }
+        return AwsArnUtils.arnToQueueUrl(arn, baseUrl);
+    }
+
+    private static int computePublishSize(String message, String subject,
+                                          Map<String, MessageAttributeValue> attributes) {
+        int total = message == null ? 0 : message.getBytes(StandardCharsets.UTF_8).length;
+        if (subject != null) {
+            total += subject.getBytes(StandardCharsets.UTF_8).length;
+        }
+        if (attributes != null) {
+            for (Map.Entry<String, MessageAttributeValue> entry : attributes.entrySet()) {
+                total += entry.getKey().getBytes(StandardCharsets.UTF_8).length;
+                MessageAttributeValue value = entry.getValue();
+                if (value == null) {
+                    continue;
+                }
+                if (value.getDataType() != null) {
+                    total += value.getDataType().getBytes(StandardCharsets.UTF_8).length;
+                }
+                if (value.getBinaryValue() != null) {
+                    total += value.getBinaryValue().length;
+                } else if (value.getStringValue() != null) {
+                    total += value.getStringValue().getBytes(StandardCharsets.UTF_8).length;
+                }
+            }
+        }
+        return total;
+    }
+
+    private static String sha256(String message) {
+        try {
+        	MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(message.getBytes(StandardCharsets.UTF_8));
+            return HEX.formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            return UUID.randomUUID().toString();
+        }
+    }
+
+    private static String topicKey(String region, String arn) {
+        return "topic::" + region + "::" + arn;
+    }
+
+    private static String subKey(String region, String subscriptionArn) {
+        return "sub::" + region + "::" + subscriptionArn;
+    }
+}
