@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@nexus/contracts": "workspace:*",
-    "@nexus/shared": "workspace:*"
+    "@nexus/shared": "workspace:*",
+    "groq-sdk": "^0.9.1"
   }
 }
