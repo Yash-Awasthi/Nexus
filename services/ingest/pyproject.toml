@@ -15,6 +15,9 @@ dependencies = [
   "opentelemetry-sdk>=1.27.0",
   "opentelemetry-exporter-otlp>=1.27.0",
   "prometheus-client>=0.21.0",
+  "finscrape @ file:../../../fin-scrape",
+  "redis[hiredis]>=5.0.0",
+  "asyncpg>=0.29.0",
 ]
 [project.optional-dependencies]
 dev = [
@@ -32,3 +35,4 @@ strict = true
 python_version = "3.11"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+

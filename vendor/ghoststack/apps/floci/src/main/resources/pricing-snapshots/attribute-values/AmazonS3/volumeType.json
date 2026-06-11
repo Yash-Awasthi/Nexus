@@ -1,7 +1,0 @@
-[
-  { "Value": "Standard" },
-  { "Value": "Standard - Infrequent Access" },
-  { "Value": "One Zone - Infrequent Access" },
-  { "Value": "Glacier Flexible Retrieval" },
-  { "Value": "Glacier Deep Archive" }
-]

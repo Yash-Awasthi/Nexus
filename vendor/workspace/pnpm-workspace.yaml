@@ -1,6 +1,0 @@
-packages:
-  - 'packages/core'
-  - 'packages/integrations'
-  - 'packages/orchestrator'
-  - 'packages/agents/*'
-  - 'apps/*'
