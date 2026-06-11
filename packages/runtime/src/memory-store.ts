@@ -5,9 +5,8 @@
  * semantic indexing, and trace-based retrieval.
  */
 
-import { IRuntimePersistence } from "./interfaces/persistence.interface.js";
-import { IEventStore } from "./interfaces/persistence.interface.js";
-import { ILogger } from "./interfaces/logger.interface.js";
+import type { ILogger } from "./interfaces/logger.interface.js";
+import type { IRuntimePersistence , IEventStore } from "./interfaces/persistence.interface.js";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -350,7 +349,7 @@ export class MemoryStore implements IMemoryStore {
     await this.ensureLoaded();
     const keepCount = opts.keepCount ?? 200;
     const recentWindowMs = opts.recentWindowMs ?? 60 * 60 * 1000; // 1 hour
-    const preserveTypes: Set<string> = new Set(opts.preserveTypes ?? ["decision", "knowledge"]);
+    const preserveTypes = new Set<string>(opts.preserveTypes ?? ["decision", "knowledge"]);
 
     if (this.entries.size <= keepCount) return 0;
 

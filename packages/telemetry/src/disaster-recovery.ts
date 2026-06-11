@@ -220,7 +220,7 @@ export class DisasterRecovery {
 // ─── MemoryDisasterRecovery — for tests ──────────────────────────────────────
 
 export class MemoryDisasterRecovery {
-  private checkpoints: Array<{ state: RuntimeCheckpoint; takenAt: Date }> = [];
+  private checkpoints: { state: RuntimeCheckpoint; takenAt: Date }[] = [];
   private readonly max: number;
 
   constructor(max = 5) {

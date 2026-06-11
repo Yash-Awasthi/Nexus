@@ -15,7 +15,7 @@ export function metricsToPrometheus(metrics: Record<string, unknown>): string {
       lines.push(`# TYPE ${safeName} gauge`);
       lines.push(`${safeName} ${value}`);
     } else if (Array.isArray(value) && value.every((v) => typeof v === "number")) {
-      const arr = value as number[];
+      const arr = value;
       const sum = arr.reduce((a, b) => a + b, 0);
       const count = arr.length;
       const max = count ? Math.max(...arr) : 0;

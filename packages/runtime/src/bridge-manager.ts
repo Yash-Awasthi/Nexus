@@ -11,10 +11,11 @@
  *   await mgr.stopAll();
  */
 
-import { spawn, ChildProcess } from "child_process";
-import * as path from "path";
+import type { ChildProcess } from "child_process";
+import { spawn } from "child_process";
 import * as fs from "fs";
 import * as http from "http";
+import * as path from "path";
 
 export type BridgeName = "stealth-browser" | "scraping" | "local-inference" | "mcp-server";
 
@@ -36,8 +37,8 @@ const HEALTH_CHECK_INTERVAL_MS = 500;
 const HEALTH_CHECK_MAX_ATTEMPTS = 20;
 
 export class BridgeManager {
-  private processes: Map<BridgeName, ChildProcess> = new Map();
-  private started: Set<BridgeName> = new Set();
+  private processes = new Map<BridgeName, ChildProcess>();
+  private started = new Set<BridgeName>();
 
   /** Start a bridge by name. No-op if already running. */
   async start(name: BridgeName): Promise<void> {
@@ -126,7 +127,7 @@ export class BridgeManager {
         resolve(res.statusCode !== undefined && res.statusCode < 400);
         res.resume();
       });
-      req.on("error", () => resolve(false));
+      req.on("error", () => { resolve(false); });
       req.setTimeout(400, () => { req.destroy(); resolve(false); });
     });
   }

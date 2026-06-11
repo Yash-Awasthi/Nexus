@@ -14,8 +14,9 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { IExecutionContext } from "./interfaces/execution.interface.js";
-import { ILanguageModel, ChatMessage } from "./interfaces/language-model.interface.js";
+
+import type { IExecutionContext } from "./interfaces/execution.interface.js";
+import type { ILanguageModel, ChatMessage } from "./interfaces/language-model.interface.js";
 import { createLanguageModel } from "./language-model.js";
 import { WebSearchEngine } from "./web-search-engine.js";
 
@@ -113,7 +114,7 @@ Return at most 12 most relevant files. Paths must be relative to the project roo
 
     try {
       const result = await this.llm.generateObject<{
-        files: Array<{ path: string; reason: string }>;
+        files: { path: string; reason: string }[];
         summary: string;
       }>({
         messages: [
@@ -225,13 +226,13 @@ Make ALL changes in one response.`;
 
     try {
       const result = await this.llm.generateObject<{
-        changes: Array<{
+        changes: {
           path: string;
           operation: "str_replace" | "write_file";
           oldString?: string;
           newString?: string;
           content?: string;
-        }>;
+        }[];
         explanation: string;
       }>({
         messages: [
@@ -358,7 +359,7 @@ Respond as JSON:
     try {
       const result = await this.llm.generateObject<{
         approved: boolean;
-        issues: Array<{ severity: string; file: string; line: string; suggestion: string }>;
+        issues: { severity: string; file: string; line: string; suggestion: string }[];
         summary: string;
       }>({
         messages: [
@@ -499,11 +500,11 @@ ${contextText ? `Context provided:\n${contextText}\n\n` : ""}Be thorough. Show y
  * Acts as a single IExecutionAdapter that dispatches to the right agent.
  */
 export class CodeAgentPool {
-  private agents: Array<{
+  private agents: {
     canExecute(t: string): boolean;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     execute(task: any, ctx: IExecutionContext): Promise<Record<string, unknown>>;
-  }>;
+  }[];
 
   constructor(llm?: ILanguageModel) {
     const model = llm ?? defaultLLM();

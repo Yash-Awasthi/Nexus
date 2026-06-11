@@ -8,7 +8,7 @@
  * service implementations.
  */
 
-import { IConfigLoader } from "../runtime/config-loader.js";
+import type { IConfigLoader } from "../runtime/config-loader.js";
 
 // ─── Public types ──────────────────────────────────────────────────────────────
 

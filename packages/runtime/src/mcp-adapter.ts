@@ -1,6 +1,5 @@
-import { IMCPRuntime, IMCPTask, IMCPExecutionResult, IMCPRuntimeMetrics } from "./interfaces/mcp.interface.js";
-import { IMCPServerRegistry } from "./interfaces/mcp.interface.js";
-import { IMetricsCollector, ITraceRecorder } from "./interfaces/observability.interface.js";
+import type { IMCPRuntime, IMCPTask, IMCPExecutionResult, IMCPRuntimeMetrics , IMCPServerRegistry } from "./interfaces/mcp.interface.js";
+import type { IMetricsCollector, ITraceRecorder } from "./interfaces/observability.interface.js";
 
 export class MCPRuntime implements IMCPRuntime {
   private registry: IMCPServerRegistry;

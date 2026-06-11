@@ -18,11 +18,11 @@
  *   - The worker emits structured log lines on success / failure for telemetry
  */
 
-import { Worker, type Job } from "bullmq";
-import type { ConnectionOptions } from "bullmq";
 import { db } from "@nexus/db";
 import { runtimeTasks } from "@nexus/db/schema";
+import { type ConnectionOptions, Worker, type Job } from "bullmq";
 import { eq } from "drizzle-orm";
+
 import { handleCouncilJob, type CouncilJobPayload } from "../handlers/council-handler.js";
 import { handleIngestJob, type IngestJobPayload } from "../handlers/ingest-handler.js";
 

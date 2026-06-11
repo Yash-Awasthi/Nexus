@@ -1,7 +1,8 @@
-import { IFilesystemSandbox, ISandboxConstraint } from "./interfaces/environment.interface.js";
-import { isSafeSandboxPath } from "./security-utils.js";
 import * as fs from "fs";
 import * as path from "path";
+
+import type { IFilesystemSandbox, ISandboxConstraint } from "./interfaces/environment.interface.js";
+import { isSafeSandboxPath } from "./security-utils.js";
 
 export class SandboxConstraint implements ISandboxConstraint {
   constructor(
@@ -21,7 +22,7 @@ export class SandboxConstraint implements ISandboxConstraint {
 }
 
 export class FilesystemSandbox implements IFilesystemSandbox {
-  private writeLog: Array<{ timestamp: Date; file: string; bytes: number }> = [];
+  private writeLog: { timestamp: Date; file: string; bytes: number }[] = [];
   private totalBytesWritten = 0;
 
   constructor(
@@ -87,7 +88,7 @@ export class FilesystemSandbox implements IFilesystemSandbox {
     }
   }
 
-  getWriteLog(): Array<{ timestamp: Date; file: string; bytes: number }> {
+  getWriteLog(): { timestamp: Date; file: string; bytes: number }[] {
     return this.writeLog;
   }
 

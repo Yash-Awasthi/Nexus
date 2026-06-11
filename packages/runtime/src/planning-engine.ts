@@ -1,5 +1,5 @@
-import { IPlanningEngine, ICognitiveTrace, ITaskSynthesisResult } from "./interfaces/governance.interface.js";
-import { ILanguageModel } from "./interfaces/language-model.interface.js";
+import type { IPlanningEngine, ICognitiveTrace, ITaskSynthesisResult } from "./interfaces/governance.interface.js";
+import type { ILanguageModel } from "./interfaces/language-model.interface.js";
 
 // ─── Task template & blueprint types ─────────────────────────────────────────
 
@@ -270,7 +270,7 @@ function selectBlueprint(normObjective: string): PlanBlueprint {
     }
   }
   const fallbackKey = PRIORITY_ORDER[0] ?? "default";
-  return (PLAN_BLUEPRINTS.default ?? PLAN_BLUEPRINTS[fallbackKey]) as PlanBlueprint;
+  return (PLAN_BLUEPRINTS.default ?? PLAN_BLUEPRINTS[fallbackKey])!;
 }
 
 /**
@@ -317,7 +317,7 @@ function synthesisFromBlueprint(
 
 // ─── PlanningEngine ───────────────────────────────────────────────────────────
 
-const BLUEPRINT_KEYS = Object.keys(PLAN_BLUEPRINTS) as Array<keyof typeof PLAN_BLUEPRINTS>;
+const BLUEPRINT_KEYS = Object.keys(PLAN_BLUEPRINTS);
 
 export class PlanningEngine implements IPlanningEngine {
   private readonly llm?: ILanguageModel;
@@ -378,7 +378,7 @@ Respond with a JSON object: { "blueprintKey": "<chosen key>" }.`
         ]
       });
 
-      const chosen = result?.blueprintKey as keyof typeof PLAN_BLUEPRINTS;
+      const chosen = result?.blueprintKey;
       if (chosen && PLAN_BLUEPRINTS[chosen]) {
         return PLAN_BLUEPRINTS[chosen];
       }

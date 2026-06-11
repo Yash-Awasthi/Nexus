@@ -1,9 +1,9 @@
-import { Task } from "./task-router.js";
+import type { Task } from "./task-router.js";
 
-export type QueueJobPayload = {
+export interface QueueJobPayload {
   type: string;
   payload: Record<string, unknown>;
-};
+}
 
 /**
  * Maps a workflow task to the queue executor shape.

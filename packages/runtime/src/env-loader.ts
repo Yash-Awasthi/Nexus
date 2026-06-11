@@ -61,7 +61,7 @@ function parseLine(line: string): { key: string; value: string } | null {
     raw = raw.slice(1, closeIdx);
   } else {
     // Strip inline comment (# preceded by whitespace)
-    const commentMatch = raw.match(/\s+#.*/);
+    const commentMatch = /\s+#.*/.exec(raw);
     if (commentMatch) {
       raw = raw.slice(0, commentMatch.index).trim();
     } else {

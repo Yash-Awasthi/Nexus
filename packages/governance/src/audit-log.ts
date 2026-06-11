@@ -88,7 +88,7 @@ export function canonicalJson(obj: unknown): string {
     return JSON.stringify(obj);
   }
   const sorted: Record<string, unknown> = {};
-  for (const key of Object.keys(obj as object).sort()) {
+  for (const key of Object.keys(obj).sort()) {
     sorted[key] = canonicalJson((obj as Record<string, unknown>)[key]);
   }
   return JSON.stringify(sorted);

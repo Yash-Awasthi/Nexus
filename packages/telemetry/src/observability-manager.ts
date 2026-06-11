@@ -1,9 +1,9 @@
-import { IMetricsCollector, ITraceRecorder, ITraceSpan } from "./interfaces/observability.interface.js";
+import type { IMetricsCollector, ITraceRecorder, ITraceSpan } from "./interfaces/observability.interface.js";
 
 // ─── Histogram for percentile calculations ───────────────────────────
 
 export class Histogram {
-  private buckets: Map<number, number> = new Map();
+  private buckets = new Map<number, number>();
   private count = 0;
   private sum = 0;
   private minVal = Infinity;
@@ -90,7 +90,7 @@ export class MetricsCollector implements IMetricsCollector {
   private histograms: Record<string, Histogram> = {};
   private timestamps: Record<string, number> = {};
 
-  increment(metricName: string, amount: number = 1, _tags?: Record<string, string>): void {
+  increment(metricName: string, amount = 1, _tags?: Record<string, string>): void {
     if (!this.counters[metricName]) {
       this.counters[metricName] = 0;
     }
@@ -230,9 +230,9 @@ export class TraceRecorder implements ITraceRecorder {
 // ─── Telemetry Exporter ──────────────────────────────────────────────
 
 export class TelemetryExporter {
-  private exportQueue: Array<{ timestamp: Date; type: string; payload: unknown }> = [];
+  private exportQueue: { timestamp: Date; type: string; payload: unknown }[] = [];
 
-  constructor(private exportIntervalMs: number = 60000) {
+  constructor(private exportIntervalMs = 60000) {
     if (exportIntervalMs > 0) {
       const timer = setInterval(() => this.flush(), exportIntervalMs);
       timer.unref();
@@ -243,7 +243,7 @@ export class TelemetryExporter {
     this.exportQueue.push({ timestamp: new Date(), type, payload });
   }
 
-  flush(): Array<{ timestamp: Date; type: string; payload: unknown }> {
+  flush(): { timestamp: Date; type: string; payload: unknown }[] {
     const batch = this.exportQueue;
     this.exportQueue = [];
     return batch;

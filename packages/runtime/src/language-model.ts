@@ -7,9 +7,10 @@
  * Both implement ILanguageModel so all consumers are backend-agnostic.
  */
 
-import * as https from "https";
 import * as http from "http";
-import {
+import * as https from "https";
+
+import type {
   ILanguageModel,
   ChatMessage,
   TextChunk,
@@ -41,7 +42,7 @@ function httpsPost(
     const req = (parsed.protocol === "https:" ? https : http).request(options, (res) => {
       const chunks: Buffer[] = [];
       res.on("data", (c: Buffer) => chunks.push(c));
-      res.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+      res.on("end", () => { resolve(Buffer.concat(chunks).toString("utf8")); });
     });
     req.on("error", reject);
     req.write(payload);

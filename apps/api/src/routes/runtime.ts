@@ -7,10 +7,12 @@
  *   PATCH  /api/v1/runtime/tasks/:taskId   (cancel)
  */
 
-import type { FastifyInstance } from "fastify";
 import { db } from "@nexus/db";
 import { runtimeTasks } from "@nexus/db/schema";
-import { eq, desc, and, SQL } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
+import type { FastifyInstance } from "fastify";
+
 import { requireAuth } from "../middleware/auth.js";
 
 export async function runtimeRoutes(app: FastifyInstance): Promise<void> {

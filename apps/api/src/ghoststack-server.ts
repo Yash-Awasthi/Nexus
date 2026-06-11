@@ -1,13 +1,17 @@
 // @ts-nocheck
 import * as http from "http";
 import * as path from "path";
-import { createRuntimeContext, startRuntime, stopRuntime, GhostStackRuntimeContext } from "./runtime-context.js";
+
+
 import { RuntimeDiagnosticAPI } from "../orchestration/diagnostic-api.js";
-import { metricsToPrometheus } from "../orchestration/prometheus-format.js";
-import { ADAPTER_MANIFEST } from "./adapters/manifest.js";
 import { registerGhostStackMcpBridge } from "../orchestration/ghoststack-mcp-bridge.js";
-import { IExecutionContext } from "../orchestration/interfaces/execution.interface.js";
+import type { IExecutionContext } from "../orchestration/interfaces/execution.interface.js";
+import { metricsToPrometheus } from "../orchestration/prometheus-format.js";
+
+import { ADAPTER_MANIFEST } from "./adapters/manifest.js";
 import { runFederationE2e } from "./e2e-federation.js";
+import { createRuntimeContext, startRuntime, stopRuntime } from "./runtime-context.js";
+import type { GhostStackRuntimeContext } from "./runtime-context.js";
 
 // ─── Structured health response ──────────────────────────────────────────────
 
@@ -92,17 +96,17 @@ function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     req.on("data", (c) => chunks.push(c));
-    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    req.on("end", () => { resolve(Buffer.concat(chunks).toString("utf8")); });
     req.on("error", reject);
   });
 }
 
-export type GhostStackServer = {
+export interface GhostStackServer {
   server: http.Server;
   ctx: GhostStackRuntimeContext;
   port: number;
   stop: () => Promise<void>;
-};
+}
 
 export async function createGhostStackServer(repoRoot: string): Promise<GhostStackServer> {
   const bootStarted = Date.now();
@@ -168,7 +172,7 @@ export async function createGhostStackServer(repoRoot: string): Promise<GhostSta
       // Set GHOSTSTACK_API_TOKEN to require Bearer token auth on all non-health endpoints.
       const apiToken = process.env.GHOSTSTACK_API_TOKEN;
       if (apiToken && pathname !== "/health" && pathname !== "/healthz") {
-        const authHeader = (req.headers["authorization"] as string) ?? "";
+        const authHeader = (req.headers.authorization!) ?? "";
         const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
         if (provided !== apiToken) {
           res.statusCode = 401;
@@ -306,7 +310,7 @@ export async function createGhostStackServer(repoRoot: string): Promise<GhostSta
       const statusCode = rawMessage.startsWith("Not Found") ? 404 : 500;
       // Avoid exposing internal stack traces / file paths in production responses.
       const safeMessage =
-        process.env["NODE_ENV"] === "production" && statusCode === 500
+        process.env.NODE_ENV === "production" && statusCode === 500
           ? "Internal server error"
           : rawMessage;
       res.statusCode = statusCode;
@@ -319,13 +323,13 @@ export async function createGhostStackServer(repoRoot: string): Promise<GhostSta
   });
 
   await new Promise<void>((resolve) => {
-    server.listen(port, () => resolve());
+    server.listen(port, () => { resolve(); });
   });
 
   const stop = async () => {
     ctx.logger.info("GhostStack HTTP server stopping");
     await stopRuntime(ctx);
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await new Promise<void>((resolve) => server.close(() => { resolve(); }));
   };
 
   return { server, ctx, port, stop };

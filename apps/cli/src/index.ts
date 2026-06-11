@@ -19,8 +19,9 @@
  *   nexus audit verify
  */
 
-import { Command } from "commander";
 import chalk from "chalk";
+import { Command } from "commander";
+
 import { api } from "./lib/client.js";
 
 const program = new Command();

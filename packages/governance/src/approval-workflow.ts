@@ -1,6 +1,6 @@
-import { IApprovalWorkflow, IApprovalRecord } from "./interfaces/governance.interface.js";
-import { IEventStore } from "./interfaces/persistence.interface.js";
-import { IEventBus } from "./event-bus.js";
+import type { IEventBus } from "./event-bus.js";
+import type { IApprovalWorkflow, IApprovalRecord } from "./interfaces/governance.interface.js";
+import type { IEventStore } from "./interfaces/persistence.interface.js";
 
 export class ApprovalWorkflow implements IApprovalWorkflow {
   private eventStore: IEventStore;

@@ -9,23 +9,24 @@
  *  - All API route groups mounted under /api/v1
  */
 
-import Fastify, { type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import sensible from "@fastify/sensible";
+import Fastify, { type FastifyInstance } from "fastify";
+
+import { auditRoutes } from "./routes/audit.js";
+import { councilRoutes } from "./routes/council.js";
+import { governanceRoutes } from "./routes/governance.js";
 import { healthRoutes } from "./routes/health.js";
 import { ingestRoutes } from "./routes/ingest.js";
-import { councilRoutes } from "./routes/council.js";
 import { runtimeRoutes } from "./routes/runtime.js";
-import { governanceRoutes } from "./routes/governance.js";
-import { auditRoutes } from "./routes/audit.js";
 
 export async function buildServer(): Promise<FastifyInstance> {
   const app = Fastify({
     logger: {
-      level: process.env["LOG_LEVEL"] ?? "info",
+      level: process.env.LOG_LEVEL ?? "info",
       transport:
-        process.env["NODE_ENV"] !== "production"
+        process.env.NODE_ENV !== "production"
           ? { target: "pino-pretty", options: { colorize: true } }
           : undefined,
     },
@@ -34,7 +35,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   // ── Plugins ───────────────────────────────────────────────────────────────
   await app.register(helmet, { contentSecurityPolicy: false });
   await app.register(cors, {
-    origin: process.env["ALLOWED_ORIGINS"]?.split(",") ?? true,
+    origin: process.env.ALLOWED_ORIGINS?.split(",") ?? true,
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
   });
   await app.register(sensible);

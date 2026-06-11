@@ -1,6 +1,10 @@
 // @ts-nocheck
-import { Task } from "./task-router.js";
-import {
+import type { GhostStackOrchestrator } from "../runtime/orchestrator.js";
+
+import type { IEventBus } from "./event-bus.js";
+import type { IApprovalWorkflow } from "./interfaces/governance.interface.js";
+import type { IRuntimePersistence } from "./interfaces/persistence.interface.js";
+import type {
   IWorkflowDefinition,
   IWorkflowExecution,
   IWorkflowTemplate,
@@ -10,11 +14,8 @@ import {
   IWorkflowApprovalPolicy,
   IWorkflowConstraint
 } from "./interfaces/workflow.interface.js";
-import { GhostStackOrchestrator } from "../runtime/orchestrator.js";
-import { IRuntimePersistence } from "./interfaces/persistence.interface.js";
-import { IApprovalWorkflow } from "./interfaces/governance.interface.js";
-import { IEventBus } from "./event-bus.js";
-import { RuntimeGraph } from "./runtime-graph.js";
+import type { RuntimeGraph } from "./runtime-graph.js";
+import type { Task } from "./task-router.js";
 
 // ─── Replay Context Types ───────────────────────────────────────────
 
@@ -34,7 +35,7 @@ export interface ReplayOptions {
 export interface ReplayLineage {
   originalExecutionId: string;
   replayGeneration: number;
-  previousExecutions: Array<{ executionId: string; status: string; timestamp: Date }>;
+  previousExecutions: { executionId: string; status: string; timestamp: Date }[];
 }
 
 // 1. Generic Workflow Constraint Implementation
@@ -214,10 +215,10 @@ interface IdempotencyRecord {
 
 // 5. Workflow Engine & Replayer Core
 export class WorkflowEngine implements IWorkflowReplay {
-  private checkpoints: Map<string, WorkflowCheckpoint> = new Map();
-  private cancelledExecutions: Set<string> = new Set();
-  private eventHandlers: Map<WorkflowEventType, Set<WorkflowEventHandler>> = new Map();
-  private allHandlers: Set<WorkflowEventHandler> = new Set();
+  private checkpoints = new Map<string, WorkflowCheckpoint>();
+  private cancelledExecutions = new Set<string>();
+  private eventHandlers = new Map<WorkflowEventType, Set<WorkflowEventHandler>>();
+  private allHandlers = new Set<WorkflowEventHandler>();
   private idempotencyTokens = new Map<string, IdempotencyRecord>(); // token -> record
 
   /** Tracks replay lineage for deterministic replay ordering and crash continuation. */
@@ -402,7 +403,7 @@ export class WorkflowEngine implements IWorkflowReplay {
 
     // Check if we have a checkpoint to resume from
     const existingCp = this.checkpoints.get(executionId);
-    if (existingCp && existingCp.status === "cancelled") {
+    if (existingCp?.status === "cancelled") {
       return {
         id: executionId,
         workflowId,
@@ -956,7 +957,7 @@ export class WorkflowEngine implements IWorkflowReplay {
   }
 
   /** List all recorded replay lineages for diagnostics. */
-  listReplayLineages(): Array<{ originalExecutionId: string; generation: number; replays: number }> {
+  listReplayLineages(): { originalExecutionId: string; generation: number; replays: number }[] {
     return Array.from(this.replayLineage.entries()).map(([key, value]) => ({
       originalExecutionId: key,
       generation: value.replayGeneration,

@@ -35,11 +35,11 @@ export interface ToolDefinition {
 
 export interface TextChunk {
   contentChunk: string;
-  toolCallChunks?: Array<{
+  toolCallChunks?: {
     id: string;
     name: string;
     arguments: Record<string, unknown>;
-  }>;
+  }[];
 }
 
 export interface GenerateTextParams {

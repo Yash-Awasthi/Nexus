@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-import { pgTable, uuid, text, jsonb, timestamp, index } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import { pgTable, uuid, text, jsonb, timestamp, index } from "drizzle-orm/pg-core";
 
 /**
  * signals — processed, enriched signals derived from one or more ingested events.

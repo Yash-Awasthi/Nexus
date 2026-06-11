@@ -21,7 +21,7 @@ export interface IPlanningEngine {
 }
 
 export interface IApprovalWorkflow {
-  listRecords(): Promise<Array<{ taskId: string; approvalId: string; [key: string]: unknown }>>;
+  listRecords(): Promise<{ taskId: string; approvalId: string; [key: string]: unknown }[]>;
   requestApproval(request: { id: string; description: string; requester: string }): Promise<{ approved: boolean; reason?: string }>;
   getStatus(requestId: string): Promise<{ status: "pending" | "approved" | "rejected" }>;
 }

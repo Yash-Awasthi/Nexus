@@ -142,7 +142,7 @@ export class HealthAggregator {
       const resultOrTimeout = await Promise.race([
         probe.fn(),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("__timeout__")), probe.timeoutMs),
+          setTimeout(() => { reject(new Error("__timeout__")); }, probe.timeoutMs),
         ),
       ]);
 
@@ -169,7 +169,7 @@ export class HealthAggregator {
     }
   }
 
-  private aggregate(results: Array<ProbeResult & { critical: boolean }>): HealthStatus {
+  private aggregate(results: (ProbeResult & { critical: boolean })[]): HealthStatus {
     const allOk = results.every((r) => r.status === "ok");
     if (allOk) return "ready";
 

@@ -6,10 +6,13 @@
  */
 
 import { randomUUID } from "crypto";
-import type { FastifyInstance } from "fastify";
+
 import { db } from "@nexus/db";
 import { ingestedEvents, signals } from "@nexus/db/schema";
-import { eq, desc, and, SQL } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
+import type { FastifyInstance } from "fastify";
+
 import { requireAuth } from "../middleware/auth.js";
 
 // ── /ingest/events ────────────────────────────────────────────────────────────

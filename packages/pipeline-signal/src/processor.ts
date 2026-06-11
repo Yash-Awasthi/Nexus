@@ -24,6 +24,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+
 import { SignalClassifier, type ClassificationInput } from "./classifier.js";
 
 // ── Storage adapter interfaces ────────────────────────────────────────────────
@@ -215,7 +216,7 @@ export class SignalProcessor {
 // ── In-memory adapters for tests ──────────────────────────────────────────────
 
 export class MemoryEventSource implements IEventSource {
-  private events: Array<RawEvent & { processed: boolean }> = [];
+  private events: (RawEvent & { processed: boolean })[] = [];
 
   seed(event: RawEvent): void {
     this.events.push({ ...event, processed: false });

@@ -1,16 +1,14 @@
-import { IRuntimeInspector, ITaskSnapshot, IQueueSnapshot, IEventSnapshot } from "./interfaces/observability.interface.js";
-import { IMetricsCollector } from "./interfaces/observability.interface.js";
-import { IQueueBackend } from "./interfaces/queue.interface.js";
-import { IServiceDiscovery } from "./interfaces/discovery.interface.js";
-import { IEventStore } from "./interfaces/persistence.interface.js";
-import { IMCPRuntime, IMCPServerRegistry } from "./interfaces/mcp.interface.js";
-import { IGovernanceEngine, IApprovalWorkflow, ICognitiveTrace } from "./interfaces/governance.interface.js";
-import { IEnvironmentTelemetry, IFilesystemSandbox, IExecutionEnvironment } from "./interfaces/environment.interface.js";
-import { IWorkflowRegistry, IWorkflowTelemetry } from "./interfaces/workflow.interface.js";
-
-import type { IMemoryStore } from "./memory-store.js";
 import type { IAgentBus, AgentMessage, AgentCapability } from "./agent-bus.js";
 import type { CircuitBreaker } from "./circuit-breaker.js";
+import type { IServiceDiscovery } from "./interfaces/discovery.interface.js";
+import type { IEnvironmentTelemetry, IFilesystemSandbox, IExecutionEnvironment } from "./interfaces/environment.interface.js";
+import type { IGovernanceEngine, IApprovalWorkflow, ICognitiveTrace } from "./interfaces/governance.interface.js";
+import type { IMCPRuntime, IMCPServerRegistry } from "./interfaces/mcp.interface.js";
+import type { IRuntimeInspector, ITaskSnapshot, IQueueSnapshot, IEventSnapshot , IMetricsCollector } from "./interfaces/observability.interface.js";
+import type { IEventStore } from "./interfaces/persistence.interface.js";
+import type { IQueueBackend } from "./interfaces/queue.interface.js";
+import type { IWorkflowRegistry, IWorkflowTelemetry } from "./interfaces/workflow.interface.js";
+import type { IMemoryStore } from "./memory-store.js";
 
 // Forward reference to avoid circular dependency — context type is used
 // only at construction time via the static factory method.

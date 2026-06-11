@@ -1,7 +1,7 @@
-import { IMCPServerRegistry, IMCPServerInfo, IMCPTransport } from "./interfaces/mcp.interface.js";
+import type { IMCPServerRegistry, IMCPServerInfo, IMCPTransport } from "./interfaces/mcp.interface.js";
 
 export class MCPServerRegistry implements IMCPServerRegistry {
-  private servers: Map<string, { info: IMCPServerInfo; transport: IMCPTransport }> = new Map();
+  private servers = new Map<string, { info: IMCPServerInfo; transport: IMCPTransport }>();
 
   async registerServer(info: IMCPServerInfo, transport: IMCPTransport): Promise<void> {
     const mutableInfo = { ...info };

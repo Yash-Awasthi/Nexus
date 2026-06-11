@@ -6,13 +6,14 @@
  *   GET  /api/v1/council/transcripts/:verdictId
  */
 
-import type { FastifyInstance } from "fastify";
+import type { CouncilRequest } from "@nexus/contracts";
+import { CouncilService } from "@nexus/council";
+import type { CouncilPersistPayload } from "@nexus/council";
 import { db } from "@nexus/db";
 import { verdicts, councilTranscripts } from "@nexus/db/schema";
 import { eq } from "drizzle-orm";
-import { CouncilService } from "@nexus/council";
-import type { CouncilPersistPayload } from "@nexus/council";
-import type { CouncilRequest } from "@nexus/contracts";
+import type { FastifyInstance } from "fastify";
+
 import { requireAuth } from "../middleware/auth.js";
 
 // Lazy singleton — created on first request to avoid cold-start cost

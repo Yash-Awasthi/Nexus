@@ -13,6 +13,7 @@
  */
 
 import type { CouncilRequest, CouncilResponse, ProposalResult, ModelVote } from "@nexus/contracts";
+
 import { DeliberationEngine, type ILLMTransport } from "./engine.js";
 import { GroqTransport } from "./groq-transport.js";
 
@@ -80,7 +81,7 @@ export class CouncilService {
 
       // Compute total cost from vote token estimates
       // (engine tracks this internally; we approximate here)
-      const totalCostUsd = result.votes.reduce((acc, v) => {
+      const totalCostUsd = result.votes.reduce((acc, _v) => {
         // Each vote's cost is embedded in reasoning if engine exposed it — safe fallback to 0
         return acc;
       }, 0);
@@ -91,7 +92,7 @@ export class CouncilService {
         ...(opts?.signalId !== undefined ? { signalId: opts.signalId } : {}),
         totalCostUsd,
       }).catch((err: unknown) =>
-        console.error("[CouncilService] onResult persistence failed:", err),
+        { console.error("[CouncilService] onResult persistence failed:", err); },
       );
     }
 

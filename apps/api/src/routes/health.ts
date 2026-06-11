@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { FastifyInstance } from "fastify";
 import { db } from "@nexus/db";
 import { sql } from "drizzle-orm";
+import type { FastifyInstance } from "fastify";
 
 export async function healthRoutes(app: FastifyInstance): Promise<void> {
   app.get("/health", async (_req, reply) => {
     return reply.code(200).send({
       status: "ok",
-      version: process.env["npm_package_version"] ?? "0.1.0",
+      version: process.env.npm_package_version ?? "0.1.0",
       timestamp: new Date().toISOString(),
     });
   });
@@ -19,9 +19,9 @@ export async function healthRoutes(app: FastifyInstance): Promise<void> {
     // DB check
     try {
       await db.execute(sql`SELECT 1`);
-      checks["db"] = "ok";
+      checks.db = "ok";
     } catch (err) {
-      checks["db"] = `error: ${err instanceof Error ? err.message : String(err)}`;
+      checks.db = `error: ${err instanceof Error ? err.message : String(err)}`;
       ok = false;
     }
 

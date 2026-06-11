@@ -1,16 +1,19 @@
 // @ts-nocheck
-import { IMCPTransport } from "./interfaces/mcp.interface.js";
-import type { GhostStackRuntimeContext } from "../runtime/runtime-context.js";
-import { FlociExecutionAdapter } from "./floci-adapter.js";
-import { resolveSandboxPath } from "./runtime-sandbox.js";
-import { loadWorkflowSpecFile, specToWorkflowDefinition } from "./spec-loader.js";
-import { dispatchExtendedAction, EXTENDED_FLOCI_ACTIONS } from "./floci-extended.js";
-import { resolveFlociEndpoint } from "./floci-client.js";
-import { runFederationE2e } from "../runtime/e2e-federation.js";
-import { MCPServerRegistry } from "./mcp-registry.js";
-import { MCPRuntime } from "./mcp-adapter.js";
 import * as fs from "fs";
 import * as path from "path";
+
+import { runFederationE2e } from "../runtime/e2e-federation.js";
+import type { GhostStackRuntimeContext } from "../runtime/runtime-context.js";
+
+import type { FlociExecutionAdapter } from "./floci-adapter.js";
+import { resolveFlociEndpoint } from "./floci-client.js";
+import { dispatchExtendedAction, EXTENDED_FLOCI_ACTIONS } from "./floci-extended.js";
+import type { IMCPTransport } from "./interfaces/mcp.interface.js";
+import { MCPRuntime } from "./mcp-adapter.js";
+import { MCPServerRegistry } from "./mcp-registry.js";
+import { resolveSandboxPath } from "./runtime-sandbox.js";
+import { loadWorkflowSpecFile, specToWorkflowDefinition } from "./spec-loader.js";
+
 
 /**
  * In-process MCP transport exposing GhostStack orchestrator capabilities.
@@ -172,7 +175,7 @@ export class GhostStackMcpBridge implements IMCPTransport {
       }
       case "ghoststack_memory_query": {
         const result = await this.ctx.memoryStore.query({
-          types: args.types as Array<"observation" | "decision" | "result" | "error" | "state" | "knowledge">,
+          types: args.types as ("observation" | "decision" | "result" | "error" | "state" | "knowledge")[],
           keyPrefix: args.keyPrefix as string,
           tags: args.tags as string[],
           limit: (args.limit as number) || 20
@@ -206,7 +209,7 @@ export class GhostStackMcpBridge implements IMCPTransport {
         return JSON.stringify({ messageId: msgId }, null, 2);
       }
       case "ghoststack_agent_find": {
-        const agents = await this.ctx.agentBus.findAgents(args.action as string);
+        const agents = await this.ctx.agentBus.findAgents(args.action);
         return JSON.stringify(agents, null, 2);
       }
 

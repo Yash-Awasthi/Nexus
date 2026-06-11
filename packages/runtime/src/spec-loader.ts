@@ -1,7 +1,8 @@
 import * as fs from "fs";
 import * as path from "path";
-import { Task } from "./task-router.js";
-import { IWorkflowDefinition } from "./interfaces/workflow.interface.js";
+
+import type { IWorkflowDefinition } from "./interfaces/workflow.interface.js";
+import type { Task } from "./task-router.js";
 
 export interface WorkflowSpecTask {
   id: string;
@@ -28,7 +29,7 @@ export interface WorkflowSpecFile {
 }
 
 // Required fields for each task entry
-const TASK_REQUIRED_FIELDS: Array<keyof WorkflowSpecTask> = [
+const TASK_REQUIRED_FIELDS: (keyof WorkflowSpecTask)[] = [
   "id", "title", "description", "type", "action", "priority"
 ];
 

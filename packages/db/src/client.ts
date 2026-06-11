@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
+
 import * as schema from "./schema/index.js";
 
 /**
@@ -15,7 +16,7 @@ import * as schema from "./schema/index.js";
  *   const tasks = await db.select().from(runtimeTasks).where(...);
  */
 function createClient() {
-  const url = process.env["DATABASE_URL"];
+  const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error("DATABASE_URL is required — set it in .env or Doppler");
   }

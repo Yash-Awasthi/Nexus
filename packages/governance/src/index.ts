@@ -138,7 +138,7 @@ export class WildcardPermissionsPolicy implements IExecutionPolicy {
   name = "WildcardPermissionsPolicy";
 
   requiresApproval(task: ITaskSynthesisResult): boolean {
-    const perms = task.arguments["permissions"];
+    const perms = task.arguments.permissions;
     return Array.isArray(perms) && perms.includes("*");
   }
 
@@ -161,7 +161,7 @@ export class LoopDetectionGuardrail implements IRuntimeGuardrail {
     const counts = new Map<string, number>();
     for (const log of executionLogs) {
       const entry = log as Record<string, unknown>;
-      const action = String(entry["action"] ?? entry["event"] ?? "");
+      const action = String(entry.action ?? entry.event ?? "");
       const n = (counts.get(action) ?? 0) + 1;
       counts.set(action, n);
       if (n > this.maxCount) {
@@ -183,8 +183,8 @@ export class RunawayRetriesGuardrail implements IRuntimeGuardrail {
   check(_tasks: ITaskSynthesisResult[], executionLogs: unknown[]): { success: boolean; reason?: string } {
     for (const log of executionLogs) {
       const entry = log as Record<string, unknown>;
-      if (typeof entry["retries"] === "number" && entry["retries"] > this.maxRetries) {
-        return { success: false, reason: `Runaway retries: ${entry["retries"]} exceeds max ${this.maxRetries}` };
+      if (typeof entry.retries === "number" && entry.retries > this.maxRetries) {
+        return { success: false, reason: `Runaway retries: ${entry.retries} exceeds max ${this.maxRetries}` };
       }
     }
     return { success: true };

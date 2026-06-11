@@ -1,24 +1,29 @@
 // @ts-nocheck
 import * as fs from "fs";
-import * as path from "path";
 import * as net from "net";
+import * as path from "path";
+
 import { probeFlociHealth, resolveFlociEndpoint } from "../orchestration/floci-client.js";
-import { loadGhostStackConfig, GhostStackConfig } from "./ghoststack-config.js";
-import { runDockerCompose } from "./docker-compose-runner.js";
-import { createGhostStackServer, GhostStackServer } from "./ghoststack-server.js";
-import { McpServerHost } from "./adapters/mcp-server-host.js";
 import type { RuntimeGraph } from "../orchestration/runtime-graph.js";
 
-export type FederationServiceStatus = {
+import { McpServerHost } from "./adapters/mcp-server-host.js";
+import { runDockerCompose } from "./docker-compose-runner.js";
+import type { GhostStackConfig } from "./ghoststack-config.js";
+import { loadGhostStackConfig } from "./ghoststack-config.js";
+import type { GhostStackServer } from "./ghoststack-server.js";
+import { createGhostStackServer } from "./ghoststack-server.js";
+
+
+export interface FederationServiceStatus {
   name: string;
   status: "healthy" | "degraded" | "offline" | "skipped";
   detail?: string;
   latencyMs?: number;
   pid?: number;
   port?: number;
-};
+}
 
-export type FederationSupervisorStatus = {
+export interface FederationSupervisorStatus {
   mode: "federation" | "standalone";
   status: "running" | "stopped" | "degraded";
   startedAt?: string;
@@ -28,9 +33,9 @@ export type FederationSupervisorStatus = {
   flociUrl?: string;
   weStartedFlociDocker?: boolean;
   services: FederationServiceStatus[];
-};
+}
 
-type PersistedState = {
+interface PersistedState {
   startedAt: string;
   weStartedFlociDocker: boolean;
   composeFiles: string[];
@@ -38,7 +43,7 @@ type PersistedState = {
   mcpPort: number;
   apiPid?: number;
   mcpPid?: number;
-};
+}
 
 const COMPOSE_FEDERATION = ["docker/docker-compose.federation.yaml"];
 
@@ -93,7 +98,7 @@ export class FederationSupervisor {
   private startedAt: string | null = null;
   private runtimeGraph: RuntimeGraph | null = null;
   /** Signal handler references for cleanup on stop() — prevents handler accumulation on repeated start() calls */
-  private signalHandlers: Array<{ signal: string; handler: () => void }> = [];
+  private signalHandlers: { signal: string; handler: () => void }[] = [];
 
   constructor(repoRoot: string, config?: GhostStackConfig) {
     this.repoRoot = repoRoot;

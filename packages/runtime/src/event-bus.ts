@@ -1,6 +1,6 @@
 import type { IEventStore } from "./interfaces/event-store.interface.js";
 export type { IEventStore };
-import { ILogger } from "./interfaces/logger.interface.js";
+import type { ILogger } from "./interfaces/logger.interface.js";
 
 export interface EventSubscription {
   unsubscribe(): void;

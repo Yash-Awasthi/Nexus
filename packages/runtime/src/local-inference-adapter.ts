@@ -11,15 +11,16 @@
  * Requires the local-inference Python bridge to be running (port 7703).
  */
 
-import {
+import { getBridgeManager, BridgeManager } from "../runtime/bridge-manager.js";
+
+import type { IExecutionContext } from "./interfaces/execution.interface.js";
+import type {
   ILanguageModel,
   TextChunk,
   GenerateTextParams,
   StreamTextParams,
   GenerateObjectParams
 } from "./interfaces/language-model.interface.js";
-import { IExecutionContext } from "./interfaces/execution.interface.js";
-import { getBridgeManager, BridgeManager } from "../runtime/bridge-manager.js";
 
 // ─── Default model — small, fast, runs on 4GB VRAM ───────────────────────────
 const DEFAULT_MODEL = "meta-llama/Llama-3.2-3B-Instruct";
@@ -48,7 +49,7 @@ export class LocalInferenceAdapter {
     const payload = task?.payload ?? task ?? {};
     const prompt: string = payload.prompt ?? payload.query ?? payload.input ?? "";
     const model: string = payload.model ?? this.opts.model ?? DEFAULT_MODEL;
-    const messages: Array<{ role: string; content: string }> = Array.isArray(payload.messages)
+    const messages: { role: string; content: string }[] = Array.isArray(payload.messages)
       ? payload.messages
       : [];
 

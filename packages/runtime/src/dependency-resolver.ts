@@ -1,5 +1,5 @@
-import { ITaskDependencyResolver } from "./interfaces/execution.interface.js";
-import { Task } from "./task-router.js";
+import type { ITaskDependencyResolver } from "./interfaces/execution.interface.js";
+import type { Task } from "./task-router.js";
 
 export class TaskDependencyResolver implements ITaskDependencyResolver {
   detectCycles(tasks: Task[]): boolean {

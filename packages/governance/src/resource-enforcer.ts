@@ -10,9 +10,9 @@
  * Integrates with existing FilesystemSandbox, path-boundary, and security-utils.
  */
 
-import { isSafeUrl } from "./security-utils.js";
-import { assertPathDescendsFrom } from "./path-boundary.js";
 import type { IExecutionEnvironment } from "./interfaces/environment.interface.js";
+import { assertPathDescendsFrom } from "./path-boundary.js";
+import { isSafeUrl } from "./security-utils.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -26,44 +26,44 @@ export type ResourceCapability =
   | "browser:interact"     // Browser automation
   | "execution:compute";   // CPU-bound computation
 
-export type NetworkEgressRule = {
+export interface NetworkEgressRule {
   allowedHosts: string[];           // e.g. ["api.example.com"]
   allowedPorts: number[];           // e.g. [443]
   allowedProtocols: ("http" | "https" | "ws" | "wss")[];
   blockPrivateRanges: boolean;      // Block 10.x, 192.168.x, 172.16-31.x
   blockLoopback: boolean;           // Block localhost, 127.0.0.1
-};
+}
 
-export type ProcessSpawnRule = {
+export interface ProcessSpawnRule {
   maxProcesses: number;             // Max concurrent child processes (0 = disallow)
   allowedBinaries: string[];        // e.g. ["node", "python3", "ffmpeg"]
   allowedEnvpPrefixes: string[];    // Environment var prefixes to pass to children
   sandboxCwd: boolean;              // Force cwd inside sandbox root
-};
+}
 
-export type EnvAccessRule = {
+export interface EnvAccessRule {
   mode: "allowlist" | "blocklist";
   entries: string[];                 // e.g. ["PATH", "HOME", "NODE_ENV"]
-};
+}
 
-export type ExecutionTimeBudget = {
+export interface ExecutionTimeBudget {
   maxWallClockMs: number;            // Max wall-clock per execution scope
   maxCpuMs: number;                  // Max CPU time per execution scope (best-effort)
-};
+}
 
-export type ResourceEnforcerConfig = {
+export interface ResourceEnforcerConfig {
   networkEgress?: NetworkEgressRule;
   processSpawn?: ProcessSpawnRule;
   envAccess?: EnvAccessRule;
   timeBudget?: ExecutionTimeBudget;
-};
+}
 
-export type ResourceViolation = {
+export interface ResourceViolation {
   type: "network_egress" | "process_spawn" | "env_access" | "time_budget";
   detail: string;
   severity: "warn" | "critical";
   blocked: boolean;                  // true = operation prevented, false = just logged
-};
+}
 
 // ── Defaults ─────────────────────────────────────────────────────────
 

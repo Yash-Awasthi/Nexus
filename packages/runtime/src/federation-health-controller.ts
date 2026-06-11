@@ -17,41 +17,43 @@
 import * as fs from "fs";
 import * as net from "net";
 import * as path from "path";
-import { resolveFlociEndpoint, probeFlociHealth } from "./floci-client.js";
+
 import type { FederationSupervisor, FederationServiceStatus } from "../runtime/federation-supervisor.js";
+
+import { resolveFlociEndpoint, probeFlociHealth } from "./floci-client.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
 export type EscalationLevel = "healthy" | "degraded" | "restarting" | "offline";
 
-export type FederationEscalationRecord = {
+export interface FederationEscalationRecord {
   serviceName: string;
   currentLevel: EscalationLevel;
   lastTransition: string; // ISO timestamp
   transitions: number;
-  history: Array<{ from: EscalationLevel; to: EscalationLevel; at: string; reason: string }>;
-};
+  history: { from: EscalationLevel; to: EscalationLevel; at: string; reason: string }[];
+}
 
-export type ReconciliationReport = {
+export interface ReconciliationReport {
   timestamp: string;
-  issues: Array<{
+  issues: {
     type: "service_mismatch" | "port_conflict" | "pid_gone" | "docker_missing";
     detail: string;
     severity: "warn" | "critical";
     suggestedAction: string;
-  }>;
+  }[];
   servicesReconciled: number;
-};
+}
 
-export type OrphanCleanupReport = {
+export interface OrphanCleanupReport {
   timestamp: string;
   staleStateFilesRemoved: string[];
   zombiePidsKilled: number[];
   orphanDockerContainers: string[];
   totalBytesFreed: number;
-};
+}
 
-export type FederationHealthControllerOptions = {
+export interface FederationHealthControllerOptions {
   /** MS before marking a missing service as degraded. Default: 10_000 */
   degradedAfterMs?: number;
   /** MS before escalating from degraded → restarting. Default: 30_000 */
@@ -68,7 +70,7 @@ export type FederationHealthControllerOptions = {
   autoCleanupOnStart?: boolean;
   /** Whether to enable background reconciliation loop. Default: true */
   enableBackgroundReconciliation?: boolean;
-};
+}
 
 const DEFAULT_OPTIONS: Required<FederationHealthControllerOptions> = {
   degradedAfterMs: 10_000,
@@ -388,7 +390,7 @@ export class FederationHealthController {
       });
       server.once("listening", () => {
         // Successfully bound — port is available, so not in use
-        server.close(() => resolve(false));
+        server.close(() => { resolve(false); });
       });
       server.listen(port, "127.0.0.1");
     });

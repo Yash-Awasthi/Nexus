@@ -1,5 +1,5 @@
-import { URL } from "url";
 import * as path from "path";
+import { URL } from "url";
 
 /**
  * Checks if a URL is safe to load, preventing path traversal, loopback access,

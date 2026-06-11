@@ -118,7 +118,7 @@ export function defineAdapter<TInput = unknown, TOutput = unknown>(
     },
 
     execute(task: unknown, context: IExecutionContext): Promise<unknown> {
-      return definition.execute(task as TInput, context) as Promise<unknown>;
+      return definition.execute(task as TInput, context);
     },
   };
 }

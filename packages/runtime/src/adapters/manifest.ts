@@ -9,14 +9,14 @@ export type AdapterIntegrationMode =
   | "optional"
   | "reference"; // vendored copy only, no GhostStack wiring yet
 
-export type AdapterManifestEntry = {
+export interface AdapterManifestEntry {
   id: string;
   path: string;
   mode: AdapterIntegrationMode;
   defaultPort?: number;
   healthPath?: string;
   description: string;
-};
+}
 
 export const ADAPTER_MANIFEST: AdapterManifestEntry[] = [
   {

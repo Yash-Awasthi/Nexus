@@ -18,6 +18,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+
 import type { IEventBus } from "./event-bus.js";
 import type { ITraceRecorder } from "./interfaces/observability.interface.js";
 
@@ -175,7 +176,7 @@ export class CouncilBridge {
           timeoutMs,
         }),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`Council deliberation timed out after ${timeoutMs}ms`)), timeoutMs),
+          setTimeout(() => { reject(new Error(`Council deliberation timed out after ${timeoutMs}ms`)); }, timeoutMs),
         ),
       ]);
 

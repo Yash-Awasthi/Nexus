@@ -1,22 +1,22 @@
 // @ts-nocheck
-import { IRuntimeManager } from "../orchestration/runtime-manager.js";
-import { IEventBus } from "../orchestration/event-bus.js";
-import { TaskRouter, Task } from "../orchestration/task-router.js";
-import { IAgentRegistry } from "../orchestration/agent-registry.js";
-import { IEventStore } from "../orchestration/interfaces/persistence.interface.js";
-import { ILogger } from "../orchestration/interfaces/logger.interface.js";
+import type { IAgentRegistry } from "../orchestration/agent-registry.js";
 import { TaskDependencyResolver } from "../orchestration/dependency-resolver.js";
-import { ITaskDependencyResolver } from "../orchestration/interfaces/execution.interface.js";
-import { MemoryQueueBackend } from "../orchestration/queue-backend.js";
-import { IQueueBackend } from "../orchestration/interfaces/queue.interface.js";
-import { TaskExecutor } from "../orchestration/task-executor.js";
-import { buildQueuePayloadFromTask } from "../orchestration/task-payload.js";
-import { IMetricsCollector, ITraceRecorder } from "../orchestration/interfaces/observability.interface.js";
-import {
+import type { IEventBus } from "../orchestration/event-bus.js";
+import type { ITaskDependencyResolver } from "../orchestration/interfaces/execution.interface.js";
+import type {
   IPlanningEngine,
   IGovernanceEngine,
   IApprovalWorkflow
 } from "../orchestration/interfaces/governance.interface.js";
+import type { ILogger } from "../orchestration/interfaces/logger.interface.js";
+import type { IMetricsCollector, ITraceRecorder } from "../orchestration/interfaces/observability.interface.js";
+import type { IEventStore } from "../orchestration/interfaces/persistence.interface.js";
+import type { IQueueBackend } from "../orchestration/interfaces/queue.interface.js";
+import { MemoryQueueBackend } from "../orchestration/queue-backend.js";
+import type { IRuntimeManager } from "../orchestration/runtime-manager.js";
+import type { TaskExecutor } from "../orchestration/task-executor.js";
+import { buildQueuePayloadFromTask } from "../orchestration/task-payload.js";
+import type { TaskRouter, Task } from "../orchestration/task-router.js";
 
 export class GhostStackOrchestrator {
   private runtimeManager: IRuntimeManager;

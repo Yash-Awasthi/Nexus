@@ -6,9 +6,9 @@
  * allowing recovery via health probes.
  */
 
-import { IEventBus } from "./event-bus.js";
-import { ILogger } from "./interfaces/logger.interface.js";
-import { IMetricsCollector } from "./interfaces/observability.interface.js";
+import type { IEventBus } from "./event-bus.js";
+import type { ILogger } from "./interfaces/logger.interface.js";
+import type { IMetricsCollector } from "./interfaces/observability.interface.js";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -275,7 +275,7 @@ export class CircuitBreakerAdapterWrapper {
     // If adapter has executeAction, wrap that too
     if ((adapter as any).executeAction) {
       const originalExecuteAction = (adapter as any).executeAction.bind(adapter);
-      (wrapped as any).executeAction = async (action: string, payload: Record<string, unknown>, context: any) => {
+      (wrapped).executeAction = async (action: string, payload: Record<string, unknown>, context: any) => {
         return this.breaker.execute(() => originalExecuteAction(action, payload, context));
       };
     }

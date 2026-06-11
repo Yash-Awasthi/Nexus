@@ -14,7 +14,7 @@ export async function requireAuth(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
-  const expected = process.env["NEXUS_API_KEY"];
+  const expected = process.env.NEXUS_API_KEY;
   if (!expected) return; // auth disabled in dev
 
   const authHeader = request.headers.authorization ?? "";

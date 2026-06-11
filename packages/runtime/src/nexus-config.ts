@@ -1,8 +1,9 @@
 import * as fs from "fs";
 import * as path from "path";
+
 import { loadEnvFile } from "./env-loader.js";
 
-export type GhostStackConfig = {
+export interface GhostStackConfig {
   apiPort: number;
   flociUrl: string;
   mcpPort: number;
@@ -14,7 +15,7 @@ export type GhostStackConfig = {
     mcpBridge: boolean;
     mcpExternal: boolean;
   };
-};
+}
 
 const DEFAULTS: GhostStackConfig = {
   apiPort: 3000,
@@ -80,7 +81,7 @@ function validateConfig(config: GhostStackConfig): void {
     console.error("\n=======================================================");
     console.error("  GHOSTSTACK CONFIGURATION VALIDATION FAILED");
     console.error("=======================================================");
-    errors.forEach((err) => console.error(err));
+    errors.forEach((err) => { console.error(err); });
     console.error("=======================================================\n");
     throw new Error("Configuration validation failed. Check printed logs above.");
   }
@@ -135,8 +136,8 @@ export function loadGhostStackConfig(repoRoot: string): GhostStackConfig {
   if (cliArgs["floci-strict"] !== undefined) {
     merged.features.flociStrict = cliArgs["floci-strict"] === "true";
   }
-  if (cliArgs["offline"] !== undefined) {
-    merged.features.offlineMode = cliArgs["offline"] === "true";
+  if (cliArgs.offline !== undefined) {
+    merged.features.offlineMode = cliArgs.offline === "true";
   }
   if (cliArgs["mcp-bridge"] !== undefined) {
     merged.features.mcpBridge = cliArgs["mcp-bridge"] === "true";

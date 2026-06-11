@@ -11,9 +11,11 @@
  */
 
 import { randomUUID } from "crypto";
+
 import type { CouncilRequest, CouncilResponse, ProposalResult, ModelVote } from "@nexus/contracts";
 import { BudgetExceededError } from "@nexus/shared";
-import { summonArchetypes, type Archetype, type TaskCategory } from "./archetypes.js";
+
+import { summonArchetypes, type TaskCategory } from "./archetypes.js";
 
 // ── LLM transport interface ───────────────────────────────────────────────────
 
@@ -55,17 +57,17 @@ const NO_PATTERNS = /\b(no|reject|oppose|disagree|against|decline)\b/i;
 
 function parseVote(content: string): "yes" | "no" | "abstain" {
   const lower = content.toLowerCase();
-  const yesScore = (lower.match(YES_PATTERNS) ?? []).length;
-  const noScore = (lower.match(NO_PATTERNS) ?? []).length;
+  const yesScore = ((YES_PATTERNS.exec(lower)) ?? []).length;
+  const noScore = ((NO_PATTERNS.exec(lower)) ?? []).length;
   if (yesScore === 0 && noScore === 0) return "abstain";
   return yesScore >= noScore ? "yes" : "no";
 }
 
 function parseConfidence(content: string): number {
   // Look for explicit confidence statements: "confidence: 0.8", "80% confident", etc.
-  const pct = content.match(/(\d{1,3})\s*%\s*confident/i);
+  const pct = /(\d{1,3})\s*%\s*confident/i.exec(content);
   if (pct?.[1]) return Math.min(1, parseInt(pct[1], 10) / 100);
-  const dec = content.match(/confidence[:\s]+([0-9.]+)/i);
+  const dec = /confidence[:\s]+([0-9.]+)/i.exec(content);
   if (dec?.[1]) {
     const v = parseFloat(dec[1]);
     return v > 1 ? v / 100 : v;
@@ -125,7 +127,7 @@ export class DeliberationEngine {
             { model: this.config.defaultModel, temperature: 0.7, maxTokens: 512 },
           ).then((r) => { clearTimeout(voteTimer); return r; }),
           new Promise<never>((_, reject) => {
-            voteTimer = setTimeout(() => reject(new Error("Vote timeout")), timeoutMs);
+            voteTimer = setTimeout(() => { reject(new Error("Vote timeout")); }, timeoutMs);
           }),
         ]);
 

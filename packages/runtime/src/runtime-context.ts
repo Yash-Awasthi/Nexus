@@ -1,30 +1,9 @@
 // @ts-nocheck
+/* eslint-disable import/order, import/no-duplicates */
 import * as path from "path";
-import { loadEnvFromRoot } from "./env-loader.js";
-import { GhostStackOrchestrator } from "./orchestrator.js";
-import { RuntimeManager } from "../orchestration/runtime-manager.js";
-import { YAMLConfigLoader } from "./config-loader.js";
-import { LocalEventBus } from "../orchestration/event-bus.js";
-import { TaskRouter } from "../orchestration/task-router.js";
-import { LocalAgentRegistry } from "../orchestration/agent-registry.js";
-import {
-  FileEventStore,
-  FileRuntimePersistence,
-  backupRuntimePersistence
-} from "../orchestration/persistence-manager.js";
-import { StructuredLogger } from "../orchestration/logger.js";
-import { FileQueueBackend } from "../orchestration/file-queue-backend.js";
-import { IQueueBackend } from "../orchestration/interfaces/queue.interface.js";
-import { TaskExecutor } from "../orchestration/task-executor.js";
-import { MetricsCollector, TraceRecorder, DiagnosticEnricher } from "../orchestration/observability-manager.js";
-import { MemoryStore, TraceIndexer } from "../orchestration/memory-store.js";
+
 import { AgentBus, TaskDelegationAgent } from "../orchestration/agent-bus.js";
-import { CircuitBreaker, HealthAwareCircuitBreaker, CircuitBreakerAdapterWrapper } from "../orchestration/circuit-breaker.js";
-import { RuntimeCompactor, LeakDetector, ResourceQuotaManager } from "../orchestration/runtime-compactor.js";
-import { EXTENDED_FLOCI_ACTIONS } from "../orchestration/floci-extended.js";
-import { resolveFlociEndpoint } from "../orchestration/floci-client.js";
-import { GHOSTSTACK_MCP_TOOLS } from "../orchestration/ghoststack-mcp-bridge.js";
-import { LocalServiceDiscovery, HealthMonitor } from "../orchestration/service-discovery.js";
+import { LocalAgentRegistry } from "../orchestration/agent-registry.js";
 import { ApprovalWorkflow } from "../orchestration/approval-workflow.js";
 import { PlanningEngine } from "../orchestration/planning-engine.js";
 import { GovernanceEngine } from "../orchestration/governance-engine.js";
@@ -38,12 +17,38 @@ import {
   TaskGraphLimitGuardrail
 } from "../orchestration/governance-engine.js";
 import { BrowserExecutionAdapter } from "../orchestration/browser-adapter.js";
-import { ScrapingExecutionAdapter } from "../orchestration/scraping-adapter.js";
-import { FlociExecutionAdapter } from "../orchestration/floci-adapter.js";
+import { HealthAwareCircuitBreaker, CircuitBreakerAdapterWrapper } from "../orchestration/circuit-breaker.js";
+import type { CircuitBreaker} from "../orchestration/circuit-breaker.js";
 import { WebSearchAdapter } from "../orchestration/web-search-adapter.js";
 import { CodeAgentPool } from "../orchestration/code-agent-pool.js";
 import { LocalInferenceAdapter } from "../orchestration/local-inference-adapter.js";
 import { EnvironmentTelemetry } from "../orchestration/environment-telemetry.js";
+import { LocalEventBus } from "../orchestration/event-bus.js";
+import { FileQueueBackend } from "../orchestration/file-queue-backend.js";
+import { FlociExecutionAdapter } from "../orchestration/floci-adapter.js";
+import { resolveFlociEndpoint } from "../orchestration/floci-client.js";
+import { EXTENDED_FLOCI_ACTIONS } from "../orchestration/floci-extended.js";
+import { GHOSTSTACK_MCP_TOOLS } from "../orchestration/ghoststack-mcp-bridge.js";
+import type { IQueueBackend } from "../orchestration/interfaces/queue.interface.js";
+import { StructuredLogger } from "../orchestration/logger.js";
+import { MemoryStore, TraceIndexer } from "../orchestration/memory-store.js";
+import { MetricsCollector, TraceRecorder, DiagnosticEnricher } from "../orchestration/observability-manager.js";
+import {
+  FileEventStore,
+  FileRuntimePersistence,
+  backupRuntimePersistence
+} from "../orchestration/persistence-manager.js";
+import { RuntimeCompactor, LeakDetector, ResourceQuotaManager } from "../orchestration/runtime-compactor.js";
+import { RuntimeGraph } from "../orchestration/runtime-graph.js";
+import { RuntimeInspector } from "../orchestration/runtime-inspector.js";
+import { RuntimeManager } from "../orchestration/runtime-manager.js";
+import type { RuntimeSandboxLayout } from "../orchestration/runtime-sandbox.js";
+import { createRuntimeSandbox } from "../orchestration/runtime-sandbox.js";
+import { ScrapingExecutionAdapter } from "../orchestration/scraping-adapter.js";
+import { LocalServiceDiscovery, HealthMonitor } from "../orchestration/service-discovery.js";
+import { loadWorkflowSpecsFromDir, specToWorkflowDefinition } from "../orchestration/spec-loader.js";
+import { TaskExecutor } from "../orchestration/task-executor.js";
+import { TaskRouter } from "../orchestration/task-router.js";
 import {
   WorkflowRegistry,
   WorkflowTelemetry,
@@ -54,12 +59,12 @@ import {
   SpecToExecutionTemplate,
   GovernedEtlWorkflowTemplate
 } from "../orchestration/workflow-engine.js";
-import { RuntimeInspector } from "../orchestration/runtime-inspector.js";
-import { RuntimeGraph } from "../orchestration/runtime-graph.js";
-import { loadWorkflowSpecsFromDir, specToWorkflowDefinition } from "../orchestration/spec-loader.js";
-import { createRuntimeSandbox, RuntimeSandboxLayout } from "../orchestration/runtime-sandbox.js";
 
-export type GhostStackRuntimeContext = {
+import { YAMLConfigLoader } from "./config-loader.js";
+import { loadEnvFromRoot } from "./env-loader.js";
+import { GhostStackOrchestrator } from "./orchestrator.js";
+
+export interface GhostStackRuntimeContext {
   repoRoot: string;
   sandbox: RuntimeSandboxLayout;
   runtimeDbDir: string;
@@ -98,8 +103,8 @@ export type GhostStackRuntimeContext = {
   planningEngine: PlanningEngine;
   governanceEngine: GovernanceEngine;
   /** Cleanup functions for event bus subscriptions and other resources */
-  cleanup: Array<() => void>;
-};
+  cleanup: (() => void)[];
+}
 
 export async function createRuntimeContext(repoRoot: string): Promise<GhostStackRuntimeContext> {
   // Load .env file before anything reads process.env — existing vars always win.
@@ -203,7 +208,7 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
   // ------------------------------------------------------------------
   const traceIndexer = new TraceIndexer(eventStore, memoryStore);
   // Subscribe to event bus to auto-index events as memory entries
-  const cleanupFns: Array<() => void> = [];
+  const cleanupFns: (() => void)[] = [];
   const wildcardSub = eventBus.subscribe("*", async (_payload: any) => {
     // Fire-and-forget index; never block event processing
     traceIndexer.indexRecentEvents().catch(() => {});
@@ -376,7 +381,7 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
       const wfMeta = wf.metadata;
       if (!wfMeta) continue;
       const triggerConfig = wfMeta.s3Triggers as
-        | Array<{ bucket: string; prefix?: string }>
+        | { bucket: string; prefix?: string }[]
         | undefined;
       if (!triggerConfig) continue;
 

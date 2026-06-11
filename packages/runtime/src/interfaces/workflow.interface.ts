@@ -1,4 +1,4 @@
-import { Task } from "../task-router.js";
+import type { Task } from "../task-router.js";
 
 export interface IWorkflowConstraint {
   name: string;

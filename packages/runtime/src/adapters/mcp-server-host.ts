@@ -1,13 +1,14 @@
-import { spawn, ChildProcess } from "child_process";
-import * as path from "path";
+import type { ChildProcess } from "child_process";
+import { spawn } from "child_process";
 import * as fs from "fs";
+import * as path from "path";
 
-export type McpServerHostOptions = {
+export interface McpServerHostOptions {
   repoRoot: string;
   apiUrl?: string;
   mcpPort?: number;
   pythonCommand?: string;
-};
+}
 
 /**
  * Manages the optional external MCP Python server (composite federation MCP).

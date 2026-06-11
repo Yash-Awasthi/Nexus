@@ -24,12 +24,12 @@ export interface ClassificationResult {
   tags: string[];
 }
 
-export type ClassifierRule = {
+export interface ClassifierRule {
   name: string;
   /** Return true when this rule applies */
   matches: (input: ClassificationInput) => boolean;
   classify: (input: ClassificationInput) => ClassificationResult;
-};
+}
 
 // ── Built-in rules ────────────────────────────────────────────────────────────
 
@@ -41,7 +41,7 @@ const BUILT_IN_RULES: ClassifierRule[] = [
     classify: (i) => ({
       signalType: "code.review-required",
       priority: i.eventType === "pr.review_requested" ? "high" : "medium",
-      summary: `GitHub PR event: ${i.eventType} — ${String((i.payload as Record<string, unknown>)["title"] ?? "untitled")}`,
+      summary: `GitHub PR event: ${i.eventType} — ${String((i.payload).title ?? "untitled")}`,
       tags: ["github", "pull-request"],
     }),
   },
@@ -63,7 +63,7 @@ const BUILT_IN_RULES: ClassifierRule[] = [
     name: "gmail.action-required",
     matches: (i) => {
       if (i.source !== "gmail") return false;
-      const subject = String((i.payload as Record<string, unknown>)["subject"] ?? "").toLowerCase();
+      const subject = String((i.payload).subject ?? "").toLowerCase();
       return (
         subject.includes("action required") ||
         subject.includes("urgent") ||
@@ -74,7 +74,7 @@ const BUILT_IN_RULES: ClassifierRule[] = [
     classify: (i) => ({
       signalType: "email.action-required",
       priority: "high",
-      summary: `Action-required email: ${String((i.payload as Record<string, unknown>)["subject"] ?? "")}`,
+      summary: `Action-required email: ${String((i.payload).subject ?? "")}`,
       tags: ["gmail", "action-required"],
     }),
   },
@@ -85,7 +85,7 @@ const BUILT_IN_RULES: ClassifierRule[] = [
     classify: (i) => ({
       signalType: "email.received",
       priority: "low",
-      summary: `Email from ${String((i.payload as Record<string, unknown>)["from"] ?? "unknown")}`,
+      summary: `Email from ${String((i.payload).from ?? "unknown")}`,
       tags: ["gmail"],
     }),
   },
@@ -107,7 +107,7 @@ const BUILT_IN_RULES: ClassifierRule[] = [
     classify: (i) => ({
       signalType: "task.assigned",
       priority: "medium",
-      summary: `Linear issue: ${String((i.payload as Record<string, unknown>)["title"] ?? i.eventType)}`,
+      summary: `Linear issue: ${String((i.payload).title ?? i.eventType)}`,
       tags: ["linear", "issue"],
     }),
   },
@@ -118,7 +118,7 @@ const BUILT_IN_RULES: ClassifierRule[] = [
     classify: (i) => ({
       signalType: "data.scraped",
       priority: "low",
-      summary: `Scrape result: ${String((i.payload as Record<string, unknown>)["url"] ?? i.eventType)}`,
+      summary: `Scrape result: ${String((i.payload).url ?? i.eventType)}`,
       tags: ["scrape", "data"],
     }),
   },

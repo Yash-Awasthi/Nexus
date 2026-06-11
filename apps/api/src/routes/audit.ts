@@ -5,10 +5,12 @@
  *   GET /api/v1/audit/log/verify   — verify HMAC chain integrity
  */
 
-import type { FastifyInstance } from "fastify";
 import { db } from "@nexus/db";
 import { auditLog } from "@nexus/db/schema";
-import { desc, gte, lte, and, SQL } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
+import { desc, gte, lte, and } from "drizzle-orm";
+import type { FastifyInstance } from "fastify";
+
 import { requireAuth } from "../middleware/auth.js";
 
 export async function auditRoutes(app: FastifyInstance): Promise<void> {
@@ -50,7 +52,7 @@ export async function auditRoutes(app: FastifyInstance): Promise<void> {
     const { createHash, createHmac } = await import("node:crypto");
     const { asc } = await import("drizzle-orm");
 
-    const auditKey = process.env["NEXUS_AUDIT_KEY"] ?? "nexus-dev-audit-key";
+    const auditKey = process.env.NEXUS_AUDIT_KEY ?? "nexus-dev-audit-key";
     const GENESIS = "NEXUS_AUDIT_CHAIN_GENESIS_V1";
 
     const rows = await db
@@ -78,7 +80,7 @@ export async function auditRoutes(app: FastifyInstance): Promise<void> {
         firstBroken = entry.sequence;
         break;
       }
-      prevChainHash = entry.chainHash as string;
+      prevChainHash = entry.chainHash;
     }
 
     const valid = firstBroken === undefined;

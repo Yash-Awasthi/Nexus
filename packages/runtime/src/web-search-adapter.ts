@@ -6,10 +6,11 @@
  *   { query: string, mode?: "speed"|"balanced"|"quality", history?: ChatMessage[] }
  */
 
-import { IExecutionContext } from "./interfaces/execution.interface.js";
-import { WebSearchEngine, SearchMode } from "./web-search-engine.js";
-import { ILanguageModel, ChatMessage } from "./interfaces/language-model.interface.js";
+import type { IExecutionContext } from "./interfaces/execution.interface.js";
+import type { ILanguageModel, ChatMessage } from "./interfaces/language-model.interface.js";
 import { createLanguageModel } from "./language-model.js";
+import type { SearchMode } from "./web-search-engine.js";
+import { WebSearchEngine } from "./web-search-engine.js";
 
 export class WebSearchAdapter {
   private engine: WebSearchEngine;

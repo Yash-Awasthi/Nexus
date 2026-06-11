@@ -1,8 +1,9 @@
 // @ts-nocheck
-import { IScrapingExecutionAdapter, IScrapingTask, IEnvironmentTelemetry } from "./interfaces/environment.interface.js";
-import { IExecutionContext } from "./interfaces/execution.interface.js";
-import { isSafeUrl } from "./security-utils.js";
 import { getBridgeManager, BridgeManager } from "../runtime/bridge-manager.js";
+
+import type { IScrapingExecutionAdapter, IScrapingTask, IEnvironmentTelemetry } from "./interfaces/environment.interface.js";
+import type { IExecutionContext } from "./interfaces/execution.interface.js";
+import { isSafeUrl } from "./security-utils.js";
 
 export class ScrapingExecutionAdapter implements IScrapingExecutionAdapter {
   constructor(
@@ -115,7 +116,7 @@ export class ScrapingExecutionAdapter implements IScrapingExecutionAdapter {
         data[selector] = result.extracted?.[selector] ?? "";
       }
       if (!task.selectors.length) {
-        data["__text__"] = result.text || result.html?.slice(0, 10_000) || "";
+        data.__text__ = result.text || result.html?.slice(0, 10_000) || "";
       }
 
       return { success: true, data, requestsCount, bytesFetched };

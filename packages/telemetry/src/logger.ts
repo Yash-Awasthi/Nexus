@@ -1,5 +1,6 @@
 import * as fs from "fs";
-import { ILogger } from "./interfaces/logger.interface.js";
+
+import type { ILogger } from "./interfaces/logger.interface.js";
 
 // ─── Log level ordering ────────────────────────────────────────────────────────
 
@@ -102,12 +103,12 @@ export class StructuredLogger implements ILogger {
 // where console noise would pollute output or assertions.
 
 export class NullLogger implements ILogger {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   info(_message: string, _context?: any): void { /* no-op */ }
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   warn(_message: string, _context?: any): void { /* no-op */ }
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   error(_message: string, _error?: any, _context?: any): void { /* no-op */ }
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   debug(_message: string, _context?: any): void { /* no-op */ }
 }

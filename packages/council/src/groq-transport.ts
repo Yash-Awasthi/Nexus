@@ -7,13 +7,14 @@
  */
 
 import Groq from "groq-sdk";
+
 import type { ILLMTransport, ILLMMessage, ILLMResponse } from "./engine.js";
 
 export class GroqTransport implements ILLMTransport {
   private readonly client: Groq;
 
   constructor(apiKey?: string) {
-    const key = apiKey ?? process.env["GROQ_API_KEY"];
+    const key = apiKey ?? process.env.GROQ_API_KEY;
     if (!key) {
       throw new Error(
         "GroqTransport requires GROQ_API_KEY — set it in env or pass apiKey to constructor",
@@ -35,7 +36,7 @@ export class GroqTransport implements ILLMTransport {
 
     const res = await this.client.chat.completions.create({
       model,
-      messages: messages as Array<Groq.Chat.ChatCompletionMessageParam>,
+      messages: messages,
       temperature: options?.temperature ?? 0.7,
       max_tokens: options?.maxTokens ?? 512,
     });

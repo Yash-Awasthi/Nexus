@@ -26,7 +26,8 @@
 
 import { Queue } from "bullmq";
 import type { ConnectionOptions } from "bullmq";
-import { IQueueBackend, QueueJob } from "./interfaces/queue.interface.js";
+
+import type { IQueueBackend, QueueJob } from "./interfaces/queue.interface.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

@@ -1,15 +1,16 @@
 import * as fs from "fs";
 import * as path from "path";
+
 import { assertPathDescendsFrom } from "./path-boundary.js";
 
-export type RuntimeSandboxLayout = {
+export interface RuntimeSandboxLayout {
   root: string;
   dataDir: string;
   workspacesDir: string;
   specsDir: string;
   tempDir: string;
   backupsDir: string;
-};
+}
 
 /**
  * Canonical filesystem layout under the repo root (or configured data root).

@@ -14,8 +14,10 @@
  */
 
 import * as https from "https";
-import { ILanguageModel, ChatMessage } from "./interfaces/language-model.interface.js";
+
 import { getBridgeManager, BridgeManager } from "../runtime/bridge-manager.js";
+
+import type { ILanguageModel, ChatMessage } from "./interfaces/language-model.interface.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -91,7 +93,7 @@ async function tavilySearch(
           (res) => {
             const chunks: Buffer[] = [];
             res.on("data", (c: Buffer) => chunks.push(c));
-            res.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+            res.on("end", () => { resolve(Buffer.concat(chunks).toString("utf8")); });
           }
         );
         req.on("error", reject);

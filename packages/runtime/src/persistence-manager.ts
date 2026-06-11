@@ -1,7 +1,8 @@
-import { IEventStore, IRuntimePersistence } from "./interfaces/persistence.interface.js";
-import { ILogger } from "./interfaces/logger.interface.js";
 import * as fs from "fs";
 import * as path from "path";
+
+import type { ILogger } from "./interfaces/logger.interface.js";
+import type { IEventStore, IRuntimePersistence } from "./interfaces/persistence.interface.js";
 
 /**
  * Append-only JSONL event log with best-effort replay.

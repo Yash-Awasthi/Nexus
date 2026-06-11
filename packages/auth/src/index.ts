@@ -240,11 +240,9 @@ export function authenticate(authHeader: string | undefined, config: AuthConfig)
 
 // ── Fastify adapter ───────────────────────────────────────────────────────────
 
-export interface FastifyAuthHookFn {
-  (request: { headers: { authorization?: string } }, reply: {
+export type FastifyAuthHookFn = (request: { headers: { authorization?: string } }, reply: {
     code: (n: number) => { send: (body: unknown) => Promise<void> };
-  }): Promise<void>;
-}
+  }) => Promise<void>;
 
 /**
  * Returns a Fastify preHandler hook that enforces auth.

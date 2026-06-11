@@ -16,12 +16,12 @@
  * - CompactionScheduler: periodic compaction cycles
  */
 
-import { IEventBus, EventBusStats } from "./event-bus.js";
-import { IRuntimePersistence } from "./interfaces/persistence.interface.js";
-import { IQueueBackend } from "./interfaces/queue.interface.js";
-import { MetricsCollector } from "./observability-manager.js";
-import { RuntimeGraph } from "./runtime-graph.js";
-import { ILogger } from "./interfaces/logger.interface.js";
+import type { IEventBus, EventBusStats } from "./event-bus.js";
+import type { ILogger } from "./interfaces/logger.interface.js";
+import type { IRuntimePersistence } from "./interfaces/persistence.interface.js";
+import type { IQueueBackend } from "./interfaces/queue.interface.js";
+import type { MetricsCollector } from "./observability-manager.js";
+import type { RuntimeGraph } from "./runtime-graph.js";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -116,7 +116,7 @@ const DEFAULT_QUOTAS: ResourceQuota = {
 // ─── Leak Detector ───────────────────────────────────────────────────
 
 export class LeakDetector {
-  private readings: Array<{ timestamp: Date; heapUsedMB: number; activeSubscriptions: number }> = [];
+  private readings: { timestamp: Date; heapUsedMB: number; activeSubscriptions: number }[] = [];
   private readonly MAX_READINGS = 20;
 
   constructor(

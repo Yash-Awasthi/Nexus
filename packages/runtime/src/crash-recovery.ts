@@ -26,10 +26,10 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { IQueueBackend, QueueJob } from "./interfaces/queue.interface.js";
+
 import type { IEventBus } from "./event-bus.js";
-import type { IMetricsCollector } from "./interfaces/observability.interface.js";
-import type { ITraceRecorder } from "./interfaces/observability.interface.js";
+import type { IMetricsCollector , ITraceRecorder } from "./interfaces/observability.interface.js";
+import type { IQueueBackend, QueueJob } from "./interfaces/queue.interface.js";
 
 // ─── Recovery store interface ─────────────────────────────────────────────────
 
@@ -117,7 +117,7 @@ export class CrashRecovery {
     const running = await this.store.getRunningTasks();
 
     let requeued = 0;
-    let failed = 0;
+    const failed = 0;
     let skipped = 0;
     const now = Date.now();
 
@@ -171,7 +171,7 @@ export class CrashRecovery {
       });
     }
 
-    if (span) this.tracer?.endSpan(span.spanId, result as unknown as Record<string, unknown>);
+    if (span) this.tracer?.endSpan(span.spanId, result);
 
     return result;
   }
@@ -225,7 +225,7 @@ export class CrashRecovery {
 // ─── MemoryRecoveryStore — for tests ─────────────────────────────────────────
 
 export class MemoryRecoveryStore implements IRecoveryStore {
-  private tasks: Map<string, TaskRecord> = new Map();
+  private tasks = new Map<string, TaskRecord>();
 
   /** Seed tasks directly for tests */
   seed(task: TaskRecord): void {

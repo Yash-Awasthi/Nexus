@@ -5,10 +5,10 @@
  * capability discovery, and results routing.
  */
 
-import { IEventBus } from "./event-bus.js";
-import { IEventStore } from "./interfaces/persistence.interface.js";
-import { MemoryStore } from "./memory-store.js";
-import { ILogger } from "./interfaces/logger.interface.js";
+import type { IEventBus } from "./event-bus.js";
+import type { ILogger } from "./interfaces/logger.interface.js";
+import type { IEventStore } from "./interfaces/persistence.interface.js";
+import type { MemoryStore } from "./memory-store.js";
 
 // ─── Types ───────────────────────────────────────────────────────────
 

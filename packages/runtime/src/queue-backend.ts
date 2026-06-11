@@ -1,4 +1,4 @@
-import { IQueueBackend, QueueJob } from "./interfaces/queue.interface.js";
+import type { IQueueBackend, QueueJob } from "./interfaces/queue.interface.js";
 
 export class MemoryQueueBackend implements IQueueBackend {
   private activeQueue: QueueJob[] = [];

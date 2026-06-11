@@ -14,8 +14,8 @@
  * - Deepened repair (edge-node ref consistency, duplicate cleanup)
  */
 
-import { IEventBus } from "./event-bus.js";
-import { IRuntimePersistence } from "./interfaces/persistence.interface.js";
+import type { IEventBus } from "./event-bus.js";
+import type { IRuntimePersistence } from "./interfaces/persistence.interface.js";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -447,14 +447,14 @@ export class RuntimeGraph {
    * mutation queue execution, ensuring atomicity.
    */
   async bulkAddNodes(
-    nodes: Array<{
+    nodes: {
       id: string;
       type: ResourceType;
       name: string;
       status?: ResourceStatus;
       metadata?: Record<string, unknown>;
       dependencies?: string[];
-    }>
+    }[]
   ): Promise<ResourceNode[]> {
     return this.enqueue(async () => {
       await this.ensureLoaded();
@@ -752,7 +752,7 @@ export class RuntimeGraph {
     // Walk backwards to find the most recent valid checkpoint
     for (let i = this.checkpoints.length - 1; i >= 0; i--) {
       const cp = this.checkpoints[i];
-      if (cp && cp.report.valid) {
+      if (cp?.report.valid) {
         await this.restoreSnapshot(cp.snapshot);
         return cp;
       }

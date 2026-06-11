@@ -1,9 +1,9 @@
-import { ITaskExecutor, IExecutionAdapter, IExecutionContext } from "./interfaces/execution.interface.js";
-import { IQueueBackend } from "./interfaces/queue.interface.js";
-import { IEventBus } from "./event-bus.js";
-import { IRuntimePersistence } from "./interfaces/persistence.interface.js";
-import { ILogger } from "./interfaces/logger.interface.js";
-import { IMetricsCollector, ITraceRecorder } from "./interfaces/observability.interface.js";
+import type { IEventBus } from "./event-bus.js";
+import type { ITaskExecutor, IExecutionAdapter, IExecutionContext } from "./interfaces/execution.interface.js";
+import type { ILogger } from "./interfaces/logger.interface.js";
+import type { IMetricsCollector, ITraceRecorder } from "./interfaces/observability.interface.js";
+import type { IRuntimePersistence } from "./interfaces/persistence.interface.js";
+import type { IQueueBackend } from "./interfaces/queue.interface.js";
 
 export class TaskExecutor implements ITaskExecutor {
   private queue: IQueueBackend;
@@ -80,7 +80,7 @@ export class TaskExecutor implements ITaskExecutor {
 
       this.metrics?.recordTiming("task.latency", durationMs);
       if (taskType === "floci" && result && typeof result === "object") {
-        const r = result as Record<string, unknown>;
+        const r = result;
         if (typeof r.flociRequestMs === "number") {
           this.metrics?.recordTiming("floci.request_ms", r.flociRequestMs);
         }

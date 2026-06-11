@@ -1,13 +1,13 @@
-import { IExecutionAdapter } from "./execution.interface.js";
+import type { IExecutionAdapter } from "./execution.interface.js";
 
 export interface IBrowserTask {
   id: string;
   url: string;
-  actions: Array<{
+  actions: {
     type: "navigate" | "click" | "type" | "screenshot";
     selector?: string;
     value?: string;
-  }>;
+  }[];
   timeoutMs: number;
 }
 
@@ -42,7 +42,7 @@ export interface IFilesystemSandbox {
   writeFile(filePath: string, content: string): Promise<void>;
   readFile(filePath: string): Promise<string>;
   deleteFile(filePath: string): Promise<void>;
-  getWriteLog(): Array<{ timestamp: Date; file: string; bytes: number }>;
+  getWriteLog(): { timestamp: Date; file: string; bytes: number }[];
   cleanup(): Promise<void>;
 }
 
