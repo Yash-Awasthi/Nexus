@@ -1,0 +1,41 @@
+path,decision,destination,rationale,loc_estimate
+src/agents/orchestrator.ts,MOVE,packages/council/src/orchestrator.ts,Core council deliberation logic — the heart of @nexus/council; replaces council/engine.ts stub,~500
+src/agents/messageBus.ts,MOVE,packages/council/src/message-bus.ts,Intra-council message routing; complements DeliberationEngine,~150
+src/agents/sharedMemory.ts,MOVE,packages/council/src/shared-memory.ts,Fact storage and retrieval during deliberation,~200
+src/agents/conflictDetector.ts,MOVE,packages/council/src/conflict-detector.ts,Contradiction detection during peer review,~100
+src/config/archetypes.ts,MOVE,packages/council/src/archetypes.ts,Already ported in M7 pass — merge with existing port,~300
+src/db/schema/council.ts,MOVE,packages/db/src/schemas/council.ts,Council DB schemas (CustomProvider/SharedFact/CustomPersona/PromptDNA/ContradictionRecord),~200
+src/db/schema/agentMemories.ts,MOVE,packages/db/src/schemas/agent-memories.ts,Agent memory persistence,~50
+src/db/schema/agentActionLogs.ts,MOVE,packages/db/src/schemas/agent-action-logs.ts,Governance audit log,~40
+src/db/schema/conversations.ts,MOVE,packages/db/src/schemas/conversations.ts,Core conversation entity,~80
+src/db/schema/users.ts,MOVE,packages/db/src/schemas/users.ts,Auth entity,~60
+src/db/schema/projects.ts,MOVE,packages/db/src/schemas/projects.ts,Project entity,~80
+src/db/schema/semanticCache.ts,MOVE,packages/db/src/schemas/semantic-cache.ts,Vector cache for embedding deduplication,~40
+src/db/schema/index.ts,MOVE,packages/db/src/schemas/index.ts,Schema barrel export,~20
+src/lib/crypto.ts,MOVE,packages/auth/src/crypto.ts,AES-256-GCM encryption helpers,~50
+src/lib/audit.ts,MOVE,packages/governance/src/audit-log.ts,HMAC-chained audit trail (ADR-0010),~100
+src/lib/agentMemory.ts,MOVE,packages/memory/src/agent-memory.ts,Per-agent memory persistence,~150
+src/lib/agentProfiles.ts,MOVE,packages/council/src/agent-profiles.ts,Agent personality management,~100
+src/services/reliability.service.ts,MOVE,packages/council/src/reliability.ts,Track per-model reliability scores,~150
+src/services/vectorStore.service.ts,MOVE,packages/memory/src/vector-store.ts,pgvector embedding store,~200
+src/router/index.ts,MOVE,packages/council/src/router.ts,LLM request routing (load-balance across providers),~150
+src/adapters/gemini.adapter.ts,DELETE,,Replaced by @nexus/adapter-groq + Gemini can be added later; not in 14 adapter list,~100
+src/adapters/openrouter.adapter.ts,MOVE,packages/adapters/groq/src/openrouter.ts,OpenRouter multi-model routing — extend groq adapter or create nexus/adapter-openrouter,~100
+desktop/,DELETE,,Tauri desktop wrapper — ADR-0001 kills all non-web surfaces,~6 files
+electron/,DELETE,,Electron wrapper — ADR-0001; no desktop surface in NEXUS v1,~7 files
+extensions/chrome/,DELETE,,Chrome extension — standalone product; not part of NEXUS platform,~18 files
+landingpage/,DELETE,,Marketing copy; not part of application runtime,~1 file
+frontend/app/routes/blog.tsx,DELETE,,Marketing route — no place in platform app,~50
+frontend/app/routes/careers.tsx,DELETE,,Marketing route,~50
+frontend/app/routes/about.tsx,DELETE,,Marketing route,~30
+frontend/app/routes/landing.tsx,DELETE,,Marketing route; handled externally,~100
+frontend/app/routes/pricing.tsx,DELETE,,Marketing route,~60
+grafana/,MOVE,apps/worker/grafana/,Grafana dashboards — belong to observability layer (M11); keep in monorepo worker app,~5 files
+helm/,MOVE,apps/api/helm/,Helm charts for api service deployment; move to apps/api infra,~15 files
+k8s/,MOVE,apps/api/k8s/,K8s raw manifests for api service,~10 files
+src/services/council.service.ts,MOVE,packages/council/src/council-service.ts,Multi-model API orchestration service — this IS @nexus/council,~300
+src/services/debate*.ts,MOVE,packages/council/src/debate-pipeline.ts,Debate orchestration pipeline,~200
+src/middleware/,MOVE,apps/api/src/middleware/,HTTP middleware (auth/rate-limit/cors) — belongs in api app layer,~multiple
+src/routes/council.ts,MOVE,apps/api/src/routes/council.ts,Council HTTP routes,~100
+src/routes/conversations.ts,MOVE,apps/api/src/routes/conversations.ts,Conversation HTTP routes,~200
+src/db/migrations/,MOVE,packages/db/migrations/,SQL migration files — centralise all DB migrations in @nexus/db,~28 files
