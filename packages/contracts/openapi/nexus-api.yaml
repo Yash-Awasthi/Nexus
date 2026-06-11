@@ -1,0 +1,1030 @@
+openapi: "3.1.0"
+
+info:
+  title: Nexus API
+  version: "1.0.0"
+  description: |
+    Unified API for the Nexus autonomous orchestration platform.
+    Covers ingest, council deliberation, runtime task management,
+    governance approvals, and observability.
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+  contact:
+    name: Nexus Maintainers
+    url: https://github.com/Yash-Awasthi/Nexus
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local development
+  - url: https://api.nexus.internal/v1
+    description: Production
+
+tags:
+  - name: ingest
+    description: Event and signal ingestion from external sources
+  - name: council
+    description: Multi-agent deliberation and verdict retrieval
+  - name: runtime
+    description: Task lifecycle management
+  - name: governance
+    description: Approval workflows and policy enforcement
+  - name: audit
+    description: Immutable HMAC-chained audit log
+  - name: health
+    description: Health and readiness probes
+
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      tags: [health]
+      summary: Liveness probe
+      responses:
+        "200":
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /health/ready:
+    get:
+      operationId: getReadiness
+      tags: [health]
+      summary: Readiness probe — checks DB and queue connections
+      responses:
+        "200":
+          description: All dependencies reachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+        "503":
+          description: One or more dependencies unreachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+
+  /ingest/events:
+    post:
+      operationId: ingestEvent
+      tags: [ingest]
+      summary: Ingest a raw event from an external adapter
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IngestEventRequest"
+      responses:
+        "202":
+          description: Event accepted and queued for processing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestEventResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+
+  /ingest/events/{eventId}:
+    get:
+      operationId: getIngestedEvent
+      tags: [ingest]
+      summary: Retrieve a previously ingested event by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: Event found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestedEvent"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /ingest/signals:
+    post:
+      operationId: createSignal
+      tags: [ingest]
+      summary: Create a processed signal derived from one or more events
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSignalRequest"
+      responses:
+        "201":
+          description: Signal created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Signal"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /council/deliberate:
+    post:
+      operationId: deliberate
+      tags: [council]
+      summary: Submit a signal for council deliberation
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeliberateRequest"
+      responses:
+        "202":
+          description: Deliberation started; poll /council/verdicts/{verdictId} for result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeliberateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /council/verdicts/{verdictId}:
+    get:
+      operationId: getVerdict
+      tags: [council]
+      summary: Retrieve the council verdict for a deliberation
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/VerdictId"
+      responses:
+        "200":
+          description: Verdict found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Verdict"
+        "202":
+          description: Deliberation still in progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeliberationPending"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /council/transcripts/{verdictId}:
+    get:
+      operationId: getCouncilTranscript
+      tags: [council]
+      summary: Retrieve the full deliberation transcript for a verdict
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/VerdictId"
+      responses:
+        "200":
+          description: Transcript found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouncilTranscript"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /runtime/tasks:
+    get:
+      operationId: listTasks
+      tags: [runtime]
+      summary: List runtime tasks with optional filtering
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/TaskStatus"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Task list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    post:
+      operationId: createTask
+      tags: [runtime]
+      summary: Submit a new task for execution
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskRequest"
+      responses:
+        "202":
+          description: Task accepted and queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuntimeTask"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /runtime/tasks/{taskId}:
+    get:
+      operationId: getTask
+      tags: [runtime]
+      summary: Get task status and metadata
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: Task found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuntimeTask"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      operationId: cancelTask
+      tags: [runtime]
+      summary: Cancel a queued or running task
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "204":
+          description: Task cancelled
+        "409":
+          description: Task is already in a terminal state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /governance/approvals:
+    get:
+      operationId: listApprovals
+      tags: [governance]
+      summary: List pending approval requests
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Approval list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalListResponse"
+
+    post:
+      operationId: createApproval
+      tags: [governance]
+      summary: Create an approval request for a governed action
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateApprovalRequest"
+      responses:
+        "201":
+          description: Approval request created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalRequest"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /governance/approvals/{approvalId}:
+    get:
+      operationId: getApproval
+      tags: [governance]
+      summary: Get a specific approval request
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ApprovalId"
+      responses:
+        "200":
+          description: Approval request found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    patch:
+      operationId: resolveApproval
+      tags: [governance]
+      summary: Approve or reject an approval request
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ApprovalId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResolveApprovalRequest"
+      responses:
+        "200":
+          description: Approval resolved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalRequest"
+        "409":
+          description: Approval already resolved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /audit/log:
+    get:
+      operationId: getAuditLog
+      tags: [audit]
+      summary: Query HMAC-chained audit log entries
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: entity_type
+          in: query
+          schema:
+            type: string
+        - name: entity_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogResponse"
+
+  /audit/log/verify:
+    post:
+      operationId: verifyAuditChain
+      tags: [audit]
+      summary: Verify the HMAC chain integrity for a range of entries
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyChainRequest"
+      responses:
+        "200":
+          description: Chain verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerifyChainResponse"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    EventId:
+      name: eventId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    VerdictId:
+      name: verdictId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    ApprovalId:
+      name: approvalId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Invalid request body or parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Unauthorized:
+      description: Missing or invalid authentication token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Forbidden:
+      description: Caller lacks required capability
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    UnprocessableEntity:
+      description: Semantically invalid payload (e.g. schema validation failure)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    # ─── Primitives ───────────────────────────────────────────────────────────
+
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code (e.g. VALIDATION_ERROR)
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+    HealthResponse:
+      type: object
+      required: [status, version]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        version:
+          type: string
+        uptime:
+          type: number
+          description: Process uptime in seconds
+
+    ReadinessResponse:
+      type: object
+      required: [status, checks]
+      properties:
+        status:
+          type: string
+          enum: [ready, degraded]
+        checks:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [ok, fail]
+
+    # ─── Ingest ───────────────────────────────────────────────────────────────
+
+    IngestEventRequest:
+      type: object
+      required: [source, event_type, payload]
+      properties:
+        source:
+          type: string
+          description: Adapter source identifier (e.g. "gmail", "github")
+        event_type:
+          type: string
+          description: Event type (e.g. "email.received", "pr.opened")
+        payload:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+        idempotency_key:
+          type: string
+          description: Optional client-provided deduplication key
+
+    IngestEventResponse:
+      type: object
+      required: [event_id, status]
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [accepted, duplicate]
+
+    IngestedEvent:
+      type: object
+      required: [id, source, event_type, payload, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        source:
+          type: string
+        event_type:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+        idempotency_key:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        processed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    CreateSignalRequest:
+      type: object
+      required: [signal_type, source_event_ids, summary]
+      properties:
+        signal_type:
+          type: string
+        source_event_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 1
+        summary:
+          type: string
+        priority:
+          type: string
+          enum: [low, medium, high, critical]
+          default: medium
+        metadata:
+          type: object
+          additionalProperties: true
+
+    Signal:
+      type: object
+      required: [id, signal_type, source_event_ids, summary, priority, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        signal_type:
+          type: string
+        source_event_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        summary:
+          type: string
+        priority:
+          type: string
+          enum: [low, medium, high, critical]
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+
+    # ─── Council ──────────────────────────────────────────────────────────────
+
+    DeliberateRequest:
+      type: object
+      required: [signal_id]
+      properties:
+        signal_id:
+          type: string
+          format: uuid
+        override_archetypes:
+          type: array
+          items:
+            type: string
+          description: Optional list of archetype names to force onto the council
+        budget_usd:
+          type: number
+          minimum: 0
+          description: Optional per-deliberation LLM budget cap in USD
+
+    DeliberateResponse:
+      type: object
+      required: [verdict_id, status]
+      properties:
+        verdict_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending]
+
+    DeliberationPending:
+      type: object
+      required: [verdict_id, status]
+      properties:
+        verdict_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending]
+        started_at:
+          type: string
+          format: date-time
+
+    Verdict:
+      type: object
+      required: [id, signal_id, decision, confidence, rationale, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        signal_id:
+          type: string
+          format: uuid
+        decision:
+          type: string
+          enum: [approve, reject, defer, escalate]
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        rationale:
+          type: string
+        dissents:
+          type: array
+          items:
+            type: string
+          description: Archetype names that dissented from the majority
+        cost_usd:
+          type: number
+          description: Total LLM cost for this deliberation
+        created_at:
+          type: string
+          format: date-time
+
+    CouncilTranscript:
+      type: object
+      required: [verdict_id, turns, created_at]
+      properties:
+        verdict_id:
+          type: string
+          format: uuid
+        turns:
+          type: array
+          items:
+            $ref: "#/components/schemas/TranscriptTurn"
+        created_at:
+          type: string
+          format: date-time
+
+    TranscriptTurn:
+      type: object
+      required: [archetype, role, content, token_count]
+      properties:
+        archetype:
+          type: string
+        role:
+          type: string
+          enum: [system, user, assistant]
+        content:
+          type: string
+        token_count:
+          type: integer
+        cost_usd:
+          type: number
+
+    # ─── Runtime ──────────────────────────────────────────────────────────────
+
+    TaskStatus:
+      type: string
+      enum: [queued, running, completed, failed, cancelled, awaiting_approval]
+
+    CreateTaskRequest:
+      type: object
+      required: [type, payload]
+      properties:
+        type:
+          type: string
+          description: Task type identifier (e.g. "email.send", "pr.review")
+        payload:
+          type: object
+          additionalProperties: true
+        priority:
+          type: string
+          enum: [low, medium, high]
+          default: medium
+        verdict_id:
+          type: string
+          format: uuid
+          description: Optional verdict that authorized this task
+        idempotency_key:
+          type: string
+
+    RuntimeTask:
+      type: object
+      required: [id, type, status, priority, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        status:
+          $ref: "#/components/schemas/TaskStatus"
+        priority:
+          type: string
+          enum: [low, medium, high]
+        verdict_id:
+          type: string
+          format: uuid
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        result:
+          type: object
+          additionalProperties: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    TaskListResponse:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RuntimeTask"
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    # ─── Governance ───────────────────────────────────────────────────────────
+
+    CreateApprovalRequest:
+      type: object
+      required: [entity_type, entity_id, action, requestor]
+      properties:
+        entity_type:
+          type: string
+          description: The type of entity requiring approval (e.g. "task", "verdict")
+        entity_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          description: The governed action requiring approval
+        requestor:
+          type: string
+          description: Identity of the agent or user requesting approval
+        context:
+          type: object
+          additionalProperties: true
+
+    ResolveApprovalRequest:
+      type: object
+      required: [resolution, resolved_by]
+      properties:
+        resolution:
+          type: string
+          enum: [approved, rejected]
+        resolved_by:
+          type: string
+        reason:
+          type: string
+
+    ApprovalRequest:
+      type: object
+      required: [id, entity_type, entity_id, action, requestor, status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        entity_type:
+          type: string
+        entity_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        requestor:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected, expired]
+        resolution:
+          type: string
+          enum: [approved, rejected]
+          nullable: true
+        resolved_by:
+          type: string
+          nullable: true
+        reason:
+          type: string
+          nullable: true
+        context:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    ApprovalListResponse:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApprovalRequest"
+        total:
+          type: integer
+
+    # ─── Audit Log ────────────────────────────────────────────────────────────
+
+    AuditLogEntry:
+      type: object
+      required: [id, sequence, entity_type, entity_id, action, actor, payload_hash, chain_hash, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        sequence:
+          type: integer
+          description: Monotonic sequence number for chain ordering
+        entity_type:
+          type: string
+        entity_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        actor:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        payload_hash:
+          type: string
+          description: SHA-256 hex digest of the canonical payload JSON
+        chain_hash:
+          type: string
+          description: HMAC-SHA256(prev_chain_hash || payload_hash) — links entries
+        created_at:
+          type: string
+          format: date-time
+
+    AuditLogResponse:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLogEntry"
+        total:
+          type: integer
+
+    VerifyChainRequest:
+      type: object
+      required: [from_sequence, to_sequence]
+      properties:
+        from_sequence:
+          type: integer
+          minimum: 1
+        to_sequence:
+          type: integer
+
+    VerifyChainResponse:
+      type: object
+      required: [valid, checked_count]
+      properties:
+        valid:
+          type: boolean
+        checked_count:
+          type: integer
+        first_broken_sequence:
+          type: integer
+          nullable: true
+          description: Present only when valid=false; the first sequence number where chain is broken

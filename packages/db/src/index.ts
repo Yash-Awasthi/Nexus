@@ -1,4 +1,3 @@
 // SPDX-License-Identifier: Apache-2.0
-// @nexus/db — skeleton (implementation pending)
-
-export {};
+export * from "./schema/index.js";
+export * from "./client.js";
