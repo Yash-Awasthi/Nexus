@@ -26,7 +26,7 @@ export function createMockLogger(): MockLogger {
   const log =
     (level: MockLogEntry["level"]) =>
     (message: string, context?: Record<string, unknown>) => {
-      entries.push({ level, message, context });
+      entries.push({ level, message, ...(context !== undefined ? { context } : {}) });
     };
 
   return {

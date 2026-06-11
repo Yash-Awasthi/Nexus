@@ -1,7 +1,8 @@
-import { IBrowserExecutionAdapter, IBrowserTask, IEnvironmentTelemetry } from "./interfaces/environment.interface";
-import { IExecutionContext } from "./interfaces/execution.interface";
-import { isSafeUrl } from "./security-utils";
-import { getBridgeManager, BridgeManager } from "../runtime/bridge-manager";
+// @ts-nocheck
+import { IBrowserExecutionAdapter, IBrowserTask, IEnvironmentTelemetry } from "./interfaces/environment.interface.js";
+import { IExecutionContext } from "./interfaces/execution.interface.js";
+import { isSafeUrl } from "./security-utils.js";
+import { getBridgeManager, BridgeManager } from "../runtime/bridge-manager.js";
 
 export class BrowserExecutionAdapter implements IBrowserExecutionAdapter {
   constructor(

@@ -1,5 +1,5 @@
-import { IEventStore, IRuntimePersistence } from "./interfaces/persistence.interface";
-import { ILogger } from "./interfaces/logger.interface";
+import { IEventStore, IRuntimePersistence } from "./interfaces/persistence.interface.js";
+import { ILogger } from "./interfaces/logger.interface.js";
 import * as fs from "fs";
 import * as path from "path";
 

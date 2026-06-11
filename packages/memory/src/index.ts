@@ -135,7 +135,7 @@ export class FixedEmbedder implements IEmbedder {
     for (let i = 0; i < text.length; i++) {
       const code = text.charCodeAt(i);
       const idx = (code * 31 + i * 7) % this.dimensions;
-      vec[idx] += code / 127;
+      vec[idx] = (vec[idx] ?? 0) + code / 127;
     }
     return normalize(Array.from(vec));
   }
@@ -261,7 +261,7 @@ export class MemoryManager {
       embedding,
       metadata: options.metadata ?? {},
       createdAt: now,
-      expiresAt: options.ttl !== undefined ? now + options.ttl : undefined,
+      ...(options.ttl !== undefined ? { expiresAt: now + options.ttl } : {}),
     };
 
     try {

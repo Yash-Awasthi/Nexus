@@ -1,4 +1,4 @@
-import { IMCPServerRegistry, IMCPServerInfo, IMCPTransport } from "./interfaces/mcp.interface";
+import { IMCPServerRegistry, IMCPServerInfo, IMCPTransport } from "./interfaces/mcp.interface.js";
 
 export class MCPServerRegistry implements IMCPServerRegistry {
   private servers: Map<string, { info: IMCPServerInfo; transport: IMCPTransport }> = new Map();

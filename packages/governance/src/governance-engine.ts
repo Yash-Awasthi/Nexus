@@ -5,7 +5,7 @@ import {
   IRuntimeGuardrail,
   ITaskSynthesisResult,
   ICognitiveTrace
-} from "./interfaces/governance.interface";
+} from "./interfaces/governance.interface.js";
 
 // 1. Core Constraints implementations
 export class ResourceScopeConstraint implements IExecutionConstraint {

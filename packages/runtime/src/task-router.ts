@@ -1,5 +1,5 @@
-import { IEventBus } from "./event-bus";
-import { IEventStore } from "./interfaces/persistence.interface";
+import { IEventBus } from "./event-bus.js";
+import { IEventStore } from "./interfaces/persistence.interface.js";
 
 export interface Task {
   id: string;

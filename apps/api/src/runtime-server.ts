@@ -1,5 +1,5 @@
 /** Re-exports for Docker CMD and legacy imports */
-export { createGhostStackServer, startHttpServer } from "./ghoststack-server";
+export { createGhostStackServer, startHttpServer } from "./ghoststack-server.js";
 
 if (require.main === module) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports

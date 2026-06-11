@@ -1,4 +1,4 @@
-import { IMetricsCollector, ITraceRecorder, ITraceSpan } from "./interfaces/observability.interface";
+import { IMetricsCollector, ITraceRecorder, ITraceSpan } from "./interfaces/observability.interface.js";
 
 // ─── Histogram for percentile calculations ───────────────────────────
 
@@ -160,7 +160,7 @@ export class TraceRecorder implements ITraceRecorder {
   startSpan(name: string, parentId?: string, metadata?: Record<string, any>): ITraceSpan {
     const span: ITraceSpan = {
       spanId: `${name}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
-      parentId,
+      ...(parentId !== undefined ? { parentId } : {}),
       name,
       startTime: new Date(),
       metadata: metadata ? { ...metadata } : {}

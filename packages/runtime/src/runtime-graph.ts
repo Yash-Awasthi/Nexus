@@ -14,8 +14,8 @@
  * - Deepened repair (edge-node ref consistency, duplicate cleanup)
  */
 
-import { IEventBus } from "./event-bus";
-import { IRuntimePersistence } from "./interfaces/persistence.interface";
+import { IEventBus } from "./event-bus.js";
+import { IRuntimePersistence } from "./interfaces/persistence.interface.js";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -113,7 +113,7 @@ export class GraphMutationError extends Error {
   constructor(
     message: string,
     public op: string,
-    public cause?: Error
+    public override cause?: Error
   ) {
     super(message);
     this.name = "GraphMutationError";
@@ -752,7 +752,7 @@ export class RuntimeGraph {
     // Walk backwards to find the most recent valid checkpoint
     for (let i = this.checkpoints.length - 1; i >= 0; i--) {
       const cp = this.checkpoints[i];
-      if (cp.report.valid) {
+      if (cp && cp.report.valid) {
         await this.restoreSnapshot(cp.snapshot);
         return cp;
       }

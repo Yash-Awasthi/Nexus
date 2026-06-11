@@ -5,7 +5,7 @@
  * This module re-exports it so existing import paths continue to work.
  */
 
-export { IEventStore } from "./event-store.interface";
+export type { IEventStore } from "./event-store.interface.js";
 
 export interface IRuntimePersistence {
   saveState(key: string, state: any, options?: { verifyWrite?: boolean }): Promise<void>;

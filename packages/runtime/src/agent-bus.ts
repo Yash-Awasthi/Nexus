@@ -5,10 +5,10 @@
  * capability discovery, and results routing.
  */
 
-import { IEventBus } from "./event-bus";
-import { IEventStore } from "./interfaces/persistence.interface";
-import { MemoryStore } from "./memory-store";
-import { ILogger } from "./interfaces/logger.interface";
+import { IEventBus } from "./event-bus.js";
+import { IEventStore } from "./interfaces/persistence.interface.js";
+import { MemoryStore } from "./memory-store.js";
+import { ILogger } from "./interfaces/logger.interface.js";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -171,6 +171,9 @@ export class AgentBus implements IAgentBus {
 
     // Pick first available agent (round-robin would be better, but keep it simple)
     const target = agents[0];
+    if (!target) {
+      return { requestId: request.id, success: false, error: "Internal: no agent available", durationMs: Date.now() - started };
+    }
 
     // Mark agent as busy
     target.status = "busy";
@@ -295,7 +298,7 @@ export class TaskDelegationAgent {
         to: msg.from,
         type: "result",
         subject: `delegated:${targetAction}`,
-        body: { delegated: true, target: agents[0].agentId, payload },
+        body: { delegated: true, target: agents[0]?.agentId, payload },
         correlationId: msg.correlationId
       });
     } else {

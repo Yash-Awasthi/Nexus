@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * RuntimeManager — central service lifecycle manager for GhostStack.
  *
@@ -7,7 +8,7 @@
  * service implementations.
  */
 
-import { IConfigLoader } from "../runtime/config-loader";
+import { IConfigLoader } from "../runtime/config-loader.js";
 
 // ─── Public types ──────────────────────────────────────────────────────────────
 

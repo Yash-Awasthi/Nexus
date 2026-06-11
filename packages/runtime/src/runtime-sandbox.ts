@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { assertPathDescendsFrom } from "./path-boundary";
+import { assertPathDescendsFrom } from "./path-boundary.js";
 
 export type RuntimeSandboxLayout = {
   root: string;

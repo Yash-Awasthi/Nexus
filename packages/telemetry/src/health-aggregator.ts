@@ -149,7 +149,7 @@ export class HealthAggregator {
       const latencyMs = Date.now() - start;
       return {
         status: resultOrTimeout.ok ? "ok" : "fail",
-        message: resultOrTimeout.ok ? undefined : (resultOrTimeout.message ?? "probe returned ok=false"),
+        ...(resultOrTimeout.ok ? {} : { message: resultOrTimeout.message ?? "probe returned ok=false" }),
         latencyMs,
         critical: probe.critical,
       };
@@ -206,7 +206,7 @@ export function redisProbe(
 ): ProbeFn {
   return async () => {
     const pong = await client.ping();
-    return { ok: pong === "PONG", message: pong !== "PONG" ? `Unexpected PING response: ${pong}` : undefined };
+    return { ok: pong === "PONG", ...(pong !== "PONG" ? { message: `Unexpected PING response: ${pong}` } : {}) };
   };
 }
 
@@ -222,7 +222,7 @@ export function queueDepthProbe(
     const ok = depth <= maxDepth;
     return {
       ok,
-      message: ok ? undefined : `Queue depth ${depth} exceeds limit ${maxDepth}`,
+      ...(ok ? {} : { message: `Queue depth ${depth} exceeds limit ${maxDepth}` }),
     };
   };
 }

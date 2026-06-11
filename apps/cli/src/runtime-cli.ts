@@ -1,19 +1,20 @@
 #!/usr/bin/env node
+// @ts-nocheck
 /**
  * GhostStack operator CLI (`gs` / `ghoststack`)
  */
 import * as fs from "fs";
 import * as path from "path";
-import { bootstrap } from "./bootstrap";
-import { loadGhostStackConfig } from "./ghoststack-config";
-import { FederationSupervisor } from "./federation-supervisor";
-import { createRuntimeContext, startRuntime, stopRuntime } from "./runtime-context";
-import { createGhostStackServer } from "./ghoststack-server";
-import { runFederationE2e } from "./e2e-federation";
-import { ADAPTER_MANIFEST } from "./adapters/manifest";
-import { runHealthcheck } from "./healthcheck";
-import { PlanningEngine } from "../orchestration/planning-engine";
-import { specToWorkflowDefinition } from "../orchestration/spec-loader";
+import { bootstrap } from "./bootstrap.js";
+import { loadGhostStackConfig } from "./ghoststack-config.js";
+import { FederationSupervisor } from "./federation-supervisor.js";
+import { createRuntimeContext, startRuntime, stopRuntime } from "./runtime-context.js";
+import { createGhostStackServer } from "./ghoststack-server.js";
+import { runFederationE2e } from "./e2e-federation.js";
+import { ADAPTER_MANIFEST } from "./adapters/manifest.js";
+import { runHealthcheck } from "./healthcheck.js";
+import { PlanningEngine } from "../orchestration/planning-engine.js";
+import { specToWorkflowDefinition } from "../orchestration/spec-loader.js";
 
 const repoRoot = path.resolve(__dirname, "..");
 

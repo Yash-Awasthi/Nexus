@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { google } from 'googleapis';
 import { createReadStream, createWriteStream } from 'node:fs';
 

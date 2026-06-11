@@ -1,9 +1,9 @@
-import { ITaskExecutor, IExecutionAdapter, IExecutionContext } from "./interfaces/execution.interface";
-import { IQueueBackend } from "./interfaces/queue.interface";
-import { IEventBus } from "./event-bus";
-import { IRuntimePersistence } from "./interfaces/persistence.interface";
-import { ILogger } from "./interfaces/logger.interface";
-import { IMetricsCollector, ITraceRecorder } from "./interfaces/observability.interface";
+import { ITaskExecutor, IExecutionAdapter, IExecutionContext } from "./interfaces/execution.interface.js";
+import { IQueueBackend } from "./interfaces/queue.interface.js";
+import { IEventBus } from "./event-bus.js";
+import { IRuntimePersistence } from "./interfaces/persistence.interface.js";
+import { ILogger } from "./interfaces/logger.interface.js";
+import { IMetricsCollector, ITraceRecorder } from "./interfaces/observability.interface.js";
 
 export class TaskExecutor implements ITaskExecutor {
   private queue: IQueueBackend;

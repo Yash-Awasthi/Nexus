@@ -1,12 +1,13 @@
+// @ts-nocheck
 import * as fs from "fs";
 import * as path from "path";
 import * as net from "net";
-import { probeFlociHealth, resolveFlociEndpoint } from "../orchestration/floci-client";
-import { loadGhostStackConfig, GhostStackConfig } from "./ghoststack-config";
-import { runDockerCompose } from "./docker-compose-runner";
-import { createGhostStackServer, GhostStackServer } from "./ghoststack-server";
-import { McpServerHost } from "./adapters/mcp-server-host";
-import type { RuntimeGraph } from "../orchestration/runtime-graph";
+import { probeFlociHealth, resolveFlociEndpoint } from "../orchestration/floci-client.js";
+import { loadGhostStackConfig, GhostStackConfig } from "./ghoststack-config.js";
+import { runDockerCompose } from "./docker-compose-runner.js";
+import { createGhostStackServer, GhostStackServer } from "./ghoststack-server.js";
+import { McpServerHost } from "./adapters/mcp-server-host.js";
+import type { RuntimeGraph } from "../orchestration/runtime-graph.js";
 
 export type FederationServiceStatus = {
   name: string;

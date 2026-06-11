@@ -1,4 +1,4 @@
-import { ICapabilityPolicy, IExecutionEnvironment, IEnvironmentTelemetry } from "./interfaces/environment.interface";
+import { ICapabilityPolicy, IExecutionEnvironment, IEnvironmentTelemetry } from "./interfaces/environment.interface.js";
 
 export class ExecutionEnvironment implements IExecutionEnvironment {
   constructor(

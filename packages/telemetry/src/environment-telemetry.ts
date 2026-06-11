@@ -1,4 +1,4 @@
-import { IEnvironmentTelemetry } from "./interfaces/environment.interface";
+import { IEnvironmentTelemetry } from "./interfaces/environment.interface.js";
 
 export class EnvironmentTelemetry implements IEnvironmentTelemetry {
   browserSessionsActive = 0;

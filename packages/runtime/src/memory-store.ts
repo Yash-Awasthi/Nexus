@@ -5,9 +5,9 @@
  * semantic indexing, and trace-based retrieval.
  */
 
-import { IRuntimePersistence } from "./interfaces/persistence.interface";
-import { IEventStore } from "./interfaces/persistence.interface";
-import { ILogger } from "./interfaces/logger.interface";
+import { IRuntimePersistence } from "./interfaces/persistence.interface.js";
+import { IEventStore } from "./interfaces/persistence.interface.js";
+import { ILogger } from "./interfaces/logger.interface.js";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -459,6 +459,7 @@ export class TraceIndexer {
     let indexed = 0;
     for (let i = this.lastIndexed; i < events.length; i++) {
       const event = events[i];
+      if (!event) continue;
       const memType = this.mapEventToMemoryType(event.event);
       if (!memType) continue;
 

@@ -1,5 +1,5 @@
-import { IPlanningEngine, ICognitiveTrace, ITaskSynthesisResult } from "./interfaces/governance.interface";
-import { ILanguageModel } from "./interfaces/language-model.interface";
+import { IPlanningEngine, ICognitiveTrace, ITaskSynthesisResult } from "./interfaces/governance.interface.js";
+import { ILanguageModel } from "./interfaces/language-model.interface.js";
 
 // ─── Task template & blueprint types ─────────────────────────────────────────
 
@@ -247,6 +247,7 @@ function extractArgumentOverrides(objective: string): Record<string, unknown> {
   while ((match = kvPattern.exec(objective)) !== null) {
     const key = match[1];
     const raw = match[2];
+    if (!key || !raw) continue;
     // Coerce numeric strings; leave the rest as strings
     const asNumber = Number(raw);
     overrides[key] = Number.isNaN(asNumber) ? raw : asNumber;
@@ -262,11 +263,14 @@ const BLUEPRINT_WORD_REGEXES: Record<string, RegExp> = Object.fromEntries(
 
 function selectBlueprint(normObjective: string): PlanBlueprint {
   for (const key of PRIORITY_ORDER) {
-    if (BLUEPRINT_WORD_REGEXES[key].test(normObjective)) {
-      return PLAN_BLUEPRINTS[key];
+    const regex = BLUEPRINT_WORD_REGEXES[key];
+    const bp = PLAN_BLUEPRINTS[key];
+    if (regex && bp && regex.test(normObjective)) {
+      return bp;
     }
   }
-  return PLAN_BLUEPRINTS.default;
+  const fallbackKey = PRIORITY_ORDER[0] ?? "default";
+  return (PLAN_BLUEPRINTS.default ?? PLAN_BLUEPRINTS[fallbackKey]) as PlanBlueprint;
 }
 
 /**
@@ -364,7 +368,7 @@ export class PlanningEngine implements IPlanningEngine {
           {
             role: "system",
             content: `You are an AI workflow planner. Given a user objective, select the most appropriate execution blueprint.
-Available blueprints: ${BLUEPRINT_KEYS.map((k) => `"${k}" (${PLAN_BLUEPRINTS[k].label})`).join(", ")}.
+Available blueprints: ${BLUEPRINT_KEYS.map((k) => `"${k}" (${PLAN_BLUEPRINTS[k]?.label ?? ""})`).join(", ")}.
 Respond with a JSON object: { "blueprintKey": "<chosen key>" }.`
           },
           {

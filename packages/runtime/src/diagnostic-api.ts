@@ -1,4 +1,4 @@
-import { IRuntimeInspector } from "./interfaces/observability.interface";
+import { IRuntimeInspector } from "./interfaces/observability.interface.js";
 
 export class RuntimeDiagnosticAPI {
   private inspector: IRuntimeInspector;

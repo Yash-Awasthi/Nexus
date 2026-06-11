@@ -14,10 +14,10 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { IExecutionContext } from "./interfaces/execution.interface";
-import { ILanguageModel, ChatMessage } from "./interfaces/language-model.interface";
-import { createLanguageModel } from "./language-model";
-import { WebSearchEngine } from "./web-search-engine";
+import { IExecutionContext } from "./interfaces/execution.interface.js";
+import { ILanguageModel, ChatMessage } from "./interfaces/language-model.interface.js";
+import { createLanguageModel } from "./language-model.js";
+import { WebSearchEngine } from "./web-search-engine.js";
 
 // ─── Shared LLM accessor ──────────────────────────────────────────────────────
 

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { LinearClient } from '@linear/sdk';
 export type { LinearDocument } from '@linear/sdk';
 

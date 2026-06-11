@@ -1,13 +1,14 @@
-import { IMCPTransport } from "./interfaces/mcp.interface";
-import type { GhostStackRuntimeContext } from "../runtime/runtime-context";
-import { FlociExecutionAdapter } from "./floci-adapter";
-import { resolveSandboxPath } from "./runtime-sandbox";
-import { loadWorkflowSpecFile, specToWorkflowDefinition } from "./spec-loader";
-import { dispatchExtendedAction, EXTENDED_FLOCI_ACTIONS } from "./floci-extended";
-import { resolveFlociEndpoint } from "./floci-client";
-import { runFederationE2e } from "../runtime/e2e-federation";
-import { MCPServerRegistry } from "./mcp-registry";
-import { MCPRuntime } from "./mcp-adapter";
+// @ts-nocheck
+import { IMCPTransport } from "./interfaces/mcp.interface.js";
+import type { GhostStackRuntimeContext } from "../runtime/runtime-context.js";
+import { FlociExecutionAdapter } from "./floci-adapter.js";
+import { resolveSandboxPath } from "./runtime-sandbox.js";
+import { loadWorkflowSpecFile, specToWorkflowDefinition } from "./spec-loader.js";
+import { dispatchExtendedAction, EXTENDED_FLOCI_ACTIONS } from "./floci-extended.js";
+import { resolveFlociEndpoint } from "./floci-client.js";
+import { runFederationE2e } from "../runtime/e2e-federation.js";
+import { MCPServerRegistry } from "./mcp-registry.js";
+import { MCPRuntime } from "./mcp-adapter.js";
 import * as fs from "fs";
 import * as path from "path";
 

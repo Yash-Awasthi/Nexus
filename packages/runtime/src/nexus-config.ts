@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { loadEnvFile } from "./env-loader";
+import { loadEnvFile } from "./env-loader.js";
 
 export type GhostStackConfig = {
   apiPort: number;
@@ -42,6 +42,7 @@ function parseCliArgs(): Record<string, string> {
   const args = process.argv;
   for (let i = 2; i < args.length; i++) {
     const arg = args[i];
+    if (!arg) continue;
     if (arg.startsWith("--")) {
       const key = arg.slice(2);
       const val = args[i + 1];

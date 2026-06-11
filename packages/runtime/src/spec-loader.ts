@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
-import { Task } from "./task-router";
-import { IWorkflowDefinition } from "./interfaces/workflow.interface";
+import { Task } from "./task-router.js";
+import { IWorkflowDefinition } from "./interfaces/workflow.interface.js";
 
 export interface WorkflowSpecTask {
   id: string;
@@ -66,6 +66,7 @@ export function parseWorkflowSpec(raw: string, sourceLabel: string): WorkflowSpe
 
   for (let i = 0; i < spec.tasks.length; i++) {
     const task = spec.tasks[i];
+    if (!task) continue;
     const label = `tasks[${i}]`;
 
     // Required fields present and non-empty strings

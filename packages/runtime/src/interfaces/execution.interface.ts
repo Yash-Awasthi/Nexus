@@ -1,4 +1,4 @@
-import { ILogger } from "./logger.interface";
+import { ILogger } from "./logger.interface.js";
 
 export interface IExecutionContext {
   taskId: string;

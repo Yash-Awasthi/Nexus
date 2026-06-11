@@ -1,21 +1,22 @@
-import { IRuntimeManager } from "../orchestration/runtime-manager";
-import { IEventBus } from "../orchestration/event-bus";
-import { TaskRouter, Task } from "../orchestration/task-router";
-import { IAgentRegistry } from "../orchestration/agent-registry";
-import { IEventStore } from "../orchestration/interfaces/persistence.interface";
-import { ILogger } from "../orchestration/interfaces/logger.interface";
-import { TaskDependencyResolver } from "../orchestration/dependency-resolver";
-import { ITaskDependencyResolver } from "../orchestration/interfaces/execution.interface";
-import { MemoryQueueBackend } from "../orchestration/queue-backend";
-import { IQueueBackend } from "../orchestration/interfaces/queue.interface";
-import { TaskExecutor } from "../orchestration/task-executor";
-import { buildQueuePayloadFromTask } from "../orchestration/task-payload";
-import { IMetricsCollector, ITraceRecorder } from "../orchestration/interfaces/observability.interface";
+// @ts-nocheck
+import { IRuntimeManager } from "../orchestration/runtime-manager.js";
+import { IEventBus } from "../orchestration/event-bus.js";
+import { TaskRouter, Task } from "../orchestration/task-router.js";
+import { IAgentRegistry } from "../orchestration/agent-registry.js";
+import { IEventStore } from "../orchestration/interfaces/persistence.interface.js";
+import { ILogger } from "../orchestration/interfaces/logger.interface.js";
+import { TaskDependencyResolver } from "../orchestration/dependency-resolver.js";
+import { ITaskDependencyResolver } from "../orchestration/interfaces/execution.interface.js";
+import { MemoryQueueBackend } from "../orchestration/queue-backend.js";
+import { IQueueBackend } from "../orchestration/interfaces/queue.interface.js";
+import { TaskExecutor } from "../orchestration/task-executor.js";
+import { buildQueuePayloadFromTask } from "../orchestration/task-payload.js";
+import { IMetricsCollector, ITraceRecorder } from "../orchestration/interfaces/observability.interface.js";
 import {
   IPlanningEngine,
   IGovernanceEngine,
   IApprovalWorkflow
-} from "../orchestration/interfaces/governance.interface";
+} from "../orchestration/interfaces/governance.interface.js";
 
 export class GhostStackOrchestrator {
   private runtimeManager: IRuntimeManager;

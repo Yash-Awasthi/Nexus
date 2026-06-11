@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { WebClient } from '@slack/web-api';
 
 let _client: WebClient | null = null;

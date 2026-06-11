@@ -1,16 +1,16 @@
-import { IRuntimeInspector, ITaskSnapshot, IQueueSnapshot, IEventSnapshot } from "./interfaces/observability.interface";
-import { IMetricsCollector } from "./interfaces/observability.interface";
-import { IQueueBackend } from "./interfaces/queue.interface";
-import { IServiceDiscovery } from "./interfaces/discovery.interface";
-import { IEventStore } from "./interfaces/persistence.interface";
-import { IMCPRuntime, IMCPServerRegistry } from "./interfaces/mcp.interface";
-import { IGovernanceEngine, IApprovalWorkflow, ICognitiveTrace } from "./interfaces/governance.interface";
-import { IEnvironmentTelemetry, IFilesystemSandbox, IExecutionEnvironment } from "./interfaces/environment.interface";
-import { IWorkflowRegistry, IWorkflowTelemetry } from "./interfaces/workflow.interface";
+import { IRuntimeInspector, ITaskSnapshot, IQueueSnapshot, IEventSnapshot } from "./interfaces/observability.interface.js";
+import { IMetricsCollector } from "./interfaces/observability.interface.js";
+import { IQueueBackend } from "./interfaces/queue.interface.js";
+import { IServiceDiscovery } from "./interfaces/discovery.interface.js";
+import { IEventStore } from "./interfaces/persistence.interface.js";
+import { IMCPRuntime, IMCPServerRegistry } from "./interfaces/mcp.interface.js";
+import { IGovernanceEngine, IApprovalWorkflow, ICognitiveTrace } from "./interfaces/governance.interface.js";
+import { IEnvironmentTelemetry, IFilesystemSandbox, IExecutionEnvironment } from "./interfaces/environment.interface.js";
+import { IWorkflowRegistry, IWorkflowTelemetry } from "./interfaces/workflow.interface.js";
 
-import type { IMemoryStore } from "./memory-store";
-import type { IAgentBus, AgentMessage, AgentCapability } from "./agent-bus";
-import type { CircuitBreaker } from "./circuit-breaker";
+import type { IMemoryStore } from "./memory-store.js";
+import type { IAgentBus, AgentMessage, AgentCapability } from "./agent-bus.js";
+import type { CircuitBreaker } from "./circuit-breaker.js";
 
 // Forward reference to avoid circular dependency — context type is used
 // only at construction time via the static factory method.

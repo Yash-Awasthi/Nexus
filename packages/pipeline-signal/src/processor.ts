@@ -96,16 +96,16 @@ export class SignalProcessor {
   private readonly onError?: (err: Error, eventId: string) => void;
 
   private running = false;
-  private timer?: ReturnType<typeof setTimeout>;
+  private timer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(config: SignalProcessorConfig) {
     this.eventSource = config.eventSource;
     this.signalSink = config.signalSink;
-    this.eventBus = config.eventBus;
+    if (config.eventBus !== undefined) { this.eventBus = config.eventBus; }
     this.classifier = config.classifier ?? new SignalClassifier();
     this.batchSize = config.batchSize ?? 50;
     this.pollIntervalMs = config.pollIntervalMs ?? 5000;
-    this.onError = config.onError;
+    if (config.onError !== undefined) { this.onError = config.onError; }
   }
 
   /**
@@ -146,7 +146,7 @@ export class SignalProcessor {
           source: event.source,
           eventType: event.eventType,
           payload: event.payload,
-          metadata: event.metadata,
+          ...(event.metadata !== undefined ? { metadata: event.metadata } : {}),
         };
 
         const classification = this.classifier.classify(input);

@@ -1,5 +1,5 @@
-import { IFilesystemSandbox, ISandboxConstraint } from "./interfaces/environment.interface";
-import { isSafeSandboxPath } from "./security-utils";
+import { IFilesystemSandbox, ISandboxConstraint } from "./interfaces/environment.interface.js";
+import { isSafeSandboxPath } from "./security-utils.js";
 import * as fs from "fs";
 import * as path from "path";
 

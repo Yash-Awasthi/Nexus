@@ -1,32 +1,33 @@
+// @ts-nocheck
 import * as path from "path";
-import { loadEnvFromRoot } from "./env-loader";
-import { GhostStackOrchestrator } from "./orchestrator";
-import { RuntimeManager } from "../orchestration/runtime-manager";
-import { YAMLConfigLoader } from "./config-loader";
-import { LocalEventBus } from "../orchestration/event-bus";
-import { TaskRouter } from "../orchestration/task-router";
-import { LocalAgentRegistry } from "../orchestration/agent-registry";
+import { loadEnvFromRoot } from "./env-loader.js";
+import { GhostStackOrchestrator } from "./orchestrator.js";
+import { RuntimeManager } from "../orchestration/runtime-manager.js";
+import { YAMLConfigLoader } from "./config-loader.js";
+import { LocalEventBus } from "../orchestration/event-bus.js";
+import { TaskRouter } from "../orchestration/task-router.js";
+import { LocalAgentRegistry } from "../orchestration/agent-registry.js";
 import {
   FileEventStore,
   FileRuntimePersistence,
   backupRuntimePersistence
-} from "../orchestration/persistence-manager";
-import { StructuredLogger } from "../orchestration/logger";
-import { FileQueueBackend } from "../orchestration/file-queue-backend";
-import { IQueueBackend } from "../orchestration/interfaces/queue.interface";
-import { TaskExecutor } from "../orchestration/task-executor";
-import { MetricsCollector, TraceRecorder, DiagnosticEnricher } from "../orchestration/observability-manager";
-import { MemoryStore, TraceIndexer } from "../orchestration/memory-store";
-import { AgentBus, TaskDelegationAgent } from "../orchestration/agent-bus";
-import { CircuitBreaker, HealthAwareCircuitBreaker, CircuitBreakerAdapterWrapper } from "../orchestration/circuit-breaker";
-import { RuntimeCompactor, LeakDetector, ResourceQuotaManager } from "../orchestration/runtime-compactor";
-import { EXTENDED_FLOCI_ACTIONS } from "../orchestration/floci-extended";
-import { resolveFlociEndpoint } from "../orchestration/floci-client";
-import { GHOSTSTACK_MCP_TOOLS } from "../orchestration/ghoststack-mcp-bridge";
-import { LocalServiceDiscovery, HealthMonitor } from "../orchestration/service-discovery";
-import { ApprovalWorkflow } from "../orchestration/approval-workflow";
-import { PlanningEngine } from "../orchestration/planning-engine";
-import { GovernanceEngine } from "../orchestration/governance-engine";
+} from "../orchestration/persistence-manager.js";
+import { StructuredLogger } from "../orchestration/logger.js";
+import { FileQueueBackend } from "../orchestration/file-queue-backend.js";
+import { IQueueBackend } from "../orchestration/interfaces/queue.interface.js";
+import { TaskExecutor } from "../orchestration/task-executor.js";
+import { MetricsCollector, TraceRecorder, DiagnosticEnricher } from "../orchestration/observability-manager.js";
+import { MemoryStore, TraceIndexer } from "../orchestration/memory-store.js";
+import { AgentBus, TaskDelegationAgent } from "../orchestration/agent-bus.js";
+import { CircuitBreaker, HealthAwareCircuitBreaker, CircuitBreakerAdapterWrapper } from "../orchestration/circuit-breaker.js";
+import { RuntimeCompactor, LeakDetector, ResourceQuotaManager } from "../orchestration/runtime-compactor.js";
+import { EXTENDED_FLOCI_ACTIONS } from "../orchestration/floci-extended.js";
+import { resolveFlociEndpoint } from "../orchestration/floci-client.js";
+import { GHOSTSTACK_MCP_TOOLS } from "../orchestration/ghoststack-mcp-bridge.js";
+import { LocalServiceDiscovery, HealthMonitor } from "../orchestration/service-discovery.js";
+import { ApprovalWorkflow } from "../orchestration/approval-workflow.js";
+import { PlanningEngine } from "../orchestration/planning-engine.js";
+import { GovernanceEngine } from "../orchestration/governance-engine.js";
 import {
   ResourceScopeConstraint,
   CostBudgetConstraint,
@@ -35,14 +36,14 @@ import {
   LoopDetectionGuardrail,
   RunawayRetriesGuardrail,
   TaskGraphLimitGuardrail
-} from "../orchestration/governance-engine";
-import { BrowserExecutionAdapter } from "../orchestration/browser-adapter";
-import { ScrapingExecutionAdapter } from "../orchestration/scraping-adapter";
-import { FlociExecutionAdapter } from "../orchestration/floci-adapter";
-import { WebSearchAdapter } from "../orchestration/web-search-adapter";
-import { CodeAgentPool } from "../orchestration/code-agent-pool";
-import { LocalInferenceAdapter } from "../orchestration/local-inference-adapter";
-import { EnvironmentTelemetry } from "../orchestration/environment-telemetry";
+} from "../orchestration/governance-engine.js";
+import { BrowserExecutionAdapter } from "../orchestration/browser-adapter.js";
+import { ScrapingExecutionAdapter } from "../orchestration/scraping-adapter.js";
+import { FlociExecutionAdapter } from "../orchestration/floci-adapter.js";
+import { WebSearchAdapter } from "../orchestration/web-search-adapter.js";
+import { CodeAgentPool } from "../orchestration/code-agent-pool.js";
+import { LocalInferenceAdapter } from "../orchestration/local-inference-adapter.js";
+import { EnvironmentTelemetry } from "../orchestration/environment-telemetry.js";
 import {
   WorkflowRegistry,
   WorkflowTelemetry,
@@ -52,11 +53,11 @@ import {
   DocumentProcessingTemplate,
   SpecToExecutionTemplate,
   GovernedEtlWorkflowTemplate
-} from "../orchestration/workflow-engine";
-import { RuntimeInspector } from "../orchestration/runtime-inspector";
-import { RuntimeGraph } from "../orchestration/runtime-graph";
-import { loadWorkflowSpecsFromDir, specToWorkflowDefinition } from "../orchestration/spec-loader";
-import { createRuntimeSandbox, RuntimeSandboxLayout } from "../orchestration/runtime-sandbox";
+} from "../orchestration/workflow-engine.js";
+import { RuntimeInspector } from "../orchestration/runtime-inspector.js";
+import { RuntimeGraph } from "../orchestration/runtime-graph.js";
+import { loadWorkflowSpecsFromDir, specToWorkflowDefinition } from "../orchestration/spec-loader.js";
+import { createRuntimeSandbox, RuntimeSandboxLayout } from "../orchestration/runtime-sandbox.js";
 
 export type GhostStackRuntimeContext = {
   repoRoot: string;

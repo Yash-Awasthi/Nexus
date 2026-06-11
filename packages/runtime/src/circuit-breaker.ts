@@ -6,9 +6,9 @@
  * allowing recovery via health probes.
  */
 
-import { IEventBus } from "./event-bus";
-import { ILogger } from "./interfaces/logger.interface";
-import { IMetricsCollector } from "./interfaces/observability.interface";
+import { IEventBus } from "./event-bus.js";
+import { ILogger } from "./interfaces/logger.interface.js";
+import { IMetricsCollector } from "./interfaces/observability.interface.js";
 
 // ─── Types ───────────────────────────────────────────────────────────
 

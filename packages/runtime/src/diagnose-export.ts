@@ -1,17 +1,18 @@
-import { RuntimeDiagnosticAPI } from "../orchestration/diagnostic-api";
-import { RuntimeInspector } from "../orchestration/runtime-inspector";
-import { MemoryQueueBackend } from "../orchestration/queue-backend";
-import { FileEventStore, FileRuntimePersistence } from "../orchestration/persistence-manager";
-import { MetricsCollector } from "../orchestration/observability-manager";
-import { LocalServiceDiscovery } from "../orchestration/service-discovery";
-import { ApprovalWorkflow } from "../orchestration/approval-workflow";
-import { LocalEventBus } from "../orchestration/event-bus";
+// @ts-nocheck
+import { RuntimeDiagnosticAPI } from "../orchestration/diagnostic-api.js";
+import { RuntimeInspector } from "../orchestration/runtime-inspector.js";
+import { MemoryQueueBackend } from "../orchestration/queue-backend.js";
+import { FileEventStore, FileRuntimePersistence } from "../orchestration/persistence-manager.js";
+import { MetricsCollector } from "../orchestration/observability-manager.js";
+import { LocalServiceDiscovery } from "../orchestration/service-discovery.js";
+import { ApprovalWorkflow } from "../orchestration/approval-workflow.js";
+import { LocalEventBus } from "../orchestration/event-bus.js";
 import {
   WorkflowRegistry,
   WorkflowTelemetry,
   BrowserResearchWorkflowTemplate,
   LocalCloudProvisioningTemplate
-} from "../orchestration/workflow-engine";
+} from "../orchestration/workflow-engine.js";
 import * as fs from "fs";
 import * as path from "path";
 

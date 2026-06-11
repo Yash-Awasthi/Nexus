@@ -1,6 +1,6 @@
-import { IApprovalWorkflow, IApprovalRecord } from "./interfaces/governance.interface";
-import { IEventStore } from "./interfaces/persistence.interface";
-import { IEventBus } from "./event-bus";
+import { IApprovalWorkflow, IApprovalRecord } from "./interfaces/governance.interface.js";
+import { IEventStore } from "./interfaces/persistence.interface.js";
+import { IEventBus } from "./event-bus.js";
 
 export class ApprovalWorkflow implements IApprovalWorkflow {
   private eventStore: IEventStore;
@@ -35,8 +35,8 @@ export class ApprovalWorkflow implements IApprovalWorkflow {
         const existing = recordsMap.get(payload.approvalId);
         if (existing) {
           existing.status = payload.status;
-          existing.decisionTimestamp = payload.decisionTimestamp ? new Date(payload.decisionTimestamp) : undefined;
-          existing.decidedBy = payload.decidedBy;
+          if (payload.decisionTimestamp) { existing.decisionTimestamp = new Date(payload.decisionTimestamp); } else { delete existing.decisionTimestamp; }
+          if (payload.decidedBy !== undefined) { existing.decidedBy = payload.decidedBy; } else { delete existing.decidedBy; }
         }
       }
     }

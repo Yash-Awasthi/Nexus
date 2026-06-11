@@ -1,4 +1,4 @@
-import { IExecutionAdapter } from "./execution.interface";
+import { IExecutionAdapter } from "./execution.interface.js";
 
 export interface IBrowserTask {
   id: string;

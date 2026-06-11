@@ -57,11 +57,11 @@ export class CouncilService {
     this.engine = new DeliberationEngine({
       llm: transport,
       defaultCouncilSize: config.defaultCouncilSize ?? 5,
-      defaultModel: config.defaultModel,
-      inputCostPer1k: config.inputCostPer1k,
-      outputCostPer1k: config.outputCostPer1k,
+      ...(config.defaultModel !== undefined ? { defaultModel: config.defaultModel } : {}),
+      ...(config.inputCostPer1k !== undefined ? { inputCostPer1k: config.inputCostPer1k } : {}),
+      ...(config.outputCostPer1k !== undefined ? { outputCostPer1k: config.outputCostPer1k } : {}),
     });
-    this.onResult = config.onResult;
+    if (config.onResult !== undefined) { this.onResult = config.onResult; }
   }
 
   /**
@@ -88,7 +88,7 @@ export class CouncilService {
       await this.onResult({
         result,
         votes: result.votes,
-        signalId: opts?.signalId,
+        ...(opts?.signalId !== undefined ? { signalId: opts.signalId } : {}),
         totalCostUsd,
       }).catch((err: unknown) =>
         console.error("[CouncilService] onResult persistence failed:", err),

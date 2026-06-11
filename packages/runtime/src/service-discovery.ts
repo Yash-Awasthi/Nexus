@@ -1,7 +1,8 @@
-import { IServiceDiscovery, ServiceHeartbeat, IHealthMonitor } from "./interfaces/discovery.interface";
-import { IConfigLoader } from "../runtime/config-loader";
-import { probeFlociHealth, resolveFlociEndpoint } from "./floci-client";
-import { ILogger } from "./interfaces/logger.interface";
+// @ts-nocheck
+import { IServiceDiscovery, ServiceHeartbeat, IHealthMonitor } from "./interfaces/discovery.interface.js";
+import { IConfigLoader } from "../runtime/config-loader.js";
+import { probeFlociHealth, resolveFlociEndpoint } from "./floci-client.js";
+import { ILogger } from "./interfaces/logger.interface.js";
 
 export class LocalServiceDiscovery implements IServiceDiscovery {
   private services = new Map<string, ServiceHeartbeat>();

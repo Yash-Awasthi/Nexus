@@ -130,7 +130,7 @@ async function assertOk(res: Response, adapterName: string): Promise<unknown> {
 
 async function execute(task: GitHubTask, ctx: IExecutionContext): Promise<unknown> {
   const token = requireEnv(ctx, "GITHUB_TOKEN");
-  const baseUrl = (ctx.env?.["GITHUB_API_URL"] as string | undefined) ?? "https://api.github.com";
+  const baseUrl = (ctx.environment?.["GITHUB_API_URL"] as string | undefined) ?? "https://api.github.com";
 
   switch (task.taskType) {
     case "github.create-issue": {

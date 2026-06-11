@@ -1,5 +1,5 @@
 import * as fs from "fs";
-import { ILogger } from "./interfaces/logger.interface";
+import { ILogger } from "./interfaces/logger.interface.js";
 
 // ─── Log level ordering ────────────────────────────────────────────────────────
 

@@ -56,7 +56,7 @@ function parseLine(line: string): { key: string; value: string } | null {
     (raw.startsWith('"') && raw.includes('"', 1)) ||
     (raw.startsWith("'") && raw.includes("'", 1))
   ) {
-    const quote = raw[0];
+    const quote = raw[0] ?? '"';
     const closeIdx = raw.indexOf(quote, 1);
     raw = raw.slice(1, closeIdx);
   } else {

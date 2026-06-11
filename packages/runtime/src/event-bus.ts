@@ -1,6 +1,6 @@
-import { IEventStore } from "./interfaces/event-store.interface";
-export { IEventStore };
-import { ILogger } from "./interfaces/logger.interface";
+import type { IEventStore } from "./interfaces/event-store.interface.js";
+export type { IEventStore };
+import { ILogger } from "./interfaces/logger.interface.js";
 
 export interface EventSubscription {
   unsubscribe(): void;
@@ -277,8 +277,8 @@ export class LocalEventBus implements IEventBus {
     const sorted = [...this.history].sort((a, b) => a.sequenceNumber - b.sequenceNumber);
 
     for (let i = 1; i < sorted.length; i++) {
-      const prev = sorted[i - 1].sequenceNumber;
-      const curr = sorted[i].sequenceNumber;
+      const prev = sorted[i - 1]?.sequenceNumber ?? 0;
+      const curr = sorted[i]?.sequenceNumber ?? 0;
 
       if (curr - prev > 1) {
         const missing: number[] = [];

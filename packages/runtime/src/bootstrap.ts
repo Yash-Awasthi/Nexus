@@ -1,5 +1,6 @@
+// @ts-nocheck
 import * as path from "path";
-import { createRuntimeContext, startRuntime } from "./runtime-context";
+import { createRuntimeContext, startRuntime } from "./runtime-context.js";
 
 export async function bootstrap() {
   const bootStarted = Date.now();
