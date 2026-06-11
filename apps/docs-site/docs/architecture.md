@@ -43,7 +43,7 @@ Nexus/
 ├── apps/
 │   ├── api/          @nexus/api        Fastify REST gateway
 │   ├── worker/       @nexus/worker     BullMQ consumers
-│   ├── web/          @nexus/web        React Router 6 dashboard
+│   ├── web/          @nexus/web        React Router 7 dashboard
 │   ├── cli/          @nexus/cli        npx nexus CLI
 │   └── docs-site/    @nexus/docs       This site (Docusaurus)
 ├── packages/
