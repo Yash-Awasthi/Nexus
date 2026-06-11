@@ -1,0 +1,46 @@
+{
+  "name": "@workspace/integrations",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".":                { "import": "./dist/index.js",               "types": "./dist/index.d.ts" },
+    "./slack":          { "import": "./dist/slack/index.js",          "types": "./dist/slack/index.d.ts" },
+    "./github":         { "import": "./dist/github/index.js",         "types": "./dist/github/index.d.ts" },
+    "./supabase":       { "import": "./dist/supabase/index.js",       "types": "./dist/supabase/index.d.ts" },
+    "./neon":           { "import": "./dist/neon/index.js",           "types": "./dist/neon/index.d.ts" },
+    "./groq":           { "import": "./dist/groq/index.js",           "types": "./dist/groq/index.d.ts" },
+    "./tavily":         { "import": "./dist/tavily/index.js",         "types": "./dist/tavily/index.d.ts" },
+    "./cloudflare":     { "import": "./dist/cloudflare/index.js",     "types": "./dist/cloudflare/index.d.ts" },
+    "./vercel":         { "import": "./dist/vercel/index.js",         "types": "./dist/vercel/index.d.ts" },
+    "./doppler":        { "import": "./dist/doppler/index.js",        "types": "./dist/doppler/index.d.ts" },
+    "./linear":         { "import": "./dist/linear/index.js",         "types": "./dist/linear/index.d.ts" },
+    "./betterstack":    { "import": "./dist/betterstack/index.js",    "types": "./dist/betterstack/index.d.ts" },
+    "./gmail":          { "import": "./dist/gmail/index.js",          "types": "./dist/gmail/index.d.ts" },
+    "./googlecalendar": { "import": "./dist/googlecalendar/index.js", "types": "./dist/googlecalendar/index.d.ts" },
+    "./googledrive":    { "import": "./dist/googledrive/index.js",    "types": "./dist/googledrive/index.d.ts" }
+  },
+  "scripts": {
+    "build":     "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "clean":     "rm -rf dist"
+  },
+  "dependencies": {
+    "@workspace/core":          "workspace:*",
+    "@slack/web-api":      "^7.0.0",
+    "@supabase/supabase-js":"^2.45.0",
+    "@octokit/rest":       "^21.0.0",
+    "@linear/sdk":         "^30.0.0",
+    "cloudflare":          "^3.5.0",
+    "@vercel/sdk":         "^1.0.0",
+    "groq-sdk":            "^0.7.0",
+    "googleapis":          "^144.0.0",
+    "pg":                  "^8.12.0"
+  },
+  "devDependencies": {
+    "@types/pg":   "^8.11.0",
+    "typescript":  "^5.5.0"
+  }
+}
