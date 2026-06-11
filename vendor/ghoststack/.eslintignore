@@ -1,0 +1,15 @@
+# Exclude third-party apps
+apps/
+
+# Dependencies
+node_modules/
+
+# Local databases and runtime outputs
+data-runtime/
+generated/
+logs/
+
+# Build caches
+dist/
+build/
+coverage/

@@ -1,0 +1,31 @@
+package io.github.hectorvent.floci.services.cloudwatch.logs.model;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import io.quarkus.runtime.annotations.RegisterForReflection;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@RegisterForReflection
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class LogGroup {
+
+    private String logGroupName;
+    private long createdTime;
+    private Integer retentionInDays;
+    private Map<String, String> tags = new HashMap<>();
+
+    public LogGroup() {}
+
+    public String getLogGroupName() { return logGroupName; }
+    public void setLogGroupName(String logGroupName) { this.logGroupName = logGroupName; }
+
+    public long getCreatedTime() { return createdTime; }
+    public void setCreatedTime(long createdTime) { this.createdTime = createdTime; }
+
+    public Integer getRetentionInDays() { return retentionInDays; }
+    public void setRetentionInDays(Integer retentionInDays) { this.retentionInDays = retentionInDays; }
+
+    public Map<String, String> getTags() { return tags; }
+    public void setTags(Map<String, String> tags) { this.tags = tags; }
+}

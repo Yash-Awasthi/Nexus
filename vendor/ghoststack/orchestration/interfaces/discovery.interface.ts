@@ -1,0 +1,19 @@
+export interface ServiceHeartbeat {
+  name: string;
+  status: "healthy" | "unhealthy" | "offline";
+  lastCheck: Date;
+  details?: any;
+}
+
+export interface IServiceDiscovery {
+  registerService(name: string, port: number, details?: any): Promise<void>;
+  deregisterService(name: string): Promise<void>;
+  getService(name: string): Promise<ServiceHeartbeat | undefined>;
+  listServices(): Promise<ServiceHeartbeat[]>;
+}
+
+export interface IHealthMonitor {
+  startMonitoring(): Promise<void>;
+  stopMonitoring(): Promise<void>;
+  checkService(name: string): Promise<boolean>;
+}

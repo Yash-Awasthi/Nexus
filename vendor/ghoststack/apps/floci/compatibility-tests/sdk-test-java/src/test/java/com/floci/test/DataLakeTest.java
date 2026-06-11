@@ -1,0 +1,130 @@
+package com.floci.test;
+
+import org.junit.jupiter.api.*;
+import software.amazon.awssdk.core.SdkBytes;
+import software.amazon.awssdk.services.athena.AthenaClient;
+import software.amazon.awssdk.services.athena.model.*;
+import software.amazon.awssdk.services.firehose.FirehoseClient;
+import software.amazon.awssdk.services.firehose.model.PutRecordRequest;
+import software.amazon.awssdk.services.firehose.model.Record;
+import software.amazon.awssdk.services.glue.GlueClient;
+import software.amazon.awssdk.services.glue.model.*;
+
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@DisplayName("Data Lake (Athena + Glue + Firehose)")
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+class DataLakeTest {
+
+    private static AthenaClient athena;
+    private static GlueClient glue;
+    private static FirehoseClient firehose;
+
+    private static final String DB_NAME = TestFixtures.uniqueName("test_db");
+    private static final String TABLE_NAME = "orders";
+    private static final String STREAM_NAME = TestFixtures.uniqueName("orders_stream");
+
+    @BeforeAll
+    static void setup() {
+        athena = TestFixtures.athenaClient();
+        glue = TestFixtures.glueClient();
+        firehose = TestFixtures.firehoseClient();
+    }
+
+    @Test
+    @org.junit.jupiter.api.Order(1)
+    void setupInfrastructure() {
+        // 1. Glue Database
+        glue.createDatabase(CreateDatabaseRequest.builder()
+                .databaseInput(DatabaseInput.builder().name(DB_NAME).build())
+                .build());
+
+        // 2. Glue Table — standard AWS JSON table config: TextInputFormat + JsonSerDe
+        glue.createTable(CreateTableRequest.builder()
+                .databaseName(DB_NAME)
+                .tableInput(TableInput.builder()
+                        .name(TABLE_NAME)
+                        .storageDescriptor(StorageDescriptor.builder()
+                                .location("s3://floci-firehose-results/" + STREAM_NAME + "/")
+                                .inputFormat("org.apache.hadoop.mapred.TextInputFormat")
+                                .outputFormat("org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat")
+                                .serdeInfo(SerDeInfo.builder()
+                                        .serializationLibrary("org.openx.data.jsonserde.JsonSerDe")
+                                        .parameters(Map.of("serialization.format", "1"))
+                                        .build())
+                                .columns(
+                                        software.amazon.awssdk.services.glue.model.Column.builder().name("id").type("int").build(),
+                                        software.amazon.awssdk.services.glue.model.Column.builder().name("amount").type("double").build()
+                                )
+                                .build())
+                        .build())
+                .build());
+
+        // 3. Firehose Stream
+        firehose.createDeliveryStream(software.amazon.awssdk.services.firehose.model.CreateDeliveryStreamRequest.builder()
+                .deliveryStreamName(STREAM_NAME)
+                .build());
+    }
+
+    @Test
+    @org.junit.jupiter.api.Order(2)
+    void ingestAndQuery() throws Exception {
+        // Ingest data
+        for (int i = 1; i <= 5; i++) {
+            String json = String.format("{\"id\": %d, \"amount\": %.2f}", i, i * 10.0);
+            firehose.putRecord(PutRecordRequest.builder()
+                    .deliveryStreamName(STREAM_NAME)
+                    .record(Record.builder().data(SdkBytes.fromString(json, StandardCharsets.UTF_8)).build())
+                    .build());
+        }
+
+        // Athena Query
+        StartQueryExecutionResponse startResp = athena.startQueryExecution(StartQueryExecutionRequest.builder()
+                .queryString("SELECT sum(amount) as total FROM " + TABLE_NAME)
+                .queryExecutionContext(QueryExecutionContext.builder().database(DB_NAME).build())
+                .build());
+
+        String queryId = startResp.queryExecutionId();
+
+        // Wait for query
+        int attempts = 0;
+        QueryExecutionStatus status = null;
+        while (attempts < 30) {
+            GetQueryExecutionResponse getResp = athena.getQueryExecution(GetQueryExecutionRequest.builder()
+                    .queryExecutionId(queryId)
+                    .build());
+            status = getResp.queryExecution().status();
+            if (status.state() == QueryExecutionState.SUCCEEDED) break;
+            if (status.state() == QueryExecutionState.FAILED) {
+                Assertions.fail("Query failed: " + status.stateChangeReason());
+            }
+            Thread.sleep(1000);
+            attempts++;
+        }
+
+        assertThat(status.state()).isEqualTo(QueryExecutionState.SUCCEEDED);
+
+        GetQueryResultsResponse results = athena.getQueryResults(GetQueryResultsRequest.builder()
+                .queryExecutionId(queryId)
+                .build());
+
+        assertThat(results.resultSet()).isNotNull();
+        // Athena GetQueryResults includes a header row + data rows
+        assertThat(results.resultSet().rows()).hasSizeGreaterThanOrEqualTo(2);
+
+        // Header row must contain the column name
+        List<String> header = results.resultSet().rows().get(0).data().stream()
+                .map(d -> d.varCharValue())
+                .collect(Collectors.toList());
+        assertThat(header).containsExactly("total");
+
+        // Data row: sum(amount) = 10+20+30+40+50 = 150
+        String total = results.resultSet().rows().get(1).data().get(0).varCharValue();
+        assertThat(Double.parseDouble(total)).isEqualTo(150.0);
+    }
+}

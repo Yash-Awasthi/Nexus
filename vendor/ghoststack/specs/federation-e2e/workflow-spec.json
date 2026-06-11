@@ -1,0 +1,44 @@
+{
+  "spec_version": "v1.1",
+  "metadata": {
+    "name": "Federation E2E (static spec reference)",
+    "description": "Documented task chain; live E2E uses runtime/e2e-federation.ts with unique resource names.",
+    "author": "GhostStack"
+  },
+  "template_id": "federation-e2e-template",
+  "tasks": [
+    {
+      "id": "e2e-s3",
+      "title": "Create bucket",
+      "description": "S3 bucket for E2E",
+      "type": "floci",
+      "action": "create_s3_bucket",
+      "priority": "high",
+      "arguments": { "bucketName": "ghoststack-e2e-placeholder" },
+      "dependencies": []
+    },
+    {
+      "id": "e2e-lambda-create",
+      "title": "Deploy Lambda",
+      "description": "Create function",
+      "type": "floci",
+      "action": "create_lambda",
+      "priority": "high",
+      "arguments": { "functionName": "ghoststack-e2e-fn-placeholder" },
+      "dependencies": ["e2e-s3"]
+    },
+    {
+      "id": "e2e-lambda-invoke",
+      "title": "Invoke Lambda",
+      "description": "Invoke function",
+      "type": "floci",
+      "action": "invoke_lambda",
+      "priority": "high",
+      "arguments": {
+        "functionName": "ghoststack-e2e-fn-placeholder",
+        "payload": { "test": true }
+      },
+      "dependencies": ["e2e-lambda-create"]
+    }
+  ]
+}

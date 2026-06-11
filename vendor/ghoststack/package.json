@@ -1,0 +1,65 @@
+{
+  "name": "ghoststack",
+  "version": "1.2.0",
+  "description": "GhostStack — Local-First Autonomous Orchestration Engine with governed task execution, LLM-backed planning, and multi-adapter routing",
+  "main": "dist/runtime/server.js",
+  "bin": {
+    "gs": "./runtime/cli.ts",
+    "ghoststack": "./runtime/cli.ts"
+  },
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "gs": "ts-node runtime/cli.ts",
+    "start": "ts-node runtime/server.ts",
+    "start:federation": "ts-node runtime/cli.ts start:federation",
+    "stop:federation": "ts-node runtime/cli.ts stop",
+    "e2e": "ts-node runtime/cli.ts e2e",
+    "e2e:http": "ts-node runtime/cli.ts e2e:http",
+    "bootstrap": "ts-node runtime/bootstrap.ts",
+    "healthcheck": "ts-node runtime/healthcheck.ts",
+    "diagnose": "ts-node runtime/diagnose-export.ts",
+    "benchmark": "ts-node runtime/benchmark-runner.ts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "format": "prettier --write ."
+  },
+  "keywords": [
+    "orchestration",
+    "local-first",
+    "mcp",
+    "workflow",
+    "autonomous",
+    "dag"
+  ],
+  "author": "Yash Awasthi",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "axios": "^1.17.0",
+    "js-yaml": "^4.1.1"
+  },
+  "optionalDependencies": {
+    "playwright": "^1.60.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/js-yaml": "^4.0.9",
+    "@typescript-eslint/eslint-plugin": "^8.59.3",
+    "@typescript-eslint/parser": "^8.59.3",
+    "eslint": "^8.57.0",
+    "eslint-plugin-import": "^2.29.1",
+    "jest": "^30.4.2",
+    "prettier": "^3.2.5",
+    "ts-jest": "^29.4.9",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  }
+}
