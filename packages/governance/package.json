@@ -1,6 +1,6 @@
 {
   "name": "@nexus/governance",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": false,
   "description": "Policy engine: constraints, guardrails, approval workflow, capability policies",
   "license": "Apache-2.0",
@@ -22,5 +22,8 @@
   },
   "devDependencies": {
     "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "@nexus/shared": "workspace:*"
   }
 }
