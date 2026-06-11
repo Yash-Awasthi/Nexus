@@ -1,0 +1,18 @@
+path,decision,destination,rationale,loc_estimate
+orchestration/interfaces/execution.interface.ts,MOVE,packages/plugin-sdk/src/index.ts,Already ported — IExecutionAdapter is the foundation of @nexus/plugin-sdk,~50
+orchestration/interfaces/governance.interface.ts,MOVE,packages/governance/src/index.ts,Already ported — GovernanceEngine interfaces in @nexus/governance,~80
+orchestration/interfaces/queue.interface.ts,MOVE,packages/runtime/src/queue.interface.ts,IQueueBackend owned by @nexus/runtime (M6 user milestone),~40
+orchestration/interfaces/event-store.interface.ts,MOVE,packages/runtime/src/event-store.interface.ts,IEventStore for @nexus/runtime,~20
+orchestration/interfaces/persistence.interface.ts,MOVE,packages/runtime/src/persistence.interface.ts,IRuntimePersistence for @nexus/runtime,~20
+orchestration/interfaces/observability.interface.ts,MOVE,packages/telemetry/src/index.ts,IMetricsCollector/ITraceRecorder — belongs in @nexus/telemetry,~40
+orchestration/interfaces/mcp.interface.ts,MOVE,packages/runtime/src/mcp.interface.ts,MCP runtime interface for @nexus/runtime,~40
+orchestration/interfaces/workflow.interface.ts,MOVE,packages/runtime/src/workflow.interface.ts,Workflow engine interface for @nexus/runtime,~40
+orchestration/governance-engine.ts,MOVE,packages/governance/src/index.ts,Already ported — full GovernanceEngine implementation,~250
+orchestration/task-executor.ts,MOVE,packages/runtime/src/task-executor.ts,TaskExecutor with backoff — owned by @nexus/runtime (M6),~200
+orchestration/event-bus.ts,MOVE,packages/runtime/src/event-bus.ts,LocalEventBus with backpressure/dedup/history — owned by @nexus/runtime,~300
+orchestration/mcp-adapter.ts,MOVE,packages/runtime/src/mcp-adapter.ts,MCPRuntime with blocklist/timeout — owned by @nexus/runtime,~150
+apps/CloakBrowser/,DELETE,,Unrelated browser automation tool — no connection to NEXUS AI pipeline; ADR-0001 scope,~788 files
+apps/floci/,DELETE,,Floci explicitly killed in ADR-0001; all associated code removed,~all
+runtime/,KEEP-PARTIAL,packages/runtime/,Only queue + persistence + schema implementations; move to @nexus/runtime (M6 user milestone),varies
+schemas/,MOVE,packages/db/src/schemas/ghoststack/,Zod/JSON schemas for task/queue types; integrate into @nexus/db,~20 files
+tests/,KEEP,packages/runtime/tests/,Orchestration tests should migrate with their implementation,~all

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["turbo.json", "pnpm-workspace.yaml"],
+      "project": ["scripts/**/*.ts"]
+    },
+    "packages/shared": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/plugin-sdk": {
+      "entry": ["src/index.ts", "src/testing.ts"],
+      "project": ["src/**/*.ts", "tests/**/*.ts"]
+    },
+    "packages/contracts": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/council": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/governance": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/adapters/groq": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
+    "packages/adapters/tavily": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
+    "packages/adapters/slack": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
+    "packages/adapters/betterstack": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
+    "packages/adapters/calendar": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
+    "packages/adapters/cloudflare": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
+    "packages/adapters/council": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
+    "packages/adapters/doppler": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
+    "packages/adapters/drive": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
+    "packages/adapters/gmail": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
+    "packages/adapters/ingest": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
+    "packages/adapters/linear": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
+    "packages/adapters/neon": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
+    "packages/adapters/supabase": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
+    "packages/adapters/vercel": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
+    "apps/api": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
+    "apps/web": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
+    "apps/worker": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
+    "apps/cli": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] }
+  },
+  "ignore": [
+    "dist/**",
+    "coverage/**",
+    "**/node_modules/**",
+    "**/*.d.ts",
+    "services/ingest/**"
+  ]
+}

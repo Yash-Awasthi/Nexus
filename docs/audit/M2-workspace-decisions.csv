@@ -1,0 +1,14 @@
+path,decision,destination,rationale,loc_estimate
+packages/core/src/agent-base.ts,DELETE,,Replaced by IExecutionAdapter in @nexus/plugin-sdk; has hardcoded claude-opus-4-6 (hallucinated model),~100
+packages/core/src/message-bus.ts,DELETE,,Concepts salvaged — EventBus from Ghoststack is superior; code discarded,~80
+packages/core/src/state-store.ts,DELETE,,Replaced by IRuntimePersistence in @nexus/runtime; concepts kept not code,~70
+packages/core/src/tool-registry.ts,DELETE,,Replaced by AdapterRegistry in @nexus/plugin-sdk,~60
+packages/integrations/src/anthropic.ts,MOVE,packages/adapters/anthropic/src/index.ts,Add as 15th adapter — Anthropic direct API adapter; implement same as groq,~100
+packages/integrations/src/openai.ts,MOVE,packages/adapters/openai/src/index.ts,Add as 16th adapter — OpenAI direct API,~100
+packages/integrations/src/google.ts,MOVE,packages/adapters/google/src/index.ts,Gemini integration,~80
+packages/integrations/src/github.ts,MOVE,packages/adapters/github/src/index.ts,GitHub adapter — useful for linear-adjacent workflows,~80
+packages/integrations/src/notion.ts,MOVE,packages/adapters/notion/src/index.ts,Notion adapter,~70
+packages/integrations/src/jira.ts,DELETE,,Not in 14 adapter list; low priority; defer,~50
+packages/integrations/src/confluence.ts,DELETE,,Low priority; defer,~50
+packages/core/src/,DELETE,,All agent subclass implementations; replaced by plugin-sdk + adapters,~3500
+turbo.json,REFERENCE,,pnpm + Turbo config already replicated in Nexus/turbo.json,~30

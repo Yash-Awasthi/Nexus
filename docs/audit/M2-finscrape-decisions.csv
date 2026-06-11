@@ -1,0 +1,24 @@
+path,decision,destination,rationale,loc_estimate
+finscrape/scrapers/bloomberg.py,MOVE,services/ingest/src/nexus_ingest/vendor/scrapers/bloomberg.py,Core scraper — promoted to nexus-ingest; M4 already has registry pointing to this,~100
+finscrape/scrapers/reuters.py,MOVE,services/ingest/src/nexus_ingest/vendor/scrapers/reuters.py,Core scraper,~80
+finscrape/scrapers/edgar.py,MOVE,services/ingest/src/nexus_ingest/vendor/scrapers/edgar.py,Core scraper — SEC EDGAR filing access,~120
+finscrape/scrapers/yahoo.py,MOVE,services/ingest/src/nexus_ingest/vendor/scrapers/yahoo.py,Core scraper,~80
+finscrape/scrapers/cnbc.py,MOVE,services/ingest/src/nexus_ingest/vendor/scrapers/cnbc.py,Core scraper,~70
+finscrape/scrapers/ft.py,MOVE,services/ingest/src/nexus_ingest/vendor/scrapers/ft.py,Core scraper — FT financial news,~70
+finscrape/scrapers/benzinga.py,MOVE,services/ingest/src/nexus_ingest/vendor/scrapers/benzinga.py,Core scraper,~70
+finscrape/scrapers/google_news.py,MOVE,services/ingest/src/nexus_ingest/vendor/scrapers/google_news.py,Core scraper,~80
+finscrape/scrapers/google_serp.py,MOVE,services/ingest/src/nexus_ingest/vendor/scrapers/google_serp.py,Core scraper,~60
+finscrape/scrapers/investingcom.py,MOVE,services/ingest/src/nexus_ingest/vendor/scrapers/investingcom.py,Core scraper,~80
+finscrape/scrapers/marketwatch.py,MOVE,services/ingest/src/nexus_ingest/vendor/scrapers/marketwatch.py,Core scraper,~70
+finscrape/scrapers/rss.py,MOVE,services/ingest/src/nexus_ingest/vendor/scrapers/rss.py,Core scraper — generic RSS feed,~80
+finscrape/scrapers/seekingalpha.py,MOVE,services/ingest/src/nexus_ingest/vendor/scrapers/seekingalpha.py,Core scraper,~80
+finscrape/scrapers/__init__.py,MOVE,services/ingest/src/nexus_ingest/vendor/scrapers/__init__.py,BaseScraper base class,~200
+finscrape/models/,MOVE,services/ingest/src/nexus_ingest/vendor/models/,ScrapedArticle + FinEvent + Verdict + EventType data models,~120
+finscrape/analysis/,MOVE,services/ingest/src/nexus_ingest/vendor/analysis/,Ticker extraction + COMPANY_TO_TICKER map + sentiment,~500
+finscrape/engine/,MOVE,services/ingest/src/nexus_ingest/vendor/engine/,Scrapling engine (Fetcher/StealthyFetcher/DynamicFetcher) — keep as-is,~all
+finscrape/edgar/,MOVE,services/ingest/src/nexus_ingest/vendor/edgar/,SEC EDGAR specific utilities,~all
+finscrape/pipeline.py,MOVE,services/ingest/src/nexus_ingest/pipeline.py,AI analysis pipeline — integrate into ingest service,~300
+finscrape/push_to_dashboard.py,DELETE,,Dashboard-specific push script; nexus-ingest has its own NEXUS_API_URL push via httpx,~250
+finscrape/scrape_server.py,DELETE,,Replaced entirely by nexus-ingest FastAPI (api.py); this is the predecessor,~110
+finscrape/main.py,DELETE,,CLI entry point for standalone fin-scrape; replaced by apps/cli in monorepo,~200
+dashboard/,DELETE,,Cloudflare Workers dashboard UI; separate product not part of NEXUS platform,~all
