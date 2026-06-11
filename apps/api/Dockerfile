@@ -4,7 +4,7 @@
 # Run:   docker run -p 3000:3000 --env-file .env nexus-api
 
 # ─── Stage 1: deps ────────────────────────────────────────────────────────────
-FROM node:20.18.0-alpine AS deps
+FROM node:26.3.0-alpine AS deps
 WORKDIR /app
 
 # Install pnpm
@@ -46,7 +46,7 @@ RUN pnpm --filter @nexus/shared build && \
     pnpm --filter @nexus/api build
 
 # ─── Stage 3: runner ─────────────────────────────────────────────────────────
-FROM node:20.18.0-alpine AS runner
+FROM node:26.3.0-alpine AS runner
 WORKDIR /app
 
 # Non-root user for security
