@@ -251,8 +251,14 @@ Make ALL changes in one response.`;
       const applied: string[] = [];
       const failed: string[] = [];
 
+      const rootDirNormalized = path.resolve(rootDir) + path.sep;
       for (const change of result.changes) {
         const absPath = path.resolve(rootDir, change.path);
+        // Reject path traversal attempts: resolved path must stay within rootDir.
+        if (!absPath.startsWith(rootDirNormalized)) {
+          failed.push(`${change.path}: path traversal rejected`);
+          continue;
+        }
         try {
           fs.mkdirSync(path.dirname(absPath), { recursive: true });
           if (change.operation === "write_file" && change.content) {

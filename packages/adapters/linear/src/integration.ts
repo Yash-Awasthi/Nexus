@@ -1,4 +1,5 @@
-import { LinearClient, LinearDocument } from '@linear/sdk';
+import { LinearClient } from '@linear/sdk';
+export type { LinearDocument } from '@linear/sdk';
 
 let _linear: LinearClient | null = null;
 

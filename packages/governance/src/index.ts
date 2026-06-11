@@ -13,7 +13,7 @@
  *   Guardrails  — runtime checks on plan-level or log-level data (loop detection, cost ceiling)
  */
 
-import { GovernanceViolationError } from "@nexus/shared";
+export { GovernanceViolationError } from "@nexus/shared";
 
 // ── Core types ─────────────────────────────────────────────────────────────────
 

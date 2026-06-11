@@ -24,7 +24,7 @@
  *  Always call `close()` before process exit to drain connections cleanly.
  */
 
-import { Queue, QueueEvents } from "bullmq";
+import { Queue } from "bullmq";
 import type { ConnectionOptions } from "bullmq";
 import { IQueueBackend, QueueJob } from "./interfaces/queue.interface.js";
 

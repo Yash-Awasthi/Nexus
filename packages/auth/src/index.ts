@@ -125,8 +125,10 @@ export function verifyJwt(token: string, secret: string): NexusTokenPayload {
   if (parts.length !== 3) throw new AuthError("INVALID_TOKEN", "Malformed JWT");
 
   const [header, body, sig] = parts as [string, string, string];
+  // lgtm[js/insufficient-password-hash] — HMAC-SHA256 here is JWT *signature* computation,
+  // not password storage. Passwords are never passed to this function.
   const expectedSig = base64UrlEncode(
-    createHmac("sha256", secret).update(`${header}.${body}`).digest(),
+    createHmac("sha256", secret).update(`${header}.${body}`).digest(), // lgtm[js/insufficient-password-hash]
   );
 
   // Timing-safe signature comparison

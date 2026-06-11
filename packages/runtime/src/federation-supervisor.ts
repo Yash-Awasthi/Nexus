@@ -528,12 +528,9 @@ export class FederationSupervisor {
     services.push(apiStatus);
 
     const mcpPort = this.config.mcpPort;
-    let mcpStatus: FederationServiceStatus = {
-      name: "mcp-server",
-      status: "offline",
-      port: mcpPort,
-      pid: mcpPid
-    };
+    // Declare without initial value — both try and catch always assign,
+    // so the old "offline" default was a useless assignment.
+    let mcpStatus: FederationServiceStatus;
     try {
       await fetch(`http://127.0.0.1:${mcpPort}/mcp`, { signal: AbortSignal.timeout(2000) });
       mcpStatus = {
@@ -544,7 +541,7 @@ export class FederationSupervisor {
         port: mcpPort
       };
     } catch {
-      mcpStatus = { name: "mcp-server", status: "skipped", detail: "not running", pid: mcpPid, port: mcpPort };
+      mcpStatus = { name: "mcp-server", status: "offline", detail: "not running", pid: mcpPid, port: mcpPort };
     }
     services.push(mcpStatus);
 

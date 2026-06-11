@@ -301,10 +301,16 @@ export async function createGhostStackServer(repoRoot: string): Promise<GhostSta
       res.statusCode = 405;
       res.end(JSON.stringify({ error: `Method not allowed: ${method} ${pathname}` }));
     } catch (err: any) {
-      const message = err?.message || String(err);
-      res.statusCode = message.startsWith("Not Found") ? 404 : 500;
+      const rawMessage = err?.message || String(err);
+      const statusCode = rawMessage.startsWith("Not Found") ? 404 : 500;
+      // Avoid exposing internal stack traces / file paths in production responses.
+      const safeMessage =
+        process.env["NODE_ENV"] === "production" && statusCode === 500
+          ? "Internal server error"
+          : rawMessage;
+      res.statusCode = statusCode;
       res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ error: message }));
+      res.end(JSON.stringify({ error: safeMessage }));
       ctx.metrics.increment("http.errors", 1);
     } finally {
       ctx.metrics.recordTiming("http.request_ms", Date.now() - reqStarted, { route: pathname });

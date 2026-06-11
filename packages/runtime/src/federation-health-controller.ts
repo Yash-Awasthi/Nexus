@@ -304,7 +304,12 @@ export class FederationHealthController {
             }
 
             const size = stat.size;
-            fs.unlinkSync(fp);
+            // Guard against TOCTOU: file may have been removed between statSync and unlinkSync.
+            try {
+              fs.unlinkSync(fp);
+            } catch (unlinkErr: any) {
+              if (unlinkErr.code !== "ENOENT") throw unlinkErr;
+            }
             report.staleStateFilesRemoved.push(fp);
             report.totalBytesFreed += size;
           }

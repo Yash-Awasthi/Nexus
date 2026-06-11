@@ -402,3 +402,6 @@ export class LocalEventBus implements IEventBus {
     return this.dedupCount;
   }
 }
+
+// Backward-compatible alias — consumers that `import { EventBus }` continue to work.
+export { LocalEventBus as EventBus };

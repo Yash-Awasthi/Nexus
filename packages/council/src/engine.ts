@@ -112,6 +112,10 @@ export class DeliberationEngine {
     const votePromises = archetypes.map(async (archetype) => {
       const voteStart = Date.now();
       try {
+        // Explicit timer handle so we can clear it when the LLM resolves first,
+        // preventing the leaked setTimeout from keeping the event loop alive
+        // (resource exhaustion via accumulated timers in high-concurrency runs).
+        let voteTimer: ReturnType<typeof setTimeout> | undefined;
         const response = await Promise.race([
           this.config.llm.chat(
             [
@@ -119,10 +123,10 @@ export class DeliberationEngine {
               { role: "user", content: userPrompt },
             ],
             { model: this.config.defaultModel, temperature: 0.7, maxTokens: 512 },
-          ),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("Vote timeout")), timeoutMs),
-          ),
+          ).then((r) => { clearTimeout(voteTimer); return r; }),
+          new Promise<never>((_, reject) => {
+            voteTimer = setTimeout(() => reject(new Error("Vote timeout")), timeoutMs);
+          }),
         ]);
 
         const costUsd =

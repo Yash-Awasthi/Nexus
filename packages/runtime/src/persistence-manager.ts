@@ -24,8 +24,11 @@ export class FileEventStore implements IEventStore {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    if (!fs.existsSync(this.filePath)) {
-      fs.writeFileSync(this.filePath, "", "utf8");
+    // Use exclusive-create flag to avoid TOCTOU race between existsSync + writeFileSync.
+    try {
+      fs.writeFileSync(this.filePath, "", { flag: "wx", encoding: "utf8" });
+    } catch (err: any) {
+      if (err.code !== "EEXIST") throw err; // File already exists — that's fine
     }
   }
 

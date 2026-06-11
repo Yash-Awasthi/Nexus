@@ -88,9 +88,9 @@ async function cmdInit(): Promise<void> {
     console.log(`[scaffold] Created demo specs directory: ${demoSpecsDir}`);
   }
 
-  // Create ghoststack.config.json if not exists
+  // Create ghoststack.config.json if not exists (wx flag = exclusive create, avoids TOCTOU)
   const configPath = path.join(repoRoot, "ghoststack.config.json");
-  if (!fs.existsSync(configPath)) {
+  try {
     const defaultConfig = {
       apiPort: 3000,
       flociUrl: "http://localhost:4566",
@@ -104,14 +104,20 @@ async function cmdInit(): Promise<void> {
         mcpExternal: true
       }
     };
-    fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2), "utf8");
+    fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2), { flag: "wx", encoding: "utf8" });
     console.log(`[scaffold] Created default config file: ${configPath}`);
+  } catch (err: any) {
+    if (err.code !== "EEXIST") throw err;
   }
 
-  // Create .env if not exists
+  // Create .env if not exists (exclusive create to avoid TOCTOU race)
   const envPath = path.join(repoRoot, ".env");
   const envExamplePath = path.join(repoRoot, ".env.example");
-  if (!fs.existsSync(envPath)) {
+  try {
+    // Attempt exclusive open — throws EEXIST if file already present
+    const fd = fs.openSync(envPath, "wx");
+    fs.closeSync(fd);
+    // File didn't exist — populate it
     if (fs.existsSync(envExamplePath)) {
       fs.copyFileSync(envExamplePath, envPath);
       console.log(`[scaffold] Copied .env from .env.example`);
@@ -129,11 +135,14 @@ GHOSTSTACK_MCP_EXTERNAL=true
       fs.writeFileSync(envPath, defaultEnv, "utf8");
       console.log(`[scaffold] Created default .env file`);
     }
+  } catch (err: any) {
+    if (err.code !== "EEXIST") throw err;
   }
 
-  // Create example spec if not exists
+  // Create example spec if not exists (exclusive create to avoid TOCTOU race)
   const specPath = path.join(demoSpecsDir, "workflow-spec.json");
-  if (!fs.existsSync(specPath)) {
+  try { fs.writeFileSync(specPath, "", { flag: "wx" }); } catch (e: any) { if (e.code !== "EEXIST") throw e; }
+  if (!fs.readFileSync(specPath, "utf8").trim()) {
     const demoSpec = {
       spec_version: "v1.1",
       metadata: {

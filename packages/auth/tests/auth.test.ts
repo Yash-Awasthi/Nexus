@@ -134,10 +134,7 @@ describe("JWT (signJwt + verifyJwt)", () => {
   });
 
   it("accepts JWT with no exp field (non-expiring)", () => {
-    const noExp = { sub: "svc", role: "agent" as const, exp: 0 };
-    const token = signJwt(noExp, SECRET);
-    // exp=0 is in the past — should still expire
-    // Instead test with a very large exp
+    // exp=0 is in the past — should still expire; test with a far-future exp instead
     const longLived = { sub: "svc", role: "agent" as const, exp: Math.floor(Date.now() / 1000) + 999999 };
     const t2 = signJwt(longLived, SECRET);
     expect(verifyJwt(t2, SECRET).sub).toBe("svc");
