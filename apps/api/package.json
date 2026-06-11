@@ -1,0 +1,19 @@
+{
+  "name": "@nexus/api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Fastify HTTP/WebSocket gateway — REST API, SSE, WebSocket",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "clean": "rm -rf dist coverage"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "tsx": "^4.19.1"
+  }
+}

@@ -1,0 +1,43 @@
+name: Feature Request
+description: Propose a new feature or enhancement
+labels: ["enhancement", "triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What problem does this solve? Why is it needed?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Affected layer
+      options:
+        - "Sense (nexus-ingest)"
+        - "Think (@nexus/council)"
+        - "Decide (@nexus/runtime / @nexus/governance)"
+        - "Act (@nexus/adapters)"
+        - "Web UI (@nexus/web)"
+        - "CLI (@nexus/cli)"
+        - "Infra / Docker"
+        - "Cross-cutting"
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and this is not a duplicate
+          required: true
+        - label: I am willing to submit a PR for this
+          required: false
