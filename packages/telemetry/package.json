@@ -1,8 +1,8 @@
 {
   "name": "@nexus/telemetry",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": false,
-  "description": "OpenTelemetry wrappers, Prometheus helpers, structured logging",
+  "description": "Observability: health aggregator, SLO tracking, perf benchmarks, DR checkpoints, Prometheus, structured logging",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -18,9 +18,14 @@
     "dev": "tsc --project tsconfig.json --watch",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "clean": "rm -rf dist coverage"
   },
   "devDependencies": {
-    "typescript": "^5.6.3"
+    "@fast-check/vitest": "^0.1.5",
+    "fast-check": "^3.23.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
   }
 }
