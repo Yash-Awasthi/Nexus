@@ -1,2 +1,3 @@
 // SPDX-License-Identifier: Apache-2.0
-// @nexus/web — skeleton (implementation pending)
+// apps/web entry — see src/main.tsx for the React SPA entrypoint
+export {};
