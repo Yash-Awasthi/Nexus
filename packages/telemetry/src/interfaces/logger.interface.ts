@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 export interface ILogger {
-  info(message: string, context?: any): void;
-  warn(message: string, context?: any): void;
-  error(message: string, error?: any, context?: any): void;
-  debug(message: string, context?: any): void;
+  info(message: string, context?: unknown): void;
+  warn(message: string, context?: unknown): void;
+  error(message: string, error?: unknown, context?: unknown): void;
+  debug(message: string, context?: unknown): void;
 }

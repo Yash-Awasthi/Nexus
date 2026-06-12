@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
+import type { KnownBlock } from "@slack/web-api";
 import { WebClient } from "@slack/web-api";
 
 let _client: WebClient | null = null;
@@ -22,7 +23,7 @@ export async function postBlocks(channel: string, blocks: unknown[], text = ""):
   const res = await slack().chat.postMessage({
     channel,
     text,
-    blocks: blocks as Parameters<typeof slack>[],
+    blocks: blocks as KnownBlock[],
   });
   return res.ts ?? "";
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-const BASE = import.meta.env.VITE_API_URL ?? "";
-const KEY = import.meta.env.VITE_API_KEY ?? "";
+const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
+const KEY = (import.meta.env.VITE_API_KEY as string | undefined) ?? "";
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };

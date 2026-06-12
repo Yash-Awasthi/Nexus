@@ -19,7 +19,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - run: pnpm run test -- --passWithNoTests
+      - run: pnpm run test -- --coverage
         env:
           # Schema tests are type-only (no live queries), but the db client
           # throws at import time without DATABASE_URL.  A placeholder URL
@@ -31,6 +31,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: unit
+          files: packages/*/coverage/lcov.info
           fail_ci_if_error: false
 
   python:

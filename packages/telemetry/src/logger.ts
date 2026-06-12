@@ -47,7 +47,7 @@ export class StructuredLogger implements ILogger {
     return LEVEL_RANK[level] >= LEVEL_RANK[this.minLevel];
   }
 
-  private _format(level: LogLevel, message: string, extra?: any): string {
+  private _format(level: LogLevel, message: string, extra?: unknown): string {
     const ts = new Date().toISOString();
     if (this.jsonMode) {
       return JSON.stringify({
@@ -81,17 +81,17 @@ export class StructuredLogger implements ILogger {
     }
   }
 
-  info(message: string, context?: any): void {
+  info(message: string, context?: unknown): void {
     if (!this._passes("INFO")) return;
     this._emit("INFO", this._format("INFO", message, context));
   }
 
-  warn(message: string, context?: any): void {
+  warn(message: string, context?: unknown): void {
     if (!this._passes("WARN")) return;
     this._emit("WARN", this._format("WARN", message, context));
   }
 
-  error(message: string, error?: any, context?: any): void {
+  error(message: string, error?: unknown, context?: unknown): void {
     if (!this._passes("ERROR")) return;
     const extra =
       error !== undefined || context !== undefined
@@ -105,7 +105,7 @@ export class StructuredLogger implements ILogger {
     this._emit("ERROR", this._format("ERROR", message, extra));
   }
 
-  debug(message: string, context?: any): void {
+  debug(message: string, context?: unknown): void {
     if (!this._passes("DEBUG")) return;
     this._emit("DEBUG", this._format("DEBUG", message, context));
   }
@@ -123,19 +123,19 @@ export class StructuredLogger implements ILogger {
 // where console noise would pollute output or assertions.
 
 export class NullLogger implements ILogger {
-  info(_message: string, _context?: any): void {
+  info(_message: string, _context?: unknown): void {
     /* no-op */
   }
 
-  warn(_message: string, _context?: any): void {
+  warn(_message: string, _context?: unknown): void {
     /* no-op */
   }
 
-  error(_message: string, _error?: any, _context?: any): void {
+  error(_message: string, _error?: unknown, _context?: unknown): void {
     /* no-op */
   }
 
-  debug(_message: string, _context?: any): void {
+  debug(_message: string, _context?: unknown): void {
     /* no-op */
   }
 }

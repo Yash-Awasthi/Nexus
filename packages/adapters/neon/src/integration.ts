@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck
-import pg from "pg";
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
+import { Pool } from "pg";
+import type { QueryResultRow } from "pg";
 
-const { Pool } = pg;
-let _pool: pg.Pool | null = null;
+let _pool: InstanceType<typeof Pool> | null = null;
 
-export function pool(): pg.Pool {
+export function pool(): InstanceType<typeof Pool> {
   if (!_pool) {
     const url = process.env["NEON_DATABASE_URL"];
     if (!url) throw new Error("NEON_DATABASE_URL not set");
@@ -14,7 +14,7 @@ export function pool(): pg.Pool {
   return _pool;
 }
 
-export async function query<T extends pg.QueryResultRow = pg.QueryResultRow>(
+export async function query<T extends QueryResultRow = QueryResultRow>(
   sql: string,
   params?: unknown[],
 ): Promise<T[]> {
@@ -22,7 +22,7 @@ export async function query<T extends pg.QueryResultRow = pg.QueryResultRow>(
   return res.rows;
 }
 
-export async function queryOne<T extends pg.QueryResultRow = pg.QueryResultRow>(
+export async function queryOne<T extends QueryResultRow = QueryResultRow>(
   sql: string,
   params?: unknown[],
 ): Promise<T | null> {

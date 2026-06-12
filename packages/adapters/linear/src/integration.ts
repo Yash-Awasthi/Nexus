@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 import { LinearClient } from "@linear/sdk";
 export type { LinearDocument } from "@linear/sdk";
 
@@ -74,7 +74,7 @@ export async function listCycles(
   return cycles.nodes.map((c) => ({
     id: c.id,
     number: c.number,
-    name: c.name,
+    name: c.name ?? undefined,
     startsAt: c.startsAt,
   }));
 }

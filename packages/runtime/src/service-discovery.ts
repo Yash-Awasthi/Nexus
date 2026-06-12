@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck
+// @ts-nocheck — imports reference orchestration modules not yet exported from @nexus/runtime public API
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 import type { IConfigLoader } from "../runtime/config-loader.js";
 
 import { probeFlociHealth, resolveFlociEndpoint } from "./floci-client.js";

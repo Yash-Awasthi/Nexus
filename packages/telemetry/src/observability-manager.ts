@@ -5,6 +5,12 @@ import type {
   ITraceSpan,
 } from "./interfaces/observability.interface.js";
 
+// ─── Span tree node for getSpanTree() ────────────────────────────────
+export interface SpanTreeNode extends ITraceSpan {
+  durationMs?: number;
+  children: SpanTreeNode[];
+}
+
 // ─── Histogram for percentile calculations ───────────────────────────
 
 export class Histogram {
@@ -120,8 +126,8 @@ export class MetricsCollector implements IMetricsCollector {
     this.histograms[metricName].record(durationMs);
   }
 
-  getMetrics(): Record<string, any> {
-    const result: Record<string, any> = {};
+  getMetrics(): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
 
     // Counters
     for (const [name, value] of Object.entries(this.counters)) {
@@ -168,7 +174,7 @@ export class MetricsCollector implements IMetricsCollector {
 export class TraceRecorder implements ITraceRecorder {
   private spans: ITraceSpan[] = [];
 
-  startSpan(name: string, parentId?: string, metadata?: Record<string, any>): ITraceSpan {
+  startSpan(name: string, parentId?: string, metadata?: Record<string, unknown>): ITraceSpan {
     const span: ITraceSpan = {
       spanId: `${name}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
       ...(parentId !== undefined ? { parentId } : {}),
@@ -180,7 +186,7 @@ export class TraceRecorder implements ITraceRecorder {
     return span;
   }
 
-  endSpan(spanId: string, metadata?: Record<string, any>): void {
+  endSpan(spanId: string, metadata?: Record<string, unknown>): void {
     const span = this.spans.find((s) => s.spanId === spanId);
     if (span) {
       span.endTime = new Date();
@@ -194,8 +200,8 @@ export class TraceRecorder implements ITraceRecorder {
     return [...this.spans];
   }
 
-  getSpanTree(): any[] {
-    const buildTree = (parentId?: string): any[] => {
+  getSpanTree(): SpanTreeNode[] {
+    const buildTree = (parentId?: string): SpanTreeNode[] => {
       return this.spans
         .filter((s) => s.parentId === parentId)
         .map((s) => ({
@@ -355,9 +361,9 @@ export class DiagnosticEnricher {
   }
 
   getRichDiagnostics(): {
-    metrics: Record<string, any>;
+    metrics: Record<string, unknown>;
     traces: ReturnType<TraceRecorder["getTraceSummary"]>;
-    spanTree: any[];
+    spanTree: SpanTreeNode[];
     healthHistory: {
       stats: ReturnType<HealthHistory["getStats"]>;
       latest: HealthRecord | undefined;

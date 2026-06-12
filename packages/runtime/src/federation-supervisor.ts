@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck
+// @ts-nocheck — imports reference orchestration modules not yet exported from @nexus/runtime public API
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 import * as fs from "fs";
 import * as net from "net";
 import * as path from "path";

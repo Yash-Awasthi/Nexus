@@ -13,7 +13,6 @@ regexes = [
   "NEXUS_API_KEY.*=.*your-api-key",
   "NEXUS_API_KEY.*=.*change-me",
   "NEXUS_API_KEY.*=.*dev-secret",
-  "ghp_LEssI.*",  # example PAT in docs only
   "example\\.com",
   "localhost",
 ]

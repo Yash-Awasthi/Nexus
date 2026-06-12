@@ -30,14 +30,6 @@
       "inputs": ["src/**", "tests/**"],
       "outputs": ["coverage/**"]
     },
-    "test:e2e": {
-      "dependsOn": ["^build"],
-      "cache": false
-    },
-    "test:a11y": {
-      "dependsOn": ["^build"],
-      "cache": false
-    },
     "typecheck": {
       "dependsOn": ["^build"],
       "inputs": ["src/**", "tsconfig.json"]

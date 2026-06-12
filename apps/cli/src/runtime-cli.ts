@@ -1,5 +1,8 @@
 #!/usr/bin/env node
-// @ts-nocheck
+// @ts-nocheck — CLI imports runtime internals directly (planning-engine, ghoststack-config,
+// e2e-federation, etc.) that are not yet exported from @nexus/runtime's public API.
+// Pending refactor: migrate all imports to @nexus/runtime package boundary.
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 // SPDX-License-Identifier: Apache-2.0
 /**
  * GhostStack operator CLI (`gs` / `ghoststack`)

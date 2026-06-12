@@ -13,7 +13,8 @@
     "serve": "docusaurus serve",
     "write-translations": "docusaurus write-translations",
     "write-heading-ids": "docusaurus write-heading-ids",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "docs:check": "docusaurus build --out-dir /tmp/docusaurus-check"
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "^3.6.3",
