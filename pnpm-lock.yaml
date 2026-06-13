@@ -92,6 +92,9 @@ importers:
       '@nexus/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@nexus/gateway':
+        specifier: workspace:*
+        version: link:../../packages/gateway
       '@nexus/governance':
         specifier: workspace:*
         version: link:../../packages/governance
@@ -673,6 +676,12 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/gateway:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
 
   packages/governance:
     dependencies:

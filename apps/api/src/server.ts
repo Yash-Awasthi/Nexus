@@ -16,6 +16,7 @@ import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 
 import { auditRoutes } from "./routes/audit.js";
 import { councilRoutes } from "./routes/council.js";
+import { gatewayRoutes } from "./routes/gateway.js";
 import { governanceRoutes } from "./routes/governance.js";
 import { healthRoutes } from "./routes/health.js";
 import { ingestRoutes } from "./routes/ingest.js";
@@ -51,6 +52,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       await api.register(runtimeRoutes);
       await api.register(governanceRoutes);
       await api.register(auditRoutes);
+      await api.register(gatewayRoutes);
     },
     { prefix: "/api/v1" },
   );

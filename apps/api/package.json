@@ -27,6 +27,7 @@
     "@fastify/sensible": "^6.0.4",
     "@nexus/auth": "workspace:*",
     "@nexus/contracts": "workspace:*",
+    "@nexus/gateway": "workspace:*",
     "@nexus/council": "workspace:*",
     "@nexus/db": "workspace:*",
     "@nexus/governance": "workspace:*",
