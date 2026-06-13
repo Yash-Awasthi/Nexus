@@ -9,8 +9,9 @@
  *
  * For integration tests against a real DB, see packages/db/tests/integration/.
  */
-import { describe, it, expect } from "vitest";
 import { fc } from "@fast-check/vitest";
+import { describe, it, expect } from "vitest";
+
 import {
   ingestedEvents,
   signals,

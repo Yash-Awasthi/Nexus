@@ -6,3 +6,5 @@ export * from "./council-transcripts.js";
 export * from "./runtime-tasks.js";
 export * from "./approval-requests.js";
 export * from "./audit-log.js";
+export * from "./memory-entries.js";
+export * from "./billing.js";
