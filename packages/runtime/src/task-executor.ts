@@ -54,7 +54,7 @@ export class TaskExecutor implements ITaskExecutor {
     const length = await this.queue.getQueueLength();
     this.metrics?.recordGauge("queue.size", length);
 
-    const taskType = job.payload?.type || "floci";
+    const taskType = ((job.payload as Record<string, unknown>)?.type as string) || "floci";
     const adapter = this.adapters.find((a) => a.canExecute(taskType));
 
     if (!adapter) {
@@ -118,8 +118,8 @@ export class TaskExecutor implements ITaskExecutor {
       }
 
       return true;
-    } catch (err: any) {
-      const errorMessage = err?.message || String(err);
+    } catch (err) {
+      const errorMessage = (err as Error)?.message || String(err);
       this.logger.error(`Task ${job.id} execution failed: ${errorMessage}`);
 
       this.metrics?.increment("task.failed");

@@ -210,7 +210,8 @@ export class AgentBus implements IAgentBus {
       }, request.timeoutMs);
 
       // Listen for response before sending the delegation
-      sub = this.eventBus.subscribe("agent_message", async (msg: AgentMessage) => {
+      sub = this.eventBus.subscribe("agent_message", async (payload: unknown) => {
+        const msg = payload as AgentMessage;
         if (msg.correlationId === request.id && msg.from === target.agentId) {
           clearTimeout(timeout);
           if (sub) {

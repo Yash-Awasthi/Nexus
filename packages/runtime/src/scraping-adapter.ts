@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck — imports reference orchestration modules not yet exported from @nexus/runtime public API
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
-import { getBridgeManager, BridgeManager } from "../runtime/bridge-manager.js";
-
+import { getBridgeManager, BridgeManager } from "./bridge-manager.js";
 import type {
   IScrapingExecutionAdapter,
   IScrapingTask,
@@ -21,14 +18,15 @@ export class ScrapingExecutionAdapter implements IScrapingExecutionAdapter {
     return taskType === "scraping";
   }
 
-  async execute(task: any, context: IExecutionContext): Promise<any> {
-    const payload = task.payload || {};
+  async execute(task: unknown, context: IExecutionContext): Promise<Record<string, unknown>> {
+    const t = task as Record<string, unknown>;
+    const payload = (t.payload as Record<string, unknown>) || {};
     const scrapingTask: IScrapingTask = {
       id: context.taskId,
-      url: payload.url || "",
-      selectors: payload.selectors || [],
-      maxDepth: payload.maxDepth || 1,
-      maxRequests: payload.maxRequests || 5,
+      url: (payload.url as string) || "",
+      selectors: (payload.selectors as string[]) || [],
+      maxDepth: (payload.maxDepth as number) || 1,
+      maxRequests: (payload.maxRequests as number) || 5,
     };
     return this.executeScrapingTask(scrapingTask);
   }
@@ -88,7 +86,7 @@ export class ScrapingExecutionAdapter implements IScrapingExecutionAdapter {
         task.url.includes("cloudflare") ||
         task.url.includes("linkedin") ||
         task.url.includes("twitter") ||
-        (task as any).stealth === true;
+        ("stealth" in task && (task as { stealth?: boolean }).stealth === true);
 
       const endpoint = useStealthMode ? "/fetch_stealth" : "/fetch";
 
@@ -127,10 +125,10 @@ export class ScrapingExecutionAdapter implements IScrapingExecutionAdapter {
       }
 
       return { success: true, data, requestsCount, bytesFetched };
-    } catch (err: any) {
+    } catch (err) {
       return {
         success: false,
-        data: { error: err.message },
+        data: { error: (err as Error).message },
         requestsCount,
         bytesFetched,
       };

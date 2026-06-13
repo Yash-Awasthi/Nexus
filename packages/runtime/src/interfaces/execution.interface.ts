@@ -25,15 +25,20 @@ export interface IRuntimeEvent {
 // Record<string, unknown> — callers may cast further when needed.
 export interface IExecutionAdapter {
   canExecute(taskType: string): boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  execute(task: any, context: IExecutionContext): Promise<Record<string, unknown>>;
+  /**
+   * Execute a task. The `task` parameter is intentionally `unknown` at the
+   * interface boundary — tasks are heterogeneous across adapters (browser,
+   * scraping, search, code, inference). Each implementation narrows `task`
+   * to its own payload shape via type guards or casts.
+   */
+  execute(task: unknown, context: IExecutionContext): Promise<Record<string, unknown>>;
 }
 
 export interface ITaskDependencyResolver {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  resolveOrder(tasks: any[]): any[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  detectCycles(tasks: any[]): boolean;
+  /** Returns tasks sorted in dependency order. Items are `unknown` at interface level; implementations provide concrete types. */
+  resolveOrder(tasks: unknown[]): unknown[];
+  /** Detects circular dependencies. Items are `unknown` at interface level; implementations provide concrete types. */
+  detectCycles(tasks: unknown[]): boolean;
 }
 
 export interface ITaskExecutor {

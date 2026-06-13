@@ -12,7 +12,7 @@
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import sensible from "@fastify/sensible";
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 
 import { auditRoutes } from "./routes/audit.js";
 import { councilRoutes } from "./routes/council.js";
@@ -26,7 +26,7 @@ export async function buildServer(): Promise<FastifyInstance> {
     logger: {
       level: process.env.LOG_LEVEL ?? "info",
       transport:
-        process.env.NODE_ENV !== "production"
+        process.env.NODE_ENV === "development"
           ? { target: "pino-pretty", options: { colorize: true } }
           : undefined,
     },
@@ -56,7 +56,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   );
 
   // ── Global error handler ──────────────────────────────────────────────────
-  app.setErrorHandler((error, _request, reply) => {
+  app.setErrorHandler((error: FastifyError, _request, reply) => {
     app.log.error(error);
     const statusCode = error.statusCode ?? 500;
     reply.code(statusCode).send({

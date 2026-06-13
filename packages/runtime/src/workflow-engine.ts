@@ -1,7 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck — imports reference orchestration modules not yet exported from @nexus/runtime public API
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
-import type { GhostStackOrchestrator } from "../runtime/orchestrator.js";
 
 import type { IEventBus } from "./event-bus.js";
 import type { IApprovalWorkflow } from "./interfaces/governance.interface.js";
@@ -16,6 +13,7 @@ import type {
   IWorkflowApprovalPolicy,
   IWorkflowConstraint,
 } from "./interfaces/workflow.interface.js";
+import type { GhostStackOrchestrator } from "./orchestrator.js";
 import type { RuntimeGraph } from "./runtime-graph.js";
 import type { Task } from "./task-router.js";
 
@@ -131,7 +129,7 @@ export class WorkflowTelemetry implements IWorkflowTelemetry {
     }
   }
 
-  recordExecutionSuccess(executionId: string, results: Record<string, any>): void {
+  recordExecutionSuccess(executionId: string, results: Record<string, unknown>): void {
     const record = this.memoryLogs.find((e) => e.id === executionId);
     if (record) {
       record.status = "succeeded";
@@ -199,7 +197,7 @@ export interface WorkflowCheckpoint {
   completedTaskIds: string[];
   failedTaskIds: string[];
   pendingTaskIds: string[];
-  taskResults: Record<string, any>;
+  taskResults: Record<string, unknown>;
   status: "running" | "paused" | "cancelled";
   error?: string;
   /** Replay generation marker — set when checkpoint was created during a replay */
@@ -547,7 +545,7 @@ export class WorkflowEngine implements IWorkflowReplay {
       // TaskExecutor.executeNext() saves each job's output to persistence under
       // the job id (= task id). Read those back so downstream tasks and callers
       // see real execution data rather than a synthetic { status: "completed" }.
-      const results: Record<string, any> = { ...(existingCp?.taskResults ?? {}) };
+      const results: Record<string, unknown> = { ...(existingCp?.taskResults ?? {}) };
       for (const t of def.tasks) {
         try {
           const persisted = this.persistence
@@ -567,7 +565,10 @@ export class WorkflowEngine implements IWorkflowReplay {
             executionId,
             workflowId,
             timestamp: new Date(),
-            payload: { taskId: t.id, status: results[t.id]?.status ?? "completed" },
+            payload: {
+              taskId: t.id,
+              status: (results[t.id] as Record<string, unknown> | undefined)?.status ?? "completed",
+            },
           });
         }
       }
@@ -615,8 +616,8 @@ export class WorkflowEngine implements IWorkflowReplay {
         originalExecutionId: undefined, // overridden by deterministicReplay() caller
         stateVerified: isReplay,
       };
-    } catch (e: any) {
-      const errorMsg = e.message || String(e);
+    } catch (e) {
+      const errorMsg = (e as Error).message || String(e);
 
       // Capture task results before potential side-effect suppression
       const cp = this.checkpoints.get(executionId);
@@ -691,7 +692,7 @@ export class WorkflowEngine implements IWorkflowReplay {
       await this.orchestrator.submitAndExecuteTasks(def.tasks);
 
       // Read actual task outputs from persistence (same fix as executeWorkflow path)
-      const results: Record<string, any> = {};
+      const results: Record<string, unknown> = {};
       for (const t of def.tasks) {
         try {
           const persisted = this.persistence
@@ -713,8 +714,8 @@ export class WorkflowEngine implements IWorkflowReplay {
         completedAt: new Date(),
         approved: true,
       };
-    } catch (e: any) {
-      const errorMsg = e.message || String(e);
+    } catch (e) {
+      const errorMsg = (e as Error).message || String(e);
       this.telemetry.recordExecutionFailure(executionId, errorMsg);
       return {
         id: executionId,
@@ -921,7 +922,7 @@ export class WorkflowEngine implements IWorkflowReplay {
       if (pausedCheckpoints.length === 0) {
         return { resumed: null };
       }
-      executionId = pausedCheckpoints[0].executionId;
+      executionId = pausedCheckpoints[0]!.executionId;
     }
 
     const cp = this.checkpoints.get(executionId);
@@ -1025,7 +1026,7 @@ export class WorkflowEngine implements IWorkflowReplay {
     for (const taskId of cp.failedTaskIds) {
       if (
         record.taskResults[taskId] !== undefined &&
-        record.taskResults[taskId]?.status !== "failed"
+        (record.taskResults[taskId] as Record<string, unknown>)?.status !== "failed"
       ) {
         issues.push(`Checkpoint says task ${taskId} failed but telemetry shows different status`);
       }
@@ -1041,15 +1042,16 @@ export class BrowserResearchWorkflowTemplate implements IWorkflowTemplate {
   name = "Governed Browser Research Workflow";
   description = "Coordinates research with navigation caps, scraping tasks, and approval gates.";
 
-  createWorkflow(params: Record<string, any>): IWorkflowDefinition {
-    const limitBytes = params.limitBytes || 5000;
+  createWorkflow(params: Record<string, unknown>): IWorkflowDefinition {
+    const limitBytes = (params.limitBytes as number | undefined) ?? 5000;
+    const wfId = (params.id as string | undefined) || "browser-research-wf";
     return {
-      id: params.id || "browser-research-wf",
+      id: wfId,
       name: this.name,
       description: this.description,
       tasks: [
         {
-          id: `${params.id || "browser-research-wf"}-nav-task`,
+          id: `${wfId}-nav-task`,
           title: "Browser Navigation step",
           description: `browser navigate task with quota limit ${limitBytes}`,
           priority: "high",
@@ -1057,12 +1059,12 @@ export class BrowserResearchWorkflowTemplate implements IWorkflowTemplate {
           dependencies: [],
         },
         {
-          id: `${params.id || "browser-research-wf"}-scrape-task`,
+          id: `${wfId}-scrape-task`,
           title: "Headlines Scraping step",
           description: "scraping research headlines information",
           priority: "medium",
           status: "pending",
-          dependencies: [`${params.id || "browser-research-wf"}-nav-task`],
+          dependencies: [`${wfId}-nav-task`],
         },
       ],
       approvalPolicy: new WorkflowApprovalPolicy(this.name, async (_tasks) => {
@@ -1089,8 +1091,8 @@ export class LocalCloudProvisioningTemplate implements IWorkflowTemplate {
   name = "Local Cloud Provisioning Workflow";
   description = "Ingests multi-resource configs, sorting topological floci task chains.";
 
-  createWorkflow(params: Record<string, any>): IWorkflowDefinition {
-    const prefix = params.id || "cloud-prov";
+  createWorkflow(params: Record<string, unknown>): IWorkflowDefinition {
+    const prefix = (params.id as string | undefined) || "cloud-prov";
     return {
       id: prefix,
       name: this.name,
@@ -1130,8 +1132,8 @@ export class DocumentProcessingTemplate implements IWorkflowTemplate {
   name = "Document Processing Workflow";
   description = "Performs filesystem sandboxed ingestion, parsing, and formatting.";
 
-  createWorkflow(params: Record<string, any>): IWorkflowDefinition {
-    const prefix = params.id || "doc-proc";
+  createWorkflow(params: Record<string, unknown>): IWorkflowDefinition {
+    const prefix = (params.id as string | undefined) || "doc-proc";
     return {
       id: prefix,
       name: this.name,
@@ -1156,7 +1158,7 @@ export class DocumentProcessingTemplate implements IWorkflowTemplate {
       ],
       constraints: [
         new WorkflowConstraint("Sandbox Size Limit Gate", async () => {
-          const limitBytes = params.limitBytes || 50000;
+          const limitBytes = (params.limitBytes as number | undefined) ?? 50000;
           return {
             allowed: limitBytes < 1000000,
             reason: limitBytes >= 1000000 ? "Size exceeds sandboxed quota limit" : undefined,
@@ -1173,8 +1175,8 @@ export class GovernedEtlWorkflowTemplate implements IWorkflowTemplate {
   description =
     "Extract, transform, and load pipeline with scraping, filter, and S3 provisioning steps.";
 
-  createWorkflow(params: Record<string, any>): IWorkflowDefinition {
-    const prefix = params.id || "governed-etl";
+  createWorkflow(params: Record<string, unknown>): IWorkflowDefinition {
+    const prefix = (params.id as string | undefined) || "governed-etl";
     const sourceUrl = (params.source_url as string) || "https://news.ycombinator.com";
     const bucketName = (params.target_s3_bucket as string) || "ghoststack-etl-archive";
     const pattern = (params.transform_pattern as string) || "(?:AI|LLM|Agent|GPT|Cognitive)";
@@ -1237,8 +1239,8 @@ export class SpecToExecutionTemplate implements IWorkflowTemplate {
   name = "Spec-to-Execution Workflow";
   description = "Synthesizes cognitive spec goals, evaluating approvals and execution safety.";
 
-  createWorkflow(params: Record<string, any>): IWorkflowDefinition {
-    const prefix = params.id || "spec-exec";
+  createWorkflow(params: Record<string, unknown>): IWorkflowDefinition {
+    const prefix = (params.id as string | undefined) || "spec-exec";
     return {
       id: prefix,
       name: this.name,

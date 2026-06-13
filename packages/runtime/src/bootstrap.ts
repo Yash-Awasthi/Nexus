@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck — imports reference orchestration modules not yet exported from @nexus/runtime public API
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 import * as path from "path";
 
+import type { IApprovalRecord } from "./interfaces/governance.interface.js";
 import { createRuntimeContext, startRuntime } from "./runtime-context.js";
 
 export async function bootstrap() {
@@ -75,8 +74,8 @@ export async function bootstrap() {
     "\n[SHOWCASE] 2. Instantiating ILLEGAL Workflow (contains path traversal attempt)...",
   );
   const illegalWorkflow = browserTemplate.createWorkflow({ id: "showcase-illegal-research" });
-  illegalWorkflow.tasks[0].id = "task-passwd";
-  illegalWorkflow.tasks[0].description = "Attempt reading file:///etc/passwd inside sandbox";
+  illegalWorkflow.tasks[0]!.id = "task-passwd";
+  illegalWorkflow.tasks[0]!.description = "Attempt reading file:///etc/passwd inside sandbox";
   ctx.registry.registerWorkflow(illegalWorkflow);
 
   console.log("[SHOWCASE] Executing ILLEGAL Workflow...");
@@ -109,7 +108,9 @@ export async function bootstrap() {
   const pendingApprovals = await ctx.approval.listRecords();
   console.log(`[SHOWCASE] Governance Registry pending approval records found:`, pendingApprovals);
 
-  const targetApproval = pendingApprovals.find((r) => r.taskId === "exec-approval-demo")!;
+  const targetApproval = pendingApprovals.find(
+    (r: IApprovalRecord) => r.taskId === "exec-approval-demo",
+  )!;
   console.log(
     `[SHOWCASE] Approving pending governance token request [${targetApproval.approvalId}]...`,
   );

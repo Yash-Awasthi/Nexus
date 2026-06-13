@@ -35,12 +35,13 @@ export class WebSearchAdapter {
     return taskType === "search" || taskType === "answer" || taskType === "web_search";
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async execute(task: any, context: IExecutionContext): Promise<Record<string, unknown>> {
-    const payload = task?.payload ?? task ?? {};
-    const query: string =
-      payload.query ?? payload.objective ?? payload.prompt ?? payload.input ?? "";
-    const mode: SearchMode = payload.mode ?? "balanced";
+  async execute(task: unknown, context: IExecutionContext): Promise<Record<string, unknown>> {
+    const t = task as Record<string, unknown> | null | undefined;
+    const payload = (t?.["payload"] as Record<string, unknown> | undefined) ?? t ?? {};
+    const query = String(
+      payload.query ?? payload.objective ?? payload.prompt ?? payload.input ?? "",
+    );
+    const mode = (payload.mode ?? "balanced") as SearchMode;
     const history: ChatMessage[] = Array.isArray(payload.history) ? payload.history : [];
 
     if (!query) {
@@ -63,9 +64,9 @@ export class WebSearchAdapter {
         skippedSearch: result.skippedSearch,
         findingsCount: result.findings.length,
       };
-    } catch (err: any) {
-      context.logger.error(`WebSearch failed: ${err.message}`);
-      return { success: false, error: err.message };
+    } catch (err) {
+      context.logger.error(`WebSearch failed: ${(err as Error).message}`);
+      return { success: false, error: (err as Error).message };
     }
   }
 }

@@ -9,7 +9,7 @@
 export type { IEventStore } from "./event-store.interface.js";
 
 export interface IRuntimePersistence {
-  saveState(key: string, state: any, options?: { verifyWrite?: boolean }): Promise<void>;
+  saveState(key: string, state: unknown, options?: { verifyWrite?: boolean }): Promise<void>;
   getState<T>(key: string): Promise<T | undefined>;
   clearState(key: string): Promise<void>;
 }

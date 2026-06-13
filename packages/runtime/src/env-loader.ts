@@ -127,13 +127,19 @@ export function loadEnvFromRoot(repoRoot: string, verbose = false): EnvLoaderRes
   if (verbose) {
     if (result.filePath) {
       if (result.loaded.length > 0) {
-        console.log(`[env] Loaded ${result.loaded.length} variable(s) from ${result.filePath}`);
+        process.stderr.write(
+          `[env] Loaded ${result.loaded.length} variable(s) from ${result.filePath}\n`,
+        );
       }
       if (result.skipped.length > 0) {
-        console.log(`[env] Skipped ${result.skipped.length} variable(s) already in environment`);
+        process.stderr.write(
+          `[env] Skipped ${result.skipped.length} variable(s) already in environment\n`,
+        );
       }
     } else {
-      console.log(`[env] No .env file found at ${envPath} — using process environment only`);
+      process.stderr.write(
+        `[env] No .env file found at ${envPath} — using process environment only\n`,
+      );
     }
   }
 

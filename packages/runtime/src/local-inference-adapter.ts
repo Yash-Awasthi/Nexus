@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck — imports reference orchestration modules not yet exported from @nexus/runtime public API
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 /**
  * LocalInferenceAdapter — runs large language models locally via layer-by-layer
  * sharded inference (70B+ on 4GB VRAM, no quantization required).
@@ -13,8 +11,7 @@
  * Requires the local-inference Python bridge to be running (port 7703).
  */
 
-import { getBridgeManager, BridgeManager } from "../runtime/bridge-manager.js";
-
+import { getBridgeManager, BridgeManager } from "./bridge-manager.js";
 import type { IExecutionContext } from "./interfaces/execution.interface.js";
 import type {
   ILanguageModel,
@@ -46,11 +43,13 @@ export class LocalInferenceAdapter {
     return taskType === "inference" || taskType === "local_llm" || taskType === "generate";
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async execute(task: any, context: IExecutionContext): Promise<Record<string, unknown>> {
-    const payload = task?.payload ?? task ?? {};
-    const prompt: string = payload.prompt ?? payload.query ?? payload.input ?? "";
-    const model: string = payload.model ?? this.opts.model ?? DEFAULT_MODEL;
+  async execute(task: unknown, context: IExecutionContext): Promise<Record<string, unknown>> {
+    const payload = ((task as Record<string, unknown>).payload ?? task ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const prompt: string = (payload.prompt ?? payload.query ?? payload.input ?? "") as string;
+    const model: string = (payload.model ?? this.opts.model ?? DEFAULT_MODEL) as string;
     const messages: { role: string; content: string }[] = Array.isArray(payload.messages)
       ? payload.messages
       : [];
@@ -93,8 +92,8 @@ export class LocalInferenceAdapter {
         model: result.model,
         tokensGenerated: result.tokens_generated,
       };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
     }
   }
 }
@@ -113,6 +112,19 @@ export class LocalLanguageModel implements ILanguageModel {
   }
 
   private async callBridge(endpoint: string, body: Record<string, unknown>): Promise<string> {
+    // Honour offline mode so LocalLanguageModel doesn't throw when bridges aren't installed.
+    // Callers that need a real response should set GHOSTSTACK_OFFLINE_MODE=false AND install
+    // packages/runtime/src/bridges/requirements.txt first.
+    const isOffline =
+      process.env.GHOSTSTACK_OFFLINE_MODE === "1" ||
+      (process.env.GHOSTSTACK_OFFLINE_MODE ?? "").toLowerCase() === "true";
+    if (isOffline) {
+      throw new Error(
+        "LocalLanguageModel: bridge unavailable in offline mode " +
+          "(set GHOSTSTACK_OFFLINE_MODE=false and install bridge deps to enable local inference)",
+      );
+    }
+
     const mgr = getBridgeManager();
     const baseUrl = await mgr.url("local-inference");
     const result = await BridgeManager.post<{

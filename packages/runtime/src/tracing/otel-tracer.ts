@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck — imports reference orchestration modules not yet exported from @nexus/runtime public API
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 /**
  * NexusOtelTracer — OpenTelemetry-compatible distributed tracing for @nexus/runtime.
  *
@@ -91,16 +89,20 @@ async function tryLoadOtelSdk(
 ): Promise<OtelSdk | undefined> {
   try {
     // Dynamic import — graceful no-op if not installed
-    const { NodeSDK } = await import("@opentelemetry/sdk-node");
-    const { Resource } = await import("@opentelemetry/resources");
-    const { SEMRESATTRS_SERVICE_NAME } = await import("@opentelemetry/semantic-conventions");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { NodeSDK } = await import("@opentelemetry/sdk-node" as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { Resource } = await import("@opentelemetry/resources" as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { SEMRESATTRS_SERVICE_NAME } = await import("@opentelemetry/semantic-conventions" as any);
 
     const sdkConfig: Record<string, unknown> = {
       resource: new Resource({ [SEMRESATTRS_SERVICE_NAME]: serviceName }),
     };
 
     if (endpoint) {
-      const { OTLPTraceExporter } = await import("@opentelemetry/exporter-trace-otlp-http");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { OTLPTraceExporter } = await import("@opentelemetry/exporter-trace-otlp-http" as any);
       sdkConfig.traceExporter = new OTLPTraceExporter({ url: `${endpoint}/v1/traces` });
     }
 
@@ -143,6 +145,7 @@ export class NexusOtelTracer implements ITraceRecorder {
 
     const endpoint = config.otlpEndpoint ?? process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 
+    // eslint-disable-next-line promise/always-return -- intentional void side-effect; init result stored on instance
     this.initPromise = tryLoadOtelSdk(this.serviceName, endpoint).then((sdk) => {
       this.otelSdk = sdk;
     });

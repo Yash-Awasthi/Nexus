@@ -1,28 +1,28 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck — imports reference orchestration modules not yet exported from @nexus/runtime public API
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 import * as fs from "fs";
+import { fileURLToPath } from "node:url";
 import * as path from "path";
 
-import { ApprovalWorkflow } from "../orchestration/approval-workflow.js";
-import { RuntimeDiagnosticAPI } from "../orchestration/diagnostic-api.js";
-import { LocalEventBus } from "../orchestration/event-bus.js";
-import { MetricsCollector } from "../orchestration/observability-manager.js";
-import { FileEventStore, FileRuntimePersistence } from "../orchestration/persistence-manager.js";
-import { MemoryQueueBackend } from "../orchestration/queue-backend.js";
-import { RuntimeInspector } from "../orchestration/runtime-inspector.js";
-import { LocalServiceDiscovery } from "../orchestration/service-discovery.js";
+import { ApprovalWorkflow } from "@nexus/governance";
+
+import { RuntimeDiagnosticAPI } from "./diagnostic-api.js";
+import { LocalEventBus } from "./event-bus.js";
+import { MetricsCollector } from "./observability-manager.js";
+import { FileEventStore, FileRuntimePersistence } from "./persistence-manager.js";
+import { MemoryQueueBackend } from "./queue-backend.js";
+import { RuntimeInspector } from "./runtime-inspector.js";
+import { LocalServiceDiscovery } from "./service-discovery.js";
 import {
   WorkflowRegistry,
   WorkflowTelemetry,
   BrowserResearchWorkflowTemplate,
   LocalCloudProvisioningTemplate,
-} from "../orchestration/workflow-engine.js";
+} from "./workflow-engine.js";
 
 async function exportDiagnostics() {
   console.log("[DIAG] Packaging GhostStack v1.1 Operational Diagnostics Snapshot...");
 
-  const testDir = path.join(__dirname, "../data-runtime");
+  const testDir = path.join(fileURLToPath(new URL(".", import.meta.url)), "../data-runtime");
   const eventLogPath = path.join(testDir, "events.jsonl");
   const cacheDbPath = path.join(testDir, "cache.json");
 
@@ -83,7 +83,7 @@ async function exportDiagnostics() {
     },
   };
 
-  const logsDir = path.join(__dirname, "../logs");
+  const logsDir = path.join(fileURLToPath(new URL(".", import.meta.url)), "../logs");
   if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
   }

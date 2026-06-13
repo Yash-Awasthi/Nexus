@@ -14,6 +14,8 @@
  */
 
 export { GovernanceViolationError } from "@nexus/shared";
+export { ApprovalWorkflow } from "./approval-workflow.js";
+export type { IApprovalWorkflow, IApprovalRecord } from "./interfaces/governance.interface.js";
 
 // ── Core types ─────────────────────────────────────────────────────────────────
 

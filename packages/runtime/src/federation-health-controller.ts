@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck — imports reference orchestration modules not yet exported from @nexus/runtime public API
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 /**
  * Federation Health Controller
  *
@@ -20,11 +18,7 @@ import * as fs from "fs";
 import * as net from "net";
 import * as path from "path";
 
-import type {
-  FederationSupervisor,
-  FederationServiceStatus,
-} from "../runtime/federation-supervisor.js";
-
+import type { FederationSupervisor, FederationServiceStatus } from "./federation-supervisor.js";
 import { resolveFlociEndpoint, probeFlociHealth } from "./floci-client.js";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -332,8 +326,8 @@ export class FederationHealthController {
             // Guard against TOCTOU: file may have been removed between statSync and unlinkSync.
             try {
               fs.unlinkSync(fp);
-            } catch (unlinkErr: any) {
-              if (unlinkErr.code !== "ENOENT") throw unlinkErr;
+            } catch (unlinkErr) {
+              if ((unlinkErr as NodeJS.ErrnoException).code !== "ENOENT") throw unlinkErr;
             }
             report.staleStateFilesRemoved.push(fp);
             report.totalBytesFreed += size;
@@ -414,9 +408,9 @@ export class FederationHealthController {
   private async isPortInUse(port: number): Promise<boolean> {
     return new Promise((resolve) => {
       const server = net.createServer();
-      server.once("error", (err: any) => {
+      server.once("error", (err: Error) => {
         // EADDRINUSE means the port is occupied by another process
-        resolve(err.code === "EADDRINUSE");
+        resolve((err as NodeJS.ErrnoException).code === "EADDRINUSE");
       });
       server.once("listening", () => {
         // Successfully bound — port is available, so not in use
@@ -437,10 +431,11 @@ export class FederationHealthController {
     try {
       process.kill(pid, 0);
       return true;
-    } catch (e: any) {
-      if (e.code === "EPERM") return true;
-      if (e.code === "ESRCH") return false;
-      if (e.code === "EINVAL") return false;
+    } catch (e) {
+      const _e = e as NodeJS.ErrnoException;
+      if (_e.code === "EPERM") return true;
+      if (_e.code === "ESRCH") return false;
+      if (_e.code === "EINVAL") return false;
       return true;
     }
   }

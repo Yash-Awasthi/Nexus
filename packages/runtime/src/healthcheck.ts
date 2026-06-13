@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck — imports reference orchestration modules not yet exported from @nexus/runtime public API
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 import * as fs from "fs";
+import { fileURLToPath } from "node:url";
 import * as path from "path";
 
 import * as yaml from "js-yaml";
+
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
 export function runHealthcheck(): boolean {
   console.log("\x1b[36m=========================================================================");
@@ -30,8 +31,10 @@ export function runHealthcheck(): boolean {
         console.log(`\x1b[31m[FAIL] ${check.name} failed sanity checks.\x1b[0m\n`);
         healthy = false;
       }
-    } catch (e: any) {
-      console.log(`\x1b[31m[CRITICAL] Error checking ${check.name}: ${e.message}\x1b[0m\n`);
+    } catch (e) {
+      console.log(
+        `\x1b[31m[CRITICAL] Error checking ${check.name}: ${(e as Error).message}\x1b[0m\n`,
+      );
       healthy = false;
     }
   }
@@ -79,8 +82,8 @@ function checkYAMLConfigs(): boolean {
       const content = fs.readFileSync(p, "utf8");
       yaml.load(content);
       console.log(`  [OK] Parsed valid YAML config: ${file}`);
-    } catch (err: any) {
-      console.error(`  [ERR] Malformed YAML in file ${file}: ${err.message}`);
+    } catch (err) {
+      console.error(`  [ERR] Malformed YAML in file ${file}: ${(err as Error).message}`);
       return false;
     }
   }
@@ -128,8 +131,8 @@ function checkSchemas(): boolean {
       const content = fs.readFileSync(p, "utf8");
       JSON.parse(content);
       console.log(`  [OK] Loaded valid JSON schema: ${file}`);
-    } catch (err: any) {
-      console.error(`  [ERR] Malformed JSON schema in ${file}: ${err.message}`);
+    } catch (err) {
+      console.error(`  [ERR] Malformed JSON schema in ${file}: ${(err as Error).message}`);
       return false;
     }
   }
@@ -173,8 +176,8 @@ function checkMcpBridgeHealth(): boolean {
       const content = fs.readFileSync(mcpRegistryPath, "utf8");
       JSON.parse(content);
       console.log(`  [OK] MCP registry schema: mcp_registry.json`);
-    } catch (err: any) {
-      console.error(`  [ERR] Malformed MCP registry schema: ${err.message}`);
+    } catch (err) {
+      console.error(`  [ERR] Malformed MCP registry schema: ${(err as Error).message}`);
       allOk = false;
     }
   } else {
@@ -195,6 +198,6 @@ function checkMcpBridgeHealth(): boolean {
   return allOk;
 }
 
-if (require.main === module) {
+if (process.argv[1] === fileURLToPath(new URL(import.meta.url))) {
   process.exit(runHealthcheck() ? 0 : 1);
 }

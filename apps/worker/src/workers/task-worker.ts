@@ -86,7 +86,7 @@ export function createTaskWorkers(connection: ConnectionOptions): Worker[] {
   const workers = [highWorker, mediumWorker, lowWorker];
 
   for (const worker of workers) {
-    worker.on("completed", (job, result) => {
+    worker.on("completed", (job: Job, result: unknown) => {
       console.log(
         JSON.stringify({
           level: "info",
@@ -98,7 +98,7 @@ export function createTaskWorkers(connection: ConnectionOptions): Worker[] {
       );
     });
 
-    worker.on("failed", (job, err) => {
+    worker.on("failed", (job: Job | undefined, err: Error) => {
       console.error(
         JSON.stringify({
           level: "error",

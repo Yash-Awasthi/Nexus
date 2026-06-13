@@ -81,12 +81,9 @@ export class CouncilService {
     if (this.onResult && response.ok && response.result) {
       const result = response.result;
 
-      // Compute total cost from vote token estimates
-      // (engine tracks this internally; we approximate here)
-      const totalCostUsd = result.votes.reduce((acc, _v) => {
-        // Each vote's cost is embedded in reasoning if engine exposed it — safe fallback to 0
-        return acc;
-      }, 0);
+      // totalCostUsd is computed from per-vote token usage in DeliberationEngine
+      // and surfaced on ProposalResult — read it directly (no recomputation needed).
+      const totalCostUsd = result.totalCostUsd;
 
       await this.onResult({
         result,

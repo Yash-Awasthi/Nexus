@@ -2,25 +2,29 @@
 /**
  * Bearer token authentication for @nexus/api.
  *
- * Reads NEXUS_API_KEY from env.  If not set, auth is bypassed (dev mode).
+ * Delegates to @nexus/auth which uses constant-time comparison (timingSafeEqual)
+ * to prevent timing-based API key brute-force attacks.
+ *
+ * When NEXUS_API_KEY is unset auth is bypassed (dev mode).
  * Register as a Fastify preHandler hook on protected route groups.
  */
 
+import { authenticate, AuthError } from "@nexus/auth";
 import type { FastifyRequest, FastifyReply } from "fastify";
 
-const BEARER_PREFIX = "Bearer ";
-
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const expected = process.env.NEXUS_API_KEY;
-  if (!expected) return; // auth disabled in dev
-
-  const authHeader = request.headers.authorization ?? "";
-  if (!authHeader.startsWith(BEARER_PREFIX)) {
-    return reply.code(401).send({ error: "Missing Bearer token" });
-  }
-
-  const token = authHeader.slice(BEARER_PREFIX.length);
-  if (token !== expected) {
-    return reply.code(401).send({ error: "Invalid API key" });
+  // Read env dynamically so tests can mutate NEXUS_API_KEY after module load
+  const authConfig = {
+    apiKey: process.env.NEXUS_API_KEY || undefined,
+    disabled: !process.env.NEXUS_API_KEY,
+  };
+  try {
+    authenticate(request.headers.authorization, authConfig);
+  } catch (err) {
+    if (err instanceof AuthError) {
+      await reply.code(err.httpStatus).send({ code: err.code, message: err.message });
+      return;
+    }
+    await reply.code(500).send({ code: "INTERNAL_ERROR", message: "Auth check failed" });
   }
 }

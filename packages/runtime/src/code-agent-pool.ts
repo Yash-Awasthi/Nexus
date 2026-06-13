@@ -19,6 +19,7 @@ import * as path from "path";
 import type { IExecutionContext } from "./interfaces/execution.interface.js";
 import type { ILanguageModel, ChatMessage } from "./interfaces/language-model.interface.js";
 import { createLanguageModel } from "./language-model.js";
+import type { SearchMode } from "./web-search-engine.js";
 import { WebSearchEngine } from "./web-search-engine.js";
 
 // ─── Shared LLM accessor ──────────────────────────────────────────────────────
@@ -81,11 +82,11 @@ export class FilePickerAgent {
     return taskType === "code_explore" || taskType === "file_picker";
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async execute(task: any, context: IExecutionContext): Promise<Record<string, unknown>> {
-    const payload = task?.payload ?? task ?? {};
-    const prompt: string = payload.prompt ?? payload.query ?? "";
-    const rootDir: string = payload.rootDir ?? process.cwd();
+  async execute(task: unknown, context: IExecutionContext): Promise<Record<string, unknown>> {
+    const t = task as Record<string, unknown>;
+    const payload = (t.payload ?? t) as Record<string, unknown>;
+    const prompt: string = (payload.prompt ?? payload.query ?? "") as string;
+    const rootDir: string = (payload.rootDir ?? process.cwd()) as string;
     const directories: string[] = Array.isArray(payload.directories) ? payload.directories : [];
 
     context.logger.info(`FilePickerAgent: "${prompt.slice(0, 60)}"`);
@@ -155,8 +156,8 @@ Return at most 12 most relevant files. Paths must be relative to the project roo
         summary: result.summary,
         rootDir,
       };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
     }
   }
 }
@@ -179,12 +180,14 @@ export class CodeEditorAgent {
     return taskType === "code_edit" || taskType === "edit";
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async execute(task: any, context: IExecutionContext): Promise<Record<string, unknown>> {
-    const payload = task?.payload ?? task ?? {};
-    const request: string = payload.request ?? payload.prompt ?? payload.query ?? "";
-    const rootDir: string = payload.rootDir ?? process.cwd();
-    const filePaths: string[] = Array.isArray(payload.filePaths) ? payload.filePaths : [];
+  async execute(task: unknown, context: IExecutionContext): Promise<Record<string, unknown>> {
+    const t = task as Record<string, unknown>;
+    const payload = (t.payload ?? t) as Record<string, unknown>;
+    const request: string = (payload.request ?? payload.prompt ?? payload.query ?? "") as string;
+    const rootDir: string = (payload.rootDir ?? process.cwd()) as string;
+    const filePaths: string[] = Array.isArray(payload.filePaths)
+      ? (payload.filePaths as string[])
+      : [];
 
     context.logger.info(`CodeEditorAgent: "${request.slice(0, 60)}"`);
 
@@ -275,8 +278,8 @@ Make ALL changes in one response.`;
             fs.writeFileSync(absPath, updated, "utf8");
             applied.push(change.path);
           }
-        } catch (err: any) {
-          failed.push(`${change.path}: ${err.message}`);
+        } catch (err) {
+          failed.push(`${change.path}: ${(err as Error).message}`);
         }
       }
 
@@ -287,8 +290,8 @@ Make ALL changes in one response.`;
         explanation: result.explanation,
         changesCount: result.changes.length,
       };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
     }
   }
 }
@@ -311,14 +314,17 @@ export class CodeReviewerAgent {
     return taskType === "code_review" || taskType === "review";
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async execute(task: any, context: IExecutionContext): Promise<Record<string, unknown>> {
-    const payload = task?.payload ?? task ?? {};
-    const rootDir: string = payload.rootDir ?? process.cwd();
-    const filePaths: string[] = Array.isArray(payload.filePaths) ? payload.filePaths : [];
-    const diff: string = payload.diff ?? "";
-    const request: string =
-      payload.request ?? payload.query ?? "Review the provided code for issues.";
+  async execute(task: unknown, context: IExecutionContext): Promise<Record<string, unknown>> {
+    const t = task as Record<string, unknown>;
+    const payload = (t.payload ?? t) as Record<string, unknown>;
+    const rootDir: string = (payload.rootDir ?? process.cwd()) as string;
+    const filePaths: string[] = Array.isArray(payload.filePaths)
+      ? (payload.filePaths as string[])
+      : [];
+    const diff: string = (payload.diff ?? "") as string;
+    const request: string = (payload.request ??
+      payload.query ??
+      "Review the provided code for issues.") as string;
 
     context.logger.info(`CodeReviewerAgent: ${filePaths.length} files`);
 
@@ -385,8 +391,8 @@ Respond as JSON:
         criticalCount: result.issues.filter((i) => i.severity === "critical").length,
         summary: result.summary,
       };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
     }
   }
 }
@@ -414,16 +420,16 @@ export class ResearcherAgent {
     return taskType === "research" || taskType === "web_research";
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async execute(task: any, context: IExecutionContext): Promise<Record<string, unknown>> {
-    const payload = task?.payload ?? task ?? {};
-    const query: string = payload.query ?? payload.prompt ?? "";
+  async execute(task: unknown, context: IExecutionContext): Promise<Record<string, unknown>> {
+    const t = task as Record<string, unknown>;
+    const payload = (t.payload ?? t) as Record<string, unknown>;
+    const query: string = (payload.query ?? payload.prompt ?? "") as string;
     const depth = payload.depth ?? payload.mode ?? "balanced";
 
     context.logger.info(`ResearcherAgent: "${query.slice(0, 60)}"`);
 
     try {
-      const result = await this.searchEngine.search(query, { mode: depth });
+      const result = await this.searchEngine.search(query, { mode: depth as SearchMode });
       return {
         success: true,
         answer: result.answer,
@@ -431,8 +437,8 @@ export class ResearcherAgent {
         queriesUsed: result.queriesUsed,
         findingsCount: result.findings.length,
       };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
     }
   }
 }
@@ -456,11 +462,11 @@ export class ThinkerAgent {
     return taskType === "reason" || taskType === "think";
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async execute(task: any, context: IExecutionContext): Promise<Record<string, unknown>> {
-    const payload = task?.payload ?? task ?? {};
-    const prompt: string = payload.prompt ?? payload.query ?? "";
-    const contextText: string = payload.context ?? "";
+  async execute(task: unknown, context: IExecutionContext): Promise<Record<string, unknown>> {
+    const t = task as Record<string, unknown>;
+    const payload = (t.payload ?? t) as Record<string, unknown>;
+    const prompt: string = (payload.prompt ?? payload.query ?? "") as string;
+    const contextText: string = (payload.context ?? "") as string;
     const history: ChatMessage[] = Array.isArray(payload.history) ? payload.history : [];
 
     context.logger.info(`ThinkerAgent: "${prompt.slice(0, 60)}"`);
@@ -488,8 +494,8 @@ ${contextText ? `Context provided:\n${contextText}\n\n` : ""}Be thorough. Show y
       });
 
       return { success: true, answer, prompt };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
     }
   }
 }
@@ -503,8 +509,8 @@ ${contextText ? `Context provided:\n${contextText}\n\n` : ""}Be thorough. Show y
 export class CodeAgentPool {
   private agents: {
     canExecute(t: string): boolean;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    execute(task: any, ctx: IExecutionContext): Promise<Record<string, unknown>>;
+
+    execute(task: unknown, ctx: IExecutionContext): Promise<Record<string, unknown>>;
   }[];
 
   constructor(llm?: ILanguageModel) {
@@ -524,16 +530,18 @@ export class CodeAgentPool {
     return this.agents.some((a) => a.canExecute(taskType));
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async execute(task: any, context: IExecutionContext): Promise<Record<string, unknown>> {
-    const taskType: string = task?.type ?? task?.payload?.type ?? "";
+  async execute(task: unknown, context: IExecutionContext): Promise<Record<string, unknown>> {
+    const t = task as Record<string, unknown>;
+    const taskType: string = (t.type ??
+      (t.payload as Record<string, unknown> | undefined)?.type ??
+      "") as string;
     // Generic "code" type: delegate to the CodeEditorAgent as the general-purpose agent
     const resolvedType = taskType === "code" ? "code_edit" : taskType;
     const agent = this.agents.find((a) => a.canExecute(resolvedType));
     if (!agent) {
       return { success: false, error: `No agent for task type: ${taskType}` };
     }
-    return agent.execute({ ...task, type: resolvedType }, context);
+    return agent.execute({ ...t, type: resolvedType }, context);
   }
 
   /** All task types handled by this pool */

@@ -1,18 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck — imports reference orchestration modules not yet exported from @nexus/runtime public API
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 import * as fs from "fs";
 import * as path from "path";
 
-import { runFederationE2e } from "../runtime/e2e-federation.js";
-import type { GhostStackRuntimeContext } from "../runtime/runtime-context.js";
-
+import { runFederationE2e } from "./e2e-federation.js";
 import type { FlociExecutionAdapter } from "./floci-adapter.js";
 import { resolveFlociEndpoint } from "./floci-client.js";
 import { dispatchExtendedAction, EXTENDED_FLOCI_ACTIONS } from "./floci-extended.js";
 import type { IMCPTransport } from "./interfaces/mcp.interface.js";
 import { MCPRuntime } from "./mcp-adapter.js";
 import { MCPServerRegistry } from "./mcp-registry.js";
+import type { GhostStackRuntimeContext } from "./runtime-context.js";
 import { resolveSandboxPath } from "./runtime-sandbox.js";
 import { loadWorkflowSpecFile, specToWorkflowDefinition } from "./spec-loader.js";
 
@@ -256,7 +253,7 @@ export class GhostStackMcpBridge implements IMCPTransport {
         return JSON.stringify({ messageId: msgId }, null, 2);
       }
       case "ghoststack_agent_find": {
-        const agents = await this.ctx.agentBus.findAgents(args.action);
+        const agents = await this.ctx.agentBus.findAgents(args.action as string);
         return JSON.stringify(agents, null, 2);
       }
 
@@ -282,7 +279,11 @@ export class GhostStackMcpBridge implements IMCPTransport {
         return JSON.stringify(diag, null, 2);
       }
       case "ghoststack_health_history": {
-        const history = this.ctx.diagnosticEnricher.getHealthHistory();
+        const history = this.ctx.diagnosticEnricher.getHealthHistory() as unknown as {
+          getStats(): unknown;
+          getLatest(): unknown;
+          getHistory(): unknown[];
+        };
         return JSON.stringify(
           {
             stats: history.getStats(),

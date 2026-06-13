@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck — imports reference orchestration modules not yet exported from @nexus/runtime public API
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
-import type { IConfigLoader } from "../runtime/config-loader.js";
-
+import type { IConfigLoader } from "./config-loader.js";
 import { probeFlociHealth, resolveFlociEndpoint } from "./floci-client.js";
 import type {
   IServiceDiscovery,
@@ -14,13 +11,14 @@ import type { ILogger } from "./interfaces/logger.interface.js";
 export class LocalServiceDiscovery implements IServiceDiscovery {
   private services = new Map<string, ServiceHeartbeat>();
 
-  async registerService(name: string, port: number, details?: any): Promise<void> {
-    const status = details?.status || "healthy";
+  async registerService(name: string, port: number, details?: unknown): Promise<void> {
+    const _d = details as Record<string, unknown> | undefined;
+    const status = (_d?.status as ServiceHeartbeat["status"]) || "healthy";
     this.services.set(name, {
       name,
       status,
       lastCheck: new Date(),
-      details: { ...details, port },
+      details: { ...(_d ?? {}), port },
     });
   }
 
@@ -118,8 +116,8 @@ export class HealthMonitor implements IHealthMonitor {
           }
         }
 
-        await this.discovery.registerService(serviceName, def.port, {
-          type: def.type,
+        await this.discovery.registerService(serviceName, def!.port, {
+          type: def!.type,
           status,
           healthPath: hc?.path,
           probeLatencyMs,

@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck — imports reference orchestration modules not yet exported from @nexus/runtime public API
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 /**
  * RuntimeManager — central service lifecycle manager for GhostStack.
  *
@@ -10,7 +8,7 @@
  * service implementations.
  */
 
-import type { IConfigLoader } from "../runtime/config-loader.js";
+import type { IConfigLoader } from "./config-loader.js";
 
 // ─── Public types ──────────────────────────────────────────────────────────────
 
@@ -147,9 +145,9 @@ export class RuntimeManager implements IRuntimeManager {
       record.restartCount += 1;
       record.lastError = undefined;
       record.detail = undefined;
-    } catch (err: any) {
+    } catch (err) {
       record.status = "error";
-      record.lastError = err?.message || String(err);
+      record.lastError = (err as Error)?.message || String(err);
       record.detail = record.lastError;
       throw err;
     }
@@ -163,9 +161,9 @@ export class RuntimeManager implements IRuntimeManager {
       record.status = "stopped";
       record.stoppedAt = new Date();
       record.detail = undefined;
-    } catch (err: any) {
+    } catch (err) {
       record.status = "error";
-      record.lastError = err?.message || String(err);
+      record.lastError = (err as Error)?.message || String(err);
       record.detail = record.lastError;
       throw err;
     }

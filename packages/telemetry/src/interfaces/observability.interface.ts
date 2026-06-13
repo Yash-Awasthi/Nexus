@@ -51,11 +51,11 @@ export interface ITelemetrySink {
 }
 
 export interface IRuntimeInspector {
-  getHealth(): Promise<any>;
-  getMetrics(): Promise<any>;
+  getHealth(): Promise<unknown>;
+  getMetrics(): Promise<unknown>;
   getTasks(): Promise<ITaskSnapshot[]>;
   getEvents(): Promise<IEventSnapshot[]>;
   getQueues(): Promise<IQueueSnapshot>;
-  getServices(): Promise<any[]>;
-  getSnapshots(): Promise<any>;
+  getServices(): Promise<unknown[]>;
+  getSnapshots(): Promise<unknown>;
 }

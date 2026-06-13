@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck — imports reference orchestration modules not yet exported from @nexus/runtime public API
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 /**
  * WebSearchEngine — agentic web search + answer synthesis.
  *
@@ -17,8 +15,7 @@
 
 import * as https from "https";
 
-import { getBridgeManager, BridgeManager } from "../runtime/bridge-manager.js";
-
+import { getBridgeManager, BridgeManager } from "./bridge-manager.js";
 import type { ILanguageModel, ChatMessage } from "./interfaces/language-model.interface.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────

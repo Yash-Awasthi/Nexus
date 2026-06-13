@@ -38,15 +38,49 @@ export interface GhostStackContextLike {
   scrapingTelemetry: IEnvironmentTelemetry;
   registry: IWorkflowRegistry;
   workflowTelemetry: IWorkflowTelemetry;
-  workflowEngine: any;
+  workflowEngine: unknown;
   memoryStore: IMemoryStore;
   agentBus: IAgentBus;
   circuitBreaker: CircuitBreaker;
-  circuitBreakerWrapper?: any;
-  traceIndexer?: any;
+  circuitBreakerWrapper?: unknown;
+  traceIndexer?: unknown;
 }
 
-export class RuntimeInspector implements IRuntimeInspector {
+// ── Extended inspector interface — superset of IRuntimeInspector ──────────────
+// Captures all extended diagnostic methods on RuntimeInspector so callers
+// (e.g. RuntimeDiagnosticAPI) can type-check without casting to any.
+export interface IExtendedRuntimeInspector extends IRuntimeInspector {
+  getMCPSummary(): Promise<unknown>;
+  getMCPServers(): Promise<unknown[]>;
+  getMCPTools(): Promise<string[]>;
+  getMCPExecutions(): Promise<unknown[]>;
+  getGovernanceInfo(): Promise<unknown>;
+  getApprovalsList(): Promise<unknown[]>;
+  getPlansList(): Promise<ICognitiveTrace[]>;
+  getGuardrailsInfo(): Promise<unknown>;
+  getBrowserMetrics(): unknown;
+  getScrapingMetrics(): unknown;
+  getSandboxMetrics(): unknown;
+  getEnvironmentsList(): unknown[];
+  getWorkflowsList(): unknown[];
+  getWorkflowExecution(executionId: string): unknown;
+  getWorkflowExecutionHistory(): unknown[];
+  getWorkflowReplays(): unknown[];
+  getWorkflowTemplates(): unknown[];
+  getWorkflowTelemetryStats(): unknown;
+  getMemoryStats(): Promise<unknown>;
+  getMemoryEntries(query?: {
+    types?: string[];
+    keyPrefix?: string;
+    limit?: number;
+  }): Promise<unknown[]>;
+  getAgentCapabilities(): Promise<AgentCapability[]>;
+  getAgentMessages(options?: { limit?: number }): Promise<AgentMessage[]>;
+  getCircuitBreakerState(): unknown;
+  recordPlan(plan: ICognitiveTrace): void;
+}
+
+export class RuntimeInspector implements IExtendedRuntimeInspector {
   private metrics: IMetricsCollector;
   private queue: IQueueBackend;
   private discovery: IServiceDiscovery;
@@ -67,7 +101,7 @@ export class RuntimeInspector implements IRuntimeInspector {
   // Phase 8 Workflow Core Abstractions Context
   private workflowRegistry?: IWorkflowRegistry;
   private workflowTelemetry?: IWorkflowTelemetry;
-  private workflowEngine?: any;
+  private workflowEngine?: unknown;
 
   // New Layer: Unified Memory & Knowledge
   private memoryStore?: IMemoryStore;
@@ -118,12 +152,12 @@ export class RuntimeInspector implements IRuntimeInspector {
     envsList?: IExecutionEnvironment[],
     workflowRegistry?: IWorkflowRegistry,
     workflowTelemetry?: IWorkflowTelemetry,
-    workflowEngine?: any,
+    workflowEngine?: unknown,
     memoryStore?: IMemoryStore,
     agentBus?: IAgentBus,
     circuitBreaker?: CircuitBreaker,
-    _circuitBreakerWrapper?: any,
-    _traceIndexer?: any,
+    _circuitBreakerWrapper?: unknown,
+    _traceIndexer?: unknown,
   ) {
     this.metrics = metrics;
     this.queue = queue;
@@ -148,7 +182,7 @@ export class RuntimeInspector implements IRuntimeInspector {
     this.circuitBreaker = circuitBreaker;
   }
 
-  async getHealth(): Promise<any> {
+  async getHealth(): Promise<unknown> {
     const services = await this.discovery.listServices();
     const anyUnhealthy = services.some((s) => s.status !== "healthy");
     return {
@@ -158,7 +192,7 @@ export class RuntimeInspector implements IRuntimeInspector {
     };
   }
 
-  async getMetrics(): Promise<any> {
+  async getMetrics(): Promise<unknown> {
     return this.metrics.getMetrics();
   }
 
@@ -219,18 +253,18 @@ export class RuntimeInspector implements IRuntimeInspector {
     };
   }
 
-  async getServices(): Promise<any[]> {
+  async getServices(): Promise<unknown[]> {
     const list = await this.discovery.listServices();
     return list.map((s) => ({
       name: s.name,
       status: s.status,
       lastCheck: s.lastCheck,
-      port: s.details?.port,
-      type: s.details?.type,
+      port: (s.details as Record<string, unknown>)?.port,
+      type: (s.details as Record<string, unknown>)?.type,
     }));
   }
 
-  async getMCPSummary(): Promise<any> {
+  async getMCPSummary(): Promise<unknown> {
     const metrics = this.mcpRuntime ? await this.mcpRuntime.getMetrics() : null;
     const list = this.mcpRegistry ? await this.mcpRegistry.listServers() : [];
     const logs = this.mcpRuntime ? await this.mcpRuntime.getExecutionsLog() : [];
@@ -242,7 +276,7 @@ export class RuntimeInspector implements IRuntimeInspector {
     };
   }
 
-  async getMCPServers(): Promise<any[]> {
+  async getMCPServers(): Promise<unknown[]> {
     return this.mcpRegistry ? await this.mcpRegistry.listServers() : [];
   }
 
@@ -256,22 +290,27 @@ export class RuntimeInspector implements IRuntimeInspector {
     return tools;
   }
 
-  async getMCPExecutions(): Promise<any[]> {
+  async getMCPExecutions(): Promise<unknown[]> {
     return this.mcpRuntime ? await this.mcpRuntime.getExecutionsLog() : [];
   }
 
   // Cognitive Governance Endpoints
-  async getGovernanceInfo(): Promise<any> {
+  async getGovernanceInfo(): Promise<unknown> {
     if (!this.governanceEngine) return {};
-    const engine = this.governanceEngine as any;
+    type ExtEngine = IGovernanceEngine & {
+      getConstraints?(): { name: string }[];
+      getPolicies?(): { name: string }[];
+      getGuardrails?(): { name: string }[];
+    };
+    const engine = this.governanceEngine as ExtEngine;
     return {
-      constraints: engine.getConstraints ? engine.getConstraints().map((c: any) => c.name) : [],
-      policies: engine.getPolicies ? engine.getPolicies().map((p: any) => p.name) : [],
-      guardrails: engine.getGuardrails ? engine.getGuardrails().map((g: any) => g.name) : [],
+      constraints: engine.getConstraints ? engine.getConstraints().map((c) => c.name) : [],
+      policies: engine.getPolicies ? engine.getPolicies().map((p) => p.name) : [],
+      guardrails: engine.getGuardrails ? engine.getGuardrails().map((g) => g.name) : [],
     };
   }
 
-  async getApprovalsList(): Promise<any[]> {
+  async getApprovalsList(): Promise<unknown[]> {
     return this.approvalWorkflow ? await this.approvalWorkflow.listRecords() : [];
   }
 
@@ -279,9 +318,10 @@ export class RuntimeInspector implements IRuntimeInspector {
     return [...this.plansLog];
   }
 
-  async getGuardrailsInfo(): Promise<any> {
+  async getGuardrailsInfo(): Promise<unknown> {
     if (!this.governanceEngine) return {};
-    const engine = this.governanceEngine as any;
+    type ExtEngine = IGovernanceEngine & { getGuardrails?(): { name: string }[] };
+    const engine = this.governanceEngine as ExtEngine;
     const guardrails = engine.getGuardrails ? engine.getGuardrails() : [];
     return {
       activeGuardrailsCount: guardrails.length,
@@ -290,7 +330,7 @@ export class RuntimeInspector implements IRuntimeInspector {
   }
 
   // Phase 7 Environment Inspection APIs
-  getBrowserMetrics(): any {
+  getBrowserMetrics(): unknown {
     if (!this.browserTelemetry) return {};
     return {
       activeSessions: this.browserTelemetry.browserSessionsActive,
@@ -299,7 +339,7 @@ export class RuntimeInspector implements IRuntimeInspector {
     };
   }
 
-  getScrapingMetrics(): any {
+  getScrapingMetrics(): unknown {
     if (!this.scrapingTelemetry) return {};
     return {
       totalBytesFetched: this.scrapingTelemetry.totalBytesFetched,
@@ -307,14 +347,14 @@ export class RuntimeInspector implements IRuntimeInspector {
     };
   }
 
-  getSandboxMetrics(): any {
+  getSandboxMetrics(): unknown {
     if (!this.fsSandbox) return {};
     return {
       writeLog: this.fsSandbox.getWriteLog(),
     };
   }
 
-  getEnvironmentsList(): any[] {
+  getEnvironmentsList(): unknown[] {
     if (!this.envsList) return [];
     return this.envsList.map((e) => ({
       name: e.name,
@@ -323,7 +363,7 @@ export class RuntimeInspector implements IRuntimeInspector {
   }
 
   // Phase 8 Workflow Diagnostics Observability APIs
-  getWorkflowsList(): any[] {
+  getWorkflowsList(): unknown[] {
     if (!this.workflowRegistry) return [];
     return this.workflowRegistry.listWorkflows().map((w) => ({
       id: w.id,
@@ -333,24 +373,24 @@ export class RuntimeInspector implements IRuntimeInspector {
     }));
   }
 
-  getWorkflowExecution(executionId: string): any {
+  getWorkflowExecution(executionId: string): unknown {
     if (!this.workflowTelemetry) return null;
     const history = this.workflowTelemetry.getExecutionHistory();
     return history.find((e) => e.id === executionId) || null;
   }
 
-  getWorkflowExecutionHistory(): any[] {
+  getWorkflowExecutionHistory(): unknown[] {
     if (!this.workflowTelemetry) return [];
     return this.workflowTelemetry.getExecutionHistory();
   }
 
-  getWorkflowReplays(): any[] {
+  getWorkflowReplays(): unknown[] {
     if (!this.workflowTelemetry) return [];
     // Filter executions that have replay patterns
     return this.workflowTelemetry.getExecutionHistory().filter((e) => e.id.includes("replay"));
   }
 
-  getWorkflowTemplates(): any[] {
+  getWorkflowTemplates(): unknown[] {
     if (!this.workflowRegistry) return [];
     return this.workflowRegistry.listTemplates().map((t) => ({
       templateId: t.templateId,
@@ -359,7 +399,7 @@ export class RuntimeInspector implements IRuntimeInspector {
     }));
   }
 
-  getWorkflowTelemetryStats(): any {
+  getWorkflowTelemetryStats(): unknown {
     if (!this.workflowTelemetry) return {};
     const history = this.workflowTelemetry.getExecutionHistory();
     return {
@@ -377,7 +417,7 @@ export class RuntimeInspector implements IRuntimeInspector {
 
   // ── Memory Store ────────────────────────────────────────────────
 
-  async getMemoryStats(): Promise<any> {
+  async getMemoryStats(): Promise<unknown> {
     if (!this.memoryStore) return { available: false };
     const stats = await this.memoryStore.getStats();
     return {
@@ -392,10 +432,12 @@ export class RuntimeInspector implements IRuntimeInspector {
     types?: string[];
     keyPrefix?: string;
     limit?: number;
-  }): Promise<any[]> {
+  }): Promise<unknown[]> {
     if (!this.memoryStore) return [];
     const result = await this.memoryStore.query({
-      types: query?.types as any,
+      types: query?.types as
+        | ("error" | "observation" | "decision" | "result" | "state" | "knowledge")[]
+        | undefined,
       keyPrefix: query?.keyPrefix,
       limit: query?.limit || 20,
     });
@@ -424,7 +466,7 @@ export class RuntimeInspector implements IRuntimeInspector {
 
   // ── Circuit Breaker ────────────────────────────────────────────────
 
-  getCircuitBreakerState(): any {
+  getCircuitBreakerState(): unknown {
     if (!this.circuitBreaker) return { available: false };
     return {
       available: true,
@@ -434,7 +476,7 @@ export class RuntimeInspector implements IRuntimeInspector {
 
   // ── Snapshots ─────────────────────────────────────────────────────
 
-  async getSnapshots(): Promise<any> {
+  async getSnapshots(): Promise<unknown> {
     return {
       timestamp: new Date(),
       health: await this.getHealth(),

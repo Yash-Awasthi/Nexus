@@ -73,3 +73,68 @@ export type {
 // ── Runtime wiring factory ────────────────────────────────────────────────────
 export { createNexusRuntime } from "./runtime-wiring.js";
 export type { NexusRuntime, NexusRuntimeConfig, QueueBackendType } from "./runtime-wiring.js";
+
+// ── Execution interfaces ───────────────────────────────────────────────────────
+export type {
+  IExecutionContext,
+  IRuntimeEvent,
+  IExecutionAdapter,
+  ITaskDependencyResolver,
+  ITaskExecutor,
+} from "./interfaces/execution.interface.js";
+
+// ── Diagnostic API ────────────────────────────────────────────────────────────
+export { RuntimeDiagnosticAPI } from "./diagnostic-api.js";
+
+// ── MCP bridge ────────────────────────────────────────────────────────────────
+export { registerGhostStackMcpBridge, GHOSTSTACK_MCP_TOOLS } from "./ghoststack-mcp-bridge.js";
+
+// ── Planning engine ───────────────────────────────────────────────────────────
+export { PlanningEngine } from "./planning-engine.js";
+
+// ── Spec loader ───────────────────────────────────────────────────────────────
+export {
+  parseWorkflowSpec,
+  specToWorkflowDefinition,
+  loadWorkflowSpecFile,
+} from "./spec-loader.js";
+export type { WorkflowSpecTask, WorkflowSpecFile } from "./spec-loader.js";
+
+// ── Runtime context factory ───────────────────────────────────────────────────
+export { createRuntimeContext, startRuntime, stopRuntime } from "./runtime-context.js";
+export type { GhostStackRuntimeContext } from "./runtime-context.js";
+
+// ── Adapter manifest ──────────────────────────────────────────────────────────
+export { ADAPTER_MANIFEST, getManifestEntry } from "./adapters/manifest.js";
+export type { AdapterManifestEntry, AdapterIntegrationMode } from "./adapters/manifest.js";
+
+// ── Federation ────────────────────────────────────────────────────────────────
+export { runFederationE2e } from "./e2e-federation.js";
+export type { FederationE2eResult, FederationE2eOptions } from "./e2e-federation.js";
+export { FederationSupervisor } from "./federation-supervisor.js";
+export type {
+  FederationServiceStatus,
+  FederationSupervisorStatus,
+} from "./federation-supervisor.js";
+
+// ── GhostStack config ─────────────────────────────────────────────────────────
+export { loadGhostStackConfig } from "./ghoststack-config.js";
+export type { GhostStackConfig, GhostStackFeatures } from "./ghoststack-config.js";
+
+// ── GhostStack server ─────────────────────────────────────────────────────────
+export { createGhostStackServer } from "./ghoststack-server.js";
+export type { GhostStackServer } from "./ghoststack-server.js";
+
+// ── Bootstrap & healthcheck ───────────────────────────────────────────────────
+export { bootstrap } from "./bootstrap.js";
+export { runHealthcheck } from "./healthcheck.js";
+
+// ── Governance interfaces ─────────────────────────────────────────────────────
+export type {
+  ITaskSynthesisResult,
+  ICognitiveTrace,
+  IPlanningEngine,
+  IApprovalRecord,
+  IApprovalWorkflow,
+  IGovernanceEngine,
+} from "./interfaces/governance.interface.js";

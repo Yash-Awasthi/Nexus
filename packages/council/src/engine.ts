@@ -13,7 +13,8 @@
 import { randomUUID } from "crypto";
 
 import type { CouncilRequest, CouncilResponse, ProposalResult, ModelVote } from "@nexus/contracts";
-import { BudgetExceededError } from "@nexus/shared";
+import { BudgetExceededError, applySTMs, COUNCIL_STM_PRESET } from "@nexus/shared";
+import type { STMModule } from "@nexus/shared";
 
 import { summonArchetypes, type TaskCategory } from "./archetypes.js";
 
@@ -51,6 +52,13 @@ export interface DeliberationEngineConfig {
   inputCostPer1k?: number;
   /** Cost per 1k output tokens in USD for budget tracking */
   outputCostPer1k?: number;
+  /**
+   * STM (Semantic Transformation Modules) applied to each archetype's reasoning
+   * text before it is surfaced in the vote.  Strips hedges and preambles by default.
+   * Pass an empty array to disable all post-processing.
+   * Default: COUNCIL_STM_PRESET (hedgeReducer + directMode, both enabled).
+   */
+  stmModules?: STMModule[];
 }
 
 // ── Vote parsing ──────────────────────────────────────────────────────────────
@@ -90,6 +98,7 @@ export class DeliberationEngine {
       defaultModel: "llama-3.3-70b-versatile",
       inputCostPer1k: 0.0006, // Groq llama-3.3-70b default
       outputCostPer1k: 0.0008,
+      stmModules: COUNCIL_STM_PRESET,
       ...config,
     };
   }
@@ -101,7 +110,11 @@ export class DeliberationEngine {
     const startTime = Date.now();
     const proposalId = randomUUID();
 
-    const { proposal, budgetUsd = Infinity, timeoutMs = 60_000 } = request;
+    // Cap timeoutMs to prevent resource exhaustion from user-supplied values.
+    const MAX_VOTE_TIMEOUT_MS = 300_000; // 5 minutes hard cap
+    const rawTimeout = request.timeoutMs ?? 60_000;
+    const { proposal, budgetUsd = Infinity } = request;
+    const timeoutMs = Math.min(Math.max(1, rawTimeout), MAX_VOTE_TIMEOUT_MS);
 
     // Detect task category from title/description
     const category = this._detectCategory(proposal.title + " " + (proposal.description ?? ""));
@@ -150,11 +163,15 @@ export class DeliberationEngine {
           throw new BudgetExceededError({ totalCostUsd, budgetUsd });
         }
 
+        // Apply STM post-processors to reasoning before surfacing it.
+        // Vote parsing uses the raw content so signal words aren't stripped.
+        const reasoning = applySTMs(response.content, this.config.stmModules);
+
         return {
           model: response.model,
           provider: "groq",
           vote: parseVote(response.content),
-          reasoning: response.content,
+          reasoning,
           confidence: parseConfidence(response.content),
           latencyMs: response.latencyMs,
         } satisfies ModelVote;
@@ -200,6 +217,7 @@ export class DeliberationEngine {
       summary: this._buildSummary(outcome, votes, majority),
       deliberatedAt: new Date().toISOString(),
       totalLatencyMs: Date.now() - startTime,
+      totalCostUsd: Math.round(totalCostUsd * 1e8) / 1e8, // 8 d.p. = sub-cent precision
     };
 
     return { ok: true, result };

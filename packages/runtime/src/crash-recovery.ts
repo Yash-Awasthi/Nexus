@@ -179,7 +179,7 @@ export class CrashRecovery {
       });
     }
 
-    if (span) this.tracer?.endSpan(span.spanId, result);
+    if (span) this.tracer?.endSpan(span.spanId, result as unknown as Record<string, unknown>);
 
     return result;
   }

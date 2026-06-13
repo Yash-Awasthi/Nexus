@@ -4,7 +4,7 @@ export interface RetryPolicy {
   backoffFactorMs: number;
 }
 
-export interface QueueJob<T = any> {
+export interface QueueJob<T = unknown> {
   id: string;
   payload: T;
   priority: "low" | "medium" | "high";
@@ -20,6 +20,7 @@ export interface IQueueBackend {
   getDeadLetterQueue(): Promise<QueueJob[]>;
   /** Remove all jobs from the dead-letter queue (e.g. after recycling them). */
   clearDeadLetterQueue(): Promise<void>;
+  clear?(includeDlq?: boolean): Promise<void>;
   getQueueLength(): Promise<number>;
   getActiveJobs(): Promise<QueueJob[]>;
 }

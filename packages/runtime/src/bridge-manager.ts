@@ -16,9 +16,15 @@ import type { ChildProcess } from "child_process";
 import { spawn } from "child_process";
 import * as fs from "fs";
 import * as http from "http";
+import { fileURLToPath } from "node:url";
 import * as path from "path";
 
-export type BridgeName = "stealth-browser" | "scraping" | "local-inference" | "mcp-server";
+export type BridgeName =
+  | "stealth-browser"
+  | "scraping"
+  | "local-inference"
+  | "mcp-server"
+  | "floci";
 
 interface BridgeConfig {
   script: string; // relative to runtime/bridges/
@@ -31,9 +37,13 @@ const BRIDGE_CONFIGS: Record<BridgeName, BridgeConfig> = {
   scraping: { script: "web_scraping_bridge.py", port: 7702, healthPath: "/health" },
   "local-inference": { script: "local_inference_bridge.py", port: 7703, healthPath: "/health" },
   "mcp-server": { script: "mcp_server_bridge.py", port: 7704, healthPath: "/health" },
+  // Floci bridge — translates /_floci/extended/<action> calls to boto3 against the Floci emulator.
+  // Floci itself (floci/floci:latest) runs the standard AWS wire protocol on port 4566;
+  // this bridge provides the custom HTTP shim that FlociExecutionAdapter expects.
+  floci: { script: "floci_bridge.py", port: 4567, healthPath: "/_floci/health" },
 };
 
-const BRIDGES_DIR = path.join(__dirname, "bridges");
+const BRIDGES_DIR = path.join(fileURLToPath(new URL(".", import.meta.url)), "bridges");
 const HEALTH_CHECK_INTERVAL_MS = 500;
 const HEALTH_CHECK_MAX_ATTEMPTS = 20;
 

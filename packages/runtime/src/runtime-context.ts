@@ -1,15 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck — imports reference orchestration modules not yet exported from @nexus/runtime public API
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
-/* eslint-disable import/order, import/no-duplicates */
-import * as path from "path";
 
-import { AgentBus, TaskDelegationAgent } from "../orchestration/agent-bus.js";
-import { LocalAgentRegistry } from "../orchestration/agent-registry.js";
-import { ApprovalWorkflow } from "../orchestration/approval-workflow.js";
-import { PlanningEngine } from "../orchestration/planning-engine.js";
-import { GovernanceEngine } from "../orchestration/governance-engine.js";
+import * as path from "node:path";
+
 import {
+  ApprovalWorkflow,
+  GovernanceEngine,
   ResourceScopeConstraint,
   CostBudgetConstraint,
   DangerousOperationPolicy,
@@ -17,54 +12,54 @@ import {
   LoopDetectionGuardrail,
   RunawayRetriesGuardrail,
   TaskGraphLimitGuardrail,
-} from "../orchestration/governance-engine.js";
-import { BrowserExecutionAdapter } from "../orchestration/browser-adapter.js";
+} from "@nexus/governance";
 import {
-  HealthAwareCircuitBreaker,
-  CircuitBreakerAdapterWrapper,
-} from "../orchestration/circuit-breaker.js";
-import type { CircuitBreaker } from "../orchestration/circuit-breaker.js";
-import { WebSearchAdapter } from "../orchestration/web-search-adapter.js";
-import { CodeAgentPool } from "../orchestration/code-agent-pool.js";
-import { LocalInferenceAdapter } from "../orchestration/local-inference-adapter.js";
-import { EnvironmentTelemetry } from "../orchestration/environment-telemetry.js";
-import { LocalEventBus } from "../orchestration/event-bus.js";
-import { FileQueueBackend } from "../orchestration/file-queue-backend.js";
-import { FlociExecutionAdapter } from "../orchestration/floci-adapter.js";
-import { resolveFlociEndpoint } from "../orchestration/floci-client.js";
-import { EXTENDED_FLOCI_ACTIONS } from "../orchestration/floci-extended.js";
-import { GHOSTSTACK_MCP_TOOLS } from "../orchestration/ghoststack-mcp-bridge.js";
-import type { IQueueBackend } from "../orchestration/interfaces/queue.interface.js";
-import { StructuredLogger } from "../orchestration/logger.js";
-import { MemoryStore, TraceIndexer } from "../orchestration/memory-store.js";
-import {
-  MetricsCollector,
-  TraceRecorder,
-  DiagnosticEnricher,
-} from "../orchestration/observability-manager.js";
+  MemoryManager,
+  PgVectorStore,
+  GroqEmbedder,
+  InMemoryStore,
+  FixedEmbedder,
+} from "@nexus/memory";
+import { EnvironmentTelemetry, StructuredLogger } from "@nexus/telemetry";
+
+import { AgentBus, TaskDelegationAgent } from "./agent-bus.js";
+import { LocalAgentRegistry } from "./agent-registry.js";
+import { BrowserExecutionAdapter } from "./browser-adapter.js";
+import { HealthAwareCircuitBreaker, CircuitBreakerAdapterWrapper } from "./circuit-breaker.js";
+import type { CircuitBreaker } from "./circuit-breaker.js";
+import { CodeAgentPool } from "./code-agent-pool.js";
+import { YAMLConfigLoader } from "./config-loader.js";
+import { loadEnvFromRoot } from "./env-loader.js";
+import { LocalEventBus } from "./event-bus.js";
+import { FileQueueBackend } from "./file-queue-backend.js";
+import { FlociExecutionAdapter } from "./floci-adapter.js";
+import { resolveFlociEndpoint } from "./floci-client.js";
+import { EXTENDED_FLOCI_ACTIONS } from "./floci-extended.js";
+import { GHOSTSTACK_MCP_TOOLS } from "./ghoststack-mcp-bridge.js";
+import type { IQueueBackend } from "./interfaces/queue.interface.js";
+import { createLanguageModel } from "./language-model.js";
+import { LocalInferenceAdapter } from "./local-inference-adapter.js";
+import { MemoryStore, TraceIndexer } from "./memory-store.js";
+import { MetricsCollector, TraceRecorder, DiagnosticEnricher } from "./observability-manager.js";
+import { GhostStackOrchestrator } from "./orchestrator.js";
 import {
   FileEventStore,
   FileRuntimePersistence,
   backupRuntimePersistence,
-} from "../orchestration/persistence-manager.js";
-import {
-  RuntimeCompactor,
-  LeakDetector,
-  ResourceQuotaManager,
-} from "../orchestration/runtime-compactor.js";
-import { RuntimeGraph } from "../orchestration/runtime-graph.js";
-import { RuntimeInspector } from "../orchestration/runtime-inspector.js";
-import { RuntimeManager } from "../orchestration/runtime-manager.js";
-import type { RuntimeSandboxLayout } from "../orchestration/runtime-sandbox.js";
-import { createRuntimeSandbox } from "../orchestration/runtime-sandbox.js";
-import { ScrapingExecutionAdapter } from "../orchestration/scraping-adapter.js";
-import { LocalServiceDiscovery, HealthMonitor } from "../orchestration/service-discovery.js";
-import {
-  loadWorkflowSpecsFromDir,
-  specToWorkflowDefinition,
-} from "../orchestration/spec-loader.js";
-import { TaskExecutor } from "../orchestration/task-executor.js";
-import { TaskRouter } from "../orchestration/task-router.js";
+} from "./persistence-manager.js";
+import { PlanningEngine } from "./planning-engine.js";
+import { RuntimeCompactor, LeakDetector, ResourceQuotaManager } from "./runtime-compactor.js";
+import { RuntimeGraph } from "./runtime-graph.js";
+import { RuntimeInspector } from "./runtime-inspector.js";
+import { RuntimeManager } from "./runtime-manager.js";
+import type { RuntimeSandboxLayout } from "./runtime-sandbox.js";
+import { createRuntimeSandbox } from "./runtime-sandbox.js";
+import { ScrapingExecutionAdapter } from "./scraping-adapter.js";
+import { LocalServiceDiscovery, HealthMonitor } from "./service-discovery.js";
+import { loadWorkflowSpecsFromDir, specToWorkflowDefinition } from "./spec-loader.js";
+import { TaskExecutor } from "./task-executor.js";
+import { TaskRouter } from "./task-router.js";
+import { WebSearchAdapter } from "./web-search-adapter.js";
 import {
   WorkflowRegistry,
   WorkflowTelemetry,
@@ -74,11 +69,7 @@ import {
   DocumentProcessingTemplate,
   SpecToExecutionTemplate,
   GovernedEtlWorkflowTemplate,
-} from "../orchestration/workflow-engine.js";
-
-import { YAMLConfigLoader } from "./config-loader.js";
-import { loadEnvFromRoot } from "./env-loader.js";
-import { GhostStackOrchestrator } from "./orchestrator.js";
+} from "./workflow-engine.js";
 
 export interface GhostStackRuntimeContext {
   repoRoot: string;
@@ -118,6 +109,12 @@ export interface GhostStackRuntimeContext {
   quotaManager: ResourceQuotaManager;
   planningEngine: PlanningEngine;
   governanceEngine: GovernanceEngine;
+  /**
+   * Semantic vector memory — production-grade long-term recall backed by
+   * Postgres pgvector (PgVectorStore + GroqEmbedder).  Falls back to
+   * InMemoryStore + FixedEmbedder when GHOSTSTACK_OFFLINE_MODE is true.
+   */
+  vectorMemory: MemoryManager;
   /** Cleanup functions for event bus subscriptions and other resources */
   cleanup: (() => void)[];
 }
@@ -225,7 +222,7 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
   const traceIndexer = new TraceIndexer(eventStore, memoryStore);
   // Subscribe to event bus to auto-index events as memory entries
   const cleanupFns: (() => void)[] = [];
-  const wildcardSub = eventBus.subscribe("*", async (_payload: any) => {
+  const wildcardSub = eventBus.subscribe("*", async (_payload: unknown) => {
     // Fire-and-forget index; never block event processing
     traceIndexer.indexRecentEvents().catch(() => {});
   });
@@ -251,7 +248,23 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
   // ------------------------------------------------------------------
   // Wire governance engine with constraints, policies, and guardrails
   // ------------------------------------------------------------------
-  const planningEngine = new PlanningEngine();
+  const planningEngine = new PlanningEngine(
+    createLanguageModel({ provider: "groq", groqApiKey: process.env.GROQ_API_KEY }),
+  );
+
+  // ------------------------------------------------------------------
+  // Semantic vector memory (PgVectorStore + GroqEmbedder in production;
+  // InMemoryStore + FixedEmbedder in offline / test mode)
+  // ------------------------------------------------------------------
+  const vectorMemory = new MemoryManager(
+    offlineMode || !process.env.DATABASE_URL
+      ? { store: new InMemoryStore(), embedder: new FixedEmbedder(768) }
+      : {
+          store: new PgVectorStore({ databaseUrl: process.env.DATABASE_URL }),
+          embedder: new GroqEmbedder({ apiKey: process.env.GROQ_API_KEY }),
+        },
+  );
+
   const governanceEngine = new GovernanceEngine();
 
   governanceEngine.registerConstraint(new ResourceScopeConstraint(["system:root", "admin:direct"]));
@@ -321,10 +334,11 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
   const diagnosticEnricher = new DiagnosticEnricher(metrics, tracer);
 
   // ── Auto-register Floci resources in RuntimeGraph via event bus ──
-  const flociActionSub = eventBus.subscribe("floci_action_completed", async (payload: any) => {
-    const action = payload.action as string;
-    const status = payload.status as string;
-    const service = payload.service as string;
+  const flociActionSub = eventBus.subscribe("floci_action_completed", async (payload: unknown) => {
+    const p = payload as Record<string, unknown>;
+    const action = p.action as string;
+    const status = p.status as string;
+    const service = p.service as string;
 
     let nodeId: string | undefined;
     let nodeType:
@@ -337,23 +351,23 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
     let nodeName: string | undefined;
 
     if (action === "create_s3_bucket") {
-      nodeId = `s3:${payload.bucketName}`;
+      nodeId = `s3:${p.bucketName}`;
       nodeType = "floci_s3_bucket";
-      nodeName = `Bucket: ${payload.bucketName}`;
+      nodeName = `Bucket: ${p.bucketName}`;
     } else if (action === "create_sqs_queue") {
-      nodeId = `sqs:${payload.queueName}`;
+      nodeId = `sqs:${p.queueName}`;
       nodeType = "floci_sqs_queue";
-      nodeName = `Queue: ${payload.queueName}`;
+      nodeName = `Queue: ${p.queueName}`;
     } else if (action === "create_dynamodb_table") {
-      nodeId = `ddb:${payload.tableName}`;
+      nodeId = `ddb:${p.tableName}`;
       nodeType = "floci_dynamodb_table";
-      nodeName = `Table: ${payload.tableName}`;
+      nodeName = `Table: ${p.tableName}`;
     } else if (action === "create_lambda") {
-      nodeId = `lambda:${payload.functionName}`;
+      nodeId = `lambda:${p.functionName}`;
       nodeType = "floci_lambda_function";
-      nodeName = `Lambda: ${payload.functionName}`;
+      nodeName = `Lambda: ${p.functionName}`;
     } else if (action === "delete_lambda") {
-      await runtimeGraph.updateNodeStatus(`lambda:${payload.functionName}`, "removed", {
+      await runtimeGraph.updateNodeStatus(`lambda:${p.functionName}`, "removed", {
         reason: "Lambda deleted via Floci",
       });
       return;
@@ -407,9 +421,10 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
   // any registered workflows that declare S3 trigger bindings in their metadata.
   // Configure via workflow definition metadata.s3Triggers, e.g.:
   //   metadata: { s3Triggers: [{ bucket: "my-bucket", prefix: "uploads/" }] }
-  const s3TriggerSub = eventBus.subscribe("floci_s3_object_created", async (evt: any) => {
-    const bucketName = evt.payload?.bucketName as string;
-    const objectKey = evt.payload?.key as string;
+  const s3TriggerSub = eventBus.subscribe("floci_s3_object_created", async (evt: unknown) => {
+    const evtRec = evt as Record<string, Record<string, unknown>>;
+    const bucketName = evtRec.payload?.bucketName as string;
+    const objectKey = evtRec.payload?.key as string;
     if (!bucketName || !objectKey) return;
 
     for (const wf of registry.listWorkflows()) {
@@ -423,7 +438,7 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
         if (trigger.prefix && !objectKey.startsWith(trigger.prefix)) continue;
 
         const execId = `s3-trigger-${wf.id}-${Date.now()}`;
-        workflowEngine.executeWorkflow(wf.id, execId).catch((err: any) => {
+        workflowEngine.executeWorkflow(wf.id, execId).catch((err) => {
           logger.error("S3 auto-trigger workflow failed", {
             workflowId: wf.id,
             executionId: execId,
@@ -553,6 +568,7 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
     quotaManager,
     planningEngine,
     governanceEngine,
+    vectorMemory,
     cleanup: cleanupFns,
   };
 }
@@ -597,8 +613,8 @@ export async function stopRuntime(ctx: GhostStackRuntimeContext): Promise<void> 
 
   // 2. Destroy circuit breaker health probes
   try {
-    if (ctx.circuitBreaker && typeof (ctx.circuitBreaker as any).destroy === "function") {
-      (ctx.circuitBreaker as any).destroy();
+    if (ctx.circuitBreaker && "destroy" in ctx.circuitBreaker) {
+      (ctx.circuitBreaker as unknown as { destroy(): void }).destroy();
     }
   } catch (err) {
     errors.push(`circuitBreaker: ${(err as Error).message}`);

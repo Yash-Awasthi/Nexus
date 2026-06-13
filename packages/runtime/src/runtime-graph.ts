@@ -179,6 +179,7 @@ export class RuntimeGraph {
           } catch (e) {
             reject(e);
           }
+          return;
         })
         .catch(async () => {
           // Even if previous mutation failed, still process this one
@@ -189,6 +190,7 @@ export class RuntimeGraph {
           } catch (e) {
             reject(e);
           }
+          return;
         });
     });
   }

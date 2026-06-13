@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
+import { randomUUID } from "node:crypto";
+
+import { neon } from "@neondatabase/serverless";
+
 /**
  * @nexus/memory — long-term agent memory with vector search.
  *
@@ -15,8 +19,6 @@
  *   Swap InMemoryStore for a PgVectorStore (pgvector + Drizzle) and
  *   FixedEmbedder for an OpenAI / local model embedder — no other changes.
  */
-
-import { randomUUID } from "node:crypto";
 
 // ── Core types ────────────────────────────────────────────────────────────────
 
@@ -117,6 +119,95 @@ export class MemoryError extends Error {
   }
 }
 
+// ── GroqEmbedder ──────────────────────────────────────────────────────────────
+
+interface GroqEmbeddingResponse {
+  data: { embedding: number[]; index: number }[];
+  model: string;
+}
+
+export interface GroqEmbedderConfig {
+  /** Groq API key — defaults to process.env.GROQ_API_KEY */
+  apiKey?: string;
+  /**
+   * Groq embedding model.
+   * Default: "nomic-embed-text-v1.5" (768 dimensions, free tier, fast).
+   */
+  model?: string;
+}
+
+/**
+ * Real semantic embedder backed by the Groq embeddings API.
+ *
+ * Uses `nomic-embed-text-v1.5` (768-dimensional) by default.
+ * Drop-in replacement for FixedEmbedder — same IEmbedder contract.
+ * Requires GROQ_API_KEY env var (or pass apiKey in config).
+ *
+ * Usage:
+ *   const memory = new MemoryManager({
+ *     store: new InMemoryStore(),
+ *     embedder: new GroqEmbedder({ apiKey: process.env.GROQ_API_KEY }),
+ *   });
+ */
+export class GroqEmbedder implements IEmbedder {
+  readonly dimensions = 768;
+  private readonly apiKey: string;
+  private readonly model: string;
+  private static readonly ENDPOINT = "https://api.groq.com/openai/v1/embeddings";
+
+  constructor(config: GroqEmbedderConfig = {}) {
+    const key = config.apiKey ?? process.env.GROQ_API_KEY ?? "";
+    if (!key) {
+      throw new MemoryError(
+        "EMBED_FAILED",
+        "GroqEmbedder requires an API key — set GROQ_API_KEY or pass apiKey in config",
+      );
+    }
+    this.apiKey = key;
+    this.model = config.model ?? "nomic-embed-text-v1.5";
+  }
+
+  async embed(text: string): Promise<number[]> {
+    let response: Response;
+    try {
+      response = await fetch(GroqEmbedder.ENDPOINT, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ model: this.model, input: text }),
+      });
+    } catch (cause) {
+      throw new MemoryError("EMBED_FAILED", `Groq embeddings request failed: ${String(cause)}`);
+    }
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "(unreadable)");
+      throw new MemoryError("EMBED_FAILED", `Groq API error ${response.status}: ${body}`);
+    }
+
+    let data: GroqEmbeddingResponse;
+    try {
+      data = (await response.json()) as GroqEmbeddingResponse;
+    } catch (cause) {
+      throw new MemoryError("EMBED_FAILED", `Failed to parse Groq response: ${String(cause)}`);
+    }
+
+    const embedding = data.data[0]?.embedding;
+    if (!embedding || embedding.length === 0) {
+      throw new MemoryError("EMBED_FAILED", "Groq returned an empty embedding");
+    }
+    if (embedding.length !== this.dimensions) {
+      throw new MemoryError(
+        "DIMENSION_MISMATCH",
+        `Expected ${this.dimensions} dimensions, got ${embedding.length}`,
+      );
+    }
+    return embedding;
+  }
+}
+
 // ── FixedEmbedder ─────────────────────────────────────────────────────────────
 
 /**
@@ -210,6 +301,231 @@ export class InMemoryStore implements IMemoryStore {
     }
     return results;
   }
+}
+
+// ── PgVectorStore ─────────────────────────────────────────────────────────────
+
+export interface PgVectorStoreConfig {
+  /** Postgres connection string — defaults to process.env.DATABASE_URL */
+  databaseUrl?: string;
+}
+
+/**
+ * Production vector store backed by Postgres + pgvector.
+ *
+ * Uses the Neon serverless HTTP driver for edge/serverless compatibility.
+ * `ensureSchema()` is called lazily on the first operation — no manual
+ * migration required; the table is created automatically.
+ *
+ * Similarity search uses pgvector's cosine distance operator (`<=>`).
+ * Score returned = 1 - cosine_distance, so 1.0 = identical, 0.0 = orthogonal.
+ */
+export class PgVectorStore implements IMemoryStore {
+  private readonly sql: ReturnType<typeof neon>;
+  private schemaEnsured = false;
+
+  constructor(config: PgVectorStoreConfig = {}) {
+    const url = config.databaseUrl ?? process.env.DATABASE_URL ?? "";
+    if (!url) {
+      throw new MemoryError(
+        "STORE_READ_FAILED",
+        "PgVectorStore requires DATABASE_URL — pass databaseUrl or set the env var",
+      );
+    }
+    this.sql = neon(url);
+  }
+
+  // ── Schema bootstrap ────────────────────────────────────────────────────────
+
+  private async ensureSchema(): Promise<void> {
+    if (this.schemaEnsured) return;
+    try {
+      await this.sql`CREATE EXTENSION IF NOT EXISTS vector`;
+      await this.sql`
+        CREATE TABLE IF NOT EXISTS memory_entries (
+          id          TEXT        PRIMARY KEY,
+          text        TEXT        NOT NULL,
+          embedding   vector(768) NOT NULL,
+          metadata    JSONB       NOT NULL DEFAULT '{}',
+          created_at  INTEGER     NOT NULL,
+          expires_at  INTEGER
+        )
+      `;
+      await this.sql`
+        CREATE INDEX IF NOT EXISTS memory_entries_created_at_idx
+          ON memory_entries (created_at)
+      `;
+      this.schemaEnsured = true;
+    } catch (cause) {
+      throw new MemoryError("STORE_WRITE_FAILED", `Schema bootstrap failed: ${String(cause)}`);
+    }
+  }
+
+  // ── IMemoryStore implementation ─────────────────────────────────────────────
+
+  async save(entry: MemoryEntry): Promise<MemoryEntry> {
+    await this.ensureSchema();
+    const embStr = `[${entry.embedding.join(",")}]`;
+    try {
+      await this.sql`
+        INSERT INTO memory_entries (id, text, embedding, metadata, created_at, expires_at)
+        VALUES (
+          ${entry.id},
+          ${entry.text},
+          ${embStr}::vector,
+          ${JSON.stringify(entry.metadata)}::jsonb,
+          ${entry.createdAt},
+          ${entry.expiresAt ?? null}
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          text       = EXCLUDED.text,
+          embedding  = EXCLUDED.embedding,
+          metadata   = EXCLUDED.metadata,
+          created_at = EXCLUDED.created_at,
+          expires_at = EXCLUDED.expires_at
+      `;
+    } catch (cause) {
+      throw new MemoryError("STORE_WRITE_FAILED", `save() failed: ${String(cause)}`);
+    }
+    return entry;
+  }
+
+  async search(
+    queryEmbedding: number[],
+    limit: number,
+    filter?: MemoryFilter,
+  ): Promise<MemorySearchResult[]> {
+    await this.ensureSchema();
+    const embStr = `[${queryEmbedding.join(",")}]`;
+    const now = Math.floor(Date.now() / 1000);
+    const excludeExpired = filter?.excludeExpired ?? true;
+
+    let rows: Record<string, unknown>[];
+    try {
+      rows = (await this.sql`
+        SELECT
+          id,
+          text,
+          embedding::text  AS embedding_str,
+          metadata,
+          created_at,
+          expires_at,
+          1 - (embedding <=> ${embStr}::vector) AS score
+        FROM memory_entries
+        WHERE (
+          ${excludeExpired ? 1 : 0}::int = 0
+          OR expires_at IS NULL
+          OR expires_at > ${now}
+        )
+        ORDER BY embedding <=> ${embStr}::vector
+        LIMIT ${limit}
+      `) as unknown as Record<string, unknown>[];
+    } catch (cause) {
+      throw new MemoryError("STORE_READ_FAILED", `search() failed: ${String(cause)}`);
+    }
+
+    const results: MemorySearchResult[] = [];
+    for (const row of rows) {
+      const entry = pgRowToEntry(row);
+      if (filter?.metadata) {
+        const matches = Object.entries(filter.metadata).every(([k, v]) => entry.metadata[k] === v);
+        if (!matches) continue;
+      }
+      results.push({ entry, score: row.score as number });
+    }
+    return results;
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.ensureSchema();
+    try {
+      await this.sql`DELETE FROM memory_entries WHERE id = ${id}`;
+    } catch (cause) {
+      throw new MemoryError("STORE_WRITE_FAILED", `delete() failed: ${String(cause)}`);
+    }
+  }
+
+  async list(filter?: MemoryFilter): Promise<MemoryEntry[]> {
+    await this.ensureSchema();
+    const now = Math.floor(Date.now() / 1000);
+    const excludeExpired = filter?.excludeExpired ?? true;
+
+    let rows: Record<string, unknown>[];
+    try {
+      rows = (await this.sql`
+        SELECT id, text, embedding::text AS embedding_str, metadata, created_at, expires_at
+        FROM memory_entries
+        WHERE (
+          ${excludeExpired ? 1 : 0}::int = 0
+          OR expires_at IS NULL
+          OR expires_at > ${now}
+        )
+        ORDER BY created_at DESC
+      `) as unknown as Record<string, unknown>[];
+    } catch (cause) {
+      throw new MemoryError("STORE_READ_FAILED", `list() failed: ${String(cause)}`);
+    }
+
+    const entries = rows.map(pgRowToEntry);
+    if (!filter?.metadata) return entries;
+
+    return entries.filter((entry) =>
+      Object.entries(filter.metadata!).every(([k, v]) => entry.metadata[k] === v),
+    );
+  }
+
+  async purge(filter?: MemoryFilter): Promise<number> {
+    await this.ensureSchema();
+    const now = Math.floor(Date.now() / 1000);
+    const excludeExpired = filter?.excludeExpired ?? true;
+
+    if (!filter?.metadata) {
+      // Fast path: single DELETE without fetching rows first
+      try {
+        const deleted = (await this.sql`
+          DELETE FROM memory_entries
+          WHERE (
+            ${excludeExpired ? 1 : 0}::int = 0
+            OR expires_at IS NULL
+            OR expires_at > ${now}
+          )
+          RETURNING id
+        `) as unknown as Record<string, unknown>[];
+        return deleted.length;
+      } catch (cause) {
+        throw new MemoryError("STORE_WRITE_FAILED", `purge() failed: ${String(cause)}`);
+      }
+    }
+
+    // Metadata-filtered path: list matching entries then delete individually
+    const entries = await this.list(filter);
+    if (entries.length === 0) return 0;
+    try {
+      for (const entry of entries) {
+        await this.sql`DELETE FROM memory_entries WHERE id = ${entry.id}`;
+      }
+    } catch (cause) {
+      throw new MemoryError("STORE_WRITE_FAILED", `purge(metadata) failed: ${String(cause)}`);
+    }
+    return entries.length;
+  }
+}
+
+/** Convert a raw Postgres row to a MemoryEntry. */
+function pgRowToEntry(row: Record<string, unknown>): MemoryEntry {
+  const embStr = row.embedding_str as string;
+  const embedding = embStr
+    .slice(1, -1)
+    .split(",")
+    .map((v) => parseFloat(v));
+  return {
+    id: row.id as string,
+    text: row.text as string,
+    embedding,
+    metadata: (row.metadata ?? {}) as Record<string, unknown>,
+    createdAt: row.created_at as number,
+    ...(row.expires_at != null ? { expiresAt: row.expires_at as number } : {}),
+  };
 }
 
 // ── MemoryManager ─────────────────────────────────────────────────────────────

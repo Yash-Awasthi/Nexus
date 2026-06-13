@@ -92,24 +92,6 @@ async def _run_scraper(source: ScrapeSource, max_articles: int, max_age_hours: f
     )
 
 
-@router.post("/{source}", response_model=ScrapeResponse, summary="Scrape a single source")
-async def scrape_source(
-    source: ScrapeSource = Path(..., description="Financial data source to scrape"),
-    body: ScrapeRequest = ScrapeRequest(),
-) -> ScrapeResponse:
-    """
-    Trigger a scrape for the given source.
-
-    Returns articles and (if the pipeline is available) analysed financial events.
-    """
-    settings = get_settings()
-    return await _run_scraper(
-        source,
-        max_articles=body.max_articles or settings.max_articles,
-        max_age_hours=body.max_age_hours or settings.max_age_hours,
-    )
-
-
 @router.post("/batch", response_model=BatchScrapeResponse, summary="Scrape multiple sources concurrently")
 async def scrape_batch(body: BatchScrapeRequest) -> BatchScrapeResponse:
     """
@@ -157,3 +139,21 @@ async def scrape_batch(body: BatchScrapeRequest) -> BatchScrapeResponse:
 async def list_sources() -> dict[str, list[str]]:
     """Return the list of registered scraper source names."""
     return {"sources": list(SCRAPER_REGISTRY.keys())}
+
+
+@router.post("/{source}", response_model=ScrapeResponse, summary="Scrape a single source")
+async def scrape_source(
+    source: ScrapeSource = Path(..., description="Financial data source to scrape"),
+    body: ScrapeRequest = ScrapeRequest(),
+) -> ScrapeResponse:
+    """
+    Trigger a scrape for the given source.
+
+    Returns articles and (if the pipeline is available) analysed financial events.
+    """
+    settings = get_settings()
+    return await _run_scraper(
+        source,
+        max_articles=body.max_articles or settings.max_articles,
+        max_age_hours=body.max_age_hours or settings.max_age_hours,
+    )

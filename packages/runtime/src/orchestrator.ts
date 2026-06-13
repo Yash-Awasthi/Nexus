@@ -1,27 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck — imports reference orchestration modules not yet exported from @nexus/runtime public API
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
-import type { IAgentRegistry } from "../orchestration/agent-registry.js";
-import { TaskDependencyResolver } from "../orchestration/dependency-resolver.js";
-import type { IEventBus } from "../orchestration/event-bus.js";
-import type { ITaskDependencyResolver } from "../orchestration/interfaces/execution.interface.js";
+import type { IAgentRegistry } from "./agent-registry.js";
+import { TaskDependencyResolver } from "./dependency-resolver.js";
+import type { IEventBus } from "./event-bus.js";
+import type { ITaskDependencyResolver } from "./interfaces/execution.interface.js";
 import type {
   IPlanningEngine,
   IGovernanceEngine,
   IApprovalWorkflow,
-} from "../orchestration/interfaces/governance.interface.js";
-import type { ILogger } from "../orchestration/interfaces/logger.interface.js";
-import type {
-  IMetricsCollector,
-  ITraceRecorder,
-} from "../orchestration/interfaces/observability.interface.js";
-import type { IEventStore } from "../orchestration/interfaces/persistence.interface.js";
-import type { IQueueBackend } from "../orchestration/interfaces/queue.interface.js";
-import { MemoryQueueBackend } from "../orchestration/queue-backend.js";
-import type { IRuntimeManager } from "../orchestration/runtime-manager.js";
-import type { TaskExecutor } from "../orchestration/task-executor.js";
-import { buildQueuePayloadFromTask } from "../orchestration/task-payload.js";
-import type { TaskRouter, Task } from "../orchestration/task-router.js";
+} from "./interfaces/governance.interface.js";
+import type { ILogger } from "./interfaces/logger.interface.js";
+import type { IMetricsCollector, ITraceRecorder } from "./interfaces/observability.interface.js";
+import type { IEventStore } from "./interfaces/persistence.interface.js";
+import type { IQueueBackend } from "./interfaces/queue.interface.js";
+import { MemoryQueueBackend } from "./queue-backend.js";
+import type { IRuntimeManager } from "./runtime-manager.js";
+import type { TaskExecutor } from "./task-executor.js";
+import { buildQueuePayloadFromTask } from "./task-payload.js";
+import type { TaskRouter, Task } from "./task-router.js";
+
+/** Minimal interface for optional diagnostic inspector injection. */
+type InspectorLike = { recordPlan?(plan: unknown): void };
 
 export class GhostStackOrchestrator {
   private runtimeManager: IRuntimeManager;
@@ -42,7 +40,7 @@ export class GhostStackOrchestrator {
   private planningEngine?: IPlanningEngine;
   private governanceEngine?: IGovernanceEngine;
   private approvalWorkflow?: IApprovalWorkflow;
-  private inspector?: any;
+  private inspector?: InspectorLike;
 
   constructor(
     runtimeManager: IRuntimeManager,
@@ -58,7 +56,7 @@ export class GhostStackOrchestrator {
     planningEngine?: IPlanningEngine,
     governanceEngine?: IGovernanceEngine,
     approvalWorkflow?: IApprovalWorkflow,
-    inspector?: any,
+    inspector?: InspectorLike,
   ) {
     this.runtimeManager = runtimeManager;
     this.eventBus = eventBus;
@@ -99,7 +97,7 @@ export class GhostStackOrchestrator {
     approvalWorkflow?: IApprovalWorkflow;
     /** Optional custom dependency resolver — defaults to TaskDependencyResolver. */
     resolver?: ITaskDependencyResolver;
-    inspector?: any;
+    inspector?: InspectorLike;
   }): GhostStackOrchestrator {
     const inst = new GhostStackOrchestrator(
       opts.runtimeManager,
@@ -160,7 +158,7 @@ export class GhostStackOrchestrator {
     this.logger?.info(`Submitting ${tasks.length} tasks to dependency validation loop...`);
     const traceSpan = this.tracer?.startSpan("submit.tasks", undefined, { count: tasks.length });
 
-    const sortedTasks = this.resolver.resolveOrder(tasks);
+    const sortedTasks = this.resolver.resolveOrder(tasks) as Task[];
     this.logger?.info("Tasks sorted in topological order", {
       sorted: sortedTasks.map((t) => t.id),
     });
@@ -177,7 +175,7 @@ export class GhostStackOrchestrator {
           type: payloadType,
           payload: payloadPayload,
         },
-        priority: (task.priority as any) || "medium",
+        priority: (task.priority || "medium") as "low" | "medium" | "high",
         retries: 0,
         maxRetries: 3,
         createdAt: new Date(),

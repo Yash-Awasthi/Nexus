@@ -267,21 +267,27 @@ export class CircuitBreakerAdapterWrapper {
   /**
    * Wrap an adapter's execute method through the circuit breaker.
    */
-  wrapAdapter<T extends { execute(task: any, context: any): Promise<any> }>(adapter: T): T {
+  wrapAdapter<T extends { execute(task: unknown, context: unknown): Promise<unknown> }>(
+    adapter: T,
+  ): T {
     const wrapped = Object.create(adapter);
     const originalExecute = adapter.execute.bind(adapter);
-    wrapped.execute = async (task: any, context: any) => {
+    wrapped.execute = async (task: unknown, context: unknown) => {
       return this.breaker.execute(() => originalExecute(task, context));
     };
     // If adapter has executeAction, wrap that too
-    if ((adapter as any).executeAction) {
-      const originalExecuteAction = (adapter as any).executeAction.bind(adapter);
+    if ("executeAction" in adapter) {
+      const originalExecuteAction = (
+        adapter as Record<string, unknown> & { executeAction(...args: unknown[]): unknown }
+      ).executeAction.bind(adapter);
       wrapped.executeAction = async (
         action: string,
         payload: Record<string, unknown>,
-        context: any,
+        context: unknown,
       ) => {
-        return this.breaker.execute(() => originalExecuteAction(action, payload, context));
+        return this.breaker.execute(
+          () => originalExecuteAction(action, payload, context) as Promise<unknown>,
+        );
       };
     }
     return wrapped;

@@ -6,7 +6,7 @@
  *   GET  /api/v1/council/transcripts/:verdictId
  */
 
-import type { CouncilRequest } from "@nexus/contracts";
+import type { CouncilRequest, ModelVote } from "@nexus/contracts";
 import { CouncilService } from "@nexus/council";
 import type { CouncilPersistPayload } from "@nexus/council";
 import { db } from "@nexus/db";
@@ -44,8 +44,8 @@ async function persistCouncilResult(payload: CouncilPersistPayload): Promise<voi
     result.outcome === "approved" ? "approve" : result.outcome === "rejected" ? "reject" : "defer";
 
   const dissents = votes
-    .filter((v) => v.vote !== result.majority && v.vote !== "abstain")
-    .map((v) => v.model);
+    .filter((v: ModelVote) => v.vote !== result.majority && v.vote !== "abstain")
+    .map((v: ModelVote) => v.model);
 
   const [verdictRow] = await db
     .insert(verdicts)
@@ -56,7 +56,7 @@ async function persistCouncilResult(payload: CouncilPersistPayload): Promise<voi
       rationale: result.summary,
       dissents,
       actions: null,
-      costUsd: "0",
+      costUsd: payload.totalCostUsd > 0 ? payload.totalCostUsd.toFixed(6) : null,
     })
     .returning({ id: verdicts.id });
 
@@ -65,7 +65,7 @@ async function persistCouncilResult(payload: CouncilPersistPayload): Promise<voi
   // Write transcript
   await db.insert(councilTranscripts).values({
     verdictId: verdictRow.id,
-    turns: votes.map((v) => ({
+    turns: votes.map((v: ModelVote) => ({
       archetype: v.model,
       role: "assistant",
       content: v.reasoning,
@@ -82,7 +82,9 @@ export async function councilRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
     Body: CouncilRequest & { signal_id?: string };
   }>("/council/deliberate", { preHandler: requireAuth }, async (request, reply) => {
-    const { signal_id, ...councilRequest } = request.body;
+    const { signal_id, ...councilRequest } = request.body as CouncilRequest & {
+      signal_id?: string;
+    };
     const svc = getCouncilService();
 
     try {

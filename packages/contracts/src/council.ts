@@ -40,6 +40,8 @@ export interface ProposalResult {
   summary: string;
   deliberatedAt: string;
   totalLatencyMs: number;
+  /** Sum of per-vote LLM token costs in USD (computed from usage.promptTokens + completionTokens). */
+  totalCostUsd: number;
 }
 
 // ── Council request / response ────────────────────────────────────────────────

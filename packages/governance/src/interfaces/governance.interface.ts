@@ -4,7 +4,7 @@ export interface ITaskSynthesisResult {
   serverName?: string;
   toolName?: string;
   action: string;
-  arguments: any;
+  arguments: Record<string, unknown>;
   dependencies: string[];
   priority: "low" | "medium" | "high";
   /** Executor adapter type — determines which TaskExecutor adapter handles this task */
@@ -24,7 +24,7 @@ export interface ICognitiveTrace {
 }
 
 export interface IPlanningEngine {
-  generatePlan(objective: string, context?: any): Promise<ICognitiveTrace>;
+  generatePlan(objective: string, context?: unknown): Promise<ICognitiveTrace>;
 }
 
 export interface IExecutionConstraint {
@@ -58,7 +58,10 @@ export interface IApprovalWorkflow {
 
 export interface IRuntimeGuardrail {
   name: string;
-  check(tasks: ITaskSynthesisResult[], executionLogs: any[]): { success: boolean; reason?: string };
+  check(
+    tasks: ITaskSynthesisResult[],
+    executionLogs: unknown[],
+  ): { success: boolean; reason?: string };
 }
 
 export interface IGovernanceEngine {

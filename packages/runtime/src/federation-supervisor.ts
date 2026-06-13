@@ -1,19 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck — imports reference orchestration modules not yet exported from @nexus/runtime public API
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 import * as fs from "fs";
 import * as net from "net";
 import * as path from "path";
 
-import { probeFlociHealth, resolveFlociEndpoint } from "../orchestration/floci-client.js";
-import type { RuntimeGraph } from "../orchestration/runtime-graph.js";
-
 import { McpServerHost } from "./adapters/mcp-server-host.js";
 import { runDockerCompose } from "./docker-compose-runner.js";
+import { probeFlociHealth, resolveFlociEndpoint } from "./floci-client.js";
 import type { GhostStackConfig } from "./ghoststack-config.js";
 import { loadGhostStackConfig } from "./ghoststack-config.js";
 import type { GhostStackServer } from "./ghoststack-server.js";
 import { createGhostStackServer } from "./ghoststack-server.js";
+import type { RuntimeGraph } from "./runtime-graph.js";
 
 export interface FederationServiceStatus {
   name: string;
@@ -51,8 +48,8 @@ const COMPOSE_FEDERATION = ["docker/docker-compose.federation.yaml"];
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const server = net.createServer();
-    server.once("error", (err: any) => {
-      if (err.code === "EADDRINUSE") {
+    server.once("error", (err: Error) => {
+      if ((err as NodeJS.ErrnoException).code === "EADDRINUSE") {
         resolve(false);
       } else {
         resolve(true);
@@ -81,10 +78,11 @@ function isProcessRunning(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;
-  } catch (e: any) {
-    if (e.code === "EPERM") return true;
-    if (e.code === "ESRCH") return false;
-    if (e.code === "EINVAL") return false;
+  } catch (e) {
+    const _e = e as NodeJS.ErrnoException;
+    if (_e.code === "EPERM") return true;
+    if (_e.code === "ESRCH") return false;
+    if (_e.code === "EINVAL") return false;
     // Unknown error — safe default: assume running
     return true;
   }
@@ -269,8 +267,8 @@ export class FederationSupervisor {
             `GhostStack is already running (API PID: ${state.apiPid}). Stop it first with 'gs stop'`,
           );
         }
-      } catch (err: any) {
-        if (err.message.includes("GhostStack is already running")) throw err;
+      } catch (err) {
+        if ((err as Error).message.includes("GhostStack is already running")) throw err;
         // corrupt state file, we will clear it
         this.clearState();
       }

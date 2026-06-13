@@ -25,7 +25,7 @@ export interface IMetricsCollector {
   increment(metricName: string, amount?: number, tags?: Record<string, string>): void;
   recordGauge(metricName: string, value: number, tags?: Record<string, string>): void;
   recordTiming(metricName: string, durationMs: number, tags?: Record<string, string>): void;
-  getMetrics(): Record<string, any>;
+  getMetrics(): Record<string, unknown>;
   reset(): void;
 }
 
@@ -35,27 +35,27 @@ export interface ITraceSpan {
   name: string;
   startTime: Date;
   endTime?: Date;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ITraceRecorder {
-  startSpan(name: string, parentId?: string, metadata?: Record<string, any>): ITraceSpan;
-  endSpan(spanId: string, metadata?: Record<string, any>): void;
+  startSpan(name: string, parentId?: string, metadata?: Record<string, unknown>): ITraceSpan;
+  endSpan(spanId: string, metadata?: Record<string, unknown>): void;
   getSpans(): ITraceSpan[];
   clear(): void;
 }
 
 export interface ITelemetrySink {
-  record(event: string, payload: any): void;
-  getTelemetry(): any[];
+  record(event: string, payload: unknown): void;
+  getTelemetry(): unknown[];
 }
 
 export interface IRuntimeInspector {
-  getHealth(): Promise<any>;
-  getMetrics(): Promise<any>;
+  getHealth(): Promise<unknown>;
+  getMetrics(): Promise<unknown>;
   getTasks(): Promise<ITaskSnapshot[]>;
   getEvents(): Promise<IEventSnapshot[]>;
   getQueues(): Promise<IQueueSnapshot>;
-  getServices(): Promise<any[]>;
-  getSnapshots(): Promise<any>;
+  getServices(): Promise<unknown[]>;
+  getSnapshots(): Promise<unknown>;
 }

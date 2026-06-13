@@ -35,10 +35,10 @@ export interface EventBusConfig {
 export interface IEventBus {
   publish(
     event: string,
-    payload: any,
+    payload: unknown,
     options?: { causeEventId?: string; dedupKey?: string },
   ): Promise<void>;
-  subscribe(event: string, handler: (payload: any) => void | Promise<void>): EventSubscription;
+  subscribe(event: string, handler: (payload: unknown) => void | Promise<void>): EventSubscription;
   getActiveSubscriptionCount(): number;
   getDeduplicationCount(): number;
   /** Compact dedup window and return cleanup stats. */
@@ -72,7 +72,7 @@ export interface EventBusStats {
 export interface EventEnvelope {
   eventId: string;
   event: string;
-  payload: any;
+  payload: unknown;
   timestamp: string;
   sequenceNumber: number;
   causeChain?: string[];
@@ -80,7 +80,7 @@ export interface EventEnvelope {
 }
 
 export class LocalEventBus implements IEventBus {
-  private handlers = new Map<string, Set<(payload: any) => void | Promise<void>>>();
+  private handlers = new Map<string, Set<(payload: unknown) => void | Promise<void>>>();
   private eventCounter = 0;
   private sequenceCounter = 0;
   private recentDedupKeys = new Set<string>();
@@ -111,7 +111,7 @@ export class LocalEventBus implements IEventBus {
 
   async publish(
     event: string,
-    payload: any,
+    payload: unknown,
     options?: { causeEventId?: string; dedupKey?: string },
   ): Promise<void> {
     // ── Backpressure: wait if too many pending ────────────────────────
@@ -242,7 +242,7 @@ export class LocalEventBus implements IEventBus {
     this.pendingCount--;
   }
 
-  subscribe(event: string, handler: (payload: any) => void | Promise<void>): EventSubscription {
+  subscribe(event: string, handler: (payload: unknown) => void | Promise<void>): EventSubscription {
     if (!this.handlers.has(event)) {
       this.handlers.set(event, new Set());
     }

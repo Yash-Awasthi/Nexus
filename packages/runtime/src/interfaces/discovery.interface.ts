@@ -3,11 +3,11 @@ export interface ServiceHeartbeat {
   name: string;
   status: "healthy" | "unhealthy" | "offline";
   lastCheck: Date;
-  details?: any;
+  details?: unknown;
 }
 
 export interface IServiceDiscovery {
-  registerService(name: string, port: number, details?: any): Promise<void>;
+  registerService(name: string, port: number, details?: unknown): Promise<void>;
   deregisterService(name: string): Promise<void>;
   getService(name: string): Promise<ServiceHeartbeat | undefined>;
   listServices(): Promise<ServiceHeartbeat[]>;

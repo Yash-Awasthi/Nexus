@@ -39,6 +39,7 @@ export default function Signals() {
         : "/ingest/signals?limit=100";
     api
       .get<{ signals: Signal[]; limit: number; offset: number }>(query)
+      // eslint-disable-next-line promise/always-return -- void side-effect, no return needed
       .then((data) => {
         setSignals(data.signals);
         setError(null);

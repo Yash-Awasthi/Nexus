@@ -1,0 +1,101 @@
+# SPDX-License-Identifier: Apache-2.0
+# docker-compose.observability.yml — Local observability stack
+#
+# Usage:
+#   docker compose \
+#     -f docker-compose.yml \
+#     -f infra/docker/docker-compose.observability.yml \
+#     --profile observability up
+#
+# Adds:
+#   - OpenTelemetry Collector (OTLP gRPC :4317, HTTP :4318)
+#   - Prometheus (scrapes OTel + direct service metrics) at :9090
+#   - Grafana (pre-configured datasources) at :3001
+#   - Jaeger (trace UI) at :16686
+#
+# Services are on the "observability" profile so they don't start with plain
+# `docker compose up` — use `--profile observability` to include them.
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.102.0
+    profiles: [observability]
+    restart: unless-stopped
+    volumes:
+      - ./infra/otel/config.yaml:/etc/otel/config.yaml:ro
+    command: ["--config=/etc/otel/config.yaml"]
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "8888:8888" # Collector self-metrics
+      - "8889:8889" # Prometheus exporter
+    networks:
+      - nexus-net
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    profiles: [observability]
+    restart: unless-stopped
+    volumes:
+      - ./infra/otel/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=7d"
+      - "--web.enable-lifecycle"
+    networks:
+      - nexus-net
+
+  grafana:
+    image: grafana/grafana:10.4.3
+    profiles: [observability]
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: nexus-dev
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_FEATURE_TOGGLES_ENABLE: traceqlEditor
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infra/otel/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/nexus.yaml:ro
+    ports:
+      - "3001:3000" # offset from API port
+    networks:
+      - nexus-net
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    profiles: [observability]
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "14250:14250" # gRPC collector
+    networks:
+      - nexus-net
+
+  # Wire existing services to emit telemetry
+  api:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: nexus-api
+      OTEL_TRACES_EXPORTER: otlp
+
+  worker:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: nexus-worker
+      OTEL_TRACES_EXPORTER: otlp
+
+  ingest:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: nexus-ingest
+      OTEL_TRACES_EXPORTER: otlp
+
+volumes:
+  prometheus-data:
+  grafana-data:

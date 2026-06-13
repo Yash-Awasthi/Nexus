@@ -87,13 +87,14 @@ export class LoopDetectionGuardrail implements IRuntimeGuardrail {
 
   check(
     tasks: ITaskSynthesisResult[],
-    executionLogs: any[],
+    executionLogs: unknown[],
   ): { success: boolean; reason?: string } {
     const actionCounts = new Map<string, number>();
     for (const log of executionLogs) {
-      const action = log.action || log.event || "";
-      actionCounts.set(action, (actionCounts.get(action) || 0) + 1);
-      if ((actionCounts.get(action) || 0) > this.actionMaxCount) {
+      const _log = log as Record<string, unknown>;
+      const action = (_log.action || _log.event || "") as string;
+      actionCounts.set(action, (actionCounts.get(action) ?? 0) + 1);
+      if ((actionCounts.get(action) ?? 0) > this.actionMaxCount) {
         return {
           success: false,
           reason: `Orchestration loop protection triggered: action '${action}' invoked ${actionCounts.get(action)} times`,
@@ -114,13 +115,14 @@ export class RunawayRetriesGuardrail implements IRuntimeGuardrail {
 
   check(
     tasks: ITaskSynthesisResult[],
-    executionLogs: any[],
+    executionLogs: unknown[],
   ): { success: boolean; reason?: string } {
     for (const log of executionLogs) {
-      if (log.retries && log.retries > this.maxRetries) {
+      const _log = log as Record<string, unknown>;
+      if (_log.retries && (_log.retries as number) > this.maxRetries) {
         return {
           success: false,
-          reason: `Runaway retry guardrail triggered: retries count ${log.retries} exceeds limit ${this.maxRetries}`,
+          reason: `Runaway retry guardrail triggered: retries count ${_log.retries} exceeds limit ${this.maxRetries}`,
         };
       }
     }
@@ -138,7 +140,7 @@ export class TaskGraphLimitGuardrail implements IRuntimeGuardrail {
 
   check(
     tasks: ITaskSynthesisResult[],
-    _executionLogs: any[],
+    _executionLogs: unknown[],
   ): { success: boolean; reason?: string } {
     if (tasks.length > this.maxTasksCount) {
       return {
@@ -159,7 +161,7 @@ export class TimeoutConstraint implements IExecutionConstraint {
   }
 
   validate(task: ITaskSynthesisResult): { success: boolean; reason?: string } {
-    const declared = (task.governanceMetadata as any)?.maxExecutionMs;
+    const declared = (task.governanceMetadata as Record<string, unknown>)?.maxExecutionMs;
     if (typeof declared === "number" && declared > this.maxExecutionMs) {
       return {
         success: false,
@@ -180,7 +182,7 @@ export class HighCostPlanGuardrail implements IRuntimeGuardrail {
 
   check(
     tasks: ITaskSynthesisResult[],
-    _executionLogs: any[],
+    _executionLogs: unknown[],
   ): { success: boolean; reason?: string } {
     const totalCost = tasks.reduce((sum, t) => sum + (t.governanceMetadata?.costEstimate ?? 0), 0);
     if (totalCost > this.maxPlanCost) {
@@ -203,7 +205,7 @@ export class DuplicateActionGuardrail implements IRuntimeGuardrail {
 
   check(
     tasks: ITaskSynthesisResult[],
-    _executionLogs: any[],
+    _executionLogs: unknown[],
   ): { success: boolean; reason?: string } {
     const counts = new Map<string, number>();
     for (const task of tasks) {
@@ -297,7 +299,7 @@ export class GovernanceEngine implements IGovernanceEngine {
 
   async evaluateRuntimeLogs(
     tasks: ITaskSynthesisResult[],
-    executionLogs: any[],
+    executionLogs: unknown[],
   ): Promise<{ allowed: boolean; reason?: string }> {
     for (const guardrail of this.guardrails) {
       const res = guardrail.check(tasks, executionLogs);

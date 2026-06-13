@@ -1,18 +1,39 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck — imports reference orchestration modules not yet exported from @nexus/runtime public API
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 import * as http from "http";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 import * as path from "path";
 
-import { RuntimeDiagnosticAPI } from "../orchestration/diagnostic-api.js";
-import { registerGhostStackMcpBridge } from "../orchestration/ghoststack-mcp-bridge.js";
-import type { IExecutionContext } from "../orchestration/interfaces/execution.interface.js";
-import { metricsToPrometheus } from "../orchestration/prometheus-format.js";
+/**
+ * JSON.stringify replacer that strips stack traces and internal paths from
+ * serialized values.  Prevents accidental stack-trace exposure in API responses
+ * when workflow results contain Error objects or error-shaped payloads.
+ */
+function safeJsonReplacer(_key: string, value: unknown): unknown {
+  if (value instanceof Error) {
+    return { message: value.message };
+  }
+  // Strip any plain-object fields named "stack" that look like stack traces.
+  if (_key === "stack" && typeof value === "string" && value.includes("\n    at ")) {
+    return undefined;
+  }
+  return value;
+}
 
-import { ADAPTER_MANIFEST } from "./adapters/manifest.js";
-import { runFederationE2e } from "./e2e-federation.js";
-import { createRuntimeContext, startRuntime, stopRuntime } from "./runtime-context.js";
-import type { GhostStackRuntimeContext } from "./runtime-context.js";
+const _require = createRequire(import.meta.url);
+
+import {
+  ADAPTER_MANIFEST,
+  FederationSupervisor,
+  RuntimeDiagnosticAPI,
+  createRuntimeContext,
+  registerGhostStackMcpBridge,
+  runFederationE2e,
+  startRuntime,
+  stopRuntime,
+} from "@nexus/runtime";
+import type { GhostStackRuntimeContext, IExecutionContext } from "@nexus/runtime";
+import { metricsToPrometheus } from "@nexus/telemetry";
 
 // ─── Structured health response ──────────────────────────────────────────────
 
@@ -33,13 +54,13 @@ async function buildHealthResponse(
   try {
     const queueLen = (await ctx.queue?.getQueueLength?.()) ?? 0;
     components.queue = { status: "healthy", detail: `${queueLen} job(s) pending` };
-  } catch (e: any) {
-    components.queue = { status: "error", detail: e?.message };
+  } catch (e) {
+    components.queue = { status: "error", detail: (e as Error)?.message };
   }
 
   // Floci adapter
   try {
-    const flociHealth = ctx.flociAdapter?.getLastHealth?.();
+    const flociHealth = ctx.flociAdapter.getLastHealth?.();
     if (flociHealth?.reachable === false) {
       components.floci = {
         status: "offline",
@@ -50,8 +71,8 @@ async function buildHealthResponse(
     } else {
       components.floci = { status: "unknown", detail: "not yet probed" };
     }
-  } catch (e: any) {
-    components.floci = { status: "error", detail: e?.message };
+  } catch (e) {
+    components.floci = { status: "error", detail: (e as Error)?.message };
   }
 
   // Event bus
@@ -61,8 +82,8 @@ async function buildHealthResponse(
       status: "healthy",
       detail: `${Array.isArray(history) ? history.length : "?"} event(s) in history`,
     };
-  } catch (e: any) {
-    components.event_bus = { status: "error", detail: e?.message };
+  } catch (e) {
+    components.event_bus = { status: "error", detail: (e as Error)?.message };
   }
 
   // Workflow engine
@@ -70,10 +91,10 @@ async function buildHealthResponse(
     const wfStats = ctx.inspector?.getWorkflowTelemetryStats?.();
     components.workflow_engine = {
       status: "healthy",
-      detail: `${wfStats?.totalExecutions ?? 0} total execution(s)`,
+      detail: `${(wfStats as Record<string, unknown>)?.totalExecutions ?? 0} total execution(s)`,
     };
-  } catch (e: any) {
-    components.workflow_engine = { status: "error", detail: e?.message };
+  } catch (e) {
+    components.workflow_engine = { status: "error", detail: (e as Error)?.message };
   }
 
   const hasError = Object.values(components).some(
@@ -87,8 +108,7 @@ async function buildHealthResponse(
   // Read version from package.json — resolved relative to the dist or source root
   let version = "unknown";
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    version = (require("../package.json") as { version: string }).version;
+    version = (_require("../package.json") as { version: string }).version;
   } catch {
     // ignore
   }
@@ -169,7 +189,7 @@ export async function createGhostStackServer(repoRoot: string): Promise<GhostSta
         res.setHeader("Content-Type", "application/json");
         res.end(
           JSON.stringify(
-            { manifest: ADAPTER_MANIFEST, floci: ctx.flociAdapter.getLastHealth() },
+            { manifest: ADAPTER_MANIFEST, floci: ctx.flociAdapter.getLastHealth?.() },
             null,
             2,
           ),
@@ -178,7 +198,6 @@ export async function createGhostStackServer(repoRoot: string): Promise<GhostSta
       }
 
       if (method === "GET" && pathname === "/runtime/federation/status") {
-        const { FederationSupervisor } = await import("./federation-supervisor.js");
         const status = await FederationSupervisor.readPersistedStatus(repoRoot);
         res.statusCode = 200;
         res.setHeader("Content-Type", "application/json");
@@ -254,7 +273,11 @@ export async function createGhostStackServer(repoRoot: string): Promise<GhostSta
           environment: {},
           logger: ctx.logger,
         };
-        const result = await ctx.flociAdapter.executeAction(action, payload, flociCtx);
+        const result = await ctx.flociAdapter.executeAction(
+          action,
+          payload,
+          flociCtx as unknown as Record<string, unknown>,
+        );
         res.statusCode = 200;
         res.end(JSON.stringify(result, null, 2));
         return;
@@ -267,7 +290,7 @@ export async function createGhostStackServer(repoRoot: string): Promise<GhostSta
           strict: body.strict === true,
           cleanup: body.cleanup !== false,
         });
-        res.statusCode = result.status === "succeeded" ? 200 : 500;
+        res.statusCode = result.success ? 200 : 500;
         res.end(JSON.stringify(result, null, 2));
         return;
       }
@@ -284,7 +307,7 @@ export async function createGhostStackServer(repoRoot: string): Promise<GhostSta
         }
         const result = await ctx.workflowEngine.executeWorkflow(workflowId, executionId);
         res.statusCode = 200;
-        res.end(JSON.stringify(result, null, 2));
+        res.end(JSON.stringify(result, safeJsonReplacer, 2));
         return;
       }
 
@@ -294,10 +317,10 @@ export async function createGhostStackServer(repoRoot: string): Promise<GhostSta
         pathname.endsWith("/approve")
       ) {
         const parts = pathname.split("/");
-        const approvalId = parts[parts.length - 2];
+        const approvalId = parts[parts.length - 2]!;
         const result = await ctx.workflowEngine.approveAndTriggerWorkflow(approvalId);
         res.statusCode = 200;
-        res.end(JSON.stringify(result, null, 2));
+        res.end(JSON.stringify(result, safeJsonReplacer, 2));
         return;
       }
 
@@ -320,8 +343,8 @@ export async function createGhostStackServer(repoRoot: string): Promise<GhostSta
 
       // ── DELETE /runtime/queue/dlq/clear — flush dead-letter queue ─────────────
       if (method === "DELETE" && pathname === "/runtime/queue/dlq/clear") {
-        if (typeof (ctx.queue as any).clear === "function") {
-          await (ctx.queue as any).clear(true); // includeDlq = true
+        if (typeof ctx.queue.clear === "function") {
+          await ctx.queue.clear(true); // includeDlq = true
           res.statusCode = 200;
           res.end(JSON.stringify({ cleared: true }));
         } else {
@@ -333,8 +356,8 @@ export async function createGhostStackServer(repoRoot: string): Promise<GhostSta
 
       res.statusCode = 405;
       res.end(JSON.stringify({ error: `Method not allowed: ${method} ${pathname}` }));
-    } catch (err: any) {
-      const rawMessage = err?.message || String(err);
+    } catch (err) {
+      const rawMessage = (err as Error)?.message || String(err);
       const statusCode = rawMessage.startsWith("Not Found") ? 404 : 500;
       // Avoid exposing internal stack traces / file paths in production responses.
       const safeMessage =
@@ -370,8 +393,8 @@ export async function createGhostStackServer(repoRoot: string): Promise<GhostSta
 }
 
 export async function startHttpServer(): Promise<http.Server> {
-  const repoRoot = path.resolve(__dirname, "..");
-  const { loadGhostStackConfig } = await import("./ghoststack-config.js");
+  const repoRoot = path.resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
+  const { loadGhostStackConfig } = await import("@nexus/runtime");
   loadGhostStackConfig(repoRoot);
   const gs = await createGhostStackServer(repoRoot);
   console.log(

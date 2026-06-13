@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
+
 import type { KnownBlock } from "@slack/web-api";
 import { WebClient } from "@slack/web-api";
 

@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck — imports reference orchestration modules not yet exported from @nexus/runtime public API
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 /**
  * Runtime Compactor — Centralized Resource Compaction & Leak Detection
  *
@@ -156,8 +154,8 @@ export class LeakDetector {
     let suspiciousMemoryGrowth = false;
     let growthRateMBperMin = 0;
     if (this.readings.length >= 2) {
-      const first = this.readings[0];
-      const last = this.readings[this.readings.length - 1];
+      const first = this.readings[0]!;
+      const last = this.readings[this.readings.length - 1]!;
       const elapsedMinutes = (last.timestamp.getTime() - first.timestamp.getTime()) / 60000;
       if (elapsedMinutes > 0) {
         growthRateMBperMin =
@@ -176,8 +174,8 @@ export class LeakDetector {
     let suspiciousSubscriptionGrowth = false;
     let growthRatePerMin = 0;
     if (this.readings.length >= 2) {
-      const first = this.readings[0];
-      const last = this.readings[this.readings.length - 1];
+      const first = this.readings[0]!;
+      const last = this.readings[this.readings.length - 1]!;
       const elapsedMinutes = (last.timestamp.getTime() - first.timestamp.getTime()) / 60000;
       if (elapsedMinutes > 0) {
         growthRatePerMin =
@@ -207,7 +205,8 @@ export class LeakDetector {
         heapGrowthMB:
           this.readings.length >= 2
             ? Math.round(
-                (this.readings[this.readings.length - 1].heapUsedMB - this.readings[0].heapUsedMB) *
+                (this.readings[this.readings.length - 1]!.heapUsedMB -
+                  this.readings[0]!.heapUsedMB) *
                   100,
               ) / 100
             : 0,

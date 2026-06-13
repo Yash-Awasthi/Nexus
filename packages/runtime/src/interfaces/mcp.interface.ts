@@ -3,7 +3,7 @@ export interface IMCPTask {
   id: string;
   serverName: string;
   toolName: string;
-  arguments: Record<string, any>;
+  arguments: Record<string, unknown>;
   correlationId: string;
   timeoutMs?: number;
   priority?: "low" | "medium" | "high";
@@ -12,7 +12,7 @@ export interface IMCPTask {
 
 export interface IMCPExecutionResult {
   success: boolean;
-  output?: any;
+  output?: unknown;
   error?: string;
   durationMs: number;
   correlationId: string;
@@ -26,7 +26,7 @@ export interface IMCPExecutionContext {
 }
 
 export interface IMCPTransport {
-  send(message: any): Promise<any>;
+  send(message: unknown): Promise<unknown>;
   connect(): Promise<void>;
   disconnect(): Promise<void>;
 }

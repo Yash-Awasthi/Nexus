@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck — imports reference orchestration modules not yet exported from @nexus/runtime public API
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
-import { getBridgeManager, BridgeManager } from "../runtime/bridge-manager.js";
-
+import { getBridgeManager, BridgeManager } from "./bridge-manager.js";
 import type {
   IBrowserExecutionAdapter,
   IBrowserTask,
@@ -21,13 +18,14 @@ export class BrowserExecutionAdapter implements IBrowserExecutionAdapter {
     return taskType === "browser";
   }
 
-  async execute(task: any, context: IExecutionContext): Promise<any> {
-    const payload = task.payload || {};
+  async execute(task: unknown, context: IExecutionContext): Promise<Record<string, unknown>> {
+    const t = task as Record<string, unknown>;
+    const payload = (t.payload as Record<string, unknown>) || {};
     const browserTask: IBrowserTask = {
       id: context.taskId,
-      url: payload.url || "",
-      actions: payload.actions || [],
-      timeoutMs: payload.timeoutMs || 5000,
+      url: (payload.url as string) || "",
+      actions: (payload.actions as IBrowserTask["actions"]) || [],
+      timeoutMs: (payload.timeoutMs as number) || 5000,
     };
     return this.executeBrowserTask(browserTask);
   }
@@ -139,12 +137,12 @@ export class BrowserExecutionAdapter implements IBrowserExecutionAdapter {
           : {}),
         logs,
       };
-    } catch (err: any) {
+    } catch (err) {
       this.telemetry.browserSessionsActive -= 1;
-      logs.push(`Stealth browser execution failure: ${err.message}`);
+      logs.push(`Stealth browser execution failure: ${(err as Error).message}`);
       return {
         success: false,
-        content: `Error: ${err.message}`,
+        content: `Error: ${(err as Error).message}`,
         logs,
       };
     }

@@ -1,28 +1,32 @@
 #!/usr/bin/env node
-// @ts-nocheck — CLI imports runtime internals directly (planning-engine, ghoststack-config,
-// e2e-federation, etc.) that are not yet exported from @nexus/runtime's public API.
-// Pending refactor: migrate all imports to @nexus/runtime package boundary.
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 // SPDX-License-Identifier: Apache-2.0
 /**
  * GhostStack operator CLI (`gs` / `ghoststack`)
  */
 import * as fs from "fs";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 import * as path from "path";
 
-import { PlanningEngine } from "../orchestration/planning-engine.js";
-import { specToWorkflowDefinition } from "../orchestration/spec-loader.js";
+const _require = createRequire(import.meta.url);
 
-import { ADAPTER_MANIFEST } from "./adapters/manifest.js";
-import { bootstrap } from "./bootstrap.js";
-import { runFederationE2e } from "./e2e-federation.js";
-import { FederationSupervisor } from "./federation-supervisor.js";
-import { loadGhostStackConfig } from "./ghoststack-config.js";
-import { createGhostStackServer } from "./ghoststack-server.js";
-import { runHealthcheck } from "./healthcheck.js";
-import { createRuntimeContext, startRuntime, stopRuntime } from "./runtime-context.js";
+import {
+  ADAPTER_MANIFEST,
+  FederationSupervisor,
+  PlanningEngine,
+  bootstrap,
+  createGhostStackServer,
+  createRuntimeContext,
+  loadGhostStackConfig,
+  runFederationE2e,
+  runHealthcheck,
+  specToWorkflowDefinition,
+  startRuntime,
+  stopRuntime,
+} from "@nexus/runtime";
+import type { ITaskSynthesisResult, QueueJob } from "@nexus/runtime";
 
-const repoRoot = path.resolve(__dirname, "..");
+const repoRoot = path.resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 
 function usage(): void {
   console.log(`GhostStack CLI
@@ -116,8 +120,8 @@ async function cmdInit(): Promise<void> {
       encoding: "utf8",
     });
     console.log(`[scaffold] Created default config file: ${configPath}`);
-  } catch (err: any) {
-    if (err.code !== "EEXIST") throw err;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
   }
 
   // Create .env if not exists (exclusive create to avoid TOCTOU race)
@@ -145,16 +149,16 @@ GHOSTSTACK_MCP_EXTERNAL=true
       fs.writeFileSync(envPath, defaultEnv, "utf8");
       console.log(`[scaffold] Created default .env file`);
     }
-  } catch (err: any) {
-    if (err.code !== "EEXIST") throw err;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
   }
 
   // Create example spec if not exists (exclusive create to avoid TOCTOU race)
   const specPath = path.join(demoSpecsDir, "workflow-spec.json");
   try {
     fs.writeFileSync(specPath, "", { flag: "wx" });
-  } catch (e: any) {
-    if (e.code !== "EEXIST") throw e;
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
   }
   if (!fs.readFileSync(specPath, "utf8").trim()) {
     const demoSpec = {
@@ -285,7 +289,7 @@ async function cmdE2e(viaHttp: boolean): Promise<void> {
   try {
     const result = await runFederationE2e(ctx, { strict: true, cleanup: true });
     console.log(JSON.stringify(result, null, 2));
-    if (result.status !== "succeeded") process.exit(1);
+    if (!result.success) process.exit(1);
   } finally {
     await stopRuntime(ctx);
   }
@@ -335,10 +339,11 @@ async function cmdWorkflowsList(): Promise<void> {
       console.log("  (no workflows registered)");
     } else {
       for (const w of workflows) {
-        console.log(`  ${w.id}`);
-        console.log(`    Name:        ${w.name}`);
-        console.log(`    Description: ${w.description}`);
-        console.log(`    Tasks:       ${w.tasksCount}`);
+        const _w = w as Record<string, unknown>;
+        console.log(`  ${_w.id}`);
+        console.log(`    Name:        ${_w.name}`);
+        console.log(`    Description: ${_w.description}`);
+        console.log(`    Tasks:       ${_w.tasksCount}`);
         console.log("");
       }
     }
@@ -352,7 +357,7 @@ async function cmdWorkflowsExecutions(): Promise<void> {
   const ctx = await createRuntimeContext(repoRoot);
   await startRuntime(ctx);
   try {
-    const stats = ctx.inspector.getWorkflowTelemetryStats();
+    const stats = ctx.inspector.getWorkflowTelemetryStats() as Record<string, unknown>;
     const executions = ctx.inspector.getWorkflowExecutionHistory();
     console.log("\n======================== Workflow Executions ========================");
     console.log(`  Total:    ${stats.totalExecutions}`);
@@ -365,12 +370,13 @@ async function cmdWorkflowsExecutions(): Promise<void> {
       console.log("  (no executions)");
     } else {
       for (const e of executions.slice(-20).reverse()) {
-        const status = e.status.padEnd(12);
-        const id = e.id.padEnd(28);
-        const started = e.startedAt ? new Date(e.startedAt).toLocaleTimeString() : "-";
-        const note = e.error
-          ? ` ERR: ${e.error}`
-          : e.approved === false
+        const _e = e as Record<string, unknown>;
+        const status = (_e.status as string).padEnd(12);
+        const id = (_e.id as string).padEnd(28);
+        const started = _e.startedAt ? new Date(_e.startedAt as string).toLocaleTimeString() : "-";
+        const note = _e.error
+          ? ` ERR: ${_e.error}`
+          : _e.approved === false
             ? " (pending approval)"
             : "";
         console.log(`  ${status}${id}${started}${note}`);
@@ -392,9 +398,10 @@ async function cmdWorkflowsTemplates(): Promise<void> {
       console.log("  (no templates registered)");
     } else {
       for (const t of templates) {
-        console.log(`  ${t.templateId}`);
-        console.log(`    Name:        ${t.name}`);
-        console.log(`    Description: ${t.description}`);
+        const _t = t as Record<string, unknown>;
+        console.log(`  ${_t.templateId}`);
+        console.log(`    Name:        ${_t.name}`);
+        console.log(`    Description: ${_t.description}`);
         console.log("");
       }
     }
@@ -420,8 +427,8 @@ async function cmdApprove(approvalId: string | undefined): Promise<void> {
     console.log(`  Status:    ${result.status.toUpperCase()}`);
     if (result.error) console.error(`  Error:     ${result.error}`);
     console.log("");
-  } catch (err: any) {
-    console.error(`Approval failed: ${err.message}`);
+  } catch (err) {
+    console.error(`Approval failed: ${(err as Error).message}`);
     process.exit(1);
   } finally {
     await stopRuntime(ctx);
@@ -714,7 +721,7 @@ async function cmdMemory(): Promise<void> {
   const ctx = await createRuntimeContext(repoRoot);
   await startRuntime(ctx);
   try {
-    const stats = await ctx.inspector.getMemoryStats();
+    const stats = (await ctx.inspector.getMemoryStats()) as Record<string, unknown>;
     console.log("\n======================== Memory Store ==============================");
     console.log(`  Available: ${stats.available}`);
     if (stats.available) {
@@ -728,7 +735,8 @@ async function cmdMemory(): Promise<void> {
         console.log("");
         console.log("  Recent entries:");
         for (const e of entries) {
-          console.log(`    [${e.type}] ${e.key} @ ${e.timestamp}`);
+          const _e = e as Record<string, unknown>;
+          console.log(`    [${_e.type}] ${_e.key} @ ${_e.timestamp}`);
         }
       }
     }
@@ -742,8 +750,7 @@ async function cmdVersion(): Promise<void> {
   let version = "unknown";
   const nodeVersion = process.versions.node;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    version = (require("../package.json") as { version: string }).version;
+    version = (_require("../package.json") as { version: string }).version;
   } catch {
     // ignore
   }
@@ -763,7 +770,7 @@ async function cmdPlan(objective: string | undefined): Promise<void> {
   const engine = new PlanningEngine();
   const plan = await engine.generatePlan(objective);
   const total = plan.synthesisResults.reduce(
-    (sum, t) => sum + (t.governanceMetadata?.costEstimate ?? 0),
+    (sum: number, t: ITaskSynthesisResult) => sum + (t.governanceMetadata?.costEstimate ?? 0),
     0,
   );
 
@@ -776,7 +783,7 @@ async function cmdPlan(objective: string | undefined): Promise<void> {
   console.log(`----------------------------------------------------------------------`);
 
   for (let i = 0; i < plan.synthesisResults.length; i++) {
-    const t = plan.synthesisResults[i];
+    const t = plan.synthesisResults[i]!;
     const priority = `[${t.priority.toUpperCase().padEnd(6)}]`;
     const deps = t.dependencies.length > 0 ? `deps: ${t.dependencies.join(", ")}` : "deps: none";
     const dangerous = t.governanceMetadata?.dangerous ? " ⚠ DANGEROUS" : "";
@@ -791,7 +798,7 @@ async function cmdPlan(objective: string | undefined): Promise<void> {
   }
 
   console.log(`\n======================================================================`);
-  if (plan.synthesisResults.some((t) => t.governanceMetadata?.dangerous)) {
+  if (plan.synthesisResults.some((t: ITaskSynthesisResult) => t.governanceMetadata?.dangerous)) {
     console.log(`  ⚠  Plan contains dangerous operations — governance approval required.`);
   }
   console.log(`\n`);
@@ -818,7 +825,7 @@ async function cmdQueue(): Promise<void> {
         const id = job.id.padEnd(32);
         const pri = (job.priority ?? "?").padEnd(10);
         const retries = `${job.retries}/${job.maxRetries}`.padEnd(8);
-        const type = job.payload?.type ?? "?";
+        const type = (job.payload as Record<string, unknown>)?.type ?? "?";
         console.log(`  ${id} ${pri} ${retries} ${type}`);
       }
     }
@@ -872,7 +879,7 @@ async function cmdDlq(subcommand: string | undefined, jobId?: string): Promise<v
         console.error("Usage: gs dlq retry <job-id>");
         process.exit(1);
       }
-      const job = dlq.find((j) => j.id === jobId);
+      const job = dlq.find((j: QueueJob) => j.id === jobId);
       if (!job) {
         console.error(`No DLQ job found with id: ${jobId}`);
         process.exit(1);
@@ -881,7 +888,7 @@ async function cmdDlq(subcommand: string | undefined, jobId?: string): Promise<v
       await ctx.queue.push(job);
       // Remove only this one job from DLQ by clearing and re-adding the rest
       await ctx.queue.clearDeadLetterQueue();
-      for (const remaining of dlq.filter((j) => j.id !== jobId)) {
+      for (const remaining of dlq.filter((j: QueueJob) => j.id !== jobId)) {
         await ctx.queue.moveToDeadLetter(remaining, "preserved after retry of sibling");
       }
       console.log(`\n  Re-enqueued job ${jobId} (retries reset to 0).\n`);
@@ -1096,7 +1103,7 @@ async function main(): Promise<void> {
   }
 }
 
-if (require.main === module) {
+if (process.argv[1] === fileURLToPath(new URL(import.meta.url))) {
   main().catch((err) => {
     console.error("[gs] fatal:", err);
     process.exit(1);

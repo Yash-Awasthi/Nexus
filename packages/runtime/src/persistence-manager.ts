@@ -2,6 +2,7 @@
 import * as fs from "fs";
 import * as path from "path";
 
+import type { EventRecord } from "./interfaces/event-store.interface.js";
 import type { ILogger } from "./interfaces/logger.interface.js";
 import type { IEventStore, IRuntimePersistence } from "./interfaces/persistence.interface.js";
 
@@ -29,8 +30,8 @@ export class FileEventStore implements IEventStore {
     // Use exclusive-create flag to avoid TOCTOU race between existsSync + writeFileSync.
     try {
       fs.writeFileSync(this.filePath, "", { flag: "wx", encoding: "utf8" });
-    } catch (err: any) {
-      if (err.code !== "EEXIST") throw err; // File already exists — that's fine
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err; // File already exists — that's fine
     }
   }
 
@@ -38,7 +39,7 @@ export class FileEventStore implements IEventStore {
     return this.filePath;
   }
 
-  async saveEvent(event: string, payload: any): Promise<void> {
+  async saveEvent(event: string, payload: unknown): Promise<void> {
     const record = {
       event,
       payload,
@@ -48,23 +49,24 @@ export class FileEventStore implements IEventStore {
 
     this.appendQueue = this.appendQueue.then(() => {
       fs.appendFileSync(this.filePath, line, "utf8");
+      return;
     });
     return this.appendQueue;
   }
 
-  async replayEvents(since?: Date): Promise<any[]> {
+  async replayEvents(since?: Date): Promise<EventRecord[]> {
     this.lastReplayCorruptLines = 0;
     if (!fs.existsSync(this.filePath)) {
       return [];
     }
     const content = fs.readFileSync(this.filePath, "utf8");
     const lines = content.split("\n").filter((line) => line.trim().length > 0);
-    const parsed: any[] = [];
+    const parsed: EventRecord[] = [];
     const corruptLines: string[] = [];
 
     for (const line of lines) {
       try {
-        parsed.push(JSON.parse(line));
+        parsed.push(JSON.parse(line) as EventRecord);
       } catch {
         this.lastReplayCorruptLines++;
         corruptLines.push(line);
@@ -84,7 +86,7 @@ export class FileEventStore implements IEventStore {
 
     if (since) {
       const sinceTime = since.getTime();
-      return parsed.filter((item) => new Date(item.timestamp).getTime() >= sinceTime);
+      return parsed.filter((item: EventRecord) => new Date(item.timestamp).getTime() >= sinceTime);
     }
 
     return parsed;
@@ -128,7 +130,7 @@ export class FileRuntimePersistence implements IRuntimePersistence {
     return this.filePath;
   }
 
-  private readState(): Record<string, any> {
+  private readState(): Record<string, unknown> {
     if (!fs.existsSync(this.filePath)) {
       return {};
     }
@@ -150,7 +152,7 @@ export class FileRuntimePersistence implements IRuntimePersistence {
     }
   }
 
-  private writeState(state: Record<string, any>) {
+  private writeState(state: Record<string, unknown>) {
     // Write sequentially via writeQueue; writeFileSync is safe here
     // because the queue serializes all access. We avoid the temp+rename
     // pattern which fails with EPERM on Windows (rename when dest exists).
@@ -158,7 +160,7 @@ export class FileRuntimePersistence implements IRuntimePersistence {
     fs.writeFileSync(this.filePath, payload, "utf8");
   }
 
-  async saveState(key: string, state: any, options?: { verifyWrite?: boolean }): Promise<void> {
+  async saveState(key: string, state: unknown, options?: { verifyWrite?: boolean }): Promise<void> {
     this.writeQueue = this.writeQueue
       .then(() => {
         const current = this.readState();
@@ -186,6 +188,7 @@ export class FileRuntimePersistence implements IRuntimePersistence {
             }
           }
         }
+        return;
       })
       .catch((e) => {
         throw e;
@@ -205,6 +208,7 @@ export class FileRuntimePersistence implements IRuntimePersistence {
         const current = this.readState();
         delete current[key];
         this.writeState(current);
+        return;
       })
       .catch((e) => {
         throw e;

@@ -94,7 +94,7 @@ export class MCPRuntime implements IMCPRuntime {
     }
 
     const timeoutMs = task.timeoutMs || 5000;
-    let timeoutId: any;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => {
@@ -129,9 +129,10 @@ export class MCPRuntime implements IMCPRuntime {
       this.metricsCollector?.recordTiming("mcp.latency", durationMs);
 
       // Extract text content from typical MCP response
-      let output: any = rawResult;
-      if (rawResult && Array.isArray(rawResult.content)) {
-        output = rawResult.content[0]?.text || rawResult;
+      let output: unknown = rawResult;
+      const _raw = rawResult as Record<string, unknown>;
+      if (rawResult && Array.isArray(_raw.content)) {
+        output = (_raw.content[0] as Record<string, unknown>)?.text || rawResult;
       }
 
       const res: IMCPExecutionResult = {
@@ -146,14 +147,14 @@ export class MCPRuntime implements IMCPRuntime {
         this.tracer?.endSpan(traceSpan.spanId, { status: "success", durationMs });
       }
       return res;
-    } catch (err: any) {
+    } catch (err) {
       clearTimeout(timeoutId);
       const durationMs = Date.now() - startTimeMs;
       this.totalFailures++;
       this.accumDurationMs += durationMs;
       this.metricsCollector?.increment("mcp.failures");
 
-      const errorMessage = err?.message || String(err);
+      const errorMessage = (err as Error)?.message || String(err);
       const isTimeout = errorMessage.includes("Execution Timeout");
       if (isTimeout) {
         this.totalTimeouts++;

@@ -32,7 +32,7 @@ export interface IWorkflowExecution {
   id: string;
   workflowId: string;
   status: "pending" | "running" | "succeeded" | "failed" | "rejected";
-  taskResults: Record<string, any>;
+  taskResults: Record<string, unknown>;
   startedAt: Date;
   completedAt?: Date;
   approved?: boolean;
@@ -49,7 +49,7 @@ export interface IWorkflowTemplate {
   templateId: string;
   name: string;
   description: string;
-  createWorkflow(params: Record<string, any>): IWorkflowDefinition;
+  createWorkflow(params: Record<string, unknown>): IWorkflowDefinition;
 }
 
 export interface IWorkflowRegistry {
@@ -63,7 +63,7 @@ export interface IWorkflowRegistry {
 
 export interface IWorkflowTelemetry {
   recordExecutionStart(executionId: string, workflowId: string): void;
-  recordExecutionSuccess(executionId: string, results: Record<string, any>): void;
+  recordExecutionSuccess(executionId: string, results: Record<string, unknown>): void;
   recordExecutionFailure(executionId: string, error: string): void;
   recordApprovalDecision(executionId: string, approved: boolean): void;
   getExecutionHistory(): IWorkflowExecution[];

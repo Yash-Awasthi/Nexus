@@ -179,7 +179,7 @@ export class RedisQueueBackend implements IQueueBackend {
   /** Return all jobs currently in the DLQ. */
   async getDeadLetterQueue(): Promise<QueueJob[]> {
     const jobs = await this.dlq.getJobs(["waiting", "delayed", "failed"]);
-    return jobs.map((j) => ({
+    return jobs.map((j: { data: Record<string, unknown> }) => ({
       id: j.data.nexusJobId as string,
       payload: j.data.payload,
       priority: j.data.priority as QueueJob["priority"],

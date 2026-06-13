@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// @ts-nocheck — imports reference orchestration modules not yet exported from @nexus/runtime public API
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 import * as fs from "fs";
 
 import * as yaml from "js-yaml";
@@ -65,7 +63,7 @@ export class YAMLConfigLoader implements IConfigLoader {
     this.options = options;
   }
 
-  private readYamlFile(filePath: string): any {
+  private readYamlFile(filePath: string): unknown {
     try {
       const content = fs.readFileSync(filePath, "utf8");
       return yaml.load(content);

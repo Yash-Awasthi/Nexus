@@ -37,7 +37,7 @@ export class TaskRouter {
     return task;
   }
 
-  async replayEvent(eventRecord: { event: string; payload: any }): Promise<void> {
+  async replayEvent(eventRecord: { event: string; payload: unknown }): Promise<void> {
     const { event, payload } = eventRecord;
     if (event === "task_routed") {
       const task = payload as Task;

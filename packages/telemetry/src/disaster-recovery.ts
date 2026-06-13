@@ -90,6 +90,9 @@ export class DisasterRecovery {
   private readonly dir: string;
   private readonly maxCheckpoints: number;
   private readonly prefix: string;
+  // Monotonic counter ensures unique filenames even when multiple checkpoints
+  // are written within the same millisecond (common in fast unit tests).
+  private seq = 0;
 
   constructor(config: DisasterRecoveryConfig) {
     this.dir = config.dir;
@@ -117,7 +120,7 @@ export class DisasterRecovery {
       digest,
     };
 
-    const filename = `${this.prefix}-${Date.now()}.json`;
+    const filename = `${this.prefix}-${Date.now()}-${String(++this.seq).padStart(6, "0")}.json`;
     const filepath = path.join(this.dir, filename);
 
     // Write atomically: write to temp, then rename

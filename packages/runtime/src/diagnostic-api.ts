@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { IRuntimeInspector } from "./interfaces/observability.interface.js";
+import type { IExtendedRuntimeInspector } from "./runtime-inspector.js";
 
 export class RuntimeDiagnosticAPI {
-  private inspector: IRuntimeInspector;
+  private inspector: IExtendedRuntimeInspector;
 
-  constructor(inspector: IRuntimeInspector) {
+  constructor(inspector: IExtendedRuntimeInspector) {
     this.inspector = inspector;
   }
 
-  async handle(method: string, path: string): Promise<any> {
+  async handle(method: string, path: string): Promise<unknown> {
     if (method !== "GET") {
       throw new Error(`Unsupported method: ${method}`);
     }
@@ -18,22 +18,18 @@ export class RuntimeDiagnosticAPI {
       const parts = path.split("/");
       const last = parts[parts.length - 1];
       if (last === "replays") {
-        return (this.inspector as any).getWorkflowReplays
-          ? (this.inspector as any).getWorkflowReplays()
-          : [];
+        return this.inspector.getWorkflowReplays ? this.inspector.getWorkflowReplays() : [];
       }
       if (last === "templates") {
-        return (this.inspector as any).getWorkflowTemplates
-          ? (this.inspector as any).getWorkflowTemplates()
-          : [];
+        return this.inspector.getWorkflowTemplates ? this.inspector.getWorkflowTemplates() : [];
       }
       if (last === "telemetry") {
-        return (this.inspector as any).getWorkflowTelemetryStats
-          ? (this.inspector as any).getWorkflowTelemetryStats()
+        return this.inspector.getWorkflowTelemetryStats
+          ? this.inspector.getWorkflowTelemetryStats()
           : {};
       }
-      return (this.inspector as any).getWorkflowExecution
-        ? (this.inspector as any).getWorkflowExecution(last)
+      return this.inspector.getWorkflowExecution
+        ? this.inspector.getWorkflowExecution(last!)
         : null;
     }
 
@@ -55,80 +51,60 @@ export class RuntimeDiagnosticAPI {
       case "/runtime/snapshots":
         return this.inspector.getSnapshots();
       case "/runtime/mcp":
-        return (this.inspector as any).getMCPSummary ? (this.inspector as any).getMCPSummary() : {};
+        return this.inspector.getMCPSummary?.();
       case "/runtime/mcp/servers":
-        return (this.inspector as any).getMCPServers ? (this.inspector as any).getMCPServers() : [];
+        return this.inspector.getMCPServers?.();
       case "/runtime/mcp/tools":
-        return (this.inspector as any).getMCPTools ? (this.inspector as any).getMCPTools() : [];
+        return this.inspector.getMCPTools?.();
       case "/runtime/mcp/executions":
-        return (this.inspector as any).getMCPExecutions
-          ? (this.inspector as any).getMCPExecutions()
-          : [];
+        return this.inspector.getMCPExecutions ? this.inspector.getMCPExecutions() : [];
 
       // Phase 6 Cognitive Governance Endpoints
       case "/runtime/governance":
-        return (this.inspector as any).getGovernanceInfo
-          ? (this.inspector as any).getGovernanceInfo()
-          : {};
+        return this.inspector.getGovernanceInfo ? this.inspector.getGovernanceInfo() : {};
       case "/runtime/approvals":
-        return (this.inspector as any).getApprovalsList
-          ? (this.inspector as any).getApprovalsList()
-          : [];
+        return this.inspector.getApprovalsList ? this.inspector.getApprovalsList() : [];
       case "/runtime/plans":
-        return (this.inspector as any).getPlansList ? (this.inspector as any).getPlansList() : [];
+        return this.inspector.getPlansList?.();
       case "/runtime/guardrails":
-        return (this.inspector as any).getGuardrailsInfo
-          ? (this.inspector as any).getGuardrailsInfo()
-          : {};
+        return this.inspector.getGuardrailsInfo ? this.inspector.getGuardrailsInfo() : {};
 
       // Phase 7 Controlled Execution Subsystem Endpoints
       case "/runtime/browser":
-        return (this.inspector as any).getBrowserMetrics
-          ? (this.inspector as any).getBrowserMetrics()
-          : {};
+        return this.inspector.getBrowserMetrics ? this.inspector.getBrowserMetrics() : {};
       case "/runtime/scraping":
-        return (this.inspector as any).getScrapingMetrics
-          ? (this.inspector as any).getScrapingMetrics()
-          : {};
+        return this.inspector.getScrapingMetrics ? this.inspector.getScrapingMetrics() : {};
       case "/runtime/sandbox":
-        return (this.inspector as any).getSandboxMetrics
-          ? (this.inspector as any).getSandboxMetrics()
-          : {};
+        return this.inspector.getSandboxMetrics ? this.inspector.getSandboxMetrics() : {};
       case "/runtime/environments":
-        return (this.inspector as any).getEnvironmentsList
-          ? (this.inspector as any).getEnvironmentsList()
-          : [];
+        return this.inspector.getEnvironmentsList ? this.inspector.getEnvironmentsList() : [];
 
       // Phase 8 Workflow Observability Endpoints
       case "/runtime/workflows":
-        return (this.inspector as any).getWorkflowsList
-          ? (this.inspector as any).getWorkflowsList()
-          : [];
+        return this.inspector.getWorkflowsList ? this.inspector.getWorkflowsList() : [];
 
       // Memory & Knowledge Layer Endpoints
       case "/runtime/memory":
-        return (this.inspector as any).getMemoryStats
-          ? (this.inspector as any).getMemoryStats()
+        return this.inspector.getMemoryStats
+          ? this.inspector.getMemoryStats()
           : { available: false };
       case "/runtime/memory/entries":
-        return (this.inspector as any).getMemoryEntries
-          ? (this.inspector as any).getMemoryEntries({ limit: 50 })
+        return this.inspector.getMemoryEntries
+          ? this.inspector.getMemoryEntries({ limit: 50 })
           : [];
 
       // Agent Bus Endpoints
       case "/runtime/agents":
-        return (this.inspector as any).getAgentCapabilities
-          ? (this.inspector as any).getAgentCapabilities()
-          : [];
+        return this.inspector.getAgentCapabilities ? this.inspector.getAgentCapabilities() : [];
       case "/runtime/agents/messages":
-        return (this.inspector as any).getAgentMessages
-          ? (this.inspector as any).getAgentMessages({ limit: 50 })
+        return this.inspector.getAgentMessages
+          ? this.inspector.getAgentMessages({ limit: 50 })
           : [];
 
       // Circuit Breaker Endpoints
       case "/runtime/circuits":
-        return (this.inspector as any).getCircuitBreakerState
-          ? (this.inspector as any).getCircuitBreakerState()
+        return this.inspector.getCircuitBreakerState
+          ? this.inspector.getCircuitBreakerState()
           : { available: false };
 
       default:
