@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+
 import {
   FixedEmbedder,
+  GroqEmbedder,
   InMemoryStore,
   MemoryManager,
   MemoryError,
   cosineSimilarity,
   normalize,
 } from "../src/index.js";
+import type { MemoryEntry } from "../src/index.js";
 
 // ── Math helpers ──────────────────────────────────────────────────────────────
 
@@ -251,5 +254,159 @@ describe("MemoryManager", () => {
     } catch (e) {
       expect((e as MemoryError).code).toBe("EMBED_FAILED");
     }
+  });
+
+  it("remember() throws STORE_WRITE_FAILED when store.save throws", async () => {
+    const badStore = {
+      save: async () => {
+        throw new Error("write error");
+      },
+      search: async () => [],
+      delete: async () => {},
+      list: async () => [],
+      purge: async () => 0,
+    };
+    const m = new MemoryManager({ store: badStore, embedder: new FixedEmbedder(4) });
+    await expect(m.remember("test")).rejects.toMatchObject({ code: "STORE_WRITE_FAILED" });
+  });
+
+  it("recall() throws EMBED_FAILED when embedder.embed throws", async () => {
+    const badEmbedder = {
+      dimensions: 4,
+      embed: async () => {
+        throw new Error("embed fail");
+      },
+    };
+    const m = new MemoryManager({ store: new InMemoryStore(), embedder: badEmbedder });
+    await expect(m.recall("query")).rejects.toMatchObject({ code: "EMBED_FAILED" });
+  });
+
+  it("recall() throws STORE_READ_FAILED when store.search throws", async () => {
+    const badStore = {
+      save: async (e: MemoryEntry) => e,
+      search: async () => {
+        throw new Error("search error");
+      },
+      delete: async () => {},
+      list: async () => [],
+      purge: async () => 0,
+    };
+    const m = new MemoryManager({ store: badStore, embedder: new FixedEmbedder(4) });
+    await expect(m.recall("query")).rejects.toMatchObject({ code: "STORE_READ_FAILED" });
+  });
+});
+
+// ── GroqEmbedder ──────────────────────────────────────────────────────────────
+
+const FAKE_KEY = "gsk_test_key_1234";
+const FAKE_EMBEDDING = Array.from({ length: 768 }, (_, i) => i / 768);
+
+function makeGroqResponse(embedding: number[]): Response {
+  return new Response(
+    JSON.stringify({ data: [{ embedding, index: 0 }], model: "nomic-embed-text-v1.5" }),
+    { status: 200, headers: { "Content-Type": "application/json" } },
+  );
+}
+
+describe("GroqEmbedder", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete process.env.GROQ_API_KEY;
+  });
+
+  it("throws MemoryError when no API key is provided", () => {
+    delete process.env.GROQ_API_KEY;
+    expect(() => new GroqEmbedder()).toThrow(MemoryError);
+    expect(() => new GroqEmbedder()).toThrow(/GROQ_API_KEY/);
+  });
+
+  it("reads API key from process.env.GROQ_API_KEY", () => {
+    process.env.GROQ_API_KEY = FAKE_KEY;
+    expect(() => new GroqEmbedder()).not.toThrow();
+  });
+
+  it("returns 768-dim vector on success", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(makeGroqResponse(FAKE_EMBEDDING)));
+    const embedder = new GroqEmbedder({ apiKey: FAKE_KEY });
+    const result = await embedder.embed("hello world");
+    expect(result).toHaveLength(768);
+    expect(result[0]).toBeCloseTo(0);
+    expect(result[767]).toBeCloseTo(767 / 768);
+  });
+
+  it("sends correct Authorization header and body", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(makeGroqResponse(FAKE_EMBEDDING));
+    vi.stubGlobal("fetch", mockFetch);
+    const embedder = new GroqEmbedder({ apiKey: FAKE_KEY });
+    await embedder.embed("test text");
+    expect(mockFetch).toHaveBeenCalledOnce();
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.groq.com/openai/v1/embeddings");
+    const headers = init.headers as Record<string, string>;
+    expect(headers["Authorization"]).toBe(`Bearer ${FAKE_KEY}`);
+    const body = JSON.parse(init.body as string) as { model: string; input: string };
+    expect(body.model).toBe("nomic-embed-text-v1.5");
+    expect(body.input).toBe("test text");
+  });
+
+  it("respects a custom model name", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(makeGroqResponse(FAKE_EMBEDDING));
+    vi.stubGlobal("fetch", mockFetch);
+    const embedder = new GroqEmbedder({ apiKey: FAKE_KEY, model: "custom-model" });
+    await embedder.embed("x");
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as { model: string };
+    expect(body.model).toBe("custom-model");
+  });
+
+  it("throws EMBED_FAILED on non-200 response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("Unauthorized", { status: 401 })),
+    );
+    const embedder = new GroqEmbedder({ apiKey: FAKE_KEY });
+    await expect(embedder.embed("text")).rejects.toThrow(MemoryError);
+    try {
+      await embedder.embed("text");
+    } catch (e) {
+      expect((e as MemoryError).code).toBe("EMBED_FAILED");
+      expect((e as MemoryError).message).toMatch(/401/);
+    }
+  });
+
+  it("throws EMBED_FAILED on network error", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("network failure")));
+    const embedder = new GroqEmbedder({ apiKey: FAKE_KEY });
+    await expect(embedder.embed("text")).rejects.toThrow(MemoryError);
+    try {
+      await embedder.embed("text");
+    } catch (e) {
+      expect((e as MemoryError).code).toBe("EMBED_FAILED");
+      expect((e as MemoryError).message).toMatch(/network failure/);
+    }
+  });
+
+  it("throws EMBED_FAILED when response body is not valid JSON", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("not json", { status: 200 })));
+    const embedder = new GroqEmbedder({ apiKey: FAKE_KEY });
+    await expect(embedder.embed("text")).rejects.toThrow(MemoryError);
+  });
+
+  it("throws EMBED_FAILED when data array is empty", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(new Response(JSON.stringify({ data: [], model: "m" }), { status: 200 })),
+    );
+    const embedder = new GroqEmbedder({ apiKey: FAKE_KEY });
+    await expect(embedder.embed("text")).rejects.toMatchObject({ code: "EMBED_FAILED" });
+  });
+
+  it("throws DIMENSION_MISMATCH when API returns wrong vector length", async () => {
+    const wrongDim = Array.from({ length: 512 }, () => 0.1);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(makeGroqResponse(wrongDim)));
+    const embedder = new GroqEmbedder({ apiKey: FAKE_KEY });
+    await expect(embedder.embed("text")).rejects.toMatchObject({ code: "DIMENSION_MISMATCH" });
   });
 });

@@ -10,11 +10,11 @@ describe("ARCHETYPES registry", () => {
 
   it("every archetype has required fields", () => {
     for (const [key, a] of Object.entries(ARCHETYPES)) {
-      expect(a.id, `${key}.id`).toBe(key);
-      expect(typeof a.name, `${key}.name`).toBe("string");
-      expect(a.name.length, `${key}.name non-empty`).toBeGreaterThan(0);
-      expect(typeof a.systemPrompt, `${key}.systemPrompt`).toBe("string");
-      expect(a.systemPrompt.length, `${key}.systemPrompt non-empty`).toBeGreaterThan(0);
+      expect(a.id).toBe(key);
+      expect(typeof a.name).toBe("string");
+      expect(a.name.length).toBeGreaterThan(0);
+      expect(typeof a.systemPrompt).toBe("string");
+      expect(a.systemPrompt.length).toBeGreaterThan(0);
     }
   });
 
@@ -47,7 +47,7 @@ describe("SUMMONS mapping", () => {
   it("every archetype ID in SUMMONS exists in ARCHETYPES", () => {
     for (const ids of Object.values(SUMMONS)) {
       for (const id of ids) {
-        expect(ARCHETYPES[id as keyof typeof ARCHETYPES], `${id} should exist`).toBeDefined();
+        expect(ARCHETYPES[id as keyof typeof ARCHETYPES]).toBeDefined();
       }
     }
   });

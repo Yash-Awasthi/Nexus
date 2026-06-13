@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
+import type { IExecutionContext } from "@nexus/plugin-sdk";
+import { AdapterConfigError } from "@nexus/plugin-sdk";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { neonAdapter } from "../src/index.js";
-import type { IExecutionContext } from "@nexus/plugin-sdk";
-import { AdapterConfigError } from "@nexus/plugin-sdk";
 
 function makeCtx(env: Record<string, string> = {}): IExecutionContext {
   return {

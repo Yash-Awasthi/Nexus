@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
+import type { IExecutionContext } from "@nexus/plugin-sdk";
+import { AdapterConfigError, AdapterHttpError } from "@nexus/plugin-sdk";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { dopplerAdapter } from "../src/index.js";
-import type { IExecutionContext } from "@nexus/plugin-sdk";
-import { AdapterConfigError, AdapterHttpError } from "@nexus/plugin-sdk";
 
 function makeCtx(env: Record<string, string> = {}): IExecutionContext {
   return {
@@ -49,7 +49,12 @@ describe("dopplerAdapter", () => {
 
   describe("execute() — doppler.get-secret", () => {
     it("fetches a single secret value", async () => {
-      mockFetch(200, { value: { computed: "super-secret-value" } });
+      mockFetch(200, {
+        secret: {
+          name: "DB_URL",
+          value: { raw: "super-secret-value", computed: "super-secret-value" },
+        },
+      });
       const result = await dopplerAdapter.execute(
         { taskType: "doppler.get-secret", project: "nexus", config: "prd", name: "DB_URL" },
         makeCtx(ENV),

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, vi } from "vitest";
 import { fc } from "@fast-check/vitest";
-import { SloTracker, percentile, type SloViolation } from "../src/slo-tracker.js";
+import { describe, it, expect, vi } from "vitest";
+
+import { SloTracker, percentile } from "../src/slo-tracker.js";
 
 // ─── percentile helper ────────────────────────────────────────────────────────
 

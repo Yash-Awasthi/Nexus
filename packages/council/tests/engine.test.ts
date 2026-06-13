@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
+import type { CouncilRequest } from "@nexus/contracts";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { DeliberationEngine, type ILLMTransport, type ILLMResponse } from "../src/engine.js";
-import type { CouncilRequest } from "@nexus/contracts";
 
 // ── Mock transport factory ─────────────────────────────────────────────────
 
@@ -225,7 +225,7 @@ describe("DeliberationEngine — category detection", () => {
     ["ethical moral harm benefit analysis", "ethicist"],
   ];
 
-  it.each(cases)("title '%s' summons correct lead archetype", async (title, expectedLead) => {
+  it.each(cases)("title '%s' summons correct lead archetype", async (title, _expectedLead) => {
     const transport = makeMockTransport();
     const engine = new DeliberationEngine({ llm: transport, defaultCouncilSize: 5 });
     await engine.deliberate({ proposal: { title, description: "" } });

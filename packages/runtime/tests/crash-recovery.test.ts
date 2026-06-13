@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fc } from "@fast-check/vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
 import {
   CrashRecovery,
   MemoryRecoveryStore,
   type TaskRecord,
   type CrashRecoveryConfig,
 } from "../src/crash-recovery.js";
-import { MemoryQueueBackend } from "../src/queue-backend.js";
 import type { IEventBus } from "../src/event-bus.js";
+import { MemoryQueueBackend } from "../src/queue-backend.js";
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 

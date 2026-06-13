@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
+import type { IExecutionContext } from "@nexus/plugin-sdk";
+import { AdapterConfigError, AdapterHttpError } from "@nexus/plugin-sdk";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { calendarAdapter } from "../src/index.js";
-import type { IExecutionContext } from "@nexus/plugin-sdk";
-import { AdapterConfigError, AdapterHttpError } from "@nexus/plugin-sdk";
 
 function makeCtx(env: Record<string, string> = {}): IExecutionContext {
   return {
@@ -48,7 +48,14 @@ describe("calendarAdapter", () => {
 
   describe("execute() — calendar.create-event", () => {
     it("POSTs a new event and returns created event data", async () => {
-      const event = { id: "evt-1", summary: "Team Standup", status: "confirmed" };
+      const event = {
+        id: "evt-1",
+        summary: "Team Standup",
+        status: "confirmed",
+        htmlLink: "https://calendar.google.com/event/evt-1",
+        start: { dateTime: "2024-01-01T10:00:00Z" },
+        end: { dateTime: "2024-01-01T10:30:00Z" },
+      };
       mockFetch(200, event);
       const result = await calendarAdapter.execute(
         {

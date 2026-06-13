@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
+import type { IExecutionContext } from "@nexus/plugin-sdk";
+import { AdapterConfigError, AdapterHttpError } from "@nexus/plugin-sdk";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { gmailAdapter } from "../src/index.js";
-import type { IExecutionContext } from "@nexus/plugin-sdk";
-import { AdapterConfigError, AdapterHttpError } from "@nexus/plugin-sdk";
 
 function makeCtx(env: Record<string, string> = {}): IExecutionContext {
   return {
@@ -92,7 +92,18 @@ describe("gmailAdapter", () => {
 
   describe("execute() — gmail.read", () => {
     it("reads a specific message by ID", async () => {
-      mockFetch(200, { id: "msg-1", snippet: "Hello world", payload: {} });
+      mockFetch(200, {
+        id: "msg-1",
+        snippet: "Hello world",
+        payload: {
+          headers: [
+            { name: "Subject", value: "Test Subject" },
+            { name: "From", value: "sender@example.com" },
+            { name: "Date", value: "2024-01-01T00:00:00Z" },
+          ],
+          body: { data: "" },
+        },
+      });
       const result = await gmailAdapter.execute(
         { taskType: "gmail.read", messageId: "msg-1" },
         makeCtx(ENV),
