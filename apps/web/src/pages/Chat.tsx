@@ -155,6 +155,10 @@ export default function Chat() {
   const [model, setModel] = useState(MODELS[0]!.id);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Context pack — fetched once on first send, injected as system prompt
+  const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
+  const [contextTokens, setContextTokens] = useState<number>(0);
+  const systemPromptRef = useRef<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -196,7 +200,23 @@ export default function Chat() {
     }));
 
     try {
-      const res = await api.chat(history, model);
+      // Fetch context pack on the very first message and cache it for the session
+      let sysPrompt = systemPromptRef.current;
+      if (sysPrompt === null) {
+        try {
+          const pack = await api.contextPack();
+          sysPrompt = pack.system_prompt;
+          systemPromptRef.current = sysPrompt;
+          setSystemPrompt(sysPrompt);
+          setContextTokens(pack.total_token_estimate);
+        } catch {
+          // Context pack fetch failed — proceed without system prompt
+          sysPrompt = undefined as unknown as string;
+          systemPromptRef.current = "";
+        }
+      }
+
+      const res = await api.chat(history, model, sysPrompt ?? undefined);
       const text = res.content.map((b) => b.text).join("");
 
       const assistantMsg: DisplayMessage = {
@@ -226,6 +246,10 @@ export default function Chat() {
   const clearHistory = (): void => {
     setMessages([]);
     setError(null);
+    // Reset context pack so it re-fetches fresh state on the next session
+    setSystemPrompt(null);
+    setContextTokens(0);
+    systemPromptRef.current = null;
   };
 
   return (
@@ -245,6 +269,23 @@ export default function Chat() {
               </option>
             ))}
           </select>
+          {systemPrompt && (
+            <span
+              title={`Context pack injected: ~${contextTokens} tokens`}
+              style={{
+                fontSize: 11,
+                color: "#16a34a",
+                fontWeight: 700,
+                letterSpacing: "0.06em",
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />
+              CTX ~{contextTokens}t
+            </span>
+          )}
           {messages.length > 0 && (
             <button
               onClick={clearHistory}

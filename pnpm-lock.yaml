@@ -83,6 +83,9 @@ importers:
       '@nexus/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@nexus/context-pack':
+        specifier: workspace:*
+        version: link:../../packages/context-pack
       '@nexus/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -604,6 +607,12 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/context-pack:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
 
   packages/contracts:
     devDependencies:

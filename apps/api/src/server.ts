@@ -15,6 +15,7 @@ import sensible from "@fastify/sensible";
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 
 import { auditRoutes } from "./routes/audit.js";
+import { contextRoutes } from "./routes/context.js";
 import { councilRoutes } from "./routes/council.js";
 import { gatewayRoutes } from "./routes/gateway.js";
 import { governanceRoutes } from "./routes/governance.js";
@@ -55,6 +56,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       await api.register(auditRoutes);
       await api.register(gatewayRoutes);
       await api.register(sseRoutes);
+      await api.register(contextRoutes);
     },
     { prefix: "/api/v1" },
   );

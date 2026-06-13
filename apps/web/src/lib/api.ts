@@ -61,4 +61,21 @@ export const api = {
       "GET",
       "/api/v1/gateway/models",
     ),
+
+  /**
+   * Assemble a context pack — returns a system prompt string built from
+   * recent tasks, active signals, and stored memories.
+   */
+  contextPack: (opts?: {
+    agent_role?: string;
+    memory_query?: string;
+    extra_context?: string;
+    max_tokens?: number;
+  }) =>
+    request<{
+      system_prompt: string;
+      total_token_estimate: number;
+      assembled_at: string;
+      was_trimmed: boolean;
+    }>("POST", "/api/v1/context-pack", opts ?? {}),
 };
