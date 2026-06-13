@@ -28,6 +28,7 @@
     "@nexus/auth": "workspace:*",
     "@nexus/contracts": "workspace:*",
     "@nexus/gateway": "workspace:*",
+    "@nexus/sse": "workspace:*",
     "@nexus/council": "workspace:*",
     "@nexus/db": "workspace:*",
     "@nexus/governance": "workspace:*",

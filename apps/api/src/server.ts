@@ -21,6 +21,7 @@ import { governanceRoutes } from "./routes/governance.js";
 import { healthRoutes } from "./routes/health.js";
 import { ingestRoutes } from "./routes/ingest.js";
 import { runtimeRoutes } from "./routes/runtime.js";
+import { sseRoutes } from "./routes/sse.js";
 
 export async function buildServer(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -53,6 +54,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       await api.register(governanceRoutes);
       await api.register(auditRoutes);
       await api.register(gatewayRoutes);
+      await api.register(sseRoutes);
     },
     { prefix: "/api/v1" },
   );

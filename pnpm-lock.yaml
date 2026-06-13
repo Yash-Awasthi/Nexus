@@ -104,6 +104,9 @@ importers:
       '@nexus/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@nexus/sse':
+        specifier: workspace:*
+        version: link:../../packages/sse
       '@nexus/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry
@@ -781,6 +784,12 @@ importers:
       vitest:
         specifier: ^2.1.4
         version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/sse:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
 
   packages/telemetry:
     devDependencies:
