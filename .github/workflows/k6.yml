@@ -10,10 +10,14 @@ on:
         description: API base URL (defaults to staging)
         default: "https://nexus-staging.internal"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   smoke:
     name: Smoke test
     runs-on: ubuntu-latest
+    if: ${{ secrets.NEXUS_STAGING_URL != '' || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@v4
 

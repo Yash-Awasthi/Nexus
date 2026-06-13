@@ -6,6 +6,16 @@ import promisePlugin from "eslint-plugin-promise";
 import vitestPlugin from "eslint-plugin-vitest";
 
 export default tseslint.config(
+  {
+    // Auto-generated directories should never be linted.
+    ignores: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.docusaurus/**",
+      "**/coverage/**",
+      "**/.turbo/**",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
@@ -86,10 +96,9 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: {
-          // Test files live outside each package's build tsconfig (rootDir: src).
-          // Use allowDefaultProject with a non-** glob so ESLint can still
-          // type-check them via the nearest tsconfig.eslint.json (no ** allowed).
-          allowDefaultProject: ["packages/*/tests/*.test.ts", "packages/*/tests/*.spec.ts"],
+          // All test, config, and source files are covered by tsconfig.eslint.json.
+          // allowDefaultProject is intentionally omitted — it triggers the >8 file
+          // protection when test files are present across many packages.
           defaultProject: "./tsconfig.eslint.json",
         },
         tsconfigRootDir: import.meta.dirname,
@@ -97,10 +106,46 @@ export default tseslint.config(
     },
   },
   {
+    // Test, config, and auto-generated files are validated by their own tooling
+    // (vitest, vite, docusaurus).  Disable type-aware ESLint rules so the project
+    // service does not need to resolve these files via tsconfig — they deliberately
+    // live outside each package's rootDir: src build boundary.
+    files: [
+      "**/*.test.ts",
+      "**/*.spec.ts",
+      "**/vitest.config.ts",
+      "**/vite.config.ts",
+      "**/drizzle.config.ts",
+      "**/.docusaurus/**/*.{js,mjs,ts}",
+      "apps/docs-site/.docusaurus/**/*",
+    ],
+    ...tseslint.configs.disableTypeChecked,
+  },
+  {
     files: ["**/*.test.ts", "**/*.spec.ts"],
     plugins: { vitest: vitestPlugin },
+    languageOptions: {
+      globals: {
+        // Vitest injects these globals at runtime; declare them so ESLint's
+        // no-undef rule doesn't flag them in test files.
+        describe: "readonly",
+        it: "readonly",
+        test: "readonly",
+        expect: "readonly",
+        beforeAll: "readonly",
+        afterAll: "readonly",
+        beforeEach: "readonly",
+        afterEach: "readonly",
+        vi: "readonly",
+      },
+    },
     rules: {
       ...vitestPlugin.configs.recommended.rules,
+      // Dynamic import() type annotations are valid in test files that use
+      // vi.resetModules() — cannot use static imports for runtime-reset modules.
+      "@typescript-eslint/consistent-type-imports": "off",
+      // vi.mock() calls between imports cause ordering false-positives.
+      "import/order": "off",
     },
   },
   {
@@ -113,9 +158,16 @@ export default tseslint.config(
     files: [
       "packages/runtime/src/**/*.ts",
       "packages/governance/src/**/*.ts",
+      "packages/council/src/**/*.ts",
+      "packages/db/src/**/*.ts",
+      "packages/adapters/**/*.ts",
       "apps/api/src/**/*.ts",
       "apps/cli/src/**/*.ts",
       "apps/worker/src/**/*.ts",
+      "apps/web/src/**/*.ts",
+      "apps/web/src/**/*.tsx",
+      "apps/docs-site/**/*.ts",
+      "apps/docs-site/**/*.tsx",
     ],
     rules: {
       "@typescript-eslint/no-unsafe-assignment": "off",

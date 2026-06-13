@@ -26,6 +26,6 @@
   },
   "dependencies": {
     "@nexus/plugin-sdk": "workspace:*",
-    "groq-sdk": "*"
+    "groq-sdk": "^0.9.1"
   }
 }

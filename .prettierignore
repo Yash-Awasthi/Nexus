@@ -6,3 +6,4 @@ coverage/
 *.gen.py
 pnpm-lock.yaml
 infra/helm/
+.docusaurus/

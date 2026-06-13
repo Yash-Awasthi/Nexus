@@ -8,6 +8,9 @@ on:
   schedule:
     - cron: "0 6 * * 1" # Weekly Monday 06:00 UTC
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   gitleaks:
     name: Secret scanning (gitleaks)
@@ -19,6 +22,12 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Override the auto-computed push range (before^..after). After a
+          # history rewrite/squash the root commit has no parent, so the
+          # default range "root^..HEAD" produces a fatal git error even when
+          # no secrets exist. Scanning --all covers the full (now 8-commit)
+          # history on every run, which is cheap and correct.
+          GITLEAKS_LOG_OPTS: "--all --no-merges --first-parent"
 
   codeql:
     name: CodeQL analysis

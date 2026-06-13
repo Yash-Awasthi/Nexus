@@ -1,5 +1,5 @@
-import React from "react";
 import ComponentCreator from "@docusaurus/ComponentCreator";
+import React from "react";
 
 export default [
   {

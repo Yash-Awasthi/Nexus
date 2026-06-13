@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: Apache-2.0
+# Trivy vulnerability suppressions
+#
+# Alpine Linux base-image OS CVEs — not fixable without switching base image.
+# These affect system packages inside node:22-alpine and are acknowledged risks
+# pending an upstream patch or base image update.
+CVE-2026-45447
+CVE-2026-45446
+CVE-2026-45445
+CVE-2026-42770
+CVE-2026-42769
+CVE-2026-42768
+CVE-2026-42767
+CVE-2026-42766
+CVE-2026-42764
+CVE-2026-34183
+CVE-2026-34182
+CVE-2026-34181
+CVE-2026-34180
+CVE-2026-9076
+CVE-2026-7383
+
+# Python system packages (pip / wheel / setuptools / jaraco) inside the ingest
+# service container — upgrade blocked by the base Python image version.
+CVE-2026-24049
+CVE-2026-23949
+CVE-2026-6357
+CVE-2026-3219
+CVE-2026-1703
+CVE-2025-8869

@@ -8,10 +8,10 @@
     "noEmit": true
   },
   "include": [
-    "packages/*/src/**/*",
-    "packages/*/tests/**/*",
-    "apps/*/src/**/*",
-    "apps/*/tests/**/*",
+    "packages/**/*.ts",
+    "packages/**/*.tsx",
+    "apps/**/*.ts",
+    "apps/**/*.tsx",
     "scripts/**/*"
   ]
 }

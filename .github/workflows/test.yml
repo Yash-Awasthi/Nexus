@@ -6,6 +6,9 @@ on:
   push:
     branches: [main]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   unit:
     name: Unit tests
@@ -34,6 +37,44 @@ jobs:
           files: packages/*/coverage/lcov.info
           fail_ci_if_error: false
 
+  e2e:
+    name: E2E — signal pipeline
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: nexus
+          POSTGRES_PASSWORD: nexus
+          POSTGRES_DB: nexus_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Enable pgvector extension
+        run: PGPASSWORD=nexus psql -h localhost -U nexus -d nexus_e2e -c "CREATE EXTENSION IF NOT EXISTS vector;"
+      - name: Apply database schema
+        working-directory: packages/db
+        run: pnpm db:push --force
+        env:
+          DATABASE_URL: postgresql://nexus:nexus@localhost:5432/nexus_e2e
+      - name: Run E2E signal pipeline tests
+        run: pnpm --filter @nexus/worker test -- --reporter=verbose tests/e2e/
+        env:
+          DATABASE_URL: postgresql://nexus:nexus@localhost:5432/nexus_e2e
+
   python:
     name: Python tests (nexus-ingest)
     runs-on: ubuntu-latest
@@ -46,4 +87,4 @@ jobs:
       - working-directory: services/ingest
         run: |
           pip install -e ".[dev]"
-          pytest --tb=short -q || true
+          pytest --tb=short -q
