@@ -6,10 +6,14 @@
  *   • Auth header injection
  *   • Request body shaping (each provider has a different schema)
  *   • Response parsing + token usage extraction
- *   • Streaming delta aggregation
+ *   • Real streaming delta emission (SSE / NDJSON)
  *   • Error mapping → LlmError with typed codes
  *
  * Transport is injectable for testing (MockTransport).
+ * When no transport is injected (_useDefaultTransport = true) real SSE/NDJSON
+ * streaming is activated via native fetch ReadableStream.  When MockTransport
+ * is injected (_useDefaultTransport = false) stream() falls back to the
+ * complete()-based single-delta path so existing tests pass unchanged.
  */
 
 // ── Core types ─────────────────────────────────────────────────────────────────
@@ -140,8 +144,11 @@ abstract class BaseDriver implements LlmDriver {
   abstract readonly provider: string;
   abstract readonly model: string;
   protected transport: HttpTransport;
+  /** True when no transport was injected — enables real SSE/NDJSON streaming. */
+  protected _useDefaultTransport: boolean;
 
   constructor(transport?: HttpTransport) {
+    this._useDefaultTransport = transport === undefined;
     this.transport = transport ?? this.makeDefaultTransport();
   }
 
@@ -159,6 +166,91 @@ abstract class BaseDriver implements LlmDriver {
     };
   }
 
+  /**
+   * Async generator that streams SSE lines from a POST request.
+   * Yields the raw payload of each "data: <payload>" line (skipping "[DONE]").
+   * Uses native fetch ReadableStream — only call when _useDefaultTransport is true.
+   */
+  protected async *sseLines(
+    url: string,
+    body: unknown,
+    headers: Record<string, string>,
+  ): AsyncGenerator<string> {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) throw mapHttpError(resp.status, this.provider);
+    if (!resp.body) return;
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const payload = line.slice(6).trim();
+            if (payload && payload !== "[DONE]") yield payload;
+          }
+        }
+      }
+      // Flush remaining buffer
+      if (buffer.startsWith("data: ")) {
+        const payload = buffer.slice(6).trim();
+        if (payload && payload !== "[DONE]") yield payload;
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
+  /**
+   * Async generator that streams NDJSON lines from a POST request.
+   * Yields each non-empty line (raw JSON string).
+   * Uses native fetch ReadableStream — only call when _useDefaultTransport is true.
+   */
+  protected async *ndjsonLines(
+    url: string,
+    body: unknown,
+    headers: Record<string, string>,
+  ): AsyncGenerator<string> {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) throw mapHttpError(resp.status, this.provider);
+    if (!resp.body) return;
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (line.trim()) yield line.trim();
+        }
+      }
+      if (buffer.trim()) yield buffer.trim();
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
   countTokens(text: string): number {
     return estimateTokens(text);
   }
@@ -166,7 +258,7 @@ abstract class BaseDriver implements LlmDriver {
   abstract complete(opts: LlmRequestOptions): Promise<LlmResponse>;
 
   async stream(opts: LlmRequestOptions, handler: StreamHandler): Promise<LlmResponse> {
-    // Default: call complete and emit as single delta
+    // Default: call complete and emit as single delta (used by test path)
     const result = await this.complete({ ...opts, stream: false });
     await handler({ delta: result.content, done: false, usage: result.usage });
     await handler({ delta: "", done: true, usage: result.usage });
@@ -239,6 +331,62 @@ export class AnthropicDriver extends BaseDriver {
       Date.now() - t0,
     );
   }
+
+  override async stream(opts: LlmRequestOptions, handler: StreamHandler): Promise<LlmResponse> {
+    if (!this._useDefaultTransport) return super.stream(opts, handler);
+
+    const t0 = Date.now();
+    const systemMsg = opts.systemPrompt ?? opts.messages.find((m) => m.role === "system")?.content;
+    const messages = opts.messages.filter((m) => m.role !== "system");
+    const body = {
+      model: opts.model ?? this.model,
+      max_tokens: opts.maxTokens ?? 4096,
+      messages,
+      stream: true,
+      ...(systemMsg ? { system: systemMsg } : {}),
+      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+    };
+
+    let content = "";
+    let msgId = `anth-stream-${Date.now()}`;
+    let responseModel = opts.model ?? this.model;
+    let inputTokens = 0;
+    let outputTokens = 0;
+
+    for await (const line of this.sseLines(
+      `${this.baseUrl}/v1/messages`,
+      body,
+      { "x-api-key": this.apiKey, "anthropic-version": "2023-06-01" },
+    )) {
+      let event: Record<string, unknown>;
+      try { event = JSON.parse(line); } catch { continue; }
+
+      const type = event["type"] as string | undefined;
+      if (type === "message_start") {
+        const msg = event["message"] as Record<string, unknown> | undefined;
+        if (msg?.["id"]) msgId = msg["id"] as string;
+        if (msg?.["model"]) responseModel = msg["model"] as string;
+        const u = msg?.["usage"] as Record<string, number> | undefined;
+        if (u?.["input_tokens"]) inputTokens = u["input_tokens"];
+      } else if (type === "content_block_delta") {
+        const delta = ((event["delta"] as Record<string, unknown>)?.["text"] as string) ?? "";
+        if (delta) {
+          content += delta;
+          await handler({ delta, done: false });
+        }
+      } else if (type === "message_delta") {
+        const u = event["usage"] as Record<string, number> | undefined;
+        if (u?.["output_tokens"]) outputTokens = u["output_tokens"];
+      }
+    }
+
+    const usageObj = this.makeUsage(
+      inputTokens || estimateTokens(messages.map((m) => m.content).join(" ")),
+      outputTokens || estimateTokens(content),
+    );
+    await handler({ delta: "", done: true, usage: usageObj });
+    return this.makeResponse(msgId, content, responseModel, usageObj, Date.now() - t0);
+  }
 }
 
 // ── 2. OpenAI-compatible base ─────────────────────────────────────────────────
@@ -283,6 +431,66 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
       Date.now() - t0,
       (choice?.finish_reason as LlmResponse["finishReason"]) ?? "stop",
     );
+  }
+
+  override async stream(opts: LlmRequestOptions, handler: StreamHandler): Promise<LlmResponse> {
+    if (!this._useDefaultTransport) return super.stream(opts, handler);
+
+    const t0 = Date.now();
+    const messages = opts.systemPrompt
+      ? [{ role: "system", content: opts.systemPrompt }, ...opts.messages]
+      : opts.messages;
+    const body: Record<string, unknown> = {
+      model: opts.model ?? this.model,
+      messages,
+      stream: true,
+      ...(opts.maxTokens !== undefined ? { max_tokens: opts.maxTokens } : {}),
+      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+      ...(opts.stop ? { stop: opts.stop } : {}),
+    };
+
+    let content = "";
+    let id = `${this.provider}-stream-${Date.now()}`;
+    let finishReason: LlmResponse["finishReason"] = "stop";
+    let promptTokens = 0;
+    let completionTokens = 0;
+
+    for await (const line of this.sseLines(
+      `${this.baseUrl}/chat/completions`,
+      body,
+      { Authorization: `Bearer ${this.apiKey}` },
+    )) {
+      let event: Record<string, unknown>;
+      try { event = JSON.parse(line); } catch { continue; }
+
+      const eventId = event["id"] as string | undefined;
+      if (eventId) id = eventId;
+
+      const choices = event["choices"] as Array<{
+        delta?: { content?: string };
+        finish_reason?: string;
+      }> | undefined;
+
+      const delta = choices?.[0]?.delta?.content ?? "";
+      if (delta) {
+        content += delta;
+        await handler({ delta, done: false });
+      }
+
+      const fr = choices?.[0]?.finish_reason;
+      if (fr) finishReason = fr as LlmResponse["finishReason"];
+
+      const usage = event["usage"] as { prompt_tokens?: number; completion_tokens?: number } | undefined;
+      if (usage?.prompt_tokens) promptTokens = usage.prompt_tokens;
+      if (usage?.completion_tokens) completionTokens = usage.completion_tokens;
+    }
+
+    const usageObj = this.makeUsage(
+      promptTokens || estimateTokens(messages.map((m) => m.content).join(" ")),
+      completionTokens || estimateTokens(content),
+    );
+    await handler({ delta: "", done: true, usage: usageObj });
+    return this.makeResponse(id, content, opts.model ?? this.model, usageObj, Date.now() - t0, finishReason);
   }
 }
 
@@ -393,6 +601,63 @@ export class GeminiDriver extends BaseDriver {
       Date.now() - t0,
     );
   }
+
+  override async stream(opts: LlmRequestOptions, handler: StreamHandler): Promise<LlmResponse> {
+    if (!this._useDefaultTransport) return super.stream(opts, handler);
+
+    const t0 = Date.now();
+    const model = opts.model ?? this.model;
+    const contents = opts.messages
+      .filter((m) => m.role !== "system")
+      .map((m) => ({
+        role: m.role === "assistant" ? "model" : "user",
+        parts: [{ text: m.content }],
+      }));
+    const body: Record<string, unknown> = {
+      contents,
+      ...(opts.systemPrompt ? { systemInstruction: { parts: [{ text: opts.systemPrompt }] } } : {}),
+      generationConfig: {
+        maxOutputTokens: opts.maxTokens ?? 8192,
+        ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+      },
+    };
+
+    let content = "";
+    let inputTokens = 0;
+    let outputTokens = 0;
+
+    for await (const line of this.sseLines(
+      `${this.baseUrl}/models/${model}:streamGenerateContent?alt=sse&key=${this.apiKey}`,
+      body,
+      {},
+    )) {
+      let event: Record<string, unknown>;
+      try { event = JSON.parse(line); } catch { continue; }
+
+      const candidates = event["candidates"] as Array<{
+        content: { parts: Array<{ text: string }> };
+      }> | undefined;
+      const text = candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+      if (text) {
+        content += text;
+        await handler({ delta: text, done: false });
+      }
+
+      const usage = event["usageMetadata"] as {
+        promptTokenCount?: number;
+        candidatesTokenCount?: number;
+      } | undefined;
+      if (usage?.promptTokenCount) inputTokens = usage.promptTokenCount;
+      if (usage?.candidatesTokenCount) outputTokens = usage.candidatesTokenCount;
+    }
+
+    const usageObj = this.makeUsage(
+      inputTokens || estimateTokens(contents.map((c) => c.parts[0]?.text ?? "").join(" ")),
+      outputTokens || estimateTokens(content),
+    );
+    await handler({ delta: "", done: true, usage: usageObj });
+    return this.makeResponse(`gemini-${Date.now()}`, content, model, usageObj, Date.now() - t0);
+  }
 }
 
 // ── 8. Ollama (local) ─────────────────────────────────────────────────────────
@@ -422,6 +687,48 @@ export class OllamaDriver extends BaseDriver {
     const content = message?.content ?? "";
     const usage = this.makeUsage(estimateTokens(opts.messages.map((m) => m.content).join(" ")), estimateTokens(content));
     return this.makeResponse(`ollama-${Date.now()}`, content, model, usage, Date.now() - t0);
+  }
+
+  override async stream(opts: LlmRequestOptions, handler: StreamHandler): Promise<LlmResponse> {
+    if (!this._useDefaultTransport) return super.stream(opts, handler);
+
+    const t0 = Date.now();
+    const model = opts.model ?? this.model;
+    const body = {
+      model,
+      messages: opts.messages,
+      stream: true,
+      ...(opts.maxTokens !== undefined ? { options: { num_predict: opts.maxTokens } } : {}),
+    };
+
+    let content = "";
+    let promptTokens = 0;
+    let completionTokens = 0;
+
+    for await (const line of this.ndjsonLines(`${this.baseUrl}/api/chat`, body, {})) {
+      let chunk: Record<string, unknown>;
+      try { chunk = JSON.parse(line); } catch { continue; }
+
+      const msg = chunk["message"] as { content?: string } | undefined;
+      const delta = msg?.content ?? "";
+      if (delta) {
+        content += delta;
+        await handler({ delta, done: false });
+      }
+
+      if (chunk["done"] === true) {
+        promptTokens = (chunk["prompt_eval_count"] as number | undefined) ?? 0;
+        completionTokens = (chunk["eval_count"] as number | undefined) ?? 0;
+        break;
+      }
+    }
+
+    const usageObj = this.makeUsage(
+      promptTokens || estimateTokens(opts.messages.map((m) => m.content).join(" ")),
+      completionTokens || estimateTokens(content),
+    );
+    await handler({ delta: "", done: true, usage: usageObj });
+    return this.makeResponse(`ollama-${Date.now()}`, content, model, usageObj, Date.now() - t0);
   }
 }
 
