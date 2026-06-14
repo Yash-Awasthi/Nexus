@@ -41,6 +41,12 @@ import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
 
+// ── SSE stream timeout ────────────────────────────────────────────────────────
+// Default 30 s — override via STREAM_TIMEOUT_MS env var.
+// Prevents a slow or stalled provider from holding an SSE connection indefinitely.
+
+const STREAM_TIMEOUT_MS = parseInt(process.env.STREAM_TIMEOUT_MS ?? "30000", 10);
+
 // ── SSE headers ───────────────────────────────────────────────────────────────
 
 const SSE_HEADERS = {
@@ -244,8 +250,12 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
         content_block: { type: "text", text: "" },
       });
 
+      let streamTimeoutId: ReturnType<typeof setTimeout> | undefined;
+
       try {
-        await driver.stream(opts, async ({ delta, done, usage }) => {
+        // Race the provider stream against a hard timeout so a stalled upstream
+        // can't hold the SSE connection open forever.
+        const streamPromise = driver.stream(opts, async ({ delta, done, usage }) => {
           if (done) {
             // Flush any remaining buffered content from the parser
             for (const chunk of parser.flush()) {
@@ -282,7 +292,18 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
             }
           }
         });
+
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          streamTimeoutId = setTimeout(
+            () => reject(new Error(`Gateway stream timed out after ${STREAM_TIMEOUT_MS}ms`)),
+            STREAM_TIMEOUT_MS,
+          );
+        });
+
+        await Promise.race([streamPromise, timeoutPromise]);
+        clearTimeout(streamTimeoutId);
       } catch (err: unknown) {
+        clearTimeout(streamTimeoutId);
         const e = err as { message?: string };
         // Inject continuation suffix so the client gets a graceful truncation notice
         const { text: recoveredText } = orchestrator.handleError(lastText, "plain");

@@ -144,6 +144,40 @@ services:
     profiles:
       - dev # opt-in: docker compose --profile dev up
 
+  # ── fin-scrape → Nexus ingest bridge ────────────────────────────────────────
+  # Thin FastAPI bridge that watches a shared volume for JSON files written by the
+  # fin-scrape Python scraper and forwards them to POST /api/v1/ingest/events.
+  # Opt-in profile: docker compose --profile finscrape up
+  ingest-bridge:
+    build:
+      context: apps/ingest-py
+      dockerfile: Dockerfile
+    container_name: nexus-ingest-bridge
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      NEXUS_API_URL: http://api:3000
+      NEXUS_INGEST_API_KEY: ${NEXUS_INGEST_API_KEY:-dev-api-key-change-in-prod}
+      FINSCRAPE_OUTPUT_DIR: /data/finscrape
+      FINSCRAPE_DONE_DIR: /data/finscrape/done
+      BRIDGE_PORT: "8001"
+      BRIDGE_API_KEY: ${BRIDGE_API_KEY:-}
+      LOG_LEVEL: info
+    volumes:
+      - finscrape_data:/data/finscrape
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    profiles:
+      - finscrape  # opt-in: docker compose --profile finscrape up
+
   # ── SearXNG self-hosted metasearch ───────────────────────────────────────────
   # Provides private, API-accessible web search for the Nexus adapter-searxng.
   # Adapter env var: SEARXNG_BASE_URL=http://searxng:8080  (inter-container)
@@ -194,3 +228,4 @@ volumes:
   postgres_data:
   redis_data:
   searxng_data:
+  finscrape_data:  # shared between ingest-bridge and any fin-scrape scraper container
