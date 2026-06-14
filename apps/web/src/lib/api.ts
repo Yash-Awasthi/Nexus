@@ -258,4 +258,181 @@ export const api = {
 
   obsProviders: () =>
     request<{ providers: { name: string; model: string }[] }>("GET", "/api/v1/obs/providers"),
+
+  // ── Knowledge Graph ───────────────────────────────────────────────────────
+
+  kgNodes: (opts?: { type?: string; limit?: number; minConfidence?: number }) => {
+    const p = new URLSearchParams();
+    if (opts?.type) p.set("type", opts.type);
+    if (opts?.limit) p.set("limit", String(opts.limit));
+    if (opts?.minConfidence) p.set("minConfidence", String(opts.minConfidence));
+    return request<{ nodes: unknown[]; edges: unknown[]; totalNodes: number; totalEdges: number }>(
+      "GET", `/api/v1/knowledge-graph/nodes${p.toString() ? `?${p}` : ""}`,
+    );
+  },
+
+  kgSearch: (q: string, k = 20) =>
+    request<{ nodes: unknown[]; edges: unknown[]; totalNodes: number; totalEdges: number }>(
+      "GET", `/api/v1/knowledge-graph/search?q=${encodeURIComponent(q)}&k=${k}`,
+    ),
+
+  kgNode: (id: string) => request<unknown>("GET", `/api/v1/knowledge-graph/nodes/${id}`),
+
+  kgRelated: (id: string, direction?: "outbound" | "inbound" | "both") =>
+    request<{ node: unknown; neighbors: unknown[] }>(
+      "GET", `/api/v1/knowledge-graph/nodes/${id}/related${direction ? `?direction=${direction}` : ""}`,
+    ),
+
+  kgIngest: (text: string, source?: string) =>
+    request<{ nodesAdded: number; nodesMerged: number; edgesAdded: number; edgesMerged: number }>(
+      "POST", "/api/v1/knowledge-graph/ingest", { text, source },
+    ),
+
+  kgStats: () =>
+    request<{ nodes: number; edges: number; nodesByType: Record<string, number> }>(
+      "GET", "/api/v1/knowledge-graph/stats",
+    ),
+
+  kgDeleteNode: (id: string) => request<void>("DELETE", `/api/v1/knowledge-graph/nodes/${id}`),
+
+  // ── Image Gen ─────────────────────────────────────────────────────────────
+
+  imageGenerate: (opts: {
+    prompt: string;
+    negativePrompt?: string;
+    model?: string;
+    size?: string;
+    n?: number;
+    style?: "vivid" | "natural";
+  }) =>
+    request<{ images: { id: string; url: string; prompt: string; model: string; size: string; createdAt: string }[]; latencyMs: number }>(
+      "POST", "/api/v1/image-gen/generate", opts,
+    ),
+
+  imageModels: () =>
+    request<{ models: { id: string; label: string; provider: string; available: boolean }[] }>(
+      "GET", "/api/v1/image-gen/models",
+    ),
+
+  imageHistory: (limit = 20) =>
+    request<{ images: unknown[]; total: number }>(
+      "GET", `/api/v1/image-gen/history?limit=${limit}`,
+    ),
+
+  // ── Voice ─────────────────────────────────────────────────────────────────
+
+  voiceChat: (text: string, voice?: string) =>
+    request<{ text: string; latencyMs: number }>(
+      "POST", "/api/v1/voice/chat", { text, voice },
+    ),
+
+  voiceTranscribe: (audioBase64: string, format = "wav", sampleRate = 16000) =>
+    request<{ transcript: string; latencyMs: number }>(
+      "POST", "/api/v1/voice/transcribe", { audio: audioBase64, format, sampleRate },
+    ),
+
+  voiceVoices: () =>
+    request<{ voices: { id: string; label: string; provider: string }[] }>(
+      "GET", "/api/v1/voice/voices",
+    ),
+
+  voiceProviders: () =>
+    request<{ transcribe: unknown; synthesize: unknown }>(
+      "GET", "/api/v1/voice/providers",
+    ),
+
+  // ── Billing ───────────────────────────────────────────────────────────────
+
+  billingPlan: () =>
+    request<{ plan: { name: string; price: number; tier: string; features: string[]; tokensPerMonth: number } }>(
+      "GET", "/api/v1/billing/plan",
+    ),
+
+  billingPeriod: () =>
+    request<{ period: { startDate: string; endDate: string; tokensUsed: number; tokensLimit: number; requestsCount: number } }>(
+      "GET", "/api/v1/billing/current-period",
+    ),
+
+  billingKeys: () =>
+    request<{ keys: unknown[] }>("GET", "/api/v1/billing/keys"),
+
+  billingCreateKey: (name: string, scopes?: string[]) =>
+    request<{ id: string; name: string; rawKey: string; keyPrefix: string; createdAt: number }>(
+      "POST", "/api/v1/billing/keys", { name, scopes },
+    ),
+
+  billingRevokeKey: (id: string) => request<void>("DELETE", `/api/v1/billing/keys/${id}`),
+
+  billingQuota: () =>
+    request<{ allowed: boolean; reason?: string; tokensRemaining?: number }>(
+      "GET", "/api/v1/billing/quota",
+    ),
+
+  // ── Admin ─────────────────────────────────────────────────────────────────
+
+  adminRoutes: () =>
+    request<{ routes: { alias: string; model: string; provider: string; overridden: boolean }[]; total: number }>(
+      "GET", "/api/v1/admin/routes",
+    ),
+
+  adminStats: (alias?: string) =>
+    request<{ stats: { alias: string; requests: number; totalTokens: number; errors: number; avgLatencyMs: number }[] }>(
+      "GET", `/api/v1/admin/stats${alias ? `?alias=${encodeURIComponent(alias)}` : ""}`,
+    ),
+
+  adminSettings: () =>
+    request<{ settings: { tracing: boolean; logLevel: string; rateLimitRpm: number; maxTokens: number; defaultModel: string } }>(
+      "GET", "/api/v1/admin/settings",
+    ),
+
+  adminUpdateSettings: (patch: Record<string, unknown>) =>
+    request<{ settings: unknown }>("POST", "/api/v1/admin/settings", patch),
+
+  adminAddRoute: (alias: string, model: string, provider: string) =>
+    request<{ alias: string; model: string; provider: string }>(
+      "POST", "/api/v1/admin/routes", { alias, model, provider },
+    ),
+
+  adminOverrideAlias: (alias: string, model: string) =>
+    request<{ alias: string; overrideModel: string }>(
+      "POST", `/api/v1/admin/routes/${encodeURIComponent(alias)}/override`, { model },
+    ),
+
+  // ── Feature Flags ─────────────────────────────────────────────────────────
+
+  featureFlags: () =>
+    request<{ flags: { key: string; value: boolean | string | number; default: unknown; type: string; description?: string; overridden: boolean }[]; total: number }>(
+      "GET", "/api/v1/feature-flags",
+    ),
+
+  featureFlagSet: (key: string, value: boolean | string | number) =>
+    request<{ key: string; value: unknown; overridden: boolean }>(
+      "PATCH", `/api/v1/feature-flags/${encodeURIComponent(key)}`, { value },
+    ),
+
+  featureFlagReset: (key: string) =>
+    request<void>("DELETE", `/api/v1/feature-flags/${encodeURIComponent(key)}`),
+
+  // ── Connectors ────────────────────────────────────────────────────────────
+
+  connectors: () =>
+    request<{ connectors: { id: string; name: string; type: string; status: string; enabled: boolean; error?: string }[]; total: number }>(
+      "GET", "/api/v1/connectors",
+    ),
+
+  connectorToggle: (id: string, enabled: boolean) =>
+    request<unknown>("PATCH", `/api/v1/connectors/${id}`, { enabled }),
+
+  connectorConnect: (id?: string) =>
+    request<unknown>("POST", "/api/v1/connectors/connect", id ? { id } : {}),
+
+  connectorHealth: (id: string) =>
+    request<{ ok: boolean; latencyMs: number; error?: string }>(
+      "POST", `/api/v1/connectors/${id}/health`, {},
+    ),
+
+  connectorReconnect: (id: string) =>
+    request<{ ok: boolean; error?: string }>(
+      "POST", `/api/v1/connectors/${id}/reconnect`, {},
+    ),
 };

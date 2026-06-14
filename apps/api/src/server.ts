@@ -20,14 +20,21 @@ import Fastify, {
   type FastifyRequest,
 } from "fastify";
 
+import { adminRoutes } from "./routes/admin.js";
 import { auditRoutes } from "./routes/audit.js";
+import { billingRoutes } from "./routes/billing.js";
 import { chatSuggestionsRoutes } from "./routes/chat-suggestions.js";
+import { connectorsRoutes } from "./routes/connectors.js";
 import { contextRoutes } from "./routes/context.js";
 import { corpusBuilderRoutes } from "./routes/corpus-builder.js";
 import { councilRoutes } from "./routes/council.js";
 import { domainFeedsRoutes } from "./routes/domain-feeds.js";
+import { featureFlagsRoutes } from "./routes/feature-flags.js";
 import { gatewayRoutes } from "./routes/gateway.js";
 import { governanceRoutes } from "./routes/governance.js";
+import { imageGenRoutes } from "./routes/image-gen.js";
+import { knowledgeGraphRoutes } from "./routes/knowledge-graph.js";
+import { voiceRoutes } from "./routes/voice.js";
 import { healthRoutes } from "./routes/health.js";
 import { ingestRoutes } from "./routes/ingest.js";
 import { obsProvidersRoutes } from "./routes/obs-providers.js";
@@ -110,6 +117,15 @@ export async function buildServer(): Promise<FastifyInstance> {
       await api.register(domainFeedsRoutes);
       await api.register(corpusBuilderRoutes);
       await api.register(obsProvidersRoutes);
+
+      // Full-feature pages
+      await api.register(knowledgeGraphRoutes);
+      await api.register(imageGenRoutes);
+      await api.register(voiceRoutes);
+      await api.register(billingRoutes);
+      await api.register(adminRoutes);
+      await api.register(featureFlagsRoutes);
+      await api.register(connectorsRoutes);
     },
     { prefix: "/api/v1" },
   );
