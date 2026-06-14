@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api, type ChatMessage } from "../lib/api.js";
+import { MessageActions } from "../components/MessageActions.js";
+import { AssistantSteps, type AssistantStep } from "../components/AssistantSteps.js";
 
 // ── Style tokens ──────────────────────────────────────────────────────────────
 
@@ -145,6 +147,8 @@ const s = {
 interface DisplayMessage extends ChatMessage {
   id: string;
   tokenUsage?: { input: number; output: number };
+  steps?: AssistantStep[];
+  rating?: "up" | "down";
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -329,11 +333,53 @@ export default function Chat() {
             <span style={s.roleBadge(msg.role)}>
               {msg.role === "user" ? "You" : "Nexus"}
             </span>
+            {/* Assistant steps (chain-of-thought) */}
+            {msg.role === "assistant" && msg.steps && msg.steps.length > 0 && (
+              <AssistantSteps steps={msg.steps} />
+            )}
             <div style={s.bubble(msg.role)}>{msg.content}</div>
             {msg.tokenUsage && (
               <span style={s.tokenInfo}>
                 {msg.tokenUsage.input}↑ {msg.tokenUsage.output}↓ tokens
               </span>
+            )}
+            {/* Per-message actions for assistant messages */}
+            {msg.role === "assistant" && (
+              <MessageActions
+                messageId={msg.id}
+                content={msg.content}
+                currentModel={model}
+                models={MODELS}
+                loading={loading}
+                onRegenerate={(msgId, regenerateModel) => {
+                  // Replay history up to (not including) this message, then resend with chosen model
+                  const idx = messages.findIndex((m) => m.id === msgId);
+                  const historyUpTo = messages.slice(0, idx).map(({ role, content }) => ({ role, content }));
+                  setMessages((prev) => prev.slice(0, idx));
+                  setLoading(true);
+                  void api.chat(historyUpTo, regenerateModel).then((res) => {
+                    const text = res.content.map((b) => b.text).join("");
+                    setMessages((prev) => [
+                      ...prev,
+                      {
+                        id: `a-${Date.now()}`,
+                        role: "assistant",
+                        content: text,
+                        tokenUsage: { input: res.usage.input_tokens, output: res.usage.output_tokens },
+                      },
+                    ]);
+                    setLoading(false);
+                  }).catch((err: unknown) => {
+                    setError(err instanceof Error ? err.message : "Regeneration failed");
+                    setLoading(false);
+                  });
+                }}
+                onRate={(msgId, rating) => {
+                  setMessages((prev) =>
+                    prev.map((m) => (m.id === msgId ? { ...m, rating } : m)),
+                  );
+                }}
+              />
             )}
           </div>
         ))}

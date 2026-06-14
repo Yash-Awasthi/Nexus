@@ -7,6 +7,7 @@ import Audit from "./pages/Audit.js";
 import Chat from "./pages/Chat.js";
 import Council from "./pages/Council.js";
 import Dashboard from "./pages/Dashboard.js";
+import Discover from "./pages/Discover.js";
 import Signals from "./pages/Signals.js";
 import Tasks from "./pages/Tasks.js";
 
@@ -16,6 +17,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
+          <Route path="discover" element={<Discover />} />
           <Route path="signals" element={<Signals />} />
           <Route path="council" element={<Council />} />
           <Route path="tasks" element={<Tasks />} />
