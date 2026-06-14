@@ -15,6 +15,7 @@
  *   • HfPublishResult       — result of a push-to-hub operation
  *   • HfPublisher           — injectable publisher abstraction
  *   • MockHfPublisher       — test double
+ *   • HuggingFacePublisher  — real HF datasets API publisher (requires HF_TOKEN)
  *   • ResearchApiRouter     — REST-style router (list, read, query, flush, download)
  *   • TierGate              — tier-based access control
  *   • JsonlSerializer       — serialize batches to JSONL
@@ -187,6 +188,65 @@ export class MockHfPublisher implements HfPublisher {
       success: true,
       url: `https://huggingface.co/datasets/${repoId}`,
     };
+  }
+}
+
+/**
+ * Real HuggingFace datasets API publisher.
+ * Uploads each batch as a JSONL file via PUT to the HF Hub Datasets API.
+ *
+ * Setup:
+ *   1. Create a dataset repo at https://huggingface.co/new-dataset
+ *   2. Generate a write-access token at https://huggingface.co/settings/tokens
+ *   3. Set HF_TOKEN and HF_REPO_ID in .env
+ */
+export class HuggingFacePublisher implements HfPublisher {
+  private token: string;
+  private serializer: JsonlSerializer;
+
+  constructor(config: { token: string }) {
+    this.token = config.token;
+    this.serializer = new JsonlSerializer();
+  }
+
+  async push(batch: CorpusBatch, repoId: string): Promise<HfPublishResult> {
+    const jsonl = this.serializer.serialize(batch.samples);
+    // Sanitize batch name for use as a filename component
+    const safeName = batch.name.replace(/[^a-z0-9_-]/gi, "_").toLowerCase();
+    const filename = `${safeName}-${batch.id}.jsonl`;
+    const url = `https://huggingface.co/api/datasets/${repoId}/resolve/main/${filename}`;
+
+    try {
+      const resp = await fetch(url, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          "Content-Type": "application/x-ndjson",
+        },
+        body: jsonl,
+      });
+
+      if (!resp.ok) {
+        const errText = await resp.text().catch(() => `HTTP ${resp.status}`);
+        return { batchId: batch.id, repoId, sampleCount: 0, success: false, error: errText };
+      }
+
+      return {
+        batchId: batch.id,
+        repoId,
+        sampleCount: batch.samples.length,
+        success: true,
+        url: `https://huggingface.co/datasets/${repoId}/blob/main/${filename}`,
+      };
+    } catch (err) {
+      return {
+        batchId: batch.id,
+        repoId,
+        sampleCount: 0,
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
   }
 }
 

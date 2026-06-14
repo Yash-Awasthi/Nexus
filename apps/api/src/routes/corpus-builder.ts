@@ -9,11 +9,16 @@
  * POST /api/v1/corpus/query             — query samples with filters (pro+)
  * POST /api/v1/corpus/flush             — flush + push to HuggingFace (enterprise+)
  * GET  /api/v1/corpus/pending           — count pending samples
+ *
+ * Publisher selection (at startup):
+ *   HF_TOKEN set → HuggingFacePublisher (real HF datasets API)
+ *   otherwise    → MockHfPublisher (in-memory log, no network)
  */
 
 import {
   InMemoryBatchStore,
   MockHfPublisher,
+  HuggingFacePublisher,
   ResearchApiRouter,
   type DataTier,
   type SampleTag,
@@ -25,7 +30,11 @@ import { requireAuth } from "../middleware/auth.js";
 // ── Singletons ────────────────────────────────────────────────────────────────
 
 const batchStore = new InMemoryBatchStore();
-const publisher = new MockHfPublisher();
+
+const publisher = process.env.HF_TOKEN
+  ? new HuggingFacePublisher({ token: process.env.HF_TOKEN })
+  : new MockHfPublisher();
+
 const router = new ResearchApiRouter({
   store: batchStore,
   publisher,
@@ -141,6 +150,9 @@ export async function corpusBuilderRoutes(app: FastifyInstance): Promise<void> {
 
   /** GET /corpus/pending */
   app.get("/corpus/pending", { preHandler: requireAuth }, async (_req, reply) => {
-    return reply.send({ pending: batchStore.pendingCount() });
+    return reply.send({
+      pending: batchStore.pendingCount(),
+      publisher: process.env.HF_TOKEN ? "huggingface" : "mock",
+    });
   });
 }

@@ -3,14 +3,18 @@
  * search-orchestrator — Strategy-chain search with timeline output.
  *
  * Provides:
- *   • SearchStrategy      — injectable strategy interface (Chroma/SQLite/Hybrid)
- *   • SearchResult        — typed result with source + score
- *   • SearchFilters       — date/project/type filters
- *   • StrategyChain       — ordered fallback chain (first non-empty result wins)
- *   • TimelineBuilder     — groups results into dated timeline segments
- *   • SearchOrchestrator  — facade: filters → chain → timeline
- *   • MockSearchStrategy  — configurable in-memory test double
+ *   • SearchStrategy         — injectable strategy interface
+ *   • SearchResult           — typed result with source + score
+ *   • SearchFilters          — date/project/type filters
+ *   • StrategyChain          — ordered fallback chain (first non-empty result wins)
+ *   • TimelineBuilder        — groups results into dated timeline segments
+ *   • SearchOrchestrator     — facade: filters → chain → timeline
+ *   • MockSearchStrategy     — configurable in-memory test double
+ *   • ChromaSearchStrategy   — real Chroma vector DB strategy (uses CHROMA_URL)
+ *   • PgFullTextStrategy     — Postgres ILIKE full-text over memory_entries (uses DATABASE_URL)
  */
+
+import { neon } from "@neondatabase/serverless";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -97,6 +101,145 @@ export class MockSearchStrategy implements SearchStrategy {
       },
     ];
     return { results, source: this.name, durationMs: 1, totalFound: results.length };
+  }
+}
+
+// ── ChromaSearchStrategy ──────────────────────────────────────────────────────
+
+/**
+ * Real Chroma vector DB search strategy.
+ * Requires a running Chroma instance (default: http://chroma:8000).
+ * Set CHROMA_URL to override the endpoint.
+ * Set CHROMA_COLLECTION to override the collection name (default: "nexus").
+ */
+export class ChromaSearchStrategy implements SearchStrategy {
+  readonly name: SearchSource = "chroma";
+  private chromaUrl: string;
+  private collection: string;
+
+  constructor(config: { chromaUrl?: string; collection?: string } = {}) {
+    this.chromaUrl = config.chromaUrl ?? process.env.CHROMA_URL ?? "http://chroma:8000";
+    this.collection = config.collection ?? process.env.CHROMA_COLLECTION ?? "nexus";
+  }
+
+  async search(request: SearchRequest): Promise<SearchResponse> {
+    const t0 = Date.now();
+    try {
+      const resp = await fetch(
+        `${this.chromaUrl}/api/v1/collections/${this.collection}/query`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query_texts: [request.query],
+            n_results: request.maxResults ?? 10,
+            include: ["documents", "metadatas", "distances"],
+          }),
+        },
+      );
+
+      if (!resp.ok) {
+        return { results: [], source: "chroma", durationMs: Date.now() - t0, totalFound: 0 };
+      }
+
+      const data = await resp.json() as {
+        documents?: string[][];
+        metadatas?: Array<Array<Record<string, unknown> | null>>;
+        distances?: number[][];
+        ids?: string[][];
+      };
+
+      const docs  = data.documents?.[0] ?? [];
+      const metas = data.metadatas?.[0] ?? [];
+      const dists = data.distances?.[0] ?? [];
+      const ids   = data.ids?.[0] ?? [];
+
+      const results: SearchResult[] = docs.map((doc, i) => {
+        const meta = metas[i] ?? {};
+        return {
+          id:        ids[i] ?? `chroma-${i}`,
+          content:   doc,
+          source:    "chroma" as SearchSource,
+          type:      (meta?.["type"] as SearchResultType) ?? "document",
+          // Chroma distances are L2; convert to 0–1 similarity (clamped)
+          score:     Math.max(0, Math.min(1, 1 - (dists[i] ?? 0))),
+          timestamp: (meta?.["timestamp"] as string) ?? new Date().toISOString(),
+          projectId: meta?.["projectId"] as string | undefined,
+          metadata:  meta ?? undefined,
+        };
+      });
+
+      return { results, source: "chroma", durationMs: Date.now() - t0, totalFound: results.length };
+    } catch {
+      // Chroma unreachable — return empty so chain can fall through
+      return { results: [], source: "chroma", durationMs: Date.now() - t0, totalFound: 0 };
+    }
+  }
+}
+
+// ── PgFullTextStrategy ────────────────────────────────────────────────────────
+
+/**
+ * Postgres full-text search over the memory_entries table using ILIKE.
+ * Works with Neon cloud URLs. Falls back gracefully for local non-Neon postgres.
+ * Set DATABASE_URL to enable.
+ */
+export class PgFullTextStrategy implements SearchStrategy {
+  // Reuse the "sqlite" source name so existing chain consumers don't break
+  readonly name: SearchSource = "sqlite";
+  private sql: ReturnType<typeof neon> | null = null;
+
+  constructor(connectionString?: string) {
+    const url = connectionString ?? process.env.DATABASE_URL ?? "";
+    if (url) {
+      try {
+        this.sql = neon(url);
+      } catch {
+        this.sql = null;
+      }
+    }
+  }
+
+  async search(request: SearchRequest): Promise<SearchResponse> {
+    const t0 = Date.now();
+    if (!this.sql) {
+      return { results: [], source: "sqlite", durationMs: 0, totalFound: 0 };
+    }
+
+    try {
+      const pattern = `%${request.query.toLowerCase()}%`;
+      const limit = request.maxResults ?? 10;
+
+      const rows = await this.sql`
+        SELECT
+          'mem-' || id::text   AS id,
+          content,
+          'note'               AS type,
+          created_at           AS timestamp,
+          metadata
+        FROM memory_entries
+        WHERE LOWER(content) LIKE ${pattern}
+        ORDER BY created_at DESC
+        LIMIT ${limit}
+      `;
+
+      const results: SearchResult[] = rows.map((row, i) => {
+        const r = row as Record<string, unknown>;
+        return {
+          id:        (r["id"] as string) ?? `pg-${i}`,
+          content:   (r["content"] as string) ?? "",
+          source:    "sqlite" as SearchSource,
+          type:      (r["type"] as SearchResultType) ?? "note",
+          score:     0.75,
+          timestamp: (r["timestamp"] as string) ?? new Date().toISOString(),
+          metadata:  (r["metadata"] as Record<string, unknown>) ?? undefined,
+        };
+      });
+
+      return { results, source: "sqlite", durationMs: Date.now() - t0, totalFound: results.length };
+    } catch {
+      return { results: [], source: "sqlite", durationMs: Date.now() - t0, totalFound: 0 };
+    }
   }
 }
 
@@ -248,9 +391,40 @@ export class SearchOrchestrator {
 
 // ── Convenience factory ───────────────────────────────────────────────────────
 
+/**
+ * Build a default SearchOrchestrator wired to real backends when env vars are present.
+ *
+ * Priority:
+ *   1. CHROMA_URL set  → ChromaSearchStrategy as primary
+ *   2. DATABASE_URL set → PgFullTextStrategy as secondary (or primary if no Chroma)
+ *   3. Neither set      → MockSearchStrategy × 2 for local dev
+ *
+ * You can override by passing explicit strategies.
+ */
 export function createDefaultOrchestrator(
-  strategies: SearchStrategy[] = [new MockSearchStrategy("chroma"), new MockSearchStrategy("sqlite")],
+  strategies?: SearchStrategy[],
 ): SearchOrchestrator {
-  const chain = new StrategyChain({ strategies });
-  return new SearchOrchestrator({ chain });
+  if (strategies && strategies.length > 0) {
+    return new SearchOrchestrator({ chain: new StrategyChain({ strategies }) });
+  }
+
+  const resolved: SearchStrategy[] = [];
+
+  if (process.env.CHROMA_URL) {
+    resolved.push(new ChromaSearchStrategy());
+  }
+
+  if (process.env.DATABASE_URL) {
+    resolved.push(new PgFullTextStrategy());
+  }
+
+  if (resolved.length === 0) {
+    // Neither configured — use mock strategies for local dev / CI
+    resolved.push(
+      new MockSearchStrategy("chroma"),
+      new MockSearchStrategy("sqlite"),
+    );
+  }
+
+  return new SearchOrchestrator({ chain: new StrategyChain({ strategies: resolved }) });
 }

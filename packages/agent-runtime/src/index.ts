@@ -3,14 +3,16 @@
  * agent-runtime — Step execution loop for multi-step LLM agents.
  *
  * Provides:
- *   • StepInput / StepOutput  — typed step I/O
- *   • ToolStreamParser        — parse tool calls from streamed LLM output
- *   • StrReplaceProcessor     — apply str_replace tool calls to a file map
- *   • CacheControl            — per-step cache control headers/policies
- *   • AgentStepExecutor       — run a single step (prompt → tool calls → results)
- *   • AgentRuntime            — multi-step loop with abort handling
- *   • RuntimeToolSet          — assemble a typed tool set for a run
- *   • MockLlmStream           — injectable streaming LLM test double
+ *   • StepInput / StepOutput    — typed step I/O
+ *   • ToolStreamParser          — parse tool calls from streamed LLM output
+ *   • StrReplaceProcessor       — apply str_replace tool calls to a file map
+ *   • CacheControl              — per-step cache control headers/policies
+ *   • AgentStepExecutor         — run a single step (prompt → tool calls → results)
+ *   • AgentRuntime              — multi-step loop with abort handling
+ *   • RuntimeToolSet            — assemble a typed tool set for a run
+ *   • MockLlmStream             — injectable streaming LLM test double
+ *   • LlmStreamDriver           — structural interface for @nexus/llm-drivers drivers
+ *   • llmDriverToStreamFn       — bridge: LlmDriver.stream() → AsyncIterable<string>
  */
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -239,6 +241,101 @@ export class MockLlmStream {
       }
     }.bind(this);
   }
+}
+
+// ── LlmStreamDriver adapter ───────────────────────────────────────────────────
+
+/**
+ * Structural interface matching the stream() signature of @nexus/llm-drivers drivers.
+ * Defined here (not imported) to avoid circular workspace dependencies.
+ * Any LlmDriver from @nexus/llm-drivers satisfies this interface structurally.
+ */
+export interface LlmStreamDriver {
+  readonly model: string;
+  stream(
+    opts: {
+      model?: string;
+      messages: Array<{ role: string; content: string }>;
+      systemPrompt?: string;
+      maxTokens?: number;
+      temperature?: number;
+    },
+    handler: (delta: { delta: string; done: boolean }) => void | Promise<void>,
+  ): Promise<unknown>;
+}
+
+/**
+ * Adapts a callback-based LlmDriver.stream() to an AsyncIterable<string>.
+ *
+ * The driver emits deltas via a handler callback; this function bridges that
+ * to an async generator using a queue + Promise resolver pattern.
+ *
+ * Usage:
+ *   import { GroqDriver } from "@nexus/llm-drivers";
+ *   const driver = new GroqDriver({ apiKey: "..." });
+ *   const streamFn = llmDriverToStreamFn(driver);
+ *   const runtime = new AgentRuntime({ llm: streamFn, ... });
+ */
+export function llmDriverToStreamFn(
+  driver: LlmStreamDriver,
+  modelOverride?: string,
+): LlmStreamFn {
+  return async function* (
+    systemPrompt: string,
+    userPrompt: string,
+    opts?: { signal?: AbortSignal },
+  ): AsyncGenerator<string> {
+    // Queue-based bridge: driver pushes chunks here, generator pulls them
+    const queue: string[] = [];
+    let resolve: (() => void) | null = null;
+    let done = false;
+    let streamError: unknown = null;
+
+    const push = (chunk: string): void => {
+      queue.push(chunk);
+      const r = resolve;
+      resolve = null;
+      r?.();
+    };
+
+    const streamPromise = driver.stream(
+      {
+        model:        modelOverride ?? driver.model,
+        messages:     [{ role: "user", content: userPrompt }],
+        systemPrompt,
+      },
+      (delta) => {
+        if (!delta.done && delta.delta) push(delta.delta);
+      },
+    ).then(() => {
+      done = true;
+      const r = resolve;
+      resolve = null;
+      r?.();
+    }).catch((err: unknown) => {
+      streamError = err;
+      done = true;
+      const r = resolve;
+      resolve = null;
+      r?.();
+    });
+
+    // Detach — we drive consumption via the generator below
+    void streamPromise;
+
+    while (!done || queue.length > 0) {
+      if (opts?.signal?.aborted) return;
+
+      if (queue.length > 0) {
+        yield queue.shift()!;
+      } else {
+        // Wait for next push or done signal
+        await new Promise<void>((res) => { resolve = res; });
+      }
+    }
+
+    if (streamError) throw streamError;
+  };
 }
 
 // ── AgentStepExecutor ─────────────────────────────────────────────────────────

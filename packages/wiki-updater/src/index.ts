@@ -8,7 +8,8 @@
  *
  * Provides:
  *   • WikiArticle              — article store entry
- *   • WikiStore                — in-memory article store
+ *   • WikiStore                — in-memory article store (used by pipeline)
+ *   • PgWikiStore              — Postgres-backed persistent store (Neon serverless)
  *   • IntentDistillStep        — distil document intent to BM25 query
  *   • CandidateSearchStep      — BM25 candidate retrieval
  *   • SelectorStep             — select most relevant candidate
@@ -19,6 +20,8 @@
  *   • StageMetrics             — per-stage timing/result counters
  *   • MockWikiBackend          — injectable test double
  */
+
+import { neon } from "@neondatabase/serverless";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -140,6 +143,119 @@ export class WikiStore {
   }
 
   clear(): void { this.articles.clear(); this.index.clear(); }
+}
+
+// ── PgWikiStore ───────────────────────────────────────────────────────────────
+
+/**
+ * Postgres-backed wiki article store using @neondatabase/serverless.
+ * Persists articles across restarts; falls back gracefully on query errors.
+ *
+ * Table is created on first call to init() or lazily on first write.
+ *
+ * Usage:
+ *   const pg = new PgWikiStore(process.env.DATABASE_URL!);
+ *   await pg.init(); // idempotent — safe to call every startup
+ */
+export class PgWikiStore {
+  private sql: ReturnType<typeof neon>;
+  private ready = false;
+
+  constructor(connectionString: string) {
+    this.sql = neon(connectionString);
+  }
+
+  /** Creates the wiki_articles table if it does not already exist. */
+  async init(): Promise<void> {
+    await this.sql`
+      CREATE TABLE IF NOT EXISTS wiki_articles (
+        id          TEXT PRIMARY KEY,
+        title       TEXT        NOT NULL,
+        content     TEXT        NOT NULL,
+        tags        TEXT[]      NOT NULL DEFAULT '{}',
+        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        version     INTEGER     NOT NULL DEFAULT 1
+      )
+    `;
+    this.ready = true;
+  }
+
+  private async ensureReady(): Promise<void> {
+    if (!this.ready) await this.init();
+  }
+
+  async getAll(): Promise<WikiArticle[]> {
+    await this.ensureReady();
+    const rows = await this.sql`
+      SELECT * FROM wiki_articles ORDER BY updated_at DESC
+    `;
+    return rows.map(this.rowToArticle);
+  }
+
+  async getById(id: string): Promise<WikiArticle | undefined> {
+    await this.ensureReady();
+    const rows = await this.sql`
+      SELECT * FROM wiki_articles WHERE id = ${id} LIMIT 1
+    `;
+    return rows[0] ? this.rowToArticle(rows[0] as Record<string, unknown>) : undefined;
+  }
+
+  async search(query: string, limit = 5): Promise<WikiArticle[]> {
+    await this.ensureReady();
+    const pattern = `%${query.toLowerCase()}%`;
+    const rows = await this.sql`
+      SELECT * FROM wiki_articles
+      WHERE LOWER(title) LIKE ${pattern} OR LOWER(content) LIKE ${pattern}
+      ORDER BY updated_at DESC
+      LIMIT ${limit}
+    `;
+    return rows.map((r) => this.rowToArticle(r as Record<string, unknown>));
+  }
+
+  async upsert(article: WikiArticle): Promise<void> {
+    await this.ensureReady();
+    await this.sql`
+      INSERT INTO wiki_articles (id, title, content, tags, updated_at, version)
+      VALUES (
+        ${article.id},
+        ${article.title},
+        ${article.content},
+        ${article.tags},
+        ${article.updatedAt},
+        ${article.version}
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        title      = EXCLUDED.title,
+        content    = EXCLUDED.content,
+        tags       = EXCLUDED.tags,
+        updated_at = EXCLUDED.updated_at,
+        version    = EXCLUDED.version
+    `;
+  }
+
+  async delete(id: string): Promise<boolean> {
+    await this.ensureReady();
+    const result = await this.sql`DELETE FROM wiki_articles WHERE id = ${id}`;
+    // neon returns an array; rowCount lives on the result object
+    return ((result as unknown as { rowCount?: number }).rowCount ?? 0) > 0;
+  }
+
+  async count(): Promise<number> {
+    await this.ensureReady();
+    const rows = await this.sql`SELECT COUNT(*)::int AS n FROM wiki_articles`;
+    return (rows[0] as Record<string, unknown>)?.["n"] as number ?? 0;
+  }
+
+  private rowToArticle(row: Record<string, unknown>): WikiArticle {
+    return {
+      id:        row["id"] as string,
+      title:     row["title"] as string,
+      content:   row["content"] as string,
+      tags:      (row["tags"] as string[]) ?? [],
+      updatedAt: (row["updated_at"] as string) ?? new Date().toISOString(),
+      version:   (row["version"] as number) ?? 1,
+    };
+  }
 }
 
 // ── StageMetrics ──────────────────────────────────────────────────────────────
