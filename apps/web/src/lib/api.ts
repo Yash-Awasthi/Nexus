@@ -526,4 +526,26 @@ export const api = {
     request<{ ok: boolean; error?: string }>(
       "POST", `/api/v1/connectors/${id}/reconnect`, {},
     ),
+
+  // ── Council ───────────────────────────────────────────────────────────────
+
+  /** Paginated list of verdicts (newest first). */
+  councilVerdicts: (limit = 20, offset = 0) =>
+    request<{ verdicts: unknown[]; limit: number; offset: number }>(
+      "GET", `/api/v1/council/verdicts?limit=${limit}&offset=${offset}`,
+    ),
+
+  /** Single verdict by ID. */
+  councilVerdict: (verdictId: string) =>
+    request<unknown>("GET", `/api/v1/council/verdicts/${verdictId}`),
+
+  /** Transcript for a verdict. */
+  councilTranscript: (verdictId: string) =>
+    request<unknown>("GET", `/api/v1/council/transcripts/${verdictId}`),
+
+  /** Trigger deliberation for an existing signal by ID. */
+  councilTrigger: (signalId: string, budgetUsd?: number, timeoutMs?: number) =>
+    request<{ ok: boolean; result: unknown }>(
+      "POST", "/api/v1/council/trigger", { signalId, budgetUsd, timeoutMs },
+    ),
 };
