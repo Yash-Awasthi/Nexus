@@ -24,6 +24,7 @@ import { adminRoutes } from "./routes/admin.js";
 import { auditRoutes } from "./routes/audit.js";
 import { billingRoutes } from "./routes/billing.js";
 import { chatSuggestionsRoutes } from "./routes/chat-suggestions.js";
+import { codeReplRoutes } from "./routes/code-repl.js";
 import { connectorsRoutes } from "./routes/connectors.js";
 import { contextRoutes } from "./routes/context.js";
 import { corpusBuilderRoutes } from "./routes/corpus-builder.js";
@@ -125,6 +126,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       await api.register(billingRoutes);
       await api.register(adminRoutes);
       await api.register(featureFlagsRoutes);
+      await api.register(codeReplRoutes);
       await api.register(connectorsRoutes);
     },
     { prefix: "/api/v1" },

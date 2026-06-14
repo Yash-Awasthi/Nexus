@@ -42,6 +42,7 @@
     "@nexus/posthog-analytics": "workspace:*",
     "@nexus/sse": "workspace:*",
     "@nexus/stm": "workspace:*",
+    "@nexus/code-repl": "workspace:*",
     "@nexus/council": "workspace:*",
     "@nexus/db": "workspace:*",
     "@nexus/governance": "workspace:*",

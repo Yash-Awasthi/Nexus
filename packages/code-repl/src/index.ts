@@ -3,15 +3,19 @@
  * code-repl — Persistent REPL kernel with Jupyter-style last-expression output.
  *
  * Provides:
- *   • ReplResult       — { stdout, stderr, displayData, lastExpression }
- *   • KernelSession    — stateful session with variable store + history
- *   • JupyterMode      — wraps code to auto-print last expression
- *   • ReplExecutor     — injectable code execution interface
- *   • MockReplExecutor — in-memory executor for tests
- *   • SessionReaper    — TTL-based idle session cleanup
- *   • ReplKernel       — per-language kernel facade
- *   • KernelManager    — named kernel registry with create/get/reap
+ *   • ReplResult          — { stdout, stderr, displayData, lastExpression }
+ *   • KernelSession       — stateful session with variable store + history
+ *   • JupyterMode         — wraps code to auto-print last expression
+ *   • ReplExecutor        — injectable code execution interface
+ *   • MockReplExecutor    — in-memory executor for tests
+ *   • DockerReplExecutor  — real sandboxed execution via docker run (needs Docker)
+ *   • SessionReaper       — TTL-based idle session cleanup
+ *   • ReplKernel          — per-language kernel facade
+ *   • KernelManager       — named kernel registry with create/get/reap
+ *   • isDockerAvailable   — probe whether the docker binary is reachable
  */
+
+import { spawn } from "node:child_process";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -159,6 +163,168 @@ export class MockReplExecutor implements ReplExecutor {
       exitCode: behavior.exitCode ?? 0,
       durationMs: behavior.durationMs ?? 10,
     };
+  }
+}
+
+// ── DockerReplExecutor ─────────────────────────────────────────────────────────
+
+const DOCKER_IMAGES: Record<ReplLanguage, { image: string; cmd: string[] }> = {
+  python: { image: "python:3.12-slim",   cmd: ["python3", "-"] },
+  r:      { image: "r-base:4.3",         cmd: ["Rscript", "-"] },
+  julia:  { image: "julia:1.10-alpine",  cmd: ["julia", "--startup-file=no", "-"] },
+};
+
+const STDOUT_CAP = 65_536;  // 64 KB
+const STDERR_CAP = 16_384;  // 16 KB
+
+/**
+ * Probes whether the `docker` binary is reachable and the daemon responds.
+ * Used by the API route to decide whether to activate real execution.
+ */
+export async function isDockerAvailable(): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    const proc = spawn("docker", ["info"], { stdio: "ignore" });
+    proc.on("close", (code) => resolve(code === 0));
+    proc.on("error", () => resolve(false));
+  });
+}
+
+/**
+ * Real sandboxed code executor using `docker run`.
+ *
+ * Each execution spawns a fresh, isolated container with:
+ *   --network=none   — no outbound/inbound network
+ *   --memory         — default 512 MB RAM cap
+ *   --cpus           — default 0.5 CPU core cap
+ *   --pids-limit     — prevent fork bombs (128 processes)
+ *   --no-new-privileges — prevent privilege escalation
+ *   --rm             — auto-remove container on exit
+ *
+ * Code is passed via stdin; stdout/stderr are capped at 64 KB / 16 KB
+ * respectively to prevent memory exhaustion from runaway output.
+ * On timeout the container is SIGKILLed and exitCode 124 is returned.
+ *
+ * Requires Docker Desktop or Docker Engine on the host.
+ * Falls back gracefully: throws if `docker` is not found so the API layer
+ * can substitute MockReplExecutor.
+ */
+export class DockerReplExecutor implements ReplExecutor {
+  private readonly memoryLimit: string;
+  private readonly cpuLimit: string;
+  private readonly defaultTimeoutMs: number;
+  private readonly networkMode: string;
+
+  constructor(config?: {
+    memoryLimit?: string;
+    cpuLimit?: string;
+    defaultTimeoutMs?: number;
+    networkMode?: string;
+  }) {
+    this.memoryLimit       = config?.memoryLimit       ?? "512m";
+    this.cpuLimit          = config?.cpuLimit          ?? "0.5";
+    this.defaultTimeoutMs  = config?.defaultTimeoutMs  ?? 10_000;
+    this.networkMode       = config?.networkMode       ?? "none";
+  }
+
+  async execute(
+    language: ReplLanguage,
+    code: string,
+    _state: KernelSessionState,
+    timeoutMs?: number,
+  ): Promise<ReplResult> {
+    const timeout = timeoutMs ?? this.defaultTimeoutMs;
+    const { image, cmd } = DOCKER_IMAGES[language];
+    const t0 = Date.now();
+
+    return new Promise<ReplResult>((resolve, reject) => {
+      const dockerArgs = [
+        "run", "--rm", "--interactive",
+        `--network=${this.networkMode}`,
+        `--memory=${this.memoryLimit}`,
+        `--cpus=${this.cpuLimit}`,
+        "--pids-limit=128",
+        "--no-new-privileges",
+        image,
+        ...cmd,
+      ];
+
+      const proc = spawn("docker", dockerArgs, { stdio: ["pipe", "pipe", "pipe"] });
+
+      let stdout = "";
+      let stderr = "";
+      let timedOut = false;
+      let outputCapped = false;
+
+      const killTimer = setTimeout(() => {
+        timedOut = true;
+        proc.kill("SIGKILL");
+      }, timeout);
+
+      // Feed code to the interpreter via stdin
+      proc.stdin?.write(code, "utf-8");
+      proc.stdin?.end();
+
+      proc.stdout?.on("data", (chunk: Buffer) => {
+        if (outputCapped) return;
+        stdout += chunk.toString("utf-8");
+        if (stdout.length >= STDOUT_CAP) {
+          stdout = stdout.slice(0, STDOUT_CAP);
+          outputCapped = true;
+          proc.kill("SIGKILL"); // don't let runaway output fill memory
+        }
+      });
+
+      proc.stderr?.on("data", (chunk: Buffer) => {
+        stderr += chunk.toString("utf-8");
+        if (stderr.length > STDERR_CAP) stderr = stderr.slice(0, STDERR_CAP);
+      });
+
+      proc.on("close", (exitCode) => {
+        clearTimeout(killTimer);
+        const durationMs = Date.now() - t0;
+
+        if (timedOut) {
+          resolve({
+            stdout,
+            stderr: `Execution timed out after ${timeout}ms.\n${stderr}`.trim(),
+            exitCode: 124,  // conventional timeout code (same as GNU timeout)
+            durationMs,
+          });
+          return;
+        }
+
+        if (outputCapped) {
+          resolve({
+            stdout: stdout + "\n[output truncated at 64 KB]",
+            stderr,
+            exitCode: exitCode ?? 1,
+            durationMs,
+          });
+          return;
+        }
+
+        resolve({
+          stdout,
+          stderr,
+          exitCode: exitCode ?? 1,
+          durationMs,
+          lastExpression: exitCode === 0 && stdout.trim() ? stdout.trim() : undefined,
+        });
+      });
+
+      proc.on("error", (err) => {
+        clearTimeout(killTimer);
+        const nodeErr = err as NodeJS.ErrnoException;
+        if (nodeErr.code === "ENOENT") {
+          reject(new Error(
+            "DockerReplExecutor: `docker` binary not found. " +
+            "Install Docker Desktop or Docker Engine, then restart the API.",
+          ));
+        } else {
+          reject(err);
+        }
+      });
+    });
   }
 }
 
