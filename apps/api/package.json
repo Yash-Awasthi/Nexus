@@ -50,6 +50,8 @@
     "@nexus/telemetry": "workspace:*",
     "@nexus/voice": "workspace:*",
     "@nexus/wiki-updater": "workspace:*",
+    "@nexus/think-parser": "workspace:*",
+    "@nexus/stream-recovery": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.8.5"
   }

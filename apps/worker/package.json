@@ -28,6 +28,11 @@
     "@nexus/governance": "workspace:*",
     "@nexus/pipeline-signal": "workspace:*",
     "@nexus/shared": "workspace:*",
+    "@nexus/wiki-updater": "workspace:*",
+    "@nexus/corpus-builder": "workspace:*",
+    "@nexus/obs-providers": "workspace:*",
+    "@nexus/domain-feeds": "workspace:*",
+    "@nexus/search-orchestrator": "workspace:*",
     "bullmq": "^5.34.0",
     "ioredis": "^5.4.1",
     "drizzle-orm": "^0.45.2"

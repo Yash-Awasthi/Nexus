@@ -5,6 +5,11 @@
  * Job routing:
  *   "ingest:event"        → handleIngestJob
  *   "council.deliberate"  → handleCouncilJob
+ *   "wiki:reconcile"      → handleWikiReconcileJob
+ *   "corpus:build"        → handleCorpusBuildJob
+ *   "obs:generate"        → handleObsGenerateJob
+ *   "feeds:refresh"       → handleFeedsRefreshJob
+ *   "search:reindex"      → handleSearchReindexJob
  *   (unknown)             → log + complete (no-op)
  *
  * Concurrency:
@@ -25,6 +30,18 @@ import { eq } from "drizzle-orm";
 
 import { handleCouncilJob, type CouncilJobPayload } from "../handlers/council-handler.js";
 import { handleIngestJob, type IngestJobPayload } from "../handlers/ingest-handler.js";
+import {
+  handleWikiReconcileJob,
+  handleCorpusBuildJob,
+  handleObsGenerateJob,
+  handleFeedsRefreshJob,
+  handleSearchReindexJob,
+  type WikiReconcilePayload,
+  type CorpusBuildPayload,
+  type ObsGeneratePayload,
+  type FeedsRefreshPayload,
+  type SearchReindexPayload,
+} from "../handlers/async-handlers.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -56,6 +73,27 @@ async function processJob(job: Job): Promise<unknown> {
     case "council.deliberate":
     case "council.evaluate":
       result = await handleCouncilJob(data as CouncilJobPayload);
+      break;
+
+    // ── Async package backbone ────────────────────────────────────────────────
+    case "wiki:reconcile":
+      result = await handleWikiReconcileJob(data as WikiReconcilePayload);
+      break;
+
+    case "corpus:build":
+      result = await handleCorpusBuildJob(data as CorpusBuildPayload);
+      break;
+
+    case "obs:generate":
+      result = await handleObsGenerateJob(data as ObsGeneratePayload);
+      break;
+
+    case "feeds:refresh":
+      result = await handleFeedsRefreshJob(data as FeedsRefreshPayload);
+      break;
+
+    case "search:reindex":
+      result = await handleSearchReindexJob(data as SearchReindexPayload);
       break;
 
     default:

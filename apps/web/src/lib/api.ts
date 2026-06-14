@@ -83,6 +83,97 @@ export const api = {
       ...(system && { system }),
     }),
 
+  /**
+   * Send messages with real-time SSE token streaming.
+   *
+   * Opens a fetch ReadableStream to POST /gateway/messages with stream:true.
+   * Parses Anthropic-format SSE events; calls onDelta() for each text token
+   * as it arrives so the UI can render incrementally.
+   * Resolves with a full ChatResponse once the stream closes.
+   */
+  chatStream: async (
+    messages: ChatMessage[],
+    model = "nexus/smart",
+    system?: string,
+    onDelta?: (delta: string) => void,
+  ): Promise<ChatResponse> => {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (KEY) headers.Authorization = `Bearer ${KEY}`;
+
+    const res = await fetch(`${BASE}/api/v1/gateway/messages`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model,
+        messages,
+        max_tokens: 2048,
+        stream: true,
+        ...(system && { system }),
+      }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`${res.status}: ${text}`);
+    }
+
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let lineBuf = "";
+    let fullText = "";
+    let responseId = `stream-${Date.now()}`;
+    let responseModel = model;
+    let outputTokens = 0;
+    let done = false;
+
+    while (!done) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+
+      lineBuf += decoder.decode(chunk.value, { stream: true });
+      const lines = lineBuf.split("\n");
+      lineBuf = lines.pop() ?? "";
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const raw = line.slice(6).trim();
+        if (raw === "[DONE]") { done = true; break; }
+
+        try {
+          const event = JSON.parse(raw) as Record<string, unknown>;
+          const evType = event.type as string;
+
+          if (evType === "message_start") {
+            const msg = event.message as Record<string, unknown>;
+            if (msg.id)    responseId    = msg.id    as string;
+            if (msg.model) responseModel = msg.model as string;
+          } else if (evType === "content_block_delta") {
+            const delta = event.delta as Record<string, unknown>;
+            if (delta.type === "text_delta" && typeof delta.text === "string") {
+              fullText += delta.text as string;
+              onDelta?.(delta.text as string);
+            }
+          } else if (evType === "message_delta") {
+            const usage = event.usage as Record<string, unknown> | undefined;
+            if (typeof usage?.output_tokens === "number") {
+              outputTokens = usage.output_tokens as number;
+            }
+          }
+        } catch {
+          /* malformed JSON event — skip and continue */
+        }
+      }
+    }
+
+    return {
+      id: responseId,
+      content: [{ type: "text", text: fullText }],
+      model: responseModel,
+      stop_reason: "end_turn",
+      usage: { input_tokens: 0, output_tokens: outputTokens },
+    };
+  },
+
   /** List available gateway model aliases + configured providers. */
   gatewayModels: () =>
     request<{ models: { id: string; provider: string; backend_model: string; available: boolean }[]; providers: string[] }>(

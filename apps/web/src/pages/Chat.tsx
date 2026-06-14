@@ -203,6 +203,10 @@ export default function Chat() {
       content,
     }));
 
+    // Insert empty placeholder — streaming tokens fill it in real time
+    const assistantId = `a-${Date.now()}`;
+    setMessages((prev) => [...prev, { id: assistantId, role: "assistant", content: "" }]);
+
     try {
       // Fetch context pack on the very first message and cache it for the session
       let sysPrompt = systemPromptRef.current;
@@ -220,18 +224,33 @@ export default function Chat() {
         }
       }
 
-      const res = await api.chat(history, model, sysPrompt ?? undefined);
-      const text = res.content.map((b) => b.text).join("");
+      // Stream tokens — each delta is appended to the placeholder as it arrives
+      const res = await api.chatStream(
+        history,
+        model,
+        sysPrompt ?? undefined,
+        (delta) => {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, content: m.content + delta } : m,
+            ),
+          );
+        },
+      );
 
-      const assistantMsg: DisplayMessage = {
-        id: `a-${Date.now()}`,
-        role: "assistant",
-        content: text,
-        tokenUsage: { input: res.usage.input_tokens, output: res.usage.output_tokens },
-      };
-
-      setMessages((prev) => [...prev, assistantMsg]);
+      // Final pass: attach token usage metadata once stream is closed
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, tokenUsage: { input: res.usage.input_tokens, output: res.usage.output_tokens } }
+            : m,
+        ),
+      );
     } catch (err) {
+      // Drop placeholder only if stream never delivered any content
+      setMessages((prev) =>
+        prev.filter((m) => m.id !== assistantId || m.content.length > 0),
+      );
       setError(err instanceof Error ? err.message : "Request failed");
     } finally {
       setLoading(false);

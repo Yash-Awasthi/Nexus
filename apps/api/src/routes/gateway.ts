@@ -3,12 +3,17 @@
  * Model Gateway routes — backed by @nexus/llm-drivers DriverRegistry.
  *
  * POST /api/v1/gateway/messages  — Anthropic Messages-compatible proxy (15 providers)
+ *                                   stream:true → text/event-stream SSE (Anthropic format)
  * GET  /api/v1/gateway/models    — list available model aliases + registered providers
  *
  * Provider selection precedence:
  *   1. x-nexus-provider header  (explicit override)
  *   2. Model alias table         (nexus/*, claude-*, gemini-*, etc.)
  *   3. 400 if provider unknown or not configured
+ *
+ * Streaming pipeline (when stream:true):
+ *   driver.stream() → ThinkTagParser (strip <think>) → SSE text/event-stream → client
+ *   Errors wrapped by StreamRecoveryOrchestrator (continuation suffix + block close).
  */
 
 import {
@@ -30,9 +35,20 @@ import {
   type LlmRequestOptions,
   type LlmRole,
 } from "@nexus/llm-drivers";
+import { ThinkTagParser } from "@nexus/think-parser";
+import { StreamRecoveryOrchestrator } from "@nexus/stream-recovery";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
+
+// ── SSE headers ───────────────────────────────────────────────────────────────
+
+const SSE_HEADERS = {
+  "Content-Type": "text/event-stream",
+  "Cache-Control": "no-cache",
+  Connection: "keep-alive",
+  "X-Accel-Buffering": "no",
+} as const;
 
 // ── Model alias table ──────────────────────────────────────────────────────────
 
@@ -158,8 +174,13 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
    * POST /gateway/messages
    *
    * Drop-in replacement for POST https://api.anthropic.com/v1/messages.
-   * Translates to the resolved LlmDriver; returns Anthropic-format response.
-   * stream:true is silently treated as non-streaming for now.
+   * When stream:true → hijacks response and emits SSE in Anthropic format:
+   *   message_start → content_block_start → content_block_delta* →
+   *   content_block_stop → message_delta → message_stop → [DONE]
+   *
+   * ThinkTagParser strips <think>…</think> blocks from the delta stream so
+   * chain-of-thought tokens never reach the client.
+   * StreamRecoveryOrchestrator injects a continuation suffix on error.
    */
   app.post<{
     Headers: { "x-nexus-provider"?: string };
@@ -193,8 +214,99 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
+    const opts = toDriverRequest(request.body, resolvedModel);
+
+    // ── Streaming branch ────────────────────────────────────────────────────
+    if (request.body.stream) {
+      reply.hijack();
+      const raw = reply.raw;
+      raw.writeHead(200, SSE_HEADERS);
+
+      const parser = new ThinkTagParser();
+      const orchestrator = new StreamRecoveryOrchestrator({ holdMs: 50 });
+      const msgId = `nexus-${Date.now()}`;
+      let lastText = "";
+
+      const writeEvent = (data: unknown): void => {
+        if (!raw.destroyed) {
+          raw.write(`data: ${JSON.stringify(data)}\n\n`);
+        }
+      };
+
+      // Send opening frames
+      writeEvent({
+        type: "message_start",
+        message: { id: msgId, type: "message", role: "assistant", model: resolvedModel },
+      });
+      writeEvent({
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "text", text: "" },
+      });
+
+      try {
+        await driver.stream(opts, async ({ delta, done, usage }) => {
+          if (done) {
+            // Flush any remaining buffered content from the parser
+            for (const chunk of parser.flush()) {
+              if (chunk.type === "TEXT" && chunk.text) {
+                lastText += chunk.text;
+                writeEvent({
+                  type: "content_block_delta",
+                  index: 0,
+                  delta: { type: "text_delta", text: chunk.text },
+                });
+              }
+            }
+            writeEvent({ type: "content_block_stop", index: 0 });
+            writeEvent({
+              type: "message_delta",
+              delta: { stop_reason: "end_turn", stop_sequence: null },
+              usage: { output_tokens: usage?.outputTokens ?? 0 },
+            });
+            writeEvent({ type: "message_stop" });
+            if (!raw.destroyed) raw.write("data: [DONE]\n\n");
+            if (!raw.destroyed) raw.end();
+          } else {
+            // Feed through think-parser; only emit TEXT chunks to client
+            for (const chunk of parser.feed(delta)) {
+              if (chunk.type === "TEXT" && chunk.text) {
+                lastText += chunk.text;
+                writeEvent({
+                  type: "content_block_delta",
+                  index: 0,
+                  delta: { type: "text_delta", text: chunk.text },
+                });
+              }
+              // THINKING chunks silently dropped — chain-of-thought stays server-side
+            }
+          }
+        });
+      } catch (err: unknown) {
+        const e = err as { message?: string };
+        // Inject continuation suffix so the client gets a graceful truncation notice
+        const { text: recoveredText } = orchestrator.handleError(lastText, "plain");
+        const suffix = recoveredText.slice(lastText.length);
+        if (suffix) {
+          writeEvent({
+            type: "content_block_delta",
+            index: 0,
+            delta: { type: "text_delta", text: suffix },
+          });
+        }
+        writeEvent({
+          type: "error",
+          error: { type: "stream_error", message: e.message ?? "Stream interrupted" },
+        });
+        if (!raw.destroyed) raw.write("data: [DONE]\n\n");
+        if (!raw.destroyed) raw.end();
+      }
+
+      return; // hijacked — Fastify must not touch reply after this
+    }
+
+    // ── Non-streaming branch (existing behaviour) ───────────────────────────
     try {
-      const opts = toDriverRequest(request.body, resolvedModel);
       const response = await driver.complete(opts);
 
       return reply.code(200).send({
