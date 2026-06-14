@@ -13,9 +13,11 @@ import {
   resetDefaultLlmClient,
   _getDefaultClient,
   PROVIDER_DEFAULTS,
+  validateExtractResult,
   type LlmClient,
   type LlmResponse,
   type ExtractSchema,
+  type ExtractViolation,
 } from "../src/index.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -569,5 +571,132 @@ describe("extract", () => {
       scores: { type: "number[]", description: "list of scores" },
     }, llm);
     expect(result.scores).toEqual([8, 9, 10]);
+  });
+
+  it("throws SCHEMA_VALIDATION_ERROR when required field is missing", async () => {
+    // model omits "urgent" which is required
+    const llm = makeLlmClient('{"sender":"a@b.com","subject":"Hi"}');
+    const err = await extract("text", emailSchema, llm).catch((e: unknown) => e);
+    expect((err as LlmUtilsError).code).toBe("SCHEMA_VALIDATION_ERROR");
+    expect((err as LlmUtilsError).message).toContain('"urgent"');
+  });
+
+  it("throws SCHEMA_VALIDATION_ERROR when field has wrong type", async () => {
+    // "urgent" should be boolean but model returns string
+    const llm = makeLlmClient('{"sender":"a@b.com","subject":"Hi","urgent":"yes"}');
+    const err = await extract("text", emailSchema, llm).catch((e: unknown) => e);
+    expect((err as LlmUtilsError).code).toBe("SCHEMA_VALIDATION_ERROR");
+    expect((err as LlmUtilsError).message).toContain('"urgent"');
+  });
+
+  it("does NOT throw when optional field is absent", async () => {
+    const llm = makeLlmClient('{"title":"Doc"}');
+    const result = await extract("text", {
+      title: { type: "string" as const },
+      subtitle: { type: "string" as const, required: false },
+    }, llm);
+    expect(result.title).toBe("Doc");
+  });
+
+  it("collects multiple violations in one error", async () => {
+    // both sender and urgent missing
+    const llm = makeLlmClient('{"subject":"Hi"}');
+    const err = await extract("text", emailSchema, llm).catch((e: unknown) => e);
+    const violations = ((err as LlmUtilsError).context as { violations: ExtractViolation[] }).violations;
+    expect(violations.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ── validateExtractResult (standalone) ───────────────────────────────────────
+
+describe("validateExtractResult", () => {
+  const schema = {
+    name:  { type: "string"  as const },
+    age:   { type: "number"  as const },
+    active:{ type: "boolean" as const },
+    tags:  { type: "string[]" as const },
+    scores:{ type: "number[]" as const },
+    notes: { type: "string"  as const, required: false },
+  } satisfies ExtractSchema;
+
+  it("passes when all required fields are present and typed correctly", () => {
+    expect(() =>
+      validateExtractResult(
+        { name: "Yash", age: 21, active: true, tags: ["a"], scores: [1] },
+        schema,
+      ),
+    ).not.toThrow();
+  });
+
+  it("passes when optional field is absent", () => {
+    expect(() =>
+      validateExtractResult(
+        { name: "Yash", age: 21, active: true, tags: [], scores: [] },
+        schema,
+      ),
+    ).not.toThrow();
+  });
+
+  it("throws SCHEMA_VALIDATION_ERROR for missing required string field", () => {
+    let err: unknown;
+    try { validateExtractResult({ age: 21, active: true, tags: [], scores: [] }, schema); }
+    catch (e) { err = e; }
+    expect((err as LlmUtilsError).code).toBe("SCHEMA_VALIDATION_ERROR");
+  });
+
+  it("throws SCHEMA_VALIDATION_ERROR for wrong type on number field", () => {
+    let err: unknown;
+    try { validateExtractResult({ name: "X", age: "twenty", active: true, tags: [], scores: [] }, schema); }
+    catch (e) { err = e; }
+    expect((err as LlmUtilsError).code).toBe("SCHEMA_VALIDATION_ERROR");
+    expect((err as LlmUtilsError).message).toContain('"age"');
+  });
+
+  it("throws for wrong type on boolean field", () => {
+    let err: unknown;
+    try { validateExtractResult({ name: "X", age: 1, active: 1, tags: [], scores: [] }, schema); }
+    catch (e) { err = e; }
+    expect((err as LlmUtilsError).code).toBe("SCHEMA_VALIDATION_ERROR");
+  });
+
+  it("throws for string[] field containing non-strings", () => {
+    let err: unknown;
+    try { validateExtractResult({ name: "X", age: 1, active: true, tags: [1, 2], scores: [] }, schema); }
+    catch (e) { err = e; }
+    expect((err as LlmUtilsError).code).toBe("SCHEMA_VALIDATION_ERROR");
+  });
+
+  it("throws for number[] field containing non-numbers", () => {
+    let err: unknown;
+    try { validateExtractResult({ name: "X", age: 1, active: true, tags: [], scores: ["a"] }, schema); }
+    catch (e) { err = e; }
+    expect((err as LlmUtilsError).code).toBe("SCHEMA_VALIDATION_ERROR");
+  });
+
+  it("violation context has field, expected, got, reason", () => {
+    let err: unknown;
+    try { validateExtractResult({ age: 21, active: true, tags: [], scores: [] }, schema); }
+    catch (e) { err = e; }
+    const v = ((err as LlmUtilsError).context as { violations: ExtractViolation[] }).violations[0]!;
+    expect(v.field).toBe("name");
+    expect(v.reason).toBe("missing");
+    expect(v.got).toBe("undefined");
+  });
+
+  it("accepts null as missing (same as undefined) for required fields", () => {
+    let err: unknown;
+    try { validateExtractResult({ name: null, age: 1, active: true, tags: [], scores: [] }, schema); }
+    catch (e) { err = e; }
+    expect((err as LlmUtilsError).code).toBe("SCHEMA_VALIDATION_ERROR");
+  });
+
+  it("passes for optional field that is null", () => {
+    // null optional field treated same as absent → no violation
+    expect(() =>
+      validateExtractResult(
+        { name: "X", age: 1, active: true, tags: [], scores: [], notes: null },
+        schema,
+      ),
+    ).not.toThrow();
   });
 });

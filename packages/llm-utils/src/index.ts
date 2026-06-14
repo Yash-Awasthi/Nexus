@@ -379,6 +379,73 @@ export async function summarize(
 
 export type FieldType = "string" | "number" | "boolean" | "string[]" | "number[]";
 
+// ── Runtime schema validation ─────────────────────────────────────────────────
+
+export interface ExtractViolation {
+  field: string;
+  expected: FieldType;
+  /** JavaScript typeof / "array" / "undefined" describing what arrived */
+  got: string;
+  reason: "missing" | "wrong_type";
+}
+
+function _checkFieldType(value: unknown, type: FieldType): boolean {
+  switch (type) {
+    case "string":   return typeof value === "string";
+    case "number":   return typeof value === "number";
+    case "boolean":  return typeof value === "boolean";
+    case "string[]": return Array.isArray(value) && value.every((v) => typeof v === "string");
+    case "number[]": return Array.isArray(value) && value.every((v) => typeof v === "number");
+  }
+}
+
+/**
+ * Validate a parsed extract result against the original schema.
+ * Throws `LlmUtilsError` with code `SCHEMA_VALIDATION_ERROR` when:
+ *   - A required field is absent (undefined or null)
+ *   - A present field has the wrong JavaScript type
+ * Optional fields (required: false) that are absent are silently accepted.
+ * @internal exported for testing
+ */
+export function validateExtractResult<S extends ExtractSchema>(
+  raw: Record<string, unknown>,
+  schema: S,
+): void {
+  const violations: ExtractViolation[] = [];
+
+  for (const [field, def] of Object.entries(schema)) {
+    const value = raw[field];
+    const isRequired = def.required !== false;
+
+    if (value === undefined || value === null) {
+      if (isRequired) {
+        violations.push({ field, expected: def.type, got: "undefined", reason: "missing" });
+      }
+      continue; // optional missing field: skip type check
+    }
+
+    if (!_checkFieldType(value, def.type)) {
+      const got = Array.isArray(value) ? "array" : typeof value;
+      violations.push({ field, expected: def.type, got, reason: "wrong_type" });
+    }
+  }
+
+  if (violations.length > 0) {
+    const desc = violations
+      .map((v) =>
+        v.reason === "missing"
+          ? `"${v.field}" is required but missing`
+          : `"${v.field}" expected ${v.expected} but got ${v.got}`,
+      )
+      .join("; ");
+    throw new LlmUtilsError(
+      `Extract schema validation failed: ${desc}`,
+      "SCHEMA_VALIDATION_ERROR",
+      { violations },
+    );
+  }
+}
+
 export interface FieldSchema {
   /** Expected JavaScript type of the field value. */
   type: FieldType;
@@ -416,6 +483,7 @@ export type ExtractResult<S extends ExtractSchema> = {
  *
  * @throws {LlmUtilsError} EMPTY_SCHEMA — schema has no fields.
  * @throws {LlmUtilsError} JSON_PARSE_ERROR — model output was not valid JSON.
+ * @throws {LlmUtilsError} SCHEMA_VALIDATION_ERROR — required field missing or wrong type in model output.
  *
  * @example
  * ```ts
@@ -460,7 +528,9 @@ export async function extract<S extends ExtractSchema>(
     { temperature: 0.0, maxTokens: 512 },
   );
 
-  return parseJsonResponse<ExtractResult<S>>(response.content);
+  const raw = parseJsonResponse<Record<string, unknown>>(response.content);
+  validateExtractResult(raw, schema);
+  return raw as ExtractResult<S>;
 }
 
 // ── Re-export convenience ─────────────────────────────────────────────────────
