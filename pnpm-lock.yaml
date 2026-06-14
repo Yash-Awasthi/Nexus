@@ -80,9 +80,18 @@ importers:
       '@fastify/sensible':
         specifier: ^6.0.4
         version: 6.0.4
+      '@nexus/admin-gateway':
+        specifier: workspace:*
+        version: link:../../packages/admin-gateway
       '@nexus/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@nexus/billing':
+        specifier: workspace:*
+        version: link:../../packages/billing
+      '@nexus/connectors':
+        specifier: workspace:*
+        version: link:../../packages/connectors
       '@nexus/context-pack':
         specifier: workspace:*
         version: link:../../packages/context-pack
@@ -95,12 +104,36 @@ importers:
       '@nexus/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@nexus/feature-flags':
+        specifier: workspace:*
+        version: link:../../packages/feature-flags
       '@nexus/gateway':
         specifier: workspace:*
         version: link:../../packages/gateway
       '@nexus/governance':
         specifier: workspace:*
         version: link:../../packages/governance
+      '@nexus/hf-research':
+        specifier: workspace:*
+        version: link:../../packages/hf-research
+      '@nexus/image-gen':
+        specifier: workspace:*
+        version: link:../../packages/image-gen
+      '@nexus/knowledge-graph':
+        specifier: workspace:*
+        version: link:../../packages/knowledge-graph
+      '@nexus/llm-drivers':
+        specifier: workspace:*
+        version: link:../../packages/llm-drivers
+      '@nexus/llm-tracer':
+        specifier: workspace:*
+        version: link:../../packages/llm-tracer
+      '@nexus/obs-providers':
+        specifier: workspace:*
+        version: link:../../packages/obs-providers
+      '@nexus/posthog-analytics':
+        specifier: workspace:*
+        version: link:../../packages/posthog-analytics
       '@nexus/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
@@ -110,9 +143,24 @@ importers:
       '@nexus/sse':
         specifier: workspace:*
         version: link:../../packages/sse
+      '@nexus/stm':
+        specifier: workspace:*
+        version: link:../../packages/stm
+      '@nexus/stream-recovery':
+        specifier: workspace:*
+        version: link:../../packages/stream-recovery
       '@nexus/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry
+      '@nexus/think-parser':
+        specifier: workspace:*
+        version: link:../../packages/think-parser
+      '@nexus/voice':
+        specifier: workspace:*
+        version: link:../../packages/voice
+      '@nexus/wiki-updater':
+        specifier: workspace:*
+        version: link:../../packages/wiki-updater
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@neondatabase/serverless@0.10.4)(@types/pg@8.11.6)(gel@2.2.0)(pg@8.21.0)
@@ -252,21 +300,39 @@ importers:
       '@nexus/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@nexus/corpus-builder':
+        specifier: workspace:*
+        version: link:../../packages/corpus-builder
       '@nexus/council':
         specifier: workspace:*
         version: link:../../packages/council
       '@nexus/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@nexus/domain-feeds':
+        specifier: workspace:*
+        version: link:../../packages/domain-feeds
       '@nexus/governance':
         specifier: workspace:*
         version: link:../../packages/governance
+      '@nexus/llm-drivers':
+        specifier: workspace:*
+        version: link:../../packages/llm-drivers
+      '@nexus/obs-providers':
+        specifier: workspace:*
+        version: link:../../packages/obs-providers
       '@nexus/pipeline-signal':
         specifier: workspace:*
         version: link:../../packages/pipeline-signal
+      '@nexus/search-orchestrator':
+        specifier: workspace:*
+        version: link:../../packages/search-orchestrator
       '@nexus/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@nexus/wiki-updater':
+        specifier: workspace:*
+        version: link:../../packages/wiki-updater
       bullmq:
         specifier: ^5.34.0
         version: 5.78.0
@@ -276,10 +342,16 @@ importers:
       ioredis:
         specifier: ^5.4.1
         version: 5.11.1
+      pg:
+        specifier: ^8.13.3
+        version: 8.21.0
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.21
+      '@types/pg':
+        specifier: ^8.11.6
+        version: 8.11.6
       '@vitest/coverage-v8':
         specifier: ^2.1.8
         version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
@@ -434,6 +506,12 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
 
+  packages/adapters/ide:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
   packages/adapters/ingest:
     dependencies:
       '@nexus/contracts':
@@ -468,6 +546,12 @@ importers:
       '@nexus/plugin-sdk':
         specifier: workspace:*
         version: link:../../plugin-sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
+  packages/adapters/mlx:
     devDependencies:
       typescript:
         specifier: ^5.6.3
@@ -574,8 +658,116 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
+  packages/adaptive-scraper:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/admin-gateway:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
+  packages/adr:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/agent-diff:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/agent-runtime:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/agents:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/ai-selector:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/alerts:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
   packages/auth:
     devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/auto-observe:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/autotune:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/best-of-n:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -608,11 +800,164 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
 
+  packages/bots:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/brief-engine:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/broadcast:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
+  packages/browser-use:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/chat-analyst:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/chat-history:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/chat-suggestions:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/cli-session:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/client-detect:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/code-editor-agent:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/code-map:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/code-repl:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/connectors:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/consortium:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
   packages/context-pack:
     devDependencies:
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
+
+  packages/context-pruner:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/context-sections:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
 
   packages/contracts:
     devDependencies:
@@ -621,6 +966,15 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/corpus-builder:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
         version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
 
   packages/council:
@@ -670,6 +1024,60 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
 
+  packages/discord-bot:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/doc-acl:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/doc-classifier:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/doc-consumer:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/doc-extractor:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/doc-ocr:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
   packages/doc-pipeline:
     dependencies:
       '@nexus/plugin-sdk':
@@ -684,6 +1092,63 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/doc-plugins:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/doc-templates:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
+  packages/doc-workflow:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/doc-workflows:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/domain-feeds:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/domain-forecast:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
         version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
 
   packages/evals:
@@ -705,11 +1170,92 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
 
+  packages/feature-flags:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/federated-connectors:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/file-explorer-agents:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/file-store:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/fts:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
   packages/gateway:
     devDependencies:
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
+
+  packages/gateway-log:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/general-agent:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/geoip:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
 
   packages/governance:
     dependencies:
@@ -730,6 +1276,246 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
 
+  packages/hf-research:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/hooks:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/human-browser:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/hybrid-search:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/i18n:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/image-gen:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/ingest-intent:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/k8s-sandbox:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/knowledge-graph:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/kv:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/librarian:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/llm-cache:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/llm-drivers:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/llm-router:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/llm-tracer:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/llm-utils:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/load-test:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/mail-ingest:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/mcp-app:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/mcp-bulk:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/mcp-client:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/mcp-grants:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
+  packages/mcp-openapi:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
   packages/memory:
     dependencies:
       '@neondatabase/serverless':
@@ -743,8 +1529,116 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
 
+  packages/memory-tools:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/message-renderer:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/message-tree:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/multi-reviewer:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/nlp-utils:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/obs-providers:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/openclaw:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/parseltongue:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
   packages/pipeline-signal:
     devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/platform-adapters:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/plugin-modes:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -762,6 +1656,120 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.4
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/posthog-analytics:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/prediction-market:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/privacy-validator:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/prompt-cache:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/provider-registry:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/proxy-rotation:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/queue-health:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/ragtime:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/reranker:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/researcher:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/rlhf-pipeline:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/run-cost:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
 
   packages/runtime:
@@ -808,6 +1816,96 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
+  packages/scenario-planner:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/scraping-mcp:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/sdk:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/search-facets:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/search-orchestrator:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/searxng-client:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/session-lifecycle:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/session-summarizer:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/session-sync:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/sft-tagger:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
   packages/shared:
     devDependencies:
       '@vitest/coverage-v8':
@@ -820,11 +1918,130 @@ importers:
         specifier: ^2.1.4
         version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
 
+  packages/skills:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/smart-reader:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/spider:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/sqlite-migrations:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/sqlite-store:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
   packages/sse:
     devDependencies:
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
+
+  packages/sse-reconnect:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/stealth-browser:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/stm:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/stream-recovery:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/supervisor:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/task-queue:
+    dependencies:
+      '@nexus/knowledge-graph':
+        specifier: workspace:*
+        version: link:../knowledge-graph
+      '@nexus/obs-providers':
+        specifier: workspace:*
+        version: link:../obs-providers
+      '@nexus/search-orchestrator':
+        specifier: workspace:*
+        version: link:../search-orchestrator
+      '@nexus/wiki':
+        specifier: workspace:*
+        version: link:../wiki
+      '@nexus/wiki-updater':
+        specifier: workspace:*
+        version: link:../wiki-updater
+    optionalDependencies:
+      ioredis:
+        specifier: ^5.0.0
+        version: 5.11.1
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
 
   packages/telemetry:
     devDependencies:
@@ -839,6 +2056,153 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/think-parser:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/thinker:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/tier-gate:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/tmux-cli:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/token-budget:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/tool-registry:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/transcript-store:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/trigger-engine:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/ultraplinian:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/video-search:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/voice:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/weather-feed:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/wiki:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/wiki-updater:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/worker-events:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
         version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
 
 packages:

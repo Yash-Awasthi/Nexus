@@ -4,9 +4,14 @@
  *
  * Starts:
  *  1. Three BullMQ workers (nexus-high / medium / low)
- *  2. SignalWorker — DB polling fallback for unprocessed events
+ *  2. SignalWorker         — DB polling fallback for unprocessed events
+ *  3. SignalNotifyListener — Postgres LISTEN/NOTIFY hot path (Phase 2)
+ *                            Enqueues council.deliberate jobs for qualifying
+ *                            signals immediately on INSERT, gated by
+ *                            COUNCIL_MIN_PRIORITY (default: high).
  */
 
+import { SignalNotifyListener } from "./workers/signal-notify-listener.js";
 import { SignalWorker } from "./workers/signal-worker.js";
 import { createTaskWorkers } from "./workers/task-worker.js";
 
@@ -39,15 +44,29 @@ async function main(): Promise<void> {
     JSON.stringify({ level: "info", event: "worker.queues-started", count: workers.length }),
   );
 
-  // Start DB-polling signal worker
+  // Start DB-polling signal worker (fallback / catch-up path)
   const signalWorker = new SignalWorker();
   signalWorker.start();
+
+  // Start Postgres LISTEN/NOTIFY listener (hot path — Phase 2)
+  const notifyListener = new SignalNotifyListener(connection);
+  if (process.env.DATABASE_URL) {
+    await notifyListener.start();
+  } else {
+    console.warn(
+      JSON.stringify({
+        level: "warn",
+        event: "signal-notify-listener.skipped",
+        reason: "DATABASE_URL not set",
+      }),
+    );
+  }
 
   // Graceful shutdown
   async function shutdown(signal: string): Promise<void> {
     console.log(JSON.stringify({ level: "info", event: "worker.shutdown", signal }));
     signalWorker.stop();
-
+    await notifyListener.stop();
     await Promise.all(workers.map((w) => w.close()));
     console.log(JSON.stringify({ level: "info", event: "worker.stopped" }));
     process.exit(0);
