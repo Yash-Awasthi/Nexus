@@ -296,6 +296,19 @@ export interface ThresholdConfig {
   minCheckPassRate?: number;
 }
 
+/**
+ * Default thresholds applied automatically when `RunConfig.thresholds` is
+ * omitted.  These represent conservative production-safe limits.
+ *
+ * To run with *no* threshold enforcement at all, pass `thresholds: {}`.
+ */
+export const DEFAULT_THRESHOLDS: ThresholdConfig = {
+  /** 1 second p95 — most interactive APIs must beat this */
+  p95LatencyMs: 1000,
+  /** 5 % error rate ceiling before failing the run */
+  errorRatePercent: 5,
+};
+
 export interface RunConfig {
   stages: LoadStage[];
   thresholds?: ThresholdConfig;
@@ -451,9 +464,10 @@ export class LoadRunner {
       stageMetrics: metrics.stageMetrics,
     };
 
-    const { passed, violations } = config.thresholds
-      ? evaluateThresholds(partial, config.thresholds)
-      : { passed: true, violations: [] };
+    const { passed, violations } = evaluateThresholds(
+      partial,
+      config.thresholds ?? DEFAULT_THRESHOLDS,
+    );
 
     return { ...partial, thresholdsPassed: passed, thresholdViolations: violations };
   }

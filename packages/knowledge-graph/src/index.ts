@@ -528,6 +528,340 @@ export class KnowledgeGraph {
   }
 }
 
+// ── NeonKGStore ───────────────────────────────────────────────────────────────
+//
+// Postgres-backed KGStore via Neon HTTP API (or any pg-compatible executor).
+//
+// Uses an injectable NeonQueryFn so the store can be tested without a real DB:
+//
+//   const store = new NeonKGStore({ query: myMockFn });
+//   await store.init();           // CREATE TABLE IF NOT EXISTS ...
+//   await store.upsertNode(node); // INSERT ... ON CONFLICT DO UPDATE
+//
+// Production wiring (example with @neondatabase/serverless):
+//
+//   import { neon } from "@neondatabase/serverless";
+//   const sql = neon(process.env.DATABASE_URL!);
+//   const store = new NeonKGStore({
+//     query: (q, p) => sql(q, ...(p ?? [])).then(rows => ({ rows })),
+//   });
+
+/** Row shape returned from SQL queries */
+export type NeonRow = Record<string, unknown>;
+
+/**
+ * Injectable SQL executor — structurally compatible with @neondatabase/serverless
+ * and any pg-compatible driver.
+ *
+ * @param sql    Parameterised SQL string using $1, $2, … placeholders
+ * @param params Bound parameter values (may be omitted for DDL)
+ */
+export type NeonQueryFn = (
+  sql: string,
+  params?: unknown[],
+) => Promise<{ rows: NeonRow[] }>;
+
+export interface NeonKGStoreConfig {
+  /** Injectable SQL executor (see NeonQueryFn) */
+  query: NeonQueryFn;
+  /**
+   * Table name prefix.  Default: "kg_".
+   * Resulting tables: {prefix}nodes, {prefix}edges.
+   */
+  tablePrefix?: string;
+}
+
+/**
+ * Postgres-backed KGStore that persists graph nodes and edges in two tables.
+ *
+ * Upsert semantics:
+ *  • Nodes — on conflict, take GREATEST(confidence), union sources/properties
+ *    in application code (read → merge → write).
+ *  • Edges — same: GREATEST(confidence), union sources.
+ *
+ * Schema is managed by `init()` (CREATE TABLE IF NOT EXISTS).  Call `init()`
+ * once at startup before any read/write operations.
+ *
+ * @example
+ * ```ts
+ * const store = new NeonKGStore({ query: neonQueryFn });
+ * await store.init();
+ * const kg = new KnowledgeGraph(store, extractEntities, extractRelationships);
+ * ```
+ */
+export class NeonKGStore implements KGStore {
+  private readonly queryFn: NeonQueryFn;
+  private readonly nodesTable: string;
+  private readonly edgesTable: string;
+
+  constructor(config: NeonKGStoreConfig) {
+    this.queryFn = config.query;
+    const prefix = config.tablePrefix ?? "kg_";
+    this.nodesTable = `${prefix}nodes`;
+    this.edgesTable = `${prefix}edges`;
+  }
+
+  /**
+   * Create tables if they don't exist.  Call once at application startup.
+   */
+  async init(): Promise<void> {
+    await this.queryFn(
+      `CREATE TABLE IF NOT EXISTS ${this.nodesTable} (
+        id          TEXT PRIMARY KEY,
+        name        TEXT        NOT NULL,
+        type        TEXT        NOT NULL,
+        confidence  REAL        NOT NULL,
+        properties  JSONB       NOT NULL DEFAULT '{}',
+        sources     JSONB       NOT NULL DEFAULT '[]',
+        created_at  BIGINT      NOT NULL,
+        updated_at  BIGINT      NOT NULL
+      )`,
+    );
+    await this.queryFn(
+      `CREATE TABLE IF NOT EXISTS ${this.edgesTable} (
+        id          TEXT PRIMARY KEY,
+        subject_id  TEXT        NOT NULL,
+        predicate   TEXT        NOT NULL,
+        object_id   TEXT        NOT NULL,
+        confidence  REAL        NOT NULL,
+        sources     JSONB       NOT NULL DEFAULT '[]',
+        created_at  BIGINT      NOT NULL,
+        updated_at  BIGINT      NOT NULL
+      )`,
+    );
+  }
+
+  // ── Nodes ──────────────────────────────────────────────────────────────────
+
+  async upsertNode(node: KGNode): Promise<KGNode> {
+    const existing = await this.getNode(node.id);
+    if (existing) {
+      const merged: KGNode = {
+        ...existing,
+        confidence: Math.max(existing.confidence, node.confidence),
+        sources: Array.from(new Set([...existing.sources, ...node.sources])),
+        properties: { ...existing.properties, ...node.properties },
+        updatedAt: node.updatedAt,
+      };
+      await this.queryFn(
+        `UPDATE ${this.nodesTable}
+           SET confidence=$1, sources=$2, properties=$3, updated_at=$4
+         WHERE id=$5`,
+        [
+          merged.confidence,
+          JSON.stringify(merged.sources),
+          JSON.stringify(merged.properties),
+          merged.updatedAt,
+          merged.id,
+        ],
+      );
+      return merged;
+    }
+
+    await this.queryFn(
+      `INSERT INTO ${this.nodesTable}
+         (id, name, type, confidence, properties, sources, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [
+        node.id,
+        node.name,
+        node.type,
+        node.confidence,
+        JSON.stringify(node.properties),
+        JSON.stringify(node.sources),
+        node.createdAt,
+        node.updatedAt,
+      ],
+    );
+    return node;
+  }
+
+  async getNode(id: string): Promise<KGNode | undefined> {
+    const { rows } = await this.queryFn(
+      `SELECT * FROM ${this.nodesTable} WHERE id=$1`,
+      [id],
+    );
+    return rows[0] ? rowToNode(rows[0]) : undefined;
+  }
+
+  async findNodes(query: NodeQuery): Promise<KGNode[]> {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    if (query.type !== undefined) {
+      params.push(query.type);
+      conditions.push(`type=$${params.length}`);
+    }
+    if (query.nameContains !== undefined) {
+      params.push(`%${query.nameContains.toLowerCase()}%`);
+      conditions.push(`LOWER(name) LIKE $${params.length}`);
+    }
+    if (query.minConfidence !== undefined) {
+      params.push(query.minConfidence);
+      conditions.push(`confidence>=$${params.length}`);
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const limit = query.limit !== undefined ? ` LIMIT ${query.limit}` : "";
+    const { rows } = await this.queryFn(
+      `SELECT * FROM ${this.nodesTable} ${where}${limit}`,
+      params,
+    );
+    return rows.map(rowToNode);
+  }
+
+  async deleteNode(id: string): Promise<void> {
+    await this.queryFn(`DELETE FROM ${this.nodesTable} WHERE id=$1`, [id]);
+  }
+
+  // ── Edges ──────────────────────────────────────────────────────────────────
+
+  async upsertEdge(edge: KGEdge): Promise<KGEdge> {
+    const existing = await this.getEdge(edge.id);
+    if (existing) {
+      const merged: KGEdge = {
+        ...existing,
+        confidence: Math.max(existing.confidence, edge.confidence),
+        sources: Array.from(new Set([...existing.sources, ...edge.sources])),
+        updatedAt: edge.updatedAt,
+      };
+      await this.queryFn(
+        `UPDATE ${this.edgesTable}
+           SET confidence=$1, sources=$2, updated_at=$3
+         WHERE id=$4`,
+        [merged.confidence, JSON.stringify(merged.sources), merged.updatedAt, merged.id],
+      );
+      return merged;
+    }
+
+    await this.queryFn(
+      `INSERT INTO ${this.edgesTable}
+         (id, subject_id, predicate, object_id, confidence, sources, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [
+        edge.id,
+        edge.subjectId,
+        edge.predicate,
+        edge.objectId,
+        edge.confidence,
+        JSON.stringify(edge.sources),
+        edge.createdAt,
+        edge.updatedAt,
+      ],
+    );
+    return edge;
+  }
+
+  async getEdge(id: string): Promise<KGEdge | undefined> {
+    const { rows } = await this.queryFn(
+      `SELECT * FROM ${this.edgesTable} WHERE id=$1`,
+      [id],
+    );
+    return rows[0] ? rowToEdge(rows[0]) : undefined;
+  }
+
+  async findEdges(query: EdgeQuery): Promise<KGEdge[]> {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    if (query.subjectId !== undefined) {
+      params.push(query.subjectId);
+      conditions.push(`subject_id=$${params.length}`);
+    }
+    if (query.objectId !== undefined) {
+      params.push(query.objectId);
+      conditions.push(`object_id=$${params.length}`);
+    }
+    if (query.predicate !== undefined) {
+      params.push(query.predicate.toLowerCase());
+      conditions.push(`LOWER(predicate)=$${params.length}`);
+    }
+    if (query.minConfidence !== undefined) {
+      params.push(query.minConfidence);
+      conditions.push(`confidence>=$${params.length}`);
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const limit = query.limit !== undefined ? ` LIMIT ${query.limit}` : "";
+    const { rows } = await this.queryFn(
+      `SELECT * FROM ${this.edgesTable} ${where}${limit}`,
+      params,
+    );
+    return rows.map(rowToEdge);
+  }
+
+  async deleteEdge(id: string): Promise<void> {
+    await this.queryFn(`DELETE FROM ${this.edgesTable} WHERE id=$1`, [id]);
+  }
+
+  // ── Meta ───────────────────────────────────────────────────────────────────
+
+  async stats(): Promise<KGStats> {
+    const { rows: nodeRows } = await this.queryFn(
+      `SELECT type, COUNT(*) AS cnt FROM ${this.nodesTable} GROUP BY type`,
+    );
+    const { rows: edgeRows } = await this.queryFn(
+      `SELECT COUNT(*) AS cnt FROM ${this.edgesTable}`,
+    );
+
+    const nodesByType: Partial<Record<EntityType, number>> = {};
+    let totalNodes = 0;
+    for (const row of nodeRows) {
+      const t = row["type"] as EntityType;
+      const count = Number(row["cnt"]);
+      nodesByType[t] = count;
+      totalNodes += count;
+    }
+
+    return {
+      nodes: totalNodes,
+      edges: Number(edgeRows[0]?.["cnt"] ?? 0),
+      nodesByType,
+    };
+  }
+}
+
+// ── Row → domain object helpers ───────────────────────────────────────────────
+
+function parseJsonField<T>(value: unknown, fallback: T): T {
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      return fallback;
+    }
+  }
+  // Neon HTTP driver may return already-parsed objects
+  if (value !== null && value !== undefined) return value as T;
+  return fallback;
+}
+
+function rowToNode(row: NeonRow): KGNode {
+  return {
+    id: row["id"] as string,
+    name: row["name"] as string,
+    type: row["type"] as EntityType,
+    confidence: Number(row["confidence"]),
+    properties: parseJsonField<Record<string, unknown>>(row["properties"], {}),
+    sources: parseJsonField<string[]>(row["sources"], []),
+    createdAt: Number(row["created_at"]),
+    updatedAt: Number(row["updated_at"]),
+  };
+}
+
+function rowToEdge(row: NeonRow): KGEdge {
+  return {
+    id: row["id"] as string,
+    subjectId: row["subject_id"] as string,
+    predicate: row["predicate"] as string,
+    objectId: row["object_id"] as string,
+    confidence: Number(row["confidence"]),
+    sources: parseJsonField<string[]>(row["sources"], []),
+    createdAt: Number(row["created_at"]),
+    updatedAt: Number(row["updated_at"]),
+  };
+}
+
 // ── Error ─────────────────────────────────────────────────────────────────────
 
 export class KGError extends Error {

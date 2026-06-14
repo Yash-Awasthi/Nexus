@@ -1303,3 +1303,2115 @@ export class TavilyDocumentConnector extends BaseDocumentConnector {
     }
   }
 }
+
+// ── NeonDocumentConnector ─────────────────────────────────────────────────────
+
+export interface NeonDocumentConnectorConfig {
+  /** Neon HTTP endpoint: https://<host>/sql */
+  endpointUrl: string;
+  /** Database user */
+  user: string;
+  /** Database password */
+  password: string;
+  /**
+   * SQL query to run during sync.  Must return rows with at least an `id` column.
+   * Additional columns (`title`, `content`, `url`) are mapped to SyncedDocument fields.
+   */
+  query: string;
+  fetch?: FetchFn;
+}
+
+export class NeonDocumentConnector extends BaseDocumentConnector {
+  readonly id = "neon-doc";
+  readonly name = "Neon";
+
+  private readonly cfg: NeonDocumentConnectorConfig;
+  private readonly fetchFn: FetchFn;
+
+  constructor(config: NeonDocumentConnectorConfig) {
+    super();
+    this.cfg = config;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get authHeader(): string {
+    return `Basic ${Buffer.from(`${this.cfg.user}:${this.cfg.password}`).toString("base64")}`;
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(this.cfg.endpointUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: this.authHeader },
+      body: JSON.stringify({ query: "SELECT 1 AS ping" }),
+    });
+    if (res.status === 401 || res.status === 403) return { ok: false, error: "Neon auth failed" };
+    if (!res.ok) return { ok: false, error: `Neon returned ${res.status}` };
+    return { ok: true };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(this.cfg.endpointUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: this.authHeader },
+      body: JSON.stringify({ query: "SELECT 1" }),
+    });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const res = await this.fetchFn(this.cfg.endpointUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: this.authHeader },
+      body: JSON.stringify({ query: this.cfg.query }),
+    });
+    if (!res.ok) return;
+
+    const json = (await res.json()) as { rows?: Record<string, unknown>[] };
+    const rows = json.rows ?? [];
+    const now = Date.now();
+    let emitted = 0;
+
+    for (const row of rows) {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      const id = String(row["id"] ?? `row-${emitted}`);
+      const title = String(row["title"] ?? id);
+      const content = String(row["content"] ?? "");
+      const url = String(row["url"] ?? `neon://${id}`);
+      yield {
+        id: makeDocId(this.id, url),
+        title,
+        content,
+        sourceUrl: url,
+        connectorId: this.id,
+        syncedAt: now,
+        metadata: row,
+      };
+      emitted++;
+    }
+  }
+}
+
+// ── RssDocumentConnector ──────────────────────────────────────────────────────
+
+export interface RssDocumentConnectorConfig {
+  feedUrl: string;
+  fetch?: FetchFn;
+}
+
+export class RssDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name: string;
+
+  private readonly feedUrl: string;
+  private readonly fetchFn: FetchFn;
+
+  constructor(config: RssDocumentConnectorConfig) {
+    super();
+    this.feedUrl = config.feedUrl;
+    this.id = `rss-doc::${config.feedUrl}`;
+    this.name = `RSS (${config.feedUrl})`;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(this.feedUrl);
+    if (!res.ok) return { ok: false, error: `Feed returned ${res.status}` };
+    const text = await res.text();
+    if (!text.includes("<rss") && !text.includes("<feed") && !text.includes("<channel")) {
+      return { ok: false, error: "URL does not appear to be an RSS/Atom feed" };
+    }
+    return { ok: true };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(this.feedUrl);
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const res = await this.fetchFn(this.feedUrl);
+    if (!res.ok) return;
+
+    const xml = await res.text();
+    const now = Date.now();
+    const itemRe = /<(?:item|entry)[^>]*>([\s\S]*?)<\/(?:item|entry)>/gi;
+    const tagRe = (tag: string): RegExp =>
+      new RegExp(`<${tag}[^>]*>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?<\\/${tag}>`, "i");
+
+    let count = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = itemRe.exec(xml)) !== null) {
+      if (opts?.limit !== undefined && count >= opts.limit) break;
+      const block = match[1]!;
+      const title = (tagRe("title").exec(block)?.[1] ?? "Untitled").trim();
+      const link = (tagRe("link").exec(block)?.[1] ?? tagRe("id").exec(block)?.[1] ?? "").trim();
+      const description = (
+        tagRe("description").exec(block)?.[1] ??
+        tagRe("content").exec(block)?.[1] ??
+        tagRe("summary").exec(block)?.[1] ??
+        ""
+      ).trim();
+      const pubDate = tagRe("pubDate").exec(block)?.[1] ?? tagRe("published").exec(block)?.[1] ?? "";
+      if (!link) continue;
+      yield {
+        id: makeDocId(this.id, link),
+        title,
+        content: description,
+        sourceUrl: link,
+        connectorId: this.id,
+        syncedAt: now,
+        metadata: { pubDate },
+      };
+      count++;
+    }
+  }
+}
+
+// ── NotionDocumentConnector ───────────────────────────────────────────────────
+
+export interface NotionDocumentConnectorConfig {
+  token: string;
+  databaseId: string;
+  fetch?: FetchFn;
+}
+
+interface NotionPage {
+  id: string;
+  url?: string;
+  last_edited_time?: string;
+  properties?: Record<string, {
+    type?: string;
+    title?: Array<{ plain_text?: string }>;
+    rich_text?: Array<{ plain_text?: string }>;
+  }>;
+}
+
+function extractNotionTitle(page: NotionPage): string {
+  if (!page.properties) return page.id;
+  for (const prop of Object.values(page.properties)) {
+    if (prop.type === "title" && prop.title?.[0]?.plain_text) return prop.title[0].plain_text;
+  }
+  return page.id;
+}
+
+export class NotionDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name = "Notion";
+
+  private readonly token: string;
+  private readonly databaseId: string;
+  private readonly fetchFn: FetchFn;
+  private static readonly BASE = "https://api.notion.com/v1";
+  private static readonly VER = "2022-06-28";
+
+  constructor(config: NotionDocumentConnectorConfig) {
+    super();
+    this.token = config.token;
+    this.databaseId = config.databaseId;
+    this.id = `notion-doc::${config.databaseId}`;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get headers(): Record<string, string> {
+    return {
+      Authorization: `Bearer ${this.token}`,
+      "Notion-Version": NotionDocumentConnector.VER,
+      "Content-Type": "application/json",
+    };
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${NotionDocumentConnector.BASE}/users/me`, { headers: this.headers });
+    if (res.status === 401) return { ok: false, error: "Notion token invalid" };
+    if (!res.ok) return { ok: false, error: `Notion returned ${res.status}` };
+    return { ok: true };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${NotionDocumentConnector.BASE}/users/me`, { headers: this.headers });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const pageSize = Math.min(opts?.limit ?? 100, 100);
+    const now = Date.now();
+    let emitted = 0;
+    let cursor: string | undefined;
+
+    do {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      const body: Record<string, unknown> = { page_size: pageSize };
+      if (cursor) body["start_cursor"] = cursor;
+      const res = await this.fetchFn(
+        `${NotionDocumentConnector.BASE}/databases/${this.databaseId}/query`,
+        { method: "POST", headers: this.headers, body: JSON.stringify(body) },
+      );
+      if (!res.ok) break;
+      const json = (await res.json()) as { results?: NotionPage[]; has_more?: boolean; next_cursor?: string | null };
+      for (const page of json.results ?? []) {
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        const title = extractNotionTitle(page);
+        const url = page.url ?? `https://notion.so/${page.id.replace(/-/g, "")}`;
+        yield {
+          id: makeDocId(this.id, page.id),
+          title,
+          content: title,
+          sourceUrl: url,
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { notionId: page.id, lastEdited: page.last_edited_time },
+        };
+        emitted++;
+      }
+      cursor = json.has_more && json.next_cursor ? json.next_cursor : undefined;
+    } while (cursor);
+  }
+}
+
+// ── ConfluenceDocumentConnector ───────────────────────────────────────────────
+
+export interface ConfluenceDocumentConnectorConfig {
+  baseUrl: string;
+  email: string;
+  apiToken: string;
+  spaceKey: string;
+  fetch?: FetchFn;
+}
+
+export class ConfluenceDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name = "Confluence";
+
+  private readonly cfg: ConfluenceDocumentConnectorConfig;
+  private readonly fetchFn: FetchFn;
+
+  constructor(config: ConfluenceDocumentConnectorConfig) {
+    super();
+    this.cfg = config;
+    this.id = `confluence-doc::${config.spaceKey}`;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get authHeader(): string {
+    return `Basic ${Buffer.from(`${this.cfg.email}:${this.cfg.apiToken}`).toString("base64")}`;
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${this.cfg.baseUrl}/wiki/rest/api/user/current`, {
+      headers: { Authorization: this.authHeader, Accept: "application/json" },
+    });
+    if (res.status === 401) return { ok: false, error: "Confluence credentials invalid" };
+    if (!res.ok) return { ok: false, error: `Confluence returned ${res.status}` };
+    const json = (await res.json()) as { displayName?: string };
+    return { ok: true, metadata: { user: json.displayName } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${this.cfg.baseUrl}/wiki/rest/api/user/current`, {
+      headers: { Authorization: this.authHeader, Accept: "application/json" },
+    });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const batchLimit = 25;
+    const now = Date.now();
+    let start = 0;
+    let emitted = 0;
+
+    while (true) {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      const url =
+        `${this.cfg.baseUrl}/wiki/rest/api/content` +
+        `?spaceKey=${encodeURIComponent(this.cfg.spaceKey)}&type=page` +
+        `&expand=body.storage&limit=${batchLimit}&start=${start}`;
+      const res = await this.fetchFn(url, {
+        headers: { Authorization: this.authHeader, Accept: "application/json" },
+      });
+      if (!res.ok) break;
+      const json = (await res.json()) as {
+        results?: Array<{ id: string; title: string; body?: { storage?: { value?: string } }; _links?: { webui?: string } }>;
+      };
+      const pages = json.results ?? [];
+      if (pages.length === 0) break;
+      for (const page of pages) {
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        const pageUrl = page._links?.webui
+          ? `${this.cfg.baseUrl}/wiki${page._links.webui}`
+          : `${this.cfg.baseUrl}/wiki/spaces/${this.cfg.spaceKey}/pages/${page.id}`;
+        yield {
+          id: makeDocId(this.id, page.id),
+          title: page.title,
+          content: page.body?.storage?.value ?? "",
+          sourceUrl: pageUrl,
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { confluenceId: page.id, spaceKey: this.cfg.spaceKey },
+        };
+        emitted++;
+      }
+      start += pages.length;
+      if (pages.length < batchLimit) break;
+    }
+  }
+}
+
+// ── JiraDocumentConnector ─────────────────────────────────────────────────────
+
+export interface JiraDocumentConnectorConfig {
+  baseUrl: string;
+  email: string;
+  apiToken: string;
+  jql?: string;
+  fetch?: FetchFn;
+}
+
+function extractJiraText(
+  doc: { content?: Array<{ content?: Array<{ text?: string }> }> } | undefined,
+): string {
+  if (!doc?.content) return "";
+  return doc.content
+    .flatMap((b) => b.content ?? [])
+    .map((i) => i.text ?? "")
+    .join(" ")
+    .trim();
+}
+
+export class JiraDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name = "Jira";
+
+  private readonly cfg: JiraDocumentConnectorConfig;
+  private readonly fetchFn: FetchFn;
+
+  constructor(config: JiraDocumentConnectorConfig) {
+    super();
+    this.cfg = config;
+    this.id = `jira-doc::${new URL(config.baseUrl).hostname}`;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get authHeader(): string {
+    return `Basic ${Buffer.from(`${this.cfg.email}:${this.cfg.apiToken}`).toString("base64")}`;
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${this.cfg.baseUrl}/rest/api/3/myself`, {
+      headers: { Authorization: this.authHeader, Accept: "application/json" },
+    });
+    if (res.status === 401) return { ok: false, error: "Jira credentials invalid" };
+    if (!res.ok) return { ok: false, error: `Jira returned ${res.status}` };
+    const json = (await res.json()) as { displayName?: string };
+    return { ok: true, metadata: { user: json.displayName } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${this.cfg.baseUrl}/rest/api/3/myself`, {
+      headers: { Authorization: this.authHeader, Accept: "application/json" },
+    });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const jql = opts?.query ?? this.cfg.jql ?? "ORDER BY updated DESC";
+    const maxResults = 50;
+    const now = Date.now();
+    let startAt = 0;
+    let emitted = 0;
+
+    while (true) {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      const res = await this.fetchFn(`${this.cfg.baseUrl}/rest/api/3/search`, {
+        method: "POST",
+        headers: { Authorization: this.authHeader, "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ jql, fields: ["summary", "description", "status"], startAt, maxResults }),
+      });
+      if (!res.ok) break;
+      const json = (await res.json()) as {
+        issues?: Array<{ key: string; fields?: { summary?: string; description?: { content?: Array<{ content?: Array<{ text?: string }> }> }; status?: { name?: string } } }>;
+        total?: number;
+      };
+      const issues = json.issues ?? [];
+      if (issues.length === 0) break;
+      for (const issue of issues) {
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        yield {
+          id: makeDocId(this.id, issue.key),
+          title: `[${issue.key}] ${issue.fields?.summary ?? "Untitled"}`,
+          content: extractJiraText(issue.fields?.description),
+          sourceUrl: `${this.cfg.baseUrl}/browse/${issue.key}`,
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { jiraKey: issue.key, status: issue.fields?.status?.name },
+        };
+        emitted++;
+      }
+      startAt += issues.length;
+      if (json.total !== undefined && startAt >= json.total) break;
+    }
+  }
+}
+
+// ── GitLabDocumentConnector ───────────────────────────────────────────────────
+
+export interface GitLabDocumentConnectorConfig {
+  baseUrl?: string;
+  token: string;
+  projectId: string | number;
+  syncType?: "issues" | "merge_requests" | "both";
+  fetch?: FetchFn;
+}
+
+export class GitLabDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name = "GitLab";
+
+  private readonly baseUrl: string;
+  private readonly token: string;
+  private readonly projectId: string | number;
+  private readonly syncType: "issues" | "merge_requests" | "both";
+  private readonly fetchFn: FetchFn;
+
+  constructor(config: GitLabDocumentConnectorConfig) {
+    super();
+    this.baseUrl = config.baseUrl ?? "https://gitlab.com";
+    this.token = config.token;
+    this.projectId = config.projectId;
+    this.syncType = config.syncType ?? "both";
+    this.id = `gitlab-doc::${config.projectId}`;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get apiBase(): string { return `${this.baseUrl}/api/v4`; }
+  private get authHeaders(): Record<string, string> { return { "PRIVATE-TOKEN": this.token }; }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${this.apiBase}/user`, { headers: this.authHeaders });
+    if (res.status === 401) return { ok: false, error: "GitLab token invalid" };
+    if (!res.ok) return { ok: false, error: `GitLab returned ${res.status}` };
+    const json = (await res.json()) as { username?: string };
+    return { ok: true, metadata: { username: json.username } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${this.apiBase}/user`, { headers: this.authHeaders });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const pid = encodeURIComponent(String(this.projectId));
+    const now = Date.now();
+    let emitted = 0;
+    const endpoints: Array<"issues" | "merge_requests"> =
+      this.syncType === "issues" ? ["issues"]
+      : this.syncType === "merge_requests" ? ["merge_requests"]
+      : ["issues", "merge_requests"];
+
+    for (const endpoint of endpoints) {
+      let page = 1;
+      while (true) {
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        const res = await this.fetchFn(
+          `${this.apiBase}/projects/${pid}/${endpoint}?per_page=50&page=${page}&state=opened`,
+          { headers: this.authHeaders },
+        );
+        if (!res.ok) break;
+        const items = (await res.json()) as Array<{ iid: number; title: string; description?: string; web_url: string; state?: string }>;
+        if (items.length === 0) break;
+        for (const item of items) {
+          if (opts?.limit !== undefined && emitted >= opts.limit) break;
+          const prefix = endpoint === "issues" ? "Issue" : "MR";
+          yield {
+            id: makeDocId(this.id, item.web_url),
+            title: `[${prefix} #${item.iid}] ${item.title}`,
+            content: item.description ?? "",
+            sourceUrl: item.web_url,
+            connectorId: this.id,
+            syncedAt: now,
+            metadata: { iid: item.iid, type: endpoint, state: item.state },
+          };
+          emitted++;
+        }
+        const nextPage = res.headers?.get?.("x-next-page");
+        if (!nextPage) break;
+        page++;
+      }
+    }
+  }
+}
+
+// ── HackerNewsDocumentConnector ───────────────────────────────────────────────
+
+export interface HackerNewsDocumentConnectorConfig {
+  storyType?: "topstories" | "newstories" | "beststories" | "askstories" | "showstories";
+  fetch?: FetchFn;
+}
+
+export class HackerNewsDocumentConnector extends BaseDocumentConnector {
+  readonly id = "hackernews-doc";
+  readonly name = "Hacker News";
+
+  private readonly storyType: string;
+  private readonly fetchFn: FetchFn;
+  private static readonly BASE = "https://hacker-news.firebaseio.com/v0";
+
+  constructor(config: HackerNewsDocumentConnectorConfig = {}) {
+    super();
+    this.storyType = config.storyType ?? "topstories";
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${HackerNewsDocumentConnector.BASE}/${this.storyType}.json`);
+    if (!res.ok) return { ok: false, error: `HN API returned ${res.status}` };
+    return { ok: true, metadata: { storyType: this.storyType } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${HackerNewsDocumentConnector.BASE}/${this.storyType}.json`);
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const listRes = await this.fetchFn(`${HackerNewsDocumentConnector.BASE}/${this.storyType}.json`);
+    if (!listRes.ok) return;
+    const ids = (await listRes.json()) as number[];
+    const limit = opts?.limit ?? 30;
+    const now = Date.now();
+
+    for (const id of ids.slice(0, limit)) {
+      const itemRes = await this.fetchFn(`${HackerNewsDocumentConnector.BASE}/item/${id}.json`);
+      if (!itemRes.ok) continue;
+      const item = (await itemRes.json()) as { id: number; title?: string; url?: string; text?: string; by?: string; score?: number; type?: string };
+      if (!item.title) continue;
+      const url = item.url ?? `https://news.ycombinator.com/item?id=${item.id}`;
+      yield {
+        id: makeDocId(this.id, String(item.id)),
+        title: item.title,
+        content: item.text ?? item.url ?? "",
+        sourceUrl: url,
+        connectorId: this.id,
+        syncedAt: now,
+        metadata: { hnId: item.id, by: item.by, score: item.score, type: item.type },
+      };
+    }
+  }
+}
+
+// ── AirtableDocumentConnector ─────────────────────────────────────────────────
+
+export interface AirtableDocumentConnectorConfig {
+  /** Airtable personal access token */
+  apiKey: string;
+  /** Base ID (appXXXXXXXXXXXXXX) */
+  baseId: string;
+  /** Table name or table ID */
+  tableId: string;
+  /** Field name to use as content (default: "Notes") */
+  contentField?: string;
+  /** Field name to use as title (default: "Name") */
+  titleField?: string;
+  fetch?: FetchFn;
+}
+
+export class AirtableDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name = "Airtable";
+
+  private readonly cfg: AirtableDocumentConnectorConfig;
+  private readonly fetchFn: FetchFn;
+  private static readonly BASE = "https://api.airtable.com/v0";
+
+  constructor(config: AirtableDocumentConnectorConfig) {
+    super();
+    this.cfg = config;
+    this.id = `airtable-doc::${config.baseId}/${config.tableId}`;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get headers(): Record<string, string> {
+    return { Authorization: `Bearer ${this.cfg.apiKey}`, "Content-Type": "application/json" };
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(
+      `${AirtableDocumentConnector.BASE}/${this.cfg.baseId}/${encodeURIComponent(this.cfg.tableId)}?maxRecords=1`,
+      { headers: this.headers },
+    );
+    if (res.status === 401 || res.status === 403) return { ok: false, error: "Airtable API key invalid" };
+    if (!res.ok) return { ok: false, error: `Airtable returned ${res.status}` };
+    return { ok: true };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(
+      `${AirtableDocumentConnector.BASE}/${this.cfg.baseId}/${encodeURIComponent(this.cfg.tableId)}?maxRecords=1`,
+      { headers: this.headers },
+    );
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const titleField = this.cfg.titleField ?? "Name";
+    const contentField = this.cfg.contentField ?? "Notes";
+    const now = Date.now();
+    let offset: string | undefined;
+    let emitted = 0;
+
+    do {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      const params = new URLSearchParams({ pageSize: "100" });
+      if (offset) params.set("offset", offset);
+
+      const res = await this.fetchFn(
+        `${AirtableDocumentConnector.BASE}/${this.cfg.baseId}/${encodeURIComponent(this.cfg.tableId)}?${params}`,
+        { headers: this.headers },
+      );
+      if (!res.ok) break;
+
+      const json = (await res.json()) as { records?: Array<{ id: string; fields?: Record<string, unknown> }>; offset?: string };
+      for (const record of json.records ?? []) {
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        const fields = record.fields ?? {};
+        const title = String(fields[titleField] ?? record.id);
+        const content = String(fields[contentField] ?? "");
+        const url = `https://airtable.com/${this.cfg.baseId}/${this.cfg.tableId}/${record.id}`;
+        yield { id: makeDocId(this.id, record.id), title, content, sourceUrl: url, connectorId: this.id, syncedAt: now, metadata: { airtableId: record.id } };
+        emitted++;
+      }
+      offset = json.offset;
+    } while (offset);
+  }
+}
+
+// ── AsanaDocumentConnector ────────────────────────────────────────────────────
+
+export interface AsanaDocumentConnectorConfig {
+  /** Asana personal access token */
+  accessToken: string;
+  /** Project GID to sync tasks from */
+  projectGid: string;
+  fetch?: FetchFn;
+}
+
+export class AsanaDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name = "Asana";
+
+  private readonly token: string;
+  private readonly projectGid: string;
+  private readonly fetchFn: FetchFn;
+  private static readonly BASE = "https://app.asana.com/api/1.0";
+
+  constructor(config: AsanaDocumentConnectorConfig) {
+    super();
+    this.token = config.accessToken;
+    this.projectGid = config.projectGid;
+    this.id = `asana-doc::${config.projectGid}`;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get headers(): Record<string, string> {
+    return { Authorization: `Bearer ${this.token}`, Accept: "application/json" };
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${AsanaDocumentConnector.BASE}/users/me`, { headers: this.headers });
+    if (res.status === 401) return { ok: false, error: "Asana token invalid" };
+    if (!res.ok) return { ok: false, error: `Asana returned ${res.status}` };
+    const json = (await res.json()) as { data?: { name?: string; email?: string } };
+    return { ok: true, metadata: { user: json.data?.name, email: json.data?.email } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${AsanaDocumentConnector.BASE}/users/me`, { headers: this.headers });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const now = Date.now();
+    let cursor: string | undefined;
+    let emitted = 0;
+
+    do {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      const params = new URLSearchParams({ project: this.projectGid, limit: "100", opt_fields: "name,notes,permalink_url" });
+      if (cursor) params.set("offset", cursor);
+
+      const res = await this.fetchFn(`${AsanaDocumentConnector.BASE}/tasks?${params}`, { headers: this.headers });
+      if (!res.ok) break;
+
+      const json = (await res.json()) as { data?: Array<{ gid: string; name?: string; notes?: string; permalink_url?: string }>; next_page?: { offset?: string } };
+      for (const task of json.data ?? []) {
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        yield { id: makeDocId(this.id, task.gid), title: task.name ?? task.gid, content: task.notes ?? "", sourceUrl: task.permalink_url ?? `https://app.asana.com/0/${this.projectGid}/${task.gid}`, connectorId: this.id, syncedAt: now, metadata: { gid: task.gid } };
+        emitted++;
+      }
+      cursor = json.next_page?.offset;
+    } while (cursor);
+  }
+}
+
+// ── BitbucketDocumentConnector ────────────────────────────────────────────────
+
+export interface BitbucketDocumentConnectorConfig {
+  workspace: string;
+  repoSlug: string;
+  username: string;
+  appPassword: string;
+  fetch?: FetchFn;
+}
+
+export class BitbucketDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name = "Bitbucket";
+
+  private readonly cfg: BitbucketDocumentConnectorConfig;
+  private readonly fetchFn: FetchFn;
+  private static readonly BASE = "https://api.bitbucket.org/2.0";
+
+  constructor(config: BitbucketDocumentConnectorConfig) {
+    super();
+    this.cfg = config;
+    this.id = `bitbucket-doc::${config.workspace}/${config.repoSlug}`;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get authHeader(): string {
+    return `Basic ${Buffer.from(`${this.cfg.username}:${this.cfg.appPassword}`).toString("base64")}`;
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${BitbucketDocumentConnector.BASE}/user`, { headers: { Authorization: this.authHeader } });
+    if (res.status === 401) return { ok: false, error: "Bitbucket credentials invalid" };
+    if (!res.ok) return { ok: false, error: `Bitbucket returned ${res.status}` };
+    const json = (await res.json()) as { display_name?: string };
+    return { ok: true, metadata: { user: json.display_name } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${BitbucketDocumentConnector.BASE}/user`, { headers: { Authorization: this.authHeader } });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const now = Date.now();
+    let url: string | undefined = `${BitbucketDocumentConnector.BASE}/repositories/${this.cfg.workspace}/${this.cfg.repoSlug}/issues?pagelen=50`;
+    let emitted = 0;
+
+    while (url) {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      const res = await this.fetchFn(url, { headers: { Authorization: this.authHeader } });
+      if (!res.ok) break;
+      const json = (await res.json()) as { values?: Array<{ id: number; title: string; content?: { raw?: string }; links?: { html?: { href?: string } } }>; next?: string };
+      for (const issue of json.values ?? []) {
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        yield { id: makeDocId(this.id, String(issue.id)), title: `Issue #${issue.id}: ${issue.title}`, content: issue.content?.raw ?? "", sourceUrl: issue.links?.html?.href ?? "", connectorId: this.id, syncedAt: now, metadata: { issueId: issue.id } };
+        emitted++;
+      }
+      url = json.next;
+    }
+  }
+}
+
+// ── BookstackDocumentConnector ────────────────────────────────────────────────
+
+export interface BookstackDocumentConnectorConfig {
+  baseUrl: string;
+  tokenId: string;
+  tokenSecret: string;
+  fetch?: FetchFn;
+}
+
+export class BookstackDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name = "BookStack";
+
+  private readonly cfg: BookstackDocumentConnectorConfig;
+  private readonly fetchFn: FetchFn;
+
+  constructor(config: BookstackDocumentConnectorConfig) {
+    super();
+    this.cfg = config;
+    this.id = `bookstack-doc::${new URL(config.baseUrl).hostname}`;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get authHeader(): string {
+    return `Token ${this.cfg.tokenId}:${this.cfg.tokenSecret}`;
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${this.cfg.baseUrl}/api/users?count=1`, { headers: { Authorization: this.authHeader } });
+    if (res.status === 401 || res.status === 403) return { ok: false, error: "BookStack token invalid" };
+    if (!res.ok) return { ok: false, error: `BookStack returned ${res.status}` };
+    return { ok: true };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${this.cfg.baseUrl}/api/users?count=1`, { headers: { Authorization: this.authHeader } });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const now = Date.now();
+    let page = 1;
+    let emitted = 0;
+
+    while (true) {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      const res = await this.fetchFn(`${this.cfg.baseUrl}/api/pages?count=50&page=${page}`, { headers: { Authorization: this.authHeader } });
+      if (!res.ok) break;
+      const json = (await res.json()) as { data?: Array<{ id: number; name: string; slug?: string; book_id?: number }>; total?: number };
+      const pages = json.data ?? [];
+      if (pages.length === 0) break;
+      for (const p of pages) {
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        // Fetch page content
+        const detail = await this.fetchFn(`${this.cfg.baseUrl}/api/pages/${p.id}`, { headers: { Authorization: this.authHeader } });
+        const content = detail.ok ? ((await detail.json()) as { html?: string }).html ?? "" : "";
+        yield { id: makeDocId(this.id, String(p.id)), title: p.name, content, sourceUrl: `${this.cfg.baseUrl}/books/${p.book_id}/page/${p.slug ?? p.id}`, connectorId: this.id, syncedAt: now, metadata: { pageId: p.id } };
+        emitted++;
+      }
+      if (pages.length < 50) break;
+      page++;
+    }
+  }
+}
+
+// ── CanvasDocumentConnector ───────────────────────────────────────────────────
+
+export interface CanvasDocumentConnectorConfig {
+  /** Canvas LMS base URL e.g. "https://myschool.instructure.com" */
+  baseUrl: string;
+  accessToken: string;
+  fetch?: FetchFn;
+}
+
+export class CanvasDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name = "Canvas";
+
+  private readonly cfg: CanvasDocumentConnectorConfig;
+  private readonly fetchFn: FetchFn;
+
+  constructor(config: CanvasDocumentConnectorConfig) {
+    super();
+    this.cfg = config;
+    this.id = `canvas-doc::${new URL(config.baseUrl).hostname}`;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get headers(): Record<string, string> {
+    return { Authorization: `Bearer ${this.cfg.accessToken}` };
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${this.cfg.baseUrl}/api/v1/users/self`, { headers: this.headers });
+    if (res.status === 401) return { ok: false, error: "Canvas token invalid" };
+    if (!res.ok) return { ok: false, error: `Canvas returned ${res.status}` };
+    const json = (await res.json()) as { name?: string };
+    return { ok: true, metadata: { user: json.name } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${this.cfg.baseUrl}/api/v1/users/self`, { headers: this.headers });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const now = Date.now();
+    let emitted = 0;
+    // Fetch courses first
+    const coursesRes = await this.fetchFn(`${this.cfg.baseUrl}/api/v1/courses?per_page=50`, { headers: this.headers });
+    if (!coursesRes.ok) return;
+    const courses = (await coursesRes.json()) as Array<{ id: number; name: string }>;
+
+    for (const course of courses) {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      // Fetch announcements per course
+      const annRes = await this.fetchFn(`${this.cfg.baseUrl}/api/v1/courses/${course.id}/discussion_topics?only_announcements=true&per_page=50`, { headers: this.headers });
+      if (!annRes.ok) continue;
+      const announcements = (await annRes.json()) as Array<{ id: number; title: string; message?: string; html_url?: string }>;
+      for (const ann of announcements) {
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        yield { id: makeDocId(this.id, `${course.id}/${ann.id}`), title: `[${course.name}] ${ann.title}`, content: ann.message ?? "", sourceUrl: ann.html_url ?? "", connectorId: this.id, syncedAt: now, metadata: { courseId: course.id } };
+        emitted++;
+      }
+    }
+  }
+}
+
+// ── ClickUpDocumentConnector ──────────────────────────────────────────────────
+
+export interface ClickUpDocumentConnectorConfig {
+  apiKey: string;
+  /** Space ID to sync tasks from */
+  spaceId: string;
+  fetch?: FetchFn;
+}
+
+export class ClickUpDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name = "ClickUp";
+
+  private readonly apiKey: string;
+  private readonly spaceId: string;
+  private readonly fetchFn: FetchFn;
+  private static readonly BASE = "https://api.clickup.com/api/v2";
+
+  constructor(config: ClickUpDocumentConnectorConfig) {
+    super();
+    this.apiKey = config.apiKey;
+    this.spaceId = config.spaceId;
+    this.id = `clickup-doc::${config.spaceId}`;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get headers(): Record<string, string> {
+    return { Authorization: this.apiKey, "Content-Type": "application/json" };
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${ClickUpDocumentConnector.BASE}/user`, { headers: this.headers });
+    if (res.status === 401) return { ok: false, error: "ClickUp API key invalid" };
+    if (!res.ok) return { ok: false, error: `ClickUp returned ${res.status}` };
+    const json = (await res.json()) as { user?: { username?: string } };
+    return { ok: true, metadata: { user: json.user?.username } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${ClickUpDocumentConnector.BASE}/user`, { headers: this.headers });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const now = Date.now();
+    let emitted = 0;
+    // Get lists in space
+    const listsRes = await this.fetchFn(`${ClickUpDocumentConnector.BASE}/space/${this.spaceId}/list`, { headers: this.headers });
+    if (!listsRes.ok) return;
+    const { lists = [] } = (await listsRes.json()) as { lists?: Array<{ id: string; name: string }> };
+
+    for (const list of lists) {
+      let page = 0;
+      while (true) {
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        const res = await this.fetchFn(`${ClickUpDocumentConnector.BASE}/list/${list.id}/task?page=${page}&include_closed=true`, { headers: this.headers });
+        if (!res.ok) break;
+        const json = (await res.json()) as { tasks?: Array<{ id: string; name: string; description?: string; url?: string }>; last_page?: boolean };
+        for (const task of json.tasks ?? []) {
+          if (opts?.limit !== undefined && emitted >= opts.limit) break;
+          yield { id: makeDocId(this.id, task.id), title: `[${list.name}] ${task.name}`, content: task.description ?? "", sourceUrl: task.url ?? `https://app.clickup.com/t/${task.id}`, connectorId: this.id, syncedAt: now, metadata: { taskId: task.id, listId: list.id } };
+          emitted++;
+        }
+        if (json.last_page) break;
+        page++;
+      }
+    }
+  }
+}
+
+// ── CodaDocumentConnector ─────────────────────────────────────────────────────
+
+export interface CodaDocumentConnectorConfig {
+  apiToken: string;
+  /** Coda document ID */
+  docId: string;
+  fetch?: FetchFn;
+}
+
+export class CodaDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name = "Coda";
+
+  private readonly apiToken: string;
+  private readonly docId: string;
+  private readonly fetchFn: FetchFn;
+  private static readonly BASE = "https://coda.io/apis/v1";
+
+  constructor(config: CodaDocumentConnectorConfig) {
+    super();
+    this.apiToken = config.apiToken;
+    this.docId = config.docId;
+    this.id = `coda-doc::${config.docId}`;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get headers(): Record<string, string> {
+    return { Authorization: `Bearer ${this.apiToken}` };
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${CodaDocumentConnector.BASE}/docs/${this.docId}`, { headers: this.headers });
+    if (res.status === 401 || res.status === 403) return { ok: false, error: "Coda API token invalid" };
+    if (!res.ok) return { ok: false, error: `Coda returned ${res.status}` };
+    const json = (await res.json()) as { name?: string };
+    return { ok: true, metadata: { docName: json.name } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${CodaDocumentConnector.BASE}/docs/${this.docId}`, { headers: this.headers });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const now = Date.now();
+    let emitted = 0;
+    let pageToken: string | undefined;
+
+    do {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      const params = new URLSearchParams({ limit: "50" });
+      if (pageToken) params.set("pageToken", pageToken);
+      const res = await this.fetchFn(`${CodaDocumentConnector.BASE}/docs/${this.docId}/pages?${params}`, { headers: this.headers });
+      if (!res.ok) break;
+      const json = (await res.json()) as { items?: Array<{ id: string; name: string; browserLink?: string }>; nextPageToken?: string };
+      for (const page of json.items ?? []) {
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        // Fetch page content export
+        const exportRes = await this.fetchFn(`${CodaDocumentConnector.BASE}/docs/${this.docId}/pages/${page.id}/export`, { method: "POST", headers: { ...this.headers, "Content-Type": "application/json" }, body: JSON.stringify({ outputFormat: "markdown" }) });
+        const content = exportRes.ok ? ((await exportRes.json()) as { markdown?: string }).markdown ?? "" : "";
+        yield { id: makeDocId(this.id, page.id), title: page.name, content, sourceUrl: page.browserLink ?? `https://coda.io/d/${this.docId}/${page.id}`, connectorId: this.id, syncedAt: now, metadata: { pageId: page.id } };
+        emitted++;
+      }
+      pageToken = json.nextPageToken;
+    } while (pageToken);
+  }
+}
+
+// ── DiscordDocumentConnector ──────────────────────────────────────────────────
+
+export interface DiscordDocumentConnectorConfig {
+  /** Discord bot token */
+  botToken: string;
+  /** Channel IDs to sync messages from */
+  channelIds: string[];
+  fetch?: FetchFn;
+}
+
+export class DiscordDocumentConnector extends BaseDocumentConnector {
+  readonly id = "discord-doc";
+  readonly name = "Discord";
+
+  private readonly botToken: string;
+  private readonly channelIds: string[];
+  private readonly fetchFn: FetchFn;
+  private static readonly BASE = "https://discord.com/api/v10";
+
+  constructor(config: DiscordDocumentConnectorConfig) {
+    super();
+    this.botToken = config.botToken;
+    this.channelIds = config.channelIds;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get headers(): Record<string, string> {
+    return { Authorization: `Bot ${this.botToken}` };
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${DiscordDocumentConnector.BASE}/users/@me`, { headers: this.headers });
+    if (res.status === 401) return { ok: false, error: "Discord bot token invalid" };
+    if (!res.ok) return { ok: false, error: `Discord returned ${res.status}` };
+    const json = (await res.json()) as { username?: string; id?: string };
+    return { ok: true, metadata: { bot: json.username, id: json.id } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${DiscordDocumentConnector.BASE}/users/@me`, { headers: this.headers });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const now = Date.now();
+    let emitted = 0;
+    const perChannel = opts?.limit ? Math.ceil(opts.limit / Math.max(1, this.channelIds.length)) : 100;
+
+    for (const channelId of this.channelIds) {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      let before: string | undefined;
+      let fetched = 0;
+
+      while (fetched < perChannel) {
+        const params = new URLSearchParams({ limit: "100" });
+        if (before) params.set("before", before);
+        const res = await this.fetchFn(`${DiscordDocumentConnector.BASE}/channels/${channelId}/messages?${params}`, { headers: this.headers });
+        if (!res.ok) break;
+        const messages = (await res.json()) as Array<{ id: string; content?: string; author?: { username?: string }; timestamp?: string }>;
+        if (messages.length === 0) break;
+        for (const msg of messages) {
+          if (opts?.limit !== undefined && emitted >= opts.limit) break;
+          if (!msg.content?.trim()) continue;
+          yield { id: makeDocId(this.id, msg.id), title: `Discord message by ${msg.author?.username ?? "unknown"}`, content: msg.content, sourceUrl: `https://discord.com/channels/${channelId}/${msg.id}`, connectorId: this.id, syncedAt: now, metadata: { channelId, author: msg.author?.username, timestamp: msg.timestamp } };
+          emitted++;
+          fetched++;
+        }
+        before = messages[messages.length - 1]?.id;
+        if (messages.length < 100) break;
+      }
+    }
+  }
+}
+
+// ── DiscourseDocumentConnector ────────────────────────────────────────────────
+
+export interface DiscourseDocumentConnectorConfig {
+  baseUrl: string;
+  apiKey: string;
+  apiUsername: string;
+  fetch?: FetchFn;
+}
+
+export class DiscourseDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name = "Discourse";
+
+  private readonly cfg: DiscourseDocumentConnectorConfig;
+  private readonly fetchFn: FetchFn;
+
+  constructor(config: DiscourseDocumentConnectorConfig) {
+    super();
+    this.cfg = config;
+    this.id = `discourse-doc::${new URL(config.baseUrl).hostname}`;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get headers(): Record<string, string> {
+    return { "Api-Key": this.cfg.apiKey, "Api-Username": this.cfg.apiUsername };
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${this.cfg.baseUrl}/users/${this.cfg.apiUsername}.json`, { headers: this.headers });
+    if (res.status === 403) return { ok: false, error: "Discourse API key invalid" };
+    if (!res.ok) return { ok: false, error: `Discourse returned ${res.status}` };
+    return { ok: true };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${this.cfg.baseUrl}/users/${this.cfg.apiUsername}.json`, { headers: this.headers });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const now = Date.now();
+    let page = 0;
+    let emitted = 0;
+
+    while (true) {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      const res = await this.fetchFn(`${this.cfg.baseUrl}/latest.json?page=${page}`, { headers: this.headers });
+      if (!res.ok) break;
+      const json = (await res.json()) as { topic_list?: { topics?: Array<{ id: number; title: string; slug?: string; posts_count?: number; excerpt?: string }> } };
+      const topics = json.topic_list?.topics ?? [];
+      if (topics.length === 0) break;
+      for (const topic of topics) {
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        yield { id: makeDocId(this.id, String(topic.id)), title: topic.title, content: topic.excerpt ?? "", sourceUrl: `${this.cfg.baseUrl}/t/${topic.slug ?? topic.id}/${topic.id}`, connectorId: this.id, syncedAt: now, metadata: { topicId: topic.id, postsCount: topic.posts_count } };
+        emitted++;
+      }
+      page++;
+    }
+  }
+}
+
+// ── DropboxDocumentConnector ──────────────────────────────────────────────────
+
+export interface DropboxDocumentConnectorConfig {
+  accessToken: string;
+  /** Folder path to sync (default: "") meaning root */
+  folderPath?: string;
+  fetch?: FetchFn;
+}
+
+export class DropboxDocumentConnector extends BaseDocumentConnector {
+  readonly id = "dropbox-doc";
+  readonly name = "Dropbox";
+
+  private readonly accessToken: string;
+  private readonly folderPath: string;
+  private readonly fetchFn: FetchFn;
+
+  constructor(config: DropboxDocumentConnectorConfig) {
+    super();
+    this.accessToken = config.accessToken;
+    this.folderPath = config.folderPath ?? "";
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get headers(): Record<string, string> {
+    return { Authorization: `Bearer ${this.accessToken}`, "Content-Type": "application/json" };
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn("https://api.dropboxapi.com/2/users/get_current_account", { method: "POST", headers: this.headers });
+    if (res.status === 401) return { ok: false, error: "Dropbox access token invalid" };
+    if (!res.ok) return { ok: false, error: `Dropbox returned ${res.status}` };
+    const json = (await res.json()) as { name?: { display_name?: string }; email?: string };
+    return { ok: true, metadata: { user: json.name?.display_name, email: json.email } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn("https://api.dropboxapi.com/2/users/get_current_account", { method: "POST", headers: this.headers });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const now = Date.now();
+    let emitted = 0;
+    let cursor: string | undefined;
+    let hasMore = true;
+
+    // List folder
+    let url = "https://api.dropboxapi.com/2/files/list_folder";
+    let body: Record<string, unknown> = { path: this.folderPath, recursive: true, limit: 200 };
+
+    while (hasMore) {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      if (cursor) { url = "https://api.dropboxapi.com/2/files/list_folder/continue"; body = { cursor }; }
+
+      const res = await this.fetchFn(url, { method: "POST", headers: this.headers, body: JSON.stringify(body) });
+      if (!res.ok) break;
+      const json = (await res.json()) as { entries?: Array<{ ".tag"?: string; id?: string; name?: string; path_display?: string; path_lower?: string }>; has_more?: boolean; cursor?: string };
+
+      for (const entry of json.entries ?? []) {
+        if (entry[".tag"] !== "file") continue;
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        yield { id: makeDocId(this.id, entry.path_lower ?? entry.id ?? ""), title: entry.name ?? "", content: "", sourceUrl: `https://www.dropbox.com/home${entry.path_display ?? ""}`, connectorId: this.id, syncedAt: now, metadata: { path: entry.path_display } };
+        emitted++;
+      }
+      hasMore = json.has_more ?? false;
+      cursor = json.cursor;
+    }
+  }
+}
+
+// ── FirefliesDocumentConnector ────────────────────────────────────────────────
+
+export interface FirefliesDocumentConnectorConfig {
+  apiKey: string;
+  fetch?: FetchFn;
+}
+
+export class FirefliesDocumentConnector extends BaseDocumentConnector {
+  readonly id = "fireflies-doc";
+  readonly name = "Fireflies";
+
+  private readonly apiKey: string;
+  private readonly fetchFn: FetchFn;
+  private static readonly BASE = "https://api.fireflies.ai/graphql";
+
+  constructor(config: FirefliesDocumentConnectorConfig) {
+    super();
+    this.apiKey = config.apiKey;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get headers(): Record<string, string> {
+    return { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" };
+  }
+
+  private async gql(query: string, variables?: Record<string, unknown>): Promise<{ data?: Record<string, unknown>; errors?: unknown[] }> {
+    const res = await this.fetchFn(FirefliesDocumentConnector.BASE, {
+      method: "POST",
+      headers: this.headers,
+      body: JSON.stringify({ query, variables }),
+    });
+    if (!res.ok) return { errors: [{ message: `HTTP ${res.status}` }] };
+    return res.json() as Promise<{ data?: Record<string, unknown>; errors?: unknown[] }>;
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const result = await this.gql(`query { user { email name } }`);
+    if (result.errors?.length) return { ok: false, error: "Fireflies API key invalid" };
+    const user = (result.data?.["user"] as Record<string, unknown> | undefined);
+    return { ok: true, metadata: { email: user?.["email"], name: user?.["name"] } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const result = await this.gql(`query { user { email } }`);
+    return { ok: !result.errors?.length, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const limit = opts?.limit ?? 50;
+    const now = Date.now();
+    const result = await this.gql(
+      `query Transcripts($limit: Int) { transcripts(limit: $limit) { id title date summary { overview } } }`,
+      { limit },
+    );
+    const transcripts = (result.data?.["transcripts"] as Array<{ id: string; title?: string; date?: string; summary?: { overview?: string } }>) ?? [];
+    for (const t of transcripts) {
+      yield { id: makeDocId(this.id, t.id), title: t.title ?? t.id, content: t.summary?.overview ?? "", sourceUrl: `https://app.fireflies.ai/view/${t.id}`, connectorId: this.id, syncedAt: now, metadata: { transcriptId: t.id, date: t.date } };
+    }
+  }
+}
+
+// ── FreshdeskDocumentConnector ────────────────────────────────────────────────
+
+export interface FreshdeskDocumentConnectorConfig {
+  domain: string;
+  apiKey: string;
+  fetch?: FetchFn;
+}
+
+export class FreshdeskDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name = "Freshdesk";
+
+  private readonly domain: string;
+  private readonly apiKey: string;
+  private readonly fetchFn: FetchFn;
+
+  constructor(config: FreshdeskDocumentConnectorConfig) {
+    super();
+    this.domain = config.domain;
+    this.apiKey = config.apiKey;
+    this.id = `freshdesk-doc::${config.domain}`;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get authHeader(): string {
+    return `Basic ${Buffer.from(`${this.apiKey}:X`).toString("base64")}`;
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`https://${this.domain}.freshdesk.com/api/v2/agents/me`, { headers: { Authorization: this.authHeader } });
+    if (res.status === 401) return { ok: false, error: "Freshdesk API key invalid" };
+    if (!res.ok) return { ok: false, error: `Freshdesk returned ${res.status}` };
+    const json = (await res.json()) as { contact?: { name?: string } };
+    return { ok: true, metadata: { user: json.contact?.name } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`https://${this.domain}.freshdesk.com/api/v2/agents/me`, { headers: { Authorization: this.authHeader } });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const now = Date.now();
+    let page = 1;
+    let emitted = 0;
+
+    while (true) {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      const res = await this.fetchFn(`https://${this.domain}.freshdesk.com/api/v2/tickets?per_page=100&page=${page}&include=description`, { headers: { Authorization: this.authHeader } });
+      if (!res.ok) break;
+      const tickets = (await res.json()) as Array<{ id: number; subject: string; description_text?: string; ticket_url?: string }>;
+      if (tickets.length === 0) break;
+      for (const t of tickets) {
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        yield { id: makeDocId(this.id, String(t.id)), title: `Ticket #${t.id}: ${t.subject}`, content: t.description_text ?? "", sourceUrl: `https://${this.domain}.freshdesk.com/a/tickets/${t.id}`, connectorId: this.id, syncedAt: now, metadata: { ticketId: t.id } };
+        emitted++;
+      }
+      if (tickets.length < 100) break;
+      page++;
+    }
+  }
+}
+
+// ── GitBookDocumentConnector ──────────────────────────────────────────────────
+
+export interface GitBookDocumentConnectorConfig {
+  apiToken: string;
+  /** Space ID to sync */
+  spaceId: string;
+  fetch?: FetchFn;
+}
+
+export class GitBookDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name = "GitBook";
+
+  private readonly apiToken: string;
+  private readonly spaceId: string;
+  private readonly fetchFn: FetchFn;
+  private static readonly BASE = "https://api.gitbook.com/v1";
+
+  constructor(config: GitBookDocumentConnectorConfig) {
+    super();
+    this.apiToken = config.apiToken;
+    this.spaceId = config.spaceId;
+    this.id = `gitbook-doc::${config.spaceId}`;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get headers(): Record<string, string> {
+    return { Authorization: `Bearer ${this.apiToken}` };
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${GitBookDocumentConnector.BASE}/user`, { headers: this.headers });
+    if (res.status === 401) return { ok: false, error: "GitBook token invalid" };
+    if (!res.ok) return { ok: false, error: `GitBook returned ${res.status}` };
+    const json = (await res.json()) as { displayName?: string; email?: string };
+    return { ok: true, metadata: { user: json.displayName, email: json.email } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${GitBookDocumentConnector.BASE}/user`, { headers: this.headers });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const now = Date.now();
+    let emitted = 0;
+    let next: string | undefined = `${GitBookDocumentConnector.BASE}/spaces/${this.spaceId}/content/pages`;
+
+    while (next) {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      const res = await this.fetchFn(next, { headers: this.headers });
+      if (!res.ok) break;
+      const json = (await res.json()) as { items?: Array<{ id: string; title: string; path?: string; urls?: { app?: string } }>; next?: { url?: string } };
+      for (const page of json.items ?? []) {
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        yield { id: makeDocId(this.id, page.id), title: page.title, content: "", sourceUrl: page.urls?.app ?? `https://app.gitbook.com/spaces/${this.spaceId}/pages/${page.id}`, connectorId: this.id, syncedAt: now, metadata: { pageId: page.id, path: page.path } };
+        emitted++;
+      }
+      next = json.next?.url;
+    }
+  }
+}
+
+// ── GongDocumentConnector ─────────────────────────────────────────────────────
+
+export interface GongDocumentConnectorConfig {
+  accessKey: string;
+  accessKeySecret: string;
+  fetch?: FetchFn;
+}
+
+export class GongDocumentConnector extends BaseDocumentConnector {
+  readonly id = "gong-doc";
+  readonly name = "Gong";
+
+  private readonly accessKey: string;
+  private readonly accessKeySecret: string;
+  private readonly fetchFn: FetchFn;
+  private static readonly BASE = "https://us-11211.api.gong.io";
+
+  constructor(config: GongDocumentConnectorConfig) {
+    super();
+    this.accessKey = config.accessKey;
+    this.accessKeySecret = config.accessKeySecret;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get authHeader(): string {
+    return `Basic ${Buffer.from(`${this.accessKey}:${this.accessKeySecret}`).toString("base64")}`;
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${GongDocumentConnector.BASE}/v2/users?limit=1`, { headers: { Authorization: this.authHeader } });
+    if (res.status === 401) return { ok: false, error: "Gong credentials invalid" };
+    if (!res.ok) return { ok: false, error: `Gong returned ${res.status}` };
+    return { ok: true };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${GongDocumentConnector.BASE}/v2/users?limit=1`, { headers: { Authorization: this.authHeader } });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const now = Date.now();
+    let emitted = 0;
+    let cursor: string | undefined;
+
+    do {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      const body: Record<string, unknown> = { limit: 100 };
+      if (cursor) body["cursor"] = cursor;
+      const res = await this.fetchFn(`${GongDocumentConnector.BASE}/v2/calls`, {
+        method: "GET",
+        headers: { Authorization: this.authHeader },
+      });
+      if (!res.ok) break;
+      const json = (await res.json()) as { calls?: Array<{ id: string; title?: string; started?: string; url?: string }>; cursor?: string };
+      for (const call of json.calls ?? []) {
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        yield { id: makeDocId(this.id, call.id), title: call.title ?? `Call ${call.id}`, content: "", sourceUrl: call.url ?? `https://app.gong.io/call?id=${call.id}`, connectorId: this.id, syncedAt: now, metadata: { callId: call.id, started: call.started } };
+        emitted++;
+      }
+      cursor = json.cursor;
+    } while (cursor);
+  }
+}
+
+// ── GoogleDriveDocumentConnector ──────────────────────────────────────────────
+
+export interface GoogleDriveDocumentConnectorConfig {
+  /** OAuth2 access token */
+  accessToken: string;
+  /** Optional folder ID to restrict to (default: "root") */
+  folderId?: string;
+  fetch?: FetchFn;
+}
+
+export class GoogleDriveDocumentConnector extends BaseDocumentConnector {
+  readonly id = "gdrive-doc";
+  readonly name = "Google Drive";
+
+  private readonly accessToken: string;
+  private readonly folderId: string;
+  private readonly fetchFn: FetchFn;
+  private static readonly BASE = "https://www.googleapis.com/drive/v3";
+
+  constructor(config: GoogleDriveDocumentConnectorConfig) {
+    super();
+    this.accessToken = config.accessToken;
+    this.folderId = config.folderId ?? "root";
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get headers(): Record<string, string> {
+    return { Authorization: `Bearer ${this.accessToken}` };
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn("https://www.googleapis.com/oauth2/v2/userinfo", { headers: this.headers });
+    if (res.status === 401) return { ok: false, error: "Google access token invalid" };
+    if (!res.ok) return { ok: false, error: `Google returned ${res.status}` };
+    const json = (await res.json()) as { name?: string; email?: string };
+    return { ok: true, metadata: { user: json.name, email: json.email } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn("https://www.googleapis.com/oauth2/v2/userinfo", { headers: this.headers });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const now = Date.now();
+    let emitted = 0;
+    let pageToken: string | undefined;
+
+    do {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      const params = new URLSearchParams({
+        q: `'${this.folderId}' in parents and trashed=false`,
+        fields: "nextPageToken,files(id,name,webViewLink,mimeType)",
+        pageSize: "100",
+      });
+      if (pageToken) params.set("pageToken", pageToken);
+
+      const res = await this.fetchFn(`${GoogleDriveDocumentConnector.BASE}/files?${params}`, { headers: this.headers });
+      if (!res.ok) break;
+      const json = (await res.json()) as { files?: Array<{ id: string; name: string; webViewLink?: string; mimeType?: string }>; nextPageToken?: string };
+      for (const file of json.files ?? []) {
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        yield { id: makeDocId(this.id, file.id), title: file.name, content: "", sourceUrl: file.webViewLink ?? `https://drive.google.com/file/d/${file.id}`, connectorId: this.id, syncedAt: now, metadata: { fileId: file.id, mimeType: file.mimeType } };
+        emitted++;
+      }
+      pageToken = json.nextPageToken;
+    } while (pageToken);
+  }
+}
+
+// ── GuruDocumentConnector ─────────────────────────────────────────────────────
+
+export interface GuruDocumentConnectorConfig {
+  username: string;
+  apiToken: string;
+  fetch?: FetchFn;
+}
+
+export class GuruDocumentConnector extends BaseDocumentConnector {
+  readonly id = "guru-doc";
+  readonly name = "Guru";
+
+  private readonly username: string;
+  private readonly apiToken: string;
+  private readonly fetchFn: FetchFn;
+  private static readonly BASE = "https://api.getguru.com/api/v1";
+
+  constructor(config: GuruDocumentConnectorConfig) {
+    super();
+    this.username = config.username;
+    this.apiToken = config.apiToken;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get authHeader(): string {
+    return `Basic ${Buffer.from(`${this.username}:${this.apiToken}`).toString("base64")}`;
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${GuruDocumentConnector.BASE}/whoami`, { headers: { Authorization: this.authHeader } });
+    if (res.status === 401) return { ok: false, error: "Guru credentials invalid" };
+    if (!res.ok) return { ok: false, error: `Guru returned ${res.status}` };
+    const json = (await res.json()) as { email?: string };
+    return { ok: true, metadata: { email: json.email } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${GuruDocumentConnector.BASE}/whoami`, { headers: { Authorization: this.authHeader } });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const now = Date.now();
+    let page = 0;
+    let emitted = 0;
+
+    while (true) {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      const res = await this.fetchFn(`${GuruDocumentConnector.BASE}/search/cardmgr?q=&queryType=search&maxResults=50&page=${page}`, { headers: { Authorization: this.authHeader } });
+      if (!res.ok) break;
+      const cards = (await res.json()) as Array<{ preferredPhrase?: string; id?: string; content?: { text?: string }; htmlContent?: string; shareLink?: string }>;
+      if (cards.length === 0) break;
+      for (const card of cards) {
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        yield { id: makeDocId(this.id, card.id ?? ""), title: card.preferredPhrase ?? card.id ?? "", content: card.content?.text ?? "", sourceUrl: card.shareLink ?? `https://app.getguru.com/cards/${card.id}`, connectorId: this.id, syncedAt: now, metadata: { cardId: card.id } };
+        emitted++;
+      }
+      if (cards.length < 50) break;
+      page++;
+    }
+  }
+}
+
+// ── HubSpotDocumentConnector ──────────────────────────────────────────────────
+
+export interface HubSpotDocumentConnectorConfig {
+  accessToken: string;
+  /** Object types to sync. Default: ["contacts"] */
+  objectTypes?: Array<"contacts" | "companies" | "deals" | "tickets">;
+  fetch?: FetchFn;
+}
+
+export class HubSpotDocumentConnector extends BaseDocumentConnector {
+  readonly id = "hubspot-doc";
+  readonly name = "HubSpot";
+
+  private readonly accessToken: string;
+  private readonly objectTypes: Array<"contacts" | "companies" | "deals" | "tickets">;
+  private readonly fetchFn: FetchFn;
+  private static readonly BASE = "https://api.hubapi.com";
+
+  constructor(config: HubSpotDocumentConnectorConfig) {
+    super();
+    this.accessToken = config.accessToken;
+    this.objectTypes = config.objectTypes ?? ["contacts"];
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get headers(): Record<string, string> {
+    return { Authorization: `Bearer ${this.accessToken}`, "Content-Type": "application/json" };
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${HubSpotDocumentConnector.BASE}/crm/v3/owners/`, { headers: this.headers });
+    if (res.status === 401) return { ok: false, error: "HubSpot token invalid" };
+    if (!res.ok) return { ok: false, error: `HubSpot returned ${res.status}` };
+    return { ok: true };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${HubSpotDocumentConnector.BASE}/crm/v3/owners/`, { headers: this.headers });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const now = Date.now();
+    let emitted = 0;
+
+    for (const objType of this.objectTypes) {
+      let after: string | undefined;
+      while (true) {
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        const params = new URLSearchParams({ limit: "100" });
+        if (after) params.set("after", after);
+        const res = await this.fetchFn(`${HubSpotDocumentConnector.BASE}/crm/v3/objects/${objType}?${params}`, { headers: this.headers });
+        if (!res.ok) break;
+        const json = (await res.json()) as { results?: Array<{ id: string; properties?: Record<string, string | null> }>; paging?: { next?: { after?: string } } };
+        for (const obj of json.results ?? []) {
+          if (opts?.limit !== undefined && emitted >= opts.limit) break;
+          const props = obj.properties ?? {};
+          const title = props["name"] ?? props["firstname"] ?? props["subject"] ?? obj.id;
+          const content = props["description"] ?? props["notes_last_contacted"] ?? "";
+          yield { id: makeDocId(this.id, `${objType}/${obj.id}`), title: `[${objType}] ${title}`, content: content ?? "", sourceUrl: `https://app.hubspot.com/contacts/${objType}/${obj.id}`, connectorId: this.id, syncedAt: now, metadata: { objectType: objType, objectId: obj.id } };
+          emitted++;
+        }
+        after = json.paging?.next?.after;
+        if (!after) break;
+      }
+    }
+  }
+}
+
+// ── ImapDocumentConnector ─────────────────────────────────────────────────────
+// Note: Full IMAP requires a socket connection (not fetch-based).
+// This connector uses an injectable queryFn that abstracts the IMAP protocol,
+// enabling testing without a real mail server.
+
+export interface ImapMessage {
+  uid: string;
+  subject: string;
+  from: string;
+  date: string;
+  text: string;
+}
+
+export type ImapQueryFn = (opts: { mailbox?: string; limit?: number }) => Promise<ImapMessage[]>;
+
+export interface ImapDocumentConnectorConfig {
+  host: string;
+  port?: number;
+  user: string;
+  password: string;
+  mailbox?: string;
+  /** Injectable IMAP query function — avoids hard dependency on imap library */
+  queryFn?: ImapQueryFn;
+  fetch?: FetchFn;
+}
+
+export class ImapDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name = "IMAP Email";
+
+  private readonly cfg: ImapDocumentConnectorConfig;
+  private readonly queryFn: ImapQueryFn;
+
+  constructor(config: ImapDocumentConnectorConfig) {
+    super();
+    this.cfg = config;
+    this.id = `imap-doc::${config.user}@${config.host}`;
+    // Default query fn signals not connected
+    this.queryFn = config.queryFn ?? (() => Promise.resolve([]));
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    // Without a queryFn, we can't verify the connection; treat as ok when queryFn provided
+    if (this.cfg.queryFn) {
+      try {
+        await this.queryFn({ mailbox: this.cfg.mailbox ?? "INBOX", limit: 1 });
+        return { ok: true, metadata: { host: this.cfg.host, user: this.cfg.user } };
+      } catch (err) {
+        return { ok: false, error: `IMAP connect failed: ${String(err)}` };
+      }
+    }
+    return { ok: true, metadata: { note: "no queryFn provided — configure a real IMAP adapter" } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    try {
+      await this.queryFn({ mailbox: this.cfg.mailbox ?? "INBOX", limit: 1 });
+      return { ok: true, latencyMs: Date.now() - start };
+    } catch {
+      return { ok: false, latencyMs: Date.now() - start };
+    }
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const now = Date.now();
+    const messages = await this.queryFn({ mailbox: this.cfg.mailbox ?? "INBOX", limit: opts?.limit });
+    for (const msg of messages) {
+      yield {
+        id: makeDocId(this.id, msg.uid),
+        title: msg.subject || "(no subject)",
+        content: msg.text,
+        sourceUrl: `imap://${this.cfg.host}/${this.cfg.mailbox ?? "INBOX"}/${msg.uid}`,
+        connectorId: this.id,
+        syncedAt: now,
+        metadata: { from: msg.from, date: msg.date, uid: msg.uid },
+      };
+    }
+  }
+}
+
+// ── LoopiODocumentConnector ───────────────────────────────────────────────────
+
+export interface LoopiODocumentConnectorConfig {
+  apiKey: string;
+  fetch?: FetchFn;
+}
+
+export class LoopiODocumentConnector extends BaseDocumentConnector {
+  readonly id = "loopio-doc";
+  readonly name = "Loopio";
+
+  private readonly apiKey: string;
+  private readonly fetchFn: FetchFn;
+  private static readonly BASE = "https://api.loopio.com/data/2.0";
+
+  constructor(config: LoopiODocumentConnectorConfig) {
+    super();
+    this.apiKey = config.apiKey;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get headers(): Record<string, string> {
+    return { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" };
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${LoopiODocumentConnector.BASE}/entries?limit=1`, { headers: this.headers });
+    if (res.status === 401 || res.status === 403) return { ok: false, error: "Loopio API key invalid" };
+    if (!res.ok) return { ok: false, error: `Loopio returned ${res.status}` };
+    return { ok: true };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${LoopiODocumentConnector.BASE}/entries?limit=1`, { headers: this.headers });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const now = Date.now();
+    let offset = 0;
+    let emitted = 0;
+
+    while (true) {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      const res = await this.fetchFn(`${LoopiODocumentConnector.BASE}/entries?limit=50&offset=${offset}`, { headers: this.headers });
+      if (!res.ok) break;
+      const json = (await res.json()) as { items?: Array<{ id: number; question?: string; answer?: string; tags?: string[] }> };
+      const items = json.items ?? [];
+      if (items.length === 0) break;
+      for (const entry of items) {
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        yield { id: makeDocId(this.id, String(entry.id)), title: entry.question ?? `Entry ${entry.id}`, content: entry.answer ?? "", sourceUrl: `https://app.loopio.com/library/${entry.id}`, connectorId: this.id, syncedAt: now, metadata: { entryId: entry.id, tags: entry.tags } };
+        emitted++;
+      }
+      offset += items.length;
+      if (items.length < 50) break;
+    }
+  }
+}
+
+// ── MediaWikiDocumentConnector ────────────────────────────────────────────────
+
+export interface MediaWikiDocumentConnectorConfig {
+  /** MediaWiki API endpoint e.g. "https://en.wikipedia.org/w/api.php" */
+  apiUrl: string;
+  /** Category to list pages from (without "Category:" prefix) */
+  category?: string;
+  /** Specific page titles to sync instead of category listing */
+  pageTitles?: string[];
+  fetch?: FetchFn;
+}
+
+export class MediaWikiDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name = "MediaWiki";
+
+  private readonly cfg: MediaWikiDocumentConnectorConfig;
+  private readonly fetchFn: FetchFn;
+
+  constructor(config: MediaWikiDocumentConnectorConfig) {
+    super();
+    this.cfg = config;
+    this.id = `mediawiki-doc::${new URL(config.apiUrl).hostname}`;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${this.cfg.apiUrl}?action=query&meta=siteinfo&siprop=general&format=json`);
+    if (!res.ok) return { ok: false, error: `MediaWiki returned ${res.status}` };
+    const json = (await res.json()) as { query?: { general?: { sitename?: string } } };
+    return { ok: true, metadata: { site: json.query?.general?.sitename } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${this.cfg.apiUrl}?action=query&meta=siteinfo&format=json`);
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const now = Date.now();
+    let emitted = 0;
+    let titles: string[];
+
+    if (this.cfg.pageTitles && this.cfg.pageTitles.length > 0) {
+      titles = this.cfg.pageTitles;
+    } else if (this.cfg.category) {
+      // List pages in category
+      const res = await this.fetchFn(`${this.cfg.apiUrl}?action=query&list=categorymembers&cmtitle=Category:${encodeURIComponent(this.cfg.category)}&cmlimit=500&format=json`);
+      if (!res.ok) return;
+      const json = (await res.json()) as { query?: { categorymembers?: Array<{ title: string }> } };
+      titles = (json.query?.categorymembers ?? []).map((m) => m.title);
+    } else {
+      return;
+    }
+
+    for (const title of titles) {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      const res = await this.fetchFn(`${this.cfg.apiUrl}?action=query&titles=${encodeURIComponent(title)}&prop=extracts&exintro=true&explaintext=true&format=json`);
+      if (!res.ok) continue;
+      const json = (await res.json()) as { query?: { pages?: Record<string, { extract?: string; pageid?: number }> } };
+      const pages = Object.values(json.query?.pages ?? {});
+      for (const page of pages) {
+        const url = `${new URL(this.cfg.apiUrl).origin}/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`;
+        yield { id: makeDocId(this.id, title), title, content: page.extract ?? "", sourceUrl: url, connectorId: this.id, syncedAt: now, metadata: { pageId: page.pageid } };
+        emitted++;
+      }
+    }
+  }
+}
+
+// ── SharePointDocumentConnector ───────────────────────────────────────────────
+
+export interface SharePointDocumentConnectorConfig {
+  /** SharePoint site URL e.g. "https://tenant.sharepoint.com/sites/mysite" */
+  siteUrl: string;
+  /** OAuth2 access token (Microsoft Graph) */
+  accessToken: string;
+  /** Drive ID (default: "root" drive) */
+  driveId?: string;
+  fetch?: FetchFn;
+}
+
+export class SharePointDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name = "SharePoint";
+
+  private readonly cfg: SharePointDocumentConnectorConfig;
+  private readonly fetchFn: FetchFn;
+  private static readonly GRAPH = "https://graph.microsoft.com/v1.0";
+
+  constructor(config: SharePointDocumentConnectorConfig) {
+    super();
+    this.cfg = config;
+    this.id = `sharepoint-doc::${new URL(config.siteUrl).hostname}`;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get headers(): Record<string, string> {
+    return { Authorization: `Bearer ${this.cfg.accessToken}` };
+  }
+
+  private get siteId(): string {
+    const u = new URL(this.cfg.siteUrl);
+    // Graph API requires hostname:relative-path format
+    return `${u.hostname}:${u.pathname}`;
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${SharePointDocumentConnector.GRAPH}/sites/${this.siteId}`, { headers: this.headers });
+    if (res.status === 401) return { ok: false, error: "SharePoint access token invalid" };
+    if (!res.ok) return { ok: false, error: `SharePoint returned ${res.status}` };
+    const json = (await res.json()) as { displayName?: string };
+    return { ok: true, metadata: { site: json.displayName } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${SharePointDocumentConnector.GRAPH}/sites/${this.siteId}`, { headers: this.headers });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const now = Date.now();
+    let emitted = 0;
+    const driveBase = this.cfg.driveId
+      ? `${SharePointDocumentConnector.GRAPH}/sites/${this.siteId}/drives/${this.cfg.driveId}`
+      : `${SharePointDocumentConnector.GRAPH}/sites/${this.siteId}/drive`;
+
+    let next: string | undefined = `${driveBase}/root/children?$top=100&$select=id,name,webUrl,file`;
+
+    while (next) {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      const res = await this.fetchFn(next, { headers: this.headers });
+      if (!res.ok) break;
+      const json = (await res.json()) as { value?: Array<{ id: string; name: string; webUrl?: string; file?: unknown }>; "@odata.nextLink"?: string };
+      for (const item of json.value ?? []) {
+        if (!item.file) continue; // skip folders
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        yield { id: makeDocId(this.id, item.id), title: item.name, content: "", sourceUrl: item.webUrl ?? "", connectorId: this.id, syncedAt: now, metadata: { fileId: item.id } };
+        emitted++;
+      }
+      next = json["@odata.nextLink"];
+    }
+  }
+}
+
+// ── ZendeskDocumentConnector ──────────────────────────────────────────────────
+
+export interface ZendeskDocumentConnectorConfig {
+  subdomain: string;
+  email: string;
+  apiToken: string;
+  fetch?: FetchFn;
+}
+
+export class ZendeskDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name = "Zendesk";
+
+  private readonly cfg: ZendeskDocumentConnectorConfig;
+  private readonly fetchFn: FetchFn;
+
+  constructor(config: ZendeskDocumentConnectorConfig) {
+    super();
+    this.cfg = config;
+    this.id = `zendesk-doc::${config.subdomain}`;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  private get apiBase(): string { return `https://${this.cfg.subdomain}.zendesk.com/api/v2`; }
+  private get authHeader(): string {
+    return `Basic ${Buffer.from(`${this.cfg.email}/token:${this.cfg.apiToken}`).toString("base64")}`;
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${this.apiBase}/users/me.json`, { headers: { Authorization: this.authHeader } });
+    if (res.status === 401) return { ok: false, error: "Zendesk credentials invalid" };
+    if (!res.ok) return { ok: false, error: `Zendesk returned ${res.status}` };
+    const json = (await res.json()) as { user?: { name?: string; email?: string } };
+    return { ok: true, metadata: { user: json.user?.name, email: json.user?.email } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${this.apiBase}/users/me.json`, { headers: { Authorization: this.authHeader } });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const now = Date.now();
+    let emitted = 0;
+    let url: string | undefined = `${this.apiBase}/tickets.json?per_page=100&sort_by=updated_at&sort_order=desc`;
+
+    while (url) {
+      if (opts?.limit !== undefined && emitted >= opts.limit) break;
+      const res = await this.fetchFn(url, { headers: { Authorization: this.authHeader } });
+      if (!res.ok) break;
+      const json = (await res.json()) as { tickets?: Array<{ id: number; subject: string; description?: string; url?: string; status?: string }>; next_page?: string };
+      for (const t of json.tickets ?? []) {
+        if (opts?.limit !== undefined && emitted >= opts.limit) break;
+        yield { id: makeDocId(this.id, String(t.id)), title: `Ticket #${t.id}: ${t.subject}`, content: t.description ?? "", sourceUrl: `https://${this.cfg.subdomain}.zendesk.com/agent/tickets/${t.id}`, connectorId: this.id, syncedAt: now, metadata: { ticketId: t.id, status: t.status } };
+        emitted++;
+      }
+      url = json.next_page ?? undefined;
+    }
+  }
+}

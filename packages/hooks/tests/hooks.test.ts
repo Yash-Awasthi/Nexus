@@ -1,15 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import {
   HookRegistry,
   HookError,
+  MemoryHookStore,
   globalHooks,
   definePlugin,
   HOOK_EVENTS,
   type Plugin,
   type HookRegistration,
   type EmitResult,
+  type HookStore,
+  type StoredHandler,
+  type HookHandler,
 } from "../src/index.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -223,6 +227,12 @@ describe("HookRegistry.emit — basics", () => {
       const result = await reg.emit(event as never, {} as never);
       expect(result.handled).toBe(0);
     }
+  });
+
+  it("EmitResult includes compensationsRan field", async () => {
+    const result = await reg.emit("task.before", TASK_BEFORE);
+    expect(result).toHaveProperty("compensationsRan");
+    expect(result.compensationsRan).toBe(0);
   });
 });
 
@@ -518,5 +528,528 @@ describe("globalHooks", () => {
     await globalHooks.emit("agent.observe", AGENT_OBS);
     expect(fn).toHaveBeenCalled();
     globalHooks.off(h); // cleanup
+  });
+});
+
+// ── MemoryHookStore ───────────────────────────────────────────────────────────
+
+describe("MemoryHookStore", () => {
+  let store: MemoryHookStore;
+
+  const entry: StoredHandler = {
+    id: "h1",
+    event: "task.before",
+    label: "my-logger",
+    priority: 10,
+    timeoutMs: 500,
+    createdAt: 1000,
+  };
+
+  beforeEach(() => {
+    store = new MemoryHookStore();
+  });
+
+  it("loadAll returns empty array initially", async () => {
+    const all = await store.loadAll();
+    expect(all).toEqual([]);
+  });
+
+  it("save stores an entry retrievable via loadAll", async () => {
+    await store.save(entry);
+    const all = await store.loadAll();
+    expect(all).toHaveLength(1);
+    expect(all[0]).toMatchObject({ id: "h1", label: "my-logger", event: "task.before" });
+  });
+
+  it("save stores a defensive copy", async () => {
+    await store.save(entry);
+    // Mutate original
+    (entry as StoredHandler & { extra?: string }).extra = "mutated";
+    const all = await store.loadAll();
+    expect((all[0] as StoredHandler & { extra?: string }).extra).toBeUndefined();
+    delete (entry as StoredHandler & { extra?: string }).extra;
+  });
+
+  it("save overwrites on same id", async () => {
+    await store.save(entry);
+    await store.save({ ...entry, label: "updated-label" });
+    const all = await store.loadAll();
+    expect(all).toHaveLength(1);
+    expect(all[0]?.label).toBe("updated-label");
+  });
+
+  it("delete removes entry", async () => {
+    await store.save(entry);
+    await store.delete("h1");
+    const all = await store.loadAll();
+    expect(all).toHaveLength(0);
+  });
+
+  it("delete is a no-op for non-existent id", async () => {
+    await expect(store.delete("nonexistent")).resolves.toBeUndefined();
+  });
+
+  it("multiple entries stored independently", async () => {
+    await store.save({ ...entry, id: "h1", label: "first" });
+    await store.save({ ...entry, id: "h2", label: "second" });
+    const all = await store.loadAll();
+    expect(all).toHaveLength(2);
+    const labels = all.map((e) => e.label).sort();
+    expect(labels).toEqual(["first", "second"]);
+  });
+
+  it("delete removes only the targeted entry", async () => {
+    await store.save({ ...entry, id: "h1", label: "first" });
+    await store.save({ ...entry, id: "h2", label: "second" });
+    await store.delete("h1");
+    const all = await store.loadAll();
+    expect(all).toHaveLength(1);
+    expect(all[0]?.label).toBe("second");
+  });
+});
+
+// ── HookRegistry — constructor with store ─────────────────────────────────────
+
+describe("HookRegistry — store option in constructor", () => {
+  it("constructs without store (default no-op)", () => {
+    const reg = new HookRegistry();
+    expect(reg).toBeInstanceOf(HookRegistry);
+  });
+
+  it("constructs with a HookStore", () => {
+    const store = new MemoryHookStore();
+    const reg = new HookRegistry({ store });
+    expect(reg).toBeInstanceOf(HookRegistry);
+  });
+
+  it("constructs with empty options object", () => {
+    const reg = new HookRegistry({});
+    expect(reg).toBeInstanceOf(HookRegistry);
+  });
+});
+
+// ── HookRegistry — persist: true ─────────────────────────────────────────────
+
+describe("HookRegistry — persist: true", () => {
+  it("saves to store when persist: true and label provided", async () => {
+    const store = new MemoryHookStore();
+    const reg = new HookRegistry({ store });
+
+    reg.on("task.before", vi.fn(), { label: "my-handler", persist: true, priority: 5, timeoutMs: 200 });
+
+    // Give the fire-and-forget promise a tick to resolve
+    await Promise.resolve();
+
+    const stored = await store.loadAll();
+    expect(stored).toHaveLength(1);
+    expect(stored[0]?.label).toBe("my-handler");
+    expect(stored[0]?.event).toBe("task.before");
+    expect(stored[0]?.priority).toBe(5);
+    expect(stored[0]?.timeoutMs).toBe(200);
+  });
+
+  it("does NOT save when persist: true but no label", async () => {
+    const store = new MemoryHookStore();
+    const reg = new HookRegistry({ store });
+
+    reg.on("task.before", vi.fn(), { persist: true }); // no label
+    await Promise.resolve();
+
+    const stored = await store.loadAll();
+    expect(stored).toHaveLength(0);
+  });
+
+  it("does NOT save when persist: true but no store configured", async () => {
+    const reg = new HookRegistry(); // no store
+    // Should not throw
+    expect(() =>
+      reg.on("task.before", vi.fn(), { label: "x", persist: true })
+    ).not.toThrow();
+  });
+
+  it("does NOT save when persist is omitted", async () => {
+    const store = new MemoryHookStore();
+    const reg = new HookRegistry({ store });
+
+    reg.on("task.before", vi.fn(), { label: "no-persist" });
+    await Promise.resolve();
+
+    const stored = await store.loadAll();
+    expect(stored).toHaveLength(0);
+  });
+
+  it("off() calls store.delete for persisted handler", async () => {
+    const store = new MemoryHookStore();
+    const reg = new HookRegistry({ store });
+
+    const h = reg.on("task.before", vi.fn(), { label: "deletable", persist: true });
+    await Promise.resolve();
+    expect((await store.loadAll())).toHaveLength(1);
+
+    reg.off(h);
+    await Promise.resolve();
+    expect((await store.loadAll())).toHaveLength(0);
+  });
+
+  it("off() without store does not throw", () => {
+    const reg = new HookRegistry();
+    const h = reg.on("task.before", vi.fn(), { label: "x" });
+    expect(() => reg.off(h)).not.toThrow();
+  });
+});
+
+// ── HookRegistry — rehydrate ──────────────────────────────────────────────────
+
+describe("HookRegistry.rehydrate", () => {
+  it("returns 0 when no store is configured", async () => {
+    const reg = new HookRegistry();
+    const count = await reg.rehydrate({ myHandler: vi.fn() });
+    expect(count).toBe(0);
+  });
+
+  it("returns 0 when store is empty", async () => {
+    const store = new MemoryHookStore();
+    const reg = new HookRegistry({ store });
+    const count = await reg.rehydrate({ myHandler: vi.fn() });
+    expect(count).toBe(0);
+  });
+
+  it("re-registers stored handler by label", async () => {
+    const store = new MemoryHookStore();
+    const reg = new HookRegistry({ store });
+
+    // Simulate a persisted registration from a previous process
+    const storedEntry: StoredHandler = {
+      id: "stored-id-1",
+      event: "task.before",
+      label: "my-logger",
+      priority: 10,
+      createdAt: Date.now(),
+    };
+    await store.save(storedEntry);
+
+    const fn = vi.fn();
+    const count = await reg.rehydrate({ "my-logger": fn });
+    expect(count).toBe(1);
+    expect(reg.handlerCount("task.before")).toBe(1);
+
+    await reg.emit("task.before", TASK_BEFORE);
+    expect(fn).toHaveBeenCalledWith(TASK_BEFORE);
+  });
+
+  it("skips entries whose label is not in namedHandlers", async () => {
+    const store = new MemoryHookStore();
+    const reg = new HookRegistry({ store });
+
+    await store.save({
+      id: "s1",
+      event: "task.before",
+      label: "unknown-handler",
+      priority: 0,
+      createdAt: Date.now(),
+    });
+
+    const count = await reg.rehydrate({ "my-handler": vi.fn() });
+    expect(count).toBe(0);
+    expect(reg.handlerCount("task.before")).toBe(0);
+  });
+
+  it("rehydrates multiple entries", async () => {
+    const store = new MemoryHookStore();
+    const reg = new HookRegistry({ store });
+
+    await store.save({ id: "s1", event: "task.before", label: "h1", priority: 0, createdAt: Date.now() });
+    await store.save({ id: "s2", event: "session.init", label: "h2", priority: 5, createdAt: Date.now() });
+
+    const fn1 = vi.fn();
+    const fn2 = vi.fn();
+    const count = await reg.rehydrate({ h1: fn1, h2: fn2 });
+    expect(count).toBe(2);
+
+    await reg.emit("task.before", TASK_BEFORE);
+    await reg.emit("session.init", SESSION_INIT);
+    expect(fn1).toHaveBeenCalledTimes(1);
+    expect(fn2).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores stored priority", async () => {
+    const store = new MemoryHookStore();
+    const reg = new HookRegistry({ store });
+
+    await store.save({ id: "s1", event: "task.before", label: "high-pri", priority: 99, createdAt: Date.now() });
+
+    const order: string[] = [];
+    await reg.rehydrate({ "high-pri": () => { order.push("rehydrated"); } });
+    reg.on("task.before", () => { order.push("new"); }, { priority: 1 });
+
+    await reg.emit("task.before", TASK_BEFORE);
+    expect(order).toEqual(["rehydrated", "new"]);
+  });
+
+  it("prevents duplicate rehydration for same id", async () => {
+    const store = new MemoryHookStore();
+    const reg = new HookRegistry({ store });
+
+    await store.save({ id: "s1", event: "task.before", label: "h1", priority: 0, createdAt: Date.now() });
+
+    const fn = vi.fn();
+    const count1 = await reg.rehydrate({ h1: fn });
+    const count2 = await reg.rehydrate({ h1: fn });
+
+    expect(count1).toBe(1);
+    expect(count2).toBe(0); // second call skips duplicate
+    expect(reg.handlerCount("task.before")).toBe(1);
+  });
+
+  it("rehydrated handler fires normally on emit", async () => {
+    const store = new MemoryHookStore();
+    const reg = new HookRegistry({ store });
+
+    await store.save({ id: "s-fire", event: "agent.observe", label: "observer", priority: 0, createdAt: Date.now() });
+
+    const fn = vi.fn();
+    await reg.rehydrate({ observer: fn });
+    const result = await reg.emit("agent.observe", AGENT_OBS);
+    expect(result.handled).toBe(1);
+    expect(fn).toHaveBeenCalledWith(AGENT_OBS);
+  });
+});
+
+// ── HookRegistry — timeoutMs ──────────────────────────────────────────────────
+
+describe("HookRegistry — timeoutMs", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("fast handler (no timeout set) runs normally", async () => {
+    const reg = new HookRegistry();
+    const fn = vi.fn();
+    reg.on("task.before", fn);
+    const result = await reg.emit("task.before", TASK_BEFORE);
+    expect(fn).toHaveBeenCalled();
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it("handler that completes before timeout succeeds", async () => {
+    const reg = new HookRegistry();
+    const fn = vi.fn().mockResolvedValue(undefined);
+    reg.on("task.before", fn, { timeoutMs: 5000, label: "fast" });
+    const result = await reg.emit("task.before", TASK_BEFORE);
+    expect(result.errors).toHaveLength(0);
+    expect(result.handled).toBe(1);
+  });
+
+  it("slow handler exceeding timeoutMs records timeout error", async () => {
+    vi.useFakeTimers();
+    const reg = new HookRegistry();
+
+    reg.on(
+      "task.before",
+      () => new Promise<void>((resolve) => setTimeout(resolve, 10_000)),
+      { label: "slow-op", timeoutMs: 50 },
+    );
+
+    const emitPromise = reg.emit("task.before", TASK_BEFORE);
+    await vi.advanceTimersByTimeAsync(100);
+    const result = await emitPromise;
+
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]?.error).toContain("timed out");
+    expect(result.errors[0]?.label).toBe("slow-op");
+  });
+
+  it("timeout error message includes handler label", async () => {
+    vi.useFakeTimers();
+    const reg = new HookRegistry();
+
+    reg.on(
+      "task.before",
+      () => new Promise<void>(() => { /* never resolves */ }),
+      { label: "stuck-handler", timeoutMs: 10 },
+    );
+
+    const emitPromise = reg.emit("task.before", TASK_BEFORE);
+    await vi.advanceTimersByTimeAsync(50);
+    const result = await emitPromise;
+
+    expect(result.errors[0]?.error).toContain("stuck-handler");
+  });
+
+  it("timed-out handler does not prevent remaining handlers from running", async () => {
+    vi.useFakeTimers();
+    const reg = new HookRegistry();
+    const next = vi.fn();
+
+    reg.on(
+      "task.before",
+      () => new Promise<void>(() => { /* never resolves */ }),
+      { timeoutMs: 10, priority: 10 },
+    );
+    reg.on("task.before", next, { priority: 5 });
+
+    const emitPromise = reg.emit("task.before", TASK_BEFORE);
+    await vi.advanceTimersByTimeAsync(50);
+    const result = await emitPromise;
+
+    expect(result.errors).toHaveLength(1);
+    expect(next).toHaveBeenCalled();
+    expect(result.handled).toBe(2);
+  });
+});
+
+// ── HookRegistry — before/after ordering constraints ─────────────────────────
+
+describe("HookRegistry — before/after ordering", () => {
+  let reg: HookRegistry;
+  let order: string[];
+
+  beforeEach(() => {
+    reg = makeRegistry();
+    order = [];
+  });
+
+  it("handler with before: 'X' runs before handler labeled 'X'", async () => {
+    reg.on("task.before", () => { order.push("A"); }, { label: "A", before: "B" });
+    reg.on("task.before", () => { order.push("B"); }, { label: "B" });
+    await reg.emit("task.before", TASK_BEFORE);
+    expect(order.indexOf("A")).toBeLessThan(order.indexOf("B"));
+  });
+
+  it("handler with after: 'X' runs after handler labeled 'X'", async () => {
+    // Register C before B in insertion order, but C declares after: "B"
+    reg.on("task.before", () => { order.push("C"); }, { label: "C", after: "B" });
+    reg.on("task.before", () => { order.push("B"); }, { label: "B" });
+    await reg.emit("task.before", TASK_BEFORE);
+    expect(order.indexOf("B")).toBeLessThan(order.indexOf("C"));
+  });
+
+  it("three handlers with chain ordering A → B → C", async () => {
+    reg.on("task.before", () => { order.push("C"); }, { label: "C", after: "B" });
+    reg.on("task.before", () => { order.push("A"); }, { label: "A", before: "B" });
+    reg.on("task.before", () => { order.push("B"); }, { label: "B" });
+    await reg.emit("task.before", TASK_BEFORE);
+    expect(order).toEqual(["A", "B", "C"]);
+  });
+
+  it("before/after constraints with unknown label are ignored", async () => {
+    // "before: 'nonexistent'" should not throw or break ordering
+    reg.on("task.before", () => { order.push("A"); }, { label: "A", before: "nonexistent" });
+    reg.on("task.before", () => { order.push("B"); }, { label: "B" });
+    const result = await reg.emit("task.before", TASK_BEFORE);
+    expect(result.errors).toHaveLength(0);
+    expect(order).toHaveLength(2);
+  });
+
+  it("before constraint can reorder handlers even when declaring handler has lower priority", async () => {
+    // The topological sort is applied globally after priority sort.
+    // A before: "X" constraint re-inserts the declaring handler before "X"
+    // even if "X" had a higher priority value.
+    reg.on("task.before", () => { order.push("low"); }, { label: "low", priority: 1, before: "high" });
+    reg.on("task.before", () => { order.push("high"); }, { label: "high", priority: 100 });
+    await reg.emit("task.before", TASK_BEFORE);
+    // "low" declared before: "high", so topological sort places it first
+    expect(order.indexOf("low")).toBeLessThan(order.indexOf("high"));
+  });
+
+  it("same-priority handlers: after constraint reorders within tier", async () => {
+    // A, B, C all priority 0. B declares after: "C".
+    // Insertion order: A(0), B(1, after:C), C(2)
+    // After topological sort: A, C, B
+    reg.on("task.before", () => { order.push("A"); }, { label: "A" });
+    reg.on("task.before", () => { order.push("B"); }, { label: "B", after: "C" });
+    reg.on("task.before", () => { order.push("C"); }, { label: "C" });
+    await reg.emit("task.before", TASK_BEFORE);
+    expect(order.indexOf("C")).toBeLessThan(order.indexOf("B"));
+    expect(order[0]).toBe("A"); // A has no constraint, stays first
+  });
+});
+
+// ── HookRegistry — compensation handlers ─────────────────────────────────────
+
+describe("HookRegistry — compensation handlers", () => {
+  let reg: HookRegistry;
+
+  beforeEach(() => {
+    reg = makeRegistry();
+  });
+
+  it("compensation handlers do NOT run when no abort", async () => {
+    const comp = vi.fn();
+    reg.on("task.before", vi.fn()); // normal handler, no abort
+    reg.on("task.before", comp, { compensate: true });
+    const result = await reg.emit("task.before", TASK_BEFORE);
+    expect(comp).not.toHaveBeenCalled();
+    expect(result.compensationsRan).toBe(0);
+  });
+
+  it("compensation handlers run when abort is triggered", async () => {
+    const comp = vi.fn();
+    reg.on("task.before", () => ({ abort: true }));
+    reg.on("task.before", comp, { compensate: true });
+    const result = await reg.emit("task.before", TASK_BEFORE);
+    expect(comp).toHaveBeenCalled();
+    expect(result.compensationsRan).toBe(1);
+    expect(result.aborted).toBe(true);
+  });
+
+  it("multiple compensation handlers run in reverse registration order", async () => {
+    const order: string[] = [];
+    reg.on("task.before", () => ({ abort: true }), { priority: 10 });
+    reg.on("task.before", () => { order.push("comp1"); }, { compensate: true });
+    reg.on("task.before", () => { order.push("comp2"); }, { compensate: true });
+    reg.on("task.before", () => { order.push("comp3"); }, { compensate: true });
+    const result = await reg.emit("task.before", TASK_BEFORE);
+    expect(result.compensationsRan).toBe(3);
+    expect(order).toEqual(["comp3", "comp2", "comp1"]);
+  });
+
+  it("compensationsRan counts only successfully ran compensations", async () => {
+    reg.on("task.before", () => ({ abort: true }));
+    reg.on("task.before", vi.fn(), { compensate: true });
+    reg.on("task.before", () => { throw new Error("comp-fail"); }, { compensate: true });
+    reg.on("task.before", vi.fn(), { compensate: true });
+
+    // Registration order: comp1, comp2 (throws), comp3
+    // Reverse order for execution: comp3, comp2 (throws), comp1
+    const result = await reg.emit("task.before", TASK_BEFORE);
+    expect(result.compensationsRan).toBe(2); // comp3 and comp1 succeed
+    expect(result.errors.some((e) => e.error.includes("[compensation]"))).toBe(true);
+  });
+
+  it("compensation handler error is prefixed with [compensation] in error string", async () => {
+    reg.on("task.before", () => ({ abort: true }));
+    reg.on("task.before", () => { throw new Error("rollback-failed"); }, { compensate: true });
+    const result = await reg.emit("task.before", TASK_BEFORE);
+    expect(result.errors[0]?.error).toContain("[compensation]");
+    expect(result.errors[0]?.error).toContain("rollback-failed");
+  });
+
+  it("compensation handlers receive the same payload as normal handlers", async () => {
+    const comp = vi.fn();
+    reg.on("task.before", () => ({ abort: true }));
+    reg.on("task.before", comp, { compensate: true });
+    await reg.emit("task.before", TASK_BEFORE);
+    expect(comp).toHaveBeenCalledWith(TASK_BEFORE);
+  });
+
+  it("normal handlers skipped after abort are NOT treated as compensation handlers", async () => {
+    const skipped = vi.fn();
+    const comp = vi.fn();
+    reg.on("task.before", () => ({ abort: true }), { priority: 10 });
+    reg.on("task.before", skipped, { priority: 5 }); // normal, skipped
+    reg.on("task.before", comp, { compensate: true });
+
+    const result = await reg.emit("task.before", TASK_BEFORE);
+    expect(skipped).not.toHaveBeenCalled();
+    expect(comp).toHaveBeenCalledTimes(1);
+    expect(result.compensationsRan).toBe(1);
+  });
+
+  it("compensationsRan is 0 in EmitResult when abort never fires", async () => {
+    reg.on("task.before", vi.fn());
+    reg.on("task.before", vi.fn(), { compensate: true });
+    const result = await reg.emit("task.before", TASK_BEFORE);
+    expect(result.compensationsRan).toBe(0);
   });
 });

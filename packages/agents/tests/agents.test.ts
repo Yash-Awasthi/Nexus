@@ -280,6 +280,91 @@ describe("LibrarianAgent", () => {
     await agent.recall("q");
     expect(memory.recall).toHaveBeenCalledWith("q", 7, undefined);
   });
+
+  // ── KG error exposure ──────────────────────────────────────────────────────
+
+  it("kgError is undefined on successful recall", async () => {
+    const agent = new LibrarianAgent({ memory, kg });
+    const result = await agent.recall("Alice");
+    expect(result.kgError).toBeUndefined();
+  });
+
+  it("kgError is undefined when no KG is wired", async () => {
+    const agent = new LibrarianAgent({ memory });
+    const result = await agent.recall("Alice");
+    expect(result.kgError).toBeUndefined();
+  });
+
+  it("kgError is set when KG throws, memories still populated", async () => {
+    kg.queryNodes = vi.fn().mockRejectedValue(new Error("KG down"));
+    const agent = new LibrarianAgent({ memory, kg });
+    const result = await agent.recall("Alice");
+    expect(result.kgError).toContain("KG down");
+    expect(result.memories).toHaveLength(2);
+    expect(result.entities).toHaveLength(0);
+  });
+
+  it("kgError message is the stringified Error", async () => {
+    const err = new Error("graph timeout");
+    kg.queryNodes = vi.fn().mockRejectedValue(err);
+    const agent = new LibrarianAgent({ memory, kg });
+    const result = await agent.recall("q");
+    expect(result.kgError).toBe(String(err));
+  });
+
+  // ── keywordSearch ──────────────────────────────────────────────────────────
+
+  it("keywordSearch returns a LibrarianRecallResult", async () => {
+    const agent = new LibrarianAgent({ memory });
+    const result = await agent.keywordSearch("Alice");
+    expect(result).toHaveProperty("memories");
+    expect(result).toHaveProperty("entities");
+    expect(result).toHaveProperty("contextText");
+  });
+
+  it("keywordSearch re-ranks memories by TF score (term frequency)", async () => {
+    // "Alice" appears twice in first entry, once in second
+    const mem = makeMemory([
+      makeMemoryResult("Bob is the CTO at Bob Corp", 0.95),  // high semantic, no 'alice'
+      makeMemoryResult("Alice works with Alice at Nexus", 0.6), // low semantic, 2× 'alice'
+      makeMemoryResult("Alice is a developer", 0.7),           // 1× 'alice'
+    ]);
+    const agent = new LibrarianAgent({ memory: mem, defaultRecallLimit: 3 });
+    const result = await agent.keywordSearch("alice");
+    // Entry with 2× 'alice' should rank first
+    expect(result.memories[0]!.entry.text).toContain("Alice works with Alice");
+    // Entry with 1× 'alice' should rank second
+    expect(result.memories[1]!.entry.text).toContain("Alice is a developer");
+  });
+
+  it("keywordSearch uses semantic score as tie-breaker when TF scores are equal", async () => {
+    const mem = makeMemory([
+      makeMemoryResult("Alice low score", 0.5),   // 1× alice, score 0.5
+      makeMemoryResult("Alice high score", 0.9),  // 1× alice, score 0.9
+    ]);
+    const agent = new LibrarianAgent({ memory: mem, defaultRecallLimit: 2 });
+    const result = await agent.keywordSearch("alice");
+    // Higher semantic score wins on tie
+    expect(result.memories[0]!.entry.text).toContain("high score");
+  });
+
+  it("keywordSearch respects limit option", async () => {
+    const agent = new LibrarianAgent({ memory, defaultRecallLimit: 10 });
+    const result = await agent.keywordSearch("q", { limit: 1 });
+    expect(result.memories.length).toBeLessThanOrEqual(1);
+  });
+
+  it("keywordSearch includes KG entities when KG is wired", async () => {
+    const agent = new LibrarianAgent({ memory, kg });
+    const result = await agent.keywordSearch("Alice");
+    expect(result.entities).toHaveLength(2);
+  });
+
+  it("keywordSearch assembles contextText", async () => {
+    const agent = new LibrarianAgent({ memory });
+    const result = await agent.keywordSearch("Alice");
+    expect(result.contextText).toContain("## Relevant Memories");
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -482,6 +567,47 @@ describe("ResearcherAgent", () => {
     const agent = new ResearcherAgent({ runner, kg: kgNoIngest });
     const result = await agent.research("q");
     expect(result.ingestedIntoKG).toBe(false);
+  });
+
+  // ── Dedup before KG ingest ─────────────────────────────────────────────────
+
+  it("ingests first call for a query into KG", async () => {
+    const agent = new ResearcherAgent({ runner, kg });
+    const result = await agent.research("ai-ethics");
+    expect(result.ingestedIntoKG).toBe(true);
+    expect(kg.ingest).toHaveBeenCalledTimes(1);
+  });
+
+  it("does NOT re-ingest same query into KG on second call", async () => {
+    const agent = new ResearcherAgent({ runner, kg });
+    await agent.research("ai-ethics");
+    const second = await agent.research("ai-ethics");
+    expect(kg.ingest).toHaveBeenCalledTimes(1); // only once
+    expect(second.ingestedIntoKG).toBe(false);
+  });
+
+  it("ingests different queries independently (no cross-query dedup)", async () => {
+    const agent = new ResearcherAgent({ runner, kg });
+    await agent.research("ai-ethics");
+    await agent.research("ml-ops");
+    expect(kg.ingest).toHaveBeenCalledTimes(2);
+  });
+
+  it("dedup is scoped to agent instance — new instance re-ingests", async () => {
+    const agent1 = new ResearcherAgent({ runner, kg });
+    const agent2 = new ResearcherAgent({ runner, kg });
+    await agent1.research("ai-ethics");
+    const result = await agent2.research("ai-ethics");
+    expect(kg.ingest).toHaveBeenCalledTimes(2);
+    expect(result.ingestedIntoKG).toBe(true);
+  });
+
+  it("dedup respects skipKG — skipped calls do not mark query as ingested", async () => {
+    const agent = new ResearcherAgent({ runner, kg });
+    await agent.research("ai-ethics", { skipKG: true });
+    // Next call without skipKG should ingest since the skipped one wasn't tracked
+    const result = await agent.research("ai-ethics");
+    expect(result.ingestedIntoKG).toBe(true);
   });
 });
 
@@ -723,5 +849,78 @@ describe("FileExplorerAgent", () => {
     expect((hooks.emit as ReturnType<typeof vi.fn>).mock.calls[0]![1]).toMatchObject({
       agent: "fe-custom",
     });
+  });
+
+  // ── TF-scored ranking via ListOptions.query ────────────────────────────────
+
+  it("listFiles with query returns FileInfo with score field", async () => {
+    const agentFs = makeFS(
+      {},
+      { "/src": ["/src/auth.ts", "/src/index.ts", "/src/auth-utils.ts"] },
+    );
+    const agent = new FileExplorerAgent({ fs: agentFs });
+    const files = await agent.listFiles("/src", { query: "auth" });
+    expect(files.every((f) => f.score !== undefined)).toBe(true);
+  });
+
+  it("listFiles with query ranks by TF score descending", async () => {
+    const agentFs = makeFS(
+      {},
+      {
+        "/src": [
+          "/src/index.ts",          // no 'auth' — score 0
+          "/src/auth.ts",           // 'auth' appears once — score 1
+          "/src/auth-utils.ts",     // 'auth' appears twice (auth + utils split) — score higher
+        ],
+      },
+    );
+    const agent = new FileExplorerAgent({ fs: agentFs });
+    const files = await agent.listFiles("/src", { query: "auth" });
+    // Files with 'auth' in the name should rank above index.ts
+    const scores = files.map((f) => f.score ?? 0);
+    // Sorted descending
+    for (let i = 0; i < scores.length - 1; i++) {
+      expect(scores[i]!).toBeGreaterThanOrEqual(scores[i + 1]!);
+    }
+    // index.ts (no 'auth') should be last
+    expect(files[files.length - 1]!.name).toBe("index.ts");
+  });
+
+  it("listFiles without query returns FileInfo without score field", async () => {
+    const agent = new FileExplorerAgent({ fs });
+    const files = await agent.listFiles("/project/src");
+    expect(files.every((f) => f.score === undefined)).toBe(true);
+  });
+
+  it("listFiles query can be combined with pattern filter", async () => {
+    const agentFs = makeFS(
+      {},
+      {
+        "/src": [
+          "/src/auth.ts",
+          "/src/auth-service.ts",
+          "/src/user.ts",           // passes pattern 'ts' but not related to 'auth'
+        ],
+      },
+    );
+    const agent = new FileExplorerAgent({ fs: agentFs });
+    // pattern filters to .ts files only, then query ranks by 'auth' TF
+    const files = await agent.listFiles("/src", { pattern: "auth", query: "auth" });
+    expect(files).toHaveLength(2);
+    expect(files.every((f) => f.name.includes("auth"))).toBe(true);
+    expect(files.every((f) => (f.score ?? 0) > 0)).toBe(true);
+  });
+
+  it("listFiles query with no matching terms gives score 0 for all", async () => {
+    const agent = new FileExplorerAgent({ fs });
+    const files = await agent.listFiles("/project/src", { query: "zzz" });
+    expect(files.every((f) => f.score === 0)).toBe(true);
+  });
+
+  it("listFiles query with empty directory returns empty array", async () => {
+    const agentFs = makeFS({}, { "/empty": [] });
+    const agent = new FileExplorerAgent({ fs: agentFs });
+    const files = await agent.listFiles("/empty", { query: "anything" });
+    expect(files).toHaveLength(0);
   });
 });

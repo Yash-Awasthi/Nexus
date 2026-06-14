@@ -10,6 +10,7 @@ import {
   withPacing,
   sequential,
   weighted,
+  DEFAULT_THRESHOLDS,
   type ScenarioFn,
   type VUContext,
   type LoadTestResult,
@@ -641,5 +642,42 @@ describe("weighted", () => {
     };
     await pick(ctx);
     expect(called[0]).toBe(2); // fallback to last
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DEFAULT_THRESHOLDS
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("DEFAULT_THRESHOLDS", () => {
+  it("is exported and has p95LatencyMs", () => {
+    expect(typeof DEFAULT_THRESHOLDS.p95LatencyMs).toBe("number");
+  });
+
+  it("is exported and has errorRatePercent", () => {
+    expect(typeof DEFAULT_THRESHOLDS.errorRatePercent).toBe("number");
+  });
+
+  it("applied automatically when thresholds omitted — passes for zero-latency scenario", async () => {
+    const runner = makeRunner(async () => {});
+    // NullHttpClient: latency ≈ 0ms, errorRate = 0% — both within defaults
+    const result = await runner.run(singleStage(1));
+    expect(result.thresholdsPassed).toBe(true);
+    expect(result.thresholdViolations).toHaveLength(0);
+  });
+
+  it("fails when error rate exceeds default (no explicit thresholds)", async () => {
+    const runner = makeRunner(async () => { throw new Error("always fail"); });
+    const result = await runner.run(singleStage(1));
+    // 100% error rate > DEFAULT_THRESHOLDS.errorRatePercent (5)
+    expect(result.thresholdsPassed).toBe(false);
+    expect(result.thresholdViolations.some((v) => v.includes("error rate"))).toBe(true);
+  });
+
+  it("thresholds:{} disables all conditions (explicit opt-out passes even at 100% errors)", async () => {
+    const runner = makeRunner(async () => { throw new Error("always fail"); });
+    const result = await runner.run({ ...singleStage(1), thresholds: {} });
+    expect(result.thresholdsPassed).toBe(true);
+    expect(result.thresholdViolations).toHaveLength(0);
   });
 });

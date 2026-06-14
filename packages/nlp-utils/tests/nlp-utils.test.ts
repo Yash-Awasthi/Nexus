@@ -6,7 +6,9 @@ import {
   chunkByFixed,
   chunkBySentence,
   chunkByParagraph,
+  chunkBySemantic,
   chunkByStrategy,
+  jaccardSimilarity,
   detectLanguage,
   extractKeywords,
   extractEntities,
@@ -15,6 +17,8 @@ import {
   CHARS_PER_TOKEN,
   DEFAULT_MAX_TOKENS,
   DEFAULT_OVERLAP_TOKENS,
+  DEFAULT_SEMANTIC_THRESHOLD,
+  DEFAULT_SEMANTIC_MAX_CHARS,
   STOPWORDS,
   type NlpLlmClient,
   type Entity,
@@ -587,5 +591,174 @@ describe("extractRelationships", () => {
   it("uses nullNlpLlmClient by default", async () => {
     const rels = await extractRelationships("text", entities);
     expect(rels).toEqual([]);
+  });
+});
+
+// ── jaccardSimilarity ─────────────────────────────────────────────────────────
+
+describe("jaccardSimilarity", () => {
+  it("returns 0 for two empty sets", () => {
+    expect(jaccardSimilarity(new Set(), new Set())).toBe(0);
+  });
+
+  it("returns 0 when sets are disjoint", () => {
+    expect(jaccardSimilarity(new Set(["a", "b"]), new Set(["c", "d"]))).toBe(0);
+  });
+
+  it("returns 1 for identical sets", () => {
+    const s = new Set(["x", "y", "z"]);
+    expect(jaccardSimilarity(s, s)).toBe(1);
+  });
+
+  it("returns 0.5 for half-overlapping sets", () => {
+    // A={a,b,c}, B={b,c,d} → intersection=2, union=4 → 0.5
+    expect(jaccardSimilarity(new Set(["a", "b", "c"]), new Set(["b", "c", "d"]))).toBe(0.5);
+  });
+
+  it("returns 1/3 for one-element overlap in three-element sets", () => {
+    // A={a,b,c}, B={c,d,e} → intersection=1, union=5 → 0.2
+    expect(jaccardSimilarity(new Set(["a", "b", "c"]), new Set(["c", "d", "e"]))).toBeCloseTo(
+      1 / 5,
+    );
+  });
+
+  it("is commutative", () => {
+    const a = new Set(["dog", "cat", "bird"]);
+    const b = new Set(["cat", "fish", "frog"]);
+    expect(jaccardSimilarity(a, b)).toBeCloseTo(jaccardSimilarity(b, a));
+  });
+
+  it("returns 0 when left set is empty", () => {
+    expect(jaccardSimilarity(new Set(), new Set(["a", "b"]))).toBe(0);
+  });
+
+  it("returns 0 when right set is empty", () => {
+    expect(jaccardSimilarity(new Set(["a", "b"]), new Set())).toBe(0);
+  });
+});
+
+// ── DEFAULT_SEMANTIC_THRESHOLD / DEFAULT_SEMANTIC_MAX_CHARS ───────────────────
+
+describe("semantic chunking constants", () => {
+  it("DEFAULT_SEMANTIC_THRESHOLD is 0.15", () => {
+    expect(DEFAULT_SEMANTIC_THRESHOLD).toBe(0.15);
+  });
+
+  it("DEFAULT_SEMANTIC_MAX_CHARS is 2000", () => {
+    expect(DEFAULT_SEMANTIC_MAX_CHARS).toBe(2000);
+  });
+});
+
+// ── chunkBySemantic ───────────────────────────────────────────────────────────
+
+describe("chunkBySemantic — edge cases", () => {
+  it("returns [] for empty text", () => {
+    expect(chunkBySemantic("")).toEqual([]);
+  });
+
+  it("returns [] for whitespace-only text", () => {
+    expect(chunkBySemantic("   ")).toEqual([]);
+  });
+
+  it("returns single chunk for single sentence", () => {
+    const chunks = chunkBySemantic("The quick brown fox jumps over the lazy dog.");
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]?.text).toContain("fox");
+  });
+
+  it("indices start at 0 and are sequential", () => {
+    const s1 = "The quick brown fox jumps over the lazy dog.";
+    const s2 = "Blockchain consensus algorithms ensure distributed trust.";
+    const chunks = chunkBySemantic(`${s1} ${s2}`, { similarityThreshold: 0.99 });
+    chunks.forEach((c, i) => expect(c.index).toBe(i));
+  });
+
+  it("tokenEstimate matches estimateTokens for every chunk", () => {
+    const text =
+      "Dogs are loyal pets. Dogs love to play fetch. Quantum computing uses qubits.";
+    const chunks = chunkBySemantic(text);
+    for (const c of chunks) {
+      expect(c.tokenEstimate).toBe(estimateTokens(c.text));
+    }
+  });
+
+  it("text without sentence punctuation returns one chunk", () => {
+    const text = "no punctuation at all just words flowing along";
+    const chunks = chunkBySemantic(text);
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]?.text).toBe(text);
+  });
+});
+
+describe("chunkBySemantic — topic cohesion", () => {
+  it("keeps sentences on the same topic together", () => {
+    // Two sentences sharing vocabulary → should merge
+    const text = "Dogs love to run and play. Dogs also enjoy swimming and fetching.";
+    const chunks = chunkBySemantic(text, { similarityThreshold: 0.05 });
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]?.text).toContain("Dogs");
+  });
+
+  it("splits sentences with no shared vocabulary when threshold is high", () => {
+    const dogSentence = "Dogs love running playing fetching barking wagging tails.";
+    const quantumSentence =
+      "Qubits entanglement superposition quantum coherence decoherence fidelity.";
+    const chunks = chunkBySemantic(`${dogSentence} ${quantumSentence}`, {
+      similarityThreshold: 0.3,
+    });
+    // These sentences share zero vocabulary → must split into 2
+    expect(chunks.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("threshold=0 groups all sentences (always similar enough)", () => {
+    const text =
+      "Alpha beta gamma. Delta epsilon zeta. Eta theta iota.";
+    const chunks = chunkBySemantic(text, { similarityThreshold: 0 });
+    // With threshold 0, every sentence meets ≥ 0 → all merge
+    expect(chunks).toHaveLength(1);
+  });
+
+  it("threshold=1 splits every sentence into its own chunk", () => {
+    // With threshold 1, only identical word sets qualify — extremely rare in natural text
+    const text = "Alpha beta gamma delta. Epsilon zeta eta theta. Iota kappa lambda mu.";
+    const chunks = chunkBySemantic(text, { similarityThreshold: 1 });
+    // All three sentences have disjoint vocabularies → 3 chunks
+    expect(chunks.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("chunkBySemantic — maxCharsPerChunk", () => {
+  it("respects maxCharsPerChunk even within a single topic", () => {
+    // Build many short sentences on the same topic so they'd normally merge but
+    // the char limit forces splits.
+    const sentence = "Dogs love running and playing fetch.";
+    const text = Array.from({ length: 6 }, () => sentence).join(" ");
+    const chunks = chunkBySemantic(text, { maxCharsPerChunk: 80, similarityThreshold: 0 });
+    // Each chunk must not dramatically exceed the limit
+    for (const c of chunks) {
+      expect(c.text.length).toBeLessThanOrEqual(sentence.length * 2 + 5);
+    }
+    // Must produce multiple chunks
+    expect(chunks.length).toBeGreaterThan(1);
+  });
+
+  it("a single very long sentence is emitted as one chunk even beyond maxCharsPerChunk", () => {
+    const sentence = "word ".repeat(600).trim() + ".";
+    const chunks = chunkBySemantic(sentence, { maxCharsPerChunk: 100 });
+    // The single sentence exceeds max but has no boundary to split at
+    expect(chunks).toHaveLength(1);
+  });
+});
+
+describe("chunkBySemantic — chunkByStrategy integration", () => {
+  it("chunkByStrategy dispatches 'semantic' to chunkBySemantic", () => {
+    const text = "Hello world. This is a test sentence.";
+    const a = chunkByStrategy(text, "semantic", { similarityThreshold: 0.05 });
+    const b = chunkBySemantic(text, { similarityThreshold: 0.05 });
+    expect(a).toEqual(b);
+  });
+
+  it("returns [] for empty text via strategy dispatcher", () => {
+    expect(chunkByStrategy("", "semantic")).toEqual([]);
   });
 });

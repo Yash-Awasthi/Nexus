@@ -14,9 +14,17 @@
  *
  * Dispatch model:
  *   • Handlers run sequentially in descending priority order (higher first).
- *   • A handler returning { abort: true } stops the remaining chain.
+ *   • before/after ordering constraints refine position within priority tier.
+ *   • A handler returning { abort: true } stops the remaining chain and
+ *     triggers registered compensation handlers in reverse registration order.
+ *   • Each handler may declare a timeoutMs after which it is force-cancelled.
  *   • Handler errors are collected and returned in EmitResult — one bad
  *     handler never prevents the rest from running.
+ *
+ * Persistence:
+ *   • Inject a HookStore to persist handler metadata (label / event / priority).
+ *   • Call registry.rehydrate(namedHandlers) on startup to re-register
+ *     persisted handlers by matching stored labels to live handler functions.
  *
  * Plugin bundles:
  *   • A Plugin is a named object with an install() that registers hooks.
@@ -30,7 +38,7 @@
  *
  * globalHooks.on("task.before", async ({ taskId, taskType }) => {
  *   console.log("starting", taskType, taskId);
- * }, { priority: 10, label: "logger" });
+ * }, { priority: 10, label: "logger", timeoutMs: 2000 });
  *
  * await globalHooks.emit("task.before", { taskId: "t1", taskType: "doc.ingest", payload: {}, attempt: 1 });
  * ```
@@ -128,6 +136,7 @@ export type HookEvent = keyof HookEventMap;
 export interface HookResult {
   /**
    * When true, stops dispatch — no further handlers for this emit run.
+   * Triggers any registered compensation handlers.
    * Use sparingly; most hooks should not abort the chain.
    */
   abort?: boolean;
@@ -153,8 +162,37 @@ export interface HookOptions {
    * Default: 0.
    */
   priority?: number;
-  /** Human-readable label for debug output */
+  /** Human-readable label for debug output and ordering declarations */
   label?: string;
+  /**
+   * This handler must run before the handler whose label matches this value.
+   * Applied within the same priority tier.
+   */
+  before?: string;
+  /**
+   * This handler must run after the handler whose label matches this value.
+   * Applied within the same priority tier.
+   */
+  after?: string;
+  /**
+   * Maximum milliseconds this handler may run before it is considered timed
+   * out.  A timeout is recorded as an error in EmitResult.errors.
+   * Default: no timeout.
+   */
+  timeoutMs?: number;
+  /**
+   * When true, this handler is a compensation handler.
+   * Compensation handlers run in reverse registration order when a prior
+   * handler aborts the chain (returns { abort: true }).
+   * Compensation handlers themselves cannot abort.
+   */
+  compensate?: boolean;
+  /**
+   * When true and a HookStore is configured, the handler metadata (label,
+   * event, priority, timeoutMs) is persisted so it can be rehydrated after
+   * a process restart.
+   */
+  persist?: boolean;
 }
 
 // ── Emit result ───────────────────────────────────────────────────────────────
@@ -168,12 +206,52 @@ export interface HandlerError {
 export interface EmitResult {
   /** Event that was emitted */
   event: HookEvent;
-  /** Number of handlers that executed (including aborted) */
+  /** Number of normal handlers that executed (including aborted) */
   handled: number;
   /** True if a handler returned { abort: true } */
   aborted: boolean;
+  /** Number of compensation handlers that ran after abort */
+  compensationsRan: number;
   /** Errors thrown by individual handlers (collected, not re-thrown) */
   errors: HandlerError[];
+}
+
+// ── Persistence store interface ───────────────────────────────────────────────
+
+export interface StoredHandler {
+  id: string;
+  event: HookEvent;
+  label: string;
+  priority: number;
+  timeoutMs?: number;
+  createdAt: number;
+}
+
+/**
+ * Minimal persistence interface for HookRegistry.
+ * Implement this to survive process restarts (e.g. in-memory, Redis, SQLite).
+ */
+export interface HookStore {
+  save(entry: StoredHandler): Promise<void>;
+  delete(id: string): Promise<void>;
+  loadAll(): Promise<StoredHandler[]>;
+}
+
+/** In-memory HookStore — for testing and single-process use. */
+export class MemoryHookStore implements HookStore {
+  private readonly store = new Map<string, StoredHandler>();
+
+  async save(entry: StoredHandler): Promise<void> {
+    this.store.set(entry.id, { ...entry });
+  }
+
+  async delete(id: string): Promise<void> {
+    this.store.delete(id);
+  }
+
+  async loadAll(): Promise<StoredHandler[]> {
+    return Array.from(this.store.values());
+  }
 }
 
 // ── Plugin interface ──────────────────────────────────────────────────────────
@@ -200,16 +278,103 @@ export interface Plugin {
 
 // ── Internal handler record ───────────────────────────────────────────────────
 
-interface HandlerRecord<T> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+interface HandlerRecord<T = any> {
   id: string;
   event: HookEvent;
   priority: number;
   label?: string;
+  before?: string;
+  after?: string;
+  timeoutMs?: number;
+  compensate: boolean;
   handler: HookHandler<T>;
   insertionOrder: number;
 }
 
+// ── Topological sort helper ───────────────────────────────────────────────────
+
+/**
+ * Given a list of handlers already sorted by (priority DESC, insertionOrder ASC),
+ * apply before/after ordering constraints using a stable topological sort.
+ * Cycles are silently ignored (the original order is preserved for cyclic pairs).
+ */
+function applyOrderingConstraints(handlers: HandlerRecord[]): HandlerRecord[] {
+  // Build label→record map (last registration wins for duplicates)
+  const labelMap = new Map<string, HandlerRecord>();
+  for (const h of handlers) {
+    if (h.label) labelMap.set(h.label, h);
+  }
+
+  // Build adjacency list: mustBefore[i] = set of indices that must come after i
+  const n = handlers.length;
+  const indexMap = new Map(handlers.map((h, i) => [h.id, i]));
+  const before = new Array<Set<number>>(n).fill(null as unknown as Set<number>).map(() => new Set<number>());
+
+  for (let i = 0; i < n; i++) {
+    const h = handlers[i]!;
+    if (h.before) {
+      const target = labelMap.get(h.before);
+      if (target) {
+        const j = indexMap.get(target.id);
+        if (j !== undefined && j !== i) before[i]!.add(j); // i must come before j
+      }
+    }
+    if (h.after) {
+      const source = labelMap.get(h.after);
+      if (source) {
+        const j = indexMap.get(source.id);
+        if (j !== undefined && j !== i) before[j]!.add(i); // j must come before i
+      }
+    }
+  }
+
+  // Kahn's algorithm for topological sort; falls back to priority order on tie
+  const inDegree = new Array<number>(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    for (const j of before[i]!) inDegree[j] = (inDegree[j] ?? 0) + 1;
+  }
+
+  const queue: number[] = [];
+  for (let i = 0; i < n; i++) {
+    if (inDegree[i] === 0) queue.push(i);
+  }
+  // Sort queue by original (priority) order for stable output
+  queue.sort((a, b) => a - b);
+
+  const result: HandlerRecord[] = [];
+  while (queue.length > 0) {
+    const i = queue.shift()!;
+    result.push(handlers[i]!);
+    const dependents = Array.from(before[i]!).sort((a, b) => a - b);
+    for (const j of dependents) {
+      if (--inDegree[j]! === 0) {
+        queue.push(j);
+        queue.sort((a, b) => a - b);
+      }
+    }
+  }
+
+  // If cycle detected (result.length < n), append remaining in original order
+  if (result.length < n) {
+    const seen = new Set(result.map((h) => h.id));
+    for (const h of handlers) {
+      if (!seen.has(h.id)) result.push(h);
+    }
+  }
+
+  return result;
+}
+
 // ── HookRegistry ──────────────────────────────────────────────────────────────
+
+export interface HookRegistryOptions {
+  /**
+   * Optional persistence store.  When provided, handlers registered with
+   * `persist: true` will be saved here and can be reloaded via `rehydrate()`.
+   */
+  store?: HookStore;
+}
 
 /**
  * Central hook registry.
@@ -221,7 +386,12 @@ export class HookRegistry {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly handlers = new Map<HookEvent, HandlerRecord<any>[]>();
   private readonly plugins = new Map<string, Plugin>();
+  private readonly store?: HookStore;
   private insertionCounter = 0;
+
+  constructor(opts: HookRegistryOptions = {}) {
+    this.store = opts.store;
+  }
 
   // ── Registration ──────────────────────────────────────────────────────────
 
@@ -240,6 +410,10 @@ export class HookRegistry {
       event,
       priority: opts.priority ?? 0,
       label: opts.label,
+      before: opts.before,
+      after: opts.after,
+      timeoutMs: opts.timeoutMs,
+      compensate: opts.compensate ?? false,
       handler,
       insertionOrder: this.insertionCounter++,
     };
@@ -247,6 +421,20 @@ export class HookRegistry {
     const bucket = this.handlers.get(event) ?? [];
     bucket.push(record);
     this.handlers.set(event, bucket);
+
+    // Persist metadata if requested
+    if (opts.persist && this.store && opts.label) {
+      const entry: StoredHandler = {
+        id: record.id,
+        event,
+        label: opts.label,
+        priority: record.priority,
+        timeoutMs: record.timeoutMs,
+        createdAt: Date.now(),
+      };
+      // Fire-and-forget; failures do not affect registration
+      this.store.save(entry).catch(() => undefined);
+    }
 
     return { id: record.id, event, priority: record.priority, label: record.label };
   }
@@ -259,7 +447,10 @@ export class HookRegistry {
     const bucket = this.handlers.get(registration.event);
     if (!bucket) return;
     const idx = bucket.findIndex((r) => r.id === registration.id);
-    if (idx !== -1) bucket.splice(idx, 1);
+    if (idx !== -1) {
+      bucket.splice(idx, 1);
+      this.store?.delete(registration.id).catch(() => undefined);
+    }
   }
 
   /**
@@ -274,40 +465,98 @@ export class HookRegistry {
     }
   }
 
+  // ── Rehydration (restart persistence) ─────────────────────────────────────
+
+  /**
+   * Re-register handlers whose metadata was persisted in the store.
+   *
+   * @param namedHandlers - Map from label string to actual handler function.
+   *   Only stored entries whose label appears in this map will be re-registered.
+   *
+   * @returns Number of handlers successfully rehydrated.
+   */
+  async rehydrate(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    namedHandlers: Record<string, HookHandler<any>>,
+  ): Promise<number> {
+    if (!this.store) return 0;
+    const stored = await this.store.loadAll();
+    let count = 0;
+    for (const entry of stored) {
+      const fn = namedHandlers[entry.label];
+      if (!fn) continue;
+      // Re-register with the persisted metadata, using the stored id
+      const record: HandlerRecord = {
+        id: entry.id,
+        event: entry.event,
+        priority: entry.priority,
+        label: entry.label,
+        timeoutMs: entry.timeoutMs,
+        compensate: false,
+        handler: fn,
+        insertionOrder: this.insertionCounter++,
+      };
+      const bucket = this.handlers.get(entry.event) ?? [];
+      // Avoid duplicate rehydration
+      if (!bucket.some((r) => r.id === entry.id)) {
+        bucket.push(record);
+        this.handlers.set(entry.event, bucket);
+        count++;
+      }
+    }
+    return count;
+  }
+
   // ── Emit ──────────────────────────────────────────────────────────────────
 
   /**
-   * Fire all registered handlers for `event` in descending priority order.
+   * Fire all registered handlers for `event` in descending priority order
+   * (with before/after ordering constraints applied within each priority tier).
    *
    * Returns an EmitResult describing what happened.  Never throws — errors
    * from individual handlers are collected in `result.errors`.
+   *
+   * When a handler aborts the chain, registered compensation handlers run
+   * in reverse registration order before emit() returns.
    */
   async emit<E extends HookEvent>(
     event: E,
     payload: HookEventMap[E],
   ): Promise<EmitResult> {
-    const result: EmitResult = { event, handled: 0, aborted: false, errors: [] };
+    const result: EmitResult = {
+      event,
+      handled: 0,
+      aborted: false,
+      compensationsRan: 0,
+      errors: [],
+    };
 
     const raw = this.handlers.get(event) ?? [];
 
-    // Sort: higher priority first; ties broken by insertion order (lower = earlier)
-    const sorted = raw
+    // Separate normal and compensation handlers
+    const normal = raw.filter((r) => !r.compensate);
+    const compensations = raw.filter((r) => r.compensate);
+
+    // Sort normal: priority DESC, insertionOrder ASC
+    const prioritySorted = normal
       .slice()
       .sort((a, b) => b.priority - a.priority || a.insertionOrder - b.insertionOrder);
+
+    // Apply before/after ordering constraints
+    const sorted = applyOrderingConstraints(prioritySorted);
 
     for (const record of sorted) {
       result.handled++;
 
       let hookResult: HookResult | void;
       try {
-        hookResult = await record.handler(payload);
+        hookResult = await this._runWithTimeout(record, payload);
       } catch (err) {
         result.errors.push({
           handlerId: record.id,
           label: record.label,
           error: String(err),
         });
-        // Continue chain even if a handler throws
         continue;
       }
 
@@ -317,7 +566,63 @@ export class HookRegistry {
       }
     }
 
+    // Run compensation handlers when abort was signalled
+    if (result.aborted && compensations.length > 0) {
+      // Reverse registration order for compensation
+      const reversed = compensations.slice().reverse();
+      for (const record of reversed) {
+        try {
+          await this._runWithTimeout(record, payload);
+          result.compensationsRan++;
+        } catch (err) {
+          result.errors.push({
+            handlerId: record.id,
+            label: record.label,
+            error: `[compensation] ${String(err)}`,
+          });
+        }
+      }
+    }
+
     return result;
+  }
+
+  /** Run a handler, racing against an optional timeout. */
+  private async _runWithTimeout(
+    record: HandlerRecord,
+    payload: unknown,
+  ): Promise<HookResult | void> {
+    if (!record.timeoutMs) {
+      return record.handler(payload);
+    }
+
+    return new Promise<HookResult | void>((resolve, reject) => {
+      let done = false;
+
+      const timer = setTimeout(() => {
+        if (!done) {
+          done = true;
+          reject(new Error(`Handler "${record.label ?? record.id}" timed out after ${record.timeoutMs}ms`));
+        }
+      }, record.timeoutMs);
+
+      Promise.resolve(record.handler(payload)).then(
+        (r) => {
+          if (!done) {
+            done = true;
+            clearTimeout(timer);
+            resolve(r);
+          }
+        },
+        (err) => {
+          if (!done) {
+            done = true;
+            clearTimeout(timer);
+            reject(err as Error);
+          }
+        },
+      );
+    });
   }
 
   // ── Plugin management ─────────────────────────────────────────────────────

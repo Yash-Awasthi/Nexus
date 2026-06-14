@@ -3,13 +3,22 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   AlertError,
   AlertEngine,
+  AlertHistory,
   NullAlertChannel,
   FailingAlertChannel,
+  MemoryAlertRuleStore,
+  MemoryAlertCooldownStore,
+  FileAlertRuleStore,
+  persistEngineTo,
+  loadEngineFromStore,
   thresholdRule,
   type AlertRule,
   type AlertChannel,
   type AlertHooks,
   type AlertEvent,
+  type AlertReadFileFn,
+  type AlertWriteFileFn,
+  type AlertCooldownStore,
 } from "../src/index.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -707,5 +716,523 @@ describe("AlertEngine — DispatchResult", () => {
     const ids = r.events.map((e) => e.ruleId);
     expect(ids).toContain("a");
     expect(ids).toContain("b");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AlertRuleStore — MemoryAlertRuleStore
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("MemoryAlertRuleStore", () => {
+  it("loadRules() returns empty array initially", async () => {
+    const store = new MemoryAlertRuleStore();
+    expect(await store.loadRules()).toEqual([]);
+  });
+
+  it("saveRules() persists rules and loadRules() returns them", async () => {
+    const store = new MemoryAlertRuleStore();
+    const rule = thresholdRule("r1", "cpu", "gt", 90);
+    await store.saveRules([rule]);
+    const loaded = await store.loadRules();
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]!.id).toBe("r1");
+  });
+
+  it("saveRules() replaces previous rules", async () => {
+    const store = new MemoryAlertRuleStore();
+    await store.saveRules([thresholdRule("old", "x", "gt", 1)]);
+    await store.saveRules([thresholdRule("new", "y", "gt", 2)]);
+    const loaded = await store.loadRules();
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]!.id).toBe("new");
+  });
+
+  it("clear() removes all rules", async () => {
+    const store = new MemoryAlertRuleStore();
+    await store.saveRules([thresholdRule("r1", "x", "gt", 1)]);
+    await store.clear();
+    expect(await store.loadRules()).toHaveLength(0);
+  });
+
+  it("loadRules() returns a copy — mutations do not affect the store", async () => {
+    const store = new MemoryAlertRuleStore();
+    const rule = thresholdRule("r1", "cpu", "gt", 90);
+    await store.saveRules([rule]);
+    const loaded = await store.loadRules();
+    loaded.push(thresholdRule("r2", "mem", "gt", 80));
+    expect(await store.loadRules()).toHaveLength(1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AlertRuleStore — FileAlertRuleStore
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("FileAlertRuleStore", () => {
+  function makeFileStore(initialContent?: string) {
+    let disk = initialContent ?? "[]";
+    const readFile: AlertReadFileFn = vi.fn(async () => disk);
+    const writeFile: AlertWriteFileFn = vi.fn(async (_p, content) => {
+      disk = content;
+    });
+    const store = new FileAlertRuleStore({ path: "/tmp/rules.json", readFile, writeFile });
+    return { store, readFile, writeFile, getDisk: () => disk };
+  }
+
+  it("loadRules() returns [] when file is empty JSON array", async () => {
+    const { store } = makeFileStore("[]");
+    expect(await store.loadRules()).toEqual([]);
+  });
+
+  it("loadRules() returns [] when file is missing (readFile throws)", async () => {
+    const readFile: AlertReadFileFn = vi.fn(async () => { throw new Error("ENOENT"); });
+    const store = new FileAlertRuleStore({ path: "/missing.json", readFile });
+    expect(await store.loadRules()).toEqual([]);
+  });
+
+  it("loadRules() parses rules from disk", async () => {
+    const rule = thresholdRule("disk-rule", "cpu", "gt", 80);
+    const { store } = makeFileStore(JSON.stringify([rule]));
+    const loaded = await store.loadRules();
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]!.id).toBe("disk-rule");
+  });
+
+  it("saveRules() writes JSON to the file path", async () => {
+    const { store, writeFile } = makeFileStore();
+    await store.saveRules([thresholdRule("r1", "x", "gt", 1)]);
+    expect(vi.mocked(writeFile)).toHaveBeenCalledOnce();
+    const written = vi.mocked(writeFile).mock.calls[0]![1];
+    const parsed = JSON.parse(written) as AlertRule[];
+    expect(parsed[0]!.id).toBe("r1");
+  });
+
+  it("clear() writes '[]' to the file", async () => {
+    const { store, writeFile } = makeFileStore('[{"id":"old"}]');
+    await store.clear();
+    const written = vi.mocked(writeFile).mock.calls[0]![1];
+    expect(JSON.parse(written)).toEqual([]);
+  });
+
+  it("round-trip: saveRules + loadRules preserves all rule fields", async () => {
+    const { store } = makeFileStore();
+    const rule: AlertRule = {
+      id: "rt-rule",
+      name: "Round-trip",
+      metric: "cost.usd",
+      condition: { type: "threshold", operator: "gt", value: 100 },
+      severity: "critical",
+      cooldownMs: 3_600_000,
+      metadata: { team: "platform" },
+    };
+    await store.saveRules([rule]);
+    const [loaded] = await store.loadRules();
+    expect(loaded).toMatchObject(rule);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// persistEngineTo / loadEngineFromStore
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("persistEngineTo", () => {
+  it("writes all engine rules to store", async () => {
+    const engine = new AlertEngine();
+    engine.addRule(thresholdRule("r1", "cpu", "gt", 80));
+    engine.addRule(thresholdRule("r2", "mem", "gt", 90));
+    const store = new MemoryAlertRuleStore();
+    await persistEngineTo(engine, store);
+    const rules = await store.loadRules();
+    expect(rules).toHaveLength(2);
+    expect(rules.map((r) => r.id).sort()).toEqual(["r1", "r2"]);
+  });
+
+  it("writes empty array when engine has no rules", async () => {
+    const engine = new AlertEngine();
+    const store = new MemoryAlertRuleStore();
+    await persistEngineTo(engine, store);
+    expect(await store.loadRules()).toEqual([]);
+  });
+});
+
+describe("loadEngineFromStore", () => {
+  it("loads rules from store into a new engine", async () => {
+    const store = new MemoryAlertRuleStore();
+    await store.saveRules([thresholdRule("r1", "cpu", "gt", 80), thresholdRule("r2", "mem", "gt", 90)]);
+    const engine = await loadEngineFromStore(store);
+    expect(engine.listRules()).toHaveLength(2);
+    expect(engine.getRule("r1")).toBeDefined();
+  });
+
+  it("returns an engine with no rules when store is empty", async () => {
+    const store = new MemoryAlertRuleStore();
+    const engine = await loadEngineFromStore(store);
+    expect(engine.listRules()).toHaveLength(0);
+  });
+
+  it("engine from store can evaluate rules immediately", async () => {
+    const store = new MemoryAlertRuleStore();
+    await store.saveRules([thresholdRule("cost", "cost.usd", "gt", 50, "warning")]);
+    const channel = new NullAlertChannel();
+    const engine = await loadEngineFromStore(store, { channels: [channel] });
+    const result = await engine.evaluate("cost.usd", 100);
+    expect(result.fired).toBe(1);
+    expect(channel.sent).toHaveLength(1);
+  });
+
+  it("persistence round-trip survives restart", async () => {
+    // Session 1: create engine, add rules, persist
+    const store = new MemoryAlertRuleStore();
+    const engine1 = new AlertEngine();
+    engine1.addRule(thresholdRule("latency", "latency.p99", "gt", 500, "critical"));
+    await persistEngineTo(engine1, store);
+
+    // Session 2: new engine loaded from store — rules intact
+    const engine2 = await loadEngineFromStore(store);
+    expect(engine2.getRule("latency")).toBeDefined();
+    const r = await engine2.evaluate("latency.p99", 600);
+    expect(r.fired).toBe(1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AlertHistory — circular buffer
+// ─────────────────────────────────────────────────────────────────────────────
+
+function makeEvent(overrides: Partial<AlertEvent> = {}): AlertEvent {
+  return {
+    id: "e-" + Math.random().toString(36).slice(2),
+    ruleId: "r1",
+    ruleName: "test-rule",
+    severity: "info",
+    metric: "cpu",
+    value: 90,
+    firedAt: Date.now(),
+    ...overrides,
+  };
+}
+
+describe("AlertHistory", () => {
+  it("starts empty", () => {
+    const h = new AlertHistory();
+    expect(h.size).toBe(0);
+    expect(h.getAll()).toEqual([]);
+  });
+
+  it("push adds events in order", () => {
+    const h = new AlertHistory();
+    const e1 = makeEvent({ ruleId: "r1", firedAt: 1000 });
+    const e2 = makeEvent({ ruleId: "r2", firedAt: 2000 });
+    h.push(e1);
+    h.push(e2);
+    expect(h.size).toBe(2);
+    expect(h.getAll()[0]).toBe(e1);
+    expect(h.getAll()[1]).toBe(e2);
+  });
+
+  it("getAll returns a defensive copy", () => {
+    const h = new AlertHistory();
+    h.push(makeEvent());
+    const arr = h.getAll();
+    arr.length = 0;
+    expect(h.size).toBe(1);
+  });
+
+  it("evicts oldest entry when maxSize is exceeded", () => {
+    const h = new AlertHistory(3);
+    const e1 = makeEvent({ ruleId: "old" });
+    const e2 = makeEvent({ ruleId: "mid" });
+    const e3 = makeEvent({ ruleId: "new3" });
+    const e4 = makeEvent({ ruleId: "new4" });
+    h.push(e1);
+    h.push(e2);
+    h.push(e3);
+    h.push(e4); // evicts e1
+    expect(h.size).toBe(3);
+    const all = h.getAll();
+    expect(all[0]).toBe(e2);
+    expect(all[2]).toBe(e4);
+  });
+
+  it("defaults to maxSize 100", () => {
+    const h = new AlertHistory();
+    for (let i = 0; i < 105; i++) h.push(makeEvent());
+    expect(h.size).toBe(100);
+  });
+
+  it("getByRule filters by ruleId", () => {
+    const h = new AlertHistory();
+    h.push(makeEvent({ ruleId: "r1" }));
+    h.push(makeEvent({ ruleId: "r2" }));
+    h.push(makeEvent({ ruleId: "r1" }));
+    const r1Events = h.getByRule("r1");
+    expect(r1Events).toHaveLength(2);
+    expect(r1Events.every((e) => e.ruleId === "r1")).toBe(true);
+  });
+
+  it("getByRule returns empty array when no events match", () => {
+    const h = new AlertHistory();
+    h.push(makeEvent({ ruleId: "r1" }));
+    expect(h.getByRule("r-unknown")).toHaveLength(0);
+  });
+
+  it("getBySeverity filters by severity", () => {
+    const h = new AlertHistory();
+    h.push(makeEvent({ severity: "info" }));
+    h.push(makeEvent({ severity: "critical" }));
+    h.push(makeEvent({ severity: "critical" }));
+    expect(h.getBySeverity("critical")).toHaveLength(2);
+    expect(h.getBySeverity("info")).toHaveLength(1);
+    expect(h.getBySeverity("warning")).toHaveLength(0);
+  });
+
+  it("clear removes all events and resets size", () => {
+    const h = new AlertHistory();
+    h.push(makeEvent());
+    h.push(makeEvent());
+    h.clear();
+    expect(h.size).toBe(0);
+    expect(h.getAll()).toEqual([]);
+  });
+
+  it("can push again after clear", () => {
+    const h = new AlertHistory(2);
+    h.push(makeEvent());
+    h.push(makeEvent());
+    h.clear();
+    h.push(makeEvent({ ruleId: "after-clear" }));
+    expect(h.size).toBe(1);
+    expect(h.getAll()[0]!.ruleId).toBe("after-clear");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AlertEngine — history integration
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("AlertEngine — history integration", () => {
+  let history: AlertHistory;
+
+  beforeEach(() => {
+    resetClock();
+    history = new AlertHistory();
+  });
+
+  it("records fired alert in history", async () => {
+    const engine = new AlertEngine({ now: mockNow, history });
+    engine.addRule(thresholdRule("r1", "cpu", "gt", 80, "warning"));
+    await engine.evaluate("cpu", 90);
+    expect(history.size).toBe(1);
+    expect(history.getByRule("r1")).toHaveLength(1);
+  });
+
+  it("does NOT record suppressed (cooldown) alerts in history", async () => {
+    const engine = new AlertEngine({ now: mockNow, history });
+    engine.addRule(thresholdRule("r1", "cpu", "gt", 80, "info", { cooldownMs: 5000 }));
+    await engine.evaluate("cpu", 90);
+    advanceMs(100); // still in cooldown
+    await engine.evaluate("cpu", 90);
+    expect(history.size).toBe(1); // only the first one
+  });
+
+  it("does NOT record disabled rule events in history", async () => {
+    const engine = new AlertEngine({ now: mockNow, history });
+    engine.addRule({ ...thresholdRule("r1", "cpu", "gt", 80, "info"), enabled: false });
+    await engine.evaluate("cpu", 90);
+    expect(history.size).toBe(0);
+  });
+
+  it("records events from multiple rules in one evaluate call", async () => {
+    const engine = new AlertEngine({ now: mockNow, history });
+    engine.addRule(thresholdRule("r1", "m", "gt", 0, "info"));
+    engine.addRule(thresholdRule("r2", "m", "gt", 0, "warning"));
+    await engine.evaluate("m", 1);
+    expect(history.size).toBe(2);
+  });
+
+  it("history events contain correct ruleId and metric", async () => {
+    const engine = new AlertEngine({ now: mockNow, history });
+    engine.addRule(thresholdRule("cost", "cost.usd", "gt", 10, "critical"));
+    await engine.evaluate("cost.usd", 15);
+    const ev = history.getAll()[0]!;
+    expect(ev.ruleId).toBe("cost");
+    expect(ev.metric).toBe("cost.usd");
+    expect(ev.value).toBe(15);
+    expect(ev.severity).toBe("critical");
+  });
+
+  it("works with no history configured — no error", async () => {
+    const engine = new AlertEngine({ now: mockNow }); // no history
+    engine.addRule(thresholdRule("r1", "m", "gt", 0, "info"));
+    await expect(engine.evaluate("m", 1)).resolves.toBeDefined();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MemoryAlertCooldownStore
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("MemoryAlertCooldownStore", () => {
+  it("loadCooldowns returns {} initially", async () => {
+    const store = new MemoryAlertCooldownStore();
+    const cooldowns = await store.loadCooldowns();
+    expect(cooldowns).toEqual({});
+  });
+
+  it("saveCooldown persists ruleId → firedAt", async () => {
+    const store = new MemoryAlertCooldownStore();
+    await store.saveCooldown("r1", 12345);
+    const cooldowns = await store.loadCooldowns();
+    expect(cooldowns["r1"]).toBe(12345);
+  });
+
+  it("saveCooldown overwrites existing entry for same ruleId", async () => {
+    const store = new MemoryAlertCooldownStore();
+    await store.saveCooldown("r1", 1000);
+    await store.saveCooldown("r1", 2000);
+    const cooldowns = await store.loadCooldowns();
+    expect(cooldowns["r1"]).toBe(2000);
+  });
+
+  it("multiple ruleIds stored independently", async () => {
+    const store = new MemoryAlertCooldownStore();
+    await store.saveCooldown("r1", 1000);
+    await store.saveCooldown("r2", 2000);
+    const cooldowns = await store.loadCooldowns();
+    expect(Object.keys(cooldowns)).toHaveLength(2);
+    expect(cooldowns["r1"]).toBe(1000);
+    expect(cooldowns["r2"]).toBe(2000);
+  });
+
+  it("deleteCooldown removes entry", async () => {
+    const store = new MemoryAlertCooldownStore();
+    await store.saveCooldown("r1", 1000);
+    await store.deleteCooldown("r1");
+    const cooldowns = await store.loadCooldowns();
+    expect(cooldowns["r1"]).toBeUndefined();
+  });
+
+  it("deleteCooldown is a no-op for unknown ruleId", async () => {
+    const store = new MemoryAlertCooldownStore();
+    await expect(store.deleteCooldown("nonexistent")).resolves.toBeUndefined();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AlertEngine — cooldown persistence (loadCooldowns / cooldownStore)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("AlertEngine — cooldown persistence", () => {
+  beforeEach(() => { resetClock(); });
+
+  it("loadCooldowns returns 0 when no cooldownStore configured", async () => {
+    const engine = new AlertEngine({ now: mockNow });
+    const count = await engine.loadCooldowns();
+    expect(count).toBe(0);
+  });
+
+  it("loadCooldowns returns 0 when store is empty", async () => {
+    const cooldownStore = new MemoryAlertCooldownStore();
+    const engine = new AlertEngine({ now: mockNow, cooldownStore });
+    const count = await engine.loadCooldowns();
+    expect(count).toBe(0);
+  });
+
+  it("saves lastFiredAt to cooldownStore when alert fires", async () => {
+    const cooldownStore = new MemoryAlertCooldownStore();
+    const engine = new AlertEngine({ now: mockNow, cooldownStore });
+    engine.addRule(thresholdRule("r1", "cpu", "gt", 50, "warning"));
+    await engine.evaluate("cpu", 90);
+    // Fire-and-forget; give it a tick
+    await Promise.resolve();
+    const cooldowns = await cooldownStore.loadCooldowns();
+    expect(cooldowns["r1"]).toBe(mockNow());
+  });
+
+  it("restored cooldown suppresses firing within window after restart", async () => {
+    const cooldownStore = new MemoryAlertCooldownStore();
+
+    // Session 1: alert fires at T=1_000_000 with 500s cooldown
+    // (Use 500_000 < _time=1_000_000 so the first call fires, not suppressed)
+    const engine1 = new AlertEngine({ now: mockNow, cooldownStore });
+    engine1.addRule(thresholdRule("r1", "cpu", "gt", 50, "warning", { cooldownMs: 500_000 }));
+    await engine1.evaluate("cpu", 90);
+    // saveCooldown body runs synchronously (no awaits inside); store is populated
+
+    // Session 2: new engine, restores cooldown; advance only 60s (still in window)
+    advanceMs(60_000);
+    const engine2 = new AlertEngine({ now: mockNow, cooldownStore });
+    engine2.addRule(thresholdRule("r1", "cpu", "gt", 50, "warning", { cooldownMs: 500_000 }));
+    const count = await engine2.loadCooldowns();
+    expect(count).toBe(1);
+
+    const ch = new NullAlertChannel();
+    engine2["channels"].push(ch);
+
+    const result = await engine2.evaluate("cpu", 90);
+    expect(result.suppressed).toBe(1); // still in cooldown from session 1
+    expect(ch.sent).toHaveLength(0);
+  });
+
+  it("restored cooldown allows firing after cooldown expires", async () => {
+    const cooldownStore = new MemoryAlertCooldownStore();
+
+    // Session 1: fire at T=1_000_000, cooldown 500_000ms
+    const engine1 = new AlertEngine({ now: mockNow, cooldownStore });
+    engine1.addRule(thresholdRule("r1", "cpu", "gt", 50, "warning", { cooldownMs: 500_000 }));
+    await engine1.evaluate("cpu", 90);
+
+    // Session 2: advance past cooldown window
+    advanceMs(500_001);
+    const engine2 = new AlertEngine({ now: mockNow, cooldownStore });
+    engine2.addRule(thresholdRule("r1", "cpu", "gt", 50, "warning", { cooldownMs: 500_000 }));
+    await engine2.loadCooldowns();
+
+    const result = await engine2.evaluate("cpu", 90);
+    expect(result.fired).toBe(1); // cooldown expired
+    expect(result.suppressed).toBe(0);
+  });
+
+  it("removeRule deletes cooldown from store", async () => {
+    const cooldownStore = new MemoryAlertCooldownStore();
+    const engine = new AlertEngine({ now: mockNow, cooldownStore });
+    engine.addRule(thresholdRule("r1", "cpu", "gt", 50, "warning"));
+    await engine.evaluate("cpu", 90);
+    await Promise.resolve();
+
+    engine.removeRule("r1");
+    await Promise.resolve();
+    const cooldowns = await cooldownStore.loadCooldowns();
+    expect(cooldowns["r1"]).toBeUndefined();
+  });
+
+  it("resetCooldown removes entry from store", async () => {
+    const cooldownStore = new MemoryAlertCooldownStore();
+    const engine = new AlertEngine({ now: mockNow, cooldownStore });
+    engine.addRule(thresholdRule("r1", "cpu", "gt", 50, "warning", { cooldownMs: 5000 }));
+    await engine.evaluate("cpu", 90);
+    await Promise.resolve();
+
+    engine.resetCooldown("r1");
+    await Promise.resolve();
+    const cooldowns = await cooldownStore.loadCooldowns();
+    expect(cooldowns["r1"]).toBeUndefined();
+  });
+
+  it("loadEngineFromStore restores cooldowns when cooldownStore in config", async () => {
+    const ruleStore = new MemoryAlertRuleStore();
+    const cooldownStore = new MemoryAlertCooldownStore();
+
+    // Session 1: fire and persist (cooldownMs 500_000 < _time 1_000_000 so first call fires)
+    const engine1 = new AlertEngine({ now: mockNow, cooldownStore });
+    engine1.addRule(thresholdRule("latency", "lat", "gt", 100, "critical", { cooldownMs: 500_000 }));
+    await persistEngineTo(engine1, ruleStore);
+    await engine1.evaluate("lat", 200);
+
+    // Session 2: load from store 1s later, still within cooldown
+    advanceMs(1000);
+    const engine2 = await loadEngineFromStore(ruleStore, { now: mockNow, cooldownStore });
+    const result = await engine2.evaluate("lat", 200);
+    expect(result.suppressed).toBe(1);
   });
 });

@@ -166,6 +166,11 @@ export interface LibrarianRecallResult {
   entities: AgentKGNode[];
   /** Assembled plain-text context ready for injection into a prompt */
   contextText: string;
+  /**
+   * If the KG lookup failed, the error message is exposed here.
+   * memories and contextText are still populated from the memory store.
+   */
+  kgError?: string;
 }
 
 /** Token estimate: ceil(chars / charsPerToken) */
@@ -224,6 +229,7 @@ export class LibrarianAgent {
 
     // ── 3. KG entity lookup ─────────────────────────────────────────────────
     let entities: AgentKGNode[] = [];
+    let kgError: string | undefined;
     if (this.kg) {
       try {
         entities = await this.kg.queryNodes({
@@ -232,9 +238,10 @@ export class LibrarianAgent {
         });
         // Sort by descending confidence
         entities = [...entities].sort((a, b) => b.confidence - a.confidence);
-      } catch {
-        // KG failures are non-fatal — proceed with memories only
+      } catch (err) {
+        // KG failures are non-fatal — proceed with memories only; expose the error
         entities = [];
+        kgError = String(err);
       }
     }
 
@@ -251,7 +258,51 @@ export class LibrarianAgent {
       contextTokens: estimateTokens(contextText, this.charsPerToken),
     });
 
-    return { memories, entities, contextText };
+    return { memories, entities, contextText, kgError };
+  }
+
+  /**
+   * Keyword-index search: recalls candidates then re-ranks by query term
+   * frequency (TF) in the memory text.  Supplements semantic recall when
+   * embeddings are weak or unavailable.
+   *
+   * The candidate pool is fetched with a 3× limit to ensure enough results
+   * for re-ranking before slicing back to the configured limit.
+   */
+  async keywordSearch(
+    query: string,
+    opts: LibrarianRecallOptions = {},
+  ): Promise<LibrarianRecallResult> {
+    const finalLimit = opts.limit ?? this.defaultRecallLimit;
+    // Fetch a larger candidate pool for re-ranking
+    const candidateLimit = finalLimit * 3;
+    const rawResult = await this.recall(query, { ...opts, limit: candidateLimit });
+
+    const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+
+    // TF-score each memory by counting how many times each query term appears
+    const scored = rawResult.memories.map((m) => {
+      const textLower = m.entry.text.toLowerCase();
+      const tf = terms.reduce((sum, term) => {
+        let count = 0;
+        let pos = 0;
+        while ((pos = textLower.indexOf(term, pos)) !== -1) {
+          count++;
+          pos += term.length;
+        }
+        return sum + count;
+      }, 0);
+      return { mem: m, tf };
+    });
+
+    // Sort by TF DESC, then by semantic score DESC as tie-breaker
+    scored.sort((a, b) => b.tf - a.tf || b.mem.score - a.mem.score);
+
+    const memories = scored.slice(0, finalLimit).map((s) => s.mem);
+    const maxContextTokens = opts.maxContextTokens ?? 2048;
+    const contextText = this._assembleContext(memories, rawResult.entities, maxContextTokens);
+
+    return { ...rawResult, memories, contextText };
   }
 
   private _assembleContext(
@@ -380,6 +431,11 @@ export class ResearcherAgent {
   private readonly kg?: AgentKG;
   private readonly hooks?: AgentHooks;
   private readonly name: string;
+  /**
+   * Tracks queries already ingested into the KG to prevent duplicate ingestion
+   * within the lifetime of this agent instance.
+   */
+  private readonly _ingestedQueries = new Set<string>();
 
   constructor(config: ResearcherConfig) {
     this.runner = config.runner;
@@ -432,13 +488,19 @@ export class ResearcherAgent {
       }
     }
 
-    // ── 4. Ingest into KG ───────────────────────────────────────────────────
+    // ── 4. Ingest into KG (with dedup) ──────────────────────────────────────
     if (this.kg?.ingest && !opts.skipKG && runResult.ok) {
-      try {
-        await this.kg.ingest(runResult.report, { source: query });
-        ingestedIntoKG = true;
-      } catch {
-        // KG failures are non-fatal
+      if (this._ingestedQueries.has(query)) {
+        // Already ingested this query — skip to avoid duplicate KG entries
+        ingestedIntoKG = false;
+      } else {
+        try {
+          await this.kg.ingest(runResult.report, { source: query });
+          this._ingestedQueries.add(query);
+          ingestedIntoKG = true;
+        } catch {
+          // KG failures are non-fatal
+        }
       }
     }
 
@@ -503,6 +565,11 @@ export interface FileInfo {
   path: string;
   /** Entry name (last path segment) */
   name: string;
+  /**
+   * TF relevance score computed when `ListOptions.query` is provided.
+   * Higher is more relevant. Absent when no query was given.
+   */
+  score?: number;
 }
 
 export interface EditResult {
@@ -522,6 +589,12 @@ export interface ListOptions {
    * substring (case-insensitive).  Leave undefined to return all entries.
    */
   pattern?: string;
+  /**
+   * When provided, results are ranked by TF (term frequency) score: the
+   * number of times query terms appear in the file path/name segments.
+   * Results are returned in descending score order with a `score` field.
+   */
+  query?: string;
 }
 
 export class FileExplorerAgent {
@@ -622,6 +695,20 @@ export class FileExplorerAgent {
           return name.toLowerCase().includes(pattern);
         })
       : entries;
+
+    // TF-scored ranking when query is provided
+    if (opts.query) {
+      const terms = opts.query.toLowerCase().split(/\s+/).filter(Boolean);
+      const scored: FileInfo[] = filtered.map((e) => {
+        // Split path into word segments for TF counting
+        const segments = e.toLowerCase().split(/[/._\-\s]+/).filter(Boolean);
+        const score = terms.reduce((sum, term) => {
+          return sum + segments.filter((seg) => seg.includes(term)).length;
+        }, 0);
+        return { path: e, name: e.split("/").pop() ?? e, score };
+      });
+      return scored.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+    }
 
     return filtered.map((e) => ({
       path: e,

@@ -4,6 +4,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   MemoryFlagStore,
   NullFlagStore,
+  PollingFlagStore,
+  FileFlagStore,
   FeatureFlagRegistry,
   envKeyName,
   readEnvFlag,
@@ -11,6 +13,8 @@ import {
   globalFlags,
   type FlagChangeEvent,
   type FlagValue,
+  type FlagReadFileFn,
+  type FlagWriteFileFn,
 } from "../src/index.js";
 
 // ── MemoryFlagStore ───────────────────────────────────────────────────────────
@@ -443,5 +447,259 @@ describe("globalFlags", () => {
 
   it("sandbox.docker defaults to false", () => {
     expect(globalFlags.isEnabled("sandbox.docker")).toBe(false);
+  });
+});
+
+// ── PollingFlagStore ──────────────────────────────────────────────────────────
+
+/** Build a minimal Response-like object for the injected fetch mock */
+function mockResponse(body: Record<string, FlagValue>, ok = true): Response {
+  return {
+    ok,
+    json: () => Promise.resolve(body),
+  } as unknown as Response;
+}
+
+describe("PollingFlagStore — cache operations", () => {
+  it("starts with an empty cache", () => {
+    const store = new PollingFlagStore({ url: "http://localhost/flags", fetch: vi.fn() });
+    expect(store.getAll()).toEqual({});
+  });
+
+  it("get returns undefined for unknown key before any poll", () => {
+    const store = new PollingFlagStore({ url: "http://localhost/flags", fetch: vi.fn() });
+    expect(store.get("my.flag")).toBeUndefined();
+  });
+
+  it("has returns false for unknown key before any poll", () => {
+    const store = new PollingFlagStore({ url: "http://localhost/flags", fetch: vi.fn() });
+    expect(store.has("my.flag")).toBe(false);
+  });
+
+  it("set/get/has/delete work against the in-memory cache", () => {
+    const store = new PollingFlagStore({ url: "http://localhost/flags", fetch: vi.fn() });
+    store.set("feat.a", true);
+    expect(store.has("feat.a")).toBe(true);
+    expect(store.get("feat.a")).toBe(true);
+    store.delete("feat.a");
+    expect(store.has("feat.a")).toBe(false);
+    expect(store.get("feat.a")).toBeUndefined();
+  });
+
+  it("getAll returns a shallow copy of the cache", () => {
+    const store = new PollingFlagStore({ url: "http://localhost/flags", fetch: vi.fn() });
+    store.set("x", 42);
+    const all = store.getAll();
+    expect(all["x"]).toBe(42);
+    // mutating the returned object must not affect the store
+    all["x"] = 99;
+    expect(store.get("x")).toBe(42);
+  });
+});
+
+describe("PollingFlagStore — start()", () => {
+  it("polls the URL on start() and populates cache", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(mockResponse({ "my.flag": true, "count": 5 }));
+    const store = new PollingFlagStore({ url: "http://localhost/flags", fetch: fetchFn });
+    await store.start();
+    store.stop();
+    expect(fetchFn).toHaveBeenCalledWith("http://localhost/flags");
+    expect(store.get("my.flag")).toBe(true);
+    expect(store.get("count")).toBe(5);
+    expect(store.has("my.flag")).toBe(true);
+  });
+
+  it("silently ignores non-ok responses (cache stays empty)", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(mockResponse({}, false));
+    const store = new PollingFlagStore({ url: "http://localhost/flags", fetch: fetchFn });
+    await store.start();
+    store.stop();
+    expect(store.getAll()).toEqual({});
+  });
+
+  it("silently ignores network errors (cache stays empty)", async () => {
+    const fetchFn = vi.fn().mockRejectedValue(new Error("Network failure"));
+    const store = new PollingFlagStore({ url: "http://localhost/flags", fetch: fetchFn });
+    await store.start();
+    store.stop();
+    expect(store.getAll()).toEqual({});
+  });
+
+  it("retains last good cache when a subsequent poll fails", async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(mockResponse({ "stable.flag": true }))
+      .mockRejectedValueOnce(new Error("transient"));
+    const store = new PollingFlagStore({ url: "http://localhost/flags", fetch: fetchFn });
+    await store.start();
+    store.stop();
+    // Simulate a manual second poll
+    await (store as unknown as { _poll(): Promise<void> })._poll();
+    expect(store.get("stable.flag")).toBe(true); // cache preserved
+  });
+
+  it("replaces entire cache on each successful poll", async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(mockResponse({ "flag.a": true, "flag.b": false }))
+      .mockResolvedValueOnce(mockResponse({ "flag.a": false })); // flag.b gone
+    const store = new PollingFlagStore({ url: "http://localhost/flags", fetch: fetchFn });
+    await store.start();
+    store.stop();
+    await (store as unknown as { _poll(): Promise<void> })._poll();
+    expect(store.get("flag.a")).toBe(false);
+    expect(store.has("flag.b")).toBe(false); // removed in second poll
+  });
+});
+
+describe("PollingFlagStore — stop()", () => {
+  it("stop() can be called before start() without throwing", () => {
+    const store = new PollingFlagStore({ url: "http://localhost/flags", fetch: vi.fn() });
+    expect(() => store.stop()).not.toThrow();
+  });
+
+  it("stop() can be called multiple times without throwing", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(mockResponse({}));
+    const store = new PollingFlagStore({ url: "http://localhost/flags", fetch: fetchFn });
+    await store.start();
+    expect(() => {
+      store.stop();
+      store.stop();
+    }).not.toThrow();
+  });
+});
+
+describe("PollingFlagStore — FeatureFlagRegistry integration", () => {
+  it("registry reads values loaded by PollingFlagStore", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(mockResponse({ "sandbox.docker": true }));
+    const store = new PollingFlagStore({ url: "http://localhost/flags", fetch: fetchFn });
+    await store.start();
+    store.stop();
+    const reg = new FeatureFlagRegistry({ store, env: {} });
+    reg.define({ key: "sandbox.docker", type: "boolean", default: false });
+    expect(reg.isEnabled("sandbox.docker")).toBe(true);
+  });
+});
+
+// ── FileFlagStore ─────────────────────────────────────────────────────────────
+
+describe("FileFlagStore — load()", () => {
+  it("populates cache from valid JSON file", async () => {
+    const readFile: FlagReadFileFn = vi
+      .fn()
+      .mockResolvedValue(JSON.stringify({ "feat.on": true, "count": 7 }));
+    const store = new FileFlagStore({ path: "/flags.json", readFile });
+    await store.load();
+    expect(store.get("feat.on")).toBe(true);
+    expect(store.get("count")).toBe(7);
+  });
+
+  it("silently returns empty cache on ENOENT / read error", async () => {
+    const readFile: FlagReadFileFn = vi.fn().mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+    const store = new FileFlagStore({ path: "/missing.json", readFile });
+    await store.load();
+    expect(store.getAll()).toEqual({});
+  });
+
+  it("silently returns empty cache on invalid JSON", async () => {
+    const readFile: FlagReadFileFn = vi.fn().mockResolvedValue("not-json{{{");
+    const store = new FileFlagStore({ path: "/bad.json", readFile });
+    await store.load();
+    expect(store.getAll()).toEqual({});
+  });
+
+  it("replaces previous cache on second load()", async () => {
+    const readFile: FlagReadFileFn = vi
+      .fn()
+      .mockResolvedValueOnce(JSON.stringify({ "flag.a": true }))
+      .mockResolvedValueOnce(JSON.stringify({ "flag.b": false }));
+    const store = new FileFlagStore({ path: "/flags.json", readFile });
+    await store.load();
+    expect(store.has("flag.a")).toBe(true);
+    await store.load();
+    expect(store.has("flag.a")).toBe(false); // replaced
+    expect(store.get("flag.b")).toBe(false);
+  });
+});
+
+describe("FileFlagStore — persist()", () => {
+  it("writes current cache as pretty JSON", async () => {
+    const written: string[] = [];
+    const writeFile: FlagWriteFileFn = vi.fn().mockImplementation((_p, c) => {
+      written.push(c);
+      return Promise.resolve();
+    });
+    const store = new FileFlagStore({ path: "/flags.json", writeFile });
+    store.set("feat.a", true);
+    store.set("count", 3);
+    await store.persist();
+    expect(writeFile).toHaveBeenCalledOnce();
+    const saved = JSON.parse(written[0]!) as Record<string, FlagValue>;
+    expect(saved["feat.a"]).toBe(true);
+    expect(saved["count"]).toBe(3);
+  });
+
+  it("writes empty object when cache is empty", async () => {
+    const writeFile: FlagWriteFileFn = vi.fn().mockResolvedValue(undefined);
+    const store = new FileFlagStore({ path: "/flags.json", writeFile });
+    await store.persist();
+    expect(writeFile).toHaveBeenCalledWith("/flags.json", JSON.stringify({}, null, 2));
+  });
+});
+
+describe("FileFlagStore — cache operations", () => {
+  it("set/get/has/delete work before any load()", () => {
+    const store = new FileFlagStore({ path: "/flags.json" });
+    store.set("k", "hello");
+    expect(store.has("k")).toBe(true);
+    expect(store.get("k")).toBe("hello");
+    store.delete("k");
+    expect(store.has("k")).toBe(false);
+  });
+
+  it("getAll returns a shallow copy", () => {
+    const store = new FileFlagStore({ path: "/flags.json" });
+    store.set("a", 1);
+    const all = store.getAll();
+    all["a"] = 999;
+    expect(store.get("a")).toBe(1);
+  });
+});
+
+describe("FileFlagStore — round-trip", () => {
+  it("persist then load restores all flags", async () => {
+    const disk: Record<string, string> = {};
+    const readFile: FlagReadFileFn = vi.fn().mockImplementation((p) =>
+      p in disk ? Promise.resolve(disk[p]!) : Promise.reject(new Error("ENOENT")),
+    );
+    const writeFile: FlagWriteFileFn = vi.fn().mockImplementation((p, c) => {
+      disk[p] = c;
+      return Promise.resolve();
+    });
+
+    // Write
+    const storeA = new FileFlagStore({ path: "/flags.json", readFile, writeFile });
+    storeA.set("sandbox.docker", true);
+    storeA.set("gateway.default_model", "nexus/smart");
+    storeA.set("limit", 50);
+    await storeA.persist();
+
+    // Read in a fresh instance
+    const storeB = new FileFlagStore({ path: "/flags.json", readFile, writeFile });
+    await storeB.load();
+    expect(storeB.get("sandbox.docker")).toBe(true);
+    expect(storeB.get("gateway.default_model")).toBe("nexus/smart");
+    expect(storeB.get("limit")).toBe(50);
+  });
+
+  it("FileFlagStore integrates with FeatureFlagRegistry after load()", async () => {
+    const readFile: FlagReadFileFn = vi
+      .fn()
+      .mockResolvedValue(JSON.stringify({ "kg.enabled": true }));
+    const store = new FileFlagStore({ path: "/flags.json", readFile });
+    await store.load();
+    const reg = new FeatureFlagRegistry({ store, env: {} });
+    reg.define({ key: "kg.enabled", type: "boolean", default: false });
+    expect(reg.isEnabled("kg.enabled")).toBe(true);
   });
 });

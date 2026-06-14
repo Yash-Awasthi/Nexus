@@ -148,6 +148,57 @@ export interface AlertRule {
   enabled?: boolean;
 }
 
+// ── Alert history (circular buffer) ──────────────────────────────────────────
+
+/**
+ * Circular buffer of recent `AlertEvent` instances.
+ *
+ * Inject into `AlertEngineConfig.history` — the engine pushes every fired
+ * event into the buffer automatically.  Once `maxSize` is reached, the oldest
+ * entry is evicted (FIFO).
+ */
+export class AlertHistory {
+  private readonly buf: AlertEvent[] = [];
+  private readonly maxSize: number;
+
+  constructor(maxSize = 100) {
+    this.maxSize = maxSize;
+  }
+
+  /** Add an event; evicts the oldest entry when buffer is at capacity. */
+  push(event: AlertEvent): void {
+    if (this.buf.length >= this.maxSize) {
+      this.buf.shift();
+    }
+    this.buf.push(event);
+  }
+
+  /** Return a defensive copy of all events in chronological order. */
+  getAll(): AlertEvent[] {
+    return [...this.buf];
+  }
+
+  /** Return all events fired by a specific rule. */
+  getByRule(ruleId: string): AlertEvent[] {
+    return this.buf.filter((e) => e.ruleId === ruleId);
+  }
+
+  /** Return all events with a specific severity. */
+  getBySeverity(severity: AlertSeverity): AlertEvent[] {
+    return this.buf.filter((e) => e.severity === severity);
+  }
+
+  /** Number of events currently stored. */
+  get size(): number {
+    return this.buf.length;
+  }
+
+  /** Clear all events. */
+  clear(): void {
+    this.buf.length = 0;
+  }
+}
+
 // ── Alert event ───────────────────────────────────────────────────────────────
 
 export interface AlertEvent {
@@ -216,6 +267,43 @@ interface RateWindow {
   timestamps: number[];
 }
 
+// ── Cooldown persistence store ────────────────────────────────────────────────
+
+/**
+ * Backing store for per-rule cooldown state (`lastFiredAt`).
+ *
+ * Implement this to persist cooldowns across process restarts so that a
+ * restart doesn't reset suppression windows.
+ *
+ * After creating an `AlertEngine` with a `cooldownStore`, call
+ * `engine.loadCooldowns()` at startup to restore state.
+ */
+export interface AlertCooldownStore {
+  /** Persist the last-fired timestamp for a rule. */
+  saveCooldown(ruleId: string, firedAt: number): Promise<void>;
+  /** Return all persisted cooldown entries as a ruleId → firedAt map. */
+  loadCooldowns(): Promise<Record<string, number>>;
+  /** Remove the cooldown entry for a rule (e.g. when the rule is deleted). */
+  deleteCooldown(ruleId: string): Promise<void>;
+}
+
+/** In-memory cooldown store — for testing and single-process use. */
+export class MemoryAlertCooldownStore implements AlertCooldownStore {
+  private readonly data = new Map<string, number>();
+
+  async saveCooldown(ruleId: string, firedAt: number): Promise<void> {
+    this.data.set(ruleId, firedAt);
+  }
+
+  async loadCooldowns(): Promise<Record<string, number>> {
+    return Object.fromEntries(this.data);
+  }
+
+  async deleteCooldown(ruleId: string): Promise<void> {
+    this.data.delete(ruleId);
+  }
+}
+
 // ── Engine config ─────────────────────────────────────────────────────────────
 
 export interface AlertEngineConfig {
@@ -226,6 +314,17 @@ export interface AlertEngineConfig {
    * Inject a deterministic clock in tests.
    */
   now?: () => number;
+  /**
+   * Optional circular buffer — the engine pushes every fired AlertEvent
+   * here so callers can inspect recent alert history.
+   */
+  history?: AlertHistory;
+  /**
+   * Optional cooldown persistence store.
+   * When provided, each fired alert's `lastFiredAt` is persisted.
+   * Call `engine.loadCooldowns()` at startup to restore state after restart.
+   */
+  cooldownStore?: AlertCooldownStore;
 }
 
 // ── Dispatch result ───────────────────────────────────────────────────────────
@@ -250,6 +349,8 @@ export class AlertEngine {
   private readonly channels: AlertChannel[];
   private readonly hooks?: AlertHooks;
   private readonly now: () => number;
+  private readonly history?: AlertHistory;
+  private readonly cooldownStore?: AlertCooldownStore;
 
   /** Last fire timestamp per rule id (for cooldown) */
   private readonly lastFired = new Map<string, number>();
@@ -261,6 +362,8 @@ export class AlertEngine {
     this.channels = config.channels ?? [];
     this.hooks = config.hooks;
     this.now = config.now ?? (() => Date.now());
+    this.history = config.history;
+    this.cooldownStore = config.cooldownStore;
   }
 
   // ── Rule management ────────────────────────────────────────────────────────
@@ -282,6 +385,7 @@ export class AlertEngine {
     this.rules.delete(id);
     this.lastFired.delete(id);
     this.rateState.delete(id);
+    this.cooldownStore?.deleteCooldown(id).catch(() => undefined);
     return this;
   }
 
@@ -368,6 +472,11 @@ export class AlertEngine {
       };
 
       this.lastFired.set(rule.id, now);
+      // Persist cooldown state (fire-and-forget; failures are non-fatal)
+      this.cooldownStore?.saveCooldown(rule.id, now).catch(() => undefined);
+      // Record in history buffer
+      this.history?.push(event);
+
       result.fired++;
       result.events.push(event);
 
@@ -409,6 +518,7 @@ export class AlertEngine {
    */
   resetCooldown(ruleId: string): this {
     this.lastFired.delete(ruleId);
+    this.cooldownStore?.deleteCooldown(ruleId).catch(() => undefined);
     return this;
   }
 
@@ -418,6 +528,27 @@ export class AlertEngine {
   resetRateWindow(ruleId: string): this {
     this.rateState.delete(ruleId);
     return this;
+  }
+
+  /**
+   * Restore cooldown state from the configured `cooldownStore`.
+   *
+   * Call this once at startup after constructing the engine so that
+   * cooldown windows from the previous process are honoured.
+   *
+   * No-op (returns 0) if no `cooldownStore` was provided.
+   *
+   * @returns Number of cooldown entries restored.
+   */
+  async loadCooldowns(): Promise<number> {
+    if (!this.cooldownStore) return 0;
+    const stored = await this.cooldownStore.loadCooldowns();
+    let count = 0;
+    for (const [ruleId, firedAt] of Object.entries(stored)) {
+      this.lastFired.set(ruleId, firedAt);
+      count++;
+    }
+    return count;
   }
 
   // ── Condition evaluation helpers ───────────────────────────────────────────
@@ -485,6 +616,137 @@ export class AlertEngine {
     }
     return haystack.includes(needle);
   }
+}
+
+// ── Alert rule persistence ─────────────────────────────────────────────────────
+
+/** Injectable file reader (matches fs/promises readFile utf-8 signature) */
+export type AlertReadFileFn = (path: string) => Promise<string>;
+/** Injectable file writer */
+export type AlertWriteFileFn = (path: string, content: string) => Promise<void>;
+
+/**
+ * Backing store for alert rule definitions.
+ * Implementations may be in-memory, file-based, or database-backed.
+ */
+export interface AlertRuleStore {
+  /** Load all persisted rules */
+  loadRules(): Promise<AlertRule[]>;
+  /** Replace all persisted rules with the provided list */
+  saveRules(rules: AlertRule[]): Promise<void>;
+  /** Clear all persisted rules */
+  clear(): Promise<void>;
+}
+
+/** In-memory AlertRuleStore — for testing and non-persistent use */
+export class MemoryAlertRuleStore implements AlertRuleStore {
+  private rules: AlertRule[] = [];
+
+  async loadRules(): Promise<AlertRule[]> {
+    return [...this.rules];
+  }
+
+  async saveRules(rules: AlertRule[]): Promise<void> {
+    this.rules = [...rules];
+  }
+
+  async clear(): Promise<void> {
+    this.rules = [];
+  }
+}
+
+export interface FileAlertRuleStoreConfig {
+  /** Absolute path to the JSON file where rules are persisted */
+  path: string;
+  /** Injectable reader (default: Node's fs/promises readFile) */
+  readFile?: AlertReadFileFn;
+  /** Injectable writer (default: Node's fs/promises writeFile) */
+  writeFile?: AlertWriteFileFn;
+}
+
+/**
+ * File-backed AlertRuleStore.
+ *
+ * Rules survive process restarts — load them into an AlertEngine at startup
+ * via `AlertEngine.fromStore(store)`.  Call `persistTo(store)` after any
+ * rule mutation to sync state back to disk.
+ */
+export class FileAlertRuleStore implements AlertRuleStore {
+  private readonly config: FileAlertRuleStoreConfig;
+  private readonly readFileFn: AlertReadFileFn;
+  private readonly writeFileFn: AlertWriteFileFn;
+
+  constructor(config: FileAlertRuleStoreConfig) {
+    this.config = config;
+    this.readFileFn =
+      config.readFile ??
+      (async (p) => {
+        const { readFile } = await import("fs/promises");
+        return readFile(p, "utf8");
+      });
+    this.writeFileFn =
+      config.writeFile ??
+      (async (p, c) => {
+        const { writeFile } = await import("fs/promises");
+        await writeFile(p, c, "utf8");
+      });
+  }
+
+  async loadRules(): Promise<AlertRule[]> {
+    try {
+      const content = await this.readFileFn(this.config.path);
+      const parsed = JSON.parse(content) as unknown;
+      return Array.isArray(parsed) ? (parsed as AlertRule[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  async saveRules(rules: AlertRule[]): Promise<void> {
+    await this.writeFileFn(this.config.path, JSON.stringify(rules, null, 2));
+  }
+
+  async clear(): Promise<void> {
+    await this.writeFileFn(this.config.path, "[]");
+  }
+}
+
+// ── Persistence helpers ───────────────────────────────────────────────────────
+
+/**
+ * Persist all rules currently registered in `engine` to `store`.
+ * Call after every `addRule` / `removeRule` / `updateRule` to keep
+ * the store in sync with the live engine state.
+ */
+export async function persistEngineTo(
+  engine: AlertEngine,
+  store: AlertRuleStore,
+): Promise<void> {
+  await store.saveRules(engine.listRules());
+}
+
+/**
+ * Create a new AlertEngine pre-loaded with rules from `store`.
+ *
+ * ```ts
+ * const store = new FileAlertRuleStore({ path: "./alert-rules.json", readFile, writeFile });
+ * const engine = await loadEngineFromStore(store, { channels: [webhookChannel] });
+ * ```
+ */
+export async function loadEngineFromStore(
+  store: AlertRuleStore,
+  config?: AlertEngineConfig,
+): Promise<AlertEngine> {
+  const engine = new AlertEngine(config);
+  const rules = await store.loadRules();
+  for (const rule of rules) {
+    engine.addRule(rule);
+  }
+  // Restore cooldowns from the store if one was provided in config
+  if (config?.cooldownStore) {
+    await engine.loadCooldowns();
+  }
+  return engine;
 }
 
 // ── Convenience factory ────────────────────────────────────────────────────────

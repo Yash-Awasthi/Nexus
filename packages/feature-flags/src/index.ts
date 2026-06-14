@@ -318,6 +318,196 @@ export class FeatureFlagRegistry extends EventEmitter {
   }
 }
 
+// ── Cross-process FlagStore implementations ───────────────────────────────────
+//
+// These stores enable flag state to be shared across multiple processes:
+//   PollingFlagStore — periodically fetches flag JSON from a URL endpoint
+//   FileFlagStore    — reads/writes flag state to a JSON file on disk
+//
+// Both are fully injectable (fetch / readFile / writeFile) for deterministic testing.
+
+/** Injectable fetch type (structurally matches global fetch) */
+export type FlagFetchFn = typeof fetch;
+
+/** Injectable file reader */
+export type FlagReadFileFn = (path: string) => Promise<string>;
+
+/** Injectable file writer */
+export type FlagWriteFileFn = (path: string, content: string) => Promise<void>;
+
+export interface PollingFlagStoreConfig {
+  /** URL that serves a JSON object of `{ [flagKey]: value }` */
+  url: string;
+  /** Polling interval in ms (default: 30_000) */
+  intervalMs?: number;
+  /** Injectable fetch (default: global fetch) */
+  fetch?: FlagFetchFn;
+}
+
+/**
+ * FlagStore that periodically polls a remote URL for flag values.
+ *
+ * The endpoint must return `Content-Type: application/json` with a flat
+ * `Record<string, boolean | string | number>` body.  Non-ok responses are
+ * silently ignored — the in-memory cache retains its previous values.
+ *
+ * Call `start()` to begin polling and `stop()` to clear the interval.
+ *
+ * ```ts
+ * const store = new PollingFlagStore({ url: "https://config.example.com/flags" });
+ * await store.start();
+ * const registry = new FeatureFlagRegistry({ store });
+ * ```
+ */
+export class PollingFlagStore implements FlagStore {
+  private cache: Record<string, FlagValue> = {};
+  private intervalId: ReturnType<typeof setInterval> | undefined;
+  private readonly config: PollingFlagStoreConfig;
+  private readonly fetchFn: FlagFetchFn;
+
+  constructor(config: PollingFlagStoreConfig) {
+    this.config = config;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  /**
+   * Perform an immediate poll then schedule recurring polls.
+   * Returns after the first poll completes (even if the request failed).
+   */
+  async start(): Promise<void> {
+    await this._poll();
+    const intervalMs = this.config.intervalMs ?? 30_000;
+    this.intervalId = setInterval(() => {
+      void this._poll();
+    }, intervalMs);
+    // Allow Node.js to exit even if the timer is still active
+    if (this.intervalId && typeof this.intervalId === "object" && "unref" in this.intervalId) {
+      (this.intervalId as { unref(): void }).unref();
+    }
+  }
+
+  /** Cancel the polling interval. */
+  stop(): void {
+    if (this.intervalId !== undefined) {
+      clearInterval(this.intervalId);
+      this.intervalId = undefined;
+    }
+  }
+
+  private async _poll(): Promise<void> {
+    try {
+      const res = await this.fetchFn(this.config.url);
+      if (res.ok) {
+        const json = (await res.json()) as Record<string, FlagValue>;
+        this.cache = json;
+      }
+    } catch {
+      // Network errors are non-fatal — keep last known good cache
+    }
+  }
+
+  get(key: string): FlagValue | undefined {
+    return this.cache[key];
+  }
+
+  set(key: string, value: FlagValue): void {
+    this.cache[key] = value;
+  }
+
+  delete(key: string): void {
+    delete this.cache[key];
+  }
+
+  has(key: string): boolean {
+    return key in this.cache;
+  }
+
+  getAll(): Record<string, FlagValue> {
+    return { ...this.cache };
+  }
+}
+
+export interface FileFlagStoreConfig {
+  /** Absolute path to the JSON file containing flag state */
+  path: string;
+  /** Injectable reader (default: Node's fs/promises readFile) */
+  readFile?: FlagReadFileFn;
+  /** Injectable writer (default: Node's fs/promises writeFile) */
+  writeFile?: FlagWriteFileFn;
+}
+
+/**
+ * FlagStore backed by a JSON file on disk.
+ *
+ * Multiple processes can share flags by pointing to the same file.
+ * Call `load()` at startup and `persist()` after mutating flags.
+ *
+ * ```ts
+ * const store = new FileFlagStore({ path: "/etc/nexus/flags.json" });
+ * await store.load();
+ * const registry = new FeatureFlagRegistry({ store });
+ * // ... later, after changing flags ...
+ * await store.persist();
+ * ```
+ */
+export class FileFlagStore implements FlagStore {
+  private cache: Record<string, FlagValue> = {};
+  private readonly config: FileFlagStoreConfig;
+  private readonly readFileFn: FlagReadFileFn;
+  private readonly writeFileFn: FlagWriteFileFn;
+
+  constructor(config: FileFlagStoreConfig) {
+    this.config = config;
+    this.readFileFn =
+      config.readFile ??
+      (async (p) => {
+        const { readFile } = await import("fs/promises");
+        return readFile(p, "utf8");
+      });
+    this.writeFileFn =
+      config.writeFile ??
+      (async (p, c) => {
+        const { writeFile } = await import("fs/promises");
+        await writeFile(p, c, "utf8");
+      });
+  }
+
+  /** Load flag state from disk into the in-memory cache. */
+  async load(): Promise<void> {
+    try {
+      const content = await this.readFileFn(this.config.path);
+      this.cache = JSON.parse(content) as Record<string, FlagValue>;
+    } catch {
+      this.cache = {};
+    }
+  }
+
+  /** Flush the in-memory cache to disk. */
+  async persist(): Promise<void> {
+    await this.writeFileFn(this.config.path, JSON.stringify(this.cache, null, 2));
+  }
+
+  get(key: string): FlagValue | undefined {
+    return this.cache[key];
+  }
+
+  set(key: string, value: FlagValue): void {
+    this.cache[key] = value;
+  }
+
+  delete(key: string): void {
+    delete this.cache[key];
+  }
+
+  has(key: string): boolean {
+    return key in this.cache;
+  }
+
+  getAll(): Record<string, FlagValue> {
+    return { ...this.cache };
+  }
+}
+
 function inferType(value: FlagValue): FlagType {
   if (typeof value === "boolean") return "boolean";
   if (typeof value === "number") return "number";

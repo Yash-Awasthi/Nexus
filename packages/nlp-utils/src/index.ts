@@ -36,7 +36,7 @@ export interface TextChunk {
   tokenEstimate: number;
 }
 
-export type ChunkStrategy = "fixed" | "sentence" | "paragraph";
+export type ChunkStrategy = "fixed" | "sentence" | "paragraph" | "semantic";
 
 export interface FixedChunkOptions {
   /** Max tokens per chunk. Default: 256 */
@@ -188,6 +188,149 @@ export function chunkByParagraph(text: string, opts: SegmentChunkOptions = {}): 
   return chunks;
 }
 
+// ── chunkBySemantic — similarity-guided topic-cohesive chunking ───────────────
+
+export interface SemanticChunkOptions {
+  /**
+   * Jaccard similarity threshold in [0, 1].
+   * Consecutive sentences with similarity ≥ this value are grouped into the
+   * same chunk (same topic).  Sentences that fall below start a new chunk.
+   * Default: 0.15 (roughly 15% vocabulary overlap keeps sentences together).
+   */
+  similarityThreshold?: number;
+  /** Max characters before a forced split within one topic region. Default: 2000 */
+  maxCharsPerChunk?: number;
+}
+
+/**
+ * Compute Jaccard similarity between two word sets.
+ *
+ * |A ∩ B| / |A ∪ B|
+ *
+ * Returns 0 when both sets are empty.
+ */
+export function jaccardSimilarity(
+  a: ReadonlySet<string>,
+  b: ReadonlySet<string>,
+): number {
+  if (a.size === 0 && b.size === 0) return 0;
+  let intersection = 0;
+  for (const w of a) {
+    if (b.has(w)) intersection++;
+  }
+  const union = a.size + b.size - intersection;
+  return union === 0 ? 0 : intersection / union;
+}
+
+/** Tokenise a sentence into a stopword-filtered word set (for Jaccard). */
+function toWordSet(text: string): Set<string> {
+  const words = text.toLowerCase().match(/[a-z][a-z'-]*[a-z]|[a-z]{2,}/g) ?? [];
+  return new Set(words.filter((w) => !STOPWORDS.has(w)));
+}
+
+const DEFAULT_SEMANTIC_THRESHOLD = 0.15;
+const DEFAULT_SEMANTIC_MAX_CHARS = 2000;
+
+/**
+ * Split text into semantically cohesive chunks using Jaccard similarity on
+ * sentence word sets.
+ *
+ * Algorithm:
+ *  1. Split text into sentences (same boundaries as chunkBySentence).
+ *  2. For each sentence, compute its stopword-filtered word set.
+ *  3. Greedily accumulate sentences into the current chunk while:
+ *       a. Jaccard(current_chunk_words, sentence_words) ≥ similarityThreshold, OR
+ *       b. The current chunk is empty (always accept the first sentence).
+ *       c. AND adding the sentence does not exceed maxCharsPerChunk.
+ *  4. A similarity drop signals a topic shift → flush the current chunk and
+ *     start a new one.
+ *
+ * Compared with chunkByParagraph / chunkBySentence, this produces chunks that
+ * track topic continuity rather than whitespace structure.
+ *
+ * @returns TextChunk[] (may be empty for blank input).
+ */
+export function chunkBySemantic(
+  text: string,
+  opts: SemanticChunkOptions = {},
+): TextChunk[] {
+  if (text.trim().length === 0) return [];
+
+  const threshold = opts.similarityThreshold ?? DEFAULT_SEMANTIC_THRESHOLD;
+  const maxChars = opts.maxCharsPerChunk ?? DEFAULT_SEMANTIC_MAX_CHARS;
+
+  // ── 1. Sentence split (same regex as chunkBySentence) ──────────────────
+  const sentences = text
+    .split(/(?<=[.!?。！？])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (sentences.length === 0) {
+    const t = text.trim();
+    return [{ index: 0, text: t, tokenEstimate: estimateTokens(t) }];
+  }
+
+  // ── 2. Per-sentence word sets ───────────────────────────────────────────
+  const wordSets = sentences.map(toWordSet);
+
+  // ── 3. Greedy grouping ─────────────────────────────────────────────────
+  const chunks: TextChunk[] = [];
+  let chunkIdx = 0;
+
+  let bufferSentences: string[] = [];
+  let bufferChars = 0;
+  // Accumulated word set for the current chunk (union of all sentence sets)
+  let bufferWords = new Set<string>();
+
+  const flush = (): void => {
+    if (bufferSentences.length === 0) return;
+    const t = bufferSentences.join(" ");
+    chunks.push({ index: chunkIdx++, text: t, tokenEstimate: estimateTokens(t) });
+    bufferSentences = [];
+    bufferChars = 0;
+    bufferWords = new Set();
+  };
+
+  for (let i = 0; i < sentences.length; i++) {
+    const sentence = sentences[i]!;
+    const sentWords = wordSets[i]!;
+    const sentChars = sentence.length;
+
+    const wouldExceedMax =
+      bufferChars > 0 && bufferChars + 1 + sentChars > maxChars;
+
+    if (bufferSentences.length === 0) {
+      // Always start a new chunk with the first sentence
+      bufferSentences.push(sentence);
+      bufferChars = sentChars;
+      for (const w of sentWords) bufferWords.add(w);
+    } else if (wouldExceedMax) {
+      // Force flush — size limit hit regardless of similarity
+      flush();
+      bufferSentences.push(sentence);
+      bufferChars = sentChars;
+      for (const w of sentWords) bufferWords.add(w);
+    } else {
+      const sim = jaccardSimilarity(bufferWords, sentWords);
+      if (sim >= threshold) {
+        // Same topic — keep accumulating
+        bufferSentences.push(sentence);
+        bufferChars += 1 + sentChars;
+        for (const w of sentWords) bufferWords.add(w);
+      } else {
+        // Topic shift — flush and start fresh
+        flush();
+        bufferSentences.push(sentence);
+        bufferChars = sentChars;
+        bufferWords = new Set(sentWords);
+      }
+    }
+  }
+
+  flush();
+  return chunks;
+}
+
 // ── chunkByStrategy — dispatcher ──────────────────────────────────────────────
 
 /**
@@ -198,7 +341,7 @@ export function chunkByParagraph(text: string, opts: SegmentChunkOptions = {}): 
 export function chunkByStrategy(
   text: string,
   strategy: ChunkStrategy,
-  opts: ChunkOptions = {},
+  opts: ChunkOptions & SemanticChunkOptions = {},
 ): TextChunk[] {
   switch (strategy) {
     case "fixed":
@@ -207,6 +350,8 @@ export function chunkByStrategy(
       return chunkBySentence(text, opts);
     case "paragraph":
       return chunkByParagraph(text, opts);
+    case "semantic":
+      return chunkBySemantic(text, opts);
   }
 }
 
@@ -567,4 +712,11 @@ export async function extractRelationships(
 
 // ── Constants re-export ───────────────────────────────────────────────────────
 
-export { CHARS_PER_TOKEN, DEFAULT_MAX_TOKENS, DEFAULT_OVERLAP_TOKENS, STOPWORDS };
+export {
+  CHARS_PER_TOKEN,
+  DEFAULT_MAX_TOKENS,
+  DEFAULT_OVERLAP_TOKENS,
+  STOPWORDS,
+  DEFAULT_SEMANTIC_THRESHOLD,
+  DEFAULT_SEMANTIC_MAX_CHARS,
+};
