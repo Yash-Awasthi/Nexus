@@ -8,6 +8,7 @@ import Chat from "./pages/Chat.js";
 import Council from "./pages/Council.js";
 import Dashboard from "./pages/Dashboard.js";
 import Discover from "./pages/Discover.js";
+import MemoryTimeline from "./pages/MemoryTimeline.js";
 import Signals from "./pages/Signals.js";
 import Tasks from "./pages/Tasks.js";
 
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="chat" element={<Chat />} />
           <Route path="approvals" element={<Approvals />} />
           <Route path="audit" element={<Audit />} />
+          <Route path="memory" element={<MemoryTimeline />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

@@ -10,6 +10,7 @@ const NAV = [
   { to: "/tasks", label: "Tasks", icon: "◎" },
   { to: "/approvals", label: "Approvals", icon: "✓" },
   { to: "/audit", label: "Audit", icon: "⛓" },
+  { to: "/memory", label: "Memory", icon: "◈" },
 ];
 
 const styles = {
