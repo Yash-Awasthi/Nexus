@@ -283,3 +283,10 @@ export class SyncTaskRunner {
     return { processed: totalProcessed, failed: totalFailed };
   }
 }
+
+
+// ── Redis-backed client + async queue ─────────────────────────────────────────
+// ioredis is an optional peer dependency — only instantiate RedisStreamClient
+// when REDIS_URL is set and ioredis is installed.
+
+export { RedisStreamClient, AsyncTaskQueue } from "./redis-stream-client.js";

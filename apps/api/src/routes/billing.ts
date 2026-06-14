@@ -2,36 +2,25 @@
 /**
  * Billing routes — plan info, quota usage, API key management, Stripe webhooks.
  *
+ * API key CRUD is backed by Drizzle ORM → Neon Postgres (via @nexus/billing).
+ * When DATABASE_URL is not set the key endpoints return 503 with a clear error.
+ *
  * GET  /api/v1/billing/plan            — current plan definition
  * GET  /api/v1/billing/current-period  — usage for current billing period
  * GET  /api/v1/billing/keys            — list API keys for the authenticated owner
  * POST /api/v1/billing/keys            — create a new API key
  * DELETE /api/v1/billing/keys/:id      — revoke a key
+ * GET  /api/v1/billing/quota           — current quota status
  * POST /api/v1/billing/webhook/stripe  — Stripe webhook handler
  */
 
-import {
-  QuotaChecker,
-  createApiKey,
-  listApiKeys,
-  revokeApiKey,
-  InMemoryKeyStore,
-  InMemoryUsageStore,
-} from "@nexus/billing";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
 
-// ── In-memory stores (swap for DB-backed in production) ───────────────────────
+// ── DB availability flag ──────────────────────────────────────────────────────
 
-const keyStore = new InMemoryKeyStore();
-const usageStore = new InMemoryUsageStore();
-
-const quota = new QuotaChecker({
-  store: usageStore,
-  monthlyTokenLimit: 50_000,
-  rpmLimit: 60,
-});
+const DB_AVAILABLE = !!process.env.DATABASE_URL;
 
 // ── Static plan definitions ───────────────────────────────────────────────────
 
@@ -63,7 +52,7 @@ const PLANS = {
     rpmLimit: 6000,
     tier: "enterprise",
   },
-};
+} as const;
 
 type PlanKey = keyof typeof PLANS;
 
@@ -86,19 +75,40 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
     const now = new Date();
     const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
     const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-    const usage = await usageStore.getMonthlyUsage("global");
     const planKey = currentPlanKey();
     const plan = PLANS[planKey];
+
+    // Real usage aggregation when DB is available
+    let tokensUsed = 0;
+    let requestsCount = 0;
+
+    if (DB_AVAILABLE) {
+      try {
+        const { db } = await import("@nexus/db");
+        const { usageEvents } = await import("@nexus/db/schema");
+        const { sql } = await import("drizzle-orm");
+        const periodStart = startDate.toISOString();
+        const [row] = await db
+          .select({
+            total: sql<number>`coalesce(sum(${usageEvents.costUnits}), 0)`,
+            count: sql<number>`count(*)`,
+          })
+          .from(usageEvents)
+          .where(sql`${usageEvents.createdAt} >= ${periodStart}`);
+        tokensUsed = Number(row?.total ?? 0);
+        requestsCount = Number(row?.count ?? 0);
+      } catch {
+        // DB query failed — serve zeros rather than 500
+      }
+    }
 
     return reply.send({
       period: {
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
-        tokensUsed: usage.tokens,
+        tokensUsed,
         tokensLimit: plan.tokensPerMonth,
-        requestsCount: usage.requests,
-        rpmCurrent: usage.rpmCurrent,
+        requestsCount,
         rpmLimit: plan.rpmLimit,
       },
     });
@@ -106,28 +116,55 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
 
   /** GET /billing/keys */
   app.get("/billing/keys", { preHandler: requireAuth }, async (_req, reply) => {
-    const keys = await listApiKeys(keyStore, "global");
-    return reply.send({ keys: keys.map((k) => ({ ...k, rawKey: undefined })) });
+    if (!DB_AVAILABLE) {
+      return reply.code(503).send({ error: "Database not configured — API key management requires DATABASE_URL" });
+    }
+    const { listApiKeys } = await import("@nexus/billing");
+    const keys = await listApiKeys("global");
+    // Strip keyHash from the response — never expose it
+    return reply.send({
+      keys: keys.map((k) => ({
+        id: k.id,
+        name: k.name,
+        keyPrefix: k.keyPrefix,
+        plan: k.plan,
+        monthlyQuota: k.monthlyQuota,
+        rpmLimit: k.rpmLimit,
+        createdAt: k.createdAt,
+        revokedAt: k.revokedAt,
+      })),
+    });
   });
 
   /** POST /billing/keys */
-  app.post<{ Body: { name: string; scopes?: string[] } }>(
+  app.post<{ Body: { name: string; plan?: "free" | "pro" | "enterprise"; monthlyQuota?: number; rpmLimit?: number } }>(
     "/billing/keys",
     { preHandler: requireAuth },
     async (request, reply) => {
-      const result = await createApiKey(keyStore, {
-        ownerId: "global",
-        name: request.body.name,
-        scopes: request.body.scopes ?? ["api"],
-      });
-      return reply.code(201).send({
-        id: result.id,
-        name: result.name,
-        rawKey: result.rawKey,
-        keyPrefix: result.keyPrefix,
-        createdAt: result.createdAt,
-        scopes: result.scopes,
-      });
+      if (!DB_AVAILABLE) {
+        return reply.code(503).send({ error: "Database not configured — API key management requires DATABASE_URL" });
+      }
+      const { createApiKey } = await import("@nexus/billing");
+      try {
+        const { rawKey, apiKey } = await createApiKey({
+          ownerId: "global",
+          name: request.body.name,
+          plan: request.body.plan ?? "free",
+          monthlyQuota: request.body.monthlyQuota,
+          rpmLimit: request.body.rpmLimit,
+        });
+        return reply.code(201).send({
+          id: apiKey.id,
+          name: apiKey.name,
+          rawKey,            // Only shown once at creation time
+          keyPrefix: apiKey.keyPrefix,
+          plan: apiKey.plan,
+          createdAt: apiKey.createdAt,
+        });
+      } catch (err: unknown) {
+        const e = err as { message?: string };
+        return reply.code(400).send({ error: e.message });
+      }
     },
   );
 
@@ -136,16 +173,50 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
     "/billing/keys/:id",
     { preHandler: requireAuth },
     async (request, reply) => {
-      const revoked = await revokeApiKey(keyStore, request.params.id);
-      if (!revoked) return reply.code(404).send({ error: "Key not found" });
-      return reply.code(204).send();
+      if (!DB_AVAILABLE) {
+        return reply.code(503).send({ error: "Database not configured — API key management requires DATABASE_URL" });
+      }
+      const { revokeApiKey } = await import("@nexus/billing");
+      try {
+        await revokeApiKey(request.params.id);
+        return reply.code(204).send();
+      } catch (err: unknown) {
+        const e = err as { message?: string };
+        return reply.code(404).send({ error: e.message ?? "Key not found" });
+      }
     },
   );
 
-  /** GET /billing/quota — real-time quota status */
+  /** GET /billing/quota — plan limits + live usage summary */
   app.get("/billing/quota", { preHandler: requireAuth }, async (_req, reply) => {
-    const check = await quota.check("global", 0);
-    return reply.send(check);
+    const planKey = currentPlanKey();
+    const plan = PLANS[planKey];
+
+    let monthlyUsed = 0;
+    if (DB_AVAILABLE) {
+      try {
+        const { db } = await import("@nexus/db");
+        const { usageEvents } = await import("@nexus/db/schema");
+        const { sql } = await import("drizzle-orm");
+        const periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+        const [row] = await db
+          .select({ total: sql<number>`coalesce(sum(${usageEvents.costUnits}), 0)` })
+          .from(usageEvents)
+          .where(sql`${usageEvents.createdAt} >= ${periodStart}`);
+        monthlyUsed = Number(row?.total ?? 0);
+      } catch {
+        // serve best-effort zeros
+      }
+    }
+
+    return reply.send({
+      allowed: plan.tokensPerMonth < 0 || monthlyUsed < plan.tokensPerMonth,
+      plan: planKey,
+      tokensPerMonth: plan.tokensPerMonth,
+      tokensUsed: monthlyUsed,
+      tokensRemaining: plan.tokensPerMonth < 0 ? null : Math.max(0, plan.tokensPerMonth - monthlyUsed),
+      rpmLimit: plan.rpmLimit,
+    });
   });
 
   /** POST /billing/webhook/stripe */
@@ -153,13 +224,32 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
     "/billing/webhook/stripe",
     { config: { rawBody: true } },
     async (request, reply) => {
-      // Signature verification happens here — skip in dev if no STRIPE_WEBHOOK_SECRET
       const secret = process.env.STRIPE_WEBHOOK_SECRET;
       if (!secret) {
         app.log.warn("STRIPE_WEBHOOK_SECRET not set — skipping signature verification");
       }
-      // For now: acknowledge all events (production: use StripeWebhookProcessor)
-      app.log.info({ event: "stripe-webhook" }, "Stripe webhook received");
+
+      if (DB_AVAILABLE && secret) {
+        try {
+          const { StripeWebhookProcessor } = await import("@nexus/billing");
+          const { db } = await import("@nexus/db");
+          const { stripeWebhookEvents } = await import("@nexus/db/schema");
+          const processor = new StripeWebhookProcessor({ secret, db, stripeWebhookEvents });
+          const rawBody = (request as { rawBody?: string | Buffer }).rawBody ?? JSON.stringify(request.body);
+          const sig = request.headers["stripe-signature"] as string | undefined ?? "";
+          const result = await processor.process(rawBody.toString(), sig);
+          return reply.code(200).send(result);
+        } catch (err: unknown) {
+          const e = err as { name?: string; message?: string };
+          if (e.name === "StripeSignatureError") {
+            return reply.code(400).send({ error: "Invalid Stripe signature" });
+          }
+          app.log.error({ err }, "Stripe webhook processing error");
+        }
+      }
+
+      // Acknowledge all events when DB or secret is unavailable
+      app.log.info({ event: "stripe-webhook" }, "Stripe webhook received (passthrough)");
       return reply.code(200).send({ received: true });
     },
   );

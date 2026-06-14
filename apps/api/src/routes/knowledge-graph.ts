@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Knowledge Graph routes — backed by @nexus/knowledge-graph InMemoryKGStore.
+ * Knowledge Graph routes — backed by NeonKGStore (Postgres) when DATABASE_URL
+ * is set; falls back to InMemoryKGStore for local dev / CI without a database.
  *
  * GET  /api/v1/knowledge-graph/nodes            — list nodes (limit, type, minConfidence)
  * GET  /api/v1/knowledge-graph/search           — search nodes by name substring (?q= &k=)
@@ -16,24 +17,42 @@
 
 import {
   InMemoryKGStore,
+  NeonKGStore,
   KnowledgeGraph,
   makeNodeId,
   makeEdgeId,
   nullEntityExtractor,
   nullRelationshipExtractor,
+  type NeonQueryFn,
   type EntityType,
 } from "@nexus/knowledge-graph";
 import type { FastifyInstance } from "fastify";
+import { Pool } from "pg";
 
 import { requireAuth } from "../middleware/auth.js";
 
-// ── Singletons ────────────────────────────────────────────────────────────────
+// ── Store bootstrap — Postgres when available, in-memory fallback ─────────────
 
-const store = new InMemoryKGStore();
+let store: InMemoryKGStore | NeonKGStore;
+
+if (process.env.DATABASE_URL) {
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const queryFn: NeonQueryFn = (sql, params) =>
+    pool.query(sql, (params ?? []) as unknown[]).then((r) => ({ rows: r.rows }));
+  const neonStore = new NeonKGStore({ query: queryFn });
+  // Init tables (CREATE TABLE IF NOT EXISTS) — non-blocking at module load time
+  neonStore.init().catch((err) => {
+    console.error("[knowledge-graph] NeonKGStore.init() failed:", err);
+  });
+  store = neonStore;
+} else {
+  store = new InMemoryKGStore();
+}
+
 const kg = new KnowledgeGraph(store, nullEntityExtractor, nullRelationshipExtractor);
 
-// Seed with a few example nodes so the UI is not empty on first load
-(async () => {
+// Seed the in-memory store with example nodes (skipped when Neon is active)
+if (!(store instanceof NeonKGStore)) {
   const now = Math.floor(Date.now() / 1000);
   const seed = [
     { name: "Nexus Platform", type: "PRODUCT" as EntityType, confidence: 1.0 },
@@ -43,23 +62,24 @@ const kg = new KnowledgeGraph(store, nullEntityExtractor, nullRelationshipExtrac
     { name: "Multi-agent AI", type: "OTHER"   as EntityType, confidence: 0.9 },
   ];
   const ids: string[] = [];
-  for (const s of seed) {
-    const id = makeNodeId(s.name, s.type);
-    ids.push(id);
-    await store.upsertNode({ id, name: s.name, type: s.type, confidence: s.confidence, properties: {}, sources: ["seed"], createdAt: now, updatedAt: now });
-  }
-  // A few edges
-  const edgePairs: [string, string, string][] = [
-    [ids[1]!, "builds",    ids[0]!],
-    [ids[1]!, "studies_at",ids[2]!],
-    [ids[0]!, "uses",      ids[3]!],
-    [ids[0]!, "implements",ids[4]!],
-  ];
-  for (const [s, pred, o] of edgePairs) {
-    const id = makeEdgeId(s, pred, o);
-    await store.upsertEdge({ id, subjectId: s, predicate: pred, objectId: o, confidence: 0.95, sources: ["seed"], createdAt: now, updatedAt: now });
-  }
-})();
+  void (async () => {
+    for (const s of seed) {
+      const id = makeNodeId(s.name, s.type);
+      ids.push(id);
+      await store.upsertNode({ id, name: s.name, type: s.type, confidence: s.confidence, properties: {}, sources: ["seed"], createdAt: now, updatedAt: now });
+    }
+    const edgePairs: [string, string, string][] = [
+      [ids[1]!, "builds",     ids[0]!],
+      [ids[1]!, "studies_at", ids[2]!],
+      [ids[0]!, "uses",       ids[3]!],
+      [ids[0]!, "implements", ids[4]!],
+    ];
+    for (const [s, pred, o] of edgePairs) {
+      const id = makeEdgeId(s, pred, o);
+      await store.upsertEdge({ id, subjectId: s, predicate: pred, objectId: o, confidence: 0.95, sources: ["seed"], createdAt: now, updatedAt: now });
+    }
+  })();
+}
 
 // ── Shape helpers — translate KGNode/KGEdge to page-expected format ───────────
 
@@ -104,7 +124,6 @@ export async function knowledgeGraphRoutes(app: FastifyInstance): Promise<void> 
       ? await kg.queryNodes({ nameContains: q, limit: k })
       : await kg.queryNodes({ limit: k });
 
-    // For each found node, pull its edges so the UI can draw the subgraph
     const nodeIds = new Set(nodes.map((n) => n.id));
     const allEdges = await kg.queryEdges({ limit: 500 });
     const relevantEdges = allEdges.filter(

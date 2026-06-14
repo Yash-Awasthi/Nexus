@@ -50,7 +50,7 @@ const PLACEHOLDER_CONNECTORS = [
   { id: "linear",  name: "Linear",  type: "issues"    },
 ];
 for (const p of PLACEHOLDER_CONNECTORS) {
-  if (!registry.has(p.id)) {
+  if (!registry.get(p.id)) {
     registry.register(new NullConnector(p));
   }
 }
@@ -79,7 +79,7 @@ function connectorView(id: string) {
 export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
   /** GET /connectors */
   app.get("/connectors", { preHandler: requireAuth }, async (_req, reply) => {
-    const connectors = registry.ids().map((id) => connectorView(id)).filter(Boolean);
+    const connectors = registry.list().map((c) => connectorView(c.id)).filter(Boolean);
     return reply.send({ connectors, total: connectors.length });
   });
 
@@ -99,13 +99,17 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
     Params: { id: string };
     Body: { enabled?: boolean };
   }>("/connectors/:id", { preHandler: requireAuth }, async (request, reply) => {
-    if (!registry.has(request.params.id)) {
+    if (!registry.get(request.params.id)) {
       return reply.code(404).send({ error: "Connector not found" });
     }
     if (request.body.enabled !== undefined) {
       enabledOverrides.set(request.params.id, request.body.enabled);
       if (!request.body.enabled) {
-        registry.disable(request.params.id);
+        // Disconnect the connector when disabling
+        const conn = registry.get(request.params.id);
+        if (conn && conn.status === "connected") {
+          void conn.disconnect().catch(() => undefined);
+        }
       }
     }
     return reply.send(connectorView(request.params.id));

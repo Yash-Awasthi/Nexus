@@ -2,6 +2,9 @@
 /**
  * Observation-provider routes — session observation store + generation trigger.
  *
+ * Persists to Postgres `obs_entries` table when DATABASE_URL is set;
+ * falls back to an in-memory array for local dev / CI without a database.
+ *
  * GET  /api/v1/obs/memories             — return stored observations as MemoryEntry[]
  * POST /api/v1/obs/generate             — generate an observation for a session
  * POST /api/v1/obs/store                — manually store an observation
@@ -17,10 +20,11 @@ import {
   type ObservationEvent,
 } from "@nexus/obs-providers";
 import type { FastifyInstance } from "fastify";
+import { Pool } from "pg";
 
 import { requireAuth } from "../middleware/auth.js";
 
-// ── In-memory observation store ───────────────────────────────────────────────
+// ── Observation shape ─────────────────────────────────────────────────────────
 
 export interface StoredObservation {
   id: string;
@@ -34,19 +38,156 @@ export interface StoredObservation {
   createdAt: string;
 }
 
-const obsStore: StoredObservation[] = [];
+// ── Backing store — Postgres when DATABASE_URL is set, in-memory fallback ─────
 
-// Seed with a welcome observation
-obsStore.push({
-  id: "obs-seed-1",
-  content: "Nexus platform is initialised and ready. Observation pipeline connected.",
-  category: "event",
-  tags: ["nexus", "startup"],
-  confidence: 1.0,
-  provider: "system",
-  model: "built-in",
-  createdAt: new Date().toISOString(),
-});
+interface ObsStore {
+  all(limit: number, category?: string): Promise<StoredObservation[]>;
+  add(obs: StoredObservation): Promise<void>;
+  remove(id: string): Promise<boolean>;
+}
+
+class InMemoryObsStore implements ObsStore {
+  private entries: StoredObservation[] = [];
+
+  constructor() {
+    // Seed with a startup entry
+    this.entries.push({
+      id: "obs-seed-1",
+      content: "Nexus platform is initialised and ready. Observation pipeline connected.",
+      category: "event",
+      tags: ["nexus", "startup"],
+      confidence: 1.0,
+      provider: "system",
+      model: "built-in",
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  async all(limit: number, category?: string): Promise<StoredObservation[]> {
+    let entries = [...this.entries].reverse();
+    if (category) entries = entries.filter((e) => e.category === category);
+    return entries.slice(0, limit);
+  }
+
+  async add(obs: StoredObservation): Promise<void> {
+    this.entries.push(obs);
+  }
+
+  async remove(id: string): Promise<boolean> {
+    const idx = this.entries.findIndex((e) => e.id === id);
+    if (idx === -1) return false;
+    this.entries.splice(idx, 1);
+    return true;
+  }
+}
+
+class PgObsStore implements ObsStore {
+  private pool: Pool;
+  private ready: Promise<void>;
+
+  constructor(pool: Pool) {
+    this.pool = pool;
+    this.ready = this.init();
+  }
+
+  private async init(): Promise<void> {
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS obs_entries (
+        id          TEXT PRIMARY KEY,
+        content     TEXT        NOT NULL,
+        category    TEXT        NOT NULL DEFAULT 'event',
+        tags        JSONB       NOT NULL DEFAULT '[]',
+        confidence  REAL        NOT NULL DEFAULT 1.0,
+        provider    TEXT        NOT NULL DEFAULT 'system',
+        model       TEXT        NOT NULL DEFAULT 'built-in',
+        session_id  TEXT,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS obs_entries_category_idx  ON obs_entries (category);
+      CREATE INDEX IF NOT EXISTS obs_entries_created_at_idx ON obs_entries (created_at DESC);
+    `);
+    // Seed startup entry if table is empty
+    const { rows } = await this.pool.query(`SELECT COUNT(*) AS cnt FROM obs_entries`);
+    if (Number(rows[0]?.cnt) === 0) {
+      await this.pool.query(
+        `INSERT INTO obs_entries (id, content, category, tags, confidence, provider, model)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING`,
+        [
+          "obs-seed-1",
+          "Nexus platform is initialised and ready. Observation pipeline connected.",
+          "event",
+          JSON.stringify(["nexus", "startup"]),
+          1.0,
+          "system",
+          "built-in",
+        ],
+      );
+    }
+  }
+
+  async all(limit: number, category?: string): Promise<StoredObservation[]> {
+    await this.ready;
+    const params: unknown[] = [limit];
+    const where = category ? `WHERE category=$2` : "";
+    if (category) params.push(category);
+    const { rows } = await this.pool.query(
+      `SELECT * FROM obs_entries ${where} ORDER BY created_at DESC LIMIT $1`,
+      params,
+    );
+    return rows.map(rowToObs);
+  }
+
+  async add(obs: StoredObservation): Promise<void> {
+    await this.ready;
+    await this.pool.query(
+      `INSERT INTO obs_entries (id, content, category, tags, confidence, provider, model, session_id, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       ON CONFLICT (id) DO NOTHING`,
+      [
+        obs.id,
+        obs.content,
+        obs.category,
+        JSON.stringify(obs.tags),
+        obs.confidence,
+        obs.provider,
+        obs.model,
+        obs.sessionId ?? null,
+        obs.createdAt,
+      ],
+    );
+  }
+
+  async remove(id: string): Promise<boolean> {
+    await this.ready;
+    const { rowCount } = await this.pool.query(
+      `DELETE FROM obs_entries WHERE id=$1`,
+      [id],
+    );
+    return (rowCount ?? 0) > 0;
+  }
+}
+
+function rowToObs(row: Record<string, unknown>): StoredObservation {
+  return {
+    id: row["id"] as string,
+    content: row["content"] as string,
+    category: row["category"] as string,
+    tags: Array.isArray(row["tags"]) ? (row["tags"] as string[]) : (JSON.parse(row["tags"] as string) as string[]),
+    confidence: Number(row["confidence"]),
+    provider: row["provider"] as string,
+    model: row["model"] as string,
+    sessionId: row["session_id"] as string | undefined,
+    createdAt: row["created_at"] instanceof Date
+      ? (row["created_at"] as Date).toISOString()
+      : String(row["created_at"]),
+  };
+}
+
+// ── Singleton store ───────────────────────────────────────────────────────────
+
+const obsStore: ObsStore = process.env.DATABASE_URL
+  ? new PgObsStore(new Pool({ connectionString: process.env.DATABASE_URL }))
+  : new InMemoryObsStore();
 
 // ── Provider registry (mock by default; swap callFn for real LLM in prod) ────
 
@@ -67,14 +208,9 @@ export async function obsProvidersRoutes(app: FastifyInstance): Promise<void> {
     "/obs/memories",
     { preHandler: requireAuth },
     async (request, reply) => {
-      let entries = [...obsStore].reverse(); // newest first
-      if (request.query.category) {
-        entries = entries.filter((e) => e.category === request.query.category);
-      }
       const limit = Math.min(parseInt(request.query.limit ?? "100"), 500);
-      entries = entries.slice(0, limit);
+      const entries = await obsStore.all(limit, request.query.category);
 
-      // Shape to MemoryEntry (matches apps/web/src/pages/MemoryTimeline.tsx)
       const memories = entries.map((e) => ({
         id: e.id,
         content: e.content,
@@ -122,7 +258,7 @@ export async function obsProvidersRoutes(app: FastifyInstance): Promise<void> {
         sessionId,
         createdAt: new Date().toISOString(),
       };
-      obsStore.push(stored);
+      await obsStore.add(stored);
       return reply.code(201).send({ observation: stored, result });
     }
 
@@ -152,7 +288,7 @@ export async function obsProvidersRoutes(app: FastifyInstance): Promise<void> {
       sessionId: request.body.sessionId,
       createdAt: new Date().toISOString(),
     };
-    obsStore.push(stored);
+    await obsStore.add(stored);
     return reply.code(201).send(stored);
   });
 
@@ -163,9 +299,8 @@ export async function obsProvidersRoutes(app: FastifyInstance): Promise<void> {
     "/obs/:id",
     { preHandler: requireAuth },
     async (request, reply) => {
-      const idx = obsStore.findIndex((e) => e.id === request.params.id);
-      if (idx === -1) return reply.code(404).send({ error: "Observation not found" });
-      obsStore.splice(idx, 1);
+      const deleted = await obsStore.remove(request.params.id);
+      if (!deleted) return reply.code(404).send({ error: "Observation not found" });
       return reply.code(204).send();
     },
   );
