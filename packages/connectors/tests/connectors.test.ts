@@ -10,8 +10,20 @@ import {
   TavilyConnector,
   NeonConnector,
   LinearConnector,
+  isDocumentConnector,
+  BaseDocumentConnector,
+  DocumentConnectorRegistry,
+  GitHubDocumentConnector,
+  SlackDocumentConnector,
+  WebDocumentConnector,
+  FileSystemDocumentConnector,
+  LinearDocumentConnector,
+  TavilyDocumentConnector,
   type Connector,
   type FetchFn,
+  type DocumentConnector,
+  type SyncedDocument,
+  type ReadFileFn,
 } from "../src/index.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -611,5 +623,623 @@ describe("ConnectorRegistry — disconnectAll", () => {
     await registry.disconnectAll();
     expect(a.status).toBe("disconnected");
     expect(b.status).toBe("disconnected");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Document sync layer helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Fetch returning text() instead of json() — for WebDocumentConnector */
+function makeTextFetch(
+  responses: Array<{ ok: boolean; status?: number; textBody?: string }>,
+): FetchFn {
+  let idx = 0;
+  return vi.fn(async () => {
+    const r = responses[idx++] ?? { ok: true, textBody: "" };
+    return {
+      ok: r.ok,
+      status: r.status ?? (r.ok ? 200 : 400),
+      json: async () => ({}),
+      text: async () => r.textBody ?? "",
+    } as Response;
+  });
+}
+
+/** Minimal concrete document connector for testing BaseDocumentConnector */
+class NullDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name: string;
+  private readonly _docs: SyncedDocument[];
+
+  constructor(id: string, docs: SyncedDocument[] = []) {
+    super();
+    this.id = id;
+    this.name = `Null (${id})`;
+    this._docs = docs;
+    this._status = "connected";
+  }
+
+  protected async _doConnect() {
+    return { ok: true };
+  }
+  protected async _doHealthCheck() {
+    return { ok: true };
+  }
+  protected async *_doSync(): AsyncIterable<SyncedDocument> {
+    for (const doc of this._docs) yield doc;
+  }
+}
+
+function makeDoc(overrides: Partial<SyncedDocument> = {}): SyncedDocument {
+  return {
+    id: "test::https://example.com",
+    title: "Test Doc",
+    content: "Hello world",
+    sourceUrl: "https://example.com",
+    connectorId: "test",
+    syncedAt: Date.now(),
+    ...overrides,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// isDocumentConnector
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("isDocumentConnector", () => {
+  it("returns true for a DocumentConnector", () => {
+    const c = new NullDocumentConnector("x");
+    expect(isDocumentConnector(c)).toBe(true);
+  });
+
+  it("returns false for a plain Connector", () => {
+    const c = new NullConnector("plain");
+    expect(isDocumentConnector(c)).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BaseDocumentConnector (via NullDocumentConnector)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("BaseDocumentConnector", () => {
+  it("sync() is an async iterable", () => {
+    const c = new NullDocumentConnector("x");
+    const iter = c.sync();
+    expect(typeof iter[Symbol.asyncIterator]).toBe("function");
+  });
+
+  it("sync() yields all documents from _doSync", async () => {
+    const doc = makeDoc();
+    const c = new NullDocumentConnector("x", [doc]);
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync()) docs.push(d);
+    expect(docs).toHaveLength(1);
+    expect(docs[0]!.id).toBe(doc.id);
+  });
+
+  it("sync() yields nothing when _doSync is empty", async () => {
+    const c = new NullDocumentConnector("empty");
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync()) docs.push(d);
+    expect(docs).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GitHubDocumentConnector
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("GitHubDocumentConnector", () => {
+  const cfg = { token: "ghp_test", owner: "octocat", repo: "hello" };
+
+  it("has id containing owner/repo", () => {
+    const c = new GitHubDocumentConnector({ ...cfg, fetch: okFetch() });
+    expect(c.id).toContain("octocat/hello");
+  });
+
+  it("connect() sends Bearer to /user and returns ok:true", async () => {
+    const fetchFn = okFetch({ login: "octocat", id: 1 });
+    const c = new GitHubDocumentConnector({ ...cfg, fetch: fetchFn });
+    const result = await c.connect();
+    expect(result.ok).toBe(true);
+    expect(result.metadata?.login).toBe("octocat");
+    expect((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toContain("/user");
+  });
+
+  it("connect() ok:false on 401", async () => {
+    const c = new GitHubDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const result = await c.connect();
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("invalid or expired");
+  });
+
+  it("connect() ok:false on 5xx", async () => {
+    const c = new GitHubDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 503 }]) });
+    const result = await c.connect();
+    expect(result.ok).toBe(false);
+  });
+
+  it("healthCheck() hits /rate_limit", async () => {
+    const fetchFn = okFetch({ rate: { remaining: 4999, limit: 5000 } });
+    const c = new GitHubDocumentConnector({ ...cfg, fetch: fetchFn });
+    const hc = await c.healthCheck();
+    expect(hc.ok).toBe(true);
+    expect((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toContain("rate_limit");
+  });
+
+  it("sync() yields one doc per issue", async () => {
+    const issues = [
+      { number: 1, title: "Bug A", body: "Details", html_url: "https://github.com/o/r/issues/1", updated_at: "2024-01-01T00:00:00Z", state: "open" },
+      { number: 2, title: "PR B", body: "PR body", html_url: "https://github.com/o/r/pull/2", updated_at: "2024-01-02T00:00:00Z", state: "open", pull_request: {} },
+    ];
+    const c = new GitHubDocumentConnector({ ...cfg, fetch: okFetch(issues) });
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync()) docs.push(d);
+    expect(docs).toHaveLength(2);
+    expect(docs[0]!.title).toContain("Issue #1");
+    expect(docs[1]!.title).toContain("PR #2");
+    expect(docs[0]!.metadata?.type).toBe("Issue");
+    expect(docs[1]!.metadata?.type).toBe("PR");
+  });
+
+  it("sync() filters by since timestamp", async () => {
+    const issues = [
+      { number: 1, title: "Old", body: "", html_url: "https://github.com/o/r/issues/1", updated_at: "2020-01-01T00:00:00Z", state: "open" },
+      { number: 2, title: "New", body: "", html_url: "https://github.com/o/r/issues/2", updated_at: "2024-06-01T00:00:00Z", state: "open" },
+    ];
+    const c = new GitHubDocumentConnector({ ...cfg, fetch: okFetch(issues) });
+    const since = new Date("2023-01-01").getTime();
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync({ since })) docs.push(d);
+    expect(docs).toHaveLength(1);
+    expect(docs[0]!.title).toContain("New");
+  });
+
+  it("sync() filters by query text", async () => {
+    const issues = [
+      { number: 1, title: "crash bug", body: "", html_url: "https://github.com/o/r/issues/1", updated_at: "2024-01-01T00:00:00Z", state: "open" },
+      { number: 2, title: "feature request", body: "", html_url: "https://github.com/o/r/issues/2", updated_at: "2024-01-02T00:00:00Z", state: "open" },
+    ];
+    const c = new GitHubDocumentConnector({ ...cfg, fetch: okFetch(issues) });
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync({ query: "crash" })) docs.push(d);
+    expect(docs).toHaveLength(1);
+    expect(docs[0]!.title).toContain("crash");
+  });
+
+  it("sync() returns nothing when HTTP response is not ok", async () => {
+    const c = new GitHubDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 403 }]),
+    });
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync()) docs.push(d);
+    expect(docs).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SlackDocumentConnector
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("SlackDocumentConnector", () => {
+  const cfg = { token: "xoxb-test", channelId: "C0TEST123" };
+
+  it("has id containing channelId", () => {
+    const c = new SlackDocumentConnector({ ...cfg, fetch: okFetch() });
+    expect(c.id).toContain("C0TEST123");
+  });
+
+  it("connect() uses auth.test and returns team metadata", async () => {
+    const fetchFn = okFetch({ ok: true, team: "Nexus", user: "bot" });
+    const c = new SlackDocumentConnector({ ...cfg, fetch: fetchFn });
+    const result = await c.connect();
+    expect(result.ok).toBe(true);
+    expect(result.metadata?.team).toBe("Nexus");
+    expect((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toContain("auth.test");
+  });
+
+  it("connect() ok:false when Slack returns ok:false", async () => {
+    const c = new SlackDocumentConnector({ ...cfg, fetch: okFetch({ ok: false, error: "invalid_auth" }) });
+    const result = await c.connect();
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("invalid_auth");
+  });
+
+  it("sync() yields one doc per message", async () => {
+    const body = {
+      ok: true,
+      messages: [
+        { ts: "1700000000.000001", text: "Hello there", user: "U1" },
+        { ts: "1700000001.000002", text: "World", user: "U2" },
+      ],
+    };
+    const c = new SlackDocumentConnector({ ...cfg, fetch: okFetch(body) });
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync()) docs.push(d);
+    expect(docs).toHaveLength(2);
+    expect(docs[0]!.content).toBe("Hello there");
+    expect(docs[0]!.metadata?.user).toBe("U1");
+  });
+
+  it("sync() sends oldest param when since is provided", async () => {
+    const fetchFn = okFetch({ ok: true, messages: [] });
+    const c = new SlackDocumentConnector({ ...cfg, fetch: fetchFn });
+    const since = 1700000000000; // ms
+    for await (const _ of c.sync({ since })) { /* drain */ }
+    const calledUrl = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![0] as string;
+    expect(calledUrl).toContain("oldest=1700000000");
+  });
+
+  it("sync() yields nothing when Slack ok:false in history response", async () => {
+    const c = new SlackDocumentConnector({ ...cfg, fetch: okFetch({ ok: false, messages: [] }) });
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync()) docs.push(d);
+    expect(docs).toHaveLength(0);
+  });
+
+  it("sync() yields nothing on non-ok HTTP response", async () => {
+    const c = new SlackDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 429 }]) });
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync()) docs.push(d);
+    expect(docs).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WebDocumentConnector
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("WebDocumentConnector", () => {
+  it("has id 'web-doc'", () => {
+    const c = new WebDocumentConnector({ urls: [], fetch: makeTextFetch([]) });
+    expect(c.id).toBe("web-doc");
+  });
+
+  it("connect() ok:true with zero urls (no fetch call)", async () => {
+    const fetchFn = makeTextFetch([]);
+    const c = new WebDocumentConnector({ urls: [], fetch: fetchFn });
+    const result = await c.connect();
+    expect(result.ok).toBe(true);
+    expect(result.metadata?.urlCount).toBe(0);
+    expect((fetchFn as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
+  });
+
+  it("connect() ok:true when first URL returns 200", async () => {
+    const c = new WebDocumentConnector({
+      urls: ["https://example.com"],
+      fetch: makeTextFetch([{ ok: true, textBody: "<h1>Hello</h1>" }]),
+    });
+    const result = await c.connect();
+    expect(result.ok).toBe(true);
+    expect(result.metadata?.urlCount).toBe(1);
+  });
+
+  it("connect() ok:false when fetchFn throws", async () => {
+    const throwFetch: FetchFn = vi.fn(async () => { throw new Error("ECONNREFUSED"); });
+    const c = new WebDocumentConnector({ urls: ["https://unreachable.test"], fetch: throwFetch });
+    const result = await c.connect();
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("ECONNREFUSED");
+  });
+
+  it("sync() yields one doc per URL", async () => {
+    const fetchFn = makeTextFetch([
+      { ok: true, textBody: "Page one content" },
+      { ok: true, textBody: "Page two content" },
+    ]);
+    const c = new WebDocumentConnector({
+      urls: ["https://a.com", "https://b.com"],
+      fetch: fetchFn,
+    });
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync()) docs.push(d);
+    expect(docs).toHaveLength(2);
+    expect(docs[0]!.content).toBe("Page one content");
+    expect(docs[0]!.sourceUrl).toBe("https://a.com");
+    expect(docs[1]!.sourceUrl).toBe("https://b.com");
+  });
+
+  it("sync() respects limit option", async () => {
+    const fetchFn = makeTextFetch([{ ok: true, textBody: "A" }, { ok: true, textBody: "B" }]);
+    const c = new WebDocumentConnector({
+      urls: ["https://a.com", "https://b.com", "https://c.com"],
+      fetch: fetchFn,
+    });
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync({ limit: 1 })) docs.push(d);
+    expect(docs).toHaveLength(1);
+  });
+
+  it("sync() filters by query", async () => {
+    const fetchFn = makeTextFetch([
+      { ok: true, textBody: "nexus platform rocks" },
+      { ok: true, textBody: "irrelevant content here" },
+    ]);
+    const c = new WebDocumentConnector({
+      urls: ["https://a.com", "https://b.com"],
+      fetch: fetchFn,
+    });
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync({ query: "nexus" })) docs.push(d);
+    expect(docs).toHaveLength(1);
+    expect(docs[0]!.sourceUrl).toBe("https://a.com");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FileSystemDocumentConnector
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("FileSystemDocumentConnector", () => {
+  it("has id 'fs-doc'", () => {
+    const c = new FileSystemDocumentConnector({ paths: [] });
+    expect(c.id).toBe("fs-doc");
+  });
+
+  it("connect() always returns ok:true with pathCount", async () => {
+    const c = new FileSystemDocumentConnector({ paths: ["/a.md", "/b.md"] });
+    const result = await c.connect();
+    expect(result.ok).toBe(true);
+    expect(result.metadata?.pathCount).toBe(2);
+  });
+
+  it("sync() yields one doc per path using injectable readFile", async () => {
+    const readFile: ReadFileFn = vi.fn(async (p: string) => `Content of ${p}`);
+    const c = new FileSystemDocumentConnector({
+      paths: ["/docs/readme.md", "/docs/guide.txt"],
+      readFile,
+    });
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync()) docs.push(d);
+    expect(docs).toHaveLength(2);
+    expect(docs[0]!.content).toBe("Content of /docs/readme.md");
+    expect(docs[0]!.title).toBe("readme.md");
+    expect(docs[1]!.title).toBe("guide.txt");
+  });
+
+  it("sync() skips files that throw on read", async () => {
+    const readFile: ReadFileFn = vi.fn(async (p: string) => {
+      if (p.includes("missing")) throw new Error("ENOENT");
+      return `Content of ${p}`;
+    });
+    const c = new FileSystemDocumentConnector({
+      paths: ["/docs/exists.md", "/docs/missing.md"],
+      readFile,
+    });
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync()) docs.push(d);
+    expect(docs).toHaveLength(1);
+    expect(docs[0]!.sourceUrl).toBe("/docs/exists.md");
+  });
+
+  it("sync() filters by query", async () => {
+    const readFile: ReadFileFn = vi.fn(async (p: string) =>
+      p.includes("match") ? "this contains nexus keyword" : "unrelated text",
+    );
+    const c = new FileSystemDocumentConnector({
+      paths: ["/match.md", "/other.md"],
+      readFile,
+    });
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync({ query: "nexus" })) docs.push(d);
+    expect(docs).toHaveLength(1);
+    expect(docs[0]!.sourceUrl).toBe("/match.md");
+  });
+
+  it("sync() respects limit", async () => {
+    const readFile: ReadFileFn = vi.fn(async (p: string) => `Content of ${p}`);
+    const c = new FileSystemDocumentConnector({
+      paths: ["/a.md", "/b.md", "/c.md"],
+      readFile,
+    });
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync({ limit: 2 })) docs.push(d);
+    expect(docs).toHaveLength(2);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LinearDocumentConnector
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("LinearDocumentConnector", () => {
+  it("has id 'linear-doc'", () => {
+    expect(new LinearDocumentConnector({ apiKey: "k", fetch: okFetch() }).id).toBe("linear-doc");
+  });
+
+  it("connect() sends viewer GraphQL query", async () => {
+    const fetchFn = okFetch({ data: { viewer: { id: "u1", name: "Yash" } } });
+    const c = new LinearDocumentConnector({ apiKey: "lin_k", fetch: fetchFn });
+    const result = await c.connect();
+    expect(result.ok).toBe(true);
+    expect(result.metadata?.viewer).toBe("Yash");
+    const body = JSON.parse((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
+    expect(body.query).toContain("viewer");
+  });
+
+  it("connect() ok:false on 401", async () => {
+    const c = new LinearDocumentConnector({ apiKey: "bad", fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const result = await c.connect();
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("invalid");
+  });
+
+  it("sync() yields one doc per issue", async () => {
+    const body = {
+      data: {
+        issues: {
+          nodes: [
+            { id: "i1", title: "Fix crash", description: "Crash on load", url: "https://linear.app/t/i1", updatedAt: "2024-01-01T00:00:00Z", state: { name: "In Progress" } },
+            { id: "i2", title: "Add feature", description: "", url: "https://linear.app/t/i2", updatedAt: "2024-01-02T00:00:00Z", state: { name: "Todo" } },
+          ],
+        },
+      },
+    };
+    const c = new LinearDocumentConnector({ apiKey: "k", fetch: okFetch(body) });
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync()) docs.push(d);
+    expect(docs).toHaveLength(2);
+    expect(docs[0]!.title).toBe("Fix crash");
+    expect(docs[0]!.content).toBe("Crash on load");
+    expect(docs[0]!.metadata?.state).toBe("In Progress");
+  });
+
+  it("sync() includes teamId in GraphQL filter when set", async () => {
+    const fetchFn = okFetch({ data: { issues: { nodes: [] } } });
+    const c = new LinearDocumentConnector({ apiKey: "k", teamId: "TEAM123", fetch: fetchFn });
+    for await (const _ of c.sync()) { /* drain */ }
+    const body = JSON.parse((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
+    expect(body.query).toContain("TEAM123");
+  });
+
+  it("sync() filters by since timestamp", async () => {
+    const body = {
+      data: {
+        issues: {
+          nodes: [
+            { id: "old", title: "Old issue", description: "", url: "https://linear.app/t/old", updatedAt: "2020-01-01T00:00:00Z", state: { name: "Done" } },
+            { id: "new", title: "New issue", description: "", url: "https://linear.app/t/new", updatedAt: "2024-06-01T00:00:00Z", state: { name: "Open" } },
+          ],
+        },
+      },
+    };
+    const c = new LinearDocumentConnector({ apiKey: "k", fetch: okFetch(body) });
+    const since = new Date("2023-01-01").getTime();
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync({ since })) docs.push(d);
+    expect(docs).toHaveLength(1);
+    expect(docs[0]!.title).toBe("New issue");
+  });
+
+  it("sync() returns nothing on non-ok HTTP response", async () => {
+    const c = new LinearDocumentConnector({ apiKey: "k", fetch: makeFetch([{ ok: false, status: 500 }]) });
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync()) docs.push(d);
+    expect(docs).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TavilyDocumentConnector
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("TavilyDocumentConnector", () => {
+  it("has id 'tavily-doc'", () => {
+    expect(new TavilyDocumentConnector({ apiKey: "k", queries: [], fetch: okFetch() }).id).toBe("tavily-doc");
+  });
+
+  it("connect() ok:false on 401", async () => {
+    const c = new TavilyDocumentConnector({
+      apiKey: "bad",
+      queries: ["test"],
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
+    const result = await c.connect();
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("invalid");
+  });
+
+  it("connect() ok:false on 403", async () => {
+    const c = new TavilyDocumentConnector({
+      apiKey: "bad",
+      queries: ["test"],
+      fetch: makeFetch([{ ok: false, status: 403 }]),
+    });
+    const result = await c.connect();
+    expect(result.ok).toBe(false);
+  });
+
+  it("connect() ok:true with queryCount in metadata", async () => {
+    const c = new TavilyDocumentConnector({
+      apiKey: "tvly-k",
+      queries: ["nexus", "agents"],
+      fetch: okFetch({ results: [] }),
+    });
+    const result = await c.connect();
+    expect(result.ok).toBe(true);
+    expect(result.metadata?.queryCount).toBe(2);
+  });
+
+  it("sync() yields results from each query", async () => {
+    const fetchFn = makeFetch([
+      { ok: true, body: { results: [{ title: "R1", url: "https://r1.com", content: "About nexus" }, { title: "R2", url: "https://r2.com", content: "More nexus" }] } },
+      { ok: true, body: { results: [{ title: "R3", url: "https://r3.com", content: "About agents" }] } },
+    ]);
+    const c = new TavilyDocumentConnector({ apiKey: "k", queries: ["nexus", "agents"], fetch: fetchFn });
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync()) docs.push(d);
+    expect(docs).toHaveLength(3);
+    expect(docs[0]!.metadata?.query).toBe("nexus");
+    expect(docs[2]!.metadata?.query).toBe("agents");
+  });
+
+  it("sync() respects hard limit across queries", async () => {
+    const fetchFn = makeFetch([
+      { ok: true, body: { results: [{ title: "A", url: "https://a.com", content: "a" }, { title: "B", url: "https://b.com", content: "b" }] } },
+      { ok: true, body: { results: [{ title: "C", url: "https://c.com", content: "c" }] } },
+    ]);
+    const c = new TavilyDocumentConnector({ apiKey: "k", queries: ["q1", "q2"], fetch: fetchFn });
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync({ limit: 2 })) docs.push(d);
+    expect(docs).toHaveLength(2);
+  });
+
+  it("sync() continues to next query when one fails", async () => {
+    const fetchFn = makeFetch([
+      { ok: false, status: 500 },
+      { ok: true, body: { results: [{ title: "R1", url: "https://r1.com", content: "content" }] } },
+    ]);
+    const c = new TavilyDocumentConnector({ apiKey: "k", queries: ["bad", "good"], fetch: fetchFn });
+    const docs: SyncedDocument[] = [];
+    for await (const d of c.sync()) docs.push(d);
+    expect(docs).toHaveLength(1);
+    expect(docs[0]!.metadata?.query).toBe("good");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DocumentConnectorRegistry
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("DocumentConnectorRegistry", () => {
+  it("getDocumentConnectors() returns only document connectors", () => {
+    const reg = new DocumentConnectorRegistry();
+    reg.register(new NullConnector("plain"));
+    reg.register(new NullDocumentConnector("doc-a"));
+    reg.register(new NullDocumentConnector("doc-b"));
+    const docConnectors = reg.getDocumentConnectors();
+    expect(docConnectors).toHaveLength(2);
+    expect(docConnectors.every((c) => isDocumentConnector(c))).toBe(true);
+  });
+
+  it("getDocumentConnectors() returns empty array when none registered", () => {
+    const reg = new DocumentConnectorRegistry();
+    reg.register(new NullConnector("plain"));
+    expect(reg.getDocumentConnectors()).toHaveLength(0);
+  });
+
+  it("syncAll() collects docs from all document connectors", async () => {
+    const reg = new DocumentConnectorRegistry();
+    reg.register(new NullDocumentConnector("a", [makeDoc({ id: "a::1", title: "A1" }), makeDoc({ id: "a::2", title: "A2" })]));
+    reg.register(new NullDocumentConnector("b", [makeDoc({ id: "b::1", title: "B1" })]));
+    const docs = await reg.syncAll();
+    expect(docs).toHaveLength(3);
+  });
+
+  it("syncAll() skips plain connectors", async () => {
+    const reg = new DocumentConnectorRegistry();
+    reg.register(new NullConnector("plain"));
+    reg.register(new NullDocumentConnector("doc", [makeDoc({ id: "d::1" })]));
+    const docs = await reg.syncAll();
+    expect(docs).toHaveLength(1);
+  });
+
+  it("syncAll() returns empty array when registry is empty", async () => {
+    const reg = new DocumentConnectorRegistry();
+    const docs = await reg.syncAll();
+    expect(docs).toHaveLength(0);
   });
 });

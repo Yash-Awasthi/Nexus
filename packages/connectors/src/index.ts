@@ -658,3 +658,648 @@ export class ConnectorRegistry {
     await Promise.all(this.list().map((c) => c.disconnect()));
   }
 }
+
+// ── Document sync layer ────────────────────────────────────────────────────────
+//
+// Extends the connector interface with a document-sync capability.
+// Any connector implementing DocumentConnector can stream SyncedDocuments
+// from its source, enabling a unified knowledge-ingestion pipeline.
+//
+// Concrete document connectors (all injectable fetch / readFile for testing):
+//   GitHubDocumentConnector     — repo issues and PRs via GitHub REST API
+//   SlackDocumentConnector      — channel message history
+//   WebDocumentConnector        — arbitrary HTTP pages (GET + text body)
+//   FileSystemDocumentConnector — local files (injectable readFile)
+//   LinearDocumentConnector     — Linear issues via GraphQL
+//   TavilyDocumentConnector     — web search results per query
+
+// ── Core document types ────────────────────────────────────────────────────────
+
+export interface SyncedDocument {
+  /** Unique document ID — typically "<connectorId>::<sourceUrl>" */
+  id: string;
+  /** Human-readable document title */
+  title: string;
+  /** Full text content */
+  content: string;
+  /** Source URL or file path */
+  sourceUrl: string;
+  /** ID of the connector that produced this document */
+  connectorId: string;
+  /** Wall-clock ms when the document was synced */
+  syncedAt: number;
+  /** Optional connector-specific metadata */
+  metadata?: Record<string, unknown>;
+}
+
+export interface SyncOptions {
+  /** Max documents to emit (default: connector-specific) */
+  limit?: number;
+  /** Only yield documents updated after this Unix timestamp (ms) */
+  since?: number;
+  /** Optional search/filter query for connectors that support it */
+  query?: string;
+}
+
+export interface DocumentConnector extends Connector {
+  sync(opts?: SyncOptions): AsyncIterable<SyncedDocument>;
+}
+
+/**
+ * Type guard — returns true when a Connector also implements DocumentConnector.
+ */
+export function isDocumentConnector(c: Connector): c is DocumentConnector {
+  return typeof (c as DocumentConnector).sync === "function";
+}
+
+// ── BaseDocumentConnector ──────────────────────────────────────────────────────
+
+export abstract class BaseDocumentConnector
+  extends BaseConnector
+  implements DocumentConnector
+{
+  async *sync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    yield* this._doSync(opts);
+  }
+
+  protected abstract _doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument>;
+}
+
+// ── DocumentConnectorRegistry ─────────────────────────────────────────────────
+
+export class DocumentConnectorRegistry extends ConnectorRegistry {
+  /** Return only the registered connectors that implement DocumentConnector.sync() */
+  getDocumentConnectors(): DocumentConnector[] {
+    return this.list().filter(isDocumentConnector);
+  }
+
+  /**
+   * Run sync() on every document connector in parallel and collect all results.
+   * Non-document connectors are silently skipped.
+   */
+  async syncAll(opts?: SyncOptions): Promise<SyncedDocument[]> {
+    const docs: SyncedDocument[] = [];
+    await Promise.all(
+      this.getDocumentConnectors().map(async (c) => {
+        for await (const doc of c.sync(opts)) {
+          docs.push(doc);
+        }
+      }),
+    );
+    return docs;
+  }
+}
+
+// ── Internal helpers ───────────────────────────────────────────────────────────
+
+function makeDocId(connectorId: string, sourceUrl: string): string {
+  return `${connectorId}::${sourceUrl}`;
+}
+
+// ── GitHubDocumentConnector ───────────────────────────────────────────────────
+
+export interface GitHubDocumentConnectorConfig {
+  /** GitHub Personal Access Token */
+  token: string;
+  /** Repository owner (user or org) */
+  owner: string;
+  /** Repository name */
+  repo: string;
+  fetch?: FetchFn;
+}
+
+/**
+ * Syncs issues and PRs from a GitHub repository.
+ * Yields one SyncedDocument per issue/PR, with body as content.
+ */
+export class GitHubDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name: string;
+
+  private readonly token: string;
+  private readonly owner: string;
+  private readonly repo: string;
+  private readonly fetchFn: FetchFn;
+  private static readonly BASE = "https://api.github.com";
+
+  constructor(config: GitHubDocumentConnectorConfig) {
+    super();
+    this.token = config.token;
+    this.owner = config.owner;
+    this.repo = config.repo;
+    this.id = `github-doc::${config.owner}/${config.repo}`;
+    this.name = `GitHub (${config.owner}/${config.repo})`;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${GitHubDocumentConnector.BASE}/user`, {
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        Accept: "application/vnd.github+json",
+      },
+    });
+    if (res.status === 401) return { ok: false, error: "GitHub token is invalid or expired" };
+    if (!res.ok) return { ok: false, error: `GitHub API returned ${res.status}` };
+    const user = (await res.json()) as { login: string };
+    return { ok: true, metadata: { login: user.login } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${GitHubDocumentConnector.BASE}/rate_limit`, {
+      headers: { Authorization: `Bearer ${this.token}` },
+    });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const limit = opts?.limit ?? 50;
+    const url = `${GitHubDocumentConnector.BASE}/repos/${this.owner}/${this.repo}/issues?state=all&per_page=${limit}`;
+    const res = await this.fetchFn(url, {
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        Accept: "application/vnd.github+json",
+      },
+    });
+
+    if (!res.ok) return;
+
+    const issues = (await res.json()) as Array<{
+      number: number;
+      title: string;
+      body?: string;
+      html_url: string;
+      updated_at: string;
+      state: string;
+      pull_request?: unknown;
+    }>;
+
+    const now = Date.now();
+    const since = opts?.since;
+
+    for (const issue of issues) {
+      if (since !== undefined && new Date(issue.updated_at).getTime() < since) continue;
+
+      if (opts?.query) {
+        const q = opts.query.toLowerCase();
+        if (
+          !issue.title.toLowerCase().includes(q) &&
+          !(issue.body ?? "").toLowerCase().includes(q)
+        )
+          continue;
+      }
+
+      const docType = issue.pull_request ? "PR" : "Issue";
+      yield {
+        id: makeDocId(this.id, issue.html_url),
+        title: `${docType} #${issue.number}: ${issue.title}`,
+        content: issue.body ?? "",
+        sourceUrl: issue.html_url,
+        connectorId: this.id,
+        syncedAt: now,
+        metadata: { number: issue.number, state: issue.state, type: docType },
+      };
+    }
+  }
+}
+
+// ── SlackDocumentConnector ────────────────────────────────────────────────────
+
+export interface SlackDocumentConnectorConfig {
+  /** Slack Bot OAuth token (xoxb-…) */
+  token: string;
+  /** Slack channel ID to sync messages from */
+  channelId: string;
+  fetch?: FetchFn;
+}
+
+/**
+ * Syncs message history from a Slack channel.
+ * Yields one SyncedDocument per message.
+ */
+export class SlackDocumentConnector extends BaseDocumentConnector {
+  readonly id: string;
+  readonly name: string;
+
+  private readonly token: string;
+  private readonly channelId: string;
+  private readonly fetchFn: FetchFn;
+  private static readonly BASE = "https://slack.com/api";
+
+  constructor(config: SlackDocumentConnectorConfig) {
+    super();
+    this.token = config.token;
+    this.channelId = config.channelId;
+    this.id = `slack-doc::${config.channelId}`;
+    this.name = `Slack (${config.channelId})`;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${SlackDocumentConnector.BASE}/auth.test`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${this.token}`, "Content-Type": "application/json" },
+    });
+    if (!res.ok) return { ok: false, error: `Slack API returned ${res.status}` };
+    const json = (await res.json()) as { ok: boolean; error?: string; team?: string };
+    if (!json.ok) return { ok: false, error: json.error ?? "auth.test failed" };
+    return { ok: true, metadata: { team: json.team } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${SlackDocumentConnector.BASE}/api.test`, {
+      headers: { Authorization: `Bearer ${this.token}` },
+    });
+    if (!res.ok) return { ok: false, latencyMs: Date.now() - start };
+    const json = (await res.json()) as { ok: boolean };
+    return { ok: json.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const limit = opts?.limit ?? 50;
+    const params = new URLSearchParams({ channel: this.channelId, limit: String(limit) });
+    if (opts?.since !== undefined) {
+      // Slack timestamps are Unix seconds (with decimal precision)
+      params.set("oldest", String(opts.since / 1000));
+    }
+
+    const res = await this.fetchFn(
+      `${SlackDocumentConnector.BASE}/conversations.history?${params}`,
+      { headers: { Authorization: `Bearer ${this.token}` } },
+    );
+
+    if (!res.ok) return;
+
+    const json = (await res.json()) as {
+      ok: boolean;
+      messages?: Array<{ ts: string; text: string; user?: string }>;
+    };
+    if (!json.ok || !json.messages) return;
+
+    const now = Date.now();
+    for (const msg of json.messages) {
+      const msgUrl = `https://slack.com/archives/${this.channelId}/p${msg.ts.replace(".", "")}`;
+      yield {
+        id: makeDocId(this.id, msgUrl),
+        title: `Slack message ${msg.ts}`,
+        content: msg.text,
+        sourceUrl: msgUrl,
+        connectorId: this.id,
+        syncedAt: now,
+        metadata: { ts: msg.ts, user: msg.user },
+      };
+    }
+  }
+}
+
+// ── WebDocumentConnector ──────────────────────────────────────────────────────
+
+export interface WebDocumentConnectorConfig {
+  /** List of URLs to fetch as text documents */
+  urls: string[];
+  fetch?: FetchFn;
+}
+
+/**
+ * Syncs arbitrary web pages via HTTP GET.
+ * Yields one SyncedDocument per URL, using the response body as content.
+ */
+export class WebDocumentConnector extends BaseDocumentConnector {
+  readonly id = "web-doc";
+  readonly name = "Web";
+
+  private readonly urls: string[];
+  private readonly fetchFn: FetchFn;
+
+  constructor(config: WebDocumentConnectorConfig) {
+    super();
+    this.urls = config.urls;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    if (this.urls.length === 0) return { ok: true, metadata: { urlCount: 0 } };
+    try {
+      const res = await this.fetchFn(this.urls[0]!);
+      return { ok: res.ok, metadata: { urlCount: this.urls.length } };
+    } catch (e) {
+      return { ok: false, error: String(e) };
+    }
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    if (this.urls.length === 0) return { ok: true };
+    try {
+      const res = await this.fetchFn(this.urls[0]!);
+      return { ok: res.ok };
+    } catch {
+      return { ok: false, error: "unreachable" };
+    }
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const limit = opts?.limit !== undefined ? opts.limit : this.urls.length;
+    const urls = this.urls.slice(0, limit);
+    const now = Date.now();
+
+    for (const url of urls) {
+      try {
+        const res = await this.fetchFn(url);
+        if (!res.ok) continue;
+
+        const content = await res.text();
+
+        if (opts?.query && !content.toLowerCase().includes(opts.query.toLowerCase())) continue;
+
+        // Derive a title from the first non-empty line, stripping HTML tags
+        const firstLine = content.split("\n").find((l) => l.trim().length > 0) ?? url;
+        const title = firstLine.replace(/<[^>]*>/g, "").trim().slice(0, 200) || url;
+
+        yield {
+          id: makeDocId(this.id, url),
+          title,
+          content,
+          sourceUrl: url,
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { status: res.status },
+        };
+      } catch {
+        // Skip unreachable URLs silently
+      }
+    }
+  }
+}
+
+// ── FileSystemDocumentConnector ───────────────────────────────────────────────
+
+/** Injectable file reader — matches the signature of fs/promises readFile(path, "utf8") */
+export type ReadFileFn = (path: string) => Promise<string>;
+
+export interface FileSystemDocumentConnectorConfig {
+  /** List of file paths to read */
+  paths: string[];
+  /** Injectable reader (default: Node's fs/promises readFile with utf-8 encoding) */
+  readFile?: ReadFileFn;
+}
+
+/**
+ * Syncs local files from disk.
+ * Yields one SyncedDocument per file; unreadable files are silently skipped.
+ * readFile is injectable for full testability without touching the filesystem.
+ */
+export class FileSystemDocumentConnector extends BaseDocumentConnector {
+  readonly id = "fs-doc";
+  readonly name = "FileSystem";
+
+  private readonly paths: string[];
+  private readonly readFileFn: ReadFileFn;
+
+  constructor(config: FileSystemDocumentConnectorConfig) {
+    super();
+    this.paths = config.paths;
+    this.readFileFn =
+      config.readFile ??
+      (async (p: string) => {
+        const { readFile } = await import("fs/promises");
+        return readFile(p, "utf8");
+      });
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    return { ok: true, metadata: { pathCount: this.paths.length } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    return { ok: true, details: { pathCount: this.paths.length } };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const limit = opts?.limit !== undefined ? opts.limit : this.paths.length;
+    const paths = this.paths.slice(0, limit);
+    const now = Date.now();
+
+    for (const filePath of paths) {
+      try {
+        const content = await this.readFileFn(filePath);
+
+        if (opts?.query && !content.toLowerCase().includes(opts.query.toLowerCase())) continue;
+
+        const fileName = filePath.split("/").pop() ?? filePath;
+        yield {
+          id: makeDocId(this.id, filePath),
+          title: fileName,
+          content,
+          sourceUrl: filePath,
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { path: filePath },
+        };
+      } catch {
+        // Skip unreadable files silently
+      }
+    }
+  }
+}
+
+// ── LinearDocumentConnector ───────────────────────────────────────────────────
+
+export interface LinearDocumentConnectorConfig {
+  apiKey: string;
+  /** Optional team ID to scope the issue query */
+  teamId?: string;
+  fetch?: FetchFn;
+}
+
+/**
+ * Syncs issues from Linear via GraphQL.
+ * Yields one SyncedDocument per issue, with description as content.
+ */
+export class LinearDocumentConnector extends BaseDocumentConnector {
+  readonly id = "linear-doc";
+  readonly name = "Linear";
+
+  private readonly apiKey: string;
+  private readonly teamId?: string;
+  private readonly fetchFn: FetchFn;
+  private static readonly ENDPOINT = "https://api.linear.app/graphql";
+
+  constructor(config: LinearDocumentConnectorConfig) {
+    super();
+    this.apiKey = config.apiKey;
+    this.teamId = config.teamId;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const res = await this.fetchFn(LinearDocumentConnector.ENDPOINT, {
+      method: "POST",
+      headers: { Authorization: this.apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ query: "{ viewer { id name } }" }),
+    });
+    if (res.status === 401) return { ok: false, error: "Linear API key is invalid" };
+    if (!res.ok) return { ok: false, error: `Linear API returned ${res.status}` };
+    const json = (await res.json()) as {
+      data?: { viewer?: { id: string; name: string } };
+      errors?: unknown[];
+    };
+    if (json.errors) return { ok: false, error: "GraphQL error" };
+    return { ok: true, metadata: { viewer: json.data?.viewer?.name } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(LinearDocumentConnector.ENDPOINT, {
+      method: "POST",
+      headers: { Authorization: this.apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ query: "{ viewer { id } }" }),
+    });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const limit = opts?.limit ?? 50;
+    const filters: string[] = [];
+    if (this.teamId) filters.push(`team: { id: { eq: "${this.teamId}" } }`);
+    if (opts?.query) filters.push(`title: { containsIgnoreCase: "${opts.query}" }`);
+    const filterStr = filters.length > 0 ? `, filter: { ${filters.join(", ")} }` : "";
+    const gql = `{ issues(first: ${limit}${filterStr}) { nodes { id title description url updatedAt state { name } } } }`;
+
+    const res = await this.fetchFn(LinearDocumentConnector.ENDPOINT, {
+      method: "POST",
+      headers: { Authorization: this.apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ query: gql }),
+    });
+
+    if (!res.ok) return;
+
+    const json = (await res.json()) as {
+      data?: {
+        issues?: {
+          nodes: Array<{
+            id: string;
+            title: string;
+            description?: string;
+            url: string;
+            updatedAt: string;
+            state?: { name: string };
+          }>;
+        };
+      };
+    };
+
+    const nodes = json.data?.issues?.nodes ?? [];
+    const now = Date.now();
+    const since = opts?.since;
+
+    for (const issue of nodes) {
+      if (since !== undefined && new Date(issue.updatedAt).getTime() < since) continue;
+      yield {
+        id: makeDocId(this.id, issue.url),
+        title: issue.title,
+        content: issue.description ?? "",
+        sourceUrl: issue.url,
+        connectorId: this.id,
+        syncedAt: now,
+        metadata: { linearId: issue.id, state: issue.state?.name },
+      };
+    }
+  }
+}
+
+// ── TavilyDocumentConnector ───────────────────────────────────────────────────
+
+export interface TavilyDocumentConnectorConfig {
+  apiKey: string;
+  /** Search queries to run — each query yields a batch of results */
+  queries: string[];
+  fetch?: FetchFn;
+}
+
+/**
+ * Syncs web search results from Tavily.
+ * Each query in `queries` produces up to ceil(limit / queries.length) results.
+ */
+export class TavilyDocumentConnector extends BaseDocumentConnector {
+  readonly id = "tavily-doc";
+  readonly name = "Tavily";
+
+  private readonly apiKey: string;
+  private readonly queries: string[];
+  private readonly fetchFn: FetchFn;
+  private static readonly BASE = "https://api.tavily.com";
+
+  constructor(config: TavilyDocumentConnectorConfig) {
+    super();
+    this.apiKey = config.apiKey;
+    this.queries = config.queries;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    const query = this.queries[0] ?? "ping";
+    const res = await this.fetchFn(`${TavilyDocumentConnector.BASE}/search`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ api_key: this.apiKey, query, search_depth: "basic", max_results: 1 }),
+    });
+    if (res.status === 401 || res.status === 403) return { ok: false, error: "Tavily API key is invalid" };
+    if (!res.ok) return { ok: false, error: `Tavily API returned ${res.status}` };
+    return { ok: true, metadata: { queryCount: this.queries.length } };
+  }
+
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+    const start = Date.now();
+    const res = await this.fetchFn(`${TavilyDocumentConnector.BASE}/search`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ api_key: this.apiKey, query: "health", search_depth: "basic", max_results: 1 }),
+    });
+    return { ok: res.ok, latencyMs: Date.now() - start };
+  }
+
+  protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
+    const queryCount = Math.max(1, this.queries.length);
+    const perQueryLimit = opts?.limit !== undefined ? Math.ceil(opts.limit / queryCount) : 5;
+    const hardLimit = opts?.limit;
+    const now = Date.now();
+    let emitted = 0;
+
+    for (const query of this.queries) {
+      if (hardLimit !== undefined && emitted >= hardLimit) break;
+
+      const res = await this.fetchFn(`${TavilyDocumentConnector.BASE}/search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          api_key: this.apiKey,
+          query,
+          search_depth: "basic",
+          max_results: perQueryLimit,
+        }),
+      });
+
+      if (!res.ok) continue;
+
+      const json = (await res.json()) as {
+        results?: Array<{ title: string; url: string; content: string; score?: number }>;
+      };
+
+      for (const result of json.results ?? []) {
+        if (hardLimit !== undefined && emitted >= hardLimit) break;
+        yield {
+          id: makeDocId(this.id, result.url),
+          title: result.title,
+          content: result.content,
+          sourceUrl: result.url,
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { query, score: result.score },
+        };
+        emitted++;
+      }
+    }
+  }
+}
