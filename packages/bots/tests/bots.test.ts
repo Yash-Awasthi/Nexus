@@ -11,6 +11,7 @@ import {
   type BotReply,
   type BotHandler,
   type BotHooks,
+  type BotTriggerMode,
   type FetchFn,
 } from "../src/index.js";
 
@@ -622,5 +623,145 @@ describe("TeamsBotAdapter — hooks", () => {
     expect((hooks.emit as ReturnType<typeof vi.fn>).mock.calls[0]![1]).toMatchObject({
       bot: "my-teams-bot",
     });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SlackBotAdapter — trigger modes
+// ─────────────────────────────────────────────────────────────────────────────
+
+function makeSlack(opts: {
+  triggerMode?: BotTriggerMode;
+  botUserId?: string;
+  allowedUserIds?: string[];
+  handler?: BotHandler;
+} = {}) {
+  return new SlackBotAdapter({
+    token: "xoxb-test",
+    handler: opts.handler ?? echoHandler,
+    fetch: makeFetch([{ ok: true }]),
+    triggerMode: opts.triggerMode,
+    botUserId: opts.botUserId,
+    allowedUserIds: opts.allowedUserIds,
+  });
+}
+
+describe("SlackBotAdapter — triggerMode", () => {
+  it("default 'all' mode handles every non-bot message", async () => {
+    const slack = makeSlack(); // default triggerMode:"all"
+    const result = await slack.handleEvent(messagePayload());
+    expect(result.handled).toBe(true);
+  });
+
+  it("mention mode: handles message that mentions the bot", async () => {
+    const slack = makeSlack({ triggerMode: "mention", botUserId: "U999" });
+    const result = await slack.handleEvent(messagePayload({ event: undefined, text: "<@U999> help" }));
+    // rebuild properly
+    const payload = {
+      type: "event_callback",
+      event_id: "Ev001",
+      event: { type: "message", text: "<@U999> help", channel: "C1", user: "U1", ts: "1.0" },
+    };
+    const r = await slack.handleEvent(payload);
+    expect(r.handled).toBe(true);
+  });
+
+  it("mention mode: skips message without bot mention", async () => {
+    const slack = makeSlack({ triggerMode: "mention", botUserId: "U999" });
+    const r = await slack.handleEvent(messagePayload({ text: "just chatting" }));
+    expect(r.handled).toBe(false);
+  });
+
+  it("mention mode: passes through when botUserId not configured", async () => {
+    const slack = makeSlack({ triggerMode: "mention" }); // no botUserId
+    const r = await slack.handleEvent(messagePayload({ text: "no mention" }));
+    expect(r.handled).toBe(true);
+  });
+
+  it("command mode: handles message starting with /", async () => {
+    const slack = makeSlack({ triggerMode: "command" });
+    const r = await slack.handleEvent(messagePayload({ text: "/help me" }));
+    expect(r.handled).toBe(true);
+  });
+
+  it("command mode: skips regular message", async () => {
+    const slack = makeSlack({ triggerMode: "command" });
+    const r = await slack.handleEvent(messagePayload({ text: "hello there" }));
+    expect(r.handled).toBe(false);
+  });
+
+  it("command mode: skips message with leading space before non-slash", async () => {
+    const slack = makeSlack({ triggerMode: "command" });
+    const r = await slack.handleEvent(messagePayload({ text: "  not a command" }));
+    expect(r.handled).toBe(false);
+  });
+});
+
+describe("SlackBotAdapter — allowedUserIds", () => {
+  it("allows users in the allowlist", async () => {
+    const slack = makeSlack({ allowedUserIds: ["U456"] });
+    const r = await slack.handleEvent(messagePayload()); // user is U456 from helper
+    expect(r.handled).toBe(true);
+  });
+
+  it("blocks users not in the allowlist", async () => {
+    const slack = makeSlack({ allowedUserIds: ["U999"] });
+    const r = await slack.handleEvent(messagePayload()); // user is U456
+    expect(r.handled).toBe(false);
+  });
+
+  it("allows all users when allowedUserIds is not set", async () => {
+    const slack = makeSlack(); // no allowedUserIds
+    const r = await slack.handleEvent(messagePayload());
+    expect(r.handled).toBe(true);
+  });
+
+  it("allows multiple users in the allowlist", async () => {
+    const slack = makeSlack({ allowedUserIds: ["U111", "U456", "U789"] });
+    const r = await slack.handleEvent(messagePayload()); // user U456
+    expect(r.handled).toBe(true);
+  });
+
+  it("trigger mode and allowedUserIds both gate the handler", async () => {
+    // mention mode + allowlist: need BOTH conditions to pass
+    const slack = makeSlack({
+      triggerMode: "mention",
+      botUserId: "U999",
+      allowedUserIds: ["U456"],
+    });
+    // correct user, no mention → blocked by trigger mode
+    const r1 = await slack.handleEvent(messagePayload({ text: "hello" }));
+    expect(r1.handled).toBe(false);
+
+    // mention present, wrong user → blocked by allowlist
+    const r2 = await slack.handleEvent({
+      type: "event_callback",
+      event_id: "E",
+      event: { type: "message", text: "<@U999> help", channel: "C1", user: "U_OTHER", ts: "1.0" },
+    });
+    expect(r2.handled).toBe(false);
+
+    // mention + correct user → passes both gates
+    const slack2 = makeSlack({
+      triggerMode: "mention",
+      botUserId: "U999",
+      allowedUserIds: ["U456"],
+      handler: echoHandler,
+    });
+    // need to reset fetch
+    const slack3 = new SlackBotAdapter({
+      token: "xoxb-test",
+      handler: echoHandler,
+      fetch: makeFetch([{ ok: true }]),
+      triggerMode: "mention",
+      botUserId: "U999",
+      allowedUserIds: ["U456"],
+    });
+    const r3 = await slack3.handleEvent({
+      type: "event_callback",
+      event_id: "E",
+      event: { type: "message", text: "<@U999> help me", channel: "C1", user: "U456", ts: "1.0" },
+    });
+    expect(r3.handled).toBe(true);
   });
 });

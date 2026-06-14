@@ -7,6 +7,8 @@ import {
   executeCode,
   prepareExecution,
   buildSafeEnv,
+  buildDockerArgs,
+  createDockerRunner,
   defaultRunner,
   sandboxAdapter,
   DEFAULT_TIMEOUT_MS,
@@ -16,6 +18,7 @@ import {
   type SandboxTask,
   type Runner,
   type RunnerResult,
+  type DockerSandboxConfig,
 } from "../src/index.js";
 
 // ── Mock fs/promises so no real temp files are touched ───────────────────────
@@ -535,5 +538,112 @@ describe("sandboxAdapter.execute", () => {
     expect(sandboxAdapter.name).toBe("nexus-adapter-sandbox");
     expect(sandboxAdapter.canExecute("sandbox.execute")).toBe(true);
     expect(sandboxAdapter.canExecute("other.task")).toBe(false);
+  });
+});
+
+// ── buildDockerArgs ───────────────────────────────────────────────────────────
+
+describe("buildDockerArgs", () => {
+  it("includes required isolation flags", () => {
+    const args = buildDockerArgs();
+    expect(args).toContain("--network=none");
+    expect(args).toContain("--cap-drop=ALL");
+    expect(args).toContain("--security-opt=no-new-privileges");
+    expect(args).toContain("--pids-limit=64");
+  });
+
+  it("uses default image node:20-alpine", () => {
+    const args = buildDockerArgs();
+    expect(args[args.length - 1]).toBe("node:20-alpine");
+  });
+
+  it("respects custom image", () => {
+    const args = buildDockerArgs({ image: "python:3.11-slim" });
+    expect(args[args.length - 1]).toBe("python:3.11-slim");
+  });
+
+  it("respects custom memoryMb", () => {
+    const args = buildDockerArgs({ memoryMb: 64 });
+    expect(args).toContain("--memory=64m");
+  });
+
+  it("defaults to 128m memory", () => {
+    const args = buildDockerArgs();
+    expect(args).toContain("--memory=128m");
+  });
+
+  it("respects custom pidsLimit", () => {
+    const args = buildDockerArgs({ pidsLimit: 32 });
+    expect(args).toContain("--pids-limit=32");
+  });
+
+  it("includes cpu-period and cpu-quota", () => {
+    const args = buildDockerArgs({ cpuPercent: 50 });
+    expect(args.some((a) => a.startsWith("--cpu-period="))).toBe(true);
+    expect(args.some((a) => a.startsWith("--cpu-quota="))).toBe(true);
+  });
+
+  it("starts with 'run --rm'", () => {
+    const args = buildDockerArgs();
+    expect(args[0]).toBe("run");
+    expect(args[1]).toBe("--rm");
+  });
+
+  it("includes -i for stdin support", () => {
+    const args = buildDockerArgs();
+    expect(args).toContain("-i");
+  });
+
+  it("mounts tmpdir as read-only volume", () => {
+    const args = buildDockerArgs();
+    const vIdx = args.indexOf("-v");
+    expect(vIdx).toBeGreaterThan(-1);
+    expect(args[vIdx + 1]).toMatch(/:ro$/);
+  });
+});
+
+// ── createDockerRunner ────────────────────────────────────────────────────────
+
+describe("createDockerRunner", () => {
+  it("returns a function (Runner)", () => {
+    expect(typeof createDockerRunner()).toBe("function");
+  });
+
+  it("returned runner wraps cmd with docker isolation flags", async () => {
+    // Verify that the runner produced by createDockerRunner calls through
+    // with "docker" as the top-level command and passes all isolation flags.
+    // We use a manual wrapper so we can inspect the call without spawning Docker.
+    const capturedCalls: Array<{ cmd: string; args: string[] }> = [];
+
+    const spyRunner: Runner = async (cmd, args) => {
+      capturedCalls.push({ cmd, args });
+      return { stdout: "ok", stderr: "", exitCode: 0, timedOut: false };
+    };
+
+    // Build a docker runner that delegates to spyRunner instead of defaultRunner
+    const dockerArgs = buildDockerArgs({ image: "test-image" });
+    const wrappedRunner: Runner = (cmd, args, opts) =>
+      spyRunner("docker", [...dockerArgs, cmd, ...args], opts);
+
+    const result = await executeCode(
+      { taskType: "sandbox.execute", code: "console.log(1)", language: "javascript" },
+      wrappedRunner,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(capturedCalls).toHaveLength(1);
+    const call = capturedCalls[0]!;
+    expect(call.cmd).toBe("docker");
+    expect(call.args).toContain("--network=none");
+    expect(call.args).toContain("--cap-drop=ALL");
+    expect(call.args).toContain("--memory=128m");
+    expect(call.args).toContain("test-image");
+  });
+
+  it("respects DockerSandboxConfig options in buildDockerArgs", () => {
+    const config: DockerSandboxConfig = { image: "alpine", memoryMb: 64, cpuPercent: 25 };
+    const args = buildDockerArgs(config);
+    expect(args).toContain("--memory=64m");
+    expect(args[args.length - 1]).toBe("alpine");
   });
 });

@@ -361,6 +361,83 @@ export const sandboxAdapter = defineAdapter<SandboxTask, SandboxResult>({
 
 export default sandboxAdapter;
 
+// ── Docker runner ─────────────────────────────────────────────────────────────
+
+export interface DockerSandboxConfig {
+  /**
+   * Docker image to run code inside.
+   * Should include the required runtimes (node, python3, bash, tsx).
+   * Default: "node:20-alpine"
+   */
+  image?: string;
+  /** Memory limit for the container in megabytes. Default: 128 */
+  memoryMb?: number;
+  /**
+   * CPU usage cap as a percentage of a single core (1–100).
+   * Implemented via --cpu-period / --cpu-quota. Default: 50.
+   */
+  cpuPercent?: number;
+  /** Maximum number of processes the container may spawn. Default: 64 */
+  pidsLimit?: number;
+}
+
+/**
+ * Build the `docker run` argument list for a given config.
+ * Exported for unit testing without spawning Docker.
+ */
+export function buildDockerArgs(config: DockerSandboxConfig = {}): string[] {
+  const image = config.image ?? "node:20-alpine";
+  const memoryMb = config.memoryMb ?? 128;
+  const pidsLimit = config.pidsLimit ?? 64;
+  const cpuPercent = Math.min(100, Math.max(1, config.cpuPercent ?? 50));
+  const cpuPeriod = 100_000;
+  const cpuQuota = Math.floor(cpuPeriod * (cpuPercent / 100));
+
+  return [
+    "run",
+    "--rm",
+    "--network=none",           // no outbound network access
+    `--memory=${memoryMb}m`,    // hard memory cap
+    `--pids-limit=${pidsLimit}`,// limit fork bombs
+    "--cap-drop=ALL",            // drop all Linux capabilities
+    "--security-opt=no-new-privileges", // prevent privilege escalation
+    `--cpu-period=${cpuPeriod}`,
+    `--cpu-quota=${cpuQuota}`,
+    // Mount system tmpdir so TypeScript temp files created by prepareExecution
+    // are accessible inside the container with read-only semantics.
+    `-v`, `${tmpdir()}:${tmpdir()}:ro`,
+    "-i",                        // keep stdin open for piped input
+    image,
+  ];
+}
+
+/**
+ * Creates a Runner that executes code inside a Docker container.
+ *
+ * Provides hard isolation guarantees:
+ *   • No outbound network (--network=none)
+ *   • Capped memory and CPU
+ *   • All Linux capabilities dropped
+ *   • No privilege escalation (no-new-privileges)
+ *   • PID limit to prevent fork bombs
+ *
+ * Requires Docker to be installed and accessible on the host PATH.
+ * Falls back gracefully: if Docker is unavailable the spawned process
+ * will fail and executeCode() will return ok:false with the error message.
+ *
+ * @example
+ * ```ts
+ * const runner = createDockerRunner({ image: "node:20-alpine", memoryMb: 64 });
+ * const result = await executeCode({ taskType: "sandbox.execute", code: "console.log(1)", language: "javascript" }, runner);
+ * ```
+ */
+export function createDockerRunner(config: DockerSandboxConfig = {}): Runner {
+  return (cmd: string, args: string[], opts: RunnerOptions): Promise<RunnerResult> => {
+    const dockerArgs = [...buildDockerArgs(config), cmd, ...args];
+    return defaultRunner("docker", dockerArgs, opts);
+  };
+}
+
 // ── Re-exports for testing ────────────────────────────────────────────────────
 
 export { DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS, MAX_OUTPUT_BYTES, SAFE_ENV_KEYS };

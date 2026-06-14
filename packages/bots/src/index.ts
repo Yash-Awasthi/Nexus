@@ -29,9 +29,9 @@
  *
  * Sandbox note
  * ────────────
- *   Handlers run in-process. Docker-based sandbox isolation is planned
- *   for a later infrastructure milestone (pre-12 deployment phase).
- *   Until then, ensure handlers are trusted code only.
+ *   Handlers run in-process. Use createDockerRunner() from @nexus/sandbox
+ *   and invoke executeCode() inside your handler for untrusted code paths.
+ *   See BotTriggerMode and allowedUserIds for coarse-grained access control.
  *
  * Usage
  * ─────
@@ -136,6 +136,18 @@ export interface BotHooks {
 
 export type FetchFn = typeof fetch;
 
+// ── Trigger mode ─────────────────────────────────────────────────────────────
+
+/**
+ * Controls which Slack messages invoke the handler.
+ *
+ *   "all"     — every non-bot channel message (backward-compatible default,
+ *               noisy in active workspaces)
+ *   "mention" — only messages that @mention the bot (requires botUserId)
+ *   "command" — only messages whose text starts with "/" (slash commands)
+ */
+export type BotTriggerMode = "all" | "mention" | "command";
+
 // ── Slack Bot Adapter ─────────────────────────────────────────────────────────
 
 export interface SlackBotConfig {
@@ -155,6 +167,23 @@ export interface SlackBotConfig {
   hooks?: BotHooks;
   /** Bot display name used in hook payloads (default: "slack-bot") */
   name?: string;
+  /**
+   * Controls which messages trigger the handler.
+   * Default: "all" (backward-compatible).
+   * Use "mention" or "command" for production deployments to reduce noise.
+   */
+  triggerMode?: BotTriggerMode;
+  /**
+   * Bot's Slack user ID (e.g. "U0123456").
+   * Required when triggerMode is "mention" — used to detect @mention patterns.
+   */
+  botUserId?: string;
+  /**
+   * Explicit allowlist of Slack user IDs permitted to invoke the handler.
+   * When set, messages from users NOT in this set are silently dropped.
+   * Leave undefined to allow all users.
+   */
+  allowedUserIds?: string[];
 }
 
 export interface SlackEventResult {
@@ -200,6 +229,9 @@ export class SlackBotAdapter {
   private readonly fetchFn: FetchFn;
   private readonly hooks?: BotHooks;
   private readonly name: string;
+  private readonly triggerMode: BotTriggerMode;
+  private readonly botUserId?: string;
+  private readonly allowedUserIds?: ReadonlySet<string>;
 
   private static readonly API_BASE = "https://slack.com/api";
 
@@ -210,6 +242,27 @@ export class SlackBotAdapter {
     this.fetchFn = config.fetch ?? fetch;
     this.hooks = config.hooks;
     this.name = config.name ?? "slack-bot";
+    this.triggerMode = config.triggerMode ?? "all";
+    this.botUserId = config.botUserId;
+    this.allowedUserIds = config.allowedUserIds
+      ? new Set(config.allowedUserIds)
+      : undefined;
+  }
+
+  /** Returns true when the message text matches the configured trigger mode. */
+  private _matchesTrigger(text: string): boolean {
+    switch (this.triggerMode) {
+      case "mention":
+        // Matches <@UXXXXXXXX> mention format
+        return this.botUserId
+          ? text.includes(`<@${this.botUserId}>`)
+          : true; // no botUserId configured — pass through
+      case "command":
+        return text.trimStart().startsWith("/");
+      case "all":
+      default:
+        return true;
+    }
   }
 
   /**
@@ -273,6 +326,16 @@ export class SlackBotAdapter {
       timestamp: ev.ts ? Math.floor(parseFloat(ev.ts) * 1000) : Date.now(),
       raw: ec,
     };
+
+    // ── Trigger mode gate ───────────────────────────────────────────────────
+    if (!this._matchesTrigger(text)) {
+      return { handled: false };
+    }
+
+    // ── User allowlist gate ─────────────────────────────────────────────────
+    if (this.allowedUserIds && !this.allowedUserIds.has(msg.userId)) {
+      return { handled: false };
+    }
 
     // ── Invoke handler ──────────────────────────────────────────────────────
     await this._emitHook("task.before", {
