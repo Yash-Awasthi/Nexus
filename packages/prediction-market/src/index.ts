@@ -3,15 +3,17 @@
  * prediction-market — Polymarket price relay with tiered CDN caching.
  *
  * Provides:
- *   • MarketOutcome       — individual outcome with price + probability
- *   • Market              — top-level prediction market
- *   • CacheTier           — 120s/300s/900s stale-while-revalidate tiers
- *   • MarketCache         — tiered TTL cache with SWR semantics
- *   • RateLimiter         — per-key sliding window
- *   • ApiKeyAuthenticator — API key validation
- *   • PolymarketClient    — relay client (injectable HTTP backend)
- *   • PredictionMarketService — facade (auth + rate-limit + cache + client)
- *   • MockMarketBackend   — configurable in-memory test double
+ *   • MarketOutcome            — individual outcome with price + probability
+ *   • Market                   — top-level prediction market
+ *   • CacheTier                — 120s/300s/900s stale-while-revalidate tiers
+ *   • MarketCache              — tiered TTL cache with SWR semantics
+ *   • RateLimiter              — per-key sliding window
+ *   • ApiKeyAuthenticator      — API key validation
+ *   • MarketBackend            — injectable HTTP backend interface
+ *   • MockMarketBackend        — configurable in-memory test double
+ *   • PolymarketHttpBackend    — real Polymarket CLOB API client (no auth required)
+ *   • PolymarketClient         — relay client (injectable HTTP backend)
+ *   • PredictionMarketService  — facade (auth + rate-limit + cache + client)
  */
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -19,8 +21,8 @@
 export interface MarketOutcome {
   id: string;
   label: string;
-  price: number;        // 0–1 (USDC cents on-chain → probability)
-  probability: number;  // normalized 0–1
+  price: number;
+  probability: number;
   volume24h?: number;
 }
 
@@ -31,8 +33,8 @@ export interface Market {
   outcomes: MarketOutcome[];
   volume: number;
   liquidity: number;
-  resolveAt?: string;   // ISO-8601
-  fetchedAt: string;    // ISO-8601
+  resolveAt?: string;
+  fetchedAt: string;
 }
 
 export interface MarketListResponse {
@@ -52,9 +54,9 @@ export interface MarketQuery {
 export type CacheTierLevel = "hot" | "warm" | "cold";
 
 export const CACHE_TIERS: Record<CacheTierLevel, { maxAgeMs: number; swr: number }> = {
-  hot:  { maxAgeMs: 120_000,  swr: 60_000  },  // 2 min fresh, 1 min SWR
-  warm: { maxAgeMs: 300_000,  swr: 120_000 },  // 5 min fresh, 2 min SWR
-  cold: { maxAgeMs: 900_000,  swr: 300_000 },  // 15 min fresh, 5 min SWR
+  hot:  { maxAgeMs: 120_000,  swr: 60_000  },
+  warm: { maxAgeMs: 300_000,  swr: 120_000 },
+  cold: { maxAgeMs: 900_000,  swr: 300_000 },
 };
 
 export interface CacheEntry<T> {
@@ -80,10 +82,8 @@ export class MarketCache {
   get<T extends Market | MarketListResponse>(key: string): CacheLookup<T> {
     const entry = this.store.get(key) as CacheEntry<T> | undefined;
     if (!entry) return { value: null, status: "miss" };
-
     const age = Date.now() - entry.cachedAt;
     const { maxAgeMs, swr } = CACHE_TIERS[entry.tier];
-
     if (age < maxAgeMs) return { value: entry.value, status: "fresh" };
     if (age < maxAgeMs + swr) return { value: entry.value, status: "stale-while-revalidate" };
     this.store.delete(key);
@@ -93,8 +93,7 @@ export class MarketCache {
   invalidate(key: string): boolean { return this.store.delete(key); }
   invalidateCategory(category: string): void {
     for (const [k, v] of this.store.entries()) {
-      const m = v.value as Market;
-      if (m.category === category) this.store.delete(k);
+      if ((v.value as Market).category === category) this.store.delete(k);
     }
   }
   clear(): void { this.store.clear(); }
@@ -122,10 +121,8 @@ export class PmRateLimiter {
     const now = Date.now();
     const windowStart = now - this.windowMs;
     const timestamps = (this.windows.get(key) ?? []).filter((t) => t > windowStart);
-
     if (timestamps.length >= this.rpm) {
-      const oldest = timestamps[0]!;
-      return { allowed: false, retryAfterMs: Math.max(0, oldest + this.windowMs - now) };
+      return { allowed: false, retryAfterMs: Math.max(0, timestamps[0]! + this.windowMs - now) };
     }
     timestamps.push(now);
     this.windows.set(key, timestamps);
@@ -140,15 +137,18 @@ export class PmRateLimiter {
 
 export class ApiKeyAuthenticator {
   private validKeys: Set<string>;
-
-  constructor(keys: string[]) {
-    this.validKeys = new Set(keys);
-  }
-
+  constructor(keys: string[]) { this.validKeys = new Set(keys); }
   validate(key: string): boolean { return this.validKeys.has(key); }
   add(key: string): void { this.validKeys.add(key); }
   revoke(key: string): void { this.validKeys.delete(key); }
   count(): number { return this.validKeys.size; }
+}
+
+// ── MarketBackend interface ───────────────────────────────────────────────────
+
+export interface MarketBackend {
+  fetchMarket(id: string): Promise<Market>;
+  fetchMarkets(query: MarketQuery): Promise<MarketListResponse>;
 }
 
 // ── MockMarketBackend ─────────────────────────────────────────────────────────
@@ -177,11 +177,6 @@ function makeDefaultMarket(id: string, category = "politics"): Market {
   };
 }
 
-export interface MarketBackend {
-  fetchMarket(id: string): Promise<Market>;
-  fetchMarkets(query: MarketQuery): Promise<MarketListResponse>;
-}
-
 export class MockMarketBackend implements MarketBackend {
   private behavior: MockMarketBehavior;
   readonly fetchLog: string[] = [];
@@ -208,6 +203,106 @@ export class MockMarketBackend implements MarketBackend {
     if (query.category) markets = markets.filter((m) => m.category === query.category);
     if (query.ids) markets = markets.filter((m) => query.ids!.includes(m.id));
     if (query.limit) markets = markets.slice(0, query.limit);
+    return { markets, total: markets.length, fetchedAt: new Date().toISOString() };
+  }
+}
+
+// ── PolymarketHttpBackend ─────────────────────────────────────────────────────
+
+interface PolyToken { token_id: string; outcome: string; price: number; }
+
+interface PolyRaw {
+  condition_id: string;
+  question?: string;
+  title?: string;
+  category?: string;
+  tokens?: PolyToken[];
+  volume?: number;
+  liquidity?: number;
+  end_date_iso?: string;
+}
+
+interface PolyListResp { data?: PolyRaw[]; }
+
+function toMarket(raw: PolyRaw): Market {
+  const tokens = raw.tokens ?? [];
+  const totalPrice = tokens.reduce((s, t) => s + (t.price ?? 0), 0) || 1;
+  return {
+    id:       raw.condition_id,
+    question: raw.question ?? raw.title ?? raw.condition_id,
+    category: (raw.category ?? "general").toLowerCase(),
+    outcomes: tokens.map((t) => ({
+      id:          t.token_id,
+      label:       t.outcome,
+      price:       t.price ?? 0,
+      probability: (t.price ?? 0) / totalPrice,
+    })),
+    volume:    raw.volume    ?? 0,
+    liquidity: raw.liquidity ?? 0,
+    resolveAt: raw.end_date_iso,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Real Polymarket CLOB HTTP backend.
+ *
+ * Calls the public Polymarket CLOB REST API — no API key required for reads.
+ *   GET https://clob.polymarket.com/markets          — list markets
+ *   GET https://clob.polymarket.com/markets/{id}     — single market
+ *
+ * Wrap with PolymarketClient to get SWR caching on top.
+ */
+export class PolymarketHttpBackend implements MarketBackend {
+  private baseUrl: string;
+
+  constructor(config: { baseUrl?: string } = {}) {
+    this.baseUrl = config.baseUrl ?? "https://clob.polymarket.com";
+  }
+
+  async fetchMarket(id: string): Promise<Market> {
+    let resp: Response;
+    try {
+      resp = await fetch(`${this.baseUrl}/markets/${encodeURIComponent(id)}`, {
+        headers: { Accept: "application/json" },
+      });
+    } catch (err) {
+      throw new Error(`PolymarketHttpBackend: network error for market ${id}: ${String(err)}`);
+    }
+    if (!resp.ok) {
+      throw new Error(`PolymarketHttpBackend: HTTP ${resp.status} for market ${id}`);
+    }
+    return toMarket((await resp.json()) as PolyRaw);
+  }
+
+  async fetchMarkets(query: MarketQuery = {}): Promise<MarketListResponse> {
+    const params = new URLSearchParams();
+    params.set("limit", String(Math.min(query.limit ?? 20, 100)));
+    if (query.category) params.set("category", query.category);
+
+    let resp: Response;
+    try {
+      resp = await fetch(`${this.baseUrl}/markets?${params.toString()}`, {
+        headers: { Accept: "application/json" },
+      });
+    } catch (err) {
+      throw new Error(`PolymarketHttpBackend: network error listing markets: ${String(err)}`);
+    }
+    if (!resp.ok) {
+      throw new Error(`PolymarketHttpBackend: HTTP ${resp.status} listing markets`);
+    }
+
+    const body = (await resp.json()) as PolyListResp | PolyRaw[];
+    const rawList: PolyRaw[] = Array.isArray(body)
+      ? body
+      : (body as PolyListResp).data ?? [];
+
+    let markets = rawList.map(toMarket);
+    if (query.ids?.length) {
+      const idSet = new Set(query.ids);
+      markets = markets.filter((m) => idSet.has(m.id));
+    }
+
     return { markets, total: markets.length, fetchedAt: new Date().toISOString() };
   }
 }
@@ -280,40 +375,26 @@ export class PredictionMarketService {
     const cache = new MarketCache();
     this.client = new PolymarketClient(opts.backend, cache, opts.cacheTier ?? "warm");
     this.rateLimiter = new PmRateLimiter({ requestsPerMinute: opts.requestsPerMinute ?? 60 });
-    if (opts.apiKeys && opts.apiKeys.length > 0) {
-      this.auth = new ApiKeyAuthenticator(opts.apiKeys);
-    }
+    if (opts.apiKeys?.length) this.auth = new ApiKeyAuthenticator(opts.apiKeys);
   }
 
   async getMarket(id: string, apiKey?: string): Promise<ServiceCallResult<Market>> {
-    if (this.auth) {
-      if (!apiKey || !this.auth.validate(apiKey)) {
-        return { data: null, unauthorized: true };
-      }
-    }
+    if (this.auth && (!apiKey || !this.auth.validate(apiKey))) return { data: null, unauthorized: true };
     const rl = this.rateLimiter.check(apiKey ?? "anonymous");
     if (!rl.allowed) return { data: null, rateLimited: true };
-
     try {
-      const market = await this.client.getMarket(id);
-      return { data: market };
+      return { data: await this.client.getMarket(id) };
     } catch (err) {
       return { data: null, error: err instanceof Error ? err.message : String(err) };
     }
   }
 
   async getMarkets(query: MarketQuery = {}, apiKey?: string): Promise<ServiceCallResult<MarketListResponse>> {
-    if (this.auth) {
-      if (!apiKey || !this.auth.validate(apiKey)) {
-        return { data: null, unauthorized: true };
-      }
-    }
+    if (this.auth && (!apiKey || !this.auth.validate(apiKey))) return { data: null, unauthorized: true };
     const rl = this.rateLimiter.check(apiKey ?? "anonymous");
     if (!rl.allowed) return { data: null, rateLimited: true };
-
     try {
-      const response = await this.client.getMarkets(query);
-      return { data: response };
+      return { data: await this.client.getMarkets(query) };
     } catch (err) {
       return { data: null, error: err instanceof Error ? err.message : String(err) };
     }

@@ -40,6 +40,7 @@
     "@nexus/llm-tracer": "workspace:*",
     "@nexus/obs-providers": "workspace:*",
     "@nexus/posthog-analytics": "workspace:*",
+    "@nexus/prediction-market": "workspace:*",
     "@nexus/sse": "workspace:*",
     "@nexus/stm": "workspace:*",
     "@nexus/code-repl": "workspace:*",

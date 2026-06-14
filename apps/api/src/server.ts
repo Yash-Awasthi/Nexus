@@ -39,6 +39,7 @@ import { voiceRoutes } from "./routes/voice.js";
 import { healthRoutes } from "./routes/health.js";
 import { ingestRoutes } from "./routes/ingest.js";
 import { obsProvidersRoutes } from "./routes/obs-providers.js";
+import { predictionMarketRoutes } from "./routes/prediction-market.js";
 import { runtimeRoutes } from "./routes/runtime.js";
 import { sseRoutes } from "./routes/sse.js";
 import { stmRoutes } from "./routes/stm.js";
@@ -118,6 +119,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       await api.register(domainFeedsRoutes);
       await api.register(corpusBuilderRoutes);
       await api.register(obsProvidersRoutes);
+      await api.register(predictionMarketRoutes);
 
       // Full-feature pages
       await api.register(knowledgeGraphRoutes);
