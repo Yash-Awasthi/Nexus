@@ -1,0 +1,146 @@
+// SPDX-License-Identifier: Apache-2.0
+/**
+ * Corpus-builder routes — RLHF/SFT training data pipeline via @nexus/hf-research.
+ *
+ * GET  /api/v1/corpus/batches           — list batches (free+)
+ * GET  /api/v1/corpus/batches/:id       — get batch (free+)
+ * GET  /api/v1/corpus/batches/:id/jsonl — download JSONL (pro+)
+ * POST /api/v1/corpus/samples           — add sample to pending buffer
+ * POST /api/v1/corpus/query             — query samples with filters (pro+)
+ * POST /api/v1/corpus/flush             — flush + push to HuggingFace (enterprise+)
+ * GET  /api/v1/corpus/pending           — count pending samples
+ */
+
+import {
+  InMemoryBatchStore,
+  MockHfPublisher,
+  ResearchApiRouter,
+  type DataTier,
+  type SampleTag,
+} from "@nexus/hf-research";
+import type { FastifyInstance } from "fastify";
+
+import { requireAuth } from "../middleware/auth.js";
+
+// ── Singletons ────────────────────────────────────────────────────────────────
+
+const batchStore = new InMemoryBatchStore();
+const publisher = new MockHfPublisher();
+const router = new ResearchApiRouter({
+  store: batchStore,
+  publisher,
+  defaultRepoId: process.env.HF_REPO_ID ?? "nexus/research",
+});
+
+// Default caller tier — override with x-nexus-tier header
+function callerTier(req: { headers: Record<string, string | string[] | undefined> }): DataTier {
+  const header = req.headers["x-nexus-tier"];
+  const val = Array.isArray(header) ? header[0] : header;
+  if (val === "pro" || val === "enterprise") return val;
+  return "free";
+}
+
+// ── Route plugin ──────────────────────────────────────────────────────────────
+
+export async function corpusBuilderRoutes(app: FastifyInstance): Promise<void> {
+  /** GET /corpus/batches */
+  app.get<{ Querystring: { limit?: string } }>(
+    "/corpus/batches",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const result = router.listBatches({
+        userTier: callerTier(request),
+        params: { limit: request.query.limit ?? "" },
+      });
+      return reply.code(result.status).send(result.data ?? { error: result.error });
+    },
+  );
+
+  /** GET /corpus/batches/:id */
+  app.get<{ Params: { id: string } }>(
+    "/corpus/batches/:id",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const result = router.readBatch({
+        userTier: callerTier(request),
+        params: { id: request.params.id },
+      });
+      return reply.code(result.status).send(result.data ?? { error: result.error });
+    },
+  );
+
+  /** GET /corpus/batches/:id/jsonl */
+  app.get<{ Params: { id: string } }>(
+    "/corpus/batches/:id/jsonl",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const result = router.downloadJsonl({
+        userTier: callerTier(request),
+        params: { id: request.params.id },
+      });
+      if (!result.data) return reply.code(result.status).send({ error: result.error });
+      return reply
+        .code(200)
+        .header("Content-Type", "application/x-ndjson")
+        .send(result.data);
+    },
+  );
+
+  /** POST /corpus/samples — add sample to pending buffer */
+  app.post<{
+    Body: {
+      prompt: string;
+      completion: string;
+      tag?: SampleTag;
+      model?: string;
+      sessionId?: string;
+      metadata?: Record<string, unknown>;
+    };
+  }>("/corpus/samples", { preHandler: requireAuth }, async (request, reply) => {
+    const sample = batchStore.addSample({
+      prompt: request.body.prompt,
+      completion: request.body.completion,
+      tag: request.body.tag ?? "neutral",
+      model: request.body.model,
+      sessionId: request.body.sessionId,
+      metadata: request.body.metadata,
+    });
+    return reply.code(201).send(sample);
+  });
+
+  /** POST /corpus/query — filter samples (pro+) */
+  app.post<{
+    Body: {
+      tier?: DataTier;
+      tags?: SampleTag[];
+      fromDate?: string;
+      toDate?: string;
+      model?: string;
+      limit?: number;
+    };
+  }>("/corpus/query", { preHandler: requireAuth }, async (request, reply) => {
+    const result = router.querySamples({
+      userTier: callerTier(request),
+      body: request.body,
+    });
+    return reply.code(result.status).send(result.data ?? { error: result.error });
+  });
+
+  /** POST /corpus/flush — flush pending + push to HF (enterprise+) */
+  app.post<{ Body: { name?: string } }>(
+    "/corpus/flush",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const result = await router.flushAndPush({
+        userTier: callerTier(request),
+        body: { name: request.body.name },
+      });
+      return reply.code(result.status).send(result.data ?? { error: result.error });
+    },
+  );
+
+  /** GET /corpus/pending */
+  app.get("/corpus/pending", { preHandler: requireAuth }, async (_req, reply) => {
+    return reply.send({ pending: batchStore.pendingCount() });
+  });
+}

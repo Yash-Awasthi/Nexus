@@ -4,19 +4,26 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Layout from "./components/Layout.js";
 import Approvals from "./pages/Approvals.js";
 import Audit from "./pages/Audit.js";
+import Billing from "./pages/Billing.js";
 import Chat from "./pages/Chat.js";
+import Connectors from "./pages/Connectors.js";
 import Council from "./pages/Council.js";
 import Dashboard from "./pages/Dashboard.js";
 import Discover from "./pages/Discover.js";
+import ImageGen from "./pages/ImageGen.js";
+import KGExplorer from "./pages/KGExplorer.js";
 import MemoryTimeline from "./pages/MemoryTimeline.js";
+import Settings from "./pages/Settings.js";
 import Signals from "./pages/Signals.js";
 import Tasks from "./pages/Tasks.js";
+import Voice from "./pages/Voice.js";
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Layout />}>
+          {/* Core platform */}
           <Route index element={<Dashboard />} />
           <Route path="discover" element={<Discover />} />
           <Route path="signals" element={<Signals />} />
@@ -26,6 +33,15 @@ export default function App() {
           <Route path="approvals" element={<Approvals />} />
           <Route path="audit" element={<Audit />} />
           <Route path="memory" element={<MemoryTimeline />} />
+
+          {/* Extended capabilities */}
+          <Route path="billing" element={<Billing />} />
+          <Route path="connectors" element={<Connectors />} />
+          <Route path="image-gen" element={<ImageGen />} />
+          <Route path="knowledge-graph" element={<KGExplorer />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="voice" element={<Voice />} />
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
