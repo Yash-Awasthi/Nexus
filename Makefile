@@ -26,24 +26,29 @@ help: ## Show available targets
 
 # ── First-time setup ─────────────────────────────────────────────────────────
 
-setup: ## Install deps and copy .env.example → .env (run once)
-	@if [ ! -f .env ]; then \
-	  cp .env.example .env; \
-	  echo "Created .env from .env.example — fill in GROQ_API_KEY and DATABASE_URL"; \
+setup: ## Generate secret keys + create .env, then install deps (idempotent — safe to re-run)
+	@if [ -f .env ]; then \
+	  echo ".env already exists — skipping key generation (delete it to regenerate)"; \
 	else \
-	  echo ".env already exists — skipping copy"; \
+	  cp .env.example .env; \
+	  sed -i.bak "s|NEXUS_API_KEY=.*|NEXUS_API_KEY=$$(openssl rand -hex 32)|" .env; \
+	  sed -i.bak "s|NEXUS_AUDIT_KEY=.*|NEXUS_AUDIT_KEY=$$(openssl rand -hex 32)|" .env; \
+	  sed -i.bak "s|NEXUS_INGEST_API_KEY=.*|NEXUS_INGEST_API_KEY=$$(openssl rand -hex 32)|" .env; \
+	  rm -f .env.bak; \
+	  echo "✓ .env created with generated secrets:"; \
+	  printf "  NEXUS_API_KEY        = %s\n" "$$(grep '^NEXUS_API_KEY=' .env | cut -d= -f2)"; \
+	  printf "  NEXUS_AUDIT_KEY      = %s\n" "$$(grep '^NEXUS_AUDIT_KEY=' .env | cut -d= -f2)"; \
+	  printf "  NEXUS_INGEST_API_KEY = %s\n" "$$(grep '^NEXUS_INGEST_API_KEY=' .env | cut -d= -f2)"; \
+	  echo ""; \
+	  echo "Copy NEXUS_API_KEY into VITE_API_KEY in .env so the web client can authenticate."; \
+	  echo "Then: set GROQ_API_KEY + DATABASE_URL and run:"; \
+	  echo "  make dev-infra && make migrate && pnpm dev"; \
 	fi
-	pnpm install
-	@echo ""
-	@echo "Next steps:"
-	@echo "  1. Edit .env (set GROQ_API_KEY, DATABASE_URL, NEXUS_API_KEY)"
-	@echo "  2. make dev-infra      # start postgres + redis"
-	@echo "  3. make migrate        # apply schema"
-	@echo "  4. pnpm dev            # start api + worker with hot-reload"
+	@command -v pnpm >/dev/null 2>&1 && pnpm install || echo "pnpm not found — run: npm install -g pnpm && pnpm install"
 
 # ── Infrastructure (postgres + redis only) ───────────────────────────────────
 
-dev-infra: ## Start postgres + redis in the background
+dev-infra: setup ## Start postgres + redis (runs setup first so .env always exists)
 	docker compose up postgres redis -d
 	@echo "Waiting for healthy containers..."
 	@docker compose ps postgres redis

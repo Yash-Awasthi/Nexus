@@ -54,7 +54,7 @@ services:
     environment:
       DATABASE_URL: postgresql://nexus:nexus_dev_password@postgres:5432/nexus
       REDIS_URL: redis://redis:6379
-      NEXUS_API_KEY: dev-api-key-change-in-prod
+      NEXUS_API_KEY: ${NEXUS_API_KEY}
       LOG_LEVEL: info
     depends_on:
       postgres:
@@ -83,8 +83,8 @@ services:
       DATABASE_URL: postgresql://nexus:nexus_dev_password@postgres:5432/nexus
       REDIS_URL: redis://redis:6379
       GROQ_API_KEY: ${GROQ_API_KEY:-}
-      NEXUS_API_KEY: dev-api-key-change-in-prod
-      JWT_SECRET: dev-jwt-secret-change-in-prod
+      NEXUS_API_KEY: ${NEXUS_API_KEY}
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-in-prod}
       SEARXNG_BASE_URL: http://searxng:8080
       ALLOWED_ORIGINS: http://localhost:5173,http://localhost:3000
       LOG_LEVEL: info
@@ -115,7 +115,7 @@ services:
       DATABASE_URL: postgresql://nexus:nexus_dev_password@postgres:5432/nexus
       REDIS_URL: redis://redis:6379
       GROQ_API_KEY: ${GROQ_API_KEY:-}
-      NEXUS_API_KEY: dev-api-key-change-in-prod
+      NEXUS_API_KEY: ${NEXUS_API_KEY}
       LOG_LEVEL: info
       OTEL_SERVICE_NAME: nexus-worker
       SEARXNG_BASE_URL: http://searxng:8080
