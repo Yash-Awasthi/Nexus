@@ -7,13 +7,16 @@
  * Real browser integration is done by supplying a BrowserDriver.
  *
  * Features:
- *   • StealthProfile    — fingerprint spoofing configuration
- *   • BrowserDriver     — injectable interface (real: patchright, test: MockDriver)
- *   • MockDriver        — in-memory driver for testing
- *   • PagePool          — reusable page pool with max-size cap
- *   • CloudflareBypass  — heuristic bypass state machine
- *   • StealthPage       — high-level page wrapper (navigate/content/click/type/screenshot)
- *   • StealthBrowser    — lifecycle manager (open/close pool/acquire/release)
+ *   • StealthProfile      — fingerprint spoofing configuration
+ *   • BrowserDriver       — injectable interface (real: patchright, test: MockDriver)
+ *   • MockDriver          — in-memory driver for testing
+ *   • PatchrightDriver    — real stealth browser via patchright (optional dep)
+ *   • PatchrightPage      — BrowserPage wrapper around patchright Page
+ *   • isPatchrightAvailable — probe whether patchright is installed
+ *   • PagePool            — reusable page pool with max-size cap
+ *   • CloudflareBypass    — heuristic bypass state machine
+ *   • StealthPage         — high-level page wrapper (navigate/content/click/type/screenshot)
+ *   • StealthBrowser      — lifecycle manager (open/close pool/acquire/release)
  */
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -181,6 +184,192 @@ export class MockBrowserDriver implements BrowserDriver {
 
   async close(): Promise<void> {
     this._open = false;
+  }
+}
+
+// ── PatchrightDriver ──────────────────────────────────────────────────────────
+
+/**
+ * Probes whether the `patchright` package is installed and importable.
+ * Used at startup to decide whether to activate real browser execution.
+ */
+export async function isPatchrightAvailable(): Promise<boolean> {
+  try {
+    await import("patchright");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type PatchrightPageType = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type PatchrightBrowserType = any;
+
+/**
+ * BrowserPage backed by a real patchright Page.
+ * Maps our interface to patchright's Playwright-compatible API.
+ */
+export class PatchrightPage implements BrowserPage {
+  private _page: PatchrightPageType;
+  private _closed = false;
+
+  constructor(page: PatchrightPageType) {
+    this._page = page;
+  }
+
+  get url(): string { return (this._page.url?.() as string | undefined) ?? "about:blank"; }
+  get isClosed(): boolean { return this._closed || (this._page.isClosed?.() as boolean | undefined) === true; }
+
+  async navigate(url: string): Promise<NavigateResult> {
+    const t0 = Date.now();
+    const response = await (this._page.goto(url, { waitUntil: "domcontentloaded" }) as Promise<{ status(): number } | null>);
+    const status = response?.status() ?? 200;
+    const pageTitle = (await this._page.title()) as string;
+    return { url, status, title: pageTitle, loadTimeMs: Date.now() - t0 };
+  }
+
+  async content(): Promise<string> {
+    return this._page.content() as Promise<string>;
+  }
+
+  async title(): Promise<string> {
+    return this._page.title() as Promise<string>;
+  }
+
+  async click(selector: string, opts?: ClickOptions): Promise<void> {
+    await this._page.click(selector, {
+      delay:  opts?.delay,
+      button: opts?.button ?? "left",
+    });
+  }
+
+  async type(selector: string, text: string, opts?: TypeOptions): Promise<void> {
+    if (opts?.delay) {
+      // Key-by-key typing for delay simulation
+      await this._page.locator(selector).pressSequentially(text, { delay: opts.delay });
+    } else {
+      await this._page.fill(selector, text);
+    }
+  }
+
+  async evaluate<T>(fn: string | (() => T)): Promise<T> {
+    return this._page.evaluate(fn) as Promise<T>;
+  }
+
+  async screenshot(opts?: ScreenshotOptions): Promise<Buffer> {
+    return this._page.screenshot({
+      fullPage: opts?.fullPage ?? false,
+      type:     opts?.format ?? "png",
+      quality:  opts?.quality,
+    }) as Promise<Buffer>;
+  }
+
+  async waitForSelector(selector: string, timeoutMs = 30_000): Promise<void> {
+    await this._page.waitForSelector(selector, { timeout: timeoutMs });
+  }
+
+  async close(): Promise<void> {
+    this._closed = true;
+    await this._page.close();
+  }
+}
+
+/**
+ * Real stealth browser driver backed by patchright (an undetected Chromium fork).
+ *
+ * patchright is an optional peer dependency — install with:
+ *   pnpm add patchright
+ *   npx patchright install chromium
+ *
+ * Dynamically imported on first use so the package stays optional.
+ * Falls back gracefully: throws if patchright is not found so the caller
+ * can substitute MockBrowserDriver.
+ *
+ * Usage:
+ *   const available = await isPatchrightAvailable();
+ *   const driver = available ? new PatchrightDriver() : new MockBrowserDriver();
+ *   const browser = new StealthBrowser({ driver });
+ */
+export class PatchrightDriver implements BrowserDriver {
+  private _browser: PatchrightBrowserType | null = null;
+  private _open = false;
+  private readonly headless: boolean;
+  private readonly channel: string;
+
+  constructor(config?: { headless?: boolean; channel?: string }) {
+    this.headless = config?.headless ?? true;
+    this.channel  = config?.channel  ?? "chromium";
+  }
+
+  get isOpen(): boolean { return this._open && this._browser !== null; }
+
+  private async ensureOpen(): Promise<PatchrightBrowserType> {
+    if (this._browser) return this._browser;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let patchright: any;
+    try {
+      patchright = await import("patchright");
+    } catch {
+      throw new Error(
+        "PatchrightDriver: `patchright` package not found. " +
+        "Install it with: pnpm add patchright && npx patchright install chromium",
+      );
+    }
+
+    const chromium = (patchright.chromium ?? patchright.default?.chromium) as {
+      launch(opts: Record<string, unknown>): Promise<PatchrightBrowserType>;
+    } | undefined;
+
+    if (!chromium) {
+      throw new Error("PatchrightDriver: could not locate chromium in patchright exports");
+    }
+
+    this._browser = await chromium.launch({
+      headless: this.headless,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-blink-features=AutomationControlled",
+      ],
+    });
+    this._open = true;
+    return this._browser;
+  }
+
+  async newPage(profile?: StealthProfile): Promise<BrowserPage> {
+    const browser = await this.ensureOpen();
+
+    const contextOptions: Record<string, unknown> = {
+      userAgent:        profile?.userAgent,
+      locale:           profile?.locale,
+      timezoneId:       profile?.timezone,
+      viewport:         profile?.viewport ?? { width: 1280, height: 720 },
+      extraHTTPHeaders: profile?.extraHeaders,
+    };
+
+    // Remove undefined values to avoid patchright validation errors
+    for (const k of Object.keys(contextOptions)) {
+      if (contextOptions[k] === undefined) delete contextOptions[k];
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const context = await (browser as any).newContext(contextOptions);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const page = await (context as any).newPage();
+    return new PatchrightPage(page);
+  }
+
+  async close(): Promise<void> {
+    if (this._browser) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (this._browser as any).close();
+      this._browser = null;
+      this._open = false;
+    }
   }
 }
 
