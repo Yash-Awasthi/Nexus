@@ -1,0 +1,83 @@
+{
+  "docusaurus-plugin-content-docs": {
+    "default": {
+      "path": "/docs",
+      "versions": [
+        {
+          "name": "current",
+          "label": "Next",
+          "isLast": true,
+          "path": "/docs",
+          "mainDocId": "intro",
+          "docs": [
+            {
+              "id": "adrs",
+              "path": "/docs/adrs",
+              "sidebar": "docs"
+            },
+            {
+              "id": "api-reference",
+              "path": "/docs/api-reference",
+              "sidebar": "docs"
+            },
+            {
+              "id": "architecture",
+              "path": "/docs/architecture",
+              "sidebar": "docs"
+            },
+            {
+              "id": "cli-reference",
+              "path": "/docs/cli-reference",
+              "sidebar": "docs"
+            },
+            {
+              "id": "contributing",
+              "path": "/docs/contributing",
+              "sidebar": "docs"
+            },
+            {
+              "id": "intro",
+              "path": "/docs/",
+              "sidebar": "docs"
+            },
+            {
+              "id": "plugin-author-guide",
+              "path": "/docs/plugin-author-guide",
+              "sidebar": "docs"
+            },
+            {
+              "id": "quick-start",
+              "path": "/docs/quick-start",
+              "sidebar": "docs"
+            },
+            {
+              "id": "runbook",
+              "path": "/docs/runbook",
+              "sidebar": "docs"
+            },
+            {
+              "id": "slos",
+              "path": "/docs/slos",
+              "sidebar": "docs"
+            },
+            {
+              "id": "threat-model",
+              "path": "/docs/threat-model",
+              "sidebar": "docs"
+            }
+          ],
+          "draftIds": [],
+          "sidebars": {
+            "docs": {
+              "link": {
+                "path": "/docs/",
+                "label": "Overview"
+              }
+            }
+          }
+        }
+      ],
+      "breadcrumbs": true
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "@nexus/evals",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lightweight task-completion scoring and adapter regression suite",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist coverage"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.8",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8",
+    "@types/node": "^22.0.0"
+  },
+  "dependencies": {
+    "@nexus/plugin-sdk": "workspace:*"
+  }
+}

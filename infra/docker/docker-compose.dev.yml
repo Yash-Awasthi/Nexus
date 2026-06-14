@@ -1,0 +1,86 @@
+# SPDX-License-Identifier: Apache-2.0
+# docker-compose.dev.yml — Development overrides
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f infra/docker/docker-compose.dev.yml up
+#
+# Or via Makefile:
+#   make dev-up
+#
+# Adds:
+#   - Builds from "development" stage (tsx hot-reload, no pre-compiled dist)
+#   - Bind-mounts full monorepo into container so tsx sees source changes
+#   - Exposes Node.js inspector ports (9229 api, 9230 worker)
+#   - Exposes Python debugpy port (5678) on ingest
+#   - Sets LOG_LEVEL=debug for all services
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: development
+    volumes:
+      # Full monorepo bind-mount — tsx watches src/ directly, no dist needed
+      - .:/app:ro
+      # Anonymous volume prevents the bind-mount from shadowing node_modules
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+      - "9229:9229" # Node.js inspector
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: debug
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+      target: development
+    volumes:
+      - .:/app:ro
+      - /app/node_modules
+    ports:
+      - "9230:9229" # Node.js inspector (offset to avoid collision with api)
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: debug
+
+  ingest:
+    volumes:
+      - ./services/ingest:/app:ro
+    ports:
+      - "8000:8000"
+      - "5678:5678" # Python debugpy
+    environment:
+      LOG_LEVEL: debug
+      PYTHONDONTWRITEBYTECODE: "1"
+    command:
+      [
+        "python",
+        "-m",
+        "debugpy",
+        "--listen",
+        "0.0.0.0:5678",
+        "-m",
+        "uvicorn",
+        "nexus_ingest.api:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--reload",
+      ]
+
+  postgres:
+    ports:
+      - "5432:5432" # Expose for local DB clients (TablePlus, psql)
+
+  redis:
+    ports:
+      - "6379:6379" # Expose for redis-cli

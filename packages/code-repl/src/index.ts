@@ -1,0 +1,299 @@
+// SPDX-License-Identifier: Apache-2.0
+/**
+ * code-repl — Persistent REPL kernel with Jupyter-style last-expression output.
+ *
+ * Provides:
+ *   • ReplResult       — { stdout, stderr, displayData, lastExpression }
+ *   • KernelSession    — stateful session with variable store + history
+ *   • JupyterMode      — wraps code to auto-print last expression
+ *   • ReplExecutor     — injectable code execution interface
+ *   • MockReplExecutor — in-memory executor for tests
+ *   • SessionReaper    — TTL-based idle session cleanup
+ *   • ReplKernel       — per-language kernel facade
+ *   • KernelManager    — named kernel registry with create/get/reap
+ */
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export type ReplLanguage = "python" | "r" | "julia";
+
+export interface ReplInput {
+  code: string;
+  timeoutMs?: number;
+}
+
+export interface ReplResult {
+  stdout: string;
+  stderr: string;
+  displayData?: unknown;  // rich output (images, HTML, etc.)
+  lastExpression?: string; // auto-print of last expression in Jupyter mode
+  exitCode: number;
+  durationMs: number;
+}
+
+export interface VariableStore {
+  [name: string]: unknown;
+}
+
+export interface KernelSessionState {
+  id: string;
+  language: ReplLanguage;
+  variables: VariableStore;
+  history: string[];      // executed code snippets
+  createdAt: string;
+  lastUsedAt: string;
+  executionCount: number;
+}
+
+// ── JupyterMode ───────────────────────────────────────────────────────────────
+
+export class JupyterMode {
+  /**
+   * Wrap code so the last expression is automatically displayed.
+   * Only applies when the last non-empty line is an expression (not assignment,
+   * def, class, import, return, print, etc.).
+   */
+  static wrapPython(code: string): string {
+    const lines = code.split("\n").map((l) => l.trimEnd());
+    const lastLine = [...lines].reverse().find((l) => l.trim() !== "");
+    if (!lastLine) return code;
+
+    const stripped = lastLine.trim();
+    // Don't wrap control structures, assignments, or statements
+    const isStatement = /^(def |class |import |from |return |yield |raise |del |pass\b|break\b|continue\b|async |print\(|#)/.test(stripped)
+      || (/^[a-zA-Z_][a-zA-Z0-9_]*\s*=/.test(stripped) && !stripped.includes("=="))
+      || lastLine !== lastLine.trimStart(); // indented → inside a block
+
+    if (isStatement) return code;
+
+    // Replace last expression line with print wrapper
+    const idx = [...lines].map((l, i) => ({ l, i }))
+      .reverse()
+      .find(({ l }) => l.trim() !== "");
+    if (!idx) return code;
+
+    const newLines = [...lines];
+    newLines[idx.i] = `__repl_last__ = ${stripped}\nif __repl_last__ is not None: print(repr(__repl_last__))`;
+    return newLines.join("\n");
+  }
+
+  static wrapR(code: string): string {
+    const lines = code.split("\n").map((l) => l.trimEnd());
+    const lastLine = [...lines].reverse().find((l) => l.trim() !== "");
+    if (!lastLine) return code;
+    const stripped = lastLine.trim();
+    const isAssignment = /(<-|=)/.test(stripped) && !/==/g.test(stripped);
+    if (isAssignment) return code;
+    const idx = [...lines].map((l, i) => ({ l, i })).reverse().find(({ l }) => l.trim() !== "");
+    if (!idx) return code;
+    const newLines = [...lines];
+    newLines[idx.i] = `print(${stripped})`;
+    return newLines.join("\n");
+  }
+
+  static wrapJulia(code: string): string {
+    const lines = code.split("\n").map((l) => l.trimEnd());
+    const lastLine = [...lines].reverse().find((l) => l.trim() !== "");
+    if (!lastLine) return code;
+    const stripped = lastLine.trim();
+    const isAssignment = /=/.test(stripped) && !/==/g.test(stripped) && !/^#/.test(stripped);
+    if (isAssignment) return code;
+    const idx = [...lines].map((l, i) => ({ l, i })).reverse().find(({ l }) => l.trim() !== "");
+    if (!idx) return code;
+    const newLines = [...lines];
+    newLines[idx.i] = `println(${stripped})`;
+    return newLines.join("\n");
+  }
+
+  static wrap(code: string, language: ReplLanguage): string {
+    switch (language) {
+      case "python": return JupyterMode.wrapPython(code);
+      case "r": return JupyterMode.wrapR(code);
+      case "julia": return JupyterMode.wrapJulia(code);
+    }
+  }
+}
+
+// ── ReplExecutor ──────────────────────────────────────────────────────────────
+
+export interface ReplExecutor {
+  execute(language: ReplLanguage, code: string, state: KernelSessionState, timeoutMs?: number): Promise<ReplResult>;
+}
+
+// ── MockReplExecutor ──────────────────────────────────────────────────────────
+
+export interface MockExecutionBehavior {
+  stdout?: string;
+  stderr?: string;
+  exitCode?: number;
+  displayData?: unknown;
+  lastExpression?: string;
+  throws?: string;
+  durationMs?: number;
+  /** Callback to inspect/modify state before returning result */
+  onExecute?: (code: string, state: KernelSessionState) => void;
+}
+
+export class MockReplExecutor implements ReplExecutor {
+  private behaviors: MockExecutionBehavior[];
+  private callIndex = 0;
+  readonly executionLog: Array<{ language: ReplLanguage; code: string }> = [];
+
+  constructor(behaviors: MockExecutionBehavior | MockExecutionBehavior[] = {}) {
+    this.behaviors = Array.isArray(behaviors) ? behaviors : [behaviors];
+  }
+
+  async execute(language: ReplLanguage, code: string, state: KernelSessionState, _timeoutMs?: number): Promise<ReplResult> {
+    this.executionLog.push({ language, code });
+    const behavior = this.behaviors[Math.min(this.callIndex, this.behaviors.length - 1)]!;
+    this.callIndex++;
+
+    if (behavior.throws) throw new Error(behavior.throws);
+    behavior.onExecute?.(code, state);
+
+    return {
+      stdout: behavior.stdout ?? "",
+      stderr: behavior.stderr ?? "",
+      displayData: behavior.displayData,
+      lastExpression: behavior.lastExpression,
+      exitCode: behavior.exitCode ?? 0,
+      durationMs: behavior.durationMs ?? 10,
+    };
+  }
+}
+
+// ── KernelSession ─────────────────────────────────────────────────────────────
+
+let _sessionSeq = 0;
+
+export class KernelSession {
+  private state: KernelSessionState;
+  private executor: ReplExecutor;
+  private jupyterMode: boolean;
+
+  constructor(language: ReplLanguage, executor: ReplExecutor, jupyterMode = true) {
+    this.executor = executor;
+    this.jupyterMode = jupyterMode;
+    this.state = {
+      id: `kernel-${++_sessionSeq}`,
+      language,
+      variables: {},
+      history: [],
+      createdAt: new Date().toISOString(),
+      lastUsedAt: new Date().toISOString(),
+      executionCount: 0,
+    };
+  }
+
+  get id(): string { return this.state.id; }
+  get language(): ReplLanguage { return this.state.language; }
+  get executionCount(): number { return this.state.executionCount; }
+  get state_(): KernelSessionState { return this.state; }
+
+  /** Execute code in this session. */
+  async execute(input: ReplInput): Promise<ReplResult> {
+    const wrappedCode = this.jupyterMode
+      ? JupyterMode.wrap(input.code, this.state.language)
+      : input.code;
+
+    this.state.history.push(input.code);
+    this.state.executionCount++;
+    this.state.lastUsedAt = new Date().toISOString();
+
+    const result = await this.executor.execute(
+      this.state.language,
+      wrappedCode,
+      this.state,
+      input.timeoutMs,
+    );
+
+    return result;
+  }
+
+  /** Set a variable in the kernel state (test helper / real kernel sync). */
+  setVariable(name: string, value: unknown): void {
+    this.state.variables[name] = value;
+  }
+
+  getVariable(name: string): unknown {
+    return this.state.variables[name];
+  }
+
+  getHistory(): string[] { return [...this.state.history]; }
+
+  /** Returns idle time in ms. */
+  idleTimeMs(): number {
+    return Date.now() - new Date(this.state.lastUsedAt).getTime();
+  }
+}
+
+// ── SessionReaper ─────────────────────────────────────────────────────────────
+
+export class SessionReaper {
+  private maxIdleMs: number;
+
+  constructor(maxIdleMs = 30 * 60 * 1000) { // 30 min default
+    this.maxIdleMs = maxIdleMs;
+  }
+
+  /** Returns session IDs that should be reaped. */
+  identify(sessions: KernelSession[]): string[] {
+    return sessions
+      .filter((s) => s.idleTimeMs() > this.maxIdleMs)
+      .map((s) => s.id);
+  }
+
+  /** Reap idle sessions from a registry map. Returns count reaped. */
+  reap(registry: Map<string, KernelSession>): number {
+    const toReap = this.identify([...registry.values()]);
+    for (const id of toReap) registry.delete(id);
+    return toReap.length;
+  }
+}
+
+// ── KernelManager ─────────────────────────────────────────────────────────────
+
+export interface KernelManagerOptions {
+  executor: ReplExecutor;
+  jupyterMode?: boolean;
+  maxSessions?: number;
+  reaper?: SessionReaper;
+}
+
+export class KernelManager {
+  private kernels = new Map<string, KernelSession>();
+  private executor: ReplExecutor;
+  private jupyterMode: boolean;
+  private maxSessions: number;
+  private reaper: SessionReaper;
+
+  constructor(opts: KernelManagerOptions) {
+    this.executor = opts.executor;
+    this.jupyterMode = opts.jupyterMode ?? true;
+    this.maxSessions = opts.maxSessions ?? 20;
+    this.reaper = opts.reaper ?? new SessionReaper();
+  }
+
+  /** Create a new kernel session. Reaps idle sessions if at capacity. */
+  create(language: ReplLanguage): KernelSession {
+    if (this.kernels.size >= this.maxSessions) {
+      const reaped = this.reaper.reap(this.kernels);
+      if (reaped === 0 && this.kernels.size >= this.maxSessions) {
+        throw new Error(`KernelManager at capacity (maxSessions=${this.maxSessions})`);
+      }
+    }
+    const session = new KernelSession(language, this.executor, this.jupyterMode);
+    this.kernels.set(session.id, session);
+    return session;
+  }
+
+  get(id: string): KernelSession | undefined { return this.kernels.get(id); }
+  has(id: string): boolean { return this.kernels.has(id); }
+  destroy(id: string): boolean { return this.kernels.delete(id); }
+  destroyAll(): void { this.kernels.clear(); }
+  count(): number { return this.kernels.size; }
+  list(): KernelSession[] { return [...this.kernels.values()]; }
+
+  /** Run the reaper and return count removed. */
+  reapIdle(): number { return this.reaper.reap(this.kernels); }
+}

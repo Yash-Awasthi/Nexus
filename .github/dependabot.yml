@@ -1,0 +1,64 @@
+# SPDX-License-Identifier: Apache-2.0
+version: 2
+
+updates:
+  # pnpm workspace — monorepo root
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    groups:
+      devDependencies:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # Python ingest service
+  - package-ecosystem: pip
+    directory: /services/ingest
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+
+  # Docker base images (api)
+  - package-ecosystem: docker
+    directory: /apps/api
+    schedule:
+      interval: weekly
+      day: tuesday
+    open-pull-requests-limit: 3
+
+  # Docker base images (worker)
+  - package-ecosystem: docker
+    directory: /apps/worker
+    schedule:
+      interval: weekly
+      day: tuesday
+    open-pull-requests-limit: 3
+
+  # Docker base images (ingest)
+  - package-ecosystem: docker
+    directory: /services/ingest
+    schedule:
+      interval: weekly
+      day: tuesday
+    open-pull-requests-limit: 3

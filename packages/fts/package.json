@@ -1,0 +1,19 @@
+{
+  "name": "@nexus/fts",
+  "version": "0.0.0",
+  "private": false,
+  "description": "Full-text search (BM25) + vector search with Reciprocal Rank Fusion",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "dev": "tsc --project tsconfig.json --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist coverage",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": { "typescript": "^5.6.3" }
+}

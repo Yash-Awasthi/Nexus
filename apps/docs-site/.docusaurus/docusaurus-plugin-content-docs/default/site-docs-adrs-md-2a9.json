@@ -1,0 +1,27 @@
+{
+  "id": "adrs",
+  "title": "ADR Index",
+  "description": "All 18 locked architectural decisions for NEXUS.",
+  "source": "@site/docs/adrs.md",
+  "sourceDirName": ".",
+  "slug": "/adrs",
+  "permalink": "/docs/adrs",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/Yash-Awasthi/Nexus/edit/main/apps/docs-site/docs/adrs.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedBy": "Nexus CI",
+  "lastUpdatedAt": 1781180407000,
+  "sidebarPosition": 12,
+  "frontMatter": {
+    "id": "adrs",
+    "title": "ADR Index",
+    "sidebar_position": 12
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "SLOs",
+    "permalink": "/docs/slos"
+  }
+}

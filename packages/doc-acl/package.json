@@ -1,0 +1,14 @@
+{
+  "name": "@nexus/doc-acl",
+  "version": "0.0.0",
+  "private": false,
+  "description": "Row-level document access control — user/group principal model, permission enforcement",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
+  "scripts": { "build": "tsc --project tsconfig.json", "typecheck": "tsc --noEmit", "clean": "rm -rf dist", "test": "vitest run --passWithNoTests" },
+  "devDependencies": { "typescript": "^5.6.3", "vitest": "^2.1.8" },
+  "dependencies": {}
+}

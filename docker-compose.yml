@@ -1,0 +1,196 @@
+# SPDX-License-Identifier: Apache-2.0
+# Nexus local development stack
+# Usage: docker compose up
+# Requires: Docker 24+, Compose v2
+
+version: "3.9"
+
+services:
+  # ── Infrastructure ──────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: nexus-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nexus
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: nexus_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus -d nexus"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: nexus-redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── Python ingest service ───────────────────────────────────────────────────
+
+  ingest:
+    build:
+      context: .
+      dockerfile: services/ingest/Dockerfile
+    container_name: nexus-ingest
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://nexus:nexus_dev_password@postgres:5432/nexus
+      REDIS_URL: redis://redis:6379
+      NEXUS_API_KEY: dev-api-key-change-in-prod
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ── Node API ─────────────────────────────────────────────────────────────────
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: nexus-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://nexus:nexus_dev_password@postgres:5432/nexus
+      REDIS_URL: redis://redis:6379
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      NEXUS_API_KEY: dev-api-key-change-in-prod
+      JWT_SECRET: dev-jwt-secret-change-in-prod
+      SEARXNG_BASE_URL: http://searxng:8080
+      ALLOWED_ORIGINS: http://localhost:5173,http://localhost:3000
+      LOG_LEVEL: info
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_SERVICE_NAME: nexus-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── Node Worker ──────────────────────────────────────────────────────────────
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    container_name: nexus-worker
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://nexus:nexus_dev_password@postgres:5432/nexus
+      REDIS_URL: redis://redis:6379
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      NEXUS_API_KEY: dev-api-key-change-in-prod
+      LOG_LEVEL: info
+      OTEL_SERVICE_NAME: nexus-worker
+      SEARXNG_BASE_URL: http://searxng:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── React SPA (Vite dev server) ──────────────────────────────────────────────
+  # Only included in dev — not built as a Docker image (served via Vercel/CDN in prod)
+  web:
+    image: node:20.18.0-alpine
+    container_name: nexus-web
+    working_dir: /app
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: sh -c "corepack enable && pnpm --filter @nexus/web dev"
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:3000
+    depends_on:
+      - api
+    profiles:
+      - dev # opt-in: docker compose --profile dev up
+
+  # ── SearXNG self-hosted metasearch ───────────────────────────────────────────
+  # Provides private, API-accessible web search for the Nexus adapter-searxng.
+  # Adapter env var: SEARXNG_BASE_URL=http://searxng:8080  (inter-container)
+  #                  or http://localhost:4000               (from host / API)
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: nexus-searxng
+    restart: unless-stopped
+    ports:
+      - "4000:8080"
+    volumes:
+      - ./infra/searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - searxng_data:/etc/searxng
+    environment:
+      # Override in production: openssl rand -hex 32
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-nexus-dev-searxng-secret-change-in-prod}
+      SEARXNG_BASE_URL: http://searxng:8080
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── Observability (optional) ─────────────────────────────────────────────────
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: nexus-otel
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./infra/otel/config.yaml:/etc/otel/config.yaml:ro
+    ports:
+      - "4318:4318" # OTLP/HTTP
+      - "4317:4317" # OTLP/gRPC
+      - "8888:8888" # Prometheus metrics
+    profiles:
+      - observability # opt-in
+
+volumes:
+  postgres_data:
+  redis_data:
+  searxng_data:

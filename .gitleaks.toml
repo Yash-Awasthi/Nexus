@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: Apache-2.0
+# gitleaks configuration for NEXUS
+# Run: gitleaks detect --source . --config .gitleaks.toml
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowlisted patterns"
+# Allow placeholder values in example files and docs
+regexes = [
+  "NEXUS_API_KEY.*=.*<your-",
+  "NEXUS_API_KEY.*=.*your-api-key",
+  "NEXUS_API_KEY.*=.*change-me",
+  "NEXUS_API_KEY.*=.*dev-secret",
+  "example\\.com",
+  "localhost",
+]
+paths = [
+  ".env.example",
+  "docs/",
+  "README.md",
+  "CONTRIBUTING.md",
+]
+
+# Custom rules on top of defaults
+[[rules]]
+id = "nexus-api-key"
+description = "NEXUS API Key"
+regex = '''NEXUS_API_KEY\s*=\s*['\"]([a-zA-Z0-9_\-]{20,})['\"]'''
+tags = ["secret", "nexus"]
+
+[[rules]]
+id = "nexus-audit-key"
+description = "NEXUS Audit HMAC Key"
+regex = '''NEXUS_AUDIT_KEY\s*=\s*['\"]([a-zA-Z0-9_\-]{16,})['\"]'''
+tags = ["secret", "nexus"]
+
+[[rules]]
+id = "doppler-token"
+description = "Doppler service token"
+regex = '''dp\.st\.[a-zA-Z0-9]{40,}'''
+tags = ["secret", "doppler"]
