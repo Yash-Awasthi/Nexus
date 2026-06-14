@@ -6,11 +6,12 @@
  * Architecture
  * ─────────────
  *   AudioBuffer        — raw audio data with format + sample-rate metadata
+ *   VadProvider        — Voice Activity Detection: AudioBuffer → { hasSpeech, energyLevel }
  *   TranscribeProvider — STT: AudioBuffer → transcript string
  *   SynthesizeProvider — TTS: text → AudioBuffer (optional — omit for text-only sessions)
  *   VoiceHandler       — text in → text out (wire in any agent or LLM call)
  *   VoiceSession       — orchestrates one voice turn:
- *                          audio in → transcribe → handler → synthesize → audio out
+ *                          audio in → [VAD gate] → transcribe → handler → synthesize → audio out
  *
  * Included providers
  * ───────────────────
@@ -77,6 +78,102 @@ export interface AudioBuffer {
   sampleRate: number;
   /** Duration in seconds — optional; used for logging/metrics */
   durationSeconds?: number;
+}
+
+// ── VAD (Voice Activity Detection) ────────────────────────────────────────────
+
+export interface VadResult {
+  /** Whether the audio contains detectable speech */
+  hasSpeech: boolean;
+  /** Computed energy level normalised to [0, 1] — higher means louder */
+  energyLevel: number;
+}
+
+/**
+ * Voice Activity Detection provider.
+ * Runs before transcription to avoid wasting API calls on silence.
+ */
+export interface VadProvider {
+  readonly name: string;
+  detect(audio: AudioBuffer): Promise<VadResult>;
+}
+
+/**
+ * Null VAD — always reports speech present.
+ * Use when VAD is not required or for tests that don't care about silence.
+ */
+export class NullVadProvider implements VadProvider {
+  readonly name = "null-vad";
+  async detect(_audio: AudioBuffer): Promise<VadResult> {
+    return { hasSpeech: true, energyLevel: 1 };
+  }
+}
+
+/**
+ * Silence VAD — always reports no speech.
+ * Use in tests to simulate a silent audio segment without real audio data.
+ */
+export class SilenceVadProvider implements VadProvider {
+  readonly name = "silence-vad";
+  async detect(_audio: AudioBuffer): Promise<VadResult> {
+    return { hasSpeech: false, energyLevel: 0 };
+  }
+}
+
+export interface EnergyVadConfig {
+  /**
+   * Minimum RMS energy level (0–1) required to classify audio as speech.
+   * Default: 0.02.  Increase for noisy environments; decrease for quiet mics.
+   */
+  threshold?: number;
+  /**
+   * Number of leading bytes to skip before computing energy.
+   * For WAV audio the first 44 bytes are header and should be excluded.
+   * Default: 44.
+   */
+  headerBytes?: number;
+}
+
+/**
+ * Energy-based VAD.
+ *
+ * Computes the root-mean-square (RMS) of audio samples treated as 8-bit
+ * unsigned PCM (centre 128, range 0–255 → normalised to [−1, 1]).
+ * Returns hasSpeech:true when energyLevel >= threshold.
+ *
+ * Works well for uncompressed WAV.  For compressed formats the energy
+ * estimate is approximate; prefer NullVadProvider or a model-based
+ * provider (e.g. Silero) for production compressed-audio pipelines.
+ */
+export class EnergyVadProvider implements VadProvider {
+  readonly name = "energy-vad";
+  private readonly threshold: number;
+  private readonly headerBytes: number;
+
+  constructor(config: EnergyVadConfig = {}) {
+    this.threshold = config.threshold ?? 0.02;
+    this.headerBytes = config.headerBytes ?? 44;
+  }
+
+  async detect(audio: AudioBuffer): Promise<VadResult> {
+    const data = audio.data;
+    const start = Math.min(this.headerBytes, data.length);
+    const samples = data.subarray(start);
+
+    if (samples.length === 0) {
+      return { hasSpeech: false, energyLevel: 0 };
+    }
+
+    // RMS of (byte − 128) / 128 — centred on PCM silence (0x80)
+    let sumSq = 0;
+    for (let i = 0; i < samples.length; i++) {
+      const norm = (samples[i]! - 128) / 128;
+      sumSq += norm * norm;
+    }
+    const energyLevel = Math.sqrt(sumSq / samples.length);
+
+    return { hasSpeech: energyLevel >= this.threshold, energyLevel };
+  }
 }
 
 // ── Provider interfaces ───────────────────────────────────────────────────────
@@ -398,6 +495,12 @@ export interface VoiceSessionConfig {
   synthesize?: SynthesizeProvider;
   handler: VoiceHandler;
   hooks?: VoiceHooks;
+  /**
+   * Optional VAD provider.  When set, each turn starts with a silence check.
+   * If no speech is detected the turn is skipped (no STT/handler/TTS calls)
+   * and VoiceTurnResult.skipped will be true.
+   */
+  vad?: VadProvider;
   /** Session name used in hook payloads (default: "voice-session") */
   name?: string;
   /** Default transcribe options applied to every turn */
@@ -432,6 +535,13 @@ export interface VoiceTurnResult {
   synthesizeMs?: number;
   /** Language detected / used during transcription */
   language?: string;
+  /**
+   * True when the VAD provider determined no speech was present.
+   * transcript and response are empty strings; no STT/handler/TTS was called.
+   */
+  skipped?: boolean;
+  /** VAD energy level from this turn (undefined when no VAD provider configured) */
+  vadEnergyLevel?: number;
 }
 
 export class VoiceSession {
@@ -439,6 +549,7 @@ export class VoiceSession {
   private readonly synthesize?: SynthesizeProvider;
   private readonly handler: VoiceHandler;
   private readonly hooks?: VoiceHooks;
+  private readonly vad?: VadProvider;
   private readonly name: string;
   private readonly transcribeOpts: TranscribeOptions;
   private readonly synthesizeOpts: SynthesizeOptions;
@@ -448,6 +559,7 @@ export class VoiceSession {
     this.synthesize = config.synthesize;
     this.handler = config.handler;
     this.hooks = config.hooks;
+    this.vad = config.vad;
     this.name = config.name ?? "voice-session";
     this.transcribeOpts = config.transcribeOpts ?? {};
     this.synthesizeOpts = config.synthesizeOpts ?? {};
@@ -462,6 +574,22 @@ export class VoiceSession {
     // ── Validate input ──────────────────────────────────────────────────────
     if (!audio.data || audio.data.length === 0) {
       throw new VoiceError("INVALID_AUDIO", "Cannot process an empty audio buffer");
+    }
+
+    // ── 0. VAD gate ──────────────────────────────────────────────────────────
+    if (this.vad) {
+      const vadResult = await this.vad.detect(audio);
+      if (!vadResult.hasSpeech) {
+        return {
+          transcript: "",
+          response: "",
+          latencyMs: Date.now() - turnStart,
+          transcribeMs: 0,
+          handlerMs: 0,
+          skipped: true,
+          vadEnergyLevel: vadResult.energyLevel,
+        };
+      }
     }
 
     // ── Hook: task.before ────────────────────────────────────────────────────
@@ -552,6 +680,7 @@ export class VoiceSession {
       handlerMs,
       synthesizeMs,
       language: transcribeResult.language,
+      skipped: false,
     };
   }
 

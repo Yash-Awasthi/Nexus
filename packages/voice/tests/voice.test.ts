@@ -7,12 +7,16 @@ import {
   NullSynthesizeProvider,
   GroqTranscribeProvider,
   ElevenLabsSynthesizeProvider,
+  EnergyVadProvider,
+  NullVadProvider,
+  SilenceVadProvider,
   createAudioBuffer,
   type TranscribeProvider,
   type TranscribeResult,
   type SynthesizeProvider,
   type VoiceHandler,
   type VoiceHooks,
+  type VadProvider,
   type FetchFn,
   type AudioBuffer,
 } from "../src/index.js";
@@ -640,5 +644,210 @@ describe("VoiceSession — opts passthrough", () => {
     await session.process(fakeAudio(), { language: "en" });
     const callOpts = (transcribe.transcribe as ReturnType<typeof vi.fn>).mock.calls[0]![1];
     expect(callOpts).toMatchObject({ prompt: "nexus platform", temperature: 0, language: "en" });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EnergyVadProvider
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** PCM silence: all bytes at 128 (the zero-signal centre for 8-bit PCM) */
+function silentPcm(byteCount: number, headerBytes = 44): Uint8Array {
+  const buf = new Uint8Array(headerBytes + byteCount);
+  buf.fill(128); // everything at centre = 0 energy
+  return buf;
+}
+
+/** PCM signal: bytes alternate 0 and 255 — maximum energy */
+function loudPcm(byteCount: number, headerBytes = 44): Uint8Array {
+  const buf = new Uint8Array(headerBytes + byteCount);
+  for (let i = headerBytes; i < buf.length; i++) {
+    buf[i] = i % 2 === 0 ? 0 : 255;
+  }
+  return buf;
+}
+
+describe("EnergyVadProvider", () => {
+  it("returns hasSpeech:false for silent audio (all 128)", async () => {
+    const vad = new EnergyVadProvider({ headerBytes: 0 });
+    const audio = createAudioBuffer(new Uint8Array(100).fill(128), "wav");
+    const result = await vad.detect(audio);
+    expect(result.hasSpeech).toBe(false);
+    expect(result.energyLevel).toBe(0);
+  });
+
+  it("returns hasSpeech:true for loud audio (0/255 alternating)", async () => {
+    const vad = new EnergyVadProvider({ headerBytes: 0 });
+    const raw = new Uint8Array(100);
+    for (let i = 0; i < 100; i++) raw[i] = i % 2 === 0 ? 0 : 255;
+    const audio = createAudioBuffer(raw, "wav");
+    const result = await vad.detect(audio);
+    expect(result.hasSpeech).toBe(true);
+    expect(result.energyLevel).toBeCloseTo(1, 1);
+  });
+
+  it("skips header bytes by default", async () => {
+    // loud signal in header region only (bytes 0-43) — after skipping, only silence
+    const buf = loudPcm(0, 44); // 44 bytes of loud, then nothing
+    const vad = new EnergyVadProvider(); // headerBytes default 44
+    const audio = createAudioBuffer(buf, "wav");
+    const result = await vad.detect(audio);
+    expect(result.hasSpeech).toBe(false);
+    expect(result.energyLevel).toBe(0); // empty after header skip
+  });
+
+  it("respects custom threshold", async () => {
+    // Audio with mild signal — passes low threshold, fails high threshold
+    const vad_low = new EnergyVadProvider({ headerBytes: 0, threshold: 0.001 });
+    const vad_high = new EnergyVadProvider({ headerBytes: 0, threshold: 0.99 });
+    const raw = new Uint8Array(100).fill(140); // slight deviation from 128
+    const audio = createAudioBuffer(raw, "wav");
+    expect((await vad_low.detect(audio)).hasSpeech).toBe(true);
+    expect((await vad_high.detect(audio)).hasSpeech).toBe(false);
+  });
+
+  it("returns energyLevel in [0, 1] range", async () => {
+    const vad = new EnergyVadProvider({ headerBytes: 0 });
+    const audio = createAudioBuffer(loudPcm(100, 0), "wav");
+    const { energyLevel } = await vad.detect(audio);
+    expect(energyLevel).toBeGreaterThanOrEqual(0);
+    expect(energyLevel).toBeLessThanOrEqual(1);
+  });
+
+  it("handles empty buffer after header skip gracefully", async () => {
+    const vad = new EnergyVadProvider({ headerBytes: 100 });
+    const audio = createAudioBuffer(new Uint8Array(50), "wav");
+    const result = await vad.detect(audio);
+    expect(result.hasSpeech).toBe(false);
+    expect(result.energyLevel).toBe(0);
+  });
+
+  it("name is 'energy-vad'", () => {
+    expect(new EnergyVadProvider().name).toBe("energy-vad");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NullVadProvider / SilenceVadProvider
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("NullVadProvider", () => {
+  it("always returns hasSpeech:true regardless of audio", async () => {
+    const vad = new NullVadProvider();
+    const audio = createAudioBuffer(new Uint8Array(10).fill(128), "wav");
+    const result = await vad.detect(audio);
+    expect(result.hasSpeech).toBe(true);
+    expect(result.energyLevel).toBe(1);
+  });
+
+  it("name is 'null-vad'", () => {
+    expect(new NullVadProvider().name).toBe("null-vad");
+  });
+});
+
+describe("SilenceVadProvider", () => {
+  it("always returns hasSpeech:false regardless of audio", async () => {
+    const vad = new SilenceVadProvider();
+    const audio = createAudioBuffer(loudPcm(100, 0), "wav");
+    const result = await vad.detect(audio);
+    expect(result.hasSpeech).toBe(false);
+    expect(result.energyLevel).toBe(0);
+  });
+
+  it("name is 'silence-vad'", () => {
+    expect(new SilenceVadProvider().name).toBe("silence-vad");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VoiceSession — VAD gate
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("VoiceSession — VAD gate", () => {
+  const transcribeSpy = vi.fn().mockResolvedValue({ transcript: "hello", latencyMs: 10 });
+  const handlerSpy = vi.fn().mockResolvedValue("world");
+  const mockTranscribe: TranscribeProvider = { name: "mock", transcribe: transcribeSpy };
+
+  beforeEach(() => {
+    transcribeSpy.mockClear();
+    handlerSpy.mockClear();
+  });
+
+  it("skips transcription and handler when VAD reports no speech", async () => {
+    const session = new VoiceSession({
+      transcribe: mockTranscribe,
+      handler: handlerSpy,
+      vad: new SilenceVadProvider(),
+    });
+    const result = await session.process(fakeAudio());
+    expect(result.skipped).toBe(true);
+    expect(result.transcript).toBe("");
+    expect(result.response).toBe("");
+    expect(transcribeSpy).not.toHaveBeenCalled();
+    expect(handlerSpy).not.toHaveBeenCalled();
+  });
+
+  it("proceeds normally when VAD reports speech", async () => {
+    const session = new VoiceSession({
+      transcribe: mockTranscribe,
+      handler: handlerSpy,
+      vad: new NullVadProvider(),
+    });
+    const result = await session.process(fakeAudio());
+    expect(result.skipped).toBe(false);
+    expect(result.transcript).toBe("hello");
+    expect(transcribeSpy).toHaveBeenCalledOnce();
+    expect(handlerSpy).toHaveBeenCalledOnce();
+  });
+
+  it("skipped result has latencyMs >= 0", async () => {
+    const session = new VoiceSession({
+      transcribe: mockTranscribe,
+      handler: handlerSpy,
+      vad: new SilenceVadProvider(),
+    });
+    const result = await session.process(fakeAudio());
+    expect(result.latencyMs).toBeGreaterThanOrEqual(0);
+    expect(result.transcribeMs).toBe(0);
+    expect(result.handlerMs).toBe(0);
+  });
+
+  it("skipped result includes vadEnergyLevel", async () => {
+    const session = new VoiceSession({
+      transcribe: mockTranscribe,
+      handler: handlerSpy,
+      vad: new SilenceVadProvider(),
+    });
+    const result = await session.process(fakeAudio());
+    expect(result.vadEnergyLevel).toBe(0);
+  });
+
+  it("proceeds normally without a VAD provider configured", async () => {
+    const session = new VoiceSession({
+      transcribe: mockTranscribe,
+      handler: handlerSpy,
+      // no vad
+    });
+    const result = await session.process(fakeAudio());
+    expect(result.skipped).toBe(false);
+    expect(transcribeSpy).toHaveBeenCalledOnce();
+  });
+
+  it("uses a custom VadProvider that checks energy", async () => {
+    const customVad: VadProvider = {
+      name: "custom",
+      detect: async (audio) => ({
+        hasSpeech: audio.data.length > 50,
+        energyLevel: audio.data.length > 50 ? 0.5 : 0,
+      }),
+    };
+    const sessionSmall = new VoiceSession({ transcribe: mockTranscribe, handler: handlerSpy, vad: customVad });
+    const sessionLarge = new VoiceSession({ transcribe: mockTranscribe, handler: handlerSpy, vad: customVad });
+
+    const smallAudio = createAudioBuffer(new Uint8Array(10), "wav");
+    const largeAudio = createAudioBuffer(new Uint8Array(100), "wav");
+
+    expect((await sessionSmall.process(smallAudio)).skipped).toBe(true);
+    expect((await sessionLarge.process(largeAudio)).skipped).toBe(false);
   });
 });
