@@ -1,0 +1,32 @@
+{
+  "name": "@nexus/adapter-neon",
+  "version": "0.0.0",
+  "private": false,
+  "description": "NEXUS adapter for neon",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "dev": "tsc --project tsconfig.json --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "clean": "rm -rf dist coverage",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "@types/pg": "*",
+    "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "@nexus/plugin-sdk": "workspace:*",
+    "pg": "*"
+  }
+}

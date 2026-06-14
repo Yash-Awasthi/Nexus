@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: Apache-2.0
+name: k6 Load Tests
+
+on:
+  schedule:
+    - cron: "0 3 * * *" # Nightly at 03:00 UTC
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: API base URL (defaults to staging)
+        default: "https://nexus-staging.internal"
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  smoke:
+    name: Smoke test
+    runs-on: ubuntu-latest
+    if: ${{ secrets.NEXUS_STAGING_URL != '' || github.event_name == 'workflow_dispatch' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run k6 smoke test
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: infra/k6/smoke-test.js
+          flags: --env BASE_URL=${{ github.event.inputs.target_url || 'http://localhost:3000' }} --env API_KEY=${{ secrets.NEXUS_API_KEY_STAGING }}
+
+  load:
+    name: Load test (nightly only)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run k6 load test
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: infra/k6/load-test.js
+          flags: >
+            --env BASE_URL=${{ secrets.NEXUS_STAGING_URL }}
+            --env API_KEY=${{ secrets.NEXUS_API_KEY_STAGING }}
+            --vus 20 --duration 120s
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-results-${{ github.run_id }}
+          path: summary.json

@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nexus.fullname" . }}-config
+  labels:
+    {{- include "nexus.labels" . | nindent 4 }}
+data:
+  REDIS_URL: {{ .Values.global.env.REDIS_URL | quote }}
+  LOG_LEVEL: {{ .Values.global.env.LOG_LEVEL | quote }}
+  NODE_ENV: "production"
+  # Component ports — consumed by init containers and sidecars
+  API_PORT: {{ .Values.api.service.port | quote }}
+  INGEST_PORT: {{ .Values.ingest.service.port | quote }}
+  # Feature flags (override at release time via --set)
+  NEXUS_FEATURE_MEMORY: "true"
+  NEXUS_FEATURE_PIPELINE_SIGNAL: "true"

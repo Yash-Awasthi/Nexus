@@ -1,0 +1,31 @@
+{
+  "name": "@nexus/adapter-jira",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Nexus adapter for Jira Cloud — issues, search, transitions",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "dev": "tsc --project tsconfig.json --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "clean": "rm -rf dist coverage",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@nexus/plugin-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

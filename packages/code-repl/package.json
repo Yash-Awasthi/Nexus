@@ -1,0 +1,9 @@
+{
+  "name": "@nexus/code-repl",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "test": "vitest run" },
+  "devDependencies": { "vitest": "*", "typescript": "*" }
+}

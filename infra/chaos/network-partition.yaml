@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: Apache-2.0
+# chaos/network-partition.yaml
+#
+# Simulate a network partition between the ingest service and Postgres.
+# Apply:   kubectl apply -f infra/chaos/network-partition.yaml -n nexus
+# Restore: kubectl delete -f infra/chaos/network-partition.yaml -n nexus
+#
+# What it does:
+#   - Allows ingest pods to talk to everything EXCEPT Postgres (port 5432)
+#   - Ingest → Redis (6379) and Ingest → API (3000) remain intact
+#   - After ~60 s verify the queue accumulates events and drains once restored
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: chaos-ingest-postgres-partition
+  namespace: nexus
+  labels:
+    chaos: "true"
+    scenario: network-partition
+spec:
+  podSelector:
+    matchLabels:
+      app: nexus-ingest
+  policyTypes:
+    - Egress
+  egress:
+    # Allow DNS
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Allow Redis
+    - ports:
+        - port: 6379
+          protocol: TCP
+    # Allow internal API
+    - to:
+        - podSelector:
+            matchLabels:
+              app: nexus-api
+      ports:
+        - port: 3000
+          protocol: TCP
+    # Allow HTTPS (external scrapers)
+    - ports:
+        - port: 443
+          protocol: TCP
+    # Postgres (5432) intentionally omitted → partition effect

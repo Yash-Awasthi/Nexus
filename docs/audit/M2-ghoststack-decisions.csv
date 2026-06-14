@@ -1,0 +1,91 @@
+file,decision,destination,rationale
+orchestration/agent-bus.ts,MOVE,packages/runtime/src/agent-bus.ts,Agent event bus — core runtime primitive
+orchestration/agent-registry.ts,MOVE,packages/runtime/src/agent-registry.ts,Registry of adapters — needed by runtime
+orchestration/approval-workflow.ts,MOVE,packages/governance/src/approval-workflow.ts,HITL gate belongs in governance
+orchestration/browser-adapter.ts,MOVE,packages/runtime/src/browser-adapter.ts,Browser execution adapter
+orchestration/capability-policy.ts,MOVE,packages/governance/src/capability-policy.ts,Policy — governance layer
+orchestration/circuit-breaker.ts,MOVE,packages/runtime/src/circuit-breaker.ts,Resilience primitive — runtime
+orchestration/code-agent-pool.ts,MOVE,packages/runtime/src/code-agent-pool.ts,Code execution adapter
+orchestration/dependency-resolver.ts,MOVE,packages/runtime/src/dependency-resolver.ts,Task DAG resolver
+orchestration/diagnostic-api.ts,MOVE,packages/runtime/src/diagnostic-api.ts,Runtime diagnostics
+orchestration/environment-telemetry.ts,MOVE,packages/telemetry/src/environment-telemetry.ts,Telemetry — own package
+orchestration/event-bus.ts,MOVE,packages/runtime/src/event-bus.ts,IEventBus wins per ADR-0007
+orchestration/federation-health-controller.ts,MOVE,packages/runtime/src/federation-health-controller.ts,Federation topology management
+orchestration/file-queue-backend.ts,MOVE,packages/runtime/src/file-queue-backend.ts,Offline dev queue backend
+orchestration/filesystem-sandbox.ts,MOVE,packages/runtime/src/filesystem-sandbox.ts,Sandbox execution primitive
+orchestration/floci-adapter.ts,DELETE,–,ADR-0001: kill Floci
+orchestration/floci-client.ts,DELETE,–,ADR-0001: kill Floci
+orchestration/floci-extended.ts,DELETE,–,ADR-0001: kill Floci
+orchestration/floci-lambda.ts,DELETE,–,ADR-0001: kill Floci
+orchestration/floci-zip.ts,DELETE,–,ADR-0001: kill Floci
+orchestration/ghoststack-mcp-bridge.ts,MOVE,packages/runtime/src/mcp-bridge.ts,MCP server bridge
+orchestration/governance-engine.ts,MOVE,packages/governance/src/governance-engine.ts,Core governance logic
+orchestration/interfaces/discovery.interface.ts,MOVE,packages/runtime/src/interfaces/discovery.interface.ts,Contract layer
+orchestration/interfaces/environment.interface.ts,MOVE,packages/runtime/src/interfaces/environment.interface.ts,Contract layer
+orchestration/interfaces/event-store.interface.ts,MOVE,packages/runtime/src/interfaces/event-store.interface.ts,Contract layer
+orchestration/interfaces/execution.interface.ts,MOVE,packages/runtime/src/interfaces/execution.interface.ts,IExecutionAdapter — plugin SDK contract
+orchestration/interfaces/governance.interface.ts,MOVE,packages/governance/src/interfaces/governance.interface.ts,Governance contracts
+orchestration/interfaces/language-model.interface.ts,MOVE,packages/runtime/src/interfaces/language-model.interface.ts,ILanguageModel — used by planner
+orchestration/interfaces/logger.interface.ts,MOVE,packages/telemetry/src/interfaces/logger.interface.ts,Logging contract
+orchestration/interfaces/mcp.interface.ts,MOVE,packages/runtime/src/interfaces/mcp.interface.ts,MCP contracts
+orchestration/interfaces/observability.interface.ts,MOVE,packages/telemetry/src/interfaces/observability.interface.ts,Observability contracts
+orchestration/interfaces/persistence.interface.ts,MOVE,packages/runtime/src/interfaces/persistence.interface.ts,Persistence contracts
+orchestration/interfaces/queue.interface.ts,MOVE,packages/runtime/src/interfaces/queue.interface.ts,IQueueBackend — swappable
+orchestration/interfaces/workflow.interface.ts,MOVE,packages/runtime/src/interfaces/workflow.interface.ts,Workflow DSL contracts
+orchestration/language-model.ts,MOVE,packages/runtime/src/language-model.ts,Groq/Free LLM providers
+orchestration/local-inference-adapter.ts,MOVE,packages/runtime/src/local-inference-adapter.ts,Local LLM adapter
+orchestration/logger.ts,MOVE,packages/telemetry/src/logger.ts,Logger implementation
+orchestration/mcp-adapter.ts,MOVE,packages/runtime/src/mcp-adapter.ts,MCP tool executor
+orchestration/mcp-registry.ts,MOVE,packages/runtime/src/mcp-registry.ts,MCP server registry
+orchestration/memory-store.ts,MOVE,packages/runtime/src/memory-store.ts,Runtime memory (JSONL)
+orchestration/observability-manager.ts,MOVE,packages/telemetry/src/observability-manager.ts,OTel/Prometheus manager
+orchestration/path-boundary.ts,MOVE,packages/runtime/src/path-boundary.ts,Filesystem path safety
+orchestration/persistence-manager.ts,MOVE,packages/runtime/src/persistence-manager.ts,State persistence manager
+orchestration/planning-engine.ts,MOVE,packages/runtime/src/planning-engine.ts,Blueprint planner + LLM fallback
+orchestration/prometheus-format.ts,MOVE,packages/telemetry/src/prometheus-format.ts,Prometheus exposition format
+orchestration/queue-backend.ts,MOVE,packages/runtime/src/queue-backend.ts,In-memory queue backend
+orchestration/resource-enforcer.ts,MOVE,packages/governance/src/resource-enforcer.ts,Cost/resource limits — governance
+orchestration/runtime-compactor.ts,MOVE,packages/runtime/src/runtime-compactor.ts,Log compaction
+orchestration/runtime-graph.ts,MOVE,packages/runtime/src/runtime-graph.ts,DAG task graph
+orchestration/runtime-inspector.ts,MOVE,packages/runtime/src/runtime-inspector.ts,Runtime state inspector
+orchestration/runtime-manager.ts,MOVE,packages/runtime/src/runtime-manager.ts,Service lifecycle manager
+orchestration/runtime-sandbox.ts,MOVE,packages/runtime/src/runtime-sandbox.ts,Process sandbox
+orchestration/scraping-adapter.ts,MOVE,packages/runtime/src/scraping-adapter.ts,Web scraping adapter
+orchestration/security-utils.ts,MOVE,packages/runtime/src/security-utils.ts,Crypto/security helpers
+orchestration/service-discovery.ts,MOVE,packages/runtime/src/service-discovery.ts,Service mesh discovery
+orchestration/spec-loader.ts,MOVE,packages/runtime/src/spec-loader.ts,Workflow spec loader
+orchestration/task-executor.ts,MOVE,packages/runtime/src/task-executor.ts,Task execution engine
+orchestration/task-payload.ts,MOVE,packages/runtime/src/task-payload.ts,Task payload normaliser
+orchestration/task-router.ts,MOVE,packages/runtime/src/task-router.ts,Adapter routing
+orchestration/web-search-adapter.ts,MOVE,packages/runtime/src/web-search-adapter.ts,Web search adapter (Tavily)
+orchestration/web-search-engine.ts,MOVE,packages/runtime/src/web-search-engine.ts,Search engine abstraction
+orchestration/workflow-engine.ts,MOVE,packages/runtime/src/workflow-engine.ts,Workflow execution engine
+runtime/orchestrator.ts,MOVE,packages/runtime/src/orchestrator.ts,GhostStackOrchestrator.create() — main entry
+runtime/bootstrap.ts,MOVE,packages/runtime/src/bootstrap.ts,Runtime bootstrap sequence
+runtime/bridge-manager.ts,MOVE,packages/runtime/src/bridge-manager.ts,Python bridge manager
+runtime/config-loader.ts,MOVE,packages/runtime/src/config-loader.ts,Config loading
+runtime/diagnose-export.ts,MOVE,packages/runtime/src/diagnose-export.ts,Diagnostic data export
+runtime/env-loader.ts,MOVE,packages/runtime/src/env-loader.ts,Environment variable loader
+runtime/federation-supervisor.ts,MOVE,packages/runtime/src/federation-supervisor.ts,Multi-node federation
+runtime/ghoststack-config.ts,MOVE,packages/runtime/src/nexus-config.ts,Config types (renamed)
+runtime/ghoststack-server.ts,MOVE,apps/api/src/ghoststack-server.ts,HTTP server — migrates to Fastify in M6
+runtime/healthcheck.ts,MOVE,packages/runtime/src/healthcheck.ts,Health check logic
+runtime/orchestrator.ts,MOVE,packages/runtime/src/orchestrator.ts,Main orchestrator factory
+runtime/runtime-context.ts,MOVE,packages/runtime/src/runtime-context.ts,Runtime context/config
+runtime/server.ts,MOVE,apps/api/src/runtime-server.ts,Express HTTP server — migrates to Fastify in M6
+runtime/cli.ts,MOVE,apps/cli/src/runtime-cli.ts,CLI commands — migrates to @nexus/cli in M9
+runtime/adapters/manifest.ts,MOVE,packages/runtime/src/adapters/manifest.ts,Adapter manifest
+runtime/adapters/mcp-server-host.ts,MOVE,packages/runtime/src/adapters/mcp-server-host.ts,MCP server host
+runtime/benchmark-runner.ts,DELETE,–,Standalone benchmark — rewrite per-package in Vitest
+runtime/docker-compose-runner.ts,DELETE,–,Docker-specific; infra/ handles this in Nexus
+runtime/e2e-federation.ts,DELETE,–,Test file; rewrite in Vitest under packages/runtime/tests/
+runtime/bridges/local_inference_bridge.py,DELETE,–,Python bridge; rewrite as part of nexus-ingest in M4
+runtime/bridges/mcp_server_bridge.py,DELETE,–,Rewrite in nexus-ingest M4
+runtime/bridges/stealth_browser_bridge.py,DELETE,–,Rewrite in nexus-ingest M4
+runtime/bridges/web_scraping_bridge.py,DELETE,–,Rewrite in nexus-ingest M4
+runtime/mcp/ghoststack_mcp_server.py,DELETE,–,Rewrite as @nexus/api MCP endpoint in M6
+archive/quarantine/README.md,DELETE,–,Archive — dead code
+tests/,DELETE,–,Full suite; rewrite as Vitest in packages/runtime/tests/
+jest.config.js,DELETE,–,Using Vitest in Nexus
+docker/,DELETE,–,Rebuilt in infra/docker/ per ADR-0018
+docs/,DELETE,–,Content preserved in Nexus docs where relevant
