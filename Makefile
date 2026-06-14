@@ -34,14 +34,15 @@ setup: ## Generate secret keys + create .env, then install deps (idempotent — 
 	  sed -i.bak "s|NEXUS_API_KEY=.*|NEXUS_API_KEY=$$(openssl rand -hex 32)|" .env; \
 	  sed -i.bak "s|NEXUS_AUDIT_KEY=.*|NEXUS_AUDIT_KEY=$$(openssl rand -hex 32)|" .env; \
 	  sed -i.bak "s|NEXUS_INGEST_API_KEY=.*|NEXUS_INGEST_API_KEY=$$(openssl rand -hex 32)|" .env; \
+	  sed -i.bak "s|VITE_API_KEY=.*|VITE_API_KEY=$$(grep '^NEXUS_API_KEY=' .env | cut -d= -f2)|" .env; \
 	  rm -f .env.bak; \
 	  echo "✓ .env created with generated secrets:"; \
 	  printf "  NEXUS_API_KEY        = %s\n" "$$(grep '^NEXUS_API_KEY=' .env | cut -d= -f2)"; \
 	  printf "  NEXUS_AUDIT_KEY      = %s\n" "$$(grep '^NEXUS_AUDIT_KEY=' .env | cut -d= -f2)"; \
 	  printf "  NEXUS_INGEST_API_KEY = %s\n" "$$(grep '^NEXUS_INGEST_API_KEY=' .env | cut -d= -f2)"; \
+	  printf "  VITE_API_KEY         = %s (mirrored from NEXUS_API_KEY)\n" "$$(grep '^VITE_API_KEY=' .env | cut -d= -f2)"; \
 	  echo ""; \
-	  echo "Copy NEXUS_API_KEY into VITE_API_KEY in .env so the web client can authenticate."; \
-	  echo "Then: set GROQ_API_KEY + DATABASE_URL and run:"; \
+	  echo "Next: set GROQ_API_KEY + DATABASE_URL in .env, then:"; \
 	  echo "  make dev-infra && make migrate && pnpm dev"; \
 	fi
 	@command -v pnpm >/dev/null 2>&1 && pnpm install || echo "pnpm not found — run: npm install -g pnpm && pnpm install"
