@@ -1,0 +1,48 @@
+file,decision,destination,rationale
+packages/integrations/src/betterstack/index.ts,MOVE,packages/adapters/betterstack/src/integration.ts,Production SDK wrapper — keep as adapter seed
+packages/integrations/src/cloudflare/index.ts,MOVE,packages/adapters/cloudflare/src/integration.ts,Cloudflare Workers/DNS API wrapper
+packages/integrations/src/doppler/index.ts,MOVE,packages/adapters/doppler/src/integration.ts,Doppler secrets API wrapper
+packages/integrations/src/gmail/index.ts,MOVE,packages/adapters/gmail/src/integration.ts,Gmail API wrapper (Google auth)
+packages/integrations/src/googlecalendar/index.ts,MOVE,packages/adapters/calendar/src/integration.ts,Google Calendar API wrapper
+packages/integrations/src/googledrive/index.ts,MOVE,packages/adapters/drive/src/integration.ts,Google Drive API wrapper
+packages/integrations/src/groq/index.ts,MOVE,packages/adapters/groq/src/integration.ts,Groq SDK wrapper
+packages/integrations/src/linear/index.ts,MOVE,packages/adapters/linear/src/integration.ts,Linear SDK wrapper
+packages/integrations/src/neon/index.ts,MOVE,packages/adapters/neon/src/integration.ts,Neon serverless Postgres client
+packages/integrations/src/slack/index.ts,MOVE,packages/adapters/slack/src/integration.ts,Slack Web API wrapper
+packages/integrations/src/supabase/index.ts,MOVE,packages/adapters/supabase/src/integration.ts,Supabase client wrapper
+packages/integrations/src/tavily/index.ts,MOVE,packages/adapters/tavily/src/integration.ts,Tavily search API wrapper
+packages/integrations/src/vercel/index.ts,MOVE,packages/adapters/vercel/src/integration.ts,Vercel REST API wrapper
+packages/core/src/message-bus.ts,KEEP_CONCEPT,packages/runtime/src/event-bus.ts,Concept preserved; code superseded by GhostStack EventBus (ADR-0007)
+packages/core/src/state-store.ts,KEEP_CONCEPT,packages/db/src/,Concept preserved; implementation superseded by Drizzle + Neon (ADR-0002)
+packages/core/src/tool-registry.ts,KEEP_CONCEPT,packages/plugin-sdk/src/,Concept preserved; superseded by defineAdapter + capability API (ADR-0008)
+packages/core/src/types/index.ts,KEEP_CONCEPT,packages/shared/src/,Types preserved; superseded by @nexus/shared zod schemas
+packages/core/src/agent-base.ts,DELETE,–,Anthropic SDK direct-call pattern; superseded by adapter pattern
+packages/core/src/logger.ts,DELETE,–,Thin console wrapper; superseded by @nexus/telemetry logger
+packages/core/src/index.ts,DELETE,–,Barrel for deleted files
+packages/agents/analyst/src/index.ts,DELETE,–,Thin Claude wrapper; capabilities moved to @nexus/council presets + adapters
+packages/agents/calendar/src/index.ts,DELETE,–,Replaced by @nexus/adapter-calendar + council routing
+packages/agents/coder/src/index.ts,DELETE,–,Replaced by code-agent-pool in @nexus/runtime
+packages/agents/content/src/index.ts,DELETE,–,Replaced by council deliberation (content persona preset)
+packages/agents/database/src/index.ts,DELETE,–,Replaced by @nexus/adapter-neon + @nexus/adapter-supabase
+packages/agents/deploy/src/index.ts,DELETE,–,Replaced by @nexus/adapter-vercel + @nexus/adapter-cloudflare
+packages/agents/drive/src/index.ts,DELETE,–,Replaced by @nexus/adapter-drive
+packages/agents/email/src/index.ts,DELETE,–,Replaced by @nexus/adapter-gmail
+packages/agents/github/src/index.ts,DELETE,–,Replaced by @nexus/adapter-github (scaffold; GitHub SDK in M7)
+packages/agents/linear/src/index.ts,DELETE,–,Replaced by @nexus/adapter-linear
+packages/agents/memory/src/index.ts,DELETE,–,Replaced by @nexus/memory (pgvector RAG)
+packages/agents/monitor/src/index.ts,DELETE,–,Replaced by @nexus/adapter-betterstack
+packages/agents/orchestrator/src/index.ts,DELETE,–,Replaced by @nexus/runtime GhostStackOrchestrator
+packages/agents/researcher/src/index.ts,DELETE,–,Replaced by web-search-adapter + council deep-research
+packages/agents/scheduler/src/index.ts,DELETE,–,Replaced by @nexus/worker BullMQ + cron
+packages/agents/secrets/src/index.ts,DELETE,–,Replaced by @nexus/adapter-doppler
+packages/agents/slack/src/index.ts,DELETE,–,Replaced by @nexus/adapter-slack
+packages/agents/yash/src/index.ts,DELETE,–,Personal orchestrator agent; superseded by council + runtime
+packages/orchestrator/src/index.ts,DELETE,–,Simple task router; superseded by @nexus/runtime GhostStackOrchestrator
+packages/orchestrator/src/agent-registry.ts,DELETE,–,Superseded by @nexus/runtime agent-registry
+packages/orchestrator/src/task-router.ts,DELETE,–,Superseded by @nexus/runtime task-router
+apps/server/src/index.ts,DELETE,–,Thin HTTP server; superseded by @nexus/api (Fastify) in M6
+db/migrations/001_agent_state.sql,KEEP_CONCEPT,packages/db/src/,Schema concept merged into @nexus/db unified schema (M3)
+db/migrations/002_task_log.sql,KEEP_CONCEPT,packages/db/src/,Schema concept merged into @nexus/db
+db/migrations/003_message_log.sql,KEEP_CONCEPT,packages/db/src/,Schema concept merged into @nexus/db
+db/migrations/004_scheduled_tasks.sql,KEEP_CONCEPT,packages/db/src/,Schema concept merged into @nexus/db
+db/migrations/005_agent_memories.sql,KEEP_CONCEPT,packages/db/src/,Schema concept merged into @nexus/db + @nexus/memory

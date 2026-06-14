@@ -1,0 +1,14 @@
+labels: ["ideas"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Idea
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Why would this benefit NEXUS?
+    validations:
+      required: true

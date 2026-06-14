@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: Apache-2.0
+# chaos/cpu-stress.yaml
+#
+# Kubernetes Job that runs stress-ng on the cluster to simulate CPU pressure.
+# Useful for verifying HPA scale-out and circuit-breaker latency degradation.
+#
+# Apply:   kubectl apply -f infra/chaos/cpu-stress.yaml -n nexus
+# Monitor: kubectl get hpa -n nexus -w
+# Cleanup: kubectl delete job chaos-cpu-stress -n nexus
+#
+# Duration: 120 s (configurable via CPU_STRESS_TIMEOUT env var)
+# Workers:  2 CPU stressors at 100% each
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: chaos-cpu-stress
+  namespace: nexus
+  labels:
+    chaos: "true"
+    scenario: cpu-stress
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        chaos: "true"
+        scenario: cpu-stress
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: stress
+          image: alexeiled/stress-ng:latest
+          args:
+            - "--cpu"
+            - "2"
+            - "--cpu-load"
+            - "100"
+            - "--timeout"
+            - "120s"
+            - "--metrics-brief"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "64Mi"
+            limits:
+              cpu: "2000m"
+              memory: "128Mi"

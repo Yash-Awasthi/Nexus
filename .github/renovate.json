@@ -1,0 +1,29 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":dependencyDashboard", ":semanticCommits", "group:monorepos"],
+  "labels": ["dependencies"],
+  "prCreation": "not-pending",
+  "prHourlyLimit": 3,
+  "prConcurrentLimit": 10,
+  "schedule": ["before 7am on monday"],
+  "timezone": "UTC",
+  "ignorePaths": ["**/node_modules/**", "**/dist/**"],
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "automergeType": "pr",
+      "matchPackagePatterns": ["*"]
+    },
+    {
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["dependencies", "major-update"]
+    },
+    {
+      "matchPackagePatterns": ["fastify", "drizzle-orm", "bullmq"],
+      "automerge": false,
+      "labels": ["dependencies", "core-dep"]
+    }
+  ]
+}

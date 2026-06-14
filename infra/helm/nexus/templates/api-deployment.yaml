@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: Apache-2.0
+{{- if .Values.api.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nexus.fullname" . }}-api
+  labels:
+    {{- include "nexus.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  replicas: {{ .Values.api.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "nexus.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        {{- include "nexus.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: api
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: api
+          image: "{{ .Values.global.image.registry }}/{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+          imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+          ports:
+            - containerPort: 3000
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "nexus.fullname" . }}-secrets
+                  key: DATABASE_URL
+            - name: NEXUS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "nexus.fullname" . }}-secrets
+                  key: NEXUS_API_KEY
+            - name: NEXUS_AUDIT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "nexus.fullname" . }}-secrets
+                  key: NEXUS_AUDIT_KEY
+            - name: GROQ_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "nexus.fullname" . }}-secrets
+                  key: GROQ_API_KEY
+            - name: REDIS_URL
+              value: {{ .Values.global.env.REDIS_URL | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.global.env.LOG_LEVEL | quote }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+{{- end }}

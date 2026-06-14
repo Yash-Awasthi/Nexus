@@ -1,0 +1,77 @@
+# SPDX-License-Identifier: Apache-2.0
+# GhostStack Federation Compose
+#
+# Starts the complete federation stack: Floci (AWS emulator) + Redis + Postgres.
+# Used by FederationSupervisor.startFlociDocker() and `make dev-fed`.
+#
+# Usage:
+#   docker compose -f packages/runtime/docker/docker-compose.federation.yaml up -d
+#   docker compose -f packages/runtime/docker/docker-compose.federation.yaml down --remove-orphans
+
+name: ghoststack-federation
+
+services:
+  # ── Floci — lightweight AWS emulator (LocalStack-compatible) ─────────────
+  # https://github.com/floci-io/floci
+  # Exposes the full AWS wire protocol on port 4566.
+  # /_localstack/health is served for backward-compatible health checks.
+  floci:
+    image: floci/floci:latest
+    ports:
+      - "4566:4566"
+    environment:
+      FLOCI_HOSTNAME: floci
+      AWS_DEFAULT_REGION: us-east-1
+    # Floci is a JVM image — curl/wget are not present.
+    # Use the built-in TCP probe: Docker marks healthy once the port accepts connections.
+    # FederationSupervisor.waitForFloci() then does its own HTTP-level probe loop.
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/4566' 2>/dev/null && exit 0 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 15s
+    volumes:
+      - floci-data:/var/lib/floci
+    restart: unless-stopped
+
+  # ── Redis — BullMQ queue backend ─────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  # ── Postgres — primary relational store ──────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: nexus_dev_password
+      POSTGRES_DB: nexus
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus -d nexus"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  floci-data:
+  postgres-data:

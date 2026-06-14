@@ -1,0 +1,75 @@
+# SPDX-License-Identifier: Apache-2.0
+# docker-compose.ci.yml — CI/CD overrides
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f infra/docker/docker-compose.ci.yml up -d
+#
+# Differences from base:
+#   - No volume mounts (deterministic builds from image layers only)
+#   - Fixed ports (no dynamic mapping)
+#   - Tight resource limits to match CI runner specs
+#   - Health-check intervals tightened for faster startup verification
+#   - No restart policies (CI should fail fast)
+#   - No persistent volumes (fresh state per run)
+
+services:
+  api:
+    restart: "no"
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: warn
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    healthcheck:
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  worker:
+    restart: "no"
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: warn
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
+  ingest:
+    restart: "no"
+    environment:
+      LOG_LEVEL: warning
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    healthcheck:
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  postgres:
+    restart: "no"
+    tmpfs:
+      - /var/lib/postgresql/data # ephemeral — no disk I/O overhead in CI
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  redis:
+    restart: "no"
+    command: ["redis-server", "--save", ""] # disable persistence in CI
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
