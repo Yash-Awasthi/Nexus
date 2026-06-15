@@ -51,7 +51,19 @@ if (process.env.GITHUB_TOKEN) {
 }
 
 if (process.env.DATABASE_URL) {
-  registry.register(new NeonConnector({ connectionString: process.env.DATABASE_URL }));
+  try {
+    // NeonConnector expects { endpoint, database, user, password } — parse from URL.
+    const raw = process.env.DATABASE_URL.replace(/^postgres(ql)?:\/\//, "https://");
+    const u   = new URL(raw);
+    registry.register(new NeonConnector({
+      endpoint: `https://${u.host}`,
+      database: u.pathname.slice(1).split("?")[0] ?? "neondb",
+      user:     decodeURIComponent(u.username),
+      password: decodeURIComponent(u.password),
+    }));
+  } catch {
+    registry.register(new NullConnector({ id: "neon", name: "Neon DB" }));
+  }
 } else {
   registry.register(new NullConnector({ id: "neon", name: "Neon DB" }));
 }

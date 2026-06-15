@@ -136,9 +136,9 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     "/admin/stats",
     { preHandler: requireAuth },
     async (request, reply) => {
-      const stats = request.query.alias
-        ? [adminService.getStats(decodeURIComponent(request.query.alias))].filter(Boolean)
-        : adminService.allStats();
+      const stats = adminService.getStats(
+        request.query.alias ? decodeURIComponent(request.query.alias) : undefined,
+      );
       return reply.send({ stats });
     },
   );

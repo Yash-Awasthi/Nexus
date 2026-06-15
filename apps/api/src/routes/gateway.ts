@@ -117,7 +117,7 @@ const STREAM_TIMEOUT_MS = parseInt(process.env.STREAM_TIMEOUT_MS ?? "30000", 10)
 const GATEWAY_CONTEXT_BUDGET = parseInt(process.env.GATEWAY_CONTEXT_BUDGET_TOKENS ?? "32000", 10);
 
 const _gatewayPruner = new PrunerChain([
-  new SlidingWindowPruner({ tokenizer: new NaiveTokenizer() }),
+  new SlidingWindowPruner(new NaiveTokenizer()),
 ]);
 
 // ── Gateway-log (KV-backed, cross-pod safe) ───────────────────────────────────
@@ -163,17 +163,17 @@ const _toolRegistry: ToolRegistry = createDefaultRegistry({
     : undefined,
 });
 
-function pruneGatewayMessages(
+async function pruneGatewayMessages(
   opts: LlmRequestOptions,
   reserveTokens: number,
-): LlmRequestOptions {
+): Promise<LlmRequestOptions> {
   const budget = GATEWAY_CONTEXT_BUDGET - Math.max(0, reserveTokens);
   if (budget <= 0) return opts;
   const input: PrunerMessage[] = opts.messages.map((m) => ({
     role: m.role as PrunerMessage["role"],
     content: m.content,
   }));
-  const result = _gatewayPruner.prune(input, budget);
+  const result = await _gatewayPruner.prune(input, budget);
   if (result.prunedCount === 0) return opts; // no change — return original
   return {
     ...opts,
@@ -372,7 +372,7 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
 
     // Prune message history to fit the context window before dispatching.
     // No-op when the thread is short; drops oldest non-system messages when long.
-    const opts = pruneGatewayMessages(
+    const opts = await pruneGatewayMessages(
       toDriverRequest(request.body, resolvedModel),
       request.body.max_tokens ?? 4096,
     );
