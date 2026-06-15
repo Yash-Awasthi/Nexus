@@ -27,6 +27,8 @@ import Fastify, {
 } from "fastify";
 
 import { adminRoutes } from "./routes/admin.js";
+import { parseltongueRoutes } from "./routes/parseltongue.js";
+import { metricsRoutes } from "./routes/metrics.js";
 import { auditRoutes } from "./routes/audit.js";
 import { billingRoutes } from "./routes/billing.js";
 import { agentsRoutes } from "./routes/agents.js";
@@ -98,10 +100,36 @@ export async function buildServer(): Promise<FastifyInstance> {
           ? { target: "pino-pretty", options: { colorize: true } }
           : undefined,
     },
+    // Unique request ID on every incoming request — propagated through Pino logs.
+    // Format: nexus-<timestamp-hex>-<random-6>
+    genReqId: () =>
+      `nexus-${Date.now().toString(16)}-${Math.random().toString(36).slice(2, 8)}`,
   });
 
   // ── Plugins ───────────────────────────────────────────────────────────────
-  await app.register(helmet, { contentSecurityPolicy: false });
+  // CSP: strict policy for the web app; report-only in dev (NEXUS_CSP_REPORT_ONLY=true)
+  const cspDirectives = {
+    defaultSrc:     ["'self'"],
+    scriptSrc:      ["'self'", "'strict-dynamic'"],
+    styleSrc:       ["'self'", "'unsafe-inline'"],
+    imgSrc:         ["'self'", "data:", "blob:"],
+    connectSrc:     ["'self'", ...(process.env.ALLOWED_ORIGINS?.split(",") ?? [])],
+    fontSrc:        ["'self'"],
+    objectSrc:      ["'none'"],
+    baseUri:        ["'self'"],
+    frameAncestors: ["'none'"],
+    ...(process.env.NODE_ENV === "production" ? { upgradeInsecureRequests: [] as string[] } : {}),
+  };
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      useDefaults:        false,
+      directives:         cspDirectives,
+      reportOnly:         process.env.NEXUS_CSP_REPORT_ONLY === "true",
+    },
+    hsts:        process.env.NODE_ENV === "production" ? { maxAge: 31536000, includeSubDomains: true } : false,
+    frameguard:  { action: "deny" },
+    noSniff:     true,
+  });
   await app.register(cors, {
     origin: process.env.ALLOWED_ORIGINS?.split(",") ?? true,
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
@@ -128,6 +156,15 @@ export async function buildServer(): Promise<FastifyInstance> {
       span.setAttribute("http.status_code", reply.statusCode);
       span.end({ status: reply.statusCode >= 500 ? "error" : "ok" });
     }
+
+    // SLO tracking: record every response for availability + error rate computation
+    try {
+      const { sloTracker } = await import("./routes/metrics.js");
+      sloTracker.record({
+        success:    reply.statusCode < 500,
+        latencyMs:  reply.elapsedTime ?? 0,
+      });
+    } catch { /* metrics not yet loaded */ }
 
     // PostHog analytics — fire-and-forget on successful mutations
     if (request.method === "POST" && reply.statusCode === 201) {
@@ -209,6 +246,10 @@ export async function buildServer(): Promise<FastifyInstance> {
       await api.register(llmRoutes);
       await api.register(evalsRoutes);
       await api.register(scenarioPlannerRoutes);
+
+      // Y — parseltongue obfuscation + Prometheus metrics
+      await api.register(parseltongueRoutes);
+      await api.register(metricsRoutes);
     },
     { prefix: "/api/v1" },
   );

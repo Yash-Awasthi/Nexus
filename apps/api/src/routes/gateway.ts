@@ -53,10 +53,20 @@ import {
 import { ToolRegistry, createDefaultRegistry } from "@nexus/tool-registry";
 import { globalHooks } from "@nexus/hooks";
 import { KVTokenBudget, BudgetExceededError } from "@nexus/token-budget";
+import { RunCostTracker, InMemoryRunCostStore } from "@nexus/run-cost";
+import { globalTierGate, makeTierGatePreHandler } from "@nexus/tier-gate";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
+import { getTierFromRequest } from "../middleware/auth.js";
 import { getSharedKV } from "../lib/shared-kv.js";
+
+// ── Run-cost tracker (per-gateway-call USD accounting) ────────────────────────
+// Records inputTokens + outputTokens per completion; exposes GET /gateway/cost-report.
+// Upgrade path: swap InMemoryRunCostStore for PgRunCostStore when DATABASE_URL set.
+
+export const _costStore   = new InMemoryRunCostStore();
+export const costTracker  = new RunCostTracker({ store: _costStore });
 
 // ── Token budget (RPM limiting per identity) ──────────────────────────────────
 // GATEWAY_RPM_LIMIT (default 60) requests per 60-second sliding window.
@@ -502,6 +512,18 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
         identity:  _logIdent,
       }).catch(() => {});
 
+      // Run-cost accounting (fire-and-forget)
+      try {
+        const runId = costTracker.startRun(`gw-${resolvedModel}`);
+        costTracker.recordStep(runId, {
+          step:         "completion",
+          model:        resolvedModel,
+          inputTokens:  response.usage.inputTokens,
+          outputTokens: response.usage.outputTokens,
+        });
+        costTracker.endRun(runId);
+      } catch { /* non-fatal */ }
+
       globalHooks.emit("task.after", {
         taskId:      `gw-${_logStart}`,
         taskType:    "gateway.completion",
@@ -589,7 +611,9 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
       params?:   UltraplinianSamplingParams;
       stream?:   boolean;
     };
-  }>("/gateway/race", { preHandler: requireAuth }, async (request, reply) => {
+  }>("/gateway/race", {
+    preHandler: [requireAuth, makeTierGatePreHandler({ feature: "ultraplinian", getTier: getTierFromRequest })],
+  }, async (request, reply) => {
     if (!_ultraRunner) {
       return reply.code(503).send({
         error: "ultraplinian_unavailable",
@@ -654,5 +678,32 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
     if (!name) return reply.code(400).send({ error: "name is required" });
     const result = await _toolRegistry.invoke(name, input);
     return reply.code(result.success ? 200 : 422).send(result);
+  });
+
+  /**
+   * GET /gateway/cost-report
+   *
+   * Returns aggregate USD cost + token breakdown for all completed runs since
+   * the last process restart.  Replace InMemoryRunCostStore with a Pg-backed
+   * store for persistent cross-restart reporting.
+   */
+  app.get("/gateway/cost-report", { preHandler: requireAuth }, async (_request, reply) => {
+    const runs        = await _costStore.list();
+    const totalUsd    = runs.reduce((s, r) => s + r.steps.reduce((a, st) => a + (st.costUsd     ?? 0), 0), 0);
+    const totalTokens = runs.reduce((s, r) => s + r.steps.reduce((a, st) => a + (st.totalTokens ?? 0), 0), 0);
+    return reply.send({
+      totalRuns:    runs.length,
+      totalUsd:     Math.round(totalUsd * 1_000_000) / 1_000_000,
+      totalTokens,
+      runs:         runs.slice(0, 200).map((r) => ({
+        runId:       r.runId,
+        label:       r.label,
+        startedAt:   r.startedAt,
+        endedAt:     r.endedAt,
+        totalUsd:    r.steps.reduce((a, st) => a + (st.costUsd     ?? 0), 0),
+        totalTokens: r.steps.reduce((a, st) => a + (st.totalTokens ?? 0), 0),
+        steps:       r.steps.length,
+      })),
+    });
   });
 }
