@@ -16,7 +16,7 @@
 import { GatewayAdminService } from "@nexus/admin-gateway";
 import type { FastifyInstance } from "fastify";
 
-import { DRIVER_ALIASES } from "./gateway.js";
+import { DRIVER_ALIASES, gatewayLog } from "./gateway.js";
 import { requireAuth } from "../middleware/auth.js";
 
 // ── Singleton admin service ───────────────────────────────────────────────────
@@ -131,6 +131,48 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   /** GET /admin/settings */
   app.get("/admin/settings", { preHandler: requireAuth }, async (_req, reply) => {
     return reply.send({ settings: adminSettings });
+  });
+
+  /**
+   * GET /admin/traces?provider=&model=&status=&limit=&since=&before=
+   *
+   * Query the gateway request log (MemoryGatewayLog circular buffer, 10 k entries).
+   * Results are returned most-recent first.
+   */
+  app.get<{
+    Querystring: {
+      provider?: string;
+      model?:    string;
+      status?:   "success" | "error" | "cached";
+      limit?:    string;
+      since?:    string;
+      before?:   string;
+      identity?: string;
+    };
+  }>("/admin/traces", { preHandler: requireAuth }, async (request, reply) => {
+    const { provider, model, status, limit, since, before, identity } = request.query;
+    const entries = await gatewayLog.query({
+      provider,
+      model,
+      status,
+      identity,
+      limit:  limit  ? Math.min(parseInt(limit,  10), 1000) : 100,
+      since:  since  ? parseInt(since,  10) : undefined,
+      before: before ? parseInt(before, 10) : undefined,
+    });
+    return reply.send({ entries, total: entries.length });
+  });
+
+  /** GET /admin/traces/stats — aggregate stats for the logged requests */
+  app.get("/admin/traces/stats", { preHandler: requireAuth }, async (_request, reply) => {
+    const [stats, count] = await Promise.all([gatewayLog.stats(), gatewayLog.count()]);
+    return reply.send({ ...stats, total: count });
+  });
+
+  /** DELETE /admin/traces — flush the circular buffer */
+  app.delete("/admin/traces", { preHandler: requireAuth }, async (_request, reply) => {
+    await gatewayLog.clear();
+    return reply.code(204).send();
   });
 
   /** POST /admin/settings — partial update */

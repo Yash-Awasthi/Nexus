@@ -43,6 +43,14 @@ import {
 } from "@nexus/context-pruner";
 import { ThinkTagParser } from "@nexus/think-parser";
 import { StreamRecoveryOrchestrator } from "@nexus/stream-recovery";
+import { MemoryGatewayLog } from "@nexus/gateway-log";
+import {
+  UltraplinianRunner,
+  type SpeedTier,
+  type UltraplinianMessage,
+  type SamplingParams as UltraplinianSamplingParams,
+} from "@nexus/ultraplinian";
+import { ToolRegistry, createDefaultRegistry } from "@nexus/tool-registry";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
@@ -68,6 +76,45 @@ const GATEWAY_CONTEXT_BUDGET = parseInt(process.env.GATEWAY_CONTEXT_BUDGET_TOKEN
 const _gatewayPruner = new PrunerChain([
   new SlidingWindowPruner({ tokenizer: new NaiveTokenizer() }),
 ]);
+
+// ── Gateway-log (circular buffer, 10 k entries) ───────────────────────────────
+// Exported so admin.ts can expose /admin/traces without coupling to server state.
+export const gatewayLog = new MemoryGatewayLog({ maxEntries: 10_000 });
+
+// ── Ultraplinian runner ────────────────────────────────────────────────────────
+// Activated when OPENROUTER_API_KEY is set; otherwise POST /gateway/race → 503.
+const _ultraRunner = process.env.OPENROUTER_API_KEY
+  ? new UltraplinianRunner({ apiKey: process.env.OPENROUTER_API_KEY })
+  : null;
+
+// ── Tool registry ──────────────────────────────────────────────────────────────
+// Pre-loaded with all built-in tools; Tavily web_search wired when key present.
+const _toolRegistry: ToolRegistry = createDefaultRegistry({
+  web_search: process.env.TAVILY_API_KEY
+    ? async (input) => {
+        const i = input as { query: string; maxResults?: number };
+        const resp = await fetch("https://api.tavily.com/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            api_key:     process.env.TAVILY_API_KEY,
+            query:       i.query,
+            max_results: i.maxResults ?? 5,
+          }),
+        });
+        const data = await resp.json() as {
+          results?: Array<{ title: string; url: string; content: string }>;
+        };
+        return {
+          results: (data.results ?? []).map((r) => ({
+            title:   r.title,
+            url:     r.url,
+            snippet: r.content,
+          })),
+        };
+      }
+    : undefined,
+});
 
 function pruneGatewayMessages(
   opts: LlmRequestOptions,
@@ -270,6 +317,9 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
       request.body.max_tokens ?? 4096,
     );
 
+    const _logStart  = Date.now();
+    const _logIdent  = (request.headers.authorization as string | undefined)?.slice(7, 27) ?? "anon";
+
     // ── Streaming branch ────────────────────────────────────────────────────
     if (request.body.stream) {
       reply.hijack();
@@ -325,6 +375,15 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
             writeEvent({ type: "message_stop" });
             if (!raw.destroyed) raw.write("data: [DONE]\n\n");
             if (!raw.destroyed) raw.end();
+            gatewayLog.append({
+              timestamp: _logStart,
+              model:     resolvedModel,
+              provider:  providerName,
+              status:    "success",
+              latencyMs: Date.now() - _logStart,
+              usage:     usage ? { inputTokens: usage.inputTokens ?? 0, outputTokens: usage.outputTokens ?? 0 } : undefined,
+              identity:  _logIdent,
+            }).catch(() => {});
           } else {
             // Feed through think-parser; only emit TEXT chunks to client
             for (const chunk of parser.feed(delta)) {
@@ -369,6 +428,15 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
         });
         if (!raw.destroyed) raw.write("data: [DONE]\n\n");
         if (!raw.destroyed) raw.end();
+        gatewayLog.append({
+          timestamp:    _logStart,
+          model:        resolvedModel,
+          provider:     providerName,
+          status:       "error",
+          latencyMs:    Date.now() - _logStart,
+          errorMessage: (err as Error).message ?? "Stream interrupted",
+          identity:     _logIdent,
+        }).catch(() => {});
       }
 
       return; // hijacked — Fastify must not touch reply after this
@@ -377,6 +445,16 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
     // ── Non-streaming branch (existing behaviour) ───────────────────────────
     try {
       const response = await driver.complete(opts);
+
+      gatewayLog.append({
+        timestamp: _logStart,
+        model:     resolvedModel,
+        provider:  providerName,
+        status:    "success",
+        latencyMs: Date.now() - _logStart,
+        usage:     { inputTokens: response.usage.inputTokens, outputTokens: response.usage.outputTokens },
+        identity:  _logIdent,
+      }).catch(() => {});
 
       return reply.code(200).send({
         id: response.id,
@@ -393,6 +471,15 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
     } catch (err: unknown) {
       const e = err as { code?: string; statusCode?: number; message?: string };
       const statusCode = e.statusCode && e.statusCode >= 400 ? e.statusCode : 502;
+      gatewayLog.append({
+        timestamp:    _logStart,
+        model:        resolvedModel,
+        provider:     providerName,
+        status:       "error",
+        latencyMs:    Date.now() - _logStart,
+        errorMessage: e.message ?? "Upstream provider error",
+        identity:     _logIdent,
+      }).catch(() => {});
       return reply.code(statusCode).send({
         type: "error",
         error: {
@@ -418,5 +505,95 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
       available: registry.has(target.provider),
     }));
     return reply.send({ models, providers: registry.list() });
+  });
+
+  /**
+   * POST /gateway/race
+   *
+   * ULTRAPLINIAN — races N models in parallel (via OpenRouter) and returns the
+   * winner scored on substance/directness/completeness.
+   *
+   * Body:
+   *   tier      — "fast" | "standard" | "smart" | "power" | "ultra" (default: "fast")
+   *   messages  — chat messages [{ role, content }]
+   *   models    — override model list (bypasses tier)
+   *   params    — sampling params (temperature, max_tokens, …)
+   *   stream    — if true, returns text/event-stream with result + [DONE]
+   *
+   * Requires OPENROUTER_API_KEY; returns 503 if not configured.
+   */
+  app.post<{
+    Body: {
+      tier?:     SpeedTier;
+      messages:  UltraplinianMessage[];
+      models?:   string[];
+      params?:   UltraplinianSamplingParams;
+      stream?:   boolean;
+    };
+  }>("/gateway/race", { preHandler: requireAuth }, async (request, reply) => {
+    if (!_ultraRunner) {
+      return reply.code(503).send({
+        error: "ultraplinian_unavailable",
+        message: "OPENROUTER_API_KEY is not configured",
+      });
+    }
+
+    const { tier = "fast", messages, models, params, stream = false } = request.body;
+
+    if (stream) {
+      reply.hijack();
+      const raw = reply.raw;
+      raw.writeHead(200, SSE_HEADERS);
+      const writeEvent = (d: unknown) => {
+        if (!raw.destroyed) raw.write(`data: ${JSON.stringify(d)}\n\n`);
+      };
+      try {
+        const result = await _ultraRunner.race({ tier, messages, models, params });
+        writeEvent({ type: "result", ...result });
+      } catch (err) {
+        writeEvent({ type: "error", message: (err instanceof Error ? err.message : String(err)) });
+      }
+      if (!raw.destroyed) { raw.write("data: [DONE]\n\n"); raw.end(); }
+      return;
+    }
+
+    try {
+      const result = await _ultraRunner.race({ tier, messages, models, params });
+      return reply.send(result);
+    } catch (err) {
+      return reply.code(502).send({
+        error: "race_failed",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  });
+
+  /**
+   * GET /gateway/tools
+   *
+   * List all registered tools in LLM function-calling schema format.
+   */
+  app.get("/gateway/tools", { preHandler: requireAuth }, async (_request, reply) => {
+    return reply.send({
+      tools: _toolRegistry.toLlmTools(),
+      total: _toolRegistry.size(),
+    });
+  });
+
+  /**
+   * POST /gateway/tools/invoke
+   *
+   * Invoke a registered tool by name.
+   * Body: { name: string, input: unknown }
+   *
+   * Returns ToolResult { tool, success, output?, error?, durationMs }.
+   */
+  app.post<{
+    Body: { name: string; input?: unknown };
+  }>("/gateway/tools/invoke", { preHandler: requireAuth }, async (request, reply) => {
+    const { name, input = {} } = request.body;
+    if (!name) return reply.code(400).send({ error: "name is required" });
+    const result = await _toolRegistry.invoke(name, input);
+    return reply.code(result.success ? 200 : 422).send(result);
   });
 }
