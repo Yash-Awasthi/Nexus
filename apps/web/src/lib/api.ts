@@ -454,6 +454,16 @@ export const api = {
 
   billingRevokeKey: (id: string) => request<void>("DELETE", `/api/v1/billing/keys/${id}`),
 
+  /** Create a Stripe Checkout session — caller must redirect to returned url. */
+  billingCheckout: (plan: "pro" | "enterprise", opts?: { successUrl?: string; cancelUrl?: string }) =>
+    request<{ sessionId: string; url: string }>(
+      "POST", "/api/v1/billing/checkout", { plan, ...opts },
+    ),
+
+  /** Create a Stripe Customer Portal session — caller must redirect to returned url. */
+  billingPortal: (returnUrl?: string) =>
+    request<{ url: string }>("POST", "/api/v1/billing/portal", { returnUrl }),
+
   billingQuota: () =>
     request<{ allowed: boolean; reason?: string; tokensRemaining?: number }>(
       "GET", "/api/v1/billing/quota",

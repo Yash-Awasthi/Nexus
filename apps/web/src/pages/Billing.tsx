@@ -65,6 +65,9 @@ export default function Billing() {
   const [stats, setStats] = useState<UsageStat[]>([]);
   const [period, setPeriod] = useState<BillingPeriod | null>(null);
   const [loading, setLoading] = useState(true);
+  const [checkoutLoading, setCheckoutLoading] = useState<"pro" | "enterprise" | null>(null);
+  const [portalLoading, setPortalLoading]     = useState(false);
+  const [actionError, setActionError]         = useState<string | null>(null);
 
   useEffect(() => {
     Promise.allSettled([
@@ -87,6 +90,30 @@ export default function Billing() {
       });
     }).finally(() => setLoading(false));
   }, []);
+
+  const startCheckout = async (targetPlan: "pro" | "enterprise") => {
+    setCheckoutLoading(targetPlan);
+    setActionError(null);
+    try {
+      const res = await api.post<{ url: string }>("/billing/checkout", { plan: targetPlan });
+      window.location.href = res.url;
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Checkout failed");
+      setCheckoutLoading(null);
+    }
+  };
+
+  const openPortal = async () => {
+    setPortalLoading(true);
+    setActionError(null);
+    try {
+      const res = await api.post<{ url: string }>("/billing/portal", {});
+      window.location.href = res.url;
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Portal unavailable");
+      setPortalLoading(false);
+    }
+  };
 
   if (loading) return <p style={{ color: "#64748b" }}>Loading billing info…</p>;
 
@@ -126,6 +153,73 @@ export default function Billing() {
           )}
         </div>
       )}
+
+      {/* Plan upgrade + portal */}
+      <div style={{ ...s.section, marginBottom: 20 }}>
+        <div style={s.sectionTitle}>Manage Subscription</div>
+        {actionError && (
+          <div style={{ color: "#f87171", fontSize: 13, marginBottom: 12 }}>⚠ {actionError}</div>
+        )}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {plan?.tier === "free" && (
+            <>
+              <button
+                onClick={() => void startCheckout("pro")}
+                disabled={checkoutLoading !== null}
+                style={{
+                  background:  checkoutLoading === "pro" ? "#334155" : "#7c3aed",
+                  border:      "none",
+                  borderRadius: 8,
+                  color:       "#fff",
+                  cursor:      checkoutLoading ? "wait" : "pointer",
+                  fontSize:    13,
+                  fontWeight:  600,
+                  padding:     "10px 18px",
+                  transition:  "background 0.15s",
+                }}
+              >
+                {checkoutLoading === "pro" ? "Redirecting…" : "Upgrade to Pro — $29/mo"}
+              </button>
+              <button
+                onClick={() => void startCheckout("enterprise")}
+                disabled={checkoutLoading !== null}
+                style={{
+                  background:  checkoutLoading === "enterprise" ? "#334155" : "#1e1b4b",
+                  border:      "1px solid #4338ca",
+                  borderRadius: 8,
+                  color:       "#a5b4fc",
+                  cursor:      checkoutLoading ? "wait" : "pointer",
+                  fontSize:    13,
+                  fontWeight:  600,
+                  padding:     "10px 18px",
+                  transition:  "background 0.15s",
+                }}
+              >
+                {checkoutLoading === "enterprise" ? "Redirecting…" : "Upgrade to Enterprise — $199/mo"}
+              </button>
+            </>
+          )}
+          {plan && plan.tier !== "free" && (
+            <button
+              onClick={() => void openPortal()}
+              disabled={portalLoading}
+              style={{
+                background:  portalLoading ? "#334155" : "#161b27",
+                border:      "1px solid #1e2535",
+                borderRadius: 8,
+                color:       "#94a3b8",
+                cursor:      portalLoading ? "wait" : "pointer",
+                fontSize:    13,
+                fontWeight:  600,
+                padding:     "10px 18px",
+                transition:  "background 0.15s",
+              }}
+            >
+              {portalLoading ? "Opening…" : "Manage Subscription →"}
+            </button>
+          )}
+        </div>
+      </div>
 
       <div style={s.section}>
         <div style={s.sectionTitle}>Usage by Alias</div>

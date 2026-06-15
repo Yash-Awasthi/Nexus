@@ -233,6 +233,186 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
+  // ── Stripe Checkout + Portal ──────────────────────────────────────────────
+
+  /**
+   * POST /billing/checkout
+   *
+   * Creates a Stripe Checkout Session for upgrading to the requested plan.
+   * Returns { url } — the frontend must redirect to it.
+   *
+   * Body: { plan: "pro" | "enterprise"; successUrl?: string; cancelUrl?: string }
+   */
+  app.post<{
+    Body: {
+      plan:       "pro" | "enterprise";
+      successUrl?: string;
+      cancelUrl?:  string;
+    };
+  }>(
+    "/billing/checkout",
+    {
+      preHandler: requireAuth,
+      schema: {
+        body: {
+          type: "object",
+          required: ["plan"],
+          properties: {
+            plan:       { type: "string", enum: ["pro", "enterprise"] },
+            successUrl: { type: "string", format: "uri" },
+            cancelUrl:  { type: "string", format: "uri" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const stripeKey = process.env.STRIPE_SECRET_KEY;
+      if (!stripeKey) {
+        return reply.code(503).send({ error: "Stripe not configured — set STRIPE_SECRET_KEY" });
+      }
+
+      // Price IDs from env (set in Stripe dashboard → Product catalog)
+      const priceIds: Record<"pro" | "enterprise", string | undefined> = {
+        pro:        process.env.STRIPE_PRICE_PRO,
+        enterprise: process.env.STRIPE_PRICE_ENTERPRISE,
+      };
+      const priceId = priceIds[request.body.plan];
+      if (!priceId) {
+        return reply.code(503).send({
+          error: `STRIPE_PRICE_${request.body.plan.toUpperCase()} env var not set`,
+        });
+      }
+
+      const origin = process.env.OAUTH_REDIRECT_BASE_URL ?? "http://localhost:5173";
+      const successUrl = request.body.successUrl ?? `${origin}/billing?session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl  = request.body.cancelUrl  ?? `${origin}/billing`;
+
+      try {
+        // Lightweight Stripe REST call — no SDK dependency needed
+        const body = new URLSearchParams({
+          "mode":                             "subscription",
+          "line_items[0][price]":             priceId,
+          "line_items[0][quantity]":          "1",
+          "success_url":                      successUrl,
+          "cancel_url":                       cancelUrl,
+          "allow_promotion_codes":            "true",
+          "billing_address_collection":       "auto",
+          "customer_email":                   (request.nexusUserId ?? ""),
+          "subscription_data[metadata][plan]": request.body.plan,
+          "subscription_data[metadata][userId]": request.nexusUserId ?? "anon",
+        });
+
+        const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+          method:  "POST",
+          headers: {
+            Authorization:  `Bearer ${stripeKey}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: body.toString(),
+        });
+
+        if (!res.ok) {
+          const err = await res.json() as { error?: { message?: string } };
+          return reply.code(502).send({
+            error: `Stripe error: ${err.error?.message ?? res.statusText}`,
+          });
+        }
+
+        const session = await res.json() as { id: string; url: string };
+        return reply.send({ sessionId: session.id, url: session.url });
+      } catch (err: unknown) {
+        const e = err as { message?: string };
+        return reply.code(500).send({ error: e.message ?? "Checkout session creation failed" });
+      }
+    },
+  );
+
+  /**
+   * POST /billing/portal
+   *
+   * Creates a Stripe Customer Portal session for managing subscriptions.
+   * Requires the user's Stripe customer ID (looked up from DB via userId).
+   * Returns { url } — the frontend must redirect to it.
+   *
+   * Body: { returnUrl?: string }
+   */
+  app.post<{ Body: { returnUrl?: string } }>(
+    "/billing/portal",
+    {
+      preHandler: requireAuth,
+      schema: {
+        body: {
+          type: "object",
+          properties: {
+            returnUrl: { type: "string", format: "uri" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const stripeKey = process.env.STRIPE_SECRET_KEY;
+      if (!stripeKey) {
+        return reply.code(503).send({ error: "Stripe not configured — set STRIPE_SECRET_KEY" });
+      }
+
+      const origin = process.env.OAUTH_REDIRECT_BASE_URL ?? "http://localhost:5173";
+      const returnUrl = request.body.returnUrl ?? `${origin}/billing`;
+
+      // Resolve Stripe customer ID from DB
+      let customerId: string | undefined;
+      if (DB_AVAILABLE && request.nexusUserId) {
+        try {
+          const { db } = await import("@nexus/db");
+          const { users } = await import("@nexus/db/schema");
+          const { eq } = await import("drizzle-orm");
+          const [row] = await db
+            .select({ stripeCustomerId: users.stripeCustomerId })
+            .from(users)
+            .where(eq(users.id, request.nexusUserId))
+            .limit(1);
+          customerId = row?.stripeCustomerId ?? undefined;
+        } catch {
+          // DB lookup failed — fall through to 503
+        }
+      }
+
+      if (!customerId) {
+        return reply.code(404).send({
+          error: "No Stripe customer linked to this account. Complete a checkout first.",
+        });
+      }
+
+      try {
+        const body = new URLSearchParams({
+          customer:   customerId,
+          return_url: returnUrl,
+        });
+
+        const res = await fetch("https://api.stripe.com/v1/billing_portal/sessions", {
+          method:  "POST",
+          headers: {
+            Authorization:  `Bearer ${stripeKey}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: body.toString(),
+        });
+
+        if (!res.ok) {
+          const err = await res.json() as { error?: { message?: string } };
+          return reply.code(502).send({
+            error: `Stripe error: ${err.error?.message ?? res.statusText}`,
+          });
+        }
+
+        const session = await res.json() as { url: string };
+        return reply.send({ url: session.url });
+      } catch (err: unknown) {
+        const e = err as { message?: string };
+        return reply.code(500).send({ error: e.message ?? "Portal session creation failed" });
+      }
+    },
+  );
+
   /** POST /billing/webhook/stripe */
   app.post(
     "/billing/webhook/stripe",
