@@ -15,6 +15,7 @@
 
 export type JsonSchemaType = "string" | "number" | "integer" | "boolean" | "array" | "object" | "null";
 
+/** Json schema interface definition. */
 export interface JsonSchema {
   type?: JsonSchemaType | JsonSchemaType[];
   description?: string;
@@ -40,6 +41,7 @@ export interface ToolDefinition<TInput = unknown, TOutput = unknown> {
   handler: (input: TInput, ctx?: ToolContext) => Promise<TOutput>;
 }
 
+/** Tool context interface definition. */
 export interface ToolContext {
   sessionId?: string;
   userId?: string;
@@ -47,6 +49,7 @@ export interface ToolContext {
   [key: string]: unknown;
 }
 
+/** Tool result interface definition. */
 export interface ToolResult<T = unknown> {
   tool: string;
   success: boolean;
@@ -136,18 +139,21 @@ export interface WebSearchInput {
   maxResults?: number;
   freshness?: "day" | "week" | "month" | "any";
 }
+/** Web search output interface definition. */
 export interface WebSearchOutput {
   results: Array<{ title: string; url: string; snippet: string }>;
   query: string;
   totalResults?: number;
 }
 
+/** Github read file input interface definition. */
 export interface GithubReadFileInput {
   owner: string;
   repo: string;
   path: string;
   ref?: string; // branch/tag/commit
 }
+/** Github read file output interface definition. */
 export interface GithubReadFileOutput {
   content: string;
   encoding: string;
@@ -156,6 +162,7 @@ export interface GithubReadFileOutput {
   path: string;
 }
 
+/** Papers search input interface definition. */
 export interface PapersSearchInput {
   query: string;
   maxResults?: number;
@@ -163,6 +170,7 @@ export interface PapersSearchInput {
   yearFrom?: number;
   yearTo?: number;
 }
+/** Papers search output interface definition. */
 export interface PapersSearchOutput {
   papers: Array<{
     paperId: string;
@@ -175,23 +183,27 @@ export interface PapersSearchOutput {
   }>;
 }
 
+/** Dataset input interface definition. */
 export interface DatasetInput {
   name: string;
   split?: "train" | "validation" | "test";
   maxRows?: number;
   columns?: string[];
 }
+/** Dataset output interface definition. */
 export interface DatasetOutput {
   rows: Record<string, unknown>[];
   totalRows: number;
   schema: Record<string, string>;
 }
 
+/** Sandbox input interface definition. */
 export interface SandboxInput {
   language: "python" | "r" | "julia";
   code: string;
   timeoutMs?: number;
 }
+/** Sandbox output interface definition. */
 export interface SandboxOutput {
   stdout: string;
   stderr: string;
@@ -199,22 +211,26 @@ export interface SandboxOutput {
   durationMs: number;
 }
 
+/** Plan input interface definition. */
 export interface PlanInput {
   goal: string;
   context?: string;
   maxSteps?: number;
 }
+/** Plan output interface definition. */
 export interface PlanOutput {
   steps: Array<{ step: number; description: string; tools?: string[] }>;
   estimatedTurns: number;
 }
 
+/** Notify input interface definition. */
 export interface NotifyInput {
   channel: "email" | "slack" | "webhook" | "log";
   subject: string;
   body: string;
   recipient?: string;
 }
+/** Notify output interface definition. */
 export interface NotifyOutput {
   sent: boolean;
   channel: string;
@@ -258,6 +274,7 @@ export function createWebSearchTool(handler?: ToolHandlerMap["web_search"]): Too
   };
 }
 
+/** Create github read file tool. */
 export function createGithubReadFileTool(handler?: ToolHandlerMap["github_read_file"]): ToolDefinition<GithubReadFileInput, GithubReadFileOutput> {
   return {
     name: "github_read_file",
@@ -276,6 +293,7 @@ export function createGithubReadFileTool(handler?: ToolHandlerMap["github_read_f
   };
 }
 
+/** Create papers tool. */
 export function createPapersTool(handler?: ToolHandlerMap["papers"]): ToolDefinition<PapersSearchInput, PapersSearchOutput> {
   return {
     name: "papers",
@@ -295,6 +313,7 @@ export function createPapersTool(handler?: ToolHandlerMap["papers"]): ToolDefini
   };
 }
 
+/** Create dataset tool. */
 export function createDatasetTool(handler?: ToolHandlerMap["dataset"]): ToolDefinition<DatasetInput, DatasetOutput> {
   return {
     name: "dataset",
@@ -313,6 +332,7 @@ export function createDatasetTool(handler?: ToolHandlerMap["dataset"]): ToolDefi
   };
 }
 
+/** Create sandbox tool. */
 export function createSandboxTool(handler?: ToolHandlerMap["sandbox"]): ToolDefinition<SandboxInput, SandboxOutput> {
   return {
     name: "sandbox",
@@ -330,6 +350,7 @@ export function createSandboxTool(handler?: ToolHandlerMap["sandbox"]): ToolDefi
   };
 }
 
+/** Create plan tool. */
 export function createPlanTool(handler?: ToolHandlerMap["plan"]): ToolDefinition<PlanInput, PlanOutput> {
   return {
     name: "plan",
@@ -347,6 +368,7 @@ export function createPlanTool(handler?: ToolHandlerMap["plan"]): ToolDefinition
   };
 }
 
+/** Create notify tool. */
 export function createNotifyTool(handler?: ToolHandlerMap["notify"]): ToolDefinition<NotifyInput, NotifyOutput> {
   return {
     name: "notify",

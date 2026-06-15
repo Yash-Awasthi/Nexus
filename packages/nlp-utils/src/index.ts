@@ -36,8 +36,10 @@ export interface TextChunk {
   tokenEstimate: number;
 }
 
+/** Chunk strategy type alias. */
 export type ChunkStrategy = "fixed" | "sentence" | "paragraph" | "semantic";
 
+/** Fixed chunk options interface definition. */
 export interface FixedChunkOptions {
   /** Max tokens per chunk. Default: 256 */
   maxTokens?: number;
@@ -45,17 +47,20 @@ export interface FixedChunkOptions {
   overlapTokens?: number;
 }
 
+/** Segment chunk options interface definition. */
 export interface SegmentChunkOptions {
   /** Max characters before a forced split within sentence/paragraph mode */
   maxCharsPerChunk?: number;
 }
 
+/** Chunk options type alias. */
 export type ChunkOptions = FixedChunkOptions & SegmentChunkOptions;
 
 // ── Token estimation ──────────────────────────────────────────────────────────
 
 const CHARS_PER_TOKEN = 4;
 
+/** Estimate tokens. */
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / CHARS_PER_TOKEN);
 }
@@ -370,6 +375,7 @@ export type NlpScript =
   | "devanagari"
   | "unknown";
 
+/** Language result interface definition. */
 export interface LanguageResult {
   /** ISO 639-1 code or "unknown" */
   language: string;
@@ -488,6 +494,7 @@ export interface KeywordResult {
   frequency: number;
 }
 
+/** Keyword options interface definition. */
 export interface KeywordOptions {
   /** How many top keywords to return. Default: 10. */
   topK?: number;
@@ -553,6 +560,7 @@ export function extractKeywords(text: string, opts: KeywordOptions = {}): Keywor
 
 export type EntityType = "PERSON" | "ORG" | "LOCATION" | "DATE" | "PRODUCT" | "EVENT" | "OTHER";
 
+/** Entity interface definition. */
 export interface Entity {
   text: string;
   type: EntityType;

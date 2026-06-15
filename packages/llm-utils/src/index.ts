@@ -42,6 +42,7 @@ export interface LlmMessage {
   content: string;
 }
 
+/** Llm call options interface definition. */
 export interface LlmCallOptions {
   /** Sampling temperature. Default varies per operation (0.0–0.2). */
   temperature?: number;
@@ -49,11 +50,13 @@ export interface LlmCallOptions {
   maxTokens?: number;
 }
 
+/** Llm usage interface definition. */
 export interface LlmUsage {
   inputTokens: number;
   outputTokens: number;
 }
 
+/** Llm response interface definition. */
 export interface LlmResponse {
   content: string;
   model: string;
@@ -255,6 +258,7 @@ export interface ClassifyResult<L extends string = string> {
   confidence: number;
 }
 
+/** Classify options interface definition. */
 export interface ClassifyOptions {
   /** Override the system prompt. Must still instruct the model to return JSON. */
   systemPrompt?: string;
@@ -446,6 +450,7 @@ export function validateExtractResult<S extends ExtractSchema>(
   }
 }
 
+/** Field schema interface definition. */
 export interface FieldSchema {
   /** Expected JavaScript type of the field value. */
   type: FieldType;
@@ -455,6 +460,7 @@ export interface FieldSchema {
   required?: boolean;
 }
 
+/** Extract schema type alias. */
 export type ExtractSchema = Record<string, FieldSchema>;
 
 type ResolveType<T extends FieldType> = T extends "string"

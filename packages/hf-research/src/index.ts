@@ -24,8 +24,10 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type DataTier = "free" | "pro" | "enterprise";
+/** Sample tag type alias. */
 export type SampleTag = "preferred" | "rejected" | "neutral" | "flagged";
 
+/** Corpus sample interface definition. */
 export interface CorpusSample {
   id: string;
   prompt: string;
@@ -37,6 +39,7 @@ export interface CorpusSample {
   metadata?: Record<string, unknown>;
 }
 
+/** Corpus batch interface definition. */
 export interface CorpusBatch {
   id: string;
   name: string;
@@ -47,6 +50,7 @@ export interface CorpusBatch {
   size: number;
 }
 
+/** Batch filter interface definition. */
 export interface BatchFilter {
   tier?: DataTier;
   tags?: SampleTag[];
@@ -61,6 +65,7 @@ export interface BatchFilter {
 let _batchSeq = 0;
 let _sampleSeq = 0;
 
+/** In memory batch store. */
 export class InMemoryBatchStore {
   private batches = new Map<string, CorpusBatch>();
   private pendingSamples: CorpusSample[] = [];
@@ -128,6 +133,7 @@ export class InMemoryBatchStore {
 
 const TIER_ORDER: DataTier[] = ["free", "pro", "enterprise"];
 
+/** Tier gate. */
 export class TierGate {
   check(requiredTier: DataTier, userTier: DataTier): boolean {
     return TIER_ORDER.indexOf(userTier) >= TIER_ORDER.indexOf(requiredTier);
@@ -166,10 +172,12 @@ export interface HfPublishResult {
   url?: string;
 }
 
+/** Hf publisher interface definition. */
 export interface HfPublisher {
   push(batch: CorpusBatch, repoId: string): Promise<HfPublishResult>;
 }
 
+/** Mock hf publisher. */
 export class MockHfPublisher implements HfPublisher {
   readonly pushLog: Array<{ batch: CorpusBatch; repoId: string }> = [];
   private throws?: string;
@@ -258,12 +266,14 @@ export interface ApiRequest {
   body?: unknown;
 }
 
+/** Api response interface definition. */
 export interface ApiResponse<T> {
   data: T | null;
   status: number;
   error?: string;
 }
 
+/** Research api router. */
 export class ResearchApiRouter {
   private store: InMemoryBatchStore;
   private publisher: HfPublisher;

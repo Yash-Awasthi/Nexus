@@ -21,11 +21,13 @@ import { spawn } from "node:child_process";
 
 export type ReplLanguage = "python" | "r" | "julia";
 
+/** Repl input interface definition. */
 export interface ReplInput {
   code: string;
   timeoutMs?: number;
 }
 
+/** Repl result interface definition. */
 export interface ReplResult {
   stdout: string;
   stderr: string;
@@ -35,10 +37,12 @@ export interface ReplResult {
   durationMs: number;
 }
 
+/** Variable store interface definition. */
 export interface VariableStore {
   [name: string]: unknown;
 }
 
+/** Kernel session state interface definition. */
 export interface KernelSessionState {
   id: string;
   language: ReplLanguage;
@@ -138,6 +142,7 @@ export interface MockExecutionBehavior {
   onExecute?: (code: string, state: KernelSessionState) => void;
 }
 
+/** Mock repl executor. */
 export class MockReplExecutor implements ReplExecutor {
   private behaviors: MockExecutionBehavior[];
   private callIndex = 0;
@@ -332,6 +337,7 @@ export class DockerReplExecutor implements ReplExecutor {
 
 let _sessionSeq = 0;
 
+/** Kernel session. */
 export class KernelSession {
   private state: KernelSessionState;
   private executor: ReplExecutor;
@@ -426,6 +432,7 @@ export interface KernelManagerOptions {
   reaper?: SessionReaper;
 }
 
+/** Kernel manager. */
 export class KernelManager {
   private kernels = new Map<string, KernelSession>();
   private executor: ReplExecutor;

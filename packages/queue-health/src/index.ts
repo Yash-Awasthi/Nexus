@@ -30,8 +30,10 @@ export interface QueueMetrics {
   snapshotAt: string;
 }
 
+/** Lane status type alias. */
 export type LaneStatus = "healthy" | "degraded" | "unavailable" | "unknown";
 
+/** Lane health interface definition. */
 export interface LaneHealth {
   name: string;
   status: LaneStatus;
@@ -61,6 +63,7 @@ export interface InMemoryLaneState {
   throwOnGet?: boolean;
 }
 
+/** In memory queue lane. */
 export class InMemoryQueueLane implements QueueLane {
   private state: InMemoryLaneState;
 
@@ -126,6 +129,7 @@ export interface AlertThresholds {
   maxDelayed?: number;
 }
 
+/** Default thresholds. */
 export const DEFAULT_THRESHOLDS: AlertThresholds = {
   maxWaiting: 1000,
   maxFailed: 50,
@@ -134,6 +138,7 @@ export const DEFAULT_THRESHOLDS: AlertThresholds = {
   maxDelayed: 200,
 };
 
+/** Alert policy. */
 export class AlertPolicy {
   private thresholds: AlertThresholds;
 
@@ -184,6 +189,7 @@ export interface MonitorOptions {
   timeoutMs?: number;
 }
 
+/** Health monitor. */
 export class HealthMonitor {
   private registry: LaneRegistry;
   private policy: AlertPolicy;
@@ -248,6 +254,7 @@ export interface AggregatedHealth {
   lanes: LaneHealth[];
 }
 
+/** Health aggregator. */
 export class HealthAggregator {
   aggregate(healths: LaneHealth[]): AggregatedHealth {
     const healthyCount = healths.filter((h) => h.status === "healthy").length;

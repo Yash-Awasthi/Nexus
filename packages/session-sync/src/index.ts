@@ -15,8 +15,10 @@
 
 export type SyncStatus = "clean" | "pending" | "conflict" | "synced";
 
+/** Op type type alias. */
 export type OpType = "set" | "delete" | "merge";
 
+/** Sync session interface definition. */
 export interface SyncSession {
   id: string;
   userId: string;
@@ -28,6 +30,7 @@ export interface SyncSession {
   version: number;
 }
 
+/** Sync operation interface definition. */
 export interface SyncOperation {
   sessionId: string;
   deviceId: string;
@@ -38,6 +41,7 @@ export interface SyncOperation {
   logicalTime: number;
 }
 
+/** Conflict resolution interface definition. */
 export interface ConflictResolution {
   winner: "local" | "remote" | "merged";
   resolved: Record<string, unknown>;
@@ -103,11 +107,13 @@ export class VectorClock {
 
 export type MergeStrategy = "last-write-wins" | "union" | "custom";
 
+/** Custom merge fn type alias. */
 export type CustomMergeFn = (
   local: Record<string, unknown>,
   remote: Record<string, unknown>,
 ) => Record<string, unknown>;
 
+/** Conflict resolver. */
 export class ConflictResolver {
   private strategy: MergeStrategy;
   private customFn?: CustomMergeFn;
@@ -223,12 +229,14 @@ export interface PushResult {
   newVersion: number;
 }
 
+/** Pull result interface definition. */
 export interface PullResult {
   sessionId: string;
   ops: SyncOperation[];
   session: SyncSession | undefined;
 }
 
+/** Sync manager. */
 export class SyncManager {
   private store: SyncStore;
   private resolver: ConflictResolver;
@@ -328,6 +336,7 @@ export class SyncManager {
 
 import { neon } from "@neondatabase/serverless";
 
+/** Drizzle sync store. */
 export class DrizzleSyncStore extends SyncStore {
   private sql: ReturnType<typeof neon>;
   private schemaEnsured = false;

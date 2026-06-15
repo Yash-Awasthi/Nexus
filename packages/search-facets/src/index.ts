@@ -18,32 +18,38 @@ export interface SearchDoc {
   metadata?: Record<string, string | string[]>;
 }
 
+/** Highlight options interface definition. */
 export interface HighlightOptions {
   tag?: string;        // default "mark"
   className?: string;  // default "" (no class attr)
   caseSensitive?: boolean;
 }
 
+/** Facet bucket interface definition. */
 export interface FacetBucket {
   value: string;
   count: number;
 }
 
+/** Facet result interface definition. */
 export interface FacetResult {
   field: string;
   buckets: FacetBucket[];
 }
 
+/** Facet filter interface definition. */
 export interface FacetFilter {
   field: string;
   values: string[];
 }
 
+/** Snippet options interface definition. */
 export interface SnippetOptions {
   window?: number;     // chars around the match; default 100
   ellipsis?: string;   // default "…"
 }
 
+/** Scored doc interface definition. */
 export interface ScoredDoc {
   doc: SearchDoc;
   score: number;

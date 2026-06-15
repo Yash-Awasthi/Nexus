@@ -19,12 +19,14 @@
 
 export type RuntimeModel = string;
 
+/** Tool call raw interface definition. */
 export interface ToolCallRaw {
   name: string;
   arguments: Record<string, unknown>;
   callId?: string;
 }
 
+/** Tool result interface definition. */
 export interface ToolResult {
   callId?: string;
   name: string;
@@ -32,6 +34,7 @@ export interface ToolResult {
   error?: string;
 }
 
+/** Step input interface definition. */
 export interface StepInput {
   stepIndex: number;
   instruction: string;
@@ -40,6 +43,7 @@ export interface StepInput {
   abortSignal?: AbortSignal;
 }
 
+/** Step output interface definition. */
 export interface StepOutput {
   stepIndex: number;
   content: string;
@@ -54,18 +58,21 @@ export interface StepOutput {
 
 export type CacheControlPolicy = "no-cache" | "ephemeral" | "persistent";
 
+/** Cache control header interface definition. */
 export interface CacheControlHeader {
   policy: CacheControlPolicy;
   maxAgeMs?: number;
   staleWhileRevalidateMs?: number;
 }
 
+/** Cache policies. */
 export const CACHE_POLICIES: Record<CacheControlPolicy, CacheControlHeader> = {
   "no-cache":   { policy: "no-cache" },
   "ephemeral":  { policy: "ephemeral",  maxAgeMs: 60_000 },
   "persistent": { policy: "persistent", maxAgeMs: 3_600_000, staleWhileRevalidateMs: 60_000 },
 };
 
+/** Cache control. */
 export class CacheControl {
   static headerFor(policy: CacheControlPolicy): CacheControlHeader {
     return CACHE_POLICIES[policy];
@@ -137,6 +144,7 @@ export interface StrReplaceCall {
   newStr: string;
 }
 
+/** Str replace result interface definition. */
 export interface StrReplaceResult {
   path: string;
   success: boolean;
@@ -144,6 +152,7 @@ export interface StrReplaceResult {
   error?: string;
 }
 
+/** Str replace processor. */
 export class StrReplaceProcessor {
   private files: Map<string, string>;
 
@@ -180,6 +189,7 @@ export interface RuntimeTool {
   handler: (args: Record<string, unknown>) => Promise<unknown>;
 }
 
+/** Runtime tool set. */
 export class RuntimeToolSet {
   private tools = new Map<string, RuntimeTool>();
 
@@ -221,6 +231,7 @@ export type LlmStreamFn = (
   opts?: { signal?: AbortSignal },
 ) => AsyncIterable<string>;
 
+/** Mock llm stream. */
 export class MockLlmStream {
   private chunks: string[];
   private delayMs: number;
@@ -346,6 +357,7 @@ export interface StepExecutorOptions {
   systemPrompt: string;
 }
 
+/** Agent step executor. */
 export class AgentStepExecutor {
   private llm: LlmStreamFn;
   private toolSet: RuntimeToolSet;
@@ -431,6 +443,7 @@ export interface RuntimeOptions {
   cacheControl?: CacheControlPolicy;
 }
 
+/** Runtime result interface definition. */
 export interface RuntimeResult {
   steps: StepOutput[];
   finalContent: string;
@@ -439,6 +452,7 @@ export interface RuntimeResult {
   totalDurationMs: number;
 }
 
+/** Agent runtime. */
 export class AgentRuntime {
   private executor: AgentStepExecutor;
   private maxSteps: number;
@@ -539,6 +553,7 @@ export interface SpawnAgentTask {
   maxSteps?: number;
 }
 
+/** Spawn agent result interface definition. */
 export interface SpawnAgentResult {
   taskIndex: number;
   instruction: string;
@@ -548,6 +563,7 @@ export interface SpawnAgentResult {
   error?: string;
 }
 
+/** Spawn agents options interface definition. */
 export interface SpawnAgentsOptions {
   /** Hard cap on concurrent children (default: 5). */
   maxConcurrency?: number;

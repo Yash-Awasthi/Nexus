@@ -44,12 +44,14 @@ export interface MemoryEntry {
   userId?: string;
 }
 
+/** Memory search result interface definition. */
 export interface MemorySearchResult {
   entry: MemoryEntry;
   /** Cosine similarity in [0, 1] — higher is more similar */
   score: number;
 }
 
+/** Memory filter interface definition. */
 export interface MemoryFilter {
   /** Only return entries where metadata matches all supplied key-value pairs */
   metadata?: Record<string, unknown>;
@@ -64,6 +66,7 @@ export interface MemoryFilter {
   userId?: string;
 }
 
+/** Remember options interface definition. */
 export interface RememberOptions {
   metadata?: Record<string, unknown>;
   /** TTL in seconds from now */
@@ -124,6 +127,7 @@ export type MemoryErrorCode =
   | "NOT_FOUND"
   | "DIMENSION_MISMATCH";
 
+/** Memory error. */
 export class MemoryError extends Error {
   readonly code: MemoryErrorCode;
   constructor(code: MemoryErrorCode, message: string) {
@@ -140,6 +144,7 @@ interface GroqEmbeddingResponse {
   model: string;
 }
 
+/** Groq embedder config interface definition. */
 export interface GroqEmbedderConfig {
   /** Groq API key — defaults to process.env.GROQ_API_KEY */
   apiKey?: string;
@@ -718,6 +723,7 @@ function magnitude(v: number[]): number {
   return Math.sqrt(v.reduce((s, x) => s + x * x, 0));
 }
 
+/** Cosine similarity. */
 export function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0;
   const magA = magnitude(a);
@@ -726,6 +732,7 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   return dot(a, b) / (magA * magB);
 }
 
+/** Normalize. */
 export function normalize(v: number[]): number[] {
   const mag = magnitude(v);
   if (mag === 0) return v;

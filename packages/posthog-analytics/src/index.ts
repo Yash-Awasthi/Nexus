@@ -16,6 +16,7 @@ export interface EventProperties {
   [key: string]: string | number | boolean | null | undefined;
 }
 
+/** Tracked event interface definition. */
 export interface TrackedEvent {
   event: string;
   distinctId: string;
@@ -23,11 +24,13 @@ export interface TrackedEvent {
   timestamp: string;
 }
 
+/** Identify payload interface definition. */
 export interface IdentifyPayload {
   distinctId: string;
   properties: EventProperties;
 }
 
+/** Page event interface definition. */
 export interface PageEvent {
   distinctId: string;
   url: string;
@@ -36,6 +39,7 @@ export interface PageEvent {
   timestamp: string;
 }
 
+/** Analytics client interface definition. */
 export interface AnalyticsClient {
   track(event: string, distinctId: string, properties?: EventProperties): Promise<void>;
   identify(distinctId: string, properties: EventProperties): Promise<void>;
@@ -101,6 +105,7 @@ export interface PostHogConfig {
   disabled?: boolean;
 }
 
+/** Post hog analytics client. */
 export class PostHogAnalyticsClient implements AnalyticsClient {
   private config: Required<Omit<PostHogConfig, "disabled">> & { disabled: boolean };
   private queue: TrackedEvent[] = [];
@@ -183,6 +188,7 @@ export const NexusEvents = {
   SDK_TOOL_CALLED:         "sdk_tool_called",
 } as const;
 
+/** Nexus event name type alias. */
 export type NexusEventName = typeof NexusEvents[keyof typeof NexusEvents];
 
 // ── Convenience tracker ───────────────────────────────────────────────────────

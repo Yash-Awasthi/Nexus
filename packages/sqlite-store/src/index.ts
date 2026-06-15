@@ -47,6 +47,7 @@ interface KVEntry {
   expiresAt?: number;
 }
 
+/** In memory kv store. */
 export class InMemoryKVStore implements KVStore {
   private readonly data = new Map<string, KVEntry>();
 
@@ -99,6 +100,7 @@ export interface SqliteDatabase {
   prepare(sql: string): SqliteStatement;
 }
 
+/** Sqlite statement interface definition. */
 export interface SqliteStatement {
   run(...params: unknown[]): void;
   get(...params: unknown[]): unknown;
@@ -186,6 +188,7 @@ export interface Observation {
   createdAt: number;
 }
 
+/** Observation store interface definition. */
 export interface ObservationStore {
   add(obs: Observation): Promise<void>;
   getBySession(sessionId: string): Promise<Observation[]>;

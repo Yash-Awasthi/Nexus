@@ -12,8 +12,10 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type FeedbackRating = "thumbs_up" | "thumbs_down" | "neutral";
+/** Feedback source type alias. */
 export type FeedbackSource = "ui" | "api" | "automated";
 
+/** Feedback entry interface definition. */
 export interface FeedbackEntry {
   id: string;
   sessionId: string;
@@ -29,6 +31,7 @@ export interface FeedbackEntry {
   createdAt: string;
 }
 
+/** Preference pair interface definition. */
 export interface PreferencePair {
   id: string;
   promptText: string;
@@ -39,6 +42,7 @@ export interface PreferencePair {
   createdAt: string;
 }
 
+/** Reward signal interface definition. */
 export interface RewardSignal {
   sessionId: string;
   totalFeedback: number;
@@ -48,6 +52,7 @@ export interface RewardSignal {
   rewardScore: number; // (positive - negative) / total ∈ [-1, 1]
 }
 
+/** Feedback filter interface definition. */
 export interface FeedbackFilter {
   sessionId?: string;
   rating?: FeedbackRating;

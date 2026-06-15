@@ -18,11 +18,13 @@ export interface Variable {
   unit?: string;
 }
 
+/** Assumption interface definition. */
 export interface Assumption {
   description: string;
   confidence: number; // [0, 1]
 }
 
+/** Outcome interface definition. */
 export interface Outcome {
   name: string;
   probability: number; // [0, 1] — must sum to 1 across the scenario
@@ -30,6 +32,7 @@ export interface Outcome {
   description?: string;
 }
 
+/** Scenario interface definition. */
 export interface Scenario {
   id: string;
   name: string;
@@ -41,6 +44,7 @@ export interface Scenario {
   createdAt: string;
 }
 
+/** Prediction result interface definition. */
 export interface PredictionResult {
   expectedImpact: number;
   highestProbabilityOutcome: Outcome;
@@ -49,6 +53,7 @@ export interface PredictionResult {
   confidenceScore: number; // average assumption confidence
 }
 
+/** Sensitivity point interface definition. */
 export interface SensitivityPoint {
   variableValue: number;
   expectedImpact: number;
@@ -58,6 +63,7 @@ export interface SensitivityPoint {
 
 let _idCounter = 0;
 
+/** Scenario builder. */
 export class ScenarioBuilder {
   private scenario: Partial<Scenario> & { variables: Variable[]; assumptions: Assumption[]; outcomes: Outcome[] };
 

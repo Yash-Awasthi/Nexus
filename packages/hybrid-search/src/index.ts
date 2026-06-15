@@ -26,14 +26,17 @@ export interface SearchHit {
   metadata?: Record<string, unknown>;
 }
 
+/** Vector search adapter interface definition. */
 export interface VectorSearchAdapter {
   search(query: string, limit: number): Promise<SearchHit[]>;
 }
 
+/** Bm25 search adapter interface definition. */
 export interface BM25SearchAdapter {
   search(query: string, limit: number): Promise<SearchHit[]>;
 }
 
+/** Hybrid search options interface definition. */
 export interface HybridSearchOptions {
   query: string;
   limit?: number;
@@ -45,6 +48,7 @@ export interface HybridSearchOptions {
   bm25Weight?: number;
 }
 
+/** Hybrid search result interface definition. */
 export interface HybridSearchResult {
   hits: SearchHit[];
   vectorHits: SearchHit[];
@@ -120,6 +124,7 @@ function tokenize(text: string): string[] {
   return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
 }
 
+/** Bm25 document interface definition. */
 export interface BM25Document {
   id: string;
   text: string;

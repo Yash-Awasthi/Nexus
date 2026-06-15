@@ -65,6 +65,7 @@ export type BotErrorCode =
   | "AUTH_FAILED"
   | "UNSUPPORTED_EVENT";
 
+/** Bot error. */
 export class BotError extends Error {
   readonly code: BotErrorCode;
   readonly context?: Record<string, unknown>;
@@ -103,6 +104,7 @@ export interface BotMessage {
   raw: unknown;
 }
 
+/** Bot reply interface definition. */
 export interface BotReply {
   text: string;
   /** If set, the reply is sent into the same thread */
@@ -186,6 +188,7 @@ export interface SlackBotConfig {
   allowedUserIds?: string[];
 }
 
+/** Slack event result interface definition. */
 export interface SlackEventResult {
   /** Set on url_verification events — must be echoed back to Slack */
   challenge?: string;
@@ -222,6 +225,7 @@ interface SlackEventCallback {
 
 type SlackPayload = SlackUrlVerification | SlackEventCallback | { type: string };
 
+/** Slack bot adapter. */
 export class SlackBotAdapter {
   private readonly token: string;
   private readonly signingSecret?: string;
@@ -475,6 +479,7 @@ export interface TeamsBotConfig {
   name?: string;
 }
 
+/** Teams activity result interface definition. */
 export interface TeamsActivityResult {
   /** Whether the handler was invoked */
   handled: boolean;
@@ -496,6 +501,7 @@ interface TeamsActivity {
   channelData?: { teamsChannelId?: string };
 }
 
+/** Teams bot adapter. */
 export class TeamsBotAdapter {
   private readonly serviceUrl: string;
   private readonly appId: string;

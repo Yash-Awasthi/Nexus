@@ -54,12 +54,14 @@ export interface SessionInitPayload {
   metadata?: Record<string, unknown>;
 }
 
+/** Session end payload interface definition. */
 export interface SessionEndPayload {
   sessionId: string;
   endedAt: number;
   durationMs: number;
 }
 
+/** Task before payload interface definition. */
 export interface TaskBeforePayload {
   taskId: string;
   taskType: string;
@@ -67,6 +69,7 @@ export interface TaskBeforePayload {
   attempt: number;
 }
 
+/** Task after payload interface definition. */
 export interface TaskAfterPayload {
   taskId: string;
   taskType: string;
@@ -74,6 +77,7 @@ export interface TaskAfterPayload {
   durationMs: number;
 }
 
+/** Task error payload interface definition. */
 export interface TaskErrorPayload {
   taskId: string;
   taskType: string;
@@ -82,11 +86,13 @@ export interface TaskErrorPayload {
   willRetry: boolean;
 }
 
+/** Memory before write payload interface definition. */
 export interface MemoryBeforeWritePayload {
   text: string;
   metadata: Record<string, unknown>;
 }
 
+/** Memory after write payload interface definition. */
 export interface MemoryAfterWritePayload {
   id: string;
   text: string;
@@ -94,6 +100,7 @@ export interface MemoryAfterWritePayload {
   createdAt: number;
 }
 
+/** Agent observe payload interface definition. */
 export interface AgentObservePayload {
   agentId: string;
   /** Dot-notation observation label e.g. "tool.call", "reasoning.step" */
@@ -101,11 +108,13 @@ export interface AgentObservePayload {
   data: unknown;
 }
 
+/** File before edit payload interface definition. */
 export interface FileBeforeEditPayload {
   path: string;
   operation: "create" | "update" | "delete";
 }
 
+/** File after edit payload interface definition. */
 export interface FileAfterEditPayload {
   path: string;
   operation: "create" | "update" | "delete";
@@ -129,6 +138,7 @@ export interface HookEventMap {
   "file.after_edit": FileAfterEditPayload;
 }
 
+/** Hook event type alias. */
 export type HookEvent = keyof HookEventMap;
 
 // ── Handler contract ──────────────────────────────────────────────────────────
@@ -142,6 +152,7 @@ export interface HookResult {
   abort?: boolean;
 }
 
+/** Hook handler type alias. */
 export type HookHandler<T> = (
   payload: T,
 ) => Promise<HookResult | void> | HookResult | void;
@@ -155,6 +166,7 @@ export interface HookRegistration {
   readonly label?: string;
 }
 
+/** Hook options interface definition. */
 export interface HookOptions {
   /**
    * Handlers with higher priority run before those with lower priority.
@@ -203,6 +215,7 @@ export interface HandlerError {
   error: string;
 }
 
+/** Emit result interface definition. */
 export interface EmitResult {
   /** Event that was emitted */
   event: HookEvent;

@@ -21,6 +21,7 @@ export type DocCategory =
   | "general"
   | string;
 
+/** Classification result interface definition. */
 export interface ClassificationResult {
   category: DocCategory;
   confidence: number; // [0, 1]
@@ -29,6 +30,7 @@ export interface ClassificationResult {
   classifiedAt: string;
 }
 
+/** Classifier rule interface definition. */
 export interface ClassifierRule {
   name: string;
   category: DocCategory;
@@ -40,6 +42,7 @@ export interface ClassifierRule {
   weight?: number;
 }
 
+/** Classifier interface definition. */
 export interface Classifier {
   classify(content: string): ClassificationResult;
 }

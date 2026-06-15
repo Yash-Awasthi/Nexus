@@ -27,14 +27,17 @@ export type AnalystEventType =
   | "error"
   | "rate_limited";
 
+/** In app action type type alias. */
 export type InAppActionType = "open_panel" | "set_view" | "navigate" | "highlight";
 
+/** In app action interface definition. */
 export interface InAppAction {
   action: InAppActionType;
   target?: string;
   params?: Record<string, unknown>;
 }
 
+/** Stream start event interface definition. */
 export interface StreamStartEvent {
   type: "stream_start";
   sessionId: string;
@@ -42,6 +45,7 @@ export interface StreamStartEvent {
   timestamp: string;
 }
 
+/** Stream chunk event interface definition. */
 export interface StreamChunkEvent {
   type: "stream_chunk";
   sessionId: string;
@@ -49,6 +53,7 @@ export interface StreamChunkEvent {
   index: number;
 }
 
+/** Stream end event interface definition. */
 export interface StreamEndEvent {
   type: "stream_end";
   sessionId: string;
@@ -56,12 +61,14 @@ export interface StreamEndEvent {
   durationMs: number;
 }
 
+/** In app action event interface definition. */
 export interface InAppActionEvent {
   type: "in_app_action";
   sessionId: string;
   action: InAppAction;
 }
 
+/** Error event interface definition. */
 export interface ErrorEvent {
   type: "error";
   sessionId: string;
@@ -69,12 +76,14 @@ export interface ErrorEvent {
   message: string;
 }
 
+/** Rate limited event interface definition. */
 export interface RateLimitedEvent {
   type: "rate_limited";
   sessionId: string;
   retryAfterMs: number;
 }
 
+/** Analyst event type alias. */
 export type AnalystEvent =
   | StreamStartEvent
   | StreamChunkEvent
@@ -96,6 +105,7 @@ export type AnalystDomain =
   | "geopolitical"
   | "general";
 
+/** Domain system prompt. */
 export class DomainSystemPrompt {
   private static readonly PROMPTS: Record<AnalystDomain, string> = {
     aviation: "You are an aviation intelligence analyst. Focus on flight safety, airspace incidents, NOTAM analysis, and civil aviation trends. Provide structured analysis with risk assessments.",
@@ -134,12 +144,14 @@ export interface ContextMessage {
   content: string;
 }
 
+/** Assembled context interface definition. */
 export interface AssembledContext {
   systemPrompt: string;
   messages: ContextMessage[];
   tokenEstimate: number;
 }
 
+/** Context assembler. */
 export class ContextAssembler {
   private maxHistoryMessages: number;
 
@@ -188,6 +200,7 @@ export interface RateLimiterOptions {
   windowMs?: number;
 }
 
+/** Rate limiter. */
 export class RateLimiter {
   private windows = new Map<string, number[]>();
   private requestsPerMinute: number;
@@ -268,6 +281,7 @@ export interface StreamingAnalystOptions {
   assembler?: ContextAssembler;
 }
 
+/** Streaming analyst. */
 export class StreamingAnalyst {
   private llm: StreamingLlmFn;
   private rateLimiter?: RateLimiter;
@@ -332,6 +346,7 @@ export class StreamingAnalyst {
 
 let _aSeq = 0;
 
+/** Analyst session. */
 export class AnalystSession {
   readonly id: string;
   readonly domain: AnalystDomain;

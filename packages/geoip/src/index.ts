@@ -27,6 +27,7 @@ export interface GeoIpRecord {
   postalCode?: string;
 }
 
+/** Raw mmdb record interface definition. */
 export interface RawMmdbRecord {
   country?: { names?: { en?: string }; iso_code?: string };
   continent?: { names?: { en?: string } };
@@ -63,10 +64,12 @@ const EU_COUNTRIES = new Set([
   "NL","PL","PT","RO","SE","SI","SK",
 ]);
 
+/** Lookup locale. */
 export function lookupLocale(countryCode: string): string {
   return LOCALE_MAP[countryCode] ?? `en-${countryCode}`;
 }
 
+/** Is eu country. */
 export function isEuCountry(countryCode: string): boolean {
   return EU_COUNTRIES.has(countryCode);
 }
@@ -106,6 +109,7 @@ export class MockMmdbReader implements MmdbReader {
 
 const DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
+/** Geo ip cache. */
 export class GeoIpCache {
   private cache = new Map<string, { record: GeoIpRecord; expiresAt: number }>();
   private ttlMs: number;
@@ -160,6 +164,7 @@ export function isPrivateIp(ip: string): boolean {
   return false;
 }
 
+/** Normalize ip. */
 export function normalizeIp(ip: string): string {
   return ip.trim().replace(/^::ffff:/, ""); // strip IPv4-mapped IPv6 prefix
 }
@@ -185,6 +190,7 @@ const PRIVATE_FALLBACK: GeoIpRecord = {
   isEu: false,
 };
 
+/** Geo ip resolver. */
 export class GeoIpResolver {
   private reader: MmdbReader;
   private cache: GeoIpCache;
@@ -252,6 +258,7 @@ export interface RefreshScheduler {
   readonly isRunning: boolean;
 }
 
+/** Periodic cache refresher. */
 export class PeriodicCacheRefresher implements RefreshScheduler {
   private timer: ReturnType<typeof setInterval> | null = null;
   private cache: GeoIpCache;

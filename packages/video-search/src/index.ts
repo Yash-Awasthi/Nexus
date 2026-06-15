@@ -27,11 +27,13 @@ export interface VideoResult {
   relevanceScore?: number;
 }
 
+/** Chat message interface definition. */
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
 }
 
+/** Video search request interface definition. */
 export interface VideoSearchRequest {
   query: string;
   chatHistory?: ChatMessage[];
@@ -42,6 +44,7 @@ export interface VideoSearchRequest {
   forceRefresh?: boolean;
 }
 
+/** Video search response interface definition. */
 export interface VideoSearchResponse {
   results: VideoResult[];
   refinedQuery: string;  // LLM-refined query
@@ -59,6 +62,7 @@ export interface VideoBackend {
   search(query: string, maxResults: number): Promise<VideoResult[]>;
 }
 
+/** Mock video backend. */
 export class MockVideoBackend implements VideoBackend {
   private catalog: VideoResult[];
 
@@ -200,6 +204,7 @@ export interface VideoSearchEngineOptions {
   cacheTtlMs?: number;
 }
 
+/** Video search engine. */
 export class VideoSearchEngine {
   private agent: VideoSearchAgent;
   private cache: VideoSearchCache;

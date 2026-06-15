@@ -15,6 +15,7 @@
 
 export type TurnRole = "user" | "assistant" | "system" | "tool";
 
+/** Turn tag label type alias. */
 export type TurnTagLabel =
   | "instruction"
   | "response"
@@ -27,6 +28,7 @@ export type TurnTagLabel =
   | "error"
   | "unknown";
 
+/** Conversation turn interface definition. */
 export interface ConversationTurn {
   id: string;
   role: TurnRole;
@@ -34,6 +36,7 @@ export interface ConversationTurn {
   metadata?: Record<string, unknown>;
 }
 
+/** Turn tag interface definition. */
 export interface TurnTag {
   turnId: string;
   label: TurnTagLabel;
@@ -41,6 +44,7 @@ export interface TurnTag {
   reasons: string[];
 }
 
+/** Sft sample interface definition. */
 export interface SftSample {
   id: string;
   turns: ConversationTurn[];
@@ -132,6 +136,7 @@ const DEFAULT_RULES: TagRule[] = [
   },
 ];
 
+/** Rule tagger. */
 export class RuleTagger {
   private rules: TagRule[];
 
@@ -262,6 +267,7 @@ export interface FilterOptions {
   source?: string;
 }
 
+/** Dataset filter. */
 export class DatasetFilter {
   filter(samples: SftSample[], opts: FilterOptions = {}): SftSample[] {
     return samples.filter((sample) => {
@@ -284,16 +290,19 @@ export class DatasetFilter {
 
 export type ExportFormat = "jsonl" | "alpaca" | "sharegpt";
 
+/** Alpaca sample interface definition. */
 export interface AlpacaSample {
   instruction: string;
   input: string;
   output: string;
 }
 
+/** Share gpt sample interface definition. */
 export interface ShareGptSample {
   conversations: Array<{ from: "human" | "gpt" | "system"; value: string }>;
 }
 
+/** Sft exporter. */
 export class SftExporter {
   /** Export as JSONL (one JSON object per line). */
   toJsonl(samples: SftSample[]): string {

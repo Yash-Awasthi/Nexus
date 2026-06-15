@@ -15,9 +15,12 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type PageStatus = "published" | "draft" | "archived" | "deleted";
+/** Acl role type alias. */
 export type AclRole = "owner" | "editor" | "viewer";
+/** Notification event type alias. */
 export type NotificationEvent = "page_created" | "page_updated" | "comment_added" | "page_deleted" | "draft_saved";
 
+/** Wiki page version interface definition. */
 export interface WikiPageVersion {
   version: number;
   content: string;
@@ -27,6 +30,7 @@ export interface WikiPageVersion {
   diff?: string; // unified diff from previous version
 }
 
+/** Wiki page interface definition. */
 export interface WikiPage {
   id: string;
   slug: string;
@@ -44,6 +48,7 @@ export interface WikiPage {
   starred: string[]; // user IDs who starred
 }
 
+/** Acl entry interface definition. */
 export interface AclEntry {
   userId: string;
   role: AclRole;
@@ -51,6 +56,7 @@ export interface AclEntry {
   grantedAt: string;
 }
 
+/** Wiki comment interface definition. */
 export interface WikiComment {
   id: string;
   pageId: string;
@@ -62,6 +68,7 @@ export interface WikiComment {
   resolved: boolean;
 }
 
+/** Wiki draft interface definition. */
 export interface WikiDraft {
   id: string;
   pageId?: string; // undefined = new page draft
@@ -71,6 +78,7 @@ export interface WikiDraft {
   savedAt: string;
 }
 
+/** Wiki notification interface definition. */
 export interface WikiNotification {
   id: string;
   event: NotificationEvent;
@@ -150,6 +158,7 @@ export interface CreatePageInput {
   status?: PageStatus;
 }
 
+/** Update page input interface definition. */
 export interface UpdatePageInput {
   title?: string;
   content?: string;
@@ -160,6 +169,7 @@ export interface UpdatePageInput {
   summary?: string;
 }
 
+/** Wiki page store. */
 export class WikiPageStore {
   private pages = new Map<string, WikiPage>();
   private slugIndex = new Map<string, string>(); // slug → id
@@ -374,6 +384,7 @@ export interface SearchHit {
   score: number;
 }
 
+/** Wiki search. */
 export class WikiSearch {
   search(query: string, pages: WikiPage[], comments: WikiComment[]): SearchHit[] {
     const q = query.toLowerCase();

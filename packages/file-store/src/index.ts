@@ -57,6 +57,7 @@ export interface FileMeta {
   metadata?: Record<string, string>;
 }
 
+/** File content interface definition. */
 export interface FileContent {
   data: Uint8Array;
   meta: FileMeta;
@@ -359,6 +360,7 @@ export class LocalFileStore implements IFileStore {
 
 export type FetchFn = typeof fetch;
 
+/** S3 config interface definition. */
 export interface S3Config {
   bucket: string;
   region: string;

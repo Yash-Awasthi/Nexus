@@ -14,6 +14,7 @@
 
 export type ItemStatus = "active" | "archived" | "draft";
 
+/** Knowledge item interface definition. */
 export interface KnowledgeItem {
   id: string;
   title: string;
@@ -26,6 +27,7 @@ export interface KnowledgeItem {
   metadata: Record<string, unknown>;
 }
 
+/** Create item input interface definition. */
 export interface CreateItemInput {
   title: string;
   content: string;
@@ -35,6 +37,7 @@ export interface CreateItemInput {
   metadata?: Record<string, unknown>;
 }
 
+/** Search options interface definition. */
 export interface SearchOptions {
   tags?: string[];
   status?: ItemStatus;
@@ -210,12 +213,14 @@ function tokenize(text: string): Set<string> {
   );
 }
 
+/** Suggested link interface definition. */
 export interface SuggestedLink {
   id: string;
   title: string;
   score: number;
 }
 
+/** Cross linker. */
 export class CrossLinker {
   /** Return items most similar to the given item based on keyword overlap. */
   suggest(item: KnowledgeItem, candidates: KnowledgeItem[], topK = 5): SuggestedLink[] {
@@ -245,6 +250,7 @@ export interface IngestResult {
   autoLinked: number;
 }
 
+/** Librarian agent. */
 export class LibrarianAgent {
   private store: KnowledgeStore;
   private linker: CrossLinker;

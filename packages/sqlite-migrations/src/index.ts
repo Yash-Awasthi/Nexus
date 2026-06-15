@@ -22,12 +22,14 @@ export interface Migration {
   down?: string | string[];
 }
 
+/** Applied migration interface definition. */
 export interface AppliedMigration {
   version: number;
   name: string;
   appliedAt: string; // ISO timestamp
 }
 
+/** Migration result interface definition. */
 export interface MigrationResult {
   version: number;
   name: string;
@@ -36,6 +38,7 @@ export interface MigrationResult {
   durationMs: number;
 }
 
+/** Run report interface definition. */
 export interface RunReport {
   results: MigrationResult[];
   appliedCount: number;
@@ -52,6 +55,7 @@ export interface DbStatement {
   all<T = unknown>(...params: unknown[]): T[];
 }
 
+/** Db client interface definition. */
 export interface DbClient {
   prepare(sql: string): DbStatement;
   exec(sql: string): void;

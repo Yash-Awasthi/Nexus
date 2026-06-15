@@ -9,6 +9,7 @@ export interface BroadcastMessage {
   metadata?: Record<string, unknown>;
 }
 
+/** Recipient interface definition. */
 export interface Recipient {
   id: string;
   email?: string;
@@ -18,8 +19,10 @@ export interface Recipient {
   metadata?: Record<string, unknown>;
 }
 
+/** Delivery status type alias. */
 export type DeliveryStatus = "pending" | "delivered" | "failed";
 
+/** Delivery record interface definition. */
 export interface DeliveryRecord {
   messageId: string;
   recipientId: string;
@@ -29,6 +32,7 @@ export interface DeliveryRecord {
   error?: string;
 }
 
+/** Send result interface definition. */
 export interface SendResult {
   recipientId: string;
   channel: string;
@@ -49,6 +53,7 @@ export interface IBroadcastChannel {
 
 export type SegmentFn = (recipient: Recipient) => boolean;
 
+/** Audience segment. */
 export class AudienceSegment {
   constructor(private readonly filter: SegmentFn) {}
 
@@ -97,6 +102,7 @@ export type FetchFn = (
   },
 ) => Promise<{ ok: boolean; status: number; statusText: string }>;
 
+/** Email sender interface definition. */
 export interface EmailSender {
   send(opts: { to: string; subject: string; body: string }): Promise<void>;
 }

@@ -94,6 +94,7 @@ export interface MemoryExport {
   entries: MemoryEntry[];
 }
 
+/** Export options interface definition. */
 export interface ExportOptions {
   /**
    * When false, expired entries (expiresAt < now) are excluded.
@@ -147,11 +148,13 @@ export interface ImportOptions {
   similarityThreshold?: number;
 }
 
+/** Import error interface definition. */
 export interface ImportError {
   id: string;
   error: string;
 }
 
+/** Import result interface definition. */
 export interface ImportResult {
   /** Entries successfully saved to the store */
   imported: number;
@@ -221,6 +224,7 @@ export async function importMemory(
 
 export type DeduplicationStrategy = "exact" | "fingerprint" | "embedding";
 
+/** Duplicate group interface definition. */
 export interface DuplicateGroup {
   /** The entry that will be / was kept (lowest createdAt) */
   canonical: MemoryEntry;
@@ -230,6 +234,7 @@ export interface DuplicateGroup {
   strategy: DeduplicationStrategy;
 }
 
+/** Deduplication result interface definition. */
 export interface DeduplicationResult {
   /** Entries kept in the store */
   kept: number;
@@ -239,6 +244,7 @@ export interface DeduplicationResult {
   groups: DuplicateGroup[];
 }
 
+/** Deduplicate options interface definition. */
 export interface DeduplicateOptions {
   /** Default: "fingerprint" */
   strategy?: DeduplicationStrategy;

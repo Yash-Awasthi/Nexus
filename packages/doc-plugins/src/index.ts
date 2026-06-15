@@ -42,6 +42,7 @@ export interface PluginDoc {
   source?: string;
 }
 
+/** Doc annotation interface definition. */
 export interface DocAnnotation {
   /** ISO 8601 dates found in the document. */
   dates?: string[];
@@ -55,6 +56,7 @@ export interface DocAnnotation {
   [key: string]: unknown;
 }
 
+/** Annotated doc interface definition. */
 export interface AnnotatedDoc {
   doc: PluginDoc;
   annotations: DocAnnotation;
@@ -203,6 +205,7 @@ function extractDates(content: string): DetectedDate[] {
   return found.sort((a, b) => a.offset - b.offset);
 }
 
+/** Date extraction plugin. */
 export class DateExtractionPlugin implements DocPlugin {
   readonly name = "date-extraction";
 
@@ -222,6 +225,7 @@ export class DateExtractionPlugin implements DocPlugin {
 
 const WORDS_PER_MIN = 200; // average adult reading speed
 
+/** Word count plugin. */
 export class WordCountPlugin implements DocPlugin {
   readonly name = "word-count";
 
@@ -243,6 +247,7 @@ const ENTITY_PATTERNS: Array<{ re: RegExp; type: string }> = [
   { re: /\$[\d,]+(?:\.\d{2})?\b|\b[\d,]+(?:\.\d{2})?\s*(?:USD|EUR|GBP|JPY)\b/g, type: "MONEY" },
 ];
 
+/** Entity tag plugin. */
 export class EntityTagPlugin implements DocPlugin {
   readonly name = "entity-tag";
 

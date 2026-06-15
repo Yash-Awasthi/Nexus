@@ -4,6 +4,7 @@
 
 export type MessageRole = "system" | "user" | "assistant" | "tool";
 
+/** Message interface definition. */
 export interface Message {
   role: MessageRole;
   content: string;
@@ -16,6 +17,7 @@ export interface ITokenizer {
   count(text: string): number;
 }
 
+/** Naive tokenizer. */
 export class NaiveTokenizer implements ITokenizer {
   count(text: string): number {
     return Math.ceil(text.length / 4);
@@ -31,6 +33,7 @@ export interface LLMRequest {
   [key: string]: unknown;
 }
 
+/** Llm response interface definition. */
 export interface LLMResponse {
   id: string;
   model: string;
@@ -39,6 +42,7 @@ export interface LLMResponse {
   latencyMs?: number;
 }
 
+/** Llm provider interface definition. */
 export interface LLMProvider {
   name: string;
   models: string[];
@@ -61,6 +65,7 @@ export interface SummaryOpts {
   model?: string;
 }
 
+/** Compress result interface definition. */
 export interface CompressResult {
   messages: Message[];
   summary: string;

@@ -17,6 +17,7 @@
 
 export type ChunkType = "TEXT" | "THINKING";
 
+/** Content chunk interface definition. */
 export interface ContentChunk {
   type: ChunkType;
   text: string;
@@ -27,6 +28,7 @@ export interface ContentChunk {
 const OPEN_TAG  = "<think>";
 const CLOSE_TAG = "</think>";
 
+/** Think tag parser. */
 export class ThinkTagParser {
   private buffer = "";
   private insideThink = false;

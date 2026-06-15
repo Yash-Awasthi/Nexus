@@ -25,13 +25,16 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type FetchFn = typeof fetch;
+/** Message role type alias. */
 export type MessageRole = "system" | "user" | "assistant";
 
+/** Consortium message interface definition. */
 export interface ConsortiumMessage {
   role: MessageRole;
   content: string;
 }
 
+/** Sampling params interface definition. */
 export interface SamplingParams {
   temperature?: number;
   max_tokens?: number;
@@ -42,6 +45,7 @@ export interface SamplingParams {
   repetition_penalty?: number;
 }
 
+/** Speed tier type alias. */
 export type SpeedTier = "fast" | "standard" | "smart" | "power" | "ultra";
 
 // ── Models per tier (additive) ────────────────────────────────────────────────
@@ -73,6 +77,7 @@ const TIER_MODELS: Record<SpeedTier, readonly string[]> = {
   ],
 };
 
+/** Get models for tier. */
 export function getModelsForTier(tier: SpeedTier): string[] {
   const order: SpeedTier[] = ["fast", "standard", "smart", "power", "ultra"];
   const idx = order.indexOf(tier);
@@ -100,6 +105,7 @@ const HEADER_RE = /^#{1,3}\s/gm;
 const LIST_RE = /^[\s]*[-*•]\s/gm;
 const CODE_RE = /```/g;
 
+/** Score response. */
 export function scoreResponse(content: string, userQuery: string): number {
   if (!content || content.length < 10) return 0;
   let score = Math.min(content.length / 40, 25);
@@ -130,6 +136,7 @@ export interface ModelResult {
 
 const OR_URL = "https://openrouter.ai/api/v1/chat/completions";
 
+/** Query model. */
 export async function queryModel(
   model: string,
   messages: ConsortiumMessage[],
@@ -182,8 +189,10 @@ export const ORCHESTRATOR_MODELS = [
   "anthropic/claude-opus-4.6",
 ] as const;
 
+/** Orchestrator model type alias. */
 export type OrchestratorModel = (typeof ORCHESTRATOR_MODELS)[number] | (string & {});
 
+/** Consortium response interface definition. */
 export interface ConsortiumResponse {
   model: string;
   content: string;
@@ -193,6 +202,7 @@ export interface ConsortiumResponse {
   error?: string;
 }
 
+/** Consortium result interface definition. */
 export interface ConsortiumResult {
   synthesis: string;
   orchestratorModel: string;
@@ -229,6 +239,7 @@ export interface CollectionConfig {
   onModelResult?: (result: ModelResult, settled: number, total: number) => void;
 }
 
+/** Collect all responses. */
 export function collectAllResponses(
   models: string[],
   messages: ConsortiumMessage[],
@@ -274,6 +285,7 @@ export function collectAllResponses(
   });
 }
 
+/** Synthesize. */
 export async function synthesize(
   userQuery: string,
   responses: ConsortiumResponse[],
@@ -295,6 +307,7 @@ export async function synthesize(
   return { synthesis: result.content, durationMs: result.durationMs, model: orchestratorModel };
 }
 
+/** Consortium pipeline config interface definition. */
 export interface ConsortiumPipelineConfig {
   tier: SpeedTier;
   orchestratorModel?: OrchestratorModel;
@@ -302,6 +315,7 @@ export interface ConsortiumPipelineConfig {
   collectionConfig?: CollectionConfig;
 }
 
+/** Run consortium. */
 export async function runConsortium(
   userQuery: string,
   messages: ConsortiumMessage[],

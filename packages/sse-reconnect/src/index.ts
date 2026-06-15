@@ -22,6 +22,7 @@ export type SseEventType =
   | "error"
   | "connected";
 
+/** Sse event interface definition. */
 export interface SseEvent {
   id: string;
   type: SseEventType;
@@ -104,6 +105,7 @@ export class SseEventBuffer {
 
 export type SseHandler = (event: SseEvent) => void;
 
+/** Sse subscriber interface definition. */
 export interface SseSubscriber {
   id: string;
   handler: SseHandler;
@@ -116,6 +118,7 @@ export interface SseSubscriber {
 let _evtSeq = 0;
 let _subSeq = 0;
 
+/** Sse channel. */
 export class SseChannel {
   readonly sessionId: string;
   private subscribers = new Map<string, SseSubscriber>();

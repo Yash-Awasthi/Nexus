@@ -28,19 +28,23 @@ import { randomUUID } from "crypto";
 
 export type ContentBlockType = "text";
 
+/** Text block interface definition. */
 export interface TextBlock {
   type: "text";
   text: string;
 }
 
+/** Content block type alias. */
 export type ContentBlock = TextBlock;
 
+/** Anthropic message interface definition. */
 export interface AnthropicMessage {
   role: "user" | "assistant";
   /** String shorthand OR structured content blocks */
   content: string | ContentBlock[];
 }
 
+/** Anthropic request interface definition. */
 export interface AnthropicRequest {
   model: string;
   messages: AnthropicMessage[];
@@ -53,11 +57,13 @@ export interface AnthropicRequest {
   metadata?: { user_id?: string };
 }
 
+/** Anthropic usage interface definition. */
 export interface AnthropicUsage {
   input_tokens: number;
   output_tokens: number;
 }
 
+/** Anthropic response interface definition. */
 export interface AnthropicResponse {
   id: string;
   type: "message";
@@ -69,6 +75,7 @@ export interface AnthropicResponse {
   usage: AnthropicUsage;
 }
 
+/** Provider config interface definition. */
 export interface ProviderConfig {
   /** API key for this provider */
   apiKey: string;
@@ -76,6 +83,7 @@ export interface ProviderConfig {
   baseUrl?: string;
 }
 
+/** Gateway config interface definition. */
 export interface GatewayConfig {
   providers: {
     groq?: ProviderConfig;
@@ -91,11 +99,13 @@ export interface GatewayConfig {
   extraAliases?: Record<string, ModelTarget>;
 }
 
+/** Model target interface definition. */
 export interface ModelTarget {
   provider: string;
   model: string;
 }
 
+/** Gateway error interface definition. */
 export interface GatewayError extends Error {
   code: "MODEL_NOT_FOUND" | "PROVIDER_NOT_CONFIGURED" | "UPSTREAM_ERROR" | "UNSUPPORTED_CONTENT";
   statusCode: number;

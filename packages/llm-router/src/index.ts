@@ -64,11 +64,13 @@ export class LLMRouterError extends Error {
 
 export type MessageRole = "system" | "user" | "assistant";
 
+/** Llm message interface definition. */
 export interface LLMMessage {
   role: MessageRole;
   content: string;
 }
 
+/** Llm request interface definition. */
 export interface LLMRequest {
   /** Concrete model name (e.g. "claude-opus-4-5") or router alias (e.g. "nexus/smart"). */
   model: string;
@@ -79,12 +81,14 @@ export interface LLMRequest {
   metadata?: Record<string, unknown>;
 }
 
+/** Llm usage interface definition. */
 export interface LLMUsage {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
 }
 
+/** Llm response interface definition. */
 export interface LLMResponse {
   id: string;
   /** Resolved model name actually used. */
@@ -122,6 +126,7 @@ export interface NullProviderConfig {
   error?: Error;
 }
 
+/** Null provider. */
 export class NullProvider implements LLMProvider {
   readonly name: string;
   readonly models: readonly string[];
@@ -172,6 +177,7 @@ const CLAUDE_MODELS = [
   "claude-3-opus-20240229",
 ] as const;
 
+/** Claude provider. */
 export class ClaudeProvider implements LLMProvider {
   readonly name = "claude";
   readonly models: readonly string[] = CLAUDE_MODELS;
@@ -259,6 +265,7 @@ const GROQ_MODELS = [
   "gemma2-9b-it",
 ] as const;
 
+/** Groq provider. */
 export class GroqProvider implements LLMProvider {
   readonly name = "groq";
   readonly models: readonly string[] = GROQ_MODELS;
@@ -297,6 +304,7 @@ const OPENAI_MODELS = [
   "o1-mini",
 ] as const;
 
+/** Open ai provider. */
 export class OpenAIProvider implements LLMProvider {
   readonly name: string;
   readonly models: readonly string[] = OPENAI_MODELS;
@@ -385,6 +393,7 @@ async function _openAICompatComplete(
 
 export type RoutingStrategy = "first" | "round-robin" | "least-latency";
 
+/** Provider alias interface definition. */
 export interface ProviderAlias {
   /** The alias string callers use, e.g. "nexus/smart". */
   alias: string;
@@ -394,6 +403,7 @@ export interface ProviderAlias {
   model: string;
 }
 
+/** Router config interface definition. */
 export interface RouterConfig {
   providers: LLMProvider[];
   /**

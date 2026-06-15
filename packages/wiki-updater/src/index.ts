@@ -34,18 +34,21 @@ export interface WikiArticle {
   version: number;
 }
 
+/** Wiki document interface definition. */
 export interface WikiDocument {
   id: string;
   content: string;
   source?: string;
 }
 
+/** Update request interface definition. */
 export interface UpdateRequest {
   document: WikiDocument;
   sessionId?: string;
   dryRun?: boolean;
 }
 
+/** Update result interface definition. */
 export interface UpdateResult {
   articleId: string | null;
   created: boolean;
@@ -55,6 +58,7 @@ export interface UpdateResult {
   durationMs: number;
 }
 
+/** Stage result interface definition. */
 export interface StageResult {
   stage: string;
   durationMs: number;
@@ -67,6 +71,7 @@ export interface StageResult {
 
 let _articleSeq = 0;
 
+/** Wiki store. */
 export class WikiStore {
   private articles = new Map<string, WikiArticle>();
   private index = new Map<string, Set<string>>(); // term → article ids
@@ -267,6 +272,7 @@ export interface StageStats {
   totalDurationMs: number;
 }
 
+/** Stage metrics. */
 export class StageMetrics {
   private stats = new Map<string, StageStats>();
 
@@ -289,8 +295,10 @@ export class StageMetrics {
 // ── Pipeline steps ────────────────────────────────────────────────────────────
 
 export type DistillFn = (content: string) => Promise<string | null>;
+/** Nl update fn type alias. */
 export type NlUpdateFn = (existing: string, newContent: string) => Promise<string>;
 
+/** Pipeline context interface definition. */
 export interface PipelineContext {
   document: WikiDocument;
   distilledQuery?: string | null;
@@ -320,6 +328,7 @@ export interface PipelineOptions {
   autoCreate?: boolean;
 }
 
+/** Wiki update pipeline. */
 export class WikiUpdatePipeline {
   private store: WikiStore;
   private distillFn: DistillFn;

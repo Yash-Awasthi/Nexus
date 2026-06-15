@@ -56,6 +56,7 @@ export type ImageGenErrorCode =
   | "POLL_TIMEOUT"
   | "PREDICTION_FAILED";
 
+/** Image gen error. */
 export class ImageGenError extends Error {
   readonly code: ImageGenErrorCode;
   readonly context?: Record<string, unknown>;
@@ -90,9 +91,12 @@ export type ImageSize =
   | "1792x1024"
   | "1024x1792";
 
+/** Image quality type alias. */
 export type ImageQuality = "standard" | "hd";
+/** Image style type alias. */
 export type ImageStyle = "vivid" | "natural";
 
+/** Generate options interface definition. */
 export interface GenerateOptions {
   /** Number of images to generate (default: 1) */
   n?: number;
@@ -123,6 +127,7 @@ export interface GenerateOptions {
   guidanceScale?: number;
 }
 
+/** Generated image interface definition. */
 export interface GeneratedImage {
   /** Public URL to the image (may expire — download promptly) */
   url?: string;
@@ -138,6 +143,7 @@ export interface GeneratedImage {
   revisedPrompt?: string;
 }
 
+/** Image result interface definition. */
 export interface ImageResult {
   /** The original prompt passed by the caller */
   prompt: string;
@@ -191,6 +197,7 @@ export class NullImageProvider implements ImageProvider {
 // ── Shared utilities ──────────────────────────────────────────────────────────
 
 export type FetchFn = typeof fetch;
+/** Sleep fn type alias. */
 export type SleepFn = (ms: number) => Promise<void>;
 
 function parseSize(size: ImageSize): [number, number] {
@@ -223,6 +230,7 @@ interface OpenAIImageResponse {
   }>;
 }
 
+/** Open ai image provider. */
 export class OpenAIImageProvider implements ImageProvider {
   readonly name = "openai-dalle";
 
@@ -357,6 +365,7 @@ interface ReplicatePrediction {
   urls?: { get?: string };
 }
 
+/** Replicate provider. */
 export class ReplicateProvider implements ImageProvider {
   readonly name = "replicate";
 
@@ -527,6 +536,7 @@ export interface ImageGeneratorConfig {
   name?: string;
 }
 
+/** Image generator. */
 export class ImageGenerator {
   private readonly provider: ImageProvider;
   private readonly hooks?: ImageHooks;

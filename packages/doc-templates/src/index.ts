@@ -12,6 +12,7 @@ export type TemplateType =
   | "postmortem"
   | (string & {});
 
+/** Template section interface definition. */
 export interface TemplateSection {
   heading: string;
   /** Heading depth (default: 2). */
@@ -21,6 +22,7 @@ export interface TemplateSection {
   required?: boolean;
 }
 
+/** Frontmatter field interface definition. */
 export interface FrontmatterField {
   key: string;
   /** Default value used when the variable is not provided. */
@@ -28,6 +30,7 @@ export interface FrontmatterField {
   required?: boolean;
 }
 
+/** Doc template interface definition. */
 export interface DocTemplate {
   id: string;
   type: TemplateType;
@@ -169,6 +172,7 @@ export const ADR_TEMPLATE: DocTemplate = {
   ],
 };
 
+/** Runbook template. */
 export const RUNBOOK_TEMPLATE: DocTemplate = {
   id: "builtin:runbook",
   type: "runbook",
@@ -189,6 +193,7 @@ export const RUNBOOK_TEMPLATE: DocTemplate = {
   ],
 };
 
+/** Incident template. */
 export const INCIDENT_TEMPLATE: DocTemplate = {
   id: "builtin:incident",
   type: "incident",
@@ -210,6 +215,7 @@ export const INCIDENT_TEMPLATE: DocTemplate = {
   ],
 };
 
+/** Prd template. */
 export const PRD_TEMPLATE: DocTemplate = {
   id: "builtin:prd",
   type: "prd",
@@ -232,6 +238,7 @@ export const PRD_TEMPLATE: DocTemplate = {
   ],
 };
 
+/** Meeting template. */
 export const MEETING_TEMPLATE: DocTemplate = {
   id: "builtin:meeting",
   type: "meeting",
@@ -251,6 +258,7 @@ export const MEETING_TEMPLATE: DocTemplate = {
   ],
 };
 
+/** Weekly template. */
 export const WEEKLY_TEMPLATE: DocTemplate = {
   id: "builtin:weekly",
   type: "weekly",
@@ -269,6 +277,7 @@ export const WEEKLY_TEMPLATE: DocTemplate = {
   ],
 };
 
+/** Postmortem template. */
 export const POSTMORTEM_TEMPLATE: DocTemplate = {
   id: "builtin:postmortem",
   type: "postmortem",
@@ -291,6 +300,7 @@ export const POSTMORTEM_TEMPLATE: DocTemplate = {
   ],
 };
 
+/** All builtin templates. */
 export const ALL_BUILTIN_TEMPLATES: DocTemplate[] = [
   ADR_TEMPLATE,
   RUNBOOK_TEMPLATE,

@@ -49,11 +49,13 @@ export interface MemoryEntry {
   importance?: number;
 }
 
+/** Memory search result interface definition. */
 export interface MemorySearchResult {
   entry: MemoryEntry;
   score: number; // cosine similarity 0–1
 }
 
+/** Memory filter interface definition. */
 export interface MemoryFilter {
   metadata?: Record<string, unknown>;
   excludeExpired?: boolean;
@@ -92,6 +94,7 @@ function magnitude(v: number[]): number {
   return Math.sqrt(v.reduce((s, x) => s + x * x, 0));
 }
 
+/** Cosine similarity. */
 export function cosineSimilarity(a: number[], b: number[]): number {
   const magA = magnitude(a);
   const magB = magnitude(b);

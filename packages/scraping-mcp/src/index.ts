@@ -22,6 +22,7 @@ export interface McpToolInputSchema {
   required?: string[];
 }
 
+/** Mcp tool interface definition. */
 export interface McpTool {
   name: string;
   description: string;
@@ -29,6 +30,7 @@ export interface McpTool {
   handler: (input: unknown, sessionStore: SessionStore) => Promise<ToolCallResult>;
 }
 
+/** Tool call result interface definition. */
 export interface ToolCallResult {
   content: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }>;
   isError: boolean;
@@ -64,12 +66,14 @@ export interface FetchResult {
   headers?: Record<string, string>;
 }
 
+/** Screenshot result interface definition. */
 export interface ScreenshotResult {
   url: string;
   data: string; // base64
   mimeType: string;
 }
 
+/** Scraping backend interface definition. */
 export interface ScrapingBackend {
   fetch(url: string, sessionId?: string): Promise<FetchResult>;
   fetchStealthy(url: string, sessionId?: string): Promise<FetchResult>;
@@ -85,6 +89,7 @@ export interface MockFetchBehavior {
   screenshot?: string;
 }
 
+/** Mock scraping backend. */
 export class MockScrapingBackend implements ScrapingBackend {
   private behaviors = new Map<string, MockFetchBehavior>();
   private defaultBehavior: MockFetchBehavior;
@@ -141,6 +146,7 @@ export class MockScrapingBackend implements ScrapingBackend {
 
 let _sId = 0;
 
+/** Session store. */
 export class SessionStore {
   private sessions = new Map<string, ScrapingSession>();
 

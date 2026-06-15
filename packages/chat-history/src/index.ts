@@ -14,6 +14,7 @@
 
 export type ChatRole = "user" | "assistant" | "system";
 
+/** Chat message interface definition. */
 export interface ChatMessage {
   id: string;
   role: ChatRole;
@@ -24,6 +25,7 @@ export interface ChatMessage {
   metadata?: Record<string, unknown>;
 }
 
+/** Chat thread interface definition. */
 export interface ChatThread {
   id: string;
   title?: string;
@@ -33,6 +35,7 @@ export interface ChatThread {
   metadata?: Record<string, unknown>;
 }
 
+/** Thread summary interface definition. */
 export interface ThreadSummary {
   threadId: string;
   title?: string;
@@ -191,6 +194,7 @@ export interface ThreadStats {
   modelsUsed: string[];
 }
 
+/** Analyze thread. */
 export function analyzeThread(thread: ChatThread): ThreadStats {
   const models = new Set<string>();
   for (const m of thread.messages) {

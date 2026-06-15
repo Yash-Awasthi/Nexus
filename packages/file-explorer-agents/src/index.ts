@@ -19,6 +19,7 @@ export interface AgentInput {
   [key: string]: unknown;
 }
 
+/** Agent output interface definition. */
 export interface AgentOutput {
   success: boolean;
   data: unknown;
@@ -26,8 +27,10 @@ export interface AgentOutput {
   tokensUsed?: number;
 }
 
+/** Agent handler type alias. */
 export type AgentHandler<I extends AgentInput, O> = (input: I, ctx?: AgentContext) => Promise<O>;
 
+/** Agent context interface definition. */
 export interface AgentContext {
   sessionId?: string;
   workspacePath?: string;
@@ -55,6 +58,7 @@ export interface CodeSearchInput extends AgentInput {
   projectPath?: string;
 }
 
+/** Code search result interface definition. */
 export interface CodeSearchResult {
   path: string;
   snippet: string;
@@ -62,12 +66,14 @@ export interface CodeSearchResult {
   relevanceScore: number;
 }
 
+/** Code search output interface definition. */
 export interface CodeSearchOutput {
   results: CodeSearchResult[];
   query: string;
   totalFound: number;
 }
 
+/** Code search agent. */
 export class CodeSearchAgent {
   private handler?: AgentHandler<CodeSearchInput, CodeSearchOutput>;
 
@@ -105,12 +111,14 @@ export interface DirectoryListInput extends AgentInput {
   pattern?: string;
 }
 
+/** Directory list output interface definition. */
 export interface DirectoryListOutput {
   entries: FileEntry[];
   path: string;
   totalEntries: number;
 }
 
+/** Directory lister agent. */
 export class DirectoryListerAgent {
   private handler?: AgentHandler<DirectoryListInput, DirectoryListOutput>;
 
@@ -143,12 +151,14 @@ export interface FileListInput extends AgentInput {
   maxFiles?: number;
 }
 
+/** File list output interface definition. */
 export interface FileListOutput {
   files: FileEntry[];
   directory: string;
   totalFiles: number;
 }
 
+/** File lister agent. */
 export class FileListerAgent {
   private handler?: AgentHandler<FileListInput, FileListOutput>;
 
@@ -180,12 +190,14 @@ export interface FilePickerInput extends AgentInput {
   context?: string;
 }
 
+/** File picker output interface definition. */
 export interface FilePickerOutput {
   pickedPath: string | null;
   reasoning: string;
   alternatives?: string[];
 }
 
+/** File picker agent. */
 export class FilePickerAgent {
   private handler?: AgentHandler<FilePickerInput, FilePickerOutput>;
 
@@ -217,12 +229,14 @@ export interface GlobMatchInput extends AgentInput {
   negatePatterns?: string[];
 }
 
+/** Glob match output interface definition. */
 export interface GlobMatchOutput {
   matched: string[];
   unmatched: string[];
   totalMatched: number;
 }
 
+/** Glob matcher agent. */
 export class GlobMatcherAgent {
   private handler?: AgentHandler<GlobMatchInput, GlobMatchOutput>;
 
@@ -258,6 +272,7 @@ export function mockCodeSearchHandler(results: CodeSearchResult[] = []): AgentHa
   });
 }
 
+/** Mock directory list handler. */
 export function mockDirectoryListHandler(entries: FileEntry[] = []): AgentHandler<DirectoryListInput, DirectoryListOutput> {
   return async (input) => ({
     entries: entries.length > 0 ? entries : [
@@ -269,6 +284,7 @@ export function mockDirectoryListHandler(entries: FileEntry[] = []): AgentHandle
   });
 }
 
+/** Mock file list handler. */
 export function mockFileListHandler(files: FileEntry[] = []): AgentHandler<FileListInput, FileListOutput> {
   return async (input) => ({
     files: files.length > 0 ? files : [
@@ -279,6 +295,7 @@ export function mockFileListHandler(files: FileEntry[] = []): AgentHandler<FileL
   });
 }
 
+/** Mock file picker handler. */
 export function mockFilePickerHandler(picked: string | null = "src/main.ts"): AgentHandler<FilePickerInput, FilePickerOutput> {
   return async (input) => ({
     pickedPath: picked ?? (input.candidates[0] ?? null),
@@ -287,6 +304,7 @@ export function mockFilePickerHandler(picked: string | null = "src/main.ts"): Ag
   });
 }
 
+/** Mock glob match handler. */
 export function mockGlobMatchHandler(): AgentHandler<GlobMatchInput, GlobMatchOutput> {
   return async (input) => {
     // Simple glob simulation: pattern ending in /* matches files in that dir
@@ -319,6 +337,7 @@ export interface FileExplorerAgents {
   globMatcher: GlobMatcherAgent;
 }
 
+/** Create file explorer agents. */
 export function createFileExplorerAgents(): FileExplorerAgents {
   return {
     codeSearch: new CodeSearchAgent(),
@@ -329,6 +348,7 @@ export function createFileExplorerAgents(): FileExplorerAgents {
   };
 }
 
+/** Create mock file explorer agents. */
 export function createMockFileExplorerAgents(): FileExplorerAgents {
   const agents = createFileExplorerAgents();
   agents.codeSearch.inject(mockCodeSearchHandler());

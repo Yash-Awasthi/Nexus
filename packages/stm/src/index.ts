@@ -22,6 +22,7 @@
 
 export type STMModuleId = string;
 
+/** Transform context interface definition. */
 export interface TransformContext {
   sessionId?: string;
   userId?: string;
@@ -29,6 +30,7 @@ export interface TransformContext {
   metadata?: Record<string, unknown>;
 }
 
+/** Transform input interface definition. */
 export interface TransformInput {
   text: string;
   moduleIds?: STMModuleId[];  // null/undefined → apply all registered
@@ -36,6 +38,7 @@ export interface TransformInput {
   maxChars?: number;          // enforced by TruncationGuard
 }
 
+/** Module result interface definition. */
 export interface ModuleResult {
   moduleId: STMModuleId;
   before: string;
@@ -43,6 +46,7 @@ export interface ModuleResult {
   changed: boolean;
 }
 
+/** Transform output interface definition. */
 export interface TransformOutput {
   original: string;
   transformed: string;
@@ -51,6 +55,7 @@ export interface TransformOutput {
   charCount: number;
 }
 
+/** Stm module interface definition. */
 export interface STMModule {
   id: STMModuleId;
   description: string;
@@ -72,6 +77,7 @@ const HEDGE_PATTERNS: Array<[RegExp, string]> = [
   [/\bApparently /gi, ""],
 ];
 
+/** Hedge reducer. */
 export class HedgeReducer implements STMModule {
   readonly id = "hedge-reducer";
   readonly description = "Removes hedge phrases to produce more direct statements";
@@ -107,6 +113,7 @@ const DIRECTNESS_PATTERNS: Array<[RegExp, string]> = [
   [/\bwith the exception of\b/gi, "except"],
 ];
 
+/** Directness optimizer. */
 export class DirectnessOptimizer implements STMModule {
   readonly id = "directness-optimizer";
   readonly description = "Replaces verbose/passive constructions with direct equivalents";

@@ -49,14 +49,17 @@ export interface SearchResult {
   metadata?: Record<string, unknown>;
 }
 
+/** Searchable connector interface definition. */
 export interface SearchableConnector {
   /** Unique identifier for this connector instance. */
   id: string;
   search(query: string, opts?: { limit?: number }): Promise<SearchResult[]>;
 }
 
+/** Dedup strategy type alias. */
 export type DedupStrategy = "id" | "title" | "url";
 
+/** Federated search options interface definition. */
 export interface FederatedSearchOptions {
   query: string;
   /** Maximum results after dedup + sort. Default 10. */
@@ -67,11 +70,13 @@ export interface FederatedSearchOptions {
   timeoutMs?: number;
 }
 
+/** Connector error interface definition. */
 export interface ConnectorError {
   source: string;
   error: string;
 }
 
+/** Federated search result interface definition. */
 export interface FederatedSearchResult {
   results: SearchResult[];
   /** Connector ids that returned results successfully. */

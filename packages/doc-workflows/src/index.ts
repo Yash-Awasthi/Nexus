@@ -59,6 +59,7 @@ export interface ActionContext {
   fetchFn?: typeof fetch;
 }
 
+/** Action result interface definition. */
 export interface ActionResult {
   action: string;
   success: boolean;
@@ -66,6 +67,7 @@ export interface ActionResult {
   error?: string;
 }
 
+/** Action fn type alias. */
 export type ActionFn = (doc: WorkflowDoc, ctx: ActionContext) => Promise<ActionResult>;
 
 // ── Workflow definition ───────────────────────────────────────────────────────
@@ -91,6 +93,7 @@ export interface WorkflowExecutionResult {
   error?: string;
 }
 
+/** Process result interface definition. */
 export interface ProcessResult {
   docId: string;
   trigger: TriggerType;

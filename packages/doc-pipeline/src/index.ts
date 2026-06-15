@@ -28,6 +28,7 @@ import { defineAdapter, type IExecutionContext } from "@nexus/plugin-sdk";
 
 export type DocFormat = "text" | "markdown" | "html" | "pdf" | "docx";
 
+/** Doc input interface definition. */
 export interface DocInput {
   /** Document format — drives extractor selection */
   format: DocFormat;
@@ -39,6 +40,7 @@ export interface DocInput {
   metadata?: Record<string, unknown>;
 }
 
+/** Chunk options interface definition. */
 export interface ChunkOptions {
   /**
    * Maximum tokens per chunk (estimated at 4 chars/token).
@@ -52,6 +54,7 @@ export interface ChunkOptions {
   overlapTokens?: number;
 }
 
+/** Text chunk interface definition. */
 export interface TextChunk {
   /** Zero-based chunk index within the document */
   index: number;
@@ -61,12 +64,15 @@ export interface TextChunk {
   tokenEstimate: number;
 }
 
+/** Embedding type alias. */
 export type Embedding = number[];
 
+/** Embedded chunk interface definition. */
 export interface EmbeddedChunk extends TextChunk {
   embedding: Embedding;
 }
 
+/** Doc meta interface definition. */
 export interface DocMeta {
   source?: string;
   format: DocFormat;
@@ -75,6 +81,7 @@ export interface DocMeta {
   metadata?: Record<string, unknown>;
 }
 
+/** Store result interface definition. */
 export interface StoreResult {
   /** IDs assigned to the stored chunks (one per chunk, in order) */
   ids: string[];
@@ -82,6 +89,7 @@ export interface StoreResult {
   count: number;
 }
 
+/** Pipeline result interface definition. */
 export interface PipelineResult {
   source?: string;
   format: DocFormat;
@@ -391,6 +399,7 @@ async function execute(
   );
 }
 
+/** Doc pipeline adapter. */
 export const docPipelineAdapter = defineAdapter<DocIngestTask, PipelineResult>({
   name: "nexus-adapter-doc-pipeline",
   version: "0.1.0",

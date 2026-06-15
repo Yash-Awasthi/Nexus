@@ -23,6 +23,7 @@ export interface DigestEvent {
   metadata?: Record<string, unknown>;
 }
 
+/** Digest snapshot interface definition. */
 export interface DigestSnapshot {
   id: string;
   userId: string;
@@ -31,6 +32,7 @@ export interface DigestSnapshot {
   createdAt: string;
 }
 
+/** Brief section interface definition. */
 export interface BriefSection {
   domain: string;
   title: string;
@@ -38,12 +40,14 @@ export interface BriefSection {
   eventCount: number;
 }
 
+/** Carousel page interface definition. */
 export interface CarouselPage {
   pageIndex: number;
   totalPages: number;
   sections: BriefSection[];
 }
 
+/** Brief result interface definition. */
 export interface BriefResult {
   userId: string;
   date: string;
@@ -54,6 +58,7 @@ export interface BriefResult {
   generatedAt: string;
 }
 
+/** Brief engine options interface definition. */
 export interface BriefEngineOptions {
   /** Base URL for share links (default: "https://nexus.local") */
   baseUrl?: string;
@@ -321,6 +326,7 @@ ${slidesHtml}
 let _seq = 0;
 function uid(prefix: string): string { return `${prefix}-${Date.now()}-${++_seq}`; }
 
+/** Brief engine. */
 export class BriefEngine {
   private store: DigestStore;
   private signer: BriefSigner;
@@ -421,6 +427,7 @@ interface IDigestStoreLike {
   delete(userId: string, date: string): boolean | Promise<boolean>;
 }
 
+/** Pg digest store. */
 export class PgDigestStore implements IDigestStoreLike {
   private readonly sql: ReturnType<typeof neon>;
   private schemaEnsured = false;

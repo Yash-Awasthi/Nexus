@@ -29,6 +29,7 @@ export interface ConversationMessage {
   content: string;
 }
 
+/** Intent type type alias. */
 export type IntentType =
   | "information_seeking"
   | "task_execution"
@@ -40,8 +41,10 @@ export type IntentType =
   | "analysis"
   | "social";
 
+/** Sentiment type alias. */
 export type Sentiment = "positive" | "neutral" | "negative" | "mixed";
 
+/** Intent signal interface definition. */
 export interface IntentSignal {
   type: IntentType;
   confidence: number;
@@ -49,6 +52,7 @@ export interface IntentSignal {
   evidence: string[];
 }
 
+/** Conversation insight interface definition. */
 export interface ConversationInsight {
   conversationId: string;
   analyzedAt: number;
@@ -67,6 +71,7 @@ export interface ConversationInsight {
   summary: string;
 }
 
+/** Analyze options interface definition. */
 export interface AnalyzeOptions {
   id: string;
   messages: ConversationMessage[];

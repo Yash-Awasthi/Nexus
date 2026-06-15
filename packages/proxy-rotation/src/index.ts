@@ -22,6 +22,7 @@
 
 export type ProxyProtocol = "http" | "https" | "socks5";
 
+/** Proxy interface definition. */
 export interface Proxy {
   /** Full proxy URL, e.g. "http://user:pass@1.2.3.4:8080" */
   url: string;
@@ -35,6 +36,7 @@ export interface Proxy {
   weight?: number;
 }
 
+/** Proxy health interface definition. */
 export interface ProxyHealth {
   proxy: Proxy;
   /** Total successful uses. */

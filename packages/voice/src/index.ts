@@ -54,6 +54,7 @@ export type VoiceErrorCode =
   | "INVALID_AUDIO"
   | "PROVIDER_AUTH_FAILED";
 
+/** Voice error. */
 export class VoiceError extends Error {
   readonly code: VoiceErrorCode;
   readonly context?: Record<string, unknown>;
@@ -70,6 +71,7 @@ export class VoiceError extends Error {
 
 export type AudioFormat = "wav" | "mp3" | "ogg" | "flac" | "webm" | "m4a";
 
+/** Audio buffer interface definition. */
 export interface AudioBuffer {
   /** Raw audio bytes */
   data: Uint8Array;
@@ -120,6 +122,7 @@ export class SilenceVadProvider implements VadProvider {
   }
 }
 
+/** Energy vad config interface definition. */
 export interface EnergyVadConfig {
   /**
    * Minimum RMS energy level (0–1) required to classify audio as speech.
@@ -186,6 +189,7 @@ export interface TranscribeProvider {
   transcribe(audio: AudioBuffer, opts?: TranscribeOptions): Promise<TranscribeResult>;
 }
 
+/** Transcribe options interface definition. */
 export interface TranscribeOptions {
   /** BCP-47 language code hint (e.g. "en", "es", "fr"). Leave undefined for auto-detect. */
   language?: string;
@@ -195,6 +199,7 @@ export interface TranscribeOptions {
   temperature?: number;
 }
 
+/** Transcribe result interface definition. */
 export interface TranscribeResult {
   /** The transcribed text */
   transcript: string;
@@ -214,6 +219,7 @@ export interface SynthesizeProvider {
   synthesize(text: string, opts?: SynthesizeOptions): Promise<AudioBuffer>;
 }
 
+/** Synthesize options interface definition. */
 export interface SynthesizeOptions {
   /** Voice ID or name (provider-specific) */
   voice?: string;
@@ -259,6 +265,7 @@ export class NullSynthesizeProvider implements SynthesizeProvider {
 
 export type FetchFn = typeof fetch;
 
+/** Groq transcribe config interface definition. */
 export interface GroqTranscribeConfig {
   /** Groq API key — defaults to process.env.GROQ_API_KEY */
   apiKey?: string;
@@ -489,6 +496,7 @@ export interface VoiceHooks {
   ): Promise<{ handled: number; aborted: boolean; errors: unknown[] }>;
 }
 
+/** Voice session config interface definition. */
 export interface VoiceSessionConfig {
   transcribe: TranscribeProvider;
   /** If omitted, VoiceTurnResult.audio will be undefined */
@@ -509,6 +517,7 @@ export interface VoiceSessionConfig {
   synthesizeOpts?: SynthesizeOptions;
 }
 
+/** Voice turn options interface definition. */
 export interface VoiceTurnOptions {
   /** Per-turn language override */
   language?: string;
@@ -518,6 +527,7 @@ export interface VoiceTurnOptions {
   textOnly?: boolean;
 }
 
+/** Voice turn result interface definition. */
 export interface VoiceTurnResult {
   /** The transcribed text from the audio input */
   transcript: string;
@@ -544,6 +554,7 @@ export interface VoiceTurnResult {
   vadEnergyLevel?: number;
 }
 
+/** Voice session. */
 export class VoiceSession {
   private readonly transcribe: TranscribeProvider;
   private readonly synthesize?: SynthesizeProvider;

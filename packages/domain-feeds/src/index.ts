@@ -45,6 +45,7 @@ export interface FeedEvent {
   metadata?: Record<string, unknown>;
 }
 
+/** Feed page interface definition. */
 export interface FeedPage<T> {
   domain: string;
   events: T[];
@@ -61,6 +62,7 @@ export interface AviationEvent extends FeedEvent {
   alertType: "delay" | "cancellation" | "diversion" | "notam" | "weather";
 }
 
+/** Climate event interface definition. */
 export interface ClimateEvent extends FeedEvent {
   eventType: "temperature_anomaly" | "precipitation" | "drought" | "flood" | "storm";
   location: string;
@@ -68,12 +70,14 @@ export interface ClimateEvent extends FeedEvent {
   unit?: string;
 }
 
+/** Conflict event interface definition. */
 export interface ConflictEvent extends FeedEvent {
   region: string;
   eventType: "airstrikes" | "clashes" | "ceasefire" | "displacement" | "humanitarian";
   fatalities?: number;
 }
 
+/** Economic event interface definition. */
 export interface EconomicEvent extends FeedEvent {
   indicator: string;
   value: number;
@@ -82,6 +86,7 @@ export interface EconomicEvent extends FeedEvent {
   changePercent?: number;
 }
 
+/** Displacement event interface definition. */
 export interface DisplacementEvent extends FeedEvent {
   country: string;
   displacedCount: number;
@@ -89,6 +94,7 @@ export interface DisplacementEvent extends FeedEvent {
   campName?: string;
 }
 
+/** Cyber event interface definition. */
 export interface CyberEvent extends FeedEvent {
   threatType: "ransomware" | "phishing" | "ddos" | "data_breach" | "vulnerability" | "apt";
   targetSector?: string;
@@ -96,6 +102,7 @@ export interface CyberEvent extends FeedEvent {
   iocs?: string[];
 }
 
+/** Health event interface definition. */
 export interface HealthEvent extends FeedEvent {
   disease: string;
   region: string;
@@ -104,6 +111,7 @@ export interface HealthEvent extends FeedEvent {
   alertLevel: "watch" | "alert" | "outbreak" | "pandemic";
 }
 
+/** Imagery event interface definition. */
 export interface ImageryEvent extends FeedEvent {
   satellite: string;
   coordinates: { lat: number; lon: number };
@@ -112,6 +120,7 @@ export interface ImageryEvent extends FeedEvent {
   imageUrl?: string;
 }
 
+/** Seismology event interface definition. */
 export interface SeismologyEvent extends FeedEvent {
   magnitude: number;
   depth: number;
@@ -120,6 +129,7 @@ export interface SeismologyEvent extends FeedEvent {
   tsunamiWarning: boolean;
 }
 
+/** Wildfire event interface definition. */
 export interface WildfireEvent extends FeedEvent {
   name?: string;
   state: string;
@@ -129,6 +139,7 @@ export interface WildfireEvent extends FeedEvent {
   cause?: string;
 }
 
+/** Maritime event interface definition. */
 export interface MaritimeEvent extends FeedEvent {
   vesselName?: string;
   mmsi?: string;
@@ -147,6 +158,7 @@ export interface FeedAdapterOptions {
   http?: HttpGetFn;
 }
 
+/** Abstract base class for feed adapter. */
 export abstract class FeedAdapter<T extends FeedEvent> {
   abstract readonly domain: string;
   protected baseUrl: string;
@@ -200,6 +212,7 @@ export class AviationFeed extends FeedAdapter<AviationEvent> {
   }
 }
 
+/** Climate feed. */
 export class ClimateFeed extends FeedAdapter<ClimateEvent> {
   domain = "climate";
 
@@ -210,6 +223,7 @@ export class ClimateFeed extends FeedAdapter<ClimateEvent> {
   }
 }
 
+/** Conflict feed. */
 export class ConflictFeed extends FeedAdapter<ConflictEvent> {
   domain = "conflict";
 
@@ -220,6 +234,7 @@ export class ConflictFeed extends FeedAdapter<ConflictEvent> {
   }
 }
 
+/** Economic feed. */
 export class EconomicFeed extends FeedAdapter<EconomicEvent> {
   domain = "economic";
 
@@ -230,6 +245,7 @@ export class EconomicFeed extends FeedAdapter<EconomicEvent> {
   }
 }
 
+/** Displacement feed. */
 export class DisplacementFeed extends FeedAdapter<DisplacementEvent> {
   domain = "displacement";
 
@@ -240,6 +256,7 @@ export class DisplacementFeed extends FeedAdapter<DisplacementEvent> {
   }
 }
 
+/** Cyber feed. */
 export class CyberFeed extends FeedAdapter<CyberEvent> {
   domain = "cyber";
 
@@ -250,6 +267,7 @@ export class CyberFeed extends FeedAdapter<CyberEvent> {
   }
 }
 
+/** Health feed. */
 export class HealthFeed extends FeedAdapter<HealthEvent> {
   domain = "health";
 
@@ -260,6 +278,7 @@ export class HealthFeed extends FeedAdapter<HealthEvent> {
   }
 }
 
+/** Imagery feed. */
 export class ImageryFeed extends FeedAdapter<ImageryEvent> {
   domain = "imagery";
 
@@ -270,6 +289,7 @@ export class ImageryFeed extends FeedAdapter<ImageryEvent> {
   }
 }
 
+/** Seismology feed. */
 export class SeismologyFeed extends FeedAdapter<SeismologyEvent> {
   domain = "seismology";
 
@@ -281,6 +301,7 @@ export class SeismologyFeed extends FeedAdapter<SeismologyEvent> {
   }
 }
 
+/** Wildfire feed. */
 export class WildfireFeed extends FeedAdapter<WildfireEvent> {
   domain = "wildfire";
 
@@ -291,6 +312,7 @@ export class WildfireFeed extends FeedAdapter<WildfireEvent> {
   }
 }
 
+/** Maritime feed. */
 export class MaritimeFeed extends FeedAdapter<MaritimeEvent> {
   domain = "maritime";
 
@@ -333,6 +355,7 @@ export class FeedCache {
 export type DomainName = "aviation" | "climate" | "conflict" | "economic" | "displacement" |
   "cyber" | "health" | "imagery" | "seismology" | "wildfire" | "maritime";
 
+/** Feed registry. */
 export class FeedRegistry {
   private adapters = new Map<string, FeedAdapter<FeedEvent>>();
   private cache: FeedCache;
@@ -391,6 +414,7 @@ export interface RssItem {
   author?: string;
 }
 
+/** Rss feed interface definition. */
 export interface RssFeed {
   title: string;
   link?: string;
@@ -409,6 +433,7 @@ export interface OPMLOutline {
   title?: string;
 }
 
+/** Opml parser. */
 export class OPMLParser {
   /** Parse an OPML XML string → flat list of outlines. */
   parse(xml: string): OPMLOutline[] {
@@ -454,6 +479,7 @@ export interface RssFeedAdapterOptions {
   maxItems?: number;
 }
 
+/** Rss feed adapter. */
 export class RssFeedAdapter {
   readonly feedUrl: string;
   private http: HttpGetFn;

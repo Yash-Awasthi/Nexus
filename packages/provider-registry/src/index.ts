@@ -30,12 +30,14 @@ export interface ProviderCapabilities {
   systemPrompt: boolean;
 }
 
+/** Provider rate limits interface definition. */
 export interface ProviderRateLimits {
   requestsPerMinute: number;
   tokensPerMinute: number;
   tokensPerDay?: number;
 }
 
+/** Model definition interface definition. */
 export interface ModelDefinition {
   /** Canonical model id, e.g. "anthropic/claude-3-5-sonnet-20241022" */
   id: string;
@@ -57,6 +59,7 @@ export interface ModelDefinition {
   deprecated?: boolean;
 }
 
+/** Registry filter interface definition. */
 export interface RegistryFilter {
   provider?: string;
   capability?: keyof ProviderCapabilities;
@@ -133,6 +136,7 @@ const ALL_CAPS: ProviderCapabilities = {
 const NO_VISION: ProviderCapabilities = { ...ALL_CAPS, vision: false };
 const NO_CACHE: ProviderCapabilities = { ...ALL_CAPS, promptCaching: false };
 
+/** Builtin models. */
 export const BUILTIN_MODELS: ModelDefinition[] = [
   // Anthropic
   {

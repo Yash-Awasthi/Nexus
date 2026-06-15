@@ -32,6 +32,7 @@ export interface BonMessage {
   content: string;
 }
 
+/** Bon llm response interface definition. */
 export interface BonLlmResponse {
   content: string;
   model: string;
@@ -39,6 +40,7 @@ export interface BonLlmResponse {
   durationMs?: number;
 }
 
+/** Bon llm client interface definition. */
 export interface BonLlmClient {
   complete(messages: BonMessage[], opts?: { temperature?: number; maxTokens?: number }): Promise<BonLlmResponse>;
 }
@@ -59,6 +61,7 @@ export interface BonCandidate {
   error?: string;
 }
 
+/** Bon result interface definition. */
 export interface BonResult {
   /** The highest-scoring candidate. */
   best: BonCandidate;
@@ -113,6 +116,7 @@ export interface BestOfNConfig {
   role?: "thinker" | "editor" | string;
 }
 
+/** Generate request interface definition. */
 export interface GenerateRequest {
   prompt: string;
   /** Optional system prompt prepended to all N calls. */

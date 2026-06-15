@@ -22,6 +22,7 @@
 
 export type PrivacyDecision = "ALLOW" | "SUPPRESS" | "WARN_RACE";
 
+/** Prompt row interface definition. */
 export interface PromptRow {
   sessionId: string;
   prompt: string;
@@ -30,6 +31,7 @@ export interface PromptRow {
   redactedAt?: string;
 }
 
+/** Validation result interface definition. */
 export interface ValidationResult {
   decision: PrivacyDecision;
   reason: string;
@@ -45,6 +47,7 @@ export interface PromptStore {
   getRow(sessionId: string): Promise<PromptRow | null>;
 }
 
+/** Mock prompt store. */
 export class MockPromptStore implements PromptStore {
   private rows = new Map<string, PromptRow | null>();
 
@@ -72,6 +75,7 @@ export interface PrivacyCheckOptions {
 
 const DEFAULT_STRIP = /[\s\u200b\u00a0]/g; // whitespace + zero-width + NBSP
 
+/** Privacy check validator. */
 export class PrivacyCheckValidator {
   private opts: Required<PrivacyCheckOptions>;
 
@@ -158,6 +162,7 @@ export interface AuditEntry {
   warnMessage?: string;
 }
 
+/** Privacy audit log. */
 export class PrivacyAuditLog {
   private entries: AuditEntry[] = [];
 
@@ -186,6 +191,7 @@ export class PrivacyAuditLog {
 
 export type ValidatorFn = (sessionId: string, row: PromptRow | null, rowExists: boolean) => ValidationResult | null;
 
+/** Validation pipeline. */
 export class ValidationPipeline {
   private validators: ValidatorFn[] = [];
   private auditLog?: PrivacyAuditLog;

@@ -35,12 +35,14 @@
 
 export type SelectorStrategy = "css" | "xpath" | "text";
 
+/** Selector example interface definition. */
 export interface SelectorExample {
   description: string;
   selector: string;
   strategy: SelectorStrategy;
 }
 
+/** Element selector request interface definition. */
 export interface ElementSelectorRequest {
   /** Raw HTML of the page or relevant section. Will be truncated if too long. */
   html: string;
@@ -54,6 +56,7 @@ export interface ElementSelectorRequest {
   hint?: string;
 }
 
+/** Element selector result interface definition. */
 export interface ElementSelectorResult {
   selector: string;
   strategy: SelectorStrategy;
@@ -95,11 +98,13 @@ export class AISelectorError extends Error {
 
 export type MessageRole = "system" | "user" | "assistant";
 
+/** Llm message interface definition. */
 export interface LLMMessage {
   role: MessageRole;
   content: string;
 }
 
+/** Llm request interface definition. */
 export interface LLMRequest {
   model: string;
   messages: LLMMessage[];
@@ -107,10 +112,12 @@ export interface LLMRequest {
   temperature?: number;
 }
 
+/** Llm response interface definition. */
 export interface LLMResponse {
   content: string;
 }
 
+/** Llm provider interface definition. */
 export interface LLMProvider {
   readonly name: string;
   readonly models: readonly string[];
@@ -229,6 +236,7 @@ export interface LLMAISelectorConfig {
   temperature?: number;
 }
 
+/** Llmai selector. */
 export class LLMAISelector implements IAISelector {
   private readonly maxHtmlChars: number;
 
@@ -288,6 +296,7 @@ export interface StaticSelector {
   description?: string;
 }
 
+/** Cascade selector config interface definition. */
 export interface CascadeSelectorConfig {
   /** Static selectors to try first. */
   statics: StaticSelector[];

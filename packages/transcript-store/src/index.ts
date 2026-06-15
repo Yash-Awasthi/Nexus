@@ -14,6 +14,7 @@
 
 export type MessageRole = "user" | "assistant" | "system" | "tool";
 
+/** Transcript message interface definition. */
 export interface TranscriptMessage {
   id: string;
   role: MessageRole;
@@ -23,18 +24,21 @@ export interface TranscriptMessage {
   metadata?: Record<string, unknown>;
 }
 
+/** Transcript interface definition. */
 export interface Transcript {
   sessionId: string;
   createdAt: string;
   messages: TranscriptMessage[];
 }
 
+/** Replay options interface definition. */
 export interface ReplayOptions {
   fromIndex?: number;
   toIndex?: number;
   roles?: MessageRole[];
 }
 
+/** Search options interface definition. */
 export interface SearchOptions {
   role?: MessageRole;
   limit?: number;

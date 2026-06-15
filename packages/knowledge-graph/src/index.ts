@@ -36,12 +36,14 @@ export type EntityType =
   | "EVENT"
   | "OTHER";
 
+/** Entity interface definition. */
 export interface Entity {
   text: string;
   type: EntityType;
   confidence: number;
 }
 
+/** Relationship interface definition. */
 export interface Relationship {
   subject: string;
   predicate: string;
@@ -89,6 +91,7 @@ export interface KGNode {
   updatedAt: number;
 }
 
+/** Kg edge interface definition. */
 export interface KGEdge {
   /** Deterministic id: sha256(subjectId|predicate.lower()|objectId).slice(0,16) */
   id: string;
@@ -112,6 +115,7 @@ export interface NodeQuery {
   limit?: number;
 }
 
+/** Edge query interface definition. */
 export interface EdgeQuery {
   subjectId?: string;
   objectId?: string;
@@ -121,6 +125,7 @@ export interface EdgeQuery {
   limit?: number;
 }
 
+/** Kg stats interface definition. */
 export interface KGStats {
   nodes: number;
   edges: number;
@@ -318,6 +323,7 @@ export interface IngestOptions {
   relationshipExtractor?: RelationshipExtractor;
 }
 
+/** Ingest result interface definition. */
 export interface IngestResult {
   nodesAdded: number;
   nodesMerged: number;
@@ -327,19 +333,23 @@ export interface IngestResult {
   relationships: Relationship[];
 }
 
+/** Traversal direction type alias. */
 export type TraversalDirection = "outbound" | "inbound" | "both";
 
+/** Related options interface definition. */
 export interface RelatedOptions {
   direction?: TraversalDirection;
   limit?: number;
 }
 
+/** Related edge interface definition. */
 export interface RelatedEdge {
   node: KGNode;
   edge: KGEdge;
   direction: "outbound" | "inbound";
 }
 
+/** Related result interface definition. */
 export interface RelatedResult {
   node: KGNode | undefined;
   neighbors: RelatedEdge[];
@@ -561,6 +571,7 @@ export type NeonQueryFn = (
   params?: unknown[],
 ) => Promise<{ rows: NeonRow[] }>;
 
+/** Neon kg store config interface definition. */
 export interface NeonKGStoreConfig {
   /** Injectable SQL executor (see NeonQueryFn) */
   query: NeonQueryFn;

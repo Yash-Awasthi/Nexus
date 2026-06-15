@@ -7,12 +7,14 @@ export interface GotoOpts {
   timeoutMs?: number;
 }
 
+/** Screenshot opts interface definition. */
 export interface ScreenshotOpts {
   fullPage?: boolean;
   encoding?: "binary" | "base64";
   clip?: { x: number; y: number; width: number; height: number };
 }
 
+/** Wait selector opts interface definition. */
 export interface WaitSelectorOpts {
   visible?: boolean;
   hidden?: boolean;
@@ -34,6 +36,7 @@ export interface PageDriver {
   title(): Promise<string>;
 }
 
+/** Page driver factory type alias. */
 export type PageDriverFactory = () => Promise<PageDriver>;
 
 // ── Error ─────────────────────────────────────────────────────────────────────

@@ -30,15 +30,18 @@
 
 export type PrincipalType = "user" | "group" | "public";
 
+/** Principal type alias. */
 export type Principal =
   | { type: "user"; id: string }
   | { type: "group"; id: string }
   | { type: "public" };
 
+/** Permission type alias. */
 export type Permission = "read" | "write" | "admin";
 
 const PERM_ORDER: Record<Permission, number> = { read: 0, write: 1, admin: 2 };
 
+/** Acl entry interface definition. */
 export interface ACLEntry {
   principal: Principal;
   permission: Permission;
@@ -46,6 +49,7 @@ export interface ACLEntry {
   grantedBy?: string;
 }
 
+/** Document acl interface definition. */
 export interface DocumentACL {
   documentId: string;
   entries: ACLEntry[];

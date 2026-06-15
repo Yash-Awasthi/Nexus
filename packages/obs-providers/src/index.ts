@@ -21,6 +21,7 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type EventRole = "user" | "assistant" | "system" | "tool";
+/** Error class type alias. */
 export type ErrorClass =
   | "auth_invalid"
   | "quota_exceeded"
@@ -31,6 +32,7 @@ export type ErrorClass =
   | "timeout"
   | "unknown";
 
+/** Observation event interface definition. */
 export interface ObservationEvent {
   role: EventRole;
   content: string;
@@ -38,8 +40,10 @@ export interface ObservationEvent {
   isPrivate?: boolean;
 }
 
+/** Observation skip reason type alias. */
 export type ObservationSkipReason = "all_events_private" | "no_content" | "filtered";
 
+/** Observation result interface definition. */
 export interface ObservationResult {
   observation: string | null;          // null = skip (see skipReason)
   skipReason?: ObservationSkipReason;
@@ -52,6 +56,7 @@ export interface ObservationResult {
   errorClass?: ErrorClass;
 }
 
+/** Generation request interface definition. */
 export interface GenerationRequest {
   sessionId: string;
   events: ObservationEvent[];
@@ -71,6 +76,7 @@ Guidelines:
 - If all events are private or there is no substantive content, output: <skip_summary reason="all_events_private"/>
 - Output observation text only — no preamble, no JSON`;
 
+/** Build server generation prompt. */
 export function buildServerGenerationPrompt(
   events: ObservationEvent[],
   sessionId: string,
@@ -171,6 +177,7 @@ abstract class BaseObservationProvider implements ObservationProvider {
 
 export type LlmCallFn = (prompt: string, systemPrompt: string, maxTokens: number) => Promise<string>;
 
+/** Claude observation provider. */
 export class ClaudeObservationProvider extends BaseObservationProvider {
   readonly name = "claude";
   model: string;
@@ -232,6 +239,7 @@ export interface MockProviderBehavior {
   delayMs?: number;
 }
 
+/** Mock observation provider. */
 export class MockObservationProvider implements ObservationProvider {
   readonly name: string;
   readonly model: string;
@@ -336,6 +344,7 @@ export interface StructuredObservation {
   confidence: number; // 0–1
 }
 
+/** Llm observation provider options interface definition. */
 export interface LlmObservationProviderOptions {
   /** Model identifier, e.g. "groq/llama-3.3-70b" or "claude/claude-opus-4-5". */
   model?: string;
@@ -354,6 +363,7 @@ Confidence: 0.0–1.0
 
 If there is no substantive content, return an empty array: []`;
 
+/** Llm observation provider. */
 export class LlmObservationProvider implements ObservationProvider {
   readonly name = "llm-structured";
   readonly model: string;

@@ -15,8 +15,10 @@
 
 export type EngineType = "playwright" | "cdp" | "httpx" | "camoufox";
 
+/** Scrape status type alias. */
 export type ScrapeStatus = "success" | "blocked" | "timeout" | "error" | "cached";
 
+/** Scrape result interface definition. */
 export interface ScrapeResult {
   url: string;
   html: string;
@@ -28,6 +30,7 @@ export interface ScrapeResult {
   statusCode?: number;
 }
 
+/** Scrape options interface definition. */
 export interface ScrapeOptions {
   timeout?: number;
   headers?: Record<string, string>;
@@ -94,6 +97,7 @@ export interface SelectorFallback {
   type: "css" | "xpath" | "text";
 }
 
+/** Element selector. */
 export class ElementSelector {
   private primary: string;
   private fallbacks: SelectorFallback[];
@@ -195,6 +199,7 @@ export interface EngineStats {
   successRate: number;
 }
 
+/** Adaptive scraper. */
 export class AdaptiveScraper {
   private engines: ScrapeEngine[];
   private cache: ScrapeCache;
@@ -270,6 +275,7 @@ export interface ScheduledTask {
 
 let _taskSeq = 0;
 
+/** Scrape scheduler. */
 export class ScrapeScheduler {
   private queue: ScheduledTask[] = [];
   private scraper: AdaptiveScraper;

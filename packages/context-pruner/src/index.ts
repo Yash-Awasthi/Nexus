@@ -46,6 +46,7 @@ export class PrunerError extends Error {
 
 export type MessageRole = "system" | "user" | "assistant" | "tool";
 
+/** Message interface definition. */
 export interface Message {
   role: MessageRole;
   content: string;
@@ -75,6 +76,7 @@ export interface PruneOptions {
   reserveTokens?: number;
 }
 
+/** I context pruner interface definition. */
 export interface IContextPruner {
   /**
    * Prune `messages` to fit within `maxTokens`.
@@ -365,20 +367,25 @@ export class PrunerChain implements IContextPruner {
  * Uses the pruner to ensure messages fit within the model's context window.
  */
 export type MessageRole2 = "system" | "user" | "assistant";
+/** Llm message interface definition. */
 export interface LLMMessage { role: MessageRole2; content: string; }
+/** Llm request interface definition. */
 export interface LLMRequest {
   model: string;
   messages: LLMMessage[];
   maxTokens?: number;
   temperature?: number;
 }
+/** Llm response interface definition. */
 export interface LLMResponse { id: string; model: string; content: string; provider: string; latencyMs: number; }
+/** Llm provider interface definition. */
 export interface LLMProvider {
   readonly name: string;
   readonly models: readonly string[];
   complete(request: LLMRequest): Promise<LLMResponse>;
 }
 
+/** Budget guard options interface definition. */
 export interface BudgetGuardOptions {
   /** Context window size in tokens. Default: 4096 */
   contextWindowTokens?: number;
@@ -386,6 +393,7 @@ export interface BudgetGuardOptions {
   reserveCompletionTokens?: number;
 }
 
+/** Budget guard. */
 export class BudgetGuard implements LLMProvider {
   readonly name: string;
   readonly models: readonly string[];

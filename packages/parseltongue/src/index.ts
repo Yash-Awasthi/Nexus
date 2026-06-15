@@ -35,8 +35,10 @@ export type ObfuscationTechnique =
   | "phonetic"
   | "random";
 
+/** Obfuscation intensity type alias. */
 export type ObfuscationIntensity = "light" | "medium" | "heavy";
 
+/** Parseltongue config interface definition. */
 export interface ParseltongueConfig {
   enabled: boolean;
   technique: ObfuscationTechnique;
@@ -44,6 +46,7 @@ export interface ParseltongueConfig {
   customTriggers: string[];
 }
 
+/** Parseltongue result interface definition. */
 export interface ParseltongueResult {
   originalText: string;
   transformedText: string;
@@ -315,10 +318,12 @@ export function applyParseltongue(text: string, config: ParseltongueConfig): Par
   };
 }
 
+/** Get default config. */
 export function getDefaultConfig(): ParseltongueConfig {
   return { enabled: false, technique: "leetspeak", intensity: "medium", customTriggers: [] };
 }
 
+/** Get technique description. */
 export function getTechniqueDescription(technique: ObfuscationTechnique): string {
   const map: Record<ObfuscationTechnique, string> = {
     leetspeak: "Classic l33tspeak: a→4, e→3, etc.",

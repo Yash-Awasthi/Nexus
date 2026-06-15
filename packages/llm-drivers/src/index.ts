@@ -20,11 +20,13 @@
 
 export type LlmRole = "user" | "assistant" | "system";
 
+/** Llm message interface definition. */
 export interface LlmMessage {
   role: LlmRole;
   content: string;
 }
 
+/** Llm request options interface definition. */
 export interface LlmRequestOptions {
   model: string;
   messages: LlmMessage[];
@@ -36,12 +38,14 @@ export interface LlmRequestOptions {
   stop?: string[];
 }
 
+/** Llm usage interface definition. */
 export interface LlmUsage {
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
 }
 
+/** Llm response interface definition. */
 export interface LlmResponse {
   id: string;
   content: string;
@@ -51,14 +55,17 @@ export interface LlmResponse {
   durationMs: number;
 }
 
+/** Stream delta interface definition. */
 export interface StreamDelta {
   delta: string;
   done: boolean;
   usage?: LlmUsage;
 }
 
+/** Stream handler type alias. */
 export type StreamHandler = (delta: StreamDelta) => void | Promise<void>;
 
+/** Llm driver interface definition. */
 export interface LlmDriver {
   readonly provider: string;
   readonly model: string;
@@ -78,6 +85,7 @@ export type LlmErrorCode =
   | "TIMEOUT"
   | "INVALID_REQUEST";
 
+/** Llm error. */
 export class LlmError extends Error {
   constructor(
     public readonly code: LlmErrorCode,
@@ -96,6 +104,7 @@ export interface HttpTransport {
   post(url: string, body: unknown, headers: Record<string, string>): Promise<unknown>;
 }
 
+/** Mock transport. */
 export class MockTransport implements HttpTransport {
   readonly calls: Array<{ url: string; body: unknown; headers: Record<string, string> }> = [];
   private response: unknown = {};
@@ -837,11 +846,13 @@ export type ProviderName =
   | "gemini" | "ollama" | "lmstudio" | "llamacpp" | "fireworks"
   | "nvidia_nim" | "cerebras" | "kimi" | "codestral";
 
+/** Driver registration interface definition. */
 export interface DriverRegistration {
   provider: ProviderName;
   driver: LlmDriver;
 }
 
+/** Driver registry. */
 export class DriverRegistry {
   private drivers = new Map<string, LlmDriver>();
 

@@ -21,12 +21,14 @@ export type SuggestionCategory =
   | "next-step"
   | "related-topic";
 
+/** Chat message interface definition. */
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
   timestamp?: string;
 }
 
+/** Suggestion context interface definition. */
 export interface SuggestionContext {
   topics: string[];
   entities: string[];
@@ -35,6 +37,7 @@ export interface SuggestionContext {
   messageCount: number;
 }
 
+/** Suggestion result interface definition. */
 export interface SuggestionResult {
   id: string;
   text: string;
@@ -83,6 +86,7 @@ function extractWords(text: string): string[] {
     .filter((w) => w.length > 3 && !STOP_WORDS.has(w));
 }
 
+/** Context extractor. */
 export class ContextExtractor {
   extract(messages: ChatMessage[], topicLimit = 10): SuggestionContext {
     const recentMessages = messages.slice(-20);
@@ -130,6 +134,7 @@ interface RawSuggestion {
   reasoning?: string;
 }
 
+/** Suggestion generator. */
 export class SuggestionGenerator {
   private llmFn: SuggestionLlmFn;
   private maxSuggestions: number;
@@ -249,6 +254,7 @@ export interface EngineOptions {
   cacheTtlMs?: number;
 }
 
+/** Suggestion engine. */
 export class SuggestionEngine {
   private extractor: ContextExtractor;
   private generator: SuggestionGenerator;

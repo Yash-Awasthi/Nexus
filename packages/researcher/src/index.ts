@@ -20,6 +20,7 @@ export interface SearchResult {
   source: "web" | "corpus";
 }
 
+/** Research finding interface definition. */
 export interface ResearchFinding {
   query: string;
   results: SearchResult[];
@@ -42,6 +43,7 @@ export interface SourceReference {
   snippet?: string;
 }
 
+/** Citation index. */
 export class CitationIndex {
   private refs    = new Map<string, SourceReference>(); // citationKey → ref
   private urlKeys = new Map<string, string>();           // url → citationKey (dedup)
@@ -85,6 +87,7 @@ export class CitationIndex {
   }
 }
 
+/** Corpus document interface definition. */
 export interface CorpusDocument {
   id: string;
   title: string;
@@ -96,6 +99,7 @@ export interface CorpusDocument {
 // ── Injectable interfaces ─────────────────────────────────────────────────────
 
 export type WebSearchFn = (query: string) => Promise<SearchResult[]>;
+/** Synthesize fn type alias. */
 export type SynthesizeFn = (query: string, results: SearchResult[]) => Promise<string>;
 
 const DEFAULT_SEARCH: WebSearchFn = async (query) => [
@@ -119,6 +123,7 @@ export interface WebResearcherOptions {
   maxResults?: number;
 }
 
+/** Web researcher. */
 export class WebResearcher {
   private searchFn: WebSearchFn;
   private synthesizeFn: SynthesizeFn;
@@ -152,6 +157,7 @@ function tokenizeSimple(text: string): Set<string> {
   );
 }
 
+/** Corpus researcher. */
 export class CorpusResearcher {
   private docs: CorpusDocument[] = [];
   private synthesizeFn: SynthesizeFn;
@@ -218,6 +224,7 @@ export interface ResearchStep {
   finding?: ResearchFinding;
 }
 
+/** Research plan. */
 export class ResearchPlan {
   private steps: ResearchStep[] = [];
 
@@ -253,6 +260,7 @@ export interface ResearchSessionOptions {
   dedupByUrl?: boolean;
 }
 
+/** Combined finding interface definition. */
 export interface CombinedFinding {
   query: string;
   webFindings: ResearchFinding | null;
@@ -262,6 +270,7 @@ export interface CombinedFinding {
   durationMs: number;
 }
 
+/** Research session. */
 export class ResearchSession {
   private web: WebResearcher | null;
   private corpus: CorpusResearcher | null;

@@ -30,6 +30,7 @@ import { defineAdapter, requireEnv, type IExecutionContext } from "@nexus/plugin
 
 export type SandboxLanguage = "javascript" | "typescript" | "python" | "bash";
 
+/** Sandbox task interface definition. */
 export interface SandboxTask {
   taskType: "sandbox.execute";
   /** Source code to execute */
@@ -48,6 +49,7 @@ export interface SandboxTask {
   extraEnv?: Record<string, string>;
 }
 
+/** Sandbox result interface definition. */
 export interface SandboxResult {
   ok: boolean;
   /** stdout output (truncated at 64 KiB) */
@@ -74,6 +76,7 @@ export interface RunnerOptions {
   env: NodeJS.ProcessEnv;
 }
 
+/** Runner result interface definition. */
 export interface RunnerResult {
   stdout: string;
   stderr: string;
@@ -81,6 +84,7 @@ export interface RunnerResult {
   timedOut: boolean;
 }
 
+/** Runner type alias. */
 export type Runner = (
   cmd: string,
   args: string[],
@@ -351,6 +355,7 @@ async function execute(
   return executeCode(task);
 }
 
+/** Sandbox adapter. */
 export const sandboxAdapter = defineAdapter<SandboxTask, SandboxResult>({
   name: "nexus-adapter-sandbox",
   version: "0.1.0",

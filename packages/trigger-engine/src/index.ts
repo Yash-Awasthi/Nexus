@@ -18,8 +18,10 @@
 
 export type TriggerType = "delta" | "cron" | "nl" | "webhook";
 
+/** Trigger status type alias. */
 export type TriggerStatus = "active" | "paused" | "disabled";
 
+/** Trigger event interface definition. */
 export interface TriggerEvent {
   triggerId: string;
   triggerType: TriggerType;
@@ -27,14 +29,17 @@ export interface TriggerEvent {
   payload: Record<string, unknown>;
 }
 
+/** Destination fn type alias. */
 export type DestinationFn = (event: TriggerEvent) => void | Promise<void>;
 
+/** Destination interface definition. */
 export interface Destination {
   type: "function" | "url";
   fn?: DestinationFn;
   url?: string;
 }
 
+/** Trigger interface definition. */
 export interface Trigger {
   id: string;
   name: string;
@@ -64,6 +69,7 @@ export interface DeltaTriggerConfig {
   destinations?: Destination[];
 }
 
+/** Delta trigger. */
 export class DeltaTrigger implements Trigger {
   readonly id: string;
   readonly name: string;
@@ -128,6 +134,7 @@ function parseCronNextMs(schedule: string, fromMs: number): number {
   throw new Error(`Unsupported schedule: ${schedule}`);
 }
 
+/** Cron trigger. */
 export class CronTrigger implements Trigger {
   readonly id: string;
   readonly name: string;
@@ -181,6 +188,7 @@ function extractKeywords(text: string): Set<string> {
   );
 }
 
+/** Nl trigger. */
 export class NLTrigger implements Trigger {
   readonly id: string;
   readonly name: string;
@@ -224,6 +232,7 @@ export interface WebhookTriggerConfig {
   destinations?: Destination[];
 }
 
+/** Webhook trigger. */
 export class WebhookTrigger implements Trigger {
   readonly id: string;
   readonly name: string;
@@ -256,12 +265,14 @@ export interface EvaluateResult {
   deliveryResults: DeliveryResult[];
 }
 
+/** Delivery result interface definition. */
 export interface DeliveryResult {
   destination: Destination;
   success: boolean;
   error?: string;
 }
 
+/** Trigger registry. */
 export class TriggerRegistry {
   private triggers = new Map<string, Trigger>();
 

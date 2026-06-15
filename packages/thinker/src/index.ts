@@ -14,6 +14,7 @@
 
 export type StepStatus = "pending" | "running" | "done" | "error";
 
+/** Think step interface definition. */
 export interface ThinkStep {
   index: number;
   prompt: string;
@@ -25,6 +26,7 @@ export interface ThinkStep {
   tokens: number;
 }
 
+/** Think chain interface definition. */
 export interface ThinkChain {
   id: string;
   query: string;
@@ -36,6 +38,7 @@ export interface ThinkChain {
   model: string;
 }
 
+/** Thinker options interface definition. */
 export interface ThinkerOptions {
   model?: string;
   maxSteps?: number;
@@ -44,6 +47,7 @@ export interface ThinkerOptions {
   llmCall?: LlmCallFn;
 }
 
+/** Llm call fn type alias. */
 export type LlmCallFn = (
   prompt: string,
   model: string,
@@ -150,6 +154,7 @@ export interface BestOfNOptions {
   llmCall?: LlmCallFn;
 }
 
+/** Best of n. */
 export class BestOfN {
   private n: number;
   private thinker: Thinker;

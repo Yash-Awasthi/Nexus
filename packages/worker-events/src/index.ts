@@ -24,6 +24,7 @@ export type WorkerEventType =
   | "error"
   | "heartbeat";
 
+/** Base worker event interface definition. */
 export interface BaseWorkerEvent {
   type: WorkerEventType;
   sessionId: string;
@@ -31,6 +32,7 @@ export interface BaseWorkerEvent {
   id: string;        // monotonic per channel
 }
 
+/** Session started event interface definition. */
 export interface SessionStartedEvent extends BaseWorkerEvent {
   type: "session_started";
   model: string;
@@ -38,6 +40,7 @@ export interface SessionStartedEvent extends BaseWorkerEvent {
   metadata?: Record<string, unknown>;
 }
 
+/** New prompt event interface definition. */
 export interface NewPromptEvent extends BaseWorkerEvent {
   type: "new_prompt";
   promptId: string;
@@ -46,6 +49,7 @@ export interface NewPromptEvent extends BaseWorkerEvent {
   tokenEstimate?: number;
 }
 
+/** Observation queued event interface definition. */
 export interface ObservationQueuedEvent extends BaseWorkerEvent {
   type: "observation_queued";
   observationId: string;
@@ -53,6 +57,7 @@ export interface ObservationQueuedEvent extends BaseWorkerEvent {
   priority?: number;
 }
 
+/** Observation processed event interface definition. */
 export interface ObservationProcessedEvent extends BaseWorkerEvent {
   type: "observation_processed";
   observationId: string;
@@ -60,6 +65,7 @@ export interface ObservationProcessedEvent extends BaseWorkerEvent {
   durationMs: number;
 }
 
+/** Session completed event interface definition. */
 export interface SessionCompletedEvent extends BaseWorkerEvent {
   type: "session_completed";
   totalPrompts: number;
@@ -68,12 +74,14 @@ export interface SessionCompletedEvent extends BaseWorkerEvent {
   reason: "user_end" | "timeout" | "max_turns" | "error";
 }
 
+/** Summarize queued event interface definition. */
 export interface SummarizeQueuedEvent extends BaseWorkerEvent {
   type: "summarize_queued";
   targetSessionId: string;
   triggerReason: "context_limit" | "periodic" | "manual";
 }
 
+/** Summarize completed event interface definition. */
 export interface SummarizeCompletedEvent extends BaseWorkerEvent {
   type: "summarize_completed";
   targetSessionId: string;
@@ -81,6 +89,7 @@ export interface SummarizeCompletedEvent extends BaseWorkerEvent {
   durationMs: number;
 }
 
+/** Error event interface definition. */
 export interface ErrorEvent extends BaseWorkerEvent {
   type: "error";
   code: string;
@@ -88,11 +97,13 @@ export interface ErrorEvent extends BaseWorkerEvent {
   fatal: boolean;
 }
 
+/** Heartbeat event interface definition. */
 export interface HeartbeatEvent extends BaseWorkerEvent {
   type: "heartbeat";
   uptimeMs: number;
 }
 
+/** Worker event type alias. */
 export type WorkerEvent =
   | SessionStartedEvent
   | NewPromptEvent
@@ -133,6 +144,7 @@ export class SseSerializer {
 
 export type EventPredicate = (event: WorkerEvent) => boolean;
 
+/** Event filter. */
 export class EventFilter {
   static byType(...types: WorkerEventType[]): EventPredicate {
     const set = new Set(types);
@@ -190,6 +202,7 @@ export type UnsubscribeFn = () => void;
 
 let _globalSeq = 0;
 
+/** Event channel. */
 export class EventChannel {
   readonly sessionId: string;
   private subscribers = new Map<string, { predicate: EventPredicate | null; handler: (e: WorkerEvent) => void }>();

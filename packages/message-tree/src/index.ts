@@ -13,8 +13,10 @@
 
 export type NodeRole = "user" | "assistant" | "system" | "tool";
 
+/** Message state type alias. */
 export type MessageState = "idle" | "pending" | "streaming" | "complete" | "error";
 
+/** Message node data interface definition. */
 export interface MessageNodeData {
   role: NodeRole;
   content: string;
@@ -23,6 +25,7 @@ export interface MessageNodeData {
   state?: MessageState;
 }
 
+/** Message node interface definition. */
 export interface MessageNode extends MessageNodeData {
   id: string;
   parentId: string | null;
@@ -151,6 +154,7 @@ export interface Branch {
   createdAt: string;
 }
 
+/** Branch manager. */
 export class BranchManager {
   private branches = new Map<string, Branch>();
 

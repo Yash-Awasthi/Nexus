@@ -18,6 +18,7 @@ export interface Chunk {
   lineEnd: number;
 }
 
+/** Read result interface definition. */
 export interface ReadResult {
   chunks: Chunk[];
   totalChunks: number;
@@ -26,6 +27,7 @@ export interface ReadResult {
   durationMs: number;
 }
 
+/** Smart reader options interface definition. */
 export interface SmartReaderOptions {
   /** Max characters per chunk. Default: 1500 */
   chunkSize?: number;

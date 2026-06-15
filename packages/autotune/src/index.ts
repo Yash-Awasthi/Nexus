@@ -24,6 +24,7 @@
 
 export type ContextType = "code" | "creative" | "analytical" | "conversational" | "chaotic";
 
+/** Auto tune params interface definition. */
 export interface AutoTuneParams {
   temperature: number;
   top_p: number;
@@ -33,12 +34,14 @@ export interface AutoTuneParams {
   repetition_penalty: number;
 }
 
+/** Context score interface definition. */
 export interface ContextScore {
   type: ContextType;
   score: number;
   percentage: number;
 }
 
+/** Auto tune result interface definition. */
 export interface AutoTuneResult {
   params: AutoTuneParams;
   detectedContext: ContextType;
@@ -154,6 +157,7 @@ export interface EmaStore {
   set(context: ContextType, delta: LearnedDelta): Promise<void>;
 }
 
+/** In memory ema store. */
 export class InMemoryEmaStore implements EmaStore {
   private readonly data = new Map<ContextType, LearnedDelta>();
 
@@ -216,6 +220,7 @@ export interface DetectionResult {
   scores: ContextScore[];
 }
 
+/** Detect context. */
 export function detectContext(
   message: string,
   history: ReadonlyArray<{ role: string; content: string }> = [],

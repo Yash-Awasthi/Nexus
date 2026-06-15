@@ -20,24 +20,29 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type SpanStatus = "ok" | "error" | "unset";
+/** Span kind type alias. */
 export type SpanKind = "root" | "llm" | "tool" | "internal";
 
+/** Span attributes interface definition. */
 export interface SpanAttributes {
   [key: string]: string | number | boolean | undefined;
 }
 
+/** Span event interface definition. */
 export interface SpanEvent {
   name: string;
   timestampMs: number;
   attributes?: SpanAttributes;
 }
 
+/** Span context interface definition. */
 export interface SpanContext {
   traceId: string;
   spanId: string;
   parentSpanId?: string;
 }
 
+/** Span interface definition. */
 export interface Span {
   context: SpanContext;
   name: string;
@@ -51,6 +56,7 @@ export interface Span {
   error?: string;
 }
 
+/** End span options interface definition. */
 export interface EndSpanOptions {
   status?: SpanStatus;
   error?: string | Error;
@@ -133,6 +139,7 @@ export interface TracerOptions {
   serviceName?: string;
 }
 
+/** I tracer interface definition. */
 export interface ITracer {
   enabled: boolean;
   startSpan(name: string, kind: SpanKind, parentContext?: SpanContext): ActiveSpan;
@@ -140,6 +147,7 @@ export interface ITracer {
   clearSpans(): void;
 }
 
+/** Tracer. */
 export class Tracer implements ITracer {
   enabled: boolean;
   private spans: Span[] = [];
@@ -213,6 +221,7 @@ class NoopActiveSpan extends ActiveSpan {
   }
 }
 
+/** Noop tracer. */
 export class NoopTracer implements ITracer {
   enabled = false;
   private static _noop = new NoopActiveSpan();
@@ -228,13 +237,17 @@ export class NoopTracer implements ITracer {
 
 let _global: ITracer = new NoopTracer();
 
+/** Get tracer. */
 export function getTracer(): ITracer { return _global; }
+/** Set tracer. */
 export function setTracer(t: ITracer): void { _global = t; }
+/** Enable tracing. */
 export function enableTracing(opts?: TracerOptions): Tracer {
   const t = new Tracer({ enabled: true, ...opts });
   _global = t;
   return t;
 }
+/** Disable tracing. */
 export function disableTracing(): void { _global = new NoopTracer(); }
 
 // ── High-level span helpers ───────────────────────────────────────────────────
@@ -256,6 +269,7 @@ export async function traceFlow<T>(
   }
 }
 
+/** Llm span options interface definition. */
 export interface LlmSpanOptions {
   model: string;
   provider: string;
@@ -278,6 +292,7 @@ export function startLlmSpan(opts: LlmSpanOptions, tracer: ITracer = _global): A
   return span;
 }
 
+/** Tool span options interface definition. */
 export interface ToolSpanOptions {
   toolName: string;
   input?: Record<string, unknown>;

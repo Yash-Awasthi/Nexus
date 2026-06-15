@@ -23,26 +23,32 @@ export type EditorModel =
   | "kimi-k2"
   | "minimax-code";
 
+/** Editor tool name type alias. */
 export type EditorToolName = "write_file" | "str_replace";
 
+/** Write file params interface definition. */
 export interface WriteFileParams {
   path: string;
   content: string;
 }
 
+/** Str replace params interface definition. */
 export interface StrReplaceParams {
   path: string;
   oldStr: string;
   newStr: string;
 }
 
+/** Editor tool params type alias. */
 export type EditorToolParams = WriteFileParams | StrReplaceParams;
 
+/** Editor tool call interface definition. */
 export interface EditorToolCall {
   tool: EditorToolName;
   params: EditorToolParams;
 }
 
+/** Structured edit output interface definition. */
 export interface StructuredEditOutput {
   model: EditorModel;
   thinking?: string;        // content extracted from <think> tags
@@ -56,6 +62,7 @@ export interface StructuredEditOutput {
 /** Reasoning models (e.g. deepseek, kimi) use <think>…</think> scaffolding. */
 const REASONING_MODELS: Set<EditorModel> = new Set(["deepseek-coder", "kimi-k2"]);
 
+/** Think scaffold. */
 export class ThinkScaffold {
   static isReasoningModel(model: EditorModel): boolean {
     return REASONING_MODELS.has(model);
@@ -83,6 +90,7 @@ export type FileSystem = {
   exists(path: string): Promise<boolean>;
 };
 
+/** Write file tool. */
 export class WriteFileTool {
   private fs: FileSystem;
 
@@ -156,6 +164,7 @@ export interface ToolExecutionResult {
   error?: string;
 }
 
+/** Editor tool executor. */
 export class EditorToolExecutor {
   private writeFile: WriteFileTool;
   private strReplace: StrReplaceTool;
@@ -191,12 +200,14 @@ export interface ModelResponse {
   tokensUsed?: number;
 }
 
+/** Model backend type alias. */
 export type ModelBackend = (
   model: EditorModel,
   systemPrompt: string,
   userPrompt: string,
 ) => Promise<ModelResponse>;
 
+/** Mock model backend. */
 export class MockModelBackend {
   readonly calls: Array<{ model: EditorModel; prompt: string }> = [];
   private response: ModelResponse | ((model: EditorModel, prompt: string) => ModelResponse);
@@ -225,18 +236,21 @@ export interface EditorAgentOptions {
   maxToolCalls?: number;
 }
 
+/** Edit request interface definition. */
 export interface EditRequest {
   instruction: string;
   filePaths?: string[];
   context?: string;
 }
 
+/** Edit result interface definition. */
 export interface EditResult {
   output: StructuredEditOutput;
   toolResults: ToolExecutionResult[];
   durationMs: number;
 }
 
+/** Code editor agent. */
 export class CodeEditorAgent {
   private model: EditorModel;
   private executor: EditorToolExecutor;

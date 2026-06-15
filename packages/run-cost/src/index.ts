@@ -105,6 +105,7 @@ export interface RunStep {
   durationMs?: number;
 }
 
+/** Run step input interface definition. */
 export interface RunStepInput {
   step: string;
   model: string;
@@ -123,6 +124,7 @@ export interface RunRecord {
   steps: RunStep[];
 }
 
+/** Run summary interface definition. */
 export interface RunSummary {
   runId: string;
   label: string;
@@ -149,6 +151,7 @@ export interface IRunCostStore {
   delete(runId: string): Promise<void>;
 }
 
+/** In memory run cost store. */
 export class InMemoryRunCostStore implements IRunCostStore {
   private readonly runs = new Map<string, RunRecord>();
 

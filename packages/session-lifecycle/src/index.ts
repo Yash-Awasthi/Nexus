@@ -16,6 +16,7 @@
 
 export type SessionStatus = "pending" | "running" | "completed" | "failed" | "aborted";
 
+/** Session record interface definition. */
 export interface SessionRecord {
   id: string;
   status: SessionStatus;
@@ -36,6 +37,7 @@ export type LifecycleEventType =
   | "cleanup_started"
   | "cleanup_finished";
 
+/** Lifecycle event interface definition. */
 export interface LifecycleEvent {
   type: LifecycleEventType;
   sessionId: string;
@@ -43,8 +45,10 @@ export interface LifecycleEvent {
   data?: Record<string, unknown>;
 }
 
+/** Lifecycle listener type alias. */
 export type LifecycleListener = (event: LifecycleEvent) => void;
 
+/** Lifecycle event bus. */
 export class LifecycleEventBus {
   private listeners = new Map<LifecycleEventType | "*", Set<LifecycleListener>>();
 
@@ -69,6 +73,7 @@ export class LifecycleEventBus {
 
 let _ssSeq = 0;
 
+/** Session store. */
 export class SessionStore {
   private sessions = new Map<string, SessionRecord>();
 
@@ -137,12 +142,14 @@ export interface CompletionOptions {
   status?: "completed" | "failed" | "aborted";
 }
 
+/** Completion result interface definition. */
 export interface CompletionResult {
   sessionId: string;
   wasAlreadyCompleted: boolean;
   record: SessionRecord;
 }
 
+/** Session completion handler. */
 export class SessionCompletionHandler {
   private store: SessionStore;
   private bus: LifecycleEventBus;
@@ -201,12 +208,14 @@ export interface CleanupTask {
   fn: () => Promise<void> | void;
 }
 
+/** Cleanup result interface definition. */
 export interface CleanupResult {
   sessionId: string;
   tasks: Array<{ name: string; success: boolean; error?: string }>;
   durationMs: number;
 }
 
+/** Generator exit handler. */
 export class GeneratorExitHandler {
   private bus: LifecycleEventBus;
   private timeoutMs: number;

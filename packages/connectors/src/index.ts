@@ -53,6 +53,7 @@ export type ConnectorErrorCode =
   | "HEALTH_CHECK_FAILED"
   | "DISABLED";
 
+/** Connector error. */
 export class ConnectorError extends Error {
   readonly code: ConnectorErrorCode;
   readonly context?: Record<string, unknown>;
@@ -74,6 +75,7 @@ export type ConnectorStatus =
   | "error"
   | "disabled";
 
+/** Connect result interface definition. */
 export interface ConnectResult {
   ok: boolean;
   /** Short error description when ok:false */
@@ -82,6 +84,7 @@ export interface ConnectResult {
   metadata?: Record<string, unknown>;
 }
 
+/** Health check result interface definition. */
 export interface HealthCheckResult {
   ok: boolean;
   latencyMs: number;
@@ -216,6 +219,7 @@ export interface GitHubConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Git hub connector. */
 export class GitHubConnector extends BaseConnector {
   readonly id = "github";
   readonly name = "GitHub";
@@ -276,6 +280,7 @@ export interface SlackConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Slack connector. */
 export class SlackConnector extends BaseConnector {
   readonly id = "slack";
   readonly name = "Slack";
@@ -323,6 +328,7 @@ export interface GroqConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Groq connector. */
 export class GroqConnector extends BaseConnector {
   readonly id = "groq";
   readonly name = "Groq";
@@ -365,6 +371,7 @@ export interface TavilyConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Tavily connector. */
 export class TavilyConnector extends BaseConnector {
   readonly id = "tavily";
   readonly name = "Tavily";
@@ -434,6 +441,7 @@ export interface NeonConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Neon connector. */
 export class NeonConnector extends BaseConnector {
   readonly id = "neon";
   readonly name = "Neon";
@@ -493,6 +501,7 @@ export interface LinearConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Linear connector. */
 export class LinearConnector extends BaseConnector {
   readonly id = "linear";
   readonly name = "Linear";
@@ -560,12 +569,14 @@ export interface ConnectAllResult {
   skipped: number;
 }
 
+/** Health check all result interface definition. */
 export interface HealthCheckAllResult {
   results: Record<string, HealthCheckResult>;
   healthy: number;
   unhealthy: number;
 }
 
+/** Connector registry. */
 export class ConnectorRegistry {
   private readonly connectors = new Map<string, Connector>();
 
@@ -692,6 +703,7 @@ export interface SyncedDocument {
   metadata?: Record<string, unknown>;
 }
 
+/** Sync options interface definition. */
 export interface SyncOptions {
   /** Max documents to emit (default: connector-specific) */
   limit?: number;
@@ -701,6 +713,7 @@ export interface SyncOptions {
   query?: string;
 }
 
+/** Document connector interface definition. */
 export interface DocumentConnector extends Connector {
   sync(opts?: SyncOptions): AsyncIterable<SyncedDocument>;
 }
@@ -1038,6 +1051,7 @@ export class WebDocumentConnector extends BaseDocumentConnector {
 /** Injectable file reader — matches the signature of fs/promises readFile(path, "utf8") */
 export type ReadFileFn = (path: string) => Promise<string>;
 
+/** File system document connector config interface definition. */
 export interface FileSystemDocumentConnectorConfig {
   /** List of file paths to read */
   paths: string[];
@@ -1321,6 +1335,7 @@ export interface NeonDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Neon document connector. */
 export class NeonDocumentConnector extends BaseDocumentConnector {
   readonly id = "neon-doc";
   readonly name = "Neon";
@@ -1399,6 +1414,7 @@ export interface RssDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Rss document connector. */
 export class RssDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name: string;
@@ -1497,6 +1513,7 @@ function extractNotionTitle(page: NotionPage): string {
   return page.id;
 }
 
+/** Notion document connector. */
 export class NotionDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Notion";
@@ -1582,6 +1599,7 @@ export interface ConfluenceDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Confluence document connector. */
 export class ConfluenceDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Confluence";
@@ -1682,6 +1700,7 @@ function extractJiraText(
     .trim();
 }
 
+/** Jira document connector. */
 export class JiraDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Jira";
@@ -1768,6 +1787,7 @@ export interface GitLabDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Git lab document connector. */
 export class GitLabDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "GitLab";
@@ -1854,6 +1874,7 @@ export interface HackerNewsDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Hacker news document connector. */
 export class HackerNewsDocumentConnector extends BaseDocumentConnector {
   readonly id = "hackernews-doc";
   readonly name = "Hacker News";
@@ -1922,6 +1943,7 @@ export interface AirtableDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Airtable document connector. */
 export class AirtableDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Airtable";
@@ -2003,6 +2025,7 @@ export interface AsanaDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Asana document connector. */
 export class AsanaDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Asana";
@@ -2072,6 +2095,7 @@ export interface BitbucketDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Bitbucket document connector. */
 export class BitbucketDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Bitbucket";
@@ -2134,6 +2158,7 @@ export interface BookstackDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Bookstack document connector. */
 export class BookstackDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "BookStack";
@@ -2200,6 +2225,7 @@ export interface CanvasDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Canvas document connector. */
 export class CanvasDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Canvas";
@@ -2264,6 +2290,7 @@ export interface ClickUpDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Click up document connector. */
 export class ClickUpDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "ClickUp";
@@ -2335,6 +2362,7 @@ export interface CodaDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Coda document connector. */
 export class CodaDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Coda";
@@ -2405,6 +2433,7 @@ export interface DiscordDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Discord document connector. */
 export class DiscordDocumentConnector extends BaseDocumentConnector {
   readonly id = "discord-doc";
   readonly name = "Discord";
@@ -2479,6 +2508,7 @@ export interface DiscourseDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Discourse document connector. */
 export class DiscourseDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Discourse";
@@ -2541,6 +2571,7 @@ export interface DropboxDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Dropbox document connector. */
 export class DropboxDocumentConnector extends BaseDocumentConnector {
   readonly id = "dropbox-doc";
   readonly name = "Dropbox";
@@ -2611,6 +2642,7 @@ export interface FirefliesDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Fireflies document connector. */
 export class FirefliesDocumentConnector extends BaseDocumentConnector {
   readonly id = "fireflies-doc";
   readonly name = "Fireflies";
@@ -2674,6 +2706,7 @@ export interface FreshdeskDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Freshdesk document connector. */
 export class FreshdeskDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Freshdesk";
@@ -2739,6 +2772,7 @@ export interface GitBookDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Git book document connector. */
 export class GitBookDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "GitBook";
@@ -2802,6 +2836,7 @@ export interface GongDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Gong document connector. */
 export class GongDocumentConnector extends BaseDocumentConnector {
   readonly id = "gong-doc";
   readonly name = "Gong";
@@ -2870,6 +2905,7 @@ export interface GoogleDriveDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Google drive document connector. */
 export class GoogleDriveDocumentConnector extends BaseDocumentConnector {
   readonly id = "gdrive-doc";
   readonly name = "Google Drive";
@@ -2939,6 +2975,7 @@ export interface GuruDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Guru document connector. */
 export class GuruDocumentConnector extends BaseDocumentConnector {
   readonly id = "guru-doc";
   readonly name = "Guru";
@@ -3004,6 +3041,7 @@ export interface HubSpotDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Hub spot document connector. */
 export class HubSpotDocumentConnector extends BaseDocumentConnector {
   readonly id = "hubspot-doc";
   readonly name = "HubSpot";
@@ -3078,8 +3116,10 @@ export interface ImapMessage {
   text: string;
 }
 
+/** Imap query fn type alias. */
 export type ImapQueryFn = (opts: { mailbox?: string; limit?: number }) => Promise<ImapMessage[]>;
 
+/** Imap document connector config interface definition. */
 export interface ImapDocumentConnectorConfig {
   host: string;
   port?: number;
@@ -3091,6 +3131,7 @@ export interface ImapDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Imap document connector. */
 export class ImapDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "IMAP Email";
@@ -3153,6 +3194,7 @@ export interface LoopiODocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Loopi o document connector. */
 export class LoopiODocumentConnector extends BaseDocumentConnector {
   readonly id = "loopio-doc";
   readonly name = "Loopio";
@@ -3219,6 +3261,7 @@ export interface MediaWikiDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Media wiki document connector. */
 export class MediaWikiDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "MediaWiki";
@@ -3290,6 +3333,7 @@ export interface SharePointDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Share point document connector. */
 export class SharePointDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "SharePoint";
@@ -3363,6 +3407,7 @@ export interface ZendeskDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Zendesk document connector. */
 export class ZendeskDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Zendesk";

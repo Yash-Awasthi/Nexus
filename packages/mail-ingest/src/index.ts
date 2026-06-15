@@ -44,6 +44,7 @@ export interface MailAttachment {
   size: number;
 }
 
+/** Parsed email interface definition. */
 export interface ParsedEmail {
   id: string;
   messageId?: string;
@@ -67,6 +68,7 @@ export interface ImapMessage {
   raw: string;
 }
 
+/** I imap client interface definition. */
 export interface IImapClient {
   connect(): Promise<void>;
   disconnect(): Promise<void>;
@@ -234,6 +236,7 @@ export interface MailIngestorConfig {
   now?: () => number;
 }
 
+/** Mail ingestor. */
 export class MailIngestor {
   private readonly imap: IImapClient;
   private readonly handler: IngestHandler;
@@ -321,6 +324,7 @@ export interface StubImapOptions {
   fetchError?: string;
 }
 
+/** Stub imap client. */
 export class StubImapClient implements IImapClient {
   private readonly messages: ImapMessage[];
   private readonly connectError: string | undefined;

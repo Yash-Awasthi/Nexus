@@ -48,6 +48,7 @@ export class UltraplinianError extends Error {
 
 export type MessageRole = "system" | "user" | "assistant";
 
+/** Ultraplinian message interface definition. */
 export interface UltraplinianMessage {
   role: MessageRole;
   content: string;
@@ -80,6 +81,7 @@ export interface ModelResult {
 
 export type SpeedTier = "fast" | "standard" | "smart" | "power" | "ultra";
 
+/** Ultraplinian models. */
 export const ULTRAPLINIAN_MODELS: Record<SpeedTier, readonly string[]> = {
   fast: [
     "google/gemini-2.5-flash",
@@ -226,6 +228,7 @@ export function scoreResponse(content: string, userQuery: string): number {
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
+/** Query model. */
 export async function queryModel(
   model: string,
   messages: UltraplinianMessage[],
@@ -399,6 +402,7 @@ export interface UltraplinianRunnerConfig {
   raceConfig?: RaceConfig;
 }
 
+/** Race request interface definition. */
 export interface RaceRequest {
   tier: SpeedTier;
   messages: UltraplinianMessage[];

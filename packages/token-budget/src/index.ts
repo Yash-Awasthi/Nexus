@@ -39,6 +39,7 @@ export class BudgetError extends Error {
   }
 }
 
+/** Budget exceeded error. */
 export class BudgetExceededError extends BudgetError {
   constructor(
     public readonly identity: string,
@@ -66,6 +67,7 @@ export interface BudgetStatus {
   windowMs: number;
 }
 
+/** Consume options interface definition. */
 export interface ConsumeOptions {
   /** Identity to charge (e.g. user ID). */
   identity: string;
@@ -73,6 +75,7 @@ export interface ConsumeOptions {
   tokens: number;
 }
 
+/** Budget config interface definition. */
 export interface BudgetConfig {
   /** Max tokens per window per identity. */
   limit: number;
@@ -288,17 +291,20 @@ export class KVTokenBudget implements TokenBudget {
 
 export type MessageRole = "system" | "user" | "assistant";
 
+/** Llm message interface definition. */
 export interface LLMMessage {
   role: MessageRole;
   content: string;
 }
 
+/** Llm usage interface definition. */
 export interface LLMUsage {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
 }
 
+/** Llm request interface definition. */
 export interface LLMRequest {
   model: string;
   messages: LLMMessage[];
@@ -307,6 +313,7 @@ export interface LLMRequest {
   metadata?: Record<string, unknown>;
 }
 
+/** Llm response interface definition. */
 export interface LLMResponse {
   id: string;
   model: string;
@@ -317,6 +324,7 @@ export interface LLMResponse {
   cached?: boolean;
 }
 
+/** Llm provider interface definition. */
 export interface LLMProvider {
   readonly name: string;
   readonly models: readonly string[];

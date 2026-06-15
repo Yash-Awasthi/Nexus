@@ -21,6 +21,7 @@
 
 export type TaskStatus = "pending" | "processing" | "done" | "failed" | "delayed";
 
+/** Task interface definition. */
 export interface Task<T = unknown> {
   id: string;
   name: string;
@@ -34,23 +35,28 @@ export interface Task<T = unknown> {
   result?: unknown;
 }
 
+/** Enqueue options interface definition. */
 export interface EnqueueOptions {
   delayMs?: number;
   maxRetries?: number;
 }
 
+/** Consume options interface definition. */
 export interface ConsumeOptions {
   groupId?: string;
   batchSize?: number;
 }
 
+/** Task handler type alias. */
 export type TaskHandler<T = unknown> = (task: Task<T>) => Promise<unknown>;
 
+/** Retry policy interface definition. */
 export interface RetryPolicy {
   maxRetries: number;
   backoffMs: (attempt: number) => number;
 }
 
+/** Default retry policy. */
 export const DEFAULT_RETRY_POLICY: RetryPolicy = {
   maxRetries: 3,
   backoffMs: (attempt: number) => Math.min(1_000 * Math.pow(2, attempt), 30_000),
@@ -60,6 +66,7 @@ export const DEFAULT_RETRY_POLICY: RetryPolicy = {
 
 let _taskSeq = 0;
 
+/** In memory stream client. */
 export class InMemoryStreamClient {
   private streams = new Map<string, Task[]>();
   private processed = new Map<string, Task>();
@@ -128,6 +135,7 @@ export interface CronEntry {
   handler: () => Promise<void>;
 }
 
+/** Cron scheduler. */
 export class CronScheduler {
   private entries: CronEntry[] = [];
   private running = false;

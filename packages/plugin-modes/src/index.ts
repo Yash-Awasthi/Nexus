@@ -57,6 +57,7 @@ export interface ResolvedParams {
   repetition_penalty: number;
 }
 
+/** Plugin mode interface definition. */
 export interface PluginMode {
   id: string;
   description?: string;
@@ -67,6 +68,7 @@ export interface PluginMode {
   locale?: string;
 }
 
+/** Apply result interface definition. */
 export interface ApplyResult {
   params: ResolvedParams;
   systemPromptSnippet: string;

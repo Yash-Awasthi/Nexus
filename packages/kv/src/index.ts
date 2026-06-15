@@ -245,6 +245,7 @@ export class RedisKVStore implements KVStore {
 
 export type PubSubHandler = (data: unknown, channel: string) => void;
 
+/** Pub sub client interface definition. */
 export interface PubSubClient {
   /** Publish a message to a channel. */
   publish(channel: string, data: unknown): Promise<void>;
@@ -296,6 +297,7 @@ export interface LockAcquireResult {
   token: string;
 }
 
+/** Distributed lock interface definition. */
 export interface DistributedLock {
   /**
    * Try to acquire the lock for `key` with the given TTL.

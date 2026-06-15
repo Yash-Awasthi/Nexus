@@ -17,6 +17,7 @@ export type ObservationEventType =
   | "memory.write"
   | (string & {}); // open union
 
+/** Observation event interface definition. */
 export interface ObservationEvent<T = unknown> {
   id: string;
   type: ObservationEventType;
@@ -29,6 +30,7 @@ export interface ObservationEvent<T = unknown> {
   tags?: Record<string, string>;
 }
 
+/** Observer fn type alias. */
 export type ObserverFn<T = unknown> = (event: ObservationEvent<T>) => void | Promise<void>;
 
 // ── ObservationBus ────────────────────────────────────────────────────────────
@@ -214,12 +216,14 @@ export interface LLMMessage {
   content: string;
 }
 
+/** Llm request interface definition. */
 export interface LLMRequest {
   model: string;
   messages: LLMMessage[];
   [key: string]: unknown;
 }
 
+/** Llm response interface definition. */
 export interface LLMResponse {
   id: string;
   model: string;
@@ -229,6 +233,7 @@ export interface LLMResponse {
   usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
 }
 
+/** Llm provider interface definition. */
 export interface LLMProvider {
   name: string;
   models: string[];

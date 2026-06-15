@@ -19,6 +19,7 @@ export type AdrStatus =
   | "deprecated"
   | "superseded";
 
+/** Adr record interface definition. */
 export interface AdrRecord {
   id: number;
   title: string;
@@ -37,6 +38,7 @@ export interface AdrRecord {
   updatedAt: string;
 }
 
+/** Create adr input interface definition. */
 export interface CreateAdrInput {
   title: string;
   status?: AdrStatus;
@@ -180,6 +182,7 @@ const VALID_TRANSITIONS: Record<AdrStatus, AdrStatus[]> = {
   superseded: [],
 };
 
+/** Can transition. */
 export function canTransition(from: AdrStatus, to: AdrStatus): boolean {
   return VALID_TRANSITIONS[from].includes(to);
 }

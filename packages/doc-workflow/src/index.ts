@@ -21,19 +21,23 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type WorkflowActionType = "email" | "trash" | "move" | "webhook" | "remove-password";
+/** Trigger field type alias. */
 export type TriggerField = "mime_type" | "document_type" | "path_contains" | "tag" | "owner";
 
+/** Trigger condition interface definition. */
 export interface TriggerCondition {
   field: TriggerField;
   operator: "equals" | "contains" | "starts_with" | "ends_with";
   value: string;
 }
 
+/** Workflow action interface definition. */
 export interface WorkflowAction {
   type: WorkflowActionType;
   params: Record<string, string>;  // Jinja-templatible values
 }
 
+/** Workflow definition interface definition. */
 export interface WorkflowDefinition {
   id: string;
   name: string;
@@ -43,6 +47,7 @@ export interface WorkflowDefinition {
   order?: number;
 }
 
+/** Action context interface definition. */
 export interface ActionContext {
   documentId: string;
   originalPath: string;
@@ -56,6 +61,7 @@ export interface ActionContext {
   [key: string]: unknown;
 }
 
+/** Action result interface definition. */
 export interface ActionResult {
   workflowId: string;
   actionType: WorkflowActionType;
@@ -64,6 +70,7 @@ export interface ActionResult {
   output?: unknown;
 }
 
+/** Workflow run result interface definition. */
 export interface WorkflowRunResult {
   workflowId: string;
   matched: boolean;
@@ -116,6 +123,7 @@ const FIELD_MAP: Record<string, keyof ActionContext> = {
   // "tag" intentionally NOT mapped — literal ctx["tag"] lookup (undefined if absent)
 };
 
+/** Workflow matcher. */
 export class WorkflowMatcher {
   matches(doc: ActionContext, condition: TriggerCondition): boolean {
     const contextKey = FIELD_MAP[condition.field] ?? (condition.field as keyof ActionContext);
@@ -148,6 +156,7 @@ export type ActionHandlerFn = (
   ctx: ActionContext,
 ) => Promise<unknown>;
 
+/** Action executor. */
 export class ActionExecutor {
   private handler?: ActionHandlerFn;
   private templater = new JinjaTemplater();
@@ -195,6 +204,7 @@ export interface MockActionCall {
   ctx: ActionContext;
 }
 
+/** Mock action backend. */
 export class MockActionBackend {
   readonly calls: MockActionCall[] = [];
   private throws?: Record<WorkflowActionType, string>;

@@ -16,6 +16,7 @@
 
 export type DocumentSource = "web" | "pdf" | "database" | "upload" | "mock";
 
+/** Corpus document interface definition. */
 export interface CorpusDocument {
   id: string;
   title: string;
@@ -28,6 +29,7 @@ export interface CorpusDocument {
   score?: number;
 }
 
+/** Corpus filter interface definition. */
 export interface CorpusFilter {
   topics?: string[];
   sources?: DocumentSource[];
@@ -37,6 +39,7 @@ export interface CorpusFilter {
   minScore?: number;
 }
 
+/** Corpus interface definition. */
 export interface Corpus {
   id: string;
   query: string;
@@ -53,12 +56,14 @@ export interface CorpusSearchResult {
   query: string;
 }
 
+/** Corpus search backend interface definition. */
 export interface CorpusSearchBackend {
   search(query: string, filter?: CorpusFilter): Promise<CorpusSearchResult>;
 }
 
 let _cdSeq = 0;
 
+/** Mock corpus search backend. */
 export class MockCorpusSearchBackend implements CorpusSearchBackend {
   private documents: CorpusDocument[];
   readonly calls: string[] = [];
@@ -123,6 +128,7 @@ export class MockCorpusSearchBackend implements CorpusSearchBackend {
 
 let _corpSeq = 0;
 
+/** Corpus builder. */
 export class CorpusBuilder {
   private backend: CorpusSearchBackend;
 
@@ -173,6 +179,7 @@ export class CorpusStore {
 
 export type RenderFormat = "markdown" | "text";
 
+/** Corpus renderer. */
 export class CorpusRenderer {
   renderMarkdown(corpus: Corpus): string {
     const lines: string[] = [
@@ -221,8 +228,10 @@ export interface KnowledgeAnswer {
   corpusId: string;
 }
 
+/** Answer fn type alias. */
 export type AnswerFn = (question: string, context: string) => Promise<string>;
 
+/** Knowledge agent. */
 export class KnowledgeAgent {
   private builder: CorpusBuilder;
   private renderer: CorpusRenderer;

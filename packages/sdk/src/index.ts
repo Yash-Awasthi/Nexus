@@ -20,6 +20,7 @@ export interface NexusClientConfig {
   version?: string;    // API version; default: "v1"
 }
 
+/** Send message options interface definition. */
 export interface SendMessageOptions {
   sessionId?: string;
   model?: string;
@@ -29,11 +30,13 @@ export interface SendMessageOptions {
   stream?: boolean;
 }
 
+/** Nexus message interface definition. */
 export interface NexusMessage {
   role: "user" | "assistant" | "system";
   content: string;
 }
 
+/** Send message result interface definition. */
 export interface SendMessageResult {
   id: string;
   content: string;
@@ -43,12 +46,14 @@ export interface SendMessageResult {
   durationMs: number;
 }
 
+/** Tool definition interface definition. */
 export interface ToolDefinition {
   name: string;
   description: string;
   parameters: Record<string, { type: string; description?: string; required?: boolean }>;
 }
 
+/** Session info interface definition. */
 export interface SessionInfo {
   sessionId: string;
   model: string;
@@ -83,6 +88,7 @@ export interface HttpTransport {
   get(url: string, headers: Record<string, string>): Promise<unknown>;
 }
 
+/** Mock http transport. */
 export class MockHttpTransport implements HttpTransport {
   readonly requests: Array<{ method: "POST" | "GET"; url: string; body?: unknown }> = [];
   private handlers = new Map<string, () => unknown>();

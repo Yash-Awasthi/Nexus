@@ -25,6 +25,7 @@ export interface AliasStats {
   lastUsedAt?: number;
 }
 
+/** Record request opts interface definition. */
 export interface RecordRequestOpts {
   tokens?: number;
   latencyMs?: number;
@@ -40,6 +41,7 @@ export interface AdminRequest<TBody = unknown> {
   body?: TBody;
 }
 
+/** Admin response interface definition. */
 export interface AdminResponse<TBody = unknown> {
   status: number;
   body: TBody;

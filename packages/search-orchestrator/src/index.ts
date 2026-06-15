@@ -26,8 +26,10 @@ import { neon } from "@neondatabase/serverless";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type SearchSource = "chroma" | "sqlite" | "hybrid" | "mock";
+/** Search result type type alias. */
 export type SearchResultType = "document" | "message" | "code" | "event" | "note";
 
+/** Search result interface definition. */
 export interface SearchResult {
   id: string;
   content: string;
@@ -39,6 +41,7 @@ export interface SearchResult {
   metadata?: Record<string, unknown>;
 }
 
+/** Search filters interface definition. */
 export interface SearchFilters {
   projectId?: string;
   types?: SearchResultType[];
@@ -47,6 +50,7 @@ export interface SearchFilters {
   minScore?: number;
 }
 
+/** Search request interface definition. */
 export interface SearchRequest {
   query: string;
   filters?: SearchFilters;
@@ -55,6 +59,7 @@ export interface SearchRequest {
   userId?: string;
 }
 
+/** Search response interface definition. */
 export interface SearchResponse {
   results: SearchResult[];
   source: SearchSource;
@@ -80,6 +85,7 @@ export interface MockStrategyBehavior {
 
 let _sSeq = 0;
 
+/** Mock search strategy. */
 export class MockSearchStrategy implements SearchStrategy {
   readonly name: SearchSource;
   private behavior: MockStrategyBehavior;
@@ -342,6 +348,7 @@ export interface StrategyChainOptions {
   exhaustive?: boolean;
 }
 
+/** Strategy chain. */
 export class StrategyChain {
   private strategies: SearchStrategy[];
   private exhaustive: boolean;
@@ -394,11 +401,13 @@ export interface TimelineSegment {
   results: SearchResult[];
 }
 
+/** Timeline interface definition. */
 export interface Timeline {
   segments: TimelineSegment[];
   totalResults: number;
 }
 
+/** Timeline builder. */
 export class TimelineBuilder {
   /** Groups results by date (day bucket) and sorts segments chronologically. */
   build(results: SearchResult[]): Timeline {
@@ -435,6 +444,7 @@ export interface SearchOrchestratorOptions {
   defaultMaxResults?: number;
 }
 
+/** Search orchestrator. */
 export class SearchOrchestrator {
   private chain: StrategyChain;
   private timelineBuilder: TimelineBuilder;

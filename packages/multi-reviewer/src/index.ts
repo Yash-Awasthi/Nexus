@@ -35,6 +35,7 @@
 
 export type FetchFn = typeof fetch;
 
+/** Review model interface definition. */
 export interface ReviewModel {
   id: string;
   name: string;
@@ -42,6 +43,7 @@ export interface ReviewModel {
   weight?: number;
 }
 
+/** Default review models. */
 export const DEFAULT_REVIEW_MODELS: readonly ReviewModel[] = [
   { id: "deepseek/deepseek-v3.2", name: "DeepSeek-V3.2" },
   { id: "openai/gpt-5.3-chat", name: "GPT-5" },
@@ -50,6 +52,7 @@ export const DEFAULT_REVIEW_MODELS: readonly ReviewModel[] = [
   { id: "anthropic/claude-sonnet-4.6", name: "Claude-Sonnet-4.6" },
 ];
 
+/** Review scores interface definition. */
 export interface ReviewScores {
   correctness: number;
   readability: number;
@@ -58,12 +61,14 @@ export interface ReviewScores {
   overall: number;
 }
 
+/** Review issue interface definition. */
 export interface ReviewIssue {
   severity: "critical" | "major" | "minor" | "suggestion";
   description: string;
   line?: number;
 }
 
+/** Model review interface definition. */
 export interface ModelReview {
   modelId: string;
   modelName: string;
@@ -76,6 +81,7 @@ export interface ModelReview {
   error?: string;
 }
 
+/** Disagreement interface definition. */
 export interface Disagreement {
   dimension: keyof ReviewScores;
   minScore: number;
@@ -86,6 +92,7 @@ export interface Disagreement {
   highModels: string[];
 }
 
+/** Aggregated review interface definition. */
 export interface AggregatedReview {
   consensus: ReviewScores;
   disagreements: Disagreement[];
@@ -298,6 +305,7 @@ export interface MultiReviewerConfig {
   modelTimeout?: number;
 }
 
+/** Multi reviewer. */
 export class MultiReviewer {
   private readonly apiKey: string;
   private readonly models: ReadonlyArray<ReviewModel>;

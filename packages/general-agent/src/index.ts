@@ -16,8 +16,10 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type AgentModel = "gpt-5" | "claude-opus-4";
+/** Reasoning effort type alias. */
 export type ReasoningEffort = "low" | "medium" | "high";
 
+/** Sub agent spec interface definition. */
 export interface SubAgentSpec {
   name: string;
   description: string;
@@ -26,6 +28,7 @@ export interface SubAgentSpec {
   filePaths?: string[];
 }
 
+/** Agent response interface definition. */
 export interface AgentResponse {
   content: string;
   model: AgentModel;
@@ -35,6 +38,7 @@ export interface AgentResponse {
   durationMs: number;
 }
 
+/** Agent task interface definition. */
 export interface AgentTask {
   instruction: string;
   filePaths?: string[];
@@ -50,6 +54,7 @@ export type AgentBackend = (
   instruction: string,
 ) => Promise<{ content: string; tokensUsed?: number }>;
 
+/** Mock agent backend. */
 export class MockAgentBackend {
   readonly calls: Array<{ model: AgentModel; instruction: string }> = [];
   private content: string;
@@ -79,6 +84,7 @@ export interface GeneralAgentOptions {
   systemPromptOverride?: string;
 }
 
+/** General agent. */
 export class GeneralAgent {
   private model: AgentModel;
   private effort: ReasoningEffort;
@@ -154,6 +160,7 @@ export interface SpawnResult {
   error?: string;
 }
 
+/** Sub agent spawner. */
 export class SubAgentSpawner {
   private backend: AgentBackend;
 

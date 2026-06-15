@@ -19,6 +19,7 @@
 
 export type SessionStatus = "idle" | "starting" | "running" | "stopping" | "stopped" | "crashed";
 
+/** Spawn options interface definition. */
 export interface SpawnOptions {
   command: string;
   args?: string[];
@@ -27,6 +28,7 @@ export interface SpawnOptions {
   allowedDirs?: string[];
 }
 
+/** Spawn result interface definition. */
 export interface SpawnResult {
   pid: number;
   /** Write to stdin */
@@ -41,6 +43,7 @@ export interface SpawnResult {
   onExit(cb: (code: number | null) => void): void;
 }
 
+/** Process spawner interface definition. */
 export interface ProcessSpawner {
   spawn(opts: SpawnOptions): SpawnResult;
 }
@@ -78,6 +81,7 @@ export class MockProcess implements SpawnResult {
 
 let _pidSeq = 1000;
 
+/** Mock process spawner. */
 export class MockProcessSpawner implements ProcessSpawner {
   lastOptions?: SpawnOptions;
   processes: MockProcess[] = [];
@@ -162,11 +166,13 @@ export interface CliSessionOptions {
   stderrMaxLines?: number;
 }
 
+/** Session output interface definition. */
 export interface SessionOutput {
   stdout: string[];
   stderr: string[];
 }
 
+/** Cli session. */
 export class CliSession {
   readonly id: string;
   private status: SessionStatus = "idle";
@@ -257,6 +263,7 @@ export class CliSession {
 
 let _sessionSeq = 0;
 
+/** Session manager. */
 export class SessionManager {
   private sessions = new Map<string, CliSession>();
   private spawner: ProcessSpawner;

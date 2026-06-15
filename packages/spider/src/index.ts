@@ -54,6 +54,7 @@ export interface CrawlTarget {
   headers?: Record<string, string>;
 }
 
+/** Crawled page interface definition. */
 export interface CrawledPage {
   url: string;
   finalUrl: string; // after redirects
@@ -67,6 +68,7 @@ export interface CrawledPage {
   proxyUsed?: string;
 }
 
+/** Crawl summary interface definition. */
 export interface CrawlSummary {
   totalPages: number;
   successPages: number;
@@ -76,6 +78,7 @@ export interface CrawlSummary {
   seedUrl: string;
 }
 
+/** Crawl checkpoint interface definition. */
 export interface CrawlCheckpoint {
   seedUrl: string;
   visited: string[];
@@ -106,6 +109,7 @@ export interface Proxy {
   auth?: { username: string; password: string };
 }
 
+/** I proxy rotator interface definition. */
 export interface IProxyRotator {
   next(sessionKey?: string): Proxy | undefined;
   markSuccess(proxy: Proxy, latencyMs?: number): void;
@@ -262,6 +266,7 @@ function matchesPattern(url: string, patterns: RegExp[]): boolean {
 
 interface QueueEntry { url: string; depth: number; }
 
+/** Crawl scheduler. */
 export class CrawlScheduler {
   private readonly _queue: QueueEntry[] = [];
   private readonly _visited = new Set<string>();
@@ -325,6 +330,7 @@ export interface SpiderConfig {
   maxRetries?: number;
 }
 
+/** Spider. */
 export class Spider {
   private readonly fetch: FetchFn;
   private readonly proxy?: IProxyRotator;

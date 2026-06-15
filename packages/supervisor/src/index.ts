@@ -16,6 +16,7 @@ export interface PidFileOptions {
   staleTtlMs?: number;
 }
 
+/** Pid record interface definition. */
 export interface PidRecord {
   pid: number;
   name: string;
@@ -30,6 +31,7 @@ export interface FileIO {
   exists(path: string): boolean;
 }
 
+/** In memory file io. */
 export class InMemoryFileIO implements FileIO {
   private store = new Map<string, string>();
 
@@ -39,6 +41,7 @@ export class InMemoryFileIO implements FileIO {
   exists(path: string): boolean { return this.store.has(path); }
 }
 
+/** Pid file. */
 export class PidFile {
   private io: FileIO;
   private staleTtlMs: number;
@@ -79,6 +82,7 @@ export class PidFile {
 
 export type HealthStatus = "healthy" | "unhealthy" | "timeout" | "unknown";
 
+/** Health result interface definition. */
 export interface HealthResult {
   status: HealthStatus;
   latencyMs: number;
@@ -86,14 +90,17 @@ export interface HealthResult {
   error?: string;
 }
 
+/** Health probe type alias. */
 export type HealthProbe = (signal?: AbortSignal) => Promise<boolean>;
 
+/** Health checker options interface definition. */
 export interface HealthCheckerOptions {
   timeoutMs?: number;   // default: 5_000
   retries?: number;     // default: 1
   retryDelayMs?: number; // default: 500
 }
 
+/** Health checker. */
 export class HealthChecker {
   private opts: Required<HealthCheckerOptions>;
 
@@ -159,6 +166,7 @@ export class HealthChecker {
 
 export type ProcessState = "starting" | "running" | "stopping" | "stopped" | "crashed";
 
+/** Process entry interface definition. */
 export interface ProcessEntry {
   name: string;
   pid?: number;
@@ -169,6 +177,7 @@ export interface ProcessEntry {
   metadata: Record<string, unknown>;
 }
 
+/** Process registry. */
 export class ProcessRegistry {
   private entries = new Map<string, ProcessEntry>();
 
@@ -237,6 +246,7 @@ export class ProcessRegistry {
 
 export type ShutdownHandler = () => void | Promise<void>;
 
+/** Shutdown step interface definition. */
 export interface ShutdownStep {
   name: string;
   handler: ShutdownHandler;
@@ -244,6 +254,7 @@ export interface ShutdownStep {
   timeoutMs?: number;
 }
 
+/** Shutdown result interface definition. */
 export interface ShutdownResult {
   name: string;
   success: boolean;
@@ -251,6 +262,7 @@ export interface ShutdownResult {
   error?: string;
 }
 
+/** Shutdown cascade. */
 export class ShutdownCascade {
   private steps: ShutdownStep[] = [];
   private _isShuttingDown = false;

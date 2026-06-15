@@ -43,17 +43,20 @@ export class CacheError extends Error {
 
 export type MessageRole = "system" | "user" | "assistant";
 
+/** Llm message interface definition. */
 export interface LLMMessage {
   role: MessageRole;
   content: string;
 }
 
+/** Llm usage interface definition. */
 export interface LLMUsage {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
 }
 
+/** Llm request interface definition. */
 export interface LLMRequest {
   model: string;
   messages: LLMMessage[];
@@ -62,6 +65,7 @@ export interface LLMRequest {
   metadata?: Record<string, unknown>;
 }
 
+/** Llm response interface definition. */
 export interface LLMResponse {
   id: string;
   model: string;
@@ -72,6 +76,7 @@ export interface LLMResponse {
   cached?: boolean;
 }
 
+/** Llm provider interface definition. */
 export interface LLMProvider {
   readonly name: string;
   readonly models: readonly string[];
@@ -103,6 +108,7 @@ export interface CacheStats {
   size: number;
 }
 
+/** Prompt cache interface definition. */
 export interface PromptCache {
   /** Retrieve a cached response. Returns undefined on miss or expiry. */
   get(key: string): Promise<LLMResponse | undefined>;

@@ -15,6 +15,7 @@
 
 export type OcrStatus = "success" | "partial" | "failed" | "skipped";
 
+/** Ocr result interface definition. */
 export interface OcrResult {
   id: string;
   sourceId: string; // e.g. file path or URL
@@ -27,6 +28,7 @@ export interface OcrResult {
   metadata: Record<string, unknown>;
 }
 
+/** Extracted date interface definition. */
 export interface ExtractedDate {
   raw: string;      // original string in text
   iso: string;      // normalised ISO 8601
@@ -34,6 +36,7 @@ export interface ExtractedDate {
   position: number; // character index in text
 }
 
+/** Archive signal type type alias. */
 export type ArchiveSignalType =
   | "contains_date"
   | "references_entity"
@@ -43,12 +46,14 @@ export type ArchiveSignalType =
   | "letterhead"
   | "legal_reference";
 
+/** Archive signal interface definition. */
 export interface ArchiveSignal {
   type: ArchiveSignalType;
   value: string;
   confidence: number;
 }
 
+/** Pipeline result interface definition. */
 export interface PipelineResult {
   ocr: OcrResult;
   dates: ExtractedDate[];
@@ -65,6 +70,7 @@ function uid() { return `ocr-${Date.now()}-${++_seq}`; }
 
 export type OcrFn = (sourceId: string, data: Uint8Array | string) => Promise<Omit<OcrResult, "id">>;
 
+/** Ocr engine. */
 export class OcrEngine {
   private fn: OcrFn;
   readonly name: string;
@@ -152,6 +158,7 @@ const DATE_PATTERNS: Array<{ re: RegExp; parse: (m: RegExpMatchArray) => string 
   },
 ];
 
+/** Date extractor. */
 export class DateExtractor {
   extract(text: string): ExtractedDate[] {
     const results: ExtractedDate[] = [];
@@ -193,6 +200,7 @@ const SIGNAL_PATTERNS: Array<{ type: ArchiveSignalType; re: RegExp; confidence: 
   { type: "references_entity", re: /\b(company|corp\.?|ltd\.?|inc\.?|llc|plc)\b/gi, confidence: 0.65 },
 ];
 
+/** Archive signal detector. */
 export class ArchiveSignalDetector {
   detect(text: string): ArchiveSignal[] {
     const signals: ArchiveSignal[] = [];
@@ -245,12 +253,14 @@ export interface BatchJob {
   data?: Uint8Array | string;
 }
 
+/** Batch result interface definition. */
 export interface BatchResult {
   sourceId: string;
   result?: PipelineResult;
   error?: string;
 }
 
+/** Ocr batch processor. */
 export class OcrBatchProcessor {
   private pipeline: OcrPipeline;
   private concurrency: number;

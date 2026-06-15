@@ -34,6 +34,7 @@ export type AgentErrorCode =
   | "FILE_LIST_FAILED"
   | "HOOK_EMIT_FAILED";
 
+/** Agent error. */
 export class AgentError extends Error {
   readonly code: AgentErrorCode;
   readonly context?: Record<string, unknown>;
@@ -61,6 +62,7 @@ export interface AgentMemory {
   remember?(text: string, metadata?: Record<string, unknown>): Promise<unknown>;
 }
 
+/** Agent memory search result interface definition. */
 export interface AgentMemorySearchResult {
   entry: {
     id: string;
@@ -90,6 +92,7 @@ export interface AgentKG {
   ingest?(text: string, opts?: Record<string, unknown>): Promise<unknown>;
 }
 
+/** Agent kg node interface definition. */
 export interface AgentKGNode {
   id: string;
   name: string;
@@ -98,6 +101,7 @@ export interface AgentKGNode {
   sources: string[];
 }
 
+/** Agent kg edge interface definition. */
 export interface AgentKGEdge {
   id: string;
   subjectId: string;
@@ -106,6 +110,7 @@ export interface AgentKGEdge {
   confidence: number;
 }
 
+/** Agent related result interface definition. */
 export interface AgentRelatedResult {
   outbound: AgentKGEdge[];
   inbound: AgentKGEdge[];
@@ -146,6 +151,7 @@ export interface LibrarianConfig {
   charsPerToken?: number;
 }
 
+/** Librarian recall options interface definition. */
 export interface LibrarianRecallOptions {
   /** Override default recall limit for memory results */
   limit?: number;
@@ -159,6 +165,7 @@ export interface LibrarianRecallOptions {
   maxContextTokens?: number;
 }
 
+/** Librarian recall result interface definition. */
 export interface LibrarianRecallResult {
   /** Memory entries ordered by descending score */
   memories: AgentMemorySearchResult[];
@@ -178,6 +185,7 @@ function estimateTokens(text: string, charsPerToken: number): number {
   return Math.ceil(text.length / charsPerToken);
 }
 
+/** Librarian agent. */
 export class LibrarianAgent {
   private readonly memory: AgentMemory;
   private readonly kg?: AgentKG;
@@ -368,6 +376,7 @@ export interface ResearchRunner {
   ): Promise<ResearchRunResult>;
 }
 
+/** Research run options interface definition. */
 export interface ResearchRunOptions {
   /** Max gap-fill iterations (default: 2) */
   maxIterations?: number;
@@ -375,6 +384,7 @@ export interface ResearchRunOptions {
   resultsPerQuery?: number;
 }
 
+/** Research run result interface definition. */
 export interface ResearchRunResult {
   /** Full Markdown report */
   report: string;
@@ -387,6 +397,7 @@ export interface ResearchRunResult {
   error?: string;
 }
 
+/** Researcher config interface definition. */
 export interface ResearcherConfig {
   /** Injectable research execution function */
   runner: ResearchRunner;
@@ -400,6 +411,7 @@ export interface ResearcherConfig {
   name?: string;
 }
 
+/** Research options interface definition. */
 export interface ResearchOptions extends ResearchRunOptions {
   /**
    * Extra metadata to attach to the memory entry when persisting the report.
@@ -412,6 +424,7 @@ export interface ResearchOptions extends ResearchRunOptions {
   skipKG?: boolean;
 }
 
+/** Research result interface definition. */
 export interface ResearchResult {
   query: string;
   report: string;
@@ -425,6 +438,7 @@ export interface ResearchResult {
   error?: string;
 }
 
+/** Researcher agent. */
 export class ResearcherAgent {
   private readonly runner: ResearchRunner;
   private readonly memory?: AgentMemory;
@@ -552,6 +566,7 @@ export interface AgentFileSystem {
   exists?(path: string): Promise<boolean>;
 }
 
+/** File explorer config interface definition. */
 export interface FileExplorerConfig {
   fs: AgentFileSystem;
   /** Optional hook emitter */
@@ -560,6 +575,7 @@ export interface FileExplorerConfig {
   name?: string;
 }
 
+/** File info interface definition. */
 export interface FileInfo {
   /** Absolute or relative path returned by listDir */
   path: string;
@@ -572,6 +588,7 @@ export interface FileInfo {
   score?: number;
 }
 
+/** Edit result interface definition. */
 export interface EditResult {
   ok: boolean;
   /** Path of the edited file */
@@ -583,6 +600,7 @@ export interface EditResult {
   error?: string;
 }
 
+/** List options interface definition. */
 export interface ListOptions {
   /**
    * Simple glob-style filter: only include entries whose name contains this
@@ -597,6 +615,7 @@ export interface ListOptions {
   query?: string;
 }
 
+/** File explorer agent. */
 export class FileExplorerAgent {
   private readonly fs: AgentFileSystem;
   private readonly hooks?: AgentHooks;

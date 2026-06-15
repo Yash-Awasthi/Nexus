@@ -18,9 +18,12 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type MimeType = string;
+/** Document type type alias. */
 export type DocumentType = "text" | "pdf" | "image" | "spreadsheet" | "presentation" | "code" | "archive" | "unknown";
+/** Permission level type alias. */
 export type PermissionLevel = "read" | "write" | "owner" | "none";
 
+/** Ingested document interface definition. */
 export interface IngestedDocument {
   id: string;
   originalPath: string;
@@ -34,6 +37,7 @@ export interface IngestedDocument {
   metadata: Record<string, unknown>;
 }
 
+/** Ingestion request interface definition. */
 export interface IngestionRequest {
   path: string;
   content: string;       // document content/bytes (base64 or text)
@@ -44,6 +48,7 @@ export interface IngestionRequest {
   outputTemplate?: string;
 }
 
+/** Ingestion result interface definition. */
 export interface IngestionResult {
   document?: IngestedDocument;
   status: "success" | "skipped" | "failed";
@@ -83,6 +88,7 @@ export function computeChecksum(content: string): string {
   return hash.toString(16).padStart(8, "0");
 }
 
+/** Checksum registry. */
 export class ChecksumRegistry {
   private checksums = new Map<string, string>(); // checksum → document id
 
@@ -143,6 +149,7 @@ const TYPE_MAP: Record<MimeType, DocumentType> = {
   "application/zip": "archive",
 };
 
+/** Mime detector. */
 export class MimeDetector {
   detect(path: string): MimeType {
     const ext = path.split(".").pop()?.toLowerCase() ?? "";
@@ -178,6 +185,7 @@ export class PermissionSetter {
 
 export type SignalType = "document_consumption_started" | "document_consumption_finished" | "document_skipped";
 
+/** Ingestion signal event interface definition. */
 export interface IngestionSignalEvent {
   type: SignalType;
   documentId: string;
@@ -186,8 +194,10 @@ export interface IngestionSignalEvent {
   metadata?: Record<string, unknown>;
 }
 
+/** Signal handler type alias. */
 export type SignalHandler = (event: IngestionSignalEvent) => void;
 
+/** Ingestion signal bus. */
 export class IngestionSignalBus {
   private handlers = new Set<SignalHandler>();
 
@@ -211,8 +221,10 @@ export interface WorkflowTriggerResult {
   error?: string;
 }
 
+/** Workflow executor type alias. */
 export type WorkflowExecutor = (workflowId: string, document: IngestedDocument) => Promise<void>;
 
+/** Workflow trigger. */
 export class WorkflowTrigger {
   private executor?: WorkflowExecutor;
 
@@ -271,6 +283,7 @@ export class FilenameTemplater {
 
 let _docSeq = 0;
 
+/** Doc consumer options interface definition. */
 export interface DocConsumerOptions {
   lock?: FileLock;
   checksumRegistry?: ChecksumRegistry;
@@ -282,6 +295,7 @@ export interface DocConsumerOptions {
   defaultTemplate?: string;
 }
 
+/** Doc consumer. */
 export class DocConsumer {
   private lock: FileLock;
   private checksums: ChecksumRegistry;

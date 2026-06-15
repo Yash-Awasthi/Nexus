@@ -38,8 +38,10 @@ import { EventEmitter } from "events";
 
 export type FlagType = "boolean" | "string" | "number";
 
+/** Flag value type alias. */
 export type FlagValue = boolean | string | number;
 
+/** Flag definition interface definition. */
 export interface FlagDefinition<T extends FlagValue = FlagValue> {
   /** Dot-notation key, e.g. "sandbox.docker" */
   key: string;
@@ -51,6 +53,7 @@ export interface FlagDefinition<T extends FlagValue = FlagValue> {
   type: FlagType;
 }
 
+/** Flag change event interface definition. */
 export interface FlagChangeEvent {
   key: string;
   previous: FlagValue;
@@ -368,6 +371,7 @@ export type FlagReadFileFn = (path: string) => Promise<string>;
 /** Injectable file writer */
 export type FlagWriteFileFn = (path: string, content: string) => Promise<void>;
 
+/** Polling flag store config interface definition. */
 export interface PollingFlagStoreConfig {
   /** URL that serves a JSON object of `{ [flagKey]: value }` */
   url: string;
@@ -460,6 +464,7 @@ export class PollingFlagStore implements FlagStore {
   }
 }
 
+/** File flag store config interface definition. */
 export interface FileFlagStoreConfig {
   /** Absolute path to the JSON file containing flag state */
   path: string;
@@ -568,6 +573,7 @@ export interface RedisClientLike {
   subscribe(channel: string, callback: (message: string, channel: string) => void): Promise<void>;
 }
 
+/** Redis flag store options interface definition. */
 export interface RedisFlagStoreOptions {
   /** Key used for the Redis hash (default: "nexus:flags"). */
   hashKey?: string;
@@ -580,6 +586,7 @@ export interface RedisFlagStoreOptions {
   onRemoteChange?: (key: string) => void;
 }
 
+/** Redis flag store. */
 export class RedisFlagStore implements FlagStore {
   private readonly client: RedisClientLike;
   private readonly hashKey: string;

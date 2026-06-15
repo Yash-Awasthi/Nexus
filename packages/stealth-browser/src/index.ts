@@ -34,10 +34,12 @@ export const DEFAULT_USER_AGENT_POOL: readonly string[] = [
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0",
 ];
 
+/** Pick random user agent. */
 export function pickRandomUserAgent(pool: readonly string[] = DEFAULT_USER_AGENT_POOL): string {
   return pool[Math.floor(Math.random() * pool.length)]!;
 }
 
+/** Stealth profile interface definition. */
 export interface StealthProfile {
   userAgent?: string;
   /** When userAgent is unset, pick from this pool at random (default: DEFAULT_USER_AGENT_POOL). */
@@ -55,6 +57,7 @@ export interface StealthProfile {
   webGlNoise?: boolean;
 }
 
+/** Navigate result interface definition. */
 export interface NavigateResult {
   url: string;
   status: number;
@@ -62,21 +65,25 @@ export interface NavigateResult {
   loadTimeMs: number;
 }
 
+/** Click options interface definition. */
 export interface ClickOptions {
   delay?: number; // ms between mousedown and mouseup
   button?: "left" | "right" | "middle";
 }
 
+/** Type options interface definition. */
 export interface TypeOptions {
   delay?: number; // ms per keystroke
 }
 
+/** Screenshot options interface definition. */
 export interface ScreenshotOptions {
   fullPage?: boolean;
   format?: "png" | "jpeg";
   quality?: number; // 0-100 (jpeg only)
 }
 
+/** Cloudflare bypass result interface definition. */
 export interface CloudflareBypassResult {
   success: boolean;
   attempts: number;
@@ -99,6 +106,7 @@ export interface BrowserPage {
   readonly isClosed: boolean;
 }
 
+/** Browser driver interface definition. */
 export interface BrowserDriver {
   newPage(profile?: StealthProfile): Promise<BrowserPage>;
   close(): Promise<void>;
@@ -121,6 +129,7 @@ export interface MockPageOptions {
   loadTimeMs?: number;
 }
 
+/** Mock browser page. */
 export class MockBrowserPage implements BrowserPage {
   private _url = "about:blank";
   private _closed = false;
@@ -186,6 +195,7 @@ export class MockBrowserPage implements BrowserPage {
   }
 }
 
+/** Mock browser driver. */
 export class MockBrowserDriver implements BrowserDriver {
   private _open = true;
   private _pageOpts: MockPageOptions;
@@ -472,6 +482,7 @@ export interface PagePoolOptions {
   profile?: StealthProfile;
 }
 
+/** Page pool. */
 export class PagePool {
   private idle: BrowserPage[] = [];
   private inUse = new Set<BrowserPage>();
@@ -535,6 +546,7 @@ export interface CloudflareDetector {
   isChallenge(html: string): boolean;
 }
 
+/** Default cloudflare dector. */
 export class DefaultCloudflareDector implements CloudflareDetector {
   private patterns = [
     /cf-browser-verification/i,
@@ -551,6 +563,7 @@ export class DefaultCloudflareDector implements CloudflareDetector {
   }
 }
 
+/** Cloudflare bypass. */
 export class CloudflareBypass {
   private detector: CloudflareDetector;
   private maxAttempts: number;
@@ -638,6 +651,7 @@ export interface StealthBrowserOptions {
   bypass?: CloudflareBypass;
 }
 
+/** Stealth browser. */
 export class StealthBrowser {
   private pool: PagePool;
   private driver: BrowserDriver;
@@ -707,12 +721,14 @@ export interface StealthFetchResult {
   headers?: Record<string, string>;
 }
 
+/** Stealth screenshot result interface definition. */
 export interface StealthScreenshotResult {
   url: string;
   data: string; // base64-encoded PNG
   mimeType: string;
 }
 
+/** Stealth browser scraping backend. */
 export class StealthBrowserScrapingBackend {
   private _browser: StealthBrowser;
 

@@ -16,12 +16,14 @@
 
 export type Platform = "discord" | "telegram" | "html" | "plain";
 
+/** Message field interface definition. */
 export interface MessageField {
   name: string;
   value: string;
   inline?: boolean;
 }
 
+/** Message embed interface definition. */
 export interface MessageEmbed {
   title?: string;
   description?: string;
@@ -32,6 +34,7 @@ export interface MessageEmbed {
   thumbnail?: string;
 }
 
+/** Message payload interface definition. */
 export interface MessagePayload {
   text?: string;
   embeds?: MessageEmbed[];
@@ -42,6 +45,7 @@ export interface MessagePayload {
   attachments?: string[];
 }
 
+/** Render result interface definition. */
 export interface RenderResult {
   platform: Platform;
   output: string;
@@ -303,6 +307,7 @@ export interface IRenderer {
   render(payload: MessagePayload): RenderResult;
 }
 
+/** Renderer registry. */
 export class RendererRegistry {
   private renderers = new Map<Platform, IRenderer>();
 

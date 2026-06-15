@@ -26,6 +26,7 @@ export interface MarketOutcome {
   volume24h?: number;
 }
 
+/** Market interface definition. */
 export interface Market {
   id: string;
   question: string;
@@ -37,12 +38,14 @@ export interface Market {
   fetchedAt: string;
 }
 
+/** Market list response interface definition. */
 export interface MarketListResponse {
   markets: Market[];
   total: number;
   fetchedAt: string;
 }
 
+/** Market query interface definition. */
 export interface MarketQuery {
   category?: string;
   ids?: string[];
@@ -53,25 +56,30 @@ export interface MarketQuery {
 
 export type CacheTierLevel = "hot" | "warm" | "cold";
 
+/** Cache tiers. */
 export const CACHE_TIERS: Record<CacheTierLevel, { maxAgeMs: number; swr: number }> = {
   hot:  { maxAgeMs: 120_000,  swr: 60_000  },
   warm: { maxAgeMs: 300_000,  swr: 120_000 },
   cold: { maxAgeMs: 900_000,  swr: 300_000 },
 };
 
+/** Cache entry interface definition. */
 export interface CacheEntry<T> {
   value: T;
   cachedAt: number;
   tier: CacheTierLevel;
 }
 
+/** Cache status type alias. */
 export type CacheStatus = "fresh" | "stale-while-revalidate" | "expired" | "miss";
 
+/** Cache lookup interface definition. */
 export interface CacheLookup<T> {
   value: T | null;
   status: CacheStatus;
 }
 
+/** Market cache. */
 export class MarketCache {
   private store = new Map<string, CacheEntry<Market | MarketListResponse>>();
 
@@ -107,6 +115,7 @@ export interface RateLimitOptions {
   windowMs?: number;
 }
 
+/** Pm rate limiter. */
 export class PmRateLimiter {
   private windows = new Map<string, number[]>();
   private rpm: number;
@@ -177,6 +186,7 @@ function makeDefaultMarket(id: string, category = "politics"): Market {
   };
 }
 
+/** Mock market backend. */
 export class MockMarketBackend implements MarketBackend {
   private behavior: MockMarketBehavior;
   readonly fetchLog: string[] = [];
@@ -358,6 +368,7 @@ export interface PredictionMarketServiceOptions {
   cacheTier?: CacheTierLevel;
 }
 
+/** Service call result interface definition. */
 export interface ServiceCallResult<T> {
   data: T | null;
   error?: string;
@@ -366,6 +377,7 @@ export interface ServiceCallResult<T> {
   cached?: boolean;
 }
 
+/** Prediction market service. */
 export class PredictionMarketService {
   private client: PolymarketClient;
   private rateLimiter: PmRateLimiter;

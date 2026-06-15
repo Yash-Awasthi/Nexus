@@ -61,6 +61,7 @@ export type LoadTestErrorCode =
   | "INVALID_CONFIG"
   | "RUNNER_ABORTED";
 
+/** Load test error. */
 export class LoadTestError extends Error {
   readonly code: LoadTestErrorCode;
   readonly context?: Record<string, unknown>;
@@ -82,6 +83,7 @@ export interface HttpResponse {
   latencyMs: number;
 }
 
+/** Load test http client interface definition. */
 export interface LoadTestHttpClient {
   get(url: string, headers?: Record<string, string>): Promise<HttpResponse>;
   post(url: string, body?: unknown, headers?: Record<string, string>): Promise<HttpResponse>;
@@ -157,6 +159,7 @@ export interface CheckResult {
   passed: boolean;
 }
 
+/** Vu context interface definition. */
 export interface VUContext {
   /** 1-based VU id within the current stage */
   readonly vuId: number;
@@ -192,6 +195,7 @@ export interface LatencyStats {
   p99: number;
 }
 
+/** Check summary interface definition. */
 export interface CheckSummary {
   total: number;
   passed: number;
@@ -199,6 +203,7 @@ export interface CheckSummary {
   rate: number;
 }
 
+/** Stage metrics interface definition. */
 export interface StageMetrics {
   name?: string;
   vus: number;
@@ -283,6 +288,7 @@ export interface LoadStage {
   name?: string;
 }
 
+/** Threshold config interface definition. */
 export interface ThresholdConfig {
   /** Maximum allowed p95 latency in ms */
   p95LatencyMs?: number;
@@ -309,6 +315,7 @@ export const DEFAULT_THRESHOLDS: ThresholdConfig = {
   errorRatePercent: 5,
 };
 
+/** Run config interface definition. */
 export interface RunConfig {
   stages: LoadStage[];
   thresholds?: ThresholdConfig;
@@ -396,6 +403,7 @@ export function evaluateThresholds(
 // ── SleepFn ────────────────────────────────────────────────────────────────────
 
 export type SleepFn = (ms: number) => Promise<void>;
+/** Now fn type alias. */
 export type NowFn = () => number;
 
 // ── LoadRunner ─────────────────────────────────────────────────────────────────
@@ -410,6 +418,7 @@ export interface LoadRunnerConfig {
   sleep?: SleepFn;
 }
 
+/** Load runner. */
 export class LoadRunner {
   private readonly scenario: ScenarioFn;
   private readonly http: LoadTestHttpClient;
@@ -584,6 +593,7 @@ export interface WeightedScenario {
   weight: number;
 }
 
+/** Weighted. */
 export function weighted(options: WeightedScenario[], rng?: () => number): ScenarioFn {
   const totalWeight = options.reduce((s, o) => s + o.weight, 0);
   const rand = rng ?? Math.random;

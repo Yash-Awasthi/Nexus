@@ -170,6 +170,7 @@ export class NexusAdapterError extends Error {
   }
 }
 
+/** Adapter timeout error. */
 export class AdapterTimeoutError extends NexusAdapterError {
   constructor(adapterName: string, taskType: string, timeoutMs: number) {
     super(
@@ -181,6 +182,7 @@ export class AdapterTimeoutError extends NexusAdapterError {
   }
 }
 
+/** Adapter config error. */
 export class AdapterConfigError extends NexusAdapterError {
   constructor(adapterName: string, missingKey: string) {
     super(
@@ -192,6 +194,7 @@ export class AdapterConfigError extends NexusAdapterError {
   }
 }
 
+/** Adapter http error. */
 export class AdapterHttpError extends NexusAdapterError {
   constructor(
     adapterName: string,

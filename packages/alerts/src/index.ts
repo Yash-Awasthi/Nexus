@@ -55,6 +55,7 @@ export type AlertErrorCode =
   | "CHANNEL_SEND_FAILED"
   | "EVALUATE_FAILED";
 
+/** Alert error. */
 export class AlertError extends Error {
   readonly code: AlertErrorCode;
   readonly context?: Record<string, unknown>;
@@ -114,6 +115,7 @@ export interface CompositeCondition {
   conditions: Array<ThresholdCondition | PatternCondition>;
 }
 
+/** Alert condition type alias. */
 export type AlertCondition =
   | ThresholdCondition
   | RateCondition
@@ -124,6 +126,7 @@ export type AlertCondition =
 
 export type AlertSeverity = "info" | "warning" | "critical";
 
+/** Alert rule interface definition. */
 export interface AlertRule {
   /** Unique rule identifier */
   id: string;
@@ -655,6 +658,7 @@ export class MemoryAlertRuleStore implements AlertRuleStore {
   }
 }
 
+/** File alert rule store config interface definition. */
 export interface FileAlertRuleStoreConfig {
   /** Absolute path to the JSON file where rules are persisted */
   path: string;

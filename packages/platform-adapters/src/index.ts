@@ -14,6 +14,7 @@
 
 export type Platform = "telegram" | "slack" | "discord";
 
+/** Incoming message interface definition. */
 export interface IncomingMessage {
   platform: Platform;
   userId: string;
@@ -22,6 +23,7 @@ export interface IncomingMessage {
   raw: unknown;
 }
 
+/** Outgoing message interface definition. */
 export interface OutgoingMessage {
   chatId: string;
   text?: string;
@@ -30,12 +32,14 @@ export interface OutgoingMessage {
   parseMode?: "Markdown" | "HTML" | "plain";
 }
 
+/** Send result interface definition. */
 export interface SendResult {
   success: boolean;
   messageId?: string;
   error?: string;
 }
 
+/** Platform adapter interface definition. */
 export interface PlatformAdapter {
   readonly platform: Platform;
   parse(rawPayload: unknown): IncomingMessage | null;
@@ -48,6 +52,7 @@ export interface HttpSender {
   post(url: string, body: unknown, headers: Record<string, string>): Promise<unknown>;
 }
 
+/** Mock http sender. */
 export class MockHttpSender implements HttpSender {
   readonly calls: Array<{ url: string; body: unknown }> = [];
   private result: unknown = { ok: true };
@@ -67,6 +72,7 @@ export interface TelegramConfig {
   baseUrl?: string;
 }
 
+/** Telegram update interface definition. */
 export interface TelegramUpdate {
   update_id: number;
   message?: {
@@ -83,6 +89,7 @@ export interface TelegramUpdate {
   };
 }
 
+/** Telegram adapter. */
 export class TelegramAdapter implements PlatformAdapter {
   readonly platform = "telegram" as const;
   private config: Required<TelegramConfig>;
@@ -166,6 +173,7 @@ export interface SlackConfig {
   baseUrl?: string;
 }
 
+/** Slack event payload interface definition. */
 export interface SlackEventPayload {
   type: string;
   event?: {
@@ -183,6 +191,7 @@ export interface SlackEventPayload {
   text?: string;
 }
 
+/** Slack adapter. */
 export class SlackAdapter implements PlatformAdapter {
   readonly platform = "slack" as const;
   private config: Required<SlackConfig>;
@@ -271,6 +280,7 @@ export type AdapterConfig =
   | ({ platform: "telegram" } & TelegramConfig)
   | ({ platform: "slack" }    & SlackConfig);
 
+/** Create adapter. */
 export function createAdapter(config: AdapterConfig, sender?: HttpSender): PlatformAdapter {
   switch (config.platform) {
     case "telegram": return new TelegramAdapter(config, sender);

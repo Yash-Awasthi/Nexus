@@ -14,6 +14,7 @@
 
 export type SearchCategory = "general" | "images" | "news" | "files" | "social" | "science" | "it";
 
+/** Searxng result interface definition. */
 export interface SearxngResult {
   url: string;
   title: string;
@@ -24,6 +25,7 @@ export interface SearxngResult {
   publishedDate?: string;
 }
 
+/** Searxng response interface definition. */
 export interface SearxngResponse {
   query: string;
   results: SearxngResult[];
@@ -34,6 +36,7 @@ export interface SearxngResponse {
   latency: number;
 }
 
+/** Searxng query options interface definition. */
 export interface SearxngQueryOptions {
   categories?: SearchCategory[];
   engines?: string[];
@@ -183,6 +186,7 @@ export interface RouterInstance {
   name: string;
 }
 
+/** Router result interface definition. */
 export interface RouterResult {
   query: string;
   results: SearxngResult[];
@@ -190,6 +194,7 @@ export interface RouterResult {
   totalDurationMs: number;
 }
 
+/** Multi engine router. */
 export class MultiEngineRouter {
   private instances: RouterInstance[];
 

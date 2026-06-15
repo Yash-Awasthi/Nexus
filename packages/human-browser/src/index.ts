@@ -15,8 +15,10 @@
 
 export type ActionType = "move" | "click" | "type" | "scroll" | "wait" | "focus" | "blur";
 
+/** Point interface definition. */
 export interface Point { x: number; y: number; }
 
+/** Browser action interface definition. */
 export interface BrowserAction {
   type: ActionType;
   payload: Record<string, unknown>;
@@ -33,6 +35,7 @@ export interface TimingOptions {
   jitter?: number;
 }
 
+/** Human timing. */
 export class HumanTiming {
   /**
    * Return a human-like delay between minMs and maxMs with optional jitter.
@@ -69,6 +72,7 @@ export interface MouseMove {
   durationMs: number;
 }
 
+/** Mouse simulator. */
 export class MouseSimulator {
   private rng: () => number;
 
@@ -123,6 +127,7 @@ export interface TypingResult {
   errors: number;
 }
 
+/** Keyboard simulator. */
 export class KeyboardSimulator {
   private rng: () => number;
   private wpm: number;
@@ -180,6 +185,7 @@ export interface ScrollChunk {
   delayMs: number;
 }
 
+/** Scroll simulator. */
 export class ScrollSimulator {
   private rng: () => number;
 
@@ -279,6 +285,7 @@ export class BrowserSession {
 
 export type ExecutorFn = (action: BrowserAction) => Promise<void> | void;
 
+/** Playback result interface definition. */
 export interface PlaybackResult {
   total: number;
   executed: number;
@@ -286,6 +293,7 @@ export interface PlaybackResult {
   durationMs: number;
 }
 
+/** Action player. */
 export class ActionPlayer {
   private executor: ExecutorFn;
 

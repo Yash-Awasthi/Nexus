@@ -13,6 +13,7 @@
 
 export type JsonSchemaType = "string" | "number" | "boolean" | "object" | "array" | "null";
 
+/** Json schema property interface definition. */
 export interface JsonSchemaProperty {
   type: JsonSchemaType;
   description?: string;
@@ -20,23 +21,27 @@ export interface JsonSchemaProperty {
   items?: JsonSchemaProperty;
 }
 
+/** Input schema interface definition. */
 export interface InputSchema {
   type: "object";
   properties: Record<string, JsonSchemaProperty>;
   required?: string[];
 }
 
+/** Mcp tool definition interface definition. */
 export interface McpToolDefinition {
   name: string;
   description: string;
   inputSchema: InputSchema;
 }
 
+/** Tool result type alias. */
 export type ToolResult =
   | { type: "text"; text: string }
   | { type: "image"; data: string; mimeType: string }
   | { type: "error"; text: string };
 
+/** Tool handler type alias. */
 export type ToolHandler = (args: Record<string, unknown>) => ToolResult | Promise<ToolResult>;
 
 // ── Progress notifications ────────────────────────────────────────────────────
@@ -52,6 +57,7 @@ export interface McpProgressNotification {
   total?: number;
 }
 
+/** Progress callback type alias. */
 export type ProgressCallback = (n: McpProgressNotification) => void | Promise<void>;
 
 /** Injected into progress-aware handlers so they can emit progress updates. */
@@ -107,8 +113,10 @@ export interface McpResourceDefinition {
   mimeType?: string;
 }
 
+/** Resource reader type alias. */
 export type ResourceReader = (uri: string) => { content: string; mimeType?: string } | Promise<{ content: string; mimeType?: string }>;
 
+/** Mcp resource. */
 export class McpResource {
   readonly definition: McpResourceDefinition;
   private reader: ResourceReader;
@@ -131,8 +139,10 @@ export interface McpPromptDefinition {
   arguments?: Array<{ name: string; description?: string; required?: boolean }>;
 }
 
+/** Prompt builder type alias. */
 export type PromptBuilder = (args: Record<string, string>) => string | Promise<string>;
 
+/** Mcp prompt. */
 export class McpPrompt {
   readonly definition: McpPromptDefinition;
   private builder: PromptBuilder;
@@ -163,6 +173,7 @@ export class McpError extends Error {
 
 export type McpAuthErrorCode = "UNAUTHORIZED" | "FORBIDDEN" | "TOKEN_EXPIRED";
 
+/** Mcp auth error. */
 export class McpAuthError extends Error {
   constructor(
     public readonly code: McpAuthErrorCode,
@@ -183,6 +194,7 @@ export interface OAuthToken {
   scopes: string[];
 }
 
+/** Mcp o auth provider options interface definition. */
 export interface McpOAuthProviderOptions {
   clientId: string;
   clientSecret: string;
@@ -193,6 +205,7 @@ export interface McpOAuthProviderOptions {
   fetchFn?: typeof fetch;
 }
 
+/** Mcp o auth provider. */
 export class McpOAuthProvider {
   private clientId:     string;
   private clientSecret: string;
@@ -295,6 +308,7 @@ export interface McpServerInfo {
   description?: string;
 }
 
+/** Mcp server. */
 export class McpServer {
   private tools        = new Map<string, McpTool>();
   private resources    = new Map<string, McpResource>();

@@ -15,11 +15,13 @@
 
 export type InteractionType = 1 | 2 | 3; // PING | APPLICATION_COMMAND | MESSAGE_COMPONENT
 
+/** Discord option interface definition. */
 export interface DiscordOption {
   name: string;
   value: string | number | boolean;
 }
 
+/** Discord interaction interface definition. */
 export interface DiscordInteraction {
   id: string;
   type: InteractionType;
@@ -35,6 +37,7 @@ export interface DiscordInteraction {
   token: string;
 }
 
+/** Discord embed interface definition. */
 export interface DiscordEmbed {
   title?: string;
   description?: string;
@@ -44,6 +47,7 @@ export interface DiscordEmbed {
   timestamp?: string;
 }
 
+/** Interaction response interface definition. */
 export interface InteractionResponse {
   type: 1 | 4 | 5 | 6 | 7; // PONG | CHANNEL_MESSAGE | DEFERRED | ACK | UPDATE_MESSAGE
   data?: {
@@ -64,12 +68,14 @@ export interface CommandOption {
   choices?: Array<{ name: string; value: string | number }>;
 }
 
+/** Command definition interface definition. */
 export interface CommandDefinition {
   name: string;
   description: string;
   options?: CommandOption[];
 }
 
+/** Command context interface definition. */
 export interface CommandContext {
   interaction: DiscordInteraction;
   options: Map<string, string | number | boolean>;
@@ -77,6 +83,7 @@ export interface CommandContext {
   guildId?: string;
 }
 
+/** Command handler type alias. */
 export type CommandHandler = (ctx: CommandContext) => InteractionResponse | Promise<InteractionResponse>;
 
 // ── CommandRegistry ────────────────────────────────────────────────────────────
@@ -122,6 +129,7 @@ export interface RouterOptions {
   onUnknown?: (interaction: DiscordInteraction) => InteractionResponse;
 }
 
+/** Interaction router. */
 export class InteractionRouter {
   private registry: CommandRegistry;
   private opts: RouterOptions;
@@ -182,6 +190,7 @@ export function messageResponse(content: string, ephemeral = false): Interaction
   };
 }
 
+/** Embed response. */
 export function embedResponse(embed: DiscordEmbed, ephemeral = false): InteractionResponse {
   return {
     type: 4,
@@ -189,10 +198,12 @@ export function embedResponse(embed: DiscordEmbed, ephemeral = false): Interacti
   };
 }
 
+/** Deferred response. */
 export function deferredResponse(): InteractionResponse {
   return { type: 5 };
 }
 
+/** Pong response. */
 export function pongResponse(): InteractionResponse {
   return { type: 1 };
 }

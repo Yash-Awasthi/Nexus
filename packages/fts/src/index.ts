@@ -8,6 +8,7 @@ export interface IDocument {
   metadata?: Record<string, unknown>;
 }
 
+/** Search result interface definition. */
 export interface SearchResult {
   id: string;
   score: number;
@@ -15,6 +16,7 @@ export interface SearchResult {
   metadata?: Record<string, unknown>;
 }
 
+/** Search opts interface definition. */
 export interface SearchOpts {
   /** Number of results to return (default: 10). */
   k?: number;
@@ -52,6 +54,7 @@ interface BM25DocEntry {
 const BM25_K1 = 1.5;
 const BM25_B = 0.75;
 
+/** Bm25 index. */
 export class BM25Index implements IFullTextIndex {
   private readonly _docs = new Map<string, BM25DocEntry>();
   /** doc frequency: term → number of docs containing it */
@@ -138,6 +141,7 @@ export interface VectorSearchResult {
   score: number;
 }
 
+/** I vector store interface definition. */
 export interface IVectorStore {
   add(id: string, vector: number[]): void;
   remove(id: string): boolean;
@@ -157,6 +161,7 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return denom === 0 ? 0 : dot / denom;
 }
 
+/** In memory vector store. */
 export class InMemoryVectorStore implements IVectorStore {
   private readonly _store = new Map<string, number[]>();
 
@@ -238,6 +243,7 @@ export interface HybridSearchOpts extends SearchOpts {
   rrfK?: number;
 }
 
+/** Hybrid search engine. */
 export class HybridSearchEngine {
   private readonly _docs = new Map<string, IDocument>();
 

@@ -88,12 +88,14 @@ export interface McpInputSchema {
   description?: string;
 }
 
+/** Mcp tool definition interface definition. */
 export interface McpToolDefinition {
   name: string;
   description?: string;
   inputSchema: McpInputSchema;
 }
 
+/** Mcp call content interface definition. */
 export interface McpCallContent {
   type: "text" | "image" | "resource";
   text?: string;
@@ -102,6 +104,7 @@ export interface McpCallContent {
   uri?: string;
 }
 
+/** Mcp call result interface definition. */
 export interface McpCallResult {
   content: McpCallContent[];
   isError?: boolean;
@@ -109,6 +112,7 @@ export interface McpCallResult {
   text: string;
 }
 
+/** Mcp resource entry interface definition. */
 export interface McpResourceEntry {
   uri: string;
   name?: string;
@@ -116,6 +120,7 @@ export interface McpResourceEntry {
   mimeType?: string;
 }
 
+/** Mcp resource content interface definition. */
 export interface McpResourceContent {
   uri: string;
   mimeType?: string;
@@ -123,6 +128,7 @@ export interface McpResourceContent {
   blob?: string;
 }
 
+/** Mcp server info interface definition. */
 export interface McpServerInfo {
   name: string;
   version: string;
@@ -135,6 +141,7 @@ export interface McpTransport {
   send(method: string, params?: unknown): Promise<unknown>;
 }
 
+/** Mcp http transport. */
 export class McpHttpTransport implements McpTransport {
   private readonly url: string;
   private readonly headers: Record<string, string>;
@@ -209,6 +216,7 @@ export interface McpClientConfig {
   timeoutMs?: number;
 }
 
+/** Mcp client. */
 export class McpClient {
   private readonly transport: McpTransport;
   private _serverInfo?: McpServerInfo;

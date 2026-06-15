@@ -41,6 +41,7 @@ export interface McpInputSchema {
   [key: string]: unknown;
 }
 
+/** Mcp tool definition interface definition. */
 export interface McpToolDefinition {
   name: string;
   description?: string;
@@ -55,13 +56,16 @@ export interface OpenApiInfo {
   description?: string;
 }
 
+/** Open api server interface definition. */
 export interface OpenApiServer {
   url: string;
   description?: string;
 }
 
+/** Json schema type type alias. */
 export type JsonSchemaType = "string" | "number" | "integer" | "boolean" | "array" | "object" | "null";
 
+/** Open api schema interface definition. */
 export interface OpenApiSchema {
   type?: JsonSchemaType | JsonSchemaType[];
   description?: string;
@@ -75,6 +79,7 @@ export interface OpenApiSchema {
   [key: string]: unknown;
 }
 
+/** Open api request body interface definition. */
 export interface OpenApiRequestBody {
   required: boolean;
   description?: string;
@@ -85,6 +90,7 @@ export interface OpenApiRequestBody {
   };
 }
 
+/** Open api response interface definition. */
 export interface OpenApiResponse {
   description: string;
   content?: {
@@ -94,6 +100,7 @@ export interface OpenApiResponse {
   };
 }
 
+/** Open api operation interface definition. */
 export interface OpenApiOperation {
   operationId: string;
   summary?: string;
@@ -103,6 +110,7 @@ export interface OpenApiOperation {
   responses: Record<string, OpenApiResponse>;
 }
 
+/** Open api path item interface definition. */
 export interface OpenApiPathItem {
   get?: OpenApiOperation;
   post?: OpenApiOperation;
@@ -110,6 +118,7 @@ export interface OpenApiPathItem {
   delete?: OpenApiOperation;
 }
 
+/** Open api spec interface definition. */
 export interface OpenApiSpec {
   openapi: "3.1.0";
   info: OpenApiInfo;

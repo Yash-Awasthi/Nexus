@@ -15,6 +15,7 @@
 
 export type WeatherUnit = "metric" | "imperial";
 
+/** Weather request interface definition. */
 export interface WeatherRequest {
   lat: number;
   lng: number;
@@ -25,6 +26,7 @@ export interface WeatherRequest {
   daily?: boolean;
 }
 
+/** Current weather interface definition. */
 export interface CurrentWeather {
   temperature: number;     // °C or °F depending on unit
   windSpeed: number;       // km/h or mph
@@ -34,6 +36,7 @@ export interface CurrentWeather {
   time: string;            // ISO
 }
 
+/** Hourly weather interface definition. */
 export interface HourlyWeather {
   time: string[];
   temperature: number[];
@@ -41,6 +44,7 @@ export interface HourlyWeather {
   precipitation?: number[];
 }
 
+/** Daily summary interface definition. */
 export interface DailySummary {
   time: string[];
   weatherCode: number[];
@@ -49,6 +53,7 @@ export interface DailySummary {
   precipitationSum: number[];
 }
 
+/** Weather response interface definition. */
 export interface WeatherResponse {
   lat: number;
   lng: number;
@@ -89,6 +94,7 @@ export const WMO_DESCRIPTIONS: Record<number, string> = {
   99: "Thunderstorm with heavy hail",
 };
 
+/** Wmo code. */
 export class WmoCode {
   static describe(code: number): string {
     return WMO_DESCRIPTIONS[code] ?? `Unknown (${code})`;
@@ -180,6 +186,7 @@ export class WeatherCache {
 
 const OPEN_METEO_BASE = "https://api.open-meteo.com/v1/forecast";
 
+/** Weather client. */
 export class WeatherClient {
   private http: WeatherHttpGetFn;
 
@@ -263,6 +270,7 @@ export interface WeatherFeedOptions {
   cacheTtlMs?: number;
 }
 
+/** Weather feed. */
 export class WeatherFeed {
   private client: WeatherClient;
   private cache: WeatherCache;

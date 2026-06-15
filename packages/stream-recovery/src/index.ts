@@ -19,11 +19,13 @@ export interface HoldbackOptions {
   holdMs: number;   // default 750ms
 }
 
+/** Held chunk interface definition. */
 export interface HeldChunk<T> {
   value: T;
   heldAt: number;
 }
 
+/** Holdback buffer. */
 export class HoldbackBuffer<T> {
   private queue: HeldChunk<T>[] = [];
   private holdMs: number;
@@ -68,6 +70,7 @@ export interface RepairResult {
   error?: string;
 }
 
+/** Tool json repair. */
 export class ToolJsonRepair {
   /**
    * Attempt to repair truncated JSON by appending missing closers.
@@ -130,6 +133,7 @@ export const DEFAULT_CONTINUATION_SUFFIXES: Record<string, string> = {
   plain:    " [...]",
 };
 
+/** Continuation suffix. */
 export class ContinuationSuffix {
   private suffixes: Record<string, string>;
 
@@ -156,6 +160,7 @@ export interface RetryStrategyOptions {
   backoffFactor?: number;
 }
 
+/** Retry strategy. */
 export class RetryStrategy {
   readonly maxAttempts: number;
   readonly initialDelayMs: number;
@@ -179,6 +184,7 @@ export class RetryStrategy {
   }
 }
 
+/** Default retry strategy. */
 export const DEFAULT_RETRY_STRATEGY = new RetryStrategy({
   maxAttempts:    5,
   initialDelayMs: 100,
@@ -190,6 +196,7 @@ export const DEFAULT_RETRY_STRATEGY = new RetryStrategy({
 
 export type StreamFn<T> = () => AsyncIterable<T>;
 
+/** Retry result interface definition. */
 export interface RetryResult<T> {
   values: T[];
   attempts: number;
@@ -197,6 +204,7 @@ export interface RetryResult<T> {
   error?: string;
 }
 
+/** Stream retry handler. */
 export class StreamRetryHandler<T = string> {
   private strategy: RetryStrategy;
 
@@ -233,6 +241,7 @@ export class StreamRetryHandler<T = string> {
 
 export type SseBlockType = "block" | "updateBlock" | "researchComplete" | string;
 
+/** Sse block interface definition. */
 export interface SseBlock {
   id: string;
   type: SseBlockType;
@@ -240,6 +249,7 @@ export interface SseBlock {
   data?: unknown;
 }
 
+/** Close event interface definition. */
 export interface CloseEvent {
   blockId: string;
   type: SseBlockType;
@@ -247,6 +257,7 @@ export interface CloseEvent {
   closedAt: string;
 }
 
+/** Emitted sse tracker. */
 export class EmittedSseTracker {
   private openBlocks = new Map<string, SseBlock>();
   readonly closeEvents: CloseEvent[] = [];
@@ -288,6 +299,7 @@ export interface OrchestratorOptions {
   initialDelayMs?: number;
 }
 
+/** Stream recovery orchestrator. */
 export class StreamRecoveryOrchestrator {
   readonly holdback: HoldbackBuffer<string>;
   readonly jsonRepair: ToolJsonRepair;

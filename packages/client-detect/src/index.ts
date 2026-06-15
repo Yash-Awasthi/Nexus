@@ -25,6 +25,7 @@ export type ClientType =
   | "sdk"           // Nexus SDK / programmatic
   | "unknown";      // Unrecognised
 
+/** Detection result interface definition. */
 export interface DetectionResult {
   clientType: ClientType;
   confidence: "high" | "medium" | "low";
@@ -34,6 +35,7 @@ export interface DetectionResult {
   responseFormat: ResponseFormat;
 }
 
+/** Response format type alias. */
 export type ResponseFormat = "markdown" | "plain" | "json" | "tool-calls";
 
 const FORMAT_MAP: Record<ClientType, ResponseFormat> = {
@@ -78,6 +80,7 @@ function headerVal(headers: RequestHeaders, key: string): string {
   return Array.isArray(v) ? v[0] ?? "" : (v ?? "");
 }
 
+/** Detect client. */
 export function detectClient(headers: RequestHeaders): DetectionResult {
   // 1. Explicit header
   const explicit = headerVal(headers, "x-nexus-client") || headerVal(headers, "x-client-type");
@@ -115,6 +118,7 @@ export interface ClientDetectMiddlewareOptions {
   attachAs?: string;
 }
 
+/** Make client detect middleware. */
 export function makeClientDetectMiddleware(opts?: ClientDetectMiddlewareOptions) {
   const attachAs = opts?.attachAs ?? "nexusClient";
   return function clientDetectMiddleware(request: unknown, _reply: unknown, done?: () => void): void {

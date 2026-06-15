@@ -33,6 +33,7 @@ export type Tier = "free" | "pro" | "enterprise";
 
 const TIER_ORDER: Record<Tier, number> = { free: 0, pro: 1, enterprise: 2 };
 
+/** Tier gate definition interface definition. */
 export interface TierGateDefinition {
   feature: string;
   requiredTier: Tier;

@@ -14,6 +14,7 @@
 
 export type FieldType = "string" | "number" | "boolean" | "date" | "email" | "url";
 
+/** Field schema interface definition. */
 export interface FieldSchema {
   name: string;
   type: FieldType;
@@ -24,12 +25,14 @@ export interface FieldSchema {
   required?: boolean;
 }
 
+/** Extraction result interface definition. */
 export interface ExtractionResult {
   fields: Record<string, unknown>;
   missing: string[];
   durationMs: number;
 }
 
+/** Table row interface definition. */
 export interface TableRow {
   [column: string]: string;
 }

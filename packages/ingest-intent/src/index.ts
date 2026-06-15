@@ -30,6 +30,7 @@ export interface DistillOptions {
   failOpen?: boolean;        // default true → return null on failure
 }
 
+/** Distill result interface definition. */
 export interface DistillResult {
   query: string | null;       // null = fail-open
   termCount: number;
@@ -38,6 +39,7 @@ export interface DistillResult {
   source: "llm" | "fallback" | "null";
 }
 
+/** Llm distill fn type alias. */
 export type LlmDistillFn = (prompt: string) => Promise<string>;
 
 // ── DocumentChunker ───────────────────────────────────────────────────────────
@@ -60,6 +62,7 @@ const STOP_WORDS = new Set([
   "with", "you", "your",
 ]);
 
+/** Term normalizer. */
 export class TermNormalizer {
   normalize(text: string, maxTerms: number): string[] {
     const raw = text
@@ -138,6 +141,7 @@ ${text}
 
 Terms:`.trim();
 
+/** Intent distiller. */
 export class IntentDistiller {
   private llm?: LlmDistillFn;
   private opts: Required<DistillOptions>;

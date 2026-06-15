@@ -22,9 +22,12 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type ForecastDomain = "risk" | "market" | "geo" | "military";
+/** Forecast horizon type alias. */
 export type ForecastHorizon = "24h" | "7d" | "30d" | "90d" | "1y";
+/** Scenario likelihood type alias. */
 export type ScenarioLikelihood = "low" | "medium" | "high" | "near-certain";
 
+/** Forecast scenario interface definition. */
 export interface ForecastScenario {
   id: string;
   label: string;
@@ -36,6 +39,7 @@ export interface ForecastScenario {
   mitigations?: string[];    // recommended mitigations
 }
 
+/** Forecast result interface definition. */
 export interface ForecastResult {
   domain: ForecastDomain;
   horizon: ForecastHorizon;
@@ -47,6 +51,7 @@ export interface ForecastResult {
   warnings?: string[];
 }
 
+/** Forecast request interface definition. */
 export interface ForecastRequest {
   domain: ForecastDomain;
   horizon: ForecastHorizon;
@@ -68,6 +73,7 @@ export interface ForecastResponse {
   durationMs: number;
 }
 
+/** Forecast chunk interface definition. */
 export interface ForecastChunk {
   requestId: string;
   sequence: number;
@@ -135,6 +141,7 @@ function makeDefaultResult(domain: ForecastDomain, horizon: ForecastHorizon): Fo
   };
 }
 
+/** Mock forecast handler. */
 export class MockForecastHandler implements ForecastHandler {
   readonly domain: ForecastDomain;
   private behavior: MockHandlerBehavior;
@@ -217,6 +224,7 @@ export class ForecastCache {
 
 let _rpcSeq = 0;
 
+/** Rpc gateway. */
 export class RpcGateway {
   private handlers = new Map<ForecastDomain, ForecastHandler>();
 
@@ -293,6 +301,7 @@ export interface ForecastServiceOptions {
   cache?: ForecastCache;
 }
 
+/** Forecast service. */
 export class ForecastService {
   private gateway: RpcGateway;
   private cache: ForecastCache;
@@ -390,6 +399,7 @@ export interface ForecastPoint {
   confidence: number;
 }
 
+/** Open weather forecast handler options interface definition. */
 export interface OpenWeatherForecastHandlerOptions {
   apiKey?:  string;
   city?:    string;
@@ -409,6 +419,7 @@ interface OWMResponse {
   city: { name: string };
 }
 
+/** Open weather forecast handler. */
 export class OpenWeatherForecastHandler implements ForecastHandler {
   readonly domain: ForecastDomain = "geo";
   private apiKey:  string;

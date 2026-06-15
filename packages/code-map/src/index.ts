@@ -39,6 +39,7 @@
 
 export type SupportedLanguage = "typescript" | "javascript" | "python" | "go" | "rust" | "java";
 
+/** Detect language. */
 export function detectLanguage(path: string): SupportedLanguage | "unknown" {
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
   switch (ext) {
@@ -78,6 +79,7 @@ export type SymbolKind =
   | "method"
   | "module";
 
+/** Symbol def interface definition. */
 export interface SymbolDef {
   name: string;
   kind: SymbolKind;
@@ -85,6 +87,7 @@ export interface SymbolDef {
   exported: boolean;
 }
 
+/** Import entry interface definition. */
 export interface ImportEntry {
   /** Module specifier (relative or package name). */
   from: string;
@@ -93,12 +96,14 @@ export interface ImportEntry {
   line: number;
 }
 
+/** Export entry interface definition. */
 export interface ExportEntry {
   name: string;
   kind: SymbolKind;
   line: number;
 }
 
+/** File index interface definition. */
 export interface FileIndex {
   path: string;
   language: SupportedLanguage | "unknown";
@@ -325,6 +330,7 @@ export interface SourceFile {
   content: string;
 }
 
+/** Build code map. */
 export function buildCodeMap(files: SourceFile[]): CodeMap {
   const fileMap = new Map<string, FileIndex>();
   const symbolIndex = new Map<string, string[]>();
