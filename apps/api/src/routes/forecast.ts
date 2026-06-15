@@ -188,6 +188,7 @@ export async function forecastRoutes(app: FastifyInstance): Promise<void> {
     const limit = Math.min(parseInt(request.query.limit ?? "20", 10) || 20, 200);
     const history = await loadHistory(domain, limit);
 
+    reply.header("Cache-Control", "private, max-age=60, stale-while-revalidate=300");
     return reply.send({ domain, history, total: history.length });
   });
 }

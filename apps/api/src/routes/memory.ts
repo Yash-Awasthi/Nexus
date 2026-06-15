@@ -69,6 +69,7 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
   app.get<{
     Querystring: { query?: string; limit?: string; userId?: string };
   }>("/memory", { preHandler: requireAuth }, async (request, reply) => {
+    reply.header("Cache-Control", "private, max-age=60, stale-while-revalidate=300");
     const { query = "", limit: limitStr, userId } = request.query;
     const limit = Math.min(parseInt(limitStr ?? "10", 10) || 10, 100);
 

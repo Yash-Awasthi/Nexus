@@ -63,6 +63,7 @@ if (pgWiki) {
 export async function wikiRoutes(app: FastifyInstance): Promise<void> {
   /** GET /wiki/articles */
   app.get("/wiki/articles", { preHandler: requireAuth }, async (_req, reply) => {
+    reply.header("Cache-Control", "private, max-age=60, stale-while-revalidate=300");
     const articles = pgWiki
       ? await pgWiki.getAll().catch(() => wikiStore.all())
       : wikiStore.all();

@@ -29,7 +29,8 @@ import {
 } from "@nexus/llm-drivers";
 import type { FastifyInstance } from "fastify";
 
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, getTierFromRequest } from "../middleware/auth.js";
+import { makeTierGatePreHandler } from "@nexus/tier-gate";
 
 // ── Council config ─────────────────────────────────────────────────────────────
 
@@ -171,7 +172,7 @@ export async function councilRoutes(app: FastifyInstance): Promise<void> {
   }>(
     "/council/deliberate",
     {
-      preHandler: requireAuth,
+      preHandler: [requireAuth, makeTierGatePreHandler({ feature: "council", getTier: getTierFromRequest })],
       schema: {
         body: {
           type: "object",
