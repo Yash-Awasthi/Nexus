@@ -22,6 +22,7 @@ import {
   type ResearchFinding,
   type SourceReference,
 } from "@nexus/researcher";
+import { BM25Reranker } from "@nexus/reranker";
 import { randomUUID } from "crypto";
 import type { FastifyInstance } from "fastify";
 import { Pool } from "pg";
@@ -94,7 +95,9 @@ function buildSearchFn(): WebSearchFn {
   ];
 }
 
-// ── Singleton researcher ──────────────────────────────────────────────────────
+// ── Singleton researcher + BM25 reranker ──────────────────────────────────────
+
+const reranker = new BM25Reranker();
 
 const searchFn = buildSearchFn();
 
@@ -238,10 +241,33 @@ export async function researcherRoutes(app: FastifyInstance): Promise<void> {
 
     const combined = await session.research(query.trim());
 
-    // Build a merged CitationIndex from all result sources
+    // BM25 rerank: score each result against the query using title + snippet as text.
+    // Reranked order gives higher recall-precision; we re-map IDs back to the
+    // original SearchResult objects so all fields (url, source, score, …) are preserved.
+    const rawResults = combined.allResults;
+    let orderedResults = rawResults;
+    if (rawResults.length > 0) {
+      const { documents: rerankedDocs } = await reranker.rerank(
+        query,
+        rawResults.map((r) => ({
+          id:    r.url,
+          text:  `${r.title} ${r.snippet}`,
+          score: r.score,
+        })),
+      );
+      const byUrl = new Map(rawResults.map((r) => [r.url, r]));
+      orderedResults = rerankedDocs
+        .map((d) => {
+          const orig = byUrl.get(d.id);
+          return orig ? { ...orig, score: d.score } : undefined;
+        })
+        .filter((r): r is SearchResult => r !== undefined);
+    }
+
+    // Build a merged CitationIndex from reranked results
     const index = new CitationIndex();
     const accessedAt = new Date().toISOString();
-    combined.allResults.slice(0, Math.min(maxResults, 50)).forEach((r) => index.add(r, accessedAt));
+    orderedResults.slice(0, Math.min(maxResults, 50)).forEach((r) => index.add(r, accessedAt));
 
     const runId    = randomUUID();
     const synthesis =
@@ -254,11 +280,11 @@ export async function researcherRoutes(app: FastifyInstance): Promise<void> {
       query,
       finding: {
         query,
-        results:      combined.allResults,
+        results:       orderedResults,
         synthesis,
-        citations:    combined.citations,
+        citations:     combined.citations,
         richCitations: index.list(),
-        durationMs:   combined.durationMs,
+        durationMs:    combined.durationMs,
       },
       citations: index.list(),
       createdAt: accessedAt,
@@ -272,12 +298,12 @@ export async function researcherRoutes(app: FastifyInstance): Promise<void> {
       synthesis,
       citations:     combined.citations,
       richCitations: index.list(),
-      results:       combined.allResults.slice(0, Math.min(maxResults, 50)).map((r) => ({
-        url:    r.url,
-        title:  r.title,
+      results:       orderedResults.slice(0, Math.min(maxResults, 50)).map((r) => ({
+        url:     r.url,
+        title:   r.title,
         snippet: r.snippet,
-        score:  r.score,
-        source: r.source,
+        score:   r.score,
+        source:  r.source,
       })),
       durationMs:    combined.durationMs,
     });

@@ -23,6 +23,12 @@ import {
   MemoryManager,
   PgVectorStore,
 } from "@nexus/memory";
+import {
+  RagtimeRetriever,
+  type IEmbedder as IRagtimeEmbedder,
+  type IMemoryStore as IRagtimeMemoryStore,
+  type MemoryFilter as RagtimeMemoryFilter,
+} from "@nexus/ragtime";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
@@ -38,6 +44,15 @@ const embedder = process.env.GROQ_API_KEY
   : new FixedEmbedder();
 
 const manager = new MemoryManager({ store, embedder });
+
+// RagtimeRetriever — two-stage recall+rerank for the GET /memory endpoint.
+// Store and embedder from @nexus/memory are structurally compatible with
+// @nexus/ragtime's IMemoryStore / IEmbedder interfaces.
+const retriever = new RagtimeRetriever({
+  store:   store   as unknown as IRagtimeMemoryStore,
+  embedder: embedder as unknown as IRagtimeEmbedder,
+  config: { poolSize: 20, finalK: 50 }, // finalK=50 so callers can slice via limit param
+});
 
 // ── Route plugin ──────────────────────────────────────────────────────────────
 
@@ -56,17 +71,26 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
     const { query = "", limit: limitStr, userId } = request.query;
     const limit = Math.min(parseInt(limitStr ?? "10", 10) || 10, 100);
 
-    const filter = userId ? { userId } : undefined;
-    const results = await manager.recall(query, limit, filter);
+    // RagtimeRetriever: two-stage recall (cosine pool) + composite rerank
+    // (α·relevance + β·importance + γ·recency_decay).
+    // Filter by metadata.userId for multi-tenant isolation.
+    const ragtimeFilter: RagtimeMemoryFilter | undefined = userId
+      ? { metadata: { userId } }
+      : undefined;
+
+    const results = await retriever.retrieve(query, limit, ragtimeFilter);
 
     return reply.send({
       results: results.map((r) => ({
-        id:        r.entry.id,
-        text:      r.entry.text,
-        score:     r.score,
-        metadata:  r.entry.metadata,
-        createdAt: r.entry.createdAt,
-        userId:    r.entry.userId ?? (r.entry.metadata?.userId as string | undefined),
+        id:          r.entry.id,
+        text:        r.entry.text,
+        score:       r.composite,
+        relevance:   r.relevance,
+        importance:  r.importance,
+        recencyDecay: r.recencyDecay,
+        metadata:    r.entry.metadata,
+        createdAt:   r.entry.createdAt,
+        userId:      r.entry.metadata?.["userId"] as string | undefined,
       })),
       total: results.length,
     });

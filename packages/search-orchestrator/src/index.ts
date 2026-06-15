@@ -12,8 +12,15 @@
  *   • MockSearchStrategy     — configurable in-memory test double
  *   • ChromaSearchStrategy   — real Chroma vector DB strategy (uses CHROMA_URL)
  *   • PgFullTextStrategy     — Postgres ILIKE full-text over memory_entries (uses DATABASE_URL)
+ *   • HybridSearchStrategy   — vector + BM25 RRF fusion (wraps @nexus/hybrid-search; activated when CHROMA_URL is set)
  */
 
+import {
+  HybridSearchEngine,
+  InMemoryBM25,
+  type SearchHit as HybridSearchHit,
+  type VectorSearchAdapter,
+} from "@nexus/hybrid-search";
 import { neon } from "@neondatabase/serverless";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -253,6 +260,67 @@ export class PgFullTextStrategy implements SearchStrategy {
   }
 }
 
+// ── HybridSearchStrategy ──────────────────────────────────────────────────────
+
+/**
+ * HybridSearchStrategy — parallel vector + BM25 with RRF fusion.
+ *
+ * Wraps HybridSearchEngine (from @nexus/hybrid-search).  The vector side is
+ * supplied as an injectable VectorSearchAdapter (typically wrapping
+ * ChromaSearchStrategy).  BM25 uses an in-process InMemoryBM25 index —
+ * documents are indexed on-demand as hits arrive from the vector backend.
+ *
+ * Use via createDefaultOrchestrator() when CHROMA_URL is set; or construct
+ * directly for custom wiring.
+ */
+export class HybridSearchStrategy implements SearchStrategy {
+  readonly name: SearchSource = "hybrid";
+  private readonly engine: HybridSearchEngine;
+  private readonly bm25: InMemoryBM25;
+
+  constructor(vectorAdapter: VectorSearchAdapter) {
+    this.bm25   = new InMemoryBM25();
+    this.engine = new HybridSearchEngine(vectorAdapter, this.bm25);
+  }
+
+  async search(request: SearchRequest): Promise<SearchResponse> {
+    const t0     = Date.now();
+    const limit  = request.maxResults ?? 10;
+
+    const { hits } = await this.engine.search({ query: request.query, limit });
+
+    // Feed vector hits into BM25 for future queries (incremental indexing)
+    for (const hit of hits) {
+      if (hit.text) this.bm25.add({ id: hit.id, text: hit.text, metadata: hit.metadata });
+    }
+
+    const results: SearchResult[] = hits.map((hit: HybridSearchHit, i: number) => ({
+      id:        hit.id,
+      content:   hit.text ?? "",
+      source:    "hybrid" as SearchSource,
+      type:      (hit.metadata?.["type"] as SearchResultType) ?? "document",
+      score:     hit.score,
+      timestamp: (hit.metadata?.["timestamp"] as string) ?? new Date().toISOString(),
+      projectId: hit.metadata?.["projectId"] as string | undefined,
+      metadata:  hit.metadata,
+    }));
+
+    // userId ACL: scope results when requested
+    const filtered = request.userId
+      ? results.filter(
+          (r) => !r.metadata?.["user_id"] || r.metadata["user_id"] === request.userId,
+        )
+      : results;
+
+    return {
+      results:    filtered,
+      source:     "hybrid",
+      durationMs: Date.now() - t0,
+      totalFound: filtered.length,
+    };
+  }
+}
+
 // ── Filter helpers ────────────────────────────────────────────────────────────
 
 export function applyFilters(results: SearchResult[], filters: SearchFilters): SearchResult[] {
@@ -427,7 +495,22 @@ export function createDefaultOrchestrator(
   const resolved: SearchStrategy[] = [];
 
   if (process.env.CHROMA_URL) {
-    resolved.push(new ChromaSearchStrategy());
+    const chroma = new ChromaSearchStrategy();
+    resolved.push(chroma);
+
+    // Hybrid strategy: vector from Chroma + BM25 RRF fusion
+    const chromaAsVector: VectorSearchAdapter = {
+      async search(query: string, limit: number): Promise<HybridSearchHit[]> {
+        const resp = await chroma.search({ query, maxResults: limit });
+        return resp.results.map((r) => ({
+          id:       r.id,
+          score:    r.score,
+          text:     r.content,
+          metadata: r.metadata,
+        }));
+      },
+    };
+    resolved.push(new HybridSearchStrategy(chromaAsVector));
   }
 
   if (process.env.DATABASE_URL) {
