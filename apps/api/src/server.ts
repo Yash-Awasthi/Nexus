@@ -30,6 +30,7 @@ import { adminRoutes } from "./routes/admin.js";
 import { oauthRoutes } from "./routes/oauth.js";
 import { parseltongueRoutes } from "./routes/parseltongue.js";
 import { makeRateLimitPreHandler } from "./lib/rate-limiter.js";
+import { sentryReporter } from "./lib/sentry-reporter.js";
 import { metricsRoutes } from "./routes/metrics.js";
 import { auditRoutes } from "./routes/audit.js";
 import { billingRoutes } from "./routes/billing.js";
@@ -144,9 +145,11 @@ export async function buildServer(): Promise<FastifyInstance> {
     if (!tracer.enabled) return;
     const name = `http.${request.method} ${request.url}`;
     const span = tracer.startSpan(name, "root");
+    // Correlate span with Fastify's request ID for log tracing
     span.setAttributes({
-      "http.method": request.method,
-      "http.url": request.url,
+      "http.method":    request.method,
+      "http.url":       request.url,
+      "nexus.req_id":   request.id,
     });
     request._nexusSpan = span;
   });
@@ -167,6 +170,14 @@ export async function buildServer(): Promise<FastifyInstance> {
         latencyMs:  reply.elapsedTime ?? 0,
       });
     } catch { /* metrics not yet loaded */ }
+
+    // AlertEngine: fire "http.5xx" metric on every 5xx response
+    if (reply.statusCode >= 500) {
+      try {
+        const { alertEngine } = await import("./routes/alerts.js");
+        alertEngine.evaluate("http.5xx", 1).catch(() => {});
+      } catch { /* non-fatal */ }
+    }
 
     // PostHog analytics — fire-and-forget on successful mutations
     if (request.method === "POST" && reply.statusCode === 201) {
@@ -276,9 +287,20 @@ export async function buildServer(): Promise<FastifyInstance> {
   );
 
   // ── Global error handler ──────────────────────────────────────────────────
-  app.setErrorHandler((error: FastifyError, _request, reply) => {
+  app.setErrorHandler((error: FastifyError, request, reply) => {
     app.log.error(error);
     const statusCode = error.statusCode ?? 500;
+
+    // Capture unexpected 500s in Sentry (fire-and-forget)
+    if (statusCode >= 500) {
+      sentryReporter.captureException(error, {
+        request_id: request.id,
+        url:        request.url,
+        method:     request.method,
+        userId:     request.nexusUserId,
+      });
+    }
+
     reply.code(statusCode).send({
       error: statusCode >= 500 ? "Internal Server Error" : error.message,
       statusCode,

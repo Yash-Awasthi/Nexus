@@ -87,6 +87,15 @@ alertEngine.addRule(thresholdRule(
   { name: "Gateway latency > 5 s", cooldownMs: 120_000 },
 ));
 
+alertEngine.addRule(thresholdRule(
+  "http.5xx",
+  "http.5xx",
+  "gte",
+  1,
+  "critical",
+  { name: "HTTP 5xx response", cooldownMs: 30_000 },
+));
+
 // ── Hook-driven triggers ──────────────────────────────────────────────────────
 
 globalHooks.on("task.error", async (_payload) => {
