@@ -44,6 +44,8 @@ export interface SearchRequest {
   query: string;
   filters?: SearchFilters;
   maxResults?: number;
+  /** Multi-tenant ACL — when set, results are scoped to this userId only. */
+  userId?: string;
 }
 
 export interface SearchResponse {
@@ -125,16 +127,22 @@ export class ChromaSearchStrategy implements SearchStrategy {
   async search(request: SearchRequest): Promise<SearchResponse> {
     const t0 = Date.now();
     try {
+      const chromaBody: Record<string, unknown> = {
+        query_texts: [request.query],
+        n_results: request.maxResults ?? 10,
+        include: ["documents", "metadatas", "distances"],
+      };
+      // Multi-tenant ACL: scope results to userId when provided
+      if (request.userId) {
+        chromaBody["where"] = { user_id: { $eq: request.userId } };
+      }
+
       const resp = await fetch(
         `${this.chromaUrl}/api/v1/collections/${this.collection}/query`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            query_texts: [request.query],
-            n_results: request.maxResults ?? 10,
-            include: ["documents", "metadatas", "distances"],
-          }),
+          body: JSON.stringify(chromaBody),
         },
       );
 
@@ -209,16 +217,18 @@ export class PgFullTextStrategy implements SearchStrategy {
     try {
       const pattern = `%${request.query.toLowerCase()}%`;
       const limit = request.maxResults ?? 10;
+      const userId = request.userId ?? null;
 
       const rows = await this.sql`
         SELECT
           'mem-' || id::text   AS id,
-          content,
+          text                 AS content,
           'note'               AS type,
           created_at           AS timestamp,
           metadata
         FROM memory_entries
-        WHERE LOWER(content) LIKE ${pattern}
+        WHERE LOWER(text) LIKE ${pattern}
+          AND (${userId}::text IS NULL OR user_id = ${userId})
         ORDER BY created_at DESC
         LIMIT ${limit}
       `;
@@ -372,9 +382,15 @@ export class SearchOrchestrator {
   async search(request: SearchRequest): Promise<SearchResponse> {
     const req = { ...request, maxResults: request.maxResults ?? this.defaultMaxResults };
     const response = await this.chain.search(req);
-    const filtered = request.filters
+    let filtered = request.filters
       ? applyFilters(response.results, request.filters)
       : response.results;
+    // userId ACL post-filter (belt-and-suspenders for strategies that ignore it)
+    if (request.userId) {
+      filtered = filtered.filter(
+        (r) => !r.metadata?.["user_id"] || r.metadata["user_id"] === request.userId,
+      );
+    }
     const sliced = filtered.slice(0, req.maxResults);
     return { ...response, results: sliced, totalFound: filtered.length };
   }

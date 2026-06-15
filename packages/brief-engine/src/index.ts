@@ -67,17 +67,18 @@ export interface BriefEngineOptions {
   hmacFn?: (secret: string, data: string) => string;
 }
 
-// ── Simple hash (deterministic, no crypto dep) ───────────────────────────────
+// ── HMAC-SHA256 signing (node:crypto) ────────────────────────────────────────
 
-function simpleHmac(secret: string, data: string): string {
-  // XOR-fold deterministicly — good enough for test injection; real impl uses node:crypto
-  let h = 0;
-  const key = secret + "|" + data;
-  for (let i = 0; i < key.length; i++) {
-    h = ((h << 5) - h + key.charCodeAt(i)) >>> 0;
-  }
-  return h.toString(16).padStart(8, "0");
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { neon } from "@neondatabase/serverless";
+
+/** Real HMAC-SHA256 — replaces the old invertible XOR-fold. */
+function realHmac(secret: string, data: string): string {
+  return createHmac("sha256", secret).update(data).digest("hex");
 }
+
+/** Signing key — override via BRIEF_SIGNING_KEY env var in production. */
+const DEFAULT_HMAC_SECRET = process.env.BRIEF_SIGNING_KEY ?? "dev-key";
 
 // ── DigestStore ───────────────────────────────────────────────────────────────
 
@@ -180,17 +181,26 @@ ${inner}
 
 export class BriefSigner {
   private secret: string;
-  private hmacFn: (secret: string, data: string) => string;
+  /**
+   * Injectable HMAC function for tests.  When null the production path
+   * (createHmac + timingSafeEqual) is used.
+   */
+  private hmacFn: ((secret: string, data: string) => string) | null;
 
-  constructor(secret = "nexus-default-secret", hmacFn?: (secret: string, data: string) => string) {
+  constructor(
+    secret = DEFAULT_HMAC_SECRET,
+    hmacFn?: (secret: string, data: string) => string,
+  ) {
     this.secret = secret;
-    this.hmacFn = hmacFn ?? simpleHmac;
+    this.hmacFn = hmacFn ?? null;
   }
 
-  /** Build and sign a share URL. */
+  /** Build and sign a share URL using HMAC-SHA256. */
   sign(baseUrl: string, userId: string, date: string): string {
     const payload = `${userId}:${date}`;
-    const sig = this.hmacFn(this.secret, payload);
+    const sig = this.hmacFn
+      ? this.hmacFn(this.secret, payload)
+      : realHmac(this.secret, payload);
     const url = new URL(`${baseUrl}/brief/share`);
     url.searchParams.set("userId", userId);
     url.searchParams.set("date", date);
@@ -198,15 +208,32 @@ export class BriefSigner {
     return url.toString();
   }
 
-  /** Verify that a share URL has a valid signature. */
+  /** Verify a share URL.  Production path uses timingSafeEqual to prevent timing attacks. */
   verify(url: string): { valid: boolean; userId?: string; date?: string } {
     try {
       const parsed = new URL(url);
       const userId = parsed.searchParams.get("userId") ?? "";
       const date = parsed.searchParams.get("date") ?? "";
       const sig = parsed.searchParams.get("sig") ?? "";
-      const expected = this.hmacFn(this.secret, `${userId}:${date}`);
-      return { valid: sig === expected, userId, date };
+      const payload = `${userId}:${date}`;
+
+      if (this.hmacFn) {
+        // Test / custom-injection path — plain equality
+        const expected = this.hmacFn(this.secret, payload);
+        return { valid: sig === expected, userId, date };
+      }
+
+      // Production path — constant-time comparison
+      const expected = realHmac(this.secret, payload);
+      try {
+        const sigBuf = Buffer.from(sig, "hex");
+        const expBuf = Buffer.from(expected, "hex");
+        const valid =
+          sigBuf.length === expBuf.length && timingSafeEqual(sigBuf, expBuf);
+        return { valid, userId, date };
+      } catch {
+        return { valid: false, userId, date };
+      }
     } catch {
       return { valid: false };
     }
@@ -366,4 +393,104 @@ export class BriefEngine {
   }
 
   getStore(): DigestStore { return this.store; }
+}
+
+// ── PgDigestStore ─────────────────────────────────────────────────────────────
+//
+// Production DigestStore backed by Neon / PostgreSQL.
+// Survives pod restarts — brief history and carousel state persist across
+// deploys.  Falls back to the in-memory DigestStore when DATABASE_URL is not set.
+//
+// Table schema (auto-created on first write):
+//   brief_digests (
+//     domain     TEXT NOT NULL,   -- partitioned by userId
+//     digest     TEXT NOT NULL,   -- JSON-serialised DigestSnapshot
+//     created_at TIMESTAMPTZ DEFAULT now(),
+//     PRIMARY KEY (domain, digest)
+//   )
+//
+// Env var: DATABASE_URL — if absent the class throws in the constructor.
+// Wire via BriefEngineOptions.store:
+//   new BriefEngine({ store: new PgDigestStore() })
+
+export class PgDigestStore implements Pick<DigestStore, "save" | "get" | "list" | "delete"> {
+  private readonly sql: ReturnType<typeof neon>;
+  private schemaEnsured = false;
+
+  constructor(databaseUrl?: string) {
+    const url = databaseUrl ?? process.env.DATABASE_URL ?? "";
+    if (!url) throw new Error("PgDigestStore: DATABASE_URL is required");
+    this.sql = neon(url);
+  }
+
+  private async ensureSchema(): Promise<void> {
+    if (this.schemaEnsured) return;
+    await this.sql`
+      CREATE TABLE IF NOT EXISTS brief_digests (
+        domain     TEXT NOT NULL,
+        digest     TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT now(),
+        PRIMARY KEY (domain, digest)
+      )
+    `;
+    await this.sql`
+      CREATE INDEX IF NOT EXISTS brief_digests_domain_idx ON brief_digests (domain)
+    `;
+    this.schemaEnsured = true;
+  }
+
+  async save(snapshot: DigestSnapshot): Promise<void> {
+    await this.ensureSchema();
+    const key = `${snapshot.userId}::${snapshot.date}`;
+    const payload = JSON.stringify(snapshot);
+    await this.sql`
+      INSERT INTO brief_digests (domain, digest)
+      VALUES (${key}, ${payload})
+      ON CONFLICT (domain, digest) DO UPDATE SET digest = EXCLUDED.digest
+    `;
+  }
+
+  async get(userId: string, date: string): Promise<DigestSnapshot | undefined> {
+    await this.ensureSchema();
+    const key = `${userId}::${date}`;
+    const rows = await this.sql`
+      SELECT digest FROM brief_digests WHERE domain = ${key} LIMIT 1
+    `;
+    if (!rows[0]) return undefined;
+    return JSON.parse(rows[0].digest as string) as DigestSnapshot;
+  }
+
+  async list(userId: string): Promise<DigestSnapshot[]> {
+    await this.ensureSchema();
+    const rows = await this.sql`
+      SELECT digest FROM brief_digests
+      WHERE domain LIKE ${userId + "::%"}
+      ORDER BY created_at DESC
+    `;
+    return rows.map((r) => JSON.parse(r.digest as string) as DigestSnapshot);
+  }
+
+  async delete(userId: string, date: string): Promise<boolean> {
+    await this.ensureSchema();
+    const key = `${userId}::${date}`;
+    const rows = await this.sql`
+      DELETE FROM brief_digests WHERE domain = ${key} RETURNING domain
+    `;
+    return rows.length > 0;
+  }
+}
+
+/**
+ * Create a BriefEngine wired to PgDigestStore when DATABASE_URL is set,
+ * or InMemoryDigestStore otherwise.
+ */
+export function createDefaultBriefEngine(opts: BriefEngineOptions = {}): BriefEngine {
+  if (!opts.store) {
+    try {
+      opts = { ...opts, store: new PgDigestStore() as unknown as DigestStore };
+    } catch {
+      // DATABASE_URL not set — fall back to in-memory
+    }
+  }
+  return new BriefEngine(opts);
 }

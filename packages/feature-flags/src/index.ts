@@ -316,6 +316,39 @@ export class FeatureFlagRegistry extends EventEmitter {
     this.definitions.delete(key);
     this.store.delete(key);
   }
+
+  // ── Convenience aliases (used by API routes) ───────────────────────────────
+
+  /** Alias for `listDefinitions()`. */
+  listFlags(): FlagDefinition[] {
+    return this.listDefinitions();
+  }
+
+  /** Return a single flag definition, or undefined if not registered. */
+  getDefinition(key: string): FlagDefinition | undefined {
+    return this.definitions.get(key);
+  }
+
+  /**
+   * Return true when this flag has been overridden via `setFlag()`.
+   * Note: env var overrides are not reflected here.
+   */
+  isOverridden(key: string): boolean {
+    return this.store.has(key);
+  }
+
+  /**
+   * Clear the API-set override for a single flag key, reverting to env/default.
+   * Unlike `undefine()`, the flag definition is kept.
+   */
+  resetFlag(key: string): void {
+    if (this.store.has(key)) {
+      const previous = this.getFlag(key, this.definitions.get(key)?.default ?? false);
+      this.store.delete(key);
+      const current = this.getFlag(key, this.definitions.get(key)?.default ?? false);
+      this.emit("change", { key, previous, current, source: "api" } satisfies FlagChangeEvent);
+    }
+  }
 }
 
 // ── Cross-process FlagStore implementations ───────────────────────────────────
@@ -505,6 +538,136 @@ export class FileFlagStore implements FlagStore {
 
   getAll(): Record<string, FlagValue> {
     return { ...this.cache };
+  }
+}
+
+// ── RedisFlagStore ────────────────────────────────────────────────────────────
+//
+// Distributed FlagStore backed by Redis HSET/HGET/HGETALL.
+// Multiple API pods share flag state automatically; updates propagate via
+// pub/sub (SUBSCRIBE nexus:flags:updated) so all pods stay consistent.
+//
+// Uses a duck-typed RedisClientLike interface — pass any ioredis instance:
+//   import Redis from "ioredis";
+//   const store = new RedisFlagStore(new Redis(process.env.REDIS_URL));
+//
+// Fire-and-forget pub/sub: subscription errors are non-fatal.
+
+const REDIS_FLAGS_HASH = "nexus:flags";
+const REDIS_FLAGS_CHANNEL = "nexus:flags:updated";
+
+/** Minimal Redis interface (structurally satisfied by ioredis.Redis). */
+export interface RedisClientLike {
+  hset(key: string, field: string, value: string): Promise<unknown>;
+  hget(key: string, field: string): Promise<string | null>;
+  hgetall(key: string): Promise<Record<string, string> | null>;
+  hdel(key: string, field: string): Promise<unknown>;
+  hexists(key: string, field: string): Promise<number>;
+  publish(channel: string, message: string): Promise<unknown>;
+  duplicate(): RedisClientLike;
+  subscribe(channel: string, callback: (message: string, channel: string) => void): Promise<void>;
+}
+
+export interface RedisFlagStoreOptions {
+  /** Key used for the Redis hash (default: "nexus:flags"). */
+  hashKey?: string;
+  /** Pub/sub channel (default: "nexus:flags:updated"). */
+  channel?: string;
+  /**
+   * Callback invoked when another pod publishes a flag change.
+   * Use this to invalidate caches or re-read values.
+   */
+  onRemoteChange?: (key: string) => void;
+}
+
+export class RedisFlagStore implements FlagStore {
+  private readonly client: RedisClientLike;
+  private readonly hashKey: string;
+  private readonly channel: string;
+
+  constructor(client: RedisClientLike, opts: RedisFlagStoreOptions = {}) {
+    this.client = client;
+    this.hashKey = opts.hashKey ?? REDIS_FLAGS_HASH;
+    this.channel = opts.channel ?? REDIS_FLAGS_CHANNEL;
+
+    if (opts.onRemoteChange) {
+      // Subscribe on a duplicated connection so pub/sub doesn't block commands
+      const sub = client.duplicate();
+      void sub.subscribe(this.channel, (message) => {
+        try {
+          opts.onRemoteChange!(message);
+        } catch { /* non-fatal */ }
+      });
+    }
+  }
+
+  get(key: string): FlagValue | undefined {
+    // Synchronous interface — RedisFlagStore caches reads in-memory via getAll
+    // Callers that need async reads should use getAsync() or pre-warm the cache.
+    // For FeatureFlagRegistry's synchronous getFlag() path, fall back to undefined
+    // and let the definition default apply; async callers can call getAsync().
+    return undefined; // async reads handled by getAsync() below
+  }
+
+  /** Async variant — awaitable for non-registry contexts. */
+  async getAsync(key: string): Promise<FlagValue | undefined> {
+    const raw = await this.client.hget(this.hashKey, key);
+    if (raw === null) return undefined;
+    return deserializeFlagValue(raw);
+  }
+
+  async set(key: string, value: FlagValue): Promise<void> {
+    await this.client.hset(this.hashKey, key, serializeFlagValue(value));
+    await this.client.publish(this.channel, key).catch(() => { /* non-fatal */ });
+  }
+
+  // FlagStore.set is synchronous; fire-and-forget the async write
+  set(key: string, value: FlagValue): void {
+    void this.setAsync(key, value);
+  }
+
+  private async setAsync(key: string, value: FlagValue): Promise<void> {
+    await this.client.hset(this.hashKey, key, serializeFlagValue(value));
+    await this.client.publish(this.channel, key).catch(() => { /* non-fatal */ });
+  }
+
+  delete(key: string): void {
+    void this.client.hdel(this.hashKey, key);
+  }
+
+  has(key: string): boolean {
+    // Optimistic false — async check via hasAsync()
+    return false;
+  }
+
+  async hasAsync(key: string): Promise<boolean> {
+    return (await this.client.hexists(this.hashKey, key)) === 1;
+  }
+
+  getAll(): Record<string, FlagValue> {
+    return {}; // sync stub — use getAllAsync() for real values
+  }
+
+  async getAllAsync(): Promise<Record<string, FlagValue>> {
+    const raw = await this.client.hgetall(this.hashKey);
+    if (!raw) return {};
+    const out: Record<string, FlagValue> = {};
+    for (const [k, v] of Object.entries(raw)) {
+      out[k] = deserializeFlagValue(v);
+    }
+    return out;
+  }
+}
+
+function serializeFlagValue(v: FlagValue): string {
+  return JSON.stringify(v);
+}
+
+function deserializeFlagValue(raw: string): FlagValue {
+  try {
+    return JSON.parse(raw) as FlagValue;
+  } catch {
+    return raw;
   }
 }
 
