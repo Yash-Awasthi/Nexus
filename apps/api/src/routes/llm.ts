@@ -112,7 +112,7 @@ export async function llmRoutes(app: FastifyInstance): Promise<void> {
    *
    * List all registered providers with their supported model names.
    */
-  app.get("/llm/providers", { preHandler: requireAuth }, async (_request, reply) => {
+  app.get("/llm/providers", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
     const names = router.listProviders();
     const providers = names.map((name) => {
       const p = router.getProvider(name);
@@ -126,7 +126,7 @@ export async function llmRoutes(app: FastifyInstance): Promise<void> {
    *
    * List all registered model aliases (alias → provider, model).
    */
-  app.get("/llm/aliases", { preHandler: requireAuth }, async (_request, reply) => {
+  app.get("/llm/aliases", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
     return reply.send({ aliases: router.listAliases() });
   });
 
@@ -136,7 +136,7 @@ export async function llmRoutes(app: FastifyInstance): Promise<void> {
    * Observed average latency (ms) per provider.
    * Empty until the first successful completion.
    */
-  app.get("/llm/latency", { preHandler: requireAuth }, async (_request, reply) => {
+  app.get("/llm/latency", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
     const providerNames = router.listProviders();
     const latency: Record<string, number | null> = {};
     for (const name of providerNames) {

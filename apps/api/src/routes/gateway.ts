@@ -650,7 +650,7 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
    * Returns the alias table with availability flags,
    * plus the list of currently-configured providers.
    */
-  app.get("/gateway/models", { preHandler: requireAuth }, async (_request, reply) => {
+  app.get("/gateway/models", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
     // Model alias table is stable; safe to cache at the CDN + browser level.
     reply.header("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
     const registry = buildDriverRegistry();
@@ -731,7 +731,7 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
    *
    * List all registered tools in LLM function-calling schema format.
    */
-  app.get("/gateway/tools", { preHandler: requireAuth }, async (_request, reply) => {
+  app.get("/gateway/tools", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
     // Tool schema is static for the process lifetime; cache aggressively.
     reply.header("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
     return reply.send({

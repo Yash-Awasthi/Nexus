@@ -125,7 +125,7 @@ export async function imageGenRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /** GET /image-gen/models */
-  app.get("/image-gen/models", { preHandler: requireAuth }, async (_req, reply) => {
+  app.get("/image-gen/models", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
     const models = SUPPORTED_MODELS.map((m) => ({
       ...m,
       available: !m.requires || !!process.env[m.requires],
@@ -136,7 +136,7 @@ export async function imageGenRoutes(app: FastifyInstance): Promise<void> {
   /** GET /image-gen/history?limit= */
   app.get<{ Querystring: { limit?: string } }>(
     "/image-gen/history",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const limit = Math.min(parseInt(request.query.limit ?? "20"), 50);
       return reply.send({ images: history.slice(0, limit), total: history.length });

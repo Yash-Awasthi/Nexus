@@ -65,13 +65,13 @@ function currentPlanKey(): PlanKey {
 
 export async function billingRoutes(app: FastifyInstance): Promise<void> {
   /** GET /billing/plan */
-  app.get("/billing/plan", { preHandler: requireAuth }, async (_req, reply) => {
+  app.get("/billing/plan", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
     const planKey = currentPlanKey();
     return reply.send({ plan: { ...PLANS[planKey], key: planKey } });
   });
 
   /** GET /billing/current-period */
-  app.get("/billing/current-period", { preHandler: requireAuth }, async (_req, reply) => {
+  app.get("/billing/current-period", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
     const now = new Date();
     const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
     const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -115,7 +115,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /** GET /billing/keys */
-  app.get("/billing/keys", { preHandler: requireAuth }, async (_req, reply) => {
+  app.get("/billing/keys", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
     if (!DB_AVAILABLE) {
       return reply.code(503).send({ error: "Database not configured — API key management requires DATABASE_URL" });
     }
@@ -185,7 +185,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
   /** DELETE /billing/keys/:id */
   app.delete<{ Params: { id: string } }>(
     "/billing/keys/:id",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
     async (request, reply) => {
       if (!DB_AVAILABLE) {
         return reply.code(503).send({ error: "Database not configured — API key management requires DATABASE_URL" });
@@ -202,7 +202,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
   );
 
   /** GET /billing/quota — plan limits + live usage summary */
-  app.get("/billing/quota", { preHandler: requireAuth }, async (_req, reply) => {
+  app.get("/billing/quota", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
     const planKey = currentPlanKey();
     const plan = PLANS[planKey];
 
@@ -416,7 +416,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
   /** POST /billing/webhook/stripe */
   app.post(
     "/billing/webhook/stripe",
-    { config: { rawBody: true } },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, config: { rawBody: true } },
     async (request, reply) => {
       const secret = process.env.STRIPE_WEBHOOK_SECRET;
       if (!secret) {

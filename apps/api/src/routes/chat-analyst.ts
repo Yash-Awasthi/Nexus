@@ -226,7 +226,7 @@ export async function chatAnalystRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Body: { domain?: AnalystDomain } }>(
     "/analyst/session",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const domain  = request.body.domain ?? "general";
       const session = _sessions.create(domain);
@@ -308,7 +308,7 @@ export async function chatAnalystRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{ Params: { sessionId: string } }>(
     "/analyst/session/:sessionId",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const session = _sessions.get(request.params.sessionId);
       if (!session) {
@@ -330,7 +330,7 @@ export async function chatAnalystRoutes(app: FastifyInstance): Promise<void> {
    */
   app.delete<{ Params: { sessionId: string } }>(
     "/analyst/session/:sessionId",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
     async (request, reply) => {
       const { sessionId } = request.params;
       if (!_sessions.has(sessionId)) {

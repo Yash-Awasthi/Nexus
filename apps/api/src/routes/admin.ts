@@ -88,7 +88,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   /** DELETE /admin/routes/:alias */
   app.delete<{ Params: { alias: string } }>(
     "/admin/routes/:alias",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
     async (request, reply) => {
       adminService.removeRoute(decodeURIComponent(request.params.alias));
       return reply.code(204).send();
@@ -124,7 +124,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   /** DELETE /admin/routes/:alias/override */
   app.delete<{ Params: { alias: string } }>(
     "/admin/routes/:alias/override",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
     async (request, reply) => {
       adminService.removeOverride(decodeURIComponent(request.params.alias));
       return reply.code(204).send();
@@ -134,7 +134,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   /** GET /admin/stats */
   app.get<{ Querystring: { alias?: string } }>(
     "/admin/stats",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const stats = adminService.getStats(
         request.query.alias ? decodeURIComponent(request.query.alias) : undefined,
@@ -168,7 +168,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /** GET /admin/settings */
-  app.get("/admin/settings", { preHandler: requireAuth }, async (_req, reply) => {
+  app.get("/admin/settings", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
     return reply.send({ settings: adminSettings });
   });
 
@@ -203,7 +203,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /** GET /admin/traces/stats — aggregate stats for the logged requests */
-  app.get("/admin/traces/stats", { preHandler: requireAuth }, async (_request, reply) => {
+  app.get("/admin/traces/stats", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
     const [stats, count] = await Promise.all([gatewayLog.stats(), gatewayLog.count()]);
     return reply.send({ ...stats, total: count });
   });

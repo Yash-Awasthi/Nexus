@@ -70,7 +70,7 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
    * GET /scraping/tools
    * List all available MCP scraping tools with their input schemas.
    */
-  app.get("/scraping/tools", { preHandler: requireAuth }, async (_request, reply) => {
+  app.get("/scraping/tools", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
     return reply.send({
       tools: server.listTools().map((t) => ({
         name:        t.name,
@@ -84,7 +84,7 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
    * GET /scraping/sessions
    * List active browser sessions.
    */
-  app.get("/scraping/sessions", { preHandler: requireAuth }, async (_request, reply) => {
+  app.get("/scraping/sessions", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
     const result = await server.call("list_sessions", {});
     const first = result.content[0];
     const data = first?.type === "text" ? parseTextContent(first.text) : {};
@@ -95,7 +95,7 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
    * POST /scraping/sessions
    * Open a new browser scraping session.
    */
-  app.post("/scraping/sessions", { preHandler: requireAuth }, async (_request, reply) => {
+  app.post("/scraping/sessions", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
     const result = await server.call("open_session", {});
     if (result.isError) {
       const msg = result.content[0]?.type === "text" ? result.content[0].text : "Unknown error";
@@ -112,7 +112,7 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
    */
   app.delete<{ Params: { id: string } }>(
     "/scraping/sessions/:id",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
     async (request, reply) => {
       const result = await server.call("close_session", { sessionId: request.params.id });
       if (result.isError) {
@@ -152,7 +152,7 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Body: { url: string; sessionId?: string } }>(
     "/scraping/fetch",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const result = await server.call("get", request.body);
       if (result.isError) {
@@ -172,7 +172,7 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Body: { url: string; sessionId?: string } }>(
     "/scraping/fetch-stealthy",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const result = await server.call("fetch_stealthy", request.body);
       if (result.isError) {
@@ -192,7 +192,7 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Body: { url: string; sessionId?: string } }>(
     "/scraping/screenshot",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const result = await server.call("screenshot", request.body);
       if (result.isError) {
@@ -215,7 +215,7 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Body: { urls: string[]; sessionId?: string } }>(
     "/scraping/bulk",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const result = await server.call("bulk_get", request.body);
       if (result.isError) {

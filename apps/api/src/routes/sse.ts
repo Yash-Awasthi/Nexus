@@ -101,7 +101,7 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
 
   app.get(
     "/sse/tasks",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply): Promise<void> => {
       reply.hijack();
       openSseConnection(reply.raw, request.socket, ["tasks"]);
@@ -112,7 +112,7 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
 
   app.get<{ Params: { taskId: string } }>(
     "/sse/tasks/:taskId",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply): Promise<void> => {
       reply.hijack();
       openSseConnection(reply.raw, request.socket, [
@@ -125,7 +125,7 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
 
   app.get(
     "/sse/signals",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply): Promise<void> => {
       reply.hijack();
       openSseConnection(reply.raw, request.socket, ["signals"]);
@@ -136,7 +136,7 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
 
   app.get(
     "/sse/verdicts",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply): Promise<void> => {
       reply.hijack();
       openSseConnection(reply.raw, request.socket, ["verdicts"]);
@@ -147,7 +147,7 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
 
   app.get<{ Params: { taskId: string } }>(
     "/sse/verdicts/:taskId",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply): Promise<void> => {
       reply.hijack();
       openSseConnection(reply.raw, request.socket, [

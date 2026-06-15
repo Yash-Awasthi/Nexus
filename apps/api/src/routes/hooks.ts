@@ -58,7 +58,7 @@ export async function hooksRoutes(app: FastifyInstance): Promise<void> {
    *
    * List all registered handler registrations across all hook events.
    */
-  app.get("/hooks/handlers", { preHandler: requireAuth }, async (_request, reply) => {
+  app.get("/hooks/handlers", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
     const handlers: Array<{
       id: string;
       event: string;

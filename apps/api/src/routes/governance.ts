@@ -75,7 +75,7 @@ export async function governanceRoutes(app: FastifyInstance): Promise<void> {
   // GET /governance/approvals/:approvalId
   app.get<{ Params: { approvalId: string } }>(
     "/governance/approvals/:approvalId",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const [row] = await db
         .select()

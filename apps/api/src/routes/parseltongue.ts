@@ -91,7 +91,7 @@ export async function parseltongueRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get(
     "/parseltongue/techniques",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (_request, reply) => {
       return reply.send({
         techniques: TECHNIQUES.map((t) => ({
@@ -109,7 +109,7 @@ export async function parseltongueRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get(
     "/parseltongue/triggers",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (_request, reply) => {
       return reply.send({ triggers: [...DEFAULT_TRIGGERS], count: DEFAULT_TRIGGERS.length });
     },

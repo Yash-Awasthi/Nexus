@@ -142,7 +142,7 @@ export async function knowledgeGraphRoutes(app: FastifyInstance): Promise<void> 
   /** GET /knowledge-graph/nodes/:id */
   app.get<{ Params: { id: string } }>(
     "/knowledge-graph/nodes/:id",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const node = await kg.getNode(request.params.id);
       if (!node) return reply.code(404).send({ error: "Node not found" });
@@ -210,7 +210,7 @@ export async function knowledgeGraphRoutes(app: FastifyInstance): Promise<void> 
   /** DELETE /knowledge-graph/nodes/:id */
   app.delete<{ Params: { id: string } }>(
     "/knowledge-graph/nodes/:id",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
     async (request, reply) => {
       await store.deleteNode(request.params.id);
       return reply.code(204).send();
@@ -220,7 +220,7 @@ export async function knowledgeGraphRoutes(app: FastifyInstance): Promise<void> 
   /** DELETE /knowledge-graph/edges/:id */
   app.delete<{ Params: { id: string } }>(
     "/knowledge-graph/edges/:id",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
     async (request, reply) => {
       await store.deleteEdge(request.params.id);
       return reply.code(204).send();
@@ -228,7 +228,7 @@ export async function knowledgeGraphRoutes(app: FastifyInstance): Promise<void> 
   );
 
   /** GET /knowledge-graph/stats */
-  app.get("/knowledge-graph/stats", { preHandler: requireAuth }, async (_req, reply) => {
+  app.get("/knowledge-graph/stats", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
     return reply.send(await kg.stats());
   });
 }

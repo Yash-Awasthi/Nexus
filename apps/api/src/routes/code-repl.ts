@@ -69,7 +69,7 @@ const SUPPORTED_LANGS: ReplLanguage[] = ["python", "r", "julia"];
 export async function codeReplRoutes(app: FastifyInstance): Promise<void> {
 
   /** GET /code-repl/executor — which executor is active */
-  app.get("/code-repl/executor", { preHandler: requireAuth }, async (_req, reply) => {
+  app.get("/code-repl/executor", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
     const mgr = await getManager();
     return reply.send({
       executor: _executorType,
@@ -110,7 +110,7 @@ export async function codeReplRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /** GET /code-repl/sessions — list all active sessions */
-  app.get("/code-repl/sessions", { preHandler: requireAuth }, async (_req, reply) => {
+  app.get("/code-repl/sessions", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
     const mgr = await getManager();
     const sessions = mgr.list().map((s) => ({
       id:             s.id,
@@ -126,7 +126,7 @@ export async function codeReplRoutes(app: FastifyInstance): Promise<void> {
   /** GET /code-repl/sessions/:id — session details */
   app.get<{ Params: { id: string } }>(
     "/code-repl/sessions/:id",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const mgr = await getManager();
       const session = mgr.get(request.params.id);
@@ -147,7 +147,7 @@ export async function codeReplRoutes(app: FastifyInstance): Promise<void> {
   /** DELETE /code-repl/sessions/:id — destroy session */
   app.delete<{ Params: { id: string } }>(
     "/code-repl/sessions/:id",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
     async (request, reply) => {
       const mgr = await getManager();
       const destroyed = mgr.destroy(request.params.id);
@@ -192,7 +192,7 @@ export async function codeReplRoutes(app: FastifyInstance): Promise<void> {
   );
 
   /** POST /code-repl/sessions/reap — manually trigger idle session cleanup */
-  app.post("/code-repl/sessions/reap", { preHandler: requireAuth }, async (_req, reply) => {
+  app.post("/code-repl/sessions/reap", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
     const mgr = await getManager();
     const reaped = mgr.reapIdle();
     return reply.send({ reaped, remaining: mgr.count() });

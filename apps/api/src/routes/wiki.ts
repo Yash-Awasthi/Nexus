@@ -62,7 +62,7 @@ if (pgWiki) {
 
 export async function wikiRoutes(app: FastifyInstance): Promise<void> {
   /** GET /wiki/articles */
-  app.get("/wiki/articles", { preHandler: requireAuth }, async (_req, reply) => {
+  app.get("/wiki/articles", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
     reply.header("Cache-Control", "private, max-age=60, stale-while-revalidate=300");
     const articles = pgWiki
       ? await pgWiki.getAll().catch(() => wikiStore.all())
@@ -73,7 +73,7 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
   /** GET /wiki/articles/:id */
   app.get<{ Params: { id: string } }>(
     "/wiki/articles/:id",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const article = pgWiki
         ? await pgWiki.getById(request.params.id).catch(() => wikiStore.get(request.params.id))
@@ -86,7 +86,7 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
   /** GET /wiki/search?q=&limit= */
   app.get<{ Querystring: { q?: string; limit?: string } }>(
     "/wiki/search",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const q = request.query.q ?? "";
       const limit = Math.min(parseInt(request.query.limit ?? "10"), 50);
@@ -127,7 +127,7 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
   /** DELETE /wiki/articles/:id */
   app.delete<{ Params: { id: string } }>(
     "/wiki/articles/:id",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
     async (request, reply) => {
       const deletedMem = wikiStore.delete(request.params.id);
       if (pgWiki) {
@@ -140,7 +140,7 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
   );
 
   /** POST /wiki/reindex */
-  app.post("/wiki/reindex", { preHandler: requireAuth }, async (_req, reply) => {
+  app.post("/wiki/reindex", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
     const terms = wikiStore.reindex();
     const total = pgWiki
       ? await pgWiki.count().catch(() => wikiStore.size())
@@ -156,7 +156,7 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{ Params: { id: string } }>(
     "/wiki/articles/:id/comments",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const comments = wikiComments.listForPage(request.params.id);
       return reply.send({ comments, total: comments.length });
@@ -209,7 +209,7 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Params: { commentId: string } }>(
     "/wiki/comments/:commentId/resolve",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       try {
         const resolved = wikiComments.resolve(request.params.commentId);
@@ -225,7 +225,7 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
    */
   app.delete<{ Params: { commentId: string } }>(
     "/wiki/comments/:commentId",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
     async (request, reply) => {
       try {
         wikiComments.delete(request.params.commentId);
@@ -244,7 +244,7 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{ Querystring: { authorId?: string } }>(
     "/wiki/drafts",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const { authorId = "" } = request.query;
       const drafts = authorId ? wikiDrafts.listFor(authorId) : [];
@@ -278,7 +278,7 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{ Params: { draftId: string } }>(
     "/wiki/drafts/:draftId",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const draft = wikiDrafts.get(request.params.draftId);
       if (!draft) return reply.code(404).send({ error: "Draft not found" });
@@ -291,7 +291,7 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
    */
   app.delete<{ Params: { draftId: string } }>(
     "/wiki/drafts/:draftId",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
     async (request, reply) => {
       try {
         wikiDrafts.delete(request.params.draftId);
@@ -310,7 +310,7 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{ Params: { id: string } }>(
     "/wiki/articles/:id/acl",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const entries = wikiAcl.listEntries(request.params.id);
       return reply.send({ pageId: request.params.id, entries });
@@ -344,7 +344,7 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
    */
   app.delete<{ Params: { id: string; userId: string } }>(
     "/wiki/articles/:id/acl/:userId",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
     async (request, reply) => {
       wikiAcl.revoke(request.params.id, request.params.userId);
       return reply.code(204).send();
@@ -357,7 +357,7 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{ Params: { id: string; userId: string } }>(
     "/wiki/articles/:id/acl/:userId/role",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const role = wikiAcl.getRole(request.params.id, request.params.userId);
       return reply.send({ pageId: request.params.id, userId: request.params.userId, role });

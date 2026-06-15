@@ -48,7 +48,7 @@ export async function auditRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // GET /audit/log/verify — re-derive chain hashes and check integrity
-  app.get("/audit/log/verify", { preHandler: requireAuth }, async (_request, reply) => {
+  app.get("/audit/log/verify", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
     const { createHash, createHmac } = await import("node:crypto");
     const { asc } = await import("drizzle-orm");
 

@@ -230,7 +230,7 @@ export async function councilRoutes(app: FastifyInstance): Promise<void> {
   // GET /council/verdicts/:verdictId
   app.get<{ Params: { verdictId: string } }>(
     "/council/verdicts/:verdictId",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const [row] = await db
         .select()
@@ -244,7 +244,7 @@ export async function councilRoutes(app: FastifyInstance): Promise<void> {
   // GET /council/transcripts/:verdictId
   app.get<{ Params: { verdictId: string } }>(
     "/council/transcripts/:verdictId",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const [row] = await db
         .select()

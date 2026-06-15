@@ -173,7 +173,7 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
    */
   app.delete<{ Params: { id: string } }>(
     "/memory/:id",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
     async (request, reply) => {
       await manager.forget(request.params.id);
       return reply.code(204).send();

@@ -185,7 +185,7 @@ const credentialVault = new Map<string, string>();
 
 export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
   /** GET /connectors */
-  app.get("/connectors", { preHandler: requireAuth }, async (_req, reply) => {
+  app.get("/connectors", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
     const connectors = registry.list().map((c) => connectorView(c.id)).filter(Boolean);
     return reply.send({ connectors, total: connectors.length });
   });
@@ -193,7 +193,7 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
   /** GET /connectors/:id */
   app.get<{ Params: { id: string } }>(
     "/connectors/:id",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const view = connectorView(request.params.id);
       if (!view) return reply.code(404).send({ error: "Connector not found" });
@@ -225,7 +225,7 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
   /** POST /connectors/connect — connect all or a specific connector */
   app.post<{ Body: { id?: string } }>(
     "/connectors/connect",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       if (request.body.id) {
         const conn = registry.get(request.body.id);
@@ -241,7 +241,7 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
   /** POST /connectors/:id/health */
   app.post<{ Params: { id: string } }>(
     "/connectors/:id/health",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const conn = registry.get(request.params.id);
       if (!conn) return reply.code(404).send({ error: "Connector not found" });
@@ -253,7 +253,7 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
   /** POST /connectors/:id/reconnect */
   app.post<{ Params: { id: string } }>(
     "/connectors/:id/reconnect",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const conn = registry.get(request.params.id);
       if (!conn) return reply.code(404).send({ error: "Connector not found" });
@@ -266,7 +266,7 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
   /** POST /connectors/:id/disconnect */
   app.post<{ Params: { id: string } }>(
     "/connectors/:id/disconnect",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const conn = registry.get(request.params.id);
       if (!conn) return reply.code(404).send({ error: "Connector not found" });
@@ -284,7 +284,7 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{ Params: { id: string } }>(
     "/connectors/:id/oauth/start",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const { id } = request.params;
       const provider = OAUTH_PROVIDERS[id];
@@ -448,7 +448,7 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{ Params: { id: string } }>(
     "/connectors/:id/oauth/credential",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const encrypted = credentialVault.get(request.params.id);
       if (!encrypted) return reply.code(404).send({ error: "No stored credential" });

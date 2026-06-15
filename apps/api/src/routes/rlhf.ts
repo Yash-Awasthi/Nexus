@@ -99,7 +99,7 @@ export async function rlhfRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{ Params: { sessionId: string } }>(
     "/rlhf/reward/:sessionId",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const signal = feedbackStore.computeRewardSignal(request.params.sessionId);
       return reply.send(signal);
@@ -114,7 +114,7 @@ export async function rlhfRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post(
     "/rlhf/pairs/generate",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (_request, reply) => {
       const generated = feedbackStore.generatePreferencePairs();
       return reply.code(201).send({ generated: generated.length, pairs: generated });
@@ -126,7 +126,7 @@ export async function rlhfRoutes(app: FastifyInstance): Promise<void> {
    *
    * List all generated preference pairs.
    */
-  app.get("/rlhf/pairs", { preHandler: requireAuth }, async (_request, reply) => {
+  app.get("/rlhf/pairs", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
     const pairs = feedbackStore.listPreferencePairs();
     return reply.send({ pairs, total: pairs.length });
   });
@@ -137,7 +137,7 @@ export async function rlhfRoutes(app: FastifyInstance): Promise<void> {
    * Export preference pairs as JSONL (one { prompt, chosen, rejected } per line).
    * Content-Type: application/x-ndjson
    */
-  app.get("/rlhf/export/pairs", { preHandler: requireAuth }, async (_request, reply) => {
+  app.get("/rlhf/export/pairs", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
     const jsonl = exporter.toJSONL();
     return reply
       .header("Content-Type", "application/x-ndjson")
@@ -172,7 +172,7 @@ export async function rlhfRoutes(app: FastifyInstance): Promise<void> {
    *
    * Summary statistics: total feedback, total pairs, rating breakdown.
    */
-  app.get("/rlhf/stats", { preHandler: requireAuth }, async (_request, reply) => {
+  app.get("/rlhf/stats", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
     return reply.send(exporter.stats());
   });
 }

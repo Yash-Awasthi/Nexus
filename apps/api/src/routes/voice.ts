@@ -65,7 +65,7 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Body: { text: string; voice?: string } }>(
     "/voice/chat",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const { text, voice = "alloy" } = request.body;
       if (!text?.trim()) return reply.code(400).send({ error: "text is required" });
@@ -121,7 +121,7 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Body: { text: string; voice?: string } }>(
     "/voice/synthesize",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const { text, voice = "alloy" } = request.body;
       if (!text?.trim()) return reply.code(400).send({ error: "text is required" });
@@ -144,12 +144,12 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
   );
 
   /** GET /voice/voices */
-  app.get("/voice/voices", { preHandler: requireAuth }, async (_req, reply) => {
+  app.get("/voice/voices", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
     return reply.send({ voices: VOICES });
   });
 
   /** GET /voice/providers */
-  app.get("/voice/providers", { preHandler: requireAuth }, async (_req, reply) => {
+  app.get("/voice/providers", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
     return reply.send({
       transcribe: {
         provider: process.env.GROQ_API_KEY ? "groq" : "null",

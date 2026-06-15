@@ -73,7 +73,7 @@ export async function chatSuggestionsRoutes(app: FastifyInstance): Promise<void>
   /** GET /chat-suggestions/topics */
   app.get<{ Querystring: { limit?: string } }>(
     "/chat-suggestions/topics",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const limit = Math.min(parseInt(request.query.limit ?? "6"), 8);
       const topics = TOPIC_STARTERS.slice(0, limit);

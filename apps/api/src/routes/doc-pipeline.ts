@@ -51,7 +51,7 @@ export async function docPipelineRoutes(app: FastifyInstance): Promise<void> {
    * List document formats supported by the built-in extractor.
    * PDF/DOCX require an external extractor and are not available via this API.
    */
-  app.get("/doc-pipeline/formats", { preHandler: requireAuth }, async (_request, reply) => {
+  app.get("/doc-pipeline/formats", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
     return reply.send({ formats: SUPPORTED_FORMATS });
   });
 

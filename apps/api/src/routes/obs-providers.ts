@@ -241,7 +241,7 @@ export async function obsProvidersRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{ Querystring: { limit?: string; category?: string } }>(
     "/obs/memories",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const limit = Math.min(parseInt(request.query.limit ?? "100"), 500);
       const entries = await obsStore.all(limit, request.query.category);
@@ -332,7 +332,7 @@ export async function obsProvidersRoutes(app: FastifyInstance): Promise<void> {
    */
   app.delete<{ Params: { id: string } }>(
     "/obs/:id",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
     async (request, reply) => {
       const deleted = await obsStore.remove(request.params.id);
       if (!deleted) return reply.code(404).send({ error: "Observation not found" });
@@ -343,7 +343,7 @@ export async function obsProvidersRoutes(app: FastifyInstance): Promise<void> {
   /**
    * GET /obs/providers — list registered provider names
    */
-  app.get("/obs/providers", { preHandler: requireAuth }, async (_req, reply) => {
+  app.get("/obs/providers", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
     const providers = obsRegistry.names().map((name) => {
       const p = obsRegistry.get(name)!;
       return { name: p.name, model: p.model };

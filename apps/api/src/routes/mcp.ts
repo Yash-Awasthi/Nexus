@@ -87,7 +87,7 @@ export async function mcpRoutes(app: FastifyInstance): Promise<void> {
    *
    * Clients should reconnect on drop; no history is replayed.
    */
-  app.get("/mcp/events", { preHandler: requireAuth }, async (request, reply) => {
+  app.get("/mcp/events", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (request, reply) => {
     reply.raw.writeHead(200, {
       "Content-Type":  "text/event-stream",
       "Cache-Control": "no-cache",

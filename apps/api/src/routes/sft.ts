@@ -97,7 +97,7 @@ export async function sftRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{ Params: { id: string } }>(
     "/sft/conversations/:id",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const sample = dataset.get(request.params.id);
       if (!sample) return reply.code(404).send({ error: "Sample not found" });
@@ -135,7 +135,7 @@ export async function sftRoutes(app: FastifyInstance): Promise<void> {
    *
    * Count samples + quality distribution (min, max, mean, p50).
    */
-  app.get("/sft/stats", { preHandler: requireAuth }, async (_request, reply) => {
+  app.get("/sft/stats", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
     const samples = dataset.list();
     const count = samples.length;
 

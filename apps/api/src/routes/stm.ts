@@ -17,7 +17,7 @@ const pipeline = createDefaultPipeline();
 
 export async function stmRoutes(app: FastifyInstance): Promise<void> {
   /** GET /stm/modules — list registered modules */
-  app.get("/stm/modules", { preHandler: requireAuth }, async (_req, reply) => {
+  app.get("/stm/modules", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
     const modules = pipeline.getRegistry().list().map((m) => ({
       id: m.id,
       description: m.description,

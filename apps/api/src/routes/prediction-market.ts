@@ -75,7 +75,7 @@ export async function predictionMarketRoutes(app: FastifyInstance): Promise<void
   /** GET /prediction-markets/:id — single market */
   app.get<{ Params: { id: string } }>(
     "/prediction-markets/:id",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const apiKey = (request.headers["x-api-key"] as string | undefined);
       const result = await getSvc().getMarket(request.params.id, apiKey);
@@ -92,7 +92,7 @@ export async function predictionMarketRoutes(app: FastifyInstance): Promise<void
   /** POST /prediction-markets/refresh/:id — force-refresh from upstream */
   app.post<{ Params: { id: string } }>(
     "/prediction-markets/refresh/:id",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const apiKey = (request.headers["x-api-key"] as string | undefined);
       const svc = getSvc();
@@ -113,7 +113,7 @@ export async function predictionMarketRoutes(app: FastifyInstance): Promise<void
   /** GET /prediction-markets/cache/status */
   app.get(
     "/prediction-markets/cache/status",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (_req, reply) => {
       const cache = getSvc().getClient().getCache();
       return reply.send({

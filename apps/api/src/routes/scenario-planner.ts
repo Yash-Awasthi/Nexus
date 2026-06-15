@@ -40,7 +40,7 @@ export async function scenarioPlannerRoutes(app: FastifyInstance): Promise<void>
    * Rank all scenarios by expected impact (highest first).
    * Must be registered BEFORE /scenarios/:id or Fastify matches "plan" as an id.
    */
-  app.get("/scenarios/plan/rank", { preHandler: requireAuth }, async (_request, reply) => {
+  app.get("/scenarios/plan/rank", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
     const ranked = plan.rank();
     return reply.send({
       ranked: ranked.map(({ scenario, prediction }) => ({
@@ -113,7 +113,7 @@ export async function scenarioPlannerRoutes(app: FastifyInstance): Promise<void>
    */
   app.get<{ Params: { id: string } }>(
     "/scenarios/:id",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const scenario = plan.get(request.params.id);
       if (!scenario) return reply.code(404).send({ error: "Scenario not found" });
@@ -128,7 +128,7 @@ export async function scenarioPlannerRoutes(app: FastifyInstance): Promise<void>
    */
   app.delete<{ Params: { id: string } }>(
     "/scenarios/:id",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
     async (request, reply) => {
       const scenario = plan.get(request.params.id);
       if (!scenario) return reply.code(404).send({ error: "Scenario not found" });
@@ -153,7 +153,7 @@ export async function scenarioPlannerRoutes(app: FastifyInstance): Promise<void>
    */
   app.post<{ Params: { id: string } }>(
     "/scenarios/:id/predict",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const scenario = plan.get(request.params.id);
       if (!scenario) return reply.code(404).send({ error: "Scenario not found" });

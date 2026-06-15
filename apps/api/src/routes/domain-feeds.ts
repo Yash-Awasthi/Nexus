@@ -72,7 +72,7 @@ export async function domainFeedsRoutes(app: FastifyInstance): Promise<void> {
   // to push entries manually from the worker or external webhooks.
 
   /** GET /domain-feeds — list domains + entry counts */
-  app.get("/domain-feeds", { preHandler: requireAuth }, async (_req, reply) => {
+  app.get("/domain-feeds", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
     const domains = SUPPORTED_DOMAINS.map((d) => ({
       domain: d,
       count: getEntries(d).length,
@@ -131,7 +131,7 @@ export async function domainFeedsRoutes(app: FastifyInstance): Promise<void> {
   /** DELETE /domain-feeds/:domain/entries/:id */
   app.delete<{ Params: { domain: string; id: string } }>(
     "/domain-feeds/:domain/entries/:id",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
     async (request, reply) => {
       const domain = request.params.domain as FeedDomain;
       const entries = feedStore.get(domain);

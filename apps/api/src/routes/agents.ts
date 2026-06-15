@@ -223,7 +223,7 @@ export async function agentsRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Body: { path: string } }>(
     "/agents/file/read",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
     async (request, reply) => {
       const { path: filePath } = request.body;
       if (!filePath) return reply.code(400).send({ error: "path is required" });

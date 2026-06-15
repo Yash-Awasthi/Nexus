@@ -115,7 +115,7 @@ globalHooks.on("task.after", async (payload) => {
 
 export async function alertsRoutes(app: FastifyInstance): Promise<void> {
   /** GET /alerts/rules — list all configured alert rules */
-  app.get("/alerts/rules", { preHandler: requireAuth }, async (_request, reply) => {
+  app.get("/alerts/rules", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
     return reply.send({ rules: alertEngine.listRules(), total: alertEngine.listRules().length });
   });
 
@@ -133,7 +133,7 @@ export async function alertsRoutes(app: FastifyInstance): Promise<void> {
    *   cooldownMs  — suppress duplicate fires for this long (default: 0)
    *   enabled     — default true
    */
-  app.post<{ Body: AlertRule }>("/alerts/rules", { preHandler: requireAuth }, async (request, reply) => {
+  app.post<{ Body: AlertRule }>("/alerts/rules", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (request, reply) => {
     try {
       alertEngine.addRule(request.body);
       return reply.code(201).send(request.body);
@@ -163,7 +163,7 @@ export async function alertsRoutes(app: FastifyInstance): Promise<void> {
   /** DELETE /alerts/rules/:id — remove a rule */
   app.delete<{ Params: { id: string } }>(
     "/alerts/rules/:id",
-    { preHandler: requireAuth },
+    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
     async (request, reply) => {
       try {
         alertEngine.removeRule(request.params.id);
