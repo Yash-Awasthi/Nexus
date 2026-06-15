@@ -29,8 +29,10 @@ import Fastify, {
 import { adminRoutes } from "./routes/admin.js";
 import { auditRoutes } from "./routes/audit.js";
 import { billingRoutes } from "./routes/billing.js";
+import { alertsRoutes } from "./routes/alerts.js";
 import { autotuneRoutes } from "./routes/autotune.js";
 import { briefRoutes } from "./routes/brief.js";
+import { hooksRoutes } from "./routes/hooks.js";
 import { evalsRoutes } from "./routes/evals.js";
 import { llmRoutes } from "./routes/llm.js";
 import { rlhfRoutes } from "./routes/rlhf.js";
@@ -188,6 +190,10 @@ export async function buildServer(): Promise<FastifyInstance> {
 
       // O — autotune sampling params + EMA feedback
       await api.register(autotuneRoutes);
+
+      // R — hooks registry + alert engine
+      await api.register(hooksRoutes);
+      await api.register(alertsRoutes);
 
       // P — rlhf, sft-tagger, llm-router, evals, scenario-planner
       await api.register(rlhfRoutes);

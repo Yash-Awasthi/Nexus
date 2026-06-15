@@ -29,6 +29,7 @@ import {
   type IMemoryStore as IRagtimeMemoryStore,
   type MemoryFilter as RagtimeMemoryFilter,
 } from "@nexus/ragtime";
+import { globalHooks } from "@nexus/hooks";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
@@ -125,7 +126,17 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
       ...(userId ? { userId } : {}),
     };
 
+    // Hook: memory.before_write
+    globalHooks.emit("memory.before_write", { text, metadata: combinedMeta }).catch(() => {});
+
     const entry = await manager.remember(text, { metadata: combinedMeta, ttl });
+
+    // Hook: memory.after_write
+    globalHooks.emit("memory.after_write", {
+      entryId:  entry.id,
+      text:     entry.text,
+      metadata: entry.metadata,
+    }).catch(() => {});
 
     return reply.code(201).send({
       id:        entry.id,

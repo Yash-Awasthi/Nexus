@@ -51,6 +51,7 @@ import {
   type SamplingParams as UltraplinianSamplingParams,
 } from "@nexus/ultraplinian";
 import { ToolRegistry, createDefaultRegistry } from "@nexus/tool-registry";
+import { globalHooks } from "@nexus/hooks";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
@@ -320,6 +321,14 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
     const _logStart  = Date.now();
     const _logIdent  = (request.headers.authorization as string | undefined)?.slice(7, 27) ?? "anon";
 
+    // Hook: task.before — notify observers before dispatch
+    globalHooks.emit("task.before", {
+      taskId:   `gw-${_logStart}`,
+      taskType: "gateway.completion",
+      payload:  { model: resolvedModel, provider: providerName },
+      attempt:  1,
+    }).catch(() => {});
+
     // ── Streaming branch ────────────────────────────────────────────────────
     if (request.body.stream) {
       reply.hijack();
@@ -446,14 +455,23 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
     try {
       const response = await driver.complete(opts);
 
+      const _latMs = Date.now() - _logStart;
+
       gatewayLog.append({
         timestamp: _logStart,
         model:     resolvedModel,
         provider:  providerName,
         status:    "success",
-        latencyMs: Date.now() - _logStart,
+        latencyMs: _latMs,
         usage:     { inputTokens: response.usage.inputTokens, outputTokens: response.usage.outputTokens },
         identity:  _logIdent,
+      }).catch(() => {});
+
+      globalHooks.emit("task.after", {
+        taskId:      `gw-${_logStart}`,
+        taskType:    "gateway.completion",
+        durationMs:  _latMs,
+        result:      { model: resolvedModel, tokens: response.usage.outputTokens },
       }).catch(() => {});
 
       return reply.code(200).send({
@@ -479,6 +497,12 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
         latencyMs:    Date.now() - _logStart,
         errorMessage: e.message ?? "Upstream provider error",
         identity:     _logIdent,
+      }).catch(() => {});
+      globalHooks.emit("task.error", {
+        taskId:    `gw-${_logStart}`,
+        taskType:  "gateway.completion",
+        error:     e.message ?? "Upstream provider error",
+        attempt:   1,
       }).catch(() => {});
       return reply.code(statusCode).send({
         type: "error",
