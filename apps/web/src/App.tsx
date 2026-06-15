@@ -18,6 +18,7 @@ import Settings from "./pages/Settings.js";
 import Signals from "./pages/Signals.js";
 import Tasks from "./pages/Tasks.js";
 import Voice from "./pages/Voice.js";
+import Research from "./pages/Research.js";
 
 export default function App() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="approvals" element={<Approvals />} />
           <Route path="audit" element={<Audit />} />
           <Route path="memory" element={<MemoryTimeline />} />
+          <Route path="research" element={<Research />} />
 
           {/* Extended capabilities */}
           <Route path="billing" element={<Billing />} />
