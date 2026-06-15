@@ -94,12 +94,12 @@ function buildLlmFn(): StreamingLlmFn {
         { role: "system" as const, content: systemPrompt },
         ...messages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
       ];
-      yield* driver.stream({
-        model:       process.env.ANALYST_MODEL ?? "llama-3.3-70b-versatile",
-        messages:    allMessages,
-        max_tokens:  2048,
-        temperature: 0.3,
-      });
+      const chunks: string[] = [];
+      await driver.stream(
+        { model: process.env.ANALYST_MODEL ?? "llama-3.3-70b-versatile", messages: allMessages, maxTokens: 2048, temperature: 0.3 },
+        ({ delta }: { delta: string }) => { if (delta) chunks.push(delta); },
+      );
+      for (const chunk of chunks) yield chunk;
     };
   }
 
@@ -111,12 +111,12 @@ function buildLlmFn(): StreamingLlmFn {
         { role: "system" as const, content: systemPrompt },
         ...messages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
       ];
-      yield* driver.stream({
-        model:       process.env.ANALYST_MODEL ?? "anthropic/claude-3-5-haiku",
-        messages:    allMessages,
-        max_tokens:  2048,
-        temperature: 0.3,
-      });
+      const chunks: string[] = [];
+      await driver.stream(
+        { model: process.env.ANALYST_MODEL ?? "anthropic/claude-3-5-haiku", messages: allMessages, maxTokens: 2048, temperature: 0.3 },
+        ({ delta }: { delta: string }) => { if (delta) chunks.push(delta); },
+      );
+      for (const chunk of chunks) yield chunk;
     };
   }
 
@@ -336,7 +336,7 @@ export async function chatAnalystRoutes(app: FastifyInstance): Promise<void> {
       if (!_sessions.has(sessionId)) {
         return reply.code(404).send({ error: "Session not found" });
       }
-      _sessions.delete(sessionId);
+      _sessions.destroy(sessionId);
       return reply.code(204).send();
     },
   );

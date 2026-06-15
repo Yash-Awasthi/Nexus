@@ -129,7 +129,7 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
 
     // Dedup: if a highly-similar entry already exists (cosine similarity ≥ 0.92)
     // return it immediately instead of storing a near-duplicate.
-    const dedupFilter = userId ? { userId } : undefined;
+    const dedupFilter = userId ? { metadata: { userId } } : undefined;
     const nearMatches = await manager.recall(text, 1, dedupFilter);
     if (nearMatches.length > 0 && nearMatches[0]!.score >= 0.92) {
       const dup = nearMatches[0]!.entry;
@@ -138,7 +138,7 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
         text:      dup.text,
         metadata:  dup.metadata,
         createdAt: dup.createdAt,
-        userId:    dup.userId ?? (dup.metadata?.userId as string | undefined),
+        userId:    dup.metadata?.["userId"] as string | undefined,
         duplicate: true,
       });
     }
@@ -150,9 +150,10 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
 
     // Hook: memory.after_write
     globalHooks.emit("memory.after_write", {
-      entryId:  entry.id,
-      text:     entry.text,
-      metadata: entry.metadata,
+      id:        entry.id,
+      text:      entry.text,
+      metadata:  entry.metadata,
+      createdAt: typeof entry.createdAt === "number" ? entry.createdAt : new Date(entry.createdAt as string).getTime() / 1000,
     }).catch(() => {});
 
     return reply.code(201).send({
@@ -160,7 +161,7 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
       text:      entry.text,
       metadata:  entry.metadata,
       createdAt: entry.createdAt,
-      userId:    entry.userId ?? (entry.metadata?.userId as string | undefined),
+      userId:    entry.metadata?.["userId"] as string | undefined,
     });
   });
 
@@ -194,7 +195,7 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
 
     // Dual-filter: userId column for PgVectorStore; metadata.userId for InMemoryStore.
     const filter = userId
-      ? { userId, metadata: { userId } }
+      ? { metadata: { userId } }
       : undefined;
 
     const entries = (await manager.list(filter)).slice(0, limit);
@@ -205,7 +206,7 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
         text:      e.text,
         metadata:  e.metadata,
         createdAt: e.createdAt,
-        userId:    e.userId ?? (e.metadata?.userId as string | undefined),
+        userId:    e.metadata?.["userId"] as string | undefined,
       })),
       total: entries.length,
     });

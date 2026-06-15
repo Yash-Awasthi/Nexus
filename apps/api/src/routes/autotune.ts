@@ -26,20 +26,21 @@ import {
   type LearnedDelta,
 } from "@nexus/autotune";
 import pg from "pg";
+import type { Pool as PgPool } from "pg";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
 
 // ── Pg-backed EmaStore ────────────────────────────────────────────────────────
 
-let _pool: pg.Pool | null = null;
-function getPool(): pg.Pool | null {
+let _pool: PgPool | null = null;
+function getPool(): PgPool | null {
   if (!process.env.DATABASE_URL) return null;
   if (!_pool) _pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 3 });
   return _pool;
 }
 
-async function ensureEmaSchema(pool: pg.Pool): Promise<void> {
+async function ensureEmaSchema(pool: PgPool): Promise<void> {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS autotune_ema (
       context          TEXT PRIMARY KEY,
@@ -54,7 +55,7 @@ async function ensureEmaSchema(pool: pg.Pool): Promise<void> {
 }
 
 class PgEmaStore implements EmaStore {
-  constructor(private pool: pg.Pool) {}
+  constructor(private pool: PgPool) {}
 
   async get(context: ContextType): Promise<LearnedDelta | undefined> {
     try {

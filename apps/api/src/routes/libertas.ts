@@ -41,7 +41,7 @@ const LIBERTAS_KV_PREFIX     = "libertas:rl"; // KV key namespace
 
 function getClientIp(request: FastifyRequest): string {
   const fwd = request.headers["x-forwarded-for"];
-  if (fwd) return (Array.isArray(fwd) ? fwd[0] : fwd.split(",")[0] ?? "").trim();
+  if (fwd) return (Array.isArray(fwd) ? (fwd[0] ?? "") : (fwd.split(",")[0] ?? "")).trim();
   return request.socket?.remoteAddress ?? "unknown";
 }
 

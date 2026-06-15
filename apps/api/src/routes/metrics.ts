@@ -37,7 +37,7 @@ export const sloTracker = new SloTracker({
   windowMs:   5 * 60_000,
   targets:    { availabilityTarget: 0.999, errorRateTarget: 0.001, p99LatencyTargetMs: 2_000 },
   onViolation: (v) => {
-    process.stderr.write(`[SLO VIOLATION] sli=${v.sli} value=${v.value} target=${v.target}\n`);
+    process.stderr.write(`[SLO VIOLATION] sli=${v.sli} actual=${v.actual} target=${v.target}\n`);
   },
 });
 
@@ -62,8 +62,8 @@ export async function metricsRoutes(app: FastifyInstance): Promise<void> {
         const totalReqs      = entries.length;
         const successReqs    = entries.filter((e) => e.status === "success").length;
         const errorReqs      = entries.filter((e) => e.status === "error").length;
-        const totalInput     = entries.reduce((s, e) => s + (e.usage?.inputTokens  ?? 0), 0);
-        const totalOutput    = entries.reduce((s, e) => s + (e.usage?.outputTokens ?? 0), 0);
+        const totalInput     = entries.reduce((s, e) => s + (e.usage?.promptTokens     ?? 0), 0);
+        const totalOutput    = entries.reduce((s, e) => s + (e.usage?.completionTokens ?? 0), 0);
         const lastLatency    = entries[0]?.latencyMs ?? 0;
 
         lines.push("# TYPE nexus_gateway_requests_total counter");

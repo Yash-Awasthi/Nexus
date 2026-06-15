@@ -130,7 +130,7 @@ export class PostHogAnalyticsClient implements AnalyticsClient {
 
   async identify(distinctId: string, properties: EventProperties): Promise<void> {
     if (this.config.disabled) return;
-    await this.track("$identify", distinctId, { $set: properties as unknown as EventProperties });
+    await this.track("$identify", distinctId, { $set: JSON.stringify(properties) });
   }
 
   async page(distinctId: string, url: string, properties: EventProperties = {}): Promise<void> {

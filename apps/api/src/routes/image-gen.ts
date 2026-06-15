@@ -52,7 +52,7 @@ function buildGenerator(model: string): ImageGenerator {
   if (replicateModel && process.env.REPLICATE_API_KEY) {
     return new ImageGenerator({
       provider: new ReplicateProvider({
-        apiKey: process.env.REPLICATE_API_KEY,
+        apiToken: process.env.REPLICATE_API_KEY,
         model: replicateModel,
       }),
       maxAttempts: 2,
@@ -105,8 +105,8 @@ export async function imageGenRoutes(app: FastifyInstance): Promise<void> {
       });
 
       const images: GeneratedImage[] = result.images.map((img) => ({
-        id: img.id ?? randomUUID(),
-        url: img.url ?? img.base64DataUrl ?? "",
+        id: randomUUID(),
+        url: img.url ?? (img.data ? `data:image/${img.format};base64,${Buffer.from(img.data).toString("base64")}` : ""),
         prompt,
         model,
         size,

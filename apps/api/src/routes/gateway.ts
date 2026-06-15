@@ -153,6 +153,7 @@ const _toolRegistry: ToolRegistry = createDefaultRegistry({
           results?: Array<{ title: string; url: string; content: string }>;
         };
         return {
+          query:   i.query,
           results: (data.results ?? []).map((r) => ({
             title:   r.title,
             url:     r.url,
@@ -471,7 +472,7 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
               provider:  providerName,
               status:    "success",
               latencyMs: Date.now() - _logStart,
-              usage:     usage ? { inputTokens: usage.inputTokens ?? 0, outputTokens: usage.outputTokens ?? 0 } : undefined,
+              usage:     usage ? { promptTokens: usage.inputTokens ?? 0, completionTokens: usage.outputTokens ?? 0, totalTokens: (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0) } : undefined,
               identity:  _logIdent,
             }).catch(() => {});
           } else {
@@ -563,7 +564,7 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
         provider:  providerName,
         status:    "success",
         latencyMs: _latMs,
-        usage:     { inputTokens: response.usage.inputTokens, outputTokens: response.usage.outputTokens },
+        usage:     { promptTokens: response.usage.inputTokens, completionTokens: response.usage.outputTokens, totalTokens: response.usage.totalTokens },
         identity:  _logIdent,
       }).catch(() => {});
 
@@ -631,6 +632,7 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
         taskType:  "gateway.completion",
         error:     e.message ?? "Upstream provider error",
         attempt:   1,
+        willRetry: false,
       }).catch(() => {});
       return reply.code(statusCode).send({
         type: "error",
@@ -685,7 +687,7 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
       stream?:   boolean;
     };
   }>("/gateway/race", {
-    preHandler: [requireAuth, makeTierGatePreHandler({ feature: "ultraplinian", getTier: getTierFromRequest })],
+    preHandler: [requireAuth, makeTierGatePreHandler({ feature: "ultraplinian", getTier: (req) => getTierFromRequest(req as Parameters<typeof getTierFromRequest>[0]) })],
   }, async (request, reply) => {
     if (!_ultraRunner) {
       return reply.code(503).send({

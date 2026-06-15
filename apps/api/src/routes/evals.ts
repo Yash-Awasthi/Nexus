@@ -90,7 +90,7 @@ export async function evalsRoutes(app: FastifyInstance): Promise<void> {
         case "fields_present": {
           const fields = params["fields"] as string[] | undefined;
           if (!Array.isArray(fields)) return reply.code(400).send({ error: "params.fields must be a string[]" });
-          result = fieldsPresent(fields)(output);
+          result = fieldsPresent(...fields)(output);
           break;
         }
 
@@ -102,7 +102,7 @@ export async function evalsRoutes(app: FastifyInstance): Promise<void> {
         }
 
         case "matches_schema": {
-          const schema = params["schema"] as Record<string, FieldSchema> | undefined;
+          const schema = params["schema"] as FieldSchema | undefined;
           if (!schema) return reply.code(400).send({ error: "params.schema is required" });
           result = matchesSchema(schema)(output);
           break;
@@ -116,9 +116,9 @@ export async function evalsRoutes(app: FastifyInstance): Promise<void> {
           const scorerFns = specs.map((s) => {
             switch (s.scorer) {
               case "exact_match":     return exactMatch(s.params?.["expected"]);
-              case "fields_present":  return fieldsPresent(s.params?.["fields"] as string[] ?? []);
+              case "fields_present":  return fieldsPresent(...(s.params?.["fields"] as string[] ?? []));
               case "contains_string": return containsString(s.params?.["substring"] as string ?? "");
-              case "matches_schema":  return matchesSchema(s.params?.["schema"] as Record<string, FieldSchema> ?? {});
+              case "matches_schema":  return matchesSchema(s.params?.["schema"] as FieldSchema ?? {});
               default:                return exactMatch(undefined);
             }
           });

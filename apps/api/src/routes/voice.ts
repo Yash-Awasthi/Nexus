@@ -40,7 +40,7 @@ function buildSession(voice = "alloy"): VoiceSession {
     : new NullTranscribeProvider("(groq not configured)");
 
   const synthesize = process.env.ELEVENLABS_API_KEY
-    ? new ElevenLabsSynthesizeProvider({ apiKey: process.env.ELEVENLABS_API_KEY, voiceId: voice })
+    ? new ElevenLabsSynthesizeProvider({ apiKey: process.env.ELEVENLABS_API_KEY, defaultVoice: voice })
     : new NullSynthesizeProvider();
 
   return new VoiceSession({
@@ -71,9 +71,10 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
       if (!text?.trim()) return reply.code(400).send({ error: "text is required" });
 
       const t0 = Date.now();
-      // Use handler directly (no audio in / out for text-only mode)
-      const session = buildSession(voice);
-      const responseText = await session.textTurn(text);
+      // Use echo handler directly — VoiceSession.process() requires audio; text-only mode bypasses it
+      const echoHandler = async (t: string): Promise<string> =>
+        `You said: "${t}". (Voice handler not yet wired to LLM)`;
+      const responseText = await echoHandler(text);
 
       return reply.send({ text: responseText, latencyMs: Date.now() - t0 });
     },
@@ -126,7 +127,7 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
       if (!text?.trim()) return reply.code(400).send({ error: "text is required" });
 
       const provider = process.env.ELEVENLABS_API_KEY
-        ? new ElevenLabsSynthesizeProvider({ apiKey: process.env.ELEVENLABS_API_KEY, voiceId: voice })
+        ? new ElevenLabsSynthesizeProvider({ apiKey: process.env.ELEVENLABS_API_KEY, defaultVoice: voice })
         : new NullSynthesizeProvider();
 
       try {

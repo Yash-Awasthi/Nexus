@@ -73,12 +73,25 @@ class UpstashKVStore implements KVStore {
     await this._cmd(["DEL", key]);
   }
 
+  async has(key: string): Promise<boolean> {
+    const result = await this._cmd<number>(["EXISTS", key]);
+    return result === 1;
+  }
+
   async keys(pattern?: string): Promise<string[]> {
     return this._cmd<string[]>(["KEYS", pattern ?? "*"]);
   }
 
   async clear(): Promise<void> {
     await this._cmd(["FLUSHDB"]);
+  }
+
+  async getOrSet<T>(key: string, factory: () => Promise<T>, ttlMs?: number): Promise<T> {
+    const existing = await this.get<T>(key);
+    if (existing !== undefined) return existing;
+    const value = await factory();
+    await this.set(key, value, ttlMs);
+    return value;
   }
 }
 
@@ -112,6 +125,7 @@ export function getSharedKV(): KVStore {
     _sharedKv = new MemoryKVStore();
   }
 
-  return _sharedKv;
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  return _sharedKv!;
 }
 

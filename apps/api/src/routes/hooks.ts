@@ -37,7 +37,6 @@ function recordEmit(entry: EmitLogEntry): void {
 
 // Patch globalHooks.emit to record results — thin observer wrapper
 const _origEmit = globalHooks.emit.bind(globalHooks);
-// @ts-expect-error — wrapping the bound method for observability
 globalHooks.emit = async function (event: HookEvent, payload: unknown) {
   const result = await _origEmit(event, payload as Parameters<typeof _origEmit>[1]);
   recordEmit({

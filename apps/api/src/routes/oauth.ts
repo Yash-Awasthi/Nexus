@@ -106,7 +106,7 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
       prompt:        "consent",
       state,
     });
-    return reply.redirect(302, `${GOOGLE_AUTH_URL}?${params}`);
+    return reply.redirect(`${GOOGLE_AUTH_URL}?${params}`);
   });
 
   /**
@@ -186,7 +186,7 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
       scope:        "read:user user:email",
       state,
     });
-    return reply.redirect(302, `${GITHUB_AUTH_URL}?${params}`);
+    return reply.redirect(`${GITHUB_AUTH_URL}?${params}`);
   });
 
   /**

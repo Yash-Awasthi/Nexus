@@ -47,7 +47,7 @@ const _gatewayHandler = async (msg: BotMessage): Promise<BotReply> => {
       body: JSON.stringify({
         model:    "nexus/smart",
         messages: [{ role: "user", content: msg.text }],
-        system:   msg.metadata?.["system"] as string | undefined,
+        system:   (msg.raw as Record<string, unknown>)?.["system"] as string | undefined,
         stream:   false,
       }),
     });
@@ -70,7 +70,6 @@ const _gatewayHandler = async (msg: BotMessage): Promise<BotReply> => {
 const _slackAdapter = new SlackBotAdapter({
   token:         process.env.SLACK_BOT_TOKEN ?? "",
   signingSecret: process.env.SLACK_SIGNING_SECRET ?? "",
-  appId:         process.env.SLACK_BOT_APP_ID,
   triggerMode:   "mention",
   handler:       _gatewayHandler,
 });

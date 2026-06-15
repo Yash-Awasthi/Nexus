@@ -413,7 +413,15 @@ export class BriefEngine {
 // Wire via BriefEngineOptions.store:
 //   new BriefEngine({ store: new PgDigestStore() })
 
-export class PgDigestStore implements Pick<DigestStore, "save" | "get" | "list" | "delete"> {
+/** Type-compatible subset that supports both sync and async DigestStore implementations. */
+interface IDigestStoreLike {
+  save(snapshot: DigestSnapshot): void | Promise<void>;
+  get(userId: string, date: string): DigestSnapshot | undefined | Promise<DigestSnapshot | undefined>;
+  list(userId: string): DigestSnapshot[] | Promise<DigestSnapshot[]>;
+  delete(userId: string, date: string): boolean | Promise<boolean>;
+}
+
+export class PgDigestStore implements IDigestStoreLike {
   private readonly sql: ReturnType<typeof neon>;
   private schemaEnsured = false;
 
@@ -453,29 +461,29 @@ export class PgDigestStore implements Pick<DigestStore, "save" | "get" | "list" 
   async get(userId: string, date: string): Promise<DigestSnapshot | undefined> {
     await this.ensureSchema();
     const key = `${userId}::${date}`;
-    const rows = await this.sql`
+    const rows = (await this.sql`
       SELECT digest FROM brief_digests WHERE domain = ${key} LIMIT 1
-    `;
+    `) as Record<string, unknown>[];
     if (!rows[0]) return undefined;
-    return JSON.parse(rows[0].digest as string) as DigestSnapshot;
+    return JSON.parse(rows[0]["digest"] as string) as DigestSnapshot;
   }
 
   async list(userId: string): Promise<DigestSnapshot[]> {
     await this.ensureSchema();
-    const rows = await this.sql`
+    const rows = (await this.sql`
       SELECT digest FROM brief_digests
       WHERE domain LIKE ${userId + "::%"}
       ORDER BY created_at DESC
-    `;
-    return rows.map((r) => JSON.parse(r.digest as string) as DigestSnapshot);
+    `) as Record<string, unknown>[];
+    return rows.map((r) => JSON.parse(r["digest"] as string) as DigestSnapshot);
   }
 
   async delete(userId: string, date: string): Promise<boolean> {
     await this.ensureSchema();
     const key = `${userId}::${date}`;
-    const rows = await this.sql`
+    const rows = (await this.sql`
       DELETE FROM brief_digests WHERE domain = ${key} RETURNING domain
-    `;
+    `) as Record<string, unknown>[];
     return rows.length > 0;
   }
 }

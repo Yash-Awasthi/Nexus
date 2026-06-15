@@ -363,12 +363,12 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
       if (DB_AVAILABLE && request.nexusUserId) {
         try {
           const { db } = await import("@nexus/db");
-          const { users } = await import("@nexus/db/schema");
+          const { subscriptions } = await import("@nexus/db/schema");
           const { eq } = await import("drizzle-orm");
           const [row] = await db
-            .select({ stripeCustomerId: users.stripeCustomerId })
-            .from(users)
-            .where(eq(users.id, request.nexusUserId))
+            .select({ stripeCustomerId: subscriptions.stripeCustomerId })
+            .from(subscriptions)
+            .where(eq(subscriptions.ownerId, request.nexusUserId))
             .limit(1);
           customerId = row?.stripeCustomerId ?? undefined;
         } catch {
@@ -426,9 +426,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
       if (DB_AVAILABLE && secret) {
         try {
           const { StripeWebhookProcessor } = await import("@nexus/billing");
-          const { db } = await import("@nexus/db");
-          const { stripeWebhookEvents } = await import("@nexus/db/schema");
-          const processor = new StripeWebhookProcessor({ secret, db, stripeWebhookEvents });
+          const processor = new StripeWebhookProcessor(secret);
           const rawBody = (request as { rawBody?: string | Buffer }).rawBody ?? JSON.stringify(request.body);
           const sig = request.headers["stripe-signature"] as string | undefined ?? "";
           const result = await processor.process(rawBody.toString(), sig);

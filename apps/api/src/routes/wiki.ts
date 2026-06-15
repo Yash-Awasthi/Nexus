@@ -179,13 +179,7 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: "authorId and content are required" });
       }
       const comment = wikiComments.add(request.params.id, authorId, content, parentId);
-      _wikiNotifier.notify({
-        event:        "comment_added",
-        pageId:       request.params.id,
-        actorId:      authorId,
-        recipientIds: [],
-        payload:      { commentId: comment.id },
-      });
+      _wikiNotifier.emit("comment_added", request.params.id, authorId, { commentId: comment.id });
       return reply.code(201).send(comment);
     },
   );
@@ -274,13 +268,7 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: "authorId, title, and content are required" });
       }
       const draft = wikiDrafts.save(authorId, title, content, pageId);
-      _wikiNotifier.notify({
-        event:        "draft_saved",
-        pageId:       pageId ?? "",
-        actorId:      authorId,
-        recipientIds: [],
-        payload:      { draftId: draft.id },
-      });
+      _wikiNotifier.emit("draft_saved", pageId ?? "", authorId, { draftId: draft.id });
       return reply.code(201).send(draft);
     },
   );

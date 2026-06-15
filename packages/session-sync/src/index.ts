@@ -396,12 +396,12 @@ export class DrizzleSyncStore extends SyncStore {
    */
   async getOpsSinceAsync(sessionId: string, sinceLogicalTime = 0): Promise<SyncOperation[]> {
     await this.ensureSchema();
-    const rows = await this.sql`
+    const rows = (await this.sql`
       SELECT patch FROM sync_patches
       WHERE session_id = ${sessionId}
       ORDER BY applied_at ASC
-    `;
-    const dbOps = rows.map((r) => JSON.parse(r.patch as string) as SyncOperation);
+    `) as Record<string, unknown>[];
+    const dbOps = rows.map((r) => JSON.parse(r["patch"] as string) as SyncOperation);
     return dbOps.filter((op) => op.logicalTime > sinceLogicalTime);
   }
 }

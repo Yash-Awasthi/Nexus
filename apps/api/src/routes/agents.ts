@@ -22,6 +22,7 @@ import {
   type AgentMemorySearchResult,
   type AgentKG,
   type AgentKGNode,
+  type AgentKGEdge,
   type AgentFileSystem,
 } from "@nexus/agents";
 import {
@@ -55,13 +56,15 @@ const _memManager = _embedder
 
 // KG store
 const _kgStore = new InMemoryKGStore();
-const _kg = new KnowledgeGraph({ store: _kgStore });
+const _kg = new KnowledgeGraph(_kgStore);
 
 // AgentMemory adapter — bridges MemoryManager into AgentMemory interface
 const _agentMemory: AgentMemory = {
   async recall(query, limit = 5, filter) {
     if (!_memManager) return [];
-    const results = await _memManager.recall(query, limit, filter as { userId?: string });
+    const userId = (filter as Record<string, unknown> | undefined)?.["userId"] as string | undefined;
+    const memFilter = userId ? { metadata: { userId } } : undefined;
+    const results = await _memManager.recall(query, limit, memFilter);
     return results.map((r): AgentMemorySearchResult => ({
       entry: {
         id:        r.entry.id,
@@ -99,17 +102,32 @@ const _agentKG: AgentKG = {
   },
   async findRelated(nodeId, opts) {
     const result = await _kg.findRelated(nodeId, opts);
-    return {
-      outbound: result.outbound ?? [],
-      inbound:  result.inbound ?? [],
-      nodes:    (result.nodes ?? []).map((n): AgentKGNode => ({
-        id:         n.id,
-        name:       n.name,
-        type:       n.type,
-        confidence: n.confidence,
-        sources:    n.sources ?? [],
-      })),
-    };
+    const outbound = result.neighbors
+      .filter((nb) => nb.direction === "outbound")
+      .map((nb): AgentKGEdge => ({
+        id:         nb.edge.id,
+        subjectId:  nb.edge.subjectId,
+        predicate:  nb.edge.predicate,
+        objectId:   nb.edge.objectId,
+        confidence: nb.edge.confidence,
+      }));
+    const inbound = result.neighbors
+      .filter((nb) => nb.direction === "inbound")
+      .map((nb): AgentKGEdge => ({
+        id:         nb.edge.id,
+        subjectId:  nb.edge.subjectId,
+        predicate:  nb.edge.predicate,
+        objectId:   nb.edge.objectId,
+        confidence: nb.edge.confidence,
+      }));
+    const nodes = result.neighbors.map((nb): AgentKGNode => ({
+      id:         nb.node.id,
+      name:       nb.node.name,
+      type:       nb.node.type,
+      confidence: nb.node.confidence,
+      sources:    nb.node.sources ?? [],
+    }));
+    return { outbound, inbound, nodes };
   },
 };
 
