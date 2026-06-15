@@ -100,6 +100,43 @@ function buildSearchFn(): WebSearchFn {
   ];
 }
 
+// ── Semantic Scholar academic search ─────────────────────────────────────────
+// Free-tier: ~100 req/5 min without a key; higher limits with SEMANTIC_SCHOLAR_API_KEY.
+// Used as:
+//   a) A parallel academic-paper enrichment layer on top of the web search backend.
+//   b) The exclusive source for GET /researcher/academic?query=.
+
+interface S2Paper {
+  paperId:        string;
+  title:          string;
+  year?:          number;
+  abstract?:      string;
+  url?:           string;
+  openAccessPdf?: { url: string } | null;
+  authors?:       Array<{ name: string }>;
+}
+
+async function semanticScholarSearch(query: string, limit = 10): Promise<SearchResult[]> {
+  const base   = "https://api.semanticscholar.org/graph/v1/paper/search";
+  const fields = "title,year,authors,abstract,url,openAccessPdf";
+  const url    = `${base}?query=${encodeURIComponent(query)}&fields=${fields}&limit=${limit}`;
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (process.env.SEMANTIC_SCHOLAR_API_KEY) {
+    headers["x-api-key"] = process.env.SEMANTIC_SCHOLAR_API_KEY;
+  }
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error(`Semantic Scholar error: ${res.status}`);
+  const data = await res.json() as { data?: S2Paper[] };
+  return (data.data ?? []).map((p, i) => ({
+    url:     p.openAccessPdf?.url ?? p.url ?? `https://www.semanticscholar.org/paper/${p.paperId}`,
+    title:   p.title,
+    snippet: p.abstract?.slice(0, 300)
+      ?? `[${p.year ?? "n.d."}] ${(p.authors ?? []).map((a) => a.name).slice(0, 3).join(", ")}`,
+    score:   1 - i * 0.04,
+    source:  "corpus" as const,
+  }));
+}
+
 // ── Singleton researcher + BM25 reranker ──────────────────────────────────────
 
 const reranker = new BM25Reranker();
@@ -345,6 +382,62 @@ export async function researcherRoutes(app: FastifyInstance): Promise<void> {
         source:  r.source,
       })),
       durationMs:    _agentDurationMs,
+    });
+  });
+
+  /**
+   * GET /researcher/academic?query=&limit=
+   *
+   * Dedicated Semantic Scholar academic paper search.
+   * Returns structured paper metadata: title, year, authors, abstract, PDF URL.
+   * Does not require TAVILY_API_KEY — uses Semantic Scholar REST API (free tier).
+   * Raises throughput with SEMANTIC_SCHOLAR_API_KEY (env).
+   *
+   * Results are BM25-reranked before return so the most relevant papers rank first.
+   */
+  app.get<{
+    Querystring: { query: string; limit?: string };
+  }>("/researcher/academic", { preHandler: requireAuth }, async (request, reply) => {
+    const { query, limit: limitStr } = request.query;
+    if (!query || query.trim() === "") {
+      return reply.code(400).send({ error: "query is required" });
+    }
+    const limit = Math.min(parseInt(limitStr ?? "10", 10) || 10, 50);
+
+    let papers: SearchResult[];
+    try {
+      papers = await semanticScholarSearch(query.trim(), limit);
+    } catch (err) {
+      return reply.code(502).send({
+        error:   "semantic_scholar_error",
+        message: err instanceof Error ? err.message : "Semantic Scholar unavailable",
+      });
+    }
+
+    // BM25-rerank for query relevance
+    let ordered = papers;
+    if (papers.length > 0) {
+      try {
+        const { documents } = await reranker.rerank(
+          query,
+          papers.map((p) => ({ id: p.url, text: `${p.title} ${p.snippet}`, score: p.score })),
+        );
+        const byUrl = new Map(papers.map((p) => [p.url, p]));
+        ordered = documents
+          .map((d) => {
+            const orig = byUrl.get(d.id);
+            return orig ? { ...orig, score: d.score } : undefined;
+          })
+          .filter((r): r is SearchResult => r !== undefined);
+      } catch { /* reranker failure is non-fatal */ }
+    }
+
+    reply.header("Cache-Control", "private, max-age=300, stale-while-revalidate=600");
+    return reply.send({
+      query,
+      total:   ordered.length,
+      papers:  ordered,
+      powered_by: "Semantic Scholar (semanticscholar.org)",
     });
   });
 

@@ -74,6 +74,7 @@ import { sessionSyncRoutes } from "./routes/session-sync.js";
 import { sseRoutes } from "./routes/sse.js";
 import { stmRoutes } from "./routes/stm.js";
 import { wikiRoutes } from "./routes/wiki.js";
+import { libertasRoutes } from "./routes/libertas.js";
 
 // Augment FastifyRequest to carry optional trace span
 declare module "fastify" {
@@ -282,6 +283,9 @@ export async function buildServer(): Promise<FastifyInstance> {
 
       // Z — OAuth SSO (Google + GitHub)
       await api.register(oauthRoutes);
+
+      // AF — Libertas: public free-tier endpoint (no auth required)
+      await api.register(libertasRoutes);
     },
     { prefix: "/api/v1" },
   );
