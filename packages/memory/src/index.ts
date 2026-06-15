@@ -35,6 +35,13 @@ export interface MemoryEntry {
   createdAt: number;
   /** Optional TTL — entry is logically expired after this epoch second */
   expiresAt?: number;
+  /**
+   * Multi-tenant ACL — owning user / tenant identifier.
+   * When set, search() and list() only return entries matching this userId
+   * (if the caller also passes the same userId in MemoryFilter).
+   * Null/undefined entries are treated as shared/system-level memories.
+   */
+  userId?: string;
 }
 
 export interface MemorySearchResult {
@@ -48,6 +55,13 @@ export interface MemoryFilter {
   metadata?: Record<string, unknown>;
   /** Exclude logically expired entries (default: true) */
   excludeExpired?: boolean;
+  /**
+   * Multi-tenant ACL filter — when provided, only entries with this userId
+   * are returned.  Pass the authenticated user's ID from the API request.
+   * Entries with userId = NULL are never returned when a userId filter is set
+   * (they are system/shared entries — query without userId to see them).
+   */
+  userId?: string;
 }
 
 export interface RememberOptions {
@@ -348,8 +362,14 @@ export class PgVectorStore implements IMemoryStore {
           embedding   vector(768) NOT NULL,
           metadata    JSONB       NOT NULL DEFAULT '{}',
           created_at  INTEGER     NOT NULL,
-          expires_at  INTEGER
+          expires_at  INTEGER,
+          user_id     TEXT                                 -- multi-tenant ACL: owning user/tenant
         )
+      `;
+      // Add user_id to existing tables (idempotent — IF NOT EXISTS guard)
+      await this.sql`
+        ALTER TABLE memory_entries
+          ADD COLUMN IF NOT EXISTS user_id TEXT
       `;
       await this.sql`
         CREATE INDEX IF NOT EXISTS memory_entries_created_at_idx
@@ -370,6 +390,11 @@ export class PgVectorStore implements IMemoryStore {
         // IVFFlat unavailable (pgvector < 0.4 or cold cluster) — falls back to
         // sequential scan automatically; no impact on correctness.
       }
+      // Btree index on user_id for multi-tenant ACL lookups
+      await this.sql`
+        CREATE INDEX IF NOT EXISTS memory_entries_user_id_idx
+          ON memory_entries (user_id)
+      `;
       this.schemaEnsured = true;
     } catch (cause) {
       throw new MemoryError("STORE_WRITE_FAILED", `Schema bootstrap failed: ${String(cause)}`);
@@ -383,21 +408,23 @@ export class PgVectorStore implements IMemoryStore {
     const embStr = `[${entry.embedding.join(",")}]`;
     try {
       await this.sql`
-        INSERT INTO memory_entries (id, text, embedding, metadata, created_at, expires_at)
+        INSERT INTO memory_entries (id, text, embedding, metadata, created_at, expires_at, user_id)
         VALUES (
           ${entry.id},
           ${entry.text},
           ${embStr}::vector,
           ${JSON.stringify(entry.metadata)}::jsonb,
           ${entry.createdAt},
-          ${entry.expiresAt ?? null}
+          ${entry.expiresAt ?? null},
+          ${entry.userId ?? null}
         )
         ON CONFLICT (id) DO UPDATE SET
           text       = EXCLUDED.text,
           embedding  = EXCLUDED.embedding,
           metadata   = EXCLUDED.metadata,
           created_at = EXCLUDED.created_at,
-          expires_at = EXCLUDED.expires_at
+          expires_at = EXCLUDED.expires_at,
+          user_id    = EXCLUDED.user_id
       `;
     } catch (cause) {
       throw new MemoryError("STORE_WRITE_FAILED", `save() failed: ${String(cause)}`);
@@ -414,6 +441,7 @@ export class PgVectorStore implements IMemoryStore {
     const embStr = `[${queryEmbedding.join(",")}]`;
     const now = Math.floor(Date.now() / 1000);
     const excludeExpired = filter?.excludeExpired ?? true;
+    const userId = filter?.userId ?? null;
 
     let rows: Record<string, unknown>[];
     try {
@@ -429,12 +457,17 @@ export class PgVectorStore implements IMemoryStore {
           metadata,
           created_at,
           expires_at,
+          user_id,
           1 - (embedding <=> ${embStr}::vector) AS score
         FROM memory_entries
         WHERE (
           ${excludeExpired ? 1 : 0}::int = 0
           OR expires_at IS NULL
           OR expires_at > ${now}
+        )
+        AND (
+          ${userId}::text IS NULL
+          OR user_id = ${userId}
         )
         ORDER BY embedding <=> ${embStr}::vector
         LIMIT ${limit}
@@ -471,13 +504,18 @@ export class PgVectorStore implements IMemoryStore {
 
     let rows: Record<string, unknown>[];
     try {
+      const listUserId = filter?.userId ?? null;
       rows = (await this.sql`
-        SELECT id, text, embedding::text AS embedding_str, metadata, created_at, expires_at
+        SELECT id, text, embedding::text AS embedding_str, metadata, created_at, expires_at, user_id
         FROM memory_entries
         WHERE (
           ${excludeExpired ? 1 : 0}::int = 0
           OR expires_at IS NULL
           OR expires_at > ${now}
+        )
+        AND (
+          ${listUserId}::text IS NULL
+          OR user_id = ${listUserId}
         )
         ORDER BY created_at DESC
       `) as unknown as Record<string, unknown>[];
@@ -544,6 +582,7 @@ function pgRowToEntry(row: Record<string, unknown>): MemoryEntry {
     metadata: (row.metadata ?? {}) as Record<string, unknown>,
     createdAt: row.created_at as number,
     ...(row.expires_at != null ? { expiresAt: row.expires_at as number } : {}),
+    ...(row.user_id != null ? { userId: row.user_id as string } : {}),
   };
 }
 

@@ -39,19 +39,62 @@ export type ToolResult =
 
 export type ToolHandler = (args: Record<string, unknown>) => ToolResult | Promise<ToolResult>;
 
+// ── Progress notifications ────────────────────────────────────────────────────
+// Mirrors the MCP spec's notifications/progress message so long-running tools
+// can stream progress to the caller (fastmcp ctx.reportProgress() pattern).
+
+export interface McpProgressNotification {
+  /** Opaque token issued per invocation; echoed in every update. */
+  progressToken: string;
+  /** Units of work completed. */
+  progress: number;
+  /** Total units (omit when unknown). */
+  total?: number;
+}
+
+export type ProgressCallback = (n: McpProgressNotification) => void | Promise<void>;
+
+/** Injected into progress-aware handlers so they can emit progress updates. */
+export interface ToolContext {
+  readonly progressToken: string;
+  /**
+   * Emit a progress update toward the caller's ProgressCallback.
+   * Fire-and-forget — errors in the callback are swallowed.
+   */
+  reportProgress(progress: number, total?: number): void;
+}
+
+/**
+ * Progress-aware tool handler.  Accepts both args and a ToolContext.
+ * Old ToolHandler implementations still work (extra arg silently ignored).
+ */
+export type ProgressAwareHandler = (
+  args: Record<string, unknown>,
+  ctx: ToolContext,
+) => ToolResult | Promise<ToolResult>;
+
 // ── McpTool ───────────────────────────────────────────────────────────────────
 
 export class McpTool {
   readonly definition: McpToolDefinition;
-  private handler: ToolHandler;
+  // Stored as ProgressAwareHandler (superset of ToolHandler) so both signatures work
+  private handler: ProgressAwareHandler;
 
-  constructor(definition: McpToolDefinition, handler: ToolHandler) {
+  constructor(definition: McpToolDefinition, handler: ToolHandler | ProgressAwareHandler) {
     this.definition = definition;
-    this.handler = handler;
+    this.handler = handler as ProgressAwareHandler;
   }
 
-  async call(args: Record<string, unknown>): Promise<ToolResult> {
-    return this.handler(args);
+  /**
+   * Invoke the tool.  If `ctx` is provided it is forwarded to the handler;
+   * old-style handlers (arity 1) silently ignore the second argument.
+   */
+  async call(args: Record<string, unknown>, ctx?: ToolContext): Promise<ToolResult> {
+    const effectiveCtx: ToolContext = ctx ?? {
+      progressToken: "",
+      reportProgress: () => { /* no-op when called without a context */ },
+    };
+    return this.handler(args, effectiveCtx);
   }
 }
 
@@ -164,10 +207,34 @@ export class McpServer {
 
   // ── Dispatch ──────────────────────────────────────────────────────────────
 
-  async callTool(name: string, args: Record<string, unknown> = {}): Promise<ToolResult> {
+  /**
+   * Call a registered tool.
+   *
+   * @param onProgress  Optional callback invoked whenever the handler calls
+   *                    ctx.reportProgress().  Enables the server to relay MCP
+   *                    notifications/progress events to a connected client.
+   */
+  async callTool(
+    name: string,
+    args: Record<string, unknown> = {},
+    onProgress?: ProgressCallback,
+  ): Promise<ToolResult> {
     const tool = this.tools.get(name);
     if (!tool) throw new McpError("TOOL_NOT_FOUND", `Tool not found: ${name}`);
-    return tool.call(args);
+
+    // Build a ToolContext for this invocation
+    const progressToken = `${name}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const ctx: ToolContext = {
+      progressToken,
+      reportProgress: (progress, total) => {
+        if (!onProgress) return;
+        void Promise.resolve(
+          onProgress({ progressToken, progress, total }),
+        ).catch(() => { /* progress errors are non-fatal */ });
+      },
+    };
+
+    return tool.call(args, ctx);
   }
 
   async readResource(uri: string): Promise<{ content: string; mimeType?: string }> {

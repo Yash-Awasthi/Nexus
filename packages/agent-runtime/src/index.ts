@@ -511,3 +511,104 @@ export class AgentRuntime {
 
   getExecutor(): AgentStepExecutor { return this.executor; }
 }
+
+// ── spawn_agents tool ─────────────────────────────────────────────────────────
+//
+// Registers a "spawn_agents" tool on any RuntimeToolSet, enabling an agent to
+// fork N child agents that run concurrently and merge their results.
+//
+// Usage:
+//   const toolSet = new RuntimeToolSet();
+//   toolSet.add(makeSpawnAgentsTool(llmFn, { maxConcurrency: 4 }));
+//
+// LLM prompt pattern:
+//   spawn_agents({ tasks: [
+//     { instruction: "Summarise the Q1 earnings report" },
+//     { instruction: "Find the top 3 risks from the risk register" },
+//   ]})
+//
+// Each child is an independent AgentRuntime with its own step budget.
+// Promise.allSettled ensures one failed child never cancels the others.
+
+export interface SpawnAgentTask {
+  /** Instruction passed to the child agent. */
+  instruction: string;
+  /** Optional system-prompt override for this child. */
+  systemPrompt?: string;
+  /** Max steps for this child (overrides the factory default). */
+  maxSteps?: number;
+}
+
+export interface SpawnAgentResult {
+  taskIndex: number;
+  instruction: string;
+  finalContent: string;
+  steps: number;
+  /** Set when the child agent threw — other results are still returned. */
+  error?: string;
+}
+
+export interface SpawnAgentsOptions {
+  /** Hard cap on concurrent children (default: 5). */
+  maxConcurrency?: number;
+  /** Default step budget per child (default: 3). */
+  maxStepsPerAgent?: number;
+  /** Default system-prompt for child agents. */
+  defaultSystemPrompt?: string;
+}
+
+/**
+ * Factory: returns a RuntimeTool that forks child AgentRuntime instances.
+ *
+ * @param llm     The same LlmStreamFn used by the parent agent.
+ * @param opts    Concurrency / step limits.
+ */
+export function makeSpawnAgentsTool(
+  llm: LlmStreamFn,
+  opts: SpawnAgentsOptions = {},
+): RuntimeTool {
+  const maxConcurrency    = opts.maxConcurrency    ?? 5;
+  const maxStepsPerAgent  = opts.maxStepsPerAgent  ?? 3;
+  const defaultSystemPrompt = opts.defaultSystemPrompt;
+
+  return {
+    name: "spawn_agents",
+    description:
+      "Fork N child agents to execute sub-tasks concurrently and collect results. " +
+      "Each child runs an independent AgentRuntime.  " +
+      "Pass an array of tasks; receives an array of results in the same order. " +
+      `Max concurrent children: ${maxConcurrency}.`,
+    handler: async (args): Promise<SpawnAgentResult[]> => {
+      const rawTasks = (args.tasks as SpawnAgentTask[] | undefined) ?? [];
+      const tasks = rawTasks.slice(0, maxConcurrency);
+
+      const settled = await Promise.allSettled(
+        tasks.map(async (task, i): Promise<SpawnAgentResult> => {
+          const child = new AgentRuntime({
+            llm,
+            maxSteps:     task.maxSteps ?? maxStepsPerAgent,
+            systemPrompt: task.systemPrompt ?? defaultSystemPrompt,
+          });
+          const result = await child.run(task.instruction);
+          return {
+            taskIndex:    i,
+            instruction:  task.instruction,
+            finalContent: result.finalContent,
+            steps:        result.steps.length,
+          };
+        }),
+      );
+
+      return settled.map((s, i): SpawnAgentResult => {
+        if (s.status === "fulfilled") return s.value;
+        return {
+          taskIndex:    i,
+          instruction:  tasks[i]?.instruction ?? "",
+          finalContent: "",
+          steps:        0,
+          error: s.reason instanceof Error ? s.reason.message : String(s.reason),
+        };
+      });
+    },
+  };
+}
