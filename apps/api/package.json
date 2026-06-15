@@ -30,6 +30,7 @@
     "@nexus/billing": "workspace:*",
     "@nexus/connectors": "workspace:*",
     "@nexus/context-pack": "workspace:*",
+    "@nexus/context-pruner": "workspace:*",
     "@nexus/contracts": "workspace:*",
     "@nexus/feature-flags": "workspace:*",
     "@nexus/gateway": "workspace:*",

@@ -35,6 +35,12 @@ import {
   type LlmRequestOptions,
   type LlmRole,
 } from "@nexus/llm-drivers";
+import {
+  PrunerChain,
+  SlidingWindowPruner,
+  NaiveTokenizer,
+  type Message as PrunerMessage,
+} from "@nexus/context-pruner";
 import { ThinkTagParser } from "@nexus/think-parser";
 import { StreamRecoveryOrchestrator } from "@nexus/stream-recovery";
 import type { FastifyInstance } from "fastify";
@@ -46,6 +52,43 @@ import { requireAuth } from "../middleware/auth.js";
 // Prevents a slow or stalled provider from holding an SSE connection indefinitely.
 
 const STREAM_TIMEOUT_MS = parseInt(process.env.STREAM_TIMEOUT_MS ?? "30000", 10);
+
+// ── Context-window pre-flight pruner ─────────────────────────────────────────
+// Long threads can silently overflow the provider's context window, causing
+// a hard 400 error (Anthropic) or silent truncation (Groq/Gemini).
+// Prune aggressively BEFORE dispatching so every request fits the budget.
+//
+// Budget: GATEWAY_CONTEXT_BUDGET_TOKENS (default 32 000 — conservative for all
+// providers).  Each request reserves max_tokens for the completion; the rest is
+// available for the prompt.  SlidingWindowPruner keeps the system message plus
+// the most recent messages that fit.  Zero-cost when history is short (no-op).
+
+const GATEWAY_CONTEXT_BUDGET = parseInt(process.env.GATEWAY_CONTEXT_BUDGET_TOKENS ?? "32000", 10);
+
+const _gatewayPruner = new PrunerChain([
+  new SlidingWindowPruner({ tokenizer: new NaiveTokenizer() }),
+]);
+
+function pruneGatewayMessages(
+  opts: LlmRequestOptions,
+  reserveTokens: number,
+): LlmRequestOptions {
+  const budget = GATEWAY_CONTEXT_BUDGET - Math.max(0, reserveTokens);
+  if (budget <= 0) return opts;
+  const input: PrunerMessage[] = opts.messages.map((m) => ({
+    role: m.role as PrunerMessage["role"],
+    content: m.content,
+  }));
+  const result = _gatewayPruner.prune(input, budget);
+  if (result.prunedCount === 0) return opts; // no change — return original
+  return {
+    ...opts,
+    messages: result.messages.map((m) => ({
+      role: m.role as LlmRole,
+      content: m.content,
+    })),
+  };
+}
 
 // ── SSE headers ───────────────────────────────────────────────────────────────
 
@@ -220,7 +263,12 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    const opts = toDriverRequest(request.body, resolvedModel);
+    // Prune message history to fit the context window before dispatching.
+    // No-op when the thread is short; drops oldest non-system messages when long.
+    const opts = pruneGatewayMessages(
+      toDriverRequest(request.body, resolvedModel),
+      request.body.max_tokens ?? 4096,
+    );
 
     // ── Streaming branch ────────────────────────────────────────────────────
     if (request.body.stream) {

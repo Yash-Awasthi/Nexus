@@ -2,6 +2,16 @@
 /**
  * PgVectorStore tests — uses a mocked neon SQL function so no real DB is needed.
  * The mock is scoped to this file; it does not affect memory.test.ts.
+ *
+ * Schema bootstrap sequence (4 calls):
+ *   1. CREATE EXTENSION IF NOT EXISTS vector
+ *   2. CREATE TABLE IF NOT EXISTS memory_entries …
+ *   3. CREATE INDEX IF NOT EXISTS memory_entries_created_at_idx (btree)
+ *   4. CREATE INDEX IF NOT EXISTS memory_entries_embedding_idx (ivfflat) — non-fatal
+ *
+ * Search sequence (2 calls after schema):
+ *   1. SET LOCAL ivfflat.probes = 10
+ *   2. SELECT … ORDER BY embedding <=> … LIMIT n
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -93,7 +103,7 @@ describe("PgVectorStore", () => {
   it("save() does not re-bootstrap schema on subsequent calls", async () => {
     const store = new PgVectorStore({ databaseUrl: "postgresql://localhost/test" });
     const entry = makeEntry();
-    await store.save(entry); // first call — triggers schema bootstrap (3 SQL calls + 1 insert)
+    await store.save(entry); // first call — triggers schema bootstrap (4 SQL calls + 1 insert)
     const callsAfterFirst = mockSqlFn.mock.calls.length;
     await store.save(makeEntry({ id: "entry-2" })); // second call — only 1 SQL call (insert)
     expect(mockSqlFn.mock.calls.length).toBe(callsAfterFirst + 1);
@@ -108,12 +118,13 @@ describe("PgVectorStore", () => {
   });
 
   it("save() throws STORE_WRITE_FAILED when insert fails", async () => {
-    // First 3 calls succeed (schema bootstrap), 4th call fails (insert)
+    // Schema bootstrap (4 calls), then insert fails on call 5
     mockSqlFn
-      .mockResolvedValueOnce([]) // CREATE EXTENSION
-      .mockResolvedValueOnce([]) // CREATE TABLE
-      .mockResolvedValueOnce([]) // CREATE INDEX
-      .mockRejectedValueOnce(new Error("insert failed"));
+      .mockResolvedValueOnce([]) // 1: CREATE EXTENSION
+      .mockResolvedValueOnce([]) // 2: CREATE TABLE
+      .mockResolvedValueOnce([]) // 3: CREATE INDEX btree (created_at)
+      .mockResolvedValueOnce([]) // 4: CREATE INDEX ivfflat (embedding) — non-fatal
+      .mockRejectedValueOnce(new Error("insert failed")); // 5: INSERT
     const store = new PgVectorStore({ databaseUrl: "postgresql://localhost/test" });
     await expect(store.save(makeEntry())).rejects.toMatchObject({
       code: "STORE_WRITE_FAILED",
@@ -137,12 +148,14 @@ describe("PgVectorStore", () => {
 
   it("search() maps DB rows to MemorySearchResult", async () => {
     const entry = makeEntry();
-    // Schema bootstrap (3 calls) then search result
+    // Schema bootstrap (4 calls) + SET LOCAL (1) + SELECT (1)
     mockSqlFn
-      .mockResolvedValueOnce([]) // CREATE EXTENSION
-      .mockResolvedValueOnce([]) // CREATE TABLE
-      .mockResolvedValueOnce([]) // CREATE INDEX
-      .mockResolvedValueOnce([makeRow(entry, 0.95)]);
+      .mockResolvedValueOnce([]) // 1: CREATE EXTENSION
+      .mockResolvedValueOnce([]) // 2: CREATE TABLE
+      .mockResolvedValueOnce([]) // 3: CREATE INDEX btree
+      .mockResolvedValueOnce([]) // 4: CREATE INDEX ivfflat
+      .mockResolvedValueOnce([]) // 5: SET LOCAL ivfflat.probes = 10
+      .mockResolvedValueOnce([makeRow(entry, 0.95)]); // 6: SELECT
     const store = new PgVectorStore({ databaseUrl: "postgresql://localhost/test" });
     const results = await store.search([0.1], 5);
     expect(results).toHaveLength(1);
@@ -154,10 +167,12 @@ describe("PgVectorStore", () => {
   it("search() filters results by metadata", async () => {
     const entry = makeEntry({ metadata: { env: "prod" } });
     mockSqlFn
-      .mockResolvedValueOnce([]) // CREATE EXTENSION
-      .mockResolvedValueOnce([]) // CREATE TABLE
-      .mockResolvedValueOnce([]) // CREATE INDEX
-      .mockResolvedValueOnce([
+      .mockResolvedValueOnce([]) // 1: CREATE EXTENSION
+      .mockResolvedValueOnce([]) // 2: CREATE TABLE
+      .mockResolvedValueOnce([]) // 3: CREATE INDEX btree
+      .mockResolvedValueOnce([]) // 4: CREATE INDEX ivfflat
+      .mockResolvedValueOnce([]) // 5: SET LOCAL ivfflat.probes = 10
+      .mockResolvedValueOnce([  // 6: SELECT returns 2 rows
         makeRow(entry, 0.9),
         makeRow(makeEntry({ id: "e2", metadata: { env: "dev" } }), 0.8),
       ]);
@@ -174,11 +189,14 @@ describe("PgVectorStore", () => {
   });
 
   it("search() throws STORE_READ_FAILED when SQL fails", async () => {
+    // Schema bootstrap (4 calls) + SET LOCAL (1) + SELECT rejects (1)
     mockSqlFn
-      .mockResolvedValueOnce([]) // CREATE EXTENSION
-      .mockResolvedValueOnce([]) // CREATE TABLE
-      .mockResolvedValueOnce([]) // CREATE INDEX
-      .mockRejectedValueOnce(new Error("db offline"));
+      .mockResolvedValueOnce([]) // 1: CREATE EXTENSION
+      .mockResolvedValueOnce([]) // 2: CREATE TABLE
+      .mockResolvedValueOnce([]) // 3: CREATE INDEX btree
+      .mockResolvedValueOnce([]) // 4: CREATE INDEX ivfflat
+      .mockResolvedValueOnce([]) // 5: SET LOCAL ivfflat.probes = 10
+      .mockRejectedValueOnce(new Error("db offline")); // 6: SELECT
     const store = new PgVectorStore({ databaseUrl: "postgresql://localhost/test" });
     await expect(store.search([0.1], 5)).rejects.toMatchObject({
       code: "STORE_READ_FAILED",
@@ -195,11 +213,13 @@ describe("PgVectorStore", () => {
   });
 
   it("delete() throws STORE_WRITE_FAILED on SQL failure", async () => {
+    // Schema bootstrap (4 calls) + DELETE rejects (1)
     mockSqlFn
-      .mockResolvedValueOnce([]) // CREATE EXTENSION
-      .mockResolvedValueOnce([]) // CREATE TABLE
-      .mockResolvedValueOnce([]) // CREATE INDEX
-      .mockRejectedValueOnce(new Error("delete failed"));
+      .mockResolvedValueOnce([]) // 1: CREATE EXTENSION
+      .mockResolvedValueOnce([]) // 2: CREATE TABLE
+      .mockResolvedValueOnce([]) // 3: CREATE INDEX btree
+      .mockResolvedValueOnce([]) // 4: CREATE INDEX ivfflat
+      .mockRejectedValueOnce(new Error("delete failed")); // 5: DELETE
     const store = new PgVectorStore({ databaseUrl: "postgresql://localhost/test" });
     await expect(store.delete("entry-1")).rejects.toMatchObject({
       code: "STORE_WRITE_FAILED",
@@ -216,11 +236,13 @@ describe("PgVectorStore", () => {
 
   it("list() maps DB rows to MemoryEntry[]", async () => {
     const entry = makeEntry();
+    // Schema bootstrap (4 calls) + SELECT (1)
     mockSqlFn
-      .mockResolvedValueOnce([]) // CREATE EXTENSION
-      .mockResolvedValueOnce([]) // CREATE TABLE
-      .mockResolvedValueOnce([]) // CREATE INDEX
-      .mockResolvedValueOnce([makeRow(entry)]);
+      .mockResolvedValueOnce([]) // 1: CREATE EXTENSION
+      .mockResolvedValueOnce([]) // 2: CREATE TABLE
+      .mockResolvedValueOnce([]) // 3: CREATE INDEX btree
+      .mockResolvedValueOnce([]) // 4: CREATE INDEX ivfflat
+      .mockResolvedValueOnce([makeRow(entry)]); // 5: SELECT
     const store = new PgVectorStore({ databaseUrl: "postgresql://localhost/test" });
     const entries = await store.list();
     expect(entries).toHaveLength(1);
@@ -228,11 +250,13 @@ describe("PgVectorStore", () => {
   });
 
   it("list() filters by metadata", async () => {
+    // Schema bootstrap (4 calls) + SELECT (1)
     mockSqlFn
-      .mockResolvedValueOnce([]) // CREATE EXTENSION
-      .mockResolvedValueOnce([]) // CREATE TABLE
-      .mockResolvedValueOnce([]) // CREATE INDEX
-      .mockResolvedValueOnce([
+      .mockResolvedValueOnce([]) // 1: CREATE EXTENSION
+      .mockResolvedValueOnce([]) // 2: CREATE TABLE
+      .mockResolvedValueOnce([]) // 3: CREATE INDEX btree
+      .mockResolvedValueOnce([]) // 4: CREATE INDEX ivfflat
+      .mockResolvedValueOnce([  // 5: SELECT
         makeRow(makeEntry({ id: "e1", metadata: { role: "admin" } })),
         makeRow(makeEntry({ id: "e2", metadata: { role: "user" } })),
       ]);
@@ -243,11 +267,13 @@ describe("PgVectorStore", () => {
   });
 
   it("list() throws STORE_READ_FAILED on SQL failure", async () => {
+    // Schema bootstrap (4 calls) + SELECT rejects (1)
     mockSqlFn
-      .mockResolvedValueOnce([]) // CREATE EXTENSION
-      .mockResolvedValueOnce([]) // CREATE TABLE
-      .mockResolvedValueOnce([]) // CREATE INDEX
-      .mockRejectedValueOnce(new Error("list failed"));
+      .mockResolvedValueOnce([]) // 1: CREATE EXTENSION
+      .mockResolvedValueOnce([]) // 2: CREATE TABLE
+      .mockResolvedValueOnce([]) // 3: CREATE INDEX btree
+      .mockResolvedValueOnce([]) // 4: CREATE INDEX ivfflat
+      .mockRejectedValueOnce(new Error("list failed")); // 5: SELECT
     const store = new PgVectorStore({ databaseUrl: "postgresql://localhost/test" });
     await expect(store.list()).rejects.toMatchObject({ code: "STORE_READ_FAILED" });
   });
@@ -255,47 +281,53 @@ describe("PgVectorStore", () => {
   // ── purge() ───────────────────────────────────────────────────────────────────
 
   it("purge() fast-path returns count of deleted rows", async () => {
+    // Schema bootstrap (4 calls) + DELETE RETURNING (1)
     mockSqlFn
-      .mockResolvedValueOnce([]) // CREATE EXTENSION
-      .mockResolvedValueOnce([]) // CREATE TABLE
-      .mockResolvedValueOnce([]) // CREATE INDEX
-      .mockResolvedValueOnce([{ id: "e1" }, { id: "e2" }]); // DELETE RETURNING
+      .mockResolvedValueOnce([]) // 1: CREATE EXTENSION
+      .mockResolvedValueOnce([]) // 2: CREATE TABLE
+      .mockResolvedValueOnce([]) // 3: CREATE INDEX btree
+      .mockResolvedValueOnce([]) // 4: CREATE INDEX ivfflat
+      .mockResolvedValueOnce([{ id: "e1" }, { id: "e2" }]); // 5: DELETE RETURNING
     const store = new PgVectorStore({ databaseUrl: "postgresql://localhost/test" });
     const count = await store.purge();
     expect(count).toBe(2);
   });
 
   it("purge() fast-path throws STORE_WRITE_FAILED on SQL error", async () => {
+    // Schema bootstrap (4 calls) + DELETE rejects (1)
     mockSqlFn
-      .mockResolvedValueOnce([]) // CREATE EXTENSION
-      .mockResolvedValueOnce([]) // CREATE TABLE
-      .mockResolvedValueOnce([]) // CREATE INDEX
-      .mockRejectedValueOnce(new Error("purge failed"));
+      .mockResolvedValueOnce([]) // 1: CREATE EXTENSION
+      .mockResolvedValueOnce([]) // 2: CREATE TABLE
+      .mockResolvedValueOnce([]) // 3: CREATE INDEX btree
+      .mockResolvedValueOnce([]) // 4: CREATE INDEX ivfflat
+      .mockRejectedValueOnce(new Error("purge failed")); // 5: DELETE
     const store = new PgVectorStore({ databaseUrl: "postgresql://localhost/test" });
     await expect(store.purge()).rejects.toMatchObject({ code: "STORE_WRITE_FAILED" });
   });
 
   it("purge() metadata-filtered path lists then deletes individually", async () => {
     const entry = makeEntry({ metadata: { tag: "old" } });
-    // Schema bootstrap (3) + list query (1) + individual delete (1)
+    // Schema bootstrap (4) + list query (1) + individual delete (1)
     mockSqlFn
-      .mockResolvedValueOnce([]) // CREATE EXTENSION
-      .mockResolvedValueOnce([]) // CREATE TABLE
-      .mockResolvedValueOnce([]) // CREATE INDEX
-      .mockResolvedValueOnce([makeRow(entry)]) // list returns 1 matching entry
-      .mockResolvedValueOnce([]); // individual DELETE
+      .mockResolvedValueOnce([]) // 1: CREATE EXTENSION
+      .mockResolvedValueOnce([]) // 2: CREATE TABLE
+      .mockResolvedValueOnce([]) // 3: CREATE INDEX btree
+      .mockResolvedValueOnce([]) // 4: CREATE INDEX ivfflat
+      .mockResolvedValueOnce([makeRow(entry)]) // 5: list returns 1 matching entry
+      .mockResolvedValueOnce([]); // 6: individual DELETE
     const store = new PgVectorStore({ databaseUrl: "postgresql://localhost/test" });
     const count = await store.purge({ metadata: { tag: "old" } });
     expect(count).toBe(1);
   });
 
   it("purge() with metadata filter returns 0 when no entries match", async () => {
-    // list returns empty (no metadata match)
+    // Schema bootstrap (4 calls) + list returns empty (1)
     mockSqlFn
-      .mockResolvedValueOnce([]) // CREATE EXTENSION
-      .mockResolvedValueOnce([]) // CREATE TABLE
-      .mockResolvedValueOnce([]) // CREATE INDEX
-      .mockResolvedValueOnce([]); // list returns nothing
+      .mockResolvedValueOnce([]) // 1: CREATE EXTENSION
+      .mockResolvedValueOnce([]) // 2: CREATE TABLE
+      .mockResolvedValueOnce([]) // 3: CREATE INDEX btree
+      .mockResolvedValueOnce([]) // 4: CREATE INDEX ivfflat
+      .mockResolvedValueOnce([]); // 5: list returns nothing
     const store = new PgVectorStore({ databaseUrl: "postgresql://localhost/test" });
     const count = await store.purge({ metadata: { tag: "nonexistent" } });
     expect(count).toBe(0);
