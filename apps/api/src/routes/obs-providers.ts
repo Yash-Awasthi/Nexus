@@ -15,6 +15,7 @@
 import { randomUUID } from "crypto";
 
 import {
+  LlmObservationProvider,
   MockObservationProvider,
   ProviderRegistry,
   type ObservationEvent,
@@ -189,9 +190,43 @@ const obsStore: ObsStore = process.env.DATABASE_URL
   ? new PgObsStore(new Pool({ connectionString: process.env.DATABASE_URL }))
   : new InMemoryObsStore();
 
-// ── Provider registry (mock by default; swap callFn for real LLM in prod) ────
+// ── Provider registry ─────────────────────────────────────────────────────────
+// When NEXUS_OBSERVATION_DRIVER is set, LlmObservationProvider is the primary
+// provider (e.g. NEXUS_OBSERVATION_DRIVER=groq/llama-3.3-70b).
+// MockObservationProvider is always registered as the final fallback.
 
 const obsRegistry = new ProviderRegistry();
+
+if (process.env.NEXUS_OBSERVATION_DRIVER && process.env.GROQ_API_KEY) {
+  const model = process.env.NEXUS_OBSERVATION_DRIVER;
+  const apiKey = process.env.GROQ_API_KEY;
+
+  // Groq-backed LLM call function (non-streaming, accumulates full response)
+  const groqCallFn = async (prompt: string, system: string, maxTokens: number): Promise<string> => {
+    const resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: model.replace("groq/", ""),
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: prompt },
+        ],
+        max_tokens: maxTokens,
+        temperature: 0.2,
+      }),
+    });
+    if (!resp.ok) throw new Error(`Groq API error: ${resp.status}`);
+    const data = await resp.json() as { choices: Array<{ message: { content: string } }> };
+    return data.choices[0]?.message?.content ?? "";
+  };
+
+  obsRegistry.register(new LlmObservationProvider({ model, callFn: groqCallFn }));
+}
+
 obsRegistry.register(new MockObservationProvider("mock", "mock-model", {
   observation: "Observation generated from session context.",
 }));

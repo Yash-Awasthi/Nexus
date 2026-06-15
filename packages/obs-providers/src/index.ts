@@ -315,3 +315,121 @@ export class ProviderRegistry {
     };
   }
 }
+
+// ── LlmObservationProvider ────────────────────────────────────────────────────
+//
+// LLM-backed provider that extracts structured observations from session events.
+// Unlike ClaudeObservationProvider (single-sentence summary), this provider
+// asks the LLM to return a JSON array of {type, subject, detail, confidence}
+// observations — suitable for the knowledge-graph ingestion pipeline.
+//
+// Wire via NEXUS_OBSERVATION_DRIVER env var:
+//   NEXUS_OBSERVATION_DRIVER=groq/llama-3.3-70b
+//
+// Falls back to empty observation (not an error) when the LLM returns
+// unparseable JSON — ensuring the pipeline never hard-fails.
+
+export interface StructuredObservation {
+  type: string;       // e.g. "preference", "decision", "entity", "action"
+  subject: string;    // what/who the observation is about
+  detail: string;     // supporting sentence
+  confidence: number; // 0–1
+}
+
+export interface LlmObservationProviderOptions {
+  /** Model identifier, e.g. "groq/llama-3.3-70b" or "claude/claude-opus-4-5". */
+  model?: string;
+  /** Max observations to extract per session (default: 5). */
+  maxObservations?: number;
+  /** Injectable LLM call function. */
+  callFn: LlmCallFn;
+}
+
+const STRUCTURED_SYSTEM_PROMPT = `You are an observation extractor. Given conversation events, extract 1-5 structured observations.
+
+Return ONLY a JSON array — no preamble, no markdown, no explanation.
+Each item: { "type": string, "subject": string, "detail": string, "confidence": number }
+Types: preference | decision | entity | action | fact
+Confidence: 0.0–1.0
+
+If there is no substantive content, return an empty array: []`;
+
+export class LlmObservationProvider implements ObservationProvider {
+  readonly name = "llm-structured";
+  readonly model: string;
+  private callFn: LlmCallFn;
+  private maxObservations: number;
+
+  constructor(opts: LlmObservationProviderOptions) {
+    this.model = opts.model ?? process.env.NEXUS_OBSERVATION_DRIVER ?? "groq/llama-3.3-70b";
+    this.callFn = opts.callFn;
+    this.maxObservations = opts.maxObservations ?? 5;
+  }
+
+  async generate(request: GenerationRequest): Promise<ObservationResult> {
+    const t0 = Date.now();
+    const publicEvents = request.events.filter((e) => !e.isPrivate);
+
+    if (publicEvents.length === 0) {
+      return {
+        observation: null,
+        skipReason: "all_events_private",
+        skipXml: `<skip_summary reason="all_events_private"/>`,
+        provider: this.name,
+        model: this.model,
+        durationMs: Date.now() - t0,
+      };
+    }
+
+    const transcript = publicEvents
+      .map((e) => `[${e.role.toUpperCase()}] ${e.content}`)
+      .join("\n");
+
+    const prompt = `Session: ${request.sessionId}\n\nConversation:\n${transcript}\n\nExtract up to ${this.maxObservations} observations as a JSON array:`;
+
+    try {
+      const raw = await this.callFn(prompt, STRUCTURED_SYSTEM_PROMPT, 512);
+
+      let observations: StructuredObservation[] = [];
+      try {
+        // Strip markdown code fences if present
+        const cleaned = raw.replace(/^```(?:json)?\n?/i, "").replace(/\n?```$/i, "").trim();
+        const parsed = JSON.parse(cleaned);
+        if (Array.isArray(parsed)) {
+          observations = (parsed as StructuredObservation[]).slice(0, this.maxObservations);
+        }
+      } catch {
+        // Unparseable JSON → treat as empty (not an error)
+      }
+
+      if (observations.length === 0) {
+        return {
+          observation: null,
+          skipReason: "no_content",
+          provider: this.name,
+          model: this.model,
+          durationMs: Date.now() - t0,
+        };
+      }
+
+      // Serialise structured observations into the single `observation` string
+      // (preserves ObservationResult contract; callers can JSON.parse this back)
+      return {
+        observation: JSON.stringify(observations),
+        provider: this.name,
+        model: this.model,
+        durationMs: Date.now() - t0,
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        observation: null,
+        provider: this.name,
+        model: this.model,
+        durationMs: Date.now() - t0,
+        error: message,
+        errorClass: classifyError(message),
+      };
+    }
+  }
+}

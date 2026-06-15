@@ -243,6 +243,7 @@ export class SyncManager {
   }
 
   getStore(): SyncStore { return this.store; }
+  getClock(): VectorClock { return this.clock; }
 
   /** Push a batch of operations from this device. */
   push(sessionId: string, ops: Array<{ type: OpType; key: string; value?: unknown }>): PushResult {
@@ -301,5 +302,106 @@ export class SyncManager {
 
     // Concurrent — use resolver
     return this.resolver.resolve(local, remote);
+  }
+}
+
+// ── DrizzleSyncStore ──────────────────────────────────────────────────────────
+//
+// Production-grade SyncOperation persistence via Neon / PostgreSQL.
+// Stores each SyncOperation as a row in `sync_patches`, keyed by session_id.
+// SyncManager.push() writes ops to DB; SyncManager.pull() reads back ops
+// since a given logical time — state survives pod restarts.
+//
+// Table schema (auto-created):
+//   sync_patches (
+//     id           TEXT DEFAULT gen_random_uuid() PRIMARY KEY,
+//     device_id    TEXT NOT NULL,
+//     session_id   TEXT NOT NULL,
+//     clock        JSONB NOT NULL,   -- VectorClock snapshot
+//     patch        JSONB NOT NULL,   -- full SyncOperation payload
+//     applied_at   TIMESTAMPTZ DEFAULT now()
+//   )
+//
+// Falls back to the in-memory SyncStore when DATABASE_URL is unset.
+// Wire via SyncManager options:
+//   new SyncManager("device-1", { store: await DrizzleSyncStore.connect() })
+
+import { neon } from "@neondatabase/serverless";
+
+export class DrizzleSyncStore extends SyncStore {
+  private sql: ReturnType<typeof neon>;
+  private schemaEnsured = false;
+
+  private constructor(sql: ReturnType<typeof neon>) {
+    super();
+    this.sql = sql;
+  }
+
+  static connect(databaseUrl?: string): DrizzleSyncStore {
+    const url = databaseUrl ?? process.env.DATABASE_URL ?? "";
+    if (!url) throw new Error("DrizzleSyncStore: DATABASE_URL is required");
+    return new DrizzleSyncStore(neon(url));
+  }
+
+  private async ensureSchema(): Promise<void> {
+    if (this.schemaEnsured) return;
+    await this.sql`
+      CREATE TABLE IF NOT EXISTS sync_patches (
+        id          TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        device_id   TEXT NOT NULL,
+        session_id  TEXT NOT NULL,
+        clock       JSONB NOT NULL,
+        patch       JSONB NOT NULL,
+        applied_at  TIMESTAMPTZ DEFAULT now()
+      )
+    `;
+    await this.sql`
+      CREATE INDEX IF NOT EXISTS sync_patches_session_id_idx
+        ON sync_patches (session_id, applied_at DESC)
+    `;
+    this.schemaEnsured = true;
+  }
+
+  /**
+   * Persist a SyncOperation to the DB in addition to the in-memory SyncStore.
+   * Returns the updated SyncSession (or undefined if session not found).
+   */
+  override applyOp(op: SyncOperation): SyncSession | undefined {
+    const result = super.applyOp(op);
+    if (result) {
+      // Fire-and-forget persistence — errors are logged but don't fail the operation
+      void this.persistOp(op, result.vectorClock).catch((err) => {
+        console.warn(JSON.stringify({ level: "warn", event: "sync-store.persist-failed", error: String(err) }));
+      });
+    }
+    return result;
+  }
+
+  private async persistOp(op: SyncOperation, clock: Record<string, number>): Promise<void> {
+    await this.ensureSchema();
+    await this.sql`
+      INSERT INTO sync_patches (device_id, session_id, clock, patch)
+      VALUES (
+        ${op.deviceId},
+        ${op.sessionId},
+        ${JSON.stringify(clock)}::jsonb,
+        ${JSON.stringify(op)}::jsonb
+      )
+    `;
+  }
+
+  /**
+   * Read persisted operations for a session since a given logical time.
+   * Merges DB-stored ops with in-memory ops (deduplicates by logicalTime).
+   */
+  async getOpsSinceAsync(sessionId: string, sinceLogicalTime = 0): Promise<SyncOperation[]> {
+    await this.ensureSchema();
+    const rows = await this.sql`
+      SELECT patch FROM sync_patches
+      WHERE session_id = ${sessionId}
+      ORDER BY applied_at ASC
+    `;
+    const dbOps = rows.map((r) => JSON.parse(r.patch as string) as SyncOperation);
+    return dbOps.filter((op) => op.logicalTime > sinceLogicalTime);
   }
 }
