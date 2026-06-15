@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: Apache-2.0
+# Nexus API — Fly.io deployment config
+#
+# SETUP (first time):
+#   fly auth login
+#   fly apps create nexus-api
+#   fly secrets set \
+#     NEXUS_API_KEY=<value> \
+#     NEXUS_JWT_SECRET=<value> \
+#     DATABASE_URL=<neon-url> \
+#     GROQ_API_KEY=<value> \
+#     SENTRY_DSN=<value>
+#   fly deploy --config fly.toml
+#
+# REGIONS: Singapore (sin) primary + Mumbai (bom) replica
+# SCALE:   2 machines, 1 vCPU, 256MB RAM — vertical scale via fly scale vm
+#
+# DNS: point api.nexus.yashawasthi.dev → <fly-app-name>.fly.dev (CNAME)
+#      or use fly certs add api.nexus.yashawasthi.dev for managed TLS
+
+app            = "nexus-api"
+primary_region = "sin"
+kill_signal    = "SIGTERM"
+kill_timeout   = "30s"
+
+[build]
+  dockerfile = "apps/api/Dockerfile"
+
+[env]
+  NODE_ENV              = "production"
+  PORT                  = "3000"
+  LOG_LEVEL             = "info"
+  NEXUS_TRACING         = "true"
+  GATEWAY_CONTEXT_BUDGET = "30000"
+  PROMPT_CACHE_TTL_MS   = "3600000"
+
+[http_service]
+  internal_port        = 3000
+  force_https          = true
+  auto_stop_machines   = "stop"
+  auto_start_machines  = true
+  min_machines_running = 1
+  processes            = ["app"]
+
+  [http_service.concurrency]
+    type       = "connections"
+    hard_limit = 200
+    soft_limit = 160
+
+[[vm]]
+  size   = "shared-cpu-1x"
+  memory = "256mb"
+
+[[regions]]
+  name = "sin"
+
+[[regions]]
+  name = "bom"
+
+[checks]
+  [checks.health]
+    grace_period   = "10s"
+    interval       = "15s"
+    method         = "get"
+    path           = "/health"
+    port           = 3000
+    timeout        = "5s"
+    type           = "http"
+    restart_limit  = 3
