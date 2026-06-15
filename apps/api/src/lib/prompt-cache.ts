@@ -32,7 +32,7 @@ export interface CacheableRequest {
   temperature?: number;
 }
 
-export interface CachedLlmResponse {
+interface CachedLlmResponse {
   id:          string;
   type:        "message";
   role:        "assistant";
@@ -45,7 +45,7 @@ export interface CachedLlmResponse {
   };
 }
 
-export interface PromptCacheResult {
+interface PromptCacheResult {
   hit:       boolean;
   cacheKey:  string;
   response?: CachedLlmResponse;

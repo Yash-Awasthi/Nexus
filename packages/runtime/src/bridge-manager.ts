@@ -19,7 +19,7 @@ import * as http from "http";
 import { fileURLToPath } from "node:url";
 import * as path from "path";
 
-export type BridgeName =
+type BridgeName =
   | "stealth-browser"
   | "scraping"
   | "local-inference"

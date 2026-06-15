@@ -47,7 +47,7 @@ export interface IFilesystemSandbox {
   cleanup(): Promise<void>;
 }
 
-export interface ISandboxConstraint {
+interface ISandboxConstraint {
   maxWriteBytes: number;
   allowedPathPrefix: string;
   validateWrite(filePath: string, contentSize: number, currentTotal: number): boolean;
@@ -70,7 +70,7 @@ export interface IExecutionEnvironment {
   telemetry: IEnvironmentTelemetry;
 }
 
-export interface ICapabilityPolicy {
+interface ICapabilityPolicy {
   evaluateCapability(
     taskType: string,
     environment: IExecutionEnvironment,

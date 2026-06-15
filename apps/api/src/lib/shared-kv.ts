@@ -115,7 +115,3 @@ export function getSharedKV(): KVStore {
   return _sharedKv;
 }
 
-/** Reset singleton — useful in tests. */
-export function _resetSharedKV(): void {
-  _sharedKv = null;
-}

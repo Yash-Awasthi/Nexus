@@ -27,7 +27,7 @@ import type { IMemoryStore } from "./memory-store.js";
 
 // Forward reference to avoid circular dependency — context type is used
 // only at construction time via the static factory method.
-export interface GhostStackContextLike {
+interface GhostStackContextLike {
   metrics: IMetricsCollector;
   queue: IQueueBackend;
   discovery: IServiceDiscovery;

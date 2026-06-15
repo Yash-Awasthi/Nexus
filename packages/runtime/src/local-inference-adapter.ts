@@ -24,7 +24,7 @@ import type {
 // ─── Default model — small, fast, runs on 4GB VRAM ───────────────────────────
 const DEFAULT_MODEL = "meta-llama/Llama-3.2-3B-Instruct";
 
-export interface LocalInferenceOptions {
+interface LocalInferenceOptions {
   model?: string;
   compression?: "4bit" | "8bit" | null;
   maxNewTokens?: number;
@@ -100,7 +100,7 @@ export class LocalInferenceAdapter {
 
 // ─── ILanguageModel implementation ───────────────────────────────────────────
 
-export class LocalLanguageModel implements ILanguageModel {
+class LocalLanguageModel implements ILanguageModel {
   readonly modelId: string;
   private model: string;
   private compression: "4bit" | "8bit" | null;

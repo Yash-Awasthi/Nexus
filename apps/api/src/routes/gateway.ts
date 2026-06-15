@@ -67,7 +67,7 @@ import { getPromptCache, PromptCache, type CacheableRequest } from "../lib/promp
 // Upgrade path: swap InMemoryRunCostStore for PgRunCostStore when DATABASE_URL set.
 
 export const _costStore   = new InMemoryRunCostStore();
-export const costTracker  = new RunCostTracker({ store: _costStore });
+const costTracker  = new RunCostTracker({ store: _costStore });
 
 // ── Token budget (RPM limiting per identity) ──────────────────────────────────
 // GATEWAY_RPM_LIMIT (default 60) requests per 60-second sliding window.

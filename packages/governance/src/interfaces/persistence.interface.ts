@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-export interface IStoredEvent {
+interface IStoredEvent {
   id: string;
   event: string;
   payload: unknown;

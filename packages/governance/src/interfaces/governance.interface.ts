@@ -23,7 +23,7 @@ export interface ICognitiveTrace {
   timestamp: Date;
 }
 
-export interface IPlanningEngine {
+interface IPlanningEngine {
   generatePlan(objective: string, context?: unknown): Promise<ICognitiveTrace>;
 }
 

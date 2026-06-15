@@ -20,7 +20,7 @@ import type { FastifyRequest, FastifyReply } from "fastify";
 
 import { getSharedKV } from "./shared-kv.js";
 
-export interface RateLimitOptions {
+interface RateLimitOptions {
   /** Max requests allowed per window. */
   limit: number;
   /** Window duration in milliseconds. */

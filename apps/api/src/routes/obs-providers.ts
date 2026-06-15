@@ -27,7 +27,7 @@ import { requireAuth } from "../middleware/auth.js";
 
 // ── Observation shape ─────────────────────────────────────────────────────────
 
-export interface StoredObservation {
+interface StoredObservation {
   id: string;
   content: string;
   category: string;

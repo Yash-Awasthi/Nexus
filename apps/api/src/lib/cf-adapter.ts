@@ -56,7 +56,7 @@ export interface CFKVNamespaceLike {
 // ── Cloudflare execution context ──────────────────────────────────────────────
 // Used by waitUntil() so fire-and-forget cache writes survive request teardown.
 
-export interface CFExecutionContextLike {
+interface CFExecutionContextLike {
   waitUntil(promise: Promise<unknown>): void;
 }
 
@@ -193,7 +193,7 @@ export function _resetCFContext(): void {
 // Thin wrappers around the Cloudflare Cache API for HTTP response caching.
 // Used by edge handlers to cache deterministic GET responses.
 
-export interface CFCacheEntry {
+interface CFCacheEntry {
   body:    string;
   status:  number;
   headers: Record<string, string>;
