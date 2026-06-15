@@ -20,9 +20,11 @@ import {
   WebResearcher,
   type SearchResult,
   type ResearchFinding,
+  type SourceReference,
 } from "@nexus/researcher";
 import { randomUUID } from "crypto";
 import type { FastifyInstance } from "fastify";
+import { Pool } from "pg";
 
 import { requireAuth } from "../middleware/auth.js";
 
@@ -101,26 +103,106 @@ const session = new ResearchSession({
   dedupByUrl: true,
 });
 
-// ── In-process run store (cap: 500 entries) ───────────────────────────────────
+// ── Durable run store (pg) — in-process Map is warm L1 cache ──────────────────
 
 interface RunRecord {
   runId:      string;
   query:      string;
   finding:    ResearchFinding;
-  citations:  ReturnType<CitationIndex["list"]>;
+  citations:  SourceReference[];
   createdAt:  string;
 }
 
+let _pool: Pool | null = null;
+let _schemaReady = false;
+
+function getPool(): Pool | null {
+  if (!process.env.DATABASE_URL) return null;
+  if (!_pool) _pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  return _pool;
+}
+
+async function ensureSchema(pool: Pool): Promise<void> {
+  if (_schemaReady) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS research_runs (
+      id          text        PRIMARY KEY,
+      query       text        NOT NULL,
+      result      jsonb       NOT NULL,
+      citations   jsonb       NOT NULL DEFAULT '[]'::jsonb,
+      created_at  timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS research_runs_query_idx
+      ON research_runs (query);
+    CREATE INDEX IF NOT EXISTS research_runs_created_at_idx
+      ON research_runs (created_at DESC);
+  `);
+  _schemaReady = true;
+}
+
+// In-memory L1 (lost on restart or when cap hit; DB is authoritative)
 const runStore = new Map<string, RunRecord>();
 const RUN_CAP = 500;
 
-function storeRun(record: RunRecord): void {
+function storeInMemory(record: RunRecord): void {
   if (runStore.size >= RUN_CAP) {
-    // Evict oldest
     const oldest = runStore.keys().next().value;
     if (oldest) runStore.delete(oldest);
   }
   runStore.set(record.runId, record);
+}
+
+async function persistRun(record: RunRecord): Promise<void> {
+  storeInMemory(record);
+  const pool = getPool();
+  if (!pool) return;
+  ensureSchema(pool)
+    .then(() =>
+      pool.query(
+        `INSERT INTO research_runs (id, query, result, citations)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (id) DO NOTHING`,
+        [
+          record.runId,
+          record.query,
+          JSON.stringify(record.finding),
+          JSON.stringify(record.citations),
+        ],
+      ),
+    )
+    .catch((e: Error) => console.warn("[researcher] DB persist failed:", e.message));
+}
+
+async function loadRun(runId: string): Promise<RunRecord | null> {
+  // Check memory first
+  const cached = runStore.get(runId);
+  if (cached) return cached;
+
+  const pool = getPool();
+  if (!pool) return null;
+  try {
+    await ensureSchema(pool);
+    const { rows } = await pool.query<{
+      id: string; query: string;
+      result: ResearchFinding; citations: SourceReference[];
+      created_at: Date;
+    }>(
+      `SELECT id, query, result, citations, created_at FROM research_runs WHERE id = $1`,
+      [runId],
+    );
+    if (!rows[0]) return null;
+    const r = rows[0];
+    return {
+      runId:      r.id,
+      query:      r.query,
+      finding:    r.result,
+      citations:  Array.isArray(r.citations) ? r.citations : [],
+      createdAt:  r.created_at.toISOString(),
+    };
+  } catch (e) {
+    console.warn("[researcher] DB load failed:", (e as Error).message);
+    return null;
+  }
 }
 
 // ── Route plugin ──────────────────────────────────────────────────────────────
@@ -182,7 +264,7 @@ export async function researcherRoutes(app: FastifyInstance): Promise<void> {
       createdAt: accessedAt,
     };
 
-    storeRun(record);
+    await persistRun(record);
 
     return reply.code(201).send({
       runId,
@@ -210,20 +292,20 @@ export async function researcherRoutes(app: FastifyInstance): Promise<void> {
   app.get<{
     Params: { runId: string };
   }>("/researcher/:runId/citations", { preHandler: requireAuth }, async (request, reply) => {
-    const record = runStore.get(request.params.runId);
+    const record = await loadRun(request.params.runId);
     if (!record) {
       return reply.code(404).send({ error: `Run '${request.params.runId}' not found` });
     }
 
     return reply.send({
-      runId:      record.runId,
-      query:      record.query,
-      createdAt:  record.createdAt,
-      citations:  record.citations,
-      total:      record.citations.length,
-      markdownRef: new CitationIndex().toMarkdown !== undefined
-        ? record.citations.map((c) => `${c.citationKey} ${c.title} — <${c.url}>`).join("\n")
-        : "",
+      runId:       record.runId,
+      query:       record.query,
+      createdAt:   record.createdAt,
+      citations:   record.citations,
+      total:       record.citations.length,
+      markdownRef: record.citations
+        .map((c) => `${c.citationKey} ${c.title} — <${c.url}>`)
+        .join("\n"),
     });
   });
 }

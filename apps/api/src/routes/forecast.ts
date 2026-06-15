@@ -19,8 +19,10 @@ import {
   ForecastService,
   type ForecastDomain,
   type ForecastHorizon,
+  type ForecastResult,
 } from "@nexus/domain-forecast";
 import type { FastifyInstance } from "fastify";
+import { Pool } from "pg";
 
 import { requireAuth } from "../middleware/auth.js";
 
@@ -33,15 +35,76 @@ const gateway = process.env.OWM_API_KEY
 const cache   = new ForecastCache(60 * 60 * 1000); // 60 min TTL
 const service = new ForecastService({ gateway, cache });
 
-// In-memory history list (LRU-capped at 200 per domain)
-const historyStore = new Map<ForecastDomain, import("@nexus/domain-forecast").ForecastResult[]>();
+// ── Durable history (pg) — in-memory Map is warm L1 cache ────────────────────
+
+let _pool: Pool | null = null;
+let _schemaReady = false;
+
+function getPool(): Pool | null {
+  if (!process.env.DATABASE_URL) return null;
+  if (!_pool) _pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  return _pool;
+}
+
+async function ensureSchema(pool: Pool): Promise<void> {
+  if (_schemaReady) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS forecast_runs (
+      id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+      domain      text        NOT NULL,
+      horizon     text        NOT NULL,
+      result      jsonb       NOT NULL,
+      created_at  timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS forecast_runs_domain_idx
+      ON forecast_runs (domain);
+    CREATE INDEX IF NOT EXISTS forecast_runs_created_at_idx
+      ON forecast_runs (created_at DESC);
+  `);
+  _schemaReady = true;
+}
+
+// In-memory L1 (warm-restart perf; DB is authoritative when DATABASE_URL is set)
+const historyStore = new Map<ForecastDomain, ForecastResult[]>();
 const HISTORY_CAP = 200;
 
-function appendHistory(domain: ForecastDomain, result: import("@nexus/domain-forecast").ForecastResult): void {
+function updateMemory(domain: ForecastDomain, result: ForecastResult): void {
   const arr = historyStore.get(domain) ?? [];
   arr.unshift(result);
   if (arr.length > HISTORY_CAP) arr.length = HISTORY_CAP;
   historyStore.set(domain, arr);
+}
+
+async function persistAndRecord(domain: ForecastDomain, result: ForecastResult): Promise<void> {
+  updateMemory(domain, result);
+  const pool = getPool();
+  if (!pool) return;
+  // fire-and-forget — never blocks the response
+  ensureSchema(pool)
+    .then(() =>
+      pool.query(
+        `INSERT INTO forecast_runs (domain, horizon, result) VALUES ($1, $2, $3)`,
+        [domain, result.horizon, JSON.stringify(result)],
+      ),
+    )
+    .catch((e: Error) => console.warn("[forecast] DB persist failed:", e.message));
+}
+
+async function loadHistory(domain: ForecastDomain, limit: number): Promise<ForecastResult[]> {
+  const pool = getPool();
+  if (!pool) return (historyStore.get(domain) ?? []).slice(0, limit);
+  try {
+    await ensureSchema(pool);
+    const { rows } = await pool.query<{ result: ForecastResult }>(
+      `SELECT result FROM forecast_runs
+       WHERE domain = $1 ORDER BY created_at DESC LIMIT $2`,
+      [domain, limit],
+    );
+    return rows.map((r) => r.result);
+  } catch (e) {
+    console.warn("[forecast] DB load failed:", (e as Error).message);
+    return (historyStore.get(domain) ?? []).slice(0, limit);
+  }
 }
 
 const VALID_DOMAINS: ForecastDomain[] = ["risk", "market", "geo", "military"];
@@ -87,8 +150,8 @@ export async function forecastRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(502).send({ error: response.error ?? "Forecast generation failed" });
     }
 
-    // Record in history
-    if (response.result) appendHistory(domain, response.result);
+    // Record in history (fire-and-forget DB persist when DATABASE_URL set)
+    if (response.result) await persistAndRecord(domain, response.result);
 
     return reply.send({
       domain,
@@ -121,7 +184,7 @@ export async function forecastRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const limit = Math.min(parseInt(request.query.limit ?? "20", 10) || 20, 200);
-    const history = (historyStore.get(domain) ?? []).slice(0, limit);
+    const history = await loadHistory(domain, limit);
 
     return reply.send({ domain, history, total: history.length });
   });
