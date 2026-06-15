@@ -24,6 +24,9 @@ import { adminRoutes } from "./routes/admin.js";
 import { auditRoutes } from "./routes/audit.js";
 import { billingRoutes } from "./routes/billing.js";
 import { briefRoutes } from "./routes/brief.js";
+import { docPipelineRoutes } from "./routes/doc-pipeline.js";
+import { mcpRoutes } from "./routes/mcp.js";
+import { scrapingMcpRoutes } from "./routes/scraping-mcp.js";
 import { chatSuggestionsRoutes } from "./routes/chat-suggestions.js";
 import { codeReplRoutes } from "./routes/code-repl.js";
 import { connectorsRoutes } from "./routes/connectors.js";
@@ -142,6 +145,11 @@ export async function buildServer(): Promise<FastifyInstance> {
       await api.register(forecastRoutes);
       await api.register(sessionSyncRoutes);
       await api.register(researcherRoutes);
+
+      // N — scraping-mcp, doc-pipeline, /mcp endpoint
+      await api.register(scrapingMcpRoutes);
+      await api.register(docPipelineRoutes);
+      await api.register(mcpRoutes);
     },
     { prefix: "/api/v1" },
   );
