@@ -172,7 +172,7 @@ export async function councilRoutes(app: FastifyInstance): Promise<void> {
   }>(
     "/council/deliberate",
     {
-      preHandler: [requireAuth, makeTierGatePreHandler({ feature: "council", getTier: getTierFromRequest })],
+      preHandler: [requireAuth, makeTierGatePreHandler({ feature: "council", getTier: (req) => getTierFromRequest(req as Parameters<typeof getTierFromRequest>[0]) })],
       schema: {
         body: {
           type: "object",

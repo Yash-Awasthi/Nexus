@@ -47,7 +47,7 @@ registry.register(new TavilyConnector({ apiKey: process.env.TAVILY_API_KEY ?? ""
 if (process.env.GITHUB_TOKEN) {
   registry.register(new GitHubConnector({ token: process.env.GITHUB_TOKEN }));
 } else {
-  registry.register(new NullConnector({ id: "github", name: "GitHub" }));
+  registry.register(new NullConnector("github", "GitHub"));
 }
 
 if (process.env.DATABASE_URL) {
@@ -62,10 +62,10 @@ if (process.env.DATABASE_URL) {
       password: decodeURIComponent(u.password),
     }));
   } catch {
-    registry.register(new NullConnector({ id: "neon", name: "Neon DB" }));
+    registry.register(new NullConnector("neon", "Neon DB"));
   }
 } else {
-  registry.register(new NullConnector({ id: "neon", name: "Neon DB" }));
+  registry.register(new NullConnector("neon", "Neon DB"));
 }
 
 // Add placeholder connectors for common integrations not yet configured
@@ -76,7 +76,7 @@ const PLACEHOLDER_CONNECTORS = [
 ];
 for (const p of PLACEHOLDER_CONNECTORS) {
   if (!registry.get(p.id)) {
-    registry.register(new NullConnector(p));
+    registry.register(new NullConnector(p.id, p.name));
   }
 }
 
