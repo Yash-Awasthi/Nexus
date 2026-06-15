@@ -23,6 +23,7 @@ import Fastify, {
 import { adminRoutes } from "./routes/admin.js";
 import { auditRoutes } from "./routes/audit.js";
 import { billingRoutes } from "./routes/billing.js";
+import { briefRoutes } from "./routes/brief.js";
 import { chatSuggestionsRoutes } from "./routes/chat-suggestions.js";
 import { codeReplRoutes } from "./routes/code-repl.js";
 import { connectorsRoutes } from "./routes/connectors.js";
@@ -31,16 +32,20 @@ import { corpusBuilderRoutes } from "./routes/corpus-builder.js";
 import { councilRoutes } from "./routes/council.js";
 import { domainFeedsRoutes } from "./routes/domain-feeds.js";
 import { featureFlagsRoutes } from "./routes/feature-flags.js";
+import { forecastRoutes } from "./routes/forecast.js";
 import { gatewayRoutes } from "./routes/gateway.js";
 import { governanceRoutes } from "./routes/governance.js";
 import { imageGenRoutes } from "./routes/image-gen.js";
 import { knowledgeGraphRoutes } from "./routes/knowledge-graph.js";
+import { memoryRoutes } from "./routes/memory.js";
 import { voiceRoutes } from "./routes/voice.js";
 import { healthRoutes } from "./routes/health.js";
 import { ingestRoutes } from "./routes/ingest.js";
 import { obsProvidersRoutes } from "./routes/obs-providers.js";
 import { predictionMarketRoutes } from "./routes/prediction-market.js";
+import { researcherRoutes } from "./routes/researcher.js";
 import { runtimeRoutes } from "./routes/runtime.js";
+import { sessionSyncRoutes } from "./routes/session-sync.js";
 import { sseRoutes } from "./routes/sse.js";
 import { stmRoutes } from "./routes/stm.js";
 import { wikiRoutes } from "./routes/wiki.js";
@@ -130,6 +135,13 @@ export async function buildServer(): Promise<FastifyInstance> {
       await api.register(featureFlagsRoutes);
       await api.register(codeReplRoutes);
       await api.register(connectorsRoutes);
+
+      // K — new backbone routes
+      await api.register(memoryRoutes);
+      await api.register(briefRoutes);
+      await api.register(forecastRoutes);
+      await api.register(sessionSyncRoutes);
+      await api.register(researcherRoutes);
     },
     { prefix: "/api/v1" },
   );
