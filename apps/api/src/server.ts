@@ -30,6 +30,7 @@ import { adminRoutes } from "./routes/admin.js";
 import { auditRoutes } from "./routes/audit.js";
 import { billingRoutes } from "./routes/billing.js";
 import { agentsRoutes } from "./routes/agents.js";
+import { chatAnalystRoutes } from "./routes/chat-analyst.js";
 import { alertsRoutes } from "./routes/alerts.js";
 import { autotuneRoutes } from "./routes/autotune.js";
 import { botsRoutes } from "./routes/bots.js";
@@ -200,6 +201,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       // S — librarian + file-explorer agents, bot webhooks
       await api.register(agentsRoutes);
       await api.register(botsRoutes);
+      await api.register(chatAnalystRoutes);
 
       // P — rlhf, sft-tagger, llm-router, evals, scenario-planner
       await api.register(rlhfRoutes);
