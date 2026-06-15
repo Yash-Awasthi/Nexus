@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
+import { ErrorBoundary } from "./components/ErrorBoundary.js";
 import Layout from "./components/Layout.js";
 import Approvals from "./pages/Approvals.js";
 import Audit from "./pages/Audit.js";
@@ -20,6 +21,7 @@ import Voice from "./pages/Voice.js";
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Layout />}>
@@ -46,5 +48,6 @@ export default function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+    </ErrorBoundary>
   );
 }
