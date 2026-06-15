@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * MCP endpoint — MCP JSON-RPC 2.0 server over HTTP POST.
+ * MCP endpoint — MCP JSON-RPC 2.0 server over HTTP POST + SSE event stream.
  *
  * POST /mcp         — MCP JSON-RPC dispatcher (initialize, tools/list, tools/call)
  * GET  /mcp/info    — server capabilities (human-readable, no auth required)
+ * GET  /mcp/events  — SSE stream for live tool call event notifications
  *
  * Protocol: MCP 2024-11-05, JSON-RPC 2.0 over HTTP POST.
  * Tools exposed: all ScrapingMcpServer tools (open_session, get, bulk_get,
@@ -25,6 +26,24 @@ const _backend  = new MockScrapingBackend();
 const _sessions = new SessionStore();
 const _server   = new ScrapingMcpServer(_backend, _sessions);
 
+// ── SSE event bus ─────────────────────────────────────────────────────────────
+
+interface McpEvent {
+  type: "tool_call" | "tool_result" | "session_opened" | "session_closed";
+  toolName?: string;
+  sessionId?: string;
+  isError?: boolean;
+  timestamp: string;
+}
+
+const _subscribers = new Set<(event: McpEvent) => void>();
+
+function emit(event: McpEvent): void {
+  for (const sub of _subscribers) {
+    try { sub(event); } catch { /* ignore dead subscribers */ }
+  }
+}
+
 // ── JSON-RPC helpers ──────────────────────────────────────────────────────────
 
 function rpcOk(id: string | number | null, result: unknown) {
@@ -38,6 +57,53 @@ function rpcErr(id: string | number | null, code: number, message: string, data?
 // ── Route plugin ──────────────────────────────────────────────────────────────
 
 export async function mcpRoutes(app: FastifyInstance): Promise<void> {
+  /**
+   * GET /mcp/events
+   *
+   * Server-Sent Events stream. Emits MCP tool call lifecycle events so browser
+   * clients can observe tool activity without polling.
+   *
+   * Event types:
+   *   tool_call    — a tool was invoked (before execution)
+   *   tool_result  — a tool completed (after execution, includes isError)
+   *   session_opened / session_closed — session lifecycle
+   *
+   * Clients should reconnect on drop; no history is replayed.
+   */
+  app.get("/mcp/events", { preHandler: requireAuth }, async (request, reply) => {
+    reply.raw.writeHead(200, {
+      "Content-Type":  "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection":    "keep-alive",
+      "X-Accel-Buffering": "no",
+    });
+
+    // Send a heartbeat every 20 s to keep the connection alive
+    const heartbeat = setInterval(() => {
+      if (!reply.raw.destroyed) {
+        reply.raw.write(": heartbeat\n\n");
+      }
+    }, 20_000);
+
+    const send = (event: McpEvent): void => {
+      if (!reply.raw.destroyed) {
+        reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
+      }
+    };
+
+    _subscribers.add(send);
+
+    request.raw.on("close", () => {
+      clearInterval(heartbeat);
+      _subscribers.delete(send);
+    });
+
+    // Fastify must not close the reply automatically
+    await new Promise<void>((resolve) => {
+      request.raw.on("close", resolve);
+    });
+  });
+
   /**
    * GET /mcp/info
    * Returns server capabilities without requiring auth.
@@ -116,14 +182,25 @@ export async function mcpRoutes(app: FastifyInstance): Promise<void> {
         return reply.send(rpcErr(id, -32602, "Missing required param: name"));
       }
 
+      emit({ type: "tool_call", toolName, timestamp: new Date().toISOString() });
+
       try {
         const result = await _server.call(toolName, args);
+
+        emit({
+          type:      "tool_result",
+          toolName,
+          isError:   result.isError,
+          timestamp: new Date().toISOString(),
+        });
+
         return reply.send(rpcOk(id, {
           content: result.content,
           isError: result.isError,
         }));
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
+        emit({ type: "tool_result", toolName, isError: true, timestamp: new Date().toISOString() });
         return reply.send(rpcErr(id, -32603, `Tool execution error: ${msg}`));
       }
     }

@@ -13,6 +13,12 @@
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import sensible from "@fastify/sensible";
+import {
+  InMemoryAnalyticsClient,
+  NexusAnalytics,
+  NexusEvents,
+  PostHogAnalyticsClient,
+} from "@nexus/posthog-analytics";
 import { getTracer, enableTracing } from "@nexus/llm-tracer";
 import Fastify, {
   type FastifyError,
@@ -23,6 +29,7 @@ import Fastify, {
 import { adminRoutes } from "./routes/admin.js";
 import { auditRoutes } from "./routes/audit.js";
 import { billingRoutes } from "./routes/billing.js";
+import { autotuneRoutes } from "./routes/autotune.js";
 import { briefRoutes } from "./routes/brief.js";
 import { docPipelineRoutes } from "./routes/doc-pipeline.js";
 import { mcpRoutes } from "./routes/mcp.js";
@@ -59,6 +66,13 @@ declare module "fastify" {
     _nexusSpan?: ReturnType<ReturnType<typeof getTracer>["startSpan"]>;
   }
 }
+
+// ── Analytics singleton (PostHog in prod; InMemory in dev/CI) ─────────────────
+const _analyticsClient = process.env.POSTHOG_API_KEY
+  ? new PostHogAnalyticsClient({ apiKey: process.env.POSTHOG_API_KEY })
+  : new InMemoryAnalyticsClient();
+
+const analytics = new NexusAnalytics(_analyticsClient);
 
 export async function buildServer(): Promise<FastifyInstance> {
   // ── Tracing (zero-cost noop when disabled) ─────────────────────────────────
@@ -98,10 +112,26 @@ export async function buildServer(): Promise<FastifyInstance> {
   });
 
   app.addHook("onResponse", async (request: FastifyRequest, reply) => {
+    // LLM trace span
     const span = request._nexusSpan;
-    if (!span) return;
-    span.setAttribute("http.status_code", reply.statusCode);
-    span.end({ status: reply.statusCode >= 500 ? "error" : "ok" });
+    if (span) {
+      span.setAttribute("http.status_code", reply.statusCode);
+      span.end({ status: reply.statusCode >= 500 ? "error" : "ok" });
+    }
+
+    // PostHog analytics — fire-and-forget on successful mutations
+    if (request.method === "POST" && reply.statusCode === 201) {
+      const userId = ((request as unknown as Record<string, unknown>)["user"] as Record<string, unknown> | undefined)?.["id"] as string | undefined ?? "anonymous";
+      const path = request.url.split("?")[0] ?? request.url;
+
+      if (path.includes("/memory")) {
+        analytics.agentTaskStarted(userId, `mem-${Date.now()}`, NexusEvents.MEMORY_STORED).catch(() => {});
+      } else if (path.includes("/researcher")) {
+        analytics.agentTaskStarted(userId, `res-${Date.now()}`, NexusEvents.AGENT_TASK_STARTED).catch(() => {});
+      } else {
+        _analyticsClient.track("api.mutation", userId, { path, status: reply.statusCode }).catch(() => {});
+      }
+    }
   });
 
   // ── Health (no prefix — /health, /health/ready) ───────────────────────────
@@ -150,6 +180,9 @@ export async function buildServer(): Promise<FastifyInstance> {
       await api.register(scrapingMcpRoutes);
       await api.register(docPipelineRoutes);
       await api.register(mcpRoutes);
+
+      // O — autotune sampling params + EMA feedback
+      await api.register(autotuneRoutes);
     },
     { prefix: "/api/v1" },
   );
