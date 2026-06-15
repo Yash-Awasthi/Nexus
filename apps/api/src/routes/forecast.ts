@@ -21,6 +21,7 @@ import {
   type ForecastHorizon,
   type ForecastResult,
 } from "@nexus/domain-forecast";
+import { MemoryKVStore } from "@nexus/kv";
 import type { FastifyInstance } from "fastify";
 import { Pool } from "pg";
 
@@ -64,19 +65,20 @@ async function ensureSchema(pool: Pool): Promise<void> {
   _schemaReady = true;
 }
 
-// In-memory L1 (warm-restart perf; DB is authoritative when DATABASE_URL is set)
-const historyStore = new Map<ForecastDomain, ForecastResult[]>();
+// KV-backed L1 cache (MemoryKVStore; swap RedisKVStore via REDIS_URL + ioredis when needed)
+// historyKv key: domain → ForecastResult[] (most-recent-first, capped at HISTORY_CAP)
+const historyKv = new MemoryKVStore();
 const HISTORY_CAP = 200;
 
-function updateMemory(domain: ForecastDomain, result: ForecastResult): void {
-  const arr = historyStore.get(domain) ?? [];
+async function updateMemory(domain: ForecastDomain, result: ForecastResult): Promise<void> {
+  const arr = (await historyKv.get<ForecastResult[]>(domain)) ?? [];
   arr.unshift(result);
   if (arr.length > HISTORY_CAP) arr.length = HISTORY_CAP;
-  historyStore.set(domain, arr);
+  await historyKv.set(domain, arr);
 }
 
 async function persistAndRecord(domain: ForecastDomain, result: ForecastResult): Promise<void> {
-  updateMemory(domain, result);
+  await updateMemory(domain, result);
   const pool = getPool();
   if (!pool) return;
   // fire-and-forget — never blocks the response
@@ -92,7 +94,7 @@ async function persistAndRecord(domain: ForecastDomain, result: ForecastResult):
 
 async function loadHistory(domain: ForecastDomain, limit: number): Promise<ForecastResult[]> {
   const pool = getPool();
-  if (!pool) return (historyStore.get(domain) ?? []).slice(0, limit);
+  if (!pool) return ((await historyKv.get<ForecastResult[]>(domain)) ?? []).slice(0, limit);
   try {
     await ensureSchema(pool);
     const { rows } = await pool.query<{ result: ForecastResult }>(
@@ -103,7 +105,7 @@ async function loadHistory(domain: ForecastDomain, limit: number): Promise<Forec
     return rows.map((r) => r.result);
   } catch (e) {
     console.warn("[forecast] DB load failed:", (e as Error).message);
-    return (historyStore.get(domain) ?? []).slice(0, limit);
+    return ((await historyKv.get<ForecastResult[]>(domain)) ?? []).slice(0, limit);
   }
 }
 

@@ -52,9 +52,38 @@ import {
 } from "@nexus/ultraplinian";
 import { ToolRegistry, createDefaultRegistry } from "@nexus/tool-registry";
 import { globalHooks } from "@nexus/hooks";
-import type { FastifyInstance } from "fastify";
+import { MemoryTokenBudget, BudgetExceededError } from "@nexus/token-budget";
+import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
+
+// ── Token budget (RPM limiting per identity) ──────────────────────────────────
+// GATEWAY_RPM_LIMIT (default 60) requests per 60-second sliding window.
+// Identity = first 20 chars of Authorization token, or "anon".
+// 429 is returned when the budget is exceeded — never throws to the error handler.
+
+const _RPM_LIMIT     = parseInt(process.env.GATEWAY_RPM_LIMIT ?? "60", 10);
+const _tokenBudget   = new MemoryTokenBudget({ limit: _RPM_LIMIT, windowMs: 60_000 });
+
+async function _budgetPreHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const identity = (request.headers.authorization as string | undefined)?.slice(7, 27) ?? "anon";
+  try {
+    await _tokenBudget.consume({ identity, tokens: 1 });
+  } catch (err) {
+    if (err instanceof BudgetExceededError) {
+      const retryAfterSec = Math.ceil((err.resetAt - Date.now()) / 1000);
+      reply
+        .code(429)
+        .header("Retry-After", String(retryAfterSec))
+        .send({
+          error:      "rate_limit_exceeded",
+          message:    `Gateway RPM limit (${_RPM_LIMIT}) reached. Retry in ${retryAfterSec}s.`,
+          resetAt:    err.resetAt,
+          retryAfterSec,
+        });
+    }
+  }
+}
 
 // ── SSE stream timeout ────────────────────────────────────────────────────────
 // Default 30 s — override via STREAM_TIMEOUT_MS env var.
@@ -282,7 +311,7 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
     Headers: { "x-nexus-provider"?: string };
     Body: AnthropicRequest;
-  }>("/gateway/messages", { preHandler: requireAuth }, async (request, reply) => {
+  }>("/gateway/messages", { preHandler: [requireAuth, _budgetPreHandler] }, async (request, reply) => {
     const overrideProvider = request.headers["x-nexus-provider"];
     const registry = buildDriverRegistry();
 
