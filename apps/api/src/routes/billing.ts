@@ -139,7 +139,21 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
   /** POST /billing/keys */
   app.post<{ Body: { name: string; plan?: "free" | "pro" | "enterprise"; monthlyQuota?: number; rpmLimit?: number } }>(
     "/billing/keys",
-    { preHandler: requireAuth },
+    {
+      preHandler: requireAuth,
+      schema: {
+        body: {
+          type: "object",
+          required: ["name"],
+          properties: {
+            name:         { type: "string", minLength: 1, maxLength: 100 },
+            plan:         { type: "string", enum: ["free", "pro", "enterprise"] },
+            monthlyQuota: { type: "number", minimum: 0 },
+            rpmLimit:     { type: "number", minimum: 1, maximum: 10_000 },
+          },
+        },
+      },
+    },
     async (request, reply) => {
       if (!DB_AVAILABLE) {
         return reply.code(503).send({ error: "Database not configured — API key management requires DATABASE_URL" });

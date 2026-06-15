@@ -60,7 +60,20 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   /** POST /admin/routes — add static route */
   app.post<{ Body: { alias: string; model: string; provider: string } }>(
     "/admin/routes",
-    { preHandler: requireAuth },
+    {
+      preHandler: requireAuth,
+      schema: {
+        body: {
+          type: "object",
+          required: ["alias", "model", "provider"],
+          properties: {
+            alias:    { type: "string", minLength: 1, maxLength: 100 },
+            model:    { type: "string", minLength: 1, maxLength: 200 },
+            provider: { type: "string", minLength: 1, maxLength: 100 },
+          },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         adminService.addRoute(request.body.alias, request.body.model, request.body.provider);
@@ -85,7 +98,18 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   /** POST /admin/routes/:alias/override */
   app.post<{ Params: { alias: string }; Body: { model: string } }>(
     "/admin/routes/:alias/override",
-    { preHandler: requireAuth },
+    {
+      preHandler: requireAuth,
+      schema: {
+        body: {
+          type: "object",
+          required: ["model"],
+          properties: {
+            model: { type: "string", minLength: 1, maxLength: 200 },
+          },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         adminService.overrideAlias(decodeURIComponent(request.params.alias), request.body.model);
@@ -123,7 +147,22 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
     Params: { alias: string };
     Body: { tokens?: number; latencyMs?: number; error?: boolean };
-  }>("/admin/stats/:alias/record", { preHandler: requireAuth }, async (request, reply) => {
+  }>(
+    "/admin/stats/:alias/record",
+    {
+      preHandler: requireAuth,
+      schema: {
+        body: {
+          type: "object",
+          properties: {
+            tokens:    { type: "number", minimum: 0 },
+            latencyMs: { type: "number", minimum: 0 },
+            error:     { type: "boolean" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
     adminService.recordRequest(decodeURIComponent(request.params.alias), request.body);
     return reply.code(204).send();
   });
@@ -178,7 +217,23 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   /** POST /admin/settings — partial update */
   app.post<{ Body: Partial<AdminSettings> }>(
     "/admin/settings",
-    { preHandler: requireAuth },
+    {
+      preHandler: requireAuth,
+      schema: {
+        body: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            tracing:      { type: "boolean" },
+            logLevel:     { type: "string", enum: ["trace", "debug", "info", "warn", "error", "fatal"] },
+            rateLimitRpm: { type: "number", minimum: 1, maximum: 10_000 },
+            maxTokens:    { type: "number", minimum: 256, maximum: 200_000 },
+            defaultModel: { type: "string", minLength: 1, maxLength: 200 },
+            corsOrigins:  { type: "array", items: { type: "string" }, maxItems: 50 },
+          },
+        },
+      },
+    },
     async (request, reply) => {
       adminSettings = { ...adminSettings, ...request.body };
       // Apply live settings

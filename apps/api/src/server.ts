@@ -27,7 +27,9 @@ import Fastify, {
 } from "fastify";
 
 import { adminRoutes } from "./routes/admin.js";
+import { oauthRoutes } from "./routes/oauth.js";
 import { parseltongueRoutes } from "./routes/parseltongue.js";
+import { makeRateLimitPreHandler } from "./lib/rate-limiter.js";
 import { metricsRoutes } from "./routes/metrics.js";
 import { auditRoutes } from "./routes/audit.js";
 import { billingRoutes } from "./routes/billing.js";
@@ -181,6 +183,22 @@ export async function buildServer(): Promise<FastifyInstance> {
     }
   });
 
+  // ── IP-based rate limiting on high-value route groups ────────────────────────
+  // Limits are intentionally generous to avoid blocking legitimate use.
+  // Tighten per tier once tier-aware key extraction is plumbed through.
+  const _adminRL     = makeRateLimitPreHandler({ limit: 30,  windowMs: 60_000, keyPrefix: "admin" });
+  const _billingRL   = makeRateLimitPreHandler({ limit: 20,  windowMs: 60_000, keyPrefix: "billing" });
+  const _codeReplRL  = makeRateLimitPreHandler({ limit: 10,  windowMs: 60_000, keyPrefix: "code-repl" });
+  const _councilRL   = makeRateLimitPreHandler({ limit: 30,  windowMs: 60_000, keyPrefix: "council" });
+
+  app.addHook("onRequest", async (request: FastifyRequest, reply) => {
+    const url = request.url;
+    if      (url.startsWith("/api/v1/admin"))     await _adminRL(request, reply);
+    else if (url.startsWith("/api/v1/billing"))   await _billingRL(request, reply);
+    else if (url.startsWith("/api/v1/code-repl")) await _codeReplRL(request, reply);
+    else if (url.startsWith("/api/v1/council"))   await _councilRL(request, reply);
+  });
+
   // ── Health (no prefix — /health, /health/ready) ───────────────────────────
   await app.register(healthRoutes);
 
@@ -250,6 +268,9 @@ export async function buildServer(): Promise<FastifyInstance> {
       // Y — parseltongue obfuscation + Prometheus metrics
       await api.register(parseltongueRoutes);
       await api.register(metricsRoutes);
+
+      // Z — OAuth SSO (Google + GitHub)
+      await api.register(oauthRoutes);
     },
     { prefix: "/api/v1" },
   );

@@ -168,7 +168,31 @@ export async function councilRoutes(app: FastifyInstance): Promise<void> {
   // POST /council/deliberate
   app.post<{
     Body: CouncilRequest & { signal_id?: string };
-  }>("/council/deliberate", { preHandler: requireAuth }, async (request, reply) => {
+  }>(
+    "/council/deliberate",
+    {
+      preHandler: requireAuth,
+      schema: {
+        body: {
+          type: "object",
+          required: ["proposal"],
+          properties: {
+            proposal: {
+              type: "object",
+              required: ["title"],
+              properties: {
+                title:       { type: "string", minLength: 1, maxLength: 500 },
+                description: { type: "string", maxLength: 10_000 },
+              },
+            },
+            budgetUsd:  { type: "number", minimum: 0 },
+            timeoutMs:  { type: "number", minimum: 1_000, maximum: 300_000 },
+            signal_id:  { type: "string" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
     const { signal_id, ...councilRequest } = request.body as CouncilRequest & {
       signal_id?: string;
     };
@@ -233,7 +257,23 @@ export async function councilRoutes(app: FastifyInstance): Promise<void> {
   // POST /council/trigger — manual deliberation by signalId (Phase 3)
   app.post<{
     Body: { signalId: string; budgetUsd?: number; timeoutMs?: number };
-  }>("/council/trigger", { preHandler: requireAuth }, async (request, reply) => {
+  }>(
+    "/council/trigger",
+    {
+      preHandler: requireAuth,
+      schema: {
+        body: {
+          type: "object",
+          required: ["signalId"],
+          properties: {
+            signalId:  { type: "string", minLength: 1 },
+            budgetUsd: { type: "number", minimum: 0 },
+            timeoutMs: { type: "number", minimum: 1_000, maximum: 300_000 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
     const { signalId, budgetUsd, timeoutMs } = request.body;
 
     if (!signalId) {
