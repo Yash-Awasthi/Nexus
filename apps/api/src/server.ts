@@ -31,6 +31,11 @@ import { auditRoutes } from "./routes/audit.js";
 import { billingRoutes } from "./routes/billing.js";
 import { autotuneRoutes } from "./routes/autotune.js";
 import { briefRoutes } from "./routes/brief.js";
+import { evalsRoutes } from "./routes/evals.js";
+import { llmRoutes } from "./routes/llm.js";
+import { rlhfRoutes } from "./routes/rlhf.js";
+import { scenarioPlannerRoutes } from "./routes/scenario-planner.js";
+import { sftRoutes } from "./routes/sft.js";
 import { docPipelineRoutes } from "./routes/doc-pipeline.js";
 import { mcpRoutes } from "./routes/mcp.js";
 import { scrapingMcpRoutes } from "./routes/scraping-mcp.js";
@@ -183,6 +188,13 @@ export async function buildServer(): Promise<FastifyInstance> {
 
       // O — autotune sampling params + EMA feedback
       await api.register(autotuneRoutes);
+
+      // P — rlhf, sft-tagger, llm-router, evals, scenario-planner
+      await api.register(rlhfRoutes);
+      await api.register(sftRoutes);
+      await api.register(llmRoutes);
+      await api.register(evalsRoutes);
+      await api.register(scenarioPlannerRoutes);
     },
     { prefix: "/api/v1" },
   );
