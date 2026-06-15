@@ -379,3 +379,181 @@ export class FeedRegistry {
 
   getCache(): FeedCache { return this.cache; }
 }
+
+// ── RSS types ─────────────────────────────────────────────────────────────────
+
+export interface RssItem {
+  title: string;
+  link?: string;
+  description?: string;
+  pubDate?: string;
+  guid?: string;
+  author?: string;
+}
+
+export interface RssFeed {
+  title: string;
+  link?: string;
+  description?: string;
+  items: RssItem[];
+  fetchedAt: string;
+}
+
+// ── OPMLParser ────────────────────────────────────────────────────────────────
+
+export interface OPMLOutline {
+  text: string;
+  xmlUrl?: string;
+  htmlUrl?: string;
+  type?: string;
+  title?: string;
+}
+
+export class OPMLParser {
+  /** Parse an OPML XML string → flat list of outlines. */
+  parse(xml: string): OPMLOutline[] {
+    const outlines: OPMLOutline[] = [];
+    const outlineRe = /<outline([^>]*)(?:\/>|>[\s\S]*?<\/outline>)/gi;
+    let match: RegExpExecArray | null;
+    while ((match = outlineRe.exec(xml)) !== null) {
+      const attrs = match[1];
+      const outline: OPMLOutline = { text: this.attr(attrs, "text") ?? "" };
+      const xmlUrl  = this.attr(attrs, "xmlUrl");
+      const htmlUrl = this.attr(attrs, "htmlUrl");
+      const type    = this.attr(attrs, "type");
+      const title   = this.attr(attrs, "title");
+      if (xmlUrl)  outline.xmlUrl  = xmlUrl;
+      if (htmlUrl) outline.htmlUrl = htmlUrl;
+      if (type)    outline.type    = type;
+      if (title)   outline.title   = title;
+      outlines.push(outline);
+    }
+    return outlines;
+  }
+
+  /** Extract only feed URLs (outlines that carry xmlUrl). */
+  feedUrls(xml: string): string[] {
+    return this.parse(xml).filter((o) => o.xmlUrl).map((o) => o.xmlUrl!);
+  }
+
+  private attr(attrs: string, name: string): string | undefined {
+    const re = new RegExp(`${name}="([^"]*)"`, "i");
+    const m = attrs.match(re);
+    return m ? m[1] : undefined;
+  }
+}
+
+// ── RssFeedAdapter ─────────────────────────────────────────────────────────────
+
+export interface RssFeedAdapterOptions {
+  /** URL of the RSS/Atom feed to fetch. */
+  feedUrl: string;
+  /** Injectable HTTP function — defaults to native fetch. */
+  http?: HttpGetFn;
+  /** Max items to return per fetch (default: 20). */
+  maxItems?: number;
+}
+
+export class RssFeedAdapter {
+  readonly feedUrl: string;
+  private http: HttpGetFn;
+  private maxItems: number;
+
+  constructor(opts: RssFeedAdapterOptions) {
+    this.feedUrl  = opts.feedUrl;
+    this.maxItems = opts.maxItems ?? 20;
+    this.http     = opts.http ?? (async (url: string) => {
+      const res = await fetch(url, {
+        headers: { "Accept": "application/rss+xml, application/xml, text/xml, */*" },
+      });
+      if (!res.ok) throw new Error(`RSS fetch failed: ${res.status} ${url}`);
+      return res.text();
+    });
+  }
+
+  async fetch(): Promise<RssFeed> {
+    const fetchedAt = new Date().toISOString();
+    const raw = await this.http(this.feedUrl) as string;
+    const xml = typeof raw === "string" ? raw : JSON.stringify(raw);
+    return this.parse(xml, fetchedAt);
+  }
+
+  /** Parse RSS 2.0 or Atom XML into a structured RssFeed. */
+  parse(xml: string, fetchedAt = new Date().toISOString()): RssFeed {
+    const title       = this.tag(xml, "title") ?? this.feedUrl;
+    const link        = this.tag(xml, "link");
+    const description = this.tag(xml, "description");
+
+    const items: RssItem[] = [];
+
+    // RSS 2.0 <item> blocks
+    const itemRe = /<item[^>]*>([\s\S]*?)<\/item>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = itemRe.exec(xml)) !== null && items.length < this.maxItems) {
+      const b = m[1];
+      items.push({
+        title:       this.tag(b, "title") ?? "",
+        link:        this.tag(b, "link"),
+        description: this.tag(b, "description"),
+        pubDate:     this.tag(b, "pubDate"),
+        guid:        this.tag(b, "guid"),
+        author:      this.tag(b, "author") ?? this.tag(b, "dc:creator"),
+      });
+    }
+
+    // Atom <entry> blocks (fallback when no <item> found)
+    if (items.length === 0) {
+      const entryRe = /<entry[^>]*>([\s\S]*?)<\/entry>/gi;
+      while ((m = entryRe.exec(xml)) !== null && items.length < this.maxItems) {
+        const b = m[1];
+        items.push({
+          title:       this.tag(b, "title") ?? "",
+          link:        this.attrTag(b, "link", "href"),
+          description: this.tag(b, "summary") ?? this.tag(b, "content"),
+          pubDate:     this.tag(b, "published") ?? this.tag(b, "updated"),
+          guid:        this.tag(b, "id"),
+          author:      this.tag(b, "name"),
+        });
+      }
+    }
+
+    return { title, link, description, items, fetchedAt };
+  }
+
+  /** Convert RssFeed items to FeedEvent[] for ingestion into a FeedRegistry. */
+  toFeedEvents(feed: RssFeed, domain = "rss"): FeedEvent[] {
+    return feed.items.map((item, i) => ({
+      id:        item.guid ?? item.link ?? `${domain}-${Date.now()}-${i}`,
+      timestamp: item.pubDate ? (() => { try { return new Date(item.pubDate!).toISOString(); } catch { return feed.fetchedAt; } })() : feed.fetchedAt,
+      source:    feed.title,
+      summary:   item.title || (item.description?.slice(0, 120) ?? ""),
+      metadata: {
+        link:        item.link,
+        description: item.description,
+        author:      item.author,
+        feedUrl:     this.feedUrl,
+      },
+    }));
+  }
+
+  // ── Internal helpers ───────────────────────────────────────────────────────
+
+  /** Extract text content of a tag, handling CDATA. */
+  private tag(xml: string, tagName: string): string | undefined {
+    // CDATA variant
+    const cdataRe = new RegExp(`<${tagName}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tagName}>`, "i");
+    let m = xml.match(cdataRe);
+    if (m) return m[1].trim() || undefined;
+    // Plain text variant
+    const plainRe = new RegExp(`<${tagName}[^>]*>([^<]*)<\\/${tagName}>`, "i");
+    m = xml.match(plainRe);
+    return m ? (m[1].trim() || undefined) : undefined;
+  }
+
+  /** Extract an attribute value from a self-closing tag (e.g. <link href="…"/>). */
+  private attrTag(xml: string, tagName: string, attrName: string): string | undefined {
+    const re = new RegExp(`<${tagName}[^>]*${attrName}="([^"]*)"`, "i");
+    const m = xml.match(re);
+    return m ? m[1] : undefined;
+  }
+}

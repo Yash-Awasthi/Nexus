@@ -43,9 +43,10 @@ function parseRedisUrl(url: string): {
  * after a restart is idempotent (no duplicate repeatable jobs accumulate).
  *
  * Intervals:
- *   weather — every 5 min  (OPENWEATHER_API_KEY required, else noop in handler)
- *   crypto  — every 1 min  (CoinGecko free tier, no key required)
- *   news    — every 10 min (NEWS_API_KEY required, else noop in handler)
+ *   weather      — every 5 min  (OPENWEATHER_API_KEY required, else noop in handler)
+ *   crypto       — every 1 min  (CoinGecko free tier, no key required)
+ *   news         — every 10 min (NEWS_API_KEY required, else noop in handler)
+ *   feeds:rss    — every 15 min (RSS_FEED_URLS required, else noop in handler)
  */
 async function bootstrapRepeatableJobs(connection: ConnectionOptions): Promise<void> {
   if (!process.env.REDIS_URL) return;
@@ -66,8 +67,13 @@ async function bootstrapRepeatableJobs(connection: ConnectionOptions): Promise<v
       { domains: ["news"] },
       { repeat: { every: 600_000 }, jobId: "nexus:repeat:feeds:news" },
     );
+    await medium.add(
+      "feeds:refresh:rss",
+      {},
+      { repeat: { every: 900_000 }, jobId: "nexus:repeat:feeds:rss" },
+    );
     console.log(
-      JSON.stringify({ level: "info", event: "worker.repeatable-jobs-bootstrapped" }),
+      JSON.stringify({ level: "info", event: "worker.repeatable-jobs-bootstrapped", jobs: 4 }),
     );
   } catch (err) {
     // Non-fatal: if Redis is unreachable at startup, the worker will still

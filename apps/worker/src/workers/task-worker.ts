@@ -9,6 +9,7 @@
  *   "corpus:build"        → handleCorpusBuildJob
  *   "obs:generate"        → handleObsGenerateJob
  *   "feeds:refresh"       → handleFeedsRefreshJob
+ *   "feeds:refresh:rss"   → handleFeedsRefreshRssJob
  *   "search:reindex"      → handleSearchReindexJob
  *   (unknown)             → log + complete (no-op)
  *
@@ -35,11 +36,13 @@ import {
   handleCorpusBuildJob,
   handleObsGenerateJob,
   handleFeedsRefreshJob,
+  handleFeedsRefreshRssJob,
   handleSearchReindexJob,
   type WikiReconcilePayload,
   type CorpusBuildPayload,
   type ObsGeneratePayload,
   type FeedsRefreshPayload,
+  type FeedsRefreshRssPayload,
   type SearchReindexPayload,
 } from "../handlers/async-handlers.js";
 
@@ -90,6 +93,10 @@ async function processJob(job: Job): Promise<unknown> {
 
     case "feeds:refresh":
       result = await handleFeedsRefreshJob(data as FeedsRefreshPayload);
+      break;
+
+    case "feeds:refresh:rss":
+      result = await handleFeedsRefreshRssJob(data as FeedsRefreshRssPayload);
       break;
 
     case "search:reindex":

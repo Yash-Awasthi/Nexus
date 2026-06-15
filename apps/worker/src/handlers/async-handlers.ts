@@ -240,6 +240,68 @@ export async function handleFeedsRefreshJob(
   };
 }
 
+// ── feeds:refresh:rss ──────────────────────────────────────────────────────────
+
+export interface FeedsRefreshRssPayload {
+  /** Override RSS_FEED_URLS env var — comma-separated feed URLs. */
+  feedUrls?: string[];
+}
+
+export async function handleFeedsRefreshRssJob(
+  payload: FeedsRefreshRssPayload,
+): Promise<unknown> {
+  const { RssFeedAdapter } = await import("@nexus/domain-feeds");
+
+  // Resolve URLs: explicit payload → RSS_FEED_URLS env var → empty (skip)
+  const urls: string[] =
+    payload.feedUrls ??
+    (process.env.RSS_FEED_URLS
+      ? process.env.RSS_FEED_URLS.split(",").map((u) => u.trim()).filter(Boolean)
+      : []);
+
+  if (urls.length === 0) {
+    console.log(
+      JSON.stringify({
+        level: "info",
+        event: "feeds:refresh:rss.skipped",
+        reason: "no feed URLs configured — set RSS_FEED_URLS",
+      }),
+    );
+    return { skipped: true, reason: "no_feed_urls" };
+  }
+
+  const results = await Promise.allSettled(
+    urls.map(async (feedUrl) => {
+      const adapter = new RssFeedAdapter({ feedUrl });
+      const feed    = await adapter.fetch();
+      const events  = adapter.toFeedEvents(feed);
+      return { feedUrl, title: feed.title, items: events.length };
+    }),
+  );
+
+  const succeeded = results.filter((r) => r.status === "fulfilled") as
+    PromiseFulfilledResult<{ feedUrl: string; title: string; items: number }>[];
+  const failed = results.filter((r) => r.status === "rejected");
+
+  console.log(
+    JSON.stringify({
+      level: "info",
+      event: "feeds:refresh:rss.done",
+      total:     urls.length,
+      succeeded: succeeded.length,
+      failed:    failed.length,
+    }),
+  );
+
+  return {
+    total:       urls.length,
+    succeeded:   succeeded.length,
+    failed:      failed.length,
+    feeds:       succeeded.map((r) => r.value),
+    refreshedAt: new Date().toISOString(),
+  };
+}
+
 // ── search:reindex ─────────────────────────────────────────────────────────────
 
 export interface SearchReindexPayload {
