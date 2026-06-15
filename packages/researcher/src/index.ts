@@ -24,8 +24,65 @@ export interface ResearchFinding {
   query: string;
   results: SearchResult[];
   synthesis: string;
-  citations: string[];
+  citations: string[];          // flat URL list (backward-compat)
+  richCitations?: SourceReference[];  // structured citations with keys + metadata
   durationMs: number;
+}
+
+// ── SourceReference & CitationIndex ──────────────────────────────────────────
+
+export interface SourceReference {
+  /** Numeric citation marker, e.g. "[1]". */
+  citationKey: string;
+  url: string;
+  title: string;
+  /** ISO-8601 timestamp when the URL was accessed. */
+  accessedAt: string;
+  /** Short excerpt from the source (≤200 chars). */
+  snippet?: string;
+}
+
+export class CitationIndex {
+  private refs    = new Map<string, SourceReference>(); // citationKey → ref
+  private urlKeys = new Map<string, string>();           // url → citationKey (dedup)
+  private counter = 0;
+
+  /**
+   * Add a SearchResult to the index.  If the URL was already added the
+   * existing citationKey is returned without creating a duplicate.
+   */
+  add(result: SearchResult, accessedAt = new Date().toISOString()): string {
+    const existing = this.urlKeys.get(result.url);
+    if (existing) return existing;
+
+    const citationKey = `[${++this.counter}]`;
+    const ref: SourceReference = {
+      citationKey,
+      url:        result.url,
+      title:      result.title,
+      accessedAt,
+      snippet:    result.snippet?.slice(0, 200),
+    };
+    this.refs.set(citationKey, ref);
+    this.urlKeys.set(result.url, citationKey);
+    return citationKey;
+  }
+
+  get(key: string): SourceReference | undefined { return this.refs.get(key); }
+  byUrl(url: string): SourceReference | undefined {
+    const key = this.urlKeys.get(url);
+    return key ? this.refs.get(key) : undefined;
+  }
+  list(): SourceReference[] { return [...this.refs.values()]; }
+  size(): number { return this.refs.size; }
+  clear(): void { this.refs.clear(); this.urlKeys.clear(); this.counter = 0; }
+
+  /** Render all citations as a Markdown reference list. */
+  toMarkdown(): string {
+    return this.list()
+      .map((r) => `${r.citationKey} ${r.title} — <${r.url}>`)
+      .join("\n");
+  }
 }
 
 export interface CorpusDocument {
@@ -79,7 +136,10 @@ export class WebResearcher {
     const results = all.slice(0, this.maxResults);
     const synthesis = await this.synthesizeFn(query, results);
     const citations = results.map((r) => r.url);
-    return { query, results, synthesis, citations, durationMs: Date.now() - t0 };
+    const index = new CitationIndex();
+    const accessedAt = new Date().toISOString();
+    results.forEach((r) => index.add(r, accessedAt));
+    return { query, results, synthesis, citations, richCitations: index.list(), durationMs: Date.now() - t0 };
   }
 }
 
@@ -141,7 +201,10 @@ export class CorpusResearcher {
     const results = this.search(query);
     const synthesis = await this.synthesizeFn(query, results);
     const citations = results.map((r) => r.url);
-    return { query, results, synthesis, citations, durationMs: Date.now() - t0 };
+    const index = new CitationIndex();
+    const accessedAt = new Date().toISOString();
+    results.forEach((r) => index.add(r, accessedAt));
+    return { query, results, synthesis, citations, richCitations: index.list(), durationMs: Date.now() - t0 };
   }
 
   docCount(): number { return this.docs.length; }
