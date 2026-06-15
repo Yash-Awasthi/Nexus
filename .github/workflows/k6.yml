@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ secrets.NEXUS_STAGING_URL != '' || github.event_name == 'workflow_dispatch' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Run k6 smoke test
         uses: grafana/k6-action@v0.3.1
@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Run k6 load test
         uses: grafana/k6-action@v0.3.1
