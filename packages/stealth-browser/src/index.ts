@@ -594,3 +594,86 @@ export class StealthBrowser {
   get isOpen(): boolean { return this.driver.isOpen; }
   get pool_(): PagePool { return this.pool; }
 }
+
+// ── StealthBrowserScrapingBackend ─────────────────────────────────────────────
+/**
+ * Bridges StealthBrowser to the ScrapingBackend interface used by
+ * @nexus/scraping-mcp.  Uses structural (duck-type) compatibility — no import
+ * of scraping-mcp is needed, which avoids a circular dependency.
+ *
+ * fetch()        — navigate + html content (real HTTP status code)
+ * fetchStealthy()— same path; fingerprint spoofing already applied by StealthBrowser
+ * screenshot()   — navigate + PNG screenshot as base64
+ *
+ * Use createStealthBackend() factory to auto-select PatchrightDriver when
+ * patchright is available, falling back to MockDriver for dev/test.
+ */
+
+export interface StealthFetchResult {
+  url: string;
+  html: string;
+  status: number;
+  headers?: Record<string, string>;
+}
+
+export interface StealthScreenshotResult {
+  url: string;
+  data: string; // base64-encoded PNG
+  mimeType: string;
+}
+
+export class StealthBrowserScrapingBackend {
+  private _browser: StealthBrowser;
+
+  constructor(opts: { driver: BrowserDriver; poolSize?: number; profile?: StealthProfile }) {
+    this._browser = new StealthBrowser({
+      driver:  opts.driver,
+      poolSize: opts.poolSize ?? 3,
+      profile: opts.profile,
+    });
+  }
+
+  async fetch(url: string, _sessionId?: string): Promise<StealthFetchResult> {
+    return this._browser.withPage(async (page) => {
+      const nav  = await page.goto(url);
+      const html = await page.content();
+      return { url: nav.url, html, status: nav.status };
+    });
+  }
+
+  /** Stealthy fetch — identical to fetch() since StealthPage already applies
+   *  fingerprint spoofing, custom user-agent, and WebRTC block. */
+  async fetchStealthy(url: string, sessionId?: string): Promise<StealthFetchResult> {
+    return this.fetch(url, sessionId);
+  }
+
+  async screenshot(url: string, _sessionId?: string): Promise<StealthScreenshotResult> {
+    return this._browser.withPage(async (page) => {
+      await page.goto(url);
+      const buf = await page.screenshot({ format: "png", fullPage: false });
+      return { url, data: buf.toString("base64"), mimeType: "image/png" };
+    });
+  }
+
+  async close(): Promise<void> {
+    await this._browser.close();
+  }
+}
+
+/**
+ * Auto-select driver:
+ *   1. PatchrightDriver  — when patchright npm package is installed
+ *   2. MockDriver        — development / CI fallback
+ *
+ * @example
+ *   const backend = await createStealthBackend();
+ *   const { html } = await backend.fetch("https://example.com");
+ */
+export async function createStealthBackend(
+  opts: { poolSize?: number; profile?: StealthProfile } = {},
+): Promise<StealthBrowserScrapingBackend> {
+  const driver: BrowserDriver = (await isPatchrightAvailable())
+    ? new PatchrightDriver()
+    : new MockDriver();
+  return new StealthBrowserScrapingBackend({ driver, ...opts });
+}

@@ -14,17 +14,29 @@
  * endpoint to use Nexus scraping capabilities as MCP tools.
  */
 
-import { MockScrapingBackend, ScrapingMcpServer, SessionStore } from "@nexus/scraping-mcp";
+import {
+  MockScrapingBackend,
+  ScrapingMcpServer,
+  SessionStore,
+  type ScrapingBackend,
+} from "@nexus/scraping-mcp";
+import {
+  createStealthBackend,
+  isPatchrightAvailable,
+} from "@nexus/stealth-browser";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
 
-// ── Singleton tool registry ───────────────────────────────────────────────────
+// ── Backend factory ───────────────────────────────────────────────────────────
+// Independent instance from scraping-mcp.ts; MCP clients get their own session store.
 
-// Independent instance from scraping-mcp.ts — MCP clients get a fresh session store.
-const _backend  = new MockScrapingBackend();
-const _sessions = new SessionStore();
-const _server   = new ScrapingMcpServer(_backend, _sessions);
+async function _buildMcpBackend(): Promise<ScrapingBackend> {
+  if (process.env.STEALTH_BROWSER_URL || await isPatchrightAvailable()) {
+    return createStealthBackend({ poolSize: 2 });
+  }
+  return new MockScrapingBackend();
+}
 
 // ── SSE event bus ─────────────────────────────────────────────────────────────
 
@@ -57,6 +69,11 @@ function rpcErr(id: string | number | null, code: number, message: string, data?
 // ── Route plugin ──────────────────────────────────────────────────────────────
 
 export async function mcpRoutes(app: FastifyInstance): Promise<void> {
+  // Resolve backend once at plugin registration
+  const _backend  = await _buildMcpBackend();
+  const _sessions = new SessionStore();
+  const _server   = new ScrapingMcpServer(_backend, _sessions);
+
   /**
    * GET /mcp/events
    *

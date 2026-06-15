@@ -21,20 +21,30 @@ import {
   MockScrapingBackend,
   ScrapingMcpServer,
   SessionStore,
+  type ScrapingBackend,
 } from "@nexus/scraping-mcp";
+import {
+  createStealthBackend,
+  isPatchrightAvailable,
+} from "@nexus/stealth-browser";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
 
-// ── Singleton ─────────────────────────────────────────────────────────────────
+// ── Backend factory ───────────────────────────────────────────────────────────
+// Auto-wire StealthBrowserScrapingBackend when patchright is installed or
+// STEALTH_BROWSER_URL env var is set.  Falls back to MockScrapingBackend for
+// development / CI.  Called once per process at plugin registration time.
 
-const backend = new MockScrapingBackend({
-  html: "<html><body><p>Nexus scraping backend stub — configure STEALTH_BROWSER_URL for real scraping</p></body></html>",
-  status: 200,
-});
-
-const sessionStore = new SessionStore();
-const server = new ScrapingMcpServer(backend, sessionStore);
+async function buildBackend(): Promise<ScrapingBackend> {
+  if (process.env.STEALTH_BROWSER_URL || await isPatchrightAvailable()) {
+    return createStealthBackend({ poolSize: 3 });
+  }
+  return new MockScrapingBackend({
+    html:   "<html><body><p>Nexus scraping stub — install patchright or set STEALTH_BROWSER_URL for real scraping</p></body></html>",
+    status: 200,
+  });
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -47,8 +57,15 @@ function parseTextContent(text: string): Record<string, unknown> {
 }
 
 // ── Route plugin ──────────────────────────────────────────────────────────────
+// NOTE: SessionStore and ScrapingMcpServer are instantiated inside the plugin
+// (async) so buildBackend() can resolve before they're constructed.
 
 export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
+  // Resolve backend once at plugin registration; auto-wire stealth when available
+  const backend   = await buildBackend();
+  const sessionStore = new SessionStore();
+  const server    = new ScrapingMcpServer(backend, sessionStore);
+
   /**
    * GET /scraping/tools
    * List all available MCP scraping tools with their input schemas.
