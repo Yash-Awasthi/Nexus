@@ -21,8 +21,27 @@
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Rotating user-agent pool — sampled when StealthProfile.userAgent is not set.
+ * Covers Chrome, Firefox, Safari across Win/Mac/Linux to maximise coverage.
+ */
+export const DEFAULT_USER_AGENT_POOL: readonly string[] = [
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0",
+];
+
+export function pickRandomUserAgent(pool: readonly string[] = DEFAULT_USER_AGENT_POOL): string {
+  return pool[Math.floor(Math.random() * pool.length)]!;
+}
+
 export interface StealthProfile {
   userAgent?: string;
+  /** When userAgent is unset, pick from this pool at random (default: DEFAULT_USER_AGENT_POOL). */
+  userAgentPool?: readonly string[];
   locale?: string;
   timezone?: string;
   viewport?: { width: number; height: number };
@@ -32,6 +51,8 @@ export interface StealthProfile {
   blockWebRtc?: boolean;
   /** Randomise canvas fingerprint (default: true) */
   canvasNoise?: boolean;
+  /** Inject WebGL noise to prevent GPU fingerprinting (default: true) */
+  webGlNoise?: boolean;
 }
 
 export interface NavigateResult {
@@ -343,8 +364,13 @@ export class PatchrightDriver implements BrowserDriver {
   async newPage(profile?: StealthProfile): Promise<BrowserPage> {
     const browser = await this.ensureOpen();
 
+    // Resolve user-agent: explicit → pool rotation → chromium default
+    const userAgent =
+      profile?.userAgent
+      ?? pickRandomUserAgent(profile?.userAgentPool ?? DEFAULT_USER_AGENT_POOL);
+
     const contextOptions: Record<string, unknown> = {
-      userAgent:        profile?.userAgent,
+      userAgent,
       locale:           profile?.locale,
       timezoneId:       profile?.timezone,
       viewport:         profile?.viewport ?? { width: 1280, height: 720 },
@@ -360,6 +386,71 @@ export class PatchrightDriver implements BrowserDriver {
     const context = await (browser as any).newContext(contextOptions);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const page = await (context as any).newPage();
+
+    // ── Fingerprint-hardening init scripts ────────────────────────────────────
+    const shouldCanvasNoise = profile?.canvasNoise !== false; // default true
+    const shouldWebGlNoise  = profile?.webGlNoise  !== false; // default true
+    const shouldBlockWebRtc = profile?.blockWebRtc !== false; // default true
+
+    if (shouldCanvasNoise) {
+      // Perturb canvas pixel values by ±1 to defeat canvas fingerprinting
+      await (context as any).addInitScript(`
+        (function () {
+          const origToDataURL = HTMLCanvasElement.prototype.toDataURL;
+          HTMLCanvasElement.prototype.toDataURL = function (type, quality) {
+            const ctx = this.getContext("2d");
+            if (ctx) {
+              const img = ctx.getImageData(0, 0, this.width, this.height);
+              for (let i = 0; i < img.data.length; i += 4) {
+                img.data[i]     = Math.max(0, Math.min(255, img.data[i]     + (Math.random() > 0.5 ? 1 : -1)));
+                img.data[i + 1] = Math.max(0, Math.min(255, img.data[i + 1] + (Math.random() > 0.5 ? 1 : -1)));
+                img.data[i + 2] = Math.max(0, Math.min(255, img.data[i + 2] + (Math.random() > 0.5 ? 1 : -1)));
+              }
+              ctx.putImageData(img, 0, 0);
+            }
+            return origToDataURL.call(this, type, quality);
+          };
+        })();
+      `);
+    }
+
+    if (shouldWebGlNoise) {
+      // Randomise WebGL renderer/vendor strings to prevent GPU fingerprinting
+      await (context as any).addInitScript(`
+        (function () {
+          const getParameter = WebGLRenderingContext.prototype.getParameter;
+          WebGLRenderingContext.prototype.getParameter = function (param) {
+            if (param === 37445) return "Intel Open Source Technology Center";  // VENDOR
+            if (param === 37446) return "Mesa DRI Intel(R) HD Graphics " + (Math.floor(Math.random() * 900) + 100);  // RENDERER
+            return getParameter.call(this, param);
+          };
+          const getParameter2 = WebGL2RenderingContext.prototype.getParameter;
+          WebGL2RenderingContext.prototype.getParameter = function (param) {
+            if (param === 37445) return "Intel Open Source Technology Center";
+            if (param === 37446) return "Mesa DRI Intel(R) HD Graphics " + (Math.floor(Math.random() * 900) + 100);
+            return getParameter2.call(this, param);
+          };
+        })();
+      `);
+    }
+
+    if (shouldBlockWebRtc) {
+      // Override RTCPeerConnection to block local IP leaks
+      await (context as any).addInitScript(`
+        (function () {
+          const Orig = window.RTCPeerConnection;
+          if (!Orig) return;
+          window.RTCPeerConnection = function (config) {
+            if (config && config.iceServers) {
+              config.iceServers = [];
+            }
+            return new Orig(config);
+          };
+          window.RTCPeerConnection.prototype = Orig.prototype;
+        })();
+      `);
+    }
+
     return new PatchrightPage(page);
   }
 
@@ -674,6 +765,6 @@ export async function createStealthBackend(
 ): Promise<StealthBrowserScrapingBackend> {
   const driver: BrowserDriver = (await isPatchrightAvailable())
     ? new PatchrightDriver()
-    : new MockDriver();
+    : new MockBrowserDriver();
   return new StealthBrowserScrapingBackend({ driver, ...opts });
 }

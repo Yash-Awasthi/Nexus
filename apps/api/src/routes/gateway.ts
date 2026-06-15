@@ -292,6 +292,12 @@ interface AnthropicRequest {
   max_tokens?: number;
   temperature?: number;
   stream?: boolean;
+  /**
+   * Optional per-request USD spend guard.
+   * If total gateway cost already exceeds this value, the request is
+   * rejected 402 before any LLM call is made.
+   */
+  max_spend_usd?: number;
 }
 
 function toDriverRequest(body: AnthropicRequest, resolvedModel: string): LlmRequestOptions {
@@ -373,6 +379,28 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
       payload:  { model: resolvedModel, provider: providerName },
       attempt:  1,
     }).catch(() => {});
+
+    // ── USD spend cap (best-effort pre-call guard) ───────────────────────────
+    if (request.body.max_spend_usd !== undefined) {
+      try {
+        const runs = await _costStore.list();
+        const totalUsd = runs.reduce(
+          (s, r) => s + r.steps.reduce((a, st) => a + (st.costUsd ?? 0), 0),
+          0,
+        );
+        if (totalUsd >= request.body.max_spend_usd) {
+          return reply.code(402).send({
+            type: "error",
+            error: {
+              type: "spend_cap_exceeded",
+              message: `Gateway cumulative spend ($${totalUsd.toFixed(6)}) exceeds max_spend_usd ($${request.body.max_spend_usd}).`,
+              total_usd:    totalUsd,
+              max_spend_usd: request.body.max_spend_usd,
+            },
+          });
+        }
+      } catch { /* non-fatal — proceed if cost store unavailable */ }
+    }
 
     // ── Streaming branch ────────────────────────────────────────────────────
     if (request.body.stream) {
@@ -681,21 +709,44 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /**
-   * GET /gateway/cost-report
+   * GET /gateway/cost-report?limit=&cursor=
    *
-   * Returns aggregate USD cost + token breakdown for all completed runs since
-   * the last process restart.  Replace InMemoryRunCostStore with a Pg-backed
-   * store for persistent cross-restart reporting.
+   * Returns aggregate USD cost + token breakdown for completed gateway runs.
+   * Supports cursor-based pagination: cursor is an opaque runId; pass the
+   * nextCursor from the previous response to get the next page.
+   *
+   * Replace InMemoryRunCostStore with a Pg-backed store for persistence.
    */
-  app.get("/gateway/cost-report", { preHandler: requireAuth }, async (_request, reply) => {
-    const runs        = await _costStore.list();
-    const totalUsd    = runs.reduce((s, r) => s + r.steps.reduce((a, st) => a + (st.costUsd     ?? 0), 0), 0);
-    const totalTokens = runs.reduce((s, r) => s + r.steps.reduce((a, st) => a + (st.totalTokens ?? 0), 0), 0);
+  app.get<{
+    Querystring: { limit?: string; cursor?: string };
+  }>("/gateway/cost-report", { preHandler: requireAuth }, async (request, reply) => {
+    const limit  = Math.min(parseInt(request.query.limit ?? "50", 10) || 50, 200);
+    const cursor = request.query.cursor;
+
+    const allRuns  = await _costStore.list();
+    const totalUsd = allRuns.reduce((s, r) => s + r.steps.reduce((a, st) => a + (st.costUsd     ?? 0), 0), 0);
+    const totalTok = allRuns.reduce((s, r) => s + r.steps.reduce((a, st) => a + (st.totalTokens ?? 0), 0), 0);
+
+    // Cursor: index of the run AFTER the one with the given runId
+    let startIdx = 0;
+    if (cursor) {
+      const cursorIdx = allRuns.findIndex((r) => r.runId === cursor);
+      if (cursorIdx !== -1) startIdx = cursorIdx + 1;
+    }
+
+    const page       = allRuns.slice(startIdx, startIdx + limit);
+    const nextCursor = allRuns.length > startIdx + limit
+      ? allRuns[startIdx + limit - 1]!.runId
+      : null;
+
     return reply.send({
-      totalRuns:    runs.length,
+      totalRuns:    allRuns.length,
       totalUsd:     Math.round(totalUsd * 1_000_000) / 1_000_000,
-      totalTokens,
-      runs:         runs.slice(0, 200).map((r) => ({
+      totalTokens:  totalTok,
+      limit,
+      cursor:       cursor ?? null,
+      nextCursor,
+      runs: page.map((r) => ({
         runId:       r.runId,
         label:       r.label,
         startedAt:   r.startedAt,
