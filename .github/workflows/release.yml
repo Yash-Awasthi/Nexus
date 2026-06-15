@@ -117,7 +117,7 @@ jobs:
             ${{ matrix.image }}@${{ steps.build.outputs.digest }}
 
       - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sbom-${{ matrix.service }}
           path: sbom-${{ matrix.service }}.spdx.json
