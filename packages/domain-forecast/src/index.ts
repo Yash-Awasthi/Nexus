@@ -351,3 +351,147 @@ export function createDefaultGateway(behaviors: Partial<Record<ForecastDomain, M
   }
   return gateway;
 }
+
+// ── TypedNoopForecastHandler ──────────────────────────────────────────────────
+
+export class TypedNoopForecastHandler implements ForecastHandler {
+  readonly domain: ForecastDomain;
+  private reason: string;
+
+  constructor(domain: ForecastDomain, reason?: string) {
+    this.domain = domain;
+    this.reason = reason ?? `No handler configured for domain: ${domain}`;
+  }
+
+  async generate(request: ForecastRequest): Promise<ForecastResult> {
+    return {
+      domain:      request.domain,
+      horizon:     request.horizon,
+      generatedAt: new Date().toISOString(),
+      confidence:  0,
+      summary:     this.reason,
+      indicators:  { source: "noop", reason: this.reason },
+      scenarios:   [],
+    };
+  }
+
+  async *stream(request: ForecastRequest): AsyncIterable<ForecastChunk> {
+    const result = await this.generate(request);
+    yield { requestId: `noop-${Date.now()}`, sequence: 0, type: "complete", data: result };
+  }
+}
+
+// ── OpenWeatherForecastHandler ────────────────────────────────────────────────
+
+export interface ForecastPoint {
+  timestamp:  string;
+  value:      number;
+  unit:       string;
+  confidence: number;
+}
+
+export interface OpenWeatherForecastHandlerOptions {
+  apiKey?:  string;
+  city?:    string;
+  fetchFn?: (url: string) => Promise<{ ok: boolean; json(): Promise<unknown> }>;
+}
+
+interface OWMItem {
+  dt_txt:  string;
+  main:    { temp: number; humidity: number };
+  weather: Array<{ description: string }>;
+  wind:    { speed: number };
+  clouds:  { all: number };
+}
+
+interface OWMResponse {
+  list: OWMItem[];
+  city: { name: string };
+}
+
+export class OpenWeatherForecastHandler implements ForecastHandler {
+  readonly domain: ForecastDomain = "geo";
+  private apiKey:  string;
+  private city:    string;
+  private fetchFn: (url: string) => Promise<{ ok: boolean; json(): Promise<unknown> }>;
+
+  constructor(opts: OpenWeatherForecastHandlerOptions = {}) {
+    this.apiKey  = opts.apiKey  ?? process.env.OWM_API_KEY ?? "";
+    this.city    = opts.city    ?? process.env.OWM_CITY    ?? "London";
+    this.fetchFn = opts.fetchFn ?? ((url) => fetch(url));
+  }
+
+  async generate(request: ForecastRequest): Promise<ForecastResult> {
+    if (!this.apiKey) {
+      return new TypedNoopForecastHandler(this.domain, "OWM_API_KEY not configured").generate(request);
+    }
+    const url = `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(this.city)}&appid=${this.apiKey}&units=metric`;
+    let data: OWMResponse;
+    try {
+      const resp = await this.fetchFn(url);
+      if (!resp.ok) return new TypedNoopForecastHandler(this.domain, "OWM API error").generate(request);
+      data = await resp.json() as OWMResponse;
+    } catch {
+      return new TypedNoopForecastHandler(this.domain, "OWM fetch failed").generate(request);
+    }
+    const items = data.list ?? [];
+    if (!items.length) return new TypedNoopForecastHandler(this.domain, "No data returned").generate(request);
+
+    const buckets = new Map<string, OWMItem[]>();
+    for (const it of items) {
+      const day = it.dt_txt.slice(0, 10);
+      const arr = buckets.get(day) ?? [];
+      arr.push(it);
+      buckets.set(day, arr);
+    }
+    const scenarios: ForecastScenario[] = [...buckets.entries()].slice(0, 3).map(([day, its], i) => {
+      const avgTemp  = its.reduce((s, it) => s + it.main.temp, 0) / its.length;
+      const avgCloud = its.reduce((s, it) => s + it.clouds.all, 0) / its.length;
+      const desc     = its[0]?.weather[0]?.description ?? "unknown";
+      const prob     = Math.max(0.1, (100 - avgCloud) / 100);
+      return {
+        id: `owm-${day}-${i}`,
+        label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : `Day +${i + 1}`,
+        description: `${desc}, avg ${avgTemp.toFixed(1)}°C`,
+        probability: prob,
+        likelihood:  prob > 0.7 ? "high" : prob > 0.4 ? "medium" : "low",
+        drivers: ["openweathermap"],
+        impacts: [desc],
+      };
+    });
+    const latest = items[0]!;
+    return {
+      domain:      request.domain,
+      horizon:     request.horizon,
+      generatedAt: new Date().toISOString(),
+      confidence:  1 - (latest.clouds.all / 100) * 0.3,
+      summary:     `${data.city?.name ?? this.city}: ${latest.weather[0]?.description ?? ""}`,
+      indicators: {
+        temperature_c: latest.main.temp,
+        humidity_pct:  latest.main.humidity,
+        wind_speed_ms: latest.wind.speed,
+        source:        "openweathermap",
+      },
+      scenarios,
+    };
+  }
+}
+
+/** Production gateway — wires real handlers when env vars are set. */
+export function createProductionGateway(
+  behaviors: Partial<Record<ForecastDomain, MockHandlerBehavior>> = {},
+): RpcGateway {
+  const gateway = new RpcGateway();
+  const geoHandler = process.env.OWM_API_KEY && !behaviors["geo"]
+    ? new OpenWeatherForecastHandler()
+    : behaviors["geo"]
+      ? new MockForecastHandler("geo", behaviors["geo"])
+      : new TypedNoopForecastHandler("geo");
+  gateway.register(geoHandler);
+  for (const domain of ["risk", "market", "military"] as ForecastDomain[]) {
+    gateway.register(behaviors[domain]
+      ? new MockForecastHandler(domain, behaviors[domain]!)
+      : new TypedNoopForecastHandler(domain));
+  }
+  return gateway;
+}
