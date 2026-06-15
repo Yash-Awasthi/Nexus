@@ -29,8 +29,10 @@ import Fastify, {
 import { adminRoutes } from "./routes/admin.js";
 import { auditRoutes } from "./routes/audit.js";
 import { billingRoutes } from "./routes/billing.js";
+import { agentsRoutes } from "./routes/agents.js";
 import { alertsRoutes } from "./routes/alerts.js";
 import { autotuneRoutes } from "./routes/autotune.js";
+import { botsRoutes } from "./routes/bots.js";
 import { briefRoutes } from "./routes/brief.js";
 import { hooksRoutes } from "./routes/hooks.js";
 import { evalsRoutes } from "./routes/evals.js";
@@ -194,6 +196,10 @@ export async function buildServer(): Promise<FastifyInstance> {
       // R — hooks registry + alert engine
       await api.register(hooksRoutes);
       await api.register(alertsRoutes);
+
+      // S — librarian + file-explorer agents, bot webhooks
+      await api.register(agentsRoutes);
+      await api.register(botsRoutes);
 
       // P — rlhf, sft-tagger, llm-router, evals, scenario-planner
       await api.register(rlhfRoutes);
