@@ -126,6 +126,22 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
       ...(userId ? { userId } : {}),
     };
 
+    // Dedup: if a highly-similar entry already exists (cosine similarity ≥ 0.92)
+    // return it immediately instead of storing a near-duplicate.
+    const dedupFilter = userId ? { userId } : undefined;
+    const nearMatches = await manager.recall(text, 1, dedupFilter);
+    if (nearMatches.length > 0 && nearMatches[0]!.score >= 0.92) {
+      const dup = nearMatches[0]!.entry;
+      return reply.code(200).send({
+        id:        dup.id,
+        text:      dup.text,
+        metadata:  dup.metadata,
+        createdAt: dup.createdAt,
+        userId:    dup.userId ?? (dup.metadata?.userId as string | undefined),
+        duplicate: true,
+      });
+    }
+
     // Hook: memory.before_write
     globalHooks.emit("memory.before_write", { text, metadata: combinedMeta }).catch(() => {});
 

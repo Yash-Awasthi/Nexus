@@ -22,6 +22,11 @@ import {
   type ResearchFinding,
   type SourceReference,
 } from "@nexus/researcher";
+import {
+  ResearcherAgent,
+  type ResearchRunner,
+  type ResearchRunResult,
+} from "@nexus/agents";
 import { BM25Reranker } from "@nexus/reranker";
 import { randomUUID } from "crypto";
 import type { FastifyInstance } from "fastify";
@@ -105,6 +110,33 @@ const session = new ResearchSession({
   webResearcher: new WebResearcher({ searchFn, maxResults: 10 }),
   dedupByUrl: true,
 });
+
+// ── ResearcherAgent — wraps session as injectable ResearchRunner ───────────────
+// Captures allResults + durationMs per call so the route handler can still
+// BM25-rerank and build rich CitationIndex from full SearchResult objects.
+// Single-threaded Node.js event loop makes the capture variable race-free: each
+// awaited call to researcherAgent.research() completes before the next starts.
+
+let _capturedAllResults: SearchResult[] = [];
+let _capturedDurationMs = 0;
+
+const _researchRunner: ResearchRunner = async (query: string): Promise<ResearchRunResult> => {
+  const combined = await session.research(query);
+  _capturedAllResults = combined.allResults;
+  _capturedDurationMs = combined.durationMs;
+  const synthesis =
+    combined.webFindings?.synthesis ??
+    combined.corpusFindings?.synthesis ??
+    `${combined.allResults.length} result(s) found for: ${query}`;
+  return {
+    ok:        true,
+    report:    synthesis,
+    sources:   combined.allResults.map((r) => r.url),
+    latencyMs: combined.durationMs,
+  };
+};
+
+const researcherAgent = new ResearcherAgent({ runner: _researchRunner });
 
 // ── Durable run store (pg) — in-process Map is warm L1 cache ──────────────────
 
@@ -239,12 +271,19 @@ export async function researcherRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: "query is required" });
     }
 
-    const combined = await session.research(query.trim());
+    // ResearcherAgent orchestrates the session.research() call via _researchRunner,
+    // which captures allResults + durationMs in module-level variables for BM25 reranking.
+    const agentResult = await researcherAgent.research(query.trim());
+    const rawResults = _capturedAllResults;
+    const _agentDurationMs = _capturedDurationMs;
+
+    if (!agentResult.report && rawResults.length === 0) {
+      return reply.code(502).send({ error: "Research runner returned no results" });
+    }
 
     // BM25 rerank: score each result against the query using title + snippet as text.
     // Reranked order gives higher recall-precision; we re-map IDs back to the
     // original SearchResult objects so all fields (url, source, score, …) are preserved.
-    const rawResults = combined.allResults;
     let orderedResults = rawResults;
     if (rawResults.length > 0) {
       const { documents: rerankedDocs } = await reranker.rerank(
@@ -269,11 +308,11 @@ export async function researcherRoutes(app: FastifyInstance): Promise<void> {
     const accessedAt = new Date().toISOString();
     orderedResults.slice(0, Math.min(maxResults, 50)).forEach((r) => index.add(r, accessedAt));
 
-    const runId    = randomUUID();
-    const synthesis =
-      combined.webFindings?.synthesis ??
-      combined.corpusFindings?.synthesis ??
-      `${combined.allResults.length} result(s) found for: ${query}`;
+    const runId     = randomUUID();
+    // agentResult.report contains the synthesis text from ResearcherAgent
+    const synthesis = agentResult.report || `${rawResults.length} result(s) found for: ${query}`;
+    // URL list from agent (also built from allResults, same set)
+    const urlCitations = agentResult.sources;
 
     const record: RunRecord = {
       runId,
@@ -282,9 +321,9 @@ export async function researcherRoutes(app: FastifyInstance): Promise<void> {
         query,
         results:       orderedResults,
         synthesis,
-        citations:     combined.citations,
+        citations:     urlCitations,
         richCitations: index.list(),
-        durationMs:    combined.durationMs,
+        durationMs:    _agentDurationMs,
       },
       citations: index.list(),
       createdAt: accessedAt,
@@ -296,7 +335,7 @@ export async function researcherRoutes(app: FastifyInstance): Promise<void> {
       runId,
       query,
       synthesis,
-      citations:     combined.citations,
+      citations:     urlCitations,
       richCitations: index.list(),
       results:       orderedResults.slice(0, Math.min(maxResults, 50)).map((r) => ({
         url:     r.url,
@@ -305,7 +344,7 @@ export async function researcherRoutes(app: FastifyInstance): Promise<void> {
         score:   r.score,
         source:  r.source,
       })),
-      durationMs:    combined.durationMs,
+      durationMs:    _agentDurationMs,
     });
   });
 
