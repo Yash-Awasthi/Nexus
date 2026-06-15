@@ -12,10 +12,26 @@ import {
 // ── Sample data ───────────────────────────────────────────────────────────────
 
 const docs: SearchDoc[] = [
-  { id: "1", content: "TypeScript is a strongly typed language.", metadata: { lang: "TypeScript", level: "advanced" } },
-  { id: "2", content: "JavaScript is the language of the web.",   metadata: { lang: "JavaScript", level: "beginner" } },
-  { id: "3", content: "Python is great for data science.",        metadata: { lang: "Python", level: "beginner" } },
-  { id: "4", content: "TypeScript extends JavaScript with types.",metadata: { lang: ["TypeScript", "JavaScript"], level: "advanced" } },
+  {
+    id: "1",
+    content: "TypeScript is a strongly typed language.",
+    metadata: { lang: "TypeScript", level: "advanced" },
+  },
+  {
+    id: "2",
+    content: "JavaScript is the language of the web.",
+    metadata: { lang: "JavaScript", level: "beginner" },
+  },
+  {
+    id: "3",
+    content: "Python is great for data science.",
+    metadata: { lang: "Python", level: "beginner" },
+  },
+  {
+    id: "4",
+    content: "TypeScript extends JavaScript with types.",
+    metadata: { lang: ["TypeScript", "JavaScript"], level: "advanced" },
+  },
 ];
 
 // ── highlight ─────────────────────────────────────────────────────────────────
@@ -198,7 +214,7 @@ describe("rankByRelevance", () => {
   it("higher score for more term occurrences", () => {
     const testDocs: SearchDoc[] = [
       { id: "high", content: "cat cat cat cat" },
-      { id: "low",  content: "cat" },
+      { id: "low", content: "cat" },
     ];
     const r = rankByRelevance(testDocs, "cat");
     expect(r[0]!.score).toBeGreaterThan(r[1]!.score);

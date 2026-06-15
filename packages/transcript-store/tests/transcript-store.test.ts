@@ -3,7 +3,9 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { InMemoryTranscriptStore } from "../src/index.js";
 
 let store: InMemoryTranscriptStore;
-beforeEach(() => { store = new InMemoryTranscriptStore(); });
+beforeEach(() => {
+  store = new InMemoryTranscriptStore();
+});
 
 describe("session lifecycle", () => {
   it("creates a session with auto-generated id", () => {

@@ -225,32 +225,26 @@ export default function Chat() {
       }
 
       // Stream tokens — each delta is appended to the placeholder as it arrives
-      const res = await api.chatStream(
-        history,
-        model,
-        sysPrompt ?? undefined,
-        (delta) => {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId ? { ...m, content: m.content + delta } : m,
-            ),
-          );
-        },
-      );
+      const res = await api.chatStream(history, model, sysPrompt ?? undefined, (delta) => {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + delta } : m)),
+        );
+      });
 
       // Final pass: attach token usage metadata once stream is closed
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId
-            ? { ...m, tokenUsage: { input: res.usage.input_tokens, output: res.usage.output_tokens } }
+            ? {
+                ...m,
+                tokenUsage: { input: res.usage.input_tokens, output: res.usage.output_tokens },
+              }
             : m,
         ),
       );
     } catch (err) {
       // Drop placeholder only if stream never delivered any content
-      setMessages((prev) =>
-        prev.filter((m) => m.id !== assistantId || m.content.length > 0),
-      );
+      setMessages((prev) => prev.filter((m) => m.id !== assistantId || m.content.length > 0));
       setError(err instanceof Error ? err.message : "Request failed");
     } finally {
       setLoading(false);
@@ -281,11 +275,7 @@ export default function Chat() {
       <div style={s.header}>
         <h1 style={s.title}>◈ Chat</h1>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <select
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            style={s.modelSelect}
-          >
+          <select value={model} onChange={(e) => setModel(e.target.value)} style={s.modelSelect}>
             {MODELS.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.label}
@@ -305,7 +295,15 @@ export default function Chat() {
                 gap: 4,
               }}
             >
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: "#16a34a",
+                  display: "inline-block",
+                }}
+              />
               CTX ~{contextTokens}t
             </span>
           )}
@@ -349,9 +347,7 @@ export default function Chat() {
               gap: 2,
             }}
           >
-            <span style={s.roleBadge(msg.role)}>
-              {msg.role === "user" ? "You" : "Nexus"}
-            </span>
+            <span style={s.roleBadge(msg.role)}>{msg.role === "user" ? "You" : "Nexus"}</span>
             {/* Assistant steps (chain-of-thought) */}
             {msg.role === "assistant" && msg.steps && msg.steps.length > 0 && (
               <AssistantSteps steps={msg.steps} />
@@ -373,30 +369,36 @@ export default function Chat() {
                 onRegenerate={(msgId, regenerateModel) => {
                   // Replay history up to (not including) this message, then resend with chosen model
                   const idx = messages.findIndex((m) => m.id === msgId);
-                  const historyUpTo = messages.slice(0, idx).map(({ role, content }) => ({ role, content }));
+                  const historyUpTo = messages
+                    .slice(0, idx)
+                    .map(({ role, content }) => ({ role, content }));
                   setMessages((prev) => prev.slice(0, idx));
                   setLoading(true);
-                  void api.chat(historyUpTo, regenerateModel).then((res) => {
-                    const text = res.content.map((b) => b.text).join("");
-                    setMessages((prev) => [
-                      ...prev,
-                      {
-                        id: `a-${Date.now()}`,
-                        role: "assistant",
-                        content: text,
-                        tokenUsage: { input: res.usage.input_tokens, output: res.usage.output_tokens },
-                      },
-                    ]);
-                    setLoading(false);
-                  }).catch((err: unknown) => {
-                    setError(err instanceof Error ? err.message : "Regeneration failed");
-                    setLoading(false);
-                  });
+                  void api
+                    .chat(historyUpTo, regenerateModel)
+                    .then((res) => {
+                      const text = res.content.map((b) => b.text).join("");
+                      setMessages((prev) => [
+                        ...prev,
+                        {
+                          id: `a-${Date.now()}`,
+                          role: "assistant",
+                          content: text,
+                          tokenUsage: {
+                            input: res.usage.input_tokens,
+                            output: res.usage.output_tokens,
+                          },
+                        },
+                      ]);
+                      setLoading(false);
+                    })
+                    .catch((err: unknown) => {
+                      setError(err instanceof Error ? err.message : "Regeneration failed");
+                      setLoading(false);
+                    });
                 }}
                 onRate={(msgId, rating) => {
-                  setMessages((prev) =>
-                    prev.map((m) => (m.id === msgId ? { ...m, rating } : m)),
-                  );
+                  setMessages((prev) => prev.map((m) => (m.id === msgId ? { ...m, rating } : m)));
                 }}
               />
             )}
@@ -452,7 +454,8 @@ function ThinkingDots() {
   }, []);
   return (
     <span style={{ color: "#7c3aed", fontWeight: 700, letterSpacing: 2 }}>
-      {"●".repeat(dot)}{"○".repeat(3 - dot)}
+      {"●".repeat(dot)}
+      {"○".repeat(3 - dot)}
     </span>
   );
 }

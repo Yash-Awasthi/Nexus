@@ -45,11 +45,13 @@ function makeMemory(overrides: Partial<MemoryFact> = {}): MemoryFact {
   };
 }
 
-function makeFetchers(overrides: Partial<{
-  tasks: RecentTask[];
-  signals: ActiveSignal[];
-  memories: MemoryFact[];
-}> = {}): ContextFetchers {
+function makeFetchers(
+  overrides: Partial<{
+    tasks: RecentTask[];
+    signals: ActiveSignal[];
+    memories: MemoryFact[];
+  }> = {},
+): ContextFetchers {
   return {
     fetchRecentTasks: vi.fn().mockResolvedValue(overrides.tasks ?? [makeTask()]),
     fetchActiveSignals: vi.fn().mockResolvedValue(overrides.signals ?? [makeSignal()]),
@@ -247,10 +249,7 @@ describe("assembleContextPack — memories", () => {
   it("passes memoryQuery to fetchMemories", async () => {
     const fetchers = makeFetchers();
     await assembleContextPack(fetchers, { memoryQuery: "timezone preferences" });
-    expect(fetchers.fetchMemories).toHaveBeenCalledWith(
-      expect.any(Number),
-      "timezone preferences",
-    );
+    expect(fetchers.fetchMemories).toHaveBeenCalledWith(expect.any(Number), "timezone preferences");
   });
 
   it("changes section header when memoryQuery is set", async () => {

@@ -23,9 +23,7 @@ export interface WikiReconcilePayload {
   dryRun?: boolean;
 }
 
-export async function handleWikiReconcileJob(
-  payload: WikiReconcilePayload,
-): Promise<unknown> {
+export async function handleWikiReconcileJob(payload: WikiReconcilePayload): Promise<unknown> {
   const { WikiStore, WikiUpdatePipeline } = await import("@nexus/wiki-updater");
 
   const store = new WikiStore();
@@ -77,22 +75,19 @@ export interface CorpusBuildPayload {
   minScore?: number;
 }
 
-export async function handleCorpusBuildJob(
-  payload: CorpusBuildPayload,
-): Promise<unknown> {
-  const { CorpusBuilder, CorpusStore, MockCorpusSearchBackend } = await import(
-    "@nexus/corpus-builder"
-  );
+export async function handleCorpusBuildJob(payload: CorpusBuildPayload): Promise<unknown> {
+  const { CorpusBuilder, CorpusStore, MockCorpusSearchBackend } =
+    await import("@nexus/corpus-builder");
 
   // MockCorpusSearchBackend used as fallback — production wires a real VDB backend.
   const backend = new MockCorpusSearchBackend();
   const builder = new CorpusBuilder(backend);
-  const store   = new CorpusStore();
+  const store = new CorpusStore();
 
   const corpus = await builder.build(payload.query, {
-    topics:       payload.topics,
+    topics: payload.topics,
     maxDocuments: payload.maxDocuments ?? 20,
-    minScore:     payload.minScore,
+    minScore: payload.minScore,
   });
 
   store.save(corpus);
@@ -108,11 +103,11 @@ export async function handleCorpusBuildJob(
   );
 
   return {
-    corpusId:  corpus.id,
-    query:     corpus.query,
+    corpusId: corpus.id,
+    query: corpus.query,
     documents: corpus.documents.length,
     totalWords: corpus.totalWords,
-    builtAt:   corpus.builtAt,
+    builtAt: corpus.builtAt,
   };
 }
 
@@ -125,12 +120,8 @@ export interface ObsGeneratePayload {
   tags?: string[];
 }
 
-export async function handleObsGenerateJob(
-  payload: ObsGeneratePayload,
-): Promise<unknown> {
-  const { ProviderRegistry, MockObservationProvider } = await import(
-    "@nexus/obs-providers"
-  );
+export async function handleObsGenerateJob(payload: ObsGeneratePayload): Promise<unknown> {
+  const { ProviderRegistry, MockObservationProvider } = await import("@nexus/obs-providers");
 
   // Production: replace MockObservationProvider with ClaudeObservationProvider
   // or GeminiObservationProvider wired from env keys.
@@ -140,9 +131,9 @@ export async function handleObsGenerateJob(
 
   const result = await registry.generateWithFallback({
     sessionId: payload.sessionId,
-    events:    payload.events.map((e) => ({
-      role:      e.role as "user" | "assistant" | "system" | "tool",
-      content:   e.content,
+    events: payload.events.map((e) => ({
+      role: e.role as "user" | "assistant" | "system" | "tool",
+      content: e.content,
       timestamp: e.timestamp,
     })),
   });
@@ -159,24 +150,22 @@ export async function handleObsGenerateJob(
   );
 
   return {
-    sessionId:      payload.sessionId,
-    observation:    result.observation,
-    skipReason:     result.skipReason,
-    provider:       result.provider,
-    tokensUsed:     result.tokensUsed,
-    durationMs:     result.durationMs,
+    sessionId: payload.sessionId,
+    observation: result.observation,
+    skipReason: result.skipReason,
+    provider: result.provider,
+    tokensUsed: result.tokensUsed,
+    durationMs: result.durationMs,
   };
 }
 
 // ── feeds:refresh ──────────────────────────────────────────────────────────────
 
 export interface FeedsRefreshPayload {
-  domains?: string[];   // if omitted, refreshes all registered domains
+  domains?: string[]; // if omitted, refreshes all registered domains
 }
 
-export async function handleFeedsRefreshJob(
-  payload: FeedsRefreshPayload,
-): Promise<unknown> {
+export async function handleFeedsRefreshJob(payload: FeedsRefreshPayload): Promise<unknown> {
   const {
     FeedRegistry,
     FeedCache,
@@ -191,7 +180,7 @@ export async function handleFeedsRefreshJob(
     MaritimeFeed,
   } = await import("@nexus/domain-feeds");
 
-  const cache    = new FeedCache(300_000); // 5-minute TTL
+  const cache = new FeedCache(300_000); // 5-minute TTL
   const registry = new FeedRegistry(cache);
 
   // Register all feeds — in production each FeedAdapter gets a real baseUrl + apiKey.
@@ -215,12 +204,10 @@ export async function handleFeedsRefreshJob(
   }
 
   // Fan-out fetch — settled so a single failing adapter doesn't block the rest
-  const pages = await Promise.allSettled(
-    domainsToRefresh.map((d) => registry.fetch(d)),
-  );
+  const pages = await Promise.allSettled(domainsToRefresh.map((d) => registry.fetch(d)));
 
   const succeeded = pages.filter((p) => p.status === "fulfilled").length;
-  const failed    = pages.length - succeeded;
+  const failed = pages.length - succeeded;
 
   console.log(
     JSON.stringify({
@@ -233,7 +220,7 @@ export async function handleFeedsRefreshJob(
   );
 
   return {
-    domains:   domainsToRefresh,
+    domains: domainsToRefresh,
     succeeded,
     failed,
     refreshedAt: new Date().toISOString(),
@@ -247,16 +234,16 @@ export interface FeedsRefreshRssPayload {
   feedUrls?: string[];
 }
 
-export async function handleFeedsRefreshRssJob(
-  payload: FeedsRefreshRssPayload,
-): Promise<unknown> {
+export async function handleFeedsRefreshRssJob(payload: FeedsRefreshRssPayload): Promise<unknown> {
   const { RssFeedAdapter } = await import("@nexus/domain-feeds");
 
   // Resolve URLs: explicit payload → RSS_FEED_URLS env var → empty (skip)
   const urls: string[] =
     payload.feedUrls ??
     (process.env.RSS_FEED_URLS
-      ? process.env.RSS_FEED_URLS.split(",").map((u) => u.trim()).filter(Boolean)
+      ? process.env.RSS_FEED_URLS.split(",")
+          .map((u) => u.trim())
+          .filter(Boolean)
       : []);
 
   if (urls.length === 0) {
@@ -273,31 +260,34 @@ export async function handleFeedsRefreshRssJob(
   const results = await Promise.allSettled(
     urls.map(async (feedUrl) => {
       const adapter = new RssFeedAdapter({ feedUrl });
-      const feed    = await adapter.fetch();
-      const events  = adapter.toFeedEvents(feed);
+      const feed = await adapter.fetch();
+      const events = adapter.toFeedEvents(feed);
       return { feedUrl, title: feed.title, items: events.length };
     }),
   );
 
-  const succeeded = results.filter((r) => r.status === "fulfilled") as
-    PromiseFulfilledResult<{ feedUrl: string; title: string; items: number }>[];
+  const succeeded = results.filter((r) => r.status === "fulfilled") as PromiseFulfilledResult<{
+    feedUrl: string;
+    title: string;
+    items: number;
+  }>[];
   const failed = results.filter((r) => r.status === "rejected");
 
   console.log(
     JSON.stringify({
       level: "info",
       event: "feeds:refresh:rss.done",
-      total:     urls.length,
+      total: urls.length,
       succeeded: succeeded.length,
-      failed:    failed.length,
+      failed: failed.length,
     }),
   );
 
   return {
-    total:       urls.length,
-    succeeded:   succeeded.length,
-    failed:      failed.length,
-    feeds:       succeeded.map((r) => r.value),
+    total: urls.length,
+    succeeded: succeeded.length,
+    failed: failed.length,
+    feeds: succeeded.map((r) => r.value),
     refreshedAt: new Date().toISOString(),
   };
 }
@@ -309,17 +299,14 @@ export interface SearchReindexPayload {
   fullScan?: boolean;
 }
 
-export async function handleSearchReindexJob(
-  payload: SearchReindexPayload,
-): Promise<unknown> {
-  const { SearchOrchestrator, MockSearchStrategy, StrategyChain } = await import(
-    "@nexus/search-orchestrator"
-  );
+export async function handleSearchReindexJob(payload: SearchReindexPayload): Promise<unknown> {
+  const { SearchOrchestrator, MockSearchStrategy, StrategyChain } =
+    await import("@nexus/search-orchestrator");
 
   // Production: replace with real Chroma / SQLite strategies wired from env.
   const strategy = new MockSearchStrategy("mock");
-  const chain    = new StrategyChain({ strategies: [strategy] });
-  const orch     = new SearchOrchestrator({ chain });
+  const chain = new StrategyChain({ strategies: [strategy] });
+  const orch = new SearchOrchestrator({ chain });
 
   // Full-sweep: run an empty query across the project to warm the index.
   const result = await orch.search({
@@ -339,10 +326,10 @@ export async function handleSearchReindexJob(
   );
 
   return {
-    projectId:   payload.projectId ?? "all",
-    indexed:     result.results.length,
-    source:      result.source,
-    durationMs:  result.durationMs,
+    projectId: payload.projectId ?? "all",
+    indexed: result.results.length,
+    source: result.source,
+    durationMs: result.durationMs,
     reindexedAt: new Date().toISOString(),
   };
 }

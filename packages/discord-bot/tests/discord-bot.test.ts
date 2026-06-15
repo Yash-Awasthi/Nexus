@@ -74,10 +74,10 @@ describe("InteractionRouter", () => {
 
   it("routes to correct handler", async () => {
     const reg = new CommandRegistry();
-    reg.register(
-      { name: "ping", description: "Ping" },
-      () => ({ type: 4, data: { content: "pong!" } }),
-    );
+    reg.register({ name: "ping", description: "Ping" }, () => ({
+      type: 4,
+      data: { content: "pong!" },
+    }));
     const router = new InteractionRouter(reg);
     const r = await router.handle(makeInteraction());
     expect(r.data?.content).toBe("pong!");
@@ -145,7 +145,11 @@ describe("InteractionRouter", () => {
       return { type: 4 };
     });
     const router = new InteractionRouter(reg);
-    const interaction = makeInteraction({ data: { name: "dm" }, member: undefined, user: { id: "dm-user", username: "Bob" } });
+    const interaction = makeInteraction({
+      data: { name: "dm" },
+      member: undefined,
+      user: { id: "dm-user", username: "Bob" },
+    });
     await router.handle(interaction);
     expect(uid).toBe("dm-user");
   });

@@ -246,13 +246,13 @@ Voting modes: `unanimous | majority | weighted`. Guardrails enforce output const
 
 `@nexus/llm-drivers` provides 15 concrete provider adapters. Each driver implements provider-specific SSE or NDJSON parsing with native `ReadableStream` generators — no polling, no buffering:
 
-| Provider  | Protocol   | Streaming |
-|-----------|------------|-----------|
-| Anthropic | SSE        | `event: content_block_delta` |
+| Provider  | Protocol   | Streaming                       |
+| --------- | ---------- | ------------------------------- |
+| Anthropic | SSE        | `event: content_block_delta`    |
 | OpenAI    | SSE        | `data.choices[0].delta.content` |
-| Groq      | SSE        | OpenAI-compatible |
-| Gemini    | NDJSON     | `:streamGenerateContent` |
-| +11 more  | SSE/NDJSON | Provider-specific |
+| Groq      | SSE        | OpenAI-compatible               |
+| Gemini    | NDJSON     | `:streamGenerateContent`        |
+| +11 more  | SSE/NDJSON | Provider-specific               |
 
 ### MCP layer
 
@@ -321,32 +321,32 @@ Any team can add a new data source by implementing `@nexus/plugin-sdk`'s `define
 
 ## Core packages
 
-| Package | Description |
-|---------|-------------|
-| `@nexus/agent-runtime` | Multi-step LLM tool loop, `spawn_agents` parallel child agents |
-| `@nexus/council` | Multi-model deliberation: `Promise.allSettled` fanout, synthesis, guardrails |
-| `@nexus/llm-drivers` | 15 provider drivers with native SSE/NDJSON `ReadableStream` streaming |
-| `@nexus/llm-router` | Dynamic routing by cost, latency, and capability |
-| `@nexus/mcp-app` | MCP server framework: tools, resources, prompts, progress notifications |
-| `@nexus/mcp-client` | MCP consumer: connect to external tool registries over JSON-RPC 2.0 |
-| `@nexus/code-repl` | Jupyter-style REPL with Docker sandboxing (Python/R/Julia) |
-| `@nexus/memory` | pgvector store: IVFFlat ANN, TTL, multi-tenant ACL |
-| `@nexus/memory-tools` | High-level `remember()` / `recall()` / `forget()` API over memory |
-| `@nexus/runtime` | Circuit breaker, crash recovery, OTel tracing, queue backends |
-| `@nexus/pipeline-signal` | ingest → classify → Signal worker (7 built-in classifier rules) |
-| `@nexus/domain-feeds` | 11 global intelligence feed adapters (BullMQ-polled) |
-| `@nexus/stealth-browser` | Playwright stealth driver (PatchrightDriver) with Redis Streams eventing |
-| `@nexus/prediction-market` | Polymarket CLOB backend + OAuth 2.0 connector flow |
-| `@nexus/auth` | API key verification, HS256 JWT, Fastify preHandler hook |
-| `@nexus/db` | Drizzle ORM: 7 schemas, typed migrations, query helpers |
-| `@nexus/telemetry` | OTel bootstrap, HMAC-chained audit log, Prometheus metrics |
-| `@nexus/plugin-sdk` | `defineAdapter()`, capability types, testing harness |
-| `@nexus/contracts` | OpenAPI 3.1 + AsyncAPI 3.0 machine-readable API specs |
-| `@nexus/shared` | Shared types, `Result<T,E>`, Zod utilities |
-| `@nexus/context-pruner` | Token-budget-aware context pruning in the API gateway |
-| `@nexus/voice` | TTS/STT pipeline |
-| `@nexus/ragtime` | RAG: chunk → embed → retrieve → rerank |
-| `@nexus/knowledge-graph` | Entity + relation graph over agent memory |
+| Package                    | Description                                                                  |
+| -------------------------- | ---------------------------------------------------------------------------- |
+| `@nexus/agent-runtime`     | Multi-step LLM tool loop, `spawn_agents` parallel child agents               |
+| `@nexus/council`           | Multi-model deliberation: `Promise.allSettled` fanout, synthesis, guardrails |
+| `@nexus/llm-drivers`       | 15 provider drivers with native SSE/NDJSON `ReadableStream` streaming        |
+| `@nexus/llm-router`        | Dynamic routing by cost, latency, and capability                             |
+| `@nexus/mcp-app`           | MCP server framework: tools, resources, prompts, progress notifications      |
+| `@nexus/mcp-client`        | MCP consumer: connect to external tool registries over JSON-RPC 2.0          |
+| `@nexus/code-repl`         | Jupyter-style REPL with Docker sandboxing (Python/R/Julia)                   |
+| `@nexus/memory`            | pgvector store: IVFFlat ANN, TTL, multi-tenant ACL                           |
+| `@nexus/memory-tools`      | High-level `remember()` / `recall()` / `forget()` API over memory            |
+| `@nexus/runtime`           | Circuit breaker, crash recovery, OTel tracing, queue backends                |
+| `@nexus/pipeline-signal`   | ingest → classify → Signal worker (7 built-in classifier rules)              |
+| `@nexus/domain-feeds`      | 11 global intelligence feed adapters (BullMQ-polled)                         |
+| `@nexus/stealth-browser`   | Playwright stealth driver (PatchrightDriver) with Redis Streams eventing     |
+| `@nexus/prediction-market` | Polymarket CLOB backend + OAuth 2.0 connector flow                           |
+| `@nexus/auth`              | API key verification, HS256 JWT, Fastify preHandler hook                     |
+| `@nexus/db`                | Drizzle ORM: 7 schemas, typed migrations, query helpers                      |
+| `@nexus/telemetry`         | OTel bootstrap, HMAC-chained audit log, Prometheus metrics                   |
+| `@nexus/plugin-sdk`        | `defineAdapter()`, capability types, testing harness                         |
+| `@nexus/contracts`         | OpenAPI 3.1 + AsyncAPI 3.0 machine-readable API specs                        |
+| `@nexus/shared`            | Shared types, `Result<T,E>`, Zod utilities                                   |
+| `@nexus/context-pruner`    | Token-budget-aware context pruning in the API gateway                        |
+| `@nexus/voice`             | TTS/STT pipeline                                                             |
+| `@nexus/ragtime`           | RAG: chunk → embed → retrieve → rerank                                       |
+| `@nexus/knowledge-graph`   | Entity + relation graph over agent memory                                    |
 
 > Full package list: 140+ `@nexus/*` packages across agent, MCP, memory, ingestion, adapters, infra, and AI tooling layers.
 
@@ -414,18 +414,18 @@ See [`infra/terraform/`](infra/terraform/) for GKE and EKS provisioning modules.
 
 Key variables (see `.env.example` for the complete reference):
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DATABASE_URL` | ✅ | PostgreSQL connection string (with pgvector extension) |
-| `REDIS_URL` | ✅ | Redis connection string for BullMQ |
-| `NEXUS_API_KEY` | ✅ | Master API key for gateway authentication |
-| `NEXUS_AUDIT_KEY` | ✅ | HMAC key for audit log chaining |
-| `GROQ_API_KEY` | ✅ | Groq API key (primary LLM + embeddings) |
-| `OPENAI_API_KEY` | optional | OpenAI provider (council + llm-drivers) |
-| `OPENWEATHER_API_KEY` | optional | Weather feed polling |
-| `NEWS_API_KEY` | optional | News feed polling |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | optional | Jaeger/Tempo trace exporter |
-| `COUNCIL_MIN_PRIORITY` | optional | Minimum signal priority to trigger council (default: `high`) |
+| Variable                      | Required | Description                                                  |
+| ----------------------------- | -------- | ------------------------------------------------------------ |
+| `DATABASE_URL`                | ✅       | PostgreSQL connection string (with pgvector extension)       |
+| `REDIS_URL`                   | ✅       | Redis connection string for BullMQ                           |
+| `NEXUS_API_KEY`               | ✅       | Master API key for gateway authentication                    |
+| `NEXUS_AUDIT_KEY`             | ✅       | HMAC key for audit log chaining                              |
+| `GROQ_API_KEY`                | ✅       | Groq API key (primary LLM + embeddings)                      |
+| `OPENAI_API_KEY`              | optional | OpenAI provider (council + llm-drivers)                      |
+| `OPENWEATHER_API_KEY`         | optional | Weather feed polling                                         |
+| `NEWS_API_KEY`                | optional | News feed polling                                            |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | optional | Jaeger/Tempo trace exporter                                  |
+| `COUNCIL_MIN_PRIORITY`        | optional | Minimum signal priority to trigger council (default: `high`) |
 
 ---
 
@@ -458,6 +458,7 @@ bash infra/chaos/pod-kill.sh        # Kill random pod, observe recovery
 Coverage floor: **80%** (enforced in CI — see ADR-0017).
 
 Key test design decisions:
+
 - All packages use **injectable dependencies** — no live DB/Redis/Docker required to run the suite
 - `PgVectorStore` uses a mocked Neon SQL driver; `DockerReplExecutor` uses `MockReplExecutor` in tests
 - `MockLlmStream` / `MockTransport` provide deterministic LLM output in agent/council/driver tests
@@ -469,16 +470,17 @@ Key test design decisions:
 
 18 locked ADRs live in [`docs/adr/`](docs/adr/). Notable ones:
 
-| ADR | Decision |
-|-----|----------|
-| [ADR-0002](docs/adr/0002-postgres-sole-state.md) | PostgreSQL is the sole authoritative state store |
-| [ADR-0006](docs/adr/0006-apache-2-license.md) | Apache 2.0 license (patent grant) |
-| [ADR-0008](docs/adr/0008-plugin-sdk-first-class.md) | Plugin SDK is a first-class citizen |
-| [ADR-0009](docs/adr/0009-versioned-api.md) | API versioning from day one (`/v1/`) |
-| [ADR-0010](docs/adr/0010-hmac-chained-audit-log.md) | HMAC-chained audit log for tamper evidence |
-| [ADR-0017](docs/adr/0017-coverage-floor-80.md) | 80% coverage floor enforced in CI |
+| ADR                                                 | Decision                                         |
+| --------------------------------------------------- | ------------------------------------------------ |
+| [ADR-0002](docs/adr/0002-postgres-sole-state.md)    | PostgreSQL is the sole authoritative state store |
+| [ADR-0006](docs/adr/0006-apache-2-license.md)       | Apache 2.0 license (patent grant)                |
+| [ADR-0008](docs/adr/0008-plugin-sdk-first-class.md) | Plugin SDK is a first-class citizen              |
+| [ADR-0009](docs/adr/0009-versioned-api.md)          | API versioning from day one (`/v1/`)             |
+| [ADR-0010](docs/adr/0010-hmac-chained-audit-log.md) | HMAC-chained audit log for tamper evidence       |
+| [ADR-0017](docs/adr/0017-coverage-floor-80.md)      | 80% coverage floor enforced in CI                |
 
 Additional architectural decisions recorded in git history:
+
 - `Promise.allSettled` as the standard pattern for all concurrent fanouts (council voting, `spawn_agents`) to guarantee error isolation
 - `DockerReplExecutor` uses hard fail-secure constraints (SIGKILL, absolute caps, network isolation) rather than soft limits or graceful degradation
 - Domain feed polling via BullMQ repeatable jobs (not `setInterval`) to prevent multi-pod duplication

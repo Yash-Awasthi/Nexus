@@ -54,7 +54,10 @@ async function validateStartup(): Promise<void> {
       // Dynamic import keeps ioredis out of the module graph when not needed
       const ioredis = await import("ioredis");
       const Redis = ioredis.default ?? ioredis;
-      const redis = new (Redis as unknown as new (url: string, opts: Record<string, unknown>) => {
+      const redis = new (Redis as unknown as new (
+        url: string,
+        opts: Record<string, unknown>,
+      ) => {
         connect(): Promise<void>;
         ping(): Promise<void>;
         quit(): Promise<void>;

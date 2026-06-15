@@ -49,8 +49,7 @@ function makeFetch(responses: Array<{ ok: boolean; status?: number; body?: unkno
   });
 }
 
-const okFetch = (body: unknown = { ok: true }) =>
-  makeFetch([{ ok: true, body }]);
+const okFetch = (body: unknown = { ok: true }) => makeFetch([{ ok: true, body }]);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ConnectorError
@@ -140,7 +139,9 @@ describe("BaseConnector — lifecycle", () => {
 
   it("status moves to error when _doConnect throws", async () => {
     const c = new NullConnector();
-    c["_doConnect"] = async () => { throw new Error("crash"); };
+    c["_doConnect"] = async () => {
+      throw new Error("crash");
+    };
     const result = await c.connect();
     expect(result.ok).toBe(false);
     expect(c.status).toBe("error");
@@ -169,7 +170,9 @@ describe("BaseConnector — lifecycle", () => {
 
   it("healthCheck() wraps exception in ok:false result", async () => {
     const c = new NullConnector();
-    c["_doHealthCheck"] = async () => { throw new Error("timeout"); };
+    c["_doHealthCheck"] = async () => {
+      throw new Error("timeout");
+    };
     const result = await c.healthCheck();
     expect(result.ok).toBe(false);
     expect(result.error).toContain("timeout");
@@ -190,7 +193,10 @@ describe("GitHubConnector", () => {
     const fetchFn = okFetch({ login: "yash", id: 1 });
     const c = new GitHubConnector({ token: "ghp_test", fetch: fetchFn });
     await c.connect();
-    const headers = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.headers as Record<string, string>;
+    const headers = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.headers as Record<
+      string,
+      string
+    >;
     expect(headers["Authorization"]).toBe("Bearer ghp_test");
     expect((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toContain("/user");
   });
@@ -252,19 +258,28 @@ describe("SlackConnector", () => {
     const c = new SlackConnector({ token: "xoxb-test", fetch: fetchFn });
     await c.connect();
     expect((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toContain("auth.test");
-    const headers = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.headers as Record<string, string>;
+    const headers = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.headers as Record<
+      string,
+      string
+    >;
     expect(headers["Authorization"]).toBe("Bearer xoxb-test");
   });
 
   it("connect() returns team and user metadata", async () => {
-    const c = new SlackConnector({ token: "t", fetch: okFetch({ ok: true, team: "Nexus", user: "bot" }) });
+    const c = new SlackConnector({
+      token: "t",
+      fetch: okFetch({ ok: true, team: "Nexus", user: "bot" }),
+    });
     const result = await c.connect();
     expect(result.ok).toBe(true);
     expect(result.metadata?.team).toBe("Nexus");
   });
 
   it("connect() ok:false when Slack ok:false", async () => {
-    const c = new SlackConnector({ token: "t", fetch: okFetch({ ok: false, error: "invalid_auth" }) });
+    const c = new SlackConnector({
+      token: "t",
+      fetch: okFetch({ ok: false, error: "invalid_auth" }),
+    });
     const result = await c.connect();
     expect(result.ok).toBe(false);
     expect(result.error).toBe("invalid_auth");
@@ -298,13 +313,19 @@ describe("GroqConnector", () => {
     const fetchFn = okFetch({ data: [{ id: "llama-3.1-8b-instant" }] });
     const c = new GroqConnector({ apiKey: "gsk_test", fetch: fetchFn });
     await c.connect();
-    const headers = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.headers as Record<string, string>;
+    const headers = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.headers as Record<
+      string,
+      string
+    >;
     expect(headers["Authorization"]).toBe("Bearer gsk_test");
     expect((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toContain("/models");
   });
 
   it("connect() returns modelCount in metadata", async () => {
-    const c = new GroqConnector({ apiKey: "k", fetch: okFetch({ data: [{ id: "m1" }, { id: "m2" }] }) });
+    const c = new GroqConnector({
+      apiKey: "k",
+      fetch: okFetch({ data: [{ id: "m1" }, { id: "m2" }] }),
+    });
     const result = await c.connect();
     expect(result.ok).toBe(true);
     expect(result.metadata?.modelCount).toBe(2);
@@ -339,7 +360,9 @@ describe("TavilyConnector", () => {
     const c = new TavilyConnector({ apiKey: "tvly-test", fetch: fetchFn });
     await c.connect();
     expect((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toContain("tavily.com/search");
-    const body = JSON.parse((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
+    const body = JSON.parse(
+      (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string,
+    );
     expect(body.api_key).toBe("tvly-test");
   });
 
@@ -351,13 +374,19 @@ describe("TavilyConnector", () => {
   });
 
   it("connect() ok:false on 401", async () => {
-    const c = new TavilyConnector({ apiKey: "bad", fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const c = new TavilyConnector({
+      apiKey: "bad",
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     const result = await c.connect();
     expect(result.ok).toBe(false);
   });
 
   it("connect() ok:false on 403", async () => {
-    const c = new TavilyConnector({ apiKey: "bad", fetch: makeFetch([{ ok: false, status: 403 }]) });
+    const c = new TavilyConnector({
+      apiKey: "bad",
+      fetch: makeFetch([{ ok: false, status: 403 }]),
+    });
     const result = await c.connect();
     expect(result.ok).toBe(false);
     expect(result.error).toContain("invalid");
@@ -375,7 +404,12 @@ describe("TavilyConnector", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("NeonConnector", () => {
-  const cfg = { endpoint: "https://ep-test.neon.tech", database: "neondb", user: "user", password: "pw" };
+  const cfg = {
+    endpoint: "https://ep-test.neon.tech",
+    database: "neondb",
+    user: "user",
+    password: "pw",
+  };
 
   it("has id 'neon'", () => {
     expect(new NeonConnector({ ...cfg, fetch: okFetch() }).id).toBe("neon");
@@ -386,7 +420,9 @@ describe("NeonConnector", () => {
     const c = new NeonConnector({ ...cfg, fetch: fetchFn });
     await c.connect();
     expect((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toContain("/sql");
-    const body = JSON.parse((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
+    const body = JSON.parse(
+      (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string,
+    );
     expect(body.query).toContain("SELECT 1");
   });
 
@@ -394,7 +430,10 @@ describe("NeonConnector", () => {
     const fetchFn = okFetch({ rows: [{ ping: 1 }] });
     const c = new NeonConnector({ ...cfg, fetch: fetchFn });
     await c.connect();
-    const headers = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.headers as Record<string, string>;
+    const headers = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.headers as Record<
+      string,
+      string
+    >;
     expect(headers["Authorization"]).toMatch(/^Basic /);
   });
 
@@ -446,7 +485,9 @@ describe("LinearConnector", () => {
     const c = new LinearConnector({ apiKey: "lin_key", fetch: fetchFn });
     await c.connect();
     expect((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toContain("linear.app/graphql");
-    const body = JSON.parse((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
+    const body = JSON.parse(
+      (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string,
+    );
     expect(body.query).toContain("viewer");
   });
 
@@ -461,7 +502,10 @@ describe("LinearConnector", () => {
   });
 
   it("connect() ok:false on 401", async () => {
-    const c = new LinearConnector({ apiKey: "bad", fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const c = new LinearConnector({
+      apiKey: "bad",
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     const result = await c.connect();
     expect(result.ok).toBe(false);
   });
@@ -510,7 +554,11 @@ describe("ConnectorRegistry — registration", () => {
   it("register() throws ALREADY_REGISTERED on duplicate id", () => {
     registry.register(new NullConnector("gh"));
     let caught: ConnectorError | undefined;
-    try { registry.register(new NullConnector("gh")); } catch (e) { caught = e as ConnectorError; }
+    try {
+      registry.register(new NullConnector("gh"));
+    } catch (e) {
+      caught = e as ConnectorError;
+    }
     expect(caught?.code).toBe("ALREADY_REGISTERED");
   });
 
@@ -522,7 +570,11 @@ describe("ConnectorRegistry — registration", () => {
 
   it("unregister() throws NOT_FOUND for unknown id", () => {
     let caught: ConnectorError | undefined;
-    try { registry.unregister("nope"); } catch (e) { caught = e as ConnectorError; }
+    try {
+      registry.unregister("nope");
+    } catch (e) {
+      caught = e as ConnectorError;
+    }
     expect(caught?.code).toBe("NOT_FOUND");
   });
 
@@ -605,7 +657,9 @@ describe("ConnectorRegistry — healthCheckAll", () => {
   it("reports unhealthy when healthCheck fails", async () => {
     const registry = new ConnectorRegistry();
     const c = new NullConnector("bad");
-    c["_doHealthCheck"] = async () => { throw new Error("timeout"); };
+    c["_doHealthCheck"] = async () => {
+      throw new Error("timeout");
+    };
     registry.register(c);
     const result = await registry.healthCheckAll();
     expect(result.unhealthy).toBe(1);
@@ -756,14 +810,20 @@ describe("GitHubDocumentConnector", () => {
   });
 
   it("connect() ok:false on 401", async () => {
-    const c = new GitHubDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const c = new GitHubDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     const result = await c.connect();
     expect(result.ok).toBe(false);
     expect(result.error).toContain("invalid or expired");
   });
 
   it("connect() ok:false on 5xx", async () => {
-    const c = new GitHubDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 503 }]) });
+    const c = new GitHubDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 503 }]),
+    });
     const result = await c.connect();
     expect(result.ok).toBe(false);
   });
@@ -778,8 +838,23 @@ describe("GitHubDocumentConnector", () => {
 
   it("sync() yields one doc per issue", async () => {
     const issues = [
-      { number: 1, title: "Bug A", body: "Details", html_url: "https://github.com/o/r/issues/1", updated_at: "2024-01-01T00:00:00Z", state: "open" },
-      { number: 2, title: "PR B", body: "PR body", html_url: "https://github.com/o/r/pull/2", updated_at: "2024-01-02T00:00:00Z", state: "open", pull_request: {} },
+      {
+        number: 1,
+        title: "Bug A",
+        body: "Details",
+        html_url: "https://github.com/o/r/issues/1",
+        updated_at: "2024-01-01T00:00:00Z",
+        state: "open",
+      },
+      {
+        number: 2,
+        title: "PR B",
+        body: "PR body",
+        html_url: "https://github.com/o/r/pull/2",
+        updated_at: "2024-01-02T00:00:00Z",
+        state: "open",
+        pull_request: {},
+      },
     ];
     const c = new GitHubDocumentConnector({ ...cfg, fetch: okFetch(issues) });
     const docs: SyncedDocument[] = [];
@@ -793,8 +868,22 @@ describe("GitHubDocumentConnector", () => {
 
   it("sync() filters by since timestamp", async () => {
     const issues = [
-      { number: 1, title: "Old", body: "", html_url: "https://github.com/o/r/issues/1", updated_at: "2020-01-01T00:00:00Z", state: "open" },
-      { number: 2, title: "New", body: "", html_url: "https://github.com/o/r/issues/2", updated_at: "2024-06-01T00:00:00Z", state: "open" },
+      {
+        number: 1,
+        title: "Old",
+        body: "",
+        html_url: "https://github.com/o/r/issues/1",
+        updated_at: "2020-01-01T00:00:00Z",
+        state: "open",
+      },
+      {
+        number: 2,
+        title: "New",
+        body: "",
+        html_url: "https://github.com/o/r/issues/2",
+        updated_at: "2024-06-01T00:00:00Z",
+        state: "open",
+      },
     ];
     const c = new GitHubDocumentConnector({ ...cfg, fetch: okFetch(issues) });
     const since = new Date("2023-01-01").getTime();
@@ -806,8 +895,22 @@ describe("GitHubDocumentConnector", () => {
 
   it("sync() filters by query text", async () => {
     const issues = [
-      { number: 1, title: "crash bug", body: "", html_url: "https://github.com/o/r/issues/1", updated_at: "2024-01-01T00:00:00Z", state: "open" },
-      { number: 2, title: "feature request", body: "", html_url: "https://github.com/o/r/issues/2", updated_at: "2024-01-02T00:00:00Z", state: "open" },
+      {
+        number: 1,
+        title: "crash bug",
+        body: "",
+        html_url: "https://github.com/o/r/issues/1",
+        updated_at: "2024-01-01T00:00:00Z",
+        state: "open",
+      },
+      {
+        number: 2,
+        title: "feature request",
+        body: "",
+        html_url: "https://github.com/o/r/issues/2",
+        updated_at: "2024-01-02T00:00:00Z",
+        state: "open",
+      },
     ];
     const c = new GitHubDocumentConnector({ ...cfg, fetch: okFetch(issues) });
     const docs: SyncedDocument[] = [];
@@ -849,7 +952,10 @@ describe("SlackDocumentConnector", () => {
   });
 
   it("connect() ok:false when Slack returns ok:false", async () => {
-    const c = new SlackDocumentConnector({ ...cfg, fetch: okFetch({ ok: false, error: "invalid_auth" }) });
+    const c = new SlackDocumentConnector({
+      ...cfg,
+      fetch: okFetch({ ok: false, error: "invalid_auth" }),
+    });
     const result = await c.connect();
     expect(result.ok).toBe(false);
     expect(result.error).toBe("invalid_auth");
@@ -875,7 +981,9 @@ describe("SlackDocumentConnector", () => {
     const fetchFn = okFetch({ ok: true, messages: [] });
     const c = new SlackDocumentConnector({ ...cfg, fetch: fetchFn });
     const since = 1700000000000; // ms
-    for await (const _ of c.sync({ since })) { /* drain */ }
+    for await (const _ of c.sync({ since })) {
+      /* drain */
+    }
     const calledUrl = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![0] as string;
     expect(calledUrl).toContain("oldest=1700000000");
   });
@@ -888,7 +996,10 @@ describe("SlackDocumentConnector", () => {
   });
 
   it("sync() yields nothing on non-ok HTTP response", async () => {
-    const c = new SlackDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 429 }]) });
+    const c = new SlackDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 429 }]),
+    });
     const docs: SyncedDocument[] = [];
     for await (const d of c.sync()) docs.push(d);
     expect(docs).toHaveLength(0);
@@ -925,7 +1036,9 @@ describe("WebDocumentConnector", () => {
   });
 
   it("connect() ok:false when fetchFn throws", async () => {
-    const throwFetch: FetchFn = vi.fn(async () => { throw new Error("ECONNREFUSED"); });
+    const throwFetch: FetchFn = vi.fn(async () => {
+      throw new Error("ECONNREFUSED");
+    });
     const c = new WebDocumentConnector({ urls: ["https://unreachable.test"], fetch: throwFetch });
     const result = await c.connect();
     expect(result.ok).toBe(false);
@@ -950,7 +1063,10 @@ describe("WebDocumentConnector", () => {
   });
 
   it("sync() respects limit option", async () => {
-    const fetchFn = makeTextFetch([{ ok: true, textBody: "A" }, { ok: true, textBody: "B" }]);
+    const fetchFn = makeTextFetch([
+      { ok: true, textBody: "A" },
+      { ok: true, textBody: "B" },
+    ]);
     const c = new WebDocumentConnector({
       urls: ["https://a.com", "https://b.com", "https://c.com"],
       fetch: fetchFn,
@@ -1063,12 +1179,17 @@ describe("LinearDocumentConnector", () => {
     const result = await c.connect();
     expect(result.ok).toBe(true);
     expect(result.metadata?.viewer).toBe("Yash");
-    const body = JSON.parse((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
+    const body = JSON.parse(
+      (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string,
+    );
     expect(body.query).toContain("viewer");
   });
 
   it("connect() ok:false on 401", async () => {
-    const c = new LinearDocumentConnector({ apiKey: "bad", fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const c = new LinearDocumentConnector({
+      apiKey: "bad",
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     const result = await c.connect();
     expect(result.ok).toBe(false);
     expect(result.error).toContain("invalid");
@@ -1079,8 +1200,22 @@ describe("LinearDocumentConnector", () => {
       data: {
         issues: {
           nodes: [
-            { id: "i1", title: "Fix crash", description: "Crash on load", url: "https://linear.app/t/i1", updatedAt: "2024-01-01T00:00:00Z", state: { name: "In Progress" } },
-            { id: "i2", title: "Add feature", description: "", url: "https://linear.app/t/i2", updatedAt: "2024-01-02T00:00:00Z", state: { name: "Todo" } },
+            {
+              id: "i1",
+              title: "Fix crash",
+              description: "Crash on load",
+              url: "https://linear.app/t/i1",
+              updatedAt: "2024-01-01T00:00:00Z",
+              state: { name: "In Progress" },
+            },
+            {
+              id: "i2",
+              title: "Add feature",
+              description: "",
+              url: "https://linear.app/t/i2",
+              updatedAt: "2024-01-02T00:00:00Z",
+              state: { name: "Todo" },
+            },
           ],
         },
       },
@@ -1097,8 +1232,12 @@ describe("LinearDocumentConnector", () => {
   it("sync() includes teamId in GraphQL filter when set", async () => {
     const fetchFn = okFetch({ data: { issues: { nodes: [] } } });
     const c = new LinearDocumentConnector({ apiKey: "k", teamId: "TEAM123", fetch: fetchFn });
-    for await (const _ of c.sync()) { /* drain */ }
-    const body = JSON.parse((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
+    for await (const _ of c.sync()) {
+      /* drain */
+    }
+    const body = JSON.parse(
+      (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string,
+    );
     expect(body.query).toContain("TEAM123");
   });
 
@@ -1107,8 +1246,22 @@ describe("LinearDocumentConnector", () => {
       data: {
         issues: {
           nodes: [
-            { id: "old", title: "Old issue", description: "", url: "https://linear.app/t/old", updatedAt: "2020-01-01T00:00:00Z", state: { name: "Done" } },
-            { id: "new", title: "New issue", description: "", url: "https://linear.app/t/new", updatedAt: "2024-06-01T00:00:00Z", state: { name: "Open" } },
+            {
+              id: "old",
+              title: "Old issue",
+              description: "",
+              url: "https://linear.app/t/old",
+              updatedAt: "2020-01-01T00:00:00Z",
+              state: { name: "Done" },
+            },
+            {
+              id: "new",
+              title: "New issue",
+              description: "",
+              url: "https://linear.app/t/new",
+              updatedAt: "2024-06-01T00:00:00Z",
+              state: { name: "Open" },
+            },
           ],
         },
       },
@@ -1122,7 +1275,10 @@ describe("LinearDocumentConnector", () => {
   });
 
   it("sync() returns nothing on non-ok HTTP response", async () => {
-    const c = new LinearDocumentConnector({ apiKey: "k", fetch: makeFetch([{ ok: false, status: 500 }]) });
+    const c = new LinearDocumentConnector({
+      apiKey: "k",
+      fetch: makeFetch([{ ok: false, status: 500 }]),
+    });
     const docs: SyncedDocument[] = [];
     for await (const d of c.sync()) docs.push(d);
     expect(docs).toHaveLength(0);
@@ -1135,7 +1291,9 @@ describe("LinearDocumentConnector", () => {
 
 describe("TavilyDocumentConnector", () => {
   it("has id 'tavily-doc'", () => {
-    expect(new TavilyDocumentConnector({ apiKey: "k", queries: [], fetch: okFetch() }).id).toBe("tavily-doc");
+    expect(new TavilyDocumentConnector({ apiKey: "k", queries: [], fetch: okFetch() }).id).toBe(
+      "tavily-doc",
+    );
   });
 
   it("connect() ok:false on 401", async () => {
@@ -1172,10 +1330,25 @@ describe("TavilyDocumentConnector", () => {
 
   it("sync() yields results from each query", async () => {
     const fetchFn = makeFetch([
-      { ok: true, body: { results: [{ title: "R1", url: "https://r1.com", content: "About nexus" }, { title: "R2", url: "https://r2.com", content: "More nexus" }] } },
-      { ok: true, body: { results: [{ title: "R3", url: "https://r3.com", content: "About agents" }] } },
+      {
+        ok: true,
+        body: {
+          results: [
+            { title: "R1", url: "https://r1.com", content: "About nexus" },
+            { title: "R2", url: "https://r2.com", content: "More nexus" },
+          ],
+        },
+      },
+      {
+        ok: true,
+        body: { results: [{ title: "R3", url: "https://r3.com", content: "About agents" }] },
+      },
     ]);
-    const c = new TavilyDocumentConnector({ apiKey: "k", queries: ["nexus", "agents"], fetch: fetchFn });
+    const c = new TavilyDocumentConnector({
+      apiKey: "k",
+      queries: ["nexus", "agents"],
+      fetch: fetchFn,
+    });
     const docs: SyncedDocument[] = [];
     for await (const d of c.sync()) docs.push(d);
     expect(docs).toHaveLength(3);
@@ -1185,7 +1358,15 @@ describe("TavilyDocumentConnector", () => {
 
   it("sync() respects hard limit across queries", async () => {
     const fetchFn = makeFetch([
-      { ok: true, body: { results: [{ title: "A", url: "https://a.com", content: "a" }, { title: "B", url: "https://b.com", content: "b" }] } },
+      {
+        ok: true,
+        body: {
+          results: [
+            { title: "A", url: "https://a.com", content: "a" },
+            { title: "B", url: "https://b.com", content: "b" },
+          ],
+        },
+      },
       { ok: true, body: { results: [{ title: "C", url: "https://c.com", content: "c" }] } },
     ]);
     const c = new TavilyDocumentConnector({ apiKey: "k", queries: ["q1", "q2"], fetch: fetchFn });
@@ -1199,7 +1380,11 @@ describe("TavilyDocumentConnector", () => {
       { ok: false, status: 500 },
       { ok: true, body: { results: [{ title: "R1", url: "https://r1.com", content: "content" }] } },
     ]);
-    const c = new TavilyDocumentConnector({ apiKey: "k", queries: ["bad", "good"], fetch: fetchFn });
+    const c = new TavilyDocumentConnector({
+      apiKey: "k",
+      queries: ["bad", "good"],
+      fetch: fetchFn,
+    });
     const docs: SyncedDocument[] = [];
     for await (const d of c.sync()) docs.push(d);
     expect(docs).toHaveLength(1);
@@ -1230,7 +1415,12 @@ describe("DocumentConnectorRegistry", () => {
 
   it("syncAll() collects docs from all document connectors", async () => {
     const reg = new DocumentConnectorRegistry();
-    reg.register(new NullDocumentConnector("a", [makeDoc({ id: "a::1", title: "A1" }), makeDoc({ id: "a::2", title: "A2" })]));
+    reg.register(
+      new NullDocumentConnector("a", [
+        makeDoc({ id: "a::1", title: "A1" }),
+        makeDoc({ id: "a::2", title: "A2" }),
+      ]),
+    );
     reg.register(new NullDocumentConnector("b", [makeDoc({ id: "b::1", title: "B1" })]));
     const docs = await reg.syncAll();
     expect(docs).toHaveLength(3);
@@ -1260,36 +1450,58 @@ function makeNeonFetch(rows: Record<string, unknown>[], ok = true): FetchFn {
 }
 
 describe("NeonDocumentConnector — connect", () => {
-  const cfg = { endpointUrl: "https://neon.example.com/sql", user: "u", password: "p", query: "SELECT * FROM docs" };
+  const cfg = {
+    endpointUrl: "https://neon.example.com/sql",
+    user: "u",
+    password: "p",
+    query: "SELECT * FROM docs",
+  };
 
   it("returns ok:true on 200", async () => {
-    const conn = new NeonDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: true, body: { rows: [] } }]) });
+    const conn = new NeonDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: true, body: { rows: [] } }]),
+    });
     const r = await conn.connect();
     expect(r.ok).toBe(true);
   });
 
   it("returns ok:false on 401", async () => {
-    const conn = new NeonDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const conn = new NeonDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     const r = await conn.connect();
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/auth/i);
   });
 
   it("returns ok:false on 500", async () => {
-    const conn = new NeonDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 500 }]) });
+    const conn = new NeonDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 500 }]),
+    });
     expect((await conn.connect()).ok).toBe(false);
   });
 });
 
 describe("NeonDocumentConnector — sync", () => {
-  const cfg = { endpointUrl: "https://neon.example.com/sql", user: "u", password: "p", query: "SELECT * FROM docs" };
+  const cfg = {
+    endpointUrl: "https://neon.example.com/sql",
+    user: "u",
+    password: "p",
+    query: "SELECT * FROM docs",
+  };
 
   it("yields one SyncedDocument per row", async () => {
     const rows = [
       { id: "1", title: "Doc 1", content: "Hello", url: "https://ex.com/1" },
       { id: "2", title: "Doc 2", content: "World", url: "https://ex.com/2" },
     ];
-    const conn = new NeonDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: true, body: { rows } }]) });
+    const conn = new NeonDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: true, body: { rows } }]),
+    });
     const docs: SyncedDocument[] = [];
     for await (const d of conn.sync()) docs.push(d);
     expect(docs).toHaveLength(2);
@@ -1299,7 +1511,10 @@ describe("NeonDocumentConnector — sync", () => {
 
   it("uses row id as title when title column is absent", async () => {
     const rows = [{ id: "row-1", url: "https://ex.com/r" }];
-    const conn = new NeonDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: true, body: { rows } }]) });
+    const conn = new NeonDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: true, body: { rows } }]),
+    });
     const docs: SyncedDocument[] = [];
     for await (const d of conn.sync()) docs.push(d);
     expect(docs[0]?.title).toBe("row-1");
@@ -1307,14 +1522,20 @@ describe("NeonDocumentConnector — sync", () => {
 
   it("respects limit option", async () => {
     const rows = Array.from({ length: 10 }, (_, i) => ({ id: `r${i}`, url: `u${i}` }));
-    const conn = new NeonDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: true, body: { rows } }]) });
+    const conn = new NeonDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: true, body: { rows } }]),
+    });
     const docs: SyncedDocument[] = [];
     for await (const d of conn.sync({ limit: 3 })) docs.push(d);
     expect(docs).toHaveLength(3);
   });
 
   it("yields nothing on failed API call", async () => {
-    const conn = new NeonDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 500 }]) });
+    const conn = new NeonDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 500 }]),
+    });
     const docs: SyncedDocument[] = [];
     for await (const d of conn.sync()) docs.push(d);
     expect(docs).toHaveLength(0);
@@ -1361,17 +1582,26 @@ function makeRssFetch(xml: string, ok = true): FetchFn {
 
 describe("RssDocumentConnector — connect", () => {
   it("returns ok:true for valid RSS feed", async () => {
-    const conn = new RssDocumentConnector({ feedUrl: "https://feed.example.com/rss", fetch: makeRssFetch(SAMPLE_RSS) });
+    const conn = new RssDocumentConnector({
+      feedUrl: "https://feed.example.com/rss",
+      fetch: makeRssFetch(SAMPLE_RSS),
+    });
     expect((await conn.connect()).ok).toBe(true);
   });
 
   it("returns ok:false when response is not ok", async () => {
-    const conn = new RssDocumentConnector({ feedUrl: "https://feed.example.com/rss", fetch: makeRssFetch("", false) });
+    const conn = new RssDocumentConnector({
+      feedUrl: "https://feed.example.com/rss",
+      fetch: makeRssFetch("", false),
+    });
     expect((await conn.connect()).ok).toBe(false);
   });
 
   it("returns ok:false when content is not XML feed", async () => {
-    const conn = new RssDocumentConnector({ feedUrl: "https://x.com/", fetch: makeRssFetch("<html><body>not a feed</body></html>") });
+    const conn = new RssDocumentConnector({
+      feedUrl: "https://x.com/",
+      fetch: makeRssFetch("<html><body>not a feed</body></html>"),
+    });
     const r = await conn.connect();
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/feed/i);
@@ -1380,7 +1610,10 @@ describe("RssDocumentConnector — connect", () => {
 
 describe("RssDocumentConnector — sync", () => {
   it("yields one document per RSS item", async () => {
-    const conn = new RssDocumentConnector({ feedUrl: "https://feed.example.com/rss", fetch: makeRssFetch(SAMPLE_RSS) });
+    const conn = new RssDocumentConnector({
+      feedUrl: "https://feed.example.com/rss",
+      fetch: makeRssFetch(SAMPLE_RSS),
+    });
     const docs: SyncedDocument[] = [];
     for await (const d of conn.sync()) docs.push(d);
     expect(docs).toHaveLength(2);
@@ -1390,14 +1623,20 @@ describe("RssDocumentConnector — sync", () => {
   });
 
   it("respects limit", async () => {
-    const conn = new RssDocumentConnector({ feedUrl: "https://feed.example.com/rss", fetch: makeRssFetch(SAMPLE_RSS) });
+    const conn = new RssDocumentConnector({
+      feedUrl: "https://feed.example.com/rss",
+      fetch: makeRssFetch(SAMPLE_RSS),
+    });
     const docs: SyncedDocument[] = [];
     for await (const d of conn.sync({ limit: 1 })) docs.push(d);
     expect(docs).toHaveLength(1);
   });
 
   it("yields nothing on failed fetch", async () => {
-    const conn = new RssDocumentConnector({ feedUrl: "https://feed.example.com/rss", fetch: makeRssFetch("", false) });
+    const conn = new RssDocumentConnector({
+      feedUrl: "https://feed.example.com/rss",
+      fetch: makeRssFetch("", false),
+    });
     const docs: SyncedDocument[] = [];
     for await (const d of conn.sync()) docs.push(d);
     expect(docs).toHaveLength(0);
@@ -1405,7 +1644,10 @@ describe("RssDocumentConnector — sync", () => {
 
   it("skips items without a link", async () => {
     const xml = `<rss><channel><item><title>No Link</title><description>x</description></item></channel></rss>`;
-    const conn = new RssDocumentConnector({ feedUrl: "https://feed.example.com/rss", fetch: makeRssFetch(xml) });
+    const conn = new RssDocumentConnector({
+      feedUrl: "https://feed.example.com/rss",
+      fetch: makeRssFetch(xml),
+    });
     const docs: SyncedDocument[] = [];
     for await (const d of conn.sync()) docs.push(d);
     expect(docs).toHaveLength(0);
@@ -1417,7 +1659,9 @@ describe("RssDocumentConnector — sync", () => {
   });
 
   it("is a DocumentConnector", () => {
-    expect(isDocumentConnector(new RssDocumentConnector({ feedUrl: "https://x.com/rss" }))).toBe(true);
+    expect(isDocumentConnector(new RssDocumentConnector({ feedUrl: "https://x.com/rss" }))).toBe(
+      true,
+    );
   });
 });
 
@@ -1438,12 +1682,18 @@ describe("NotionDocumentConnector — connect", () => {
   const cfg = { token: "secret_abc", databaseId: "db-123" };
 
   it("returns ok:true on success", async () => {
-    const conn = new NotionDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: true, body: { type: "bot" } }]) });
+    const conn = new NotionDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: true, body: { type: "bot" } }]),
+    });
     expect((await conn.connect()).ok).toBe(true);
   });
 
   it("returns ok:false on 401", async () => {
-    const conn = new NotionDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const conn = new NotionDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     const r = await conn.connect();
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/token/i);
@@ -1454,7 +1704,10 @@ describe("NotionDocumentConnector — sync", () => {
   const cfg = { token: "secret_abc", databaseId: "db-123" };
 
   it("yields one document per page", async () => {
-    const body = { results: [makeNotionPage("p1", "Page One"), makeNotionPage("p2", "Page Two")], has_more: false };
+    const body = {
+      results: [makeNotionPage("p1", "Page One"), makeNotionPage("p2", "Page Two")],
+      has_more: false,
+    };
     const conn = new NotionDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: true, body }]) });
     const docs: SyncedDocument[] = [];
     for await (const d of conn.sync()) docs.push(d);
@@ -1464,7 +1717,10 @@ describe("NotionDocumentConnector — sync", () => {
   });
 
   it("respects limit", async () => {
-    const body = { results: [makeNotionPage("p1", "A"), makeNotionPage("p2", "B"), makeNotionPage("p3", "C")], has_more: false };
+    const body = {
+      results: [makeNotionPage("p1", "A"), makeNotionPage("p2", "B"), makeNotionPage("p3", "C")],
+      has_more: false,
+    };
     const conn = new NotionDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: true, body }]) });
     const docs: SyncedDocument[] = [];
     for await (const d of conn.sync({ limit: 2 })) docs.push(d);
@@ -1472,7 +1728,10 @@ describe("NotionDocumentConnector — sync", () => {
   });
 
   it("yields nothing on failed API call", async () => {
-    const conn = new NotionDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 500 }]) });
+    const conn = new NotionDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 500 }]),
+    });
     const docs: SyncedDocument[] = [];
     for await (const d of conn.sync()) docs.push(d);
     expect(docs).toHaveLength(0);
@@ -1496,15 +1755,26 @@ describe("NotionDocumentConnector — sync", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("ConfluenceDocumentConnector — connect", () => {
-  const cfg = { baseUrl: "https://team.atlassian.net", email: "a@b.com", apiToken: "tok", spaceKey: "ENG" };
+  const cfg = {
+    baseUrl: "https://team.atlassian.net",
+    email: "a@b.com",
+    apiToken: "tok",
+    spaceKey: "ENG",
+  };
 
   it("returns ok:true on success", async () => {
-    const conn = new ConfluenceDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: true, body: { displayName: "Alice" } }]) });
+    const conn = new ConfluenceDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: true, body: { displayName: "Alice" } }]),
+    });
     expect((await conn.connect()).ok).toBe(true);
   });
 
   it("returns ok:false on 401", async () => {
-    const conn = new ConfluenceDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const conn = new ConfluenceDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     const r = await conn.connect();
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/credential/i);
@@ -1512,16 +1782,34 @@ describe("ConfluenceDocumentConnector — connect", () => {
 });
 
 describe("ConfluenceDocumentConnector — sync", () => {
-  const cfg = { baseUrl: "https://team.atlassian.net", email: "a@b.com", apiToken: "tok", spaceKey: "ENG" };
+  const cfg = {
+    baseUrl: "https://team.atlassian.net",
+    email: "a@b.com",
+    apiToken: "tok",
+    spaceKey: "ENG",
+  };
 
   it("yields one document per page", async () => {
     const body = {
       results: [
-        { id: "111", title: "Setup Guide", body: { storage: { value: "<p>Hello</p>" } }, _links: { webui: "/pages/111" } },
-        { id: "222", title: "API Docs", body: { storage: { value: "<p>World</p>" } }, _links: { webui: "/pages/222" } },
+        {
+          id: "111",
+          title: "Setup Guide",
+          body: { storage: { value: "<p>Hello</p>" } },
+          _links: { webui: "/pages/111" },
+        },
+        {
+          id: "222",
+          title: "API Docs",
+          body: { storage: { value: "<p>World</p>" } },
+          _links: { webui: "/pages/222" },
+        },
       ],
     };
-    const conn = new ConfluenceDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: true, body }]) });
+    const conn = new ConfluenceDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: true, body }]),
+    });
     const docs: SyncedDocument[] = [];
     for await (const d of conn.sync()) docs.push(d);
     expect(docs).toHaveLength(2);
@@ -1530,15 +1818,27 @@ describe("ConfluenceDocumentConnector — sync", () => {
   });
 
   it("respects limit", async () => {
-    const body = { results: Array.from({ length: 5 }, (_, i) => ({ id: String(i), title: `Page ${i}`, body: { storage: { value: "" } } })) };
-    const conn = new ConfluenceDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: true, body }]) });
+    const body = {
+      results: Array.from({ length: 5 }, (_, i) => ({
+        id: String(i),
+        title: `Page ${i}`,
+        body: { storage: { value: "" } },
+      })),
+    };
+    const conn = new ConfluenceDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: true, body }]),
+    });
     const docs: SyncedDocument[] = [];
     for await (const d of conn.sync({ limit: 2 })) docs.push(d);
     expect(docs).toHaveLength(2);
   });
 
   it("yields nothing on failed fetch", async () => {
-    const conn = new ConfluenceDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 500 }]) });
+    const conn = new ConfluenceDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 500 }]),
+    });
     const docs: SyncedDocument[] = [];
     for await (const d of conn.sync()) docs.push(d);
     expect(docs).toHaveLength(0);
@@ -1557,12 +1857,18 @@ describe("JiraDocumentConnector — connect", () => {
   const cfg = { baseUrl: "https://team.atlassian.net", email: "a@b.com", apiToken: "tok" };
 
   it("returns ok:true on success", async () => {
-    const conn = new JiraDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: true, body: { displayName: "Alice" } }]) });
+    const conn = new JiraDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: true, body: { displayName: "Alice" } }]),
+    });
     expect((await conn.connect()).ok).toBe(true);
   });
 
   it("returns ok:false on 401", async () => {
-    const conn = new JiraDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const conn = new JiraDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     const r = await conn.connect();
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/credential/i);
@@ -1575,8 +1881,14 @@ describe("JiraDocumentConnector — sync", () => {
   it("yields one document per issue", async () => {
     const body = {
       issues: [
-        { key: "ENG-1", fields: { summary: "Fix bug", description: null, status: { name: "Open" } } },
-        { key: "ENG-2", fields: { summary: "Add feature", description: null, status: { name: "In Progress" } } },
+        {
+          key: "ENG-1",
+          fields: { summary: "Fix bug", description: null, status: { name: "Open" } },
+        },
+        {
+          key: "ENG-2",
+          fields: { summary: "Add feature", description: null, status: { name: "In Progress" } },
+        },
       ],
       total: 2,
     };
@@ -1589,7 +1901,13 @@ describe("JiraDocumentConnector — sync", () => {
   });
 
   it("respects limit", async () => {
-    const body = { issues: Array.from({ length: 10 }, (_, i) => ({ key: `ENG-${i}`, fields: { summary: `Issue ${i}`, status: { name: "Open" } } })), total: 10 };
+    const body = {
+      issues: Array.from({ length: 10 }, (_, i) => ({
+        key: `ENG-${i}`,
+        fields: { summary: `Issue ${i}`, status: { name: "Open" } },
+      })),
+      total: 10,
+    };
     const conn = new JiraDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: true, body }]) });
     const docs: SyncedDocument[] = [];
     for await (const d of conn.sync({ limit: 3 })) docs.push(d);
@@ -1597,7 +1915,10 @@ describe("JiraDocumentConnector — sync", () => {
   });
 
   it("yields nothing on failed fetch", async () => {
-    const conn = new JiraDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 403 }]) });
+    const conn = new JiraDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 403 }]),
+    });
     const docs: SyncedDocument[] = [];
     for await (const d of conn.sync()) docs.push(d);
     expect(docs).toHaveLength(0);
@@ -1624,12 +1945,18 @@ describe("GitLabDocumentConnector — connect", () => {
   const cfg = { token: "glpat-abc", projectId: "123" };
 
   it("returns ok:true on success", async () => {
-    const conn = new GitLabDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: true, body: { username: "yash" } }]) });
+    const conn = new GitLabDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: true, body: { username: "yash" } }]),
+    });
     expect((await conn.connect()).ok).toBe(true);
   });
 
   it("returns ok:false on 401", async () => {
-    const conn = new GitLabDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const conn = new GitLabDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     const r = await conn.connect();
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/token/i);
@@ -1640,12 +1967,39 @@ describe("GitLabDocumentConnector — sync", () => {
   const cfg = { token: "glpat-abc", projectId: "123" };
 
   it("yields issues by default (syncType=both syncs issues + MRs)", async () => {
-    const issueBody = [{ iid: 1, title: "Bug fix", description: "desc", web_url: "https://gitlab.com/p/issues/1", state: "opened" }];
-    const mrBody = [{ iid: 1, title: "MR: add feature", description: "", web_url: "https://gitlab.com/p/mr/1", state: "opened" }];
+    const issueBody = [
+      {
+        iid: 1,
+        title: "Bug fix",
+        description: "desc",
+        web_url: "https://gitlab.com/p/issues/1",
+        state: "opened",
+      },
+    ];
+    const mrBody = [
+      {
+        iid: 1,
+        title: "MR: add feature",
+        description: "",
+        web_url: "https://gitlab.com/p/mr/1",
+        state: "opened",
+      },
+    ];
     // 2 endpoint calls: issues (returns 1 item + no next-page), merge_requests (returns 1 item + no next-page)
-    const fetchFn = vi.fn()
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => issueBody, headers: { get: () => null } } as unknown as Response)
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => mrBody, headers: { get: () => null } } as unknown as Response);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => issueBody,
+        headers: { get: () => null },
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mrBody,
+        headers: { get: () => null },
+      } as unknown as Response);
     const conn = new GitLabDocumentConnector({ ...cfg, fetch: fetchFn });
     const docs: SyncedDocument[] = [];
     for await (const d of conn.sync()) docs.push(d);
@@ -1655,8 +2009,23 @@ describe("GitLabDocumentConnector — sync", () => {
   });
 
   it("respects syncType=issues", async () => {
-    const issueBody = [{ iid: 1, title: "Bug", description: "", web_url: "https://gitlab.com/p/issues/1", state: "opened" }];
-    const fetchFn = vi.fn().mockResolvedValueOnce({ ok: true, status: 200, json: async () => issueBody, headers: { get: () => null } } as unknown as Response);
+    const issueBody = [
+      {
+        iid: 1,
+        title: "Bug",
+        description: "",
+        web_url: "https://gitlab.com/p/issues/1",
+        state: "opened",
+      },
+    ];
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => issueBody,
+        headers: { get: () => null },
+      } as unknown as Response);
     const conn = new GitLabDocumentConnector({ ...cfg, syncType: "issues", fetch: fetchFn });
     const docs: SyncedDocument[] = [];
     for await (const d of conn.sync()) docs.push(d);
@@ -1665,8 +2034,21 @@ describe("GitLabDocumentConnector — sync", () => {
   });
 
   it("respects limit across endpoints", async () => {
-    const items = Array.from({ length: 5 }, (_, i) => ({ iid: i, title: `Item ${i}`, description: "", web_url: `https://gl.com/${i}`, state: "opened" }));
-    const fetchFn = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => items, headers: { get: () => null } } as unknown as Response);
+    const items = Array.from({ length: 5 }, (_, i) => ({
+      iid: i,
+      title: `Item ${i}`,
+      description: "",
+      web_url: `https://gl.com/${i}`,
+      state: "opened",
+    }));
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => items,
+        headers: { get: () => null },
+      } as unknown as Response);
     const conn = new GitLabDocumentConnector({ ...cfg, fetch: fetchFn });
     const docs: SyncedDocument[] = [];
     for await (const d of conn.sync({ limit: 3 })) docs.push(d);
@@ -1708,7 +2090,11 @@ describe("HackerNewsDocumentConnector — sync", () => {
     let call = 0;
     return vi.fn(async (url: string | URL | Request) => {
       const urlStr = String(url);
-      if (urlStr.includes("topstories") || urlStr.includes("beststories") || urlStr.includes("newstories")) {
+      if (
+        urlStr.includes("topstories") ||
+        urlStr.includes("beststories") ||
+        urlStr.includes("newstories")
+      ) {
         return { ok: true, status: 200, json: async () => ids } as unknown as Response;
       }
       const item = items[call++] ?? { id: 999, title: "Item" };
@@ -1718,7 +2104,13 @@ describe("HackerNewsDocumentConnector — sync", () => {
 
   it("yields one document per story id (up to default limit)", async () => {
     const ids = [1, 2, 3];
-    const items = ids.map((id) => ({ id, title: `Story ${id}`, url: `https://ex.com/${id}`, by: "user", score: 100 }));
+    const items = ids.map((id) => ({
+      id,
+      title: `Story ${id}`,
+      url: `https://ex.com/${id}`,
+      by: "user",
+      score: 100,
+    }));
     const conn = new HackerNewsDocumentConnector({ fetch: makeHnFetch(ids, items) });
     const docs: SyncedDocument[] = [];
     for await (const d of conn.sync({ limit: 3 })) docs.push(d);
@@ -1737,7 +2129,10 @@ describe("HackerNewsDocumentConnector — sync", () => {
 
   it("skips items without a title", async () => {
     const ids = [1, 2];
-    const items = [{ id: 1, title: null }, { id: 2, title: "Valid story", url: "https://ex.com/2" }];
+    const items = [
+      { id: 1, title: null },
+      { id: 2, title: "Valid story", url: "https://ex.com/2" },
+    ];
     const conn = new HackerNewsDocumentConnector({ fetch: makeHnFetch(ids, items) });
     const docs: SyncedDocument[] = [];
     for await (const d of conn.sync({ limit: 2 })) docs.push(d);

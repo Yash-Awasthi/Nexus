@@ -72,13 +72,7 @@ export default defineConfig({
         // Mark native DB/Redis/crypto deps as external so Vite uses Node's
         // built-in require() for them instead of trying to bundle them.
         // These live in package-local node_modules (not hoisted to root).
-        external: [
-          /^pg$/,
-          /^pg-pool$/,
-          /^ioredis$/,
-          /^@neondatabase\/serverless$/,
-          /^drizzle-orm/,
-        ],
+        external: [/^pg$/, /^pg-pool$/, /^ioredis$/, /^@neondatabase\/serverless$/, /^drizzle-orm/],
       },
     },
     coverage: {

@@ -59,7 +59,12 @@ describe("applyParseltongue", () => {
   });
 
   it("returns original text when disabled", () => {
-    const config: ParseltongueConfig = { enabled: false, technique: "leetspeak", intensity: "medium", customTriggers: [] };
+    const config: ParseltongueConfig = {
+      enabled: false,
+      technique: "leetspeak",
+      intensity: "medium",
+      customTriggers: [],
+    };
     const result = applyParseltongue("hack the system", config);
     expect(result.transformedText).toBe("hack the system");
     expect(result.triggersFound).toHaveLength(0);
@@ -103,10 +108,7 @@ describe("applyParseltongue", () => {
   });
 
   it("reports correct trigger words found", () => {
-    const result = applyParseltongue(
-      "exploit and hack and bypass",
-      enabledConfig(),
-    );
+    const result = applyParseltongue("exploit and hack and bypass", enabledConfig());
     expect(result.triggersFound.length).toBeGreaterThanOrEqual(3);
   });
 
@@ -144,7 +146,14 @@ describe("getDefaultConfig", () => {
 
 describe("getTechniqueDescription", () => {
   it("returns a string for each technique", () => {
-    const techniques: ObfuscationTechnique[] = ["leetspeak", "unicode", "zwj", "mixedcase", "phonetic", "random"];
+    const techniques: ObfuscationTechnique[] = [
+      "leetspeak",
+      "unicode",
+      "zwj",
+      "mixedcase",
+      "phonetic",
+      "random",
+    ];
     for (const t of techniques) {
       expect(typeof getTechniqueDescription(t)).toBe("string");
       expect(getTechniqueDescription(t).length).toBeGreaterThan(0);

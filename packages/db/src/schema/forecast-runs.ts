@@ -18,5 +18,5 @@ export const forecastRuns = pgTable("forecast_runs", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export type ForecastRun    = typeof forecastRuns.$inferSelect;
+export type ForecastRun = typeof forecastRuns.$inferSelect;
 export type NewForecastRun = typeof forecastRuns.$inferInsert;

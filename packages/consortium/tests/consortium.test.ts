@@ -16,7 +16,10 @@ describe("scoreResponse (inlined)", () => {
 
   it("scores longer content higher", () => {
     const s1 = scoreResponse("Yes.", "question");
-    const s2 = scoreResponse("This is a comprehensive and detailed answer covering all aspects of the question with specific examples and code snippets where appropriate.", "question");
+    const s2 = scoreResponse(
+      "This is a comprehensive and detailed answer covering all aspects of the question with specific examples and code snippets where appropriate.",
+      "question",
+    );
     expect(s2).toBeGreaterThan(s1);
   });
 });
@@ -90,7 +93,9 @@ describe("collectAllResponses", () => {
       {},
       {
         hardTimeout: 5000,
-        onModelResult: (_r, settled, total) => { notifications.push(settled); },
+        onModelResult: (_r, settled, total) => {
+          notifications.push(settled);
+        },
       },
       mockFetch as unknown as typeof fetch,
     );
@@ -127,7 +132,15 @@ describe("synthesize", () => {
 
     const result = await synthesize(
       "What is machine learning?",
-      [{ model: "m1", content: "It is pattern recognition", score: 75, durationMs: 200, success: true }],
+      [
+        {
+          model: "m1",
+          content: "It is pattern recognition",
+          score: 75,
+          durationMs: 200,
+          success: true,
+        },
+      ],
       "key",
       ORCHESTRATOR_MODELS[0],
       4096,
@@ -147,7 +160,14 @@ describe("synthesize", () => {
     });
 
     await expect(
-      synthesize("test", [], "key", ORCHESTRATOR_MODELS[0], 1024, mockFetch as unknown as typeof fetch),
+      synthesize(
+        "test",
+        [],
+        "key",
+        ORCHESTRATOR_MODELS[0],
+        1024,
+        mockFetch as unknown as typeof fetch,
+      ),
     ).rejects.toThrow();
   });
 });

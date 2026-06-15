@@ -10,6 +10,8 @@
  *   • NexusError         — typed error class
  */
 
+import { randomUUID } from "node:crypto";
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface NexusClientConfig {
@@ -225,7 +227,7 @@ export class ChatSession {
     private client: NexusClient,
     public model: string,
   ) {
-    this.sessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    this.sessionId = `session-${randomUUID()}`;
   }
 
   get messages(): NexusMessage[] {

@@ -26,34 +26,71 @@ interface KGSearchResult {
 }
 
 const s = {
-  header: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 },
+  header: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 24,
+  },
   title: { fontSize: 24, fontWeight: 700, margin: 0 } as React.CSSProperties,
   searchRow: { display: "flex", gap: 10, marginBottom: 20 },
   input: {
-    flex: 1, background: "#161b27", border: "1px solid #1e2535", borderRadius: 8,
-    color: "#e2e8f0", fontSize: 14, padding: "9px 14px", outline: "none",
+    flex: 1,
+    background: "#161b27",
+    border: "1px solid #1e2535",
+    borderRadius: 8,
+    color: "#e2e8f0",
+    fontSize: 14,
+    padding: "9px 14px",
+    outline: "none",
   } as React.CSSProperties,
   btn: (color = "#7c3aed"): React.CSSProperties => ({
-    background: color, border: "none", borderRadius: 8, color: "#fff",
-    fontSize: 13, fontWeight: 600, padding: "9px 18px", cursor: "pointer",
+    background: color,
+    border: "none",
+    borderRadius: 8,
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: 600,
+    padding: "9px 18px",
+    cursor: "pointer",
   }),
   statsRow: { display: "flex", gap: 12, marginBottom: 20 },
   stat: {
-    background: "#161b27", border: "1px solid #1e2535", borderRadius: 8,
-    padding: "10px 16px", fontSize: 13,
+    background: "#161b27",
+    border: "1px solid #1e2535",
+    borderRadius: 8,
+    padding: "10px 16px",
+    fontSize: 13,
   } as React.CSSProperties,
   statVal: { fontSize: 20, fontWeight: 700, color: "#7c3aed" },
   panels: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 },
-  panel: { background: "#161b27", border: "1px solid #1e2535", borderRadius: 10, padding: "16px 20px" },
-  panelTitle: { fontSize: 12, color: "#64748b", textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 12 },
+  panel: {
+    background: "#161b27",
+    border: "1px solid #1e2535",
+    borderRadius: 10,
+    padding: "16px 20px",
+  },
+  panelTitle: {
+    fontSize: 12,
+    color: "#64748b",
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.1em",
+    marginBottom: 12,
+  },
   node: {
-    display: "flex", alignItems: "center", gap: 10,
-    padding: "8px 0", borderBottom: "1px solid #1e2535",
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "8px 0",
+    borderBottom: "1px solid #1e2535",
   } as React.CSSProperties,
   nodeLabel: { fontSize: 14, color: "#e2e8f0", fontWeight: 500 },
   nodeType: {
-    fontSize: 11, color: "#a5b4fc", background: "#1e1b4b",
-    padding: "2px 8px", borderRadius: 12,
+    fontSize: 11,
+    color: "#a5b4fc",
+    background: "#1e1b4b",
+    padding: "2px 8px",
+    borderRadius: 12,
   } as React.CSSProperties,
   edge: { padding: "8px 0", borderBottom: "1px solid #1e2535", fontSize: 13 },
   edgeRelation: { color: "#7c3aed", fontWeight: 500 },
@@ -68,7 +105,9 @@ export default function KGExplorer() {
 
   const load = (q?: string) => {
     setLoading(true);
-    const path = q ? `/knowledge-graph/search?q=${encodeURIComponent(q)}&k=20` : "/knowledge-graph/nodes?limit=20";
+    const path = q
+      ? `/knowledge-graph/search?q=${encodeURIComponent(q)}&k=20`
+      : "/knowledge-graph/nodes?limit=20";
     api
       .get<KGSearchResult>(path)
       .then(setResult)
@@ -113,15 +152,36 @@ export default function KGExplorer() {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && load(query)}
         />
-        <button style={s.btn()} onClick={() => load(query)}>Search</button>
-        {query && <button style={s.btn("#334155")} onClick={() => { setQuery(""); load(); }}>Clear</button>}
+        <button style={s.btn()} onClick={() => load(query)}>
+          Search
+        </button>
+        {query && (
+          <button
+            style={s.btn("#334155")}
+            onClick={() => {
+              setQuery("");
+              load();
+            }}
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       {result && (
         <div style={s.statsRow}>
-          <div style={s.stat}><div style={s.statVal}>{result.totalNodes}</div><div style={{ color: "#64748b", fontSize: 11 }}>NODES</div></div>
-          <div style={s.stat}><div style={s.statVal}>{result.totalEdges}</div><div style={{ color: "#64748b", fontSize: 11 }}>EDGES</div></div>
-          <div style={s.stat}><div style={s.statVal}>{result.nodes.length}</div><div style={{ color: "#64748b", fontSize: 11 }}>SHOWN</div></div>
+          <div style={s.stat}>
+            <div style={s.statVal}>{result.totalNodes}</div>
+            <div style={{ color: "#64748b", fontSize: 11 }}>NODES</div>
+          </div>
+          <div style={s.stat}>
+            <div style={s.statVal}>{result.totalEdges}</div>
+            <div style={{ color: "#64748b", fontSize: 11 }}>EDGES</div>
+          </div>
+          <div style={s.stat}>
+            <div style={s.statVal}>{result.nodes.length}</div>
+            <div style={{ color: "#64748b", fontSize: 11 }}>SHOWN</div>
+          </div>
         </div>
       )}
 
@@ -132,7 +192,11 @@ export default function KGExplorer() {
           <div style={s.panel}>
             <div style={s.panelTitle}>Nodes</div>
             {result.nodes.map((n) => (
-              <div key={n.id} style={{ ...s.node, cursor: "pointer" }} onClick={() => setSelected(selected?.id === n.id ? null : n)}>
+              <div
+                key={n.id}
+                style={{ ...s.node, cursor: "pointer" }}
+                onClick={() => setSelected(selected?.id === n.id ? null : n)}
+              >
                 <div style={{ flex: 1 }}>
                   <span style={s.nodeLabel}>{n.label}</span>
                 </div>
@@ -145,7 +209,9 @@ export default function KGExplorer() {
             {selected ? (
               <>
                 <div style={s.panelTitle}>Node Detail — {selected.label}</div>
-                <div style={{ fontSize: 13, color: "#64748b", marginBottom: 8 }}>Type: <span style={{ color: "#a5b4fc" }}>{selected.type}</span></div>
+                <div style={{ fontSize: 13, color: "#64748b", marginBottom: 8 }}>
+                  Type: <span style={{ color: "#a5b4fc" }}>{selected.type}</span>
+                </div>
                 {selected.properties && (
                   <div style={{ fontSize: 13 }}>
                     {Object.entries(selected.properties).map(([k, v]) => (
@@ -157,13 +223,18 @@ export default function KGExplorer() {
                   </div>
                 )}
                 <div style={{ ...s.panelTitle, marginTop: 16 }}>Connected Edges</div>
-                {result.edges.filter((e) => e.source === selected.id || e.target === selected.id).map((e) => (
-                  <div key={e.id} style={s.edge}>
-                    <span style={s.edgeParts}>{e.source === selected.id ? "→" : "←"} </span>
-                    <span style={s.edgeRelation}>{e.relation}</span>
-                    <span style={s.edgeParts}> {e.source === selected.id ? e.target : e.source}</span>
-                  </div>
-                ))}
+                {result.edges
+                  .filter((e) => e.source === selected.id || e.target === selected.id)
+                  .map((e) => (
+                    <div key={e.id} style={s.edge}>
+                      <span style={s.edgeParts}>{e.source === selected.id ? "→" : "←"} </span>
+                      <span style={s.edgeRelation}>{e.relation}</span>
+                      <span style={s.edgeParts}>
+                        {" "}
+                        {e.source === selected.id ? e.target : e.source}
+                      </span>
+                    </div>
+                  ))}
               </>
             ) : (
               <>

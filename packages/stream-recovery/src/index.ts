@@ -110,7 +110,7 @@ export class ToolJsonRepair {
         escape = true;
         continue;
       }
-      if (ch === '"' && !escape) {
+      if (ch === '"') {
         inString = !inString;
         continue;
       }

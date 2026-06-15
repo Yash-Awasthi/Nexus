@@ -199,7 +199,7 @@ describe("MockHttpTransport", () => {
   it("returns registered handler response", async () => {
     const t = new MockHttpTransport();
     t.onPost("/chat", () => ({ id: "r1" }));
-    const r = await t.post("https://api.nexus.dev/v1/chat", {}, {}) as { id: string };
+    const r = (await t.post("https://api.nexus.dev/v1/chat", {}, {})) as { id: string };
     expect(r.id).toBe("r1");
   });
 });
@@ -214,10 +214,16 @@ describe("validateWebhookSignature", () => {
     // Compute expected signature
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
-      "raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
+      "raw",
+      encoder.encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
     );
     const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(body));
-    const hex = Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    const hex = Array.from(new Uint8Array(sig))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
 
     const r = await validateWebhookSignature(body, `sha256=${hex}`, secret);
     expect(r.valid).toBe(true);

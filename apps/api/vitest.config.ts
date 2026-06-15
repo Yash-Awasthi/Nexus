@@ -20,9 +20,9 @@ export default defineConfig({
         // Raise incrementally as route unit tests are added:
         //   Phase 2 target: functions 75%, lines 60%  (add council + billing tests)
         //   Phase 3 target: functions 85%, lines 80%  (full route coverage)
-        lines:      38,
-        functions:  54,   // measured ~54.8%; Phase 2 target 75% (council + billing tests)
-        branches:   38,
+        lines: 38,
+        functions: 54, // measured ~54.8%; Phase 2 target 75% (council + billing tests)
+        branches: 38,
         statements: 38,
       },
     },

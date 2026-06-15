@@ -189,10 +189,9 @@ async def scan(
         except Exception as exc:
             failed += 1
             _stats["failed"] += 1
-            _stats["last_error"] = str(exc)
-            err_msg = f"{json_file.name}: {exc}"
-            errors.append(err_msg)
+            _stats["last_error"] = "push failed"
             log.error("Failed to push %s: %s", json_file.name, exc)
+            errors.append(json_file.name)  # never expose exc detail to caller
 
     return {
         "scanned": pushed + failed + skipped,

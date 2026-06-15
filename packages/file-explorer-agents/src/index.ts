@@ -295,7 +295,7 @@ export function mockCodeSearchHandler(
         : [
             {
               path: "src/main.ts",
-              snippet: `// code for: ${input.query}`,
+              snippet: `// code for: ${input.query.replace(/[^\w\s.-]/g, "")}`,
               lineNumber: 1,
               relevanceScore: 0.9,
             },

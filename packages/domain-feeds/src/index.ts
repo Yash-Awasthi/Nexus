@@ -509,6 +509,7 @@ export interface OPMLOutline {
 export class OPMLParser {
   /** Parse an OPML XML string → flat list of outlines. */
   parse(xml: string): OPMLOutline[] {
+    if (xml.length > 500_000) throw new Error("OPML input too large");
     const outlines: OPMLOutline[] = [];
     const outlineRe = /<outline([^>]*)(?:\/>|>[\s\S]*?<\/outline>)/gi;
     let match: RegExpExecArray | null;
@@ -536,6 +537,7 @@ export class OPMLParser {
   }
 
   private attr(attrs: string, name: string): string | undefined {
+    if (attrs.length > 10_000) return undefined;
     const re = new RegExp(`${name}="([^"]*)"`, "i");
     const m = attrs.match(re);
     return m ? m[1] : undefined;
@@ -650,6 +652,7 @@ export class RssFeedAdapter {
 
   /** Extract text content of a tag, handling CDATA. */
   private tag(xml: string, tagName: string): string | undefined {
+    if (xml.length > 500_000) return undefined;
     // CDATA variant
     const cdataRe = new RegExp(
       `<${tagName}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tagName}>`,

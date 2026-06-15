@@ -37,7 +37,6 @@ import type { FastifyInstance } from "fastify";
 
 import { requireAuth, getTierFromRequest } from "../middleware/auth.js";
 
-
 // ── Council config ─────────────────────────────────────────────────────────────
 
 const COUNCIL_MODEL = process.env.COUNCIL_MODEL ?? "nexus/smart";

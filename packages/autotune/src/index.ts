@@ -348,10 +348,19 @@ export function computeAutoTuneParams(opts: ComputeOptions): AutoTuneResult {
     };
   }
 
-  // User overrides take absolute precedence
+  // User overrides take absolute precedence — restrict to known AutoTuneParams
+  // keys to prevent prototype-pollution via __proto__ / constructor injection.
+  const ALLOWED_PARAMS = new Set<string>([
+    "temperature",
+    "top_p",
+    "top_k",
+    "frequency_penalty",
+    "presence_penalty",
+    "repetition_penalty",
+  ]);
   if (overrides) {
     for (const [k, v] of Object.entries(overrides)) {
-      if (v !== undefined) {
+      if (v !== undefined && ALLOWED_PARAMS.has(k)) {
         (params as Record<string, number>)[k] = v;
       }
     }

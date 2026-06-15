@@ -198,7 +198,7 @@ function parseSingle(raw: string): ElementSelectorResult | undefined {
     if (!parsed.selector || parsed.confidence === 0) return undefined;
     return {
       selector: parsed.selector,
-      strategy: (parsed.strategy!) ?? "css",
+      strategy: parsed.strategy! ?? "css",
       confidence: parsed.confidence ?? 0,
       explanation: parsed.explanation,
     };
@@ -216,7 +216,7 @@ function parseMultiple(raw: string): ElementSelectorResult[] {
       .filter((r) => r.selector && (r.confidence ?? 0) > 0)
       .map((r) => ({
         selector: r.selector!,
-        strategy: (r.strategy!) ?? "css",
+        strategy: r.strategy! ?? "css",
         confidence: r.confidence ?? 0,
         explanation: r.explanation,
       }))

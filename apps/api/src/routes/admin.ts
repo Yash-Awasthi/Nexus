@@ -78,13 +78,11 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       try {
         adminService.addRoute(request.body.alias, request.body.model, request.body.provider);
-        return reply
-          .code(201)
-          .send({
-            alias: request.body.alias,
-            model: request.body.model,
-            provider: request.body.provider,
-          });
+        return reply.code(201).send({
+          alias: request.body.alias,
+          model: request.body.model,
+          provider: request.body.provider,
+        });
       } catch (err: unknown) {
         const e = err as { code?: string; message?: string };
         return reply.code(400).send({ error: e.code, message: e.message });

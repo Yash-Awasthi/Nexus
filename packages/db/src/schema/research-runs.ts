@@ -19,5 +19,5 @@ export const researchRuns = pgTable("research_runs", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export type ResearchRun    = typeof researchRuns.$inferSelect;
+export type ResearchRun = typeof researchRuns.$inferSelect;
 export type NewResearchRun = typeof researchRuns.$inferInsert;

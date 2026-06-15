@@ -30,11 +30,11 @@ import { Queue, type ConnectionOptions } from "bullmq";
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const COUNCIL_MIN_PRIORITY = process.env.COUNCIL_MIN_PRIORITY ?? "high";
-const QUEUE_HIGH           = "nexus-high";
-const NOTIFY_CHANNEL       = "nexus_signals";
+const QUEUE_HIGH = "nexus-high";
+const NOTIFY_CHANNEL = "nexus_signals";
 
 const PRIORITY_ORDER = ["low", "medium", "high", "critical"] as const;
-type SignalPriority  = (typeof PRIORITY_ORDER)[number];
+type SignalPriority = (typeof PRIORITY_ORDER)[number];
 
 // ── Governance gate ───────────────────────────────────────────────────────────
 
@@ -50,20 +50,20 @@ function passesGate(priority: string): boolean {
 // ── Parsed signal shape from pg_notify payload ────────────────────────────────
 
 interface NotifiedSignal {
-  id:          string;
+  id: string;
   signal_type: string;
-  summary:     string;
-  priority:    string;
-  created_at:  string;
+  summary: string;
+  priority: string;
+  created_at: string;
 }
 
 // ── Listener class ────────────────────────────────────────────────────────────
 
 export class SignalNotifyListener {
-  private client:      unknown  = null;  // pg.Client — dynamically imported
-  private queue:       Queue;
-  private running      = false;
-  private reconnectMs  = 1_000;
+  private client: unknown = null; // pg.Client — dynamically imported
+  private queue: Queue;
+  private running = false;
+  private reconnectMs = 1_000;
 
   constructor(private readonly connection: ConnectionOptions) {
     this.queue = new Queue(QUEUE_HIGH, { connection });
@@ -74,10 +74,10 @@ export class SignalNotifyListener {
     this.running = true;
     console.log(
       JSON.stringify({
-        level:        "info",
-        event:        "signal-notify-listener.starting",
-        channel:      NOTIFY_CHANNEL,
-        minPriority:  COUNCIL_MIN_PRIORITY,
+        level: "info",
+        event: "signal-notify-listener.starting",
+        channel: NOTIFY_CHANNEL,
+        minPriority: COUNCIL_MIN_PRIORITY,
       }),
     );
     await this.connect();
@@ -105,15 +105,16 @@ export class SignalNotifyListener {
 
     try {
       const pg = await import("pg");
-      const Client = (pg.default?.Client ?? pg.Client) as new (
-        opts: Record<string, unknown>,
-      ) => {
+      const Client = (pg.default?.Client ?? pg.Client) as new (opts: Record<string, unknown>) => {
         connect(): Promise<void>;
-        end():     Promise<void>;
+        end(): Promise<void>;
         query(sql: string): Promise<unknown>;
-        on(event: "notification", handler: (msg: { channel: string; payload?: string }) => void): void;
-        on(event: "error",        handler: (err: Error) => void): void;
-        on(event: "end",          handler: () => void): void;
+        on(
+          event: "notification",
+          handler: (msg: { channel: string; payload?: string }) => void,
+        ): void;
+        on(event: "error", handler: (err: Error) => void): void;
+        on(event: "end", handler: () => void): void;
       };
 
       const client = new Client({
@@ -160,11 +161,15 @@ export class SignalNotifyListener {
       await client.connect();
       await client.query(`LISTEN "${NOTIFY_CHANNEL}"`);
 
-      this.client      = client;
+      this.client = client;
       this.reconnectMs = 1_000; // reset back-off on success
 
       console.log(
-        JSON.stringify({ level: "info", event: "signal-notify-listener.connected", channel: NOTIFY_CHANNEL }),
+        JSON.stringify({
+          level: "info",
+          event: "signal-notify-listener.connected",
+          channel: NOTIFY_CHANNEL,
+        }),
       );
     } catch (err) {
       console.error(
@@ -183,7 +188,11 @@ export class SignalNotifyListener {
     const delay = this.reconnectMs;
     this.reconnectMs = Math.min(this.reconnectMs * 2, 30_000); // cap at 30s
     console.log(
-      JSON.stringify({ level: "info", event: "signal-notify-listener.reconnecting", delayMs: delay }),
+      JSON.stringify({
+        level: "info",
+        event: "signal-notify-listener.reconnecting",
+        delayMs: delay,
+      }),
     );
     setTimeout(() => this.connect().catch(console.error), delay);
   }
@@ -197,8 +206,8 @@ export class SignalNotifyListener {
     } catch {
       console.warn(
         JSON.stringify({
-          level:   "warn",
-          event:   "signal-notify-listener.invalid-payload",
+          level: "warn",
+          event: "signal-notify-listener.invalid-payload",
           payload: payload.slice(0, 200),
         }),
       );
@@ -208,10 +217,10 @@ export class SignalNotifyListener {
     if (!passesGate(signal.priority)) {
       console.log(
         JSON.stringify({
-          level:      "info",
-          event:      "council.gate.skipped",
-          signalId:   signal.id,
-          priority:   signal.priority,
+          level: "info",
+          event: "council.gate.skipped",
+          signalId: signal.id,
+          priority: signal.priority,
           minPriority: COUNCIL_MIN_PRIORITY,
         }),
       );
@@ -222,26 +231,26 @@ export class SignalNotifyListener {
       "council.deliberate",
       {
         proposal: {
-          title:       `[${signal.signal_type}] ${signal.summary.slice(0, 80)}`,
+          title: `[${signal.signal_type}] ${signal.summary.slice(0, 80)}`,
           description: signal.summary,
         },
         signalId: signal.id,
       },
       {
-        attempts:    2,
-        backoff:     { type: "fixed", delay: 5_000 },
+        attempts: 2,
+        backoff: { type: "fixed", delay: 5_000 },
         removeOnComplete: { count: 100 },
-        removeOnFail:     { count: 50  },
+        removeOnFail: { count: 50 },
       },
     );
 
     console.log(
       JSON.stringify({
-        level:      "info",
-        event:      "council.job.enqueued",
-        signalId:   signal.id,
+        level: "info",
+        event: "council.job.enqueued",
+        signalId: signal.id,
         signalType: signal.signal_type,
-        priority:   signal.priority,
+        priority: signal.priority,
       }),
     );
   }

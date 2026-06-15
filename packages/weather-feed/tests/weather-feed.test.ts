@@ -14,7 +14,7 @@ import {
 
 const US_WEATHER_RAW = {
   latitude: 40.71,
-  longitude: -74.00,
+  longitude: -74.0,
   timezone: "America/New_York",
   current_weather: {
     temperature: 22.5,
@@ -36,7 +36,7 @@ function makeHttp(response: unknown): WeatherHttpGetFn {
 }
 
 function makeReq(overrides: Partial<WeatherRequest> = {}): WeatherRequest {
-  return { lat: 40.71, lng: -74.00, ...overrides };
+  return { lat: 40.71, lng: -74.0, ...overrides };
 }
 
 // ── WmoCode ───────────────────────────────────────────────────────────────────
@@ -89,9 +89,21 @@ describe("WeatherCache", () => {
   it("set and get returns response", () => {
     const cache = new WeatherCache();
     const req = makeReq();
-    const response = { lat: 40.71, lng: -74.00, timezone: "UTC", unit: "metric" as const,
-      current: { temperature: 20, windSpeed: 10, windDirection: 180, weatherCode: 0, isDay: true, time: "t" },
-      fetchedAt: "f" };
+    const response = {
+      lat: 40.71,
+      lng: -74.0,
+      timezone: "UTC",
+      unit: "metric" as const,
+      current: {
+        temperature: 20,
+        windSpeed: 10,
+        windDirection: 180,
+        weatherCode: 0,
+        isDay: true,
+        time: "t",
+      },
+      fetchedAt: "f",
+    };
     cache.set(req, response);
     expect(cache.get(req)).not.toBeNull();
   });
@@ -104,18 +116,42 @@ describe("WeatherCache", () => {
   it("expires after TTL", async () => {
     const cache = new WeatherCache(10); // 10ms TTL
     const req = makeReq();
-    cache.set(req, { lat: 0, lng: 0, timezone: "UTC", unit: "metric" as const,
-      current: { temperature: 0, windSpeed: 0, windDirection: 0, weatherCode: 0, isDay: true, time: "" },
-      fetchedAt: "" });
+    cache.set(req, {
+      lat: 0,
+      lng: 0,
+      timezone: "UTC",
+      unit: "metric" as const,
+      current: {
+        temperature: 0,
+        windSpeed: 0,
+        windDirection: 0,
+        weatherCode: 0,
+        isDay: true,
+        time: "",
+      },
+      fetchedAt: "",
+    });
     await new Promise((r) => setTimeout(r, 20));
     expect(cache.get(req)).toBeNull();
   });
 
   it("keys are scoped by lat/lng/unit", () => {
     const cache = new WeatherCache();
-    const stub = { lat: 0, lng: 0, timezone: "UTC", unit: "metric" as const,
-      current: { temperature: 0, windSpeed: 0, windDirection: 0, weatherCode: 0, isDay: true, time: "" },
-      fetchedAt: "" };
+    const stub = {
+      lat: 0,
+      lng: 0,
+      timezone: "UTC",
+      unit: "metric" as const,
+      current: {
+        temperature: 0,
+        windSpeed: 0,
+        windDirection: 0,
+        weatherCode: 0,
+        isDay: true,
+        time: "",
+      },
+      fetchedAt: "",
+    };
     cache.set(makeReq({ lat: 1, lng: 1 }), { ...stub, lat: 1, lng: 1 });
     cache.set(makeReq({ lat: 2, lng: 2 }), { ...stub, lat: 2, lng: 2 });
     expect(cache.size()).toBe(2);
@@ -124,9 +160,21 @@ describe("WeatherCache", () => {
   it("invalidate removes a key", () => {
     const cache = new WeatherCache();
     const req = makeReq();
-    const stub = { lat: 0, lng: 0, timezone: "UTC", unit: "metric" as const,
-      current: { temperature: 0, windSpeed: 0, windDirection: 0, weatherCode: 0, isDay: true, time: "" },
-      fetchedAt: "" };
+    const stub = {
+      lat: 0,
+      lng: 0,
+      timezone: "UTC",
+      unit: "metric" as const,
+      current: {
+        temperature: 0,
+        windSpeed: 0,
+        windDirection: 0,
+        weatherCode: 0,
+        isDay: true,
+        time: "",
+      },
+      fetchedAt: "",
+    };
     cache.set(req, stub);
     cache.invalidate(req);
     expect(cache.get(req)).toBeNull();
@@ -134,9 +182,21 @@ describe("WeatherCache", () => {
 
   it("clear removes all entries", () => {
     const cache = new WeatherCache();
-    const stub = { lat: 0, lng: 0, timezone: "UTC", unit: "metric" as const,
-      current: { temperature: 0, windSpeed: 0, windDirection: 0, weatherCode: 0, isDay: true, time: "" },
-      fetchedAt: "" };
+    const stub = {
+      lat: 0,
+      lng: 0,
+      timezone: "UTC",
+      unit: "metric" as const,
+      current: {
+        temperature: 0,
+        windSpeed: 0,
+        windDirection: 0,
+        weatherCode: 0,
+        isDay: true,
+        time: "",
+      },
+      fetchedAt: "",
+    };
     cache.set(makeReq({ lat: 1 }), stub);
     cache.set(makeReq({ lat: 2 }), stub);
     cache.clear();
@@ -157,7 +217,7 @@ describe("WeatherClient", () => {
     expect(result.timezone).toBe("America/New_York");
     expect(result.unit).toBe("metric");
     expect(result.lat).toBeCloseTo(40.71);
-    expect(result.lng).toBeCloseTo(-74.00);
+    expect(result.lng).toBeCloseTo(-74.0);
   });
 
   it("parses isDay=false when is_day=0", async () => {
@@ -168,7 +228,10 @@ describe("WeatherClient", () => {
 
   it("uses imperial unit when requested", async () => {
     let capturedUrl = "";
-    const client = new WeatherClient(async (url) => { capturedUrl = url; return US_WEATHER_RAW; });
+    const client = new WeatherClient(async (url) => {
+      capturedUrl = url;
+      return US_WEATHER_RAW;
+    });
     await client.fetch(makeReq({ unit: "imperial" }));
     expect(capturedUrl).toContain("fahrenheit");
     expect(capturedUrl).toContain("mph");
@@ -176,7 +239,10 @@ describe("WeatherClient", () => {
 
   it("uses metric unit by default", async () => {
     let capturedUrl = "";
-    const client = new WeatherClient(async (url) => { capturedUrl = url; return US_WEATHER_RAW; });
+    const client = new WeatherClient(async (url) => {
+      capturedUrl = url;
+      return US_WEATHER_RAW;
+    });
     await client.fetch(makeReq());
     expect(capturedUrl).toContain("celsius");
     expect(capturedUrl).toContain("kmh");
@@ -184,7 +250,10 @@ describe("WeatherClient", () => {
 
   it("includes lat/lng in URL", async () => {
     let capturedUrl = "";
-    const client = new WeatherClient(async (url) => { capturedUrl = url; return US_WEATHER_RAW; });
+    const client = new WeatherClient(async (url) => {
+      capturedUrl = url;
+      return US_WEATHER_RAW;
+    });
     await client.fetch(makeReq({ lat: 51.5, lng: -0.12 }));
     expect(capturedUrl).toContain("latitude=51.5");
     expect(capturedUrl).toContain("longitude=-0.12");
@@ -192,7 +261,10 @@ describe("WeatherClient", () => {
 
   it("includes hourly params when requested", async () => {
     let capturedUrl = "";
-    const client = new WeatherClient(async (url) => { capturedUrl = url; return US_WEATHER_RAW; });
+    const client = new WeatherClient(async (url) => {
+      capturedUrl = url;
+      return US_WEATHER_RAW;
+    });
     await client.fetch(makeReq({ hourly: ["temperature_2m", "precipitation"] }));
     expect(capturedUrl).toContain("hourly=temperature_2m%2Cprecipitation");
   });
@@ -249,7 +321,12 @@ describe("WeatherFeed", () => {
 
   it("second fetch returns cached: true", async () => {
     let callCount = 0;
-    const feed = new WeatherFeed({ http: async () => { callCount++; return US_WEATHER_RAW; } });
+    const feed = new WeatherFeed({
+      http: async () => {
+        callCount++;
+        return US_WEATHER_RAW;
+      },
+    });
     await feed.fetch(makeReq());
     const { cached } = await feed.fetch(makeReq());
     expect(cached).toBe(true);
@@ -258,7 +335,12 @@ describe("WeatherFeed", () => {
 
   it("forceRefresh bypasses cache", async () => {
     let callCount = 0;
-    const feed = new WeatherFeed({ http: async () => { callCount++; return US_WEATHER_RAW; } });
+    const feed = new WeatherFeed({
+      http: async () => {
+        callCount++;
+        return US_WEATHER_RAW;
+      },
+    });
     await feed.fetch(makeReq());
     await feed.fetch(makeReq(), true);
     expect(callCount).toBe(2);

@@ -24,7 +24,7 @@
  * additional no-auth route in server.ts.
  */
 
-import { metricsToPrometheus, formatMetricLine , SloTracker } from "@nexus/telemetry";
+import { metricsToPrometheus, formatMetricLine, SloTracker } from "@nexus/telemetry";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";

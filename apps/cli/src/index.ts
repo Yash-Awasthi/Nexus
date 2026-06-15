@@ -249,10 +249,13 @@ gateway
   .description("List available model aliases")
   .action(async () => {
     try {
-      const data = await api.get<{ models: { id: string; provider: string; backend_model: string; available: boolean }[]; providers: string[] }>(
-        "/gateway/models",
+      const data = await api.get<{
+        models: { id: string; provider: string; backend_model: string; available: boolean }[];
+        providers: string[];
+      }>("/gateway/models");
+      console.log(
+        chalk.bold(`\n${data.models.length} model aliases (${data.providers.length} providers)\n`),
       );
-      console.log(chalk.bold(`\n${data.models.length} model aliases (${data.providers.length} providers)\n`));
       for (const m of data.models) {
         const icon = m.available ? chalk.green("✓") : chalk.gray("○");
         console.log(` ${icon} ${chalk.cyan(m.id.padEnd(24))} → ${m.provider}/${m.backend_model}`);
@@ -276,14 +279,18 @@ gateway
         usage: { input_tokens: number; output_tokens: number };
         model: string;
       }>("/gateway/messages", {
-        model:    opts.model,
+        model: opts.model,
         messages: [{ role: "user", content: message }],
-        stream:   false,
+        stream: false,
       });
       const text = data.content.map((b: { type: string; text: string }) => b.text).join("");
       console.log(chalk.bold("\nAssistant:"), "\n");
       console.log(text);
-      console.log(chalk.gray(`\n[${data.model} | ${data.usage.input_tokens}↑ ${data.usage.output_tokens}↓ tokens]`));
+      console.log(
+        chalk.gray(
+          `\n[${data.model} | ${data.usage.input_tokens}↑ ${data.usage.output_tokens}↓ tokens]`,
+        ),
+      );
     } catch (err) {
       console.error(chalk.red("✗"), String(err));
       process.exit(1);
@@ -302,9 +309,13 @@ gateway
         limit: number;
         runs: Array<{ taskId: string; totalCostUsd: number; model?: string }>;
       }>(`/gateway/cost-report?limit=${opts.limit}`);
-      console.log(chalk.bold(`\nCost Report — ${data.totalRuns} runs, $${data.totalUsd.toFixed(4)} total\n`));
+      console.log(
+        chalk.bold(`\nCost Report — ${data.totalRuns} runs, $${data.totalUsd.toFixed(4)} total\n`),
+      );
       for (const run of data.runs.slice(0, 10)) {
-        console.log(` ${chalk.gray(run.taskId.slice(0, 16))}…  $${run.totalCostUsd.toFixed(4)}  ${chalk.gray(run.model ?? "")}`);
+        console.log(
+          ` ${chalk.gray(run.taskId.slice(0, 16))}…  $${run.totalCostUsd.toFixed(4)}  ${chalk.gray(run.model ?? "")}`,
+        );
       }
     } catch (err) {
       console.error(chalk.red("✗"), String(err));
@@ -325,13 +336,21 @@ memory
     try {
       const qs = new URLSearchParams({ limit: opts.limit });
       if (opts.category) qs.set("category", opts.category);
-      const data = await api.get<{ memories: Array<{ id: string; content: string; category?: string; confidence?: number; createdAt: string }>; total: number }>(
-        `/memory?${qs}`,
-      );
+      const data = await api.get<{
+        memories: Array<{
+          id: string;
+          content: string;
+          category?: string;
+          confidence?: number;
+          createdAt: string;
+        }>;
+        total: number;
+      }>(`/memory?${qs}`);
       console.log(chalk.bold(`\n${data.total} memories\n`));
       for (const m of data.memories) {
-        const conf = m.confidence !== undefined ? chalk.gray(` [${(m.confidence * 100).toFixed(0)}%]`) : "";
-        const cat  = m.category ? chalk.yellow(` #${m.category}`) : "";
+        const conf =
+          m.confidence !== undefined ? chalk.gray(` [${(m.confidence * 100).toFixed(0)}%]`) : "";
+        const cat = m.category ? chalk.yellow(` #${m.category}`) : "";
         console.log(` ${chalk.gray(m.id.slice(0, 8))}…${cat}${conf}`);
         console.log(`   ${m.content.slice(0, 120)}${m.content.length > 120 ? "…" : ""}`);
       }
@@ -351,7 +370,10 @@ memory
       const body: Record<string, unknown> = { content };
       if (opts.category) body.category = opts.category;
       if (opts.tags) body.tags = opts.tags.split(",").map((t) => t.trim());
-      const data = await api.post<{ id: string; content: string; category?: string }>("/memory", body);
+      const data = await api.post<{ id: string; content: string; category?: string }>(
+        "/memory",
+        body,
+      );
       console.log(chalk.green("✓"), "Memory stored:", chalk.gray(data.id));
     } catch (err) {
       console.error(chalk.red("✗"), String(err));
@@ -369,10 +391,7 @@ research
   .option("--no-wait", "Return immediately without polling")
   .action(async (query: string, opts: { wait: boolean }) => {
     try {
-      const job = await api.post<{ jobId: string; status: string }>(
-        "/researcher/jobs",
-        { query },
-      );
+      const job = await api.post<{ jobId: string; status: string }>("/researcher/jobs", { query });
       console.log(chalk.green("✓"), `Job submitted: ${chalk.bold(job.jobId)}`);
 
       if (!opts.wait) return;
@@ -415,14 +434,21 @@ research
   .option("--limit <n>", "Max jobs", "10")
   .action(async (opts: { limit: string }) => {
     try {
-      const data = await api.get<{ jobs: Array<{ jobId: string; status: string; query: string; createdAt: string }> }>(
-        `/researcher/jobs?limit=${opts.limit}`,
-      );
+      const data = await api.get<{
+        jobs: Array<{ jobId: string; status: string; query: string; createdAt: string }>;
+      }>(`/researcher/jobs?limit=${opts.limit}`);
       const jobs = data.jobs ?? [];
       console.log(chalk.bold(`\n${jobs.length} research jobs\n`));
       for (const j of jobs) {
-        const icon = j.status === "done" ? chalk.green("✓") : j.status === "error" ? chalk.red("✗") : chalk.yellow("◌");
-        console.log(` ${icon} ${chalk.gray(j.jobId.slice(0, 12))}…  ${j.query.slice(0, 60)}${j.query.length > 60 ? "…" : ""}`);
+        const icon =
+          j.status === "done"
+            ? chalk.green("✓")
+            : j.status === "error"
+              ? chalk.red("✗")
+              : chalk.yellow("◌");
+        console.log(
+          ` ${icon} ${chalk.gray(j.jobId.slice(0, 12))}…  ${j.query.slice(0, 60)}${j.query.length > 60 ? "…" : ""}`,
+        );
       }
     } catch (err) {
       console.error(chalk.red("✗"), String(err));
@@ -439,9 +465,10 @@ admin
   .description("List all model alias routes")
   .action(async () => {
     try {
-      const data = await api.get<{ routes: Array<{ alias: string; model: string; provider: string; overridden: boolean }>; total: number }>(
-        "/admin/routes",
-      );
+      const data = await api.get<{
+        routes: Array<{ alias: string; model: string; provider: string; overridden: boolean }>;
+        total: number;
+      }>("/admin/routes");
       console.log(chalk.bold(`\n${data.total} routes\n`));
       for (const r of data.routes) {
         const override = r.overridden ? chalk.yellow(" [overridden]") : "";
@@ -458,11 +485,19 @@ admin
   .description("Show gateway usage stats per alias")
   .action(async () => {
     try {
-      const data = await api.get<{ stats: Array<{ alias: string; requests: number; totalTokens: number; errors: number; avgLatencyMs: number }> }>(
-        "/admin/stats",
-      );
+      const data = await api.get<{
+        stats: Array<{
+          alias: string;
+          requests: number;
+          totalTokens: number;
+          errors: number;
+          avgLatencyMs: number;
+        }>;
+      }>("/admin/stats");
       console.log(chalk.bold("\nGateway stats\n"));
-      console.log(` ${"Alias".padEnd(24)} ${"Requests".padEnd(10)} ${"Tokens".padEnd(12)} ${"Errors".padEnd(8)} Latency`);
+      console.log(
+        ` ${"Alias".padEnd(24)} ${"Requests".padEnd(10)} ${"Tokens".padEnd(12)} ${"Errors".padEnd(8)} Latency`,
+      );
       console.log(" " + "─".repeat(70));
       for (const s of data.stats) {
         if (s.requests === 0) continue;
@@ -490,12 +525,22 @@ admin
       if (opts.provider) qs.set("provider", opts.provider);
       if (opts.model) qs.set("model", opts.model);
       if (opts.status) qs.set("status", opts.status);
-      const data = await api.get<{ entries: Array<{ provider: string; model: string; status: string; latencyMs: number; inputTokens?: number; outputTokens?: number; ts: number }>; total: number }>(
-        `/admin/traces?${qs}`,
-      );
+      const data = await api.get<{
+        entries: Array<{
+          provider: string;
+          model: string;
+          status: string;
+          latencyMs: number;
+          inputTokens?: number;
+          outputTokens?: number;
+          ts: number;
+        }>;
+        total: number;
+      }>(`/admin/traces?${qs}`);
       console.log(chalk.bold(`\n${data.total} trace entries\n`));
       for (const e of data.entries.slice(0, 20)) {
-        const statusColor = e.status === "success" ? chalk.green : e.status === "cached" ? chalk.cyan : chalk.red;
+        const statusColor =
+          e.status === "success" ? chalk.green : e.status === "cached" ? chalk.cyan : chalk.red;
         const time = new Date(e.ts).toISOString().slice(11, 23);
         console.log(
           ` ${chalk.gray(time)}  ${statusColor(e.status.padEnd(8))}  ${e.provider}/${e.model.slice(0, 24)}  ${e.latencyMs}ms`,

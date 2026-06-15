@@ -121,9 +121,9 @@ describe("RuleClassifier", () => {
   });
 
   it("uses weight multiplier", () => {
-    const low: ClassifierRule[]  = [{ name: "a", category: "a", keywords: ["hello"], weight: 0.1 }];
+    const low: ClassifierRule[] = [{ name: "a", category: "a", keywords: ["hello"], weight: 0.1 }];
     const high: ClassifierRule[] = [{ name: "b", category: "b", keywords: ["hello"], weight: 2.0 }];
-    const rLow  = new RuleClassifier(low).classify("hello hello hello");
+    const rLow = new RuleClassifier(low).classify("hello hello hello");
     const rHigh = new RuleClassifier(high).classify("hello hello hello");
     expect(rHigh.confidence).toBeGreaterThan(rLow.confidence);
   });

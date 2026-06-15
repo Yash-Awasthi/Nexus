@@ -424,10 +424,9 @@ export class PatchrightDriver implements BrowserDriver {
       if (contextOptions[k] === undefined) delete contextOptions[k];
     }
 
-     
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
     const context = await (browser as any).newContext(contextOptions);
-     
+
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
     const page = await (context as any).newPage();
 
@@ -503,7 +502,6 @@ export class PatchrightDriver implements BrowserDriver {
 
   async close(): Promise<void> {
     if (this._browser) {
-       
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
       await (this._browser as any).close();
       this._browser = null;

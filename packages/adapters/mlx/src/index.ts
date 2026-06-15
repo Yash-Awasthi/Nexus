@@ -76,9 +76,15 @@ export class NullMLXBridge implements IMLXBridge {
   }
   private _response: Partial<MLXGenerateResult> = {};
 
-  get loaded(): boolean { return this._loaded; }
-  get modelPath(): string | undefined { return this._modelPath; }
-  get config(): MLXModelConfig | undefined { return this._config; }
+  get loaded(): boolean {
+    return this._loaded;
+  }
+  get modelPath(): string | undefined {
+    return this._modelPath;
+  }
+  get config(): MLXModelConfig | undefined {
+    return this._config;
+  }
 
   async load(config: MLXModelConfig): Promise<void> {
     this.loadCalls.push(config);
@@ -270,9 +276,7 @@ export class MLXModelPersister {
   async list(dir: string, fs: MLXFsLike): Promise<string[]> {
     const entries = await fs.readdir(dir);
     const ext = this._ext();
-    return entries
-      .filter((e) => e.endsWith(ext))
-      .map((e) => e.slice(0, -ext.length));
+    return entries.filter((e) => e.endsWith(ext)).map((e) => e.slice(0, -ext.length));
   }
 
   private _ext(): string {
@@ -286,14 +290,20 @@ export class NullMLXFs implements MLXFsLike {
   readonly files = new Map<string, string>();
   readonly dirs = new Set<string>();
 
-  async mkdir(path: string): Promise<void> { this.dirs.add(path); }
-  async writeFile(path: string, content: string): Promise<void> { this.files.set(path, content); }
+  async mkdir(path: string): Promise<void> {
+    this.dirs.add(path);
+  }
+  async writeFile(path: string, content: string): Promise<void> {
+    this.files.set(path, content);
+  }
   async readFile(path: string): Promise<string> {
     const v = this.files.get(path);
     if (v === undefined) throw new Error(`ENOENT: ${path}`);
     return v;
   }
-  async exists(path: string): Promise<boolean> { return this.files.has(path); }
+  async exists(path: string): Promise<boolean> {
+    return this.files.has(path);
+  }
   async readdir(path: string): Promise<string[]> {
     const prefix = path.endsWith("/") ? path : `${path}/`;
     return Array.from(this.files.keys())

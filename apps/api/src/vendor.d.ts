@@ -9,9 +9,7 @@
 
 // ── pg ────────────────────────────────────────────────────────────────────────
 declare module "pg" {
-  export interface QueryResultRow {
-    [column: string]: unknown;
-  }
+  export type QueryResultRow = Record<string, unknown>;
   export interface QueryResult<R = QueryResultRow> {
     rows: R[];
     rowCount: number | null;
@@ -32,18 +30,12 @@ declare module "pg" {
     ssl?: boolean | { rejectUnauthorized?: boolean };
   }
   export interface PoolClient {
-    query<R = QueryResultRow>(
-      text: string,
-      values?: unknown[],
-    ): Promise<QueryResult<R>>;
+    query<R = QueryResultRow>(text: string, values?: unknown[]): Promise<QueryResult<R>>;
     release(err?: Error | boolean): void;
   }
   export class Pool {
     constructor(config?: PoolConfig);
-    query<R = QueryResultRow>(
-      text: string,
-      values?: unknown[],
-    ): Promise<QueryResult<R>>;
+    query<R = QueryResultRow>(text: string, values?: unknown[]): Promise<QueryResult<R>>;
     end(): Promise<void>;
     connect(): Promise<PoolClient>;
   }
@@ -96,12 +88,7 @@ declare module "ioredis" {
     ping(): Promise<string>;
     quit(): Promise<string>;
     get(key: string): Promise<string | null>;
-    set(
-      key: string,
-      value: string,
-      expiryMode?: string,
-      time?: number,
-    ): Promise<"OK">;
+    set(key: string, value: string, expiryMode?: string, time?: number): Promise<"OK">;
     del(...keys: string[]): Promise<number>;
     keys(pattern: string): Promise<string[]>;
     flushdb(): Promise<"OK">;

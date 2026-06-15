@@ -167,7 +167,14 @@ export async function alertsRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       try {
         alertEngine.addRule(request.body);
-        return reply.code(201).send(request.body);
+        // Sanitise string fields before echoing — prevents reflected XSS if the
+        // response is ever rendered in an HTML context by a downstream client.
+        const safe = {
+          ...request.body,
+          message: encodeURIComponent(request.body.message ?? ""),
+          metric: encodeURIComponent(request.body.metric ?? ""),
+        };
+        return reply.code(201).send(safe);
       } catch (err) {
         return reply.code(409).send({ error: err instanceof Error ? err.message : String(err) });
       }

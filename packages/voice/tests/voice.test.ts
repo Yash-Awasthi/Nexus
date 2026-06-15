@@ -29,7 +29,9 @@ function fakeAudio(bytes = 100, format: AudioBuffer["format"] = "wav"): AudioBuf
   return { data: new Uint8Array(bytes).fill(1), format, sampleRate: 16000 };
 }
 
-function makeFetch(responses: Array<{ ok: boolean; status?: number; body?: unknown; arrayBuffer?: Uint8Array }>): FetchFn {
+function makeFetch(
+  responses: Array<{ ok: boolean; status?: number; body?: unknown; arrayBuffer?: Uint8Array }>,
+): FetchFn {
   let idx = 0;
   return vi.fn(async () => {
     const r = responses[idx++] ?? { ok: true, status: 200, body: {} };
@@ -206,7 +208,10 @@ describe("GroqTranscribeProvider", () => {
     const fetchFn = makeFetch([okResponse]);
     const p = new GroqTranscribeProvider({ apiKey: "mykey", fetch: fetchFn });
     await p.transcribe(fakeAudio());
-    const headers = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.headers as Record<string, string>;
+    const headers = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.headers as Record<
+      string,
+      string
+    >;
     expect(headers["Authorization"]).toBe("Bearer mykey");
   });
 
@@ -259,7 +264,11 @@ describe("GroqTranscribeProvider", () => {
 
   it("respects custom model in config", async () => {
     const fetchFn = makeFetch([okResponse]);
-    const p = new GroqTranscribeProvider({ apiKey: "k", model: "whisper-large-v3", fetch: fetchFn });
+    const p = new GroqTranscribeProvider({
+      apiKey: "k",
+      model: "whisper-large-v3",
+      fetch: fetchFn,
+    });
     await p.transcribe(fakeAudio());
     const body = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as FormData;
     expect(body.get("model")).toBe("whisper-large-v3");
@@ -306,7 +315,10 @@ describe("ElevenLabsSynthesizeProvider", () => {
     const fetchFn = makeFetch([okResponse]);
     const p = new ElevenLabsSynthesizeProvider({ apiKey: "elkey", fetch: fetchFn });
     await p.synthesize("x");
-    const headers = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.headers as Record<string, string>;
+    const headers = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.headers as Record<
+      string,
+      string
+    >;
     expect(headers["xi-api-key"]).toBe("elkey");
   });
 
@@ -351,7 +363,9 @@ describe("ElevenLabsSynthesizeProvider", () => {
     const fetchFn = makeFetch([okResponse]);
     const p = new ElevenLabsSynthesizeProvider({ apiKey: "k", fetch: fetchFn });
     await p.synthesize("x", { speed: 1.5 });
-    const body = JSON.parse((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
+    const body = JSON.parse(
+      (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string,
+    );
     expect(body.voice_settings.speed).toBe(1.5);
   });
 
@@ -429,7 +443,11 @@ describe("VoiceSession — basic flow", () => {
     const handler = vi.fn().mockRejectedValue(new Error("boom"));
     const session = new VoiceSession({ transcribe, handler });
     let caught: VoiceError | undefined;
-    try { await session.process(fakeAudio()); } catch (e) { caught = e as VoiceError; }
+    try {
+      await session.process(fakeAudio());
+    } catch (e) {
+      caught = e as VoiceError;
+    }
     expect(caught?.context).toMatchObject({ transcript: "what is the weather" });
   });
 
@@ -459,7 +477,11 @@ describe("VoiceSession — basic flow", () => {
       name: "bad",
       synthesize: vi.fn().mockRejectedValue(new Error("TTS crash")),
     };
-    const session = new VoiceSession({ transcribe, synthesize: badSynth, handler: echoVoiceHandler });
+    const session = new VoiceSession({
+      transcribe,
+      synthesize: badSynth,
+      handler: echoVoiceHandler,
+    });
     await expect(session.process(fakeAudio())).rejects.toMatchObject({
       code: "SYNTHESIZE_FAILED",
     });
@@ -471,7 +493,11 @@ describe("VoiceSession — basic flow", () => {
       name: "bad",
       synthesize: vi.fn().mockRejectedValue(voiceErr),
     };
-    const session = new VoiceSession({ transcribe, synthesize: badSynth, handler: echoVoiceHandler });
+    const session = new VoiceSession({
+      transcribe,
+      synthesize: badSynth,
+      handler: echoVoiceHandler,
+    });
     await expect(session.process(fakeAudio())).rejects.toBe(voiceErr);
   });
 });
@@ -624,7 +650,9 @@ describe("VoiceSession — opts passthrough", () => {
   it("propagates language from transcribe result", async () => {
     const transcribe: TranscribeProvider = {
       name: "mock",
-      transcribe: vi.fn().mockResolvedValue({ transcript: "bonjour", latencyMs: 0, language: "fr" }),
+      transcribe: vi
+        .fn()
+        .mockResolvedValue({ transcript: "bonjour", latencyMs: 0, language: "fr" }),
     };
     const session = new VoiceSession({ transcribe, handler: echoVoiceHandler });
     const result = await session.process(fakeAudio());
@@ -841,8 +869,16 @@ describe("VoiceSession — VAD gate", () => {
         energyLevel: audio.data.length > 50 ? 0.5 : 0,
       }),
     };
-    const sessionSmall = new VoiceSession({ transcribe: mockTranscribe, handler: handlerSpy, vad: customVad });
-    const sessionLarge = new VoiceSession({ transcribe: mockTranscribe, handler: handlerSpy, vad: customVad });
+    const sessionSmall = new VoiceSession({
+      transcribe: mockTranscribe,
+      handler: handlerSpy,
+      vad: customVad,
+    });
+    const sessionLarge = new VoiceSession({
+      transcribe: mockTranscribe,
+      handler: handlerSpy,
+      vad: customVad,
+    });
 
     const smallAudio = createAudioBuffer(new Uint8Array(10), "wav");
     const largeAudio = createAudioBuffer(new Uint8Array(100), "wav");

@@ -237,6 +237,10 @@ export class HuggingFacePublisher implements HfPublisher {
     const safeName = batch.name.replace(/[^a-z0-9_-]/gi, "_").toLowerCase();
     const filename = `${safeName}-${batch.id}.jsonl`;
     const url = `https://huggingface.co/api/datasets/${repoId}/resolve/main/${filename}`;
+    const parsedUrl = new URL(url);
+    if (!["huggingface.co", "hf.co"].includes(parsedUrl.hostname)) {
+      throw new Error(`blocked host: ${parsedUrl.hostname}`);
+    }
 
     try {
       const resp = await fetch(url, {

@@ -10,12 +10,12 @@ import { api } from "../lib/api.js";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface ResearchJob {
-  jobId:   string;
-  status:  "queued" | "running" | "done" | "error";
-  query:   string;
+  jobId: string;
+  status: "queued" | "running" | "done" | "error";
+  query: string;
   report?: string;
   sources?: Array<{ url: string; title: string; snippet?: string }>;
-  error?:  string;
+  error?: string;
   startedAt: number;
   elapsed?: number;
 }
@@ -24,36 +24,36 @@ interface ResearchJob {
 
 function StatusPill({ status }: { status: ResearchJob["status"] }) {
   const map: Record<string, { color: string; bg: string; label: string }> = {
-    queued:  { color: "#d97706", bg: "rgba(217,119,6,0.12)",  label: "Queued"  },
-    running: { color: "#2563eb", bg: "rgba(37,99,235,0.12)",  label: "Running" },
-    done:    { color: "#16a34a", bg: "rgba(22,163,74,0.12)",  label: "Done"    },
-    error:   { color: "#dc2626", bg: "rgba(220,38,38,0.12)",  label: "Error"   },
+    queued: { color: "#d97706", bg: "rgba(217,119,6,0.12)", label: "Queued" },
+    running: { color: "#2563eb", bg: "rgba(37,99,235,0.12)", label: "Running" },
+    done: { color: "#16a34a", bg: "rgba(22,163,74,0.12)", label: "Done" },
+    error: { color: "#dc2626", bg: "rgba(220,38,38,0.12)", label: "Error" },
   };
   const { color, bg, label } = map[status] ?? map.queued!;
   return (
     <span
       style={{
-        display:      "inline-flex",
-        alignItems:   "center",
-        gap:          5,
-        fontSize:     11,
-        fontWeight:   700,
-        letterSpacing:"0.06em",
-        textTransform:"uppercase",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
         color,
-        background:   bg,
-        border:       `1px solid ${color}33`,
+        background: bg,
+        border: `1px solid ${color}33`,
         borderRadius: 6,
-        padding:      "2px 8px",
+        padding: "2px 8px",
       }}
     >
       <span
         style={{
-          width:        6,
-          height:       6,
+          width: 6,
+          height: 6,
           borderRadius: "50%",
-          background:   color,
-          animation:    status === "running" ? "pulse 1.2s ease-in-out infinite" : undefined,
+          background: color,
+          animation: status === "running" ? "pulse 1.2s ease-in-out infinite" : undefined,
         }}
       />
       {label}
@@ -63,38 +63,44 @@ function StatusPill({ status }: { status: ResearchJob["status"] }) {
 
 // ── Source card ───────────────────────────────────────────────────────────────
 
-function SourceCard({ source, idx }: { source: NonNullable<ResearchJob["sources"]>[number]; idx: number }) {
+function SourceCard({
+  source,
+  idx,
+}: {
+  source: NonNullable<ResearchJob["sources"]>[number];
+  idx: number;
+}) {
   return (
     <a
       href={source.url}
       target="_blank"
       rel="noopener noreferrer"
       style={{
-        display:      "block",
-        background:   "#161b27",
-        border:       "1px solid #1e2535",
+        display: "block",
+        background: "#161b27",
+        border: "1px solid #1e2535",
         borderRadius: 8,
-        padding:      "12px 14px",
-        textDecoration:"none",
-        transition:   "border-color 0.15s",
+        padding: "12px 14px",
+        textDecoration: "none",
+        transition: "border-color 0.15s",
       }}
     >
       <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
         <span
           style={{
-            width:          20,
-            height:         20,
-            borderRadius:   "50%",
-            background:     "rgba(124,58,237,0.15)",
-            border:         "1px solid #5b21b6",
-            color:          "#c4b5fd",
-            fontSize:       10,
-            fontWeight:     700,
-            display:        "flex",
-            alignItems:     "center",
+            width: 20,
+            height: 20,
+            borderRadius: "50%",
+            background: "rgba(124,58,237,0.15)",
+            border: "1px solid #5b21b6",
+            color: "#c4b5fd",
+            fontSize: 10,
+            fontWeight: 700,
+            display: "flex",
+            alignItems: "center",
             justifyContent: "center",
-            flexShrink:     0,
-            marginTop:      1,
+            flexShrink: 0,
+            marginTop: 1,
           }}
         >
           {idx + 1}
@@ -102,28 +108,29 @@ function SourceCard({ source, idx }: { source: NonNullable<ResearchJob["sources"
         <div style={{ minWidth: 0 }}>
           <div
             style={{
-              fontSize:     13,
-              fontWeight:   600,
-              color:        "#c4b5fd",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#c4b5fd",
               marginBottom: 3,
-              overflow:     "hidden",
+              overflow: "hidden",
               textOverflow: "ellipsis",
-              whiteSpace:   "nowrap",
+              whiteSpace: "nowrap",
             }}
           >
             {source.title || source.url}
           </div>
           {source.snippet && (
             <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.5 }}>
-              {source.snippet.slice(0, 180)}{source.snippet.length > 180 ? "…" : ""}
+              {source.snippet.slice(0, 180)}
+              {source.snippet.length > 180 ? "…" : ""}
             </div>
           )}
           <div
             style={{
-              fontSize:  11,
-              color:     "#334155",
+              fontSize: 11,
+              color: "#334155",
               marginTop: 4,
-              overflow:  "hidden",
+              overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
             }}
@@ -144,21 +151,21 @@ function JobCard({ job }: { job: ResearchJob }) {
   return (
     <div
       style={{
-        background:   "#161b27",
-        border:       "1px solid #1e2535",
+        background: "#161b27",
+        border: "1px solid #1e2535",
         borderRadius: 10,
-        overflow:     "hidden",
+        overflow: "hidden",
       }}
     >
       {/* Header */}
       <div
         style={{
-          display:        "flex",
-          alignItems:     "center",
+          display: "flex",
+          alignItems: "center",
           justifyContent: "space-between",
-          padding:        "14px 18px",
-          cursor:         "pointer",
-          borderBottom:   expanded ? "1px solid #1e2535" : undefined,
+          padding: "14px 18px",
+          cursor: "pointer",
+          borderBottom: expanded ? "1px solid #1e2535" : undefined,
         }}
         onClick={() => setExpanded((v) => !v)}
       >
@@ -166,12 +173,12 @@ function JobCard({ job }: { job: ResearchJob }) {
           <StatusPill status={job.status} />
           <span
             style={{
-              fontSize:     14,
-              fontWeight:   600,
-              color:        "#e2e8f0",
-              overflow:     "hidden",
+              fontSize: 14,
+              fontWeight: 600,
+              color: "#e2e8f0",
+              overflow: "hidden",
               textOverflow: "ellipsis",
-              whiteSpace:   "nowrap",
+              whiteSpace: "nowrap",
             }}
           >
             {job.query}
@@ -193,12 +200,12 @@ function JobCard({ job }: { job: ResearchJob }) {
           {job.status === "error" && (
             <div
               style={{
-                background:   "#1c0a0a",
-                border:       "1px solid #7f1d1d",
+                background: "#1c0a0a",
+                border: "1px solid #7f1d1d",
                 borderRadius: 8,
-                padding:      "12px 14px",
-                color:        "#f87171",
-                fontSize:     13,
+                padding: "12px 14px",
+                color: "#f87171",
+                fontSize: 13,
               }}
             >
               ⚠ {job.error ?? "Research failed"}
@@ -206,7 +213,15 @@ function JobCard({ job }: { job: ResearchJob }) {
           )}
 
           {(job.status === "queued" || job.status === "running") && (
-            <div style={{ color: "#64748b", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+            <div
+              style={{
+                color: "#64748b",
+                fontSize: 13,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
               <span style={{ color: "#7c3aed" }}>●●●</span>
               Researching…
             </div>
@@ -216,8 +231,8 @@ function JobCard({ job }: { job: ResearchJob }) {
             <>
               <div
                 style={{
-                  fontSize:   14,
-                  color:      "#e2e8f0",
+                  fontSize: 14,
+                  color: "#e2e8f0",
                   lineHeight: 1.75,
                   whiteSpace: "pre-wrap",
                   marginBottom: job.sources?.length ? 20 : 0,
@@ -230,11 +245,11 @@ function JobCard({ job }: { job: ResearchJob }) {
                 <>
                   <div
                     style={{
-                      fontSize:     11,
-                      fontWeight:   700,
-                      letterSpacing:"0.08em",
-                      textTransform:"uppercase",
-                      color:        "#475569",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      color: "#475569",
                       marginBottom: 10,
                     }}
                   >
@@ -258,11 +273,11 @@ function JobCard({ job }: { job: ResearchJob }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Research() {
-  const [query, setQuery]   = useState("");
-  const [jobs, setJobs]     = useState<ResearchJob[]>([]);
+  const [query, setQuery] = useState("");
+  const [jobs, setJobs] = useState<ResearchJob[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError]   = useState<string | null>(null);
-  const pollRefs            = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
+  const [error, setError] = useState<string | null>(null);
+  const pollRefs = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
 
   const pollJob = useCallback((jobId: string, startedAt: number) => {
     const interval = setInterval(async () => {
@@ -277,13 +292,7 @@ export default function Research() {
 
         const elapsed = Date.now() - startedAt;
 
-        setJobs((prev) =>
-          prev.map((j) =>
-            j.jobId === jobId
-              ? { ...j, ...res, elapsed }
-              : j,
-          ),
-        );
+        setJobs((prev) => prev.map((j) => (j.jobId === jobId ? { ...j, ...res, elapsed } : j)));
 
         if (res.status === "done" || res.status === "error") {
           clearInterval(interval);
@@ -294,9 +303,7 @@ export default function Research() {
         pollRefs.current.delete(jobId);
         setJobs((prev) =>
           prev.map((j) =>
-            j.jobId === jobId
-              ? { ...j, status: "error", error: "Status check failed" }
-              : j,
+            j.jobId === jobId ? { ...j, status: "error", error: "Status check failed" } : j,
           ),
         );
       }
@@ -317,9 +324,9 @@ export default function Research() {
       const startedAt = Date.now();
 
       const job: ResearchJob = {
-        jobId:     res.jobId,
-        status:    "queued",
-        query:     q,
+        jobId: res.jobId,
+        status: "queued",
+        query: q,
         startedAt,
       };
       setJobs((prev) => [job, ...prev]);
@@ -345,10 +352,10 @@ export default function Research() {
       {/* Query input */}
       <div
         style={{
-          background:   "#161b27",
-          border:       "1px solid #1e2535",
+          background: "#161b27",
+          border: "1px solid #1e2535",
           borderRadius: 12,
-          padding:      "18px 20px",
+          padding: "18px 20px",
           marginBottom: 24,
         }}
       >
@@ -365,18 +372,18 @@ export default function Research() {
             placeholder="What do you want to research? (Enter to submit)"
             rows={3}
             style={{
-              flex:       1,
+              flex: 1,
               background: "#0f1117",
-              border:     "1px solid #1e2535",
+              border: "1px solid #1e2535",
               borderRadius: 8,
-              color:      "#e2e8f0",
-              fontSize:   14,
-              padding:    "10px 14px",
-              resize:     "vertical",
+              color: "#e2e8f0",
+              fontSize: 14,
+              padding: "10px 14px",
+              resize: "vertical",
               lineHeight: 1.5,
               fontFamily: "inherit",
-              outline:    "none",
-              minHeight:  72,
+              outline: "none",
+              minHeight: 72,
             }}
             disabled={loading}
           />
@@ -384,35 +391,33 @@ export default function Research() {
             onClick={() => void submit()}
             disabled={loading || !query.trim()}
             style={{
-              background:  loading || !query.trim() ? "#1e2535" : "#7c3aed",
-              border:      "none",
+              background: loading || !query.trim() ? "#1e2535" : "#7c3aed",
+              border: "none",
               borderRadius: 10,
-              color:       loading || !query.trim() ? "#475569" : "#fff",
-              cursor:      loading || !query.trim() ? "not-allowed" : "pointer",
-              fontSize:    14,
-              fontWeight:  600,
-              padding:     "12px 20px",
-              height:      72,
-              transition:  "background 0.15s",
-              flexShrink:  0,
+              color: loading || !query.trim() ? "#475569" : "#fff",
+              cursor: loading || !query.trim() ? "not-allowed" : "pointer",
+              fontSize: 14,
+              fontWeight: 600,
+              padding: "12px 20px",
+              height: 72,
+              transition: "background 0.15s",
+              flexShrink: 0,
             }}
           >
             {loading ? "Submitting…" : "Research"}
           </button>
         </div>
-        {error && (
-          <div style={{ marginTop: 12, color: "#f87171", fontSize: 13 }}>⚠ {error}</div>
-        )}
+        {error && <div style={{ marginTop: 12, color: "#f87171", fontSize: 13 }}>⚠ {error}</div>}
       </div>
 
       {/* Jobs */}
       {jobs.length === 0 ? (
         <div
           style={{
-            textAlign:  "center",
-            color:      "#334155",
-            padding:    "60px 0",
-            fontSize:   14,
+            textAlign: "center",
+            color: "#334155",
+            padding: "60px 0",
+            fontSize: 14,
           }}
         >
           <div style={{ fontSize: 40, marginBottom: 12 }}>🔬</div>

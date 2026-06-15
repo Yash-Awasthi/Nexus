@@ -74,7 +74,11 @@ describe("WorkflowMatcher", () => {
   const ctx = pdfContext();
 
   it("equals operator matches exact value", () => {
-    const c: TriggerCondition = { field: "mime_type", operator: "equals", value: "application/pdf" };
+    const c: TriggerCondition = {
+      field: "mime_type",
+      operator: "equals",
+      value: "application/pdf",
+    };
     expect(matcher.matches(ctx, c)).toBe(true);
   });
 
@@ -84,7 +88,11 @@ describe("WorkflowMatcher", () => {
   });
 
   it("contains operator matches substring", () => {
-    const c: TriggerCondition = { field: "original_path" as any, operator: "contains", value: "report" };
+    const c: TriggerCondition = {
+      field: "original_path" as any,
+      operator: "contains",
+      value: "report",
+    };
     // original_path isn't a standard field, use originalPath via ActionContext
     const c2: TriggerCondition = { field: "document_type", operator: "contains", value: "pd" };
     expect(matcher.matches(ctx, c2)).toBe(true);
@@ -168,11 +176,7 @@ describe("ActionExecutor", () => {
     const executor = new ActionExecutor().inject(async () => {
       throw new Error("email server down");
     });
-    const result = await executor.execute(
-      { type: "email", params: {} },
-      pdfContext(),
-      "wf-1",
-    );
+    const result = await executor.execute({ type: "email", params: {} }, pdfContext(), "wf-1");
     expect(result.success).toBe(false);
     expect(result.error).toContain("email server down");
   });
@@ -215,9 +219,7 @@ describe("WorkflowEngine", () => {
       name: "PDF Handler",
       enabled: true,
       conditions: [{ field: "mime_type", operator: "equals", value: "application/pdf" }],
-      actions: [
-        { type: "email", params: { to: "admin@example.com", subject: "New PDF" } },
-      ],
+      actions: [{ type: "email", params: { to: "admin@example.com", subject: "New PDF" } }],
     };
   }
 

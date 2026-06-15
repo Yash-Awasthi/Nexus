@@ -397,7 +397,6 @@ export interface HookRegistryOptions {
  * mutations during an active emit (mutations take effect on the next emit).
  */
 export class HookRegistry {
-   
   private readonly handlers = new Map<HookEvent, HandlerRecord[]>();
   private readonly plugins = new Map<string, Plugin>();
   private readonly store?: HookStore;
@@ -599,10 +598,7 @@ export class HookRegistry {
   }
 
   /** Run a handler, racing against an optional timeout. */
-  private async _runWithTimeout(
-    record: HandlerRecord,
-    payload: unknown,
-  ): Promise<HookResult> {
+  private async _runWithTimeout(record: HandlerRecord, payload: unknown): Promise<HookResult> {
     if (!record.timeoutMs) {
       return record.handler(payload);
     }

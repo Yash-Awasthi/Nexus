@@ -14,10 +14,10 @@ import {
 
 describe("extractFields", () => {
   const schema: FieldSchema[] = [
-    { name: "name",  type: "string",  pattern: /Name:\s*(.+)/i },
-    { name: "age",   type: "number",  pattern: /Age:\s*(\d+)/i },
-    { name: "email", type: "email",   pattern: /Email:\s*(\S+)/i },
-    { name: "active",type: "boolean", pattern: /Active:\s*(true|false)/i },
+    { name: "name", type: "string", pattern: /Name:\s*(.+)/i },
+    { name: "age", type: "number", pattern: /Age:\s*(\d+)/i },
+    { name: "email", type: "email", pattern: /Email:\s*(\S+)/i },
+    { name: "active", type: "boolean", pattern: /Active:\s*(true|false)/i },
   ];
 
   const doc = "Name: Alice\nAge: 30\nEmail: alice@example.com\nActive: true";

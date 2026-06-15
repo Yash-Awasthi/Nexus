@@ -23,6 +23,11 @@
 
 import { neon } from "@neondatabase/serverless";
 
+/** Escape special regex metacharacters in a literal string. */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface WikiArticle {
@@ -135,7 +140,7 @@ export class WikiStore {
     for (const article of this.articles.values()) {
       const text = (article.title + " " + article.content).toLowerCase();
       const score = terms.reduce((sum, term) => {
-        const count = (text.match(new RegExp(term, "g")) ?? []).length;
+        const count = (text.match(new RegExp(escapeRegExp(term), "g")) ?? []).length;
         return sum + count;
       }, 0);
       if (score > 0) scored.push({ article, score });

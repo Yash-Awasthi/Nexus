@@ -21,7 +21,7 @@ const US_RAW: RawMmdbRecord = {
   country: { names: { en: "United States" }, iso_code: "US" },
   continent: { names: { en: "North America" } },
   city: { names: { en: "New York" } },
-  location: { latitude: 40.71, longitude: -74.00, time_zone: "America/New_York" },
+  location: { latitude: 40.71, longitude: -74.0, time_zone: "America/New_York" },
   postal: { code: "10001" },
 };
 
@@ -69,25 +69,43 @@ describe("isEuCountry", () => {
 // ── isPrivateIp / normalizeIp ─────────────────────────────────────────────────
 
 describe("isPrivateIp", () => {
-  it("detects loopback", () => { expect(isPrivateIp("127.0.0.1")).toBe(true); });
-  it("detects 10.x.x.x", () => { expect(isPrivateIp("10.0.0.1")).toBe(true); });
-  it("detects 192.168.x.x", () => { expect(isPrivateIp("192.168.1.1")).toBe(true); });
-  it("detects 172.16.x.x", () => { expect(isPrivateIp("172.16.0.1")).toBe(true); });
-  it("detects 172.31.x.x", () => { expect(isPrivateIp("172.31.255.255")).toBe(true); });
+  it("detects loopback", () => {
+    expect(isPrivateIp("127.0.0.1")).toBe(true);
+  });
+  it("detects 10.x.x.x", () => {
+    expect(isPrivateIp("10.0.0.1")).toBe(true);
+  });
+  it("detects 192.168.x.x", () => {
+    expect(isPrivateIp("192.168.1.1")).toBe(true);
+  });
+  it("detects 172.16.x.x", () => {
+    expect(isPrivateIp("172.16.0.1")).toBe(true);
+  });
+  it("detects 172.31.x.x", () => {
+    expect(isPrivateIp("172.31.255.255")).toBe(true);
+  });
   it("returns false for public IPs", () => {
     expect(isPrivateIp("8.8.8.8")).toBe(false);
     expect(isPrivateIp("1.1.1.1")).toBe(false);
   });
-  it("detects IPv6 loopback", () => { expect(isPrivateIp("::1")).toBe(true); });
-  it("detects IPv6 link-local", () => { expect(isPrivateIp("fe80::1")).toBe(true); });
+  it("detects IPv6 loopback", () => {
+    expect(isPrivateIp("::1")).toBe(true);
+  });
+  it("detects IPv6 link-local", () => {
+    expect(isPrivateIp("fe80::1")).toBe(true);
+  });
 });
 
 describe("normalizeIp", () => {
   it("strips IPv4-mapped IPv6 prefix", () => {
     expect(normalizeIp("::ffff:8.8.8.8")).toBe("8.8.8.8");
   });
-  it("trims whitespace", () => { expect(normalizeIp("  8.8.8.8  ")).toBe("8.8.8.8"); });
-  it("leaves plain IPv4 unchanged", () => { expect(normalizeIp("1.2.3.4")).toBe("1.2.3.4"); });
+  it("trims whitespace", () => {
+    expect(normalizeIp("  8.8.8.8  ")).toBe("8.8.8.8");
+  });
+  it("leaves plain IPv4 unchanged", () => {
+    expect(normalizeIp("1.2.3.4")).toBe("1.2.3.4");
+  });
 });
 
 // ── MockMmdbReader ────────────────────────────────────────────────────────────
@@ -130,8 +148,15 @@ describe("MockMmdbReader", () => {
 // ── GeoIpCache ────────────────────────────────────────────────────────────────
 
 const stubRecord = (ip: string): GeoIpRecord => ({
-  ip, country: "US", countryCode: "US", continent: "NA",
-  lat: 0, lng: 0, timezone: "UTC", locale: "en-US", isEu: false,
+  ip,
+  country: "US",
+  countryCode: "US",
+  continent: "NA",
+  lat: 0,
+  lng: 0,
+  timezone: "UTC",
+  locale: "en-US",
+  isEu: false,
 });
 
 describe("GeoIpCache", () => {

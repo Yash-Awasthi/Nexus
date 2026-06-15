@@ -50,7 +50,7 @@ import { ThinkTagParser } from "@nexus/think-parser";
 import { globalTierGate, makeTierGatePreHandler } from "@nexus/tier-gate";
 import { KVTokenBudget, BudgetExceededError } from "@nexus/token-budget";
 import { createDefaultRegistry } from "@nexus/tool-registry";
-import type { ToolRegistry} from "@nexus/tool-registry";
+import type { ToolRegistry } from "@nexus/tool-registry";
 import {
   UltraplinianRunner,
   type SpeedTier,
@@ -61,7 +61,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 
 import { getPromptCache, PromptCache, type CacheableRequest } from "../lib/prompt-cache.js";
 import { getSharedKV } from "../lib/shared-kv.js";
-import { getTierFromRequest , requireAuth } from "../middleware/auth.js";
+import { getTierFromRequest, requireAuth } from "../middleware/auth.js";
 
 // ── Run-cost tracker (per-gateway-call USD accounting) ────────────────────────
 // Records inputTokens + outputTokens per completion; exposes GET /gateway/cost-report.

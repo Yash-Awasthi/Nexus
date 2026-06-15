@@ -158,6 +158,7 @@ export function extractLinks(text: string): string[] {
 
 /** Extract all email addresses from text. */
 export function extractEmails(text: string): string[] {
+  if (text.length > 1_000_000) throw new Error("input too large for email extraction");
   const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
   return [...new Set(text.match(emailRegex) ?? [])];
 }
@@ -169,6 +170,7 @@ export function extractEmails(text: string): string[] {
  * e.g. "Name: Alice\nAge: 30"
  */
 export function extractKeyValues(text: string): Record<string, string> {
+  if (text.length > 1_000_000) throw new Error("input too large for key-value extraction");
   const result: Record<string, string> = {};
   const lineRegex = /^([A-Za-z][\w\s]*?)\s*:\s*(.+)$/gm;
   let match: RegExpExecArray | null;

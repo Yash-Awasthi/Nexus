@@ -18,7 +18,9 @@ function makeRow(prompt: string, sessionId = "s-1"): PromptRow {
 
 describe("PrivacyCheckValidator.validate()", () => {
   let v: PrivacyCheckValidator;
-  beforeEach(() => { v = new PrivacyCheckValidator(); });
+  beforeEach(() => {
+    v = new PrivacyCheckValidator();
+  });
 
   it("row absent → WARN_RACE when allowOnAbsent=true", () => {
     const r = v.validate("s-1", null, false);

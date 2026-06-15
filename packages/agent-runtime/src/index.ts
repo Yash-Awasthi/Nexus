@@ -103,6 +103,10 @@ export class ToolStreamParser {
   }
 
   flush(): ToolCallRaw[] {
+    if (this.buffer.length > 100_000) {
+      this.buffer = "";
+      return [];
+    }
     const calls: ToolCallRaw[] = [];
     const regex = /\[TOOL:(\w+)\]([\s\S]*?)\[\/TOOL\]/g;
     let match: RegExpExecArray | null;

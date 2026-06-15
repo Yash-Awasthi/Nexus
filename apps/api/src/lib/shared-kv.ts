@@ -127,6 +127,5 @@ export function getSharedKV(): KVStore {
     _sharedKv = new MemoryKVStore();
   }
 
-   
   return _sharedKv!;
 }

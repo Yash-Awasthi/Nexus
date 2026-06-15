@@ -18,9 +18,15 @@ import {
 function msg(role: Message["role"], content: string): Message {
   return { role, content };
 }
-function sys(content = "You are a helpful assistant."): Message { return msg("system", content); }
-function user(content: string): Message { return msg("user", content); }
-function asst(content: string): Message { return msg("assistant", content); }
+function sys(content = "You are a helpful assistant."): Message {
+  return msg("system", content);
+}
+function user(content: string): Message {
+  return msg("user", content);
+}
+function asst(content: string): Message {
+  return msg("assistant", content);
+}
 
 function makeProvider(response = "Summarized."): { provider: LLMProvider; calls: LLMRequest[] } {
   const calls: LLMRequest[] = [];
@@ -127,7 +133,14 @@ describe("LLMSessionSummarizer.compress", () => {
   it("inserts a summary message after system", async () => {
     const { provider } = makeProvider("The conversation was about cats.");
     const summarizer = new LLMSessionSummarizer(provider);
-    const messages = [sys(), user("cats?"), asst("yes cats"), user("dogs?"), asst("no cats"), user("final")];
+    const messages = [
+      sys(),
+      user("cats?"),
+      asst("yes cats"),
+      user("dogs?"),
+      asst("no cats"),
+      user("final"),
+    ];
     const result = await summarizer.compress(messages, { keepRecentCount: 1 });
     const summaryMsg = result.messages[1];
     expect(summaryMsg!.role).toBe("assistant");
@@ -247,7 +260,13 @@ describe("AutoCompressor", () => {
   it("compresses when over budget", async () => {
     const s = new FixedSummarizer("sum", new NaiveTokenizer());
     const ac = new AutoCompressor(s, 1); // budget of 1 token
-    const messages = [user("this is a long message"), user("another one"), user("more"), user("and more content"), user("final")];
+    const messages = [
+      user("this is a long message"),
+      user("another one"),
+      user("more"),
+      user("and more content"),
+      user("final"),
+    ];
     const result = await ac.maybeCompress(messages);
     expect(result.summarizedCount).toBeGreaterThan(0);
   });

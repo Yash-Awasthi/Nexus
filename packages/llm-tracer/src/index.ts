@@ -344,7 +344,9 @@ export function startToolSpan(opts: ToolSpanOptions, tracer: ITracer = _global):
   if (opts.input) {
     try {
       span.setAttribute("tool.input_json", JSON.stringify(opts.input).slice(0, 512));
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
   }
   return span;
 }

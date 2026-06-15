@@ -31,8 +31,12 @@ function makeClock(step = 1): { now: NowFn; tick: (ms?: number) => void; reset: 
   let t = 0;
   return {
     now: () => t,
-    tick: (ms = step) => { t += ms; },
-    reset: () => { t = 0; },
+    tick: (ms = step) => {
+      t += ms;
+    },
+    reset: () => {
+      t = 0;
+    },
   };
 }
 
@@ -97,7 +101,9 @@ describe("LoadTestError", () => {
 describe("MetricsCollector", () => {
   let mc: MetricsCollector;
 
-  beforeEach(() => { mc = new MetricsCollector(); });
+  beforeEach(() => {
+    mc = new MetricsCollector();
+  });
 
   it("totalSamples starts at 0", () => {
     expect(mc.totalSamples).toBe(0);
@@ -226,18 +232,25 @@ describe("NullHttpClient", () => {
 describe("FetchHttpClient", () => {
   it("GET sends correct method and returns status", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
-      ok: true, status: 200, json: async () => ({ data: 1 }),
+      ok: true,
+      status: 200,
+      json: async () => ({ data: 1 }),
     });
     const client = new FetchHttpClient(mockFetch as typeof fetch);
     const r = await client.get("https://api.nexus.dev/health");
-    expect(mockFetch).toHaveBeenCalledWith("https://api.nexus.dev/health", expect.objectContaining({ method: "GET" }));
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://api.nexus.dev/health",
+      expect.objectContaining({ method: "GET" }),
+    );
     expect(r.ok).toBe(true);
     expect(r.body).toEqual({ data: 1 });
   });
 
   it("POST sends body as JSON", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
-      ok: true, status: 201, json: async () => ({}),
+      ok: true,
+      status: 201,
+      json: async () => ({}),
     });
     const client = new FetchHttpClient(mockFetch as typeof fetch);
     await client.post("https://api.nexus.dev/item", { name: "x" });
@@ -247,7 +260,11 @@ describe("FetchHttpClient", () => {
 
   it("handles non-JSON response body gracefully", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
-      ok: true, status: 204, json: async () => { throw new Error("no body"); },
+      ok: true,
+      status: 204,
+      json: async () => {
+        throw new Error("no body");
+      },
     });
     const client = new FetchHttpClient(mockFetch as typeof fetch);
     const r = await client.get("https://x.com");
@@ -256,7 +273,9 @@ describe("FetchHttpClient", () => {
 
   it("returns latencyMs >= 0", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
-      ok: true, status: 200, json: async () => ({}),
+      ok: true,
+      status: 200,
+      json: async () => ({}),
     });
     const client = new FetchHttpClient(mockFetch as typeof fetch);
     const r = await client.get("https://x.com");
@@ -268,7 +287,9 @@ describe("FetchHttpClient", () => {
 // evaluateThresholds
 // ─────────────────────────────────────────────────────────────────────────────
 
-function makeResult(overrides: Partial<LoadTestResult> = {}): Omit<LoadTestResult, "thresholdsPassed" | "thresholdViolations"> {
+function makeResult(
+  overrides: Partial<LoadTestResult> = {},
+): Omit<LoadTestResult, "thresholdsPassed" | "thresholdViolations"> {
   return {
     totalRequests: 100,
     successRequests: 99,
@@ -312,12 +333,16 @@ describe("evaluateThresholds", () => {
   });
 
   it("fails errorRatePercent when exceeded", () => {
-    const { violations } = evaluateThresholds(makeResult({ errorRatePercent: 10 }), { errorRatePercent: 5 });
+    const { violations } = evaluateThresholds(makeResult({ errorRatePercent: 10 }), {
+      errorRatePercent: 5,
+    });
     expect(violations[0]).toContain("error rate");
   });
 
   it("fails minThroughputRps when below threshold", () => {
-    const { violations } = evaluateThresholds(makeResult({ throughputRps: 5 }), { minThroughputRps: 20 });
+    const { violations } = evaluateThresholds(makeResult({ throughputRps: 5 }), {
+      minThroughputRps: 20,
+    });
     expect(violations[0]).toContain("throughput");
   });
 
@@ -350,19 +375,31 @@ describe("evaluateThresholds", () => {
 
 describe("LoadRunner — basic", () => {
   it("throws INVALID_CONFIG when stages array is empty", async () => {
-    const runner = new LoadRunner({ scenario: async () => {}, now: makeExactClock(1), sleep: noSleep });
+    const runner = new LoadRunner({
+      scenario: async () => {},
+      now: makeExactClock(1),
+      sleep: noSleep,
+    });
     await expect(runner.run({ stages: [] })).rejects.toMatchObject({ code: "INVALID_CONFIG" });
   });
 
   it("throws INVALID_CONFIG when vus is negative", async () => {
-    const runner = new LoadRunner({ scenario: async () => {}, now: makeExactClock(1), sleep: noSleep });
+    const runner = new LoadRunner({
+      scenario: async () => {},
+      now: makeExactClock(1),
+      sleep: noSleep,
+    });
     await expect(runner.run({ stages: [{ vus: -1, durationMs: 10 }] })).rejects.toMatchObject({
       code: "INVALID_CONFIG",
     });
   });
 
   it("throws INVALID_CONFIG when durationMs is negative", async () => {
-    const runner = new LoadRunner({ scenario: async () => {}, now: makeExactClock(1), sleep: noSleep });
+    const runner = new LoadRunner({
+      scenario: async () => {},
+      now: makeExactClock(1),
+      sleep: noSleep,
+    });
     await expect(runner.run({ stages: [{ vus: 1, durationMs: -1 }] })).rejects.toMatchObject({
       code: "INVALID_CONFIG",
     });
@@ -391,7 +428,9 @@ describe("LoadRunner — basic", () => {
   });
 
   it("failedRequests counts scenario exceptions", async () => {
-    const runner = makeRunner(async () => { throw new Error("crash"); });
+    const runner = makeRunner(async () => {
+      throw new Error("crash");
+    });
     const result = await runner.run(singleStage(1));
     expect(result.failedRequests).toBeGreaterThanOrEqual(1);
     expect(result.errorRatePercent).toBe(100);
@@ -423,13 +462,18 @@ describe("LoadRunner — basic", () => {
   it("VUContext.http is the configured client", async () => {
     const calls: string[] = [];
     const mockHttp = {
-      get: async (url: string) => { calls.push(url); return { status: 200, ok: true, body: null, latencyMs: 0 }; },
+      get: async (url: string) => {
+        calls.push(url);
+        return { status: 200, ok: true, body: null, latencyMs: 0 };
+      },
       post: async () => ({ status: 200, ok: true, body: null, latencyMs: 0 }),
       put: async () => ({ status: 200, ok: true, body: null, latencyMs: 0 }),
       del: async () => ({ status: 200, ok: true, body: null, latencyMs: 0 }),
     };
     const runner = new LoadRunner({
-      scenario: async (ctx) => { await ctx.http.get("https://nexus.dev/ping"); },
+      scenario: async (ctx) => {
+        await ctx.http.get("https://nexus.dev/ping");
+      },
       http: mockHttp,
       now: makeExactClock(1),
       sleep: noSleep,
@@ -497,7 +541,9 @@ describe("LoadRunner — thresholds", () => {
   });
 
   it("thresholdsPassed:false when error rate threshold violated", async () => {
-    const runner = makeRunner(async () => { throw new Error("fail"); });
+    const runner = makeRunner(async () => {
+      throw new Error("fail");
+    });
     const result = await runner.run({
       ...singleStage(),
       thresholds: { errorRatePercent: 0 },
@@ -507,7 +553,9 @@ describe("LoadRunner — thresholds", () => {
   });
 
   it("thresholdViolations contains descriptive message", async () => {
-    const runner = makeRunner(async () => { throw new Error("fail"); });
+    const runner = makeRunner(async () => {
+      throw new Error("fail");
+    });
     const result = await runner.run({
       ...singleStage(),
       thresholds: { errorRatePercent: 0 },
@@ -554,12 +602,18 @@ describe("LoadRunner — latency", () => {
 describe("withPacing", () => {
   it("calls original scenario then sleeps", async () => {
     const calls: string[] = [];
-    const scenario: ScenarioFn = async () => { calls.push("scenario"); };
-    const sleepFn = vi.fn(async (_ms: number) => { calls.push("sleep"); });
+    const scenario: ScenarioFn = async () => {
+      calls.push("scenario");
+    };
+    const sleepFn = vi.fn(async (_ms: number) => {
+      calls.push("sleep");
+    });
     const paced = withPacing(scenario, 100);
 
     const ctx: VUContext = {
-      vuId: 1, iteration: 1, http: new NullHttpClient(),
+      vuId: 1,
+      iteration: 1,
+      http: new NullHttpClient(),
       check: () => {},
       sleep: sleepFn,
     };
@@ -572,12 +626,21 @@ describe("withPacing", () => {
 describe("sequential", () => {
   it("runs all scenarios in order", async () => {
     const order: number[] = [];
-    const s1: ScenarioFn = async () => { order.push(1); };
-    const s2: ScenarioFn = async () => { order.push(2); };
-    const s3: ScenarioFn = async () => { order.push(3); };
+    const s1: ScenarioFn = async () => {
+      order.push(1);
+    };
+    const s2: ScenarioFn = async () => {
+      order.push(2);
+    };
+    const s3: ScenarioFn = async () => {
+      order.push(3);
+    };
     const ctx: VUContext = {
-      vuId: 1, iteration: 1, http: new NullHttpClient(),
-      check: () => {}, sleep: noSleep,
+      vuId: 1,
+      iteration: 1,
+      http: new NullHttpClient(),
+      check: () => {},
+      sleep: noSleep,
     };
     await sequential(s1, s2, s3)(ctx);
     expect(order).toEqual([1, 2, 3]);
@@ -585,12 +648,21 @@ describe("sequential", () => {
 
   it("stops on first thrown error", async () => {
     const order: number[] = [];
-    const s1: ScenarioFn = async () => { order.push(1); };
-    const s2: ScenarioFn = async () => { throw new Error("stop"); };
-    const s3: ScenarioFn = async () => { order.push(3); };
+    const s1: ScenarioFn = async () => {
+      order.push(1);
+    };
+    const s2: ScenarioFn = async () => {
+      throw new Error("stop");
+    };
+    const s3: ScenarioFn = async () => {
+      order.push(3);
+    };
     const ctx: VUContext = {
-      vuId: 1, iteration: 1, http: new NullHttpClient(),
-      check: () => {}, sleep: noSleep,
+      vuId: 1,
+      iteration: 1,
+      http: new NullHttpClient(),
+      check: () => {},
+      sleep: noSleep,
     };
     await expect(sequential(s1, s2, s3)(ctx)).rejects.toThrow("stop");
     expect(order).toEqual([1]);
@@ -600,12 +672,22 @@ describe("sequential", () => {
 describe("weighted", () => {
   it("always calls one of the scenarios", async () => {
     const called: number[] = [];
-    const s1: ScenarioFn = async () => { called.push(1); };
-    const s2: ScenarioFn = async () => { called.push(2); };
-    const pick = weighted([{ scenario: s1, weight: 1 }, { scenario: s2, weight: 1 }]);
+    const s1: ScenarioFn = async () => {
+      called.push(1);
+    };
+    const s2: ScenarioFn = async () => {
+      called.push(2);
+    };
+    const pick = weighted([
+      { scenario: s1, weight: 1 },
+      { scenario: s2, weight: 1 },
+    ]);
     const ctx: VUContext = {
-      vuId: 1, iteration: 1, http: new NullHttpClient(),
-      check: () => {}, sleep: noSleep,
+      vuId: 1,
+      iteration: 1,
+      http: new NullHttpClient(),
+      check: () => {},
+      sleep: noSleep,
     };
     await pick(ctx);
     expect(called).toHaveLength(1);
@@ -613,16 +695,26 @@ describe("weighted", () => {
 
   it("respects weight bias to always pick same scenario when rng returns 0", async () => {
     const called: number[] = [];
-    const s1: ScenarioFn = async () => { called.push(1); };
-    const s2: ScenarioFn = async () => { called.push(2); };
+    const s1: ScenarioFn = async () => {
+      called.push(1);
+    };
+    const s2: ScenarioFn = async () => {
+      called.push(2);
+    };
     // rng always returns 0 → r * totalWeight = 0 → always picks s1 (r - w1 <= 0)
     const pick = weighted(
-      [{ scenario: s1, weight: 99 }, { scenario: s2, weight: 1 }],
+      [
+        { scenario: s1, weight: 99 },
+        { scenario: s2, weight: 1 },
+      ],
       () => 0,
     );
     const ctx: VUContext = {
-      vuId: 1, iteration: 1, http: new NullHttpClient(),
-      check: () => {}, sleep: noSleep,
+      vuId: 1,
+      iteration: 1,
+      http: new NullHttpClient(),
+      check: () => {},
+      sleep: noSleep,
     };
     for (let i = 0; i < 5; i++) await pick(ctx);
     expect(called.every((v) => v === 1)).toBe(true);
@@ -630,15 +722,25 @@ describe("weighted", () => {
 
   it("falls back to last scenario when rng returns exactly 1", async () => {
     const called: number[] = [];
-    const s1: ScenarioFn = async () => { called.push(1); };
-    const s2: ScenarioFn = async () => { called.push(2); };
+    const s1: ScenarioFn = async () => {
+      called.push(1);
+    };
+    const s2: ScenarioFn = async () => {
+      called.push(2);
+    };
     const pick = weighted(
-      [{ scenario: s1, weight: 1 }, { scenario: s2, weight: 1 }],
+      [
+        { scenario: s1, weight: 1 },
+        { scenario: s2, weight: 1 },
+      ],
       () => 1, // r * totalWeight = 2, never subtracts to <= 0 in loop
     );
     const ctx: VUContext = {
-      vuId: 1, iteration: 1, http: new NullHttpClient(),
-      check: () => {}, sleep: noSleep,
+      vuId: 1,
+      iteration: 1,
+      http: new NullHttpClient(),
+      check: () => {},
+      sleep: noSleep,
     };
     await pick(ctx);
     expect(called[0]).toBe(2); // fallback to last
@@ -667,7 +769,9 @@ describe("DEFAULT_THRESHOLDS", () => {
   });
 
   it("fails when error rate exceeds default (no explicit thresholds)", async () => {
-    const runner = makeRunner(async () => { throw new Error("always fail"); });
+    const runner = makeRunner(async () => {
+      throw new Error("always fail");
+    });
     const result = await runner.run(singleStage(1));
     // 100% error rate > DEFAULT_THRESHOLDS.errorRatePercent (5)
     expect(result.thresholdsPassed).toBe(false);
@@ -675,7 +779,9 @@ describe("DEFAULT_THRESHOLDS", () => {
   });
 
   it("thresholds:{} disables all conditions (explicit opt-out passes even at 100% errors)", async () => {
-    const runner = makeRunner(async () => { throw new Error("always fail"); });
+    const runner = makeRunner(async () => {
+      throw new Error("always fail");
+    });
     const result = await runner.run({ ...singleStage(1), thresholds: {} });
     expect(result.thresholdsPassed).toBe(true);
     expect(result.thresholdViolations).toHaveLength(0);

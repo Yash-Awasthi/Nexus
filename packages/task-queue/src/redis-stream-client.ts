@@ -53,8 +53,8 @@ async function getRedis(url: string): Promise<import("ioredis").Redis> {
 
 // ── RedisStreamClient ─────────────────────────────────────────────────────────
 
-const CONSUMER_GROUP    = "nexus-workers";
-const STALE_IDLE_MS     = 30_000; // reclaim messages idle > 30s
+const CONSUMER_GROUP = "nexus-workers";
+const STALE_IDLE_MS = 30_000; // reclaim messages idle > 30s
 
 export class RedisStreamClient {
   private redisUrl: string;
@@ -80,10 +80,18 @@ export class RedisStreamClient {
     return this._ready;
   }
 
-  private streamKey(name: string): string { return `nexus:stream:${name}`; }
-  private failedKey(name: string): string { return `nexus:failed:${name}`; }
-  private dlqKey(name: string): string    { return `nexus:dlq:${name}`; }
-  private taskKey(msgId: string): string  { return `nexus:task:${msgId}`; }
+  private streamKey(name: string): string {
+    return `nexus:stream:${name}`;
+  }
+  private failedKey(name: string): string {
+    return `nexus:failed:${name}`;
+  }
+  private dlqKey(name: string): string {
+    return `nexus:dlq:${name}`;
+  }
+  private taskKey(msgId: string): string {
+    return `nexus:task:${msgId}`;
+  }
 
   /**
    * Ensure the consumer group exists for this stream.
@@ -110,11 +118,12 @@ export class RedisStreamClient {
     const r = await this.redis();
 
     // XADD nexus:stream:{name} * task {json}
-    const msgId = await r.xadd(
+    const msgId = (await r.xadd(
       this.streamKey(stream),
-      "*",           // auto-generate message ID
-      "task", JSON.stringify(task),
-    ) as string;
+      "*", // auto-generate message ID
+      "task",
+      JSON.stringify(task),
+    )) as string;
 
     if (!msgId) throw new Error(`RedisStreamClient: XADD returned null for stream "${stream}"`);
 
@@ -144,11 +153,15 @@ export class RedisStreamClient {
       // XAUTOCLAIM stream group consumer min-idle-time start COUNT count
       // Returns: [nextId, [[msgId, [field, val, ...]], ...], [deletedIds]]
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const claimed = await (r as any).xautoclaim(
-        key, CONSUMER_GROUP, this.consumer,
-        STALE_IDLE_MS, "0-0",
-        "COUNT", count,
-      ) as [string, [string, string[]][], string[]?] | null;
+      const claimed = (await (r as any).xautoclaim(
+        key,
+        CONSUMER_GROUP,
+        this.consumer,
+        STALE_IDLE_MS,
+        "0-0",
+        "COUNT",
+        count,
+      )) as [string, [string, string[]][], string[]?] | null;
 
       if (claimed && claimed[1]?.length) {
         for (const [msgId, fields] of claimed[1]) {
@@ -165,11 +178,16 @@ export class RedisStreamClient {
     // ── 2. Read new messages with XREADGROUP ──────────────────────────────
     // ">" means deliver messages not yet delivered to any consumer
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const results = await (r as any).xreadgroup(
-      "GROUP", CONSUMER_GROUP, this.consumer,
-      "COUNT", count - tasks.length,
-      "STREAMS", key, ">",
-    ) as [string, [string, string[]][]][] | null;
+    const results = (await (r as any).xreadgroup(
+      "GROUP",
+      CONSUMER_GROUP,
+      this.consumer,
+      "COUNT",
+      count - tasks.length,
+      "STREAMS",
+      key,
+      ">",
+    )) as [string, [string, string[]][]][] | null;
 
     if (results) {
       for (const [, messages] of results) {
@@ -207,12 +225,29 @@ export class RedisStreamClient {
     const raw = await r.get(this.taskKey(taskId));
     const task: Task = raw
       ? { ...(JSON.parse(raw) as Task), status: "failed" as TaskStatus, lastError: error }
-      : { id: taskId, name: "unknown", payload: null, status: "failed", createdAt: Date.now(), attempts: 0, maxRetries: 0 } as unknown as Task;
+      : ({
+          id: taskId,
+          name: "unknown",
+          payload: null,
+          status: "failed",
+          createdAt: Date.now(),
+          attempts: 0,
+          maxRetries: 0,
+        } as unknown as Task);
 
     await Promise.all([
       r.xack(this.streamKey(stream), CONSUMER_GROUP, taskId),
       r.hset(this.failedKey(stream), taskId, JSON.stringify(task)),
-      r.xadd(this.dlqKey(stream), "*", "taskId", taskId, "error", error, "failedAt", String(Date.now())),
+      r.xadd(
+        this.dlqKey(stream),
+        "*",
+        "taskId",
+        taskId,
+        "error",
+        error,
+        "failedAt",
+        String(Date.now()),
+      ),
       r.del(this.taskKey(taskId)),
     ]);
   }
@@ -239,9 +274,9 @@ export class RedisStreamClient {
 
     // Active tasks via XRANGE (includes delivered + pending)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const entries = await (r as any).xrange(
-      this.streamKey(stream), "-", "+",
-    ) as [string, string[]][] | null;
+    const entries = (await (r as any).xrange(this.streamKey(stream), "-", "+")) as
+      | [string, string[]][]
+      | null;
 
     if (entries) {
       for (const [msgId] of entries) {
@@ -251,7 +286,7 @@ export class RedisStreamClient {
     }
 
     // Failed tasks from dead-letter hash
-    const failedMap = await r.hgetall(this.failedKey(stream)) ?? {};
+    const failedMap = (await r.hgetall(this.failedKey(stream))) ?? {};
     for (const raw of Object.values(failedMap)) {
       const t = JSON.parse(raw) as Task;
       // Avoid duplicates (shouldn't happen but guard anyway)
@@ -274,7 +309,7 @@ export class RedisStreamClient {
       const key = this.streamKey(stream);
       // XRANGE to get all msgIds for task key cleanup
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const entries = await (r as any).xrange(key, "-", "+") as [string, string[]][] | null;
+      const entries = (await (r as any).xrange(key, "-", "+")) as [string, string[]][] | null;
       if (entries?.length) {
         const taskKeys = entries.map(([msgId]) => this.taskKey(msgId));
         await r.del(...taskKeys);
@@ -353,7 +388,11 @@ export class AsyncTaskQueue {
     this.handlers.set(name, handler as TaskHandler);
   }
 
-  async enqueue<T = unknown>(name: string, payload: T, opts: EnqueueOptions = {}): Promise<Task<T>> {
+  async enqueue<T = unknown>(
+    name: string,
+    payload: T,
+    opts: EnqueueOptions = {},
+  ): Promise<Task<T>> {
     const now = Date.now();
     const runAt = opts.delayMs ? now + opts.delayMs : undefined;
     const status: Task["status"] = runAt ? "delayed" : "pending";

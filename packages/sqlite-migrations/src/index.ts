@@ -125,6 +125,7 @@ export class InMemoryDbClient implements DbClient {
   // ── Internal mini-SQL interpreter ─────────────────────────────────────────
 
   private _interpret(sql: string, params: unknown[] = []): void {
+    if (sql.length > 100_000) throw new Error("SQL statement too large");
     const s = sql.trim().replace(/\s+/g, " ");
 
     // CREATE TABLE [IF NOT EXISTS] name (col1 type, …)
@@ -164,7 +165,9 @@ export class InMemoryDbClient implements DbClient {
     }
 
     // CREATE INDEX [IF NOT EXISTS] name ON table (…)
-    const idxMatch = /CREATE(?:\s+UNIQUE)?\s+INDEX(?:\s+IF NOT EXISTS)?\s+(\w+)\s+ON\s+(\w+)/i.exec(s);
+    const idxMatch = /CREATE(?:\s+UNIQUE)?\s+INDEX(?:\s+IF NOT EXISTS)?\s+(\w+)\s+ON\s+(\w+)/i.exec(
+      s,
+    );
     if (idxMatch) {
       const idxName = idxMatch[1]!;
       const tbl = idxMatch[2]!;
@@ -175,7 +178,8 @@ export class InMemoryDbClient implements DbClient {
     }
 
     // INSERT INTO / INSERT OR IGNORE INTO / INSERT OR REPLACE INTO
-    const insertMatch = /INSERT(?:\s+OR\s+\w+)?\s+INTO\s+(\w+)\s*\(([^)]+)\)\s+VALUES\s*\(([^)]+)\)/i.exec(s);
+    const insertMatch =
+      /INSERT(?:\s+OR\s+\w+)?\s+INTO\s+(\w+)\s*\(([^)]+)\)\s+VALUES\s*\(([^)]+)\)/i.exec(s);
     if (insertMatch) {
       const tbl = insertMatch[1]!;
       const colNames = insertMatch[2]!.split(",").map((c) => c.trim());
@@ -223,7 +227,10 @@ export class InMemoryDbClient implements DbClient {
     const s = sql.trim().replace(/\s+/g, " ");
 
     // SELECT * FROM table WHERE col = ?
-    const selMatch = /SELECT\s+(.+?)\s+FROM\s+(\w+)(?:\s+WHERE\s+(\w+)\s*=\s*\?)?(?:\s+ORDER BY\s+(\w+))?/i.exec(s);
+    const selMatch =
+      /SELECT\s+(.+?)\s+FROM\s+(\w+)(?:\s+WHERE\s+(\w+)\s*=\s*\?)?(?:\s+ORDER BY\s+(\w+))?/i.exec(
+        s,
+      );
     if (selMatch) {
       const tbl = selMatch[2]!;
       const whereCol = selMatch[3];
@@ -290,7 +297,7 @@ export class MigrationRunner {
     return stmt.all<AppliedMigration>().map((r) => ({
       version: r.version,
       name: r.name,
-       
+
       appliedAt: (r as unknown)["applied_at"] as string,
     }));
   }
@@ -453,7 +460,8 @@ export class SchemaRepair {
    * Returns a summary of actions taken.
    */
   repairAll(
-    actions: (| {
+    actions: (
+      | {
           type: "addColumn";
           table: string;
           column: string;
@@ -472,7 +480,8 @@ export class SchemaRepair {
           table: string;
           columns: string;
           unique?: boolean;
-        })[],
+        }
+    )[],
   ): string[] {
     const log: string[] = [];
     for (const action of actions) {

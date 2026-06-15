@@ -137,7 +137,10 @@ export const api = {
       for (const line of lines) {
         if (!line.startsWith("data: ")) continue;
         const raw = line.slice(6).trim();
-        if (raw === "[DONE]") { done = true; break; }
+        if (raw === "[DONE]") {
+          done = true;
+          break;
+        }
 
         try {
           const event = JSON.parse(raw) as Record<string, unknown>;
@@ -145,7 +148,7 @@ export const api = {
 
           if (evType === "message_start") {
             const msg = event.message as Record<string, unknown>;
-            if (msg.id)    responseId    = msg.id    as string;
+            if (msg.id) responseId = msg.id as string;
             if (msg.model) responseModel = msg.model as string;
           } else if (evType === "content_block_delta") {
             const delta = event.delta as Record<string, unknown>;
@@ -176,10 +179,10 @@ export const api = {
 
   /** List available gateway model aliases + configured providers. */
   gatewayModels: () =>
-    request<{ models: { id: string; provider: string; backend_model: string; available: boolean }[]; providers: string[] }>(
-      "GET",
-      "/api/v1/gateway/models",
-    ),
+    request<{
+      models: { id: string; provider: string; backend_model: string; available: boolean }[];
+      providers: string[];
+    }>("GET", "/api/v1/gateway/models"),
 
   // ── Context pack ─────────────────────────────────────────────────────────
 
@@ -205,27 +208,30 @@ export const api = {
     ),
 
   stmTransform: (text: string, moduleIds?: string[], maxChars?: number) =>
-    request<{ original: string; transformed: string; modules: unknown[]; truncated: boolean; charCount: number }>(
-      "POST",
-      "/api/v1/stm/transform",
-      { text, moduleIds, maxChars },
-    ),
+    request<{
+      original: string;
+      transformed: string;
+      modules: unknown[];
+      truncated: boolean;
+      charCount: number;
+    }>("POST", "/api/v1/stm/transform", { text, moduleIds, maxChars }),
 
   stmTransformPartial: (text: string, moduleIds?: string[], maxChars?: number) =>
-    request<{ original: string; transformed: string; modules: unknown[]; truncated: boolean; charCount: number }>(
-      "POST",
-      "/api/v1/stm/transform/partial",
-      { text, moduleIds, maxChars },
-    ),
+    request<{
+      original: string;
+      transformed: string;
+      modules: unknown[];
+      truncated: boolean;
+      charCount: number;
+    }>("POST", "/api/v1/stm/transform/partial", { text, moduleIds, maxChars }),
 
   // ── Chat suggestions ─────────────────────────────────────────────────────
 
   chatSuggestions: (lastMessage?: string, limit = 3) =>
-    request<{ suggestions: string[]; total: number }>(
-      "POST",
-      "/api/v1/chat-suggestions",
-      { last_message: lastMessage, limit },
-    ),
+    request<{ suggestions: string[]; total: number }>("POST", "/api/v1/chat-suggestions", {
+      last_message: lastMessage,
+      limit,
+    }),
 
   chatSuggestionTopics: (limit = 6) =>
     request<{ topics: string[]; total: number }>(
@@ -238,8 +244,7 @@ export const api = {
   wikiArticles: () =>
     request<{ articles: WikiArticle[]; total: number }>("GET", "/api/v1/wiki/articles"),
 
-  wikiArticle: (id: string) =>
-    request<WikiArticle>("GET", `/api/v1/wiki/articles/${id}`),
+  wikiArticle: (id: string) => request<WikiArticle>("GET", `/api/v1/wiki/articles/${id}`),
 
   wikiSearch: (q: string, limit = 10) =>
     request<{ articles: WikiArticle[]; total: number }>(
@@ -254,8 +259,7 @@ export const api = {
       { document, dryRun },
     ),
 
-  wikiDeleteArticle: (id: string) =>
-    request<void>("DELETE", `/api/v1/wiki/articles/${id}`),
+  wikiDeleteArticle: (id: string) => request<void>("DELETE", `/api/v1/wiki/articles/${id}`),
 
   wikiReindex: () =>
     request<{ terms: number; articles: number }>("POST", "/api/v1/wiki/reindex", {}),
@@ -289,8 +293,7 @@ export const api = {
       `/api/v1/corpus/batches${limit ? `?limit=${limit}` : ""}`,
     ),
 
-  corpusBatch: (id: string) =>
-    request<unknown>("GET", `/api/v1/corpus/batches/${id}`),
+  corpusBatch: (id: string) => request<unknown>("GET", `/api/v1/corpus/batches/${id}`),
 
   corpusAddSample: (sample: {
     prompt: string;
@@ -317,8 +320,7 @@ export const api = {
       { name },
     ),
 
-  corpusPending: () =>
-    request<{ pending: number }>("GET", "/api/v1/corpus/pending"),
+  corpusPending: () => request<{ pending: number }>("GET", "/api/v1/corpus/pending"),
 
   // ── Observation providers / Memory ────────────────────────────────────────
 
@@ -334,18 +336,23 @@ export const api = {
     );
   },
 
-  obsGenerate: (sessionId: string, events: { role: string; content: string }[], opts?: { category?: string; tags?: string[] }) =>
-    request<{ observation: unknown | null; result: unknown }>(
-      "POST",
-      "/api/v1/obs/generate",
-      { sessionId, events, ...opts },
-    ),
+  obsGenerate: (
+    sessionId: string,
+    events: { role: string; content: string }[],
+    opts?: { category?: string; tags?: string[] },
+  ) =>
+    request<{ observation: unknown | null; result: unknown }>("POST", "/api/v1/obs/generate", {
+      sessionId,
+      events,
+      ...opts,
+    }),
 
-  obsStore: (content: string, opts?: { category?: string; tags?: string[]; confidence?: number; sessionId?: string }) =>
-    request<MemoryEntry>("POST", "/api/v1/obs/store", { content, ...opts }),
+  obsStore: (
+    content: string,
+    opts?: { category?: string; tags?: string[]; confidence?: number; sessionId?: string },
+  ) => request<MemoryEntry>("POST", "/api/v1/obs/store", { content, ...opts }),
 
-  obsDelete: (id: string) =>
-    request<void>("DELETE", `/api/v1/obs/${id}`),
+  obsDelete: (id: string) => request<void>("DELETE", `/api/v1/obs/${id}`),
 
   obsProviders: () =>
     request<{ providers: { name: string; model: string }[] }>("GET", "/api/v1/obs/providers"),
@@ -358,30 +365,36 @@ export const api = {
     if (opts?.limit) p.set("limit", String(opts.limit));
     if (opts?.minConfidence) p.set("minConfidence", String(opts.minConfidence));
     return request<{ nodes: unknown[]; edges: unknown[]; totalNodes: number; totalEdges: number }>(
-      "GET", `/api/v1/knowledge-graph/nodes${p.toString() ? `?${p}` : ""}`,
+      "GET",
+      `/api/v1/knowledge-graph/nodes${p.toString() ? `?${p}` : ""}`,
     );
   },
 
   kgSearch: (q: string, k = 20) =>
     request<{ nodes: unknown[]; edges: unknown[]; totalNodes: number; totalEdges: number }>(
-      "GET", `/api/v1/knowledge-graph/search?q=${encodeURIComponent(q)}&k=${k}`,
+      "GET",
+      `/api/v1/knowledge-graph/search?q=${encodeURIComponent(q)}&k=${k}`,
     ),
 
   kgNode: (id: string) => request<unknown>("GET", `/api/v1/knowledge-graph/nodes/${id}`),
 
   kgRelated: (id: string, direction?: "outbound" | "inbound" | "both") =>
     request<{ node: unknown; neighbors: unknown[] }>(
-      "GET", `/api/v1/knowledge-graph/nodes/${id}/related${direction ? `?direction=${direction}` : ""}`,
+      "GET",
+      `/api/v1/knowledge-graph/nodes/${id}/related${direction ? `?direction=${direction}` : ""}`,
     ),
 
   kgIngest: (text: string, source?: string) =>
     request<{ nodesAdded: number; nodesMerged: number; edgesAdded: number; edgesMerged: number }>(
-      "POST", "/api/v1/knowledge-graph/ingest", { text, source },
+      "POST",
+      "/api/v1/knowledge-graph/ingest",
+      { text, source },
     ),
 
   kgStats: () =>
     request<{ nodes: number; edges: number; nodesByType: Record<string, number> }>(
-      "GET", "/api/v1/knowledge-graph/stats",
+      "GET",
+      "/api/v1/knowledge-graph/stats",
     ),
 
   kgDeleteNode: (id: string) => request<void>("DELETE", `/api/v1/knowledge-graph/nodes/${id}`),
@@ -396,69 +409,95 @@ export const api = {
     n?: number;
     style?: "vivid" | "natural";
   }) =>
-    request<{ images: { id: string; url: string; prompt: string; model: string; size: string; createdAt: string }[]; latencyMs: number }>(
-      "POST", "/api/v1/image-gen/generate", opts,
-    ),
+    request<{
+      images: {
+        id: string;
+        url: string;
+        prompt: string;
+        model: string;
+        size: string;
+        createdAt: string;
+      }[];
+      latencyMs: number;
+    }>("POST", "/api/v1/image-gen/generate", opts),
 
   imageModels: () =>
     request<{ models: { id: string; label: string; provider: string; available: boolean }[] }>(
-      "GET", "/api/v1/image-gen/models",
+      "GET",
+      "/api/v1/image-gen/models",
     ),
 
   imageHistory: (limit = 20) =>
     request<{ images: unknown[]; total: number }>(
-      "GET", `/api/v1/image-gen/history?limit=${limit}`,
+      "GET",
+      `/api/v1/image-gen/history?limit=${limit}`,
     ),
 
   // ── Voice ─────────────────────────────────────────────────────────────────
 
   voiceChat: (text: string, voice?: string) =>
-    request<{ text: string; latencyMs: number }>(
-      "POST", "/api/v1/voice/chat", { text, voice },
-    ),
+    request<{ text: string; latencyMs: number }>("POST", "/api/v1/voice/chat", { text, voice }),
 
   voiceTranscribe: (audioBase64: string, format = "wav", sampleRate = 16000) =>
-    request<{ transcript: string; latencyMs: number }>(
-      "POST", "/api/v1/voice/transcribe", { audio: audioBase64, format, sampleRate },
-    ),
+    request<{ transcript: string; latencyMs: number }>("POST", "/api/v1/voice/transcribe", {
+      audio: audioBase64,
+      format,
+      sampleRate,
+    }),
 
   voiceVoices: () =>
     request<{ voices: { id: string; label: string; provider: string }[] }>(
-      "GET", "/api/v1/voice/voices",
+      "GET",
+      "/api/v1/voice/voices",
     ),
 
   voiceProviders: () =>
-    request<{ transcribe: unknown; synthesize: unknown }>(
-      "GET", "/api/v1/voice/providers",
-    ),
+    request<{ transcribe: unknown; synthesize: unknown }>("GET", "/api/v1/voice/providers"),
 
   // ── Billing ───────────────────────────────────────────────────────────────
 
   billingPlan: () =>
-    request<{ plan: { name: string; price: number; tier: string; features: string[]; tokensPerMonth: number } }>(
-      "GET", "/api/v1/billing/plan",
-    ),
+    request<{
+      plan: {
+        name: string;
+        price: number;
+        tier: string;
+        features: string[];
+        tokensPerMonth: number;
+      };
+    }>("GET", "/api/v1/billing/plan"),
 
   billingPeriod: () =>
-    request<{ period: { startDate: string; endDate: string; tokensUsed: number; tokensLimit: number; requestsCount: number } }>(
-      "GET", "/api/v1/billing/current-period",
-    ),
+    request<{
+      period: {
+        startDate: string;
+        endDate: string;
+        tokensUsed: number;
+        tokensLimit: number;
+        requestsCount: number;
+      };
+    }>("GET", "/api/v1/billing/current-period"),
 
-  billingKeys: () =>
-    request<{ keys: unknown[] }>("GET", "/api/v1/billing/keys"),
+  billingKeys: () => request<{ keys: unknown[] }>("GET", "/api/v1/billing/keys"),
 
   billingCreateKey: (name: string, scopes?: string[]) =>
     request<{ id: string; name: string; rawKey: string; keyPrefix: string; createdAt: number }>(
-      "POST", "/api/v1/billing/keys", { name, scopes },
+      "POST",
+      "/api/v1/billing/keys",
+      { name, scopes },
     ),
 
   billingRevokeKey: (id: string) => request<void>("DELETE", `/api/v1/billing/keys/${id}`),
 
   /** Create a Stripe Checkout session — caller must redirect to returned url. */
-  billingCheckout: (plan: "pro" | "enterprise", opts?: { successUrl?: string; cancelUrl?: string }) =>
-    request<{ sessionId: string; url: string }>(
-      "POST", "/api/v1/billing/checkout", { plan, ...opts },
-    ),
+  billingCheckout: (
+    plan: "pro" | "enterprise",
+    opts?: { successUrl?: string; cancelUrl?: string },
+  ) =>
+    request<{ sessionId: string; url: string }>("POST", "/api/v1/billing/checkout", {
+      plan,
+      ...opts,
+    }),
 
   /** Create a Stripe Customer Portal session — caller must redirect to returned url. */
   billingPortal: (returnUrl?: string) =>
@@ -466,49 +505,77 @@ export const api = {
 
   billingQuota: () =>
     request<{ allowed: boolean; reason?: string; tokensRemaining?: number }>(
-      "GET", "/api/v1/billing/quota",
+      "GET",
+      "/api/v1/billing/quota",
     ),
 
   // ── Admin ─────────────────────────────────────────────────────────────────
 
   adminRoutes: () =>
-    request<{ routes: { alias: string; model: string; provider: string; overridden: boolean }[]; total: number }>(
-      "GET", "/api/v1/admin/routes",
-    ),
+    request<{
+      routes: { alias: string; model: string; provider: string; overridden: boolean }[];
+      total: number;
+    }>("GET", "/api/v1/admin/routes"),
 
   adminStats: (alias?: string) =>
-    request<{ stats: { alias: string; requests: number; totalTokens: number; errors: number; avgLatencyMs: number }[] }>(
-      "GET", `/api/v1/admin/stats${alias ? `?alias=${encodeURIComponent(alias)}` : ""}`,
-    ),
+    request<{
+      stats: {
+        alias: string;
+        requests: number;
+        totalTokens: number;
+        errors: number;
+        avgLatencyMs: number;
+      }[];
+    }>("GET", `/api/v1/admin/stats${alias ? `?alias=${encodeURIComponent(alias)}` : ""}`),
 
   adminSettings: () =>
-    request<{ settings: { tracing: boolean; logLevel: string; rateLimitRpm: number; maxTokens: number; defaultModel: string } }>(
-      "GET", "/api/v1/admin/settings",
-    ),
+    request<{
+      settings: {
+        tracing: boolean;
+        logLevel: string;
+        rateLimitRpm: number;
+        maxTokens: number;
+        defaultModel: string;
+      };
+    }>("GET", "/api/v1/admin/settings"),
 
   adminUpdateSettings: (patch: Record<string, unknown>) =>
     request<{ settings: unknown }>("POST", "/api/v1/admin/settings", patch),
 
   adminAddRoute: (alias: string, model: string, provider: string) =>
-    request<{ alias: string; model: string; provider: string }>(
-      "POST", "/api/v1/admin/routes", { alias, model, provider },
-    ),
+    request<{ alias: string; model: string; provider: string }>("POST", "/api/v1/admin/routes", {
+      alias,
+      model,
+      provider,
+    }),
 
   adminOverrideAlias: (alias: string, model: string) =>
     request<{ alias: string; overrideModel: string }>(
-      "POST", `/api/v1/admin/routes/${encodeURIComponent(alias)}/override`, { model },
+      "POST",
+      `/api/v1/admin/routes/${encodeURIComponent(alias)}/override`,
+      { model },
     ),
 
   // ── Feature Flags ─────────────────────────────────────────────────────────
 
   featureFlags: () =>
-    request<{ flags: { key: string; value: boolean | string | number; default: unknown; type: string; description?: string; overridden: boolean }[]; total: number }>(
-      "GET", "/api/v1/feature-flags",
-    ),
+    request<{
+      flags: {
+        key: string;
+        value: boolean | string | number;
+        default: unknown;
+        type: string;
+        description?: string;
+        overridden: boolean;
+      }[];
+      total: number;
+    }>("GET", "/api/v1/feature-flags"),
 
   featureFlagSet: (key: string, value: boolean | string | number) =>
     request<{ key: string; value: unknown; overridden: boolean }>(
-      "PATCH", `/api/v1/feature-flags/${encodeURIComponent(key)}`, { value },
+      "PATCH",
+      `/api/v1/feature-flags/${encodeURIComponent(key)}`,
+      { value },
     ),
 
   featureFlagReset: (key: string) =>
@@ -517,9 +584,17 @@ export const api = {
   // ── Connectors ────────────────────────────────────────────────────────────
 
   connectors: () =>
-    request<{ connectors: { id: string; name: string; type: string; status: string; enabled: boolean; error?: string }[]; total: number }>(
-      "GET", "/api/v1/connectors",
-    ),
+    request<{
+      connectors: {
+        id: string;
+        name: string;
+        type: string;
+        status: string;
+        enabled: boolean;
+        error?: string;
+      }[];
+      total: number;
+    }>("GET", "/api/v1/connectors"),
 
   connectorToggle: (id: string, enabled: boolean) =>
     request<unknown>("PATCH", `/api/v1/connectors/${id}`, { enabled }),
@@ -529,20 +604,21 @@ export const api = {
 
   connectorHealth: (id: string) =>
     request<{ ok: boolean; latencyMs: number; error?: string }>(
-      "POST", `/api/v1/connectors/${id}/health`, {},
+      "POST",
+      `/api/v1/connectors/${id}/health`,
+      {},
     ),
 
   connectorReconnect: (id: string) =>
-    request<{ ok: boolean; error?: string }>(
-      "POST", `/api/v1/connectors/${id}/reconnect`, {},
-    ),
+    request<{ ok: boolean; error?: string }>("POST", `/api/v1/connectors/${id}/reconnect`, {}),
 
   // ── Council ───────────────────────────────────────────────────────────────
 
   /** Paginated list of verdicts (newest first). */
   councilVerdicts: (limit = 20, offset = 0) =>
     request<{ verdicts: unknown[]; limit: number; offset: number }>(
-      "GET", `/api/v1/council/verdicts?limit=${limit}&offset=${offset}`,
+      "GET",
+      `/api/v1/council/verdicts?limit=${limit}&offset=${offset}`,
     ),
 
   /** Single verdict by ID. */
@@ -555,7 +631,9 @@ export const api = {
 
   /** Trigger deliberation for an existing signal by ID. */
   councilTrigger: (signalId: string, budgetUsd?: number, timeoutMs?: number) =>
-    request<{ ok: boolean; result: unknown }>(
-      "POST", "/api/v1/council/trigger", { signalId, budgetUsd, timeoutMs },
-    ),
+    request<{ ok: boolean; result: unknown }>("POST", "/api/v1/council/trigger", {
+      signalId,
+      budgetUsd,
+      timeoutMs,
+    }),
 };

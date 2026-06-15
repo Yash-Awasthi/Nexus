@@ -111,7 +111,7 @@ export class JupyterMode {
     const lastLine = [...lines].reverse().find((l) => l.trim() !== "");
     if (!lastLine) return code;
     const stripped = lastLine.trim();
-    const isAssignment = stripped.includes('=') && !/==/g.test(stripped) && !/^#/.test(stripped);
+    const isAssignment = stripped.includes("=") && !/==/g.test(stripped) && !/^#/.test(stripped);
     if (isAssignment) return code;
     const idx = [...lines]
       .map((l, i) => ({ l, i }))
@@ -260,6 +260,8 @@ export class DockerReplExecutor implements ReplExecutor {
     _state: KernelSessionState,
     timeoutMs?: number,
   ): Promise<ReplResult> {
+    // Resource-exhaustion guard: reject oversized code before spawning Docker
+    if (code.length > 65_536) throw new Error("code input exceeds 64 KiB limit");
     const timeout = timeoutMs ?? this.defaultTimeoutMs;
     const { image, cmd } = DOCKER_IMAGES[language];
     const t0 = Date.now();

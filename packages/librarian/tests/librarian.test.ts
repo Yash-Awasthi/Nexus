@@ -1,18 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, beforeEach } from "vitest";
-import {
-  KnowledgeStore,
-  TagIndex,
-  CrossLinker,
-  LibrarianAgent,
-} from "../src/index.js";
+import { KnowledgeStore, TagIndex, CrossLinker, LibrarianAgent } from "../src/index.js";
 
 // ── KnowledgeStore ────────────────────────────────────────────────────────────
 
 describe("KnowledgeStore", () => {
   let store: KnowledgeStore;
 
-  beforeEach(() => { store = new KnowledgeStore(); });
+  beforeEach(() => {
+    store = new KnowledgeStore();
+  });
 
   it("creates and retrieves an item", () => {
     const item = store.create({ title: "TypeScript Guide", content: "TS is great" });
@@ -176,18 +173,38 @@ describe("CrossLinker", () => {
 
   it("suggests related items by keyword overlap", () => {
     const source = {
-      id: "s", title: "TypeScript performance tips", content: "Improve TypeScript speed and performance",
-      tags: ["typescript"], links: [], status: "active" as const,
-      createdAt: "", updatedAt: "", metadata: {},
+      id: "s",
+      title: "TypeScript performance tips",
+      content: "Improve TypeScript speed and performance",
+      tags: ["typescript"],
+      links: [],
+      status: "active" as const,
+      createdAt: "",
+      updatedAt: "",
+      metadata: {},
     };
     const candidates = [
       {
-        id: "c1", title: "TypeScript best practices", content: "Write better TypeScript code",
-        tags: ["typescript"], links: [], status: "active" as const, createdAt: "", updatedAt: "", metadata: {},
+        id: "c1",
+        title: "TypeScript best practices",
+        content: "Write better TypeScript code",
+        tags: ["typescript"],
+        links: [],
+        status: "active" as const,
+        createdAt: "",
+        updatedAt: "",
+        metadata: {},
       },
       {
-        id: "c2", title: "Python tutorial", content: "Learn Python programming",
-        tags: ["python"], links: [], status: "active" as const, createdAt: "", updatedAt: "", metadata: {},
+        id: "c2",
+        title: "Python tutorial",
+        content: "Learn Python programming",
+        tags: ["python"],
+        links: [],
+        status: "active" as const,
+        createdAt: "",
+        updatedAt: "",
+        metadata: {},
       },
     ];
     const results = linker.suggest(source, candidates);
@@ -197,8 +214,15 @@ describe("CrossLinker", () => {
 
   it("excludes the source item from suggestions", () => {
     const item = {
-      id: "same", title: "thing", content: "content", tags: [],
-      links: [], status: "active" as const, createdAt: "", updatedAt: "", metadata: {},
+      id: "same",
+      title: "thing",
+      content: "content",
+      tags: [],
+      links: [],
+      status: "active" as const,
+      createdAt: "",
+      updatedAt: "",
+      metadata: {},
     };
     const results = linker.suggest(item, [item]);
     expect(results).toHaveLength(0);
@@ -206,13 +230,26 @@ describe("CrossLinker", () => {
 
   it("respects topK limit", () => {
     const source = {
-      id: "s", title: "JavaScript programming language tutorial guide",
+      id: "s",
+      title: "JavaScript programming language tutorial guide",
       content: "JavaScript is a programming language used for web development",
-      tags: ["javascript"], links: [], status: "active" as const, createdAt: "", updatedAt: "", metadata: {},
+      tags: ["javascript"],
+      links: [],
+      status: "active" as const,
+      createdAt: "",
+      updatedAt: "",
+      metadata: {},
     };
     const candidates = Array.from({ length: 10 }, (_, i) => ({
-      id: `c${i}`, title: `JavaScript guide ${i}`, content: `programming tutorial ${i}`,
-      tags: ["javascript"], links: [], status: "active" as const, createdAt: "", updatedAt: "", metadata: {},
+      id: `c${i}`,
+      title: `JavaScript guide ${i}`,
+      content: `programming tutorial ${i}`,
+      tags: ["javascript"],
+      links: [],
+      status: "active" as const,
+      createdAt: "",
+      updatedAt: "",
+      metadata: {},
     }));
     expect(linker.suggest(source, candidates, 3)).toHaveLength(3);
   });
@@ -223,22 +260,42 @@ describe("CrossLinker", () => {
 describe("LibrarianAgent", () => {
   it("ingests an item and returns result", () => {
     const agent = new LibrarianAgent();
-    const result = agent.ingest({ title: "TypeScript Guide", content: "TypeScript is great for large apps", tags: ["typescript"] });
+    const result = agent.ingest({
+      title: "TypeScript Guide",
+      content: "TypeScript is great for large apps",
+      tags: ["typescript"],
+    });
     expect(result.item.id).toBeTruthy();
     expect(result.suggestedLinks).toBeDefined();
   });
 
   it("auto-links items above threshold", () => {
     const agent = new LibrarianAgent({ autoLinkThreshold: 0.1 });
-    agent.ingest({ title: "TypeScript tips", content: "TypeScript performance optimization guide tips", tags: ["typescript"] });
-    const result = agent.ingest({ title: "TypeScript guide", content: "TypeScript performance and tips for development", tags: ["typescript"] });
+    agent.ingest({
+      title: "TypeScript tips",
+      content: "TypeScript performance optimization guide tips",
+      tags: ["typescript"],
+    });
+    const result = agent.ingest({
+      title: "TypeScript guide",
+      content: "TypeScript performance and tips for development",
+      tags: ["typescript"],
+    });
     expect(result.autoLinked).toBeGreaterThan(0);
   });
 
   it("relink returns suggestions for existing item", () => {
     const agent = new LibrarianAgent();
-    const r1 = agent.ingest({ title: "Python ML", content: "machine learning with python numpy pandas sklearn", tags: ["python", "ml"] });
-    agent.ingest({ title: "Python data", content: "data science with python numpy pandas matplotlib", tags: ["python", "data"] });
+    const r1 = agent.ingest({
+      title: "Python ML",
+      content: "machine learning with python numpy pandas sklearn",
+      tags: ["python", "ml"],
+    });
+    agent.ingest({
+      title: "Python data",
+      content: "data science with python numpy pandas matplotlib",
+      tags: ["python", "data"],
+    });
     const suggestions = agent.relink(r1.item.id);
     expect(suggestions.length).toBeGreaterThanOrEqual(0); // may or may not match
   });

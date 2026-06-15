@@ -33,7 +33,6 @@ import type { Socket } from "net";
 import { globalBus, formatSseEvent, formatPing, type SseEvent } from "@nexus/sse";
 import type { FastifyInstance } from "fastify";
 
-
 import { requireAuth } from "../middleware/auth.js";
 
 const PING_INTERVAL_MS = 20_000;
@@ -51,11 +50,7 @@ const SSE_HEADERS = {
  * Open an SSE connection, subscribe to the given channel(s), and handle
  * clean-up on client disconnect.
  */
-function openSseConnection(
-  raw: ServerResponse,
-  socket: Socket,
-  channels: string[],
-): void {
+function openSseConnection(raw: ServerResponse, socket: Socket, channels: string[]): void {
   // Write status line + headers (hijacked reply, no Fastify layer)
   raw.writeHead(200, SSE_HEADERS);
 

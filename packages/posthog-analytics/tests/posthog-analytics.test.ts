@@ -11,7 +11,9 @@ import {
 
 describe("InMemoryAnalyticsClient", () => {
   let client: InMemoryAnalyticsClient;
-  beforeEach(() => { client = new InMemoryAnalyticsClient(); });
+  beforeEach(() => {
+    client = new InMemoryAnalyticsClient();
+  });
 
   it("tracks events", async () => {
     await client.track("page_view", "user-1", { url: "/home" });

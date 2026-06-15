@@ -145,9 +145,7 @@ export default function Tasks() {
       {/* ── Task list ── */}
       {loading && <p style={{ color: "#64748b" }}>Loading…</p>}
 
-      {!loading && tasks.length === 0 && (
-        <p style={{ color: "#64748b" }}>No tasks found.</p>
-      )}
+      {!loading && tasks.length === 0 && <p style={{ color: "#64748b" }}>No tasks found.</p>}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {tasks.map((t) => (

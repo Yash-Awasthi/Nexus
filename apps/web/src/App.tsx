@@ -23,33 +23,33 @@ import Research from "./pages/Research.js";
 export default function App() {
   return (
     <ErrorBoundary>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          {/* Core platform */}
-          <Route index element={<Dashboard />} />
-          <Route path="discover" element={<Discover />} />
-          <Route path="signals" element={<Signals />} />
-          <Route path="council" element={<Council />} />
-          <Route path="tasks" element={<Tasks />} />
-          <Route path="chat" element={<Chat />} />
-          <Route path="approvals" element={<Approvals />} />
-          <Route path="audit" element={<Audit />} />
-          <Route path="memory" element={<MemoryTimeline />} />
-          <Route path="research" element={<Research />} />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            {/* Core platform */}
+            <Route index element={<Dashboard />} />
+            <Route path="discover" element={<Discover />} />
+            <Route path="signals" element={<Signals />} />
+            <Route path="council" element={<Council />} />
+            <Route path="tasks" element={<Tasks />} />
+            <Route path="chat" element={<Chat />} />
+            <Route path="approvals" element={<Approvals />} />
+            <Route path="audit" element={<Audit />} />
+            <Route path="memory" element={<MemoryTimeline />} />
+            <Route path="research" element={<Research />} />
 
-          {/* Extended capabilities */}
-          <Route path="billing" element={<Billing />} />
-          <Route path="connectors" element={<Connectors />} />
-          <Route path="image-gen" element={<ImageGen />} />
-          <Route path="knowledge-graph" element={<KGExplorer />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="voice" element={<Voice />} />
+            {/* Extended capabilities */}
+            <Route path="billing" element={<Billing />} />
+            <Route path="connectors" element={<Connectors />} />
+            <Route path="image-gen" element={<ImageGen />} />
+            <Route path="knowledge-graph" element={<KGExplorer />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="voice" element={<Voice />} />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
     </ErrorBoundary>
   );
 }

@@ -21,19 +21,16 @@ import { useState, useEffect, useCallback, useRef } from "react";
 // ── useQuery ──────────────────────────────────────────────────────────────────
 
 export interface QueryResult<T> {
-  data:    T | undefined;
+  data: T | undefined;
   loading: boolean;
-  error:   Error | null;
+  error: Error | null;
   refetch: () => void;
 }
 
-export function useQuery<T>(
-  fetcher: () => Promise<T>,
-  deps: unknown[] = [],
-): QueryResult<T> {
-  const [data,    setData]    = useState<T | undefined>(undefined);
+export function useQuery<T>(fetcher: () => Promise<T>, deps: unknown[] = []): QueryResult<T> {
+  const [data, setData] = useState<T | undefined>(undefined);
   const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState<Error | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const versionRef = useRef(0);
 
   const run = useCallback(async () => {
@@ -54,10 +51,12 @@ export function useQuery<T>(
         setLoading(false);
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
-  useEffect(() => { run(); }, [run]);
+  useEffect(() => {
+    run();
+  }, [run]);
 
   return { data, loading, error, refetch: run };
 }
@@ -65,35 +64,36 @@ export function useQuery<T>(
 // ── useMutation ───────────────────────────────────────────────────────────────
 
 export interface MutationResult<T, V> {
-  mutate:  (vars: V) => Promise<T | undefined>;
+  mutate: (vars: V) => Promise<T | undefined>;
   loading: boolean;
-  error:   Error | null;
-  data:    T | undefined;
-  reset:   () => void;
+  error: Error | null;
+  data: T | undefined;
+  reset: () => void;
 }
 
-export function useMutation<T, V = void>(
-  mutator: (vars: V) => Promise<T>,
-): MutationResult<T, V> {
-  const [data,    setData]    = useState<T | undefined>(undefined);
+export function useMutation<T, V = void>(mutator: (vars: V) => Promise<T>): MutationResult<T, V> {
+  const [data, setData] = useState<T | undefined>(undefined);
   const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState<Error | null>(null);
+  const [error, setError] = useState<Error | null>(null);
 
-  const mutate = useCallback(async (vars: V): Promise<T | undefined> => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await mutator(vars);
-      setData(result);
-      return result;
-    } catch (err) {
-      const e = err instanceof Error ? err : new Error(String(err));
-      setError(e);
-      return undefined;
-    } finally {
-      setLoading(false);
-    }
-  }, [mutator]);
+  const mutate = useCallback(
+    async (vars: V): Promise<T | undefined> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await mutator(vars);
+        setData(result);
+        return result;
+      } catch (err) {
+        const e = err instanceof Error ? err : new Error(String(err));
+        setError(e);
+        return undefined;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [mutator],
+  );
 
   const reset = useCallback(() => {
     setData(undefined);
@@ -107,30 +107,30 @@ export function useMutation<T, V = void>(
 // ── useInfiniteQuery ──────────────────────────────────────────────────────────
 
 export interface InfiniteQueryResult<T> {
-  pages:    T[];
+  pages: T[];
   loadMore: () => void;
-  hasMore:  boolean;
-  loading:  boolean;
-  error:    Error | null;
-  refetch:  () => void;
+  hasMore: boolean;
+  loading: boolean;
+  error: Error | null;
+  refetch: () => void;
 }
 
 export function useInfiniteQuery<T>(
   fetcher: (cursor: string | null) => Promise<{ data: T; nextCursor: string | null }>,
   deps: unknown[] = [],
 ): InfiniteQueryResult<T> {
-  const [pages,   setPages]   = useState<T[]>([]);
-  const [cursor,  setCursor]  = useState<string | null>(null);
+  const [pages, setPages] = useState<T[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState<Error | null>(null);
+  const [error, setError] = useState<Error | null>(null);
 
   const fetchPage = useCallback(async (cur: string | null, reset = false) => {
     setLoading(true);
     setError(null);
     try {
       const res = await fetcher(cur);
-      setPages((prev) => reset ? [res.data] : [...prev, res.data]);
+      setPages((prev) => (reset ? [res.data] : [...prev, res.data]));
       setCursor(res.nextCursor);
       setHasMore(res.nextCursor !== null);
     } catch (err) {
@@ -138,7 +138,7 @@ export function useInfiniteQuery<T>(
     } finally {
       setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
   useEffect(() => {

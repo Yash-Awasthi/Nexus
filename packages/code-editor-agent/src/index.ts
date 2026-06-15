@@ -70,6 +70,7 @@ export class ThinkScaffold {
   }
 
   static extractThinking(text: string): { thinking: string | undefined; rest: string } {
+    if (text.length > 100_000) return { thinking: undefined, rest: text };
     const match = /<think>([\s\S]*?)<\/think>/i.exec(text);
     if (!match) return { thinking: undefined, rest: text };
     const thinking = match[1]!.trim();

@@ -55,6 +55,11 @@ export type AlertErrorCode =
   | "CHANNEL_SEND_FAILED"
   | "EVALUATE_FAILED";
 
+/** Escape special regex metacharacters in a literal string. */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /** Alert error. */
 export class AlertError extends Error {
   readonly code: AlertErrorCode;
@@ -619,7 +624,7 @@ export class AlertEngine {
     const needle = condition.ignoreCase ? condition.pattern.toLowerCase() : condition.pattern;
     if (condition.regex) {
       const flags = condition.ignoreCase ? "i" : "";
-      return new RegExp(condition.pattern, flags).test(value);
+      return new RegExp(escapeRegExp(condition.pattern), flags).test(value);
     }
     return haystack.includes(needle);
   }

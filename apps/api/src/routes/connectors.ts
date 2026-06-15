@@ -35,6 +35,7 @@ import {
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
+import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
 
 // ── Registry bootstrap ────────────────────────────────────────────────────────
 
@@ -220,7 +221,10 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
       preHandler: requireAuth,
     },
     async (request, reply) => {
-      const view = connectorView(request.params.id);
+      // Sanitise the URL param before use — prevents reflected XSS when the id
+      // is echoed back in the response body through the connector view.
+      const safeId = encodeURIComponent(request.params.id);
+      const view = connectorView(safeId);
       if (!view) return reply.code(404).send({ error: "Connector not found" });
       return reply.send(view);
     },
@@ -281,7 +285,10 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
           201: { type: "object", additionalProperties: true },
         },
       },
-      preHandler: requireAuth,
+      preHandler: [
+        requireAuth,
+        makeRateLimitPreHandler({ limit: 30, windowMs: 60_000, keyPrefix: "conn-health" }),
+      ],
     },
     async (request, reply) => {
       const conn = registry.get(request.params.id);
@@ -322,7 +329,10 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
           201: { type: "object", additionalProperties: true },
         },
       },
-      preHandler: requireAuth,
+      preHandler: [
+        requireAuth,
+        makeRateLimitPreHandler({ limit: 30, windowMs: 60_000, keyPrefix: "conn-disconnect" }),
+      ],
     },
     async (request, reply) => {
       const conn = registry.get(request.params.id);

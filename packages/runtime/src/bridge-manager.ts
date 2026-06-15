@@ -19,12 +19,7 @@ import * as http from "http";
 import { fileURLToPath } from "node:url";
 import * as path from "path";
 
-type BridgeName =
-  | "stealth-browser"
-  | "scraping"
-  | "local-inference"
-  | "mcp-server"
-  | "floci";
+type BridgeName = "stealth-browser" | "scraping" | "local-inference" | "mcp-server" | "floci";
 
 interface BridgeConfig {
   script: string; // relative to runtime/bridges/

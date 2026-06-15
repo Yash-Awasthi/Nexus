@@ -25,11 +25,11 @@ export interface MemoryEntry {
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
 const CATEGORY_COLORS: Record<string, string> = {
-  fact:       "#0284c7",
+  fact: "#0284c7",
   preference: "#7c3aed",
-  event:      "#d97706",
-  skill:      "#16a34a",
-  context:    "#64748b",
+  event: "#d97706",
+  skill: "#16a34a",
+  context: "#64748b",
 };
 
 function categoryColor(cat?: string): string {
@@ -206,7 +206,10 @@ const s = {
 function formatDate(iso: string): string {
   try {
     return new Date(iso).toLocaleString(undefined, {
-      month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   } catch {
     return iso;
@@ -244,22 +247,27 @@ export default function MemoryTimeline({ memories: memoriesProp, onDelete }: Mem
   }, [memoriesProp]);
 
   // Fetch on mount
-  useEffect(() => { fetchMemories(); }, [fetchMemories]);
+  useEffect(() => {
+    fetchMemories();
+  }, [fetchMemories]);
 
   // If prop changes (controlled mode), sync
   useEffect(() => {
     if (memoriesProp) setMemories(memoriesProp);
   }, [memoriesProp]);
 
-  const handleDelete = useCallback((id: string) => {
-    if (onDelete) {
-      onDelete(id);
-      return;
-    }
-    // API delete + local optimistic removal
-    api.obsDelete(id).catch(() => {});
-    setMemories((prev) => prev.filter((m) => m.id !== id));
-  }, [onDelete]);
+  const handleDelete = useCallback(
+    (id: string) => {
+      if (onDelete) {
+        onDelete(id);
+        return;
+      }
+      // API delete + local optimistic removal
+      api.obsDelete(id).catch(() => {});
+      setMemories((prev) => prev.filter((m) => m.id !== id));
+    },
+    [onDelete],
+  );
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -300,8 +308,8 @@ export default function MemoryTimeline({ memories: memoriesProp, onDelete }: Mem
           {loading
             ? "Loading memories…"
             : search
-            ? `No memories matching "${search}"`
-            : "No memories stored yet."}
+              ? `No memories matching "${search}"`
+              : "No memories stored yet."}
         </div>
       )}
 
@@ -313,9 +321,7 @@ export default function MemoryTimeline({ memories: memoriesProp, onDelete }: Mem
             <div key={memory.id} style={s.card}>
               <div style={s.dot} />
               <div style={s.cardHeader}>
-                {memory.category && (
-                  <span style={s.badge(memory.category)}>{memory.category}</span>
-                )}
+                {memory.category && <span style={s.badge(memory.category)}>{memory.category}</span>}
                 <button
                   style={s.deleteBtn}
                   onClick={() => handleDelete(memory.id)}
@@ -334,7 +340,9 @@ export default function MemoryTimeline({ memories: memoriesProp, onDelete }: Mem
                   </span>
                 )}
                 {memory.tags?.map((tag) => (
-                  <span key={tag} style={s.tag}>#{tag}</span>
+                  <span key={tag} style={s.tag}>
+                    #{tag}
+                  </span>
                 ))}
               </div>
             </div>
@@ -374,7 +382,8 @@ const DEMO_MEMORIES: MemoryEntry[] = [
   },
   {
     id: "m4",
-    content: "User employs batch-consolidation discipline: executes multi-phase work in single sessions.",
+    content:
+      "User employs batch-consolidation discipline: executes multi-phase work in single sessions.",
     category: "skill",
     tags: ["workflow", "productivity"],
     confidence: 0.95,

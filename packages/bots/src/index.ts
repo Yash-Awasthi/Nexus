@@ -52,7 +52,7 @@
  * ```
  */
 
-import { createHmac, timingSafeEqual , randomUUID } from "node:crypto";
+import { createHmac, timingSafeEqual, randomUUID } from "node:crypto";
 
 // ── Error ─────────────────────────────────────────────────────────────────────
 

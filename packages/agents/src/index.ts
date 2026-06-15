@@ -369,7 +369,10 @@ export class LibrarianAgent {
  * Minimal interface for a research runner.
  * Compatible with @nexus/adapter-deep-research's execute() output shape.
  */
-export type ResearchRunner = (query: string, opts?: ResearchRunOptions) => Promise<ResearchRunResult>;
+export type ResearchRunner = (
+  query: string,
+  opts?: ResearchRunOptions,
+) => Promise<ResearchRunResult>;
 
 /** Research run options interface definition. */
 export interface ResearchRunOptions {

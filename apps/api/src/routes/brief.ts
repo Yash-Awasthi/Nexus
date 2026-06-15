@@ -24,6 +24,7 @@ import {
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
+import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
 
 // ── Singleton engine ──────────────────────────────────────────────────────────
 
@@ -139,31 +140,41 @@ export async function briefRoutes(app: FastifyInstance): Promise<void> {
   app.get<{
     Params: { domain: string; digest: string };
     Querystring: { url?: string; userId?: string; date?: string; sig?: string };
-  }>("/brief/:domain/share/:digest", async (request, reply) => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { userId, date, sig, url } = request.query;
+  }>(
+    "/brief/:domain/share/:digest",
+    {
+      preHandler: makeRateLimitPreHandler({
+        limit: 30,
+        windowMs: 60_000,
+        keyPrefix: "brief-share",
+      }),
+    },
+    async (request, reply) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { userId, date, sig, url } = request.query;
 
-    // Reconstruct the full URL to pass to signer.verify()
-    const fullUrl =
-      url ??
-      (request.hostname
-        ? `${request.protocol ?? "https"}://${request.hostname}${request.url}`
-        : "");
+      // Reconstruct the full URL to pass to signer.verify()
+      const fullUrl =
+        url ??
+        (request.hostname
+          ? `${request.protocol ?? "https"}://${request.hostname}${request.url}`
+          : "");
 
-    const { valid, userId: verifiedUserId, date: verifiedDate } = signer.verify(fullUrl);
+      const { valid, userId: verifiedUserId, date: verifiedDate } = signer.verify(fullUrl);
 
-    if (!valid) {
-      return reply.code(403).send({ error: "Invalid or expired share signature" });
-    }
+      if (!valid) {
+        return reply.code(403).send({ error: "Invalid or expired share signature" });
+      }
 
-    const uid = verifiedUserId ?? userId ?? "default";
-    const d = verifiedDate ?? date ?? new Date().toISOString().slice(0, 10);
+      const uid = verifiedUserId ?? userId ?? "default";
+      const d = verifiedDate ?? date ?? new Date().toISOString().slice(0, 10);
 
-    const result = engine.buildBrief(uid, d);
-    if (!result) {
-      return reply.code(404).send({ error: "Brief not found for the given user and date" });
-    }
+      const result = engine.buildBrief(uid, d);
+      if (!result) {
+        return reply.code(404).send({ error: "Brief not found for the given user and date" });
+      }
 
-    return reply.header("Content-Type", "text/html; charset=utf-8").send(result.html);
-  });
+      return reply.header("Content-Type", "text/html; charset=utf-8").send(result.html);
+    },
+  );
 }

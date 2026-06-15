@@ -57,9 +57,7 @@ describe("resolveModel", () => {
   });
 
   it("resolves nexus/planner same as nexus/smart", () => {
-    expect(resolveModel("nexus/planner", GROQ_CFG)).toEqual(
-      resolveModel("nexus/smart", GROQ_CFG),
-    );
+    expect(resolveModel("nexus/planner", GROQ_CFG)).toEqual(resolveModel("nexus/smart", GROQ_CFG));
   });
 
   it("resolves claude-3-5-sonnet alias", () => {
@@ -202,7 +200,10 @@ describe("toAnthropicResponse", () => {
   });
 
   it("defaults usage to 0 when missing from upstream", () => {
-    const noUsage = { id: "x", choices: [{ message: { role: "assistant", content: "hi" }, finish_reason: "stop" }] };
+    const noUsage = {
+      id: "x",
+      choices: [{ message: { role: "assistant", content: "hi" }, finish_reason: "stop" }],
+    };
     const res = toAnthropicResponse(noUsage as never, "m");
     expect(res.usage).toEqual({ input_tokens: 0, output_tokens: 0 });
   });
@@ -280,7 +281,10 @@ describe("routeMessage — happy path", () => {
   });
 
   it("generates a uuid id when upstream omits it", async () => {
-    const noId = { choices: [{ message: { role: "assistant", content: "hi" }, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1 } };
+    const noId = {
+      choices: [{ message: { role: "assistant", content: "hi" }, finish_reason: "stop" }],
+      usage: { prompt_tokens: 1, completion_tokens: 1 },
+    };
     const fetch = mockFetch(noId);
     const result = await routeMessage(makeReq(), GROQ_CFG, undefined, fetch);
     expect(result.id).toMatch(/^msg_/);

@@ -34,6 +34,13 @@
 
 import { EventEmitter } from "events";
 
+// ── Prototype-pollution guard ──────────────────────────────────────────────────
+
+const _UNSAFE_FLAG_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+function isSafeFlagKey(key: string): boolean {
+  return !_UNSAFE_FLAG_KEYS.has(key);
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export type FlagType = "boolean" | "string" | "number";
@@ -436,7 +443,12 @@ export class PollingFlagStore implements FlagStore {
       const res = await this.fetchFn(this.config.url);
       if (res.ok) {
         const json = (await res.json()) as Record<string, FlagValue>;
-        this.cache = json;
+        // Filter out prototype-polluting keys from remote payload
+        const safe: Record<string, FlagValue> = Object.create(null);
+        for (const [k, v] of Object.entries(json)) {
+          if (isSafeFlagKey(k)) safe[k] = v;
+        }
+        this.cache = safe;
       }
     } catch {
       // Network errors are non-fatal — keep last known good cache
@@ -444,10 +456,12 @@ export class PollingFlagStore implements FlagStore {
   }
 
   get(key: string): FlagValue | undefined {
+    if (!isSafeFlagKey(key)) return undefined;
     return this.cache[key];
   }
 
   set(key: string, value: FlagValue): void {
+    if (!isSafeFlagKey(key)) return;
     this.cache[key] = value;
   }
 
@@ -526,10 +540,12 @@ export class FileFlagStore implements FlagStore {
   }
 
   get(key: string): FlagValue | undefined {
+    if (!isSafeFlagKey(key)) return undefined;
     return this.cache[key];
   }
 
   set(key: string, value: FlagValue): void {
+    if (!isSafeFlagKey(key)) return;
     this.cache[key] = value;
   }
 

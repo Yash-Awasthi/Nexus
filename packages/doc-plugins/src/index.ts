@@ -154,6 +154,7 @@ const MONTH_MAP: Record<string, string> = {
 };
 
 function normaliseIso(raw: string): string {
+  if (raw.length > 100) return raw;
   // Already ISO with separator
   const iso = raw.replace(/\//g, "-");
   if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;

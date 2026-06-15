@@ -86,6 +86,7 @@ export class JinjaTemplater {
    * Falls back to original placeholder if key not found.
    */
   render(template: string, context: Record<string, unknown>): string {
+    if (template.length > 100_000) throw new Error("template too large for rendering");
     return template.replace(/\{\{([^}]+)\}\}/g, (_match, key) => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const trimmedKey = key.trim();

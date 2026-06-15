@@ -23,7 +23,9 @@ function doc(id: string, text: string, metadata?: Record<string, unknown>): IDoc
 describe("BM25Index", () => {
   let idx: BM25Index;
 
-  beforeEach(() => { idx = new BM25Index(); });
+  beforeEach(() => {
+    idx = new BM25Index();
+  });
 
   it("size returns 0 initially", () => {
     expect(idx.size()).toBe(0);
@@ -120,7 +122,9 @@ describe("BM25Index", () => {
 describe("InMemoryVectorStore", () => {
   let store: InMemoryVectorStore;
 
-  beforeEach(() => { store = new InMemoryVectorStore(); });
+  beforeEach(() => {
+    store = new InMemoryVectorStore();
+  });
 
   it("size is 0 initially", () => expect(store.size()).toBe(0));
 
@@ -310,7 +314,11 @@ describe("HybridSearchEngine", () => {
   });
 
   it("hybrid search with nullEmbed falls back gracefully to FTS only", () => {
-    const hybridNull = new HybridSearchEngine(new BM25Index(), new InMemoryVectorStore(), nullEmbed);
+    const hybridNull = new HybridSearchEngine(
+      new BM25Index(),
+      new InMemoryVectorStore(),
+      nullEmbed,
+    );
     hybridNull.addDocument(doc("d1", "python guide"));
     const results = hybridNull.search("python");
     // Should still return BM25 results even when embed returns []

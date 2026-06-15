@@ -186,6 +186,17 @@ function isExported(fullMatch: string): boolean {
 // ── File parser ───────────────────────────────────────────────────────────────
 
 export function parseFile(path: string, content: string): FileIndex {
+  if (content.length > 10_000_000) {
+    // Skip regex extraction on enormous files to prevent ReDoS
+    return {
+      path,
+      language: detectLanguage(path),
+      symbols: [],
+      imports: [],
+      exports: [],
+      references: [],
+    };
+  }
   const language = detectLanguage(path);
   const symbols: SymbolDef[] = [];
   const imports: ImportEntry[] = [];

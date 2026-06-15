@@ -91,7 +91,9 @@ describe("hasMetadata condition", () => {
   });
 
   it("fails when value differs", async () => {
-    expect(await hasMetadata("format", "pdf")(makeDoc({ metadata: { format: "docx" } }))).toBe(false);
+    expect(await hasMetadata("format", "pdf")(makeDoc({ metadata: { format: "docx" } }))).toBe(
+      false,
+    );
   });
 });
 
@@ -143,7 +145,12 @@ describe("WorkflowEngine.process", () => {
 
   it("skips workflows with non-matching trigger", async () => {
     const engine = new WorkflowEngine();
-    engine.register({ id: "wf-update", trigger: "on_update", conditions: [], actions: [tagAction("updated")] });
+    engine.register({
+      id: "wf-update",
+      trigger: "on_update",
+      conditions: [],
+      actions: [tagAction("updated")],
+    });
     const result = await engine.process(makeDoc(), "on_ingest");
     expect(result.executed).toHaveLength(0);
   });
@@ -187,7 +194,12 @@ describe("WorkflowEngine.process", () => {
 describe("tagAction", () => {
   it("adds tag to doc.tags", async () => {
     const engine = new WorkflowEngine();
-    engine.register({ id: "wf", trigger: "on_ingest", conditions: [], actions: [tagAction("auto-tagged")] });
+    engine.register({
+      id: "wf",
+      trigger: "on_ingest",
+      conditions: [],
+      actions: [tagAction("auto-tagged")],
+    });
     const doc = makeDoc();
     await engine.process(doc, "on_ingest");
     expect(doc.tags).toContain("auto-tagged");
@@ -204,7 +216,12 @@ describe("tagAction", () => {
 describe("setMetadataAction", () => {
   it("sets metadata key and value on the doc", async () => {
     const engine = new WorkflowEngine();
-    engine.register({ id: "wf", trigger: "on_ingest", conditions: [], actions: [setMetadataAction("reviewed", true)] });
+    engine.register({
+      id: "wf",
+      trigger: "on_ingest",
+      conditions: [],
+      actions: [setMetadataAction("reviewed", true)],
+    });
     const doc = makeDoc();
     await engine.process(doc, "on_ingest");
     expect(doc.metadata["reviewed"]).toBe(true);
@@ -214,7 +231,12 @@ describe("setMetadataAction", () => {
 describe("routeAction", () => {
   it("sets doc.metadata.route to the queue name", async () => {
     const engine = new WorkflowEngine();
-    engine.register({ id: "wf", trigger: "on_ingest", conditions: [], actions: [routeAction("archive-queue")] });
+    engine.register({
+      id: "wf",
+      trigger: "on_ingest",
+      conditions: [],
+      actions: [routeAction("archive-queue")],
+    });
     const doc = makeDoc();
     await engine.process(doc, "on_ingest");
     expect(doc.metadata["route"]).toBe("archive-queue");
@@ -225,15 +247,28 @@ describe("webhookAction", () => {
   it("POSTs to the webhook URL", async () => {
     const fetchFn = vi.fn().mockResolvedValue({ ok: true, status: 200 }) as unknown as typeof fetch;
     const engine = new WorkflowEngine({ fetchFn });
-    engine.register({ id: "wf", trigger: "on_ingest", conditions: [], actions: [webhookAction("https://example.com/hook")] });
+    engine.register({
+      id: "wf",
+      trigger: "on_ingest",
+      conditions: [],
+      actions: [webhookAction("https://example.com/hook")],
+    });
     await engine.process(makeDoc(), "on_ingest");
-    expect(fetchFn).toHaveBeenCalledWith("https://example.com/hook", expect.objectContaining({ method: "POST" }));
+    expect(fetchFn).toHaveBeenCalledWith(
+      "https://example.com/hook",
+      expect.objectContaining({ method: "POST" }),
+    );
   });
 
   it("returns action:webhook on success", async () => {
     const fetchFn = vi.fn().mockResolvedValue({ ok: true, status: 200 }) as unknown as typeof fetch;
     const engine = new WorkflowEngine({ fetchFn });
-    engine.register({ id: "wf", trigger: "on_ingest", conditions: [], actions: [webhookAction("https://x.example")] });
+    engine.register({
+      id: "wf",
+      trigger: "on_ingest",
+      conditions: [],
+      actions: [webhookAction("https://x.example")],
+    });
     const result = await engine.process(makeDoc(), "on_ingest");
     expect(result.executed[0]?.actionResults[0]?.action).toBe("webhook");
     expect(result.executed[0]?.actionResults[0]?.success).toBe(true);
@@ -242,7 +277,12 @@ describe("webhookAction", () => {
   it("returns success:false when fetch fails", async () => {
     const fetchFn = vi.fn().mockRejectedValue(new Error("ECONNREFUSED")) as unknown as typeof fetch;
     const engine = new WorkflowEngine({ fetchFn });
-    engine.register({ id: "wf", trigger: "on_ingest", conditions: [], actions: [webhookAction("https://fail.example")] });
+    engine.register({
+      id: "wf",
+      trigger: "on_ingest",
+      conditions: [],
+      actions: [webhookAction("https://fail.example")],
+    });
     const result = await engine.process(makeDoc(), "on_ingest");
     expect(result.executed[0]?.actionResults[0]?.action).toBe("webhook");
     expect(result.executed[0]?.actionResults[0]?.success).toBe(false);
@@ -252,7 +292,12 @@ describe("webhookAction", () => {
 describe("transformAction", () => {
   it("applies transform and stores result in metadata", async () => {
     const engine = new WorkflowEngine();
-    engine.register({ id: "wf", trigger: "on_ingest", conditions: [], actions: [transformAction((c) => c.toUpperCase(), "upper")] });
+    engine.register({
+      id: "wf",
+      trigger: "on_ingest",
+      conditions: [],
+      actions: [transformAction((c) => c.toUpperCase(), "upper")],
+    });
     const doc = makeDoc({ content: "hello" });
     await engine.process(doc, "on_ingest");
     expect(doc.metadata["upper"]).toBe("HELLO");
@@ -295,7 +340,9 @@ describe("error isolation in actions", () => {
       trigger: "on_ingest",
       conditions: [],
       actions: [
-        async () => { throw new Error("action failed"); },
+        async () => {
+          throw new Error("action failed");
+        },
         tagAction("after-error"),
       ],
     });

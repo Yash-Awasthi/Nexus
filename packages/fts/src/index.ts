@@ -200,10 +200,7 @@ export type RankedList = readonly { id: string; score?: number }[];
  * @param k      Ranking constant (default: 60). Higher = less sensitivity to top ranks.
  * @returns Merged list sorted by RRF score descending.
  */
-export function reciprocalRankFusion(
-  lists: RankedList[],
-  k = 60,
-): { id: string; score: number }[] {
+export function reciprocalRankFusion(lists: RankedList[], k = 60): { id: string; score: number }[] {
   const scores = new Map<string, number>();
 
   for (const list of lists) {

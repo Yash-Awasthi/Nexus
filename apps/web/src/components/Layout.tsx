@@ -3,16 +3,16 @@ import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 const NAV_CORE = [
-  { to: "/",         label: "Dashboard", icon: "⬡" },
-  { to: "/chat",     label: "Chat",      icon: "◈" },
-  { to: "/discover", label: "Discover",  icon: "◑" },
-  { to: "/signals",  label: "Signals",   icon: "⚡" },
-  { to: "/council",  label: "Council",   icon: "⚖" },
-  { to: "/tasks",    label: "Tasks",     icon: "◎" },
-  { to: "/approvals",label: "Approvals", icon: "✓" },
-  { to: "/audit",    label: "Audit",     icon: "⛓" },
-  { to: "/memory",   label: "Memory",    icon: "⊙" },
-  { to: "/research", label: "Research",  icon: "🔬" },
+  { to: "/", label: "Dashboard", icon: "⬡" },
+  { to: "/chat", label: "Chat", icon: "◈" },
+  { to: "/discover", label: "Discover", icon: "◑" },
+  { to: "/signals", label: "Signals", icon: "⚡" },
+  { to: "/council", label: "Council", icon: "⚖" },
+  { to: "/tasks", label: "Tasks", icon: "◎" },
+  { to: "/approvals", label: "Approvals", icon: "✓" },
+  { to: "/audit", label: "Audit", icon: "⛓" },
+  { to: "/memory", label: "Memory", icon: "⊙" },
+  { to: "/research", label: "Research", icon: "🔬" },
 ];
 
 const NAV_EXTENDED = [
@@ -32,8 +32,9 @@ function useBreadcrumb(): string {
   const { pathname } = useLocation();
   if (pathname === "/") return "Dashboard";
   const seg = pathname.slice(1).split("/")[0] ?? "";
-  return ALL_NAV.find((n) => n.to === `/${seg}`)?.label
-    ?? (seg.charAt(0).toUpperCase() + seg.slice(1));
+  return (
+    ALL_NAV.find((n) => n.to === `/${seg}`)?.label ?? seg.charAt(0).toUpperCase() + seg.slice(1)
+  );
 }
 
 // ── NavItem ───────────────────────────────────────────────────────────────────
@@ -55,18 +56,18 @@ function NavItem({
       end={to === "/"}
       title={collapsed ? label : undefined}
       style={({ isActive }) => ({
-        display:        "flex",
-        alignItems:     "center",
-        gap:            collapsed ? 0 : 10,
-        padding:        collapsed ? "9px 0" : "9px 20px",
+        display: "flex",
+        alignItems: "center",
+        gap: collapsed ? 0 : 10,
+        padding: collapsed ? "9px 0" : "9px 20px",
         justifyContent: collapsed ? "center" : "flex-start",
-        fontSize:       14,
-        color:          isActive ? "#c4b5fd" : "#94a3b8",
-        background:     isActive ? "rgba(124,58,237,0.12)" : "transparent",
-        borderLeft:     isActive ? "2px solid #7c3aed" : "2px solid transparent",
-        transition:     "all 0.15s",
-        whiteSpace:     "nowrap",
-        overflow:       "hidden",
+        fontSize: 14,
+        color: isActive ? "#c4b5fd" : "#94a3b8",
+        background: isActive ? "rgba(124,58,237,0.12)" : "transparent",
+        borderLeft: isActive ? "2px solid #7c3aed" : "2px solid transparent",
+        transition: "all 0.15s",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
       })}
     >
       <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>
@@ -77,29 +78,23 @@ function NavItem({
 
 // ── Topbar ────────────────────────────────────────────────────────────────────
 
-function Topbar({
-  breadcrumb,
-  onToggle,
-}: {
-  breadcrumb: string;
-  onToggle: () => void;
-}) {
+function Topbar({ breadcrumb, onToggle }: { breadcrumb: string; onToggle: () => void }) {
   const [showUser, setShowUser] = useState(false);
 
   return (
     <header
       style={{
-        height:         48,
-        background:     "#0f1117",
-        borderBottom:   "1px solid #1e2535",
-        display:        "flex",
-        alignItems:     "center",
+        height: 48,
+        background: "#0f1117",
+        borderBottom: "1px solid #1e2535",
+        display: "flex",
+        alignItems: "center",
         justifyContent: "space-between",
-        padding:        "0 20px",
-        flexShrink:     0,
-        position:       "sticky",
-        top:            0,
-        zIndex:         10,
+        padding: "0 20px",
+        flexShrink: 0,
+        position: "sticky",
+        top: 0,
+        zIndex: 10,
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -108,11 +103,11 @@ function Topbar({
           title="Toggle sidebar"
           style={{
             background: "transparent",
-            border:     "none",
-            color:      "#64748b",
-            cursor:     "pointer",
-            fontSize:   18,
-            padding:    "2px 4px",
+            border: "none",
+            color: "#64748b",
+            cursor: "pointer",
+            fontSize: 18,
+            padding: "2px 4px",
             lineHeight: 1,
           }}
         >
@@ -127,17 +122,17 @@ function Topbar({
         <button
           onClick={() => setShowUser((v) => !v)}
           style={{
-            width:          32,
-            height:         32,
-            borderRadius:   "50%",
-            background:     "rgba(124,58,237,0.2)",
-            border:         "1px solid #5b21b6",
-            color:          "#c4b5fd",
-            cursor:         "pointer",
-            fontSize:       13,
-            fontWeight:     700,
-            display:        "flex",
-            alignItems:     "center",
+            width: 32,
+            height: 32,
+            borderRadius: "50%",
+            background: "rgba(124,58,237,0.2)",
+            border: "1px solid #5b21b6",
+            color: "#c4b5fd",
+            cursor: "pointer",
+            fontSize: 13,
+            fontWeight: 700,
+            display: "flex",
+            alignItems: "center",
             justifyContent: "center",
           }}
           title="User menu"
@@ -147,16 +142,16 @@ function Topbar({
         {showUser && (
           <div
             style={{
-              position:     "absolute",
-              top:          40,
-              right:        0,
-              background:   "#161b27",
-              border:       "1px solid #1e2535",
+              position: "absolute",
+              top: 40,
+              right: 0,
+              background: "#161b27",
+              border: "1px solid #1e2535",
               borderRadius: 10,
-              padding:      "4px 0",
-              minWidth:     160,
-              boxShadow:    "0 8px 24px rgba(0,0,0,0.4)",
-              zIndex:       100,
+              padding: "4px 0",
+              minWidth: 160,
+              boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+              zIndex: 100,
             }}
           >
             {["Profile ◉", "API Keys ⊛", "Sign out ⊘"].map((item) => (
@@ -164,14 +159,14 @@ function Topbar({
                 key={item}
                 onClick={() => setShowUser(false)}
                 style={{
-                  width:      "100%",
-                  padding:    "9px 16px",
+                  width: "100%",
+                  padding: "9px 16px",
                   background: "transparent",
-                  border:     "none",
-                  color:      "#94a3b8",
-                  cursor:     "pointer",
-                  fontSize:   13,
-                  textAlign:  "left",
+                  border: "none",
+                  color: "#94a3b8",
+                  cursor: "pointer",
+                  fontSize: 13,
+                  textAlign: "left",
                 }}
               >
                 {item}
@@ -195,31 +190,31 @@ export default function Layout() {
     <div style={{ display: "flex", minHeight: "100vh" }}>
       <aside
         style={{
-          width:         sidebarW,
-          minWidth:      sidebarW,
-          background:    "#161b27",
-          borderRight:   "1px solid #1e2535",
-          display:       "flex",
+          width: sidebarW,
+          minWidth: sidebarW,
+          background: "#161b27",
+          borderRight: "1px solid #1e2535",
+          display: "flex",
           flexDirection: "column",
-          overflowY:     "auto",
-          overflowX:     "hidden",
-          transition:    "width 0.2s, min-width 0.2s",
-          position:      "sticky",
-          top:           0,
-          height:        "100vh",
+          overflowY: "auto",
+          overflowX: "hidden",
+          transition: "width 0.2s, min-width 0.2s",
+          position: "sticky",
+          top: 0,
+          height: "100vh",
         }}
       >
         <div
           style={{
-            padding:       collapsed ? "20px 0" : "20px",
-            textAlign:     collapsed ? "center" : undefined,
-            fontSize:      20,
-            fontWeight:    700,
+            padding: collapsed ? "20px 0" : "20px",
+            textAlign: collapsed ? "center" : undefined,
+            fontSize: 20,
+            fontWeight: 700,
             letterSpacing: "-0.5px",
-            color:         "#7c3aed",
-            flexShrink:    0,
-            borderBottom:  "1px solid #1e2535",
-            marginBottom:  8,
+            color: "#7c3aed",
+            flexShrink: 0,
+            borderBottom: "1px solid #1e2535",
+            marginBottom: 8,
           }}
         >
           ⬡{!collapsed && " NEXUS"}
@@ -228,14 +223,23 @@ export default function Layout() {
           {NAV_CORE.map((item) => (
             <NavItem key={item.to} {...item} collapsed={collapsed} />
           ))}
-          {collapsed
-            ? <div style={{ margin: "8px 0", borderTop: "1px solid #1e2535" }} />
-            : (
-              <div style={{ margin: "8px 20px", borderTop: "1px solid #1e2535", fontSize: 10, color: "#334155", textTransform: "uppercase", letterSpacing: "0.1em", paddingTop: 8 }}>
-                Extended
-              </div>
-            )
-          }
+          {collapsed ? (
+            <div style={{ margin: "8px 0", borderTop: "1px solid #1e2535" }} />
+          ) : (
+            <div
+              style={{
+                margin: "8px 20px",
+                borderTop: "1px solid #1e2535",
+                fontSize: 10,
+                color: "#334155",
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+                paddingTop: 8,
+              }}
+            >
+              Extended
+            </div>
+          )}
           {NAV_EXTENDED.map((item) => (
             <NavItem key={item.to} {...item} collapsed={collapsed} />
           ))}

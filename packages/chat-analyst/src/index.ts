@@ -262,6 +262,7 @@ export type StreamingLlmFn = (
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class InAppActionExtractor {
   static extract(text: string): InAppAction[] {
+    if (text.length > 100_000) return [];
     const actions: InAppAction[] = [];
     const regex = /\[ACTION:(\w+)(?:\s+([^\s\]]+))?([^\]]*)\]/g;
     let match;

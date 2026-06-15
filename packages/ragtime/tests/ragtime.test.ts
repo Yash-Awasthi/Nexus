@@ -68,7 +68,12 @@ describe("compositeScore", () => {
   });
 
   it("respects custom weights", () => {
-    const importanceHeavy = { ...cfg, relevanceWeight: 0.1, importanceWeight: 0.8, recencyWeight: 0.1 };
+    const importanceHeavy = {
+      ...cfg,
+      relevanceWeight: 0.1,
+      importanceWeight: 0.8,
+      recencyWeight: 0.1,
+    };
     const score = compositeScore(0.5, 1.0, 0, importanceHeavy);
     expect(score).toBeGreaterThan(0.7);
   });
@@ -144,9 +149,13 @@ describe("InMemoryRagtimeStore", () => {
   it("search() ranks by cosine similarity", async () => {
     const store = new InMemoryRagtimeStore();
     // hi: aligned with query (dim 0)
-    await store.save(entry("hi", { embedding: new Array(32).fill(0).map((_, i) => (i === 0 ? 1 : 0)) }));
+    await store.save(
+      entry("hi", { embedding: new Array(32).fill(0).map((_, i) => (i === 0 ? 1 : 0)) }),
+    );
     // lo: orthogonal (dim 1)
-    await store.save(entry("lo", { embedding: new Array(32).fill(0).map((_, i) => (i === 1 ? 1 : 0)) }));
+    await store.save(
+      entry("lo", { embedding: new Array(32).fill(0).map((_, i) => (i === 1 ? 1 : 0)) }),
+    );
     const qv = new Array(32).fill(0).map((_, i) => (i === 0 ? 1 : 0));
     const results = await store.search(qv, 10);
     expect(results[0]?.entry.id).toBe("hi");
@@ -166,7 +175,11 @@ describe("InMemoryRagtimeStore", () => {
 function makeRetriever(cfg: Record<string, unknown> = {}) {
   const store = new InMemoryRagtimeStore();
   const embedder = new FixedRagtimeEmbedder();
-  const retriever = new RagtimeRetriever({ store, embedder, config: { poolSize: 20, finalK: 5, ...cfg } });
+  const retriever = new RagtimeRetriever({
+    store,
+    embedder,
+    config: { poolSize: 20, finalK: 5, ...cfg },
+  });
   return { retriever, store };
 }
 

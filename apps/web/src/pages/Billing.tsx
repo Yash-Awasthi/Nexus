@@ -33,21 +33,68 @@ interface Plan {
 const s = {
   title: { fontSize: 24, fontWeight: 700, marginBottom: 8 } as React.CSSProperties,
   subtitle: { color: "#64748b", marginBottom: 28, fontSize: 14 },
-  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14, marginBottom: 24 },
-  card: { background: "#161b27", border: "1px solid #1e2535", borderRadius: 10, padding: "18px 20px" } as React.CSSProperties,
-  cardLabel: { fontSize: 11, color: "#64748b", textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 6 },
+  grid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+    gap: 14,
+    marginBottom: 24,
+  },
+  card: {
+    background: "#161b27",
+    border: "1px solid #1e2535",
+    borderRadius: 10,
+    padding: "18px 20px",
+  } as React.CSSProperties,
+  cardLabel: {
+    fontSize: 11,
+    color: "#64748b",
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.1em",
+    marginBottom: 6,
+  },
   cardVal: { fontSize: 28, fontWeight: 700, color: "#e2e8f0" },
   cardSub: { fontSize: 12, color: "#64748b", marginTop: 4 },
   progress: { height: 6, background: "#1e2535", borderRadius: 3, marginTop: 8, overflow: "hidden" },
   progressBar: (pct: number, color = "#7c3aed"): React.CSSProperties => ({
-    height: "100%", width: `${Math.min(pct, 100)}%`, background: color, borderRadius: 3, transition: "width 0.4s",
+    height: "100%",
+    width: `${Math.min(pct, 100)}%`,
+    background: color,
+    borderRadius: 3,
+    transition: "width 0.4s",
   }),
-  section: { background: "#161b27", border: "1px solid #1e2535", borderRadius: 10, padding: "20px 24px", marginBottom: 20 },
+  section: {
+    background: "#161b27",
+    border: "1px solid #1e2535",
+    borderRadius: 10,
+    padding: "20px 24px",
+    marginBottom: 20,
+  },
   sectionTitle: { fontSize: 14, fontWeight: 600, color: "#e2e8f0", marginBottom: 16 },
-  tableHead: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 8, fontSize: 11, color: "#64748b", textTransform: "uppercase" as const, letterSpacing: "0.08em", paddingBottom: 8, borderBottom: "1px solid #1e2535" },
-  tableRow: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 8, fontSize: 13, padding: "10px 0", borderBottom: "1px solid #1e2535", color: "#e2e8f0" },
+  tableHead: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr",
+    gap: 8,
+    fontSize: 11,
+    color: "#64748b",
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.08em",
+    paddingBottom: 8,
+    borderBottom: "1px solid #1e2535",
+  },
+  tableRow: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr",
+    gap: 8,
+    fontSize: 13,
+    padding: "10px 0",
+    borderBottom: "1px solid #1e2535",
+    color: "#e2e8f0",
+  },
   planBadge: (tier: Plan["tier"]): React.CSSProperties => ({
-    fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 12,
+    fontSize: 12,
+    fontWeight: 600,
+    padding: "3px 10px",
+    borderRadius: 12,
     background: tier === "enterprise" ? "#1e1b4b" : tier === "pro" ? "#14532d" : "#1c1917",
     color: tier === "enterprise" ? "#a5b4fc" : tier === "pro" ? "#4ade80" : "#78716c",
     display: "inline-block",
@@ -66,29 +113,70 @@ export default function Billing() {
   const [period, setPeriod] = useState<BillingPeriod | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState<"pro" | "enterprise" | null>(null);
-  const [portalLoading, setPortalLoading]     = useState(false);
-  const [actionError, setActionError]         = useState<string | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.allSettled([
       api.get<{ plan: Plan }>("/billing/plan"),
       api.get<{ stats: UsageStat[] }>("/admin/stats"),
       api.get<{ period: BillingPeriod }>("/billing/current-period"),
-    ]).then(([p, s, per]) => {
-      setPlan(p.status === "fulfilled" ? p.value.plan : {
-        name: "Pro", tier: "pro", tokenLimit: 10_000_000, requestLimit: 50_000,
-        tokensUsed: 2_847_392, requestsUsed: 8_423, renewsAt: "2026-07-01",
-      });
-      setStats(s.status === "fulfilled" ? s.value.stats : [
-        { alias: "nexus/smart", requests: 3241, totalTokens: 1_847_392, errors: 12, avgLatencyMs: 842 },
-        { alias: "nexus/fast", requests: 5182, totalTokens: 999_000, errors: 3, avgLatencyMs: 234 },
-        { alias: "nexus/planner", requests: 213, totalTokens: 98_432, errors: 1, avgLatencyMs: 2100 },
-      ]);
-      setPeriod(per.status === "fulfilled" ? per.value.period : {
-        start: "2026-06-01", end: "2026-06-30", totalTokens: 2_847_392,
-        totalRequests: 8_636, estimatedCost: 28.47, currency: "USD",
-      });
-    }).finally(() => setLoading(false));
+    ])
+      .then(([p, s, per]) => {
+        setPlan(
+          p.status === "fulfilled"
+            ? p.value.plan
+            : {
+                name: "Pro",
+                tier: "pro",
+                tokenLimit: 10_000_000,
+                requestLimit: 50_000,
+                tokensUsed: 2_847_392,
+                requestsUsed: 8_423,
+                renewsAt: "2026-07-01",
+              },
+        );
+        setStats(
+          s.status === "fulfilled"
+            ? s.value.stats
+            : [
+                {
+                  alias: "nexus/smart",
+                  requests: 3241,
+                  totalTokens: 1_847_392,
+                  errors: 12,
+                  avgLatencyMs: 842,
+                },
+                {
+                  alias: "nexus/fast",
+                  requests: 5182,
+                  totalTokens: 999_000,
+                  errors: 3,
+                  avgLatencyMs: 234,
+                },
+                {
+                  alias: "nexus/planner",
+                  requests: 213,
+                  totalTokens: 98_432,
+                  errors: 1,
+                  avgLatencyMs: 2100,
+                },
+              ],
+        );
+        setPeriod(
+          per.status === "fulfilled"
+            ? per.value.period
+            : {
+                start: "2026-06-01",
+                end: "2026-06-30",
+                totalTokens: 2_847_392,
+                totalRequests: 8_636,
+                estimatedCost: 28.47,
+                currency: "USD",
+              },
+        );
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const startCheckout = async (targetPlan: "pro" | "enterprise") => {
@@ -123,26 +211,38 @@ export default function Billing() {
   return (
     <div>
       <h1 style={s.title}>Billing & Usage</h1>
-      <p style={s.subtitle}>Current billing period: {period?.start} → {period?.end}</p>
+      <p style={s.subtitle}>
+        Current billing period: {period?.start} → {period?.end}
+      </p>
 
       {plan && (
         <div style={s.grid}>
           <div style={s.card}>
             <div style={s.cardLabel}>Plan</div>
-            <div style={{ marginTop: 6 }}><span style={s.planBadge(plan.tier)}>{plan.name}</span></div>
+            <div style={{ marginTop: 6 }}>
+              <span style={s.planBadge(plan.tier)}>{plan.name}</span>
+            </div>
             <div style={s.cardSub}>Renews {plan.renewsAt}</div>
           </div>
           <div style={s.card}>
             <div style={s.cardLabel}>Tokens Used</div>
             <div style={s.cardVal}>{fmt(plan.tokensUsed)}</div>
-            <div style={s.cardSub}>of {fmt(plan.tokenLimit)} limit ({tokenPct.toFixed(1)}%)</div>
-            <div style={s.progress}><div style={s.progressBar(tokenPct, tokenPct > 80 ? "#dc2626" : "#7c3aed")} /></div>
+            <div style={s.cardSub}>
+              of {fmt(plan.tokenLimit)} limit ({tokenPct.toFixed(1)}%)
+            </div>
+            <div style={s.progress}>
+              <div style={s.progressBar(tokenPct, tokenPct > 80 ? "#dc2626" : "#7c3aed")} />
+            </div>
           </div>
           <div style={s.card}>
             <div style={s.cardLabel}>Requests</div>
             <div style={s.cardVal}>{fmt(plan.requestsUsed)}</div>
-            <div style={s.cardSub}>of {fmt(plan.requestLimit)} limit ({reqPct.toFixed(1)}%)</div>
-            <div style={s.progress}><div style={s.progressBar(reqPct)} /></div>
+            <div style={s.cardSub}>
+              of {fmt(plan.requestLimit)} limit ({reqPct.toFixed(1)}%)
+            </div>
+            <div style={s.progress}>
+              <div style={s.progressBar(reqPct)} />
+            </div>
           </div>
           {period && (
             <div style={s.card}>
@@ -167,15 +267,15 @@ export default function Billing() {
                 onClick={() => void startCheckout("pro")}
                 disabled={checkoutLoading !== null}
                 style={{
-                  background:  checkoutLoading === "pro" ? "#334155" : "#7c3aed",
-                  border:      "none",
+                  background: checkoutLoading === "pro" ? "#334155" : "#7c3aed",
+                  border: "none",
                   borderRadius: 8,
-                  color:       "#fff",
-                  cursor:      checkoutLoading ? "wait" : "pointer",
-                  fontSize:    13,
-                  fontWeight:  600,
-                  padding:     "10px 18px",
-                  transition:  "background 0.15s",
+                  color: "#fff",
+                  cursor: checkoutLoading ? "wait" : "pointer",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  padding: "10px 18px",
+                  transition: "background 0.15s",
                 }}
               >
                 {checkoutLoading === "pro" ? "Redirecting…" : "Upgrade to Pro — $29/mo"}
@@ -184,18 +284,20 @@ export default function Billing() {
                 onClick={() => void startCheckout("enterprise")}
                 disabled={checkoutLoading !== null}
                 style={{
-                  background:  checkoutLoading === "enterprise" ? "#334155" : "#1e1b4b",
-                  border:      "1px solid #4338ca",
+                  background: checkoutLoading === "enterprise" ? "#334155" : "#1e1b4b",
+                  border: "1px solid #4338ca",
                   borderRadius: 8,
-                  color:       "#a5b4fc",
-                  cursor:      checkoutLoading ? "wait" : "pointer",
-                  fontSize:    13,
-                  fontWeight:  600,
-                  padding:     "10px 18px",
-                  transition:  "background 0.15s",
+                  color: "#a5b4fc",
+                  cursor: checkoutLoading ? "wait" : "pointer",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  padding: "10px 18px",
+                  transition: "background 0.15s",
                 }}
               >
-                {checkoutLoading === "enterprise" ? "Redirecting…" : "Upgrade to Enterprise — $199/mo"}
+                {checkoutLoading === "enterprise"
+                  ? "Redirecting…"
+                  : "Upgrade to Enterprise — $199/mo"}
               </button>
             </>
           )}
@@ -204,15 +306,15 @@ export default function Billing() {
               onClick={() => void openPortal()}
               disabled={portalLoading}
               style={{
-                background:  portalLoading ? "#334155" : "#161b27",
-                border:      "1px solid #1e2535",
+                background: portalLoading ? "#334155" : "#161b27",
+                border: "1px solid #1e2535",
                 borderRadius: 8,
-                color:       "#94a3b8",
-                cursor:      portalLoading ? "wait" : "pointer",
-                fontSize:    13,
-                fontWeight:  600,
-                padding:     "10px 18px",
-                transition:  "background 0.15s",
+                color: "#94a3b8",
+                cursor: portalLoading ? "wait" : "pointer",
+                fontSize: 13,
+                fontWeight: 600,
+                padding: "10px 18px",
+                transition: "background 0.15s",
               }}
             >
               {portalLoading ? "Opening…" : "Manage Subscription →"}
@@ -224,7 +326,11 @@ export default function Billing() {
       <div style={s.section}>
         <div style={s.sectionTitle}>Usage by Alias</div>
         <div style={s.tableHead}>
-          <span>Alias</span><span>Requests</span><span>Tokens</span><span>Errors</span><span>Avg Latency</span>
+          <span>Alias</span>
+          <span>Requests</span>
+          <span>Tokens</span>
+          <span>Errors</span>
+          <span>Avg Latency</span>
         </div>
         {stats.map((row) => (
           <div key={row.alias} style={s.tableRow}>

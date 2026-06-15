@@ -13,68 +13,64 @@
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import sensible from "@fastify/sensible";
+import { getTracer, enableTracing } from "@nexus/llm-tracer";
 import {
   InMemoryAnalyticsClient,
   NexusAnalytics,
   NexusEvents,
   PostHogAnalyticsClient,
 } from "@nexus/posthog-analytics";
-import { getTracer, enableTracing } from "@nexus/llm-tracer";
-import Fastify, {
-  type FastifyError,
-  type FastifyInstance,
-  type FastifyRequest,
-} from "fastify";
+import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest } from "fastify";
 
-import { adminRoutes } from "./routes/admin.js";
-import { oauthRoutes } from "./routes/oauth.js";
-import { parseltongueRoutes } from "./routes/parseltongue.js";
 import { makeRateLimitPreHandler } from "./lib/rate-limiter.js";
 import { sentryReporter } from "./lib/sentry-reporter.js";
-import { metricsRoutes } from "./routes/metrics.js";
-import { auditRoutes } from "./routes/audit.js";
-import { billingRoutes } from "./routes/billing.js";
+import { adminRoutes } from "./routes/admin.js";
 import { agentsRoutes } from "./routes/agents.js";
-import { chatAnalystRoutes } from "./routes/chat-analyst.js";
 import { alertsRoutes } from "./routes/alerts.js";
+import { auditRoutes } from "./routes/audit.js";
 import { autotuneRoutes } from "./routes/autotune.js";
+import { billingRoutes } from "./routes/billing.js";
 import { botsRoutes } from "./routes/bots.js";
 import { briefRoutes } from "./routes/brief.js";
-import { hooksRoutes } from "./routes/hooks.js";
-import { evalsRoutes } from "./routes/evals.js";
-import { llmRoutes } from "./routes/llm.js";
-import { rlhfRoutes } from "./routes/rlhf.js";
-import { scenarioPlannerRoutes } from "./routes/scenario-planner.js";
-import { sftRoutes } from "./routes/sft.js";
-import { docPipelineRoutes } from "./routes/doc-pipeline.js";
-import { mcpRoutes } from "./routes/mcp.js";
-import { scrapingMcpRoutes } from "./routes/scraping-mcp.js";
+import { chatAnalystRoutes } from "./routes/chat-analyst.js";
 import { chatSuggestionsRoutes } from "./routes/chat-suggestions.js";
 import { codeReplRoutes } from "./routes/code-repl.js";
 import { connectorsRoutes } from "./routes/connectors.js";
 import { contextRoutes } from "./routes/context.js";
 import { corpusBuilderRoutes } from "./routes/corpus-builder.js";
 import { councilRoutes } from "./routes/council.js";
+import { docPipelineRoutes } from "./routes/doc-pipeline.js";
 import { domainFeedsRoutes } from "./routes/domain-feeds.js";
+import { evalsRoutes } from "./routes/evals.js";
 import { featureFlagsRoutes } from "./routes/feature-flags.js";
 import { forecastRoutes } from "./routes/forecast.js";
 import { gatewayRoutes } from "./routes/gateway.js";
 import { governanceRoutes } from "./routes/governance.js";
-import { imageGenRoutes } from "./routes/image-gen.js";
-import { knowledgeGraphRoutes } from "./routes/knowledge-graph.js";
-import { memoryRoutes } from "./routes/memory.js";
-import { voiceRoutes } from "./routes/voice.js";
 import { healthRoutes } from "./routes/health.js";
+import { hooksRoutes } from "./routes/hooks.js";
+import { imageGenRoutes } from "./routes/image-gen.js";
 import { ingestRoutes } from "./routes/ingest.js";
+import { knowledgeGraphRoutes } from "./routes/knowledge-graph.js";
+import { libertasRoutes } from "./routes/libertas.js";
+import { llmRoutes } from "./routes/llm.js";
+import { mcpRoutes } from "./routes/mcp.js";
+import { memoryRoutes } from "./routes/memory.js";
+import { metricsRoutes } from "./routes/metrics.js";
+import { oauthRoutes } from "./routes/oauth.js";
 import { obsProvidersRoutes } from "./routes/obs-providers.js";
+import { parseltongueRoutes } from "./routes/parseltongue.js";
 import { predictionMarketRoutes } from "./routes/prediction-market.js";
 import { researcherRoutes } from "./routes/researcher.js";
+import { rlhfRoutes } from "./routes/rlhf.js";
 import { runtimeRoutes } from "./routes/runtime.js";
+import { scenarioPlannerRoutes } from "./routes/scenario-planner.js";
+import { scrapingMcpRoutes } from "./routes/scraping-mcp.js";
 import { sessionSyncRoutes } from "./routes/session-sync.js";
+import { sftRoutes } from "./routes/sft.js";
 import { sseRoutes } from "./routes/sse.js";
 import { stmRoutes } from "./routes/stm.js";
+import { voiceRoutes } from "./routes/voice.js";
 import { wikiRoutes } from "./routes/wiki.js";
-import { libertasRoutes } from "./routes/libertas.js";
 
 // Augment FastifyRequest to carry optional trace span
 declare module "fastify" {
@@ -106,33 +102,33 @@ export async function buildServer(): Promise<FastifyInstance> {
     },
     // Unique request ID on every incoming request — propagated through Pino logs.
     // Format: nexus-<timestamp-hex>-<random-6>
-    genReqId: () =>
-      `nexus-${Date.now().toString(16)}-${Math.random().toString(36).slice(2, 8)}`,
+    genReqId: () => `nexus-${Date.now().toString(16)}-${Math.random().toString(36).slice(2, 8)}`,
   });
 
   // ── Plugins ───────────────────────────────────────────────────────────────
   // CSP: strict policy for the web app; report-only in dev (NEXUS_CSP_REPORT_ONLY=true)
   const cspDirectives = {
-    defaultSrc:     ["'self'"],
-    scriptSrc:      ["'self'", "'strict-dynamic'"],
-    styleSrc:       ["'self'", "'unsafe-inline'"],
-    imgSrc:         ["'self'", "data:", "blob:"],
-    connectSrc:     ["'self'", ...(process.env.ALLOWED_ORIGINS?.split(",") ?? [])],
-    fontSrc:        ["'self'"],
-    objectSrc:      ["'none'"],
-    baseUri:        ["'self'"],
+    defaultSrc: ["'self'"],
+    scriptSrc: ["'self'", "'strict-dynamic'"],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    imgSrc: ["'self'", "data:", "blob:"],
+    connectSrc: ["'self'", ...(process.env.ALLOWED_ORIGINS?.split(",") ?? [])],
+    fontSrc: ["'self'"],
+    objectSrc: ["'none'"],
+    baseUri: ["'self'"],
     frameAncestors: ["'none'"],
     ...(process.env.NODE_ENV === "production" ? { upgradeInsecureRequests: [] as string[] } : {}),
   };
   await app.register(helmet, {
     contentSecurityPolicy: {
-      useDefaults:        false,
-      directives:         cspDirectives,
-      reportOnly:         process.env.NEXUS_CSP_REPORT_ONLY === "true",
+      useDefaults: false,
+      directives: cspDirectives,
+      reportOnly: process.env.NEXUS_CSP_REPORT_ONLY === "true",
     },
-    hsts:        process.env.NODE_ENV === "production" ? { maxAge: 31536000, includeSubDomains: true } : false,
-    frameguard:  { action: "deny" },
-    noSniff:     true,
+    hsts:
+      process.env.NODE_ENV === "production" ? { maxAge: 31536000, includeSubDomains: true } : false,
+    frameguard: { action: "deny" },
+    noSniff: true,
   });
   await app.register(cors, {
     origin: process.env.ALLOWED_ORIGINS?.split(",") ?? true,
@@ -148,9 +144,9 @@ export async function buildServer(): Promise<FastifyInstance> {
     const span = tracer.startSpan(name, "root");
     // Correlate span with Fastify's request ID for log tracing
     span.setAttributes({
-      "http.method":    request.method,
-      "http.url":       request.url,
-      "nexus.req_id":   request.id,
+      "http.method": request.method,
+      "http.url": request.url,
+      "nexus.req_id": request.id,
     });
     request._nexusSpan = span;
   });
@@ -167,30 +163,45 @@ export async function buildServer(): Promise<FastifyInstance> {
     try {
       const { sloTracker } = await import("./routes/metrics.js");
       sloTracker.record({
-        success:    reply.statusCode < 500,
-        latencyMs:  reply.elapsedTime ?? 0,
+        success: reply.statusCode < 500,
+        latencyMs: reply.elapsedTime ?? 0,
       });
-    } catch { /* metrics not yet loaded */ }
+    } catch {
+      /* metrics not yet loaded */
+    }
 
     // AlertEngine: fire "http.5xx" metric on every 5xx response
     if (reply.statusCode >= 500) {
       try {
         const { alertEngine } = await import("./routes/alerts.js");
         alertEngine.evaluate("http.5xx", 1).catch(() => {});
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
     }
 
     // PostHog analytics — fire-and-forget on successful mutations
     if (request.method === "POST" && reply.statusCode === 201) {
-      const userId = ((request as unknown as Record<string, unknown>)["user"] as Record<string, unknown> | undefined)?.["id"] as string | undefined ?? "anonymous";
+      const userId =
+        ((
+          (request as unknown as Record<string, unknown>)["user"] as
+            | Record<string, unknown>
+            | undefined
+        )?.["id"] as string | undefined) ?? "anonymous";
       const path = request.url.split("?")[0] ?? request.url;
 
       if (path.includes("/memory")) {
-        analytics.agentTaskStarted(userId, `mem-${Date.now()}`, NexusEvents.MEMORY_STORED).catch(() => {});
+        analytics
+          .agentTaskStarted(userId, `mem-${Date.now()}`, NexusEvents.MEMORY_STORED)
+          .catch(() => {});
       } else if (path.includes("/researcher")) {
-        analytics.agentTaskStarted(userId, `res-${Date.now()}`, NexusEvents.AGENT_TASK_STARTED).catch(() => {});
+        analytics
+          .agentTaskStarted(userId, `res-${Date.now()}`, NexusEvents.AGENT_TASK_STARTED)
+          .catch(() => {});
       } else {
-        _analyticsClient.track("api.mutation", userId, { path, status: reply.statusCode }).catch(() => {});
+        _analyticsClient
+          .track("api.mutation", userId, { path, status: reply.statusCode })
+          .catch(() => {});
       }
     }
   });
@@ -198,17 +209,21 @@ export async function buildServer(): Promise<FastifyInstance> {
   // ── IP-based rate limiting on high-value route groups ────────────────────────
   // Limits are intentionally generous to avoid blocking legitimate use.
   // Tighten per tier once tier-aware key extraction is plumbed through.
-  const _adminRL     = makeRateLimitPreHandler({ limit: 30,  windowMs: 60_000, keyPrefix: "admin" });
-  const _billingRL   = makeRateLimitPreHandler({ limit: 20,  windowMs: 60_000, keyPrefix: "billing" });
-  const _codeReplRL  = makeRateLimitPreHandler({ limit: 10,  windowMs: 60_000, keyPrefix: "code-repl" });
-  const _councilRL   = makeRateLimitPreHandler({ limit: 30,  windowMs: 60_000, keyPrefix: "council" });
+  const _adminRL = makeRateLimitPreHandler({ limit: 30, windowMs: 60_000, keyPrefix: "admin" });
+  const _billingRL = makeRateLimitPreHandler({ limit: 20, windowMs: 60_000, keyPrefix: "billing" });
+  const _codeReplRL = makeRateLimitPreHandler({
+    limit: 10,
+    windowMs: 60_000,
+    keyPrefix: "code-repl",
+  });
+  const _councilRL = makeRateLimitPreHandler({ limit: 30, windowMs: 60_000, keyPrefix: "council" });
 
   app.addHook("onRequest", async (request: FastifyRequest, reply) => {
     const url = request.url;
-    if      (url.startsWith("/api/v1/admin"))     await _adminRL(request, reply);
-    else if (url.startsWith("/api/v1/billing"))   await _billingRL(request, reply);
+    if (url.startsWith("/api/v1/admin")) await _adminRL(request, reply);
+    else if (url.startsWith("/api/v1/billing")) await _billingRL(request, reply);
     else if (url.startsWith("/api/v1/code-repl")) await _codeReplRL(request, reply);
-    else if (url.startsWith("/api/v1/council"))   await _councilRL(request, reply);
+    else if (url.startsWith("/api/v1/council")) await _councilRL(request, reply);
   });
 
   // ── Health (no prefix — /health, /health/ready) ───────────────────────────
@@ -299,9 +314,9 @@ export async function buildServer(): Promise<FastifyInstance> {
     if (statusCode >= 500) {
       sentryReporter.captureException(error, {
         request_id: request.id,
-        url:        request.url,
-        method:     request.method,
-        userId:     request.nexusUserId,
+        url: request.url,
+        method: request.method,
+        userId: request.nexusUserId,
       });
     }
 

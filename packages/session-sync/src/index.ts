@@ -47,6 +47,22 @@ export interface ConflictResolution {
   resolved: Record<string, unknown>;
 }
 
+// ── Prototype-pollution guard helpers ─────────────────────────────────────────
+
+const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+function isSafeKey(key: string): boolean {
+  return !UNSAFE_KEYS.has(key);
+}
+
+function safeSpread(obj: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = Object.create(null);
+  for (const [k, v] of Object.entries(obj)) {
+    if (isSafeKey(k)) result[k] = v;
+  }
+  return result;
+}
+
 // ── ID util ───────────────────────────────────────────────────────────────────
 
 let _seq = 0;
@@ -162,7 +178,7 @@ export class SyncStore {
       id: uid("sess"),
       userId,
       deviceId,
-      data: { ...initialData },
+      data: safeSpread(initialData),
       vectorClock: { [deviceId]: 0 },
       updatedAt: new Date().toISOString(),
       status: "clean",
@@ -183,6 +199,7 @@ export class SyncStore {
 
     const updated = { ...session, data: { ...session.data } };
 
+    if (!isSafeKey(op.key)) return undefined; // block __proto__ / constructor
     if (op.type === "set") {
       updated.data[op.key] = op.value;
     } else if (op.type === "delete") {
@@ -190,7 +207,7 @@ export class SyncStore {
     } else if (op.type === "merge" && typeof op.value === "object" && op.value !== null) {
       updated.data[op.key] = {
         ...((updated.data[op.key] as object) ?? {}),
-        ...(op.value as object),
+        ...safeSpread(op.value as Record<string, unknown>),
       };
     }
 
