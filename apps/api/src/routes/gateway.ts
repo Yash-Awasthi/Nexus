@@ -60,6 +60,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { requireAuth } from "../middleware/auth.js";
 import { getTierFromRequest } from "../middleware/auth.js";
 import { getSharedKV } from "../lib/shared-kv.js";
+import { getPromptCache, PromptCache, type CacheableRequest } from "../lib/prompt-cache.js";
 
 // ── Run-cost tracker (per-gateway-call USD accounting) ────────────────────────
 // Records inputTokens + outputTokens per completion; exposes GET /gateway/cost-report.
@@ -182,6 +183,13 @@ function pruneGatewayMessages(
     })),
   };
 }
+
+// ── Prompt cache (KV-backed, cross-pod safe) ───────────────────────────────────
+// Only caches non-streaming deterministic (temperature=0) requests.
+// TTL: PROMPT_CACHE_TTL_MS (default 1 h).
+// Cache hits are served with X-Nexus-Cache: HIT header, no LLM call made.
+
+const _promptCache = getPromptCache(getSharedKV());
 
 // ── SSE headers ───────────────────────────────────────────────────────────────
 
@@ -524,7 +532,26 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
       return; // hijacked — Fastify must not touch reply after this
     }
 
-    // ── Non-streaming branch (existing behaviour) ───────────────────────────
+    // ── Non-streaming branch ────────────────────────────────────────────────
+
+    // ── Prompt cache check (deterministic requests only) ────────────────────
+    if (PromptCache.isEligible(request.body)) {
+      const cacheReq: CacheableRequest = {
+        model:       resolvedModel,
+        messages:    opts.messages as CacheableRequest["messages"],
+        system:      request.body.system,
+        max_tokens:  request.body.max_tokens,
+        temperature: request.body.temperature,
+      };
+      const cached = await _promptCache.get(cacheReq);
+      if (cached.hit && cached.response) {
+        reply.header("X-Nexus-Cache", "HIT");
+        reply.header("X-Nexus-Cache-Key", cached.cacheKey.split(":")[1]?.slice(0, 16) ?? "");
+        reply.header("Cache-Control", "private, max-age=3600");
+        return reply.code(200).send(cached.response);
+      }
+    }
+
     try {
       const response = await driver.complete(opts);
 
@@ -559,18 +586,34 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
         result:      { model: resolvedModel, tokens: response.usage.outputTokens },
       }).catch(() => {});
 
-      return reply.code(200).send({
-        id: response.id,
-        type: "message",
-        role: "assistant",
-        content: [{ type: "text", text: response.content }],
-        model: response.model,
-        stop_reason: response.finishReason,
+      const responseBody = {
+        id:          response.id,
+        type:        "message" as const,
+        role:        "assistant" as const,
+        content:     [{ type: "text" as const, text: response.content }],
+        model:       response.model,
+        stop_reason: response.finishReason ?? null,
         usage: {
-          input_tokens: response.usage.inputTokens,
+          input_tokens:  response.usage.inputTokens,
           output_tokens: response.usage.outputTokens,
         },
-      });
+      };
+
+      // Cache deterministic responses for future identical requests
+      if (PromptCache.isEligible(request.body)) {
+        const cacheReq: CacheableRequest = {
+          model:       resolvedModel,
+          messages:    opts.messages as CacheableRequest["messages"],
+          system:      request.body.system,
+          max_tokens:  request.body.max_tokens,
+          temperature: request.body.temperature,
+        };
+        _promptCache.set(cacheReq, responseBody).catch(() => {});
+      }
+
+      reply.header("X-Nexus-Cache", "MISS");
+      reply.header("Cache-Control", "private, no-store");
+      return reply.code(200).send(responseBody);
     } catch (err: unknown) {
       const e = err as { code?: string; statusCode?: number; message?: string };
       const statusCode = e.statusCode && e.statusCode >= 400 ? e.statusCode : 502;
@@ -606,6 +649,8 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
    * plus the list of currently-configured providers.
    */
   app.get("/gateway/models", { preHandler: requireAuth }, async (_request, reply) => {
+    // Model alias table is stable; safe to cache at the CDN + browser level.
+    reply.header("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
     const registry = buildDriverRegistry();
     const models = Object.entries(DRIVER_ALIASES).map(([alias, target]) => ({
       id: alias,
@@ -685,6 +730,8 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
    * List all registered tools in LLM function-calling schema format.
    */
   app.get("/gateway/tools", { preHandler: requireAuth }, async (_request, reply) => {
+    // Tool schema is static for the process lifetime; cache aggressively.
+    reply.header("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
     return reply.send({
       tools: _toolRegistry.toLlmTools(),
       total: _toolRegistry.size(),
@@ -720,6 +767,8 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
   app.get<{
     Querystring: { limit?: string; cursor?: string };
   }>("/gateway/cost-report", { preHandler: requireAuth }, async (request, reply) => {
+    // Cost data is user-specific and live — must not be shared or persisted.
+    reply.header("Cache-Control", "private, no-store");
     const limit  = Math.min(parseInt(request.query.limit ?? "50", 10) || 50, 200);
     const cursor = request.query.cursor;
 

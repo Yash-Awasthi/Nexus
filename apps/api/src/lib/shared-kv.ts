@@ -17,6 +17,7 @@
  */
 
 import { MemoryKVStore, type KVStore } from "@nexus/kv";
+import { getSharedKVFromCF } from "./cf-adapter.js";
 
 // ── Upstash REST KVStore ───────────────────────────────────────────────────────
 // Implements KVStore using Upstash Redis REST API.
@@ -92,13 +93,21 @@ let _sharedKv: KVStore | null = null;
 export function getSharedKV(): KVStore {
   if (_sharedKv) return _sharedKv;
 
+  // 1. Cloudflare Workers KV (when running on CF Workers edge)
+  const cfKV = getSharedKVFromCF();
+  if (cfKV) {
+    _sharedKv = cfKV;
+    return _sharedKv;
+  }
+
+  // 2. Upstash Redis REST (cross-pod, recommended for K8s)
   const upstashUrl   = process.env.UPSTASH_REDIS_REST_URL;
   const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 
   if (upstashUrl && upstashToken) {
     _sharedKv = new UpstashKVStore(upstashUrl, upstashToken);
   } else {
-    // In-process fallback — not cross-pod safe.
+    // 3. In-process fallback — not cross-pod safe.
     // Set UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN for production.
     _sharedKv = new MemoryKVStore();
   }
