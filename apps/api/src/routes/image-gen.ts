@@ -37,7 +37,7 @@ const history: GeneratedImage[] = [];
 // ── Provider factory ──────────────────────────────────────────────────────────
 
 const REPLICATE_MODELS: Record<string, string> = {
-  "flux-1-dev":          "black-forest-labs/flux-dev",
+  "flux-1-dev": "black-forest-labs/flux-dev",
   "stable-diffusion-xl": "stability-ai/sdxl:39ed52f2319f9259f897e5c2042de5a6a4b06b97",
 };
 
@@ -63,11 +63,16 @@ function buildGenerator(model: string): ImageGenerator {
 }
 
 const SUPPORTED_MODELS = [
-  { id: "dall-e-3",          label: "DALL·E 3",           provider: "openai",    requires: "OPENAI_API_KEY" },
-  { id: "dall-e-2",          label: "DALL·E 2",           provider: "openai",    requires: "OPENAI_API_KEY" },
-  { id: "flux-1-dev",        label: "FLUX.1 Dev",         provider: "replicate", requires: "REPLICATE_API_KEY" },
-  { id: "stable-diffusion-xl", label: "Stable Diffusion XL", provider: "replicate", requires: "REPLICATE_API_KEY" },
-  { id: "null",              label: "Placeholder (dev)",   provider: "null",      requires: "" },
+  { id: "dall-e-3", label: "DALL·E 3", provider: "openai", requires: "OPENAI_API_KEY" },
+  { id: "dall-e-2", label: "DALL·E 2", provider: "openai", requires: "OPENAI_API_KEY" },
+  { id: "flux-1-dev", label: "FLUX.1 Dev", provider: "replicate", requires: "REPLICATE_API_KEY" },
+  {
+    id: "stable-diffusion-xl",
+    label: "Stable Diffusion XL",
+    provider: "replicate",
+    requires: "REPLICATE_API_KEY",
+  },
+  { id: "null", label: "Placeholder (dev)", provider: "null", requires: "" },
 ];
 
 // ── Route plugin ──────────────────────────────────────────────────────────────
@@ -106,7 +111,11 @@ export async function imageGenRoutes(app: FastifyInstance): Promise<void> {
 
       const images: GeneratedImage[] = result.images.map((img) => ({
         id: randomUUID(),
-        url: img.url ?? (img.data ? `data:image/${img.format};base64,${Buffer.from(img.data).toString("base64")}` : ""),
+        url:
+          img.url ??
+          (img.data
+            ? `data:image/${img.format};base64,${Buffer.from(img.data).toString("base64")}`
+            : ""),
         prompt,
         model,
         size,
@@ -125,18 +134,38 @@ export async function imageGenRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /** GET /image-gen/models */
-  app.get("/image-gen/models", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
-    const models = SUPPORTED_MODELS.map((m) => ({
-      ...m,
-      available: !m.requires || !!process.env[m.requires],
-    }));
-    return reply.send({ models });
-  });
+  app.get(
+    "/image-gen/models",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_req, reply) => {
+      const models = SUPPORTED_MODELS.map((m) => ({
+        ...m,
+        available: !m.requires || !!process.env[m.requires],
+      }));
+      return reply.send({ models });
+    },
+  );
 
   /** GET /image-gen/history?limit= */
   app.get<{ Querystring: { limit?: string } }>(
     "/image-gen/history",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const limit = Math.min(parseInt(request.query.limit ?? "20"), 50);
       return reply.send({ images: history.slice(0, limit), total: history.length });

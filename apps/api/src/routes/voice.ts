@@ -24,23 +24,27 @@ import { requireAuth } from "../middleware/auth.js";
 // ── Available TTS voices (ElevenLabs defaults + generic labels) ───────────────
 
 const VOICES = [
-  { id: "alloy",   label: "Alloy",   provider: "elevenlabs" },
-  { id: "echo",    label: "Echo",    provider: "elevenlabs" },
-  { id: "fable",   label: "Fable",   provider: "elevenlabs" },
-  { id: "onyx",    label: "Onyx",    provider: "elevenlabs" },
-  { id: "nova",    label: "Nova",    provider: "elevenlabs" },
+  { id: "alloy", label: "Alloy", provider: "elevenlabs" },
+  { id: "echo", label: "Echo", provider: "elevenlabs" },
+  { id: "fable", label: "Fable", provider: "elevenlabs" },
+  { id: "onyx", label: "Onyx", provider: "elevenlabs" },
+  { id: "nova", label: "Nova", provider: "elevenlabs" },
   { id: "shimmer", label: "Shimmer", provider: "elevenlabs" },
 ];
 
 // ── Session factory ───────────────────────────────────────────────────────────
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function buildSession(voice = "alloy"): VoiceSession {
   const transcribe = process.env.GROQ_API_KEY
     ? new GroqTranscribeProvider({ apiKey: process.env.GROQ_API_KEY })
     : new NullTranscribeProvider("(groq not configured)");
 
   const synthesize = process.env.ELEVENLABS_API_KEY
-    ? new ElevenLabsSynthesizeProvider({ apiKey: process.env.ELEVENLABS_API_KEY, defaultVoice: voice })
+    ? new ElevenLabsSynthesizeProvider({
+        apiKey: process.env.ELEVENLABS_API_KEY,
+        defaultVoice: voice,
+      })
     : new NullSynthesizeProvider();
 
   return new VoiceSession({
@@ -65,8 +69,17 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Body: { text: string; voice?: string } }>(
     "/voice/chat",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { text, voice = "alloy" } = request.body;
       if (!text?.trim()) return reply.code(400).send({ error: "text is required" });
 
@@ -121,13 +134,24 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Body: { text: string; voice?: string } }>(
     "/voice/synthesize",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const { text, voice = "alloy" } = request.body;
       if (!text?.trim()) return reply.code(400).send({ error: "text is required" });
 
       const provider = process.env.ELEVENLABS_API_KEY
-        ? new ElevenLabsSynthesizeProvider({ apiKey: process.env.ELEVENLABS_API_KEY, defaultVoice: voice })
+        ? new ElevenLabsSynthesizeProvider({
+            apiKey: process.env.ELEVENLABS_API_KEY,
+            defaultVoice: voice,
+          })
         : new NullSynthesizeProvider();
 
       try {
@@ -144,22 +168,46 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
   );
 
   /** GET /voice/voices */
-  app.get("/voice/voices", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
-    return reply.send({ voices: VOICES });
-  });
+  app.get(
+    "/voice/voices",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_req, reply) => {
+      return reply.send({ voices: VOICES });
+    },
+  );
 
   /** GET /voice/providers */
-  app.get("/voice/providers", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
-    return reply.send({
-      transcribe: {
-        provider: process.env.GROQ_API_KEY ? "groq" : "null",
-        model: "whisper-large-v3-turbo",
-        available: !!process.env.GROQ_API_KEY,
+  app.get(
+    "/voice/providers",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
       },
-      synthesize: {
-        provider: process.env.ELEVENLABS_API_KEY ? "elevenlabs" : "null",
-        available: !!process.env.ELEVENLABS_API_KEY,
-      },
-    });
-  });
+      preHandler: requireAuth,
+    },
+    async (_req, reply) => {
+      return reply.send({
+        transcribe: {
+          provider: process.env.GROQ_API_KEY ? "groq" : "null",
+          model: "whisper-large-v3-turbo",
+          available: !!process.env.GROQ_API_KEY,
+        },
+        synthesize: {
+          provider: process.env.ELEVENLABS_API_KEY ? "elevenlabs" : "null",
+          available: !!process.env.ELEVENLABS_API_KEY,
+        },
+      });
+    },
+  );
 }

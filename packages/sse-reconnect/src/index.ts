@@ -33,6 +33,7 @@ export interface SseEvent {
 
 // ── SseSerializer ─────────────────────────────────────────────────────────────
 
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class SseSerializer {
   static encode(event: SseEvent): string {
     const lines: string[] = [
@@ -57,12 +58,16 @@ export class SseSerializer {
 
     if (!id) return null;
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const parsed = JSON.parse(rawData);
       return {
         id,
         type,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         sessionId: parsed.sessionId ?? "",
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         data: parsed.data,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         timestamp: parsed.timestamp ?? new Date().toISOString(),
       };
     } catch {
@@ -95,10 +100,18 @@ export class SseEventBuffer {
     return this.events.slice(idx + 1);
   }
 
-  all(): SseEvent[] { return [...this.events]; }
-  size(): number { return this.events.length; }
-  clear(): void { this.events = []; }
-  last(): SseEvent | undefined { return this.events[this.events.length - 1]; }
+  all(): SseEvent[] {
+    return [...this.events];
+  }
+  size(): number {
+    return this.events.length;
+  }
+  clear(): void {
+    this.events = [];
+  }
+  last(): SseEvent | undefined {
+    return this.events[this.events.length - 1];
+  }
 }
 
 // ── SseSubscriber ─────────────────────────────────────────────────────────────
@@ -140,7 +153,11 @@ export class SseChannel {
     if (lastId !== undefined) {
       const missed = this.buffer.since(lastId);
       for (const event of missed) {
-        try { handler(event); } catch { /* isolate */ }
+        try {
+          handler(event);
+        } catch {
+          /* isolate */
+        }
       }
     }
 
@@ -158,7 +175,11 @@ export class SseChannel {
     };
     this.buffer.push(event);
     for (const sub of this.subscribers.values()) {
-      try { sub.handler(event); } catch { /* isolate */ }
+      try {
+        sub.handler(event);
+      } catch {
+        /* isolate */
+      }
     }
     return event;
   }
@@ -187,9 +208,15 @@ export class SseChannel {
     this.subscribers.clear();
   }
 
-  isClosed(): boolean { return this.closed; }
-  subscriberCount(): number { return this.subscribers.size; }
-  getBuffer(): SseEventBuffer { return this.buffer; }
+  isClosed(): boolean {
+    return this.closed;
+  }
+  subscriberCount(): number {
+    return this.subscribers.size;
+  }
+  getBuffer(): SseEventBuffer {
+    return this.buffer;
+  }
 }
 
 // ── SseSessionManager ─────────────────────────────────────────────────────────
@@ -210,8 +237,12 @@ export class SseSessionManager {
     return this.channels.get(sessionId)!;
   }
 
-  get(sessionId: string): SseChannel | undefined { return this.channels.get(sessionId); }
-  has(sessionId: string): boolean { return this.channels.has(sessionId); }
+  get(sessionId: string): SseChannel | undefined {
+    return this.channels.get(sessionId);
+  }
+  has(sessionId: string): boolean {
+    return this.channels.has(sessionId);
+  }
 
   /** Close and remove a channel. */
   close(sessionId: string): boolean {
@@ -237,6 +268,10 @@ export class SseSessionManager {
     return this.getOrCreate(sessionId).publish(type, data);
   }
 
-  activeSessions(): string[] { return [...this.channels.keys()]; }
-  count(): number { return this.channels.size; }
+  activeSessions(): string[] {
+    return [...this.channels.keys()];
+  }
+  count(): number {
+    return this.channels.size;
+  }
 }

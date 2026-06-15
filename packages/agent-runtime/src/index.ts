@@ -67,12 +67,13 @@ export interface CacheControlHeader {
 
 /** Cache policies. */
 export const CACHE_POLICIES: Record<CacheControlPolicy, CacheControlHeader> = {
-  "no-cache":   { policy: "no-cache" },
-  "ephemeral":  { policy: "ephemeral",  maxAgeMs: 60_000 },
-  "persistent": { policy: "persistent", maxAgeMs: 3_600_000, staleWhileRevalidateMs: 60_000 },
+  "no-cache": { policy: "no-cache" },
+  ephemeral: { policy: "ephemeral", maxAgeMs: 60_000 },
+  persistent: { policy: "persistent", maxAgeMs: 3_600_000, staleWhileRevalidateMs: 60_000 },
 };
 
 /** Cache control. */
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class CacheControl {
   static headerFor(policy: CacheControlPolicy): CacheControlHeader {
     return CACHE_POLICIES[policy];
@@ -111,7 +112,9 @@ export class ToolStreamParser {
       const name = match[1]!;
       const argStr = match[2]!.trim();
       try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const args = JSON.parse(argStr);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         calls.push({ name, arguments: args });
       } catch {
         calls.push({ name, arguments: { raw: argStr } });
@@ -132,8 +135,12 @@ export class ToolStreamParser {
     return text.replace(/\[TOOL:\w+\][\s\S]*?\[\/TOOL\]/g, "").trim();
   }
 
-  reset(): void { this.buffer = ""; }
-  getBuffer(): string { return this.buffer; }
+  reset(): void {
+    this.buffer = "";
+  }
+  getBuffer(): string {
+    return this.buffer;
+  }
 }
 
 // ── StrReplaceProcessor ───────────────────────────────────────────────────────
@@ -156,17 +163,27 @@ export interface StrReplaceResult {
 export class StrReplaceProcessor {
   private files: Map<string, string>;
 
-  constructor(files: Map<string, string> = new Map()) {
+  constructor(files = new Map<string, string>()) {
     this.files = files;
   }
 
   process(call: StrReplaceCall): StrReplaceResult {
     const content = this.files.get(call.path);
     if (content === undefined) {
-      return { path: call.path, success: false, replaced: false, error: `File not found: ${call.path}` };
+      return {
+        path: call.path,
+        success: false,
+        replaced: false,
+        error: `File not found: ${call.path}`,
+      };
     }
     if (!content.includes(call.oldStr)) {
-      return { path: call.path, success: false, replaced: false, error: "String not found in file" };
+      return {
+        path: call.path,
+        success: false,
+        replaced: false,
+        error: "String not found in file",
+      };
     }
     this.files.set(call.path, content.replace(call.oldStr, call.newStr));
     return { path: call.path, success: true, replaced: true };
@@ -176,9 +193,15 @@ export class StrReplaceProcessor {
     return calls.map((c) => this.process(c));
   }
 
-  getFile(path: string): string | undefined { return this.files.get(path); }
-  setFile(path: string, content: string): void { this.files.set(path, content); }
-  snapshot(): Record<string, string> { return Object.fromEntries(this.files); }
+  getFile(path: string): string | undefined {
+    return this.files.get(path);
+  }
+  setFile(path: string, content: string): void {
+    this.files.set(path, content);
+  }
+  snapshot(): Record<string, string> {
+    return Object.fromEntries(this.files);
+  }
 }
 
 // ── RuntimeToolSet ────────────────────────────────────────────────────────────
@@ -198,10 +221,18 @@ export class RuntimeToolSet {
     return this;
   }
 
-  get(name: string): RuntimeTool | undefined { return this.tools.get(name); }
-  has(name: string): boolean { return this.tools.has(name); }
-  names(): string[] { return [...this.tools.keys()]; }
-  list(): RuntimeTool[] { return [...this.tools.values()]; }
+  get(name: string): RuntimeTool | undefined {
+    return this.tools.get(name);
+  }
+  has(name: string): boolean {
+    return this.tools.has(name);
+  }
+  names(): string[] {
+    return [...this.tools.keys()];
+  }
+  list(): RuntimeTool[] {
+    return [...this.tools.values()];
+  }
 
   async invoke(name: string, args: Record<string, unknown>): Promise<ToolResult> {
     const tool = this.tools.get(name);
@@ -243,7 +274,12 @@ export class MockLlmStream {
   }
 
   asStream(): LlmStreamFn {
-    return async function* (this: MockLlmStream, _sys: string, user: string, opts?: { signal?: AbortSignal }) {
+    return async function* (
+      this: MockLlmStream,
+      _sys: string,
+      user: string,
+      opts?: { signal?: AbortSignal },
+    ) {
       this.calls.push(user);
       for (const chunk of this.chunks) {
         if (opts?.signal?.aborted) return;
@@ -266,7 +302,7 @@ export interface LlmStreamDriver {
   stream(
     opts: {
       model?: string;
-      messages: Array<{ role: string; content: string }>;
+      messages: { role: string; content: string }[];
       systemPrompt?: string;
       maxTokens?: number;
       temperature?: number;
@@ -287,10 +323,7 @@ export interface LlmStreamDriver {
  *   const streamFn = llmDriverToStreamFn(driver);
  *   const runtime = new AgentRuntime({ llm: streamFn, ... });
  */
-export function llmDriverToStreamFn(
-  driver: LlmStreamDriver,
-  modelOverride?: string,
-): LlmStreamFn {
+export function llmDriverToStreamFn(driver: LlmStreamDriver, modelOverride?: string): LlmStreamFn {
   return async function* (
     systemPrompt: string,
     userPrompt: string,
@@ -309,27 +342,31 @@ export function llmDriverToStreamFn(
       r?.();
     };
 
-    const streamPromise = driver.stream(
-      {
-        model:        modelOverride ?? driver.model,
-        messages:     [{ role: "user", content: userPrompt }],
-        systemPrompt,
-      },
-      (delta) => {
-        if (!delta.done && delta.delta) push(delta.delta);
-      },
-    ).then(() => {
-      done = true;
-      const r = resolve;
-      resolve = null;
-      r?.();
-    }).catch((err: unknown) => {
-      streamError = err;
-      done = true;
-      const r = resolve;
-      resolve = null;
-      r?.();
-    });
+    const streamPromise = driver
+      .stream(
+        {
+          model: modelOverride ?? driver.model,
+          messages: [{ role: "user", content: userPrompt }],
+          systemPrompt,
+        },
+        (delta) => {
+          if (!delta.done && delta.delta) push(delta.delta);
+        },
+      )
+      .then(() => {
+        done = true;
+        const r = resolve;
+        resolve = null;
+        // eslint-disable-next-line promise/always-return
+        r?.();
+      })
+      .catch((err: unknown) => {
+        streamError = err;
+        done = true;
+        const r = resolve;
+        resolve = null;
+        r?.();
+      });
 
     // Detach — we drive consumption via the generator below
     void streamPromise;
@@ -341,7 +378,9 @@ export function llmDriverToStreamFn(
         yield queue.shift()!;
       } else {
         // Wait for next push or done signal
-        await new Promise<void>((res) => { resolve = res; });
+        await new Promise<void>((res) => {
+          resolve = res;
+        });
       }
     }
 
@@ -382,7 +421,9 @@ export class AgentStepExecutor {
 
     // Stream and collect
     try {
-      for await (const chunk of this.llm(this.systemPrompt, userPrompt, { signal: input.abortSignal })) {
+      for await (const chunk of this.llm(this.systemPrompt, userPrompt, {
+        signal: input.abortSignal,
+      })) {
         if (input.abortSignal?.aborted) {
           return {
             stepIndex: input.stepIndex,
@@ -523,7 +564,9 @@ export class AgentRuntime {
     };
   }
 
-  getExecutor(): AgentStepExecutor { return this.executor; }
+  getExecutor(): AgentStepExecutor {
+    return this.executor;
+  }
 }
 
 // ── spawn_agents tool ─────────────────────────────────────────────────────────
@@ -579,12 +622,9 @@ export interface SpawnAgentsOptions {
  * @param llm     The same LlmStreamFn used by the parent agent.
  * @param opts    Concurrency / step limits.
  */
-export function makeSpawnAgentsTool(
-  llm: LlmStreamFn,
-  opts: SpawnAgentsOptions = {},
-): RuntimeTool {
-  const maxConcurrency    = opts.maxConcurrency    ?? 5;
-  const maxStepsPerAgent  = opts.maxStepsPerAgent  ?? 3;
+export function makeSpawnAgentsTool(llm: LlmStreamFn, opts: SpawnAgentsOptions = {}): RuntimeTool {
+  const maxConcurrency = opts.maxConcurrency ?? 5;
+  const maxStepsPerAgent = opts.maxStepsPerAgent ?? 3;
   const defaultSystemPrompt = opts.defaultSystemPrompt;
 
   return {
@@ -602,15 +642,15 @@ export function makeSpawnAgentsTool(
         tasks.map(async (task, i): Promise<SpawnAgentResult> => {
           const child = new AgentRuntime({
             llm,
-            maxSteps:     task.maxSteps ?? maxStepsPerAgent,
+            maxSteps: task.maxSteps ?? maxStepsPerAgent,
             systemPrompt: task.systemPrompt ?? defaultSystemPrompt,
           });
           const result = await child.run(task.instruction);
           return {
-            taskIndex:    i,
-            instruction:  task.instruction,
+            taskIndex: i,
+            instruction: task.instruction,
             finalContent: result.finalContent,
-            steps:        result.steps.length,
+            steps: result.steps.length,
           };
         }),
       );
@@ -618,10 +658,10 @@ export function makeSpawnAgentsTool(
       return settled.map((s, i): SpawnAgentResult => {
         if (s.status === "fulfilled") return s.value;
         return {
-          taskIndex:    i,
-          instruction:  tasks[i]?.instruction ?? "",
+          taskIndex: i,
+          instruction: tasks[i]?.instruction ?? "",
           finalContent: "",
-          steps:        0,
+          steps: 0,
           error: s.reason instanceof Error ? s.reason.message : String(s.reason),
         };
       });

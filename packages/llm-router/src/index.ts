@@ -217,21 +217,23 @@ export class ClaudeProvider implements LLMProvider {
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      throw new LLMRouterError(
-        `Claude API error ${res.status}: ${text}`,
-        "PROVIDER_ERROR",
-        { provider: "claude", status: res.status },
-      );
+      throw new LLMRouterError(`Claude API error ${res.status}: ${text}`, "PROVIDER_ERROR", {
+        provider: "claude",
+        status: res.status,
+      });
     }
 
-    const data = await res.json() as {
+    const data = (await res.json()) as {
       id: string;
       model: string;
-      content: Array<{ type: string; text: string }>;
+      content: { type: string; text: string }[];
       usage: { input_tokens: number; output_tokens: number };
     };
 
-    const content = data.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+    const content = data.content
+      .filter((b) => b.type === "text")
+      .map((b) => b.text)
+      .join("");
     const latencyMs = Date.now() - start;
 
     return {
@@ -330,7 +332,7 @@ export class OpenAIProvider implements LLMProvider {
 interface OpenAICompatResponse {
   id: string;
   model: string;
-  choices: Array<{ message: { content: string } }>;
+  choices: { message: { content: string } }[];
   usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
 }
 
@@ -349,9 +351,7 @@ async function _openAICompatComplete(
     ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
   };
 
-  const url = baseUrl.endsWith("/chat/completions")
-    ? baseUrl
-    : `${baseUrl}/chat/completions`;
+  const url = baseUrl.endsWith("/chat/completions") ? baseUrl : `${baseUrl}/chat/completions`;
 
   const res = await fetchFn(url, {
     method: "POST",
@@ -364,14 +364,13 @@ async function _openAICompatComplete(
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new LLMRouterError(
-      `${providerName} API error ${res.status}: ${text}`,
-      "PROVIDER_ERROR",
-      { provider: providerName, status: res.status },
-    );
+    throw new LLMRouterError(`${providerName} API error ${res.status}: ${text}`, "PROVIDER_ERROR", {
+      provider: providerName,
+      status: res.status,
+    });
   }
 
-  const data = await res.json() as OpenAICompatResponse;
+  const data = (await res.json()) as OpenAICompatResponse;
   const content = data.choices[0]?.message.content ?? "";
   const latencyMs = Date.now() - start;
 
@@ -467,11 +466,9 @@ export class LLMRouter {
     for (const alias of aliasChain) {
       const route = this._resolveAlias(alias);
       if (!route) {
-        lastError = new LLMRouterError(
-          `No provider found for alias "${alias}"`,
-          "NO_PROVIDER",
-          { alias },
-        );
+        lastError = new LLMRouterError(`No provider found for alias "${alias}"`, "NO_PROVIDER", {
+          alias,
+        });
         continue;
       }
 

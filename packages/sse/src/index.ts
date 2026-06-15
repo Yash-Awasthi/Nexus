@@ -34,13 +34,7 @@ export interface SseEvent<T = unknown> {
 
 // ── Domain event payloads ─────────────────────────────────────────────────────
 
-export type TaskStatus =
-  | "queued"
-  | "running"
-  | "completed"
-  | "failed"
-  | "cancelled"
-  | "paused";
+export type TaskStatus = "queued" | "running" | "completed" | "failed" | "cancelled" | "paused";
 
 /** Task update payload interface definition. */
 export interface TaskUpdatePayload {

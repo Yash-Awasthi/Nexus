@@ -3,24 +3,26 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { MemoryKVStore } from "@nexus/kv";
 import { PromptCache, _resetPromptCache, getPromptCache } from "../../src/lib/prompt-cache.js";
 
-function makeKV() { return new MemoryKVStore(); }
+function makeKV() {
+  return new MemoryKVStore();
+}
 
 const REQ = {
-  model:       "nexus/fast",
-  messages:    [{ role: "user" as const, content: "Hello" }],
-  system:      "Be helpful",
-  max_tokens:  512,
+  model: "nexus/fast",
+  messages: [{ role: "user" as const, content: "Hello" }],
+  system: "Be helpful",
+  max_tokens: 512,
   temperature: 0,
 };
 
 const RESPONSE = {
-  id:          "msg-1",
-  type:        "message" as const,
-  role:        "assistant" as const,
-  content:     [{ type: "text" as const, text: "Hi!" }],
-  model:       "llama-3.3-70b-versatile",
+  id: "msg-1",
+  type: "message" as const,
+  role: "assistant" as const,
+  content: [{ type: "text" as const, text: "Hi!" }],
+  model: "llama-3.3-70b-versatile",
   stop_reason: "end_turn",
-  usage:       { input_tokens: 5, output_tokens: 3 },
+  usage: { input_tokens: 5, output_tokens: 3 },
 };
 
 describe("PromptCache.isEligible", () => {
@@ -103,7 +105,7 @@ describe("PromptCache get/set", () => {
   it("different requests don't collide", async () => {
     const cache = new PromptCache(makeKV());
     const req2 = { ...REQ, model: "nexus/smart" };
-    await cache.set(REQ,  RESPONSE);
+    await cache.set(REQ, RESPONSE);
     const result = await cache.get(req2);
     expect(result.hit).toBe(false);
   });
@@ -117,7 +119,9 @@ describe("PromptCache get/set", () => {
   it("set is non-fatal when KV throws", async () => {
     const brokenKV = {
       get: async () => undefined,
-      set: async () => { throw new Error("KV down"); },
+      set: async () => {
+        throw new Error("KV down");
+      },
       delete: async () => {},
       has: async () => false,
       keys: async () => [],
@@ -131,7 +135,9 @@ describe("PromptCache get/set", () => {
 });
 
 describe("getPromptCache singleton", () => {
-  beforeEach(() => { _resetPromptCache(); });
+  beforeEach(() => {
+    _resetPromptCache();
+  });
 
   it("returns same instance on repeated calls", () => {
     const kv = makeKV();

@@ -253,11 +253,7 @@ export class RagtimeRetriever {
    * Stage 1: Vector recall — fetch poolSize candidates by cosine similarity.
    * Stage 2: Rerank — apply composite score; return finalK.
    */
-  async retrieve(
-    query: string,
-    k?: number,
-    filter?: MemoryFilter,
-  ): Promise<RagtimeResult[]> {
+  async retrieve(query: string, k?: number, filter?: MemoryFilter): Promise<RagtimeResult[]> {
     const finalK = k ?? this.finalK;
 
     // Stage 1 — embed query and recall pool
@@ -276,7 +272,8 @@ export class RagtimeRetriever {
 
     // Stage 2 — rerank by composite score
     const scored: RagtimeResult[] = pool.map(({ entry, score: relevance }) => {
-      const importance = (entry.importance ?? (entry.metadata["importance"] as number | undefined) ?? 0.5);
+      const importance =
+        entry.importance ?? (entry.metadata["importance"] as number | undefined) ?? 0.5;
       const ageSeconds = Math.max(0, nowSeconds - entry.createdAt);
       const ageHours = ageSeconds / 3600;
       const recencyDecay = Math.exp(-config.recencyDecayRate * ageHours);
@@ -309,7 +306,8 @@ export class RagtimeRetriever {
     };
 
     const scored: RagtimeResult[] = pool.map(({ entry, score: relevance }) => {
-      const importance = (entry.importance ?? (entry.metadata["importance"] as number | undefined) ?? 0.5);
+      const importance =
+        entry.importance ?? (entry.metadata["importance"] as number | undefined) ?? 0.5;
       const ageSeconds = Math.max(0, nowSeconds - entry.createdAt);
       const ageHours = ageSeconds / 3600;
       const recencyDecay = Math.exp(-config.recencyDecayRate * ageHours);

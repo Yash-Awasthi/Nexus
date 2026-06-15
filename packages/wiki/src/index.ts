@@ -18,7 +18,12 @@ export type PageStatus = "published" | "draft" | "archived" | "deleted";
 /** Acl role type alias. */
 export type AclRole = "owner" | "editor" | "viewer";
 /** Notification event type alias. */
-export type NotificationEvent = "page_created" | "page_updated" | "comment_added" | "page_deleted" | "draft_saved";
+export type NotificationEvent =
+  | "page_created"
+  | "page_updated"
+  | "comment_added"
+  | "page_deleted"
+  | "draft_saved";
 
 /** Wiki page version interface definition. */
 export interface WikiPageVersion {
@@ -93,7 +98,9 @@ export interface WikiNotification {
 // ── ID util ───────────────────────────────────────────────────────────────────
 
 let _seq = 0;
-function uid(prefix: string) { return `${prefix}-${Date.now()}-${++_seq}`; }
+function uid(prefix: string) {
+  return `${prefix}-${Date.now()}-${++_seq}`;
+}
 
 // ── Diff util (unified diff — pure text, no external dep) ────────────────────
 
@@ -192,13 +199,15 @@ export class WikiPageStore {
       createdAt: now,
       updatedAt: now,
       version: 1,
-      history: [{
-        version: 1,
-        content: input.content,
-        editedBy: input.createdBy,
-        editedAt: now,
-        summary: "Initial version",
-      }],
+      history: [
+        {
+          version: 1,
+          content: input.content,
+          editedBy: input.createdBy,
+          editedAt: now,
+          summary: "Initial version",
+        },
+      ],
       starred: [],
     };
     this.pages.set(page.id, page);
@@ -206,7 +215,9 @@ export class WikiPageStore {
     return page;
   }
 
-  get(id: string): WikiPage | undefined { return this.pages.get(id); }
+  get(id: string): WikiPage | undefined {
+    return this.pages.get(id);
+  }
   getBySlug(slug: string): WikiPage | undefined {
     const id = this.slugIndex.get(slug);
     return id ? this.pages.get(id) : undefined;
@@ -279,7 +290,9 @@ export class WikiPageStore {
     return pages.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
-  count(): number { return this.pages.size; }
+  count(): number {
+    return this.pages.size;
+  }
 }
 
 // ── WikiComment ───────────────────────────────────────────────────────────────
@@ -303,7 +316,9 @@ export class WikiCommentStore {
     return comment;
   }
 
-  get(id: string): WikiComment | undefined { return this.comments.get(id); }
+  get(id: string): WikiComment | undefined {
+    return this.comments.get(id);
+  }
 
   update(id: string, content: string): WikiComment | undefined {
     const c = this.comments.get(id);
@@ -320,7 +335,9 @@ export class WikiCommentStore {
     return true;
   }
 
-  delete(id: string): boolean { return this.comments.delete(id); }
+  delete(id: string): boolean {
+    return this.comments.delete(id);
+  }
 
   listForPage(pageId: string): WikiComment[] {
     return [...this.comments.values()]
@@ -343,7 +360,9 @@ export class WikiDraftStore {
   save(authorId: string, title: string, content: string, pageId?: string): WikiDraft {
     // one draft per author+pageId (or author for new pages)
     const key = `${authorId}::${pageId ?? "new"}`;
-    const existing = [...this.drafts.values()].find((d) => d.authorId === authorId && d.pageId === pageId);
+    const existing = [...this.drafts.values()].find(
+      (d) => d.authorId === authorId && d.pageId === pageId,
+    );
     const draft: WikiDraft = {
       id: existing?.id ?? uid("wd"),
       pageId,
@@ -361,13 +380,17 @@ export class WikiDraftStore {
     return draft;
   }
 
-  get(id: string): WikiDraft | undefined { return this.drafts.get(id); }
+  get(id: string): WikiDraft | undefined {
+    return this.drafts.get(id);
+  }
 
   getDraftFor(authorId: string, pageId?: string): WikiDraft | undefined {
     return [...this.drafts.values()].find((d) => d.authorId === authorId && d.pageId === pageId);
   }
 
-  delete(id: string): boolean { return this.drafts.delete(id); }
+  delete(id: string): boolean {
+    return this.drafts.delete(id);
+  }
 
   listFor(authorId: string): WikiDraft[] {
     return [...this.drafts.values()].filter((d) => d.authorId === authorId);
@@ -393,7 +416,9 @@ export class WikiSearch {
     for (const page of pages) {
       if (page.status === "deleted") continue;
       const haystack = `${page.title} ${page.content} ${page.tags.join(" ")}`.toLowerCase();
-      const count = (haystack.match(new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) ?? []).length;
+      const count = (
+        haystack.match(new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) ?? []
+      ).length;
       if (count > 0) {
         const idx = haystack.indexOf(q);
         const snippet = page.content.slice(Math.max(0, idx - 40), idx + 100).trim();
@@ -403,9 +428,15 @@ export class WikiSearch {
 
     for (const comment of comments) {
       const hay = comment.content.toLowerCase();
-      const count = (hay.match(new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) ?? []).length;
+      const count = (hay.match(new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) ?? [])
+        .length;
       if (count > 0) {
-        hits.push({ type: "comment", id: comment.id, snippet: comment.content.slice(0, 120), score: count });
+        hits.push({
+          type: "comment",
+          id: comment.id,
+          snippet: comment.content.slice(0, 120),
+          score: count,
+        });
       }
     }
 
@@ -428,10 +459,13 @@ export class WikiNotifier {
     this.subscribers.get(pageId)?.delete(userId);
   }
 
-  emit(event: NotificationEvent, pageId: string, actorId: string, payload: Record<string, unknown> = {}): WikiNotification {
-    const recipientIds = [
-      ...(this.subscribers.get(pageId) ?? []),
-    ].filter((uid) => uid !== actorId);
+  emit(
+    event: NotificationEvent,
+    pageId: string,
+    actorId: string,
+    payload: Record<string, unknown> = {},
+  ): WikiNotification {
+    const recipientIds = [...(this.subscribers.get(pageId) ?? [])].filter((uid) => uid !== actorId);
 
     const notif: WikiNotification = {
       id: uid("wn"),
@@ -496,7 +530,8 @@ export class WikiStore {
   updatePage(id: string, input: UpdatePageInput): WikiPage | undefined {
     if (!this.acl.canEdit(id, input.editedBy)) return undefined;
     const page = this.pages.update(id, input);
-    if (page) this.notifier.emit("page_updated", page.id, input.editedBy, { version: page.version });
+    if (page)
+      this.notifier.emit("page_updated", page.id, input.editedBy, { version: page.version });
     return page;
   }
 

@@ -52,8 +52,7 @@
  * ```
  */
 
-import { createHmac, timingSafeEqual } from "node:crypto";
-import { randomUUID } from "node:crypto";
+import { createHmac, timingSafeEqual , randomUUID } from "node:crypto";
 
 // ── Error ─────────────────────────────────────────────────────────────────────
 
@@ -248,9 +247,7 @@ export class SlackBotAdapter {
     this.name = config.name ?? "slack-bot";
     this.triggerMode = config.triggerMode ?? "all";
     this.botUserId = config.botUserId;
-    this.allowedUserIds = config.allowedUserIds
-      ? new Set(config.allowedUserIds)
-      : undefined;
+    this.allowedUserIds = config.allowedUserIds ? new Set(config.allowedUserIds) : undefined;
   }
 
   /** Returns true when the message text matches the configured trigger mode. */
@@ -258,9 +255,7 @@ export class SlackBotAdapter {
     switch (this.triggerMode) {
       case "mention":
         // Matches <@UXXXXXXXX> mention format
-        return this.botUserId
-          ? text.includes(`<@${this.botUserId}>`)
-          : true; // no botUserId configured — pass through
+        return this.botUserId ? text.includes(`<@${this.botUserId}>`) : true; // no botUserId configured — pass through
       case "command":
         return text.trimStart().startsWith("/");
       case "all":
@@ -283,9 +278,7 @@ export class SlackBotAdapter {
     if (this.signingSecret) {
       const verified = this._verifySlackSignature(
         headers["x-slack-signature"] ?? headers["X-Slack-Signature"] ?? "",
-        headers["x-slack-request-timestamp"] ??
-          headers["X-Slack-Request-Timestamp"] ??
-          "",
+        headers["x-slack-request-timestamp"] ?? headers["X-Slack-Request-Timestamp"] ?? "",
         typeof body === "string" ? body : JSON.stringify(body),
       );
       if (!verified) {
@@ -381,19 +374,11 @@ export class SlackBotAdapter {
   /**
    * Send a message to a Slack channel directly (outside event handling).
    */
-  async send(
-    channelId: string,
-    text: string,
-    opts: { threadTs?: string } = {},
-  ): Promise<void> {
+  async send(channelId: string, text: string, opts: { threadTs?: string } = {}): Promise<void> {
     await this._sendSlackMessage(channelId, text, opts.threadTs);
   }
 
-  private async _sendSlackMessage(
-    channel: string,
-    text: string,
-    threadTs?: string,
-  ): Promise<void> {
+  private async _sendSlackMessage(channel: string, text: string, threadTs?: string): Promise<void> {
     const body: Record<string, unknown> = { channel, text };
     if (threadTs) body["thread_ts"] = threadTs;
 
@@ -421,11 +406,7 @@ export class SlackBotAdapter {
     }
   }
 
-  private _verifySlackSignature(
-    signature: string,
-    timestamp: string,
-    rawBody: string,
-  ): boolean {
+  private _verifySlackSignature(signature: string, timestamp: string, rawBody: string): boolean {
     if (!signature || !timestamp) return false;
     // Reject stale requests (> 5 minutes)
     const ts = parseInt(timestamp, 10);
@@ -515,8 +496,7 @@ export class TeamsBotAdapter {
     "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token";
 
   constructor(config: TeamsBotConfig) {
-    this.serviceUrl =
-      config.serviceUrl ?? "https://smba.trafficmanager.net/apis";
+    this.serviceUrl = config.serviceUrl ?? "https://smba.trafficmanager.net/apis";
     this.appId = config.appId;
     this.appPassword = config.appPassword;
     this.handler = config.handler;
@@ -548,14 +528,9 @@ export class TeamsBotAdapter {
     }
 
     // Prefer teamsChannelId from channelData, fall back to conversation.id
-    const channelId =
-      activity.channelData?.teamsChannelId ??
-      activity.conversation?.id ??
-      "";
+    const channelId = activity.channelData?.teamsChannelId ?? activity.conversation?.id ?? "";
 
-    const tsMs = activity.timestamp
-      ? new Date(activity.timestamp).getTime()
-      : Date.now();
+    const tsMs = activity.timestamp ? new Date(activity.timestamp).getTime() : Date.now();
 
     const msg: BotMessage = {
       id: activity.id ?? randomUUID(),

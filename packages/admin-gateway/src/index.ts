@@ -191,7 +191,10 @@ export class AdminRouter {
       return this._route(req) as AdminResponse<T>;
     } catch (err) {
       if (err instanceof AdminGatewayError) {
-        return { status: err.statusCode, body: { error: err.message, code: err.code } } as AdminResponse<T>;
+        return {
+          status: err.statusCode,
+          body: { error: err.message, code: err.code },
+        } as AdminResponse<T>;
       }
       return { status: 500, body: { error: "Internal error" } } as AdminResponse<T>;
     }
@@ -206,7 +209,7 @@ export class AdminRouter {
     }
 
     // GET /routes/:alias
-    const routeMatch = path.match(/^\/routes\/([^/]+)$/);
+    const routeMatch = /^\/routes\/([^/]+)$/.exec(path);
     if (routeMatch) {
       const alias = decodeURIComponent(routeMatch[1]!);
 
@@ -240,7 +243,7 @@ export class AdminRouter {
     }
 
     // GET /stats/:alias
-    const statsMatch = path.match(/^\/stats\/([^/]+)$/);
+    const statsMatch = /^\/stats\/([^/]+)$/.exec(path);
     if (statsMatch && method === "GET") {
       const alias = decodeURIComponent(statsMatch[1]!);
       return { status: 200, body: { stats: this.service.getStats(alias)[0] } };

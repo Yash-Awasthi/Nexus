@@ -160,10 +160,7 @@ class PgObsStore implements ObsStore {
 
   async remove(id: string): Promise<boolean> {
     await this.ready;
-    const { rowCount } = await this.pool.query(
-      `DELETE FROM obs_entries WHERE id=$1`,
-      [id],
-    );
+    const { rowCount } = await this.pool.query(`DELETE FROM obs_entries WHERE id=$1`, [id]);
     return (rowCount ?? 0) > 0;
   }
 }
@@ -173,14 +170,17 @@ function rowToObs(row: Record<string, unknown>): StoredObservation {
     id: row["id"] as string,
     content: row["content"] as string,
     category: row["category"] as string,
-    tags: Array.isArray(row["tags"]) ? (row["tags"] as string[]) : (JSON.parse(row["tags"] as string) as string[]),
+    tags: Array.isArray(row["tags"])
+      ? (row["tags"] as string[])
+      : (JSON.parse(row["tags"] as string) as string[]),
     confidence: Number(row["confidence"]),
     provider: row["provider"] as string,
     model: row["model"] as string,
     sessionId: row["session_id"] as string | undefined,
-    createdAt: row["created_at"] instanceof Date
-      ? (row["created_at"] as Date).toISOString()
-      : String(row["created_at"]),
+    createdAt:
+      row["created_at"] instanceof Date
+        ? (row["created_at"] as Date).toISOString()
+        : String(row["created_at"]),
   };
 }
 
@@ -207,7 +207,7 @@ if (process.env.NEXUS_OBSERVATION_DRIVER && process.env.GROQ_API_KEY) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model: model.replace("groq/", ""),
@@ -220,16 +220,18 @@ if (process.env.NEXUS_OBSERVATION_DRIVER && process.env.GROQ_API_KEY) {
       }),
     });
     if (!resp.ok) throw new Error(`Groq API error: ${resp.status}`);
-    const data = await resp.json() as { choices: Array<{ message: { content: string } }> };
+    const data = (await resp.json()) as { choices: { message: { content: string } }[] };
     return data.choices[0]?.message?.content ?? "";
   };
 
   obsRegistry.register(new LlmObservationProvider({ model, callFn: groqCallFn }));
 }
 
-obsRegistry.register(new MockObservationProvider("mock", "mock-model", {
-  observation: "Observation generated from session context.",
-}));
+obsRegistry.register(
+  new MockObservationProvider("mock", "mock-model", {
+    observation: "Observation generated from session context.",
+  }),
+);
 
 // ── Route plugin ──────────────────────────────────────────────────────────────
 
@@ -241,7 +243,15 @@ export async function obsProvidersRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{ Querystring: { limit?: string; category?: string } }>(
     "/obs/memories",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const limit = Math.min(parseInt(request.query.limit ?? "100"), 500);
       const entries = await obsStore.all(limit, request.query.category);
@@ -332,7 +342,12 @@ export async function obsProvidersRoutes(app: FastifyInstance): Promise<void> {
    */
   app.delete<{ Params: { id: string } }>(
     "/obs/:id",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const deleted = await obsStore.remove(request.params.id);
       if (!deleted) return reply.code(404).send({ error: "Observation not found" });
@@ -343,11 +358,23 @@ export async function obsProvidersRoutes(app: FastifyInstance): Promise<void> {
   /**
    * GET /obs/providers — list registered provider names
    */
-  app.get("/obs/providers", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
-    const providers = obsRegistry.names().map((name) => {
-      const p = obsRegistry.get(name)!;
-      return { name: p.name, model: p.model };
-    });
-    return reply.send({ providers });
-  });
+  app.get(
+    "/obs/providers",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_req, reply) => {
+      const providers = obsRegistry.names().map((name) => {
+        const p = obsRegistry.get(name)!;
+        return { name: p.name, model: p.model };
+      });
+      return reply.send({ providers });
+    },
+  );
 }

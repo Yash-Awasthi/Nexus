@@ -37,9 +37,9 @@ interface RateLimitOptions {
 function _ipKey(req: FastifyRequest, prefix: string): string {
   const forwarded = req.headers["x-forwarded-for"] as string | undefined;
   const ip =
-    forwarded?.split(",")[0]?.trim()
-    ?? (req.socket as { remoteAddress?: string } | undefined)?.remoteAddress
-    ?? "unknown";
+    forwarded?.split(",")[0]?.trim() ??
+    (req.socket as { remoteAddress?: string } | undefined)?.remoteAddress ??
+    "unknown";
   return `ratelimit:${prefix}:${ip}`;
 }
 
@@ -58,10 +58,8 @@ export function makeRateLimitPreHandler(opts: RateLimitOptions) {
     request: FastifyRequest,
     reply: FastifyReply,
   ): Promise<void> {
-    const kv  = getSharedKV();
-    const key = keyBy
-      ? `ratelimit:${keyPrefix}:${keyBy(request)}`
-      : _ipKey(request, keyPrefix);
+    const kv = getSharedKV();
+    const key = keyBy ? `ratelimit:${keyPrefix}:${keyBy(request)}` : _ipKey(request, keyPrefix);
 
     try {
       const current = (await kv.get<number>(key)) ?? 0;
@@ -73,8 +71,8 @@ export function makeRateLimitPreHandler(opts: RateLimitOptions) {
           .header("X-RateLimit-Limit", limit)
           .header("X-RateLimit-Remaining", 0)
           .send({
-            error:    "Too Many Requests",
-            code:     "RATE_LIMIT_EXCEEDED",
+            error: "Too Many Requests",
+            code: "RATE_LIMIT_EXCEEDED",
             limit,
             windowMs,
             retryAfterSeconds: retryAfter,

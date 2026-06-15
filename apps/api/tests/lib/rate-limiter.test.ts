@@ -18,8 +18,8 @@ const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js"
 
 function makeRequest(ip?: string, auth?: string): FastifyRequest {
   return {
-    headers:  { authorization: auth },
-    socket:   { remoteAddress: ip ?? "127.0.0.1" },
+    headers: { authorization: auth },
+    socket: { remoteAddress: ip ?? "127.0.0.1" },
   } as unknown as FastifyRequest;
 }
 
@@ -27,18 +27,28 @@ type MockReply = FastifyReply & {
   _code: number;
   _body: unknown;
   _headers: Record<string, string>;
-  _sent:    boolean;
+  _sent: boolean;
 };
 
 function makeReply(): MockReply {
   const r: MockReply = {
-    _code:    200,
-    _body:    undefined,
+    _code: 200,
+    _body: undefined,
     _headers: {},
-    _sent:    false,
-    code(c: number) { r._code = c; return r as unknown as FastifyReply; },
-    header(k: string, v: string) { r._headers[k] = v; return r as unknown as FastifyReply; },
-    send(b: unknown) { r._body = b; r._sent = true; return r as unknown as FastifyReply; },
+    _sent: false,
+    code(c: number) {
+      r._code = c;
+      return r as unknown as FastifyReply;
+    },
+    header(k: string, v: string) {
+      r._headers[k] = v;
+      return r as unknown as FastifyReply;
+    },
+    send(b: unknown) {
+      r._body = b;
+      r._sent = true;
+      return r as unknown as FastifyReply;
+    },
     sent: false,
   } as unknown as MockReply;
   Object.defineProperty(r, "sent", { get: () => r._sent });
@@ -48,11 +58,13 @@ function makeReply(): MockReply {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe("makeRateLimitPreHandler", () => {
-  beforeEach(async () => { await _mockKV.clear(); });
+  beforeEach(async () => {
+    await _mockKV.clear();
+  });
 
   it("passes through under the limit", async () => {
     const handler = makeRateLimitPreHandler({ limit: 3, windowMs: 60_000, keyPrefix: "test" });
-    const req   = makeRequest("1.2.3.4");
+    const req = makeRequest("1.2.3.4");
     const reply = makeReply();
     await handler(req, reply);
     expect(reply._sent).toBe(false);
@@ -61,7 +73,7 @@ describe("makeRateLimitPreHandler", () => {
 
   it("sets X-RateLimit-Limit and X-RateLimit-Remaining headers", async () => {
     const handler = makeRateLimitPreHandler({ limit: 5, windowMs: 60_000, keyPrefix: "hdr" });
-    const req   = makeRequest("1.2.3.5");
+    const req = makeRequest("1.2.3.5");
     const reply = makeReply();
     await handler(req, reply);
     expect(reply._headers["X-RateLimit-Limit"]).toBe(5);
@@ -71,7 +83,7 @@ describe("makeRateLimitPreHandler", () => {
   it("remaining decrements with each call", async () => {
     const handler = makeRateLimitPreHandler({ limit: 3, windowMs: 60_000, keyPrefix: "dec" });
     for (let i = 3; i >= 1; i--) {
-      const req   = makeRequest("10.0.0.1");
+      const req = makeRequest("10.0.0.1");
       const reply = makeReply();
       await handler(req, reply);
       expect(reply._headers["X-RateLimit-Remaining"]).toBe(i - 1);
@@ -85,7 +97,7 @@ describe("makeRateLimitPreHandler", () => {
     for (let i = 0; i < 2; i++) {
       await handler(makeRequest(ip), makeReply());
     }
-    const req   = makeRequest(ip);
+    const req = makeRequest(ip);
     const reply = makeReply();
     await handler(req, reply);
     expect(reply._code).toBe(429);
@@ -105,10 +117,10 @@ describe("makeRateLimitPreHandler", () => {
 
   it("keyBy override uses custom key", async () => {
     const handler = makeRateLimitPreHandler({
-      limit:    1,
+      limit: 1,
       windowMs: 60_000,
       keyPrefix: "kb",
-      keyBy:    () => "shared-key",
+      keyBy: () => "shared-key",
     });
     // First request passes
     await handler(makeRequest("1.1.1.1"), makeReply());
@@ -121,7 +133,9 @@ describe("makeRateLimitPreHandler", () => {
   it("fails open when KV is unavailable", async () => {
     const brokenKV = new MemoryKVStore();
     // Override get to throw
-    brokenKV.get = async () => { throw new Error("KV down"); };
+    brokenKV.get = async () => {
+      throw new Error("KV down");
+    };
 
     vi.doMock("../../src/lib/shared-kv.js", () => ({ getSharedKV: () => brokenKV }));
 

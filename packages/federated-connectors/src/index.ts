@@ -120,11 +120,14 @@ export class FederatedConnectorRegistry {
     const settled = await Promise.allSettled(
       connectors.map((c) =>
         Promise.race<SearchResult[]>([
-          c.search(query, { limit }).then((results) =>
-            results.map((r) => ({ ...r, source: c.id })),
-          ),
+          c
+            .search(query, { limit })
+            .then((results) => results.map((r) => ({ ...r, source: c.id }))),
           new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error(`Connector "${c.id}" timed out after ${timeoutMs}ms`)), timeoutMs),
+            setTimeout(
+              () => reject(new Error(`Connector "${c.id}" timed out after ${timeoutMs}ms`)),
+              timeoutMs,
+            ),
           ),
         ]),
       ),
@@ -150,9 +153,7 @@ export class FederatedConnectorRegistry {
 
     const totalBeforeDedup = allResults.length;
     const deduped = deduplicate(allResults, dedupBy);
-    const sorted = deduped
-      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-      .slice(0, limit);
+    const sorted = deduped.sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, limit);
 
     return {
       results: sorted,

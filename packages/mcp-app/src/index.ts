@@ -98,7 +98,9 @@ export class McpTool {
   async call(args: Record<string, unknown>, ctx?: ToolContext): Promise<ToolResult> {
     const effectiveCtx: ToolContext = ctx ?? {
       progressToken: "",
-      reportProgress: () => { /* no-op when called without a context */ },
+      reportProgress: () => {
+        /* no-op when called without a context */
+      },
     };
     return this.handler(args, effectiveCtx);
   }
@@ -114,7 +116,9 @@ export interface McpResourceDefinition {
 }
 
 /** Resource reader type alias. */
-export type ResourceReader = (uri: string) => { content: string; mimeType?: string } | Promise<{ content: string; mimeType?: string }>;
+export type ResourceReader = (
+  uri: string,
+) => { content: string; mimeType?: string } | Promise<{ content: string; mimeType?: string }>;
 
 /** Mcp resource. */
 export class McpResource {
@@ -136,7 +140,7 @@ export class McpResource {
 export interface McpPromptDefinition {
   name: string;
   description?: string;
-  arguments?: Array<{ name: string; description?: string; required?: boolean }>;
+  arguments?: { name: string; description?: string; required?: boolean }[];
 }
 
 /** Prompt builder type alias. */
@@ -161,7 +165,11 @@ export class McpPrompt {
 
 export class McpError extends Error {
   constructor(
-    public readonly code: "TOOL_NOT_FOUND" | "RESOURCE_NOT_FOUND" | "PROMPT_NOT_FOUND" | "VALIDATION_ERROR",
+    public readonly code:
+      | "TOOL_NOT_FOUND"
+      | "RESOURCE_NOT_FOUND"
+      | "PROMPT_NOT_FOUND"
+      | "VALIDATION_ERROR",
     message: string,
   ) {
     super(message);
@@ -207,20 +215,20 @@ export interface McpOAuthProviderOptions {
 
 /** Mcp o auth provider. */
 export class McpOAuthProvider {
-  private clientId:     string;
+  private clientId: string;
   private clientSecret: string;
-  private tokenUrl:     string;
-  private scopes:       string[];
-  private fetchFn:      typeof fetch;
+  private tokenUrl: string;
+  private scopes: string[];
+  private fetchFn: typeof fetch;
   /** In-memory token cache keyed by access_token. */
   private tokenCache = new Map<string, OAuthToken>();
 
   constructor(opts: McpOAuthProviderOptions) {
-    this.clientId     = opts.clientId;
+    this.clientId = opts.clientId;
     this.clientSecret = opts.clientSecret;
-    this.tokenUrl     = opts.tokenUrl;
-    this.scopes       = opts.scopes ?? [];
-    this.fetchFn      = opts.fetchFn ?? fetch;
+    this.tokenUrl = opts.tokenUrl;
+    this.scopes = opts.scopes ?? [];
+    this.fetchFn = opts.fetchFn ?? fetch;
   }
 
   /**
@@ -229,17 +237,17 @@ export class McpOAuthProvider {
    */
   async exchangeCode(code: string, redirectUri: string): Promise<OAuthToken> {
     const body = new URLSearchParams({
-      grant_type:    "authorization_code",
+      grant_type: "authorization_code",
       code,
-      redirect_uri:  redirectUri,
-      client_id:     this.clientId,
+      redirect_uri: redirectUri,
+      client_id: this.clientId,
       client_secret: this.clientSecret,
     });
 
     const res = await this.fetchFn(this.tokenUrl, {
-      method:  "POST",
+      method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body:    body.toString(),
+      body: body.toString(),
     });
 
     if (!res.ok) {
@@ -247,18 +255,18 @@ export class McpOAuthProvider {
       throw new McpAuthError("UNAUTHORIZED", `OAuth token exchange failed: ${res.status} ${text}`);
     }
 
-    const data = await res.json() as {
-      access_token:  string;
-      token_type?:   string;
-      expires_in?:   number;
-      scope?:        string;
+    const data = (await res.json()) as {
+      access_token: string;
+      token_type?: string;
+      expires_in?: number;
+      scope?: string;
     };
 
     const token: OAuthToken = {
       accessToken: data.access_token,
-      tokenType:   data.token_type ?? "Bearer",
-      expiresAt:   Date.now() + (data.expires_in ?? 3600) * 1000,
-      scopes:      data.scope ? data.scope.split(" ") : this.scopes,
+      tokenType: data.token_type ?? "Bearer",
+      expiresAt: Date.now() + (data.expires_in ?? 3600) * 1000,
+      scopes: data.scope ? data.scope.split(" ") : this.scopes,
     };
 
     this.tokenCache.set(token.accessToken, token);
@@ -310,9 +318,9 @@ export interface McpServerInfo {
 
 /** Mcp server. */
 export class McpServer {
-  private tools        = new Map<string, McpTool>();
-  private resources    = new Map<string, McpResource>();
-  private prompts      = new Map<string, McpPrompt>();
+  private tools = new Map<string, McpTool>();
+  private resources = new Map<string, McpResource>();
+  private prompts = new Map<string, McpPrompt>();
   private oauthProvider: McpOAuthProvider | null = null;
 
   constructor(public readonly info: McpServerInfo) {}
@@ -371,9 +379,9 @@ export class McpServer {
       progressToken,
       reportProgress: (progress, total) => {
         if (!onProgress) return;
-        void Promise.resolve(
-          onProgress({ progressToken, progress, total }),
-        ).catch(() => { /* progress errors are non-fatal */ });
+        void Promise.resolve(onProgress({ progressToken, progress, total })).catch(() => {
+          /* progress errors are non-fatal */
+        });
       },
     };
 
@@ -392,9 +400,15 @@ export class McpServer {
     return prompt.render(args);
   }
 
-  hasTool(name: string): boolean { return this.tools.has(name); }
-  hasResource(uri: string): boolean { return this.resources.has(uri); }
-  hasPrompt(name: string): boolean { return this.prompts.has(name); }
+  hasTool(name: string): boolean {
+    return this.tools.has(name);
+  }
+  hasResource(uri: string): boolean {
+    return this.resources.has(uri);
+  }
+  hasPrompt(name: string): boolean {
+    return this.prompts.has(name);
+  }
 
   // ── OAuth ──────────────────────────────────────────────────────────────────
 
@@ -408,7 +422,9 @@ export class McpServer {
     return this;
   }
 
-  getOAuthProvider(): McpOAuthProvider | null { return this.oauthProvider; }
+  getOAuthProvider(): McpOAuthProvider | null {
+    return this.oauthProvider;
+  }
 
   /**
    * Validate the supplied bearer token via the attached OAuth provider, then

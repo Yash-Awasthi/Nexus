@@ -15,6 +15,9 @@
  * adapter; paths are resolved relative to AGENT_FS_ROOT (default: /workspace).
  */
 
+import * as fsp from "fs/promises";
+import * as path from "path";
+
 import {
   LibrarianAgent,
   FileExplorerAgent,
@@ -25,16 +28,9 @@ import {
   type AgentKGEdge,
   type AgentFileSystem,
 } from "@nexus/agents";
-import {
-  GroqEmbedder,
-  InMemoryStore,
-  MemoryManager,
-  PgVectorStore,
-} from "@nexus/memory";
-import { KnowledgeGraph, InMemoryKGStore } from "@nexus/knowledge-graph";
 import { globalHooks } from "@nexus/hooks";
-import * as fsp from "fs/promises";
-import * as path from "path";
+import { KnowledgeGraph, InMemoryKGStore } from "@nexus/knowledge-graph";
+import { GroqEmbedder, InMemoryStore, MemoryManager, PgVectorStore } from "@nexus/memory";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
@@ -50,9 +46,7 @@ const _embedder = process.env.GROQ_API_KEY
   ? new GroqEmbedder({ apiKey: process.env.GROQ_API_KEY })
   : null;
 
-const _memManager = _embedder
-  ? new MemoryManager({ store: _memStore, embedder: _embedder })
-  : null;
+const _memManager = _embedder ? new MemoryManager({ store: _memStore, embedder: _embedder }) : null;
 
 // KG store
 const _kgStore = new InMemoryKGStore();
@@ -62,20 +56,25 @@ const _kg = new KnowledgeGraph(_kgStore);
 const _agentMemory: AgentMemory = {
   async recall(query, limit = 5, filter) {
     if (!_memManager) return [];
-    const userId = (filter as Record<string, unknown> | undefined)?.["userId"] as string | undefined;
+    const userId = (filter as Record<string, unknown> | undefined)?.["userId"] as
+      | string
+      | undefined;
     const memFilter = userId ? { metadata: { userId } } : undefined;
     const results = await _memManager.recall(query, limit, memFilter);
-    return results.map((r): AgentMemorySearchResult => ({
-      entry: {
-        id:        r.entry.id,
-        text:      r.entry.text,
-        metadata:  r.entry.metadata ?? {},
-        createdAt: typeof r.entry.createdAt === "number"
-          ? r.entry.createdAt
-          : new Date(r.entry.createdAt as string).getTime() / 1000,
-      },
-      score: r.score,
-    }));
+    return results.map(
+      (r): AgentMemorySearchResult => ({
+        entry: {
+          id: r.entry.id,
+          text: r.entry.text,
+          metadata: r.entry.metadata ?? {},
+          createdAt:
+            typeof r.entry.createdAt === "number"
+              ? r.entry.createdAt
+              : new Date(r.entry.createdAt as string).getTime() / 1000,
+        },
+        score: r.score,
+      }),
+    );
   },
   async remember(text, metadata) {
     if (!_memManager) return null;
@@ -87,46 +86,54 @@ const _agentMemory: AgentMemory = {
 const _agentKG: AgentKG = {
   async queryNodes(q) {
     const nodes = await _kg.queryNodes({
-      nameContains:  q?.nameContains,
-      type:          q?.type as never,
+      nameContains: q?.nameContains,
+      type: q?.type as never,
       minConfidence: q?.minConfidence,
-      limit:         q?.limit,
+      limit: q?.limit,
     });
-    return nodes.map((n): AgentKGNode => ({
-      id:         n.id,
-      name:       n.name,
-      type:       n.type,
-      confidence: n.confidence,
-      sources:    n.sources ?? [],
-    }));
+    return nodes.map(
+      (n): AgentKGNode => ({
+        id: n.id,
+        name: n.name,
+        type: n.type,
+        confidence: n.confidence,
+        sources: n.sources ?? [],
+      }),
+    );
   },
   async findRelated(nodeId, opts) {
     const result = await _kg.findRelated(nodeId, opts);
     const outbound = result.neighbors
       .filter((nb) => nb.direction === "outbound")
-      .map((nb): AgentKGEdge => ({
-        id:         nb.edge.id,
-        subjectId:  nb.edge.subjectId,
-        predicate:  nb.edge.predicate,
-        objectId:   nb.edge.objectId,
-        confidence: nb.edge.confidence,
-      }));
+      .map(
+        (nb): AgentKGEdge => ({
+          id: nb.edge.id,
+          subjectId: nb.edge.subjectId,
+          predicate: nb.edge.predicate,
+          objectId: nb.edge.objectId,
+          confidence: nb.edge.confidence,
+        }),
+      );
     const inbound = result.neighbors
       .filter((nb) => nb.direction === "inbound")
-      .map((nb): AgentKGEdge => ({
-        id:         nb.edge.id,
-        subjectId:  nb.edge.subjectId,
-        predicate:  nb.edge.predicate,
-        objectId:   nb.edge.objectId,
-        confidence: nb.edge.confidence,
-      }));
-    const nodes = result.neighbors.map((nb): AgentKGNode => ({
-      id:         nb.node.id,
-      name:       nb.node.name,
-      type:       nb.node.type,
-      confidence: nb.node.confidence,
-      sources:    nb.node.sources ?? [],
-    }));
+      .map(
+        (nb): AgentKGEdge => ({
+          id: nb.edge.id,
+          subjectId: nb.edge.subjectId,
+          predicate: nb.edge.predicate,
+          objectId: nb.edge.objectId,
+          confidence: nb.edge.confidence,
+        }),
+      );
+    const nodes = result.neighbors.map(
+      (nb): AgentKGNode => ({
+        id: nb.node.id,
+        name: nb.node.name,
+        type: nb.node.type,
+        confidence: nb.node.confidence,
+        sources: nb.node.sources ?? [],
+      }),
+    );
     return { outbound, inbound, nodes };
   },
 };
@@ -141,8 +148,8 @@ const _agentHooks = {
 // LibrarianAgent
 const librarian = new LibrarianAgent({
   memory: _agentMemory,
-  kg:     _agentKG,
-  hooks:  _agentHooks,
+  kg: _agentKG,
+  hooks: _agentHooks,
 });
 
 // AgentFileSystem adapter
@@ -163,13 +170,16 @@ const _agentFs: AgentFileSystem = {
     return entries.map((e) => path.join(dir, e));
   },
   async exists(p) {
-    return fsp.access(path.resolve(FS_ROOT, p)).then(() => true).catch(() => false);
+    return fsp
+      .access(path.resolve(FS_ROOT, p))
+      .then(() => true)
+      .catch(() => false);
   },
 };
 
 // FileExplorerAgent
 const fileExplorer = new FileExplorerAgent({
-  fs:    _agentFs,
+  fs: _agentFs,
   hooks: _agentHooks,
 });
 
@@ -192,12 +202,12 @@ export async function agentsRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{
     Body: {
-      query:            string;
-      limit?:           number;
-      nodeLimit?:       number;
-      minScore?:        number;
+      query: string;
+      limit?: number;
+      nodeLimit?: number;
+      minScore?: number;
       maxContextTokens?: number;
-      filter?:          Record<string, unknown>;
+      filter?: Record<string, unknown>;
     };
   }>("/agents/librarian/query", { preHandler: requireAuth }, async (request, reply) => {
     const { query, ...opts } = request.body;
@@ -206,10 +216,10 @@ export async function agentsRoutes(app: FastifyInstance): Promise<void> {
     const result = await librarian.recall(query, opts);
     return reply.send({
       query,
-      memories:    result.memories,
-      entities:    result.entities,
+      memories: result.memories,
+      entities: result.entities,
       contextText: result.contextText,
-      kgError:     result.kgError,
+      kgError: result.kgError,
     });
   });
 
@@ -223,7 +233,15 @@ export async function agentsRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Body: { path: string } }>(
     "/agents/file/read",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const { path: filePath } = request.body;
       if (!filePath) return reply.code(400).send({ error: "path is required" });
@@ -247,18 +265,14 @@ export async function agentsRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{
     Body: { path: string; content: string };
-  }>(
-    "/agents/file/write",
-    { preHandler: requireAuth },
-    async (request, reply) => {
-      const { path: filePath, content } = request.body;
-      if (!filePath) return reply.code(400).send({ error: "path is required" });
-      if (content === undefined) return reply.code(400).send({ error: "content is required" });
+  }>("/agents/file/write", { preHandler: requireAuth }, async (request, reply) => {
+    const { path: filePath, content } = request.body;
+    if (!filePath) return reply.code(400).send({ error: "path is required" });
+    if (content === undefined) return reply.code(400).send({ error: "content is required" });
 
-      const result = await fileExplorer.editFile(filePath, content);
-      return reply.code(result.ok ? 201 : 422).send(result);
-    },
-  );
+    const result = await fileExplorer.editFile(filePath, content);
+    return reply.code(result.ok ? 201 : 422).send(result);
+  });
 
   /**
    * GET /agents/file/list?dir=&pattern=&query=

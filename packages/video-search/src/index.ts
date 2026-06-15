@@ -20,7 +20,7 @@ export interface VideoResult {
   url: string;
   thumbnailUrl?: string;
   duration?: number; // seconds
-  source: string;    // "youtube" | "vimeo" | "custom" | …
+  source: string; // "youtube" | "vimeo" | "custom" | …
   description?: string;
   publishedAt?: string;
   viewCount?: number;
@@ -38,16 +38,16 @@ export interface VideoSearchRequest {
   query: string;
   chatHistory?: ChatMessage[];
   maxResults?: number;
-  minDuration?: number;   // seconds
-  maxDuration?: number;   // seconds
-  source?: string;        // filter by source
+  minDuration?: number; // seconds
+  maxDuration?: number; // seconds
+  source?: string; // filter by source
   forceRefresh?: boolean;
 }
 
 /** Video search response interface definition. */
 export interface VideoSearchResponse {
   results: VideoResult[];
-  refinedQuery: string;  // LLM-refined query
+  refinedQuery: string; // LLM-refined query
   totalFound: number;
   cached: boolean;
 }
@@ -72,16 +72,22 @@ export class MockVideoBackend implements VideoBackend {
 
   async search(query: string, maxResults: number): Promise<VideoResult[]> {
     const q = query.toLowerCase();
-    const matched = this.catalog.filter((v) =>
-      v.title.toLowerCase().includes(q) ||
-      (v.description?.toLowerCase().includes(q) ?? false)
+    const matched = this.catalog.filter(
+      (v) =>
+        v.title.toLowerCase().includes(q) || (v.description?.toLowerCase().includes(q) ?? false),
     );
     return matched.slice(0, maxResults);
   }
 
-  addVideo(video: VideoResult): void { this.catalog.push(video); }
-  clear(): void { this.catalog = []; }
-  size(): number { return this.catalog.length; }
+  addVideo(video: VideoResult): void {
+    this.catalog.push(video);
+  }
+  clear(): void {
+    this.catalog = [];
+  }
+  size(): number {
+    return this.catalog.length;
+  }
 }
 
 // ── VideoSearchCache ──────────────────────────────────────────────────────────
@@ -90,7 +96,9 @@ export class VideoSearchCache {
   private cache = new Map<string, { response: VideoSearchResponse; expiresAt: number }>();
   private ttlMs: number;
 
-  constructor(ttlMs = 5 * 60 * 1000) { this.ttlMs = ttlMs; }
+  constructor(ttlMs = 5 * 60 * 1000) {
+    this.ttlMs = ttlMs;
+  }
 
   set(query: string, response: VideoSearchResponse): void {
     this.cache.set(query.toLowerCase(), { response, expiresAt: Date.now() + this.ttlMs });
@@ -99,13 +107,22 @@ export class VideoSearchCache {
   get(query: string): VideoSearchResponse | null {
     const entry = this.cache.get(query.toLowerCase());
     if (!entry) return null;
-    if (Date.now() > entry.expiresAt) { this.cache.delete(query.toLowerCase()); return null; }
+    if (Date.now() > entry.expiresAt) {
+      this.cache.delete(query.toLowerCase());
+      return null;
+    }
     return { ...entry.response, cached: true };
   }
 
-  invalidate(query: string): void { this.cache.delete(query.toLowerCase()); }
-  clear(): void { this.cache.clear(); }
-  size(): number { return this.cache.size; }
+  invalidate(query: string): void {
+    this.cache.delete(query.toLowerCase());
+  }
+  clear(): void {
+    this.cache.clear();
+  }
+  size(): number {
+    return this.cache.size;
+  }
 }
 
 // ── IntentExtractor ───────────────────────────────────────────────────────────
@@ -113,13 +130,16 @@ export class VideoSearchCache {
 export class IntentExtractor {
   private model: ModelFn;
 
-  constructor(model: ModelFn) { this.model = model; }
+  constructor(model: ModelFn) {
+    this.model = model;
+  }
 
   async refineQuery(request: VideoSearchRequest): Promise<string> {
-    const historyCtx = request.chatHistory
-      ?.slice(-4)
-      .map((m) => `${m.role}: ${m.content}`)
-      .join("\n") ?? "";
+    const historyCtx =
+      request.chatHistory
+        ?.slice(-4)
+        .map((m) => `${m.role}: ${m.content}`)
+        .join("\n") ?? "";
 
     const systemPrompt = `You are a video search query optimizer. Given a search query and optional conversation history, output ONLY an improved, specific search query string — no explanation, no quotes, no extra text.`;
     const userMessage = historyCtx
@@ -138,17 +158,23 @@ export class IntentExtractor {
 // ── VideoRanker ───────────────────────────────────────────────────────────────
 
 export class VideoRanker {
-  rank(results: VideoResult[], query: string, filters: {
-    minDuration?: number;
-    maxDuration?: number;
-    source?: string;
-  } = {}): VideoResult[] {
+  rank(
+    results: VideoResult[],
+    query: string,
+    filters: {
+      minDuration?: number;
+      maxDuration?: number;
+      source?: string;
+    } = {},
+  ): VideoResult[] {
     const terms = query.toLowerCase().split(/\s+/);
 
-    let filtered = results.filter((v) => {
+    const filtered = results.filter((v) => {
       if (filters.source && v.source !== filters.source) return false;
-      if (filters.minDuration !== undefined && (v.duration ?? 0) < filters.minDuration) return false;
-      if (filters.maxDuration !== undefined && (v.duration ?? Infinity) > filters.maxDuration) return false;
+      if (filters.minDuration !== undefined && (v.duration ?? 0) < filters.minDuration)
+        return false;
+      if (filters.maxDuration !== undefined && (v.duration ?? Infinity) > filters.maxDuration)
+        return false;
       return true;
     });
 
@@ -225,5 +251,7 @@ export class VideoSearchEngine {
     return response;
   }
 
-  getCache(): VideoSearchCache { return this.cache; }
+  getCache(): VideoSearchCache {
+    return this.cache;
+  }
 }

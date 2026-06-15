@@ -25,14 +25,14 @@ import { requireAuth } from "../middleware/auth.js";
 
 // ── Singletons ────────────────────────────────────────────────────────────────
 
-const dataset  = new SftDataset();
-const filter   = new DatasetFilter();
+const dataset = new SftDataset();
+const filter = new DatasetFilter();
 const exporter = new SftExporter();
 
 const EXPORT_MIME: Record<ExportFormat, string> = {
-  jsonl:     "application/x-ndjson",
-  alpaca:    "application/json",
-  sharegpt:  "application/json",
+  jsonl: "application/x-ndjson",
+  alpaca: "application/json",
+  sharegpt: "application/json",
 };
 
 // ── Route plugin ──────────────────────────────────────────────────────────────
@@ -49,7 +49,7 @@ export async function sftRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{
     Body: {
-      turns: Array<{ role: TurnRole; content: string; metadata?: Record<string, unknown> }>;
+      turns: { role: TurnRole; content: string; metadata?: Record<string, unknown> }[];
       source?: string;
     };
   }>("/sft/conversations", { preHandler: requireAuth }, async (request, reply) => {
@@ -72,9 +72,9 @@ export async function sftRoutes(app: FastifyInstance): Promise<void> {
     Querystring: {
       minQuality?: string;
       maxQuality?: string;
-      minTurns?:   string;
-      maxTurns?:   string;
-      source?:     string;
+      minTurns?: string;
+      maxTurns?: string;
+      source?: string;
     };
   }>("/sft/conversations", { preHandler: requireAuth }, async (request, reply) => {
     const { minQuality, maxQuality, minTurns, maxTurns, source } = request.query;
@@ -82,8 +82,8 @@ export async function sftRoutes(app: FastifyInstance): Promise<void> {
     const filtered = filter.filter(dataset.list(), {
       minQualityScore: minQuality ? parseFloat(minQuality) : undefined,
       maxQualityScore: maxQuality ? parseFloat(maxQuality) : undefined,
-      minTurns:        minTurns   ? parseInt(minTurns, 10) : undefined,
-      maxTurns:        maxTurns   ? parseInt(maxTurns, 10) : undefined,
+      minTurns: minTurns ? parseInt(minTurns, 10) : undefined,
+      maxTurns: maxTurns ? parseInt(maxTurns, 10) : undefined,
       source,
     });
 
@@ -97,7 +97,15 @@ export async function sftRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{ Params: { id: string } }>(
     "/sft/conversations/:id",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const sample = dataset.get(request.params.id);
       if (!sample) return reply.code(404).send({ error: "Sample not found" });
@@ -122,11 +130,14 @@ export async function sftRoutes(app: FastifyInstance): Promise<void> {
 
     const minQuality = request.query.minQuality ? parseFloat(request.query.minQuality) : 0;
     const samples = filter.filter(dataset.list(), { minQualityScore: minQuality });
-    const output  = exporter.export(samples, fmt);
+    const output = exporter.export(samples, fmt);
 
     return reply
       .header("Content-Type", EXPORT_MIME[fmt])
-      .header("Content-Disposition", `attachment; filename="sft-dataset.${fmt === "jsonl" ? "jsonl" : "json"}"`)
+      .header(
+        "Content-Disposition",
+        `attachment; filename="sft-dataset.${fmt === "jsonl" ? "jsonl" : "json"}"`,
+      )
       .send(output);
   });
 
@@ -135,22 +146,36 @@ export async function sftRoutes(app: FastifyInstance): Promise<void> {
    *
    * Count samples + quality distribution (min, max, mean, p50).
    */
-  app.get("/sft/stats", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
-    const samples = dataset.list();
-    const count = samples.length;
+  app.get(
+    "/sft/stats",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_request, reply) => {
+      const samples = dataset.list();
+      const count = samples.length;
 
-    let min = 1, max = 0, sum = 0;
-    const scores = samples.map((s) => s.qualityScore).sort((a, b) => a - b);
+      let min = 1,
+        max = 0,
+        sum = 0;
+      const scores = samples.map((s) => s.qualityScore).sort((a, b) => a - b);
 
-    if (scores.length > 0) {
-      min = scores[0]!;
-      max = scores[scores.length - 1]!;
-      sum = scores.reduce((a, b) => a + b, 0);
-    }
+      if (scores.length > 0) {
+        min = scores[0]!;
+        max = scores[scores.length - 1]!;
+        sum = scores.reduce((a, b) => a + b, 0);
+      }
 
-    const mean = count > 0 ? sum / count : 0;
-    const p50  = count > 0 ? (scores[Math.floor(count / 2)] ?? 0) : 0;
+      const mean = count > 0 ? sum / count : 0;
+      const p50 = count > 0 ? (scores[Math.floor(count / 2)] ?? 0) : 0;
 
-    return reply.send({ count, quality: { min, max, mean, p50 } });
-  });
+      return reply.send({ count, quality: { min, max, mean, p50 } });
+    },
+  );
 }

@@ -25,17 +25,18 @@
  * the AlertEngine and PostHog analytics can observe free-tier usage patterns.
  */
 
-import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { getSharedKV } from "../lib/shared-kv.js";
 import { globalHooks } from "@nexus/hooks";
+import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+
+import { getSharedKV } from "../lib/shared-kv.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const LIBERTAS_RATE_LIMIT    = 5;             // requests
-const LIBERTAS_WINDOW_MS     = 60_000;        // per 60 s
-const LIBERTAS_MAX_TOKENS    = 512;           // hard cap
-const LIBERTAS_TEMPERATURE   = 0.7;           // fixed
-const LIBERTAS_KV_PREFIX     = "libertas:rl"; // KV key namespace
+const LIBERTAS_RATE_LIMIT = 5; // requests
+const LIBERTAS_WINDOW_MS = 60_000; // per 60 s
+const LIBERTAS_MAX_TOKENS = 512; // hard cap
+const LIBERTAS_TEMPERATURE = 0.7; // fixed
+const LIBERTAS_KV_PREFIX = "libertas:rl"; // KV key namespace
 
 // ── IP extraction ─────────────────────────────────────────────────────────────
 
@@ -47,7 +48,10 @@ function getClientIp(request: FastifyRequest): string {
 
 // ── Groq completion (free tier — no auth required for public endpoint) ────────
 
-interface LlmMessage { role: "user" | "assistant" | "system"; content: string; }
+interface LlmMessage {
+  role: "user" | "assistant" | "system";
+  content: string;
+}
 
 async function groqComplete(
   prompt: string,
@@ -57,25 +61,25 @@ async function groqComplete(
   if (!apiKey) {
     // Local dev / CI stub — echo back the prompt
     return {
-      text:          `[echo — set GROQ_API_KEY to enable real completions] ${prompt}`,
-      model:         "stub",
-      input_tokens:  0,
+      text: `[echo — set GROQ_API_KEY to enable real completions] ${prompt}`,
+      model: "stub",
+      input_tokens: 0,
       output_tokens: 0,
     };
   }
 
   const body = {
-    model:       "llama-3.1-8b-instant",    // smallest+fastest Groq free model
-    messages:    [{ role: "user", content: prompt }] satisfies LlmMessage[],
-    max_tokens:  maxTokens,
+    model: "llama-3.1-8b-instant", // smallest+fastest Groq free model
+    messages: [{ role: "user", content: prompt }] satisfies LlmMessage[],
+    max_tokens: maxTokens,
     temperature: LIBERTAS_TEMPERATURE,
-    stream:      false,
+    stream: false,
   };
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method:  "POST",
+    method: "POST",
     headers: {
-      Authorization:  `Bearer ${apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -86,16 +90,16 @@ async function groqComplete(
     throw new Error(`Groq error: ${res.status} ${msg}`);
   }
 
-  const data = await res.json() as {
-    choices: Array<{ message: { content: string } }>;
-    model:   string;
-    usage:   { prompt_tokens: number; completion_tokens: number };
+  const data = (await res.json()) as {
+    choices: { message: { content: string } }[];
+    model: string;
+    usage: { prompt_tokens: number; completion_tokens: number };
   };
 
   return {
-    text:          data.choices[0]?.message.content ?? "",
-    model:         data.model,
-    input_tokens:  data.usage.prompt_tokens,
+    text: data.choices[0]?.message.content ?? "",
+    model: data.model,
+    input_tokens: data.usage.prompt_tokens,
     output_tokens: data.usage.completion_tokens,
   };
 }
@@ -112,29 +116,34 @@ export async function libertasRoutes(app: FastifyInstance): Promise<void> {
   app.get("/libertas", async (_request, reply) => {
     reply.header("Cache-Control", "public, max-age=60");
     return reply.send({
-      name:        "Nexus Libertas — Free Tier",
+      name: "Nexus Libertas — Free Tier",
       description: "Public, unauthenticated access to the Nexus gateway for evaluation.",
       endpoints: [
-        { method: "GET",  path: "/api/v1/libertas",          description: "This manifest" },
-        { method: "POST", path: "/api/v1/libertas/complete",  description: "Single-turn LLM completion" },
+        { method: "GET", path: "/api/v1/libertas", description: "This manifest" },
+        {
+          method: "POST",
+          path: "/api/v1/libertas/complete",
+          description: "Single-turn LLM completion",
+        },
       ],
       limits: {
         requests_per_minute: LIBERTAS_RATE_LIMIT,
-        max_tokens:          LIBERTAS_MAX_TOKENS,
-        temperature:         LIBERTAS_TEMPERATURE,
-        streaming:           false,
-        system_prompts:      false,
-        history:             false,
+        max_tokens: LIBERTAS_MAX_TOKENS,
+        temperature: LIBERTAS_TEMPERATURE,
+        streaming: false,
+        system_prompts: false,
+        history: false,
       },
       models: [
         {
-          id:       "libertas/fast",
-          backend:  "groq/llama-3.1-8b-instant",
+          id: "libertas/fast",
+          backend: "groq/llama-3.1-8b-instant",
           available: !!process.env.GROQ_API_KEY,
         },
       ],
       auth_required: false,
-      upgrade_path:  "Set X-Nexus-Api-Key header or use /api/v1/oauth/google to access the full platform.",
+      upgrade_path:
+        "Set X-Nexus-Api-Key header or use /api/v1/oauth/google to access the full platform.",
     });
   });
 
@@ -151,25 +160,27 @@ export async function libertasRoutes(app: FastifyInstance): Promise<void> {
     Body: { prompt: string; max_tokens?: number };
   }>("/libertas/complete", async (request: FastifyRequest, reply: FastifyReply) => {
     // ── Rate limit check ─────────────────────────────────────────────────────
-    const ip    = getClientIp(request);
+    const ip = getClientIp(request);
     const kvKey = `${LIBERTAS_KV_PREFIX}:${ip}`;
-    const kv    = getSharedKV();
+    const kv = getSharedKV();
 
     let current = 0;
     try {
       current = (await kv.get<number>(kvKey)) ?? 0;
-    } catch { /* fail open */ }
+    } catch {
+      /* fail open */
+    }
 
     if (current >= LIBERTAS_RATE_LIMIT) {
       const retryAfterSec = Math.ceil(LIBERTAS_WINDOW_MS / 1000);
       return reply
         .code(429)
         .header("Retry-After", String(retryAfterSec))
-        .header("X-RateLimit-Limit",     String(LIBERTAS_RATE_LIMIT))
+        .header("X-RateLimit-Limit", String(LIBERTAS_RATE_LIMIT))
         .header("X-RateLimit-Remaining", "0")
         .send({
-          error:      "rate_limit_exceeded",
-          message:    `Free tier limit is ${LIBERTAS_RATE_LIMIT} req/min. Upgrade for higher limits.`,
+          error: "rate_limit_exceeded",
+          message: `Free tier limit is ${LIBERTAS_RATE_LIMIT} req/min. Upgrade for higher limits.`,
           retryAfterSec,
         });
     }
@@ -192,38 +203,41 @@ export async function libertasRoutes(app: FastifyInstance): Promise<void> {
       result = await groqComplete(prompt, maxTokens);
     } catch (err) {
       return reply.code(502).send({
-        error:   "completion_failed",
+        error: "completion_failed",
         message: err instanceof Error ? err.message : "LLM unavailable",
       });
     }
     const latencyMs = Date.now() - _start;
 
     // Hook: task.after — notify observers
-    globalHooks.emit("task.after", {
-      taskId:     `libertas-${_start}`,
-      taskType:   "libertas.completion",
-      durationMs: latencyMs,
-      result:     { model: result.model, tokens: result.output_tokens },
-    }).catch(() => {});
+    globalHooks
+      .emit("task.after", {
+        taskId: `libertas-${_start}`,
+        taskType: "libertas.completion",
+        durationMs: latencyMs,
+        result: { model: result.model, tokens: result.output_tokens },
+      })
+      .catch(() => {});
 
     const remaining = Math.max(0, LIBERTAS_RATE_LIMIT - current - 1);
 
-    reply.header("X-RateLimit-Limit",     String(LIBERTAS_RATE_LIMIT));
+    reply.header("X-RateLimit-Limit", String(LIBERTAS_RATE_LIMIT));
     reply.header("X-RateLimit-Remaining", String(remaining));
-    reply.header("Cache-Control",         "private, no-store");
+    reply.header("Cache-Control", "private, no-store");
 
     return reply.code(200).send({
-      text:   result.text,
-      model:  result.model,
+      text: result.text,
+      model: result.model,
       usage: {
-        input_tokens:  result.input_tokens,
+        input_tokens: result.input_tokens,
         output_tokens: result.output_tokens,
       },
       latencyMs,
       remaining,
-      upgrade: remaining === 0
-        ? "You have used all free-tier requests. Upgrade to remove limits."
-        : undefined,
+      upgrade:
+        remaining === 0
+          ? "You have used all free-tier requests. Upgrade to remove limits."
+          : undefined,
     });
   });
 }

@@ -31,23 +31,21 @@ export interface ReplInput {
 export interface ReplResult {
   stdout: string;
   stderr: string;
-  displayData?: unknown;  // rich output (images, HTML, etc.)
+  displayData?: unknown; // rich output (images, HTML, etc.)
   lastExpression?: string; // auto-print of last expression in Jupyter mode
   exitCode: number;
   durationMs: number;
 }
 
 /** Variable store interface definition. */
-export interface VariableStore {
-  [name: string]: unknown;
-}
+export type VariableStore = Record<string, unknown>;
 
 /** Kernel session state interface definition. */
 export interface KernelSessionState {
   id: string;
   language: ReplLanguage;
   variables: VariableStore;
-  history: string[];      // executed code snippets
+  history: string[]; // executed code snippets
   createdAt: string;
   lastUsedAt: string;
   executionCount: number;
@@ -55,6 +53,7 @@ export interface KernelSessionState {
 
 // ── JupyterMode ───────────────────────────────────────────────────────────────
 
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class JupyterMode {
   /**
    * Wrap code so the last expression is automatically displayed.
@@ -68,20 +67,25 @@ export class JupyterMode {
 
     const stripped = lastLine.trim();
     // Don't wrap control structures, assignments, or statements
-    const isStatement = /^(def |class |import |from |return |yield |raise |del |pass\b|break\b|continue\b|async |print\(|#)/.test(stripped)
-      || (/^[a-zA-Z_][a-zA-Z0-9_]*\s*=/.test(stripped) && !stripped.includes("=="))
-      || lastLine !== lastLine.trimStart(); // indented → inside a block
+    const isStatement =
+      /^(def |class |import |from |return |yield |raise |del |pass\b|break\b|continue\b|async |print\(|#)/.test(
+        stripped,
+      ) ||
+      (/^[a-zA-Z_][a-zA-Z0-9_]*\s*=/.test(stripped) && !stripped.includes("==")) ||
+      lastLine !== lastLine.trimStart(); // indented → inside a block
 
     if (isStatement) return code;
 
     // Replace last expression line with print wrapper
-    const idx = [...lines].map((l, i) => ({ l, i }))
+    const idx = [...lines]
+      .map((l, i) => ({ l, i }))
       .reverse()
       .find(({ l }) => l.trim() !== "");
     if (!idx) return code;
 
     const newLines = [...lines];
-    newLines[idx.i] = `__repl_last__ = ${stripped}\nif __repl_last__ is not None: print(repr(__repl_last__))`;
+    newLines[idx.i] =
+      `__repl_last__ = ${stripped}\nif __repl_last__ is not None: print(repr(__repl_last__))`;
     return newLines.join("\n");
   }
 
@@ -92,7 +96,10 @@ export class JupyterMode {
     const stripped = lastLine.trim();
     const isAssignment = /(<-|=)/.test(stripped) && !/==/g.test(stripped);
     if (isAssignment) return code;
-    const idx = [...lines].map((l, i) => ({ l, i })).reverse().find(({ l }) => l.trim() !== "");
+    const idx = [...lines]
+      .map((l, i) => ({ l, i }))
+      .reverse()
+      .find(({ l }) => l.trim() !== "");
     if (!idx) return code;
     const newLines = [...lines];
     newLines[idx.i] = `print(${stripped})`;
@@ -104,9 +111,12 @@ export class JupyterMode {
     const lastLine = [...lines].reverse().find((l) => l.trim() !== "");
     if (!lastLine) return code;
     const stripped = lastLine.trim();
-    const isAssignment = /=/.test(stripped) && !/==/g.test(stripped) && !/^#/.test(stripped);
+    const isAssignment = stripped.includes('=') && !/==/g.test(stripped) && !/^#/.test(stripped);
     if (isAssignment) return code;
-    const idx = [...lines].map((l, i) => ({ l, i })).reverse().find(({ l }) => l.trim() !== "");
+    const idx = [...lines]
+      .map((l, i) => ({ l, i }))
+      .reverse()
+      .find(({ l }) => l.trim() !== "");
     if (!idx) return code;
     const newLines = [...lines];
     newLines[idx.i] = `println(${stripped})`;
@@ -115,9 +125,12 @@ export class JupyterMode {
 
   static wrap(code: string, language: ReplLanguage): string {
     switch (language) {
-      case "python": return JupyterMode.wrapPython(code);
-      case "r": return JupyterMode.wrapR(code);
-      case "julia": return JupyterMode.wrapJulia(code);
+      case "python":
+        return JupyterMode.wrapPython(code);
+      case "r":
+        return JupyterMode.wrapR(code);
+      case "julia":
+        return JupyterMode.wrapJulia(code);
     }
   }
 }
@@ -125,7 +138,12 @@ export class JupyterMode {
 // ── ReplExecutor ──────────────────────────────────────────────────────────────
 
 export interface ReplExecutor {
-  execute(language: ReplLanguage, code: string, state: KernelSessionState, timeoutMs?: number): Promise<ReplResult>;
+  execute(
+    language: ReplLanguage,
+    code: string,
+    state: KernelSessionState,
+    timeoutMs?: number,
+  ): Promise<ReplResult>;
 }
 
 // ── MockReplExecutor ──────────────────────────────────────────────────────────
@@ -146,13 +164,18 @@ export interface MockExecutionBehavior {
 export class MockReplExecutor implements ReplExecutor {
   private behaviors: MockExecutionBehavior[];
   private callIndex = 0;
-  readonly executionLog: Array<{ language: ReplLanguage; code: string }> = [];
+  readonly executionLog: { language: ReplLanguage; code: string }[] = [];
 
   constructor(behaviors: MockExecutionBehavior | MockExecutionBehavior[] = {}) {
     this.behaviors = Array.isArray(behaviors) ? behaviors : [behaviors];
   }
 
-  async execute(language: ReplLanguage, code: string, state: KernelSessionState, _timeoutMs?: number): Promise<ReplResult> {
+  async execute(
+    language: ReplLanguage,
+    code: string,
+    state: KernelSessionState,
+    _timeoutMs?: number,
+  ): Promise<ReplResult> {
     this.executionLog.push({ language, code });
     const behavior = this.behaviors[Math.min(this.callIndex, this.behaviors.length - 1)]!;
     this.callIndex++;
@@ -174,13 +197,13 @@ export class MockReplExecutor implements ReplExecutor {
 // ── DockerReplExecutor ─────────────────────────────────────────────────────────
 
 const DOCKER_IMAGES: Record<ReplLanguage, { image: string; cmd: string[] }> = {
-  python: { image: "python:3.12-slim",   cmd: ["python3", "-"] },
-  r:      { image: "r-base:4.3",         cmd: ["Rscript", "-"] },
-  julia:  { image: "julia:1.10-alpine",  cmd: ["julia", "--startup-file=no", "-"] },
+  python: { image: "python:3.12-slim", cmd: ["python3", "-"] },
+  r: { image: "r-base:4.3", cmd: ["Rscript", "-"] },
+  julia: { image: "julia:1.10-alpine", cmd: ["julia", "--startup-file=no", "-"] },
 };
 
-const STDOUT_CAP = 65_536;  // 64 KB
-const STDERR_CAP = 16_384;  // 16 KB
+const STDOUT_CAP = 65_536; // 64 KB
+const STDERR_CAP = 16_384; // 16 KB
 
 /**
  * Probes whether the `docker` binary is reachable and the daemon responds.
@@ -225,10 +248,10 @@ export class DockerReplExecutor implements ReplExecutor {
     defaultTimeoutMs?: number;
     networkMode?: string;
   }) {
-    this.memoryLimit       = config?.memoryLimit       ?? "512m";
-    this.cpuLimit          = config?.cpuLimit          ?? "0.5";
-    this.defaultTimeoutMs  = config?.defaultTimeoutMs  ?? 10_000;
-    this.networkMode       = config?.networkMode       ?? "none";
+    this.memoryLimit = config?.memoryLimit ?? "512m";
+    this.cpuLimit = config?.cpuLimit ?? "0.5";
+    this.defaultTimeoutMs = config?.defaultTimeoutMs ?? 10_000;
+    this.networkMode = config?.networkMode ?? "none";
   }
 
   async execute(
@@ -243,7 +266,9 @@ export class DockerReplExecutor implements ReplExecutor {
 
     return new Promise<ReplResult>((resolve, reject) => {
       const dockerArgs = [
-        "run", "--rm", "--interactive",
+        "run",
+        "--rm",
+        "--interactive",
         `--network=${this.networkMode}`,
         `--memory=${this.memoryLimit}`,
         `--cpus=${this.cpuLimit}`,
@@ -292,7 +317,7 @@ export class DockerReplExecutor implements ReplExecutor {
           resolve({
             stdout,
             stderr: `Execution timed out after ${timeout}ms.\n${stderr}`.trim(),
-            exitCode: 124,  // conventional timeout code (same as GNU timeout)
+            exitCode: 124, // conventional timeout code (same as GNU timeout)
             durationMs,
           });
           return;
@@ -321,10 +346,12 @@ export class DockerReplExecutor implements ReplExecutor {
         clearTimeout(killTimer);
         const nodeErr = err as NodeJS.ErrnoException;
         if (nodeErr.code === "ENOENT") {
-          reject(new Error(
-            "DockerReplExecutor: `docker` binary not found. " +
-            "Install Docker Desktop or Docker Engine, then restart the API.",
-          ));
+          reject(
+            new Error(
+              "DockerReplExecutor: `docker` binary not found. " +
+                "Install Docker Desktop or Docker Engine, then restart the API.",
+            ),
+          );
         } else {
           reject(err);
         }
@@ -357,10 +384,18 @@ export class KernelSession {
     };
   }
 
-  get id(): string { return this.state.id; }
-  get language(): ReplLanguage { return this.state.language; }
-  get executionCount(): number { return this.state.executionCount; }
-  get state_(): KernelSessionState { return this.state; }
+  get id(): string {
+    return this.state.id;
+  }
+  get language(): ReplLanguage {
+    return this.state.language;
+  }
+  get executionCount(): number {
+    return this.state.executionCount;
+  }
+  get state_(): KernelSessionState {
+    return this.state;
+  }
 
   /** Execute code in this session. */
   async execute(input: ReplInput): Promise<ReplResult> {
@@ -391,7 +426,9 @@ export class KernelSession {
     return this.state.variables[name];
   }
 
-  getHistory(): string[] { return [...this.state.history]; }
+  getHistory(): string[] {
+    return [...this.state.history];
+  }
 
   /** Returns idle time in ms. */
   idleTimeMs(): number {
@@ -404,15 +441,14 @@ export class KernelSession {
 export class SessionReaper {
   private maxIdleMs: number;
 
-  constructor(maxIdleMs = 30 * 60 * 1000) { // 30 min default
+  constructor(maxIdleMs = 30 * 60 * 1000) {
+    // 30 min default
     this.maxIdleMs = maxIdleMs;
   }
 
   /** Returns session IDs that should be reaped. */
   identify(sessions: KernelSession[]): string[] {
-    return sessions
-      .filter((s) => s.idleTimeMs() > this.maxIdleMs)
-      .map((s) => s.id);
+    return sessions.filter((s) => s.idleTimeMs() > this.maxIdleMs).map((s) => s.id);
   }
 
   /** Reap idle sessions from a registry map. Returns count reaped. */
@@ -460,13 +496,27 @@ export class KernelManager {
     return session;
   }
 
-  get(id: string): KernelSession | undefined { return this.kernels.get(id); }
-  has(id: string): boolean { return this.kernels.has(id); }
-  destroy(id: string): boolean { return this.kernels.delete(id); }
-  destroyAll(): void { this.kernels.clear(); }
-  count(): number { return this.kernels.size; }
-  list(): KernelSession[] { return [...this.kernels.values()]; }
+  get(id: string): KernelSession | undefined {
+    return this.kernels.get(id);
+  }
+  has(id: string): boolean {
+    return this.kernels.has(id);
+  }
+  destroy(id: string): boolean {
+    return this.kernels.delete(id);
+  }
+  destroyAll(): void {
+    this.kernels.clear();
+  }
+  count(): number {
+    return this.kernels.size;
+  }
+  list(): KernelSession[] {
+    return [...this.kernels.values()];
+  }
 
   /** Run the reaper and return count removed. */
-  reapIdle(): number { return this.reaper.reap(this.kernels); }
+  reapIdle(): number {
+    return this.reaper.reap(this.kernels);
+  }
 }

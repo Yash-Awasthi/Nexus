@@ -56,39 +56,83 @@ if (!(store instanceof NeonKGStore)) {
   const now = Math.floor(Date.now() / 1000);
   const seed = [
     { name: "Nexus Platform", type: "PRODUCT" as EntityType, confidence: 1.0 },
-    { name: "Yash Awasthi",   type: "PERSON"  as EntityType, confidence: 1.0 },
-    { name: "NIT Raipur",     type: "ORG"     as EntityType, confidence: 1.0 },
-    { name: "TypeScript",     type: "OTHER"   as EntityType, confidence: 0.9 },
-    { name: "Multi-agent AI", type: "OTHER"   as EntityType, confidence: 0.9 },
+    { name: "Yash Awasthi", type: "PERSON" as EntityType, confidence: 1.0 },
+    { name: "NIT Raipur", type: "ORG" as EntityType, confidence: 1.0 },
+    { name: "TypeScript", type: "OTHER" as EntityType, confidence: 0.9 },
+    { name: "Multi-agent AI", type: "OTHER" as EntityType, confidence: 0.9 },
   ];
   const ids: string[] = [];
   void (async () => {
     for (const s of seed) {
       const id = makeNodeId(s.name, s.type);
       ids.push(id);
-      await store.upsertNode({ id, name: s.name, type: s.type, confidence: s.confidence, properties: {}, sources: ["seed"], createdAt: now, updatedAt: now });
+      await store.upsertNode({
+        id,
+        name: s.name,
+        type: s.type,
+        confidence: s.confidence,
+        properties: {},
+        sources: ["seed"],
+        createdAt: now,
+        updatedAt: now,
+      });
     }
     const edgePairs: [string, string, string][] = [
-      [ids[1]!, "builds",     ids[0]!],
+      [ids[1]!, "builds", ids[0]!],
       [ids[1]!, "studies_at", ids[2]!],
-      [ids[0]!, "uses",       ids[3]!],
+      [ids[0]!, "uses", ids[3]!],
       [ids[0]!, "implements", ids[4]!],
     ];
     for (const [s, pred, o] of edgePairs) {
       const id = makeEdgeId(s, pred, o);
-      await store.upsertEdge({ id, subjectId: s, predicate: pred, objectId: o, confidence: 0.95, sources: ["seed"], createdAt: now, updatedAt: now });
+      await store.upsertEdge({
+        id,
+        subjectId: s,
+        predicate: pred,
+        objectId: o,
+        confidence: 0.95,
+        sources: ["seed"],
+        createdAt: now,
+        updatedAt: now,
+      });
     }
   })();
 }
 
 // ── Shape helpers — translate KGNode/KGEdge to page-expected format ───────────
 
-function nodeToView(n: { id: string; name: string; type: string; confidence: number; properties: Record<string, unknown>; sources: string[] }) {
-  return { id: n.id, label: n.name, type: n.type.toLowerCase(), confidence: n.confidence, properties: n.properties, sources: n.sources };
+function nodeToView(n: {
+  id: string;
+  name: string;
+  type: string;
+  confidence: number;
+  properties: Record<string, unknown>;
+  sources: string[];
+}) {
+  return {
+    id: n.id,
+    label: n.name,
+    type: n.type.toLowerCase(),
+    confidence: n.confidence,
+    properties: n.properties,
+    sources: n.sources,
+  };
 }
 
-function edgeToView(e: { id: string; subjectId: string; predicate: string; objectId: string; confidence: number }) {
-  return { id: e.id, source: e.subjectId, target: e.objectId, relation: e.predicate, confidence: e.confidence };
+function edgeToView(e: {
+  id: string;
+  subjectId: string;
+  predicate: string;
+  objectId: string;
+  confidence: number;
+}) {
+  return {
+    id: e.id,
+    source: e.subjectId,
+    target: e.objectId,
+    relation: e.predicate,
+    confidence: e.confidence,
+  };
 }
 
 // ── Route plugin ──────────────────────────────────────────────────────────────
@@ -101,7 +145,9 @@ export async function knowledgeGraphRoutes(app: FastifyInstance): Promise<void> 
     const limit = Math.min(parseInt(request.query.limit ?? "50"), 200);
     const nodes = await kg.queryNodes({
       type: request.query.type as EntityType | undefined,
-      minConfidence: request.query.minConfidence ? parseFloat(request.query.minConfidence) : undefined,
+      minConfidence: request.query.minConfidence
+        ? parseFloat(request.query.minConfidence)
+        : undefined,
       limit,
     });
     const edges = await kg.queryEdges({ limit: 200 });
@@ -142,7 +188,15 @@ export async function knowledgeGraphRoutes(app: FastifyInstance): Promise<void> 
   /** GET /knowledge-graph/nodes/:id */
   app.get<{ Params: { id: string } }>(
     "/knowledge-graph/nodes/:id",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const node = await kg.getNode(request.params.id);
       if (!node) return reply.code(404).send({ error: "Node not found" });
@@ -183,19 +237,41 @@ export async function knowledgeGraphRoutes(app: FastifyInstance): Promise<void> 
 
   /** POST /knowledge-graph/nodes — manual upsert */
   app.post<{
-    Body: { name: string; type: EntityType; confidence?: number; properties?: Record<string, unknown>; sources?: string[] };
+    Body: {
+      name: string;
+      type: EntityType;
+      confidence?: number;
+      properties?: Record<string, unknown>;
+      sources?: string[];
+    };
   }>("/knowledge-graph/nodes", { preHandler: requireAuth }, async (request, reply) => {
     const { name, type, confidence = 0.8, properties = {}, sources = [] } = request.body;
-    if (!name?.trim() || !type) return reply.code(400).send({ error: "name and type are required" });
+    if (!name?.trim() || !type)
+      return reply.code(400).send({ error: "name and type are required" });
     const now = Math.floor(Date.now() / 1000);
     const id = makeNodeId(name, type);
-    const node = await store.upsertNode({ id, name, type, confidence, properties, sources, createdAt: now, updatedAt: now });
+    const node = await store.upsertNode({
+      id,
+      name,
+      type,
+      confidence,
+      properties,
+      sources,
+      createdAt: now,
+      updatedAt: now,
+    });
     return reply.code(201).send(nodeToView(node));
   });
 
   /** POST /knowledge-graph/edges — manual upsert */
   app.post<{
-    Body: { subjectId: string; predicate: string; objectId: string; confidence?: number; sources?: string[] };
+    Body: {
+      subjectId: string;
+      predicate: string;
+      objectId: string;
+      confidence?: number;
+      sources?: string[];
+    };
   }>("/knowledge-graph/edges", { preHandler: requireAuth }, async (request, reply) => {
     const { subjectId, predicate, objectId, confidence = 0.8, sources = [] } = request.body;
     if (!subjectId || !predicate || !objectId) {
@@ -203,14 +279,28 @@ export async function knowledgeGraphRoutes(app: FastifyInstance): Promise<void> 
     }
     const now = Math.floor(Date.now() / 1000);
     const id = makeEdgeId(subjectId, predicate, objectId);
-    const edge = await store.upsertEdge({ id, subjectId, predicate, objectId, confidence, sources, createdAt: now, updatedAt: now });
+    const edge = await store.upsertEdge({
+      id,
+      subjectId,
+      predicate,
+      objectId,
+      confidence,
+      sources,
+      createdAt: now,
+      updatedAt: now,
+    });
     return reply.code(201).send(edgeToView(edge));
   });
 
   /** DELETE /knowledge-graph/nodes/:id */
   app.delete<{ Params: { id: string } }>(
     "/knowledge-graph/nodes/:id",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       await store.deleteNode(request.params.id);
       return reply.code(204).send();
@@ -220,7 +310,12 @@ export async function knowledgeGraphRoutes(app: FastifyInstance): Promise<void> 
   /** DELETE /knowledge-graph/edges/:id */
   app.delete<{ Params: { id: string } }>(
     "/knowledge-graph/edges/:id",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       await store.deleteEdge(request.params.id);
       return reply.code(204).send();
@@ -228,7 +323,19 @@ export async function knowledgeGraphRoutes(app: FastifyInstance): Promise<void> 
   );
 
   /** GET /knowledge-graph/stats */
-  app.get("/knowledge-graph/stats", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
-    return reply.send(await kg.stats());
-  });
+  app.get(
+    "/knowledge-graph/stats",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_req, reply) => {
+      return reply.send(await kg.stats());
+    },
+  );
 }

@@ -48,45 +48,57 @@ export async function auditRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // GET /audit/log/verify — re-derive chain hashes and check integrity
-  app.get("/audit/log/verify", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
-    const { createHash, createHmac } = await import("node:crypto");
-    const { asc } = await import("drizzle-orm");
+  app.get(
+    "/audit/log/verify",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_request, reply) => {
+      const { createHash, createHmac } = await import("node:crypto");
+      const { asc } = await import("drizzle-orm");
 
-    const auditKey = process.env.NEXUS_AUDIT_KEY ?? "nexus-dev-audit-key";
-    const GENESIS = "NEXUS_AUDIT_CHAIN_GENESIS_V1";
+      const auditKey = process.env.NEXUS_AUDIT_KEY ?? "nexus-dev-audit-key";
+      const GENESIS = "NEXUS_AUDIT_CHAIN_GENESIS_V1";
 
-    const rows = await db.select().from(auditLog).orderBy(asc(auditLog.sequence));
+      const rows = await db.select().from(auditLog).orderBy(asc(auditLog.sequence));
 
-    if (rows.length === 0) {
-      return reply.send({ valid: true, checked_count: 0, message: "Audit log is empty" });
-    }
-
-    let prevChainHash = GENESIS;
-    let firstBroken: number | undefined;
-
-    for (const entry of rows) {
-      const payloadHash = createHash("sha256")
-        .update(JSON.stringify(entry.payload, Object.keys(entry.payload as object).sort()))
-        .digest("hex");
-
-      const expected = createHmac("sha256", auditKey)
-        .update(prevChainHash + payloadHash)
-        .digest("hex");
-
-      if (expected !== entry.chainHash) {
-        firstBroken = entry.sequence;
-        break;
+      if (rows.length === 0) {
+        return reply.send({ valid: true, checked_count: 0, message: "Audit log is empty" });
       }
-      prevChainHash = entry.chainHash;
-    }
 
-    const valid = firstBroken === undefined;
-    return reply.send({
-      valid,
-      checked_count: rows.length,
-      ...(firstBroken !== undefined
-        ? { first_broken_sequence: firstBroken, message: "Chain integrity violation detected" }
-        : { message: "Chain intact" }),
-    });
-  });
+      let prevChainHash = GENESIS;
+      let firstBroken: number | undefined;
+
+      for (const entry of rows) {
+        const payloadHash = createHash("sha256")
+          .update(JSON.stringify(entry.payload, Object.keys(entry.payload as object).sort()))
+          .digest("hex");
+
+        const expected = createHmac("sha256", auditKey)
+          .update(prevChainHash + payloadHash)
+          .digest("hex");
+
+        if (expected !== entry.chainHash) {
+          firstBroken = entry.sequence;
+          break;
+        }
+        prevChainHash = entry.chainHash;
+      }
+
+      const valid = firstBroken === undefined;
+      return reply.send({
+        valid,
+        checked_count: rows.length,
+        ...(firstBroken !== undefined
+          ? { first_broken_sequence: firstBroken, message: "Chain integrity violation detected" }
+          : { message: "Chain intact" }),
+      });
+    },
+  );
 }

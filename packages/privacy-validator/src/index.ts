@@ -81,9 +81,10 @@ export class PrivacyCheckValidator {
 
   constructor(opts: PrivacyCheckOptions = {}) {
     this.opts = {
-      allowOnAbsent:  opts.allowOnAbsent  ?? true,
-      stripPattern:   opts.stripPattern   ?? DEFAULT_STRIP,
-      raceWarning:    opts.raceWarning    ?? "Prompt row absent — possible race condition; allowing with warning",
+      allowOnAbsent: opts.allowOnAbsent ?? true,
+      stripPattern: opts.stripPattern ?? DEFAULT_STRIP,
+      raceWarning:
+        opts.raceWarning ?? "Prompt row absent — possible race condition; allowing with warning",
     };
   }
 
@@ -140,6 +141,7 @@ export class PrivacyCheckValidator {
     // We can't distinguish "key absent" from "value null" with the async store alone.
     // Use the convention: null means "was looked up, is explicitly null" (redacted).
     // To distinguish race, callers should call validate() directly with rowExists flag.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const rowExists = row !== undefined; // always true here since getRow returns null not undefined
     return this.validate(sessionId, row, true /* row was looked up */);
   }
@@ -169,27 +171,37 @@ export class PrivacyAuditLog {
   record(result: ValidationResult): void {
     this.entries.push({
       sessionId: result.sessionId,
-      decision:  result.decision,
-      reason:    result.reason,
+      decision: result.decision,
+      reason: result.reason,
       timestamp: new Date().toISOString(),
       warnMessage: result.warnMessage,
     });
   }
 
-  getAll(): AuditEntry[] { return [...this.entries]; }
+  getAll(): AuditEntry[] {
+    return [...this.entries];
+  }
   getBySession(sessionId: string): AuditEntry[] {
     return this.entries.filter((e) => e.sessionId === sessionId);
   }
   getByDecision(decision: PrivacyDecision): AuditEntry[] {
     return this.entries.filter((e) => e.decision === decision);
   }
-  clear(): void { this.entries = []; }
-  size(): number { return this.entries.length; }
+  clear(): void {
+    this.entries = [];
+  }
+  size(): number {
+    return this.entries.length;
+  }
 }
 
 // ── ValidationPipeline ────────────────────────────────────────────────────────
 
-export type ValidatorFn = (sessionId: string, row: PromptRow | null, rowExists: boolean) => ValidationResult | null;
+export type ValidatorFn = (
+  sessionId: string,
+  row: PromptRow | null,
+  rowExists: boolean,
+) => ValidationResult | null;
 
 /** Validation pipeline. */
 export class ValidationPipeline {

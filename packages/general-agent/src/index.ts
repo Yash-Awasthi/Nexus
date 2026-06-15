@@ -56,7 +56,7 @@ export type AgentBackend = (
 
 /** Mock agent backend. */
 export class MockAgentBackend {
-  readonly calls: Array<{ model: AgentModel; instruction: string }> = [];
+  readonly calls: { model: AgentModel; instruction: string }[] = [];
   private content: string;
 
   constructor(content = "Task completed successfully.") {
@@ -70,7 +70,9 @@ export class MockAgentBackend {
     };
   }
 
-  setContent(content: string): void { this.content = content; }
+  setContent(content: string): void {
+    this.content = content;
+  }
 }
 
 // ── GeneralAgent ──────────────────────────────────────────────────────────────
@@ -93,9 +95,9 @@ export class GeneralAgent {
   private systemPromptOverride?: string;
 
   constructor(opts: GeneralAgentOptions) {
-    this.model           = opts.model    ?? "gpt-5";
-    this.effort          = opts.effort   ?? "medium";
-    this.backend         = opts.backend;
+    this.model = opts.model ?? "gpt-5";
+    this.effort = opts.effort ?? "medium";
+    this.backend = opts.backend;
     this.injectFilePaths = opts.injectFilePaths ?? false;
     this.systemPromptOverride = opts.systemPromptOverride;
   }
@@ -139,8 +141,12 @@ export class GeneralAgent {
     };
   }
 
-  getModel(): AgentModel { return this.model; }
-  getEffort(): ReasoningEffort { return this.effort; }
+  getModel(): AgentModel {
+    return this.model;
+  }
+  getEffort(): ReasoningEffort {
+    return this.effort;
+  }
 
   static spawnerPrompt(): string {
     return [
@@ -204,13 +210,11 @@ export class SubAgentSpawner {
 
 export class AgentResponseFormatter {
   format(response: AgentResponse): string {
-    const lines = [
-      `Model: ${response.model}`,
-      `Effort-based duration: ${response.durationMs}ms`,
-    ];
+    const lines = [`Model: ${response.model}`, `Effort-based duration: ${response.durationMs}ms`];
     if (response.tokensUsed) lines.push(`Tokens: ${response.tokensUsed}`);
     if (response.filePaths?.length) lines.push(`Files: ${response.filePaths.join(", ")}`);
-    if (response.subAgentsSpawned?.length) lines.push(`Sub-agents: ${response.subAgentsSpawned.join(", ")}`);
+    if (response.subAgentsSpawned?.length)
+      lines.push(`Sub-agents: ${response.subAgentsSpawned.join(", ")}`);
     lines.push("", response.content);
     return lines.join("\n");
   }

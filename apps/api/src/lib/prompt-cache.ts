@@ -15,6 +15,7 @@
  */
 
 import { createHash } from "node:crypto";
+
 import type { KVStore } from "@nexus/kv";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -25,29 +26,29 @@ export interface CachedLlmMessage {
 }
 
 export interface CacheableRequest {
-  model:       string;
-  messages:    CachedLlmMessage[];
-  system?:     string;
+  model: string;
+  messages: CachedLlmMessage[];
+  system?: string;
   max_tokens?: number;
   temperature?: number;
 }
 
 interface CachedLlmResponse {
-  id:          string;
-  type:        "message";
-  role:        "assistant";
-  content:     Array<{ type: "text"; text: string }>;
-  model:       string;
+  id: string;
+  type: "message";
+  role: "assistant";
+  content: { type: "text"; text: string }[];
+  model: string;
   stop_reason: string | null;
   usage: {
-    input_tokens:  number;
+    input_tokens: number;
     output_tokens: number;
   };
 }
 
 interface PromptCacheResult {
-  hit:       boolean;
-  cacheKey:  string;
+  hit: boolean;
+  cacheKey: string;
   response?: CachedLlmResponse;
 }
 
@@ -64,7 +65,7 @@ export class PromptCache {
   private readonly ttlMs: number;
 
   constructor(kv: KVStore, opts: { ttlMs?: number } = {}) {
-    this.kv    = kv;
+    this.kv = kv;
     const envTtl = parseInt(process.env.PROMPT_CACHE_TTL_MS ?? "0", 10);
     this.ttlMs = opts.ttlMs ?? (envTtl > 0 ? envTtl : DEFAULT_CACHE_TTL_MS);
   }
@@ -77,14 +78,14 @@ export class PromptCache {
   cacheKey(req: CacheableRequest): string {
     // Normalise messages: trim whitespace, sort by index (preserve order)
     const messages = req.messages.map((m) => ({
-      role:    m.role,
+      role: m.role,
       content: m.content.trim(),
     }));
 
     const signature = JSON.stringify({
-      model:      req.model,
+      model: req.model,
       messages,
-      system:     (req.system ?? "").trim(),
+      system: (req.system ?? "").trim(),
       max_tokens: req.max_tokens ?? 0,
       // temperature intentionally excluded — only called for temperature=0
     });

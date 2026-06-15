@@ -28,7 +28,7 @@ export interface Assumption {
 export interface Outcome {
   name: string;
   probability: number; // [0, 1] — must sum to 1 across the scenario
-  impact: number;      // arbitrary scale, e.g. -10 to +10
+  impact: number; // arbitrary scale, e.g. -10 to +10
   description?: string;
 }
 
@@ -65,7 +65,11 @@ let _idCounter = 0;
 
 /** Scenario builder. */
 export class ScenarioBuilder {
-  private scenario: Partial<Scenario> & { variables: Variable[]; assumptions: Assumption[]; outcomes: Outcome[] };
+  private scenario: Partial<Scenario> & {
+    variables: Variable[];
+    assumptions: Assumption[];
+    outcomes: Outcome[];
+  };
 
   constructor(name: string, description?: string) {
     this.scenario = {
@@ -86,7 +90,10 @@ export class ScenarioBuilder {
   }
 
   assume(description: string, confidence: number): this {
-    this.scenario.assumptions.push({ description, confidence: Math.min(1, Math.max(0, confidence)) });
+    this.scenario.assumptions.push({
+      description,
+      confidence: Math.min(1, Math.max(0, confidence)),
+    });
     return this;
   }
 
@@ -113,22 +120,13 @@ export function predictOutcome(scenario: Scenario): PredictionResult {
     throw new Error("Scenario has no outcomes");
   }
 
-  const expectedImpact = outcomes.reduce(
-    (sum, o) => sum + o.probability * o.impact,
-    0,
-  );
+  const expectedImpact = outcomes.reduce((sum, o) => sum + o.probability * o.impact, 0);
 
-  const highestProbabilityOutcome = [...outcomes].sort(
-    (a, b) => b.probability - a.probability,
-  )[0]!;
+  const highestProbabilityOutcome = [...outcomes].sort((a, b) => b.probability - a.probability)[0]!;
 
-  const worstCaseOutcome = [...outcomes].sort(
-    (a, b) => a.impact - b.impact,
-  )[0]!;
+  const worstCaseOutcome = [...outcomes].sort((a, b) => a.impact - b.impact)[0]!;
 
-  const bestCaseOutcome = [...outcomes].sort(
-    (a, b) => b.impact - a.impact,
-  )[0]!;
+  const bestCaseOutcome = [...outcomes].sort((a, b) => b.impact - a.impact)[0]!;
 
   const confidenceScore =
     assumptions.length === 0
@@ -147,7 +145,7 @@ export function predictOutcome(scenario: Scenario): PredictionResult {
 // ── Sensitivity analysis ──────────────────────────────────────────────────────
 
 export interface SensitivityOptions {
-  steps?: number;       // default: 5
+  steps?: number; // default: 5
   range?: [number, number]; // [min, max]; default: [0, 2x current value]
 }
 
@@ -178,10 +176,7 @@ export function sensitivityAnalysis(
       ...o,
       impact: o.impact * ratio,
     }));
-    const expectedImpact = scaledOutcomes.reduce(
-      (sum, o) => sum + o.probability * o.impact,
-      0,
-    );
+    const expectedImpact = scaledOutcomes.reduce((sum, o) => sum + o.probability * o.impact, 0);
     points.push({ variableValue: newValue, expectedImpact });
   }
   return points;
@@ -201,14 +196,16 @@ export class ScenarioPlan {
     return this.scenarios.find((s) => s.id === id);
   }
 
-  list(): Scenario[] { return [...this.scenarios]; }
+  list(): Scenario[] {
+    return [...this.scenarios];
+  }
 
   filterByTag(tag: string): Scenario[] {
     return this.scenarios.filter((s) => s.tags?.includes(tag));
   }
 
   /** Compare all scenarios by expected impact; return sorted descending. */
-  rank(): Array<{ scenario: Scenario; prediction: PredictionResult }> {
+  rank(): { scenario: Scenario; prediction: PredictionResult }[] {
     return this.scenarios
       .map((s) => ({ scenario: s, prediction: predictOutcome(s) }))
       .sort((a, b) => b.prediction.expectedImpact - a.prediction.expectedImpact);

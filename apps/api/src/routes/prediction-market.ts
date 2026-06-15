@@ -52,38 +52,42 @@ export async function predictionMarketRoutes(app: FastifyInstance): Promise<void
   /** GET /prediction-markets — list markets */
   app.get<{
     Querystring: { category?: string; ids?: string; limit?: string };
-  }>(
-    "/prediction-markets",
-    { preHandler: requireAuth },
-    async (request, reply) => {
-      const apiKey = (request.headers["x-api-key"] as string | undefined);
-      const query: MarketQuery = {};
-      if (request.query.category) query.category = request.query.category;
-      if (request.query.ids) query.ids = request.query.ids.split(",").map((s) => s.trim());
-      if (request.query.limit) query.limit = Math.min(parseInt(request.query.limit, 10), 100);
+  }>("/prediction-markets", { preHandler: requireAuth }, async (request, reply) => {
+    const apiKey = request.headers["x-api-key"] as string | undefined;
+    const query: MarketQuery = {};
+    if (request.query.category) query.category = request.query.category;
+    if (request.query.ids) query.ids = request.query.ids.split(",").map((s) => s.trim());
+    if (request.query.limit) query.limit = Math.min(parseInt(request.query.limit, 10), 100);
 
-      const result = await getSvc().getMarkets(query, apiKey);
+    const result = await getSvc().getMarkets(query, apiKey);
 
-      if (result.unauthorized) return reply.code(401).send({ error: "Invalid or missing API key" });
-      if (result.rateLimited)  return reply.code(429).send({ error: "Rate limit exceeded" });
-      if (result.error)        return reply.code(502).send({ error: result.error });
+    if (result.unauthorized) return reply.code(401).send({ error: "Invalid or missing API key" });
+    if (result.rateLimited) return reply.code(429).send({ error: "Rate limit exceeded" });
+    if (result.error) return reply.code(502).send({ error: result.error });
 
-      return reply.send(result.data);
-    },
-  );
+    return reply.send(result.data);
+  });
 
   /** GET /prediction-markets/:id — single market */
   app.get<{ Params: { id: string } }>(
     "/prediction-markets/:id",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
-      const apiKey = (request.headers["x-api-key"] as string | undefined);
+      const apiKey = request.headers["x-api-key"] as string | undefined;
       const result = await getSvc().getMarket(request.params.id, apiKey);
 
       if (result.unauthorized) return reply.code(401).send({ error: "Invalid or missing API key" });
-      if (result.rateLimited)  return reply.code(429).send({ error: "Rate limit exceeded" });
-      if (result.error)        return reply.code(502).send({ error: result.error });
-      if (!result.data)        return reply.code(404).send({ error: "Market not found" });
+      if (result.rateLimited) return reply.code(429).send({ error: "Rate limit exceeded" });
+      if (result.error) return reply.code(502).send({ error: result.error });
+      if (!result.data) return reply.code(404).send({ error: "Market not found" });
 
       return reply.send(result.data);
     },
@@ -92,9 +96,17 @@ export async function predictionMarketRoutes(app: FastifyInstance): Promise<void
   /** POST /prediction-markets/refresh/:id — force-refresh from upstream */
   app.post<{ Params: { id: string } }>(
     "/prediction-markets/refresh/:id",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
-      const apiKey = (request.headers["x-api-key"] as string | undefined);
+      const apiKey = request.headers["x-api-key"] as string | undefined;
       const svc = getSvc();
 
       // Invalidate cache then fetch fresh
@@ -102,9 +114,9 @@ export async function predictionMarketRoutes(app: FastifyInstance): Promise<void
       const result = await svc.getMarket(request.params.id, apiKey);
 
       if (result.unauthorized) return reply.code(401).send({ error: "Invalid or missing API key" });
-      if (result.rateLimited)  return reply.code(429).send({ error: "Rate limit exceeded" });
-      if (result.error)        return reply.code(502).send({ error: result.error });
-      if (!result.data)        return reply.code(404).send({ error: "Market not found" });
+      if (result.rateLimited) return reply.code(429).send({ error: "Rate limit exceeded" });
+      if (result.error) return reply.code(502).send({ error: result.error });
+      if (!result.data) return reply.code(404).send({ error: "Market not found" });
 
       return reply.send({ refreshed: true, market: result.data });
     },
@@ -113,7 +125,15 @@ export async function predictionMarketRoutes(app: FastifyInstance): Promise<void
   /** GET /prediction-markets/cache/status */
   app.get(
     "/prediction-markets/cache/status",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (_req, reply) => {
       const cache = getSvc().getClient().getCache();
       return reply.send({

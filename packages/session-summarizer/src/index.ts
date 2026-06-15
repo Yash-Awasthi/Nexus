@@ -117,10 +117,7 @@ export class LLMSessionSummarizer implements ISessionSummarizer {
 
     const req: LLMRequest = {
       model,
-      messages: [
-        ...messages,
-        { role: "user", content: instruction },
-      ],
+      messages: [...messages, { role: "user", content: instruction }],
       ...(opts.maxSummaryTokens !== undefined ? { maxTokens: opts.maxSummaryTokens } : {}),
     };
 

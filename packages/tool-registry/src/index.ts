@@ -13,7 +13,14 @@
 
 // ── JSON Schema subset ────────────────────────────────────────────────────────
 
-export type JsonSchemaType = "string" | "number" | "integer" | "boolean" | "array" | "object" | "null";
+export type JsonSchemaType =
+  | "string"
+  | "number"
+  | "integer"
+  | "boolean"
+  | "array"
+  | "object"
+  | "null";
 
 /** Json schema interface definition. */
 export interface JsonSchema {
@@ -61,42 +68,56 @@ export interface ToolResult<T = unknown> {
 // ── ToolRegistry ──────────────────────────────────────────────────────────────
 
 export class ToolRegistry {
-  private tools = new Map<string, ToolDefinition<unknown, unknown>>();
+  private tools = new Map<string, ToolDefinition>();
 
   register<TI, TO>(tool: ToolDefinition<TI, TO>): this {
     if (this.tools.has(tool.name)) {
       throw new Error(`Tool '${tool.name}' is already registered`);
     }
-    this.tools.set(tool.name, tool as ToolDefinition<unknown, unknown>);
+    this.tools.set(tool.name, tool as ToolDefinition);
     return this;
   }
 
   /** Register or overwrite an existing tool. */
   upsert<TI, TO>(tool: ToolDefinition<TI, TO>): this {
-    this.tools.set(tool.name, tool as ToolDefinition<unknown, unknown>);
+    this.tools.set(tool.name, tool as ToolDefinition);
     return this;
   }
 
-  get(name: string): ToolDefinition<unknown, unknown> | undefined {
+  get(name: string): ToolDefinition | undefined {
     return this.tools.get(name);
   }
 
-  has(name: string): boolean { return this.tools.has(name); }
+  has(name: string): boolean {
+    return this.tools.has(name);
+  }
 
-  list(): ToolDefinition<unknown, unknown>[] {
+  list(): ToolDefinition[] {
     return [...this.tools.values()];
   }
 
-  names(): string[] { return [...this.tools.keys()]; }
+  names(): string[] {
+    return [...this.tools.keys()];
+  }
 
-  unregister(name: string): boolean { return this.tools.delete(name); }
+  unregister(name: string): boolean {
+    return this.tools.delete(name);
+  }
 
-  clear(): void { this.tools.clear(); }
+  clear(): void {
+    this.tools.clear();
+  }
 
-  size(): number { return this.tools.size; }
+  size(): number {
+    return this.tools.size;
+  }
 
   /** Invoke a tool by name. Returns a typed ToolResult. */
-  async invoke<T = unknown>(name: string, input: unknown, ctx?: ToolContext): Promise<ToolResult<T>> {
+  async invoke<T = unknown>(
+    name: string,
+    input: unknown,
+    ctx?: ToolContext,
+  ): Promise<ToolResult<T>> {
     const tool = this.tools.get(name);
     const t0 = Date.now();
 
@@ -118,12 +139,14 @@ export class ToolRegistry {
   }
 
   /** Invoke multiple tools in parallel. */
-  async invokeAll(calls: Array<{ name: string; input: unknown; ctx?: ToolContext }>): Promise<ToolResult[]> {
+  async invokeAll(
+    calls: { name: string; input: unknown; ctx?: ToolContext }[],
+  ): Promise<ToolResult[]> {
     return Promise.all(calls.map(({ name, input, ctx }) => this.invoke(name, input, ctx)));
   }
 
   /** Return tool schemas in a format suitable for LLM function-calling. */
-  toLlmTools(): Array<{ name: string; description: string; parameters: JsonSchema }> {
+  toLlmTools(): { name: string; description: string; parameters: JsonSchema }[] {
     return this.list().map((t) => ({
       name: t.name,
       description: t.description,
@@ -141,7 +164,7 @@ export interface WebSearchInput {
 }
 /** Web search output interface definition. */
 export interface WebSearchOutput {
-  results: Array<{ title: string; url: string; snippet: string }>;
+  results: { title: string; url: string; snippet: string }[];
   query: string;
   totalResults?: number;
 }
@@ -172,7 +195,7 @@ export interface PapersSearchInput {
 }
 /** Papers search output interface definition. */
 export interface PapersSearchOutput {
-  papers: Array<{
+  papers: {
     paperId: string;
     title: string;
     authors: string[];
@@ -180,7 +203,7 @@ export interface PapersSearchOutput {
     abstract?: string;
     citationCount?: number;
     url?: string;
-  }>;
+  }[];
 }
 
 /** Dataset input interface definition. */
@@ -219,7 +242,7 @@ export interface PlanInput {
 }
 /** Plan output interface definition. */
 export interface PlanOutput {
-  steps: Array<{ step: number; description: string; tools?: string[] }>;
+  steps: { step: number; description: string; tools?: string[] }[];
   estimatedTurns: number;
 }
 
@@ -241,7 +264,10 @@ export interface NotifyOutput {
 
 export type ToolHandlerMap = {
   web_search?: (input: WebSearchInput, ctx?: ToolContext) => Promise<WebSearchOutput>;
-  github_read_file?: (input: GithubReadFileInput, ctx?: ToolContext) => Promise<GithubReadFileOutput>;
+  github_read_file?: (
+    input: GithubReadFileInput,
+    ctx?: ToolContext,
+  ) => Promise<GithubReadFileOutput>;
   papers?: (input: PapersSearchInput, ctx?: ToolContext) => Promise<PapersSearchOutput>;
   dataset?: (input: DatasetInput, ctx?: ToolContext) => Promise<DatasetOutput>;
   sandbox?: (input: SandboxInput, ctx?: ToolContext) => Promise<SandboxOutput>;
@@ -252,12 +278,16 @@ export type ToolHandlerMap = {
 // ── Default (stub) handlers ───────────────────────────────────────────────────
 
 function notImpl(name: string): () => never {
-  return () => { throw new Error(`${name}: no handler injected`); };
+  return () => {
+    throw new Error(`${name}: no handler injected`);
+  };
 }
 
 // ── Built-in tool definitions ─────────────────────────────────────────────────
 
-export function createWebSearchTool(handler?: ToolHandlerMap["web_search"]): ToolDefinition<WebSearchInput, WebSearchOutput> {
+export function createWebSearchTool(
+  handler?: ToolHandlerMap["web_search"],
+): ToolDefinition<WebSearchInput, WebSearchOutput> {
   return {
     name: "web_search",
     description: "Search the web for up-to-date information",
@@ -275,7 +305,9 @@ export function createWebSearchTool(handler?: ToolHandlerMap["web_search"]): Too
 }
 
 /** Create github read file tool. */
-export function createGithubReadFileTool(handler?: ToolHandlerMap["github_read_file"]): ToolDefinition<GithubReadFileInput, GithubReadFileOutput> {
+export function createGithubReadFileTool(
+  handler?: ToolHandlerMap["github_read_file"],
+): ToolDefinition<GithubReadFileInput, GithubReadFileOutput> {
   return {
     name: "github_read_file",
     description: "Read a file from a GitHub repository",
@@ -294,7 +326,9 @@ export function createGithubReadFileTool(handler?: ToolHandlerMap["github_read_f
 }
 
 /** Create papers tool. */
-export function createPapersTool(handler?: ToolHandlerMap["papers"]): ToolDefinition<PapersSearchInput, PapersSearchOutput> {
+export function createPapersTool(
+  handler?: ToolHandlerMap["papers"],
+): ToolDefinition<PapersSearchInput, PapersSearchOutput> {
   return {
     name: "papers",
     description: "Search academic papers on Semantic Scholar",
@@ -314,7 +348,9 @@ export function createPapersTool(handler?: ToolHandlerMap["papers"]): ToolDefini
 }
 
 /** Create dataset tool. */
-export function createDatasetTool(handler?: ToolHandlerMap["dataset"]): ToolDefinition<DatasetInput, DatasetOutput> {
+export function createDatasetTool(
+  handler?: ToolHandlerMap["dataset"],
+): ToolDefinition<DatasetInput, DatasetOutput> {
   return {
     name: "dataset",
     description: "Load rows from a named ML dataset",
@@ -333,7 +369,9 @@ export function createDatasetTool(handler?: ToolHandlerMap["dataset"]): ToolDefi
 }
 
 /** Create sandbox tool. */
-export function createSandboxTool(handler?: ToolHandlerMap["sandbox"]): ToolDefinition<SandboxInput, SandboxOutput> {
+export function createSandboxTool(
+  handler?: ToolHandlerMap["sandbox"],
+): ToolDefinition<SandboxInput, SandboxOutput> {
   return {
     name: "sandbox",
     description: "Execute code in an isolated sandbox environment",
@@ -351,7 +389,9 @@ export function createSandboxTool(handler?: ToolHandlerMap["sandbox"]): ToolDefi
 }
 
 /** Create plan tool. */
-export function createPlanTool(handler?: ToolHandlerMap["plan"]): ToolDefinition<PlanInput, PlanOutput> {
+export function createPlanTool(
+  handler?: ToolHandlerMap["plan"],
+): ToolDefinition<PlanInput, PlanOutput> {
   return {
     name: "plan",
     description: "Break a goal into an ordered execution plan",
@@ -369,7 +409,9 @@ export function createPlanTool(handler?: ToolHandlerMap["plan"]): ToolDefinition
 }
 
 /** Create notify tool. */
-export function createNotifyTool(handler?: ToolHandlerMap["notify"]): ToolDefinition<NotifyInput, NotifyOutput> {
+export function createNotifyTool(
+  handler?: ToolHandlerMap["notify"],
+): ToolDefinition<NotifyInput, NotifyOutput> {
   return {
     name: "notify",
     description: "Send a notification via the specified channel",

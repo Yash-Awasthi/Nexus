@@ -15,7 +15,6 @@
  * PDF/DOCX: not supported without external Extractor — returns 422.
  */
 
-import { GroqEmbedder } from "@nexus/memory";
 import {
   defaultExtractor,
   nullStore,
@@ -24,6 +23,7 @@ import {
   type DocInput,
   type Embedder,
 } from "@nexus/doc-pipeline";
+import { GroqEmbedder } from "@nexus/memory";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
@@ -51,9 +51,21 @@ export async function docPipelineRoutes(app: FastifyInstance): Promise<void> {
    * List document formats supported by the built-in extractor.
    * PDF/DOCX require an external extractor and are not available via this API.
    */
-  app.get("/doc-pipeline/formats", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
-    return reply.send({ formats: SUPPORTED_FORMATS });
-  });
+  app.get(
+    "/doc-pipeline/formats",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_request, reply) => {
+      return reply.send({ formats: SUPPORTED_FORMATS });
+    },
+  );
 
   /**
    * POST /doc-pipeline/ingest
@@ -71,38 +83,34 @@ export async function docPipelineRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{
     Body: DocInput & { chunkOptions?: { maxTokens?: number; overlapTokens?: number } };
-  }>(
-    "/doc-pipeline/ingest",
-    { preHandler: requireAuth },
-    async (request, reply) => {
-      const { format, content, source, metadata, chunkOptions } = request.body;
+  }>("/doc-pipeline/ingest", { preHandler: requireAuth }, async (request, reply) => {
+    const { format, content, source, metadata, chunkOptions } = request.body;
 
-      if (!format || !content) {
-        return reply.code(400).send({ error: "format and content are required" });
-      }
+    if (!format || !content) {
+      return reply.code(400).send({ error: "format and content are required" });
+    }
 
-      if (!(SUPPORTED_FORMATS as string[]).includes(format)) {
-        return reply.code(422).send({
-          error: `Unsupported format: "${format}". Supported: ${SUPPORTED_FORMATS.join(", ")}`,
-        });
-      }
+    if (!(SUPPORTED_FORMATS as string[]).includes(format)) {
+      return reply.code(422).send({
+        error: `Unsupported format: "${format}". Supported: ${SUPPORTED_FORMATS.join(", ")}`,
+      });
+    }
 
-      try {
-        const result = await runDocPipeline(
-          { format, content, source, metadata },
-          {
-            extractor:    defaultExtractor,
-            embedder,
-            store:        nullStore,
-            chunkOptions,
-          },
-        );
+    try {
+      const result = await runDocPipeline(
+        { format, content, source, metadata },
+        {
+          extractor: defaultExtractor,
+          embedder,
+          store: nullStore,
+          chunkOptions,
+        },
+      );
 
-        return reply.code(201).send(result);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return reply.code(500).send({ error: message });
-      }
-    },
-  );
+      return reply.code(201).send(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return reply.code(500).send({ error: message });
+    }
+  });
 }

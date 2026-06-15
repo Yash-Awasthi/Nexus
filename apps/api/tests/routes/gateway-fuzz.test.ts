@@ -29,13 +29,13 @@ import type { FastifyInstance } from "fastify";
 // ── Groq fetch mock ───────────────────────────────────────────────────────────
 
 const GROQ_MOCK = {
-  id:      "chatcmpl-fuzz",
-  object:  "chat.completion",
-  model:   "llama-3.3-70b-versatile",
+  id: "chatcmpl-fuzz",
+  object: "chat.completion",
+  model: "llama-3.3-70b-versatile",
   choices: [
     {
-      index:         0,
-      message:       { role: "assistant", content: "Fuzz reply" },
+      index: 0,
+      message: { role: "assistant", content: "Fuzz reply" },
       finish_reason: "stop",
     },
   ],
@@ -44,7 +44,7 @@ const GROQ_MOCK = {
 
 function mockGroqFetch() {
   return vi.fn().mockResolvedValue({
-    ok:   true,
+    ok: true,
     json: async () => GROQ_MOCK,
     text: async () => JSON.stringify(GROQ_MOCK),
   });
@@ -76,9 +76,17 @@ const unknownModelArb = fc
   .filter(
     (s) =>
       !s.startsWith("nexus/") &&
-      !["gpt-4o", "gpt-4", "gpt-3.5-turbo",
-        "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307",
-        "llama-3.3-70b-versatile", "gemma2-9b-it", "mixtral-8x7b-32768"].includes(s),
+      ![
+        "gpt-4o",
+        "gpt-4",
+        "gpt-3.5-turbo",
+        "claude-3-opus-20240229",
+        "claude-3-sonnet-20240229",
+        "claude-3-haiku-20240307",
+        "llama-3.3-70b-versatile",
+        "gemma2-9b-it",
+        "mixtral-8x7b-32768",
+      ].includes(s),
   );
 
 /** A single Anthropic-format message. */
@@ -97,8 +105,8 @@ const messageArb = fc.record({
 const messagesArb = fc.array(messageArb, { minLength: 1, maxLength: 5 });
 
 const optTemperature = fc.option(fc.float({ min: 0, max: 2, noNaN: true }), { nil: undefined });
-const optMaxTokens   = fc.option(fc.integer({ min: 1, max: 4096 }), { nil: undefined });
-const optSystem      = fc.option(fc.string({ maxLength: 200 }), { nil: undefined });
+const optMaxTokens = fc.option(fc.integer({ min: 1, max: 4096 }), { nil: undefined });
+const optSystem = fc.option(fc.string({ maxLength: 200 }), { nil: undefined });
 
 // ── Properties ────────────────────────────────────────────────────────────────
 
@@ -111,8 +119,8 @@ describe("POST /api/v1/gateway/messages — property-based fuzzing", () => {
     "unrecognised model always returns 400",
     async (model, messages) => {
       const res = await app.inject({
-        method:  "POST",
-        url:     "/api/v1/gateway/messages",
+        method: "POST",
+        url: "/api/v1/gateway/messages",
         payload: { model, messages },
       });
       const body = res.json<{ type?: string; error?: { type: string } }>();
@@ -133,8 +141,8 @@ describe("POST /api/v1/gateway/messages — property-based fuzzing", () => {
     async (messages) => {
       delete process.env.GROQ_API_KEY;
       const res = await app.inject({
-        method:  "POST",
-        url:     "/api/v1/gateway/messages",
+        method: "POST",
+        url: "/api/v1/gateway/messages",
         payload: { model: "nexus/fast", messages },
       });
       const body = res.json<{ error?: { type: string } }>();
@@ -157,11 +165,11 @@ describe("POST /api/v1/gateway/messages — property-based fuzzing", () => {
         max_spend_usd: 0,
       };
       if (temperature !== undefined) payload["temperature"] = temperature;
-      if (max_tokens   !== undefined) payload["max_tokens"]  = max_tokens;
+      if (max_tokens !== undefined) payload["max_tokens"] = max_tokens;
 
       const res = await app.inject({
-        method:  "POST",
-        url:     "/api/v1/gateway/messages",
+        method: "POST",
+        url: "/api/v1/gateway/messages",
         payload,
       });
       const body = res.json<{ error?: { type: string } }>();
@@ -185,19 +193,20 @@ describe("POST /api/v1/gateway/messages — property-based fuzzing", () => {
 
       const payload: Record<string, unknown> = { model: "nexus/fast", messages };
       if (temperature !== undefined) payload["temperature"] = temperature;
-      if (max_tokens   !== undefined) payload["max_tokens"]  = max_tokens;
-      if (system       !== undefined) payload["system"]      = system;
+      if (max_tokens !== undefined) payload["max_tokens"] = max_tokens;
+      if (system !== undefined) payload["system"] = system;
 
       const res = await app.inject({
-        method:  "POST",
-        url:     "/api/v1/gateway/messages",
+        method: "POST",
+        url: "/api/v1/gateway/messages",
         payload,
       });
 
       if (res.statusCode !== 200) return true; // tolerate non-200 in property context
       const body = res.json<{
-        id: unknown; type: unknown;
-        content: Array<{ type: unknown; text: unknown }>;
+        id: unknown;
+        type: unknown;
+        content: { type: unknown; text: unknown }[];
       }>();
       return (
         typeof body.id === "string" &&
@@ -218,27 +227,24 @@ describe("POST /api/v1/gateway/messages — property-based fuzzing", () => {
   test.prop(
     [
       fc.record({
-        model:         fc.oneof(unknownModelArb, fc.constantFrom("nexus/fast", "nexus/balanced")),
-        messages:      messagesArb,
-        temperature:   optTemperature,
-        max_tokens:    optMaxTokens,
+        model: fc.oneof(unknownModelArb, fc.constantFrom("nexus/fast", "nexus/balanced")),
+        messages: messagesArb,
+        temperature: optTemperature,
+        max_tokens: optMaxTokens,
         max_spend_usd: fc.option(fc.float({ min: 0, max: 1000, noNaN: true }), { nil: undefined }),
-        system:        optSystem,
+        system: optSystem,
       }),
     ],
     { numRuns: 30 },
-  )(
-    "arbitrary well-typed request body never causes 5xx",
-    async (payload) => {
-      process.env.GROQ_API_KEY = "test-key";
-      vi.stubGlobal("fetch", mockGroqFetch());
+  )("arbitrary well-typed request body never causes 5xx", async (payload) => {
+    process.env.GROQ_API_KEY = "test-key";
+    vi.stubGlobal("fetch", mockGroqFetch());
 
-      const res = await app.inject({
-        method:  "POST",
-        url:     "/api/v1/gateway/messages",
-        payload,
-      });
-      return res.statusCode < 500;
-    },
-  );
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/gateway/messages",
+      payload,
+    });
+    return res.statusCode < 500;
+  });
 });

@@ -117,7 +117,11 @@ export class ElementSelector {
     return null;
   }
 
-  private applySelector(html: string, selector: string, type: "css" | "xpath" | "text"): string | null {
+  private applySelector(
+    html: string,
+    selector: string,
+    type: "css" | "xpath" | "text",
+  ): string | null {
     if (type === "text") {
       return html.includes(selector) ? selector : null;
     }
@@ -147,8 +151,12 @@ export class ElementSelector {
     return null;
   }
 
-  getPrimary(): string { return this.primary; }
-  getFallbacks(): SelectorFallback[] { return [...this.fallbacks]; }
+  getPrimary(): string {
+    return this.primary;
+  }
+  getFallbacks(): SelectorFallback[] {
+    return [...this.fallbacks];
+  }
 }
 
 // ── ScrapeCache ───────────────────────────────────────────────────────────────
@@ -157,7 +165,8 @@ export class ScrapeCache {
   private cache = new Map<string, { result: ScrapeResult; expiresAt: number }>();
   private ttlMs: number;
 
-  constructor(ttlMs = 300_000) { // 5 minutes default
+  constructor(ttlMs = 300_000) {
+    // 5 minutes default
     this.ttlMs = ttlMs;
   }
 
@@ -187,7 +196,9 @@ export class ScrapeCache {
     this.cache.clear();
   }
 
-  size(): number { return this.cache.size; }
+  size(): number {
+    return this.cache.size;
+  }
 }
 
 // ── AdaptiveScraper ───────────────────────────────────────────────────────────
@@ -282,7 +293,10 @@ export class ScrapeScheduler {
   private concurrency: number;
   private delayBetweenMs: number;
 
-  constructor(scraper: AdaptiveScraper, opts: { concurrency?: number; delayBetweenMs?: number } = {}) {
+  constructor(
+    scraper: AdaptiveScraper,
+    opts: { concurrency?: number; delayBetweenMs?: number } = {},
+  ) {
     this.scraper = scraper;
     this.concurrency = opts.concurrency ?? 1;
     this.delayBetweenMs = opts.delayBetweenMs ?? 500;
@@ -325,7 +339,13 @@ export class ScrapeScheduler {
     return results;
   }
 
-  queueSize(): number { return this.queue.filter((t) => t.status === "pending").length; }
-  allTasks(): ScheduledTask[] { return [...this.queue]; }
-  clearQueue(): void { this.queue = this.queue.filter((t) => t.status !== "pending"); }
+  queueSize(): number {
+    return this.queue.filter((t) => t.status === "pending").length;
+  }
+  allTasks(): ScheduledTask[] {
+    return [...this.queue];
+  }
+  clearQueue(): void {
+    this.queue = this.queue.filter((t) => t.status !== "pending");
+  }
 }

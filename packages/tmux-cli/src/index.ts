@@ -248,14 +248,14 @@ interface _NullSession {
 export class NullTmuxClient implements ITmuxClient {
   private readonly _sessions = new Map<string, _NullSession>();
   private readonly _paneOutput = new Map<string, string>();
-  private readonly _sentKeys: Array<{ target: string; keys: string }> = [];
+  private readonly _sentKeys: { target: string; keys: string }[] = [];
 
   /** Pre-seed pane output returned by capturePane / waitForOutput. */
   setPaneOutput(sessionOrTarget: string, output: string): void {
     this._paneOutput.set(sessionOrTarget.split(":")[0]!, output);
   }
 
-  getSentKeys(): ReadonlyArray<{ target: string; keys: string }> {
+  getSentKeys(): readonly { target: string; keys: string }[] {
     return this._sentKeys;
   }
 

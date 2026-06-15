@@ -12,9 +12,7 @@
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export interface EventProperties {
-  [key: string]: string | number | boolean | null | undefined;
-}
+export type EventProperties = Record<string, string | number | boolean | null | undefined>;
 
 /** Tracked event interface definition. */
 export interface TrackedEvent {
@@ -159,37 +157,39 @@ export class PostHogAnalyticsClient implements AnalyticsClient {
     void payload;
   }
 
-  get queueSize(): number { return this.queue.length; }
+  get queueSize(): number {
+    return this.queue.length;
+  }
 }
 
 // ── Nexus-specific event catalogue ────────────────────────────────────────────
 
 export const NexusEvents = {
   // Chat
-  CHAT_MESSAGE_SENT:       "chat_message_sent",
-  CHAT_MESSAGE_RATED:      "chat_message_rated",
-  CHAT_MODEL_SWITCHED:     "chat_model_switched",
+  CHAT_MESSAGE_SENT: "chat_message_sent",
+  CHAT_MESSAGE_RATED: "chat_message_rated",
+  CHAT_MODEL_SWITCHED: "chat_model_switched",
 
   // Memory
-  MEMORY_STORED:           "memory_stored",
-  MEMORY_RECALLED:         "memory_recalled",
+  MEMORY_STORED: "memory_stored",
+  MEMORY_RECALLED: "memory_recalled",
 
   // Agent
-  AGENT_TASK_STARTED:      "agent_task_started",
-  AGENT_TASK_COMPLETED:    "agent_task_completed",
-  AGENT_TASK_FAILED:       "agent_task_failed",
+  AGENT_TASK_STARTED: "agent_task_started",
+  AGENT_TASK_COMPLETED: "agent_task_completed",
+  AGENT_TASK_FAILED: "agent_task_failed",
 
   // Discovery
-  DISCOVERY_PROFILE_VIEWED:"discovery_profile_viewed",
-  SIGNAL_REPORTED:         "signal_reported",
+  DISCOVERY_PROFILE_VIEWED: "discovery_profile_viewed",
+  SIGNAL_REPORTED: "signal_reported",
 
   // SDK
-  SDK_INITIALIZED:         "sdk_initialized",
-  SDK_TOOL_CALLED:         "sdk_tool_called",
+  SDK_INITIALIZED: "sdk_initialized",
+  SDK_TOOL_CALLED: "sdk_tool_called",
 } as const;
 
 /** Nexus event name type alias. */
-export type NexusEventName = typeof NexusEvents[keyof typeof NexusEvents];
+export type NexusEventName = (typeof NexusEvents)[keyof typeof NexusEvents];
 
 // ── Convenience tracker ───────────────────────────────────────────────────────
 
@@ -197,19 +197,31 @@ export class NexusAnalytics {
   constructor(private client: AnalyticsClient) {}
 
   async chatMessageSent(userId: string, model: string, sessionId: string): Promise<void> {
-    await this.client.track(NexusEvents.CHAT_MESSAGE_SENT, userId, { model, session_id: sessionId });
+    await this.client.track(NexusEvents.CHAT_MESSAGE_SENT, userId, {
+      model,
+      session_id: sessionId,
+    });
   }
 
   async chatMessageRated(userId: string, messageId: string, rating: "up" | "down"): Promise<void> {
-    await this.client.track(NexusEvents.CHAT_MESSAGE_RATED, userId, { message_id: messageId, rating });
+    await this.client.track(NexusEvents.CHAT_MESSAGE_RATED, userId, {
+      message_id: messageId,
+      rating,
+    });
   }
 
   async agentTaskStarted(userId: string, taskId: string, taskType: string): Promise<void> {
-    await this.client.track(NexusEvents.AGENT_TASK_STARTED, userId, { task_id: taskId, task_type: taskType });
+    await this.client.track(NexusEvents.AGENT_TASK_STARTED, userId, {
+      task_id: taskId,
+      task_type: taskType,
+    });
   }
 
   async agentTaskCompleted(userId: string, taskId: string, durationMs: number): Promise<void> {
-    await this.client.track(NexusEvents.AGENT_TASK_COMPLETED, userId, { task_id: taskId, duration_ms: durationMs });
+    await this.client.track(NexusEvents.AGENT_TASK_COMPLETED, userId, {
+      task_id: taskId,
+      duration_ms: durationMs,
+    });
   }
 
   async identify(userId: string, traits: EventProperties): Promise<void> {

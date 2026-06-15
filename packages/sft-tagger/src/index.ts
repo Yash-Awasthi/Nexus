@@ -57,7 +57,9 @@ export interface SftSample {
 // ── ID util ───────────────────────────────────────────────────────────────────
 
 let _seq = 0;
-function uid(prefix: string) { return `${prefix}-${Date.now()}-${++_seq}`; }
+function uid(prefix: string) {
+  return `${prefix}-${Date.now()}-${++_seq}`;
+}
 
 // ── RuleTagger ────────────────────────────────────────────────────────────────
 
@@ -74,21 +76,27 @@ const DEFAULT_RULES: TagRule[] = [
   {
     label: "instruction",
     roles: ["user"],
-    patterns: [/\b(please|can you|could you|help me|write|create|generate|explain|list|summarize|translate|what is|how do|when|why)\b/i],
+    patterns: [
+      /\b(please|can you|could you|help me|write|create|generate|explain|list|summarize|translate|what is|how do|when|why)\b/i,
+    ],
     confidence: 0.85,
     reason: "contains instruction keywords",
   },
   {
     label: "chain-of-thought",
     roles: ["assistant"],
-    patterns: [/\b(let me think|step by step|first,|second,|third,|1\.|2\.|3\.|\btherefore\b|\bbecause\b)/i],
+    patterns: [
+      /\b(let me think|step by step|first,|second,|third,|1\.|2\.|3\.|\btherefore\b|\bbecause\b)/i,
+    ],
     confidence: 0.8,
     reason: "contains reasoning markers",
   },
   {
     label: "refusal",
     roles: ["assistant"],
-    patterns: [/\b(i can'?t|i am not able|i'm unable|i cannot|i won'?t|i refuse|that'?s not something)/i],
+    patterns: [
+      /\b(i can'?t|i am not able|i'm unable|i cannot|i won'?t|i refuse|that'?s not something)/i,
+    ],
     confidence: 0.9,
     reason: "contains refusal language",
   },
@@ -102,7 +110,9 @@ const DEFAULT_RULES: TagRule[] = [
   {
     label: "clarification",
     roles: ["user", "assistant"],
-    patterns: [/\b(could you clarify|what do you mean|can you elaborate|i'm not sure what|do you mean)\b/i],
+    patterns: [
+      /\b(could you clarify|what do you mean|can you elaborate|i'm not sure what|do you mean)\b/i,
+    ],
     confidence: 0.75,
     reason: "contains clarification request",
   },
@@ -116,14 +126,18 @@ const DEFAULT_RULES: TagRule[] = [
   {
     label: "task-completion",
     roles: ["assistant"],
-    patterns: [/\b(here'?s? (the|your)|i'?ve? (created|written|generated|completed|finished)|done!|here you go)/i],
+    patterns: [
+      /\b(here'?s? (the|your)|i'?ve? (created|written|generated|completed|finished)|done!|here you go)/i,
+    ],
     confidence: 0.8,
     reason: "contains task completion markers",
   },
   {
     label: "error",
     roles: ["assistant"],
-    patterns: [/\b(error|exception|failed|failure|oops|sorry,? (something went wrong|i made a mistake))/i],
+    patterns: [
+      /\b(error|exception|failed|failure|oops|sorry,? (something went wrong|i made a mistake))/i,
+    ],
     confidence: 0.85,
     reason: "contains error language",
   },
@@ -145,7 +159,7 @@ export class RuleTagger {
   }
 
   tag(turn: ConversationTurn): TurnTag {
-    const matched: Array<{ label: TurnTagLabel; confidence: number; reason: string }> = [];
+    const matched: { label: TurnTagLabel; confidence: number; reason: string }[] = [];
 
     for (const rule of this.rules) {
       if (!rule.roles.includes(turn.role)) continue;
@@ -196,13 +210,15 @@ export class QualityScorer {
 
     const labels = tags.map((t) => t.label);
     if (labels.includes("instruction")) score += weights.hasInstruction;
-    if (labels.includes("response") || labels.includes("task-completion")) score += weights.hasResponse;
+    if (labels.includes("response") || labels.includes("task-completion"))
+      score += weights.hasResponse;
     if (!labels.includes("refusal")) score += weights.noRefusal;
     if (!labels.includes("unknown")) score += weights.noUnknown;
 
     // Length bonus: reward substantial responses
     const assistantTurns = turns.filter((t) => t.role === "assistant");
-    const avgLen = assistantTurns.reduce((s, t) => s + t.content.length, 0) / Math.max(assistantTurns.length, 1);
+    const avgLen =
+      assistantTurns.reduce((s, t) => s + t.content.length, 0) / Math.max(assistantTurns.length, 1);
     if (avgLen > 100) score += weights.lengthBonus;
 
     return Math.min(score, 1);
@@ -223,7 +239,7 @@ export class SftDataset {
 
   /** Add a conversation as turns. Auto-assigns IDs. */
   addConversation(
-    rawTurns: Array<{ role: TurnRole; content: string; metadata?: Record<string, unknown> }>,
+    rawTurns: { role: TurnRole; content: string; metadata?: Record<string, unknown> }[],
     source?: string,
   ): SftSample {
     const turns: ConversationTurn[] = rawTurns.map((t) => ({
@@ -250,9 +266,15 @@ export class SftDataset {
     return this.samples.find((s) => s.id === id);
   }
 
-  list(): SftSample[] { return [...this.samples]; }
-  count(): number { return this.samples.length; }
-  clear(): void { this.samples = []; }
+  list(): SftSample[] {
+    return [...this.samples];
+  }
+  count(): number {
+    return this.samples.length;
+  }
+  clear(): void {
+    this.samples = [];
+  }
 }
 
 // ── DatasetFilter ─────────────────────────────────────────────────────────────
@@ -271,15 +293,19 @@ export interface FilterOptions {
 export class DatasetFilter {
   filter(samples: SftSample[], opts: FilterOptions = {}): SftSample[] {
     return samples.filter((sample) => {
-      if (opts.minQualityScore !== undefined && sample.qualityScore < opts.minQualityScore) return false;
-      if (opts.maxQualityScore !== undefined && sample.qualityScore > opts.maxQualityScore) return false;
+      if (opts.minQualityScore !== undefined && sample.qualityScore < opts.minQualityScore)
+        return false;
+      if (opts.maxQualityScore !== undefined && sample.qualityScore > opts.maxQualityScore)
+        return false;
       if (opts.minTurns !== undefined && sample.turns.length < opts.minTurns) return false;
       if (opts.maxTurns !== undefined && sample.turns.length > opts.maxTurns) return false;
       if (opts.source && sample.source !== opts.source) return false;
 
       const labels = sample.tags.map((t) => t.label);
-      if (opts.requireLabels?.length && !opts.requireLabels.every((l) => labels.includes(l))) return false;
-      if (opts.excludeLabels?.length && opts.excludeLabels.some((l) => labels.includes(l))) return false;
+      if (opts.requireLabels?.length && !opts.requireLabels.every((l) => labels.includes(l)))
+        return false;
+      if (opts.excludeLabels?.length && opts.excludeLabels.some((l) => labels.includes(l)))
+        return false;
 
       return true;
     });
@@ -299,7 +325,7 @@ export interface AlpacaSample {
 
 /** Share gpt sample interface definition. */
 export interface ShareGptSample {
-  conversations: Array<{ from: "human" | "gpt" | "system"; value: string }>;
+  conversations: { from: "human" | "gpt" | "system"; value: string }[];
 }
 
 /** Sft exporter. */
@@ -318,7 +344,12 @@ export class SftExporter {
         const system = sample.turns.find((t) => t.role === "system");
 
         const instruction = userTurns[0]?.content ?? "";
-        const input = userTurns.slice(1).map((t) => t.content).join("\n") || (system?.content ?? "");
+        const input =
+          userTurns
+            .slice(1)
+            .map((t) => t.content)
+            .join("\n") ||
+          (system?.content ?? "");
         const output = assistantTurns.map((t) => t.content).join("\n");
 
         return { instruction, input, output };

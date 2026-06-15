@@ -63,11 +63,7 @@ export class ImageGenError extends Error {
   /** Whether this error is safe to retry */
   readonly retryable: boolean;
 
-  constructor(
-    code: ImageGenErrorCode,
-    message: string,
-    context?: Record<string, unknown>,
-  ) {
+  constructor(code: ImageGenErrorCode, message: string, context?: Record<string, unknown>) {
     super(message);
     this.name = "ImageGenError";
     this.code = code;
@@ -84,12 +80,7 @@ export type ImageFormat = "png" | "jpg" | "webp" | "gif";
  * Standard size tokens (width × height).
  * Providers map these to their native resolutions.
  */
-export type ImageSize =
-  | "256x256"
-  | "512x512"
-  | "1024x1024"
-  | "1792x1024"
-  | "1024x1792";
+export type ImageSize = "256x256" | "512x512" | "1024x1024" | "1792x1024" | "1024x1792";
 
 /** Image quality type alias. */
 export type ImageQuality = "standard" | "hd";
@@ -179,10 +170,7 @@ export class NullImageProvider implements ImageProvider {
     } = {},
   ) {}
 
-  async generate(
-    _prompt: string,
-    opts?: GenerateOptions,
-  ): Promise<GeneratedImage[]> {
+  async generate(_prompt: string, opts?: GenerateOptions): Promise<GeneratedImage[]> {
     const [w, h] = parseSize(opts?.size ?? "1024x1024");
     const count = opts?.n ?? 1;
     return Array.from({ length: count }, () => ({
@@ -223,11 +211,11 @@ export interface OpenAIImageConfig {
 }
 
 interface OpenAIImageResponse {
-  data: Array<{
+  data: {
     url?: string;
     b64_json?: string;
     revised_prompt?: string;
-  }>;
+  }[];
 }
 
 /** Open ai image provider. */
@@ -248,10 +236,7 @@ export class OpenAIImageProvider implements ImageProvider {
     this.fetchFn = config.fetch ?? fetch;
   }
 
-  async generate(
-    prompt: string,
-    opts: GenerateOptions = {},
-  ): Promise<GeneratedImage[]> {
+  async generate(prompt: string, opts: GenerateOptions = {}): Promise<GeneratedImage[]> {
     if (!prompt.trim()) {
       throw new ImageGenError("INVALID_PROMPT", "Prompt must not be empty");
     }
@@ -281,11 +266,9 @@ export class OpenAIImageProvider implements ImageProvider {
         body: JSON.stringify(body),
       });
     } catch (cause) {
-      throw new ImageGenError(
-        "PROVIDER_ERROR",
-        `OpenAI network error: ${String(cause)}`,
-        { model: this.model },
-      );
+      throw new ImageGenError("PROVIDER_ERROR", `OpenAI network error: ${String(cause)}`, {
+        model: this.model,
+      });
     }
 
     if (res.status === 401) {
@@ -295,7 +278,8 @@ export class OpenAIImageProvider implements ImageProvider {
     if (res.status === 400) {
       const json = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
       const msg = json.error?.message ?? "Bad request";
-      const isPolicy = msg.toLowerCase().includes("content policy") || msg.toLowerCase().includes("safety");
+      const isPolicy =
+        msg.toLowerCase().includes("content policy") || msg.toLowerCase().includes("safety");
       throw new ImageGenError(
         isPolicy ? "CONTENT_POLICY" : "INVALID_PROMPT",
         `OpenAI rejected prompt: ${msg}`,
@@ -304,11 +288,10 @@ export class OpenAIImageProvider implements ImageProvider {
     }
 
     if (!res.ok) {
-      throw new ImageGenError(
-        "PROVIDER_ERROR",
-        `OpenAI API returned ${res.status}`,
-        { model: this.model, status: res.status },
-      );
+      throw new ImageGenError("PROVIDER_ERROR", `OpenAI API returned ${res.status}`, {
+        model: this.model,
+        status: res.status,
+      });
     }
 
     let json: OpenAIImageResponse;
@@ -387,10 +370,7 @@ export class ReplicateProvider implements ImageProvider {
     this.sleepFn = config.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
   }
 
-  async generate(
-    prompt: string,
-    opts: GenerateOptions = {},
-  ): Promise<GeneratedImage[]> {
+  async generate(prompt: string, opts: GenerateOptions = {}): Promise<GeneratedImage[]> {
     if (!prompt.trim()) {
       throw new ImageGenError("INVALID_PROMPT", "Prompt must not be empty");
     }
@@ -402,7 +382,9 @@ export class ReplicateProvider implements ImageProvider {
       height,
       ...(opts.negativePrompt ? { negative_prompt: opts.negativePrompt } : {}),
       ...(opts.seed !== undefined ? { seed: opts.seed } : {}),
-      ...(opts.numInferenceSteps !== undefined ? { num_inference_steps: opts.numInferenceSteps } : {}),
+      ...(opts.numInferenceSteps !== undefined
+        ? { num_inference_steps: opts.numInferenceSteps }
+        : {}),
       ...(opts.guidanceScale !== undefined ? { guidance_scale: opts.guidanceScale } : {}),
       num_outputs: opts.n ?? 1,
     };
@@ -422,27 +404,21 @@ export class ReplicateProvider implements ImageProvider {
           Prefer: "respond-async",
         },
         body: JSON.stringify(
-          this.model.includes(":")
-            ? { version: this.model.split(":")[1], input }
-            : { input },
+          this.model.includes(":") ? { version: this.model.split(":")[1], input } : { input },
         ),
       });
     } catch (cause) {
-      throw new ImageGenError(
-        "PROVIDER_ERROR",
-        `Replicate network error: ${String(cause)}`,
-      );
+      throw new ImageGenError("PROVIDER_ERROR", `Replicate network error: ${String(cause)}`);
     }
 
     if (createRes.status === 401) {
       throw new ImageGenError("AUTH_FAILED", "Replicate API token is invalid or missing");
     }
     if (!createRes.ok) {
-      throw new ImageGenError(
-        "PROVIDER_ERROR",
-        `Replicate create returned ${createRes.status}`,
-        { model: this.model, status: createRes.status },
-      );
+      throw new ImageGenError("PROVIDER_ERROR", `Replicate create returned ${createRes.status}`, {
+        model: this.model,
+        status: createRes.status,
+      });
     }
 
     let prediction = (await createRes.json()) as ReplicatePrediction;
@@ -463,8 +439,7 @@ export class ReplicateProvider implements ImageProvider {
       }
 
       const pollUrl =
-        prediction.urls?.get ??
-        `${ReplicateProvider.BASE}/predictions/${prediction.id}`;
+        prediction.urls?.get ?? `${ReplicateProvider.BASE}/predictions/${prediction.id}`;
 
       let pollRes: Response;
       try {
@@ -472,17 +447,11 @@ export class ReplicateProvider implements ImageProvider {
           headers: { Authorization: `Token ${this.apiToken}` },
         });
       } catch (cause) {
-        throw new ImageGenError(
-          "PROVIDER_ERROR",
-          `Replicate poll network error: ${String(cause)}`,
-        );
+        throw new ImageGenError("PROVIDER_ERROR", `Replicate poll network error: ${String(cause)}`);
       }
 
       if (!pollRes.ok) {
-        throw new ImageGenError(
-          "PROVIDER_ERROR",
-          `Replicate poll returned ${pollRes.status}`,
-        );
+        throw new ImageGenError("PROVIDER_ERROR", `Replicate poll returned ${pollRes.status}`);
       }
 
       prediction = (await pollRes.json()) as ReplicatePrediction;
@@ -589,10 +558,7 @@ export class ImageGenerator {
         const err =
           cause instanceof ImageGenError
             ? cause
-            : new ImageGenError(
-                "PROVIDER_ERROR",
-                `Unexpected error: ${String(cause)}`,
-              );
+            : new ImageGenError("PROVIDER_ERROR", `Unexpected error: ${String(cause)}`);
 
         lastError = err;
 

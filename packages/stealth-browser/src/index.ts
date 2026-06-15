@@ -134,16 +134,20 @@ export class MockBrowserPage implements BrowserPage {
   private _url = "about:blank";
   private _closed = false;
   private opts: MockPageOptions;
-  readonly clicks: Array<{ selector: string; opts?: ClickOptions }> = [];
-  readonly types: Array<{ selector: string; text: string; opts?: TypeOptions }> = [];
+  readonly clicks: { selector: string; opts?: ClickOptions }[] = [];
+  readonly types: { selector: string; text: string; opts?: TypeOptions }[] = [];
   readonly navigations: string[] = [];
 
   constructor(opts: MockPageOptions = {}) {
     this.opts = opts;
   }
 
-  get url(): string { return this._url; }
-  get isClosed(): boolean { return this._closed; }
+  get url(): string {
+    return this._url;
+  }
+  get isClosed(): boolean {
+    return this._closed;
+  }
 
   async navigate(url: string): Promise<NavigateResult> {
     this._url = url;
@@ -205,7 +209,9 @@ export class MockBrowserDriver implements BrowserDriver {
     this._pageOpts = pageOpts;
   }
 
-  get isOpen(): boolean { return this._open; }
+  get isOpen(): boolean {
+    return this._open;
+  }
 
   async newPage(_profile?: StealthProfile): Promise<BrowserPage> {
     const page = new MockBrowserPage(this._pageOpts);
@@ -247,31 +253,45 @@ export class PatchrightPage implements BrowserPage {
   private _closed = false;
 
   constructor(page: PatchrightPageType) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     this._page = page;
   }
 
-  get url(): string { return (this._page.url?.() as string | undefined) ?? "about:blank"; }
-  get isClosed(): boolean { return this._closed || (this._page.isClosed?.() as boolean | undefined) === true; }
+  get url(): string {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    return (this._page.url?.() as string | undefined) ?? "about:blank";
+  }
+  get isClosed(): boolean {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    return this._closed || (this._page.isClosed?.() as boolean | undefined) === true;
+  }
 
   async navigate(url: string): Promise<NavigateResult> {
     const t0 = Date.now();
-    const response = await (this._page.goto(url, { waitUntil: "domcontentloaded" }) as Promise<{ status(): number } | null>);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const response = await (this._page.goto(url, { waitUntil: "domcontentloaded" }) as Promise<{
+      status(): number;
+    } | null>);
     const status = response?.status() ?? 200;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const pageTitle = (await this._page.title()) as string;
     return { url, status, title: pageTitle, loadTimeMs: Date.now() - t0 };
   }
 
   async content(): Promise<string> {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return this._page.content() as Promise<string>;
   }
 
   async title(): Promise<string> {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return this._page.title() as Promise<string>;
   }
 
   async click(selector: string, opts?: ClickOptions): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     await this._page.click(selector, {
-      delay:  opts?.delay,
+      delay: opts?.delay,
       button: opts?.button ?? "left",
     });
   }
@@ -279,30 +299,36 @@ export class PatchrightPage implements BrowserPage {
   async type(selector: string, text: string, opts?: TypeOptions): Promise<void> {
     if (opts?.delay) {
       // Key-by-key typing for delay simulation
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await this._page.locator(selector).pressSequentially(text, { delay: opts.delay });
     } else {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await this._page.fill(selector, text);
     }
   }
 
   async evaluate<T>(fn: string | (() => T)): Promise<T> {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return this._page.evaluate(fn) as Promise<T>;
   }
 
   async screenshot(opts?: ScreenshotOptions): Promise<Buffer> {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return this._page.screenshot({
       fullPage: opts?.fullPage ?? false,
-      type:     opts?.format ?? "png",
-      quality:  opts?.quality,
+      type: opts?.format ?? "png",
+      quality: opts?.quality,
     }) as Promise<Buffer>;
   }
 
   async waitForSelector(selector: string, timeoutMs = 30_000): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     await this._page.waitForSelector(selector, { timeout: timeoutMs });
   }
 
   async close(): Promise<void> {
     this._closed = true;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     await this._page.close();
   }
 }
@@ -331,10 +357,12 @@ export class PatchrightDriver implements BrowserDriver {
 
   constructor(config?: { headless?: boolean; channel?: string }) {
     this.headless = config?.headless ?? true;
-    this.channel  = config?.channel  ?? "chromium";
+    this.channel = config?.channel ?? "chromium";
   }
 
-  get isOpen(): boolean { return this._open && this._browser !== null; }
+  get isOpen(): boolean {
+    return this._open && this._browser !== null;
+  }
 
   private async ensureOpen(): Promise<PatchrightBrowserType> {
     if (this._browser) return this._browser;
@@ -346,18 +374,22 @@ export class PatchrightDriver implements BrowserDriver {
     } catch {
       throw new Error(
         "PatchrightDriver: `patchright` package not found. " +
-        "Install it with: pnpm add patchright && npx patchright install chromium",
+          "Install it with: pnpm add patchright && npx patchright install chromium",
       );
     }
 
-    const chromium = (patchright.chromium ?? patchright.default?.chromium) as {
-      launch(opts: Record<string, unknown>): Promise<PatchrightBrowserType>;
-    } | undefined;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const chromium = (patchright.chromium ?? patchright.default?.chromium) as
+      | {
+          launch(opts: Record<string, unknown>): Promise<PatchrightBrowserType>;
+        }
+      | undefined;
 
     if (!chromium) {
       throw new Error("PatchrightDriver: could not locate chromium in patchright exports");
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     this._browser = await chromium.launch({
       headless: this.headless,
       args: [
@@ -372,18 +404,18 @@ export class PatchrightDriver implements BrowserDriver {
   }
 
   async newPage(profile?: StealthProfile): Promise<BrowserPage> {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const browser = await this.ensureOpen();
 
     // Resolve user-agent: explicit → pool rotation → chromium default
     const userAgent =
-      profile?.userAgent
-      ?? pickRandomUserAgent(profile?.userAgentPool ?? DEFAULT_USER_AGENT_POOL);
+      profile?.userAgent ?? pickRandomUserAgent(profile?.userAgentPool ?? DEFAULT_USER_AGENT_POOL);
 
     const contextOptions: Record<string, unknown> = {
       userAgent,
-      locale:           profile?.locale,
-      timezoneId:       profile?.timezone,
-      viewport:         profile?.viewport ?? { width: 1280, height: 720 },
+      locale: profile?.locale,
+      timezoneId: profile?.timezone,
+      viewport: profile?.viewport ?? { width: 1280, height: 720 },
       extraHTTPHeaders: profile?.extraHeaders,
     };
 
@@ -392,19 +424,22 @@ export class PatchrightDriver implements BrowserDriver {
       if (contextOptions[k] === undefined) delete contextOptions[k];
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
     const context = await (browser as any).newContext(contextOptions);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
     const page = await (context as any).newPage();
 
     // ── Fingerprint-hardening init scripts ────────────────────────────────────
     const shouldCanvasNoise = profile?.canvasNoise !== false; // default true
-    const shouldWebGlNoise  = profile?.webGlNoise  !== false; // default true
+    const shouldWebGlNoise = profile?.webGlNoise !== false; // default true
     const shouldBlockWebRtc = profile?.blockWebRtc !== false; // default true
 
     if (shouldCanvasNoise) {
       // Perturb canvas pixel values by ±1 to defeat canvas fingerprinting
-      await (context as any).addInitScript(`
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      await (context as unknown).addInitScript(`
         (function () {
           const origToDataURL = HTMLCanvasElement.prototype.toDataURL;
           HTMLCanvasElement.prototype.toDataURL = function (type, quality) {
@@ -426,7 +461,8 @@ export class PatchrightDriver implements BrowserDriver {
 
     if (shouldWebGlNoise) {
       // Randomise WebGL renderer/vendor strings to prevent GPU fingerprinting
-      await (context as any).addInitScript(`
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      await (context as unknown).addInitScript(`
         (function () {
           const getParameter = WebGLRenderingContext.prototype.getParameter;
           WebGLRenderingContext.prototype.getParameter = function (param) {
@@ -446,7 +482,8 @@ export class PatchrightDriver implements BrowserDriver {
 
     if (shouldBlockWebRtc) {
       // Override RTCPeerConnection to block local IP leaks
-      await (context as any).addInitScript(`
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      await (context as unknown).addInitScript(`
         (function () {
           const Orig = window.RTCPeerConnection;
           if (!Orig) return;
@@ -466,7 +503,8 @@ export class PatchrightDriver implements BrowserDriver {
 
   async close(): Promise<void> {
     if (this._browser) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
       await (this._browser as any).close();
       this._browser = null;
       this._open = false;
@@ -534,9 +572,15 @@ export class PagePool {
     this.inUse.clear();
   }
 
-  get idleCount(): number { return this.idle.length; }
-  get inUseCount(): number { return this.inUse.size; }
-  get totalCount(): number { return this.idle.length + this.inUse.size; }
+  get idleCount(): number {
+    return this.idle.length;
+  }
+  get inUseCount(): number {
+    return this.inUse.size;
+  }
+  get totalCount(): number {
+    return this.idle.length + this.inUse.size;
+  }
 }
 
 // ── CloudflareBypass ──────────────────────────────────────────────────────────
@@ -570,12 +614,14 @@ export class CloudflareBypass {
   private waitMs: number;
   private sleep: (ms: number) => Promise<void>;
 
-  constructor(opts: {
-    detector?: CloudflareDetector;
-    maxAttempts?: number;
-    waitMs?: number;
-    sleep?: (ms: number) => Promise<void>;
-  } = {}) {
+  constructor(
+    opts: {
+      detector?: CloudflareDetector;
+      maxAttempts?: number;
+      waitMs?: number;
+      sleep?: (ms: number) => Promise<void>;
+    } = {},
+  ) {
     this.detector = opts.detector ?? new DefaultCloudflareDector();
     this.maxAttempts = opts.maxAttempts ?? 3;
     this.waitMs = opts.waitMs ?? 2000;
@@ -628,18 +674,40 @@ export class StealthPage {
     return { ...nav, bypassResult };
   }
 
-  async content(): Promise<string> { return this.page.content(); }
-  async title(): Promise<string> { return this.page.title(); }
-  async click(selector: string, opts?: ClickOptions): Promise<void> { return this.page.click(selector, opts); }
-  async type(selector: string, text: string, opts?: TypeOptions): Promise<void> { return this.page.type(selector, text, opts); }
-  async evaluate<T>(fn: string | (() => T)): Promise<T> { return this.page.evaluate(fn); }
-  async screenshot(opts?: ScreenshotOptions): Promise<Buffer> { return this.page.screenshot(opts); }
-  async waitForSelector(selector: string, timeoutMs?: number): Promise<void> { return this.page.waitForSelector(selector, timeoutMs); }
-  async close(): Promise<void> { return this.page.close(); }
+  async content(): Promise<string> {
+    return this.page.content();
+  }
+  async title(): Promise<string> {
+    return this.page.title();
+  }
+  async click(selector: string, opts?: ClickOptions): Promise<void> {
+    return this.page.click(selector, opts);
+  }
+  async type(selector: string, text: string, opts?: TypeOptions): Promise<void> {
+    return this.page.type(selector, text, opts);
+  }
+  async evaluate<T>(fn: string | (() => T)): Promise<T> {
+    return this.page.evaluate(fn);
+  }
+  async screenshot(opts?: ScreenshotOptions): Promise<Buffer> {
+    return this.page.screenshot(opts);
+  }
+  async waitForSelector(selector: string, timeoutMs?: number): Promise<void> {
+    return this.page.waitForSelector(selector, timeoutMs);
+  }
+  async close(): Promise<void> {
+    return this.page.close();
+  }
 
-  get url(): string { return this.page.url; }
-  get isClosed(): boolean { return this.page.isClosed; }
-  get rawPage(): BrowserPage { return this.page; }
+  get url(): string {
+    return this.page.url;
+  }
+  get isClosed(): boolean {
+    return this.page.isClosed;
+  }
+  get rawPage(): BrowserPage {
+    return this.page;
+  }
 }
 
 // ── StealthBrowser ────────────────────────────────────────────────────────────
@@ -696,8 +764,12 @@ export class StealthBrowser {
     await this.driver.close();
   }
 
-  get isOpen(): boolean { return this.driver.isOpen; }
-  get pool_(): PagePool { return this.pool; }
+  get isOpen(): boolean {
+    return this.driver.isOpen;
+  }
+  get pool_(): PagePool {
+    return this.pool;
+  }
 }
 
 // ── StealthBrowserScrapingBackend ─────────────────────────────────────────────
@@ -734,7 +806,7 @@ export class StealthBrowserScrapingBackend {
 
   constructor(opts: { driver: BrowserDriver; poolSize?: number; profile?: StealthProfile }) {
     this._browser = new StealthBrowser({
-      driver:  opts.driver,
+      driver: opts.driver,
       poolSize: opts.poolSize ?? 3,
       profile: opts.profile,
     });
@@ -742,7 +814,7 @@ export class StealthBrowserScrapingBackend {
 
   async fetch(url: string, _sessionId?: string): Promise<StealthFetchResult> {
     return this._browser.withPage(async (page) => {
-      const nav  = await page.goto(url);
+      const nav = await page.goto(url);
       const html = await page.content();
       return { url: nav.url, html, status: nav.status };
     });

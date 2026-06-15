@@ -56,7 +56,7 @@ export interface RenderResult {
 
 /** Escape Telegram MarkdownV2 special characters. */
 function escapeTelegram(text: string): string {
-  return text.replace(/([_*\[\]()~`>#+\-=|{}.!\\\$])/g, "\\$1");
+  return text.replace(/([_*[\]()~`>#+\-=|{}.!\\$])/g, "\\$1");
 }
 
 /** Escape HTML entities. */
@@ -81,12 +81,12 @@ function markdownToDiscord(text: string): string {
 
 function renderMarkdownTable(headers: string[], rows: string[][]): string {
   const colWidths = headers.map((h, i) =>
-    Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length))
+    Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length)),
   );
   const header = "| " + headers.map((h, i) => h.padEnd(colWidths[i]!)).join(" | ") + " |";
   const divider = "|-" + colWidths.map((w) => "-".repeat(w)).join("-|-") + "-|";
   const body = rows.map(
-    (row) => "| " + row.map((cell, i) => (cell ?? "").padEnd(colWidths[i]!)).join(" | ") + " |"
+    (row) => "| " + row.map((cell, i) => (cell ?? "").padEnd(colWidths[i]!)).join(" | ") + " |",
   );
   return [header, divider, ...body].join("\n");
 }
@@ -138,7 +138,11 @@ export class DiscordRenderer {
 
     const full = parts.join("\n\n");
     const truncated = full.length > this.maxLength;
-    return { platform: "discord", output: truncated ? full.slice(0, this.maxLength - 3) + "..." : full, truncated };
+    return {
+      platform: "discord",
+      output: truncated ? full.slice(0, this.maxLength - 3) + "..." : full,
+      truncated,
+    };
   }
 }
 
@@ -192,7 +196,11 @@ export class TelegramRenderer {
 
     const full = parts.join("\n\n");
     const truncated = full.length > this.maxLength;
-    return { platform: "telegram", output: truncated ? full.slice(0, this.maxLength - 3) + "\\.\\.\\." : full, truncated };
+    return {
+      platform: "telegram",
+      output: truncated ? full.slice(0, this.maxLength - 3) + "\\.\\.\\." : full,
+      truncated,
+    };
   }
 
   private _renderHtmlMode(payload: MessagePayload): RenderResult {
@@ -207,7 +215,11 @@ export class TelegramRenderer {
     }
     const full = parts.join("\n");
     const truncated = full.length > this.maxLength;
-    return { platform: "telegram", output: truncated ? full.slice(0, this.maxLength) : full, truncated };
+    return {
+      platform: "telegram",
+      output: truncated ? full.slice(0, this.maxLength) : full,
+      truncated,
+    };
   }
 }
 
@@ -236,7 +248,9 @@ export class HtmlRenderer {
     }
 
     if (payload.code) {
-      const lang = payload.code.language ? ` class="language-${escapeHtml(payload.code.language)}"` : "";
+      const lang = payload.code.language
+        ? ` class="language-${escapeHtml(payload.code.language)}"`
+        : "";
       parts.push(`<pre><code${lang}>${escapeHtml(payload.code.content)}</code></pre>`);
     }
 
@@ -245,7 +259,9 @@ export class HtmlRenderer {
     }
 
     for (const embed of payload.embeds ?? []) {
-      const colorStyle = embed.color ? ` style="border-left: 4px solid ${escapeHtml(embed.color)}"` : "";
+      const colorStyle = embed.color
+        ? ` style="border-left: 4px solid ${escapeHtml(embed.color)}"`
+        : "";
       const inner: string[] = [];
       if (embed.title) {
         const titleHtml = embed.url
@@ -255,9 +271,12 @@ export class HtmlRenderer {
       }
       if (embed.description) inner.push(`<p>${escapeHtml(embed.description)}</p>`);
       if (embed.fields?.length) {
-        const fields = embed.fields.map(
-          (f) => `<div class="field${f.inline ? " inline" : ""}"><strong>${escapeHtml(f.name)}</strong>: ${escapeHtml(f.value)}</div>`
-        ).join("\n");
+        const fields = embed.fields
+          .map(
+            (f) =>
+              `<div class="field${f.inline ? " inline" : ""}"><strong>${escapeHtml(f.name)}</strong>: ${escapeHtml(f.value)}</div>`,
+          )
+          .join("\n");
         inner.push(fields);
       }
       if (embed.footer) inner.push(`<footer><small>${escapeHtml(embed.footer)}</small></footer>`);
@@ -265,7 +284,9 @@ export class HtmlRenderer {
     }
 
     if (payload.attachments?.length) {
-      const links = payload.attachments.map((a) => `<span class="attachment">${escapeHtml(a)}</span>`).join(", ");
+      const links = payload.attachments
+        .map((a) => `<span class="attachment">${escapeHtml(a)}</span>`)
+        .join(", ");
       parts.push(`<div class="attachments">📎 ${links}</div>`);
     }
 
@@ -273,7 +294,11 @@ export class HtmlRenderer {
     if (this.wrapBody) full = `<div class="message">\n${full}\n</div>`;
 
     const truncated = full.length > this.maxLength;
-    return { platform: "html", output: truncated ? full.slice(0, this.maxLength) : full, truncated };
+    return {
+      platform: "html",
+      output: truncated ? full.slice(0, this.maxLength) : full,
+      truncated,
+    };
   }
 }
 

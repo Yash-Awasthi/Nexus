@@ -188,6 +188,7 @@ export class MemoryTokenBudget implements TokenBudget {
 
 export interface KVStoreLike {
   get<T>(key: string): Promise<T | undefined>;
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
   set<T>(key: string, value: T, ttlMs?: number): Promise<void>;
   delete(key: string): Promise<void>;
 }
@@ -236,11 +237,7 @@ export class KVTokenBudget implements TokenBudget {
   }
 
   private async _save(identity: string, events: TokenEvent[]): Promise<void> {
-    await this.kv.set<KVBudgetRecord>(
-      this._k(identity),
-      { events },
-      this.config.windowMs,
-    );
+    await this.kv.set<KVBudgetRecord>(this._k(identity), { events }, this.config.windowMs);
   }
 
   private _computeStatus(identity: string, active: TokenEvent[]): BudgetStatus {
@@ -373,8 +370,7 @@ export class BudgetedLLMProvider implements LLMProvider {
     this.name = `budgeted(${inner.name})`;
     this.models = inner.models;
     this.identityFn =
-      opts.identityFn ??
-      ((req) => (req.metadata?.identity as string | undefined) ?? "default");
+      opts.identityFn ?? ((req) => (req.metadata?.identity as string | undefined) ?? "default");
     this.tokenCountMode = opts.tokenCountMode ?? "total";
   }
 
@@ -396,12 +392,7 @@ export class BudgetedLLMProvider implements LLMProvider {
     // Pre-flight: check if there's any remaining budget
     const current = await this.budget.status(identity);
     if (current.remaining === 0) {
-      throw new BudgetExceededError(
-        identity,
-        current.consumed,
-        current.limit,
-        current.resetAt,
-      );
+      throw new BudgetExceededError(identity, current.consumed, current.limit, current.resetAt);
     }
 
     // Execute the request

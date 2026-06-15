@@ -170,8 +170,7 @@ export class GrantVerifier {
 
     // Check tool scope
     if (opts.requiredTool) {
-      const allowed =
-        payload.tools.includes("*") || payload.tools.includes(opts.requiredTool);
+      const allowed = payload.tools.includes("*") || payload.tools.includes(opts.requiredTool);
       if (!allowed) {
         return {
           valid: false,

@@ -18,7 +18,10 @@
 
 export interface McpToolInputSchema {
   type: "object";
-  properties: Record<string, { type: string; description?: string; items?: unknown; enum?: unknown[] }>;
+  properties: Record<
+    string,
+    { type: string; description?: string; items?: unknown; enum?: unknown[] }
+  >;
   required?: string[];
 }
 
@@ -32,10 +35,11 @@ export interface McpTool {
 
 /** Tool call result interface definition. */
 export interface ToolCallResult {
-  content: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }>;
+  content: ({ type: "text"; text: string } | { type: "image"; data: string; mimeType: string })[];
   isError: boolean;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function textResult(text: string): ToolCallResult {
   return { content: [{ type: "text", text }], isError: false };
 }
@@ -93,7 +97,7 @@ export interface MockFetchBehavior {
 export class MockScrapingBackend implements ScrapingBackend {
   private behaviors = new Map<string, MockFetchBehavior>();
   private defaultBehavior: MockFetchBehavior;
-  readonly fetchLog: Array<{ url: string; stealthy: boolean }> = [];
+  readonly fetchLog: { url: string; stealthy: boolean }[] = [];
   readonly screenshotLog: string[] = [];
 
   constructor(defaultBehavior: MockFetchBehavior = {}) {
@@ -160,19 +164,31 @@ export class SessionStore {
     return session;
   }
 
-  get(id: string): ScrapingSession | undefined { return this.sessions.get(id); }
-  has(id: string): boolean { return this.sessions.has(id); }
+  get(id: string): ScrapingSession | undefined {
+    return this.sessions.get(id);
+  }
+  has(id: string): boolean {
+    return this.sessions.has(id);
+  }
 
-  close(id: string): boolean { return this.sessions.delete(id); }
+  close(id: string): boolean {
+    return this.sessions.delete(id);
+  }
 
   touch(id: string): void {
     const s = this.sessions.get(id);
     if (s) s.lastUsedAt = new Date().toISOString();
   }
 
-  list(): ScrapingSession[] { return [...this.sessions.values()]; }
-  count(): number { return this.sessions.size; }
-  clear(): void { this.sessions.clear(); }
+  list(): ScrapingSession[] {
+    return [...this.sessions.values()];
+  }
+  count(): number {
+    return this.sessions.size;
+  }
+  clear(): void {
+    this.sessions.clear();
+  }
 }
 
 // ── Tool definitions ──────────────────────────────────────────────────────────
@@ -257,9 +273,14 @@ export function buildScrapingTools(backend: ScrapingBackend): McpTool[] {
             const r = await backend.fetch(url, sessionId);
             return { url: r.url, status: r.status, html: r.html, error: null };
           } catch (err) {
-            return { url, status: 0, html: "", error: err instanceof Error ? err.message : String(err) };
+            return {
+              url,
+              status: 0,
+              html: "",
+              error: err instanceof Error ? err.message : String(err),
+            };
           }
-        })
+        }),
       );
       return jsonResult({ results, totalFetched: urls.length });
     },
@@ -278,11 +299,20 @@ export function buildScrapingTools(backend: ScrapingBackend): McpTool[] {
       required: ["url"],
     },
     handler: async (input: unknown, store) => {
-      const { url, sessionId } = input as { url: string; sessionId?: string; waitSelector?: string };
+      const { url, sessionId } = input as {
+        url: string;
+        sessionId?: string;
+        waitSelector?: string;
+      };
       try {
         if (sessionId) store.touch(sessionId);
         const result = await backend.fetch(url, sessionId);
-        return jsonResult({ url: result.url, status: result.status, html: result.html, rendered: true });
+        return jsonResult({
+          url: result.url,
+          status: result.status,
+          html: result.html,
+          rendered: true,
+        });
       } catch (err) {
         return errorResult(err instanceof Error ? err.message : String(err));
       }
@@ -305,7 +335,12 @@ export function buildScrapingTools(backend: ScrapingBackend): McpTool[] {
       try {
         if (sessionId) store.touch(sessionId);
         const result = await backend.fetchStealthy(url, sessionId);
-        return jsonResult({ url: result.url, status: result.status, html: result.html, stealthy: true });
+        return jsonResult({
+          url: result.url,
+          status: result.status,
+          html: result.html,
+          stealthy: true,
+        });
       } catch (err) {
         return errorResult(err instanceof Error ? err.message : String(err));
       }
@@ -338,7 +373,16 @@ export function buildScrapingTools(backend: ScrapingBackend): McpTool[] {
     },
   };
 
-  return [open_session, close_session, list_sessions, get, bulk_get, fetch_tool, fetch_stealthy, screenshot];
+  return [
+    open_session,
+    close_session,
+    list_sessions,
+    get,
+    bulk_get,
+    fetch_tool,
+    fetch_stealthy,
+    screenshot,
+  ];
 }
 
 // ── ScrapingMcpServer ─────────────────────────────────────────────────────────
@@ -361,7 +405,13 @@ export class ScrapingMcpServer {
     return tool.handler(input, this.store);
   }
 
-  listTools(): McpTool[] { return [...this.toolMap.values()]; }
-  toolNames(): string[] { return [...this.toolMap.keys()]; }
-  getStore(): SessionStore { return this.store; }
+  listTools(): McpTool[] {
+    return [...this.toolMap.values()];
+  }
+  toolNames(): string[] {
+    return [...this.toolMap.keys()];
+  }
+  getStore(): SessionStore {
+    return this.store;
+  }
 }

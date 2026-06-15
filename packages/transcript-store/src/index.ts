@@ -137,9 +137,7 @@ export class InMemoryTranscriptStore {
   exportText(sessionId: string): string {
     const session = this.sessions.get(sessionId);
     if (!session) return "";
-    return session.messages
-      .map((m) => `[${m.role.toUpperCase()}] ${m.content}`)
-      .join("\n\n");
+    return session.messages.map((m) => `[${m.role.toUpperCase()}] ${m.content}`).join("\n\n");
   }
 
   exportJSON(sessionId: string): string {
@@ -157,10 +155,7 @@ export class InMemoryTranscriptStore {
   snapshot(sessionId: string, newSessionId: string, upToIndex?: number): Transcript {
     const source = this.sessions.get(sessionId);
     if (!source) throw new Error(`Session not found: ${sessionId}`);
-    const msgs = source.messages.slice(
-      0,
-      upToIndex !== undefined ? upToIndex + 1 : undefined,
-    );
+    const msgs = source.messages.slice(0, upToIndex !== undefined ? upToIndex + 1 : undefined);
     const fork: Transcript = {
       sessionId: newSessionId,
       createdAt: new Date().toISOString(),

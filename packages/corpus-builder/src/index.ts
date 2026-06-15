@@ -35,7 +35,7 @@ export interface CorpusFilter {
   sources?: DocumentSource[];
   maxDocuments?: number;
   minWordCount?: number;
-  after?: string;     // ISO-8601
+  after?: string; // ISO-8601
   minScore?: number;
 }
 
@@ -61,7 +61,7 @@ export interface CorpusSearchBackend {
   search(query: string, filter?: CorpusFilter): Promise<CorpusSearchResult>;
 }
 
-let _cdSeq = 0;
+const _cdSeq = 0;
 
 /** Mock corpus search backend. */
 export class MockCorpusSearchBackend implements CorpusSearchBackend {
@@ -159,12 +159,24 @@ export class CorpusStore {
     this.corpora.set(corpus.id, corpus);
   }
 
-  get(id: string): Corpus | undefined { return this.corpora.get(id); }
-  has(id: string): boolean { return this.corpora.has(id); }
-  list(): Corpus[] { return [...this.corpora.values()]; }
-  delete(id: string): boolean { return this.corpora.delete(id); }
-  clear(): void { this.corpora.clear(); }
-  count(): number { return this.corpora.size; }
+  get(id: string): Corpus | undefined {
+    return this.corpora.get(id);
+  }
+  has(id: string): boolean {
+    return this.corpora.has(id);
+  }
+  list(): Corpus[] {
+    return [...this.corpora.values()];
+  }
+  delete(id: string): boolean {
+    return this.corpora.delete(id);
+  }
+  clear(): void {
+    this.corpora.clear();
+  }
+  count(): number {
+    return this.corpora.size;
+  }
 
   /** Find corpus by query string */
   findByQuery(query: string): Corpus | undefined {
@@ -200,11 +212,7 @@ export class CorpusRenderer {
   }
 
   renderText(corpus: Corpus): string {
-    const lines: string[] = [
-      `CORPUS: ${corpus.query}`,
-      `Built: ${corpus.builtAt}`,
-      `---`,
-    ];
+    const lines: string[] = [`CORPUS: ${corpus.query}`, `Built: ${corpus.builtAt}`, `---`];
     for (const doc of corpus.documents) {
       lines.push(`[${doc.title}]`);
       lines.push(doc.content);
@@ -223,7 +231,7 @@ export class CorpusRenderer {
 export interface KnowledgeAnswer {
   question: string;
   answer: string;
-  sourceDocuments: string[];  // document IDs used
+  sourceDocuments: string[]; // document IDs used
   confidence: number;
   corpusId: string;
 }
@@ -243,10 +251,7 @@ export class KnowledgeAgent {
     this.answerFn = answerFn;
   }
 
-  async answer(
-    question: string,
-    filter: CorpusFilter = {},
-  ): Promise<KnowledgeAnswer> {
+  async answer(question: string, filter: CorpusFilter = {}): Promise<KnowledgeAnswer> {
     const corpus = await this.builder.build(question, filter);
     const context = this.renderer.renderText(corpus);
     const answer = await this.answerFn(question, context);

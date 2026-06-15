@@ -19,7 +19,15 @@
 
 export type MimeType = string;
 /** Document type type alias. */
-export type DocumentType = "text" | "pdf" | "image" | "spreadsheet" | "presentation" | "code" | "archive" | "unknown";
+export type DocumentType =
+  | "text"
+  | "pdf"
+  | "image"
+  | "spreadsheet"
+  | "presentation"
+  | "code"
+  | "archive"
+  | "unknown";
 /** Permission level type alias. */
 export type PermissionLevel = "read" | "write" | "owner" | "none";
 
@@ -40,7 +48,7 @@ export interface IngestedDocument {
 /** Ingestion request interface definition. */
 export interface IngestionRequest {
   path: string;
-  content: string;       // document content/bytes (base64 or text)
+  content: string; // document content/bytes (base64 or text)
   sizeBytes?: number;
   owner?: string;
   tags?: string[];
@@ -71,9 +79,15 @@ export class FileLock {
     this.locks.delete(path);
   }
 
-  isLocked(path: string): boolean { return this.locks.has(path); }
-  lockedPaths(): string[] { return [...this.locks]; }
-  clear(): void { this.locks.clear(); }
+  isLocked(path: string): boolean {
+    return this.locks.has(path);
+  }
+  lockedPaths(): string[] {
+    return [...this.locks];
+  }
+  clear(): void {
+    this.locks.clear();
+  }
 }
 
 // ── ChecksumRegistry ──────────────────────────────────────────────────────────
@@ -101,47 +115,57 @@ export class ChecksumRegistry {
     return { isDuplicate: false };
   }
 
-  has(checksum: string): boolean { return this.checksums.has(checksum); }
-  getDocumentId(checksum: string): string | undefined { return this.checksums.get(checksum); }
-  remove(checksum: string): void { this.checksums.delete(checksum); }
-  clear(): void { this.checksums.clear(); }
-  size(): number { return this.checksums.size; }
+  has(checksum: string): boolean {
+    return this.checksums.has(checksum);
+  }
+  getDocumentId(checksum: string): string | undefined {
+    return this.checksums.get(checksum);
+  }
+  remove(checksum: string): void {
+    this.checksums.delete(checksum);
+  }
+  clear(): void {
+    this.checksums.clear();
+  }
+  size(): number {
+    return this.checksums.size;
+  }
 }
 
 // ── MimeDetector ──────────────────────────────────────────────────────────────
 
 const MIME_MAP: Record<string, MimeType> = {
-  txt:  "text/plain",
-  md:   "text/markdown",
+  txt: "text/plain",
+  md: "text/markdown",
   html: "text/html",
-  pdf:  "application/pdf",
-  png:  "image/png",
-  jpg:  "image/jpeg",
+  pdf: "application/pdf",
+  png: "image/png",
+  jpg: "image/jpeg",
   jpeg: "image/jpeg",
-  gif:  "image/gif",
+  gif: "image/gif",
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  xls:  "application/vnd.ms-excel",
+  xls: "application/vnd.ms-excel",
   pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  ts:   "text/typescript",
-  js:   "text/javascript",
-  py:   "text/x-python",
-  zip:  "application/zip",
+  ts: "text/typescript",
+  js: "text/javascript",
+  py: "text/x-python",
+  zip: "application/zip",
   json: "application/json",
 };
 
 const TYPE_MAP: Record<MimeType, DocumentType> = {
-  "text/plain":       "text",
-  "text/markdown":    "text",
-  "text/html":        "text",
+  "text/plain": "text",
+  "text/markdown": "text",
+  "text/html": "text",
   "application/json": "code",
-  "text/typescript":  "code",
-  "text/javascript":  "code",
-  "text/x-python":    "code",
-  "application/pdf":  "pdf",
-  "image/png":        "image",
-  "image/jpeg":       "image",
-  "image/gif":        "image",
+  "text/typescript": "code",
+  "text/javascript": "code",
+  "text/x-python": "code",
+  "application/pdf": "pdf",
+  "image/png": "image",
+  "image/jpeg": "image",
+  "image/gif": "image",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "spreadsheet",
   "application/vnd.ms-excel": "spreadsheet",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation": "presentation",
@@ -183,7 +207,10 @@ export class PermissionSetter {
 
 // ── IngestionSignal ───────────────────────────────────────────────────────────
 
-export type SignalType = "document_consumption_started" | "document_consumption_finished" | "document_skipped";
+export type SignalType =
+  | "document_consumption_started"
+  | "document_consumption_finished"
+  | "document_skipped";
 
 /** Ingestion signal event interface definition. */
 export interface IngestionSignalEvent {
@@ -208,7 +235,11 @@ export class IngestionSignalBus {
 
   emit(event: IngestionSignalEvent): void {
     for (const h of this.handlers) {
-      try { h(event); } catch { /* isolate */ }
+      try {
+        h(event);
+      } catch {
+        /* isolate */
+      }
     }
   }
 }
@@ -265,9 +296,9 @@ export class FilenameTemplater {
     return template
       .replace("{name}", vars.name)
       .replace("{date}", date)
-      .replace("{ext}",  vars.ext)
+      .replace("{ext}", vars.ext)
       .replace("{type}", vars.type)
-      .replace("{id}",   vars.id);
+      .replace("{id}", vars.id);
   }
 
   /** Extract base name and extension from a path. */
@@ -307,13 +338,13 @@ export class DocConsumer {
   private defaultTemplate: string;
 
   constructor(opts: DocConsumerOptions = {}) {
-    this.lock        = opts.lock             ?? new FileLock();
-    this.checksums   = opts.checksumRegistry ?? new ChecksumRegistry();
-    this.mime        = opts.mimeDetector     ?? new MimeDetector();
+    this.lock = opts.lock ?? new FileLock();
+    this.checksums = opts.checksumRegistry ?? new ChecksumRegistry();
+    this.mime = opts.mimeDetector ?? new MimeDetector();
     this.permissions = opts.permissionSetter ?? new PermissionSetter();
-    this.signals     = opts.signalBus        ?? new IngestionSignalBus();
-    this.workflow    = opts.workflowTrigger  ?? new WorkflowTrigger();
-    this.templater   = opts.templater        ?? new FilenameTemplater();
+    this.signals = opts.signalBus ?? new IngestionSignalBus();
+    this.workflow = opts.workflowTrigger ?? new WorkflowTrigger();
+    this.templater = opts.templater ?? new FilenameTemplater();
     this.defaultTemplate = opts.defaultTemplate ?? "{name}-{date}.{ext}";
   }
 
@@ -359,7 +390,12 @@ export class DocConsumer {
       // 5. Output filename
       const { name, ext } = this.templater.parse(request.path);
       const template = request.outputTemplate ?? this.defaultTemplate;
-      const outputPath = this.templater.generate(template, { name, ext, type: documentType, id: docId });
+      const outputPath = this.templater.generate(template, {
+        name,
+        ext,
+        type: documentType,
+        id: docId,
+      });
 
       // 6. Permissions
       const permLevel = this.permissions.defaultFor(documentType, request.owner);
@@ -377,8 +413,8 @@ export class DocConsumer {
         permissions: permLevel,
         ingestedAt: new Date().toISOString(),
         metadata: {
-          tags:  request.tags   ?? [],
-          owner: request.owner  ?? null,
+          tags: request.tags ?? [],
+          owner: request.owner ?? null,
         },
       };
 
@@ -403,7 +439,13 @@ export class DocConsumer {
     }
   }
 
-  getSignalBus(): IngestionSignalBus { return this.signals; }
-  getLock(): FileLock { return this.lock; }
-  getChecksumRegistry(): ChecksumRegistry { return this.checksums; }
+  getSignalBus(): IngestionSignalBus {
+    return this.signals;
+  }
+  getLock(): FileLock {
+    return this.lock;
+  }
+  getChecksumRegistry(): ChecksumRegistry {
+    return this.checksums;
+  }
 }

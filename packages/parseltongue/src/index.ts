@@ -52,31 +52,65 @@ export interface ParseltongueResult {
   transformedText: string;
   triggersFound: string[];
   techniqueUsed: ObfuscationTechnique;
-  transformations: Array<{
+  transformations: {
     original: string;
     transformed: string;
     technique: ObfuscationTechnique;
-  }>;
+  }[];
 }
 
 // ── Default trigger list ──────────────────────────────────────────────────────
 
 export const DEFAULT_TRIGGERS: readonly string[] = [
   // Security
-  "hack", "exploit", "bypass", "crack", "attack", "penetrate",
-  "inject", "manipulate", "override", "disable", "circumvent", "evade",
-  "malware", "virus", "trojan", "payload", "shellcode", "rootkit",
-  "keylogger", "backdoor", "vulnerability",
+  "hack",
+  "exploit",
+  "bypass",
+  "crack",
+  "attack",
+  "penetrate",
+  "inject",
+  "manipulate",
+  "override",
+  "disable",
+  "circumvent",
+  "evade",
+  "malware",
+  "virus",
+  "trojan",
+  "payload",
+  "shellcode",
+  "rootkit",
+  "keylogger",
+  "backdoor",
+  "vulnerability",
   // Weapons
-  "weapon", "bomb", "explosive", "poison",
+  "weapon",
+  "bomb",
+  "explosive",
+  "poison",
   // System / privilege
-  "jailbreak", "unlock", "sudo", "privilege",
+  "jailbreak",
+  "unlock",
+  "sudo",
+  "privilege",
   // Social engineering
-  "phishing", "scam", "impersonate", "deceive", "fraud",
+  "phishing",
+  "scam",
+  "impersonate",
+  "deceive",
+  "fraud",
   // Content
-  "nsfw", "explicit", "uncensored", "unfiltered", "unrestricted",
+  "nsfw",
+  "explicit",
+  "uncensored",
+  "unfiltered",
+  "unrestricted",
   // AI meta
-  "ignore", "disregard", "forget", "pretend",
+  "ignore",
+  "disregard",
+  "forget",
+  "pretend",
 ];
 
 // ── Character maps ────────────────────────────────────────────────────────────
@@ -208,9 +242,7 @@ function applyMixedCase(word: string, intensity: ObfuscationIntensity): string {
   } else {
     for (let i = 0; i < chars.length; i++) {
       chars[i] =
-        Math.random() > 0.5
-          ? (chars[i] ?? "").toUpperCase()
-          : (chars[i] ?? "").toLowerCase();
+        Math.random() > 0.5 ? (chars[i] ?? "").toUpperCase() : (chars[i] ?? "").toLowerCase();
     }
   }
   return chars.join("");
@@ -225,7 +257,11 @@ function applyPhonetic(word: string): string {
     .replace(/c/g, "k");
 }
 
-function obfuscateWord(word: string, technique: ObfuscationTechnique, intensity: ObfuscationIntensity): string {
+function obfuscateWord(
+  word: string,
+  technique: ObfuscationTechnique,
+  intensity: ObfuscationIntensity,
+): string {
   switch (technique) {
     case "leetspeak":
       return applyLeetspeak(word, intensity);
@@ -256,10 +292,7 @@ export function detectTriggers(text: string, customTriggers: readonly string[] =
   const found = new Set<string>();
   const lower = text.toLowerCase();
   for (const trigger of allTriggers) {
-    const re = new RegExp(
-      `\\b${trigger.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`,
-      "gi",
-    );
+    const re = new RegExp(`\\b${trigger.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gi");
     if (re.test(lower)) found.add(trigger);
   }
   return Array.from(found);
@@ -298,10 +331,7 @@ export function applyParseltongue(text: string, config: ParseltongueConfig): Par
   const sorted = [...triggersFound].sort((a, b) => b.length - a.length);
 
   for (const trigger of sorted) {
-    const re = new RegExp(
-      `\\b(${trigger.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})\\b`,
-      "gi",
-    );
+    const re = new RegExp(`\\b(${trigger.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})\\b`, "gi");
     transformed = transformed.replace(re, (match) => {
       const result = obfuscateWord(match, config.technique, config.intensity);
       transformations.push({ original: match, transformed: result, technique: config.technique });

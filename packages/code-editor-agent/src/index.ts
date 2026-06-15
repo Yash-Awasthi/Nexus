@@ -16,12 +16,7 @@
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type EditorModel =
-  | "claude-opus-4"
-  | "gpt-5"
-  | "deepseek-coder"
-  | "kimi-k2"
-  | "minimax-code";
+export type EditorModel = "claude-opus-4" | "gpt-5" | "deepseek-coder" | "kimi-k2" | "minimax-code";
 
 /** Editor tool name type alias. */
 export type EditorToolName = "write_file" | "str_replace";
@@ -51,7 +46,7 @@ export interface EditorToolCall {
 /** Structured edit output interface definition. */
 export interface StructuredEditOutput {
   model: EditorModel;
-  thinking?: string;        // content extracted from <think> tags
+  thinking?: string; // content extracted from <think> tags
   explanation: string;
   toolCalls: EditorToolCall[];
   tokensUsed?: number;
@@ -60,9 +55,10 @@ export interface StructuredEditOutput {
 // ── ThinkScaffold ─────────────────────────────────────────────────────────────
 
 /** Reasoning models (e.g. deepseek, kimi) use <think>…</think> scaffolding. */
-const REASONING_MODELS: Set<EditorModel> = new Set(["deepseek-coder", "kimi-k2"]);
+const REASONING_MODELS = new Set<EditorModel>(["deepseek-coder", "kimi-k2"]);
 
 /** Think scaffold. */
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class ThinkScaffold {
   static isReasoningModel(model: EditorModel): boolean {
     return REASONING_MODELS.has(model);
@@ -98,12 +94,18 @@ export class WriteFileTool {
     this.fs = fs;
   }
 
-  async execute(params: WriteFileParams): Promise<{ success: boolean; path: string; error?: string }> {
+  async execute(
+    params: WriteFileParams,
+  ): Promise<{ success: boolean; path: string; error?: string }> {
     try {
       await this.fs.write(params.path, params.content);
       return { success: true, path: params.path };
     } catch (err) {
-      return { success: false, path: params.path, error: err instanceof Error ? err.message : String(err) };
+      return {
+        success: false,
+        path: params.path,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   }
 }
@@ -117,7 +119,9 @@ export class StrReplaceTool {
     this.fs = fs;
   }
 
-  async execute(params: StrReplaceParams): Promise<{ success: boolean; path: string; replaced: boolean; error?: string }> {
+  async execute(
+    params: StrReplaceParams,
+  ): Promise<{ success: boolean; path: string; replaced: boolean; error?: string }> {
     try {
       const content = await this.fs.read(params.path);
       if (!content.includes(params.oldStr)) {
@@ -127,7 +131,12 @@ export class StrReplaceTool {
       await this.fs.write(params.path, updated);
       return { success: true, path: params.path, replaced: true };
     } catch (err) {
-      return { success: false, path: params.path, replaced: false, error: err instanceof Error ? err.message : String(err) };
+      return {
+        success: false,
+        path: params.path,
+        replaced: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   }
 }
@@ -180,7 +189,12 @@ export class EditorToolExecutor {
       return { tool: "write_file", ...result };
     } else {
       const result = await this.strReplace.execute(call.params as StrReplaceParams);
-      return { tool: "str_replace", success: result.success, path: result.path, error: result.error };
+      return {
+        tool: "str_replace",
+        success: result.success,
+        path: result.path,
+        error: result.error,
+      };
     }
   }
 
@@ -209,10 +223,15 @@ export type ModelBackend = (
 
 /** Mock model backend. */
 export class MockModelBackend {
-  readonly calls: Array<{ model: EditorModel; prompt: string }> = [];
+  readonly calls: { model: EditorModel; prompt: string }[] = [];
   private response: ModelResponse | ((model: EditorModel, prompt: string) => ModelResponse);
 
-  constructor(response: ModelResponse | ((m: EditorModel, p: string) => ModelResponse) = { text: "No changes needed.", tokensUsed: 10 }) {
+  constructor(
+    response: ModelResponse | ((m: EditorModel, p: string) => ModelResponse) = {
+      text: "No changes needed.",
+      tokensUsed: 10,
+    },
+  ) {
     this.response = response;
   }
 
@@ -259,8 +278,8 @@ export class CodeEditorAgent {
   private maxToolCalls: number;
 
   constructor(opts: EditorAgentOptions) {
-    this.model   = opts.model ?? "claude-opus-4";
-    this.fs      = opts.fs   ?? new InMemoryFileSystem();
+    this.model = opts.model ?? "claude-opus-4";
+    this.fs = opts.fs ?? new InMemoryFileSystem();
     this.backend = opts.backend;
     this.executor = new EditorToolExecutor(this.fs);
     this.maxToolCalls = opts.maxToolCalls ?? 10;
@@ -303,7 +322,9 @@ export class CodeEditorAgent {
         request.instruction,
         request.filePaths ? `Files: ${request.filePaths.join(", ")}` : "",
         request.context ? `Context: ${request.context}` : "",
-      ].filter(Boolean).join("\n"),
+      ]
+        .filter(Boolean)
+        .join("\n"),
       this.model,
     );
 
@@ -327,8 +348,12 @@ export class CodeEditorAgent {
     };
   }
 
-  getModel(): EditorModel { return this.model; }
-  getFileSystem(): FileSystem { return this.fs; }
+  getModel(): EditorModel {
+    return this.model;
+  }
+  getFileSystem(): FileSystem {
+    return this.fs;
+  }
 
   static spawnerPrompt(): string {
     return [

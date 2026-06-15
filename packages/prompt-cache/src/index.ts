@@ -99,9 +99,7 @@ export function buildCachedPrompt(cfg: CachedPromptConfig): AnthropicPrompt {
     system.push({ type: "text", text: instruction });
   }
 
-  const messages: AnthropicMessage[] = [
-    { role: "user", content: userMessage },
-  ];
+  const messages: AnthropicMessage[] = [{ role: "user", content: userMessage }];
 
   return { system, messages };
 }

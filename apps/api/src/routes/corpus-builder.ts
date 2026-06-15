@@ -54,7 +54,15 @@ export async function corpusBuilderRoutes(app: FastifyInstance): Promise<void> {
   /** GET /corpus/batches */
   app.get<{ Querystring: { limit?: string } }>(
     "/corpus/batches",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuthWithTier },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuthWithTier,
+    },
     async (request, reply) => {
       const result = router.listBatches({
         userTier: callerTier(request),
@@ -67,7 +75,15 @@ export async function corpusBuilderRoutes(app: FastifyInstance): Promise<void> {
   /** GET /corpus/batches/:id */
   app.get<{ Params: { id: string } }>(
     "/corpus/batches/:id",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuthWithTier },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuthWithTier,
+    },
     async (request, reply) => {
       const result = router.readBatch({
         userTier: callerTier(request),
@@ -80,17 +96,22 @@ export async function corpusBuilderRoutes(app: FastifyInstance): Promise<void> {
   /** GET /corpus/batches/:id/jsonl */
   app.get<{ Params: { id: string } }>(
     "/corpus/batches/:id/jsonl",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuthWithTier },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuthWithTier,
+    },
     async (request, reply) => {
       const result = router.downloadJsonl({
         userTier: callerTier(request),
         params: { id: request.params.id },
       });
       if (!result.data) return reply.code(result.status).send({ error: result.error });
-      return reply
-        .code(200)
-        .header("Content-Type", "application/x-ndjson")
-        .send(result.data);
+      return reply.code(200).header("Content-Type", "application/x-ndjson").send(result.data);
     },
   );
 
@@ -137,7 +158,15 @@ export async function corpusBuilderRoutes(app: FastifyInstance): Promise<void> {
   /** POST /corpus/flush — flush pending + push to HF (enterprise+) */
   app.post<{ Body: { name?: string } }>(
     "/corpus/flush",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuthWithTier },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuthWithTier,
+    },
     async (request, reply) => {
       const result = await router.flushAndPush({
         userTier: callerTier(request),
@@ -148,10 +177,22 @@ export async function corpusBuilderRoutes(app: FastifyInstance): Promise<void> {
   );
 
   /** GET /corpus/pending */
-  app.get("/corpus/pending", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuthWithTier }, async (_req, reply) => {
-    return reply.send({
-      pending: batchStore.pendingCount(),
-      publisher: process.env.HF_TOKEN ? "huggingface" : "mock",
-    });
-  });
+  app.get(
+    "/corpus/pending",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuthWithTier,
+    },
+    async (_req, reply) => {
+      return reply.send({
+        pending: batchStore.pendingCount(),
+        publisher: process.env.HF_TOKEN ? "huggingface" : "mock",
+      });
+    },
+  );
 }

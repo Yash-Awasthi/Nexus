@@ -24,18 +24,18 @@
  * additional no-auth route in server.ts.
  */
 
-import { metricsToPrometheus, formatMetricLine } from "@nexus/telemetry";
-import { SloTracker } from "@nexus/telemetry";
+import { metricsToPrometheus, formatMetricLine , SloTracker } from "@nexus/telemetry";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
+
 import { gatewayLog, _costStore } from "./gateway.js";
 
 // ── SLO tracker singleton (records HTTP 2xx vs 5xx) ──────────────────────────
 // Available for other routes to call sloTracker.record() on each response.
 export const sloTracker = new SloTracker({
-  windowMs:   5 * 60_000,
-  targets:    { availabilityTarget: 0.999, errorRateTarget: 0.001, p99LatencyTargetMs: 2_000 },
+  windowMs: 5 * 60_000,
+  targets: { availabilityTarget: 0.999, errorRateTarget: 0.001, p99LatencyTargetMs: 2_000 },
   onViolation: (v) => {
     process.stderr.write(`[SLO VIOLATION] sli=${v.sli} actual=${v.actual} target=${v.target}\n`);
   },
@@ -59,33 +59,44 @@ export async function metricsRoutes(app: FastifyInstance): Promise<void> {
       // ── Gateway log metrics ─────────────────────────────────────────────────
       try {
         const entries = await gatewayLog.query({ limit: 10_000 });
-        const totalReqs      = entries.length;
-        const successReqs    = entries.filter((e) => e.status === "success").length;
-        const errorReqs      = entries.filter((e) => e.status === "error").length;
-        const totalInput     = entries.reduce((s, e) => s + (e.usage?.promptTokens     ?? 0), 0);
-        const totalOutput    = entries.reduce((s, e) => s + (e.usage?.completionTokens ?? 0), 0);
-        const lastLatency    = entries[0]?.latencyMs ?? 0;
+        const totalReqs = entries.length;
+        const successReqs = entries.filter((e) => e.status === "success").length;
+        const errorReqs = entries.filter((e) => e.status === "error").length;
+        const totalInput = entries.reduce((s, e) => s + (e.usage?.promptTokens ?? 0), 0);
+        const totalOutput = entries.reduce((s, e) => s + (e.usage?.completionTokens ?? 0), 0);
+        const lastLatency = entries[0]?.latencyMs ?? 0;
 
         lines.push("# TYPE nexus_gateway_requests_total counter");
-        lines.push(formatMetricLine("nexus_gateway_requests_total", totalReqs,  { status: "all" }));
-        lines.push(formatMetricLine("nexus_gateway_requests_total", successReqs, { status: "success" }));
-        lines.push(formatMetricLine("nexus_gateway_requests_total", errorReqs,  { status: "error" }));
+        lines.push(formatMetricLine("nexus_gateway_requests_total", totalReqs, { status: "all" }));
+        lines.push(
+          formatMetricLine("nexus_gateway_requests_total", successReqs, { status: "success" }),
+        );
+        lines.push(
+          formatMetricLine("nexus_gateway_requests_total", errorReqs, { status: "error" }),
+        );
 
         lines.push("# TYPE nexus_gateway_latency_ms gauge");
         lines.push(formatMetricLine("nexus_gateway_latency_ms", lastLatency));
 
         lines.push("# TYPE nexus_gateway_tokens_total counter");
-        lines.push(formatMetricLine("nexus_gateway_tokens_total", totalInput,  { type: "input" }));
+        lines.push(formatMetricLine("nexus_gateway_tokens_total", totalInput, { type: "input" }));
         lines.push(formatMetricLine("nexus_gateway_tokens_total", totalOutput, { type: "output" }));
-      } catch { /* gate log unavailable */ }
+      } catch {
+        /* gate log unavailable */
+      }
 
       // ── Run-cost metrics ────────────────────────────────────────────────────
       try {
-        const runs      = await _costStore.list();
-        const totalCost = runs.reduce((s, r) => s + r.steps.reduce((a, st) => a + (st.costUsd ?? 0), 0), 0);
+        const runs = await _costStore.list();
+        const totalCost = runs.reduce(
+          (s, r) => s + r.steps.reduce((a, st) => a + (st.costUsd ?? 0), 0),
+          0,
+        );
         lines.push("# TYPE nexus_gateway_cost_usd_total counter");
         lines.push(formatMetricLine("nexus_gateway_cost_usd_total", totalCost));
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
 
       // ── SLO metrics ─────────────────────────────────────────────────────────
       try {
@@ -98,20 +109,22 @@ export async function metricsRoutes(app: FastifyInstance): Promise<void> {
         lines.push(formatMetricLine("nexus_slo_p99_latency_ms", slo.latencyP99Ms));
         lines.push("# TYPE nexus_slo_total_requests counter");
         lines.push(formatMetricLine("nexus_slo_total_requests", slo.totalRequests));
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
 
       // ── Process metrics ─────────────────────────────────────────────────────
       const mem = process.memoryUsage();
-      lines.push(metricsToPrometheus({
-        process_heap_bytes:      mem.heapUsed,
-        process_rss_bytes:       mem.rss,
-        process_uptime_seconds:  process.uptime(),
-      }));
+      lines.push(
+        metricsToPrometheus({
+          process_heap_bytes: mem.heapUsed,
+          process_rss_bytes: mem.rss,
+          process_uptime_seconds: process.uptime(),
+        }),
+      );
 
       const body = lines.join("\n") + "\n";
-      return reply
-        .header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-        .send(body);
+      return reply.header("Content-Type", "text/plain; version=0.0.4; charset=utf-8").send(body);
     },
   );
 }

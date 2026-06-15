@@ -45,7 +45,7 @@ export interface CorpusBatch {
   name: string;
   samples: CorpusSample[];
   createdAt: string;
-  flushedAt?: string;     // set when pushed to HF
+  flushedAt?: string; // set when pushed to HF
   tier: DataTier;
   size: number;
 }
@@ -95,9 +95,15 @@ export class InMemoryBatchStore {
     return batch;
   }
 
-  getBatch(id: string): CorpusBatch | undefined { return this.batches.get(id); }
-  allBatches(): CorpusBatch[] { return [...this.batches.values()]; }
-  pendingCount(): number { return this.pendingSamples.length; }
+  getBatch(id: string): CorpusBatch | undefined {
+    return this.batches.get(id);
+  }
+  allBatches(): CorpusBatch[] {
+    return [...this.batches.values()];
+  }
+  pendingCount(): number {
+    return this.pendingSamples.length;
+  }
 
   listBatches(filter: BatchFilter = {}): CorpusBatch[] {
     let batches = this.allBatches();
@@ -125,8 +131,13 @@ export class InMemoryBatchStore {
     }
   }
 
-  clear(): void { this.batches.clear(); this.pendingSamples = []; }
-  size(): number { return this.batches.size; }
+  clear(): void {
+    this.batches.clear();
+    this.pendingSamples = [];
+  }
+  size(): number {
+    return this.batches.size;
+  }
 }
 
 // ── TierGate ──────────────────────────────────────────────────────────────────
@@ -179,10 +190,13 @@ export interface HfPublisher {
 
 /** Mock hf publisher. */
 export class MockHfPublisher implements HfPublisher {
-  readonly pushLog: Array<{ batch: CorpusBatch; repoId: string }> = [];
+  readonly pushLog: { batch: CorpusBatch; repoId: string }[] = [];
   private throws?: string;
 
-  setThrows(message: string): this { this.throws = message; return this; }
+  setThrows(message: string): this {
+    this.throws = message;
+    return this;
+  }
 
   async push(batch: CorpusBatch, repoId: string): Promise<HfPublishResult> {
     if (this.throws) {
@@ -281,11 +295,7 @@ export class ResearchApiRouter {
   private serializer: JsonlSerializer;
   private defaultRepoId: string;
 
-  constructor(opts: {
-    store: InMemoryBatchStore;
-    publisher: HfPublisher;
-    defaultRepoId?: string;
-  }) {
+  constructor(opts: { store: InMemoryBatchStore; publisher: HfPublisher; defaultRepoId?: string }) {
     this.store = opts.store;
     this.publisher = opts.publisher;
     this.tierGate = new TierGate();
@@ -329,7 +339,9 @@ export class ResearchApiRouter {
       return { data: null, status: 403, error: err instanceof Error ? err.message : String(err) };
     }
 
-    const name = (req.body as any)?.name ?? `batch-${Date.now()}`;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const name = (req.body as unknown)?.name ?? `batch-${Date.now()}`;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const batch = this.store.flush(name, req.userTier);
     const result = await this.publisher.push(batch, this.defaultRepoId);
 

@@ -16,6 +16,7 @@
  *   FixedEmbedder  — otherwise (deterministic pseudo-embedding, no API calls)
  */
 
+import { globalHooks } from "@nexus/hooks";
 import {
   FixedEmbedder,
   GroqEmbedder,
@@ -29,7 +30,6 @@ import {
   type IMemoryStore as IRagtimeMemoryStore,
   type MemoryFilter as RagtimeMemoryFilter,
 } from "@nexus/ragtime";
-import { globalHooks } from "@nexus/hooks";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
@@ -50,7 +50,7 @@ const manager = new MemoryManager({ store, embedder });
 // Store and embedder from @nexus/memory are structurally compatible with
 // @nexus/ragtime's IMemoryStore / IEmbedder interfaces.
 const retriever = new RagtimeRetriever({
-  store:   store   as unknown as IRagtimeMemoryStore,
+  store: store as unknown as IRagtimeMemoryStore,
   embedder: embedder as unknown as IRagtimeEmbedder,
   config: { poolSize: 20, finalK: 50 }, // finalK=50 so callers can slice via limit param
 });
@@ -84,15 +84,15 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
 
     return reply.send({
       results: results.map((r) => ({
-        id:          r.entry.id,
-        text:        r.entry.text,
-        score:       r.composite,
-        relevance:   r.relevance,
-        importance:  r.importance,
+        id: r.entry.id,
+        text: r.entry.text,
+        score: r.composite,
+        relevance: r.relevance,
+        importance: r.importance,
         recencyDecay: r.recencyDecay,
-        metadata:    r.entry.metadata,
-        createdAt:   r.entry.createdAt,
-        userId:      r.entry.metadata?.["userId"] as string | undefined,
+        metadata: r.entry.metadata,
+        createdAt: r.entry.createdAt,
+        userId: r.entry.metadata?.["userId"] as string | undefined,
       })),
       total: results.length,
     });
@@ -134,11 +134,11 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
     if (nearMatches.length > 0 && nearMatches[0]!.score >= 0.92) {
       const dup = nearMatches[0]!.entry;
       return reply.code(200).send({
-        id:        dup.id,
-        text:      dup.text,
-        metadata:  dup.metadata,
+        id: dup.id,
+        text: dup.text,
+        metadata: dup.metadata,
         createdAt: dup.createdAt,
-        userId:    dup.metadata?.["userId"] as string | undefined,
+        userId: dup.metadata?.["userId"] as string | undefined,
         duplicate: true,
       });
     }
@@ -149,19 +149,24 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
     const entry = await manager.remember(text, { metadata: combinedMeta, ttl });
 
     // Hook: memory.after_write
-    globalHooks.emit("memory.after_write", {
-      id:        entry.id,
-      text:      entry.text,
-      metadata:  entry.metadata,
-      createdAt: typeof entry.createdAt === "number" ? entry.createdAt : new Date(entry.createdAt as string).getTime() / 1000,
-    }).catch(() => {});
+    globalHooks
+      .emit("memory.after_write", {
+        id: entry.id,
+        text: entry.text,
+        metadata: entry.metadata,
+        createdAt:
+          typeof entry.createdAt === "number"
+            ? entry.createdAt
+            : new Date(entry.createdAt as string).getTime() / 1000,
+      })
+      .catch(() => {});
 
     return reply.code(201).send({
-      id:        entry.id,
-      text:      entry.text,
-      metadata:  entry.metadata,
+      id: entry.id,
+      text: entry.text,
+      metadata: entry.metadata,
       createdAt: entry.createdAt,
-      userId:    entry.metadata?.["userId"] as string | undefined,
+      userId: entry.metadata?.["userId"] as string | undefined,
     });
   });
 
@@ -173,7 +178,12 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
    */
   app.delete<{ Params: { id: string } }>(
     "/memory/:id",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       await manager.forget(request.params.id);
       return reply.code(204).send();
@@ -194,19 +204,17 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
     const limit = Math.min(parseInt(limitStr ?? "100", 10) || 100, 500);
 
     // Dual-filter: userId column for PgVectorStore; metadata.userId for InMemoryStore.
-    const filter = userId
-      ? { metadata: { userId } }
-      : undefined;
+    const filter = userId ? { metadata: { userId } } : undefined;
 
     const entries = (await manager.list(filter)).slice(0, limit);
 
     return reply.send({
       entries: entries.map((e) => ({
-        id:        e.id,
-        text:      e.text,
-        metadata:  e.metadata,
+        id: e.id,
+        text: e.text,
+        metadata: e.metadata,
         createdAt: e.createdAt,
-        userId:    e.metadata?.["userId"] as string | undefined,
+        userId: e.metadata?.["userId"] as string | undefined,
       })),
       total: entries.length,
     });

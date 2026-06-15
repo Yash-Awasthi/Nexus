@@ -14,6 +14,10 @@
  * run store (capped at 500 entries, oldest evicted).
  */
 
+import { randomUUID } from "crypto";
+
+import { ResearcherAgent, type ResearchRunner, type ResearchRunResult } from "@nexus/agents";
+import { BM25Reranker } from "@nexus/reranker";
 import {
   CitationIndex,
   ResearchSession,
@@ -22,13 +26,6 @@ import {
   type ResearchFinding,
   type SourceReference,
 } from "@nexus/researcher";
-import {
-  ResearcherAgent,
-  type ResearchRunner,
-  type ResearchRunResult,
-} from "@nexus/agents";
-import { BM25Reranker } from "@nexus/reranker";
-import { randomUUID } from "crypto";
 import type { FastifyInstance } from "fastify";
 import { Pool } from "pg";
 
@@ -44,26 +41,26 @@ function buildSearchFn(): WebSearchFn {
     const apiKey = process.env.TAVILY_API_KEY;
     return async (query: string): Promise<SearchResult[]> => {
       const res = await fetch("https://api.tavily.com/search", {
-        method:  "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({
-          api_key:        apiKey,
+        body: JSON.stringify({
+          api_key: apiKey,
           query,
-          search_depth:   "basic",
-          max_results:    10,
+          search_depth: "basic",
+          max_results: 10,
           include_answer: false,
         }),
       });
       if (!res.ok) throw new Error(`Tavily error: ${res.status}`);
-      const data = await res.json() as {
-        results?: Array<{ url: string; title: string; content: string; score?: number }>;
+      const data = (await res.json()) as {
+        results?: { url: string; title: string; content: string; score?: number }[];
       };
       return (data.results ?? []).map((r) => ({
-        url:     r.url,
-        title:   r.title,
+        url: r.url,
+        title: r.title,
         snippet: r.content?.slice(0, 300) ?? "",
-        score:   r.score ?? 0.8,
-        source:  "web" as const,
+        score: r.score ?? 0.8,
+        source: "web" as const,
       }));
     };
   }
@@ -73,17 +70,17 @@ function buildSearchFn(): WebSearchFn {
     const base = process.env.SEARXNG_URL.replace(/\/$/, "");
     return async (query: string): Promise<SearchResult[]> => {
       const url = `${base}/search?q=${encodeURIComponent(query)}&format=json&engines=google,bing`;
-      const res = await fetch(url, { headers: { "Accept": "application/json" } });
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
       if (!res.ok) throw new Error(`SearXNG error: ${res.status}`);
-      const data = await res.json() as {
-        results?: Array<{ url: string; title: string; content?: string; score?: number }>;
+      const data = (await res.json()) as {
+        results?: { url: string; title: string; content?: string; score?: number }[];
       };
       return (data.results ?? []).slice(0, 10).map((r, i) => ({
-        url:     r.url,
-        title:   r.title,
+        url: r.url,
+        title: r.title,
         snippet: r.content?.slice(0, 300) ?? "",
-        score:   r.score ?? (1 - i * 0.05),
-        source:  "web" as const,
+        score: r.score ?? 1 - i * 0.05,
+        source: "web" as const,
       }));
     };
   }
@@ -91,11 +88,11 @@ function buildSearchFn(): WebSearchFn {
   // ── NoopSearchBackend (deterministic placeholder) ───────────────────────────
   return async (query: string): Promise<SearchResult[]> => [
     {
-      url:     `https://example.com/search?q=${encodeURIComponent(query)}`,
-      title:   `[Noop] Results for: ${query}`,
+      url: `https://example.com/search?q=${encodeURIComponent(query)}`,
+      title: `[Noop] Results for: ${query}`,
       snippet: `Set TAVILY_API_KEY or SEARXNG_URL to enable real web search. Query: ${query}`,
-      score:   0.5,
-      source:  "web" as const,
+      score: 0.5,
+      source: "web" as const,
     },
   ];
 }
@@ -107,33 +104,37 @@ function buildSearchFn(): WebSearchFn {
 //   b) The exclusive source for GET /researcher/academic?query=.
 
 interface S2Paper {
-  paperId:        string;
-  title:          string;
-  year?:          number;
-  abstract?:      string;
-  url?:           string;
+  paperId: string;
+  title: string;
+  year?: number;
+  abstract?: string;
+  url?: string;
   openAccessPdf?: { url: string } | null;
-  authors?:       Array<{ name: string }>;
+  authors?: { name: string }[];
 }
 
 async function semanticScholarSearch(query: string, limit = 10): Promise<SearchResult[]> {
-  const base   = "https://api.semanticscholar.org/graph/v1/paper/search";
+  const base = "https://api.semanticscholar.org/graph/v1/paper/search";
   const fields = "title,year,authors,abstract,url,openAccessPdf";
-  const url    = `${base}?query=${encodeURIComponent(query)}&fields=${fields}&limit=${limit}`;
+  const url = `${base}?query=${encodeURIComponent(query)}&fields=${fields}&limit=${limit}`;
   const headers: Record<string, string> = { Accept: "application/json" };
   if (process.env.SEMANTIC_SCHOLAR_API_KEY) {
     headers["x-api-key"] = process.env.SEMANTIC_SCHOLAR_API_KEY;
   }
   const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(`Semantic Scholar error: ${res.status}`);
-  const data = await res.json() as { data?: S2Paper[] };
+  const data = (await res.json()) as { data?: S2Paper[] };
   return (data.data ?? []).map((p, i) => ({
-    url:     p.openAccessPdf?.url ?? p.url ?? `https://www.semanticscholar.org/paper/${p.paperId}`,
-    title:   p.title,
-    snippet: p.abstract?.slice(0, 300)
-      ?? `[${p.year ?? "n.d."}] ${(p.authors ?? []).map((a) => a.name).slice(0, 3).join(", ")}`,
-    score:   1 - i * 0.04,
-    source:  "corpus" as const,
+    url: p.openAccessPdf?.url ?? p.url ?? `https://www.semanticscholar.org/paper/${p.paperId}`,
+    title: p.title,
+    snippet:
+      p.abstract?.slice(0, 300) ??
+      `[${p.year ?? "n.d."}] ${(p.authors ?? [])
+        .map((a) => a.name)
+        .slice(0, 3)
+        .join(", ")}`,
+    score: 1 - i * 0.04,
+    source: "corpus" as const,
   }));
 }
 
@@ -166,9 +167,9 @@ const _researchRunner: ResearchRunner = async (query: string): Promise<ResearchR
     combined.corpusFindings?.synthesis ??
     `${combined.allResults.length} result(s) found for: ${query}`;
   return {
-    ok:        true,
-    report:    synthesis,
-    sources:   combined.allResults.map((r) => r.url),
+    ok: true,
+    report: synthesis,
+    sources: combined.allResults.map((r) => r.url),
     latencyMs: combined.durationMs,
   };
 };
@@ -178,11 +179,11 @@ const researcherAgent = new ResearcherAgent({ runner: _researchRunner });
 // ── Durable run store (pg) — in-process Map is warm L1 cache ──────────────────
 
 interface RunRecord {
-  runId:      string;
-  query:      string;
-  finding:    ResearchFinding;
-  citations:  SourceReference[];
-  createdAt:  string;
+  runId: string;
+  query: string;
+  finding: ResearchFinding;
+  citations: SourceReference[];
+  createdAt: string;
 }
 
 let _pool: Pool | null = null;
@@ -255,21 +256,20 @@ async function loadRun(runId: string): Promise<RunRecord | null> {
   try {
     await ensureSchema(pool);
     const { rows } = await pool.query<{
-      id: string; query: string;
-      result: ResearchFinding; citations: SourceReference[];
+      id: string;
+      query: string;
+      result: ResearchFinding;
+      citations: SourceReference[];
       created_at: Date;
-    }>(
-      `SELECT id, query, result, citations, created_at FROM research_runs WHERE id = $1`,
-      [runId],
-    );
+    }>(`SELECT id, query, result, citations, created_at FROM research_runs WHERE id = $1`, [runId]);
     if (!rows[0]) return null;
     const r = rows[0];
     return {
-      runId:      r.id,
-      query:      r.query,
-      finding:    r.result,
-      citations:  Array.isArray(r.citations) ? r.citations : [],
-      createdAt:  r.created_at.toISOString(),
+      runId: r.id,
+      query: r.query,
+      finding: r.result,
+      citations: Array.isArray(r.citations) ? r.citations : [],
+      createdAt: r.created_at.toISOString(),
     };
   } catch (e) {
     console.warn("[researcher] DB load failed:", (e as Error).message);
@@ -326,8 +326,8 @@ export async function researcherRoutes(app: FastifyInstance): Promise<void> {
       const { documents: rerankedDocs } = await reranker.rerank(
         query,
         rawResults.map((r) => ({
-          id:    r.url,
-          text:  `${r.title} ${r.snippet}`,
+          id: r.url,
+          text: `${r.title} ${r.snippet}`,
           score: r.score,
         })),
       );
@@ -345,7 +345,7 @@ export async function researcherRoutes(app: FastifyInstance): Promise<void> {
     const accessedAt = new Date().toISOString();
     orderedResults.slice(0, Math.min(maxResults, 50)).forEach((r) => index.add(r, accessedAt));
 
-    const runId     = randomUUID();
+    const runId = randomUUID();
     // agentResult.report contains the synthesis text from ResearcherAgent
     const synthesis = agentResult.report || `${rawResults.length} result(s) found for: ${query}`;
     // URL list from agent (also built from allResults, same set)
@@ -356,11 +356,11 @@ export async function researcherRoutes(app: FastifyInstance): Promise<void> {
       query,
       finding: {
         query,
-        results:       orderedResults,
+        results: orderedResults,
         synthesis,
-        citations:     urlCitations,
+        citations: urlCitations,
         richCitations: index.list(),
-        durationMs:    _agentDurationMs,
+        durationMs: _agentDurationMs,
       },
       citations: index.list(),
       createdAt: accessedAt,
@@ -372,16 +372,16 @@ export async function researcherRoutes(app: FastifyInstance): Promise<void> {
       runId,
       query,
       synthesis,
-      citations:     urlCitations,
+      citations: urlCitations,
       richCitations: index.list(),
-      results:       orderedResults.slice(0, Math.min(maxResults, 50)).map((r) => ({
-        url:     r.url,
-        title:   r.title,
+      results: orderedResults.slice(0, Math.min(maxResults, 50)).map((r) => ({
+        url: r.url,
+        title: r.title,
         snippet: r.snippet,
-        score:   r.score,
-        source:  r.source,
+        score: r.score,
+        source: r.source,
       })),
-      durationMs:    _agentDurationMs,
+      durationMs: _agentDurationMs,
     });
   });
 
@@ -409,7 +409,7 @@ export async function researcherRoutes(app: FastifyInstance): Promise<void> {
       papers = await semanticScholarSearch(query.trim(), limit);
     } catch (err) {
       return reply.code(502).send({
-        error:   "semantic_scholar_error",
+        error: "semantic_scholar_error",
         message: err instanceof Error ? err.message : "Semantic Scholar unavailable",
       });
     }
@@ -429,14 +429,16 @@ export async function researcherRoutes(app: FastifyInstance): Promise<void> {
             return orig ? { ...orig, score: d.score } : undefined;
           })
           .filter((r): r is SearchResult => r !== undefined);
-      } catch { /* reranker failure is non-fatal */ }
+      } catch {
+        /* reranker failure is non-fatal */
+      }
     }
 
     reply.header("Cache-Control", "private, max-age=300, stale-while-revalidate=600");
     return reply.send({
       query,
-      total:   ordered.length,
-      papers:  ordered,
+      total: ordered.length,
+      papers: ordered,
       powered_by: "Semantic Scholar (semanticscholar.org)",
     });
   });
@@ -456,11 +458,11 @@ export async function researcherRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return reply.send({
-      runId:       record.runId,
-      query:       record.query,
-      createdAt:   record.createdAt,
-      citations:   record.citations,
-      total:       record.citations.length,
+      runId: record.runId,
+      query: record.query,
+      createdAt: record.createdAt,
+      citations: record.citations,
+      total: record.citations.length,
       markdownRef: record.citations
         .map((c) => `${c.citationKey} ${c.title} — <${c.url}>`)
         .join("\n"),

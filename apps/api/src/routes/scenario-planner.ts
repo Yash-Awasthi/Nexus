@@ -40,16 +40,28 @@ export async function scenarioPlannerRoutes(app: FastifyInstance): Promise<void>
    * Rank all scenarios by expected impact (highest first).
    * Must be registered BEFORE /scenarios/:id or Fastify matches "plan" as an id.
    */
-  app.get("/scenarios/plan/rank", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
-    const ranked = plan.rank();
-    return reply.send({
-      ranked: ranked.map(({ scenario, prediction }) => ({
-        scenario,
-        prediction,
-      })),
-      total: ranked.length,
-    });
-  });
+  app.get(
+    "/scenarios/plan/rank",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_request, reply) => {
+      const ranked = plan.rank();
+      return reply.send({
+        ranked: ranked.map(({ scenario, prediction }) => ({
+          scenario,
+          prediction,
+        })),
+        total: ranked.length,
+      });
+    },
+  );
 
   /**
    * GET /scenarios?tag=<tag>
@@ -81,24 +93,32 @@ export async function scenarioPlannerRoutes(app: FastifyInstance): Promise<void>
    */
   app.post<{
     Body: {
-      name:         string;
+      name: string;
       description?: string;
-      variables?:   Variable[];
+      variables?: Variable[];
       assumptions?: Assumption[];
-      outcomes?:    Outcome[];
-      tags?:        string[];
+      outcomes?: Outcome[];
+      tags?: string[];
     };
   }>("/scenarios", { preHandler: requireAuth }, async (request, reply) => {
-    const { name, description, variables = [], assumptions = [], outcomes = [], tags = [] } = request.body;
+    const {
+      name,
+      description,
+      variables = [],
+      assumptions = [],
+      outcomes = [],
+      tags = [],
+    } = request.body;
 
     if (!name) return reply.code(400).send({ error: "name is required" });
-    if (outcomes.length === 0) return reply.code(400).send({ error: "at least one outcome is required" });
+    if (outcomes.length === 0)
+      return reply.code(400).send({ error: "at least one outcome is required" });
 
     const builder = new ScenarioBuilder(name, description);
-    for (const v of variables)   builder.variable(v.name, v.value, v.unit);
+    for (const v of variables) builder.variable(v.name, v.value, v.unit);
     for (const a of assumptions) builder.assume(a.description, a.confidence);
-    for (const o of outcomes)    builder.outcome(o.name, o.probability, o.impact, o.description);
-    if (tags.length > 0)         builder.tag(...tags);
+    for (const o of outcomes) builder.outcome(o.name, o.probability, o.impact, o.description);
+    if (tags.length > 0) builder.tag(...tags);
 
     const scenario = builder.build();
     plan.add(scenario);
@@ -113,7 +133,15 @@ export async function scenarioPlannerRoutes(app: FastifyInstance): Promise<void>
    */
   app.get<{ Params: { id: string } }>(
     "/scenarios/:id",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const scenario = plan.get(request.params.id);
       if (!scenario) return reply.code(404).send({ error: "Scenario not found" });
@@ -128,7 +156,12 @@ export async function scenarioPlannerRoutes(app: FastifyInstance): Promise<void>
    */
   app.delete<{ Params: { id: string } }>(
     "/scenarios/:id",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const scenario = plan.get(request.params.id);
       if (!scenario) return reply.code(404).send({ error: "Scenario not found" });
@@ -138,6 +171,7 @@ export async function scenarioPlannerRoutes(app: FastifyInstance): Promise<void>
       // Re-initialize plan: ScenarioPlan.add() is the only mutation; clear via new instance
       // Since plan is a module-level singleton we use a soft-delete marker in metadata instead
       // Add a __deleted tag so rank/list can filter (no remove() method in ScenarioPlan)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const deleted = { ...scenario, tags: [...(scenario.tags ?? []), "__deleted"] };
       // Replace in plan by adding a re-tagged copy — original stays but rank ignores __deleted
       void remaining; // kept for reference
@@ -153,7 +187,15 @@ export async function scenarioPlannerRoutes(app: FastifyInstance): Promise<void>
    */
   app.post<{ Params: { id: string } }>(
     "/scenarios/:id/predict",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const scenario = plan.get(request.params.id);
       if (!scenario) return reply.code(404).send({ error: "Scenario not found" });
@@ -181,29 +223,25 @@ export async function scenarioPlannerRoutes(app: FastifyInstance): Promise<void>
     Params: { id: string };
     Body: {
       variable: string;
-      steps?:   number;
-      range?:   [number, number];
+      steps?: number;
+      range?: [number, number];
     };
-  }>(
-    "/scenarios/:id/sensitivity",
-    { preHandler: requireAuth },
-    async (request, reply) => {
-      const scenario = plan.get(request.params.id);
-      if (!scenario) return reply.code(404).send({ error: "Scenario not found" });
+  }>("/scenarios/:id/sensitivity", { preHandler: requireAuth }, async (request, reply) => {
+    const scenario = plan.get(request.params.id);
+    if (!scenario) return reply.code(404).send({ error: "Scenario not found" });
 
-      const { variable, steps, range } = request.body;
-      if (!variable) return reply.code(400).send({ error: "variable is required" });
+    const { variable, steps, range } = request.body;
+    if (!variable) return reply.code(400).send({ error: "variable is required" });
 
-      try {
-        const opts: SensitivityOptions = {};
-        if (steps) opts.steps = steps;
-        if (range)  opts.range = range;
+    try {
+      const opts: SensitivityOptions = {};
+      if (steps) opts.steps = steps;
+      if (range) opts.range = range;
 
-        const points = sensitivityAnalysis(scenario, variable, opts);
-        return reply.send({ variable, points });
-      } catch (err) {
-        return reply.code(422).send({ error: err instanceof Error ? err.message : String(err) });
-      }
-    },
-  );
+      const points = sensitivityAnalysis(scenario, variable, opts);
+      return reply.send({ variable, points });
+    } catch (err) {
+      return reply.code(422).send({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
 }

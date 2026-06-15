@@ -56,10 +56,7 @@
 
 // ── Error ─────────────────────────────────────────────────────────────────────
 
-export type LoadTestErrorCode =
-  | "SCENARIO_ERROR"
-  | "INVALID_CONFIG"
-  | "RUNNER_ABORTED";
+export type LoadTestErrorCode = "SCENARIO_ERROR" | "INVALID_CONFIG" | "RUNNER_ABORTED";
 
 /** Load test error. */
 export class LoadTestError extends Error {
@@ -352,19 +349,13 @@ export function evaluateThresholds(
 ): { passed: boolean; violations: string[] } {
   const violations: string[] = [];
 
-  if (
-    thresholds.p95LatencyMs !== undefined &&
-    result.latency.p95 > thresholds.p95LatencyMs
-  ) {
+  if (thresholds.p95LatencyMs !== undefined && result.latency.p95 > thresholds.p95LatencyMs) {
     violations.push(
       `p95 latency ${result.latency.p95}ms exceeds threshold ${thresholds.p95LatencyMs}ms`,
     );
   }
 
-  if (
-    thresholds.p99LatencyMs !== undefined &&
-    result.latency.p99 > thresholds.p99LatencyMs
-  ) {
+  if (thresholds.p99LatencyMs !== undefined && result.latency.p99 > thresholds.p99LatencyMs) {
     violations.push(
       `p99 latency ${result.latency.p99}ms exceeds threshold ${thresholds.p99LatencyMs}ms`,
     );
@@ -489,7 +480,13 @@ export class LoadRunner {
     if (stage.vus === 0) {
       // Cool-down / idle stage — just sleep
       if (stage.durationMs > 0) await this.sleep(stage.durationMs);
-      metrics.pushStageMetrics({ name: stage.name, vus: 0, durationMs: stage.durationMs, iterations: 0, errors: 0 });
+      metrics.pushStageMetrics({
+        name: stage.name,
+        vus: 0,
+        durationMs: stage.durationMs,
+        iterations: 0,
+        errors: 0,
+      });
       return;
     }
 

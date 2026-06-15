@@ -23,10 +23,7 @@ import {
   SessionStore,
   type ScrapingBackend,
 } from "@nexus/scraping-mcp";
-import {
-  createStealthBackend,
-  isPatchrightAvailable,
-} from "@nexus/stealth-browser";
+import { createStealthBackend, isPatchrightAvailable } from "@nexus/stealth-browser";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
@@ -37,11 +34,11 @@ import { requireAuth } from "../middleware/auth.js";
 // development / CI.  Called once per process at plugin registration time.
 
 async function buildBackend(): Promise<ScrapingBackend> {
-  if (process.env.STEALTH_BROWSER_URL || await isPatchrightAvailable()) {
+  if (process.env.STEALTH_BROWSER_URL || (await isPatchrightAvailable())) {
     return createStealthBackend({ poolSize: 3 });
   }
   return new MockScrapingBackend({
-    html:   "<html><body><p>Nexus scraping stub — install patchright or set STEALTH_BROWSER_URL for real scraping</p></body></html>",
+    html: "<html><body><p>Nexus scraping stub — install patchright or set STEALTH_BROWSER_URL for real scraping</p></body></html>",
     status: 200,
   });
 }
@@ -62,49 +59,85 @@ function parseTextContent(text: string): Record<string, unknown> {
 
 export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
   // Resolve backend once at plugin registration; auto-wire stealth when available
-  const backend   = await buildBackend();
+  const backend = await buildBackend();
   const sessionStore = new SessionStore();
-  const server    = new ScrapingMcpServer(backend, sessionStore);
+  const server = new ScrapingMcpServer(backend, sessionStore);
 
   /**
    * GET /scraping/tools
    * List all available MCP scraping tools with their input schemas.
    */
-  app.get("/scraping/tools", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
-    return reply.send({
-      tools: server.listTools().map((t) => ({
-        name:        t.name,
-        description: t.description,
-        inputSchema: t.inputSchema,
-      })),
-    });
-  });
+  app.get(
+    "/scraping/tools",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_request, reply) => {
+      return reply.send({
+        tools: server.listTools().map((t) => ({
+          name: t.name,
+          description: t.description,
+          inputSchema: t.inputSchema,
+        })),
+      });
+    },
+  );
 
   /**
    * GET /scraping/sessions
    * List active browser sessions.
    */
-  app.get("/scraping/sessions", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
-    const result = await server.call("list_sessions", {});
-    const first = result.content[0];
-    const data = first?.type === "text" ? parseTextContent(first.text) : {};
-    return reply.send(data);
-  });
+  app.get(
+    "/scraping/sessions",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_request, reply) => {
+      const result = await server.call("list_sessions", {});
+      const first = result.content[0];
+      const data = first?.type === "text" ? parseTextContent(first.text) : {};
+      return reply.send(data);
+    },
+  );
 
   /**
    * POST /scraping/sessions
    * Open a new browser scraping session.
    */
-  app.post("/scraping/sessions", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
-    const result = await server.call("open_session", {});
-    if (result.isError) {
-      const msg = result.content[0]?.type === "text" ? result.content[0].text : "Unknown error";
-      return reply.code(500).send({ error: msg });
-    }
-    const first = result.content[0];
-    const data = first?.type === "text" ? parseTextContent(first.text) : {};
-    return reply.code(201).send(data);
-  });
+  app.post(
+    "/scraping/sessions",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_request, reply) => {
+      const result = await server.call("open_session", {});
+      if (result.isError) {
+        const msg = result.content[0]?.type === "text" ? result.content[0].text : "Unknown error";
+        return reply.code(500).send({ error: msg });
+      }
+      const first = result.content[0];
+      const data = first?.type === "text" ? parseTextContent(first.text) : {};
+      return reply.code(201).send(data);
+    },
+  );
 
   /**
    * DELETE /scraping/sessions/:id
@@ -112,7 +145,12 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
    */
   app.delete<{ Params: { id: string } }>(
     "/scraping/sessions/:id",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const result = await server.call("close_session", { sessionId: request.params.id });
       if (result.isError) {
@@ -139,8 +177,8 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
 
       const result = await server.call(tool, input);
       return reply.code(result.isError ? 422 : 200).send({
-        isError:  result.isError,
-        content:  result.content,
+        isError: result.isError,
+        content: result.content,
       });
     },
   );
@@ -152,7 +190,15 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Body: { url: string; sessionId?: string } }>(
     "/scraping/fetch",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const result = await server.call("get", request.body);
       if (result.isError) {
@@ -172,11 +218,20 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Body: { url: string; sessionId?: string } }>(
     "/scraping/fetch-stealthy",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const result = await server.call("fetch_stealthy", request.body);
       if (result.isError) {
-        const msg = result.content[0]?.type === "text" ? result.content[0].text : "Stealth fetch failed";
+        const msg =
+          result.content[0]?.type === "text" ? result.content[0].text : "Stealth fetch failed";
         return reply.code(422).send({ error: msg });
       }
       const first = result.content[0];
@@ -192,17 +247,26 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Body: { url: string; sessionId?: string } }>(
     "/scraping/screenshot",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const result = await server.call("screenshot", request.body);
       if (result.isError) {
-        const msg = result.content[0]?.type === "text" ? result.content[0].text : "Screenshot failed";
+        const msg =
+          result.content[0]?.type === "text" ? result.content[0].text : "Screenshot failed";
         return reply.code(422).send({ error: msg });
       }
       const img = result.content.find((c) => c.type === "image");
       return reply.send({
-        url:      request.body.url,
-        data:     img?.type === "image" ? img.data : undefined,
+        url: request.body.url,
+        data: img?.type === "image" ? img.data : undefined,
         mimeType: img?.type === "image" ? img.mimeType : undefined,
       });
     },
@@ -215,11 +279,20 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Body: { urls: string[]; sessionId?: string } }>(
     "/scraping/bulk",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const result = await server.call("bulk_get", request.body);
       if (result.isError) {
-        const msg = result.content[0]?.type === "text" ? result.content[0].text : "Bulk fetch failed";
+        const msg =
+          result.content[0]?.type === "text" ? result.content[0].text : "Bulk fetch failed";
         return reply.code(422).send({ error: msg });
       }
       const first = result.content[0];

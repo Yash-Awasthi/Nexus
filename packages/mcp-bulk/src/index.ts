@@ -225,9 +225,7 @@ export class BulkToolCaller {
     }
 
     if (this.maxBatchSize > 0 && requests.length > this.maxBatchSize) {
-      throw new Error(
-        `Batch size ${requests.length} exceeds maxBatchSize ${this.maxBatchSize}`,
-      );
+      throw new Error(`Batch size ${requests.length} exceeds maxBatchSize ${this.maxBatchSize}`);
     }
 
     if (this.mode === "sequential") {
@@ -241,10 +239,7 @@ export class BulkToolCaller {
    * Partition requests into batches and execute each batch.
    * Useful when the server has a per-request limit but you have many calls.
    */
-  async callInBatches(
-    requests: BulkToolRequest[],
-    batchSize: number,
-  ): Promise<BulkCallSummary[]> {
+  async callInBatches(requests: BulkToolRequest[], batchSize: number): Promise<BulkCallSummary[]> {
     const summaries: BulkCallSummary[] = [];
 
     for (let i = 0; i < requests.length; i += batchSize) {

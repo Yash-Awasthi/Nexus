@@ -33,19 +33,14 @@ export interface ExtractionResult {
 }
 
 /** Table row interface definition. */
-export interface TableRow {
-  [column: string]: string;
-}
+export type TableRow = Record<string, string>;
 
 // ── Field extraction ───────────────────────────────────────────────────────────
 
 /**
  * Extract structured fields from `text` using a list of `FieldSchema` definitions.
  */
-export function extractFields(
-  text: string,
-  schema: FieldSchema[],
-): ExtractionResult {
+export function extractFields(text: string, schema: FieldSchema[]): ExtractionResult {
   const t0 = Date.now();
   const fields: Record<string, unknown> = {};
   const missing: string[] = [];
@@ -69,13 +64,17 @@ export function extractFields(
 
 function coerce(raw: string, type: FieldType): unknown {
   switch (type) {
-    case "number":  return Number(raw);
-    case "boolean": return raw.toLowerCase() === "true" || raw === "1";
-    case "date":    return new Date(raw).toISOString();
+    case "number":
+      return Number(raw);
+    case "boolean":
+      return raw.toLowerCase() === "true" || raw === "1";
+    case "date":
+      return new Date(raw).toISOString();
     case "email":
     case "url":
     case "string":
-    default:        return raw;
+    default:
+      return raw;
   }
 }
 
@@ -86,10 +85,7 @@ function coerce(raw: string, type: FieldType): unknown {
  * Replaces `{{key}}` and `{{ key }}` with values from `vars`.
  * Unknown keys are replaced with empty string.
  */
-export function renderTemplate(
-  template: string,
-  vars: Record<string, unknown>,
-): string {
+export function renderTemplate(template: string, vars: Record<string, unknown>): string {
   return template.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, key: string) => {
     const val = getNestedValue(vars, key);
     return val !== undefined ? String(val) : "";
@@ -162,7 +158,7 @@ export function extractLinks(text: string): string[] {
 
 /** Extract all email addresses from text. */
 export function extractEmails(text: string): string[] {
-  const emailRegex = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
+  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
   return [...new Set(text.match(emailRegex) ?? [])];
 }
 

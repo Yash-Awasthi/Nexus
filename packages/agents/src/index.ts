@@ -369,12 +369,7 @@ export class LibrarianAgent {
  * Minimal interface for a research runner.
  * Compatible with @nexus/adapter-deep-research's execute() output shape.
  */
-export interface ResearchRunner {
-  (
-    query: string,
-    opts?: ResearchRunOptions,
-  ): Promise<ResearchRunResult>;
-}
+export type ResearchRunner = (query: string, opts?: ResearchRunOptions) => Promise<ResearchRunResult>;
 
 /** Research run options interface definition. */
 export interface ResearchRunOptions {
@@ -656,11 +651,7 @@ export class FileExplorerAgent {
           newSize: content.length,
         });
       } catch (cause) {
-        throw new AgentError(
-          "HOOK_EMIT_FAILED",
-          `Hook emit failed: ${String(cause)}`,
-          { path },
-        );
+        throw new AgentError("HOOK_EMIT_FAILED", `Hook emit failed: ${String(cause)}`, { path });
       }
 
       if (emitResult.aborted) {
@@ -720,7 +711,10 @@ export class FileExplorerAgent {
       const terms = opts.query.toLowerCase().split(/\s+/).filter(Boolean);
       const scored: FileInfo[] = filtered.map((e) => {
         // Split path into word segments for TF counting
-        const segments = e.toLowerCase().split(/[/._\-\s]+/).filter(Boolean);
+        const segments = e
+          .toLowerCase()
+          .split(/[/._\-\s]+/)
+          .filter(Boolean);
         const score = terms.reduce((sum, term) => {
           return sum + segments.filter((seg) => seg.includes(term)).length;
         }, 0);

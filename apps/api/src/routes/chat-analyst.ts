@@ -33,8 +33,8 @@ import {
 } from "@nexus/chat-analyst";
 import type { FastifyInstance } from "fastify";
 
-import { requireAuth } from "../middleware/auth.js";
 import { getSharedKV } from "../lib/shared-kv.js";
+import { requireAuth } from "../middleware/auth.js";
 
 // ── KV-backed session persistence (cross-pod safe) ───────────────────────────
 // AnalystSessionManager is in-process. To survive pod restarts and make sessions
@@ -45,24 +45,38 @@ const SESSION_TTL = parseInt(process.env.ANALYST_SESSION_TTL_MS ?? String(4 * 60
 const SESSION_KEY = (id: string): string => `analyst:session:${id}`;
 
 interface PersistedSession {
-  id:        string;
-  domain:    AnalystDomain;
-  history:   ContextMessage[];
+  id: string;
+  domain: AnalystDomain;
+  history: ContextMessage[];
   createdAt: string;
 }
 
-async function persistSession(session: { id: string; domain: AnalystDomain; createdAt: string; getHistory(): ContextMessage[] }): Promise<void> {
+async function persistSession(session: {
+  id: string;
+  domain: AnalystDomain;
+  createdAt: string;
+  getHistory(): ContextMessage[];
+}): Promise<void> {
   try {
-    await getSharedKV().set<PersistedSession>(SESSION_KEY(session.id), {
-      id:        session.id,
-      domain:    session.domain,
-      history:   session.getHistory(),
-      createdAt: session.createdAt,
-    }, SESSION_TTL);
-  } catch { /* non-fatal — in-process state is authoritative */ }
+    await getSharedKV().set<PersistedSession>(
+      SESSION_KEY(session.id),
+      {
+        id: session.id,
+        domain: session.domain,
+        history: session.getHistory(),
+        createdAt: session.createdAt,
+      },
+      SESSION_TTL,
+    );
+  } catch {
+    /* non-fatal — in-process state is authoritative */
+  }
 }
 
-async function loadSession(sessionId: string, manager: AnalystSessionManager): Promise<ReturnType<AnalystSessionManager["get"]> | undefined> {
+async function loadSession(
+  sessionId: string,
+  manager: AnalystSessionManager,
+): Promise<ReturnType<AnalystSessionManager["get"]> | undefined> {
   // Return in-process session if already warm
   const warm = manager.get(sessionId);
   if (warm) return warm;
@@ -74,7 +88,9 @@ async function loadSession(sessionId: string, manager: AnalystSessionManager): P
     // Re-hydrate history by adding messages back
     for (const msg of persisted.history) session.addMessage(msg.role, msg.content);
     return session;
-  } catch { return undefined; }
+  } catch {
+    return undefined;
+  }
 }
 
 // ── StreamingLlmFn implementation ─────────────────────────────────────────────
@@ -82,12 +98,15 @@ async function loadSession(sessionId: string, manager: AnalystSessionManager): P
 // The function bridges the @nexus/llm-drivers streaming API to AsyncIterable<string>.
 
 function buildLlmFn(): StreamingLlmFn {
-  const groqKey      = process.env.GROQ_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY;
   const openrouterKey = process.env.OPENROUTER_API_KEY;
 
   if (groqKey) {
     // Lazy import — avoids requiring @nexus/llm-drivers when Groq not configured
-    return async function* (systemPrompt: string, messages: ContextMessage[]): AsyncIterable<string> {
+    return async function* (
+      systemPrompt: string,
+      messages: ContextMessage[],
+    ): AsyncIterable<string> {
       const { GroqDriver } = await import("@nexus/llm-drivers");
       const driver = new GroqDriver({ apiKey: groqKey });
       const allMessages = [
@@ -96,15 +115,25 @@ function buildLlmFn(): StreamingLlmFn {
       ];
       const chunks: string[] = [];
       await driver.stream(
-        { model: process.env.ANALYST_MODEL ?? "llama-3.3-70b-versatile", messages: allMessages, maxTokens: 2048, temperature: 0.3 },
-        ({ delta }: { delta: string }) => { if (delta) chunks.push(delta); },
+        {
+          model: process.env.ANALYST_MODEL ?? "llama-3.3-70b-versatile",
+          messages: allMessages,
+          maxTokens: 2048,
+          temperature: 0.3,
+        },
+        ({ delta }: { delta: string }) => {
+          if (delta) chunks.push(delta);
+        },
       );
       for (const chunk of chunks) yield chunk;
     };
   }
 
   if (openrouterKey) {
-    return async function* (systemPrompt: string, messages: ContextMessage[]): AsyncIterable<string> {
+    return async function* (
+      systemPrompt: string,
+      messages: ContextMessage[],
+    ): AsyncIterable<string> {
       const { OpenRouterDriver } = await import("@nexus/llm-drivers");
       const driver = new OpenRouterDriver({ apiKey: openrouterKey });
       const allMessages = [
@@ -113,8 +142,15 @@ function buildLlmFn(): StreamingLlmFn {
       ];
       const chunks: string[] = [];
       await driver.stream(
-        { model: process.env.ANALYST_MODEL ?? "anthropic/claude-3-5-haiku", messages: allMessages, maxTokens: 2048, temperature: 0.3 },
-        ({ delta }: { delta: string }) => { if (delta) chunks.push(delta); },
+        {
+          model: process.env.ANALYST_MODEL ?? "anthropic/claude-3-5-haiku",
+          messages: allMessages,
+          maxTokens: 2048,
+          temperature: 0.3,
+        },
+        ({ delta }: { delta: string }) => {
+          if (delta) chunks.push(delta);
+        },
       );
       for (const chunk of chunks) yield chunk;
     };
@@ -131,7 +167,7 @@ function buildLlmFn(): StreamingLlmFn {
 // ── Singletons ────────────────────────────────────────────────────────────────
 
 const _analyst = new StreamingAnalyst({
-  llm:         buildLlmFn(),
+  llm: buildLlmFn(),
   rateLimiter: new RateLimiter({ requestsPerMinute: 20 }),
 });
 
@@ -164,11 +200,11 @@ export async function chatAnalystRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{
     Body: {
-      query:       string;
-      domain?:     AnalystDomain;
-      sessionId?:  string;
+      query: string;
+      domain?: AnalystDomain;
+      sessionId?: string;
       domainData?: Record<string, unknown>;
-      geo?:        GeoContext;
+      geo?: GeoContext;
     };
   }>("/analyst/query", { preHandler: requireAuth }, async (request, reply) => {
     const { query, domain = "general", sessionId, domainData, geo } = request.body;
@@ -179,9 +215,9 @@ export async function chatAnalystRoutes(app: FastifyInstance): Promise<void> {
 
     // Set up SSE headers immediately
     reply.raw.writeHead(200, {
-      "Content-Type":  "text/event-stream",
+      "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
-      Connection:      "keep-alive",
+      Connection: "keep-alive",
       "X-Accel-Buffering": "no", // disable nginx buffering
     });
 
@@ -203,10 +239,10 @@ export async function chatAnalystRoutes(app: FastifyInstance): Promise<void> {
       await persistSession(session);
     } catch (err) {
       const errEvent: AnalystEvent = {
-        type:      "error",
+        type: "error",
         sessionId: sessionId ?? "ephemeral",
-        code:      "ANALYST_ERROR",
-        message:   err instanceof Error ? err.message : "Unknown analyst error",
+        code: "ANALYST_ERROR",
+        message: err instanceof Error ? err.message : "Unknown analyst error",
       };
       sseWrite(reply.raw, errEvent);
     } finally {
@@ -226,14 +262,22 @@ export async function chatAnalystRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Body: { domain?: AnalystDomain } }>(
     "/analyst/session",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
-      const domain  = request.body.domain ?? "general";
+      const domain = request.body.domain ?? "general";
       const session = _sessions.create(domain);
       return reply.code(201).send({
-        sessionId:  session.id,
-        domain:     session.domain,
-        createdAt:  session.createdAt,
+        sessionId: session.id,
+        domain: session.domain,
+        createdAt: session.createdAt,
       });
     },
   );
@@ -247,59 +291,55 @@ export async function chatAnalystRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
     Params: { sessionId: string };
     Body: {
-      query:       string;
+      query: string;
       domainData?: Record<string, unknown>;
-      geo?:        GeoContext;
+      geo?: GeoContext;
     };
-  }>(
-    "/analyst/session/:sessionId/message",
-    { preHandler: requireAuth },
-    async (request, reply) => {
-      const { sessionId } = request.params;
-      const { query, domainData, geo } = request.body;
+  }>("/analyst/session/:sessionId/message", { preHandler: requireAuth }, async (request, reply) => {
+    const { sessionId } = request.params;
+    const { query, domainData, geo } = request.body;
 
-      if (!query || query.trim() === "") {
-        return reply.code(400).send({ error: "query is required" });
+    if (!query || query.trim() === "") {
+      return reply.code(400).send({ error: "query is required" });
+    }
+
+    // KV restore: handles cross-pod session lookup
+    const session = await loadSession(sessionId, _sessions);
+    if (!session) {
+      return reply.code(404).send({ error: `Session "${sessionId}" not found` });
+    }
+
+    reply.raw.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    });
+
+    const heartbeat = setInterval(() => {
+      if (!reply.raw.destroyed) reply.raw.write(": heartbeat\n\n");
+    }, 15_000);
+
+    try {
+      for await (const event of session.ask(query.trim(), { domainData, geo })) {
+        sseWrite(reply.raw, event as AnalystEvent);
+        if (event.type === "stream_end" || event.type === "error") break;
       }
-
-      // KV restore: handles cross-pod session lookup
-      const session = await loadSession(sessionId, _sessions);
-      if (!session) {
-        return reply.code(404).send({ error: `Session "${sessionId}" not found` });
-      }
-
-      reply.raw.writeHead(200, {
-        "Content-Type":  "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection:      "keep-alive",
-        "X-Accel-Buffering": "no",
+      await persistSession(session);
+    } catch (err) {
+      sseWrite(reply.raw, {
+        type: "error",
+        sessionId,
+        code: "ANALYST_ERROR",
+        message: err instanceof Error ? err.message : "Unknown error",
       });
+    } finally {
+      clearInterval(heartbeat);
+      reply.raw.end();
+    }
 
-      const heartbeat = setInterval(() => {
-        if (!reply.raw.destroyed) reply.raw.write(": heartbeat\n\n");
-      }, 15_000);
-
-      try {
-        for await (const event of session.ask(query.trim(), { domainData, geo })) {
-          sseWrite(reply.raw, event as AnalystEvent);
-          if (event.type === "stream_end" || event.type === "error") break;
-        }
-        await persistSession(session);
-      } catch (err) {
-        sseWrite(reply.raw, {
-          type:      "error",
-          sessionId,
-          code:      "ANALYST_ERROR",
-          message:   err instanceof Error ? err.message : "Unknown error",
-        });
-      } finally {
-        clearInterval(heartbeat);
-        reply.raw.end();
-      }
-
-      return reply;
-    },
-  );
+    return reply;
+  });
 
   /**
    * GET /analyst/session/:sessionId
@@ -308,16 +348,24 @@ export async function chatAnalystRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{ Params: { sessionId: string } }>(
     "/analyst/session/:sessionId",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const session = _sessions.get(request.params.sessionId);
       if (!session) {
         return reply.code(404).send({ error: "Session not found" });
       }
       return reply.send({
-        sessionId:     session.id,
-        domain:        session.domain,
-        createdAt:     session.createdAt,
+        sessionId: session.id,
+        domain: session.domain,
+        createdAt: session.createdAt,
         historyLength: session.getHistory().length,
       });
     },
@@ -330,7 +378,12 @@ export async function chatAnalystRoutes(app: FastifyInstance): Promise<void> {
    */
   app.delete<{ Params: { sessionId: string } }>(
     "/analyst/session/:sessionId",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const { sessionId } = request.params;
       if (!_sessions.has(sessionId)) {

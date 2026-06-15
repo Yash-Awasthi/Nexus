@@ -55,7 +55,15 @@ export async function ingestRoutes(app: FastifyInstance): Promise<void> {
   // GET /ingest/events/:eventId
   app.get<{ Params: { eventId: string } }>(
     "/ingest/events/:eventId",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const [row] = await db
         .select()
@@ -129,7 +137,15 @@ export async function ingestRoutes(app: FastifyInstance): Promise<void> {
   // GET /ingest/signals/:signalId
   app.get<{ Params: { signalId: string } }>(
     "/ingest/signals/:signalId",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const [row] = await db.select().from(signals).where(eq(signals.id, request.params.signalId));
 

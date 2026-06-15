@@ -202,13 +202,13 @@ export const defaultExtractor: Extractor = async (
 
     case "pdf":
       throw new Error(
-        'PDF extraction requires an external Extractor. ' +
+        "PDF extraction requires an external Extractor. " +
           'Wrap a library such as "pdf-parse" and inject it via opts.extractor.',
       );
 
     case "docx":
       throw new Error(
-        'DOCX extraction requires an external Extractor. ' +
+        "DOCX extraction requires an external Extractor. " +
           'Wrap a library such as "mammoth" and inject it via opts.extractor.',
       );
   }
@@ -378,10 +378,7 @@ export interface DocIngestTask {
   chunkOptions?: ChunkOptions;
 }
 
-async function execute(
-  task: DocIngestTask,
-  ctx: IExecutionContext,
-): Promise<PipelineResult> {
+async function execute(task: DocIngestTask, ctx: IExecutionContext): Promise<PipelineResult> {
   ctx.logger.info("doc.ingest", {
     format: task.format,
     contentLength: task.content.length,

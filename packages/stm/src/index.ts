@@ -33,9 +33,9 @@ export interface TransformContext {
 /** Transform input interface definition. */
 export interface TransformInput {
   text: string;
-  moduleIds?: STMModuleId[];  // null/undefined → apply all registered
+  moduleIds?: STMModuleId[]; // null/undefined → apply all registered
   context?: TransformContext;
-  maxChars?: number;          // enforced by TruncationGuard
+  maxChars?: number; // enforced by TruncationGuard
 }
 
 /** Module result interface definition. */
@@ -64,7 +64,7 @@ export interface STMModule {
 
 // ── HedgeReducer ─────────────────────────────────────────────────────────────
 
-const HEDGE_PATTERNS: Array<[RegExp, string]> = [
+const HEDGE_PATTERNS: [RegExp, string][] = [
   [/\bIt(?:'s| is) (?:worth noting that|important to note that)\b/gi, ""],
   [/\bIt (?:should|may) be noted that\b/gi, ""],
   [/\bIn (?:many|some) cases[,]?\s*/gi, ""],
@@ -97,7 +97,7 @@ export class HedgeReducer implements STMModule {
 
 // ── DirectnessOptimizer ───────────────────────────────────────────────────────
 
-const DIRECTNESS_PATTERNS: Array<[RegExp, string]> = [
+const DIRECTNESS_PATTERNS: [RegExp, string][] = [
   [/\bin order to\b/gi, "to"],
   [/\bdue to the fact that\b/gi, "because"],
   [/\bfor the purpose of\b/gi, "to"],
@@ -147,8 +147,12 @@ export class TruncationGuard implements STMModule {
     return text.length > this.maxChars;
   }
 
-  setMaxChars(n: number): void { this.maxChars = n; }
-  getMaxChars(): number { return this.maxChars; }
+  setMaxChars(n: number): void {
+    this.maxChars = n;
+  }
+  getMaxChars(): number {
+    return this.maxChars;
+  }
 }
 
 // ── MockSTMModule ─────────────────────────────────────────────────────────────
@@ -181,13 +185,27 @@ export class STMRegistry {
     return this;
   }
 
-  get(id: STMModuleId): STMModule | undefined { return this.modules.get(id); }
-  has(id: STMModuleId): boolean { return this.modules.has(id); }
-  list(): STMModule[] { return [...this.modules.values()]; }
-  ids(): STMModuleId[] { return [...this.modules.keys()]; }
-  unregister(id: STMModuleId): boolean { return this.modules.delete(id); }
-  clear(): void { this.modules.clear(); }
-  size(): number { return this.modules.size; }
+  get(id: STMModuleId): STMModule | undefined {
+    return this.modules.get(id);
+  }
+  has(id: STMModuleId): boolean {
+    return this.modules.has(id);
+  }
+  list(): STMModule[] {
+    return [...this.modules.values()];
+  }
+  ids(): STMModuleId[] {
+    return [...this.modules.keys()];
+  }
+  unregister(id: STMModuleId): boolean {
+    return this.modules.delete(id);
+  }
+  clear(): void {
+    this.modules.clear();
+  }
+  size(): number {
+    return this.modules.size;
+  }
 }
 
 // ── applySTMs ─────────────────────────────────────────────────────────────────
@@ -257,7 +275,9 @@ export class STMPipeline {
     };
   }
 
-  getRegistry(): STMRegistry { return this.registry; }
+  getRegistry(): STMRegistry {
+    return this.registry;
+  }
 
   /** Partially apply only specific module IDs (skip missing without error). */
   transformPartial(input: TransformInput): TransformOutput {

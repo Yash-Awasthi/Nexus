@@ -106,7 +106,7 @@ export class BM25Index implements IFullTextIndex {
     const N = this._docs.size;
     const avgdl = this._totalLength / N;
 
-    const scored: Array<{ id: string; score: number }> = [];
+    const scored: { id: string; score: number }[] = [];
 
     for (const [id, entry] of this._docs) {
       let score = 0;
@@ -115,7 +115,8 @@ export class BM25Index implements IFullTextIndex {
         if (tf === 0) continue;
         const df = this._df.get(term) ?? 0;
         const idf = Math.log((N - df + 0.5) / (df + 0.5) + 1);
-        const norm = tf * (BM25_K1 + 1) / (tf + BM25_K1 * (1 - BM25_B + BM25_B * entry.length / avgdl));
+        const norm =
+          (tf * (BM25_K1 + 1)) / (tf + BM25_K1 * (1 - BM25_B + (BM25_B * entry.length) / avgdl));
         score += idf * norm;
       }
       if (score > minScore) scored.push({ id, score });
@@ -150,7 +151,9 @@ export interface IVectorStore {
 }
 
 function cosineSimilarity(a: number[], b: number[]): number {
-  let dot = 0, na = 0, nb = 0;
+  let dot = 0,
+    na = 0,
+    nb = 0;
   const len = Math.min(a.length, b.length);
   for (let i = 0; i < len; i++) {
     dot += a[i]! * b[i]!;
@@ -189,7 +192,7 @@ export class InMemoryVectorStore implements IVectorStore {
 
 // ── Reciprocal Rank Fusion ────────────────────────────────────────────────────
 
-export type RankedList = ReadonlyArray<{ id: string; score?: number }>;
+export type RankedList = readonly { id: string; score?: number }[];
 
 /**
  * Reciprocal Rank Fusion (RRF) — combines multiple ranked lists.
@@ -200,7 +203,7 @@ export type RankedList = ReadonlyArray<{ id: string; score?: number }>;
 export function reciprocalRankFusion(
   lists: RankedList[],
   k = 60,
-): Array<{ id: string; score: number }> {
+): { id: string; score: number }[] {
   const scores = new Map<string, number>();
 
   for (const list of lists) {

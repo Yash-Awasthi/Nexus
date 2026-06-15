@@ -58,9 +58,9 @@ export type CacheTierLevel = "hot" | "warm" | "cold";
 
 /** Cache tiers. */
 export const CACHE_TIERS: Record<CacheTierLevel, { maxAgeMs: number; swr: number }> = {
-  hot:  { maxAgeMs: 120_000,  swr: 60_000  },
-  warm: { maxAgeMs: 300_000,  swr: 120_000 },
-  cold: { maxAgeMs: 900_000,  swr: 300_000 },
+  hot: { maxAgeMs: 120_000, swr: 60_000 },
+  warm: { maxAgeMs: 300_000, swr: 120_000 },
+  cold: { maxAgeMs: 900_000, swr: 300_000 },
 };
 
 /** Cache entry interface definition. */
@@ -83,7 +83,12 @@ export interface CacheLookup<T> {
 export class MarketCache {
   private store = new Map<string, CacheEntry<Market | MarketListResponse>>();
 
-  set<T extends Market | MarketListResponse>(key: string, value: T, tier: CacheTierLevel = "warm"): void {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
+  set<T extends Market | MarketListResponse>(
+    key: string,
+    value: T,
+    tier: CacheTierLevel = "warm",
+  ): void {
     this.store.set(key, { value, cachedAt: Date.now(), tier });
   }
 
@@ -98,14 +103,20 @@ export class MarketCache {
     return { value: null, status: "expired" };
   }
 
-  invalidate(key: string): boolean { return this.store.delete(key); }
+  invalidate(key: string): boolean {
+    return this.store.delete(key);
+  }
   invalidateCategory(category: string): void {
     for (const [k, v] of this.store.entries()) {
       if ((v.value as Market).category === category) this.store.delete(k);
     }
   }
-  clear(): void { this.store.clear(); }
-  size(): number { return this.store.size; }
+  clear(): void {
+    this.store.clear();
+  }
+  size(): number {
+    return this.store.size;
+  }
 }
 
 // ── RateLimiter ───────────────────────────────────────────────────────────────
@@ -138,19 +149,33 @@ export class PmRateLimiter {
     return { allowed: true, retryAfterMs: 0 };
   }
 
-  reset(key: string): void { this.windows.delete(key); }
-  clear(): void { this.windows.clear(); }
+  reset(key: string): void {
+    this.windows.delete(key);
+  }
+  clear(): void {
+    this.windows.clear();
+  }
 }
 
 // ── ApiKeyAuthenticator ───────────────────────────────────────────────────────
 
 export class ApiKeyAuthenticator {
   private validKeys: Set<string>;
-  constructor(keys: string[]) { this.validKeys = new Set(keys); }
-  validate(key: string): boolean { return this.validKeys.has(key); }
-  add(key: string): void { this.validKeys.add(key); }
-  revoke(key: string): void { this.validKeys.delete(key); }
-  count(): number { return this.validKeys.size; }
+  constructor(keys: string[]) {
+    this.validKeys = new Set(keys);
+  }
+  validate(key: string): boolean {
+    return this.validKeys.has(key);
+  }
+  add(key: string): void {
+    this.validKeys.add(key);
+  }
+  revoke(key: string): void {
+    this.validKeys.delete(key);
+  }
+  count(): number {
+    return this.validKeys.size;
+  }
 }
 
 // ── MarketBackend interface ───────────────────────────────────────────────────
@@ -178,7 +203,7 @@ function makeDefaultMarket(id: string, category = "politics"): Market {
     category,
     outcomes: [
       { id: `${id}-yes`, label: "Yes", price: 0.6, probability: 0.6 },
-      { id: `${id}-no`,  label: "No",  price: 0.4, probability: 0.4 },
+      { id: `${id}-no`, label: "No", price: 0.4, probability: 0.4 },
     ],
     volume: 10_000 * seq,
     liquidity: 5_000 * seq,
@@ -219,7 +244,11 @@ export class MockMarketBackend implements MarketBackend {
 
 // ── PolymarketHttpBackend ─────────────────────────────────────────────────────
 
-interface PolyToken { token_id: string; outcome: string; price: number; }
+interface PolyToken {
+  token_id: string;
+  outcome: string;
+  price: number;
+}
 
 interface PolyRaw {
   condition_id: string;
@@ -232,22 +261,24 @@ interface PolyRaw {
   end_date_iso?: string;
 }
 
-interface PolyListResp { data?: PolyRaw[]; }
+interface PolyListResp {
+  data?: PolyRaw[];
+}
 
 function toMarket(raw: PolyRaw): Market {
   const tokens = raw.tokens ?? [];
   const totalPrice = tokens.reduce((s, t) => s + (t.price ?? 0), 0) || 1;
   return {
-    id:       raw.condition_id,
+    id: raw.condition_id,
     question: raw.question ?? raw.title ?? raw.condition_id,
     category: (raw.category ?? "general").toLowerCase(),
     outcomes: tokens.map((t) => ({
-      id:          t.token_id,
-      label:       t.outcome,
-      price:       t.price ?? 0,
+      id: t.token_id,
+      label: t.outcome,
+      price: t.price ?? 0,
       probability: (t.price ?? 0) / totalPrice,
     })),
-    volume:    raw.volume    ?? 0,
+    volume: raw.volume ?? 0,
     liquidity: raw.liquidity ?? 0,
     resolveAt: raw.end_date_iso,
     fetchedAt: new Date().toISOString(),
@@ -303,9 +334,7 @@ export class PolymarketHttpBackend implements MarketBackend {
     }
 
     const body = (await resp.json()) as PolyListResp | PolyRaw[];
-    const rawList: PolyRaw[] = Array.isArray(body)
-      ? body
-      : (body as PolyListResp).data ?? [];
+    const rawList: PolyRaw[] = Array.isArray(body) ? body : ((body as PolyListResp).data ?? []);
 
     let markets = rawList.map(toMarket);
     if (query.ids?.length) {
@@ -334,7 +363,10 @@ export class PolymarketClient {
     const key = `market:${id}`;
     if (!forceRefresh) {
       const lookup = this.cache.get<Market>(key);
-      if (lookup.value && (lookup.status === "fresh" || lookup.status === "stale-while-revalidate")) {
+      if (
+        lookup.value &&
+        (lookup.status === "fresh" || lookup.status === "stale-while-revalidate")
+      ) {
         return lookup.value;
       }
     }
@@ -347,7 +379,10 @@ export class PolymarketClient {
     const key = `markets:${JSON.stringify(query)}`;
     if (!forceRefresh) {
       const lookup = this.cache.get<MarketListResponse>(key);
-      if (lookup.value && (lookup.status === "fresh" || lookup.status === "stale-while-revalidate")) {
+      if (
+        lookup.value &&
+        (lookup.status === "fresh" || lookup.status === "stale-while-revalidate")
+      ) {
         return lookup.value;
       }
     }
@@ -356,7 +391,9 @@ export class PolymarketClient {
     return response;
   }
 
-  getCache(): MarketCache { return this.cache; }
+  getCache(): MarketCache {
+    return this.cache;
+  }
 }
 
 // ── PredictionMarketService ───────────────────────────────────────────────────
@@ -391,7 +428,8 @@ export class PredictionMarketService {
   }
 
   async getMarket(id: string, apiKey?: string): Promise<ServiceCallResult<Market>> {
-    if (this.auth && (!apiKey || !this.auth.validate(apiKey))) return { data: null, unauthorized: true };
+    if (this.auth && (!apiKey || !this.auth.validate(apiKey)))
+      return { data: null, unauthorized: true };
     const rl = this.rateLimiter.check(apiKey ?? "anonymous");
     if (!rl.allowed) return { data: null, rateLimited: true };
     try {
@@ -401,8 +439,12 @@ export class PredictionMarketService {
     }
   }
 
-  async getMarkets(query: MarketQuery = {}, apiKey?: string): Promise<ServiceCallResult<MarketListResponse>> {
-    if (this.auth && (!apiKey || !this.auth.validate(apiKey))) return { data: null, unauthorized: true };
+  async getMarkets(
+    query: MarketQuery = {},
+    apiKey?: string,
+  ): Promise<ServiceCallResult<MarketListResponse>> {
+    if (this.auth && (!apiKey || !this.auth.validate(apiKey)))
+      return { data: null, unauthorized: true };
     const rl = this.rateLimiter.check(apiKey ?? "anonymous");
     if (!rl.allowed) return { data: null, rateLimited: true };
     try {
@@ -412,6 +454,10 @@ export class PredictionMarketService {
     }
   }
 
-  getClient(): PolymarketClient { return this.client; }
-  getRateLimiter(): PmRateLimiter { return this.rateLimiter; }
+  getClient(): PolymarketClient {
+    return this.client;
+  }
+  getRateLimiter(): PmRateLimiter {
+    return this.rateLimiter;
+  }
 }

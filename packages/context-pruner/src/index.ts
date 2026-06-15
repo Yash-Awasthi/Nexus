@@ -27,6 +27,7 @@
  *                        satisfies the budget.
  */
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { randomUUID } from "node:crypto";
 
 // ── Error ──────────────────────────────────────────────────────────────────────
@@ -162,7 +163,11 @@ export class SlidingWindowPruner implements IContextPruner {
     return totalTokens(messages, this.tokenizer);
   }
 
-  async prune(messages: Message[], maxTokens: number, opts: PruneOptions = {}): Promise<PruneResult> {
+  async prune(
+    messages: Message[],
+    maxTokens: number,
+    opts: PruneOptions = {},
+  ): Promise<PruneResult> {
     const budget = maxTokens - (opts.reserveTokens ?? 0);
     const { system, rest } = extractSystem(messages);
 
@@ -225,7 +230,11 @@ export class TFIDFPruner implements IContextPruner {
     return totalTokens(messages, this.tokenizer);
   }
 
-  async prune(messages: Message[], maxTokens: number, opts: PruneOptions = {}): Promise<PruneResult> {
+  async prune(
+    messages: Message[],
+    maxTokens: number,
+    opts: PruneOptions = {},
+  ): Promise<PruneResult> {
     const budget = maxTokens - (opts.reserveTokens ?? 0);
     const { system, rest } = extractSystem(messages);
 
@@ -293,7 +302,11 @@ export class ImportanceWeightedPruner implements IContextPruner {
     return totalTokens(messages, this.tokenizer);
   }
 
-  async prune(messages: Message[], maxTokens: number, opts: PruneOptions = {}): Promise<PruneResult> {
+  async prune(
+    messages: Message[],
+    maxTokens: number,
+    opts: PruneOptions = {},
+  ): Promise<PruneResult> {
     const budget = maxTokens - (opts.reserveTokens ?? 0);
     const { system, rest } = extractSystem(messages);
 
@@ -313,7 +326,7 @@ export class ImportanceWeightedPruner implements IContextPruner {
     }));
     scored.sort((a, b) => b.score - a.score);
 
-    const kept: Array<{ msg: Message; idx: number }> = [];
+    const kept: { msg: Message; idx: number }[] = [];
     for (const item of scored) {
       const cost = messageTokens(item.msg, this.tokenizer);
       if (remaining - cost >= 0) {
@@ -340,7 +353,8 @@ export class ImportanceWeightedPruner implements IContextPruner {
  */
 export class PrunerChain implements IContextPruner {
   constructor(private readonly pruners: IContextPruner[]) {
-    if (pruners.length === 0) throw new PrunerError("PrunerChain requires at least one pruner", "EMPTY_CHAIN");
+    if (pruners.length === 0)
+      throw new PrunerError("PrunerChain requires at least one pruner", "EMPTY_CHAIN");
   }
 
   estimate(messages: Message[]): number {
@@ -368,7 +382,10 @@ export class PrunerChain implements IContextPruner {
  */
 export type MessageRole2 = "system" | "user" | "assistant";
 /** Llm message interface definition. */
-export interface LLMMessage { role: MessageRole2; content: string; }
+export interface LLMMessage {
+  role: MessageRole2;
+  content: string;
+}
 /** Llm request interface definition. */
 export interface LLMRequest {
   model: string;
@@ -377,7 +394,13 @@ export interface LLMRequest {
   temperature?: number;
 }
 /** Llm response interface definition. */
-export interface LLMResponse { id: string; model: string; content: string; provider: string; latencyMs: number; }
+export interface LLMResponse {
+  id: string;
+  model: string;
+  content: string;
+  provider: string;
+  latencyMs: number;
+}
 /** Llm provider interface definition. */
 export interface LLMProvider {
   readonly name: string;

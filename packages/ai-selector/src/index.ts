@@ -151,7 +151,9 @@ function buildFindPrompt(req: ElementSelectorRequest, html: string): string {
     req.examples && req.examples.length > 0
       ? "\n\nExamples:\n" +
         req.examples
-          .map((e) => `- Description: "${e.description}"\n  Selector: ${e.selector} (${e.strategy})`)
+          .map(
+            (e) => `- Description: "${e.description}"\n  Selector: ${e.selector} (${e.strategy})`,
+          )
           .join("\n")
       : "";
 
@@ -196,8 +198,8 @@ function parseSingle(raw: string): ElementSelectorResult | undefined {
     if (!parsed.selector || parsed.confidence === 0) return undefined;
     return {
       selector: parsed.selector,
-      strategy: (parsed.strategy as SelectorStrategy) ?? "css",
-      confidence: Number(parsed.confidence ?? 0),
+      strategy: (parsed.strategy!) ?? "css",
+      confidence: parsed.confidence ?? 0,
       explanation: parsed.explanation,
     };
   } catch {
@@ -209,13 +211,13 @@ function parseMultiple(raw: string): ElementSelectorResult[] {
   try {
     const match = /\[[\s\S]*?\]/.exec(raw);
     if (!match) return [];
-    const parsed = JSON.parse(match[0]) as Array<Partial<ElementSelectorResult>>;
+    const parsed = JSON.parse(match[0]) as Partial<ElementSelectorResult>[];
     return parsed
-      .filter((r) => r.selector && Number(r.confidence ?? 0) > 0)
+      .filter((r) => r.selector && (r.confidence ?? 0) > 0)
       .map((r) => ({
         selector: r.selector!,
-        strategy: (r.strategy as SelectorStrategy) ?? "css",
-        confidence: Number(r.confidence ?? 0),
+        strategy: (r.strategy!) ?? "css",
+        confidence: r.confidence ?? 0,
         explanation: r.explanation,
       }))
       .sort((a, b) => b.confidence - a.confidence);
@@ -282,8 +284,12 @@ export class LLMAISelector implements IAISelector {
 
 /** Always returns no results. Useful as a disabled fallback in tests. */
 export class NullAISelector implements IAISelector {
-  async find(): Promise<ElementSelectorResult | undefined> { return undefined; }
-  async findAll(): Promise<ElementSelectorResult[]> { return []; }
+  async find(): Promise<ElementSelectorResult | undefined> {
+    return undefined;
+  }
+  async findAll(): Promise<ElementSelectorResult[]> {
+    return [];
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -321,7 +327,8 @@ export class CascadeSelector implements IAISelector {
       config.validate ??
       // Default naive validator: check if any attribute value or class name
       // approximating the selector exists in the raw HTML.
-      ((sel, html) => html.includes(sel.selector.replace(/[.#\[\]>+~*:^$|]/g, "").split(" ")[0] ?? ""));
+      ((sel, html) =>
+        html.includes(sel.selector.replace(/[.#[\]>+~*:^$|]/g, "").split(" ")[0] ?? ""));
   }
 
   async find(request: ElementSelectorRequest): Promise<ElementSelectorResult | undefined> {

@@ -106,7 +106,7 @@ export interface HttpTransport {
 
 /** Mock transport. */
 export class MockTransport implements HttpTransport {
-  readonly calls: Array<{ url: string; body: unknown; headers: Record<string, string> }> = [];
+  readonly calls: { url: string; body: unknown; headers: Record<string, string> }[] = [];
   private response: unknown = {};
 
   setResponse(response: unknown): this {
@@ -199,8 +199,10 @@ abstract class BaseDriver implements LlmDriver {
 
     try {
       while (true) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const { done, value } = await reader.read();
         if (done) break;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
@@ -245,8 +247,10 @@ abstract class BaseDriver implements LlmDriver {
 
     try {
       while (true) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const { done, value } = await reader.read();
         if (done) break;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
@@ -292,8 +296,12 @@ abstract class BaseDriver implements LlmDriver {
 
 // ── Driver config types ────────────────────────────────────────────────────────
 
-interface ApiKeyConfig { apiKey: string; }
-interface BaseUrlConfig { baseUrl?: string; }
+interface ApiKeyConfig {
+  apiKey: string;
+}
+interface BaseUrlConfig {
+  baseUrl?: string;
+}
 type FullConfig = ApiKeyConfig & BaseUrlConfig;
 
 // ── 1. Anthropic ──────────────────────────────────────────────────────────────
@@ -322,15 +330,15 @@ export class AnthropicDriver extends BaseDriver {
       ...(systemMsg ? { system: systemMsg } : {}),
       ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
     };
-    const raw = await this.transport.post(
-      `${this.baseUrl}/v1/messages`,
-      body,
-      { "x-api-key": this.apiKey, "anthropic-version": "2023-06-01" },
-    ) as Record<string, unknown>;
+    const raw = (await this.transport.post(`${this.baseUrl}/v1/messages`, body, {
+      "x-api-key": this.apiKey,
+      "anthropic-version": "2023-06-01",
+    })) as Record<string, unknown>;
 
-    const content = ((raw["content"] as Array<{ text: string }>)?.[0]?.text) ?? "";
+    const content = (raw["content"] as { text: string }[])?.[0]?.text ?? "";
     const usage = raw["usage"] as { input_tokens?: number; output_tokens?: number } | undefined;
-    const inputTokens = usage?.input_tokens ?? estimateTokens(messages.map((m) => m.content).join(" "));
+    const inputTokens =
+      usage?.input_tokens ?? estimateTokens(messages.map((m) => m.content).join(" "));
     const outputTokens = usage?.output_tokens ?? estimateTokens(content);
     return this.makeResponse(
       (raw["id"] as string) ?? "anth-resp",
@@ -362,13 +370,17 @@ export class AnthropicDriver extends BaseDriver {
     let inputTokens = 0;
     let outputTokens = 0;
 
-    for await (const line of this.sseLines(
-      `${this.baseUrl}/v1/messages`,
-      body,
-      { "x-api-key": this.apiKey, "anthropic-version": "2023-06-01" },
-    )) {
+    for await (const line of this.sseLines(`${this.baseUrl}/v1/messages`, body, {
+      "x-api-key": this.apiKey,
+      "anthropic-version": "2023-06-01",
+    })) {
       let event: Record<string, unknown>;
-      try { event = JSON.parse(line); } catch { continue; }
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        event = JSON.parse(line);
+      } catch {
+        continue;
+      }
 
       const type = event["type"] as string | undefined;
       if (type === "message_start") {
@@ -421,16 +433,19 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
       ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
       ...(opts.stop ? { stop: opts.stop } : {}),
     };
-    const raw = await this.transport.post(
-      `${this.baseUrl}/chat/completions`,
-      body,
-      { Authorization: `Bearer ${this.apiKey}` },
-    ) as Record<string, unknown>;
+    const raw = (await this.transport.post(`${this.baseUrl}/chat/completions`, body, {
+      Authorization: `Bearer ${this.apiKey}`,
+    })) as Record<string, unknown>;
 
-    const choice = (raw["choices"] as Array<{ message: { content: string }; finish_reason: string }>)?.[0];
+    const choice = (
+      raw["choices"] as { message: { content: string }; finish_reason: string }[]
+    )?.[0];
     const content = choice?.message?.content ?? "";
-    const usage = raw["usage"] as { prompt_tokens?: number; completion_tokens?: number } | undefined;
-    const inputTokens = usage?.prompt_tokens ?? estimateTokens(messages.map((m) => m.content).join(" "));
+    const usage = raw["usage"] as
+      | { prompt_tokens?: number; completion_tokens?: number }
+      | undefined;
+    const inputTokens =
+      usage?.prompt_tokens ?? estimateTokens(messages.map((m) => m.content).join(" "));
     const outputTokens = usage?.completion_tokens ?? estimateTokens(content);
     return this.makeResponse(
       (raw["id"] as string) ?? `${this.provider}-resp`,
@@ -464,21 +479,26 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
     let promptTokens = 0;
     let completionTokens = 0;
 
-    for await (const line of this.sseLines(
-      `${this.baseUrl}/chat/completions`,
-      body,
-      { Authorization: `Bearer ${this.apiKey}` },
-    )) {
+    for await (const line of this.sseLines(`${this.baseUrl}/chat/completions`, body, {
+      Authorization: `Bearer ${this.apiKey}`,
+    })) {
       let event: Record<string, unknown>;
-      try { event = JSON.parse(line); } catch { continue; }
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        event = JSON.parse(line);
+      } catch {
+        continue;
+      }
 
       const eventId = event["id"] as string | undefined;
       if (eventId) id = eventId;
 
-      const choices = event["choices"] as Array<{
-        delta?: { content?: string };
-        finish_reason?: string;
-      }> | undefined;
+      const choices = event["choices"] as
+        | {
+            delta?: { content?: string };
+            finish_reason?: string;
+          }[]
+        | undefined;
 
       const delta = choices?.[0]?.delta?.content ?? "";
       if (delta) {
@@ -489,7 +509,9 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
       const fr = choices?.[0]?.finish_reason;
       if (fr) finishReason = fr as LlmResponse["finishReason"];
 
-      const usage = event["usage"] as { prompt_tokens?: number; completion_tokens?: number } | undefined;
+      const usage = event["usage"] as
+        | { prompt_tokens?: number; completion_tokens?: number }
+        | undefined;
       if (usage?.prompt_tokens) promptTokens = usage.prompt_tokens;
       if (usage?.completion_tokens) completionTokens = usage.completion_tokens;
     }
@@ -499,7 +521,14 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
       completionTokens || estimateTokens(content),
     );
     await handler({ delta: "", done: true, usage: usageObj });
-    return this.makeResponse(id, content, opts.model ?? this.model, usageObj, Date.now() - t0, finishReason);
+    return this.makeResponse(
+      id,
+      content,
+      opts.model ?? this.model,
+      usageObj,
+      Date.now() - t0,
+      finishReason,
+    );
   }
 }
 
@@ -552,7 +581,10 @@ export class OpenRouterDriver extends OpenAICompatibleDriver {
   readonly model: string;
   protected baseUrl: string;
 
-  constructor(config: FullConfig & { model?: string; siteName?: string }, transport?: HttpTransport) {
+  constructor(
+    config: FullConfig & { model?: string; siteName?: string },
+    transport?: HttpTransport,
+  ) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://openrouter.ai/api/v1";
     this.model = config.model ?? "anthropic/claude-3.5-sonnet";
@@ -591,16 +623,25 @@ export class GeminiDriver extends BaseDriver {
         ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
       },
     };
-    const raw = await this.transport.post(
+    const raw = (await this.transport.post(
       `${this.baseUrl}/models/${model}:generateContent?key=${this.apiKey}`,
       body,
       {},
-    ) as Record<string, unknown>;
+    )) as Record<string, unknown>;
 
-    const candidate = (raw["candidates"] as Array<{ content: { parts: Array<{ text: string }> }; finishReason?: string }>)?.[0];
+    const candidate = (
+      raw["candidates"] as {
+        content: { parts: { text: string }[] };
+        finishReason?: string;
+      }[]
+    )?.[0];
     const content = candidate?.content?.parts?.[0]?.text ?? "";
-    const usage = raw["usageMetadata"] as { promptTokenCount?: number; candidatesTokenCount?: number } | undefined;
-    const inputTokens = usage?.promptTokenCount ?? estimateTokens(contents.map((c) => c.parts[0]?.text ?? "").join(" "));
+    const usage = raw["usageMetadata"] as
+      | { promptTokenCount?: number; candidatesTokenCount?: number }
+      | undefined;
+    const inputTokens =
+      usage?.promptTokenCount ??
+      estimateTokens(contents.map((c) => c.parts[0]?.text ?? "").join(" "));
     const outputTokens = usage?.candidatesTokenCount ?? estimateTokens(content);
     return this.makeResponse(
       `gemini-${Date.now()}`,
@@ -641,21 +682,30 @@ export class GeminiDriver extends BaseDriver {
       {},
     )) {
       let event: Record<string, unknown>;
-      try { event = JSON.parse(line); } catch { continue; }
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        event = JSON.parse(line);
+      } catch {
+        continue;
+      }
 
-      const candidates = event["candidates"] as Array<{
-        content: { parts: Array<{ text: string }> };
-      }> | undefined;
+      const candidates = event["candidates"] as
+        | {
+            content: { parts: { text: string }[] };
+          }[]
+        | undefined;
       const text = candidates?.[0]?.content?.parts?.[0]?.text ?? "";
       if (text) {
         content += text;
         await handler({ delta: text, done: false });
       }
 
-      const usage = event["usageMetadata"] as {
-        promptTokenCount?: number;
-        candidatesTokenCount?: number;
-      } | undefined;
+      const usage = event["usageMetadata"] as
+        | {
+            promptTokenCount?: number;
+            candidatesTokenCount?: number;
+          }
+        | undefined;
       if (usage?.promptTokenCount) inputTokens = usage.promptTokenCount;
       if (usage?.candidatesTokenCount) outputTokens = usage.candidatesTokenCount;
     }
@@ -691,10 +741,16 @@ export class OllamaDriver extends BaseDriver {
       stream: false,
       ...(opts.maxTokens !== undefined ? { options: { num_predict: opts.maxTokens } } : {}),
     };
-    const raw = await this.transport.post(`${this.baseUrl}/api/chat`, body, {}) as Record<string, unknown>;
+    const raw = (await this.transport.post(`${this.baseUrl}/api/chat`, body, {})) as Record<
+      string,
+      unknown
+    >;
     const message = raw["message"] as { content?: string } | undefined;
     const content = message?.content ?? "";
-    const usage = this.makeUsage(estimateTokens(opts.messages.map((m) => m.content).join(" ")), estimateTokens(content));
+    const usage = this.makeUsage(
+      estimateTokens(opts.messages.map((m) => m.content).join(" ")),
+      estimateTokens(content),
+    );
     return this.makeResponse(`ollama-${Date.now()}`, content, model, usage, Date.now() - t0);
   }
 
@@ -716,7 +772,12 @@ export class OllamaDriver extends BaseDriver {
 
     for await (const line of this.ndjsonLines(`${this.baseUrl}/api/chat`, body, {})) {
       let chunk: Record<string, unknown>;
-      try { chunk = JSON.parse(line); } catch { continue; }
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        chunk = JSON.parse(line);
+      } catch {
+        continue;
+      }
 
       const msg = chunk["message"] as { content?: string } | undefined;
       const delta = msg?.content ?? "";
@@ -842,9 +903,20 @@ export class CodestralDriver extends OpenAICompatibleDriver {
 // ── Driver registry + factory ──────────────────────────────────────────────────
 
 export type ProviderName =
-  | "anthropic" | "groq" | "deepseek" | "mistral" | "openrouter"
-  | "gemini" | "ollama" | "lmstudio" | "llamacpp" | "fireworks"
-  | "nvidia_nim" | "cerebras" | "kimi" | "codestral";
+  | "anthropic"
+  | "groq"
+  | "deepseek"
+  | "mistral"
+  | "openrouter"
+  | "gemini"
+  | "ollama"
+  | "lmstudio"
+  | "llamacpp"
+  | "fireworks"
+  | "nvidia_nim"
+  | "cerebras"
+  | "kimi"
+  | "codestral";
 
 /** Driver registration interface definition. */
 export interface DriverRegistration {

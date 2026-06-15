@@ -19,12 +19,12 @@ import { requireAuth } from "../middleware/auth.js";
 // ── Emit log ring buffer ──────────────────────────────────────────────────────
 
 interface EmitLogEntry {
-  id:        string;
-  event:     string;
+  id: string;
+  event: string;
   timestamp: string;
-  handled:   number;
-  aborted:   boolean;
-  errors:    unknown[];
+  handled: number;
+  aborted: boolean;
+  errors: unknown[];
 }
 
 const _emitLog: EmitLogEntry[] = [];
@@ -40,12 +40,12 @@ const _origEmit = globalHooks.emit.bind(globalHooks);
 globalHooks.emit = async function (event: HookEvent, payload: unknown) {
   const result = await _origEmit(event, payload as Parameters<typeof _origEmit>[1]);
   recordEmit({
-    id:        `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    event:     event as string,
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    event: event as string,
     timestamp: new Date().toISOString(),
-    handled:   result.handled,
-    aborted:   result.aborted,
-    errors:    result.errors,
+    handled: result.handled,
+    aborted: result.aborted,
+    errors: result.errors,
   });
   return result;
 };
@@ -58,23 +58,35 @@ export async function hooksRoutes(app: FastifyInstance): Promise<void> {
    *
    * List all registered handler registrations across all hook events.
    */
-  app.get("/hooks/handlers", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
-    const handlers: Array<{
-      id: string;
-      event: string;
-      label?: string;
-      priority: number;
-    }> = [];
+  app.get(
+    "/hooks/handlers",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_request, reply) => {
+      const handlers: {
+        id: string;
+        event: string;
+        label?: string;
+        priority: number;
+      }[] = [];
 
-    for (const event of HOOK_EVENTS) {
-      const regs = globalHooks.listHandlers(event as HookEvent);
-      for (const reg of regs) {
-        handlers.push({ id: reg.id, event: reg.event, label: reg.label, priority: reg.priority });
+      for (const event of HOOK_EVENTS) {
+        const regs = globalHooks.listHandlers(event as HookEvent);
+        for (const reg of regs) {
+          handlers.push({ id: reg.id, event: reg.event, label: reg.label, priority: reg.priority });
+        }
       }
-    }
 
-    return reply.send({ handlers, total: handlers.length, events: HOOK_EVENTS });
-  });
+      return reply.send({ handlers, total: handlers.length, events: HOOK_EVENTS });
+    },
+  );
 
   /**
    * GET /hooks/log?event=&limit=

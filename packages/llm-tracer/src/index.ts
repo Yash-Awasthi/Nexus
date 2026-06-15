@@ -24,9 +24,7 @@ export type SpanStatus = "ok" | "error" | "unset";
 export type SpanKind = "root" | "llm" | "tool" | "internal";
 
 /** Span attributes interface definition. */
-export interface SpanAttributes {
-  [key: string]: string | number | boolean | undefined;
-}
+export type SpanAttributes = Record<string, string | number | boolean | undefined>;
 
 /** Span event interface definition. */
 export interface SpanEvent {
@@ -89,9 +87,15 @@ export class ActiveSpan {
     this._onEnd = onEnd;
   }
 
-  get context(): SpanContext { return this._span.context; }
-  get name(): string { return this._span.name; }
-  get isEnded(): boolean { return this._ended; }
+  get context(): SpanContext {
+    return this._span.context;
+  }
+  get name(): string {
+    return this._span.name;
+  }
+  get isEnded(): boolean {
+    return this._ended;
+  }
 
   setAttribute(key: string, value: string | number | boolean): this {
     if (!this._ended) this._span.attributes[key] = value;
@@ -127,7 +131,11 @@ export class ActiveSpan {
   }
 
   snapshot(): Span {
-    return { ...this._span, attributes: { ...this._span.attributes }, events: [...this._span.events] };
+    return {
+      ...this._span,
+      attributes: { ...this._span.attributes },
+      events: [...this._span.events],
+    };
   }
 }
 
@@ -177,7 +185,9 @@ export class Tracer implements ITracer {
     });
   }
 
-  getSpans(): Span[] { return [...this.spans]; }
+  getSpans(): Span[] {
+    return [...this.spans];
+  }
 
   getSpansByName(name: string): Span[] {
     return this.spans.filter((s) => s.name === name);
@@ -191,9 +201,13 @@ export class Tracer implements ITracer {
     return this.spans.filter((s) => s.context.traceId === traceId);
   }
 
-  clearSpans(): void { this.spans = []; }
+  clearSpans(): void {
+    this.spans = [];
+  }
 
-  spanCount(): number { return this.spans.length; }
+  spanCount(): number {
+    return this.spans.length;
+  }
 }
 
 // ── NoopTracer ────────────────────────────────────────────────────────────────
@@ -213,11 +227,27 @@ class NoopActiveSpan extends ActiveSpan {
       () => {},
     );
   }
-  override setAttribute(): this { return this; }
-  override setAttributes(): this { return this; }
-  override addEvent(): this { return this; }
+  override setAttribute(): this {
+    return this;
+  }
+  override setAttributes(): this {
+    return this;
+  }
+  override addEvent(): this {
+    return this;
+  }
   override end(): Span {
-    return { context: { traceId: "noop", spanId: "noop" }, name: "noop", kind: "internal", startTimeMs: 0, endTimeMs: 0, durationMs: 0, status: "ok", attributes: {}, events: [] };
+    return {
+      context: { traceId: "noop", spanId: "noop" },
+      name: "noop",
+      kind: "internal",
+      startTimeMs: 0,
+      endTimeMs: 0,
+      durationMs: 0,
+      status: "ok",
+      attributes: {},
+      events: [],
+    };
   }
 }
 
@@ -229,7 +259,9 @@ export class NoopTracer implements ITracer {
   startSpan(_name: string, _kind?: SpanKind, _parent?: SpanContext): ActiveSpan {
     return NoopTracer._noop;
   }
-  getSpans(): Span[] { return []; }
+  getSpans(): Span[] {
+    return [];
+  }
   clearSpans(): void {}
 }
 
@@ -238,9 +270,13 @@ export class NoopTracer implements ITracer {
 let _global: ITracer = new NoopTracer();
 
 /** Get tracer. */
-export function getTracer(): ITracer { return _global; }
+export function getTracer(): ITracer {
+  return _global;
+}
 /** Set tracer. */
-export function setTracer(t: ITracer): void { _global = t; }
+export function setTracer(t: ITracer): void {
+  _global = t;
+}
 /** Enable tracing. */
 export function enableTracing(opts?: TracerOptions): Tracer {
   const t = new Tracer({ enabled: true, ...opts });
@@ -248,7 +284,9 @@ export function enableTracing(opts?: TracerOptions): Tracer {
   return t;
 }
 /** Disable tracing. */
-export function disableTracing(): void { _global = new NoopTracer(); }
+export function disableTracing(): void {
+  _global = new NoopTracer();
+}
 
 // ── High-level span helpers ───────────────────────────────────────────────────
 
@@ -304,7 +342,9 @@ export function startToolSpan(opts: ToolSpanOptions, tracer: ITracer = _global):
   const span = tracer.startSpan(`tool.${opts.toolName}`, "tool", opts.parentContext);
   span.setAttribute("tool.name", opts.toolName);
   if (opts.input) {
-    try { span.setAttribute("tool.input_json", JSON.stringify(opts.input).slice(0, 512)); } catch {}
+    try {
+      span.setAttribute("tool.input_json", JSON.stringify(opts.input).slice(0, 512));
+    } catch { /* noop */ }
   }
   return span;
 }

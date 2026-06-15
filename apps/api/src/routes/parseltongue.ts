@@ -26,7 +26,12 @@ import type { FastifyInstance } from "fastify";
 import { requireAuth } from "../middleware/auth.js";
 
 const TECHNIQUES: ObfuscationTechnique[] = [
-  "leetspeak", "unicode", "zwj", "mixedcase", "phonetic", "random",
+  "leetspeak",
+  "unicode",
+  "zwj",
+  "mixedcase",
+  "phonetic",
+  "random",
 ];
 
 export async function parseltongueRoutes(app: FastifyInstance): Promise<void> {
@@ -45,11 +50,11 @@ export async function parseltongueRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{
     Body: {
-      text:            string;
-      technique?:      ObfuscationTechnique;
-      intensity?:      ObfuscationIntensity;
+      text: string;
+      technique?: ObfuscationTechnique;
+      intensity?: ObfuscationIntensity;
       customTriggers?: string[];
-      enabled?:        boolean;
+      enabled?: boolean;
     };
   }>(
     "/parseltongue/transform",
@@ -60,11 +65,11 @@ export async function parseltongueRoutes(app: FastifyInstance): Promise<void> {
           type: "object",
           required: ["text"],
           properties: {
-            text:            { type: "string", minLength: 1, maxLength: 50_000 },
-            technique:       { type: "string", enum: TECHNIQUES },
-            intensity:       { type: "string", enum: ["light", "medium", "heavy"] },
-            customTriggers:  { type: "array", items: { type: "string" } },
-            enabled:         { type: "boolean" },
+            text: { type: "string", minLength: 1, maxLength: 50_000 },
+            technique: { type: "string", enum: TECHNIQUES },
+            intensity: { type: "string", enum: ["light", "medium", "heavy"] },
+            customTriggers: { type: "array", items: { type: "string" } },
+            enabled: { type: "boolean" },
           },
         },
       },
@@ -74,8 +79,8 @@ export async function parseltongueRoutes(app: FastifyInstance): Promise<void> {
 
       const config: ParseltongueConfig = {
         enabled,
-        technique:      technique   ?? getDefaultConfig().technique,
-        intensity:      intensity   ?? getDefaultConfig().intensity,
+        technique: technique ?? getDefaultConfig().technique,
+        intensity: intensity ?? getDefaultConfig().intensity,
         customTriggers: customTriggers,
       };
 
@@ -91,11 +96,19 @@ export async function parseltongueRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get(
     "/parseltongue/techniques",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (_request, reply) => {
       return reply.send({
         techniques: TECHNIQUES.map((t) => ({
-          id:          t,
+          id: t,
           description: getTechniqueDescription(t),
         })),
       });
@@ -109,7 +122,15 @@ export async function parseltongueRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get(
     "/parseltongue/triggers",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (_request, reply) => {
       return reply.send({ triggers: [...DEFAULT_TRIGGERS], count: DEFAULT_TRIGGERS.length });
     },

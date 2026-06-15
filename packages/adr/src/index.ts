@@ -12,12 +12,7 @@
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type AdrStatus =
-  | "proposed"
-  | "accepted"
-  | "rejected"
-  | "deprecated"
-  | "superseded";
+export type AdrStatus = "proposed" | "accepted" | "rejected" | "deprecated" | "superseded";
 
 /** Adr record interface definition. */
 export interface AdrRecord {
@@ -54,24 +49,24 @@ export interface CreateAdrInput {
 // ── AdrStore ──────────────────────────────────────────────────────────────────
 
 export class AdrStore {
-  private adrs   = new Map<number, AdrRecord>();
+  private adrs = new Map<number, AdrRecord>();
   private nextId = 1;
 
   create(input: CreateAdrInput): AdrRecord {
     const now = new Date().toISOString();
     const adr: AdrRecord = {
-      id:           this.nextId++,
-      title:        input.title,
-      status:       input.status ?? "proposed",
-      date:         input.date ?? now.slice(0, 10),
-      deciders:     input.deciders ?? [],
-      context:      input.context,
-      decision:     input.decision,
+      id: this.nextId++,
+      title: input.title,
+      status: input.status ?? "proposed",
+      date: input.date ?? now.slice(0, 10),
+      deciders: input.deciders ?? [],
+      context: input.context,
+      decision: input.decision,
       consequences: input.consequences,
       alternatives: input.alternatives,
-      tags:         input.tags ?? [],
-      createdAt:    now,
-      updatedAt:    now,
+      tags: input.tags ?? [],
+      createdAt: now,
+      updatedAt: now,
     };
     this.adrs.set(adr.id, adr);
     return adr;
@@ -102,7 +97,7 @@ export class AdrStore {
   list(filter?: { status?: AdrStatus; tag?: string }): AdrRecord[] {
     let records = [...this.adrs.values()];
     if (filter?.status) records = records.filter((a) => a.status === filter.status);
-    if (filter?.tag)    records = records.filter((a) => a.tags?.includes(filter.tag!));
+    if (filter?.tag) records = records.filter((a) => a.tags?.includes(filter.tag!));
     return records.sort((a, b) => a.id - b.id);
   }
 
@@ -121,7 +116,9 @@ export class AdrStore {
     return this.update(oldId, { status: "superseded", supersededBy: newId });
   }
 
-  count(): number { return this.adrs.size; }
+  count(): number {
+    return this.adrs.size;
+  }
 }
 
 // ── renderAdr ─────────────────────────────────────────────────────────────────
@@ -175,9 +172,9 @@ export function parseAdrNumber(input: string): number | null {
 // ── Status transitions ─────────────────────────────────────────────────────────
 
 const VALID_TRANSITIONS: Record<AdrStatus, AdrStatus[]> = {
-  proposed:   ["accepted", "rejected"],
-  accepted:   ["deprecated", "superseded"],
-  rejected:   [],
+  proposed: ["accepted", "rejected"],
+  accepted: ["deprecated", "superseded"],
+  rejected: [],
   deprecated: [],
   superseded: [],
 };

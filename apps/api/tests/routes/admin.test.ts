@@ -11,7 +11,9 @@ beforeEach(async () => {
   await app.ready();
 });
 
-afterEach(async () => { await app.close(); });
+afterEach(async () => {
+  await app.close();
+});
 
 // ── GET /admin/routes ─────────────────────────────────────────────────────────
 
@@ -26,8 +28,8 @@ describe("GET /api/v1/admin/routes", () => {
   });
 
   it("each route has alias, model, provider fields", async () => {
-    const res  = await app.inject({ method: "GET", url: "/api/v1/admin/routes" });
-    const body = res.json<{ routes: Array<{ alias: string; model: string; provider: string }> }>();
+    const res = await app.inject({ method: "GET", url: "/api/v1/admin/routes" });
+    const body = res.json<{ routes: { alias: string; model: string; provider: string }[] }>();
     const first = body.routes[0]!;
     expect(first).toHaveProperty("alias");
     expect(first).toHaveProperty("model");
@@ -40,8 +42,8 @@ describe("GET /api/v1/admin/routes", () => {
 describe("POST /api/v1/admin/routes", () => {
   it("adds a new route and returns 201", async () => {
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/admin/routes",
+      method: "POST",
+      url: "/api/v1/admin/routes",
       payload: { alias: "test/mymodel", model: "my-model-id", provider: "groq" },
     });
     expect(res.statusCode).toBe(201);
@@ -53,8 +55,8 @@ describe("POST /api/v1/admin/routes", () => {
 
   it("validates schema — rejects missing alias", async () => {
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/admin/routes",
+      method: "POST",
+      url: "/api/v1/admin/routes",
       payload: { model: "x", provider: "groq" }, // no alias
     });
     expect(res.statusCode).toBe(400);
@@ -62,8 +64,8 @@ describe("POST /api/v1/admin/routes", () => {
 
   it("validates schema — rejects missing model", async () => {
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/admin/routes",
+      method: "POST",
+      url: "/api/v1/admin/routes",
       payload: { alias: "a/b", provider: "groq" },
     });
     expect(res.statusCode).toBe(400);
@@ -71,8 +73,8 @@ describe("POST /api/v1/admin/routes", () => {
 
   it("validates schema — rejects missing provider", async () => {
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/admin/routes",
+      method: "POST",
+      url: "/api/v1/admin/routes",
       payload: { alias: "a/b", model: "m" },
     });
     expect(res.statusCode).toBe(400);
@@ -85,8 +87,8 @@ describe("POST /api/v1/admin/routes/:alias/override", () => {
   it("sets override for existing alias and returns 200", async () => {
     const alias = encodeURIComponent("nexus/fast");
     const res = await app.inject({
-      method:  "POST",
-      url:     `/api/v1/admin/routes/${alias}/override`,
+      method: "POST",
+      url: `/api/v1/admin/routes/${alias}/override`,
       payload: { model: "llama-3.1-8b-instant" },
     });
     expect(res.statusCode).toBe(200);
@@ -97,8 +99,8 @@ describe("POST /api/v1/admin/routes/:alias/override", () => {
 
   it("validates schema — rejects missing model", async () => {
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/admin/routes/nexus%2Ffast/override",
+      method: "POST",
+      url: "/api/v1/admin/routes/nexus%2Ffast/override",
       payload: {},
     });
     expect(res.statusCode).toBe(400);
@@ -113,12 +115,12 @@ describe("GET /api/v1/admin/settings", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json<{
       settings: {
-        tracing:      boolean;
-        logLevel:     string;
+        tracing: boolean;
+        logLevel: string;
         rateLimitRpm: number;
-        maxTokens:    number;
+        maxTokens: number;
         defaultModel: string;
-        corsOrigins:  string[];
+        corsOrigins: string[];
       };
     }>();
     expect(typeof body.settings.tracing).toBe("boolean");
@@ -133,8 +135,8 @@ describe("GET /api/v1/admin/settings", () => {
 describe("POST /api/v1/admin/settings", () => {
   it("updates logLevel and returns updated settings", async () => {
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/admin/settings",
+      method: "POST",
+      url: "/api/v1/admin/settings",
       payload: { logLevel: "debug" },
     });
     expect(res.statusCode).toBe(200);
@@ -144,8 +146,8 @@ describe("POST /api/v1/admin/settings", () => {
 
   it("rejects invalid logLevel via schema", async () => {
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/admin/settings",
+      method: "POST",
+      url: "/api/v1/admin/settings",
       payload: { logLevel: "verbose" }, // not in enum
     });
     expect(res.statusCode).toBe(400);
@@ -153,8 +155,8 @@ describe("POST /api/v1/admin/settings", () => {
 
   it("accepts valid payload with no extra fields", async () => {
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/admin/settings",
+      method: "POST",
+      url: "/api/v1/admin/settings",
       payload: { logLevel: "warn" },
     });
     // Valid update should succeed

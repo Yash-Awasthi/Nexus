@@ -38,7 +38,13 @@ const PLANS = {
     name: "Pro",
     price: 29,
     period: "month",
-    features: ["2M tokens/day", "All 15 providers", "Query + JSONL export", "Priority support", "Analytics"],
+    features: [
+      "2M tokens/day",
+      "All 15 providers",
+      "Query + JSONL export",
+      "Priority support",
+      "Analytics",
+    ],
     tokensPerMonth: 60_000_000,
     rpmLimit: 600,
     tier: "pro",
@@ -47,7 +53,13 @@ const PLANS = {
     name: "Enterprise",
     price: 199,
     period: "month",
-    features: ["Unlimited tokens", "All 15 providers", "HF corpus push", "SLA guarantee", "SSO + audit logs"],
+    features: [
+      "Unlimited tokens",
+      "All 15 providers",
+      "HF corpus push",
+      "SLA guarantee",
+      "SSO + audit logs",
+    ],
     tokensPerMonth: -1,
     rpmLimit: 6000,
     tier: "enterprise",
@@ -65,79 +77,124 @@ function currentPlanKey(): PlanKey {
 
 export async function billingRoutes(app: FastifyInstance): Promise<void> {
   /** GET /billing/plan */
-  app.get("/billing/plan", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
-    const planKey = currentPlanKey();
-    return reply.send({ plan: { ...PLANS[planKey], key: planKey } });
-  });
+  app.get(
+    "/billing/plan",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_req, reply) => {
+      const planKey = currentPlanKey();
+      return reply.send({ plan: { ...PLANS[planKey], key: planKey } });
+    },
+  );
 
   /** GET /billing/current-period */
-  app.get("/billing/current-period", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
-    const now = new Date();
-    const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const planKey = currentPlanKey();
-    const plan = PLANS[planKey];
-
-    // Real usage aggregation when DB is available
-    let tokensUsed = 0;
-    let requestsCount = 0;
-
-    if (DB_AVAILABLE) {
-      try {
-        const { db } = await import("@nexus/db");
-        const { usageEvents } = await import("@nexus/db/schema");
-        const { sql } = await import("drizzle-orm");
-        const periodStart = startDate.toISOString();
-        const [row] = await db
-          .select({
-            total: sql<number>`coalesce(sum(${usageEvents.costUnits}), 0)`,
-            count: sql<number>`count(*)`,
-          })
-          .from(usageEvents)
-          .where(sql`${usageEvents.createdAt} >= ${periodStart}`);
-        tokensUsed = Number(row?.total ?? 0);
-        requestsCount = Number(row?.count ?? 0);
-      } catch {
-        // DB query failed — serve zeros rather than 500
-      }
-    }
-
-    return reply.send({
-      period: {
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-        tokensUsed,
-        tokensLimit: plan.tokensPerMonth,
-        requestsCount,
-        rpmLimit: plan.rpmLimit,
+  app.get(
+    "/billing/current-period",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
       },
-    });
-  });
+      preHandler: requireAuth,
+    },
+    async (_req, reply) => {
+      const now = new Date();
+      const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const planKey = currentPlanKey();
+      const plan = PLANS[planKey];
+
+      // Real usage aggregation when DB is available
+      let tokensUsed = 0;
+      let requestsCount = 0;
+
+      if (DB_AVAILABLE) {
+        try {
+          const { db } = await import("@nexus/db");
+          const { usageEvents } = await import("@nexus/db/schema");
+          const { sql } = await import("drizzle-orm");
+          const periodStart = startDate.toISOString();
+          const [row] = await db
+            .select({
+              total: sql<number>`coalesce(sum(${usageEvents.costUnits}), 0)`,
+              count: sql<number>`count(*)`,
+            })
+            .from(usageEvents)
+            .where(sql`${usageEvents.createdAt} >= ${periodStart}`);
+          tokensUsed = row?.total ?? 0;
+          requestsCount = row?.count ?? 0;
+        } catch {
+          // DB query failed — serve zeros rather than 500
+        }
+      }
+
+      return reply.send({
+        period: {
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          tokensUsed,
+          tokensLimit: plan.tokensPerMonth,
+          requestsCount,
+          rpmLimit: plan.rpmLimit,
+        },
+      });
+    },
+  );
 
   /** GET /billing/keys */
-  app.get("/billing/keys", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
-    if (!DB_AVAILABLE) {
-      return reply.code(503).send({ error: "Database not configured — API key management requires DATABASE_URL" });
-    }
-    const { listApiKeys } = await import("@nexus/billing");
-    const keys = await listApiKeys("global");
-    // Strip keyHash from the response — never expose it
-    return reply.send({
-      keys: keys.map((k) => ({
-        id: k.id,
-        name: k.name,
-        keyPrefix: k.keyPrefix,
-        plan: k.plan,
-        monthlyQuota: k.monthlyQuota,
-        rpmLimit: k.rpmLimit,
-        createdAt: k.createdAt,
-        revokedAt: k.revokedAt,
-      })),
-    });
-  });
+  app.get(
+    "/billing/keys",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_req, reply) => {
+      if (!DB_AVAILABLE) {
+        return reply
+          .code(503)
+          .send({ error: "Database not configured — API key management requires DATABASE_URL" });
+      }
+      const { listApiKeys } = await import("@nexus/billing");
+      const keys = await listApiKeys("global");
+      // Strip keyHash from the response — never expose it
+      return reply.send({
+        keys: keys.map((k) => ({
+          id: k.id,
+          name: k.name,
+          keyPrefix: k.keyPrefix,
+          plan: k.plan,
+          monthlyQuota: k.monthlyQuota,
+          rpmLimit: k.rpmLimit,
+          createdAt: k.createdAt,
+          revokedAt: k.revokedAt,
+        })),
+      });
+    },
+  );
 
   /** POST /billing/keys */
-  app.post<{ Body: { name: string; plan?: "free" | "pro" | "enterprise"; monthlyQuota?: number; rpmLimit?: number } }>(
+  app.post<{
+    Body: {
+      name: string;
+      plan?: "free" | "pro" | "enterprise";
+      monthlyQuota?: number;
+      rpmLimit?: number;
+    };
+  }>(
     "/billing/keys",
     {
       preHandler: requireAuth,
@@ -146,17 +203,19 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
           type: "object",
           required: ["name"],
           properties: {
-            name:         { type: "string", minLength: 1, maxLength: 100 },
-            plan:         { type: "string", enum: ["free", "pro", "enterprise"] },
+            name: { type: "string", minLength: 1, maxLength: 100 },
+            plan: { type: "string", enum: ["free", "pro", "enterprise"] },
             monthlyQuota: { type: "number", minimum: 0 },
-            rpmLimit:     { type: "number", minimum: 1, maximum: 10_000 },
+            rpmLimit: { type: "number", minimum: 1, maximum: 10_000 },
           },
         },
       },
     },
     async (request, reply) => {
       if (!DB_AVAILABLE) {
-        return reply.code(503).send({ error: "Database not configured — API key management requires DATABASE_URL" });
+        return reply
+          .code(503)
+          .send({ error: "Database not configured — API key management requires DATABASE_URL" });
       }
       const { createApiKey } = await import("@nexus/billing");
       try {
@@ -170,7 +229,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(201).send({
           id: apiKey.id,
           name: apiKey.name,
-          rawKey,            // Only shown once at creation time
+          rawKey, // Only shown once at creation time
           keyPrefix: apiKey.keyPrefix,
           plan: apiKey.plan,
           createdAt: apiKey.createdAt,
@@ -185,10 +244,17 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
   /** DELETE /billing/keys/:id */
   app.delete<{ Params: { id: string } }>(
     "/billing/keys/:id",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       if (!DB_AVAILABLE) {
-        return reply.code(503).send({ error: "Database not configured — API key management requires DATABASE_URL" });
+        return reply
+          .code(503)
+          .send({ error: "Database not configured — API key management requires DATABASE_URL" });
       }
       const { revokeApiKey } = await import("@nexus/billing");
       try {
@@ -202,36 +268,53 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
   );
 
   /** GET /billing/quota — plan limits + live usage summary */
-  app.get("/billing/quota", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
-    const planKey = currentPlanKey();
-    const plan = PLANS[planKey];
+  app.get(
+    "/billing/quota",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_req, reply) => {
+      const planKey = currentPlanKey();
+      const plan = PLANS[planKey];
 
-    let monthlyUsed = 0;
-    if (DB_AVAILABLE) {
-      try {
-        const { db } = await import("@nexus/db");
-        const { usageEvents } = await import("@nexus/db/schema");
-        const { sql } = await import("drizzle-orm");
-        const periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
-        const [row] = await db
-          .select({ total: sql<number>`coalesce(sum(${usageEvents.costUnits}), 0)` })
-          .from(usageEvents)
-          .where(sql`${usageEvents.createdAt} >= ${periodStart}`);
-        monthlyUsed = Number(row?.total ?? 0);
-      } catch {
-        // serve best-effort zeros
+      let monthlyUsed = 0;
+      if (DB_AVAILABLE) {
+        try {
+          const { db } = await import("@nexus/db");
+          const { usageEvents } = await import("@nexus/db/schema");
+          const { sql } = await import("drizzle-orm");
+          const periodStart = new Date(
+            new Date().getFullYear(),
+            new Date().getMonth(),
+            1,
+          ).toISOString();
+          const [row] = await db
+            .select({ total: sql<number>`coalesce(sum(${usageEvents.costUnits}), 0)` })
+            .from(usageEvents)
+            .where(sql`${usageEvents.createdAt} >= ${periodStart}`);
+          monthlyUsed = row?.total ?? 0;
+        } catch {
+          // serve best-effort zeros
+        }
       }
-    }
 
-    return reply.send({
-      allowed: plan.tokensPerMonth < 0 || monthlyUsed < plan.tokensPerMonth,
-      plan: planKey,
-      tokensPerMonth: plan.tokensPerMonth,
-      tokensUsed: monthlyUsed,
-      tokensRemaining: plan.tokensPerMonth < 0 ? null : Math.max(0, plan.tokensPerMonth - monthlyUsed),
-      rpmLimit: plan.rpmLimit,
-    });
-  });
+      return reply.send({
+        allowed: plan.tokensPerMonth < 0 || monthlyUsed < plan.tokensPerMonth,
+        plan: planKey,
+        tokensPerMonth: plan.tokensPerMonth,
+        tokensUsed: monthlyUsed,
+        tokensRemaining:
+          plan.tokensPerMonth < 0 ? null : Math.max(0, plan.tokensPerMonth - monthlyUsed),
+        rpmLimit: plan.rpmLimit,
+      });
+    },
+  );
 
   // ── Stripe Checkout + Portal ──────────────────────────────────────────────
 
@@ -245,9 +328,9 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{
     Body: {
-      plan:       "pro" | "enterprise";
+      plan: "pro" | "enterprise";
       successUrl?: string;
-      cancelUrl?:  string;
+      cancelUrl?: string;
     };
   }>(
     "/billing/checkout",
@@ -258,9 +341,9 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
           type: "object",
           required: ["plan"],
           properties: {
-            plan:       { type: "string", enum: ["pro", "enterprise"] },
+            plan: { type: "string", enum: ["pro", "enterprise"] },
             successUrl: { type: "string", format: "uri" },
-            cancelUrl:  { type: "string", format: "uri" },
+            cancelUrl: { type: "string", format: "uri" },
           },
         },
       },
@@ -273,7 +356,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
 
       // Price IDs from env (set in Stripe dashboard → Product catalog)
       const priceIds: Record<"pro" | "enterprise", string | undefined> = {
-        pro:        process.env.STRIPE_PRICE_PRO,
+        pro: process.env.STRIPE_PRICE_PRO,
         enterprise: process.env.STRIPE_PRICE_ENTERPRISE,
       };
       const priceId = priceIds[request.body.plan];
@@ -284,41 +367,42 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const origin = process.env.OAUTH_REDIRECT_BASE_URL ?? "http://localhost:5173";
-      const successUrl = request.body.successUrl ?? `${origin}/billing?session_id={CHECKOUT_SESSION_ID}`;
-      const cancelUrl  = request.body.cancelUrl  ?? `${origin}/billing`;
+      const successUrl =
+        request.body.successUrl ?? `${origin}/billing?session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = request.body.cancelUrl ?? `${origin}/billing`;
 
       try {
         // Lightweight Stripe REST call — no SDK dependency needed
         const body = new URLSearchParams({
-          "mode":                             "subscription",
-          "line_items[0][price]":             priceId,
-          "line_items[0][quantity]":          "1",
-          "success_url":                      successUrl,
-          "cancel_url":                       cancelUrl,
-          "allow_promotion_codes":            "true",
-          "billing_address_collection":       "auto",
-          "customer_email":                   (request.nexusUserId ?? ""),
+          mode: "subscription",
+          "line_items[0][price]": priceId,
+          "line_items[0][quantity]": "1",
+          success_url: successUrl,
+          cancel_url: cancelUrl,
+          allow_promotion_codes: "true",
+          billing_address_collection: "auto",
+          customer_email: request.nexusUserId ?? "",
           "subscription_data[metadata][plan]": request.body.plan,
           "subscription_data[metadata][userId]": request.nexusUserId ?? "anon",
         });
 
         const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-          method:  "POST",
+          method: "POST",
           headers: {
-            Authorization:  `Bearer ${stripeKey}`,
+            Authorization: `Bearer ${stripeKey}`,
             "Content-Type": "application/x-www-form-urlencoded",
           },
           body: body.toString(),
         });
 
         if (!res.ok) {
-          const err = await res.json() as { error?: { message?: string } };
+          const err = (await res.json()) as { error?: { message?: string } };
           return reply.code(502).send({
             error: `Stripe error: ${err.error?.message ?? res.statusText}`,
           });
         }
 
-        const session = await res.json() as { id: string; url: string };
+        const session = (await res.json()) as { id: string; url: string };
         return reply.send({ sessionId: session.id, url: session.url });
       } catch (err: unknown) {
         const e = err as { message?: string };
@@ -384,27 +468,27 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
 
       try {
         const body = new URLSearchParams({
-          customer:   customerId,
+          customer: customerId,
           return_url: returnUrl,
         });
 
         const res = await fetch("https://api.stripe.com/v1/billing_portal/sessions", {
-          method:  "POST",
+          method: "POST",
           headers: {
-            Authorization:  `Bearer ${stripeKey}`,
+            Authorization: `Bearer ${stripeKey}`,
             "Content-Type": "application/x-www-form-urlencoded",
           },
           body: body.toString(),
         });
 
         if (!res.ok) {
-          const err = await res.json() as { error?: { message?: string } };
+          const err = (await res.json()) as { error?: { message?: string } };
           return reply.code(502).send({
             error: `Stripe error: ${err.error?.message ?? res.statusText}`,
           });
         }
 
-        const session = await res.json() as { url: string };
+        const session = (await res.json()) as { url: string };
         return reply.send({ url: session.url });
       } catch (err: unknown) {
         const e = err as { message?: string };
@@ -416,7 +500,15 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
   /** POST /billing/webhook/stripe */
   app.post(
     "/billing/webhook/stripe",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, config: { rawBody: true } },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      config: { rawBody: true },
+    },
     async (request, reply) => {
       const secret = process.env.STRIPE_WEBHOOK_SECRET;
       if (!secret) {
@@ -427,8 +519,9 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
         try {
           const { StripeWebhookProcessor } = await import("@nexus/billing");
           const processor = new StripeWebhookProcessor(secret);
-          const rawBody = (request as { rawBody?: string | Buffer }).rawBody ?? JSON.stringify(request.body);
-          const sig = request.headers["stripe-signature"] as string | undefined ?? "";
+          const rawBody =
+            (request as { rawBody?: string | Buffer }).rawBody ?? JSON.stringify(request.body);
+          const sig = (request.headers["stripe-signature"] as string | undefined) ?? "";
           const result = await processor.process(rawBody.toString(), sig);
           return reply.code(200).send(result);
         } catch (err: unknown) {

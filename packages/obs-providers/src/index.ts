@@ -45,9 +45,9 @@ export type ObservationSkipReason = "all_events_private" | "no_content" | "filte
 
 /** Observation result interface definition. */
 export interface ObservationResult {
-  observation: string | null;          // null = skip (see skipReason)
+  observation: string | null; // null = skip (see skipReason)
   skipReason?: ObservationSkipReason;
-  skipXml?: string;                    // <skip_summary reason="…"/>
+  skipXml?: string; // <skip_summary reason="…"/>
   provider: string;
   model: string;
   tokensUsed?: number;
@@ -88,9 +88,7 @@ export function buildServerGenerationPrompt(
     return `Session: ${sessionId}\nLocale: ${locale}\n\nAll events in this session are marked private. Output: <skip_summary reason="all_events_private"/>`;
   }
 
-  const transcript = publicEvents
-    .map((e) => `[${e.role.toUpperCase()}] ${e.content}`)
-    .join("\n");
+  const transcript = publicEvents.map((e) => `[${e.role.toUpperCase()}] ${e.content}`).join("\n");
 
   return `Session: ${sessionId}\nLocale: ${locale}\n\nConversation transcript:\n${transcript}\n\nGenerate a concise observation:`;
 }
@@ -107,11 +105,15 @@ export interface ObservationProvider {
 
 export function classifyError(message: string): ErrorClass {
   const msg = message.toLowerCase();
-  if (msg.includes("401") || msg.includes("unauthorized") || msg.includes("api key")) return "auth_invalid";
+  if (msg.includes("401") || msg.includes("unauthorized") || msg.includes("api key"))
+    return "auth_invalid";
   if (msg.includes("429") || msg.includes("rate limit")) return "rate_limited";
-  if (msg.includes("quota") || msg.includes("billing") || msg.includes("credits")) return "quota_exceeded";
-  if (msg.includes("context length") || msg.includes("too long") || msg.includes("token")) return "context_too_long";
-  if (msg.includes("content") || msg.includes("filter") || msg.includes("policy")) return "content_filtered";
+  if (msg.includes("quota") || msg.includes("billing") || msg.includes("credits"))
+    return "quota_exceeded";
+  if (msg.includes("context length") || msg.includes("too long") || msg.includes("token"))
+    return "context_too_long";
+  if (msg.includes("content") || msg.includes("filter") || msg.includes("policy"))
+    return "content_filtered";
   if (msg.includes("timeout") || msg.includes("timed out")) return "timeout";
   return "unknown";
 }
@@ -119,7 +121,7 @@ export function classifyError(message: string): ErrorClass {
 // ── parseSkipTag ──────────────────────────────────────────────────────────────
 
 export function parseSkipTag(text: string): ObservationSkipReason | null {
-  const match = text.match(/<skip_summary\s+reason="([^"]+)"\s*\/>/);
+  const match = /<skip_summary\s+reason="([^"]+)"\s*\/>/.exec(text);
   if (!match) return null;
   const reason = match[1] as ObservationSkipReason;
   return reason;
@@ -131,7 +133,11 @@ abstract class BaseObservationProvider implements ObservationProvider {
   abstract name: string;
   abstract model: string;
 
-  protected abstract callLlm(prompt: string, systemPrompt: string, maxTokens: number): Promise<string>;
+  protected abstract callLlm(
+    prompt: string,
+    systemPrompt: string,
+    maxTokens: number,
+  ): Promise<string>;
 
   async generate(request: GenerationRequest): Promise<ObservationResult> {
     const t0 = Date.now();
@@ -175,7 +181,11 @@ abstract class BaseObservationProvider implements ObservationProvider {
 
 // ── ClaudeObservationProvider ─────────────────────────────────────────────────
 
-export type LlmCallFn = (prompt: string, systemPrompt: string, maxTokens: number) => Promise<string>;
+export type LlmCallFn = (
+  prompt: string,
+  systemPrompt: string,
+  maxTokens: number,
+) => Promise<string>;
 
 /** Claude observation provider. */
 export class ClaudeObservationProvider extends BaseObservationProvider {
@@ -252,7 +262,9 @@ export class MockObservationProvider implements ObservationProvider {
     this.behavior = behavior;
   }
 
-  setBehavior(b: MockProviderBehavior): void { this.behavior = b; }
+  setBehavior(b: MockProviderBehavior): void {
+    this.behavior = b;
+  }
 
   async generate(request: GenerationRequest): Promise<ObservationResult> {
     const t0 = Date.now();
@@ -301,11 +313,21 @@ export class ProviderRegistry {
     return this;
   }
 
-  get(name: string): ObservationProvider | undefined { return this.providers.get(name); }
-  has(name: string): boolean { return this.providers.has(name); }
-  list(): ObservationProvider[] { return [...this.providers.values()]; }
-  names(): string[] { return [...this.providers.keys()]; }
-  unregister(name: string): boolean { return this.providers.delete(name); }
+  get(name: string): ObservationProvider | undefined {
+    return this.providers.get(name);
+  }
+  has(name: string): boolean {
+    return this.providers.has(name);
+  }
+  list(): ObservationProvider[] {
+    return [...this.providers.values()];
+  }
+  names(): string[] {
+    return [...this.providers.keys()];
+  }
+  unregister(name: string): boolean {
+    return this.providers.delete(name);
+  }
 
   /** Generate with first available provider, falling back to next on error. */
   async generateWithFallback(request: GenerationRequest): Promise<ObservationResult> {
@@ -338,9 +360,9 @@ export class ProviderRegistry {
 // unparseable JSON — ensuring the pipeline never hard-fails.
 
 export interface StructuredObservation {
-  type: string;       // e.g. "preference", "decision", "entity", "action"
-  subject: string;    // what/who the observation is about
-  detail: string;     // supporting sentence
+  type: string; // e.g. "preference", "decision", "entity", "action"
+  subject: string; // what/who the observation is about
+  detail: string; // supporting sentence
   confidence: number; // 0–1
 }
 
@@ -391,9 +413,7 @@ export class LlmObservationProvider implements ObservationProvider {
       };
     }
 
-    const transcript = publicEvents
-      .map((e) => `[${e.role.toUpperCase()}] ${e.content}`)
-      .join("\n");
+    const transcript = publicEvents.map((e) => `[${e.role.toUpperCase()}] ${e.content}`).join("\n");
 
     const prompt = `Session: ${request.sessionId}\n\nConversation:\n${transcript}\n\nExtract up to ${this.maxObservations} observations as a JSON array:`;
 
@@ -403,7 +423,11 @@ export class LlmObservationProvider implements ObservationProvider {
       let observations: StructuredObservation[] = [];
       try {
         // Strip markdown code fences if present
-        const cleaned = raw.replace(/^```(?:json)?\n?/i, "").replace(/\n?```$/i, "").trim();
+        const cleaned = raw
+          .replace(/^```(?:json)?\n?/i, "")
+          .replace(/\n?```$/i, "")
+          .trim();
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const parsed = JSON.parse(cleaned);
         if (Array.isArray(parsed)) {
           observations = (parsed as StructuredObservation[]).slice(0, this.maxObservations);

@@ -67,7 +67,10 @@ export interface InMemoryLaneState {
 export class InMemoryQueueLane implements QueueLane {
   private state: InMemoryLaneState;
 
-  constructor(public readonly name: string, state: InMemoryLaneState = {}) {
+  constructor(
+    public readonly name: string,
+    state: InMemoryLaneState = {},
+  ) {
     this.state = { ...state };
   }
 
@@ -116,7 +119,9 @@ export class LaneRegistry {
     return [...this.lanes.keys()];
   }
 
-  count(): number { return this.lanes.size; }
+  count(): number {
+    return this.lanes.size;
+  }
 }
 
 // ── AlertPolicy ───────────────────────────────────────────────────────────────
@@ -157,19 +162,29 @@ export class AlertPolicy {
     if (metrics.paused) alerts.push(`Queue '${metrics.name}' is paused`);
 
     if (this.thresholds.maxWaiting !== undefined && metrics.waiting > this.thresholds.maxWaiting) {
-      alerts.push(`Queue '${metrics.name}' has ${metrics.waiting} waiting jobs (threshold: ${this.thresholds.maxWaiting})`);
+      alerts.push(
+        `Queue '${metrics.name}' has ${metrics.waiting} waiting jobs (threshold: ${this.thresholds.maxWaiting})`,
+      );
     }
     if (this.thresholds.maxFailed !== undefined && metrics.failed > this.thresholds.maxFailed) {
-      alerts.push(`Queue '${metrics.name}' has ${metrics.failed} failed jobs (threshold: ${this.thresholds.maxFailed})`);
+      alerts.push(
+        `Queue '${metrics.name}' has ${metrics.failed} failed jobs (threshold: ${this.thresholds.maxFailed})`,
+      );
     }
     if (this.thresholds.maxStalled !== undefined && metrics.stalled > this.thresholds.maxStalled) {
-      alerts.push(`Queue '${metrics.name}' has ${metrics.stalled} stalled jobs (threshold: ${this.thresholds.maxStalled})`);
+      alerts.push(
+        `Queue '${metrics.name}' has ${metrics.stalled} stalled jobs (threshold: ${this.thresholds.maxStalled})`,
+      );
     }
     if (this.thresholds.maxActive !== undefined && metrics.active > this.thresholds.maxActive) {
-      alerts.push(`Queue '${metrics.name}' has ${metrics.active} active jobs (threshold: ${this.thresholds.maxActive})`);
+      alerts.push(
+        `Queue '${metrics.name}' has ${metrics.active} active jobs (threshold: ${this.thresholds.maxActive})`,
+      );
     }
     if (this.thresholds.maxDelayed !== undefined && metrics.delayed > this.thresholds.maxDelayed) {
-      alerts.push(`Queue '${metrics.name}' has ${metrics.delayed} delayed jobs (threshold: ${this.thresholds.maxDelayed})`);
+      alerts.push(
+        `Queue '${metrics.name}' has ${metrics.delayed} delayed jobs (threshold: ${this.thresholds.maxDelayed})`,
+      );
     }
 
     return alerts;
@@ -207,15 +222,21 @@ export class HealthMonitor {
 
     try {
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("timeout")), this.timeoutMs)
+        setTimeout(() => reject(new Error("timeout")), this.timeoutMs),
       );
       const raw = await Promise.race([lane.getMetrics(), timeoutPromise]);
       metrics = { name: lane.name, snapshotAt: new Date().toISOString(), ...raw };
     } catch {
       metrics = {
         name: lane.name,
-        waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0, stalled: 0,
-        paused: false, unavailable: true,
+        waiting: 0,
+        active: 0,
+        completed: 0,
+        failed: 0,
+        delayed: 0,
+        stalled: 0,
+        paused: false,
+        unavailable: true,
         snapshotAt: new Date().toISOString(),
       };
     }

@@ -44,20 +44,22 @@ function buildRouter(): LLMRouter {
     providers.push(new GroqProvider({ apiKey: process.env.GROQ_API_KEY }));
   }
   if (providers.length === 0) {
-    providers.push(new NullProvider({
-      name:    "null",
-      models:  ["nexus/fast", "nexus/smart"],
-      content: "LLM router: no providers configured (set GROQ_API_KEY or ANTHROPIC_API_KEY)",
-    }));
+    providers.push(
+      new NullProvider({
+        name: "null",
+        models: ["nexus/fast", "nexus/smart"],
+        content: "LLM router: no providers configured (set GROQ_API_KEY or ANTHROPIC_API_KEY)",
+      }),
+    );
   }
 
   return new LLMRouter({
     providers,
     aliases: [
-      { alias: "nexus/fast",  provider: "groq",  model: "llama-3.1-70b-versatile" },
-      { alias: "nexus/fast",  provider: "null",  model: "nexus/fast" },
+      { alias: "nexus/fast", provider: "groq", model: "llama-3.1-70b-versatile" },
+      { alias: "nexus/fast", provider: "null", model: "nexus/fast" },
       { alias: "nexus/smart", provider: "claude", model: "claude-sonnet-4-5" },
-      { alias: "nexus/smart", provider: "null",  model: "nexus/smart" },
+      { alias: "nexus/smart", provider: "null", model: "nexus/smart" },
     ],
     fallbacks: {
       "nexus/smart": ["nexus/fast"],
@@ -86,9 +88,9 @@ export async function llmRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{
     Body: {
-      model:       string;
-      messages:    LLMMessage[];
-      maxTokens?:  number;
+      model: string;
+      messages: LLMMessage[];
+      maxTokens?: number;
       temperature?: number;
     };
   }>("/llm/complete", { preHandler: requireAuth }, async (request, reply) => {
@@ -112,23 +114,47 @@ export async function llmRoutes(app: FastifyInstance): Promise<void> {
    *
    * List all registered providers with their supported model names.
    */
-  app.get("/llm/providers", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
-    const names = router.listProviders();
-    const providers = names.map((name) => {
-      const p = router.getProvider(name);
-      return { name, models: p ? [...p.models] : [] };
-    });
-    return reply.send({ providers });
-  });
+  app.get(
+    "/llm/providers",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_request, reply) => {
+      const names = router.listProviders();
+      const providers = names.map((name) => {
+        const p = router.getProvider(name);
+        return { name, models: p ? [...p.models] : [] };
+      });
+      return reply.send({ providers });
+    },
+  );
 
   /**
    * GET /llm/aliases
    *
    * List all registered model aliases (alias → provider, model).
    */
-  app.get("/llm/aliases", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
-    return reply.send({ aliases: router.listAliases() });
-  });
+  app.get(
+    "/llm/aliases",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_request, reply) => {
+      return reply.send({ aliases: router.listAliases() });
+    },
+  );
 
   /**
    * GET /llm/latency
@@ -136,12 +162,24 @@ export async function llmRoutes(app: FastifyInstance): Promise<void> {
    * Observed average latency (ms) per provider.
    * Empty until the first successful completion.
    */
-  app.get("/llm/latency", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
-    const providerNames = router.listProviders();
-    const latency: Record<string, number | null> = {};
-    for (const name of providerNames) {
-      latency[name] = router.getLatencyAvg(name) ?? null;
-    }
-    return reply.send({ latency });
-  });
+  app.get(
+    "/llm/latency",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_request, reply) => {
+      const providerNames = router.listProviders();
+      const latency: Record<string, number | null> = {};
+      for (const name of providerNames) {
+        latency[name] = router.getLatencyAvg(name) ?? null;
+      }
+      return reply.send({ latency });
+    },
+  );
 }

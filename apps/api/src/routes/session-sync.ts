@@ -32,7 +32,10 @@ async function buildManager(): Promise<SyncManager> {
 
 // Eagerly initialise; route registration waits for the promise.
 const managerPromise: Promise<SyncManager> = buildManager().catch((err) => {
-  console.warn("[session-sync] DrizzleSyncStore init failed, falling back to InMemory:", err.message);
+  console.warn(
+    "[session-sync] DrizzleSyncStore init failed, falling back to InMemory:",
+    err.message,
+  );
   return new SyncManager("api-server", { store: new SyncStore() });
 });
 
@@ -56,7 +59,7 @@ export async function sessionSyncRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
     Params: { sessionId: string };
     Body: {
-      ops: Array<{ type: string; key: string; value?: unknown }>;
+      ops: { type: string; key: string; value?: unknown }[];
       deviceId?: string;
       userId?: string;
     };
@@ -70,23 +73,24 @@ export async function sessionSyncRoutes(app: FastifyInstance): Promise<void> {
       const created = store.createSession(userId, deviceId ?? "api-server");
       // Override the generated id with the requested sessionId by replanting into store
       // (SyncStore stores by session.id — create a fresh session with the caller's id)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const patched = { ...created, id: sessionId };
       store.delete(created.id);
       // Re-use applyOp to trigger DrizzleSyncStore persistence if applicable
       store.applyOp({
         sessionId,
-        deviceId:    deviceId ?? "api-server",
-        type:        "set",
-        key:         "__init__",
-        value:       { userId },
-        timestamp:   new Date().toISOString(),
+        deviceId: deviceId ?? "api-server",
+        type: "set",
+        key: "__init__",
+        value: { userId },
+        timestamp: new Date().toISOString(),
         logicalTime: 0,
       });
     }
 
     const validOps = ops.map((op) => ({
-      type:  op.type as OpType,
-      key:   op.key,
+      type: op.type as OpType,
+      key: op.key,
       value: op.value,
     }));
 
@@ -136,11 +140,11 @@ export async function sessionSyncRoutes(app: FastifyInstance): Promise<void> {
 
     return reply.send({
       sessionId,
-      data:        session.data,
+      data: session.data,
       vectorClock: session.vectorClock,
-      status:      session.status,
-      version:     session.version,
-      updatedAt:   session.updatedAt,
+      status: session.status,
+      version: session.version,
+      updatedAt: session.updatedAt,
     });
   });
 }

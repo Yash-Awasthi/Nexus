@@ -108,7 +108,11 @@ export class HybridSearchEngine {
       this.bm25.search(query, fetchN),
     ]);
 
-    const fused = rrfFusion(vectorHits, bm25Hits, { k, weightA: vectorWeight, weightB: bm25Weight });
+    const fused = rrfFusion(vectorHits, bm25Hits, {
+      k,
+      weightA: vectorWeight,
+      weightB: bm25Weight,
+    });
     const hits = fused.slice(0, limit);
 
     return { hits, vectorHits, bm25Hits, durationMs: Date.now() - start };
@@ -121,7 +125,11 @@ const K1 = 1.5;
 const B = 0.75;
 
 function tokenize(text: string): string[] {
-  return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
 }
 
 /** Bm25 document interface definition. */

@@ -35,10 +35,18 @@ export interface FileIO {
 export class InMemoryFileIO implements FileIO {
   private store = new Map<string, string>();
 
-  write(path: string, content: string): void { this.store.set(path, content); }
-  read(path: string): string | null { return this.store.get(path) ?? null; }
-  remove(path: string): boolean { return this.store.delete(path); }
-  exists(path: string): boolean { return this.store.has(path); }
+  write(path: string, content: string): void {
+    this.store.set(path, content);
+  }
+  read(path: string): string | null {
+    return this.store.get(path) ?? null;
+  }
+  remove(path: string): boolean {
+    return this.store.delete(path);
+  }
+  exists(path: string): boolean {
+    return this.store.has(path);
+  }
 }
 
 /** Pid file. */
@@ -46,7 +54,11 @@ export class PidFile {
   private io: FileIO;
   private staleTtlMs: number;
 
-  constructor(private path: string, io: FileIO, opts: PidFileOptions = {}) {
+  constructor(
+    private path: string,
+    io: FileIO,
+    opts: PidFileOptions = {},
+  ) {
     this.io = io;
     this.staleTtlMs = opts.staleTtlMs ?? 60_000;
   }
@@ -59,7 +71,11 @@ export class PidFile {
   read(): PidRecord | null {
     const raw = this.io.read(this.path);
     if (!raw) return null;
-    try { return JSON.parse(raw) as PidRecord; } catch { return null; }
+    try {
+      return JSON.parse(raw) as PidRecord;
+    } catch {
+      return null;
+    }
   }
 
   clear(): boolean {
@@ -95,8 +111,8 @@ export type HealthProbe = (signal?: AbortSignal) => Promise<boolean>;
 
 /** Health checker options interface definition. */
 export interface HealthCheckerOptions {
-  timeoutMs?: number;   // default: 5_000
-  retries?: number;     // default: 1
+  timeoutMs?: number; // default: 5_000
+  retries?: number; // default: 1
   retryDelayMs?: number; // default: 500
 }
 
@@ -104,10 +120,13 @@ export interface HealthCheckerOptions {
 export class HealthChecker {
   private opts: Required<HealthCheckerOptions>;
 
-  constructor(private probe: HealthProbe, opts: HealthCheckerOptions = {}) {
+  constructor(
+    private probe: HealthProbe,
+    opts: HealthCheckerOptions = {},
+  ) {
     this.opts = {
-      timeoutMs:    opts.timeoutMs    ?? 5_000,
-      retries:      opts.retries      ?? 1,
+      timeoutMs: opts.timeoutMs ?? 5_000,
+      retries: opts.retries ?? 1,
       retryDelayMs: opts.retryDelayMs ?? 500,
     };
   }
@@ -267,7 +286,9 @@ export class ShutdownCascade {
   private steps: ShutdownStep[] = [];
   private _isShuttingDown = false;
 
-  get isShuttingDown(): boolean { return this._isShuttingDown; }
+  get isShuttingDown(): boolean {
+    return this._isShuttingDown;
+  }
 
   addStep(step: ShutdownStep): this {
     this.steps.push(step);

@@ -111,7 +111,7 @@ export interface ReviewRequest {
   language?: string;
   context?: string;
   /** If provided, only check these dimensions. */
-  focus?: Array<keyof ReviewScores>;
+  focus?: (keyof ReviewScores)[];
 }
 
 // ── System prompt ─────────────────────────────────────────────────────────────
@@ -145,8 +145,19 @@ function buildReviewPrompt(req: ReviewRequest): string {
 
 const JSON_BLOCK_RE = /```(?:json)?\s*([\s\S]*?)```/;
 
-function parseReview(raw: string, modelId: string, modelName: string, durationMs: number): ModelReview {
-  const defaultScores: ReviewScores = { correctness: 5, readability: 5, security: 5, performance: 5, overall: 5 };
+function parseReview(
+  raw: string,
+  modelId: string,
+  modelName: string,
+  durationMs: number,
+): ModelReview {
+  const defaultScores: ReviewScores = {
+    correctness: 5,
+    readability: 5,
+    security: 5,
+    performance: 5,
+    overall: 5,
+  };
 
   try {
     const jsonStr = JSON_BLOCK_RE.exec(raw)?.[1] ?? raw;
@@ -161,7 +172,7 @@ function parseReview(raw: string, modelId: string, modelName: string, durationMs
       overall: clampScore(rawScores["overall"]),
     };
 
-    const rawIssues = Array.isArray(parsed["issues"]) ? parsed["issues"] as unknown[] : [];
+    const rawIssues = Array.isArray(parsed["issues"]) ? (parsed["issues"] as unknown[]) : [];
     const issues: ReviewIssue[] = rawIssues
       .filter((i): i is Record<string, unknown> => typeof i === "object" && i !== null)
       .map((i) => ({
@@ -171,14 +182,25 @@ function parseReview(raw: string, modelId: string, modelName: string, durationMs
       }));
 
     return {
-      modelId, modelName, scores, issues,
+      modelId,
+      modelName,
+      scores,
+      issues,
       summary: String(parsed["summary"] ?? ""),
-      rawContent: raw, durationMs, success: true,
+      rawContent: raw,
+      durationMs,
+      success: true,
     };
   } catch {
     return {
-      modelId, modelName, scores: defaultScores, issues: [],
-      summary: "Failed to parse review", rawContent: raw, durationMs, success: false,
+      modelId,
+      modelName,
+      scores: defaultScores,
+      issues: [],
+      summary: "Failed to parse review",
+      rawContent: raw,
+      durationMs,
+      success: false,
       error: "JSON parse error",
     };
   }
@@ -230,17 +252,30 @@ async function queryReviewModel(
 
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = (await res.json()) as Record<string, unknown>;
-    const choices = data["choices"] as Array<Record<string, unknown>> | undefined;
-    const content = String((choices?.[0]?.["message"] as Record<string, unknown> | undefined)?.["content"] ?? "");
+    const choices = data["choices"] as Record<string, unknown>[] | undefined;
+    const content = String(
+      (choices?.[0]?.["message"] as Record<string, unknown> | undefined)?.["content"] ?? "",
+    );
     if (!content) throw new Error("Empty response");
 
     return parseReview(content, model.id, model.name, Date.now() - t0);
   } catch (err) {
-    const defaultScores: ReviewScores = { correctness: 5, readability: 5, security: 5, performance: 5, overall: 5 };
+    const defaultScores: ReviewScores = {
+      correctness: 5,
+      readability: 5,
+      security: 5,
+      performance: 5,
+      overall: 5,
+    };
     return {
-      modelId: model.id, modelName: model.name,
-      scores: defaultScores, issues: [], summary: "",
-      rawContent: "", durationMs: Date.now() - t0, success: false,
+      modelId: model.id,
+      modelName: model.name,
+      scores: defaultScores,
+      issues: [],
+      summary: "",
+      rawContent: "",
+      durationMs: Date.now() - t0,
+      success: false,
       error: err instanceof Error ? err.message : String(err),
     };
   }
@@ -250,7 +285,9 @@ async function queryReviewModel(
 
 const DISAGREE_THRESHOLD = 3; // spread >= 3 → flag as disagreement
 
-function aggregateReviews(reviews: ModelReview[]): Pick<AggregatedReview, "consensus" | "disagreements"> {
+function aggregateReviews(
+  reviews: ModelReview[],
+): Pick<AggregatedReview, "consensus" | "disagreements"> {
   const successful = reviews.filter((r) => r.success);
   if (successful.length === 0) {
     return {
@@ -259,7 +296,13 @@ function aggregateReviews(reviews: ModelReview[]): Pick<AggregatedReview, "conse
     };
   }
 
-  const dimensions: Array<keyof ReviewScores> = ["correctness", "readability", "security", "performance", "overall"];
+  const dimensions: (keyof ReviewScores)[] = [
+    "correctness",
+    "readability",
+    "security",
+    "performance",
+    "overall",
+  ];
   const consensus = {} as ReviewScores;
   const disagreements: Disagreement[] = [];
 
@@ -289,7 +332,10 @@ function aggregateReviews(reviews: ModelReview[]): Pick<AggregatedReview, "conse
   return { consensus, disagreements };
 }
 
-function buildVerdict(consensus: ReviewScores, criticalCount: number): AggregatedReview["finalVerdict"] {
+function buildVerdict(
+  consensus: ReviewScores,
+  criticalCount: number,
+): AggregatedReview["finalVerdict"] {
   if (criticalCount > 0 || consensus.overall < 4) return "rejected";
   if (consensus.overall < 7) return "needs-changes";
   return "approved";
@@ -299,7 +345,7 @@ function buildVerdict(consensus: ReviewScores, criticalCount: number): Aggregate
 
 export interface MultiReviewerConfig {
   apiKey: string;
-  models?: ReadonlyArray<ReviewModel>;
+  models?: readonly ReviewModel[];
   fetchFn?: FetchFn;
   /** Timeout per model in ms (default: 30000) */
   modelTimeout?: number;
@@ -308,7 +354,7 @@ export interface MultiReviewerConfig {
 /** Multi reviewer. */
 export class MultiReviewer {
   private readonly apiKey: string;
-  private readonly models: ReadonlyArray<ReviewModel>;
+  private readonly models: readonly ReviewModel[];
   private readonly fetchFn: FetchFn;
   private readonly modelTimeout: number;
 
@@ -366,12 +412,21 @@ async function withTimeout(
   return Promise.race([
     p,
     new Promise<ModelReview>((resolve) =>
-      setTimeout(() => resolve({
-        modelId: model.id, modelName: model.name,
-        scores: { correctness: 5, readability: 5, security: 5, performance: 5, overall: 5 },
-        issues: [], summary: "", rawContent: "",
-        durationMs: ms, success: false, error: "Timeout",
-      }), ms),
+      setTimeout(
+        () =>
+          resolve({
+            modelId: model.id,
+            modelName: model.name,
+            scores: { correctness: 5, readability: 5, security: 5, performance: 5, overall: 5 },
+            issues: [],
+            summary: "",
+            rawContent: "",
+            durationMs: ms,
+            success: false,
+            error: "Timeout",
+          }),
+        ms,
+      ),
     ),
   ]);
 }

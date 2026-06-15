@@ -153,9 +153,7 @@ export interface HookResult {
 }
 
 /** Hook handler type alias. */
-export type HookHandler<T> = (
-  payload: T,
-) => Promise<HookResult | void> | HookResult | void;
+export type HookHandler<T> = (payload: T) => Promise<HookResult> | HookResult;
 
 // ── Registration handle ───────────────────────────────────────────────────────
 
@@ -322,7 +320,9 @@ function applyOrderingConstraints(handlers: HandlerRecord[]): HandlerRecord[] {
   // Build adjacency list: mustBefore[i] = set of indices that must come after i
   const n = handlers.length;
   const indexMap = new Map(handlers.map((h, i) => [h.id, i]));
-  const before = new Array<Set<number>>(n).fill(null as unknown as Set<number>).map(() => new Set<number>());
+  const before = new Array<Set<number>>(n)
+    .fill(null as unknown as Set<number>)
+    .map(() => new Set<number>());
 
   for (let i = 0; i < n; i++) {
     const h = handlers[i]!;
@@ -361,6 +361,7 @@ function applyOrderingConstraints(handlers: HandlerRecord[]): HandlerRecord[] {
     result.push(handlers[i]!);
     const dependents = Array.from(before[i]!).sort((a, b) => a - b);
     for (const j of dependents) {
+      // eslint-disable-next-line @typescript-eslint/no-confusing-non-null-assertion
       if (--inDegree[j]! === 0) {
         queue.push(j);
         queue.sort((a, b) => a - b);
@@ -396,8 +397,8 @@ export interface HookRegistryOptions {
  * mutations during an active emit (mutations take effect on the next emit).
  */
 export class HookRegistry {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private readonly handlers = new Map<HookEvent, HandlerRecord<any>[]>();
+   
+  private readonly handlers = new Map<HookEvent, HandlerRecord[]>();
   private readonly plugins = new Map<string, Plugin>();
   private readonly store?: HookStore;
   private insertionCounter = 0;
@@ -532,10 +533,7 @@ export class HookRegistry {
    * When a handler aborts the chain, registered compensation handlers run
    * in reverse registration order before emit() returns.
    */
-  async emit<E extends HookEvent>(
-    event: E,
-    payload: HookEventMap[E],
-  ): Promise<EmitResult> {
+  async emit<E extends HookEvent>(event: E, payload: HookEventMap[E]): Promise<EmitResult> {
     const result: EmitResult = {
       event,
       handled: 0,
@@ -561,7 +559,7 @@ export class HookRegistry {
     for (const record of sorted) {
       result.handled++;
 
-      let hookResult: HookResult | void;
+      let hookResult: HookResult;
       try {
         hookResult = await this._runWithTimeout(record, payload);
       } catch (err) {
@@ -604,23 +602,28 @@ export class HookRegistry {
   private async _runWithTimeout(
     record: HandlerRecord,
     payload: unknown,
-  ): Promise<HookResult | void> {
+  ): Promise<HookResult> {
     if (!record.timeoutMs) {
       return record.handler(payload);
     }
 
-    return new Promise<HookResult | void>((resolve, reject) => {
+    return new Promise<HookResult>((resolve, reject) => {
       let done = false;
 
       const timer = setTimeout(() => {
         if (!done) {
           done = true;
-          reject(new Error(`Handler "${record.label ?? record.id}" timed out after ${record.timeoutMs}ms`));
+          reject(
+            new Error(
+              `Handler "${record.label ?? record.id}" timed out after ${record.timeoutMs}ms`,
+            ),
+          );
         }
       }, record.timeoutMs);
 
       Promise.resolve(record.handler(payload)).then(
         (r) => {
+          // eslint-disable-next-line promise/always-return
           if (!done) {
             done = true;
             clearTimeout(timer);
@@ -648,11 +651,9 @@ export class HookRegistry {
    */
   use(plugin: Plugin): this {
     if (this.plugins.has(plugin.name)) {
-      throw new HookError(
-        `Plugin "${plugin.name}" is already installed`,
-        "DUPLICATE_PLUGIN",
-        { pluginName: plugin.name },
-      );
+      throw new HookError(`Plugin "${plugin.name}" is already installed`, "DUPLICATE_PLUGIN", {
+        pluginName: plugin.name,
+      });
     }
     this.plugins.set(plugin.name, plugin);
     plugin.install(this);

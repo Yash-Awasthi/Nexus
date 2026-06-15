@@ -173,9 +173,13 @@ export abstract class FeedAdapter<T extends FeedEvent> {
     this.apiKey = opts.apiKey;
     this.corsOrigin = opts.corsOrigin;
     this.rateLimitRpm = opts.rateLimitRpm ?? 60;
-    this.http = opts.http ?? (async (url, headers) => {
-      throw new Error(`Real HTTP not available. URL: ${url}, Headers: ${JSON.stringify(headers)}`);
-    });
+    this.http =
+      opts.http ??
+      (async (url, headers) => {
+        throw new Error(
+          `Real HTTP not available. URL: ${url}, Headers: ${JSON.stringify(headers)}`,
+        );
+      });
   }
 
   /** Check rate limit — returns true if request is allowed. */
@@ -190,7 +194,7 @@ export abstract class FeedAdapter<T extends FeedEvent> {
 
   /** Build headers for the request. */
   protected buildHeaders(): Record<string, string> {
-    const headers: Record<string, string> = { "Accept": "application/json" };
+    const headers: Record<string, string> = { Accept: "application/json" };
     if (this.apiKey) headers["Authorization"] = `Bearer ${this.apiKey}`;
     if (this.corsOrigin) headers["Origin"] = this.corsOrigin;
     return headers;
@@ -207,7 +211,10 @@ export class AviationFeed extends FeedAdapter<AviationEvent> {
 
   async fetch(): Promise<AviationEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
-    const raw = await this.http(`${this.baseUrl}/aviation/events`, this.buildHeaders()) as AviationEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/aviation/events`,
+      this.buildHeaders(),
+    )) as AviationEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<AviationEvent>("aviation");
   }
 }
@@ -218,7 +225,10 @@ export class ClimateFeed extends FeedAdapter<ClimateEvent> {
 
   async fetch(): Promise<ClimateEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
-    const raw = await this.http(`${this.baseUrl}/climate/events`, this.buildHeaders()) as ClimateEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/climate/events`,
+      this.buildHeaders(),
+    )) as ClimateEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<ClimateEvent>("climate");
   }
 }
@@ -229,7 +239,10 @@ export class ConflictFeed extends FeedAdapter<ConflictEvent> {
 
   async fetch(): Promise<ConflictEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
-    const raw = await this.http(`${this.baseUrl}/conflict/events`, this.buildHeaders()) as ConflictEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/conflict/events`,
+      this.buildHeaders(),
+    )) as ConflictEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<ConflictEvent>("conflict");
   }
 }
@@ -240,7 +253,10 @@ export class EconomicFeed extends FeedAdapter<EconomicEvent> {
 
   async fetch(): Promise<EconomicEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
-    const raw = await this.http(`${this.baseUrl}/economic/indicators`, this.buildHeaders()) as EconomicEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/economic/indicators`,
+      this.buildHeaders(),
+    )) as EconomicEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<EconomicEvent>("economic");
   }
 }
@@ -251,7 +267,10 @@ export class DisplacementFeed extends FeedAdapter<DisplacementEvent> {
 
   async fetch(): Promise<DisplacementEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
-    const raw = await this.http(`${this.baseUrl}/displacement/events`, this.buildHeaders()) as DisplacementEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/displacement/events`,
+      this.buildHeaders(),
+    )) as DisplacementEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<DisplacementEvent>("displacement");
   }
 }
@@ -262,7 +281,10 @@ export class CyberFeed extends FeedAdapter<CyberEvent> {
 
   async fetch(): Promise<CyberEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
-    const raw = await this.http(`${this.baseUrl}/cyber/threats`, this.buildHeaders()) as CyberEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/cyber/threats`,
+      this.buildHeaders(),
+    )) as CyberEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<CyberEvent>("cyber");
   }
 }
@@ -273,7 +295,10 @@ export class HealthFeed extends FeedAdapter<HealthEvent> {
 
   async fetch(): Promise<HealthEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
-    const raw = await this.http(`${this.baseUrl}/health/alerts`, this.buildHeaders()) as HealthEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/health/alerts`,
+      this.buildHeaders(),
+    )) as HealthEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<HealthEvent>("health");
   }
 }
@@ -284,7 +309,10 @@ export class ImageryFeed extends FeedAdapter<ImageryEvent> {
 
   async fetch(): Promise<ImageryEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
-    const raw = await this.http(`${this.baseUrl}/imagery/events`, this.buildHeaders()) as ImageryEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/imagery/events`,
+      this.buildHeaders(),
+    )) as ImageryEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<ImageryEvent>("imagery");
   }
 }
@@ -296,7 +324,10 @@ export class SeismologyFeed extends FeedAdapter<SeismologyEvent> {
   async fetch(opts?: { minMagnitude?: number }): Promise<SeismologyEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
     const qs = opts?.minMagnitude ? `?minMagnitude=${opts.minMagnitude}` : "";
-    const raw = await this.http(`${this.baseUrl}/seismology/events${qs}`, this.buildHeaders()) as SeismologyEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/seismology/events${qs}`,
+      this.buildHeaders(),
+    )) as SeismologyEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<SeismologyEvent>("seismology");
   }
 }
@@ -307,7 +338,10 @@ export class WildfireFeed extends FeedAdapter<WildfireEvent> {
 
   async fetch(): Promise<WildfireEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
-    const raw = await this.http(`${this.baseUrl}/wildfire/events`, this.buildHeaders()) as WildfireEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/wildfire/events`,
+      this.buildHeaders(),
+    )) as WildfireEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<WildfireEvent>("wildfire");
   }
 }
@@ -318,7 +352,10 @@ export class MaritimeFeed extends FeedAdapter<MaritimeEvent> {
 
   async fetch(): Promise<MaritimeEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
-    const raw = await this.http(`${this.baseUrl}/maritime/incidents`, this.buildHeaders()) as MaritimeEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/maritime/incidents`,
+      this.buildHeaders(),
+    )) as MaritimeEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<MaritimeEvent>("maritime");
   }
 }
@@ -329,7 +366,9 @@ export class FeedCache {
   private store = new Map<string, { events: FeedEvent[]; expiresAt: number }>();
   private ttlMs: number;
 
-  constructor(ttlMs = 300_000) { this.ttlMs = ttlMs; }
+  constructor(ttlMs = 300_000) {
+    this.ttlMs = ttlMs;
+  }
 
   set(domain: string, events: FeedEvent[]): void {
     this.store.set(domain, { events: [...events], expiresAt: Date.now() + this.ttlMs });
@@ -344,16 +383,34 @@ export class FeedCache {
     return [...entry.events];
   }
 
-  invalidate(domain: string): void { this.store.delete(domain); }
-  clear(): void { this.store.clear(); }
-  size(): number { return this.store.size; }
-  domains(): string[] { return [...this.store.keys()]; }
+  invalidate(domain: string): void {
+    this.store.delete(domain);
+  }
+  clear(): void {
+    this.store.clear();
+  }
+  size(): number {
+    return this.store.size;
+  }
+  domains(): string[] {
+    return [...this.store.keys()];
+  }
 }
 
 // ── FeedRegistry ──────────────────────────────────────────────────────────────
 
-export type DomainName = "aviation" | "climate" | "conflict" | "economic" | "displacement" |
-  "cyber" | "health" | "imagery" | "seismology" | "wildfire" | "maritime";
+export type DomainName =
+  | "aviation"
+  | "climate"
+  | "conflict"
+  | "economic"
+  | "displacement"
+  | "cyber"
+  | "health"
+  | "imagery"
+  | "seismology"
+  | "wildfire"
+  | "maritime";
 
 /** Feed registry. */
 export class FeedRegistry {
@@ -373,7 +430,9 @@ export class FeedRegistry {
     return this.adapters.get(domain);
   }
 
-  domains(): string[] { return [...this.adapters.keys()]; }
+  domains(): string[] {
+    return [...this.adapters.keys()];
+  }
 
   async fetch(domain: string, opts?: Record<string, unknown>): Promise<FeedPage<FeedEvent>> {
     const adapter = this.adapters.get(domain);
@@ -381,26 +440,39 @@ export class FeedRegistry {
 
     const cached = this.cache.get(domain);
     if (cached) {
-      return { domain, events: cached, fetchedAt: new Date().toISOString(), totalCount: cached.length, cached: true };
+      return {
+        domain,
+        events: cached,
+        fetchedAt: new Date().toISOString(),
+        totalCount: cached.length,
+        cached: true,
+      };
     }
 
     const events = await adapter.fetch(opts);
     this.cache.set(domain, events);
-    return { domain, events, fetchedAt: new Date().toISOString(), totalCount: events.length, cached: false };
+    return {
+      domain,
+      events,
+      fetchedAt: new Date().toISOString(),
+      totalCount: events.length,
+      cached: false,
+    };
   }
 
   /** Fetch all registered domains in parallel. */
   async fetchAll(opts?: Record<string, unknown>): Promise<FeedPage<FeedEvent>[]> {
-    return Promise.allSettled(
-      [...this.adapters.keys()].map((d) => this.fetch(d, opts))
-    ).then((results) =>
-      results
-        .filter((r): r is PromiseFulfilledResult<FeedPage<FeedEvent>> => r.status === "fulfilled")
-        .map((r) => r.value)
+    return Promise.allSettled([...this.adapters.keys()].map((d) => this.fetch(d, opts))).then(
+      (results) =>
+        results
+          .filter((r): r is PromiseFulfilledResult<FeedPage<FeedEvent>> => r.status === "fulfilled")
+          .map((r) => r.value),
     );
   }
 
-  getCache(): FeedCache { return this.cache; }
+  getCache(): FeedCache {
+    return this.cache;
+  }
 }
 
 // ── RSS types ─────────────────────────────────────────────────────────────────
@@ -443,14 +515,14 @@ export class OPMLParser {
     while ((match = outlineRe.exec(xml)) !== null) {
       const attrs = match[1];
       const outline: OPMLOutline = { text: this.attr(attrs, "text") ?? "" };
-      const xmlUrl  = this.attr(attrs, "xmlUrl");
+      const xmlUrl = this.attr(attrs, "xmlUrl");
       const htmlUrl = this.attr(attrs, "htmlUrl");
-      const type    = this.attr(attrs, "type");
-      const title   = this.attr(attrs, "title");
-      if (xmlUrl)  outline.xmlUrl  = xmlUrl;
+      const type = this.attr(attrs, "type");
+      const title = this.attr(attrs, "title");
+      if (xmlUrl) outline.xmlUrl = xmlUrl;
       if (htmlUrl) outline.htmlUrl = htmlUrl;
-      if (type)    outline.type    = type;
-      if (title)   outline.title   = title;
+      if (type) outline.type = type;
+      if (title) outline.title = title;
       outlines.push(outline);
     }
     return outlines;
@@ -458,7 +530,9 @@ export class OPMLParser {
 
   /** Extract only feed URLs (outlines that carry xmlUrl). */
   feedUrls(xml: string): string[] {
-    return this.parse(xml).filter((o) => o.xmlUrl).map((o) => o.xmlUrl!);
+    return this.parse(xml)
+      .filter((o) => o.xmlUrl)
+      .map((o) => o.xmlUrl!);
   }
 
   private attr(attrs: string, name: string): string | undefined {
@@ -486,28 +560,30 @@ export class RssFeedAdapter {
   private maxItems: number;
 
   constructor(opts: RssFeedAdapterOptions) {
-    this.feedUrl  = opts.feedUrl;
+    this.feedUrl = opts.feedUrl;
     this.maxItems = opts.maxItems ?? 20;
-    this.http     = opts.http ?? (async (url: string) => {
-      const res = await fetch(url, {
-        headers: { "Accept": "application/rss+xml, application/xml, text/xml, */*" },
+    this.http =
+      opts.http ??
+      (async (url: string) => {
+        const res = await fetch(url, {
+          headers: { Accept: "application/rss+xml, application/xml, text/xml, */*" },
+        });
+        if (!res.ok) throw new Error(`RSS fetch failed: ${res.status} ${url}`);
+        return res.text();
       });
-      if (!res.ok) throw new Error(`RSS fetch failed: ${res.status} ${url}`);
-      return res.text();
-    });
   }
 
   async fetch(): Promise<RssFeed> {
     const fetchedAt = new Date().toISOString();
-    const raw = await this.http(this.feedUrl) as string;
+    const raw = (await this.http(this.feedUrl)) as string;
     const xml = typeof raw === "string" ? raw : JSON.stringify(raw);
     return this.parse(xml, fetchedAt);
   }
 
   /** Parse RSS 2.0 or Atom XML into a structured RssFeed. */
   parse(xml: string, fetchedAt = new Date().toISOString()): RssFeed {
-    const title       = this.tag(xml, "title") ?? this.feedUrl;
-    const link        = this.tag(xml, "link");
+    const title = this.tag(xml, "title") ?? this.feedUrl;
+    const link = this.tag(xml, "link");
     const description = this.tag(xml, "description");
 
     const items: RssItem[] = [];
@@ -518,12 +594,12 @@ export class RssFeedAdapter {
     while ((m = itemRe.exec(xml)) !== null && items.length < this.maxItems) {
       const b = m[1];
       items.push({
-        title:       this.tag(b, "title") ?? "",
-        link:        this.tag(b, "link"),
+        title: this.tag(b, "title") ?? "",
+        link: this.tag(b, "link"),
         description: this.tag(b, "description"),
-        pubDate:     this.tag(b, "pubDate"),
-        guid:        this.tag(b, "guid"),
-        author:      this.tag(b, "author") ?? this.tag(b, "dc:creator"),
+        pubDate: this.tag(b, "pubDate"),
+        guid: this.tag(b, "guid"),
+        author: this.tag(b, "author") ?? this.tag(b, "dc:creator"),
       });
     }
 
@@ -533,12 +609,12 @@ export class RssFeedAdapter {
       while ((m = entryRe.exec(xml)) !== null && items.length < this.maxItems) {
         const b = m[1];
         items.push({
-          title:       this.tag(b, "title") ?? "",
-          link:        this.attrTag(b, "link", "href"),
+          title: this.tag(b, "title") ?? "",
+          link: this.attrTag(b, "link", "href"),
           description: this.tag(b, "summary") ?? this.tag(b, "content"),
-          pubDate:     this.tag(b, "published") ?? this.tag(b, "updated"),
-          guid:        this.tag(b, "id"),
-          author:      this.tag(b, "name"),
+          pubDate: this.tag(b, "published") ?? this.tag(b, "updated"),
+          guid: this.tag(b, "id"),
+          author: this.tag(b, "name"),
         });
       }
     }
@@ -549,15 +625,23 @@ export class RssFeedAdapter {
   /** Convert RssFeed items to FeedEvent[] for ingestion into a FeedRegistry. */
   toFeedEvents(feed: RssFeed, domain = "rss"): FeedEvent[] {
     return feed.items.map((item, i) => ({
-      id:        item.guid ?? item.link ?? `${domain}-${Date.now()}-${i}`,
-      timestamp: item.pubDate ? (() => { try { return new Date(item.pubDate!).toISOString(); } catch { return feed.fetchedAt; } })() : feed.fetchedAt,
-      source:    feed.title,
-      summary:   item.title || (item.description?.slice(0, 120) ?? ""),
+      id: item.guid ?? item.link ?? `${domain}-${Date.now()}-${i}`,
+      timestamp: item.pubDate
+        ? (() => {
+            try {
+              return new Date(item.pubDate!).toISOString();
+            } catch {
+              return feed.fetchedAt;
+            }
+          })()
+        : feed.fetchedAt,
+      source: feed.title,
+      summary: item.title || (item.description?.slice(0, 120) ?? ""),
       metadata: {
-        link:        item.link,
+        link: item.link,
         description: item.description,
-        author:      item.author,
-        feedUrl:     this.feedUrl,
+        author: item.author,
+        feedUrl: this.feedUrl,
       },
     }));
   }
@@ -567,13 +651,16 @@ export class RssFeedAdapter {
   /** Extract text content of a tag, handling CDATA. */
   private tag(xml: string, tagName: string): string | undefined {
     // CDATA variant
-    const cdataRe = new RegExp(`<${tagName}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tagName}>`, "i");
+    const cdataRe = new RegExp(
+      `<${tagName}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tagName}>`,
+      "i",
+    );
     let m = xml.match(cdataRe);
     if (m) return m[1].trim() || undefined;
     // Plain text variant
     const plainRe = new RegExp(`<${tagName}[^>]*>([^<]*)<\\/${tagName}>`, "i");
     m = xml.match(plainRe);
-    return m ? (m[1].trim() || undefined) : undefined;
+    return m ? m[1].trim() || undefined : undefined;
   }
 
   /** Extract an attribute value from a self-closing tag (e.g. <link href="…"/>). */

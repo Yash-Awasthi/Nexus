@@ -34,7 +34,7 @@ export interface TriggerCondition {
 /** Workflow action interface definition. */
 export interface WorkflowAction {
   type: WorkflowActionType;
-  params: Record<string, string>;  // Jinja-templatible values
+  params: Record<string, string>; // Jinja-templatible values
 }
 
 /** Workflow definition interface definition. */
@@ -42,7 +42,7 @@ export interface WorkflowDefinition {
   id: string;
   name: string;
   enabled: boolean;
-  conditions: TriggerCondition[];    // ALL must match
+  conditions: TriggerCondition[]; // ALL must match
   actions: WorkflowAction[];
   order?: number;
 }
@@ -87,7 +87,9 @@ export class JinjaTemplater {
    */
   render(template: string, context: Record<string, unknown>): string {
     return template.replace(/\{\{([^}]+)\}\}/g, (_match, key) => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const trimmedKey = key.trim();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const value = this.resolveKey(trimmedKey, context);
       return value !== undefined ? String(value) : `{{${trimmedKey}}}`;
     });
@@ -97,14 +99,18 @@ export class JinjaTemplater {
     const parts = key.split(".");
     let current: unknown = context;
     for (const part of parts) {
-      if (current === null || current === undefined || typeof current !== "object") return undefined;
+      if (current === null || current === undefined || typeof current !== "object")
+        return undefined;
       current = (current as Record<string, unknown>)[part];
     }
     return current;
   }
 
   /** Render all string values in a params object. */
-  renderParams(params: Record<string, string>, context: Record<string, unknown>): Record<string, string> {
+  renderParams(
+    params: Record<string, string>,
+    context: Record<string, unknown>,
+  ): Record<string, string> {
     const result: Record<string, string> = {};
     for (const [k, v] of Object.entries(params)) {
       result[k] = this.render(v, context);
@@ -116,10 +122,10 @@ export class JinjaTemplater {
 // ── WorkflowMatcher ───────────────────────────────────────────────────────────
 
 const FIELD_MAP: Record<string, keyof ActionContext> = {
-  mime_type:     "mimeType",
+  mime_type: "mimeType",
   document_type: "documentType",
   path_contains: "originalPath",
-  owner:         "owner",
+  owner: "owner",
   // "tag" intentionally NOT mapped — literal ctx["tag"] lookup (undefined if absent)
 };
 
@@ -130,16 +136,23 @@ export class WorkflowMatcher {
     const rawValue = doc[contextKey];
     const docValue = Array.isArray(rawValue)
       ? rawValue.join(",")
-      : rawValue !== undefined ? String(rawValue) : "";
+      : rawValue !== undefined
+        ? String(rawValue)
+        : "";
     const cv = condition.value.toLowerCase();
     const dv = docValue.toLowerCase();
 
     switch (condition.operator) {
-      case "equals":      return dv === cv;
-      case "contains":    return dv.includes(cv);
-      case "starts_with": return dv.startsWith(cv);
-      case "ends_with":   return dv.endsWith(cv);
-      default:            return false;
+      case "equals":
+        return dv === cv;
+      case "contains":
+        return dv.includes(cv);
+      case "starts_with":
+        return dv.startsWith(cv);
+      case "ends_with":
+        return dv.endsWith(cv);
+      default:
+        return false;
     }
   }
 
@@ -171,7 +184,10 @@ export class ActionExecutor {
     ctx: ActionContext,
     workflowId: string,
   ): Promise<ActionResult> {
-    const renderedParams = this.templater.renderParams(action.params, ctx as Record<string, unknown>);
+    const renderedParams = this.templater.renderParams(
+      action.params,
+      ctx as Record<string, unknown>,
+    );
 
     if (!this.handler) {
       return {
@@ -275,8 +291,12 @@ export class WorkflowEngine {
     return this.runForDocument(ctx);
   }
 
-  getWorkflows(): WorkflowDefinition[] { return [...this.workflows]; }
-  getExecutor(): ActionExecutor { return this.executor; }
+  getWorkflows(): WorkflowDefinition[] {
+    return [...this.workflows];
+  }
+  getExecutor(): ActionExecutor {
+    return this.executor;
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

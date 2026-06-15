@@ -88,7 +88,8 @@ const DEFAULT_PRICE: ModelPrice = { inputPer1k: 0.001, outputPer1k: 0.002 };
  * Falls back to DEFAULT_PRICE if model is unknown.
  */
 export function estimateCost(model: string, inputTokens: number, outputTokens: number): number {
-  const price = MODEL_PRICING[model] ?? MODEL_PRICING[model.split("/").pop() ?? ""] ?? DEFAULT_PRICE;
+  const price =
+    MODEL_PRICING[model] ?? MODEL_PRICING[model.split("/").pop() ?? ""] ?? DEFAULT_PRICE;
   return (inputTokens / 1000) * price.inputPer1k + (outputTokens / 1000) * price.outputPer1k;
 }
 
@@ -237,7 +238,9 @@ export class RunCostTracker {
     this.activeRuns.delete(runId);
 
     // Persist (fire-and-forget)
-    this.store.save({ ...run }).catch(() => {/* non-fatal */});
+    this.store.save({ ...run }).catch(() => {
+      /* non-fatal */
+    });
 
     return buildSummary(run, endedAt);
   }

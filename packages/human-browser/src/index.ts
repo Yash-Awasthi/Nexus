@@ -16,7 +16,10 @@
 export type ActionType = "move" | "click" | "type" | "scroll" | "wait" | "focus" | "blur";
 
 /** Point interface definition. */
-export interface Point { x: number; y: number; }
+export interface Point {
+  x: number;
+  y: number;
+}
 
 /** Browser action interface definition. */
 export interface BrowserAction {
@@ -36,6 +39,7 @@ export interface TimingOptions {
 }
 
 /** Human timing. */
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class HumanTiming {
   /**
    * Return a human-like delay between minMs and maxMs with optional jitter.
@@ -200,7 +204,10 @@ export class ScrollSimulator {
     const sign = totalDelta >= 0 ? 1 : -1;
 
     while (remaining > 0) {
-      const chunk = Math.min(remaining, chunkSize + Math.round((this.rng() - 0.5) * chunkSize * 0.3));
+      const chunk = Math.min(
+        remaining,
+        chunkSize + Math.round((this.rng() - 0.5) * chunkSize * 0.3),
+      );
       chunks.push({
         deltaY: sign * chunk,
         delayMs: HumanTiming.delay({ minMs: 40, maxMs: 120 }, this.rng),
@@ -269,7 +276,9 @@ export class BrowserSession {
     return this;
   }
 
-  getActions(): BrowserAction[] { return [...this.actions]; }
+  getActions(): BrowserAction[] {
+    return [...this.actions];
+  }
 
   totalDuration(): number {
     return this.actions.reduce((sum, a) => sum + a.delayMs, 0);

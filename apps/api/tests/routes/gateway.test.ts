@@ -6,13 +6,13 @@ import type { FastifyInstance } from "fastify";
 // ── Groq mock response ─────────────────────────────────────────────────────────
 
 const GROQ_RESPONSE = {
-  id:      "chatcmpl-test",
-  object:  "chat.completion",
-  model:   "llama-3.3-70b-versatile",
+  id: "chatcmpl-test",
+  object: "chat.completion",
+  model: "llama-3.3-70b-versatile",
   choices: [
     {
-      index:        0,
-      message:      { role: "assistant", content: "Hello from mock!" },
+      index: 0,
+      message: { role: "assistant", content: "Hello from mock!" },
       finish_reason: "stop",
     },
   ],
@@ -21,7 +21,7 @@ const GROQ_RESPONSE = {
 
 function mockGroqFetch(overrides: Partial<typeof GROQ_RESPONSE> = {}): typeof vi.fn {
   return vi.fn().mockResolvedValue({
-    ok:   true,
+    ok: true,
     json: async () => ({ ...GROQ_RESPONSE, ...overrides }),
     text: async () => JSON.stringify(GROQ_RESPONSE),
   });
@@ -63,8 +63,10 @@ describe("GET /api/v1/gateway/models", () => {
   });
 
   it("model entries have expected shape", async () => {
-    const res  = await app.inject({ method: "GET", url: "/api/v1/gateway/models" });
-    const body = res.json<{ models: Array<{ id: string; provider: string; backend_model: string; available: boolean }> }>();
+    const res = await app.inject({ method: "GET", url: "/api/v1/gateway/models" });
+    const body = res.json<{
+      models: { id: string; provider: string; backend_model: string; available: boolean }[];
+    }>();
     const first = body.models[0]!;
     expect(first).toHaveProperty("id");
     expect(first).toHaveProperty("provider");
@@ -120,8 +122,8 @@ describe("GET /api/v1/gateway/cost-report", () => {
 describe("POST /api/v1/gateway/messages", () => {
   it("returns 400 for unrecognised model", async () => {
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/gateway/messages",
+      method: "POST",
+      url: "/api/v1/gateway/messages",
       payload: { model: "totally-unknown-model-xyz", messages: [{ role: "user", content: "hi" }] },
     });
     expect(res.statusCode).toBe(400);
@@ -133,10 +135,10 @@ describe("POST /api/v1/gateway/messages", () => {
   it("returns 400 when provider not configured (no GROQ_API_KEY)", async () => {
     delete process.env.GROQ_API_KEY;
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/gateway/messages",
+      method: "POST",
+      url: "/api/v1/gateway/messages",
       payload: {
-        model:    "nexus/fast",
+        model: "nexus/fast",
         messages: [{ role: "user", content: "hello" }],
       },
     });
@@ -149,11 +151,11 @@ describe("POST /api/v1/gateway/messages", () => {
     process.env.GROQ_API_KEY = "test-key";
     vi.stubGlobal("fetch", mockGroqFetch());
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/gateway/messages",
+      method: "POST",
+      url: "/api/v1/gateway/messages",
       payload: {
-        model:         "nexus/fast",
-        messages:      [{ role: "user", content: "hi" }],
+        model: "nexus/fast",
+        messages: [{ role: "user", content: "hi" }],
         max_spend_usd: 0, // cap at $0 → always reject
       },
     });
@@ -168,10 +170,10 @@ describe("POST /api/v1/gateway/messages", () => {
     vi.stubGlobal("fetch", mockGroqFetch());
 
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/gateway/messages",
+      method: "POST",
+      url: "/api/v1/gateway/messages",
       payload: {
-        model:    "nexus/fast",
+        model: "nexus/fast",
         messages: [{ role: "user", content: "Hello!" }],
         temperature: 0,
       },
@@ -179,11 +181,11 @@ describe("POST /api/v1/gateway/messages", () => {
 
     expect(res.statusCode).toBe(200);
     const body = res.json<{
-      type:        string;
-      role:        string;
-      content:     Array<{ type: string; text: string }>;
-      model:       string;
-      usage:       { input_tokens: number; output_tokens: number };
+      type: string;
+      role: string;
+      content: { type: string; text: string }[];
+      model: string;
+      usage: { input_tokens: number; output_tokens: number };
     }>();
     expect(body.type).toBe("message");
     expect(body.role).toBe("assistant");
@@ -197,9 +199,13 @@ describe("POST /api/v1/gateway/messages", () => {
     vi.stubGlobal("fetch", mockGroqFetch());
 
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/gateway/messages",
-      payload: { model: "nexus/fast", messages: [{ role: "user", content: "unique-1234" }], temperature: 0 },
+      method: "POST",
+      url: "/api/v1/gateway/messages",
+      payload: {
+        model: "nexus/fast",
+        messages: [{ role: "user", content: "unique-1234" }],
+        temperature: 0,
+      },
     });
     expect(res.headers["x-nexus-cache"]).toBe("MISS");
   });
@@ -208,8 +214,8 @@ describe("POST /api/v1/gateway/messages", () => {
     // With no ANTHROPIC_API_KEY, provider 'anthropic' is not registered
     delete process.env.ANTHROPIC_API_KEY;
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/gateway/messages",
+      method: "POST",
+      url: "/api/v1/gateway/messages",
       headers: { "x-nexus-provider": "anthropic" },
       payload: { model: "nexus/fast", messages: [{ role: "user", content: "hi" }] },
     });
@@ -225,8 +231,8 @@ describe("POST /api/v1/gateway/messages", () => {
 describe("POST /api/v1/gateway/tools/invoke", () => {
   it("returns 400 when name missing", async () => {
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/gateway/tools/invoke",
+      method: "POST",
+      url: "/api/v1/gateway/tools/invoke",
       payload: {},
     });
     expect(res.statusCode).toBe(400);
@@ -234,8 +240,8 @@ describe("POST /api/v1/gateway/tools/invoke", () => {
 
   it("returns 422 for unknown tool name", async () => {
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/gateway/tools/invoke",
+      method: "POST",
+      url: "/api/v1/gateway/tools/invoke",
       payload: { name: "totally_fake_tool_xyz" },
     });
     expect(res.statusCode).toBe(422);

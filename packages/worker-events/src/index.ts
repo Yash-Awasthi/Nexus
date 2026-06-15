@@ -29,7 +29,7 @@ export interface BaseWorkerEvent {
   type: WorkerEventType;
   sessionId: string;
   timestamp: string; // ISO
-  id: string;        // monotonic per channel
+  id: string; // monotonic per channel
 }
 
 /** Session started event interface definition. */
@@ -145,6 +145,7 @@ export class SseSerializer {
 export type EventPredicate = (event: WorkerEvent) => boolean;
 
 /** Event filter. */
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class EventFilter {
   static byType(...types: WorkerEventType[]): EventPredicate {
     const set = new Set(types);
@@ -191,9 +192,15 @@ export class EventReplay {
     return this.buffer.slice(idx + 1);
   }
 
-  all(): WorkerEvent[] { return [...this.buffer]; }
-  size(): number { return this.buffer.length; }
-  clear(): void { this.buffer = []; }
+  all(): WorkerEvent[] {
+    return [...this.buffer];
+  }
+  size(): number {
+    return this.buffer.length;
+  }
+  clear(): void {
+    this.buffer = [];
+  }
 }
 
 // ── EventChannel ──────────────────────────────────────────────────────────────
@@ -205,7 +212,10 @@ let _globalSeq = 0;
 /** Event channel. */
 export class EventChannel {
   readonly sessionId: string;
-  private subscribers = new Map<string, { predicate: EventPredicate | null; handler: (e: WorkerEvent) => void }>();
+  private subscribers = new Map<
+    string,
+    { predicate: EventPredicate | null; handler: (e: WorkerEvent) => void }
+  >();
   private seq = 0;
   private replay: EventReplay;
   private closed = false;
@@ -236,7 +246,11 @@ export class EventChannel {
 
     for (const { predicate, handler } of this.subscribers.values()) {
       if (!predicate || predicate(event)) {
-        try { handler(event); } catch { /* subscriber errors don't break the bus */ }
+        try {
+          handler(event);
+        } catch {
+          /* subscriber errors don't break the bus */
+        }
       }
     }
 
@@ -250,10 +264,19 @@ export class EventChannel {
     }
   }
 
-  close(): void { this.closed = true; this.subscribers.clear(); }
-  get isClosed(): boolean { return this.closed; }
-  get subscriberCount(): number { return this.subscribers.size; }
-  getReplay(): EventReplay { return this.replay; }
+  close(): void {
+    this.closed = true;
+    this.subscribers.clear();
+  }
+  get isClosed(): boolean {
+    return this.closed;
+  }
+  get subscriberCount(): number {
+    return this.subscribers.size;
+  }
+  getReplay(): EventReplay {
+    return this.replay;
+  }
 }
 
 // ── SessionEventBroadcaster ───────────────────────────────────────────────────
@@ -277,15 +300,24 @@ export class SessionEventBroadcaster {
   }
 
   /** Publish to a named session channel. Creates the channel if needed. */
-  publish(sessionId: string, event: Omit<WorkerEvent, "id" | "sessionId" | "timestamp">): WorkerEvent {
+  publish(
+    sessionId: string,
+    event: Omit<WorkerEvent, "id" | "sessionId" | "timestamp">,
+  ): WorkerEvent {
     return this.channel(sessionId).publish(event);
   }
 
   /** Fan-out to ALL open channels. */
-  broadcast(event: Omit<WorkerEvent, "id" | "sessionId" | "timestamp"> & { sessionId: string }): void {
+  broadcast(
+    event: Omit<WorkerEvent, "id" | "sessionId" | "timestamp"> & { sessionId: string },
+  ): void {
     for (const ch of this.channels.values()) {
       if (!ch.isClosed) {
-        try { ch.publish(event); } catch { /* closed channels throw; skip */ }
+        try {
+          ch.publish(event);
+        } catch {
+          /* closed channels throw; skip */
+        }
       }
     }
   }
@@ -293,7 +325,10 @@ export class SessionEventBroadcaster {
   /** Close and remove a channel. */
   closeChannel(sessionId: string): void {
     const ch = this.channels.get(sessionId);
-    if (ch) { ch.close(); this.channels.delete(sessionId); }
+    if (ch) {
+      ch.close();
+      this.channels.delete(sessionId);
+    }
   }
 
   /** Close all channels. */
@@ -302,7 +337,13 @@ export class SessionEventBroadcaster {
     this.channels.clear();
   }
 
-  sessionIds(): string[] { return [...this.channels.keys()]; }
-  hasChannel(sessionId: string): boolean { return this.channels.has(sessionId); }
-  channelCount(): number { return this.channels.size; }
+  sessionIds(): string[] {
+    return [...this.channels.keys()];
+  }
+  hasChannel(sessionId: string): boolean {
+    return this.channels.has(sessionId);
+  }
+  channelCount(): number {
+    return this.channels.size;
+  }
 }

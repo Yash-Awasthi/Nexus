@@ -42,7 +42,7 @@ export interface DiscordEmbed {
   title?: string;
   description?: string;
   color?: number;
-  fields?: Array<{ name: string; value: string; inline?: boolean }>;
+  fields?: { name: string; value: string; inline?: boolean }[];
   footer?: { text: string };
   timestamp?: string;
 }
@@ -65,7 +65,7 @@ export interface CommandOption {
   description: string;
   type: number; // 3=STRING, 4=INT, 5=BOOL, 6=USER, 7=CHANNEL, 8=ROLE
   required?: boolean;
-  choices?: Array<{ name: string; value: string | number }>;
+  choices?: { name: string; value: string | number }[];
 }
 
 /** Command definition interface definition. */
@@ -84,13 +84,15 @@ export interface CommandContext {
 }
 
 /** Command handler type alias. */
-export type CommandHandler = (ctx: CommandContext) => InteractionResponse | Promise<InteractionResponse>;
+export type CommandHandler = (
+  ctx: CommandContext,
+) => InteractionResponse | Promise<InteractionResponse>;
 
 // ── CommandRegistry ────────────────────────────────────────────────────────────
 
 export class CommandRegistry {
   private definitions = new Map<string, CommandDefinition>();
-  private handlers     = new Map<string, CommandHandler>();
+  private handlers = new Map<string, CommandHandler>();
 
   register(definition: CommandDefinition, handler: CommandHandler): this {
     this.definitions.set(definition.name, definition);
@@ -160,8 +162,7 @@ export class InteractionRouter {
         options.set(opt.name, opt.value);
       }
 
-      const userId =
-        interaction.member?.user.id ?? interaction.user?.id ?? "unknown";
+      const userId = interaction.member?.user.id ?? interaction.user?.id ?? "unknown";
 
       const ctx: CommandContext = {
         interaction,
@@ -221,11 +222,26 @@ function errorResponse(message: string): InteractionResponse {
 export class EmbedBuilder {
   private embed: DiscordEmbed = {};
 
-  setTitle(title: string): this { this.embed.title = title; return this; }
-  setDescription(description: string): this { this.embed.description = description; return this; }
-  setColor(color: number): this { this.embed.color = color; return this; }
-  setFooter(text: string): this { this.embed.footer = { text }; return this; }
-  setTimestamp(): this { this.embed.timestamp = new Date().toISOString(); return this; }
+  setTitle(title: string): this {
+    this.embed.title = title;
+    return this;
+  }
+  setDescription(description: string): this {
+    this.embed.description = description;
+    return this;
+  }
+  setColor(color: number): this {
+    this.embed.color = color;
+    return this;
+  }
+  setFooter(text: string): this {
+    this.embed.footer = { text };
+    return this;
+  }
+  setTimestamp(): this {
+    this.embed.timestamp = new Date().toISOString();
+    return this;
+  }
 
   addField(name: string, value: string, inline = false): this {
     this.embed.fields = this.embed.fields ?? [];
@@ -233,5 +249,7 @@ export class EmbedBuilder {
     return this;
   }
 
-  build(): DiscordEmbed { return { ...this.embed }; }
+  build(): DiscordEmbed {
+    return { ...this.embed };
+  }
 }

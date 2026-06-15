@@ -44,18 +44,28 @@ export async function rlhfRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{
     Body: {
-      sessionId:    string;
-      messageId:    string;
-      promptText:   string;
+      sessionId: string;
+      messageId: string;
+      promptText: string;
       responseText: string;
-      model:        string;
-      rating:       FeedbackRating;
-      comment?:     string;
-      source?:      FeedbackSource;
-      userId?:      string;
+      model: string;
+      rating: FeedbackRating;
+      comment?: string;
+      source?: FeedbackSource;
+      userId?: string;
     };
   }>("/rlhf/feedback", { preHandler: requireAuth }, async (request, reply) => {
-    const { sessionId, messageId, promptText, responseText, model, rating, comment, source = "api", userId } = request.body;
+    const {
+      sessionId,
+      messageId,
+      promptText,
+      responseText,
+      model,
+      rating,
+      comment,
+      source = "api",
+      userId,
+    } = request.body;
 
     const valid: FeedbackRating[] = ["thumbs_up", "thumbs_down", "neutral"];
     if (!valid.includes(rating)) {
@@ -63,7 +73,15 @@ export async function rlhfRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const entry = feedbackStore.addFeedback({
-      sessionId, messageId, promptText, responseText, model, rating, comment, source, userId,
+      sessionId,
+      messageId,
+      promptText,
+      responseText,
+      model,
+      rating,
+      comment,
+      source,
+      userId,
     });
 
     return reply.code(201).send(entry);
@@ -81,10 +99,10 @@ export async function rlhfRoutes(app: FastifyInstance): Promise<void> {
     const { sessionId, rating, model, userId, source } = request.query;
 
     if (sessionId) filter.sessionId = sessionId;
-    if (rating)    filter.rating    = rating as FeedbackRating;
-    if (model)     filter.model     = model;
-    if (userId)    filter.userId    = userId;
-    if (source)    filter.source    = source as FeedbackSource;
+    if (rating) filter.rating = rating as FeedbackRating;
+    if (model) filter.model = model;
+    if (userId) filter.userId = userId;
+    if (source) filter.source = source as FeedbackSource;
 
     const results = feedbackStore.queryFeedback(filter);
     return reply.send({ feedback: results, total: results.length });
@@ -99,7 +117,15 @@ export async function rlhfRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{ Params: { sessionId: string } }>(
     "/rlhf/reward/:sessionId",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const signal = feedbackStore.computeRewardSignal(request.params.sessionId);
       return reply.send(signal);
@@ -114,7 +140,15 @@ export async function rlhfRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post(
     "/rlhf/pairs/generate",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (_request, reply) => {
       const generated = feedbackStore.generatePreferencePairs();
       return reply.code(201).send({ generated: generated.length, pairs: generated });
@@ -126,10 +160,22 @@ export async function rlhfRoutes(app: FastifyInstance): Promise<void> {
    *
    * List all generated preference pairs.
    */
-  app.get("/rlhf/pairs", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
-    const pairs = feedbackStore.listPreferencePairs();
-    return reply.send({ pairs, total: pairs.length });
-  });
+  app.get(
+    "/rlhf/pairs",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_request, reply) => {
+      const pairs = feedbackStore.listPreferencePairs();
+      return reply.send({ pairs, total: pairs.length });
+    },
+  );
 
   /**
    * GET /rlhf/export/pairs
@@ -137,13 +183,25 @@ export async function rlhfRoutes(app: FastifyInstance): Promise<void> {
    * Export preference pairs as JSONL (one { prompt, chosen, rejected } per line).
    * Content-Type: application/x-ndjson
    */
-  app.get("/rlhf/export/pairs", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
-    const jsonl = exporter.toJSONL();
-    return reply
-      .header("Content-Type", "application/x-ndjson")
-      .header("Content-Disposition", 'attachment; filename="rlhf-pairs.jsonl"')
-      .send(jsonl);
-  });
+  app.get(
+    "/rlhf/export/pairs",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_request, reply) => {
+      const jsonl = exporter.toJSONL();
+      return reply
+        .header("Content-Type", "application/x-ndjson")
+        .header("Content-Disposition", 'attachment; filename="rlhf-pairs.jsonl"')
+        .send(jsonl);
+    },
+  );
 
   /**
    * GET /rlhf/export/feedback?sessionId=&rating=&model=
@@ -157,8 +215,8 @@ export async function rlhfRoutes(app: FastifyInstance): Promise<void> {
     const filter: FeedbackFilter = {};
     const { sessionId, rating, model } = request.query;
     if (sessionId) filter.sessionId = sessionId;
-    if (rating)    filter.rating    = rating as FeedbackRating;
-    if (model)     filter.model     = model;
+    if (rating) filter.rating = rating as FeedbackRating;
+    if (model) filter.model = model;
 
     const jsonl = exporter.feedbackToJSONL(filter);
     return reply
@@ -172,7 +230,19 @@ export async function rlhfRoutes(app: FastifyInstance): Promise<void> {
    *
    * Summary statistics: total feedback, total pairs, rating breakdown.
    */
-  app.get("/rlhf/stats", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
-    return reply.send(exporter.stats());
-  });
+  app.get(
+    "/rlhf/stats",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_request, reply) => {
+      return reply.send(exporter.stats());
+    },
+  );
 }

@@ -17,22 +17,42 @@ import { requireAuth } from "../middleware/auth.js";
 
 export async function featureFlagsRoutes(app: FastifyInstance): Promise<void> {
   /** GET /feature-flags */
-  app.get("/feature-flags", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
-    const flags = globalFlags.listFlags().map((def) => ({
-      key: def.key,
-      value: globalFlags.getFlag(def.key, def.default),
-      default: def.default,
-      type: def.type,
-      description: def.description,
-      overridden: globalFlags.isOverridden(def.key),
-    }));
-    return reply.send({ flags, total: flags.length });
-  });
+  app.get(
+    "/feature-flags",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_req, reply) => {
+      const flags = globalFlags.listFlags().map((def) => ({
+        key: def.key,
+        value: globalFlags.getFlag(def.key, def.default),
+        default: def.default,
+        type: def.type,
+        description: def.description,
+        overridden: globalFlags.isOverridden(def.key),
+      }));
+      return reply.send({ flags, total: flags.length });
+    },
+  );
 
   /** GET /feature-flags/:key */
   app.get<{ Params: { key: string } }>(
     "/feature-flags/:key",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const key = decodeURIComponent(request.params.key);
       const def = globalFlags.getDefinition(key);
@@ -51,7 +71,15 @@ export async function featureFlagsRoutes(app: FastifyInstance): Promise<void> {
   /** PATCH /feature-flags/:key — override value */
   app.patch<{ Params: { key: string }; Body: { value: boolean | string | number } }>(
     "/feature-flags/:key",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const key = decodeURIComponent(request.params.key);
       const def = globalFlags.getDefinition(key);
@@ -73,7 +101,12 @@ export async function featureFlagsRoutes(app: FastifyInstance): Promise<void> {
   /** DELETE /feature-flags/:key — reset to default */
   app.delete<{ Params: { key: string } }>(
     "/feature-flags/:key",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const key = decodeURIComponent(request.params.key);
       globalFlags.resetFlag(key);

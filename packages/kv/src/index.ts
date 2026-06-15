@@ -51,6 +51,7 @@ export interface KVStore {
   /** Retrieve a value by key. Returns undefined if not found or expired. */
   get<T>(key: string): Promise<T | undefined>;
   /** Persist a value, optionally with a TTL in milliseconds. */
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
   set<T>(key: string, value: T, ttlMs?: number): Promise<void>;
   /** Remove a key. No-op if absent. */
   delete(key: string): Promise<void>;
@@ -110,6 +111,7 @@ export class MemoryKVStore implements KVStore {
     return entry.value;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
   async set<T>(key: string, value: T, ttlMs?: number): Promise<void> {
     const expiresAt = ttlMs !== undefined && ttlMs > 0 ? this.now() + ttlMs : undefined;
     this.store.set(key, { value, expiresAt });
@@ -207,6 +209,7 @@ export class RedisKVStore implements KVStore {
     return JSON.parse(raw) as T;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
   async set<T>(key: string, value: T, ttlMs?: number): Promise<void> {
     const serialised = JSON.stringify(value);
     await this.client.set(this._k(key), serialised, ttlMs && ttlMs > 0 ? { PX: ttlMs } : undefined);

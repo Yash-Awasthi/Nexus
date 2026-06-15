@@ -54,13 +54,15 @@ if (process.env.DATABASE_URL) {
   try {
     // NeonConnector expects { endpoint, database, user, password } — parse from URL.
     const raw = process.env.DATABASE_URL.replace(/^postgres(ql)?:\/\//, "https://");
-    const u   = new URL(raw);
-    registry.register(new NeonConnector({
-      endpoint: `https://${u.host}`,
-      database: u.pathname.slice(1).split("?")[0] ?? "neondb",
-      user:     decodeURIComponent(u.username),
-      password: decodeURIComponent(u.password),
-    }));
+    const u = new URL(raw);
+    registry.register(
+      new NeonConnector({
+        endpoint: `https://${u.host}`,
+        database: u.pathname.slice(1).split("?")[0] ?? "neondb",
+        user: decodeURIComponent(u.username),
+        password: decodeURIComponent(u.password),
+      }),
+    );
   } catch {
     registry.register(new NullConnector("neon", "Neon DB"));
   }
@@ -70,9 +72,9 @@ if (process.env.DATABASE_URL) {
 
 // Add placeholder connectors for common integrations not yet configured
 const PLACEHOLDER_CONNECTORS = [
-  { id: "slack",   name: "Slack",   type: "messaging" },
-  { id: "notion",  name: "Notion",  type: "docs"      },
-  { id: "linear",  name: "Linear",  type: "issues"    },
+  { id: "slack", name: "Slack", type: "messaging" },
+  { id: "notion", name: "Notion", type: "docs" },
+  { id: "linear", name: "Linear", type: "issues" },
 ];
 for (const p of PLACEHOLDER_CONNECTORS) {
   if (!registry.get(p.id)) {
@@ -122,25 +124,25 @@ interface OAuthProviderConfig {
 
 const OAUTH_PROVIDERS: Record<string, OAuthProviderConfig> = {
   github: {
-    authorizeUrl:  "https://github.com/login/oauth/authorize",
-    tokenUrl:      "https://github.com/login/oauth/access_token",
-    scopes:        "repo,user:email",
-    clientId:      () => process.env.GITHUB_CLIENT_ID,
-    clientSecret:  () => process.env.GITHUB_CLIENT_SECRET,
+    authorizeUrl: "https://github.com/login/oauth/authorize",
+    tokenUrl: "https://github.com/login/oauth/access_token",
+    scopes: "repo,user:email",
+    clientId: () => process.env.GITHUB_CLIENT_ID,
+    clientSecret: () => process.env.GITHUB_CLIENT_SECRET,
   },
   slack: {
-    authorizeUrl:  "https://slack.com/oauth/v2/authorize",
-    tokenUrl:      "https://slack.com/api/oauth.v2.access",
-    scopes:        "channels:read,chat:write,users:read",
-    clientId:      () => process.env.SLACK_CLIENT_ID,
-    clientSecret:  () => process.env.SLACK_CLIENT_SECRET,
+    authorizeUrl: "https://slack.com/oauth/v2/authorize",
+    tokenUrl: "https://slack.com/api/oauth.v2.access",
+    scopes: "channels:read,chat:write,users:read",
+    clientId: () => process.env.SLACK_CLIENT_ID,
+    clientSecret: () => process.env.SLACK_CLIENT_SECRET,
   },
   linear: {
-    authorizeUrl:  "https://linear.app/oauth/authorize",
-    tokenUrl:      "https://api.linear.app/oauth/token",
-    scopes:        "read,write",
-    clientId:      () => process.env.LINEAR_CLIENT_ID,
-    clientSecret:  () => process.env.LINEAR_CLIENT_SECRET,
+    authorizeUrl: "https://linear.app/oauth/authorize",
+    tokenUrl: "https://api.linear.app/oauth/token",
+    scopes: "read,write",
+    clientId: () => process.env.LINEAR_CLIENT_ID,
+    clientSecret: () => process.env.LINEAR_CLIENT_SECRET,
   },
 };
 
@@ -166,10 +168,10 @@ function decryptCredential(ciphertext: string): string | null {
   const key = getEncryptionKey();
   if (!key) return null;
   try {
-    const buf     = Buffer.from(ciphertext, "base64");
-    const iv      = buf.subarray(0, 12);
-    const tag     = buf.subarray(12, 28);
-    const enc     = buf.subarray(28);
+    const buf = Buffer.from(ciphertext, "base64");
+    const iv = buf.subarray(0, 12);
+    const tag = buf.subarray(12, 28);
+    const enc = buf.subarray(28);
     const decipher = createDecipheriv("aes-256-gcm", key, iv);
     decipher.setAuthTag(tag);
     return decipher.update(enc).toString("utf8") + decipher.final("utf8");
@@ -185,15 +187,38 @@ const credentialVault = new Map<string, string>();
 
 export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
   /** GET /connectors */
-  app.get("/connectors", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
-    const connectors = registry.list().map((c) => connectorView(c.id)).filter(Boolean);
-    return reply.send({ connectors, total: connectors.length });
-  });
+  app.get(
+    "/connectors",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_req, reply) => {
+      const connectors = registry
+        .list()
+        .map((c) => connectorView(c.id))
+        .filter(Boolean);
+      return reply.send({ connectors, total: connectors.length });
+    },
+  );
 
   /** GET /connectors/:id */
   app.get<{ Params: { id: string } }>(
     "/connectors/:id",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const view = connectorView(request.params.id);
       if (!view) return reply.code(404).send({ error: "Connector not found" });
@@ -225,7 +250,15 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
   /** POST /connectors/connect — connect all or a specific connector */
   app.post<{ Body: { id?: string } }>(
     "/connectors/connect",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       if (request.body.id) {
         const conn = registry.get(request.body.id);
@@ -241,7 +274,15 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
   /** POST /connectors/:id/health */
   app.post<{ Params: { id: string } }>(
     "/connectors/:id/health",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const conn = registry.get(request.params.id);
       if (!conn) return reply.code(404).send({ error: "Connector not found" });
@@ -253,7 +294,15 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
   /** POST /connectors/:id/reconnect */
   app.post<{ Params: { id: string } }>(
     "/connectors/:id/reconnect",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const conn = registry.get(request.params.id);
       if (!conn) return reply.code(404).send({ error: "Connector not found" });
@@ -266,7 +315,15 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
   /** POST /connectors/:id/disconnect */
   app.post<{ Params: { id: string } }>(
     "/connectors/:id/disconnect",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const conn = registry.get(request.params.id);
       if (!conn) return reply.code(404).send({ error: "Connector not found" });
@@ -284,12 +341,22 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{ Params: { id: string } }>(
     "/connectors/:id/oauth/start",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const { id } = request.params;
       const provider = OAUTH_PROVIDERS[id];
       if (!provider) {
-        return reply.code(404).send({ error: `No OAuth provider configured for connector "${id}"` });
+        return reply
+          .code(404)
+          .send({ error: `No OAuth provider configured for connector "${id}"` });
       }
       const clientId = provider.clientId();
       if (!clientId) {
@@ -308,9 +375,9 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
       const callbackUri = `${redirectBase}/api/v1/connectors/${id}/oauth/callback`;
 
       const params = new URLSearchParams({
-        client_id:    clientId,
+        client_id: clientId,
         redirect_uri: callbackUri,
-        scope:        provider.scopes,
+        scope: provider.scopes,
         state,
         response_type: "code",
       });
@@ -331,115 +398,113 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
   app.get<{
     Params: { id: string };
     Querystring: { code?: string; state?: string; error?: string };
-  }>(
-    "/connectors/:id/oauth/callback",
-    async (request, reply) => {
-      const { id } = request.params;
-      const { code, state, error: oauthError } = request.query;
+  }>("/connectors/:id/oauth/callback", async (request, reply) => {
+    const { id } = request.params;
+    const { code, state, error: oauthError } = request.query;
 
-      // Provider reported an error
-      if (oauthError) {
-        return reply.code(400).send({ error: `OAuth provider error: ${oauthError}` });
-      }
-      if (!code || !state) {
-        return reply.code(400).send({ error: "Missing code or state parameter" });
-      }
+    // Provider reported an error
+    if (oauthError) {
+      return reply.code(400).send({ error: `OAuth provider error: ${oauthError}` });
+    }
+    if (!code || !state) {
+      return reply.code(400).send({ error: "Missing code or state parameter" });
+    }
 
-      // Validate state
-      pruneOauthStates();
-      const stateEntry = oauthStates.get(state);
-      if (!stateEntry || stateEntry.provider !== id) {
-        return reply.code(400).send({ error: "Invalid or expired state token" });
-      }
-      oauthStates.delete(state);
+    // Validate state
+    pruneOauthStates();
+    const stateEntry = oauthStates.get(state);
+    if (!stateEntry || stateEntry.provider !== id) {
+      return reply.code(400).send({ error: "Invalid or expired state token" });
+    }
+    oauthStates.delete(state);
 
-      const provider = OAUTH_PROVIDERS[id];
-      if (!provider) {
-        return reply.code(404).send({ error: `Unknown OAuth provider: ${id}` });
-      }
-      const clientId     = provider.clientId();
-      const clientSecret = provider.clientSecret();
-      if (!clientId || !clientSecret) {
-        return reply.code(503).send({ error: `OAuth credentials not configured for "${id}"` });
-      }
+    const provider = OAUTH_PROVIDERS[id];
+    if (!provider) {
+      return reply.code(404).send({ error: `Unknown OAuth provider: ${id}` });
+    }
+    const clientId = provider.clientId();
+    const clientSecret = provider.clientSecret();
+    if (!clientId || !clientSecret) {
+      return reply.code(503).send({ error: `OAuth credentials not configured for "${id}"` });
+    }
 
-      const redirectBase = process.env.OAUTH_REDIRECT_BASE_URL ?? "http://localhost:3001";
-      const callbackUri  = `${redirectBase}/api/v1/connectors/${id}/oauth/callback`;
+    const redirectBase = process.env.OAUTH_REDIRECT_BASE_URL ?? "http://localhost:3001";
+    const callbackUri = `${redirectBase}/api/v1/connectors/${id}/oauth/callback`;
 
-      // Exchange code for token
-      let tokenResponse: Record<string, unknown>;
-      try {
-        const resp = await fetch(provider.tokenUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept":       "application/json",
-          },
-          body: JSON.stringify({
-            client_id:     clientId,
-            client_secret: clientSecret,
-            code,
-            redirect_uri:  callbackUri,
-            grant_type:    "authorization_code",
-          }),
-        });
-        if (!resp.ok) {
-          return reply.code(502).send({ error: `Token exchange failed: HTTP ${resp.status}` });
-        }
-        tokenResponse = (await resp.json()) as Record<string, unknown>;
-      } catch (err) {
-        return reply.code(502).send({ error: `Token exchange network error: ${String(err)}` });
-      }
-
-      const accessToken = (tokenResponse.access_token as string | undefined)
-        ?? (tokenResponse.token as string | undefined);
-
-      if (!accessToken) {
-        return reply.code(502).send({
-          error: "Token exchange did not return access_token",
-          detail: tokenResponse,
-        });
-      }
-
-      // Encrypt and store the credential
-      const blob = JSON.stringify({
-        accessToken,
-        tokenType:    tokenResponse.token_type ?? "bearer",
-        scope:        tokenResponse.scope ?? provider.scopes,
-        obtainedAt:   new Date().toISOString(),
-        raw:          tokenResponse,
+    // Exchange code for token
+    let tokenResponse: Record<string, unknown>;
+    try {
+      const resp = await fetch(provider.tokenUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          client_id: clientId,
+          client_secret: clientSecret,
+          code,
+          redirect_uri: callbackUri,
+          grant_type: "authorization_code",
+        }),
       });
-
-      const encrypted = encryptCredential(blob);
-      if (encrypted) {
-        credentialVault.set(id, encrypted);
+      if (!resp.ok) {
+        return reply.code(502).send({ error: `Token exchange failed: HTTP ${resp.status}` });
       }
+      tokenResponse = (await resp.json()) as Record<string, unknown>;
+    } catch (err) {
+      return reply.code(502).send({ error: `Token exchange network error: ${String(err)}` });
+    }
 
-      // Reinitialise connector with fresh credential
-      // GitHub: replace NullConnector with a real GitHubConnector
-      if (id === "github") {
-        const existing = registry.get("github");
-        if (existing) {
-          void existing.disconnect().catch(() => undefined);
-        }
-        // Re-register is not always safe; update the registry entry in-place if possible.
-        // For now, store token in env-equivalent and surface connected status.
-        // A full re-init would require the registry to support replace().
-      }
+    const accessToken =
+      (tokenResponse.access_token as string | undefined) ??
+      (tokenResponse.token as string | undefined);
 
-      enabledOverrides.set(id, true);
-
-      return reply.send({
-        connected: true,
-        connector: id,
-        scope:     tokenResponse.scope ?? provider.scopes,
-        encrypted: !!encrypted,
-        message:   encrypted
-          ? "Credential stored securely. Reconnect the connector to activate."
-          : "Token obtained but OAUTH_ENCRYPTION_KEY not set — credential not persisted.",
+    if (!accessToken) {
+      return reply.code(502).send({
+        error: "Token exchange did not return access_token",
+        detail: tokenResponse,
       });
-    },
-  );
+    }
+
+    // Encrypt and store the credential
+    const blob = JSON.stringify({
+      accessToken,
+      tokenType: tokenResponse.token_type ?? "bearer",
+      scope: tokenResponse.scope ?? provider.scopes,
+      obtainedAt: new Date().toISOString(),
+      raw: tokenResponse,
+    });
+
+    const encrypted = encryptCredential(blob);
+    if (encrypted) {
+      credentialVault.set(id, encrypted);
+    }
+
+    // Reinitialise connector with fresh credential
+    // GitHub: replace NullConnector with a real GitHubConnector
+    if (id === "github") {
+      const existing = registry.get("github");
+      if (existing) {
+        void existing.disconnect().catch(() => undefined);
+      }
+      // Re-register is not always safe; update the registry entry in-place if possible.
+      // For now, store token in env-equivalent and surface connected status.
+      // A full re-init would require the registry to support replace().
+    }
+
+    enabledOverrides.set(id, true);
+
+    return reply.send({
+      connected: true,
+      connector: id,
+      scope: tokenResponse.scope ?? provider.scopes,
+      encrypted: !!encrypted,
+      message: encrypted
+        ? "Credential stored securely. Reconnect the connector to activate."
+        : "Token obtained but OAUTH_ENCRYPTION_KEY not set — credential not persisted.",
+    });
+  });
 
   /**
    * GET /connectors/:id/oauth/credential
@@ -448,12 +513,23 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{ Params: { id: string } }>(
     "/connectors/:id/oauth/credential",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const encrypted = credentialVault.get(request.params.id);
       if (!encrypted) return reply.code(404).send({ error: "No stored credential" });
       const decrypted = decryptCredential(encrypted);
-      if (!decrypted) return reply.code(500).send({ error: "Failed to decrypt credential (check OAUTH_ENCRYPTION_KEY)" });
+      if (!decrypted)
+        return reply
+          .code(500)
+          .send({ error: "Failed to decrypt credential (check OAUTH_ENCRYPTION_KEY)" });
       return reply.send(JSON.parse(decrypted) as Record<string, unknown>);
     },
   );

@@ -103,17 +103,25 @@ export class TierGateRegistry {
 // ── Platform gates ────────────────────────────────────────────────────────────
 
 export const platformGates: TierGateDefinition[] = [
-  { feature: "ultraplinian",     requiredTier: "pro",        description: "Multi-model race mode" },
-  { feature: "consortium",       requiredTier: "pro",        description: "Hive-mind synthesis" },
-  { feature: "code-map",         requiredTier: "pro",        description: "AST codebase indexer" },
-  { feature: "sandbox.docker",   requiredTier: "pro",        description: "Sandboxed Docker code execution" },
-  { feature: "autotune",         requiredTier: "pro",        description: "Pre-generation parameter optimizer" },
-  { feature: "best-of-n",        requiredTier: "pro",        description: "Multi-completion scoring" },
-  { feature: "ragtime",          requiredTier: "pro",        description: "Memory-specific RAG retrieval" },
-  { feature: "openclaw",         requiredTier: "pro",        description: "Conversation pattern analysis" },
-  { feature: "multi-reviewer",   requiredTier: "enterprise", description: "Multi-model code review" },
-  { feature: "federated-search", requiredTier: "enterprise", description: "Cross-connector federated search" },
-  { feature: "council",          requiredTier: "enterprise", description: "AI safety council verdicts" },
+  { feature: "ultraplinian", requiredTier: "pro", description: "Multi-model race mode" },
+  { feature: "consortium", requiredTier: "pro", description: "Hive-mind synthesis" },
+  { feature: "code-map", requiredTier: "pro", description: "AST codebase indexer" },
+  {
+    feature: "sandbox.docker",
+    requiredTier: "pro",
+    description: "Sandboxed Docker code execution",
+  },
+  { feature: "autotune", requiredTier: "pro", description: "Pre-generation parameter optimizer" },
+  { feature: "best-of-n", requiredTier: "pro", description: "Multi-completion scoring" },
+  { feature: "ragtime", requiredTier: "pro", description: "Memory-specific RAG retrieval" },
+  { feature: "openclaw", requiredTier: "pro", description: "Conversation pattern analysis" },
+  { feature: "multi-reviewer", requiredTier: "enterprise", description: "Multi-model code review" },
+  {
+    feature: "federated-search",
+    requiredTier: "enterprise",
+    description: "Cross-connector federated search",
+  },
+  { feature: "council", requiredTier: "enterprise", description: "AI safety council verdicts" },
 ];
 
 /** Default registry pre-seeded with all platform gates. Import and use directly. */
@@ -157,10 +165,7 @@ export function makeTierGatePreHandler(opts: TierGatePreHandlerOptions) {
       return "free";
     });
 
-  return async function tierGatePreHandler(
-    request: unknown,
-    reply: TierGateReply,
-  ): Promise<void> {
+  return async function tierGatePreHandler(request: unknown, reply: TierGateReply): Promise<void> {
     const tier = getTier(request);
     try {
       registry.assert(opts.feature, tier);

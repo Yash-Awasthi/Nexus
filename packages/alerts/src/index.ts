@@ -112,7 +112,7 @@ export interface PatternCondition {
  */
 export interface CompositeCondition {
   type: "composite";
-  conditions: Array<ThresholdCondition | PatternCondition>;
+  conditions: (ThresholdCondition | PatternCondition)[];
 }
 
 /** Alert condition type alias. */
@@ -342,7 +342,7 @@ export interface DispatchResult {
   /** Alerts fired this evaluation */
   events: AlertEvent[];
   /** Per-channel send errors (non-fatal) */
-  channelErrors: Array<{ channel: string; error: string }>;
+  channelErrors: { channel: string; error: string }[];
 }
 
 // ── AlertEngine ───────────────────────────────────────────────────────────────
@@ -584,12 +584,18 @@ export class AlertEngine {
   private _evalThreshold(condition: ThresholdCondition, value: unknown): boolean {
     if (typeof value !== "number") return false;
     switch (condition.operator) {
-      case "gt":  return value > condition.value;
-      case "gte": return value >= condition.value;
-      case "lt":  return value < condition.value;
-      case "lte": return value <= condition.value;
-      case "eq":  return value === condition.value;
-      case "neq": return value !== condition.value;
+      case "gt":
+        return value > condition.value;
+      case "gte":
+        return value >= condition.value;
+      case "lt":
+        return value < condition.value;
+      case "lte":
+        return value <= condition.value;
+      case "eq":
+        return value === condition.value;
+      case "neq":
+        return value !== condition.value;
     }
   }
 
@@ -610,9 +616,7 @@ export class AlertEngine {
   private _evalPattern(condition: PatternCondition, value: unknown): boolean {
     if (typeof value !== "string") return false;
     const haystack = condition.ignoreCase ? value.toLowerCase() : value;
-    const needle = condition.ignoreCase
-      ? condition.pattern.toLowerCase()
-      : condition.pattern;
+    const needle = condition.ignoreCase ? condition.pattern.toLowerCase() : condition.pattern;
     if (condition.regex) {
       const flags = condition.ignoreCase ? "i" : "";
       return new RegExp(condition.pattern, flags).test(value);
@@ -722,10 +726,7 @@ export class FileAlertRuleStore implements AlertRuleStore {
  * Call after every `addRule` / `removeRule` / `updateRule` to keep
  * the store in sync with the live engine state.
  */
-export async function persistEngineTo(
-  engine: AlertEngine,
-  store: AlertRuleStore,
-): Promise<void> {
+export async function persistEngineTo(engine: AlertEngine, store: AlertRuleStore): Promise<void> {
   await store.saveRules(engine.listRules());
 }
 

@@ -145,11 +145,19 @@ export class WorkflowEngine {
         let matched = true;
         for (const cond of workflow.conditions) {
           const result = await Promise.resolve(cond(doc));
-          if (!result) { matched = false; break; }
+          if (!result) {
+            matched = false;
+            break;
+          }
         }
 
         if (!matched) {
-          executed.push({ workflowId: workflow.id, matched: false, actionResults: [], durationMs: Date.now() - wt0 });
+          executed.push({
+            workflowId: workflow.id,
+            matched: false,
+            actionResults: [],
+            durationMs: Date.now() - wt0,
+          });
           continue;
         }
 
@@ -267,31 +275,50 @@ export function routeAction(queue: string): ActionFn {
 }
 
 /** Send a webhook POST with the document payload. */
-export function webhookAction(url: string, opts: { headers?: Record<string, string> } = {}): ActionFn {
+export function webhookAction(
+  url: string,
+  opts: { headers?: Record<string, string> } = {},
+): ActionFn {
   return async (doc, ctx) => {
     const fetchFn = ctx.fetchFn ?? fetch;
     try {
       const res = await fetchFn(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(opts.headers ?? {}) },
-        body: JSON.stringify({ docId: doc.id, source: doc.source, tags: doc.tags, metadata: doc.metadata }),
+        body: JSON.stringify({
+          docId: doc.id,
+          source: doc.source,
+          tags: doc.tags,
+          metadata: doc.metadata,
+        }),
       });
       return { action: "webhook", success: res.ok, data: { status: res.status, url } };
     } catch (err) {
-      return { action: "webhook", success: false, error: err instanceof Error ? err.message : String(err) };
+      return {
+        action: "webhook",
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   };
 }
 
 /** Transform content: apply a function and store result in metadata["transformed"]. */
-export function transformAction(transform: (content: string) => string, key = "transformed"): ActionFn {
+export function transformAction(
+  transform: (content: string) => string,
+  key = "transformed",
+): ActionFn {
   return async (doc) => {
     try {
       const result = transform(doc.content);
       doc.metadata[key] = result;
       return { action: "transform", success: true, data: { key, length: result.length } };
     } catch (err) {
-      return { action: "transform", success: false, error: err instanceof Error ? err.message : String(err) };
+      return {
+        action: "transform",
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   };
 }

@@ -27,22 +27,22 @@ describe("GET /api/v1/libertas", () => {
   });
 
   it("includes rate limit info", async () => {
-    const res  = await app.inject({ method: "GET", url: "/api/v1/libertas" });
+    const res = await app.inject({ method: "GET", url: "/api/v1/libertas" });
     const body = res.json<{ limits: { requests_per_minute: number; max_tokens: number } }>();
     expect(body.limits.requests_per_minute).toBe(5);
     expect(body.limits.max_tokens).toBe(512);
   });
 
   it("includes endpoints list", async () => {
-    const res  = await app.inject({ method: "GET", url: "/api/v1/libertas" });
-    const body = res.json<{ endpoints: Array<{ method: string; path: string }> }>();
+    const res = await app.inject({ method: "GET", url: "/api/v1/libertas" });
+    const body = res.json<{ endpoints: { method: string; path: string }[] }>();
     expect(Array.isArray(body.endpoints)).toBe(true);
     expect(body.endpoints.length).toBeGreaterThanOrEqual(2);
   });
 
   it("indicates model unavailability when GROQ_API_KEY not set", async () => {
-    const res  = await app.inject({ method: "GET", url: "/api/v1/libertas" });
-    const body = res.json<{ models: Array<{ available: boolean }> }>();
+    const res = await app.inject({ method: "GET", url: "/api/v1/libertas" });
+    const body = res.json<{ models: { available: boolean }[] }>();
     expect(body.models[0]!.available).toBe(false);
   });
 
@@ -52,7 +52,7 @@ describe("GET /api/v1/libertas", () => {
   });
 
   it("auth_required is false", async () => {
-    const res  = await app.inject({ method: "GET", url: "/api/v1/libertas" });
+    const res = await app.inject({ method: "GET", url: "/api/v1/libertas" });
     const body = res.json<{ auth_required: boolean }>();
     expect(body.auth_required).toBe(false);
   });
@@ -63,8 +63,8 @@ describe("GET /api/v1/libertas", () => {
 describe("POST /api/v1/libertas/complete", () => {
   it("returns 400 when prompt missing", async () => {
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/libertas/complete",
+      method: "POST",
+      url: "/api/v1/libertas/complete",
       payload: {},
     });
     expect(res.statusCode).toBe(400);
@@ -74,8 +74,8 @@ describe("POST /api/v1/libertas/complete", () => {
 
   it("returns 400 when prompt is empty string", async () => {
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/libertas/complete",
+      method: "POST",
+      url: "/api/v1/libertas/complete",
       payload: { prompt: "   " },
     });
     expect(res.statusCode).toBe(400);
@@ -83,8 +83,8 @@ describe("POST /api/v1/libertas/complete", () => {
 
   it("echo-stubs when GROQ_API_KEY not set", async () => {
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/libertas/complete",
+      method: "POST",
+      url: "/api/v1/libertas/complete",
       payload: { prompt: "Hello world" },
     });
     expect(res.statusCode).toBe(200);
@@ -96,19 +96,22 @@ describe("POST /api/v1/libertas/complete", () => {
 
   it("completes with mocked Groq when key set", async () => {
     process.env.GROQ_API_KEY = "test-key";
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok:   true,
-      json: async () => ({
-        choices: [{ message: { content: "Groq says hi" } }],
-        model:   "llama-3.1-8b-instant",
-        usage:   { prompt_tokens: 3, completion_tokens: 4 },
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: "Groq says hi" } }],
+          model: "llama-3.1-8b-instant",
+          usage: { prompt_tokens: 3, completion_tokens: 4 },
+        }),
+        text: async () => "",
       }),
-      text: async () => "",
-    }));
+    );
 
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/libertas/complete",
+      method: "POST",
+      url: "/api/v1/libertas/complete",
       payload: { prompt: "Hello" },
     });
     expect(res.statusCode).toBe(200);
@@ -118,24 +121,27 @@ describe("POST /api/v1/libertas/complete", () => {
   });
 
   it("caps max_tokens at 512", async () => {
-    const captured: Array<{ body: string }> = [];
-    vi.stubGlobal("fetch", vi.fn().mockImplementation(async (_url: string, init: { body: string }) => {
-      captured.push({ body: init.body });
-      return {
-        ok:   true,
-        json: async () => ({
-          choices: [{ message: { content: "ok" } }],
-          model:   "llama-3.1-8b-instant",
-          usage:   { prompt_tokens: 3, completion_tokens: 1 },
-        }),
-        text: async () => "",
-      };
-    }));
+    const captured: { body: string }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(async (_url: string, init: { body: string }) => {
+        captured.push({ body: init.body });
+        return {
+          ok: true,
+          json: async () => ({
+            choices: [{ message: { content: "ok" } }],
+            model: "llama-3.1-8b-instant",
+            usage: { prompt_tokens: 3, completion_tokens: 1 },
+          }),
+          text: async () => "",
+        };
+      }),
+    );
     process.env.GROQ_API_KEY = "test-key";
 
     await app.inject({
-      method:  "POST",
-      url:     "/api/v1/libertas/complete",
+      method: "POST",
+      url: "/api/v1/libertas/complete",
       payload: { prompt: "hello", max_tokens: 9999 },
     });
 
@@ -145,8 +151,8 @@ describe("POST /api/v1/libertas/complete", () => {
 
   it("sets X-RateLimit headers", async () => {
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/libertas/complete",
+      method: "POST",
+      url: "/api/v1/libertas/complete",
       payload: { prompt: "hi" },
     });
     expect(res.headers["x-ratelimit-limit"]).toBe("5");
@@ -157,15 +163,15 @@ describe("POST /api/v1/libertas/complete", () => {
     // All 5 burst through, 6th should 429
     for (let i = 0; i < 5; i++) {
       await app.inject({
-        method:  "POST",
-        url:     "/api/v1/libertas/complete",
+        method: "POST",
+        url: "/api/v1/libertas/complete",
         headers: { "x-forwarded-for": "55.55.55.55" },
         payload: { prompt: `p${i}` },
       });
     }
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/libertas/complete",
+      method: "POST",
+      url: "/api/v1/libertas/complete",
       headers: { "x-forwarded-for": "55.55.55.55" },
       payload: { prompt: "over-limit" },
     });
@@ -175,15 +181,18 @@ describe("POST /api/v1/libertas/complete", () => {
 
   it("502 when Groq returns non-ok status", async () => {
     process.env.GROQ_API_KEY = "bad-key";
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok:     false,
-      status: 401,
-      text:   async () => "Unauthorized",
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        text: async () => "Unauthorized",
+      }),
+    );
 
     const res = await app.inject({
-      method:  "POST",
-      url:     "/api/v1/libertas/complete",
+      method: "POST",
+      url: "/api/v1/libertas/complete",
       headers: { "x-forwarded-for": "99.0.0.1" },
       payload: { prompt: "hello" },
     });

@@ -27,7 +27,7 @@ export interface Section {
   type: SectionType;
   label?: string;
   content: string;
-  priority: number;   // Lower = rendered first. Default: 50
+  priority: number; // Lower = rendered first. Default: 50
   enabled: boolean;
   tokenEstimate?: number;
 }
@@ -65,9 +65,10 @@ export class PreviouslySeenRenderer implements SectionRenderer<PreviouslySeenInp
 
   render({ facts, maxFacts = 20 }: PreviouslySeenInput): Section {
     const limited = facts.slice(0, maxFacts);
-    const content = limited.length > 0
-      ? `The following facts are known from prior conversations:\n${limited.map((f, i) => `${i + 1}. ${f}`).join("\n")}`
-      : "";
+    const content =
+      limited.length > 0
+        ? `The following facts are known from prior conversations:\n${limited.map((f, i) => `${i + 1}. ${f}`).join("\n")}`
+        : "";
     return {
       type: this.type,
       label: "Previously Seen",
@@ -92,9 +93,7 @@ export class AgentContextRenderer implements SectionRenderer<AgentContextInput> 
   readonly type = "agent-context" as const;
 
   render({ agentName, role, capabilities = [], constraints = [] }: AgentContextInput): Section {
-    const lines = [
-      `You are ${agentName}, ${role}.`,
-    ];
+    const lines = [`You are ${agentName}, ${role}.`];
     if (capabilities.length > 0) {
       lines.push("", "Capabilities:", ...capabilities.map((c) => `• ${c}`));
     }
@@ -212,7 +211,12 @@ export interface TokenEconomicsInput {
 export class TokenEconomicsRenderer implements SectionRenderer<TokenEconomicsInput> {
   readonly type = "token-economics" as const;
 
-  render({ inputTokensUsed, inputTokenBudget, outputTokenBudget, remainingConversationTurns }: TokenEconomicsInput): Section {
+  render({
+    inputTokensUsed,
+    inputTokenBudget,
+    outputTokenBudget,
+    remainingConversationTurns,
+  }: TokenEconomicsInput): Section {
     const pct = Math.round((inputTokensUsed / inputTokenBudget) * 100);
     const remaining = inputTokenBudget - inputTokensUsed;
     const lines = [
@@ -255,9 +259,9 @@ export class SectionAssembler {
 
   constructor(opts: AssemblerOptions = {}) {
     this.opts = {
-      separator:   opts.separator   ?? "\n\n",
-      maxChars:    opts.maxChars    ?? Infinity,
-      showLabels:  opts.showLabels  ?? false,
+      separator: opts.separator ?? "\n\n",
+      maxChars: opts.maxChars ?? Infinity,
+      showLabels: opts.showLabels ?? false,
       labelPrefix: opts.labelPrefix ?? "## ",
     };
   }

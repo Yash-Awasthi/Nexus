@@ -603,11 +603,14 @@ export class RedisFlagStore implements FlagStore {
       void sub.subscribe(this.channel, (message) => {
         try {
           opts.onRemoteChange!(message);
-        } catch { /* non-fatal */ }
+        } catch {
+          /* non-fatal */
+        }
       });
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   get(key: string): FlagValue | undefined {
     // Synchronous interface — RedisFlagStore caches reads in-memory via getAll
     // Callers that need async reads should use getAsync() or pre-warm the cache.
@@ -625,7 +628,9 @@ export class RedisFlagStore implements FlagStore {
 
   async set(key: string, value: FlagValue): Promise<void> {
     await this.client.hset(this.hashKey, key, serializeFlagValue(value));
-    await this.client.publish(this.channel, key).catch(() => { /* non-fatal */ });
+    await this.client.publish(this.channel, key).catch(() => {
+      /* non-fatal */
+    });
   }
 
   // FlagStore.set is synchronous; fire-and-forget the async write
@@ -635,13 +640,16 @@ export class RedisFlagStore implements FlagStore {
 
   private async setAsync(key: string, value: FlagValue): Promise<void> {
     await this.client.hset(this.hashKey, key, serializeFlagValue(value));
-    await this.client.publish(this.channel, key).catch(() => { /* non-fatal */ });
+    await this.client.publish(this.channel, key).catch(() => {
+      /* non-fatal */
+    });
   }
 
   delete(key: string): void {
     void this.client.hdel(this.hashKey, key);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   has(key: string): boolean {
     // Optimistic false — async check via hasAsync()
     return false;

@@ -80,15 +80,26 @@ export class WikiStore {
     this.articles.set(article.id, article);
   }
 
-  get(id: string): WikiArticle | undefined { return this.articles.get(id); }
-  has(id: string): boolean { return this.articles.has(id); }
-  all(): WikiArticle[] { return [...this.articles.values()]; }
-  size(): number { return this.articles.size; }
+  get(id: string): WikiArticle | undefined {
+    return this.articles.get(id);
+  }
+  has(id: string): boolean {
+    return this.articles.has(id);
+  }
+  all(): WikiArticle[] {
+    return [...this.articles.values()];
+  }
+  size(): number {
+    return this.articles.size;
+  }
 
   create(title: string, content: string, tags: string[] = []): WikiArticle {
     const id = `article-${++_articleSeq}`;
     const article: WikiArticle = {
-      id, title, content, tags,
+      id,
+      title,
+      content,
+      tags,
       updatedAt: new Date().toISOString(),
       version: 1,
     };
@@ -109,12 +120,17 @@ export class WikiStore {
     return updated;
   }
 
-  delete(id: string): boolean { return this.articles.delete(id); }
+  delete(id: string): boolean {
+    return this.articles.delete(id);
+  }
 
   /** Simple BM25-like term search (token overlap). */
   search(query: string, limit = 5): WikiArticle[] {
-    const terms = query.toLowerCase().split(/\s+/).filter((t) => t.length > 2);
-    const scored: Array<{ article: WikiArticle; score: number }> = [];
+    const terms = query
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((t) => t.length > 2);
+    const scored: { article: WikiArticle; score: number }[] = [];
 
     for (const article of this.articles.values()) {
       const text = (article.title + " " + article.content).toLowerCase();
@@ -136,7 +152,8 @@ export class WikiStore {
     let terms = 0;
     for (const article of this.articles.values()) {
       const allTerms = (article.title + " " + article.content)
-        .toLowerCase().split(/\s+/)
+        .toLowerCase()
+        .split(/\s+/)
         .filter((t) => t.length > 2);
       for (const term of allTerms) {
         if (!this.index.has(term)) this.index.set(term, new Set());
@@ -147,7 +164,10 @@ export class WikiStore {
     return terms;
   }
 
-  clear(): void { this.articles.clear(); this.index.clear(); }
+  clear(): void {
+    this.articles.clear();
+    this.index.clear();
+  }
 }
 
 // ── PgWikiStore ───────────────────────────────────────────────────────────────
@@ -194,6 +214,7 @@ export class PgWikiStore {
     const rows = await this.sql`
       SELECT * FROM wiki_articles ORDER BY updated_at DESC
     `;
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     return rows.map(this.rowToArticle);
   }
 
@@ -248,17 +269,17 @@ export class PgWikiStore {
   async count(): Promise<number> {
     await this.ensureReady();
     const rows = await this.sql`SELECT COUNT(*)::int AS n FROM wiki_articles`;
-    return (rows[0] as Record<string, unknown>)?.["n"] as number ?? 0;
+    return ((rows[0] as Record<string, unknown>)?.["n"] as number) ?? 0;
   }
 
   private rowToArticle(row: Record<string, unknown>): WikiArticle {
     return {
-      id:        row["id"] as string,
-      title:     row["title"] as string,
-      content:   row["content"] as string,
-      tags:      (row["tags"] as string[]) ?? [],
+      id: row["id"] as string,
+      title: row["title"] as string,
+      content: row["content"] as string,
+      tags: (row["tags"] as string[]) ?? [],
       updatedAt: (row["updated_at"] as string) ?? new Date().toISOString(),
-      version:   (row["version"] as number) ?? 1,
+      version: (row["version"] as number) ?? 1,
     };
   }
 }
@@ -287,9 +308,15 @@ export class StageMetrics {
     s.totalDurationMs += result.durationMs;
   }
 
-  get(stage: string): StageStats | undefined { return this.stats.get(stage); }
-  all(): Record<string, StageStats> { return Object.fromEntries(this.stats); }
-  clear(): void { this.stats.clear(); }
+  get(stage: string): StageStats | undefined {
+    return this.stats.get(stage);
+  }
+  all(): Record<string, StageStats> {
+    return Object.fromEntries(this.stats);
+  }
+  clear(): void {
+    this.stats.clear();
+  }
 }
 
 // ── Pipeline steps ────────────────────────────────────────────────────────────
@@ -310,6 +337,7 @@ export interface PipelineContext {
   isNew?: boolean;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function timed<T>(fn: () => Promise<T>): Promise<{ result: T; durationMs: number }> {
   const t0 = Date.now();
   const result = await fn();
@@ -338,11 +366,11 @@ export class WikiUpdatePipeline {
   private autoCreate: boolean;
 
   constructor(opts: PipelineOptions) {
-    this.store      = opts.store;
-    this.distillFn  = opts.distillFn  ?? (async (c) => c.slice(0, 200));
+    this.store = opts.store;
+    this.distillFn = opts.distillFn ?? (async (c) => c.slice(0, 200));
     this.nlUpdateFn = opts.nlUpdateFn ?? (async (_existing, newContent) => newContent);
     this.searchLimit = opts.searchLimit ?? 5;
-    this.metrics    = opts.metrics ?? new StageMetrics();
+    this.metrics = opts.metrics ?? new StageMetrics();
     this.autoCreate = opts.autoCreate ?? true;
   }
 
@@ -464,6 +492,10 @@ export class WikiUpdatePipeline {
     };
   }
 
-  getStore(): WikiStore { return this.store; }
-  getMetrics(): StageMetrics { return this.metrics; }
+  getStore(): WikiStore {
+    return this.store;
+  }
+  getMetrics(): StageMetrics {
+    return this.metrics;
+  }
 }

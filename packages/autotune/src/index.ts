@@ -202,7 +202,7 @@ export async function updateEma(
 
   const updated: LearnedDelta = {
     temperature: prev.temperature * (1 - EMA_ALPHA) + tempAdjust * EMA_ALPHA,
-    top_p: prev.top_p * (1 - EMA_ALPHA) + (tempAdjust * 0.5) * EMA_ALPHA,
+    top_p: prev.top_p * (1 - EMA_ALPHA) + tempAdjust * 0.5 * EMA_ALPHA,
     frequency_penalty: prev.frequency_penalty,
     presence_penalty: prev.presence_penalty,
     samples: prev.samples + 1,
@@ -223,7 +223,7 @@ export interface DetectionResult {
 /** Detect context. */
 export function detectContext(
   message: string,
-  history: ReadonlyArray<{ role: string; content: string }> = [],
+  history: readonly { role: string; content: string }[] = [],
 ): DetectionResult {
   const raw: Record<ContextType, number> = {
     code: 0,
@@ -310,7 +310,7 @@ function blendParams(a: AutoTuneParams, b: AutoTuneParams, w: number): AutoTuneP
 
 export interface ComputeOptions {
   message: string;
-  history?: ReadonlyArray<{ role: string; content: string }>;
+  history?: readonly { role: string; content: string }[];
   overrides?: Partial<AutoTuneParams>;
   /** If provided, apply EMA learned adjustments. */
   learnedDelta?: LearnedDelta;
@@ -362,11 +362,15 @@ export function computeAutoTuneParams(opts: ComputeOptions): AutoTuneResult {
   const reasoning =
     `Detected: ${type} (${Math.round(confidence * 100)}% confidence)` +
     (convLen > 10 ? ` | Long conversation: +repetition_penalty` : "") +
-    (learnedDelta && learnedDelta.samples >= 3
-      ? ` | EMA (${learnedDelta.samples} samples)`
-      : "");
+    (learnedDelta && learnedDelta.samples >= 3 ? ` | EMA (${learnedDelta.samples} samples)` : "");
 
-  return { params: finalParams, detectedContext: type, confidence, reasoning, contextScores: scores };
+  return {
+    params: finalParams,
+    detectedContext: type,
+    confidence,
+    reasoning,
+    contextScores: scores,
+  };
 }
 
 /** Convenience label map. */

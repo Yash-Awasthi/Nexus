@@ -164,7 +164,8 @@ export function computeStats(entries: GatewayLogEntry[]): GatewayLogStats {
   const requestsByModel: Record<string, number> = {};
 
   for (const e of entries) {
-    tokensByProvider[e.provider] = (tokensByProvider[e.provider] ?? 0) + (e.usage?.totalTokens ?? 0);
+    tokensByProvider[e.provider] =
+      (tokensByProvider[e.provider] ?? 0) + (e.usage?.totalTokens ?? 0);
     requestsByModel[e.model] = (requestsByModel[e.model] ?? 0) + 1;
   }
 
@@ -280,6 +281,7 @@ export class MemoryGatewayLog implements IGatewayLog {
 
 export interface KVStoreLike {
   get<T>(key: string): Promise<T | undefined>;
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
   set<T>(key: string, value: T, ttlMs?: number): Promise<void>;
   keys(pattern?: string): Promise<string[]>;
   clear(): Promise<void>;
@@ -400,8 +402,7 @@ export class LoggingLLMProvider implements LLMProvider {
   ) {
     this.name = `logging(${inner.name})`;
     this.models = inner.models;
-    this.identityFn =
-      opts.identityFn ?? ((req) => req.metadata?.identity as string | undefined);
+    this.identityFn = opts.identityFn ?? ((req) => req.metadata?.identity as string | undefined);
     this.tagsFn = opts.tagsFn ?? (() => ({}));
     this._now = opts.now ?? (() => Date.now());
   }

@@ -19,12 +19,7 @@
  * outbound API calls). Teams likewise.
  */
 
-import {
-  SlackBotAdapter,
-  TeamsBotAdapter,
-  type BotMessage,
-  type BotReply,
-} from "@nexus/bots";
+import { SlackBotAdapter, TeamsBotAdapter, type BotMessage, type BotReply } from "@nexus/bots";
 import type { FastifyInstance } from "fastify";
 
 // ── Singleton adapters ────────────────────────────────────────────────────────
@@ -35,20 +30,20 @@ import type { FastifyInstance } from "fastify";
  */
 const _gatewayHandler = async (msg: BotMessage): Promise<BotReply> => {
   const apiBase = `http://127.0.0.1:${process.env.PORT ?? "3000"}`;
-  const apiKey  = process.env.API_KEY ?? process.env.NEXUS_INTERNAL_KEY ?? "dev";
+  const apiKey = process.env.API_KEY ?? process.env.NEXUS_INTERNAL_KEY ?? "dev";
 
   try {
     const resp = await fetch(`${apiBase}/api/v1/gateway/messages`, {
-      method:  "POST",
+      method: "POST",
       headers: {
-        "Content-Type":  "application/json",
-        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model:    "nexus/smart",
+        model: "nexus/smart",
         messages: [{ role: "user", content: msg.text }],
-        system:   (msg.raw as Record<string, unknown>)?.["system"] as string | undefined,
-        stream:   false,
+        system: (msg.raw as Record<string, unknown>)?.["system"] as string | undefined,
+        stream: false,
       }),
     });
 
@@ -56,8 +51,8 @@ const _gatewayHandler = async (msg: BotMessage): Promise<BotReply> => {
       return { text: `[Error ${resp.status}] Gateway unavailable — please try again.` };
     }
 
-    const data = await resp.json() as {
-      content?: Array<{ type: string; text?: string }>;
+    const data = (await resp.json()) as {
+      content?: { type: string; text?: string }[];
     };
 
     const text = data.content?.find((c) => c.type === "text")?.text ?? "(no response)";
@@ -68,16 +63,16 @@ const _gatewayHandler = async (msg: BotMessage): Promise<BotReply> => {
 };
 
 const _slackAdapter = new SlackBotAdapter({
-  token:         process.env.SLACK_BOT_TOKEN ?? "",
+  token: process.env.SLACK_BOT_TOKEN ?? "",
   signingSecret: process.env.SLACK_SIGNING_SECRET ?? "",
-  triggerMode:   "mention",
-  handler:       _gatewayHandler,
+  triggerMode: "mention",
+  handler: _gatewayHandler,
 });
 
 const _teamsAdapter = new TeamsBotAdapter({
-  appId:       process.env.TEAMS_BOT_APP_ID ?? "",
+  appId: process.env.TEAMS_BOT_APP_ID ?? "",
   appPassword: process.env.TEAMS_BOT_APP_PASSWORD ?? "",
-  handler:     _gatewayHandler,
+  handler: _gatewayHandler,
 });
 
 // ── Route plugin ──────────────────────────────────────────────────────────────
@@ -103,8 +98,8 @@ export async function botsRoutes(app: FastifyInstance): Promise<void> {
     // handleEvent(body, headers) — flat header map
     const result = await _slackAdapter.handleEvent(body, {
       "x-slack-request-timestamp": request.headers["x-slack-request-timestamp"] ?? "",
-      "x-slack-signature":         request.headers["x-slack-signature"] ?? "",
-      "x-slack-raw-body":          rawBody,
+      "x-slack-signature": request.headers["x-slack-signature"] ?? "",
+      "x-slack-raw-body": rawBody,
     });
 
     if (result.challenge) {

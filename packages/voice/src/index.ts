@@ -169,6 +169,7 @@ export class EnergyVadProvider implements VadProvider {
 
     // RMS of (byte − 128) / 128 — centred on PCM silence (0x80)
     let sumSq = 0;
+    // eslint-disable-next-line @typescript-eslint/prefer-for-of
     for (let i = 0; i < samples.length; i++) {
       const norm = (samples[i]! - 128) / 128;
       sumSq += norm * norm;
@@ -297,8 +298,7 @@ export class GroqTranscribeProvider implements TranscribeProvider {
   private readonly model: string;
   private readonly fetchFn: FetchFn;
 
-  private static readonly ENDPOINT =
-    "https://api.groq.com/openai/v1/audio/transcriptions";
+  private static readonly ENDPOINT = "https://api.groq.com/openai/v1/audio/transcriptions";
 
   constructor(config: GroqTranscribeConfig = {}) {
     this.apiKey = config.apiKey ?? process.env["GROQ_API_KEY"] ?? "";
@@ -332,11 +332,9 @@ export class GroqTranscribeProvider implements TranscribeProvider {
         body: form,
       });
     } catch (cause) {
-      throw new VoiceError(
-        "TRANSCRIBE_FAILED",
-        `Groq Whisper network error: ${String(cause)}`,
-        { model: this.model },
-      );
+      throw new VoiceError("TRANSCRIBE_FAILED", `Groq Whisper network error: ${String(cause)}`, {
+        model: this.model,
+      });
     }
 
     if (res.status === 401) {
@@ -344,11 +342,10 @@ export class GroqTranscribeProvider implements TranscribeProvider {
     }
 
     if (!res.ok) {
-      throw new VoiceError(
-        "TRANSCRIBE_FAILED",
-        `Groq Whisper API returned ${res.status}`,
-        { model: this.model, status: res.status },
-      );
+      throw new VoiceError("TRANSCRIBE_FAILED", `Groq Whisper API returned ${res.status}`, {
+        model: this.model,
+        status: res.status,
+      });
     }
 
     let json: GroqTranscriptionResponse;
@@ -453,10 +450,7 @@ export class ElevenLabsSynthesizeProvider implements SynthesizeProvider {
         }),
       });
     } catch (cause) {
-      throw new VoiceError(
-        "SYNTHESIZE_FAILED",
-        `ElevenLabs network error: ${String(cause)}`,
-      );
+      throw new VoiceError("SYNTHESIZE_FAILED", `ElevenLabs network error: ${String(cause)}`);
     }
 
     if (res.status === 401) {
@@ -464,11 +458,10 @@ export class ElevenLabsSynthesizeProvider implements SynthesizeProvider {
     }
 
     if (!res.ok) {
-      throw new VoiceError(
-        "SYNTHESIZE_FAILED",
-        `ElevenLabs API returned ${res.status}`,
-        { voiceId, status: res.status },
-      );
+      throw new VoiceError("SYNTHESIZE_FAILED", `ElevenLabs API returned ${res.status}`, {
+        voiceId,
+        status: res.status,
+      });
     }
 
     const arrayBuffer = await res.arrayBuffer();
@@ -621,11 +614,9 @@ export class VoiceSession {
       });
     } catch (cause) {
       if (cause instanceof VoiceError) throw cause;
-      throw new VoiceError(
-        "TRANSCRIBE_FAILED",
-        `Transcription failed: ${String(cause)}`,
-        { provider: this.transcribe.name },
-      );
+      throw new VoiceError("TRANSCRIBE_FAILED", `Transcription failed: ${String(cause)}`, {
+        provider: this.transcribe.name,
+      });
     }
     const transcribeMs = Date.now() - transcribeStart;
 
@@ -637,11 +628,9 @@ export class VoiceSession {
     try {
       response = await this.handler(transcript);
     } catch (cause) {
-      throw new VoiceError(
-        "HANDLER_FAILED",
-        `Voice handler threw: ${String(cause)}`,
-        { transcript },
-      );
+      throw new VoiceError("HANDLER_FAILED", `Voice handler threw: ${String(cause)}`, {
+        transcript,
+      });
     }
     const handlerMs = Date.now() - handlerStart;
 
@@ -659,11 +648,10 @@ export class VoiceSession {
         });
       } catch (cause) {
         if (cause instanceof VoiceError) throw cause;
-        throw new VoiceError(
-          "SYNTHESIZE_FAILED",
-          `Synthesis failed: ${String(cause)}`,
-          { provider: this.synthesize!.name, responseLength: response.length },
-        );
+        throw new VoiceError("SYNTHESIZE_FAILED", `Synthesis failed: ${String(cause)}`, {
+          provider: this.synthesize!.name,
+          responseLength: response.length,
+        });
       }
       synthesizeMs = Date.now() - synthStart;
     }

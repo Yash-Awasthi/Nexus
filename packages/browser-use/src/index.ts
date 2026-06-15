@@ -94,10 +94,7 @@ export class BrowserSession {
   /** Click an element and optionally wait for a URL pattern to appear. */
   async clickAndWait(selector: string, urlPattern?: RegExp | string): Promise<void> {
     if (urlPattern) {
-      await Promise.all([
-        this._driver.waitForNavigation(),
-        this._driver.click(selector),
-      ]);
+      await Promise.all([this._driver.waitForNavigation(), this._driver.click(selector)]);
       const currentUrl = this._driver.url();
       const re = typeof urlPattern === "string" ? new RegExp(urlPattern) : urlPattern;
       if (!re.test(currentUrl)) {
@@ -188,7 +185,7 @@ export class BrowserUse {
     return session;
   }
 
-  get activeSessions(): ReadonlyArray<BrowserSession> {
+  get activeSessions(): readonly BrowserSession[] {
     return this._sessions;
   }
 
@@ -208,7 +205,7 @@ export class NullPageDriver implements PageDriver {
   private _closed = false;
 
   readonly clicks: string[] = [];
-  readonly typed: Array<{ selector: string; text: string }> = [];
+  readonly typed: { selector: string; text: string }[] = [];
   readonly evaluations: string[] = [];
   readonly navigations: string[] = [];
 

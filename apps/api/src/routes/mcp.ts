@@ -20,10 +20,7 @@ import {
   SessionStore,
   type ScrapingBackend,
 } from "@nexus/scraping-mcp";
-import {
-  createStealthBackend,
-  isPatchrightAvailable,
-} from "@nexus/stealth-browser";
+import { createStealthBackend, isPatchrightAvailable } from "@nexus/stealth-browser";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
@@ -32,7 +29,7 @@ import { requireAuth } from "../middleware/auth.js";
 // Independent instance from scraping-mcp.ts; MCP clients get their own session store.
 
 async function _buildMcpBackend(): Promise<ScrapingBackend> {
-  if (process.env.STEALTH_BROWSER_URL || await isPatchrightAvailable()) {
+  if (process.env.STEALTH_BROWSER_URL || (await isPatchrightAvailable())) {
     return createStealthBackend({ poolSize: 2 });
   }
   return new MockScrapingBackend();
@@ -52,7 +49,11 @@ const _subscribers = new Set<(event: McpEvent) => void>();
 
 function emit(event: McpEvent): void {
   for (const sub of _subscribers) {
-    try { sub(event); } catch { /* ignore dead subscribers */ }
+    try {
+      sub(event);
+    } catch {
+      /* ignore dead subscribers */
+    }
   }
 }
 
@@ -70,9 +71,9 @@ function rpcErr(id: string | number | null, code: number, message: string, data?
 
 export async function mcpRoutes(app: FastifyInstance): Promise<void> {
   // Resolve backend once at plugin registration
-  const _backend  = await _buildMcpBackend();
+  const _backend = await _buildMcpBackend();
   const _sessions = new SessionStore();
-  const _server   = new ScrapingMcpServer(_backend, _sessions);
+  const _server = new ScrapingMcpServer(_backend, _sessions);
 
   /**
    * GET /mcp/events
@@ -87,39 +88,51 @@ export async function mcpRoutes(app: FastifyInstance): Promise<void> {
    *
    * Clients should reconnect on drop; no history is replayed.
    */
-  app.get("/mcp/events", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (request, reply) => {
-    reply.raw.writeHead(200, {
-      "Content-Type":  "text/event-stream",
-      "Cache-Control": "no-cache",
-      "Connection":    "keep-alive",
-      "X-Accel-Buffering": "no",
-    });
+  app.get(
+    "/mcp/events",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (request, reply) => {
+      reply.raw.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+      });
 
-    // Send a heartbeat every 20 s to keep the connection alive
-    const heartbeat = setInterval(() => {
-      if (!reply.raw.destroyed) {
-        reply.raw.write(": heartbeat\n\n");
-      }
-    }, 20_000);
+      // Send a heartbeat every 20 s to keep the connection alive
+      const heartbeat = setInterval(() => {
+        if (!reply.raw.destroyed) {
+          reply.raw.write(": heartbeat\n\n");
+        }
+      }, 20_000);
 
-    const send = (event: McpEvent): void => {
-      if (!reply.raw.destroyed) {
-        reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
-      }
-    };
+      const send = (event: McpEvent): void => {
+        if (!reply.raw.destroyed) {
+          reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
+        }
+      };
 
-    _subscribers.add(send);
+      _subscribers.add(send);
 
-    request.raw.on("close", () => {
-      clearInterval(heartbeat);
-      _subscribers.delete(send);
-    });
+      request.raw.on("close", () => {
+        clearInterval(heartbeat);
+        _subscribers.delete(send);
+      });
 
-    // Fastify must not close the reply automatically
-    await new Promise<void>((resolve) => {
-      request.raw.on("close", resolve);
-    });
-  });
+      // Fastify must not close the reply automatically
+      await new Promise<void>((resolve) => {
+        request.raw.on("close", resolve);
+      });
+    },
+  );
 
   /**
    * GET /mcp/info
@@ -128,11 +141,11 @@ export async function mcpRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get("/mcp/info", async (_request, reply) => {
     return reply.send({
-      name:            "nexus-mcp-server",
-      version:         "0.1.0",
+      name: "nexus-mcp-server",
+      version: "0.1.0",
       protocolVersion: "2024-11-05",
       capabilities: {
-        tools:     { listChanged: false },
+        tools: { listChanged: false },
         resources: {},
       },
       tools: _server.toolNames(),
@@ -161,17 +174,19 @@ export async function mcpRoutes(app: FastifyInstance): Promise<void> {
 
     // ── initialize ──────────────────────────────────────────────────────────
     if (method === "initialize") {
-      return reply.send(rpcOk(id, {
-        protocolVersion: "2024-11-05",
-        capabilities: {
-          tools:     { listChanged: false },
-          resources: {},
-        },
-        serverInfo: {
-          name:    "nexus-mcp-server",
-          version: "0.1.0",
-        },
-      }));
+      return reply.send(
+        rpcOk(id, {
+          protocolVersion: "2024-11-05",
+          capabilities: {
+            tools: { listChanged: false },
+            resources: {},
+          },
+          serverInfo: {
+            name: "nexus-mcp-server",
+            version: "0.1.0",
+          },
+        }),
+      );
     }
 
     // ── notifications/initialized ───────────────────────────────────────────
@@ -182,7 +197,7 @@ export async function mcpRoutes(app: FastifyInstance): Promise<void> {
     // ── tools/list ──────────────────────────────────────────────────────────
     if (method === "tools/list") {
       const tools = _server.listTools().map((t) => ({
-        name:        t.name,
+        name: t.name,
         description: t.description,
         inputSchema: t.inputSchema,
       }));
@@ -193,7 +208,7 @@ export async function mcpRoutes(app: FastifyInstance): Promise<void> {
     if (method === "tools/call") {
       const p = params as { name?: string; arguments?: Record<string, unknown> } | undefined;
       const toolName = p?.name;
-      const args     = p?.arguments ?? {};
+      const args = p?.arguments ?? {};
 
       if (!toolName) {
         return reply.send(rpcErr(id, -32602, "Missing required param: name"));
@@ -205,16 +220,18 @@ export async function mcpRoutes(app: FastifyInstance): Promise<void> {
         const result = await _server.call(toolName, args);
 
         emit({
-          type:      "tool_result",
+          type: "tool_result",
           toolName,
-          isError:   result.isError,
+          isError: result.isError,
           timestamp: new Date().toISOString(),
         });
 
-        return reply.send(rpcOk(id, {
-          content: result.content,
-          isError: result.isError,
-        }));
+        return reply.send(
+          rpcOk(id, {
+            content: result.content,
+            isError: result.isError,
+          }),
+        );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         emit({ type: "tool_result", toolName, isError: true, timestamp: new Date().toISOString() });

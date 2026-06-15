@@ -75,6 +75,7 @@ export interface BriefEngineOptions {
 // ── HMAC-SHA256 signing (node:crypto) ────────────────────────────────────────
 
 import { createHmac, timingSafeEqual } from "node:crypto";
+
 import { neon } from "@neondatabase/serverless";
 
 /** Real HMAC-SHA256 — replaces the old invertible XOR-fold. */
@@ -110,8 +111,12 @@ export class DigestStore {
     return this.store.delete(this.key(userId, date));
   }
 
-  clear(): void { this.store.clear(); }
-  size(): number { return this.store.size; }
+  clear(): void {
+    this.store.clear();
+  }
+  size(): number {
+    return this.store.size;
+  }
 }
 
 // ── BriefSection builder ──────────────────────────────────────────────────────
@@ -122,7 +127,9 @@ export class SectionBuilder {
     const title = `${domain.charAt(0).toUpperCase()}${domain.slice(1)} Intelligence`;
     const items = events
       .map((e) => {
-        const sev = e.severity ? `<span class="severity-${e.severity}">[${e.severity.toUpperCase()}]</span> ` : "";
+        const sev = e.severity
+          ? `<span class="severity-${e.severity}">[${e.severity.toUpperCase()}]</span> `
+          : "";
         return `<li>${sev}<strong>${escapeHtml(e.summary)}</strong> <time>${e.timestamp}</time></li>`;
       })
       .join("\n");
@@ -192,10 +199,7 @@ export class BriefSigner {
    */
   private hmacFn: ((secret: string, data: string) => string) | null;
 
-  constructor(
-    secret = DEFAULT_HMAC_SECRET,
-    hmacFn?: (secret: string, data: string) => string,
-  ) {
+  constructor(secret = DEFAULT_HMAC_SECRET, hmacFn?: (secret: string, data: string) => string) {
     this.secret = secret;
     this.hmacFn = hmacFn ?? null;
   }
@@ -203,9 +207,7 @@ export class BriefSigner {
   /** Build and sign a share URL using HMAC-SHA256. */
   sign(baseUrl: string, userId: string, date: string): string {
     const payload = `${userId}:${date}`;
-    const sig = this.hmacFn
-      ? this.hmacFn(this.secret, payload)
-      : realHmac(this.secret, payload);
+    const sig = this.hmacFn ? this.hmacFn(this.secret, payload) : realHmac(this.secret, payload);
     const url = new URL(`${baseUrl}/brief/share`);
     url.searchParams.set("userId", userId);
     url.searchParams.set("date", date);
@@ -233,8 +235,7 @@ export class BriefSigner {
       try {
         const sigBuf = Buffer.from(sig, "hex");
         const expBuf = Buffer.from(expected, "hex");
-        const valid =
-          sigBuf.length === expBuf.length && timingSafeEqual(sigBuf, expBuf);
+        const valid = sigBuf.length === expBuf.length && timingSafeEqual(sigBuf, expBuf);
         return { valid, userId, date };
       } catch {
         return { valid: false, userId, date };
@@ -324,7 +325,9 @@ ${slidesHtml}
 // ── BriefEngine ───────────────────────────────────────────────────────────────
 
 let _seq = 0;
-function uid(prefix: string): string { return `${prefix}-${Date.now()}-${++_seq}`; }
+function uid(prefix: string): string {
+  return `${prefix}-${Date.now()}-${++_seq}`;
+}
 
 /** Brief engine. */
 export class BriefEngine {
@@ -398,7 +401,9 @@ export class BriefEngine {
     return this.signer.verify(url);
   }
 
-  getStore(): DigestStore { return this.store; }
+  getStore(): DigestStore {
+    return this.store;
+  }
 }
 
 // ── PgDigestStore ─────────────────────────────────────────────────────────────
@@ -422,7 +427,10 @@ export class BriefEngine {
 /** Type-compatible subset that supports both sync and async DigestStore implementations. */
 interface IDigestStoreLike {
   save(snapshot: DigestSnapshot): void | Promise<void>;
-  get(userId: string, date: string): DigestSnapshot | undefined | Promise<DigestSnapshot | undefined>;
+  get(
+    userId: string,
+    date: string,
+  ): DigestSnapshot | undefined | Promise<DigestSnapshot | undefined>;
   list(userId: string): DigestSnapshot[] | Promise<DigestSnapshot[]>;
   delete(userId: string, date: string): boolean | Promise<boolean>;
 }

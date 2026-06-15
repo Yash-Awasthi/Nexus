@@ -15,5 +15,6 @@ if (!process.env.DATABASE_URL) {
   // Neon-shaped URL so NeonConnector/isNeonUrl checks pass at parse time.
   // No real connection is made during unit tests — queries fail at runtime
   // with ECONNREFUSED, not at import/construction time.
-  process.env.DATABASE_URL = "postgresql://nexus_test:nexus_test@ep-test-abc123.us-east-2.aws.neon.tech/nexus_test?sslmode=require";
+  process.env.DATABASE_URL =
+    "postgresql://nexus_test:nexus_test@ep-test-abc123.us-east-2.aws.neon.tech/nexus_test?sslmode=require";
 }

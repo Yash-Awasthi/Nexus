@@ -50,7 +50,7 @@ export interface CFKVNamespaceLike {
   /** Delete a key (no-op if absent). */
   delete(key: string): Promise<void>;
   /** List keys with optional prefix filter. */
-  list(options?: { prefix?: string; limit?: number }): Promise<{ keys: Array<{ name: string }> }>;
+  list(options?: { prefix?: string; limit?: number }): Promise<{ keys: { name: string }[] }>;
 }
 
 // ── Cloudflare execution context ──────────────────────────────────────────────
@@ -83,8 +83,8 @@ export class CloudflareKVStore implements KVStore {
     ns: CFKVNamespaceLike,
     opts: { ctx?: CFExecutionContextLike; keyPrefix?: string } = {},
   ) {
-    this.ns        = ns;
-    this.ctx       = opts.ctx;
+    this.ns = ns;
+    this.ctx = opts.ctx;
     this.keyPrefix = opts.keyPrefix ? `${opts.keyPrefix}:` : "";
   }
 
@@ -106,6 +106,7 @@ export class CloudflareKVStore implements KVStore {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
   async set<T>(key: string, value: T, ttlMs?: number): Promise<void> {
     const serialized = JSON.stringify(value);
     const opts: { expirationTtl?: number } = {};
@@ -193,9 +194,10 @@ export function _resetCFContext(): void {
 // Thin wrappers around the Cloudflare Cache API for HTTP response caching.
 // Used by edge handlers to cache deterministic GET responses.
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface CFCacheEntry {
-  body:    string;
-  status:  number;
+  body: string;
+  status: number;
   headers: Record<string, string>;
 }
 

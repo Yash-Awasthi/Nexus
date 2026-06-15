@@ -25,9 +25,9 @@ export type JobPhase = "pending" | "running" | "succeeded" | "failed" | "unknown
 
 /** Resource spec interface definition. */
 export interface ResourceSpec {
-  cpu?: string;    // e.g. "500m", "2"
+  cpu?: string; // e.g. "500m", "2"
   memory?: string; // e.g. "512Mi", "4Gi"
-  gpu?: number;    // number of GPU units
+  gpu?: number; // number of GPU units
 }
 
 /** Env var interface definition. */
@@ -80,7 +80,7 @@ export interface K8sJobManifest {
       metadata: { labels?: Record<string, string> };
       spec: {
         restartPolicy: "Never";
-        containers: Array<{
+        containers: {
           name: string;
           image: string;
           command: string[];
@@ -88,7 +88,7 @@ export interface K8sJobManifest {
           env?: EnvVar[];
           resources?: { requests?: ResourceSpec; limits?: ResourceSpec };
           volumeMounts?: VolumeMount[];
-        }>;
+        }[];
       };
     };
   };
@@ -120,6 +120,7 @@ export interface ExecutionResult {
 
 // ── JobManifest builder ───────────────────────────────────────────────────────
 
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class JobManifest {
   static build(spec: SandboxSpec): K8sJobManifest {
     const namespace = spec.namespace ?? "default";
@@ -338,20 +339,17 @@ export const STACK_PRESETS: Record<Language, StackPreset> = {
   r: {
     image: "nexus/scientific-r:4.3",
     defaultCommand: ["Rscript", "-e"],
-    extraEnv: [
-      { name: "R_LIBS_USER", value: "/usr/local/lib/R/site-library" },
-    ],
+    extraEnv: [{ name: "R_LIBS_USER", value: "/usr/local/lib/R/site-library" }],
   },
   julia: {
     image: "nexus/scientific-julia:1.10",
     defaultCommand: ["julia", "-e"],
-    extraEnv: [
-      { name: "JULIA_NUM_THREADS", value: "auto" },
-    ],
+    extraEnv: [{ name: "JULIA_NUM_THREADS", value: "auto" }],
   },
 };
 
 /** Scientific stack. */
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class ScientificStack {
   /** Build a SandboxSpec for running a code snippet in the given language. */
   static buildSpec(
@@ -442,7 +440,9 @@ export class SandboxExecutor {
     }
 
     const startMs = finalStatus.startTime ? new Date(finalStatus.startTime).getTime() : undefined;
-    const endMs = finalStatus.completionTime ? new Date(finalStatus.completionTime).getTime() : undefined;
+    const endMs = finalStatus.completionTime
+      ? new Date(finalStatus.completionTime).getTime()
+      : undefined;
 
     return {
       jobName,

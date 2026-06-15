@@ -28,7 +28,7 @@ export interface Task<T = unknown> {
   payload: T;
   status: TaskStatus;
   createdAt: number;
-  runAt?: number;       // epoch ms, for delayed tasks
+  runAt?: number; // epoch ms, for delayed tasks
   attempts: number;
   maxRetries: number;
   lastError?: string;
@@ -123,7 +123,9 @@ export class InMemoryStreamClient {
     else this.streams.clear();
   }
 
-  streamNames(): string[] { return [...this.streams.keys()]; }
+  streamNames(): string[] {
+    return [...this.streams.keys()];
+  }
 }
 
 // ── CronScheduler ─────────────────────────────────────────────────────────────
@@ -153,7 +155,9 @@ export class CronScheduler {
           await entry.handler();
           entry.lastRunAt = now;
           ran.push(entry.name);
-        } catch { /* isolate */ }
+        } catch {
+          /* isolate */
+        }
       }
     }
     return ran;
@@ -162,7 +166,9 @@ export class CronScheduler {
   start(tickMs = 1_000): void {
     if (this.running) return;
     this.running = true;
-    this.timer = setInterval(() => { void this.tick(); }, tickMs);
+    this.timer = setInterval(() => {
+      void this.tick();
+    }, tickMs);
   }
 
   stop(): void {
@@ -170,9 +176,15 @@ export class CronScheduler {
     this.running = false;
   }
 
-  isRunning(): boolean { return this.running; }
-  entries_(): CronEntry[] { return [...this.entries]; }
-  clear(): void { this.entries = []; }
+  isRunning(): boolean {
+    return this.running;
+  }
+  entries_(): CronEntry[] {
+    return [...this.entries];
+  }
+  clear(): void {
+    this.entries = [];
+  }
 }
 
 // ── TaskQueue ─────────────────────────────────────────────────────────────────
@@ -258,12 +270,20 @@ export class TaskQueue {
     this.cron.register(name, intervalMs, handler);
   }
 
-  async tickCron(): Promise<string[]> { return this.cron.tick(); }
+  async tickCron(): Promise<string[]> {
+    return this.cron.tick();
+  }
 
-  getClient(): InMemoryStreamClient { return this.client; }
-  getCron(): CronScheduler { return this.cron; }
+  getClient(): InMemoryStreamClient {
+    return this.client;
+  }
+  getCron(): CronScheduler {
+    return this.cron;
+  }
 
-  allTasks(): Task[] { return this.client.allTasks(this.stream); }
+  allTasks(): Task[] {
+    return this.client.allTasks(this.stream);
+  }
   tasksByStatus(status: TaskStatus): Task[] {
     return this.allTasks().filter((t) => t.status === status);
   }
@@ -291,7 +311,6 @@ export class SyncTaskRunner {
     return { processed: totalProcessed, failed: totalFailed };
   }
 }
-
 
 // ── Redis-backed client + async queue ─────────────────────────────────────────
 // ioredis is an optional peer dependency — only instantiate RedisStreamClient

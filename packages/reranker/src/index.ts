@@ -118,9 +118,7 @@ export class BM25Reranker implements Reranker {
       score: rawScores[i]! / maxScore,
     }));
 
-    scored = scored
-      .filter((d) => d.score >= scoreThreshold)
-      .sort((a, b) => b.score - a.score);
+    scored = scored.filter((d) => d.score >= scoreThreshold).sort((a, b) => b.score - a.score);
 
     if (topK !== undefined) scored = scored.slice(0, topK);
 

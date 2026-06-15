@@ -48,7 +48,9 @@ export interface SearchOptions {
 // ── ID util ───────────────────────────────────────────────────────────────────
 
 let _seq = 0;
-function uid() { return `ki-${Date.now()}-${++_seq}`; }
+function uid() {
+  return `ki-${Date.now()}-${++_seq}`;
+}
 
 // ── KnowledgeStore ────────────────────────────────────────────────────────────
 
@@ -76,7 +78,10 @@ export class KnowledgeStore {
     return this.items.get(id);
   }
 
-  update(id: string, changes: Partial<Omit<KnowledgeItem, "id" | "createdAt">>): KnowledgeItem | undefined {
+  update(
+    id: string,
+    changes: Partial<Omit<KnowledgeItem, "id" | "createdAt">>,
+  ): KnowledgeItem | undefined {
     const item = this.items.get(id);
     if (!item) return undefined;
     const updated: KnowledgeItem = {
@@ -127,7 +132,9 @@ export class KnowledgeStore {
     return opts.limit ? results.slice(0, opts.limit) : results;
   }
 
-  count(): number { return this.items.size; }
+  count(): number {
+    return this.items.size;
+  }
 
   /** Add a tag to an item (idempotent). */
   addTag(id: string, tag: string): KnowledgeItem | undefined {
@@ -207,9 +214,27 @@ export class TagIndex {
 // ── CrossLinker ───────────────────────────────────────────────────────────────
 
 function tokenize(text: string): Set<string> {
-  const stop = new Set(["the", "a", "an", "is", "and", "or", "in", "of", "to", "for", "with", "on", "at"]);
+  const stop = new Set([
+    "the",
+    "a",
+    "an",
+    "is",
+    "and",
+    "or",
+    "in",
+    "of",
+    "to",
+    "for",
+    "with",
+    "on",
+    "at",
+  ]);
   return new Set(
-    text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((w) => w.length > 2 && !stop.has(w)),
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !stop.has(w)),
   );
 }
 
@@ -262,7 +287,9 @@ export class LibrarianAgent {
     this.autoLinkThreshold = opts.autoLinkThreshold ?? 0.15;
   }
 
-  getStore(): KnowledgeStore { return this.store; }
+  getStore(): KnowledgeStore {
+    return this.store;
+  }
 
   /** Ingest a new item: create, auto-suggest links, apply threshold auto-linking. */
   ingest(input: CreateItemInput): IngestResult {

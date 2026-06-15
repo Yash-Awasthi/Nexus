@@ -15,9 +15,7 @@
 
 // ── Base types ────────────────────────────────────────────────────────────────
 
-export interface AgentInput {
-  [key: string]: unknown;
-}
+export type AgentInput = Record<string, unknown>;
 
 /** Agent output interface definition. */
 export interface AgentOutput {
@@ -83,12 +81,17 @@ export class CodeSearchAgent {
   }
 
   async execute(input: CodeSearchInput, ctx?: AgentContext): Promise<AgentOutput> {
-    if (!this.handler) return { success: false, data: null, error: "CodeSearchAgent: no handler injected" };
+    if (!this.handler)
+      return { success: false, data: null, error: "CodeSearchAgent: no handler injected" };
     try {
       const data = await this.handler(input, ctx);
       return { success: true, data };
     } catch (err) {
-      return { success: false, data: null, error: err instanceof Error ? err.message : String(err) };
+      return {
+        success: false,
+        data: null,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   }
 
@@ -128,12 +131,17 @@ export class DirectoryListerAgent {
   }
 
   async execute(input: DirectoryListInput, ctx?: AgentContext): Promise<AgentOutput> {
-    if (!this.handler) return { success: false, data: null, error: "DirectoryListerAgent: no handler injected" };
+    if (!this.handler)
+      return { success: false, data: null, error: "DirectoryListerAgent: no handler injected" };
     try {
       const data = await this.handler(input, ctx);
       return { success: true, data };
     } catch (err) {
-      return { success: false, data: null, error: err instanceof Error ? err.message : String(err) };
+      return {
+        success: false,
+        data: null,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   }
 
@@ -168,12 +176,17 @@ export class FileListerAgent {
   }
 
   async execute(input: FileListInput, ctx?: AgentContext): Promise<AgentOutput> {
-    if (!this.handler) return { success: false, data: null, error: "FileListerAgent: no handler injected" };
+    if (!this.handler)
+      return { success: false, data: null, error: "FileListerAgent: no handler injected" };
     try {
       const data = await this.handler(input, ctx);
       return { success: true, data };
     } catch (err) {
-      return { success: false, data: null, error: err instanceof Error ? err.message : String(err) };
+      return {
+        success: false,
+        data: null,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   }
 
@@ -186,7 +199,7 @@ export class FileListerAgent {
 
 export interface FilePickerInput extends AgentInput {
   description: string;
-  candidates: string[];  // list of file paths to pick from
+  candidates: string[]; // list of file paths to pick from
   context?: string;
 }
 
@@ -207,12 +220,17 @@ export class FilePickerAgent {
   }
 
   async execute(input: FilePickerInput, ctx?: AgentContext): Promise<AgentOutput> {
-    if (!this.handler) return { success: false, data: null, error: "FilePickerAgent: no handler injected" };
+    if (!this.handler)
+      return { success: false, data: null, error: "FilePickerAgent: no handler injected" };
     try {
       const data = await this.handler(input, ctx);
       return { success: true, data };
     } catch (err) {
-      return { success: false, data: null, error: err instanceof Error ? err.message : String(err) };
+      return {
+        success: false,
+        data: null,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   }
 
@@ -246,12 +264,17 @@ export class GlobMatcherAgent {
   }
 
   async execute(input: GlobMatchInput, ctx?: AgentContext): Promise<AgentOutput> {
-    if (!this.handler) return { success: false, data: null, error: "GlobMatcherAgent: no handler injected" };
+    if (!this.handler)
+      return { success: false, data: null, error: "GlobMatcherAgent: no handler injected" };
     try {
       const data = await this.handler(input, ctx);
       return { success: true, data };
     } catch (err) {
-      return { success: false, data: null, error: err instanceof Error ? err.message : String(err) };
+      return {
+        success: false,
+        data: null,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   }
 
@@ -262,43 +285,70 @@ export class GlobMatcherAgent {
 
 // ── MockHandlers (for testing) ────────────────────────────────────────────────
 
-export function mockCodeSearchHandler(results: CodeSearchResult[] = []): AgentHandler<CodeSearchInput, CodeSearchOutput> {
+export function mockCodeSearchHandler(
+  results: CodeSearchResult[] = [],
+): AgentHandler<CodeSearchInput, CodeSearchOutput> {
   return async (input) => ({
-    results: results.length > 0 ? results : [
-      { path: "src/main.ts", snippet: `// code for: ${input.query}`, lineNumber: 1, relevanceScore: 0.9 },
-    ],
+    results:
+      results.length > 0
+        ? results
+        : [
+            {
+              path: "src/main.ts",
+              snippet: `// code for: ${input.query}`,
+              lineNumber: 1,
+              relevanceScore: 0.9,
+            },
+          ],
     query: input.query,
     totalFound: results.length || 1,
   });
 }
 
 /** Mock directory list handler. */
-export function mockDirectoryListHandler(entries: FileEntry[] = []): AgentHandler<DirectoryListInput, DirectoryListOutput> {
+export function mockDirectoryListHandler(
+  entries: FileEntry[] = [],
+): AgentHandler<DirectoryListInput, DirectoryListOutput> {
   return async (input) => ({
-    entries: entries.length > 0 ? entries : [
-      { path: `${input.path}/file.ts`, name: "file.ts", type: "file", extension: "ts" },
-      { path: `${input.path}/subdir`, name: "subdir", type: "directory" },
-    ],
+    entries:
+      entries.length > 0
+        ? entries
+        : [
+            { path: `${input.path}/file.ts`, name: "file.ts", type: "file", extension: "ts" },
+            { path: `${input.path}/subdir`, name: "subdir", type: "directory" },
+          ],
     path: input.path,
     totalEntries: entries.length || 2,
   });
 }
 
 /** Mock file list handler. */
-export function mockFileListHandler(files: FileEntry[] = []): AgentHandler<FileListInput, FileListOutput> {
+export function mockFileListHandler(
+  files: FileEntry[] = [],
+): AgentHandler<FileListInput, FileListOutput> {
   return async (input) => ({
-    files: files.length > 0 ? files : [
-      { path: `${input.directory}/index.ts`, name: "index.ts", type: "file", extension: "ts" },
-    ],
+    files:
+      files.length > 0
+        ? files
+        : [
+            {
+              path: `${input.directory}/index.ts`,
+              name: "index.ts",
+              type: "file",
+              extension: "ts",
+            },
+          ],
     directory: input.directory,
     totalFiles: files.length || 1,
   });
 }
 
 /** Mock file picker handler. */
-export function mockFilePickerHandler(picked: string | null = "src/main.ts"): AgentHandler<FilePickerInput, FilePickerOutput> {
+export function mockFilePickerHandler(
+  picked: string | null = "src/main.ts",
+): AgentHandler<FilePickerInput, FilePickerOutput> {
   return async (input) => ({
-    pickedPath: picked ?? (input.candidates[0] ?? null),
+    pickedPath: picked ?? input.candidates[0] ?? null,
     reasoning: "Best match based on description",
     alternatives: input.candidates.slice(1),
   });

@@ -17,6 +17,7 @@
  */
 
 import { randomUUID } from "crypto";
+
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
@@ -41,16 +42,15 @@ const SUPPORTED_DOMAINS = [
   "research",
 ] as const;
 
-type FeedDomain = typeof SUPPORTED_DOMAINS[number];
+type FeedDomain = (typeof SUPPORTED_DOMAINS)[number];
 
-const feedStore = new Map<FeedDomain, FeedEntry[]>(
-  SUPPORTED_DOMAINS.map((d) => [d, []]),
-);
+const feedStore = new Map<FeedDomain, FeedEntry[]>(SUPPORTED_DOMAINS.map((d) => [d, []]));
 
 function getEntries(domain: FeedDomain): FeedEntry[] {
   return feedStore.get(domain) ?? [];
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function pushEntry(domain: FeedDomain, payload: Record<string, unknown>, source: string): void {
   const entries = feedStore.get(domain)!;
   entries.push({
@@ -72,14 +72,26 @@ export async function domainFeedsRoutes(app: FastifyInstance): Promise<void> {
   // to push entries manually from the worker or external webhooks.
 
   /** GET /domain-feeds — list domains + entry counts */
-  app.get("/domain-feeds", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
-    const domains = SUPPORTED_DOMAINS.map((d) => ({
-      domain: d,
-      count: getEntries(d).length,
-      latest: getEntries(d).at(-1)?.createdAt ?? null,
-    }));
-    return reply.send({ domains });
-  });
+  app.get(
+    "/domain-feeds",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_req, reply) => {
+      const domains = SUPPORTED_DOMAINS.map((d) => ({
+        domain: d,
+        count: getEntries(d).length,
+        latest: getEntries(d).at(-1)?.createdAt ?? null,
+      }));
+      return reply.send({ domains });
+    },
+  );
 
   /** GET /domain-feeds/:domain?limit=&since= */
   app.get<{
@@ -131,7 +143,12 @@ export async function domainFeedsRoutes(app: FastifyInstance): Promise<void> {
   /** DELETE /domain-feeds/:domain/entries/:id */
   app.delete<{ Params: { domain: string; id: string } }>(
     "/domain-feeds/:domain/entries/:id",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const domain = request.params.domain as FeedDomain;
       const entries = feedStore.get(domain);

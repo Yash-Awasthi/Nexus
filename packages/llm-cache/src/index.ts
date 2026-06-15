@@ -217,6 +217,7 @@ export class MemoryPromptCache implements PromptCache {
 
 export interface KVStoreLike {
   get<T>(key: string): Promise<T | undefined>;
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
   set<T>(key: string, value: T, ttlMs?: number): Promise<void>;
   delete(key: string): Promise<void>;
   keys(pattern?: string): Promise<string[]>;

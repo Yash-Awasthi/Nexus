@@ -25,8 +25,8 @@ export interface ResearchFinding {
   query: string;
   results: SearchResult[];
   synthesis: string;
-  citations: string[];          // flat URL list (backward-compat)
-  richCitations?: SourceReference[];  // structured citations with keys + metadata
+  citations: string[]; // flat URL list (backward-compat)
+  richCitations?: SourceReference[]; // structured citations with keys + metadata
   durationMs: number;
 }
 
@@ -45,8 +45,8 @@ export interface SourceReference {
 
 /** Citation index. */
 export class CitationIndex {
-  private refs    = new Map<string, SourceReference>(); // citationKey → ref
-  private urlKeys = new Map<string, string>();           // url → citationKey (dedup)
+  private refs = new Map<string, SourceReference>(); // citationKey → ref
+  private urlKeys = new Map<string, string>(); // url → citationKey (dedup)
   private counter = 0;
 
   /**
@@ -60,24 +60,34 @@ export class CitationIndex {
     const citationKey = `[${++this.counter}]`;
     const ref: SourceReference = {
       citationKey,
-      url:        result.url,
-      title:      result.title,
+      url: result.url,
+      title: result.title,
       accessedAt,
-      snippet:    result.snippet?.slice(0, 200),
+      snippet: result.snippet?.slice(0, 200),
     };
     this.refs.set(citationKey, ref);
     this.urlKeys.set(result.url, citationKey);
     return citationKey;
   }
 
-  get(key: string): SourceReference | undefined { return this.refs.get(key); }
+  get(key: string): SourceReference | undefined {
+    return this.refs.get(key);
+  }
   byUrl(url: string): SourceReference | undefined {
     const key = this.urlKeys.get(url);
     return key ? this.refs.get(key) : undefined;
   }
-  list(): SourceReference[] { return [...this.refs.values()]; }
-  size(): number { return this.refs.size; }
-  clear(): void { this.refs.clear(); this.urlKeys.clear(); this.counter = 0; }
+  list(): SourceReference[] {
+    return [...this.refs.values()];
+  }
+  size(): number {
+    return this.refs.size;
+  }
+  clear(): void {
+    this.refs.clear();
+    this.urlKeys.clear();
+    this.counter = 0;
+  }
 
   /** Render all citations as a Markdown reference list. */
   toMarkdown(): string {
@@ -144,16 +154,43 @@ export class WebResearcher {
     const index = new CitationIndex();
     const accessedAt = new Date().toISOString();
     results.forEach((r) => index.add(r, accessedAt));
-    return { query, results, synthesis, citations, richCitations: index.list(), durationMs: Date.now() - t0 };
+    return {
+      query,
+      results,
+      synthesis,
+      citations,
+      richCitations: index.list(),
+      durationMs: Date.now() - t0,
+    };
   }
 }
 
 // ── CorpusResearcher ──────────────────────────────────────────────────────────
 
 function tokenizeSimple(text: string): Set<string> {
-  const stop = new Set(["the", "a", "an", "is", "and", "or", "in", "of", "to", "for", "with", "on", "at", "be", "it"]);
+  const stop = new Set([
+    "the",
+    "a",
+    "an",
+    "is",
+    "and",
+    "or",
+    "in",
+    "of",
+    "to",
+    "for",
+    "with",
+    "on",
+    "at",
+    "be",
+    "it",
+  ]);
   return new Set(
-    text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((w) => w.length > 2 && !stop.has(w)),
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !stop.has(w)),
   );
 }
 
@@ -178,7 +215,7 @@ export class CorpusResearcher {
 
   search(query: string, limit = 10): SearchResult[] {
     const qKw = tokenizeSimple(query);
-    const scored: Array<{ doc: CorpusDocument; score: number }> = [];
+    const scored: { doc: CorpusDocument; score: number }[] = [];
 
     for (const doc of this.docs) {
       const dKw = tokenizeSimple(`${doc.title} ${doc.content}`);
@@ -210,10 +247,19 @@ export class CorpusResearcher {
     const index = new CitationIndex();
     const accessedAt = new Date().toISOString();
     results.forEach((r) => index.add(r, accessedAt));
-    return { query, results, synthesis, citations, richCitations: index.list(), durationMs: Date.now() - t0 };
+    return {
+      query,
+      results,
+      synthesis,
+      citations,
+      richCitations: index.list(),
+      durationMs: Date.now() - t0,
+    };
   }
 
-  docCount(): number { return this.docs.length; }
+  docCount(): number {
+    return this.docs.length;
+  }
 }
 
 // ── ResearchPlan ──────────────────────────────────────────────────────────────
@@ -233,7 +279,9 @@ export class ResearchPlan {
     return this;
   }
 
-  getSteps(): ResearchStep[] { return [...this.steps]; }
+  getSteps(): ResearchStep[] {
+    return [...this.steps];
+  }
 
   setFinding(index: number, finding: ResearchFinding): void {
     const step = this.steps[index];
@@ -290,10 +338,7 @@ export class ResearchSession {
       this.corpus ? this.corpus.research(query) : Promise.resolve(null),
     ]);
 
-    let allResults = [
-      ...(webFindings?.results ?? []),
-      ...(corpusFindings?.results ?? []),
-    ];
+    let allResults = [...(webFindings?.results ?? []), ...(corpusFindings?.results ?? [])];
 
     if (this.dedupByUrl) {
       const seen = new Set<string>();
@@ -319,7 +364,11 @@ export class ResearchSession {
     return finding;
   }
 
-  getHistory(): CombinedFinding[] { return [...this.history]; }
+  getHistory(): CombinedFinding[] {
+    return [...this.history];
+  }
 
-  clearHistory(): void { this.history = []; }
+  clearHistory(): void {
+    this.history = [];
+  }
 }

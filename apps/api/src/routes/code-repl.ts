@@ -40,7 +40,7 @@ async function getManager(): Promise<KernelManager> {
   const executor = dockerOk
     ? new DockerReplExecutor({
         memoryLimit: process.env.REPL_MEMORY_LIMIT ?? "512m",
-        cpuLimit:    process.env.REPL_CPU_LIMIT    ?? "0.5",
+        cpuLimit: process.env.REPL_CPU_LIMIT ?? "0.5",
         defaultTimeoutMs: parseInt(process.env.REPL_TIMEOUT_MS ?? "10000", 10),
       })
     : new MockReplExecutor({
@@ -67,17 +67,28 @@ const SUPPORTED_LANGS: ReplLanguage[] = ["python", "r", "julia"];
 // ── Route plugin ──────────────────────────────────────────────────────────────
 
 export async function codeReplRoutes(app: FastifyInstance): Promise<void> {
-
   /** GET /code-repl/executor — which executor is active */
-  app.get("/code-repl/executor", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
-    const mgr = await getManager();
-    return reply.send({
-      executor: _executorType,
-      docker:   _executorType === "docker",
-      sessions: mgr.count(),
-      languages: SUPPORTED_LANGS,
-    });
-  });
+  app.get(
+    "/code-repl/executor",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_req, reply) => {
+      const mgr = await getManager();
+      return reply.send({
+        executor: _executorType,
+        docker: _executorType === "docker",
+        sessions: mgr.count(),
+        languages: SUPPORTED_LANGS,
+      });
+    },
+  );
 
   /** POST /code-repl/sessions — create a new kernel session */
   app.post<{
@@ -101,45 +112,65 @@ export async function codeReplRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return reply.code(201).send({
-      id:             session.id,
-      language:       session.language,
+      id: session.id,
+      language: session.language,
       executionCount: session.executionCount,
-      executor:       _executorType,
-      createdAt:      session.state_.createdAt,
+      executor: _executorType,
+      createdAt: session.state_.createdAt,
     });
   });
 
   /** GET /code-repl/sessions — list all active sessions */
-  app.get("/code-repl/sessions", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
-    const mgr = await getManager();
-    const sessions = mgr.list().map((s) => ({
-      id:             s.id,
-      language:       s.language,
-      executionCount: s.executionCount,
-      idleTimeMs:     s.idleTimeMs(),
-      createdAt:      s.state_.createdAt,
-      lastUsedAt:     s.state_.lastUsedAt,
-    }));
-    return reply.send({ sessions, total: sessions.length, executor: _executorType });
-  });
+  app.get(
+    "/code-repl/sessions",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_req, reply) => {
+      const mgr = await getManager();
+      const sessions = mgr.list().map((s) => ({
+        id: s.id,
+        language: s.language,
+        executionCount: s.executionCount,
+        idleTimeMs: s.idleTimeMs(),
+        createdAt: s.state_.createdAt,
+        lastUsedAt: s.state_.lastUsedAt,
+      }));
+      return reply.send({ sessions, total: sessions.length, executor: _executorType });
+    },
+  );
 
   /** GET /code-repl/sessions/:id — session details */
   app.get<{ Params: { id: string } }>(
     "/code-repl/sessions/:id",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const mgr = await getManager();
       const session = mgr.get(request.params.id);
       if (!session) return reply.code(404).send({ error: "Session not found" });
 
       return reply.send({
-        id:             session.id,
-        language:       session.language,
+        id: session.id,
+        language: session.language,
         executionCount: session.executionCount,
-        history:        session.getHistory(),
-        idleTimeMs:     session.idleTimeMs(),
-        createdAt:      session.state_.createdAt,
-        lastUsedAt:     session.state_.lastUsedAt,
+        history: session.getHistory(),
+        idleTimeMs: session.idleTimeMs(),
+        createdAt: session.state_.createdAt,
+        lastUsedAt: session.state_.lastUsedAt,
       });
     },
   );
@@ -147,7 +178,12 @@ export async function codeReplRoutes(app: FastifyInstance): Promise<void> {
   /** DELETE /code-repl/sessions/:id — destroy session */
   app.delete<{ Params: { id: string } }>(
     "/code-repl/sessions/:id",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const mgr = await getManager();
       const destroyed = mgr.destroy(request.params.id);
@@ -160,41 +196,49 @@ export async function codeReplRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
     Params: { id: string };
     Body: { code: string; timeoutMs?: number; jupyterMode?: boolean };
-  }>(
-    "/code-repl/sessions/:id/execute",
-    { preHandler: requireAuth },
-    async (request, reply) => {
-      const mgr = await getManager();
-      const session = mgr.get(request.params.id);
-      if (!session) return reply.code(404).send({ error: "Session not found" });
+  }>("/code-repl/sessions/:id/execute", { preHandler: requireAuth }, async (request, reply) => {
+    const mgr = await getManager();
+    const session = mgr.get(request.params.id);
+    if (!session) return reply.code(404).send({ error: "Session not found" });
 
-      if (!request.body.code?.trim()) {
-        return reply.code(400).send({ error: "code is required" });
-      }
+    if (!request.body.code?.trim()) {
+      return reply.code(400).send({ error: "code is required" });
+    }
 
-      try {
-        const result = await session.execute({
-          code:      request.body.code,
-          timeoutMs: request.body.timeoutMs,
-        });
-        return reply.send({
-          ...result,
-          sessionId:      session.id,
-          executionCount: session.executionCount,
-          executor:       _executorType,
-        });
-      } catch (err) {
-        return reply.code(500).send({
-          error: err instanceof Error ? err.message : "Execution failed",
-        });
-      }
-    },
-  );
+    try {
+      const result = await session.execute({
+        code: request.body.code,
+        timeoutMs: request.body.timeoutMs,
+      });
+      return reply.send({
+        ...result,
+        sessionId: session.id,
+        executionCount: session.executionCount,
+        executor: _executorType,
+      });
+    } catch (err) {
+      return reply.code(500).send({
+        error: err instanceof Error ? err.message : "Execution failed",
+      });
+    }
+  });
 
   /** POST /code-repl/sessions/reap — manually trigger idle session cleanup */
-  app.post("/code-repl/sessions/reap", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
-    const mgr = await getManager();
-    const reaped = mgr.reapIdle();
-    return reply.send({ reaped, remaining: mgr.count() });
-  });
+  app.post(
+    "/code-repl/sessions/reap",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_req, reply) => {
+      const mgr = await getManager();
+      const reaped = mgr.reapIdle();
+      return reply.send({ reaped, remaining: mgr.count() });
+    },
+  );
 }

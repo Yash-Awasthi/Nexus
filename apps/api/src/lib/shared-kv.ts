@@ -17,6 +17,7 @@
  */
 
 import { MemoryKVStore, type KVStore } from "@nexus/kv";
+
 import { getSharedKVFromCF } from "./cf-adapter.js";
 
 // ── Upstash REST KVStore ───────────────────────────────────────────────────────
@@ -44,7 +45,7 @@ class UpstashKVStore implements KVStore {
     if (!res.ok) {
       throw new Error(`Upstash error: ${res.status} ${await res.text()}`);
     }
-    const json = (await res.json()) as Array<{ result: T; error?: string }>;
+    const json = (await res.json()) as { result: T; error?: string }[];
     if (json[0]?.error) throw new Error(`Upstash cmd error: ${json[0].error}`);
     return json[0]!.result;
   }
@@ -59,6 +60,7 @@ class UpstashKVStore implements KVStore {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
   async set<T>(key: string, value: T, ttlMs?: number): Promise<void> {
     const serialized = JSON.stringify(value);
     if (ttlMs !== undefined && ttlMs > 0) {
@@ -114,7 +116,7 @@ export function getSharedKV(): KVStore {
   }
 
   // 2. Upstash Redis REST (cross-pod, recommended for K8s)
-  const upstashUrl   = process.env.UPSTASH_REDIS_REST_URL;
+  const upstashUrl = process.env.UPSTASH_REDIS_REST_URL;
   const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 
   if (upstashUrl && upstashToken) {
@@ -125,7 +127,6 @@ export function getSharedKV(): KVStore {
     _sharedKv = new MemoryKVStore();
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+   
   return _sharedKv!;
 }
-

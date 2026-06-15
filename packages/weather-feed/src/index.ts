@@ -28,12 +28,12 @@ export interface WeatherRequest {
 
 /** Current weather interface definition. */
 export interface CurrentWeather {
-  temperature: number;     // °C or °F depending on unit
-  windSpeed: number;       // km/h or mph
-  windDirection: number;   // degrees
-  weatherCode: number;     // WMO weather code
+  temperature: number; // °C or °F depending on unit
+  windSpeed: number; // km/h or mph
+  windDirection: number; // degrees
+  weatherCode: number; // WMO weather code
   isDay: boolean;
-  time: string;            // ISO
+  time: string; // ISO
 }
 
 /** Hourly weather interface definition. */
@@ -95,6 +95,7 @@ export const WMO_DESCRIPTIONS: Record<number, string> = {
 };
 
 /** Wmo code. */
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class WmoCode {
   static describe(code: number): string {
     return WMO_DESCRIPTIONS[code] ?? `Unknown (${code})`;
@@ -158,7 +159,8 @@ export class WeatherCache {
   private cache = new Map<string, { response: WeatherResponse; expiresAt: number }>();
   private ttlMs: number;
 
-  constructor(ttlMs = 15 * 60 * 1000) { // 15 min default
+  constructor(ttlMs = 15 * 60 * 1000) {
+    // 15 min default
     this.ttlMs = ttlMs;
   }
 
@@ -173,13 +175,22 @@ export class WeatherCache {
   get(req: WeatherRequest): WeatherResponse | null {
     const entry = this.cache.get(this.key(req));
     if (!entry) return null;
-    if (Date.now() > entry.expiresAt) { this.cache.delete(this.key(req)); return null; }
+    if (Date.now() > entry.expiresAt) {
+      this.cache.delete(this.key(req));
+      return null;
+    }
     return entry.response;
   }
 
-  invalidate(req: WeatherRequest): void { this.cache.delete(this.key(req)); }
-  clear(): void { this.cache.clear(); }
-  size(): number { return this.cache.size; }
+  invalidate(req: WeatherRequest): void {
+    this.cache.delete(this.key(req));
+  }
+  clear(): void {
+    this.cache.clear();
+  }
+  size(): number {
+    return this.cache.size;
+  }
 }
 
 // ── WeatherClient ─────────────────────────────────────────────────────────────
@@ -191,10 +202,12 @@ export class WeatherClient {
   private http: WeatherHttpGetFn;
 
   constructor(http?: WeatherHttpGetFn) {
-    this.http = http ?? (async (url) => {
-      const res = await fetch(url);
-      return res.json();
-    });
+    this.http =
+      http ??
+      (async (url) => {
+        const res = await fetch(url);
+        return res.json();
+      });
   }
 
   async fetch(req: WeatherRequest): Promise<WeatherResponse> {
@@ -216,7 +229,7 @@ export class WeatherClient {
     }
 
     const url = `${OPEN_METEO_BASE}?${params.toString()}`;
-    const raw = await this.http(url) as OpenMeteoResponse;
+    const raw = (await this.http(url)) as OpenMeteoResponse;
     return this._parse(raw, unit);
   }
 
@@ -281,7 +294,10 @@ export class WeatherFeed {
   }
 
   /** Fetch weather, using cache when fresh. */
-  async fetch(req: WeatherRequest, forceRefresh = false): Promise<{ response: WeatherResponse; cached: boolean }> {
+  async fetch(
+    req: WeatherRequest,
+    forceRefresh = false,
+  ): Promise<{ response: WeatherResponse; cached: boolean }> {
     if (!forceRefresh) {
       const cached = this.cache.get(req);
       if (cached) return { response: cached, cached: true };
@@ -293,9 +309,13 @@ export class WeatherFeed {
   }
 
   /** Bulk fetch for multiple locations (parallel). */
-  async fetchAll(requests: WeatherRequest[]): Promise<Array<{ response: WeatherResponse; cached: boolean }>> {
+  async fetchAll(
+    requests: WeatherRequest[],
+  ): Promise<{ response: WeatherResponse; cached: boolean }[]> {
     return Promise.all(requests.map((r) => this.fetch(r)));
   }
 
-  getCache(): WeatherCache { return this.cache; }
+  getCache(): WeatherCache {
+    return this.cache;
+  }
 }

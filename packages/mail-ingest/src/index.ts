@@ -86,7 +86,8 @@ const HEADER_LINE_RE = /^([A-Za-z-]+):\s*(.+)$/;
 const BOUNDARY_RE = /boundary="?([^";]+)"?/i;
 const MIME_PART_RE = /Content-Type:\s*([^;\r\n]+)/i;
 const MIME_ENCODING_RE = /Content-Transfer-Encoding:\s*(\S+)/i;
-const MIME_DISP_RE = /Content-Disposition:\s*(?:attachment|inline)[^;]*;\s*filename="?([^";\r\n]+)"?/i;
+const MIME_DISP_RE =
+  /Content-Disposition:\s*(?:attachment|inline)[^;]*;\s*filename="?([^";\r\n]+)"?/i;
 const ADDR_RE = /"?[^"<]+"?\s*<([^>]+)>|^([^\s,]+@[^\s,]+)/;
 
 function extractAddress(raw: string): string {
@@ -102,6 +103,7 @@ function extractAddresses(raw: string): string[] {
  * Parse a raw RFC 2822 / MIME email into structured form.
  * Handles simple single-part and basic MIME multipart messages.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function parseEmail(raw: string, uid?: number): ParsedEmail {
   const lines = raw.replace(/\r\n/g, "\n").split("\n");
   const headers: Record<string, string> = {};
@@ -145,12 +147,17 @@ export function parseEmail(raw: string, uid?: number): ParsedEmail {
       }
       j++;
       const partBody = partLines.slice(j).join("\n").trim();
-      const partType = (MIME_PART_RE.exec(partHeaders["content-type"] ?? "")?.[1] ?? "text/plain").trim();
+      const partType = (
+        MIME_PART_RE.exec(partHeaders["content-type"] ?? "")?.[1] ?? "text/plain"
+      ).trim();
       const encoding = MIME_ENCODING_RE.exec(part)?.[1]?.toLowerCase() ?? "7bit";
       const filename = MIME_DISP_RE.exec(part)?.[1]?.trim();
 
       if (filename) {
-        const data = encoding === "base64" ? partBody.replace(/\s/g, "") : Buffer.from(partBody).toString("base64");
+        const data =
+          encoding === "base64"
+            ? partBody.replace(/\s/g, "")
+            : Buffer.from(partBody).toString("base64");
         attachments.push({ filename, mimeType: partType, data, size: data.length });
       } else if (partType.startsWith("text/html")) {
         bodyHtml = partBody;
@@ -217,7 +224,11 @@ export function toWorkflowDoc(email: ParsedEmail): WorkflowDoc {
       date: email.date.toISOString(),
       messageId: email.messageId,
       attachmentCount: email.attachments.length,
-      attachments: email.attachments.map((a) => ({ filename: a.filename, mimeType: a.mimeType, size: a.size })),
+      attachments: email.attachments.map((a) => ({
+        filename: a.filename,
+        mimeType: a.mimeType,
+        size: a.size,
+      })),
       source: "mail-ingest",
     },
     createdAt: email.date.getTime(),
@@ -253,7 +264,11 @@ export class MailIngestor {
     this.handler = config.handler;
     this.mailbox = config.mailbox ?? "INBOX";
     this.pollIntervalMs = config.pollIntervalMs ?? 60_000;
-    this.onError = config.onError ?? ((e) => { console.error("[mail-ingest]", e.message); });
+    this.onError =
+      config.onError ??
+      ((e) => {
+        console.error("[mail-ingest]", e.message);
+      });
     this.now = config.now ?? Date.now;
   }
 

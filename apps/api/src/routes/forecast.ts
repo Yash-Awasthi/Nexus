@@ -29,11 +29,9 @@ import { requireAuth } from "../middleware/auth.js";
 
 // ── Singleton ForecastService ─────────────────────────────────────────────────
 
-const gateway = process.env.OWM_API_KEY
-  ? createProductionGateway()
-  : createDefaultGateway();
+const gateway = process.env.OWM_API_KEY ? createProductionGateway() : createDefaultGateway();
 
-const cache   = new ForecastCache(60 * 60 * 1000); // 60 min TTL
+const cache = new ForecastCache(60 * 60 * 1000); // 60 min TTL
 const service = new ForecastService({ gateway, cache });
 
 // ── Durable history (pg) — in-memory Map is warm L1 cache ────────────────────
@@ -84,10 +82,11 @@ async function persistAndRecord(domain: ForecastDomain, result: ForecastResult):
   // fire-and-forget — never blocks the response
   ensureSchema(pool)
     .then(() =>
-      pool.query(
-        `INSERT INTO forecast_runs (domain, horizon, result) VALUES ($1, $2, $3)`,
-        [domain, result.horizon, JSON.stringify(result)],
-      ),
+      pool.query(`INSERT INTO forecast_runs (domain, horizon, result) VALUES ($1, $2, $3)`, [
+        domain,
+        result.horizon,
+        JSON.stringify(result),
+      ]),
     )
     .catch((e: Error) => console.warn("[forecast] DB persist failed:", e.message));
 }
@@ -158,10 +157,10 @@ export async function forecastRoutes(app: FastifyInstance): Promise<void> {
     return reply.send({
       domain,
       horizon,
-      requestId:   response.requestId,
-      cached:      response.requestId === "cached",
-      durationMs:  response.durationMs,
-      result:      response.result,
+      requestId: response.requestId,
+      cached: response.requestId === "cached",
+      durationMs: response.durationMs,
+      result: response.result,
     });
   });
 

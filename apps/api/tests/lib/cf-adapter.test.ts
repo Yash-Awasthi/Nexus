@@ -16,14 +16,18 @@ function makeMockNamespace(): CFKVNamespaceLike & { _store: Map<string, string> 
   const _store = new Map<string, string>();
   return {
     _store,
-    async get(key: string) { return _store.get(key) ?? null; },
-    async put(key: string, value: string) { _store.set(key, value); },
-    async delete(key: string) { _store.delete(key); },
+    async get(key: string) {
+      return _store.get(key) ?? null;
+    },
+    async put(key: string, value: string) {
+      _store.set(key, value);
+    },
+    async delete(key: string) {
+      _store.delete(key);
+    },
     async list(opts?: { prefix?: string; limit?: number }) {
       const prefix = opts?.prefix ?? "";
-      const keys = [..._store.keys()]
-        .filter((k) => k.startsWith(prefix))
-        .map((name) => ({ name }));
+      const keys = [..._store.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name }));
       return { keys };
     },
   };
@@ -34,7 +38,7 @@ describe("CloudflareKVStore", () => {
   let store: CloudflareKVStore;
 
   beforeEach(() => {
-    ns    = makeMockNamespace();
+    ns = makeMockNamespace();
     store = new CloudflareKVStore(ns);
   });
 
@@ -82,7 +86,10 @@ describe("CloudflareKVStore", () => {
 
   it("getOrSet caches factory result", async () => {
     let calls = 0;
-    const factory = async () => { calls++; return "computed"; };
+    const factory = async () => {
+      calls++;
+      return "computed";
+    };
     const v1 = await store.getOrSet("ck", factory);
     const v2 = await store.getOrSet("ck", factory);
     expect(v1).toBe("computed");
@@ -106,10 +113,13 @@ describe("CloudflareKVStore", () => {
   });
 
   it("set with ttlMs rounds up to 60s minimum", async () => {
-    const putCalls: Array<[string, string, unknown]> = [];
+    const putCalls: [string, string, unknown][] = [];
     const trackingNs: CFKVNamespaceLike = {
       ...ns,
-      put: async (k, v, opts) => { putCalls.push([k, v, opts]); ns._store.set(k, v); },
+      put: async (k, v, opts) => {
+        putCalls.push([k, v, opts]);
+        ns._store.set(k, v);
+      },
     };
     const s = new CloudflareKVStore(trackingNs);
     await s.set("t", "v", 1000); // 1 s < 60 s → rounds to 60
@@ -119,7 +129,9 @@ describe("CloudflareKVStore", () => {
 });
 
 describe("registerCFContext / getSharedKVFromCF", () => {
-  beforeEach(() => { _resetCFContext(); });
+  beforeEach(() => {
+    _resetCFContext();
+  });
 
   it("returns undefined before registration", () => {
     expect(getSharedKVFromCF()).toBeUndefined();

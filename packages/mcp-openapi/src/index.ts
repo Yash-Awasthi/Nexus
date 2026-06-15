@@ -63,7 +63,14 @@ export interface OpenApiServer {
 }
 
 /** Json schema type type alias. */
-export type JsonSchemaType = "string" | "number" | "integer" | "boolean" | "array" | "object" | "null";
+export type JsonSchemaType =
+  | "string"
+  | "number"
+  | "integer"
+  | "boolean"
+  | "array"
+  | "object"
+  | "null";
 
 /** Open api schema interface definition. */
 export interface OpenApiSchema {
@@ -128,7 +135,7 @@ export interface OpenApiSpec {
     schemas?: Record<string, OpenApiSchema>;
     securitySchemes?: Record<string, unknown>;
   };
-  tags?: Array<{ name: string; description?: string }>;
+  tags?: { name: string; description?: string }[];
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -172,12 +179,7 @@ export function mcpSchemaToOpenApi(schema: McpInputSchema): OpenApiSchema {
 
   // Forward any other JSON Schema keywords
   for (const [key, val] of Object.entries(schema)) {
-    if (
-      key !== "type" &&
-      key !== "description" &&
-      key !== "required" &&
-      key !== "properties"
-    ) {
+    if (key !== "type" && key !== "description" && key !== "required" && key !== "properties") {
       result[key] = val;
     }
   }

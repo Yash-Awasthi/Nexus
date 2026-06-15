@@ -50,7 +50,9 @@ export interface ConflictResolution {
 // ── ID util ───────────────────────────────────────────────────────────────────
 
 let _seq = 0;
-function uid(prefix: string) { return `${prefix}-${Date.now()}-${++_seq}`; }
+function uid(prefix: string) {
+  return `${prefix}-${Date.now()}-${++_seq}`;
+}
 
 // ── VectorClock ───────────────────────────────────────────────────────────────
 
@@ -123,10 +125,7 @@ export class ConflictResolver {
     this.customFn = customFn;
   }
 
-  resolve(
-    local: SyncSession,
-    remote: SyncSession,
-  ): ConflictResolution {
+  resolve(local: SyncSession, remote: SyncSession): ConflictResolution {
     if (this.strategy === "last-write-wins") {
       const localTime = new Date(local.updatedAt).getTime();
       const remoteTime = new Date(remote.updatedAt).getTime();
@@ -154,7 +153,11 @@ export class SyncStore {
   private sessions = new Map<string, SyncSession>();
   private ops: SyncOperation[] = [];
 
-  createSession(userId: string, deviceId: string, initialData: Record<string, unknown> = {}): SyncSession {
+  createSession(
+    userId: string,
+    deviceId: string,
+    initialData: Record<string, unknown> = {},
+  ): SyncSession {
     const session: SyncSession = {
       id: uid("sess"),
       userId,
@@ -185,7 +188,10 @@ export class SyncStore {
     } else if (op.type === "delete") {
       delete updated.data[op.key];
     } else if (op.type === "merge" && typeof op.value === "object" && op.value !== null) {
-      updated.data[op.key] = { ...(updated.data[op.key] as object ?? {}), ...(op.value as object) };
+      updated.data[op.key] = {
+        ...((updated.data[op.key] as object) ?? {}),
+        ...(op.value as object),
+      };
     }
 
     updated.vectorClock = { ...updated.vectorClock };
@@ -204,9 +210,7 @@ export class SyncStore {
 
   /** Get all operations for a session after a given logical time. */
   getOpsSince(sessionId: string, sinceLogicalTime: number): SyncOperation[] {
-    return this.ops.filter(
-      (op) => op.sessionId === sessionId && op.logicalTime > sinceLogicalTime,
-    );
+    return this.ops.filter((op) => op.sessionId === sessionId && op.logicalTime > sinceLogicalTime);
   }
 
   list(userId?: string): SyncSession[] {
@@ -218,7 +222,9 @@ export class SyncStore {
     return this.sessions.delete(sessionId);
   }
 
-  count(): number { return this.sessions.size; }
+  count(): number {
+    return this.sessions.size;
+  }
 }
 
 // ── SyncManager ───────────────────────────────────────────────────────────────
@@ -250,11 +256,15 @@ export class SyncManager {
     this.clock = new VectorClock();
   }
 
-  getStore(): SyncStore { return this.store; }
-  getClock(): VectorClock { return this.clock; }
+  getStore(): SyncStore {
+    return this.store;
+  }
+  getClock(): VectorClock {
+    return this.clock;
+  }
 
   /** Push a batch of operations from this device. */
-  push(sessionId: string, ops: Array<{ type: OpType; key: string; value?: unknown }>): PushResult {
+  push(sessionId: string, ops: { type: OpType; key: string; value?: unknown }[]): PushResult {
     let opsApplied = 0;
     let session: SyncSession | undefined;
 
@@ -380,7 +390,9 @@ export class DrizzleSyncStore extends SyncStore {
     if (result) {
       // Fire-and-forget persistence — errors are logged but don't fail the operation
       void this.persistOp(op, result.vectorClock).catch((err) => {
-        console.warn(JSON.stringify({ level: "warn", event: "sync-store.persist-failed", error: String(err) }));
+        console.warn(
+          JSON.stringify({ level: "warn", event: "sync-store.persist-failed", error: String(err) }),
+        );
       });
     }
     return result;

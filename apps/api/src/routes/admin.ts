@@ -16,8 +16,9 @@
 import { GatewayAdminService } from "@nexus/admin-gateway";
 import type { FastifyInstance } from "fastify";
 
-import { DRIVER_ALIASES, gatewayLog } from "./gateway.js";
 import { requireAuth } from "../middleware/auth.js";
+
+import { DRIVER_ALIASES, gatewayLog } from "./gateway.js";
 
 // ── Singleton admin service ───────────────────────────────────────────────────
 
@@ -67,8 +68,8 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
           type: "object",
           required: ["alias", "model", "provider"],
           properties: {
-            alias:    { type: "string", minLength: 1, maxLength: 100 },
-            model:    { type: "string", minLength: 1, maxLength: 200 },
+            alias: { type: "string", minLength: 1, maxLength: 100 },
+            model: { type: "string", minLength: 1, maxLength: 200 },
             provider: { type: "string", minLength: 1, maxLength: 100 },
           },
         },
@@ -77,7 +78,13 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       try {
         adminService.addRoute(request.body.alias, request.body.model, request.body.provider);
-        return reply.code(201).send({ alias: request.body.alias, model: request.body.model, provider: request.body.provider });
+        return reply
+          .code(201)
+          .send({
+            alias: request.body.alias,
+            model: request.body.model,
+            provider: request.body.provider,
+          });
       } catch (err: unknown) {
         const e = err as { code?: string; message?: string };
         return reply.code(400).send({ error: e.code, message: e.message });
@@ -88,7 +95,12 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   /** DELETE /admin/routes/:alias */
   app.delete<{ Params: { alias: string } }>(
     "/admin/routes/:alias",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       adminService.removeRoute(decodeURIComponent(request.params.alias));
       return reply.code(204).send();
@@ -124,7 +136,12 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   /** DELETE /admin/routes/:alias/override */
   app.delete<{ Params: { alias: string } }>(
     "/admin/routes/:alias/override",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       adminService.removeOverride(decodeURIComponent(request.params.alias));
       return reply.code(204).send();
@@ -134,7 +151,15 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   /** GET /admin/stats */
   app.get<{ Querystring: { alias?: string } }>(
     "/admin/stats",
-    { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const stats = adminService.getStats(
         request.query.alias ? decodeURIComponent(request.query.alias) : undefined,
@@ -155,22 +180,35 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         body: {
           type: "object",
           properties: {
-            tokens:    { type: "number", minimum: 0 },
+            tokens: { type: "number", minimum: 0 },
             latencyMs: { type: "number", minimum: 0 },
-            error:     { type: "boolean" },
+            error: { type: "boolean" },
           },
         },
       },
     },
     async (request, reply) => {
-    adminService.recordRequest(decodeURIComponent(request.params.alias), request.body);
-    return reply.code(204).send();
-  });
+      adminService.recordRequest(decodeURIComponent(request.params.alias), request.body);
+      return reply.code(204).send();
+    },
+  );
 
   /** GET /admin/settings */
-  app.get("/admin/settings", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_req, reply) => {
-    return reply.send({ settings: adminSettings });
-  });
+  app.get(
+    "/admin/settings",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_req, reply) => {
+      return reply.send({ settings: adminSettings });
+    },
+  );
 
   /**
    * GET /admin/traces?provider=&model=&status=&limit=&since=&before=
@@ -181,11 +219,11 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   app.get<{
     Querystring: {
       provider?: string;
-      model?:    string;
-      status?:   "success" | "error" | "cached";
-      limit?:    string;
-      since?:    string;
-      before?:   string;
+      model?: string;
+      status?: "success" | "error" | "cached";
+      limit?: string;
+      since?: string;
+      before?: string;
       identity?: string;
     };
   }>("/admin/traces", { preHandler: requireAuth }, async (request, reply) => {
@@ -195,18 +233,30 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       model,
       status,
       identity,
-      limit:  limit  ? Math.min(parseInt(limit,  10), 1000) : 100,
-      since:  since  ? parseInt(since,  10) : undefined,
+      limit: limit ? Math.min(parseInt(limit, 10), 1000) : 100,
+      since: since ? parseInt(since, 10) : undefined,
       before: before ? parseInt(before, 10) : undefined,
     });
     return reply.send({ entries, total: entries.length });
   });
 
   /** GET /admin/traces/stats — aggregate stats for the logged requests */
-  app.get("/admin/traces/stats", { schema: { response: { 200: { type: "object", additionalProperties: true }, 201: { type: "object", additionalProperties: true } } }, preHandler: requireAuth }, async (_request, reply) => {
-    const [stats, count] = await Promise.all([gatewayLog.stats(), gatewayLog.count()]);
-    return reply.send({ ...stats, total: count });
-  });
+  app.get(
+    "/admin/traces/stats",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_request, reply) => {
+      const [stats, count] = await Promise.all([gatewayLog.stats(), gatewayLog.count()]);
+      return reply.send({ ...stats, total: count });
+    },
+  );
 
   /** DELETE /admin/traces — flush the circular buffer */
   app.delete("/admin/traces", { preHandler: requireAuth }, async (_request, reply) => {
@@ -224,12 +274,15 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
           type: "object",
           additionalProperties: false,
           properties: {
-            tracing:      { type: "boolean" },
-            logLevel:     { type: "string", enum: ["trace", "debug", "info", "warn", "error", "fatal"] },
+            tracing: { type: "boolean" },
+            logLevel: {
+              type: "string",
+              enum: ["trace", "debug", "info", "warn", "error", "fatal"],
+            },
             rateLimitRpm: { type: "number", minimum: 1, maximum: 10_000 },
-            maxTokens:    { type: "number", minimum: 256, maximum: 200_000 },
+            maxTokens: { type: "number", minimum: 256, maximum: 200_000 },
             defaultModel: { type: "string", minLength: 1, maxLength: 200 },
-            corsOrigins:  { type: "array", items: { type: "string" }, maxItems: 50 },
+            corsOrigins: { type: "array", items: { type: "string" }, maxItems: 50 },
           },
         },
       },

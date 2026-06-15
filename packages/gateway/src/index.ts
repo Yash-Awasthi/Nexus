@@ -246,10 +246,7 @@ function mapStopReason(reason: string | null): AnthropicResponse["stop_reason"] 
 }
 
 /** OpenAI chat/completions response → Anthropic Messages response */
-export function toAnthropicResponse(
-  oaiRes: OAIResponse,
-  originalModel: string,
-): AnthropicResponse {
+export function toAnthropicResponse(oaiRes: OAIResponse, originalModel: string): AnthropicResponse {
   const choice = oaiRes.choices[0];
   const text = choice?.message.content ?? "";
 

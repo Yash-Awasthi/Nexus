@@ -86,7 +86,9 @@ export class MessageTree {
     return this.rootId ? this.nodes.get(this.rootId) : undefined;
   }
 
-  get size(): number { return this.nodes.size; }
+  get size(): number {
+    return this.nodes.size;
+  }
 
   /** Update the state of a node. */
   setState(id: string, state: MessageState): void {
@@ -107,12 +109,16 @@ export class MessageTree {
   }
 
   /** Fork: create a new tree from the given node (inclusive of its ancestors). */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   fork(fromNodeId: string, newRootRole: NodeRole = "system"): MessageTree {
     const path = this.pathTo(fromNodeId);
     const newTree = new MessageTree();
     let prevId: string | null = null;
     for (const n of path) {
-      const added = newTree.add({ role: n.role, content: n.content, model: n.model, metadata: n.metadata }, prevId);
+      const added = newTree.add(
+        { role: n.role, content: n.content, model: n.model, metadata: n.metadata },
+        prevId,
+      );
       prevId = added.id;
     }
     return newTree;

@@ -15,9 +15,10 @@
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";
+
 import { authenticate, AuthError } from "@nexus/auth";
-import type { FastifyRequest, FastifyReply } from "fastify";
 import type { Tier } from "@nexus/tier-gate";
+import type { FastifyRequest, FastifyReply } from "fastify";
 
 // ── HS256 JWT verifier (no npm dep — Node 22 crypto) ──────────────────────────
 
@@ -32,20 +33,26 @@ function _verifyHs256(token: string, secret: string): JwtPayload | null {
   const parts = token.split(".");
   if (parts.length !== 3) return null;
   const [h, p, s] = parts as [string, string, string];
-  const expected  = createHmac("sha256", secret).update(`${h}.${p}`).digest();
+  const expected = createHmac("sha256", secret).update(`${h}.${p}`).digest();
   let sig: Buffer;
-  try { sig = Buffer.from(s, "base64url"); } catch { return null; }
+  try {
+    sig = Buffer.from(s, "base64url");
+  } catch {
+    return null;
+  }
   if (expected.length !== sig.length || !timingSafeEqual(expected, sig)) return null;
   try {
     const payload = JSON.parse(Buffer.from(p, "base64url").toString()) as JwtPayload;
     if (payload.exp !== undefined && payload.exp < Math.floor(Date.now() / 1000)) return null;
     return payload;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 const _VALID_TIERS = new Set<string>(["free", "pro", "enterprise"]);
 function _coerceTier(raw: unknown): Tier {
-  return (typeof raw === "string" && _VALID_TIERS.has(raw)) ? raw as Tier : "free";
+  return typeof raw === "string" && _VALID_TIERS.has(raw) ? (raw as Tier) : "free";
 }
 
 // ── In-process API-key tier cache (populated by requireAuthWithTier) ──────────
@@ -60,7 +67,7 @@ function _cacheTier(prefix: string, tier: Tier): void {
 
 declare module "fastify" {
   interface FastifyRequest {
-    nexusTier?:   Tier;
+    nexusTier?: Tier;
     nexusUserId?: string;
   }
 }
@@ -75,7 +82,7 @@ export function getTierFromRequest(request: FastifyRequest): Tier {
   if (request.nexusTier) return request.nexusTier;
   const auth = request.headers.authorization;
   if (!auth?.startsWith("Bearer ")) return "free";
-  const token  = auth.slice(7);
+  const token = auth.slice(7);
   const secret = process.env.NEXUS_JWT_SECRET;
   if (secret) {
     const payload = _verifyHs256(token, secret);
@@ -87,7 +94,7 @@ export function getTierFromRequest(request: FastifyRequest): Tier {
 /** Bearer token validation (constant-time). Dev bypass when NEXUS_API_KEY unset. */
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const authConfig = {
-    apiKey:   process.env.NEXUS_API_KEY || undefined,
+    apiKey: process.env.NEXUS_API_KEY || undefined,
     disabled: !process.env.NEXUS_API_KEY,
   };
   try {
@@ -111,23 +118,26 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
  */
 export async function requireAuthWithTier(
   request: FastifyRequest,
-  reply:   FastifyReply,
+  reply: FastifyReply,
 ): Promise<void> {
   await requireAuth(request, reply);
   if (reply.sent) return;
 
   const auth = request.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) { request.nexusTier = "free"; return; }
+  if (!auth?.startsWith("Bearer ")) {
+    request.nexusTier = "free";
+    return;
+  }
 
-  const token       = auth.slice(7);
+  const token = auth.slice(7);
   const tokenPrefix = token.slice(0, 40);
-  const jwtSecret   = process.env.NEXUS_JWT_SECRET;
+  const jwtSecret = process.env.NEXUS_JWT_SECRET;
 
   // JWT path (no DB round-trip)
   if (jwtSecret) {
     const payload = _verifyHs256(token, jwtSecret);
     if (payload) {
-      request.nexusTier   = _coerceTier(payload.tier);
+      request.nexusTier = _coerceTier(payload.tier);
       request.nexusUserId = typeof payload.sub === "string" ? payload.sub : undefined;
       _cacheTier(tokenPrefix, request.nexusTier);
       return;
@@ -150,12 +160,14 @@ export async function requireAuthWithTier(
       await pool.end();
       if (rows.length > 0) {
         const row = rows[0]!;
-        request.nexusTier   = _coerceTier(row.tier);
+        request.nexusTier = _coerceTier(row.tier);
         request.nexusUserId = row.user_id;
         _cacheTier(tokenPrefix, request.nexusTier);
         return;
       }
-    } catch { /* DB unreachable — fall through to default */ }
+    } catch {
+      /* DB unreachable — fall through to default */
+    }
   }
 
   request.nexusTier = "free";

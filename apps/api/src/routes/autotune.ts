@@ -25,9 +25,9 @@ import {
   type EmaStore,
   type LearnedDelta,
 } from "@nexus/autotune";
+import type { FastifyInstance } from "fastify";
 import pg from "pg";
 import type { Pool as PgPool } from "pg";
-import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
 
@@ -68,11 +68,11 @@ class PgEmaStore implements EmaStore {
       if (rows.length === 0) return undefined;
       const r = rows[0] as Record<string, number>;
       return {
-        temperature:       r["temperature"] ?? 0,
-        top_p:             r["top_p"] ?? 0,
+        temperature: r["temperature"] ?? 0,
+        top_p: r["top_p"] ?? 0,
         frequency_penalty: r["frequency_penalty"] ?? 0,
-        presence_penalty:  r["presence_penalty"] ?? 0,
-        samples:           r["samples"] ?? 0,
+        presence_penalty: r["presence_penalty"] ?? 0,
+        samples: r["samples"] ?? 0,
       };
     } catch {
       return undefined;
@@ -92,7 +92,14 @@ class PgEmaStore implements EmaStore {
            presence_penalty = EXCLUDED.presence_penalty,
            samples = EXCLUDED.samples,
            updated_at = now()`,
-        [context, delta.temperature, delta.top_p, delta.frequency_penalty, delta.presence_penalty, delta.samples],
+        [
+          context,
+          delta.temperature,
+          delta.top_p,
+          delta.frequency_penalty,
+          delta.presence_penalty,
+          delta.samples,
+        ],
       );
     } catch {
       // silently ignore — EMA is best-effort
@@ -128,7 +135,7 @@ export async function autotuneRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
     Body: {
       message: string;
-      history?: Array<{ role: string; content: string }>;
+      history?: { role: string; content: string }[];
       overrides?: Record<string, number>;
     };
   }>("/autotune/compute", { preHandler: requireAuth }, async (request, reply) => {
@@ -148,13 +155,13 @@ export async function autotuneRoutes(app: FastifyInstance): Promise<void> {
     });
 
     return reply.send({
-      params:          result.params,
+      params: result.params,
       detectedContext: result.detectedContext,
-      contextLabel:    CONTEXT_LABELS[result.detectedContext],
-      confidence:      result.confidence,
-      reasoning:       result.reasoning,
-      contextScores:   result.contextScores,
-      emaSamples:      learnedDelta?.samples ?? 0,
+      contextLabel: CONTEXT_LABELS[result.detectedContext],
+      confidence: result.confidence,
+      reasoning: result.reasoning,
+      contextScores: result.contextScores,
+      emaSamples: learnedDelta?.samples ?? 0,
     });
   });
 
@@ -196,7 +203,7 @@ export async function autotuneRoutes(app: FastifyInstance): Promise<void> {
       context,
       contextLabel: CONTEXT_LABELS[context],
       rating,
-      emaDelta:     updated,
+      emaDelta: updated,
     });
   });
 
@@ -215,9 +222,9 @@ export async function autotuneRoutes(app: FastifyInstance): Promise<void> {
     const result = detectContext(message, []);
     return reply.send({
       detectedContext: result.type,
-      contextLabel:    CONTEXT_LABELS[result.type],
-      confidence:      result.confidence,
-      scores:          result.scores,
+      contextLabel: CONTEXT_LABELS[result.type],
+      confidence: result.confidence,
+      scores: result.scores,
     });
   });
 }

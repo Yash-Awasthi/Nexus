@@ -25,9 +25,20 @@ import { requireAuth } from "../middleware/auth.js";
 
 // ── Built-in scorer registry ──────────────────────────────────────────────────
 
-type ScorerName = "exact_match" | "fields_present" | "contains_string" | "matches_schema" | "all_of";
+type ScorerName =
+  | "exact_match"
+  | "fields_present"
+  | "contains_string"
+  | "matches_schema"
+  | "all_of";
 
-const SCORERS: ScorerName[] = ["exact_match", "fields_present", "contains_string", "matches_schema", "all_of"];
+const SCORERS: ScorerName[] = [
+  "exact_match",
+  "fields_present",
+  "contains_string",
+  "matches_schema",
+  "all_of",
+];
 
 // ── Route plugin ──────────────────────────────────────────────────────────────
 
@@ -40,11 +51,31 @@ export async function evalsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/evals/scorers", { preHandler: requireAuth }, async (_request, reply) => {
     return reply.send({
       scorers: [
-        { name: "exact_match",      params: ["expected"],                             description: "Deep equality between output and expected" },
-        { name: "fields_present",   params: ["fields: string[]"],                    description: "Required keys present and non-null in output" },
-        { name: "contains_string",  params: ["substring"],                           description: "Substring found in JSON-serialized output" },
-        { name: "matches_schema",   params: ["schema: Record<string, FieldSchema>"], description: "Output fields match declared types" },
-        { name: "all_of",           params: ["scorers: ScorerSpec[]"],               description: "Compose multiple scorers (all must pass)" },
+        {
+          name: "exact_match",
+          params: ["expected"],
+          description: "Deep equality between output and expected",
+        },
+        {
+          name: "fields_present",
+          params: ["fields: string[]"],
+          description: "Required keys present and non-null in output",
+        },
+        {
+          name: "contains_string",
+          params: ["substring"],
+          description: "Substring found in JSON-serialized output",
+        },
+        {
+          name: "matches_schema",
+          params: ["schema: Record<string, FieldSchema>"],
+          description: "Output fields match declared types",
+        },
+        {
+          name: "all_of",
+          params: ["scorers: ScorerSpec[]"],
+          description: "Compose multiple scorers (all must pass)",
+        },
       ],
     });
   });
@@ -67,8 +98,8 @@ export async function evalsRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{
     Body: {
-      output:  unknown;
-      scorer:  ScorerName;
+      output: unknown;
+      scorer: ScorerName;
       params?: Record<string, unknown>;
     };
   }>("/evals/score", { preHandler: requireAuth }, async (request, reply) => {
@@ -76,7 +107,9 @@ export async function evalsRoutes(app: FastifyInstance): Promise<void> {
 
     if (!scorer) return reply.code(400).send({ error: "scorer is required" });
     if (!(SCORERS as string[]).includes(scorer)) {
-      return reply.code(400).send({ error: `Unknown scorer: ${scorer}. Available: ${SCORERS.join(", ")}` });
+      return reply
+        .code(400)
+        .send({ error: `Unknown scorer: ${scorer}. Available: ${SCORERS.join(", ")}` });
     }
 
     let result: EvalScore;
@@ -89,7 +122,8 @@ export async function evalsRoutes(app: FastifyInstance): Promise<void> {
 
         case "fields_present": {
           const fields = params["fields"] as string[] | undefined;
-          if (!Array.isArray(fields)) return reply.code(400).send({ error: "params.fields must be a string[]" });
+          if (!Array.isArray(fields))
+            return reply.code(400).send({ error: "params.fields must be a string[]" });
           result = fieldsPresent(...fields)(output);
           break;
         }
@@ -110,16 +144,24 @@ export async function evalsRoutes(app: FastifyInstance): Promise<void> {
 
         case "all_of": {
           // all_of is a composition — accept a list of { scorer, params } objects
-          const specs = params["scorers"] as Array<{ scorer: ScorerName; params?: Record<string, unknown> }> | undefined;
-          if (!Array.isArray(specs)) return reply.code(400).send({ error: "params.scorers must be an array" });
+          const specs = params["scorers"] as
+            | { scorer: ScorerName; params?: Record<string, unknown> }[]
+            | undefined;
+          if (!Array.isArray(specs))
+            return reply.code(400).send({ error: "params.scorers must be an array" });
 
           const scorerFns = specs.map((s) => {
             switch (s.scorer) {
-              case "exact_match":     return exactMatch(s.params?.["expected"]);
-              case "fields_present":  return fieldsPresent(...(s.params?.["fields"] as string[] ?? []));
-              case "contains_string": return containsString(s.params?.["substring"] as string ?? "");
-              case "matches_schema":  return matchesSchema(s.params?.["schema"] as FieldSchema ?? {});
-              default:                return exactMatch(undefined);
+              case "exact_match":
+                return exactMatch(s.params?.["expected"]);
+              case "fields_present":
+                return fieldsPresent(...((s.params?.["fields"] as string[]) ?? []));
+              case "contains_string":
+                return containsString((s.params?.["substring"] as string) ?? "");
+              case "matches_schema":
+                return matchesSchema((s.params?.["schema"] as FieldSchema) ?? {});
+              default:
+                return exactMatch(undefined);
             }
           });
 

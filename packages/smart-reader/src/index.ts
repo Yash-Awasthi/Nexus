@@ -77,8 +77,8 @@ function makeChunks(
   content: string,
   chunkSize: number,
   overlap: number,
-): Array<{ start: number; end: number; text: string }> {
-  const chunks: Array<{ start: number; end: number; text: string }> = [];
+): { start: number; end: number; text: string }[] {
+  const chunks: { start: number; end: number; text: string }[] = [];
   let pos = 0;
   while (pos < content.length) {
     const end = Math.min(pos + chunkSize, content.length);
@@ -108,12 +108,7 @@ export function smartRead(
   opts: SmartReaderOptions = {},
 ): ReadResult {
   const t0 = Date.now();
-  const {
-    chunkSize = 1500,
-    overlap = 200,
-    topK = 5,
-    scoreThreshold = 0,
-  } = opts;
+  const { chunkSize = 1500, overlap = 200, topK = 5, scoreThreshold = 0 } = opts;
 
   const totalLines = content.split("\n").length;
   const queryTerms = buildQueryTermSet(query);
@@ -153,11 +148,7 @@ export function smartRead(
 /**
  * Retrieve a specific chunk by its line range (1-indexed, inclusive).
  */
-export function readLines(
-  content: string,
-  fromLine: number,
-  toLine: number,
-): string {
+export function readLines(content: string, fromLine: number, toLine: number): string {
   const lines = content.split("\n");
   const start = Math.max(0, fromLine - 1);
   const end = Math.min(lines.length, toLine);
@@ -167,11 +158,7 @@ export function readLines(
 /**
  * Estimate how many chunks a document will produce.
  */
-export function estimateChunks(
-  contentLength: number,
-  chunkSize = 1500,
-  overlap = 200,
-): number {
+export function estimateChunks(contentLength: number, chunkSize = 1500, overlap = 200): number {
   if (contentLength <= 0) return 0;
   if (contentLength <= chunkSize) return 1;
   const step = chunkSize - overlap;
