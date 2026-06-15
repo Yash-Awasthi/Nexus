@@ -7,10 +7,13 @@
  * POST /api/v1/domain-feeds/:domain     — push a new feed entry
  * DELETE /api/v1/domain-feeds/:domain/entries/:id — remove entry
  *
- * Real polling (activated by env vars):
- *   OPENWEATHER_API_KEY → polls OpenWeatherMap every 5 min → "weather" feed
- *   (no key needed)     → polls CoinGecko every 5 min      → "crypto" feed
- *   NEWS_API_KEY        → polls NewsAPI every 5 min         → "news" feed
+ * Feed polling is driven by BullMQ repeatable jobs in apps/worker (not setInterval
+ * here).  This eliminates N-pod duplication and the no-recovery-on-restart problem.
+ *
+ * Worker job: "feeds:refresh" → handleFeedsRefreshJob (async-handlers.ts)
+ *   { domains: ["weather"] }  every 5 min   — OPENWEATHER_API_KEY
+ *   { domains: ["crypto"]  }  every 1 min   — no key required (CoinGecko free)
+ *   { domains: ["news"]    }  every 10 min  — NEWS_API_KEY
  */
 
 import { randomUUID } from "crypto";
@@ -61,74 +64,12 @@ function pushEntry(domain: FeedDomain, payload: Record<string, unknown>, source:
   if (entries.length > 500) entries.splice(0, entries.length - 500);
 }
 
-// ── Real feed pollers ─────────────────────────────────────────────────────────
-
-const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
-
-async function pollWeather(): Promise<void> {
-  const key = process.env.OPENWEATHER_API_KEY;
-  if (!key) return;
-  const city = process.env.OPENWEATHER_CITY ?? "London";
-  try {
-    const resp = await fetch(
-      `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${key}&units=metric`,
-    );
-    if (!resp.ok) return;
-    const data = await resp.json() as Record<string, unknown>;
-    pushEntry("weather", data, "openweathermap");
-  } catch { /* best-effort */ }
-}
-
-async function pollCrypto(): Promise<void> {
-  try {
-    const resp = await fetch(
-      "https://api.coingecko.com/api/v3/simple/price" +
-      "?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true",
-    );
-    if (!resp.ok) return;
-    const data = await resp.json() as Record<string, unknown>;
-    pushEntry("crypto", data, "coingecko");
-  } catch { /* best-effort — CoinGecko has rate limits on free tier */ }
-}
-
-async function pollNews(): Promise<void> {
-  const key = process.env.NEWS_API_KEY;
-  if (!key) return;
-  try {
-    const resp = await fetch(
-      `https://newsapi.org/v2/top-headlines?language=en&pageSize=5&apiKey=${key}`,
-    );
-    if (!resp.ok) return;
-    const data = await resp.json() as { articles?: Array<Record<string, unknown>> };
-    for (const article of data.articles ?? []) {
-      pushEntry("news", article, "newsapi");
-    }
-  } catch { /* best-effort */ }
-}
-
-// Guard against multiple plugin registrations starting duplicate pollers
-let _pollersStarted = false;
-
-function startPollers(): void {
-  if (_pollersStarted) return;
-  _pollersStarted = true;
-
-  // Immediate first poll
-  void pollWeather();
-  void pollCrypto();
-  void pollNews();
-
-  // Recurring polls
-  setInterval(() => { void pollWeather(); }, POLL_INTERVAL_MS);
-  setInterval(() => { void pollCrypto(); }, POLL_INTERVAL_MS);
-  setInterval(() => { void pollNews(); }, POLL_INTERVAL_MS);
-}
-
 // ── Route plugin ──────────────────────────────────────────────────────────────
 
 export async function domainFeedsRoutes(app: FastifyInstance): Promise<void> {
-  // Start background pollers when the plugin registers
-  startPollers();
+  // Polling removed — driven by BullMQ repeatable jobs (bootstrapRepeatableJobs
+  // in apps/worker/src/index.ts).  POST /domain-feeds/:domain can still be used
+  // to push entries manually from the worker or external webhooks.
 
   /** GET /domain-feeds — list domains + entry counts */
   app.get("/domain-feeds", { preHandler: requireAuth }, async (_req, reply) => {
