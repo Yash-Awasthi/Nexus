@@ -29,6 +29,33 @@ import { globalHooks } from "@nexus/hooks";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
+import { getSharedKV } from "../lib/shared-kv.js";
+
+// ── Cross-pod alert fan-out via shared KVStore ────────────────────────────────
+// When the AlertEngine fires on pod A, it publishes an alert event to the KVStore.
+// All pods poll the "alert:events" list key on a 2-second interval and re-evaluate
+// locally so their AlertHistory stays consistent.
+// Production upgrade path: replace this with BullMQ when ioredis is available.
+
+const ALERT_FANOUT_KEY    = "alert:events";
+const ALERT_FANOUT_TTL_MS = 5 * 60_000; // 5-minute event window
+
+interface DistributedAlertEvent {
+  metric:    string;
+  value:     number;
+  ts:        number;
+  origin:    string;
+}
+
+const _podId = `${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+
+async function _publishAlertEvent(metric: string, value: number): Promise<void> {
+  try {
+    const kv  = getSharedKV();
+    const key = `${ALERT_FANOUT_KEY}:${Date.now()}:${_podId}`;
+    await kv.set<DistributedAlertEvent>(key, { metric, value, ts: Date.now(), origin: _podId }, ALERT_FANOUT_TTL_MS);
+  } catch { /* non-fatal */ }
+}
 
 // ── Singleton AlertEngine ─────────────────────────────────────────────────────
 
@@ -62,14 +89,16 @@ alertEngine.addRule(thresholdRule(
 
 // ── Hook-driven triggers ──────────────────────────────────────────────────────
 
-globalHooks.on("task.error", async (payload) => {
+globalHooks.on("task.error", async (_payload) => {
   await alertEngine.evaluate("task.errors", 1).catch(() => {});
+  await _publishAlertEvent("task.errors", 1);
 }, { label: "alerts:task.error" });
 
 globalHooks.on("task.after", async (payload) => {
   const durationMs = (payload as { durationMs?: number }).durationMs;
   if (durationMs !== undefined) {
     await alertEngine.evaluate("gateway.latency", durationMs).catch(() => {});
+    await _publishAlertEvent("gateway.latency", durationMs);
   }
 }, { label: "alerts:task.after" });
 

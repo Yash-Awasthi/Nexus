@@ -34,6 +34,48 @@ import {
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
+import { getSharedKV } from "../lib/shared-kv.js";
+
+// ── KV-backed session persistence (cross-pod safe) ───────────────────────────
+// AnalystSessionManager is in-process. To survive pod restarts and make sessions
+// accessible on any pod, we persist session history to the shared KVStore.
+// TTL: ANALYST_SESSION_TTL_MS (default 4 hours).
+
+const SESSION_TTL = parseInt(process.env.ANALYST_SESSION_TTL_MS ?? String(4 * 60 * 60_000), 10);
+const SESSION_KEY = (id: string): string => `analyst:session:${id}`;
+
+interface PersistedSession {
+  id:        string;
+  domain:    AnalystDomain;
+  history:   ContextMessage[];
+  createdAt: string;
+}
+
+async function persistSession(session: { id: string; domain: AnalystDomain; createdAt: string; getHistory(): ContextMessage[] }): Promise<void> {
+  try {
+    await getSharedKV().set<PersistedSession>(SESSION_KEY(session.id), {
+      id:        session.id,
+      domain:    session.domain,
+      history:   session.getHistory(),
+      createdAt: session.createdAt,
+    }, SESSION_TTL);
+  } catch { /* non-fatal — in-process state is authoritative */ }
+}
+
+async function loadSession(sessionId: string, manager: AnalystSessionManager): Promise<ReturnType<AnalystSessionManager["get"]> | undefined> {
+  // Return in-process session if already warm
+  const warm = manager.get(sessionId);
+  if (warm) return warm;
+  // Try to restore from KV (cross-pod scenario)
+  try {
+    const persisted = await getSharedKV().get<PersistedSession>(SESSION_KEY(sessionId));
+    if (!persisted) return undefined;
+    const session = manager.create(persisted.domain);
+    // Re-hydrate history by adding messages back
+    for (const msg of persisted.history) session.addMessage(msg.role, msg.content);
+    return session;
+  } catch { return undefined; }
+}
 
 // ── StreamingLlmFn implementation ─────────────────────────────────────────────
 // Priority: GroqDriver > OpenRouterDriver > stub echo.
@@ -148,15 +190,17 @@ export async function chatAnalystRoutes(app: FastifyInstance): Promise<void> {
     }, 15_000);
 
     try {
-      // Use named session if provided, otherwise create a fresh ephemeral one
+      // Use named session if provided (cross-pod KV restore), else create ephemeral
       const session = sessionId
-        ? (_sessions.get(sessionId) ?? _sessions.create(domain))
+        ? ((await loadSession(sessionId, _sessions)) ?? _sessions.create(domain))
         : _sessions.create(domain);
 
       for await (const event of session.ask(query.trim(), { domainData, geo })) {
         sseWrite(reply.raw, event as AnalystEvent);
         if (event.type === "stream_end" || event.type === "error") break;
       }
+      // Persist updated session history to shared KV (cross-pod durability)
+      await persistSession(session);
     } catch (err) {
       const errEvent: AnalystEvent = {
         type:      "error",
@@ -218,7 +262,8 @@ export async function chatAnalystRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: "query is required" });
       }
 
-      const session = _sessions.get(sessionId);
+      // KV restore: handles cross-pod session lookup
+      const session = await loadSession(sessionId, _sessions);
       if (!session) {
         return reply.code(404).send({ error: `Session "${sessionId}" not found` });
       }
@@ -239,6 +284,7 @@ export async function chatAnalystRoutes(app: FastifyInstance): Promise<void> {
           sseWrite(reply.raw, event as AnalystEvent);
           if (event.type === "stream_end" || event.type === "error") break;
         }
+        await persistSession(session);
       } catch (err) {
         sseWrite(reply.raw, {
           type:      "error",

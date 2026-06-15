@@ -43,7 +43,7 @@ import {
 } from "@nexus/context-pruner";
 import { ThinkTagParser } from "@nexus/think-parser";
 import { StreamRecoveryOrchestrator } from "@nexus/stream-recovery";
-import { MemoryGatewayLog } from "@nexus/gateway-log";
+import { KVGatewayLog } from "@nexus/gateway-log";
 import {
   UltraplinianRunner,
   type SpeedTier,
@@ -52,18 +52,20 @@ import {
 } from "@nexus/ultraplinian";
 import { ToolRegistry, createDefaultRegistry } from "@nexus/tool-registry";
 import { globalHooks } from "@nexus/hooks";
-import { MemoryTokenBudget, BudgetExceededError } from "@nexus/token-budget";
+import { KVTokenBudget, BudgetExceededError } from "@nexus/token-budget";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
+import { getSharedKV } from "../lib/shared-kv.js";
 
 // ── Token budget (RPM limiting per identity) ──────────────────────────────────
 // GATEWAY_RPM_LIMIT (default 60) requests per 60-second sliding window.
 // Identity = first 20 chars of Authorization token, or "anon".
-// 429 is returned when the budget is exceeded — never throws to the error handler.
+// KVTokenBudget: cross-pod safe when backed by Upstash/Redis (see shared-kv.ts).
+// Falls back to MemoryKVStore in dev — independent windows per pod, not global.
 
-const _RPM_LIMIT     = parseInt(process.env.GATEWAY_RPM_LIMIT ?? "60", 10);
-const _tokenBudget   = new MemoryTokenBudget({ limit: _RPM_LIMIT, windowMs: 60_000 });
+const _RPM_LIMIT   = parseInt(process.env.GATEWAY_RPM_LIMIT ?? "60", 10);
+const _tokenBudget = new KVTokenBudget(getSharedKV(), { limit: _RPM_LIMIT, windowMs: 60_000 });
 
 async function _budgetPreHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const identity = (request.headers.authorization as string | undefined)?.slice(7, 27) ?? "anon";
@@ -107,9 +109,13 @@ const _gatewayPruner = new PrunerChain([
   new SlidingWindowPruner({ tokenizer: new NaiveTokenizer() }),
 ]);
 
-// ── Gateway-log (circular buffer, 10 k entries) ───────────────────────────────
+// ── Gateway-log (KV-backed, cross-pod safe) ───────────────────────────────────
 // Exported so admin.ts can expose /admin/traces without coupling to server state.
-export const gatewayLog = new MemoryGatewayLog({ maxEntries: 10_000 });
+// KVGatewayLog: entries TTL 7 days (604_800_000 ms); cross-pod when shared KV is Redis.
+export const gatewayLog = new KVGatewayLog(getSharedKV(), {
+  keyPrefix:   "nexus",
+  entryTtlMs:  7 * 24 * 60 * 60 * 1000,
+});
 
 // ── Ultraplinian runner ────────────────────────────────────────────────────────
 // Activated when OPENROUTER_API_KEY is set; otherwise POST /gateway/race → 503.

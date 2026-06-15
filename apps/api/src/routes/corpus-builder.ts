@@ -25,7 +25,7 @@ import {
 } from "@nexus/hf-research";
 import type { FastifyInstance } from "fastify";
 
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuthWithTier, getTierFromRequest } from "../middleware/auth.js";
 
 // ── Singletons ────────────────────────────────────────────────────────────────
 
@@ -41,11 +41,10 @@ const router = new ResearchApiRouter({
   defaultRepoId: process.env.HF_REPO_ID ?? "nexus/research",
 });
 
-// Default caller tier — override with x-nexus-tier header
-function callerTier(req: { headers: Record<string, string | string[] | undefined> }): DataTier {
-  const header = req.headers["x-nexus-tier"];
-  const val = Array.isArray(header) ? header[0] : header;
-  if (val === "pro" || val === "enterprise") return val;
+// Tier comes from verified JWT/DB — never from a forgeable header
+function callerTier(req: Parameters<typeof getTierFromRequest>[0]): DataTier {
+  const t = getTierFromRequest(req);
+  if (t === "pro" || t === "enterprise") return t;
   return "free";
 }
 
@@ -55,7 +54,7 @@ export async function corpusBuilderRoutes(app: FastifyInstance): Promise<void> {
   /** GET /corpus/batches */
   app.get<{ Querystring: { limit?: string } }>(
     "/corpus/batches",
-    { preHandler: requireAuth },
+    { preHandler: requireAuthWithTier },
     async (request, reply) => {
       const result = router.listBatches({
         userTier: callerTier(request),
@@ -68,7 +67,7 @@ export async function corpusBuilderRoutes(app: FastifyInstance): Promise<void> {
   /** GET /corpus/batches/:id */
   app.get<{ Params: { id: string } }>(
     "/corpus/batches/:id",
-    { preHandler: requireAuth },
+    { preHandler: requireAuthWithTier },
     async (request, reply) => {
       const result = router.readBatch({
         userTier: callerTier(request),
@@ -81,7 +80,7 @@ export async function corpusBuilderRoutes(app: FastifyInstance): Promise<void> {
   /** GET /corpus/batches/:id/jsonl */
   app.get<{ Params: { id: string } }>(
     "/corpus/batches/:id/jsonl",
-    { preHandler: requireAuth },
+    { preHandler: requireAuthWithTier },
     async (request, reply) => {
       const result = router.downloadJsonl({
         userTier: callerTier(request),
@@ -105,7 +104,7 @@ export async function corpusBuilderRoutes(app: FastifyInstance): Promise<void> {
       sessionId?: string;
       metadata?: Record<string, unknown>;
     };
-  }>("/corpus/samples", { preHandler: requireAuth }, async (request, reply) => {
+  }>("/corpus/samples", { preHandler: requireAuthWithTier }, async (request, reply) => {
     const sample = batchStore.addSample({
       prompt: request.body.prompt,
       completion: request.body.completion,
@@ -127,7 +126,7 @@ export async function corpusBuilderRoutes(app: FastifyInstance): Promise<void> {
       model?: string;
       limit?: number;
     };
-  }>("/corpus/query", { preHandler: requireAuth }, async (request, reply) => {
+  }>("/corpus/query", { preHandler: requireAuthWithTier }, async (request, reply) => {
     const result = router.querySamples({
       userTier: callerTier(request),
       body: request.body,
@@ -138,7 +137,7 @@ export async function corpusBuilderRoutes(app: FastifyInstance): Promise<void> {
   /** POST /corpus/flush — flush pending + push to HF (enterprise+) */
   app.post<{ Body: { name?: string } }>(
     "/corpus/flush",
-    { preHandler: requireAuth },
+    { preHandler: requireAuthWithTier },
     async (request, reply) => {
       const result = await router.flushAndPush({
         userTier: callerTier(request),
@@ -149,7 +148,7 @@ export async function corpusBuilderRoutes(app: FastifyInstance): Promise<void> {
   );
 
   /** GET /corpus/pending */
-  app.get("/corpus/pending", { preHandler: requireAuth }, async (_req, reply) => {
+  app.get("/corpus/pending", { preHandler: requireAuthWithTier }, async (_req, reply) => {
     return reply.send({
       pending: batchStore.pendingCount(),
       publisher: process.env.HF_TOKEN ? "huggingface" : "mock",
