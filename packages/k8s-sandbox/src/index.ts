@@ -20,26 +20,31 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type Language = "python" | "r" | "julia";
+/** Job phase type alias. */
 export type JobPhase = "pending" | "running" | "succeeded" | "failed" | "unknown";
 
+/** Resource spec interface definition. */
 export interface ResourceSpec {
-  cpu?: string;    // e.g. "500m", "2"
+  cpu?: string; // e.g. "500m", "2"
   memory?: string; // e.g. "512Mi", "4Gi"
-  gpu?: number;    // number of GPU units
+  gpu?: number; // number of GPU units
 }
 
+/** Env var interface definition. */
 export interface EnvVar {
   name: string;
   value?: string;
   valueFrom?: { secretKeyRef?: { name: string; key: string } };
 }
 
+/** Volume mount interface definition. */
 export interface VolumeMount {
   name: string;
   mountPath: string;
   readOnly?: boolean;
 }
 
+/** Sandbox spec interface definition. */
 export interface SandboxSpec {
   /** Unique job name (DNS-safe). */
   name: string;
@@ -58,6 +63,7 @@ export interface SandboxSpec {
   annotations?: Record<string, string>;
 }
 
+/** K8s job manifest interface definition. */
 export interface K8sJobManifest {
   apiVersion: "batch/v1";
   kind: "Job";
@@ -74,7 +80,7 @@ export interface K8sJobManifest {
       metadata: { labels?: Record<string, string> };
       spec: {
         restartPolicy: "Never";
-        containers: Array<{
+        containers: {
           name: string;
           image: string;
           command: string[];
@@ -82,12 +88,13 @@ export interface K8sJobManifest {
           env?: EnvVar[];
           resources?: { requests?: ResourceSpec; limits?: ResourceSpec };
           volumeMounts?: VolumeMount[];
-        }>;
+        }[];
       };
     };
   };
 }
 
+/** Job status interface definition. */
 export interface JobStatus {
   name: string;
   namespace: string;
@@ -98,6 +105,7 @@ export interface JobStatus {
   exitCode?: number;
 }
 
+/** Execution result interface definition. */
 export interface ExecutionResult {
   jobName: string;
   namespace: string;
@@ -112,6 +120,7 @@ export interface ExecutionResult {
 
 // ── JobManifest builder ───────────────────────────────────────────────────────
 
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class JobManifest {
   static build(spec: SandboxSpec): K8sJobManifest {
     const namespace = spec.namespace ?? "default";
@@ -190,6 +199,7 @@ export interface MockJobBehavior {
   submitError?: string;
 }
 
+/** Mock kube client. */
 export class MockKubeClient implements KubeClient {
   private jobs = new Map<string, { status: JobStatus; ticks: number; behavior: MockJobBehavior }>();
   readonly submittedManifests: K8sJobManifest[] = [];
@@ -278,6 +288,7 @@ export interface WatchOptions {
   onStatus?: (status: JobStatus) => void;
 }
 
+/** Job watcher. */
 export class JobWatcher {
   private client: KubeClient;
   private sleep: (ms: number) => Promise<void>;
@@ -315,6 +326,7 @@ export interface StackPreset {
   extraEnv?: EnvVar[];
 }
 
+/** Stack presets. */
 export const STACK_PRESETS: Record<Language, StackPreset> = {
   python: {
     image: "nexus/scientific-python:3.12",
@@ -327,19 +339,17 @@ export const STACK_PRESETS: Record<Language, StackPreset> = {
   r: {
     image: "nexus/scientific-r:4.3",
     defaultCommand: ["Rscript", "-e"],
-    extraEnv: [
-      { name: "R_LIBS_USER", value: "/usr/local/lib/R/site-library" },
-    ],
+    extraEnv: [{ name: "R_LIBS_USER", value: "/usr/local/lib/R/site-library" }],
   },
   julia: {
     image: "nexus/scientific-julia:1.10",
     defaultCommand: ["julia", "-e"],
-    extraEnv: [
-      { name: "JULIA_NUM_THREADS", value: "auto" },
-    ],
+    extraEnv: [{ name: "JULIA_NUM_THREADS", value: "auto" }],
   },
 };
 
+/** Scientific stack. */
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class ScientificStack {
   /** Build a SandboxSpec for running a code snippet in the given language. */
   static buildSpec(
@@ -389,6 +399,7 @@ export interface ExecutorOptions {
   sleep?: (ms: number) => Promise<void>;
 }
 
+/** Sandbox executor. */
 export class SandboxExecutor {
   private client: KubeClient;
   private watcher: JobWatcher;
@@ -429,7 +440,9 @@ export class SandboxExecutor {
     }
 
     const startMs = finalStatus.startTime ? new Date(finalStatus.startTime).getTime() : undefined;
-    const endMs = finalStatus.completionTime ? new Date(finalStatus.completionTime).getTime() : undefined;
+    const endMs = finalStatus.completionTime
+      ? new Date(finalStatus.completionTime).getTime()
+      : undefined;
 
     return {
       jobName,

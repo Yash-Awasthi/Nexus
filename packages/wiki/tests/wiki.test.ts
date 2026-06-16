@@ -15,10 +15,17 @@ import {
 describe("WikiPageStore", () => {
   let store: WikiPageStore;
 
-  beforeEach(() => { store = new WikiPageStore(); });
+  beforeEach(() => {
+    store = new WikiPageStore();
+  });
 
   it("creates a page with auto-fields", () => {
-    const p = store.create({ slug: "getting-started", title: "Getting Started", content: "Welcome!", createdBy: "alice" });
+    const p = store.create({
+      slug: "getting-started",
+      title: "Getting Started",
+      content: "Welcome!",
+      createdBy: "alice",
+    });
     expect(p.id).toMatch(/^wp-/);
     expect(p.slug).toBe("getting-started");
     expect(p.version).toBe(1);
@@ -29,7 +36,9 @@ describe("WikiPageStore", () => {
 
   it("throws on duplicate slug", () => {
     store.create({ slug: "dup", title: "Dup", content: "c", createdBy: "alice" });
-    expect(() => store.create({ slug: "dup", title: "Dup2", content: "c2", createdBy: "alice" })).toThrow("Slug already exists");
+    expect(() =>
+      store.create({ slug: "dup", title: "Dup2", content: "c2", createdBy: "alice" }),
+    ).toThrow("Slug already exists");
   });
 
   it("getBySlug works", () => {
@@ -40,7 +49,11 @@ describe("WikiPageStore", () => {
 
   it("update increments version and records history", () => {
     const p = store.create({ slug: "p", title: "T", content: "v1", createdBy: "alice" });
-    const updated = store.update(p.id, { content: "v2", editedBy: "alice", summary: "Fixed typos" });
+    const updated = store.update(p.id, {
+      content: "v2",
+      editedBy: "alice",
+      summary: "Fixed typos",
+    });
     expect(updated!.version).toBe(2);
     expect(updated!.content).toBe("v2");
     expect(updated!.history).toHaveLength(2);
@@ -49,7 +62,12 @@ describe("WikiPageStore", () => {
   });
 
   it("update computes diff between versions", () => {
-    const p = store.create({ slug: "p", title: "T", content: "line one\nline two", createdBy: "alice" });
+    const p = store.create({
+      slug: "p",
+      title: "T",
+      content: "line one\nline two",
+      createdBy: "alice",
+    });
     const updated = store.update(p.id, { content: "line one\nline three", editedBy: "bob" });
     const diff = updated!.history[1]!.diff ?? "";
     expect(diff).toContain("- line two");
@@ -79,7 +97,13 @@ describe("WikiPageStore", () => {
   });
 
   it("list filters by tag", () => {
-    store.create({ slug: "a", title: "A", content: "c", createdBy: "alice", tags: ["ts", "guide"] });
+    store.create({
+      slug: "a",
+      title: "A",
+      content: "c",
+      createdBy: "alice",
+      tags: ["ts", "guide"],
+    });
     store.create({ slug: "b", title: "B", content: "c", createdBy: "alice", tags: ["python"] });
     expect(store.list({ tag: "ts" })).toHaveLength(1);
   });
@@ -92,7 +116,13 @@ describe("WikiPageStore", () => {
   });
 
   it("deduplicates tags", () => {
-    const p = store.create({ slug: "p", title: "T", content: "c", createdBy: "alice", tags: ["ts", "ts"] });
+    const p = store.create({
+      slug: "p",
+      title: "T",
+      content: "c",
+      createdBy: "alice",
+      tags: ["ts", "ts"],
+    });
     expect(p.tags).toHaveLength(1);
   });
 });
@@ -138,7 +168,9 @@ describe("WikiAcl", () => {
 describe("WikiCommentStore", () => {
   let store: WikiCommentStore;
 
-  beforeEach(() => { store = new WikiCommentStore(); });
+  beforeEach(() => {
+    store = new WikiCommentStore();
+  });
 
   it("adds a comment", () => {
     const c = store.add("p1", "alice", "Great article!");
@@ -188,7 +220,9 @@ describe("WikiCommentStore", () => {
 describe("WikiDraftStore", () => {
   let store: WikiDraftStore;
 
-  beforeEach(() => { store = new WikiDraftStore(); });
+  beforeEach(() => {
+    store = new WikiDraftStore();
+  });
 
   it("saves a draft for a new page", () => {
     const d = store.save("alice", "Draft Title", "Draft content...");
@@ -232,13 +266,63 @@ describe("WikiSearch", () => {
   const search = new WikiSearch();
 
   const pages = [
-    { id: "p1", slug: "ts", title: "TypeScript Guide", content: "TypeScript is a typed superset of JavaScript. TypeScript makes code safer.", status: "published" as const, tags: ["typescript"], linkedRepos: [], createdBy: "a", createdAt: "", updatedAt: "", version: 1, history: [], starred: [] },
-    { id: "p2", slug: "py", title: "Python Tutorial", content: "Python is great for data science and machine learning.", status: "published" as const, tags: ["python"], linkedRepos: [], createdBy: "a", createdAt: "", updatedAt: "", version: 1, history: [], starred: [] },
-    { id: "p3", slug: "del", title: "Deleted Page", content: "TypeScript deleted content", status: "deleted" as const, tags: [], linkedRepos: [], createdBy: "a", createdAt: "", updatedAt: "", version: 1, history: [], starred: [] },
+    {
+      id: "p1",
+      slug: "ts",
+      title: "TypeScript Guide",
+      content: "TypeScript is a typed superset of JavaScript. TypeScript makes code safer.",
+      status: "published" as const,
+      tags: ["typescript"],
+      linkedRepos: [],
+      createdBy: "a",
+      createdAt: "",
+      updatedAt: "",
+      version: 1,
+      history: [],
+      starred: [],
+    },
+    {
+      id: "p2",
+      slug: "py",
+      title: "Python Tutorial",
+      content: "Python is great for data science and machine learning.",
+      status: "published" as const,
+      tags: ["python"],
+      linkedRepos: [],
+      createdBy: "a",
+      createdAt: "",
+      updatedAt: "",
+      version: 1,
+      history: [],
+      starred: [],
+    },
+    {
+      id: "p3",
+      slug: "del",
+      title: "Deleted Page",
+      content: "TypeScript deleted content",
+      status: "deleted" as const,
+      tags: [],
+      linkedRepos: [],
+      createdBy: "a",
+      createdAt: "",
+      updatedAt: "",
+      version: 1,
+      history: [],
+      starred: [],
+    },
   ];
 
   const comments = [
-    { id: "c1", pageId: "p1", authorId: "bob", content: "TypeScript is amazing!", createdAt: "", updatedAt: "", resolved: false },
+    {
+      id: "c1",
+      pageId: "p1",
+      authorId: "bob",
+      content: "TypeScript is amazing!",
+      createdAt: "",
+      updatedAt: "",
+      resolved: false,
+    },
   ];
 
   it("finds pages by title/content keyword", () => {
@@ -275,7 +359,9 @@ describe("WikiSearch", () => {
 describe("WikiNotifier", () => {
   let notifier: WikiNotifier;
 
-  beforeEach(() => { notifier = new WikiNotifier(); });
+  beforeEach(() => {
+    notifier = new WikiNotifier();
+  });
 
   it("emits to subscribers", () => {
     notifier.subscribe("p1", "alice");
@@ -321,7 +407,9 @@ describe("WikiNotifier", () => {
 describe("WikiStore", () => {
   let wiki: WikiStore;
 
-  beforeEach(() => { wiki = new WikiStore(); });
+  beforeEach(() => {
+    wiki = new WikiStore();
+  });
 
   it("createPage grants owner ACL", () => {
     const p = wiki.createPage({ slug: "test", title: "T", content: "c", createdBy: "alice" });
@@ -342,7 +430,12 @@ describe("WikiStore", () => {
   });
 
   it("query finds pages", () => {
-    wiki.createPage({ slug: "ts-guide", title: "TypeScript Guide", content: "TypeScript is amazing for large codebases with strict type checking", createdBy: "alice" });
+    wiki.createPage({
+      slug: "ts-guide",
+      title: "TypeScript Guide",
+      content: "TypeScript is amazing for large codebases with strict type checking",
+      createdBy: "alice",
+    });
     const hits = wiki.query("TypeScript");
     expect(hits.length).toBeGreaterThan(0);
   });

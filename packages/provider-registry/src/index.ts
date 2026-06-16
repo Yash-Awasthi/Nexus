@@ -30,12 +30,14 @@ export interface ProviderCapabilities {
   systemPrompt: boolean;
 }
 
+/** Provider rate limits interface definition. */
 export interface ProviderRateLimits {
   requestsPerMinute: number;
   tokensPerMinute: number;
   tokensPerDay?: number;
 }
 
+/** Model definition interface definition. */
 export interface ModelDefinition {
   /** Canonical model id, e.g. "anthropic/claude-3-5-sonnet-20241022" */
   id: string;
@@ -57,6 +59,7 @@ export interface ModelDefinition {
   deprecated?: boolean;
 }
 
+/** Registry filter interface definition. */
 export interface RegistryFilter {
   provider?: string;
   capability?: keyof ProviderCapabilities;
@@ -126,77 +129,136 @@ export class ProviderRegistry {
 // ── Built-in model catalogue ──────────────────────────────────────────────────
 
 const ALL_CAPS: ProviderCapabilities = {
-  vision: true, functionCalling: true, streaming: true,
-  promptCaching: true, jsonMode: true, systemPrompt: true,
+  vision: true,
+  functionCalling: true,
+  streaming: true,
+  promptCaching: true,
+  jsonMode: true,
+  systemPrompt: true,
 };
 
 const NO_VISION: ProviderCapabilities = { ...ALL_CAPS, vision: false };
 const NO_CACHE: ProviderCapabilities = { ...ALL_CAPS, promptCaching: false };
 
+/** Builtin models. */
 export const BUILTIN_MODELS: ModelDefinition[] = [
   // Anthropic
   {
-    id: "anthropic/claude-3-5-sonnet-20241022", provider: "anthropic",
-    name: "Claude 3.5 Sonnet", contextWindow: 200_000, maxOutputTokens: 8192,
-    costPerInputToken: 3e-6, costPerOutputToken: 15e-6, capabilities: ALL_CAPS,
+    id: "anthropic/claude-3-5-sonnet-20241022",
+    provider: "anthropic",
+    name: "Claude 3.5 Sonnet",
+    contextWindow: 200_000,
+    maxOutputTokens: 8192,
+    costPerInputToken: 3e-6,
+    costPerOutputToken: 15e-6,
+    capabilities: ALL_CAPS,
     rateLimits: { requestsPerMinute: 50, tokensPerMinute: 80_000 },
   },
   {
-    id: "anthropic/claude-3-5-haiku-20241022", provider: "anthropic",
-    name: "Claude 3.5 Haiku", contextWindow: 200_000, maxOutputTokens: 8192,
-    costPerInputToken: 0.8e-6, costPerOutputToken: 4e-6, capabilities: ALL_CAPS,
+    id: "anthropic/claude-3-5-haiku-20241022",
+    provider: "anthropic",
+    name: "Claude 3.5 Haiku",
+    contextWindow: 200_000,
+    maxOutputTokens: 8192,
+    costPerInputToken: 0.8e-6,
+    costPerOutputToken: 4e-6,
+    capabilities: ALL_CAPS,
     rateLimits: { requestsPerMinute: 50, tokensPerMinute: 100_000 },
   },
   {
-    id: "anthropic/claude-3-opus-20240229", provider: "anthropic",
-    name: "Claude 3 Opus", contextWindow: 200_000, maxOutputTokens: 4096,
-    costPerInputToken: 15e-6, costPerOutputToken: 75e-6, capabilities: ALL_CAPS,
+    id: "anthropic/claude-3-opus-20240229",
+    provider: "anthropic",
+    name: "Claude 3 Opus",
+    contextWindow: 200_000,
+    maxOutputTokens: 4096,
+    costPerInputToken: 15e-6,
+    costPerOutputToken: 75e-6,
+    capabilities: ALL_CAPS,
     rateLimits: { requestsPerMinute: 20, tokensPerMinute: 40_000 },
   },
   // OpenAI
   {
-    id: "openai/gpt-4o", provider: "openai",
-    name: "GPT-4o", contextWindow: 128_000, maxOutputTokens: 16_384,
-    costPerInputToken: 2.5e-6, costPerOutputToken: 10e-6, capabilities: { ...ALL_CAPS, promptCaching: false },
+    id: "openai/gpt-4o",
+    provider: "openai",
+    name: "GPT-4o",
+    contextWindow: 128_000,
+    maxOutputTokens: 16_384,
+    costPerInputToken: 2.5e-6,
+    costPerOutputToken: 10e-6,
+    capabilities: { ...ALL_CAPS, promptCaching: false },
     rateLimits: { requestsPerMinute: 500, tokensPerMinute: 300_000 },
   },
   {
-    id: "openai/gpt-4o-mini", provider: "openai",
-    name: "GPT-4o Mini", contextWindow: 128_000, maxOutputTokens: 16_384,
-    costPerInputToken: 0.15e-6, costPerOutputToken: 0.6e-6, capabilities: NO_CACHE,
+    id: "openai/gpt-4o-mini",
+    provider: "openai",
+    name: "GPT-4o Mini",
+    contextWindow: 128_000,
+    maxOutputTokens: 16_384,
+    costPerInputToken: 0.15e-6,
+    costPerOutputToken: 0.6e-6,
+    capabilities: NO_CACHE,
     rateLimits: { requestsPerMinute: 500, tokensPerMinute: 2_000_000 },
   },
   {
-    id: "openai/o1", provider: "openai",
-    name: "o1", contextWindow: 200_000, maxOutputTokens: 100_000,
-    costPerInputToken: 15e-6, costPerOutputToken: 60e-6,
-    capabilities: { vision: true, functionCalling: false, streaming: false, promptCaching: true, jsonMode: false, systemPrompt: false },
+    id: "openai/o1",
+    provider: "openai",
+    name: "o1",
+    contextWindow: 200_000,
+    maxOutputTokens: 100_000,
+    costPerInputToken: 15e-6,
+    costPerOutputToken: 60e-6,
+    capabilities: {
+      vision: true,
+      functionCalling: false,
+      streaming: false,
+      promptCaching: true,
+      jsonMode: false,
+      systemPrompt: false,
+    },
   },
   // Google
   {
-    id: "google/gemini-2.0-flash", provider: "google",
-    name: "Gemini 2.0 Flash", contextWindow: 1_000_000, maxOutputTokens: 8192,
-    costPerInputToken: 0.1e-6, costPerOutputToken: 0.4e-6, capabilities: { ...NO_CACHE, vision: true },
+    id: "google/gemini-2.0-flash",
+    provider: "google",
+    name: "Gemini 2.0 Flash",
+    contextWindow: 1_000_000,
+    maxOutputTokens: 8192,
+    costPerInputToken: 0.1e-6,
+    costPerOutputToken: 0.4e-6,
+    capabilities: { ...NO_CACHE, vision: true },
     rateLimits: { requestsPerMinute: 2000, tokensPerMinute: 4_000_000 },
   },
   {
-    id: "google/gemini-1.5-pro", provider: "google",
-    name: "Gemini 1.5 Pro", contextWindow: 2_000_000, maxOutputTokens: 8192,
-    costPerInputToken: 1.25e-6, costPerOutputToken: 5e-6, capabilities: NO_CACHE,
+    id: "google/gemini-1.5-pro",
+    provider: "google",
+    name: "Gemini 1.5 Pro",
+    contextWindow: 2_000_000,
+    maxOutputTokens: 8192,
+    costPerInputToken: 1.25e-6,
+    costPerOutputToken: 5e-6,
+    capabilities: NO_CACHE,
     rateLimits: { requestsPerMinute: 1000, tokensPerMinute: 4_000_000 },
   },
   // Groq
   {
-    id: "groq/llama-3.3-70b-versatile", provider: "groq",
-    name: "Llama 3.3 70B", contextWindow: 128_000, maxOutputTokens: 32_768,
-    costPerInputToken: 0.59e-6, costPerOutputToken: 0.79e-6,
+    id: "groq/llama-3.3-70b-versatile",
+    provider: "groq",
+    name: "Llama 3.3 70B",
+    contextWindow: 128_000,
+    maxOutputTokens: 32_768,
+    costPerInputToken: 0.59e-6,
+    costPerOutputToken: 0.79e-6,
     capabilities: { ...NO_VISION, promptCaching: false },
     rateLimits: { requestsPerMinute: 30, tokensPerMinute: 6_000, tokensPerDay: 1_000_000 },
   },
   {
-    id: "groq/llama-3.1-8b-instant", provider: "groq",
-    name: "Llama 3.1 8B Instant", contextWindow: 128_000, maxOutputTokens: 8192,
-    costPerInputToken: 0.05e-6, costPerOutputToken: 0.08e-6,
+    id: "groq/llama-3.1-8b-instant",
+    provider: "groq",
+    name: "Llama 3.1 8B Instant",
+    contextWindow: 128_000,
+    maxOutputTokens: 8192,
+    costPerInputToken: 0.05e-6,
+    costPerOutputToken: 0.08e-6,
     capabilities: { ...NO_VISION, promptCaching: false },
     rateLimits: { requestsPerMinute: 30, tokensPerMinute: 20_000, tokensPerDay: 1_000_000 },
   },

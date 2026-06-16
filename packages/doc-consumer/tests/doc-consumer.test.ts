@@ -211,8 +211,17 @@ describe("IngestionSignalBus", () => {
 
   it("handler error does not propagate", () => {
     const bus = new IngestionSignalBus();
-    bus.on(() => { throw new Error("boom"); });
-    expect(() => bus.emit({ type: "document_consumption_finished", documentId: "d", path: "/", timestamp: "" })).not.toThrow();
+    bus.on(() => {
+      throw new Error("boom");
+    });
+    expect(() =>
+      bus.emit({
+        type: "document_consumption_finished",
+        documentId: "d",
+        path: "/",
+        timestamp: "",
+      }),
+    ).not.toThrow();
   });
 });
 
@@ -221,10 +230,16 @@ describe("IngestionSignalBus", () => {
 describe("WorkflowTrigger", () => {
   function fakeDoc(): IngestedDocument {
     return {
-      id: "doc-1", originalPath: "/a.txt", outputPath: "/out/a.txt",
-      mimeType: "text/plain", documentType: "text",
-      checksum: "abc", sizeBytes: 100, permissions: "read",
-      ingestedAt: new Date().toISOString(), metadata: {},
+      id: "doc-1",
+      originalPath: "/a.txt",
+      outputPath: "/out/a.txt",
+      mimeType: "text/plain",
+      documentType: "text",
+      checksum: "abc",
+      sizeBytes: 100,
+      permissions: "read",
+      ingestedAt: new Date().toISOString(),
+      metadata: {},
     };
   }
 
@@ -238,7 +253,9 @@ describe("WorkflowTrigger", () => {
   it("trigger with executor calls it", async () => {
     const trigger = new WorkflowTrigger();
     const called: string[] = [];
-    trigger.inject(async (wfId) => { called.push(wfId); });
+    trigger.inject(async (wfId) => {
+      called.push(wfId);
+    });
     const result = await trigger.trigger("wf-1", fakeDoc());
     expect(result.triggered).toBe(true);
     expect(called).toContain("wf-1");
@@ -246,7 +263,9 @@ describe("WorkflowTrigger", () => {
 
   it("executor error is captured", async () => {
     const trigger = new WorkflowTrigger();
-    trigger.inject(async () => { throw new Error("workflow failed"); });
+    trigger.inject(async () => {
+      throw new Error("workflow failed");
+    });
     const result = await trigger.trigger("wf-1", fakeDoc());
     expect(result.triggered).toBe(false);
     expect(result.error).toContain("workflow failed");
@@ -260,14 +279,21 @@ describe("FilenameTemplater", () => {
 
   it("generates filename from template", () => {
     const name = templater.generate("{name}-{date}.{ext}", {
-      name: "report", ext: "pdf", type: "pdf", id: "doc-1", date: "2026-01-15",
+      name: "report",
+      ext: "pdf",
+      type: "pdf",
+      id: "doc-1",
+      date: "2026-01-15",
     });
     expect(name).toBe("report-2026-01-15.pdf");
   });
 
   it("replaces all tokens", () => {
     const name = templater.generate("{id}-{type}-{name}.{ext}", {
-      name: "file", ext: "ts", type: "code", id: "doc-42",
+      name: "file",
+      ext: "ts",
+      type: "code",
+      id: "doc-42",
     });
     expect(name).toBe("doc-42-code-file.ts");
   });
@@ -359,7 +385,9 @@ describe("DocConsumer", () => {
   it("triggers workflow when workflowId provided", async () => {
     const triggered: string[] = [];
     const trigger = new WorkflowTrigger();
-    trigger.inject(async (wfId) => { triggered.push(wfId); });
+    trigger.inject(async (wfId) => {
+      triggered.push(wfId);
+    });
     const consumer = new DocConsumer({ workflowTrigger: trigger });
     await consumer.ingest({ path: "/f.txt", content: "hi", workflowId: "wf-process" });
     expect(triggered).toContain("wf-process");
@@ -379,6 +407,6 @@ describe("DocConsumer", () => {
       content: "content",
       tags: ["important", "review"],
     });
-    expect((result.document!.metadata.tags as string[])).toContain("important");
+    expect(result.document!.metadata.tags as string[]).toContain("important");
   });
 });

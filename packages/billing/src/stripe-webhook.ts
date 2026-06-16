@@ -74,7 +74,11 @@ export function verifyStripeSignature(
   for (const part of signature.split(",")) {
     const idx = part.indexOf("=");
     if (idx > 0) {
-      parts[part.slice(0, idx)] = part.slice(idx + 1);
+      // Only extract known Stripe-Signature keys — prevents prototype pollution
+      const key = part.slice(0, idx);
+      if (key === "t" || key === "v1") {
+        parts[key] = part.slice(idx + 1);
+      }
     }
   }
 

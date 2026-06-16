@@ -263,11 +263,7 @@ describe("runDeepResearch — error handling", () => {
     });
 
     await expect(
-      runDeepResearch(
-        { taskType: "deep-research.run", query: "topic" },
-        GROQ_KEY,
-        TAVILY_KEY,
-      ),
+      runDeepResearch({ taskType: "deep-research.run", query: "topic" }, GROQ_KEY, TAVILY_KEY),
     ).rejects.toThrow(/Groq API error 429/);
   });
 
@@ -283,11 +279,7 @@ describe("runDeepResearch — error handling", () => {
       });
 
     await expect(
-      runDeepResearch(
-        { taskType: "deep-research.run", query: "topic" },
-        GROQ_KEY,
-        TAVILY_KEY,
-      ),
+      runDeepResearch({ taskType: "deep-research.run", query: "topic" }, GROQ_KEY, TAVILY_KEY),
     ).rejects.toThrow();
   });
 
@@ -304,11 +296,7 @@ describe("runDeepResearch — error handling", () => {
       });
 
     await expect(
-      runDeepResearch(
-        { taskType: "deep-research.run", query: "topic" },
-        GROQ_KEY,
-        TAVILY_KEY,
-      ),
+      runDeepResearch({ taskType: "deep-research.run", query: "topic" }, GROQ_KEY, TAVILY_KEY),
     ).rejects.toThrow(/Groq API error 503/);
   });
 });
@@ -375,9 +363,7 @@ describe("runDeepResearch — query and gap parsing", () => {
   });
 
   it("caps planner output to 8 queries maximum", async () => {
-    const manyQueries = Array.from({ length: 12 }, (_, i) => `${i + 1}. query ${i + 1}`).join(
-      "\n",
-    );
+    const manyQueries = Array.from({ length: 12 }, (_, i) => `${i + 1}. query ${i + 1}`).join("\n");
     // Planner returns 12 queries; should be capped to 8 Tavily calls
     fetchMock.mockResolvedValueOnce(groqResp(manyQueries));
     for (let i = 0; i < 8; i++) fetchMock.mockResolvedValueOnce(tavilyResp(1));

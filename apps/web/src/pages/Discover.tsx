@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+
 import { api } from "../lib/api.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -239,10 +240,8 @@ export default function Discover() {
         api.get<{ entries: MemoryEntry[] }>("/memory?limit=15"),
       ]);
 
-      const signals =
-        signalsRes.status === "fulfilled" ? signalsRes.value.signals ?? [] : [];
-      const memories =
-        memoriesRes.status === "fulfilled" ? memoriesRes.value.entries ?? [] : [];
+      const signals = signalsRes.status === "fulfilled" ? (signalsRes.value.signals ?? []) : [];
+      const memories = memoriesRes.status === "fulfilled" ? (memoriesRes.value.entries ?? []) : [];
 
       // Derive trending keywords from signal content
       const allText = [...signals.map((s) => s.content), ...memories.map((m) => m.text)].join(" ");
@@ -326,7 +325,14 @@ export default function Discover() {
       <div style={{ ...s.section, marginBottom: 20 }}>
         <div style={s.sectionTitle}>
           <span style={{ color: "#d97706" }}>⚡</span> Recent Signals
-          {data && <span style={{ color: "#1e2535", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}> — {data.signals.length}</span>}
+          {data && (
+            <span
+              style={{ color: "#1e2535", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}
+            >
+              {" "}
+              — {data.signals.length}
+            </span>
+          )}
         </div>
         {data && data.signals.length > 0 ? (
           data.signals.slice(0, 8).map((sig) => (
@@ -353,7 +359,14 @@ export default function Discover() {
       <div style={s.section}>
         <div style={s.sectionTitle}>
           <span style={{ color: "#16a34a" }}>◈</span> Memory Highlights
-          {data && <span style={{ color: "#1e2535", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}> — {data.memories.length}</span>}
+          {data && (
+            <span
+              style={{ color: "#1e2535", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}
+            >
+              {" "}
+              — {data.memories.length}
+            </span>
+          )}
         </div>
         {data && data.memories.length > 0 ? (
           data.memories.slice(0, 6).map((mem) => (
@@ -388,10 +401,48 @@ export default function Discover() {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const STOP = new Set([
-  "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of",
-  "with", "by", "from", "is", "are", "was", "were", "be", "have", "has",
-  "had", "do", "does", "did", "not", "that", "this", "it", "i", "you",
-  "he", "she", "we", "they", "what", "how", "why", "when", "where", "which",
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "but",
+  "in",
+  "on",
+  "at",
+  "to",
+  "for",
+  "of",
+  "with",
+  "by",
+  "from",
+  "is",
+  "are",
+  "was",
+  "were",
+  "be",
+  "have",
+  "has",
+  "had",
+  "do",
+  "does",
+  "did",
+  "not",
+  "that",
+  "this",
+  "it",
+  "i",
+  "you",
+  "he",
+  "she",
+  "we",
+  "they",
+  "what",
+  "how",
+  "why",
+  "when",
+  "where",
+  "which",
 ]);
 
 function extractTrending(text: string, topK = 12): string[] {
@@ -422,9 +473,7 @@ function deriveSuggestedQueries(signals: Signal[], memories: MemoryEntry[]): str
   }
 
   // High-importance memories become queries
-  const important = memories
-    .filter((m) => (m.importance ?? 0) >= 0.7)
-    .slice(0, 3);
+  const important = memories.filter((m) => (m.importance ?? 0) >= 0.7).slice(0, 3);
   for (const mem of important) {
     const snippet = mem.text.slice(0, 60).replace(/\s+\S*$/, "");
     queries.push(`Tell me more about: ${snippet}…`);

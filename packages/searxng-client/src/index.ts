@@ -14,6 +14,7 @@
 
 export type SearchCategory = "general" | "images" | "news" | "files" | "social" | "science" | "it";
 
+/** Searxng result interface definition. */
 export interface SearxngResult {
   url: string;
   title: string;
@@ -24,16 +25,18 @@ export interface SearxngResult {
   publishedDate?: string;
 }
 
+/** Searxng response interface definition. */
 export interface SearxngResponse {
   query: string;
   results: SearxngResult[];
   suggestions: string[];
   answers: string[];
-  infoboxes: Array<{ infobox: string; content: string }>;
+  infoboxes: { infobox: string; content: string }[];
   number_of_results: number;
   latency: number;
 }
 
+/** Searxng query options interface definition. */
 export interface SearxngQueryOptions {
   categories?: SearchCategory[];
   engines?: string[];
@@ -115,10 +118,7 @@ export class SearxngClient {
   private http: HttpGetFn;
   private defaultOptions: SearxngQueryOptions;
 
-  constructor(
-    baseUrl: string,
-    opts: { http?: HttpGetFn; defaults?: SearxngQueryOptions } = {},
-  ) {
+  constructor(baseUrl: string, opts: { http?: HttpGetFn; defaults?: SearxngQueryOptions } = {}) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
     this.http = opts.http ?? DEFAULT_HTTP;
     this.defaultOptions = opts.defaults ?? {};
@@ -126,9 +126,7 @@ export class SearxngClient {
 
   async search(query: string, opts: SearxngQueryOptions = {}): Promise<SearxngResponse> {
     const merged = { ...this.defaultOptions, ...opts };
-    const builder = new QueryBuilder()
-      .setQuery(query)
-      .setFormat("json");
+    const builder = new QueryBuilder().setQuery(query).setFormat("json");
 
     if (merged.categories?.length) builder.setCategories(merged.categories);
     if (merged.engines?.length) builder.setEngines(merged.engines);
@@ -138,11 +136,13 @@ export class SearxngClient {
     if (merged.safeSearch !== undefined) builder.setSafeSearch(merged.safeSearch);
 
     const url = builder.build(this.baseUrl);
-    const raw = await this.http(url) as SearxngResponse;
+    const raw = (await this.http(url)) as SearxngResponse;
     return raw;
   }
 
-  getBaseUrl(): string { return this.baseUrl; }
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
 }
 
 // ── ResultDeduplicator ────────────────────────────────────────────────────────
@@ -167,7 +167,9 @@ export class ResultDeduplicator {
     return sort ? [...this.results].sort((a, b) => b.score - a.score) : [...this.results];
   }
 
-  count(): number { return this.results.length; }
+  count(): number {
+    return this.results.length;
+  }
 
   clear(): void {
     this.seen.clear();
@@ -183,6 +185,7 @@ export interface RouterInstance {
   name: string;
 }
 
+/** Router result interface definition. */
 export interface RouterResult {
   query: string;
   results: SearxngResult[];
@@ -190,6 +193,7 @@ export interface RouterResult {
   totalDurationMs: number;
 }
 
+/** Multi engine router. */
 export class MultiEngineRouter {
   private instances: RouterInstance[];
 
@@ -230,5 +234,7 @@ export class MultiEngineRouter {
     this.instances.push(inst);
   }
 
-  instanceCount(): number { return this.instances.length; }
+  instanceCount(): number {
+    return this.instances.length;
+  }
 }

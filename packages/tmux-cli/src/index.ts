@@ -8,6 +8,7 @@ export interface ExecResult {
   exitCode: number;
 }
 
+/** Exec fn type alias. */
 export type ExecFn = (cmd: string, args: string[]) => Promise<ExecResult>;
 
 // ── Options ───────────────────────────────────────────────────────────────────
@@ -19,12 +20,14 @@ export interface NewSessionOpts {
   windowName?: string;
 }
 
+/** New window opts interface definition. */
 export interface NewWindowOpts {
   name?: string;
   startDir?: string;
   detach?: boolean;
 }
 
+/** Split pane opts interface definition. */
 export interface SplitPaneOpts {
   /** Horizontal split — adds pane to the right (default: false = vertical) */
   horizontal?: boolean;
@@ -32,6 +35,7 @@ export interface SplitPaneOpts {
   startDir?: string;
 }
 
+/** Capture pane opts interface definition. */
 export interface CapturePaneOpts {
   startLine?: number;
   endLine?: number;
@@ -39,6 +43,7 @@ export interface CapturePaneOpts {
   joinLines?: boolean;
 }
 
+/** Wait opts interface definition. */
 export interface WaitOpts {
   /** Poll interval in ms (default: 200) */
   intervalMs?: number;
@@ -55,6 +60,7 @@ export interface TmuxSessionInfo {
   created: string;
 }
 
+/** Tmux pane info interface definition. */
 export interface TmuxPaneInfo {
   index: number;
   active: boolean;
@@ -238,17 +244,18 @@ interface _NullSession {
   created: string;
 }
 
+/** Null tmux client. */
 export class NullTmuxClient implements ITmuxClient {
   private readonly _sessions = new Map<string, _NullSession>();
   private readonly _paneOutput = new Map<string, string>();
-  private readonly _sentKeys: Array<{ target: string; keys: string }> = [];
+  private readonly _sentKeys: { target: string; keys: string }[] = [];
 
   /** Pre-seed pane output returned by capturePane / waitForOutput. */
   setPaneOutput(sessionOrTarget: string, output: string): void {
     this._paneOutput.set(sessionOrTarget.split(":")[0]!, output);
   }
 
-  getSentKeys(): ReadonlyArray<{ target: string; keys: string }> {
+  getSentKeys(): readonly { target: string; keys: string }[] {
     return this._sentKeys;
   }
 

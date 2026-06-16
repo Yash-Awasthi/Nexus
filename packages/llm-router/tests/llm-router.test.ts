@@ -103,7 +103,11 @@ describe("NullProvider", () => {
       id: expect.any(String),
       model: expect.any(String),
       content: expect.any(String),
-      usage: { promptTokens: expect.any(Number), completionTokens: expect.any(Number), totalTokens: expect.any(Number) },
+      usage: {
+        promptTokens: expect.any(Number),
+        completionTokens: expect.any(Number),
+        totalTokens: expect.any(Number),
+      },
       provider: "null",
       latencyMs: expect.any(Number),
     });
@@ -187,7 +191,7 @@ describe("LLMRouter — fallback chains", () => {
       providers: [failing, working],
       aliases: [
         { alias: "nexus/smart", provider: "primary", model: "m1" },
-        { alias: "nexus/fast",  provider: "backup",  model: "m2" },
+        { alias: "nexus/fast", provider: "backup", model: "m2" },
       ],
       fallbacks: { "nexus/smart": ["nexus/fast"] },
     });
@@ -203,7 +207,7 @@ describe("LLMRouter — fallback chains", () => {
       providers: [failing1, failing2],
       aliases: [
         { alias: "nexus/smart", provider: "p1", model: "m1" },
-        { alias: "nexus/fast",  provider: "p2", model: "m2" },
+        { alias: "nexus/fast", provider: "p2", model: "m2" },
       ],
       fallbacks: { "nexus/smart": ["nexus/fast"] },
     });
@@ -217,7 +221,7 @@ describe("LLMRouter — fallback chains", () => {
       providers: [primary, backup],
       aliases: [
         { alias: "nexus/smart", provider: "primary", model: "m1" },
-        { alias: "nexus/fast",  provider: "backup",  model: "m2" },
+        { alias: "nexus/fast", provider: "backup", model: "m2" },
       ],
       fallbacks: { "nexus/smart": ["nexus/fast"] },
     });
@@ -265,7 +269,7 @@ describe("LLMRouter — routing strategies", () => {
 
   it("strategy=least-latency picks provider with lower observed latency", async () => {
     const p1 = new NullProvider({ name: "p1", latencyMs: 200, models: ["m1"] });
-    const p2 = new NullProvider({ name: "p2", latencyMs: 50,  models: ["m2"] });
+    const p2 = new NullProvider({ name: "p2", latencyMs: 50, models: ["m2"] });
     const router = new LLMRouter({
       providers: [p1, p2],
       aliases: [
@@ -322,7 +326,10 @@ describe("ClaudeProvider", () => {
   it("extracts text content from response", async () => {
     const fetch = makeFetch(200, claudeBody);
     const p = new ClaudeProvider({ apiKey: "k", fetch });
-    const r = await p.complete({ model: "claude-opus-4-5", messages: [{ role: "user", content: "hi" }] });
+    const r = await p.complete({
+      model: "claude-opus-4-5",
+      messages: [{ role: "user", content: "hi" }],
+    });
     expect(r.content).toBe("Hello!");
     expect(r.provider).toBe("claude");
     expect(r.usage.promptTokens).toBe(10);
@@ -333,7 +340,7 @@ describe("ClaudeProvider", () => {
     const fetch = makeFetch(429, { error: "rate limited" });
     const p = new ClaudeProvider({ apiKey: "k", fetch });
     await expect(
-      p.complete({ model: "claude-opus-4-5", messages: [{ role: "user", content: "hi" }] })
+      p.complete({ model: "claude-opus-4-5", messages: [{ role: "user", content: "hi" }] }),
     ).rejects.toMatchObject({ code: "PROVIDER_ERROR" });
   });
 
@@ -342,7 +349,10 @@ describe("ClaudeProvider", () => {
     const p = new ClaudeProvider({ apiKey: "k", fetch });
     await p.complete({
       model: "claude-opus-4-5",
-      messages: [{ role: "system", content: "Be helpful" }, { role: "user", content: "hi" }],
+      messages: [
+        { role: "system", content: "Be helpful" },
+        { role: "user", content: "hi" },
+      ],
     });
     const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
     expect(body.system).toBe("Be helpful");
@@ -371,7 +381,10 @@ describe("GroqProvider", () => {
   it("calls Groq chat completions endpoint", async () => {
     const fetch = makeFetch(200, groqBody);
     const p = new GroqProvider({ apiKey: "gk", fetch });
-    await p.complete({ model: "llama-3.1-70b-versatile", messages: [{ role: "user", content: "hi" }] });
+    await p.complete({
+      model: "llama-3.1-70b-versatile",
+      messages: [{ role: "user", content: "hi" }],
+    });
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining("chat/completions"),
       expect.objectContaining({ method: "POST" }),
@@ -381,7 +394,10 @@ describe("GroqProvider", () => {
   it("extracts content and usage", async () => {
     const fetch = makeFetch(200, groqBody);
     const p = new GroqProvider({ apiKey: "gk", fetch });
-    const r = await p.complete({ model: "llama-3.1-70b-versatile", messages: [{ role: "user", content: "hi" }] });
+    const r = await p.complete({
+      model: "llama-3.1-70b-versatile",
+      messages: [{ role: "user", content: "hi" }],
+    });
     expect(r.content).toBe("Groq response");
     expect(r.usage.totalTokens).toBe(12);
     expect(r.provider).toBe("groq");
@@ -391,7 +407,7 @@ describe("GroqProvider", () => {
     const fetch = makeFetch(500, {});
     const p = new GroqProvider({ apiKey: "gk", fetch });
     await expect(
-      p.complete({ model: "llama-3.1-70b-versatile", messages: [{ role: "user", content: "hi" }] })
+      p.complete({ model: "llama-3.1-70b-versatile", messages: [{ role: "user", content: "hi" }] }),
     ).rejects.toMatchObject({ code: "PROVIDER_ERROR" });
   });
 });

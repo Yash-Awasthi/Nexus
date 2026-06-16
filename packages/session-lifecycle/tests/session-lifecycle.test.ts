@@ -111,8 +111,12 @@ describe("LifecycleEventBus", () => {
 
   it("listener error does not propagate", () => {
     const bus = new LifecycleEventBus();
-    bus.on("*", () => { throw new Error("boom"); });
-    expect(() => bus.emit({ type: "session_started", sessionId: "x", timestamp: "" })).not.toThrow();
+    bus.on("*", () => {
+      throw new Error("boom");
+    });
+    expect(() =>
+      bus.emit({ type: "session_started", sessionId: "x", timestamp: "" }),
+    ).not.toThrow();
   });
 
   it("clear removes all listeners", () => {
@@ -231,8 +235,18 @@ describe("GeneratorExitHandler", () => {
     const { bus, exitHandler } = createLifecycle();
     const log: string[] = [];
     const tasks: CleanupTask[] = [
-      { name: "close-db", fn: async () => { log.push("db"); } },
-      { name: "flush-cache", fn: () => { log.push("cache"); } },
+      {
+        name: "close-db",
+        fn: async () => {
+          log.push("db");
+        },
+      },
+      {
+        name: "flush-cache",
+        fn: () => {
+          log.push("cache");
+        },
+      },
     ];
     const result = await exitHandler.cleanup("s1", tasks);
     expect(log).toContain("db");
@@ -244,7 +258,12 @@ describe("GeneratorExitHandler", () => {
   it("captures task errors without throwing", async () => {
     const { bus, exitHandler } = createLifecycle();
     const tasks: CleanupTask[] = [
-      { name: "bad-task", fn: async () => { throw new Error("cleanup failed"); } },
+      {
+        name: "bad-task",
+        fn: async () => {
+          throw new Error("cleanup failed");
+        },
+      },
     ];
     const result = await exitHandler.cleanup("s1", tasks);
     expect(result.tasks[0]!.success).toBe(false);

@@ -22,6 +22,7 @@
 
 export type STMModuleId = string;
 
+/** Transform context interface definition. */
 export interface TransformContext {
   sessionId?: string;
   userId?: string;
@@ -29,13 +30,15 @@ export interface TransformContext {
   metadata?: Record<string, unknown>;
 }
 
+/** Transform input interface definition. */
 export interface TransformInput {
   text: string;
-  moduleIds?: STMModuleId[];  // null/undefined → apply all registered
+  moduleIds?: STMModuleId[]; // null/undefined → apply all registered
   context?: TransformContext;
-  maxChars?: number;          // enforced by TruncationGuard
+  maxChars?: number; // enforced by TruncationGuard
 }
 
+/** Module result interface definition. */
 export interface ModuleResult {
   moduleId: STMModuleId;
   before: string;
@@ -43,6 +46,7 @@ export interface ModuleResult {
   changed: boolean;
 }
 
+/** Transform output interface definition. */
 export interface TransformOutput {
   original: string;
   transformed: string;
@@ -51,6 +55,7 @@ export interface TransformOutput {
   charCount: number;
 }
 
+/** Stm module interface definition. */
 export interface STMModule {
   id: STMModuleId;
   description: string;
@@ -59,7 +64,7 @@ export interface STMModule {
 
 // ── HedgeReducer ─────────────────────────────────────────────────────────────
 
-const HEDGE_PATTERNS: Array<[RegExp, string]> = [
+const HEDGE_PATTERNS: [RegExp, string][] = [
   [/\bIt(?:'s| is) (?:worth noting that|important to note that)\b/gi, ""],
   [/\bIt (?:should|may) be noted that\b/gi, ""],
   [/\bIn (?:many|some) cases[,]?\s*/gi, ""],
@@ -72,6 +77,7 @@ const HEDGE_PATTERNS: Array<[RegExp, string]> = [
   [/\bApparently /gi, ""],
 ];
 
+/** Hedge reducer. */
 export class HedgeReducer implements STMModule {
   readonly id = "hedge-reducer";
   readonly description = "Removes hedge phrases to produce more direct statements";
@@ -91,7 +97,7 @@ export class HedgeReducer implements STMModule {
 
 // ── DirectnessOptimizer ───────────────────────────────────────────────────────
 
-const DIRECTNESS_PATTERNS: Array<[RegExp, string]> = [
+const DIRECTNESS_PATTERNS: [RegExp, string][] = [
   [/\bin order to\b/gi, "to"],
   [/\bdue to the fact that\b/gi, "because"],
   [/\bfor the purpose of\b/gi, "to"],
@@ -107,6 +113,7 @@ const DIRECTNESS_PATTERNS: Array<[RegExp, string]> = [
   [/\bwith the exception of\b/gi, "except"],
 ];
 
+/** Directness optimizer. */
 export class DirectnessOptimizer implements STMModule {
   readonly id = "directness-optimizer";
   readonly description = "Replaces verbose/passive constructions with direct equivalents";
@@ -140,8 +147,12 @@ export class TruncationGuard implements STMModule {
     return text.length > this.maxChars;
   }
 
-  setMaxChars(n: number): void { this.maxChars = n; }
-  getMaxChars(): number { return this.maxChars; }
+  setMaxChars(n: number): void {
+    this.maxChars = n;
+  }
+  getMaxChars(): number {
+    return this.maxChars;
+  }
 }
 
 // ── MockSTMModule ─────────────────────────────────────────────────────────────
@@ -174,13 +185,27 @@ export class STMRegistry {
     return this;
   }
 
-  get(id: STMModuleId): STMModule | undefined { return this.modules.get(id); }
-  has(id: STMModuleId): boolean { return this.modules.has(id); }
-  list(): STMModule[] { return [...this.modules.values()]; }
-  ids(): STMModuleId[] { return [...this.modules.keys()]; }
-  unregister(id: STMModuleId): boolean { return this.modules.delete(id); }
-  clear(): void { this.modules.clear(); }
-  size(): number { return this.modules.size; }
+  get(id: STMModuleId): STMModule | undefined {
+    return this.modules.get(id);
+  }
+  has(id: STMModuleId): boolean {
+    return this.modules.has(id);
+  }
+  list(): STMModule[] {
+    return [...this.modules.values()];
+  }
+  ids(): STMModuleId[] {
+    return [...this.modules.keys()];
+  }
+  unregister(id: STMModuleId): boolean {
+    return this.modules.delete(id);
+  }
+  clear(): void {
+    this.modules.clear();
+  }
+  size(): number {
+    return this.modules.size;
+  }
 }
 
 // ── applySTMs ─────────────────────────────────────────────────────────────────
@@ -250,7 +275,9 @@ export class STMPipeline {
     };
   }
 
-  getRegistry(): STMRegistry { return this.registry; }
+  getRegistry(): STMRegistry {
+    return this.registry;
+  }
 
   /** Partially apply only specific module IDs (skip missing without error). */
   transformPartial(input: TransformInput): TransformOutput {

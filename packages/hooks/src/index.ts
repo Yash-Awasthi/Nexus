@@ -54,12 +54,14 @@ export interface SessionInitPayload {
   metadata?: Record<string, unknown>;
 }
 
+/** Session end payload interface definition. */
 export interface SessionEndPayload {
   sessionId: string;
   endedAt: number;
   durationMs: number;
 }
 
+/** Task before payload interface definition. */
 export interface TaskBeforePayload {
   taskId: string;
   taskType: string;
@@ -67,6 +69,7 @@ export interface TaskBeforePayload {
   attempt: number;
 }
 
+/** Task after payload interface definition. */
 export interface TaskAfterPayload {
   taskId: string;
   taskType: string;
@@ -74,6 +77,7 @@ export interface TaskAfterPayload {
   durationMs: number;
 }
 
+/** Task error payload interface definition. */
 export interface TaskErrorPayload {
   taskId: string;
   taskType: string;
@@ -82,11 +86,13 @@ export interface TaskErrorPayload {
   willRetry: boolean;
 }
 
+/** Memory before write payload interface definition. */
 export interface MemoryBeforeWritePayload {
   text: string;
   metadata: Record<string, unknown>;
 }
 
+/** Memory after write payload interface definition. */
 export interface MemoryAfterWritePayload {
   id: string;
   text: string;
@@ -94,6 +100,7 @@ export interface MemoryAfterWritePayload {
   createdAt: number;
 }
 
+/** Agent observe payload interface definition. */
 export interface AgentObservePayload {
   agentId: string;
   /** Dot-notation observation label e.g. "tool.call", "reasoning.step" */
@@ -101,11 +108,13 @@ export interface AgentObservePayload {
   data: unknown;
 }
 
+/** File before edit payload interface definition. */
 export interface FileBeforeEditPayload {
   path: string;
   operation: "create" | "update" | "delete";
 }
 
+/** File after edit payload interface definition. */
 export interface FileAfterEditPayload {
   path: string;
   operation: "create" | "update" | "delete";
@@ -129,6 +138,7 @@ export interface HookEventMap {
   "file.after_edit": FileAfterEditPayload;
 }
 
+/** Hook event type alias. */
 export type HookEvent = keyof HookEventMap;
 
 // ── Handler contract ──────────────────────────────────────────────────────────
@@ -142,9 +152,8 @@ export interface HookResult {
   abort?: boolean;
 }
 
-export type HookHandler<T> = (
-  payload: T,
-) => Promise<HookResult | void> | HookResult | void;
+/** Hook handler type alias. */
+export type HookHandler<T> = (payload: T) => Promise<HookResult> | HookResult;
 
 // ── Registration handle ───────────────────────────────────────────────────────
 
@@ -155,6 +164,7 @@ export interface HookRegistration {
   readonly label?: string;
 }
 
+/** Hook options interface definition. */
 export interface HookOptions {
   /**
    * Handlers with higher priority run before those with lower priority.
@@ -203,6 +213,7 @@ export interface HandlerError {
   error: string;
 }
 
+/** Emit result interface definition. */
 export interface EmitResult {
   /** Event that was emitted */
   event: HookEvent;
@@ -309,7 +320,9 @@ function applyOrderingConstraints(handlers: HandlerRecord[]): HandlerRecord[] {
   // Build adjacency list: mustBefore[i] = set of indices that must come after i
   const n = handlers.length;
   const indexMap = new Map(handlers.map((h, i) => [h.id, i]));
-  const before = new Array<Set<number>>(n).fill(null as unknown as Set<number>).map(() => new Set<number>());
+  const before = new Array<Set<number>>(n)
+    .fill(null as unknown as Set<number>)
+    .map(() => new Set<number>());
 
   for (let i = 0; i < n; i++) {
     const h = handlers[i]!;
@@ -348,6 +361,7 @@ function applyOrderingConstraints(handlers: HandlerRecord[]): HandlerRecord[] {
     result.push(handlers[i]!);
     const dependents = Array.from(before[i]!).sort((a, b) => a - b);
     for (const j of dependents) {
+      // eslint-disable-next-line @typescript-eslint/no-confusing-non-null-assertion
       if (--inDegree[j]! === 0) {
         queue.push(j);
         queue.sort((a, b) => a - b);
@@ -383,8 +397,7 @@ export interface HookRegistryOptions {
  * mutations during an active emit (mutations take effect on the next emit).
  */
 export class HookRegistry {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private readonly handlers = new Map<HookEvent, HandlerRecord<any>[]>();
+  private readonly handlers = new Map<HookEvent, HandlerRecord[]>();
   private readonly plugins = new Map<string, Plugin>();
   private readonly store?: HookStore;
   private insertionCounter = 0;
@@ -519,10 +532,7 @@ export class HookRegistry {
    * When a handler aborts the chain, registered compensation handlers run
    * in reverse registration order before emit() returns.
    */
-  async emit<E extends HookEvent>(
-    event: E,
-    payload: HookEventMap[E],
-  ): Promise<EmitResult> {
+  async emit<E extends HookEvent>(event: E, payload: HookEventMap[E]): Promise<EmitResult> {
     const result: EmitResult = {
       event,
       handled: 0,
@@ -548,7 +558,7 @@ export class HookRegistry {
     for (const record of sorted) {
       result.handled++;
 
-      let hookResult: HookResult | void;
+      let hookResult: HookResult;
       try {
         hookResult = await this._runWithTimeout(record, payload);
       } catch (err) {
@@ -588,26 +598,28 @@ export class HookRegistry {
   }
 
   /** Run a handler, racing against an optional timeout. */
-  private async _runWithTimeout(
-    record: HandlerRecord,
-    payload: unknown,
-  ): Promise<HookResult | void> {
+  private async _runWithTimeout(record: HandlerRecord, payload: unknown): Promise<HookResult> {
     if (!record.timeoutMs) {
       return record.handler(payload);
     }
 
-    return new Promise<HookResult | void>((resolve, reject) => {
+    return new Promise<HookResult>((resolve, reject) => {
       let done = false;
 
       const timer = setTimeout(() => {
         if (!done) {
           done = true;
-          reject(new Error(`Handler "${record.label ?? record.id}" timed out after ${record.timeoutMs}ms`));
+          reject(
+            new Error(
+              `Handler "${record.label ?? record.id}" timed out after ${record.timeoutMs}ms`,
+            ),
+          );
         }
       }, record.timeoutMs);
 
       Promise.resolve(record.handler(payload)).then(
         (r) => {
+          // eslint-disable-next-line promise/always-return
           if (!done) {
             done = true;
             clearTimeout(timer);
@@ -635,11 +647,9 @@ export class HookRegistry {
    */
   use(plugin: Plugin): this {
     if (this.plugins.has(plugin.name)) {
-      throw new HookError(
-        `Plugin "${plugin.name}" is already installed`,
-        "DUPLICATE_PLUGIN",
-        { pluginName: plugin.name },
-      );
+      throw new HookError(`Plugin "${plugin.name}" is already installed`, "DUPLICATE_PLUGIN", {
+        pluginName: plugin.name,
+      });
     }
     this.plugins.set(plugin.name, plugin);
     plugin.install(this);

@@ -42,6 +42,7 @@ export interface LlmMessage {
   content: string;
 }
 
+/** Llm call options interface definition. */
 export interface LlmCallOptions {
   /** Sampling temperature. Default varies per operation (0.0–0.2). */
   temperature?: number;
@@ -49,11 +50,13 @@ export interface LlmCallOptions {
   maxTokens?: number;
 }
 
+/** Llm usage interface definition. */
 export interface LlmUsage {
   inputTokens: number;
   outputTokens: number;
 }
 
+/** Llm response interface definition. */
 export interface LlmResponse {
   content: string;
   model: string;
@@ -64,10 +67,7 @@ export interface LlmResponse {
  * Minimal async function contract for an LLM call.
  * Any provider (Groq, OpenAI, local) can satisfy this type.
  */
-export type LlmClient = (
-  messages: LlmMessage[],
-  opts?: LlmCallOptions,
-) => Promise<LlmResponse>;
+export type LlmClient = (messages: LlmMessage[], opts?: LlmCallOptions) => Promise<LlmResponse>;
 
 // ── createLanguageModel ───────────────────────────────────────────────────────
 
@@ -107,7 +107,7 @@ const PROVIDER_DEFAULTS: Record<"groq" | "openai", ProviderDefaults> = {
 };
 
 interface OpenAiChatResponse {
-  choices: Array<{ message: { content: string | null } }>;
+  choices: { message: { content: string | null } }[];
   model: string;
   usage?: { prompt_tokens: number; completion_tokens: number };
 }
@@ -152,11 +152,9 @@ export function createLanguageModel(opts: LanguageModelOptions = {}): LlmClient 
         }),
       });
     } catch (err) {
-      throw new LlmUtilsError(
-        `Network error calling LLM API: ${String(err)}`,
-        "NETWORK_ERROR",
-        { url },
-      );
+      throw new LlmUtilsError(`Network error calling LLM API: ${String(err)}`, "NETWORK_ERROR", {
+        url,
+      });
     }
 
     if (!response.ok) {
@@ -202,6 +200,7 @@ export const nullLlmClient: LlmClient = async (): Promise<LlmResponse> => ({
  * the model wrapped its answer.  Throws `LlmUtilsError` with code
  * `JSON_PARSE_ERROR` when the content is not valid JSON.
  */
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 export function parseJsonResponse<T>(content: string): T {
   let cleaned = content.trim();
 
@@ -255,6 +254,7 @@ export interface ClassifyResult<L extends string = string> {
   confidence: number;
 }
 
+/** Classify options interface definition. */
 export interface ClassifyOptions {
   /** Override the system prompt. Must still instruct the model to return JSON. */
   systemPrompt?: string;
@@ -391,11 +391,16 @@ export interface ExtractViolation {
 
 function _checkFieldType(value: unknown, type: FieldType): boolean {
   switch (type) {
-    case "string":   return typeof value === "string";
-    case "number":   return typeof value === "number";
-    case "boolean":  return typeof value === "boolean";
-    case "string[]": return Array.isArray(value) && value.every((v) => typeof v === "string");
-    case "number[]": return Array.isArray(value) && value.every((v) => typeof v === "number");
+    case "string":
+      return typeof value === "string";
+    case "number":
+      return typeof value === "number";
+    case "boolean":
+      return typeof value === "boolean";
+    case "string[]":
+      return Array.isArray(value) && value.every((v) => typeof v === "string");
+    case "number[]":
+      return Array.isArray(value) && value.every((v) => typeof v === "number");
   }
 }
 
@@ -407,6 +412,7 @@ function _checkFieldType(value: unknown, type: FieldType): boolean {
  * Optional fields (required: false) that are absent are silently accepted.
  * @internal exported for testing
  */
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 export function validateExtractResult<S extends ExtractSchema>(
   raw: Record<string, unknown>,
   schema: S,
@@ -446,6 +452,7 @@ export function validateExtractResult<S extends ExtractSchema>(
   }
 }
 
+/** Field schema interface definition. */
 export interface FieldSchema {
   /** Expected JavaScript type of the field value. */
   type: FieldType;
@@ -455,6 +462,7 @@ export interface FieldSchema {
   required?: boolean;
 }
 
+/** Extract schema type alias. */
 export type ExtractSchema = Record<string, FieldSchema>;
 
 type ResolveType<T extends FieldType> = T extends "string"

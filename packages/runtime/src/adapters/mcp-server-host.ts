@@ -4,7 +4,7 @@ import { spawn } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 
-export interface McpServerHostOptions {
+interface McpServerHostOptions {
   repoRoot: string;
   apiUrl?: string;
   mcpPort?: number;

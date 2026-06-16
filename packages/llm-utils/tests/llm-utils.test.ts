@@ -97,17 +97,17 @@ describe("parseJsonResponse", () => {
   });
 
   it("strips ```json … ``` fence", () => {
-    const wrapped = "```json\n{\"x\": 42}\n```";
+    const wrapped = '```json\n{"x": 42}\n```';
     expect(parseJsonResponse<{ x: number }>(wrapped)).toEqual({ x: 42 });
   });
 
   it("strips plain ``` … ``` fence", () => {
-    const wrapped = "```\n{\"y\": true}\n```";
+    const wrapped = '```\n{"y": true}\n```';
     expect(parseJsonResponse<{ y: boolean }>(wrapped)).toEqual({ y: true });
   });
 
   it("handles extra whitespace around fenced content", () => {
-    const wrapped = "```json\n  { \"z\": \"hello\" }\n```  ";
+    const wrapped = '```json\n  { "z": "hello" }\n```  ';
     expect(parseJsonResponse<{ z: string }>(wrapped)).toEqual({ z: "hello" });
   });
 
@@ -329,16 +329,16 @@ describe("classify", () => {
 
   it("throws INVALID_LABEL_RESPONSE when model returns an unknown label", async () => {
     const llm = makeLlmClient('{"label":"unknown_label","confidence":0.7}');
-    await expect(
-      classify("text", ["a", "b", "c"] as const, llm),
-    ).rejects.toMatchObject({ code: "INVALID_LABEL_RESPONSE" });
+    await expect(classify("text", ["a", "b", "c"] as const, llm)).rejects.toMatchObject({
+      code: "INVALID_LABEL_RESPONSE",
+    });
   });
 
   it("throws JSON_PARSE_ERROR when model returns non-JSON", async () => {
     const llm = makeLlmClient("the label is calendar");
-    await expect(
-      classify("text", ["calendar"] as const, llm),
-    ).rejects.toMatchObject({ code: "JSON_PARSE_ERROR" });
+    await expect(classify("text", ["calendar"] as const, llm)).rejects.toMatchObject({
+      code: "JSON_PARSE_ERROR",
+    });
   });
 
   it("passes text as user message to llm", async () => {
@@ -474,9 +474,7 @@ describe("extract", () => {
   } satisfies ExtractSchema;
 
   it("returns parsed fields from LLM JSON response", async () => {
-    const llm = makeLlmClient(
-      '{"sender":"alice@example.com","subject":"Hello","urgent":false}',
-    );
+    const llm = makeLlmClient('{"sender":"alice@example.com","subject":"Hello","urgent":false}');
     const result = await extract("email body text", emailSchema, llm);
     expect(result.sender).toBe("alice@example.com");
     expect(result.subject).toBe("Hello");
@@ -484,9 +482,7 @@ describe("extract", () => {
   });
 
   it("handles markdown-fenced JSON from model", async () => {
-    const llm = makeLlmClient(
-      "```json\n{\"sender\":\"b@b.com\",\"subject\":\"Hi\",\"urgent\":true}\n```",
-    );
+    const llm = makeLlmClient('```json\n{"sender":"b@b.com","subject":"Hi","urgent":true}\n```');
     const result = await extract("text", emailSchema, llm);
     expect(result.sender).toBe("b@b.com");
   });
@@ -559,17 +555,25 @@ describe("extract", () => {
 
   it("handles string[] field type in response", async () => {
     const llm = makeLlmClient('{"tags":["ai","llm","fast"]}');
-    const result = await extract("tags: ai, llm, fast", {
-      tags: { type: "string[]", description: "list of tags" },
-    }, llm);
+    const result = await extract(
+      "tags: ai, llm, fast",
+      {
+        tags: { type: "string[]", description: "list of tags" },
+      },
+      llm,
+    );
     expect(result.tags).toEqual(["ai", "llm", "fast"]);
   });
 
   it("handles number[] field type in response", async () => {
     const llm = makeLlmClient('{"scores":[8,9,10]}');
-    const result = await extract("scores: 8, 9, 10", {
-      scores: { type: "number[]", description: "list of scores" },
-    }, llm);
+    const result = await extract(
+      "scores: 8, 9, 10",
+      {
+        scores: { type: "number[]", description: "list of scores" },
+      },
+      llm,
+    );
     expect(result.scores).toEqual([8, 9, 10]);
   });
 
@@ -591,10 +595,14 @@ describe("extract", () => {
 
   it("does NOT throw when optional field is absent", async () => {
     const llm = makeLlmClient('{"title":"Doc"}');
-    const result = await extract("text", {
-      title: { type: "string" as const },
-      subtitle: { type: "string" as const, required: false },
-    }, llm);
+    const result = await extract(
+      "text",
+      {
+        title: { type: "string" as const },
+        subtitle: { type: "string" as const, required: false },
+      },
+      llm,
+    );
     expect(result.title).toBe("Doc");
   });
 
@@ -602,7 +610,8 @@ describe("extract", () => {
     // both sender and urgent missing
     const llm = makeLlmClient('{"subject":"Hi"}');
     const err = await extract("text", emailSchema, llm).catch((e: unknown) => e);
-    const violations = ((err as LlmUtilsError).context as { violations: ExtractViolation[] }).violations;
+    const violations = ((err as LlmUtilsError).context as { violations: ExtractViolation[] })
+      .violations;
     expect(violations.length).toBeGreaterThanOrEqual(2);
   });
 });
@@ -611,12 +620,12 @@ describe("extract", () => {
 
 describe("validateExtractResult", () => {
   const schema = {
-    name:  { type: "string"  as const },
-    age:   { type: "number"  as const },
-    active:{ type: "boolean" as const },
-    tags:  { type: "string[]" as const },
-    scores:{ type: "number[]" as const },
-    notes: { type: "string"  as const, required: false },
+    name: { type: "string" as const },
+    age: { type: "number" as const },
+    active: { type: "boolean" as const },
+    tags: { type: "string[]" as const },
+    scores: { type: "number[]" as const },
+    notes: { type: "string" as const, required: false },
   } satisfies ExtractSchema;
 
   it("passes when all required fields are present and typed correctly", () => {
@@ -630,53 +639,71 @@ describe("validateExtractResult", () => {
 
   it("passes when optional field is absent", () => {
     expect(() =>
-      validateExtractResult(
-        { name: "Yash", age: 21, active: true, tags: [], scores: [] },
-        schema,
-      ),
+      validateExtractResult({ name: "Yash", age: 21, active: true, tags: [], scores: [] }, schema),
     ).not.toThrow();
   });
 
   it("throws SCHEMA_VALIDATION_ERROR for missing required string field", () => {
     let err: unknown;
-    try { validateExtractResult({ age: 21, active: true, tags: [], scores: [] }, schema); }
-    catch (e) { err = e; }
+    try {
+      validateExtractResult({ age: 21, active: true, tags: [], scores: [] }, schema);
+    } catch (e) {
+      err = e;
+    }
     expect((err as LlmUtilsError).code).toBe("SCHEMA_VALIDATION_ERROR");
   });
 
   it("throws SCHEMA_VALIDATION_ERROR for wrong type on number field", () => {
     let err: unknown;
-    try { validateExtractResult({ name: "X", age: "twenty", active: true, tags: [], scores: [] }, schema); }
-    catch (e) { err = e; }
+    try {
+      validateExtractResult(
+        { name: "X", age: "twenty", active: true, tags: [], scores: [] },
+        schema,
+      );
+    } catch (e) {
+      err = e;
+    }
     expect((err as LlmUtilsError).code).toBe("SCHEMA_VALIDATION_ERROR");
     expect((err as LlmUtilsError).message).toContain('"age"');
   });
 
   it("throws for wrong type on boolean field", () => {
     let err: unknown;
-    try { validateExtractResult({ name: "X", age: 1, active: 1, tags: [], scores: [] }, schema); }
-    catch (e) { err = e; }
+    try {
+      validateExtractResult({ name: "X", age: 1, active: 1, tags: [], scores: [] }, schema);
+    } catch (e) {
+      err = e;
+    }
     expect((err as LlmUtilsError).code).toBe("SCHEMA_VALIDATION_ERROR");
   });
 
   it("throws for string[] field containing non-strings", () => {
     let err: unknown;
-    try { validateExtractResult({ name: "X", age: 1, active: true, tags: [1, 2], scores: [] }, schema); }
-    catch (e) { err = e; }
+    try {
+      validateExtractResult({ name: "X", age: 1, active: true, tags: [1, 2], scores: [] }, schema);
+    } catch (e) {
+      err = e;
+    }
     expect((err as LlmUtilsError).code).toBe("SCHEMA_VALIDATION_ERROR");
   });
 
   it("throws for number[] field containing non-numbers", () => {
     let err: unknown;
-    try { validateExtractResult({ name: "X", age: 1, active: true, tags: [], scores: ["a"] }, schema); }
-    catch (e) { err = e; }
+    try {
+      validateExtractResult({ name: "X", age: 1, active: true, tags: [], scores: ["a"] }, schema);
+    } catch (e) {
+      err = e;
+    }
     expect((err as LlmUtilsError).code).toBe("SCHEMA_VALIDATION_ERROR");
   });
 
   it("violation context has field, expected, got, reason", () => {
     let err: unknown;
-    try { validateExtractResult({ age: 21, active: true, tags: [], scores: [] }, schema); }
-    catch (e) { err = e; }
+    try {
+      validateExtractResult({ age: 21, active: true, tags: [], scores: [] }, schema);
+    } catch (e) {
+      err = e;
+    }
     const v = ((err as LlmUtilsError).context as { violations: ExtractViolation[] }).violations[0]!;
     expect(v.field).toBe("name");
     expect(v.reason).toBe("missing");
@@ -685,8 +712,11 @@ describe("validateExtractResult", () => {
 
   it("accepts null as missing (same as undefined) for required fields", () => {
     let err: unknown;
-    try { validateExtractResult({ name: null, age: 1, active: true, tags: [], scores: [] }, schema); }
-    catch (e) { err = e; }
+    try {
+      validateExtractResult({ name: null, age: 1, active: true, tags: [], scores: [] }, schema);
+    } catch (e) {
+      err = e;
+    }
     expect((err as LlmUtilsError).code).toBe("SCHEMA_VALIDATION_ERROR");
   });
 

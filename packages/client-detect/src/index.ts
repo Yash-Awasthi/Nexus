@@ -17,14 +17,15 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type ClientType =
-  | "claude-code"   // Anthropic Claude Code agent
-  | "cursor"        // Cursor IDE
-  | "vscode"        // VS Code extension
-  | "browser"       // Web browser (Chat UI)
-  | "cli"           // curl / httpie / raw CLI
-  | "sdk"           // Nexus SDK / programmatic
-  | "unknown";      // Unrecognised
+  | "claude-code" // Anthropic Claude Code agent
+  | "cursor" // Cursor IDE
+  | "vscode" // VS Code extension
+  | "browser" // Web browser (Chat UI)
+  | "cli" // curl / httpie / raw CLI
+  | "sdk" // Nexus SDK / programmatic
+  | "unknown"; // Unrecognised
 
+/** Detection result interface definition. */
 export interface DetectionResult {
   clientType: ClientType;
   confidence: "high" | "medium" | "low";
@@ -34,58 +35,75 @@ export interface DetectionResult {
   responseFormat: ResponseFormat;
 }
 
+/** Response format type alias. */
 export type ResponseFormat = "markdown" | "plain" | "json" | "tool-calls";
 
 const FORMAT_MAP: Record<ClientType, ResponseFormat> = {
-  "claude-code":  "tool-calls",
-  "cursor":       "tool-calls",
-  "vscode":       "plain",
-  "browser":      "markdown",
-  "cli":          "plain",
-  "sdk":          "json",
-  "unknown":      "markdown",
+  "claude-code": "tool-calls",
+  cursor: "tool-calls",
+  vscode: "plain",
+  browser: "markdown",
+  cli: "plain",
+  sdk: "json",
+  unknown: "markdown",
 };
 
 // ── Detection patterns ────────────────────────────────────────────────────────
 
-interface UAPattern { pattern: RegExp; clientType: ClientType; confidence: "high" | "medium" | "low" }
+interface UAPattern {
+  pattern: RegExp;
+  clientType: ClientType;
+  confidence: "high" | "medium" | "low";
+}
 
 const UA_PATTERNS: UAPattern[] = [
-  { pattern: /claude[-_]code/i,      clientType: "claude-code", confidence: "high" },
-  { pattern: /cursor\//i,            clientType: "cursor",      confidence: "high" },
-  { pattern: /vscode\//i,            clientType: "vscode",      confidence: "high" },
-  { pattern: /visual studio code/i,  clientType: "vscode",      confidence: "high" },
-  { pattern: /nexus[-_]sdk/i,        clientType: "sdk",         confidence: "high" },
-  { pattern: /\bcurl\//i,            clientType: "cli",         confidence: "medium" },
-  { pattern: /httpie\//i,            clientType: "cli",         confidence: "medium" },
-  { pattern: /python-httpx/i,        clientType: "sdk",         confidence: "medium" },
-  { pattern: /node-fetch/i,          clientType: "sdk",         confidence: "medium" },
-  { pattern: /axios\//i,             clientType: "sdk",         confidence: "medium" },
-  { pattern: /mozilla\/5\.0/i,       clientType: "browser",     confidence: "medium" },
-  { pattern: /chrome\//i,            clientType: "browser",     confidence: "medium" },
-  { pattern: /firefox\//i,           clientType: "browser",     confidence: "medium" },
-  { pattern: /safari\//i,            clientType: "browser",     confidence: "low" },
+  { pattern: /claude[-_]code/i, clientType: "claude-code", confidence: "high" },
+  { pattern: /cursor\//i, clientType: "cursor", confidence: "high" },
+  { pattern: /vscode\//i, clientType: "vscode", confidence: "high" },
+  { pattern: /visual studio code/i, clientType: "vscode", confidence: "high" },
+  { pattern: /nexus[-_]sdk/i, clientType: "sdk", confidence: "high" },
+  { pattern: /\bcurl\//i, clientType: "cli", confidence: "medium" },
+  { pattern: /httpie\//i, clientType: "cli", confidence: "medium" },
+  { pattern: /python-httpx/i, clientType: "sdk", confidence: "medium" },
+  { pattern: /node-fetch/i, clientType: "sdk", confidence: "medium" },
+  { pattern: /axios\//i, clientType: "sdk", confidence: "medium" },
+  { pattern: /mozilla\/5\.0/i, clientType: "browser", confidence: "medium" },
+  { pattern: /chrome\//i, clientType: "browser", confidence: "medium" },
+  { pattern: /firefox\//i, clientType: "browser", confidence: "medium" },
+  { pattern: /safari\//i, clientType: "browser", confidence: "low" },
 ];
 
 // ── detectClient ──────────────────────────────────────────────────────────────
 
-export interface RequestHeaders {
-  [key: string]: string | string[] | undefined;
-}
+export type RequestHeaders = Record<string, string | string[] | undefined>;
 
 function headerVal(headers: RequestHeaders, key: string): string {
   const v = headers[key] ?? headers[key.toLowerCase()];
-  return Array.isArray(v) ? v[0] ?? "" : (v ?? "");
+  return Array.isArray(v) ? (v[0] ?? "") : (v ?? "");
 }
 
+/** Detect client. */
 export function detectClient(headers: RequestHeaders): DetectionResult {
   // 1. Explicit header
   const explicit = headerVal(headers, "x-nexus-client") || headerVal(headers, "x-client-type");
   if (explicit) {
     const ct = explicit.toLowerCase() as ClientType;
-    const validTypes: ClientType[] = ["claude-code", "cursor", "vscode", "browser", "cli", "sdk", "unknown"];
+    const validTypes: ClientType[] = [
+      "claude-code",
+      "cursor",
+      "vscode",
+      "browser",
+      "cli",
+      "sdk",
+      "unknown",
+    ];
     if (validTypes.includes(ct)) {
-      return { clientType: ct, confidence: "high", signal: `x-nexus-client: ${explicit}`, responseFormat: FORMAT_MAP[ct] };
+      return {
+        clientType: ct,
+        confidence: "high",
+        signal: `x-nexus-client: ${explicit}`,
+        responseFormat: FORMAT_MAP[ct],
+      };
     }
   }
 
@@ -94,7 +112,12 @@ export function detectClient(headers: RequestHeaders): DetectionResult {
   if (ua) {
     for (const { pattern, clientType, confidence } of UA_PATTERNS) {
       if (pattern.test(ua)) {
-        return { clientType, confidence, signal: `user-agent: ${ua}`, responseFormat: FORMAT_MAP[clientType] };
+        return {
+          clientType,
+          confidence,
+          signal: `user-agent: ${ua}`,
+          responseFormat: FORMAT_MAP[clientType],
+        };
       }
     }
   }
@@ -102,10 +125,20 @@ export function detectClient(headers: RequestHeaders): DetectionResult {
   // 3. Accept header hints
   const accept = headerVal(headers, "accept");
   if (accept.includes("application/json") && !accept.includes("text/html")) {
-    return { clientType: "sdk", confidence: "low", signal: `accept: ${accept}`, responseFormat: "json" };
+    return {
+      clientType: "sdk",
+      confidence: "low",
+      signal: `accept: ${accept}`,
+      responseFormat: "json",
+    };
   }
 
-  return { clientType: "unknown", confidence: "low", signal: "no signal", responseFormat: "markdown" };
+  return {
+    clientType: "unknown",
+    confidence: "low",
+    signal: "no signal",
+    responseFormat: "markdown",
+  };
 }
 
 // ── Fastify middleware ────────────────────────────────────────────────────────
@@ -115,9 +148,14 @@ export interface ClientDetectMiddlewareOptions {
   attachAs?: string;
 }
 
+/** Make client detect middleware. */
 export function makeClientDetectMiddleware(opts?: ClientDetectMiddlewareOptions) {
   const attachAs = opts?.attachAs ?? "nexusClient";
-  return function clientDetectMiddleware(request: unknown, _reply: unknown, done?: () => void): void {
+  return function clientDetectMiddleware(
+    request: unknown,
+    _reply: unknown,
+    done?: () => void,
+  ): void {
     const req = request as { headers?: RequestHeaders; [key: string]: unknown };
     const result = detectClient(req.headers ?? {});
     (req as Record<string, unknown>)[attachAs] = result;

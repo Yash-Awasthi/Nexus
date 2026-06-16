@@ -75,10 +75,12 @@ describe("JobManifest.build", () => {
   });
 
   it("sets metadata from spec", () => {
-    const m = JobManifest.build(makeSpec({
-      labels: { "env": "test" },
-      annotations: { "purpose": "ci" },
-    }));
+    const m = JobManifest.build(
+      makeSpec({
+        labels: { env: "test" },
+        annotations: { purpose: "ci" },
+      }),
+    );
     expect(m.metadata.name).toBe("test-job");
     expect(m.metadata.namespace).toBe("sandboxes");
     expect(m.metadata.labels?.["env"]).toBe("test");
@@ -248,7 +250,7 @@ describe("JobWatcher", () => {
     await client.submitJob(m);
     const watcher = new JobWatcher(client, noSleep);
     await expect(
-      watcher.watch("test-job", "sandboxes", { pollIntervalMs: 0, timeoutMs: 1 })
+      watcher.watch("test-job", "sandboxes", { pollIntervalMs: 0, timeoutMs: 1 }),
     ).rejects.toThrow("timed out");
   });
 
@@ -369,7 +371,11 @@ describe("SandboxExecutor", () => {
   });
 
   it("execute handles failed job", async () => {
-    const client = new MockKubeClient({ finalPhase: "failed", stderr: "NameError: x", exitCode: 1 });
+    const client = new MockKubeClient({
+      finalPhase: "failed",
+      stderr: "NameError: x",
+      exitCode: 1,
+    });
     const executor = new SandboxExecutor({ client, sleep: noSleep });
     const result = await executor.execute(makeSpec());
     expect(result.phase).toBe("failed");

@@ -57,6 +57,7 @@ export interface ResolvedParams {
   repetition_penalty: number;
 }
 
+/** Plugin mode interface definition. */
 export interface PluginMode {
   id: string;
   description?: string;
@@ -67,6 +68,7 @@ export interface PluginMode {
   locale?: string;
 }
 
+/** Apply result interface definition. */
 export interface ApplyResult {
   params: ResolvedParams;
   systemPromptSnippet: string;
@@ -90,12 +92,12 @@ const DEFAULTS: Required<BaseAutoTuneParams> = {
 
 function resolve(base: BaseAutoTuneParams): ResolvedParams {
   return {
-    temperature:       base.temperature       ?? DEFAULTS.temperature,
-    top_p:             base.top_p             ?? DEFAULTS.top_p,
-    top_k:             base.top_k             ?? DEFAULTS.top_k,
+    temperature: base.temperature ?? DEFAULTS.temperature,
+    top_p: base.top_p ?? DEFAULTS.top_p,
+    top_k: base.top_k ?? DEFAULTS.top_k,
     frequency_penalty: base.frequency_penalty ?? DEFAULTS.frequency_penalty,
-    presence_penalty:  base.presence_penalty  ?? DEFAULTS.presence_penalty,
-    repetition_penalty:base.repetition_penalty?? DEFAULTS.repetition_penalty,
+    presence_penalty: base.presence_penalty ?? DEFAULTS.presence_penalty,
+    repetition_penalty: base.repetition_penalty ?? DEFAULTS.repetition_penalty,
   };
 }
 
@@ -134,11 +136,11 @@ export class PluginModeRegistry {
 
     const d = mode.params;
     const params: ResolvedParams = {
-      temperature:       clamp(base.temperature       + (d.temperatureDelta       ?? 0), 0, 2),
-      top_p:             clamp(base.top_p             + (d.top_pDelta             ?? 0), 0, 1),
-      top_k:             Math.round(clamp(base.top_k  + (d.top_kDelta             ?? 0), 1, 100)),
+      temperature: clamp(base.temperature + (d.temperatureDelta ?? 0), 0, 2),
+      top_p: clamp(base.top_p + (d.top_pDelta ?? 0), 0, 1),
+      top_k: Math.round(clamp(base.top_k + (d.top_kDelta ?? 0), 1, 100)),
       frequency_penalty: clamp(base.frequency_penalty + (d.frequency_penaltyDelta ?? 0), -2, 2),
-      presence_penalty:  clamp(base.presence_penalty  + (d.presence_penaltyDelta  ?? 0), -2, 2),
+      presence_penalty: clamp(base.presence_penalty + (d.presence_penaltyDelta ?? 0), -2, 2),
       repetition_penalty: base.repetition_penalty,
     };
 
@@ -183,7 +185,12 @@ export const BUILTIN_MODES: PluginMode[] = [
   {
     id: "precise",
     description: "Formal, constrained, highly accurate — low entropy",
-    params: { temperatureDelta: -0.35, top_pDelta: -0.1, top_kDelta: -20, presence_penaltyDelta: -0.05 },
+    params: {
+      temperatureDelta: -0.35,
+      top_pDelta: -0.1,
+      top_kDelta: -20,
+      presence_penaltyDelta: -0.05,
+    },
     systemPromptSnippet:
       "Be precise, formal, and factual. Avoid speculation. Use structured responses with clear headings. Cite limitations and assumptions explicitly.",
   },

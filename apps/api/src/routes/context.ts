@@ -25,8 +25,6 @@
  *   }
  */
 
-import { db } from "@nexus/db";
-import { runtimeTasks, signals, memoryEntries } from "@nexus/db/schema";
 import {
   assembleContextPack,
   type ContextFetchers,
@@ -34,6 +32,9 @@ import {
   type ActiveSignal,
   type MemoryFact,
 } from "@nexus/context-pack";
+import { db } from "@nexus/db";
+import { runtimeTasks, signals, memoryEntries } from "@nexus/db/schema";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { desc, gte, or, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
@@ -82,12 +83,7 @@ function buildDbFetchers(): ContextFetchers {
           createdAt: signals.createdAt,
         })
         .from(signals)
-        .where(
-          or(
-            eq(signals.priority, "high"),
-            eq(signals.priority, "critical"),
-          ),
-        )
+        .where(or(eq(signals.priority, "high"), eq(signals.priority, "critical")))
         .orderBy(desc(signals.createdAt))
         .limit(limit);
 

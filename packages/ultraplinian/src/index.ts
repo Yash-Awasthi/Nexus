@@ -48,6 +48,7 @@ export class UltraplinianError extends Error {
 
 export type MessageRole = "system" | "user" | "assistant";
 
+/** Ultraplinian message interface definition. */
 export interface UltraplinianMessage {
   role: MessageRole;
   content: string;
@@ -80,6 +81,7 @@ export interface ModelResult {
 
 export type SpeedTier = "fast" | "standard" | "smart" | "power" | "ultra";
 
+/** Ultraplinian models. */
 export const ULTRAPLINIAN_MODELS: Record<SpeedTier, readonly string[]> = {
   fast: [
     "google/gemini-2.5-flash",
@@ -226,6 +228,7 @@ export function scoreResponse(content: string, userQuery: string): number {
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
+/** Query model. */
 export async function queryModel(
   model: string,
   messages: UltraplinianMessage[],
@@ -246,8 +249,7 @@ export async function queryModel(
     if (params.top_k !== undefined) body["top_k"] = params.top_k;
     if (params.frequency_penalty !== undefined)
       body["frequency_penalty"] = params.frequency_penalty;
-    if (params.presence_penalty !== undefined)
-      body["presence_penalty"] = params.presence_penalty;
+    if (params.presence_penalty !== undefined) body["presence_penalty"] = params.presence_penalty;
     if (params.repetition_penalty !== undefined)
       body["repetition_penalty"] = params.repetition_penalty;
 
@@ -266,13 +268,12 @@ export async function queryModel(
     if (!res.ok) {
       const err = (await res.json().catch(() => ({}))) as Record<string, unknown>;
       const msg =
-        (err["error"] as Record<string, unknown> | undefined)?.["message"] ??
-        `HTTP ${res.status}`;
+        (err["error"] as Record<string, unknown> | undefined)?.["message"] ?? `HTTP ${res.status}`;
       throw new Error(String(msg));
     }
 
     const data = (await res.json()) as Record<string, unknown>;
-    const choices = data["choices"] as Array<Record<string, unknown>> | undefined;
+    const choices = data["choices"] as Record<string, unknown>[] | undefined;
     const msg = choices?.[0]?.["message"] as Record<string, unknown> | undefined;
     const content = String(msg?.["content"] ?? "");
 
@@ -357,6 +358,7 @@ export function raceModels(
         if (successCount >= minResults && !graceTimer) {
           graceTimer = setTimeout(finish, gracePeriod);
         }
+        // eslint-disable-next-line promise/always-return
         if (settled === models.length) finish();
       });
     };
@@ -399,6 +401,7 @@ export interface UltraplinianRunnerConfig {
   raceConfig?: RaceConfig;
 }
 
+/** Race request interface definition. */
 export interface RaceRequest {
   tier: SpeedTier;
   messages: UltraplinianMessage[];
@@ -437,8 +440,7 @@ export class UltraplinianRunner {
     );
 
     // Extract user query for scoring (last user message)
-    const userQuery =
-      [...req.messages].reverse().find((m) => m.role === "user")?.content ?? "";
+    const userQuery = [...req.messages].reverse().find((m) => m.role === "user")?.content ?? "";
 
     // Score all successful results
     const scored = rawResults.map((r) => ({

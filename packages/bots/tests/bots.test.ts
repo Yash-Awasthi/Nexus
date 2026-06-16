@@ -212,21 +212,34 @@ describe("SlackBotAdapter — message events", () => {
   });
 
   it("sends reply via chat.postMessage", async () => {
-    const adapter = new SlackBotAdapter({ token: "xoxb-test", handler: echoHandler, fetch: fetchFn });
+    const adapter = new SlackBotAdapter({
+      token: "xoxb-test",
+      handler: echoHandler,
+      fetch: fetchFn,
+    });
     await adapter.handleEvent(messagePayload());
     expect(fetchFn).toHaveBeenCalledWith(
       "https://slack.com/api/chat.postMessage",
       expect.objectContaining({ method: "POST" }),
     );
-    const callBody = JSON.parse((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
+    const callBody = JSON.parse(
+      (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string,
+    );
     expect(callBody.channel).toBe("C123");
     expect(callBody.text).toContain("Echo:");
   });
 
   it("includes Authorization Bearer in send call", async () => {
-    const adapter = new SlackBotAdapter({ token: "xoxb-token", handler: echoHandler, fetch: fetchFn });
+    const adapter = new SlackBotAdapter({
+      token: "xoxb-token",
+      handler: echoHandler,
+      fetch: fetchFn,
+    });
     await adapter.handleEvent(messagePayload());
-    const headers = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.headers as Record<string, string>;
+    const headers = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.headers as Record<
+      string,
+      string
+    >;
     expect(headers["Authorization"]).toBe("Bearer xoxb-token");
   });
 
@@ -371,7 +384,12 @@ describe("SlackBotAdapter — hooks", () => {
   it("emits task.before and task.after on message handling", async () => {
     const hooks = makeHooks();
     const fetchFn = makeFetch([{ ok: true, body: { ok: true } }]);
-    const adapter = new SlackBotAdapter({ token: "t", handler: echoHandler, fetch: fetchFn, hooks });
+    const adapter = new SlackBotAdapter({
+      token: "t",
+      handler: echoHandler,
+      fetch: fetchFn,
+      hooks,
+    });
     await adapter.handleEvent(messagePayload());
     expect(hooks.emit).toHaveBeenCalledTimes(2);
     const events = (hooks.emit as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
@@ -382,7 +400,12 @@ describe("SlackBotAdapter — hooks", () => {
   it("task.before payload includes platform and channelId", async () => {
     const hooks = makeHooks();
     const fetchFn = makeFetch([{ ok: true, body: { ok: true } }]);
-    const adapter = new SlackBotAdapter({ token: "t", handler: echoHandler, fetch: fetchFn, hooks });
+    const adapter = new SlackBotAdapter({
+      token: "t",
+      handler: echoHandler,
+      fetch: fetchFn,
+      hooks,
+    });
     await adapter.handleEvent(messagePayload());
     expect((hooks.emit as ReturnType<typeof vi.fn>).mock.calls[0]![1]).toMatchObject({
       platform: "slack",
@@ -393,7 +416,12 @@ describe("SlackBotAdapter — hooks", () => {
   it("hook errors are non-fatal", async () => {
     const hooks: BotHooks = { emit: vi.fn().mockRejectedValue(new Error("hook err")) };
     const fetchFn = makeFetch([{ ok: true, body: { ok: true } }]);
-    const adapter = new SlackBotAdapter({ token: "t", handler: echoHandler, fetch: fetchFn, hooks });
+    const adapter = new SlackBotAdapter({
+      token: "t",
+      handler: echoHandler,
+      fetch: fetchFn,
+      hooks,
+    });
     await expect(adapter.handleEvent(messagePayload())).resolves.toBeDefined();
   });
 });
@@ -403,7 +431,9 @@ describe("SlackBotAdapter — direct send", () => {
     const fetchFn = makeFetch([{ ok: true, body: { ok: true } }]);
     const adapter = new SlackBotAdapter({ token: "xoxb-x", handler: echoHandler, fetch: fetchFn });
     await adapter.send("C999", "Direct message");
-    const body = JSON.parse((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
+    const body = JSON.parse(
+      (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string,
+    );
     expect(body.channel).toBe("C999");
     expect(body.text).toBe("Direct message");
   });
@@ -412,7 +442,9 @@ describe("SlackBotAdapter — direct send", () => {
     const fetchFn = makeFetch([{ ok: true, body: { ok: true } }]);
     const adapter = new SlackBotAdapter({ token: "t", handler: echoHandler, fetch: fetchFn });
     await adapter.send("C1", "reply", { threadTs: "1717000000.000001" });
-    const body = JSON.parse((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
+    const body = JSON.parse(
+      (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string,
+    );
     expect(body.thread_ts).toBe("1717000000.000001");
   });
 
@@ -484,7 +516,10 @@ describe("TeamsBotAdapter — message activities", () => {
   it("sends Bearer token in Authorization header for reply", async () => {
     const adapter = makeTeamsAdapter(echoHandler, fetchFn);
     await adapter.handleActivity(teamsActivity());
-    const headers = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[1]![1]!.headers as Record<string, string>;
+    const headers = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[1]![1]!.headers as Record<
+      string,
+      string
+    >;
     expect(headers["Authorization"]).toBe("Bearer test-token");
   });
 
@@ -538,9 +573,7 @@ describe("TeamsBotAdapter — message activities", () => {
   });
 
   it("sendFailed is true when token endpoint fails", async () => {
-    const badFetch = makeFetch([
-      { ok: false, status: 401, body: {} },
-    ]);
+    const badFetch = makeFetch([{ ok: false, status: 401, body: {} }]);
     const adapter = makeTeamsAdapter(echoHandler, badFetch);
     const result = await adapter.handleActivity(teamsActivity());
     expect(result.sendFailed).toBe(true);
@@ -630,12 +663,14 @@ describe("TeamsBotAdapter — hooks", () => {
 // SlackBotAdapter — trigger modes
 // ─────────────────────────────────────────────────────────────────────────────
 
-function makeSlack(opts: {
-  triggerMode?: BotTriggerMode;
-  botUserId?: string;
-  allowedUserIds?: string[];
-  handler?: BotHandler;
-} = {}) {
+function makeSlack(
+  opts: {
+    triggerMode?: BotTriggerMode;
+    botUserId?: string;
+    allowedUserIds?: string[];
+    handler?: BotHandler;
+  } = {},
+) {
   return new SlackBotAdapter({
     token: "xoxb-test",
     handler: opts.handler ?? echoHandler,
@@ -655,7 +690,9 @@ describe("SlackBotAdapter — triggerMode", () => {
 
   it("mention mode: handles message that mentions the bot", async () => {
     const slack = makeSlack({ triggerMode: "mention", botUserId: "U999" });
-    const result = await slack.handleEvent(messagePayload({ event: undefined, text: "<@U999> help" }));
+    const result = await slack.handleEvent(
+      messagePayload({ event: undefined, text: "<@U999> help" }),
+    );
     // rebuild properly
     const payload = {
       type: "event_callback",

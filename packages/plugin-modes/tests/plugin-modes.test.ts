@@ -108,7 +108,12 @@ describe("PluginModeRegistry.apply()", () => {
 
   it("returns locale from mode", () => {
     const r = new PluginModeRegistry();
-    r.register({ id: "ar-mode", params: {}, systemPromptSnippet: "Respond in Arabic.", locale: "ar" });
+    r.register({
+      id: "ar-mode",
+      params: {},
+      systemPromptSnippet: "Respond in Arabic.",
+      locale: "ar",
+    });
     expect(r.apply(BASE, "ar-mode").locale).toBe("ar");
   });
 
@@ -123,7 +128,9 @@ describe("PluginModeRegistry.apply()", () => {
   it("preserves repetition_penalty unchanged", () => {
     const r = new PluginModeRegistry();
     r.register({ id: "m", params: { temperatureDelta: 0.1 }, systemPromptSnippet: "" });
-    expect(r.apply({ ...BASE, repetition_penalty: 1.15 }, "m").params.repetition_penalty).toBe(1.15);
+    expect(r.apply({ ...BASE, repetition_penalty: 1.15 }, "m").params.repetition_penalty).toBe(
+      1.15,
+    );
   });
 });
 

@@ -145,7 +145,9 @@ describe("renderTemplate", () => {
 describe("TemplateRegistry", () => {
   let registry: TemplateRegistry;
 
-  beforeEach(() => { registry = new TemplateRegistry(); });
+  beforeEach(() => {
+    registry = new TemplateRegistry();
+  });
 
   it("register + get round-trips", () => {
     registry.register(ADR_TEMPLATE);
@@ -267,7 +269,10 @@ describe("Built-in templates", () => {
   });
 
   it("Postmortem has What Went Well section", () => {
-    const rendered = renderTemplate(POSTMORTEM_TEMPLATE, { incident_date: "2026-06-14", author: "Yash" });
+    const rendered = renderTemplate(POSTMORTEM_TEMPLATE, {
+      incident_date: "2026-06-14",
+      author: "Yash",
+    });
     expect(rendered).toContain("## What Went Well");
   });
 

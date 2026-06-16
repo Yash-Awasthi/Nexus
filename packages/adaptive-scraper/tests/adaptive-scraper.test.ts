@@ -160,7 +160,10 @@ describe("AdaptiveScraper", () => {
     const e1 = new MockEngine("httpx", 1);
     let callCount = 0;
     const originalScrape = e1.scrape.bind(e1);
-    e1.scrape = async (url, opts) => { callCount++; return originalScrape(url, opts); };
+    e1.scrape = async (url, opts) => {
+      callCount++;
+      return originalScrape(url, opts);
+    };
 
     const scraper = new AdaptiveScraper([e1]);
     await scraper.scrape("https://site.com");

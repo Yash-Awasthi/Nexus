@@ -8,7 +8,8 @@
  *
  * Provides:
  *   • WikiArticle              — article store entry
- *   • WikiStore                — in-memory article store
+ *   • WikiStore                — in-memory article store (used by pipeline)
+ *   • PgWikiStore              — Postgres-backed persistent store (Neon serverless)
  *   • IntentDistillStep        — distil document intent to BM25 query
  *   • CandidateSearchStep      — BM25 candidate retrieval
  *   • SelectorStep             — select most relevant candidate
@@ -19,6 +20,13 @@
  *   • StageMetrics             — per-stage timing/result counters
  *   • MockWikiBackend          — injectable test double
  */
+
+import { neon } from "@neondatabase/serverless";
+
+/** Escape special regex metacharacters in a literal string. */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -31,18 +39,21 @@ export interface WikiArticle {
   version: number;
 }
 
+/** Wiki document interface definition. */
 export interface WikiDocument {
   id: string;
   content: string;
   source?: string;
 }
 
+/** Update request interface definition. */
 export interface UpdateRequest {
   document: WikiDocument;
   sessionId?: string;
   dryRun?: boolean;
 }
 
+/** Update result interface definition. */
 export interface UpdateResult {
   articleId: string | null;
   created: boolean;
@@ -52,6 +63,7 @@ export interface UpdateResult {
   durationMs: number;
 }
 
+/** Stage result interface definition. */
 export interface StageResult {
   stage: string;
   durationMs: number;
@@ -64,6 +76,7 @@ export interface StageResult {
 
 let _articleSeq = 0;
 
+/** Wiki store. */
 export class WikiStore {
   private articles = new Map<string, WikiArticle>();
   private index = new Map<string, Set<string>>(); // term → article ids
@@ -72,15 +85,26 @@ export class WikiStore {
     this.articles.set(article.id, article);
   }
 
-  get(id: string): WikiArticle | undefined { return this.articles.get(id); }
-  has(id: string): boolean { return this.articles.has(id); }
-  all(): WikiArticle[] { return [...this.articles.values()]; }
-  size(): number { return this.articles.size; }
+  get(id: string): WikiArticle | undefined {
+    return this.articles.get(id);
+  }
+  has(id: string): boolean {
+    return this.articles.has(id);
+  }
+  all(): WikiArticle[] {
+    return [...this.articles.values()];
+  }
+  size(): number {
+    return this.articles.size;
+  }
 
   create(title: string, content: string, tags: string[] = []): WikiArticle {
     const id = `article-${++_articleSeq}`;
     const article: WikiArticle = {
-      id, title, content, tags,
+      id,
+      title,
+      content,
+      tags,
       updatedAt: new Date().toISOString(),
       version: 1,
     };
@@ -101,17 +125,22 @@ export class WikiStore {
     return updated;
   }
 
-  delete(id: string): boolean { return this.articles.delete(id); }
+  delete(id: string): boolean {
+    return this.articles.delete(id);
+  }
 
   /** Simple BM25-like term search (token overlap). */
   search(query: string, limit = 5): WikiArticle[] {
-    const terms = query.toLowerCase().split(/\s+/).filter((t) => t.length > 2);
-    const scored: Array<{ article: WikiArticle; score: number }> = [];
+    const terms = query
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((t) => t.length > 2);
+    const scored: { article: WikiArticle; score: number }[] = [];
 
     for (const article of this.articles.values()) {
       const text = (article.title + " " + article.content).toLowerCase();
       const score = terms.reduce((sum, term) => {
-        const count = (text.match(new RegExp(term, "g")) ?? []).length;
+        const count = (text.match(new RegExp(escapeRegExp(term), "g")) ?? []).length;
         return sum + count;
       }, 0);
       if (score > 0) scored.push({ article, score });
@@ -128,7 +157,8 @@ export class WikiStore {
     let terms = 0;
     for (const article of this.articles.values()) {
       const allTerms = (article.title + " " + article.content)
-        .toLowerCase().split(/\s+/)
+        .toLowerCase()
+        .split(/\s+/)
         .filter((t) => t.length > 2);
       for (const term of allTerms) {
         if (!this.index.has(term)) this.index.set(term, new Set());
@@ -139,7 +169,124 @@ export class WikiStore {
     return terms;
   }
 
-  clear(): void { this.articles.clear(); this.index.clear(); }
+  clear(): void {
+    this.articles.clear();
+    this.index.clear();
+  }
+}
+
+// ── PgWikiStore ───────────────────────────────────────────────────────────────
+
+/**
+ * Postgres-backed wiki article store using @neondatabase/serverless.
+ * Persists articles across restarts; falls back gracefully on query errors.
+ *
+ * Table is created on first call to init() or lazily on first write.
+ *
+ * Usage:
+ *   const pg = new PgWikiStore(process.env.DATABASE_URL!);
+ *   await pg.init(); // idempotent — safe to call every startup
+ */
+export class PgWikiStore {
+  private sql: ReturnType<typeof neon>;
+  private ready = false;
+
+  constructor(connectionString: string) {
+    this.sql = neon(connectionString);
+  }
+
+  /** Creates the wiki_articles table if it does not already exist. */
+  async init(): Promise<void> {
+    await this.sql`
+      CREATE TABLE IF NOT EXISTS wiki_articles (
+        id          TEXT PRIMARY KEY,
+        title       TEXT        NOT NULL,
+        content     TEXT        NOT NULL,
+        tags        TEXT[]      NOT NULL DEFAULT '{}',
+        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        version     INTEGER     NOT NULL DEFAULT 1
+      )
+    `;
+    this.ready = true;
+  }
+
+  private async ensureReady(): Promise<void> {
+    if (!this.ready) await this.init();
+  }
+
+  async getAll(): Promise<WikiArticle[]> {
+    await this.ensureReady();
+    const rows = await this.sql`
+      SELECT * FROM wiki_articles ORDER BY updated_at DESC
+    `;
+    return (rows as Record<string, unknown>[]).map((r) => this.rowToArticle(r));
+  }
+
+  async getById(id: string): Promise<WikiArticle | undefined> {
+    await this.ensureReady();
+    const rows = await this.sql`
+      SELECT * FROM wiki_articles WHERE id = ${id} LIMIT 1
+    `;
+    const typedRows = rows as Record<string, unknown>[];
+    return typedRows[0] ? this.rowToArticle(typedRows[0]) : undefined;
+  }
+
+  async search(query: string, limit = 5): Promise<WikiArticle[]> {
+    await this.ensureReady();
+    const pattern = `%${query.toLowerCase()}%`;
+    const rows = await this.sql`
+      SELECT * FROM wiki_articles
+      WHERE LOWER(title) LIKE ${pattern} OR LOWER(content) LIKE ${pattern}
+      ORDER BY updated_at DESC
+      LIMIT ${limit}
+    `;
+    return (rows as Record<string, unknown>[]).map((r) => this.rowToArticle(r));
+  }
+
+  async upsert(article: WikiArticle): Promise<void> {
+    await this.ensureReady();
+    await this.sql`
+      INSERT INTO wiki_articles (id, title, content, tags, updated_at, version)
+      VALUES (
+        ${article.id},
+        ${article.title},
+        ${article.content},
+        ${article.tags},
+        ${article.updatedAt},
+        ${article.version}
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        title      = EXCLUDED.title,
+        content    = EXCLUDED.content,
+        tags       = EXCLUDED.tags,
+        updated_at = EXCLUDED.updated_at,
+        version    = EXCLUDED.version
+    `;
+  }
+
+  async delete(id: string): Promise<boolean> {
+    await this.ensureReady();
+    const result = await this.sql`DELETE FROM wiki_articles WHERE id = ${id}`;
+    // neon returns an array; rowCount lives on the result object
+    return ((result as unknown as { rowCount?: number }).rowCount ?? 0) > 0;
+  }
+
+  async count(): Promise<number> {
+    await this.ensureReady();
+    const rows = await this.sql`SELECT COUNT(*)::int AS n FROM wiki_articles`;
+    return (((rows as Record<string, unknown>[])[0])?.["n"] as number) ?? 0;
+  }
+
+  private rowToArticle(row: Record<string, unknown>): WikiArticle {
+    return {
+      id: row["id"] as string,
+      title: row["title"] as string,
+      content: row["content"] as string,
+      tags: (row["tags"] as string[]) ?? [],
+      updatedAt: (row["updated_at"] as string) ?? new Date().toISOString(),
+      version: (row["version"] as number) ?? 1,
+    };
+  }
 }
 
 // ── StageMetrics ──────────────────────────────────────────────────────────────
@@ -151,6 +298,7 @@ export interface StageStats {
   totalDurationMs: number;
 }
 
+/** Stage metrics. */
 export class StageMetrics {
   private stats = new Map<string, StageStats>();
 
@@ -165,16 +313,24 @@ export class StageMetrics {
     s.totalDurationMs += result.durationMs;
   }
 
-  get(stage: string): StageStats | undefined { return this.stats.get(stage); }
-  all(): Record<string, StageStats> { return Object.fromEntries(this.stats); }
-  clear(): void { this.stats.clear(); }
+  get(stage: string): StageStats | undefined {
+    return this.stats.get(stage);
+  }
+  all(): Record<string, StageStats> {
+    return Object.fromEntries(this.stats);
+  }
+  clear(): void {
+    this.stats.clear();
+  }
 }
 
 // ── Pipeline steps ────────────────────────────────────────────────────────────
 
 export type DistillFn = (content: string) => Promise<string | null>;
+/** Nl update fn type alias. */
 export type NlUpdateFn = (existing: string, newContent: string) => Promise<string>;
 
+/** Pipeline context interface definition. */
 export interface PipelineContext {
   document: WikiDocument;
   distilledQuery?: string | null;
@@ -186,6 +342,7 @@ export interface PipelineContext {
   isNew?: boolean;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function timed<T>(fn: () => Promise<T>): Promise<{ result: T; durationMs: number }> {
   const t0 = Date.now();
   const result = await fn();
@@ -204,6 +361,7 @@ export interface PipelineOptions {
   autoCreate?: boolean;
 }
 
+/** Wiki update pipeline. */
 export class WikiUpdatePipeline {
   private store: WikiStore;
   private distillFn: DistillFn;
@@ -213,11 +371,11 @@ export class WikiUpdatePipeline {
   private autoCreate: boolean;
 
   constructor(opts: PipelineOptions) {
-    this.store      = opts.store;
-    this.distillFn  = opts.distillFn  ?? (async (c) => c.slice(0, 200));
+    this.store = opts.store;
+    this.distillFn = opts.distillFn ?? (async (c) => c.slice(0, 200));
     this.nlUpdateFn = opts.nlUpdateFn ?? (async (_existing, newContent) => newContent);
     this.searchLimit = opts.searchLimit ?? 5;
-    this.metrics    = opts.metrics ?? new StageMetrics();
+    this.metrics = opts.metrics ?? new StageMetrics();
     this.autoCreate = opts.autoCreate ?? true;
   }
 
@@ -339,6 +497,10 @@ export class WikiUpdatePipeline {
     };
   }
 
-  getStore(): WikiStore { return this.store; }
-  getMetrics(): StageMetrics { return this.metrics; }
+  getStore(): WikiStore {
+    return this.store;
+  }
+  getMetrics(): StageMetrics {
+    return this.metrics;
+  }
 }

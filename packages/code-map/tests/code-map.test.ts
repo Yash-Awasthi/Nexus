@@ -18,15 +18,33 @@ import {
 // ── detectLanguage ────────────────────────────────────────────────────────────
 
 describe("detectLanguage", () => {
-  it("detects TypeScript from .ts", () => { expect(detectLanguage("src/index.ts")).toBe("typescript"); });
-  it("detects TypeScript from .tsx", () => { expect(detectLanguage("App.tsx")).toBe("typescript"); });
-  it("detects JavaScript from .js", () => { expect(detectLanguage("util.js")).toBe("javascript"); });
-  it("detects JavaScript from .mjs", () => { expect(detectLanguage("worker.mjs")).toBe("javascript"); });
-  it("detects Python from .py", () => { expect(detectLanguage("main.py")).toBe("python"); });
-  it("detects Go from .go", () => { expect(detectLanguage("main.go")).toBe("go"); });
-  it("detects Rust from .rs", () => { expect(detectLanguage("lib.rs")).toBe("rust"); });
-  it("detects Java from .java", () => { expect(detectLanguage("Main.java")).toBe("java"); });
-  it("returns unknown for unrecognised extensions", () => { expect(detectLanguage("file.xyz")).toBe("unknown"); });
+  it("detects TypeScript from .ts", () => {
+    expect(detectLanguage("src/index.ts")).toBe("typescript");
+  });
+  it("detects TypeScript from .tsx", () => {
+    expect(detectLanguage("App.tsx")).toBe("typescript");
+  });
+  it("detects JavaScript from .js", () => {
+    expect(detectLanguage("util.js")).toBe("javascript");
+  });
+  it("detects JavaScript from .mjs", () => {
+    expect(detectLanguage("worker.mjs")).toBe("javascript");
+  });
+  it("detects Python from .py", () => {
+    expect(detectLanguage("main.py")).toBe("python");
+  });
+  it("detects Go from .go", () => {
+    expect(detectLanguage("main.go")).toBe("go");
+  });
+  it("detects Rust from .rs", () => {
+    expect(detectLanguage("lib.rs")).toBe("rust");
+  });
+  it("detects Java from .java", () => {
+    expect(detectLanguage("Main.java")).toBe("java");
+  });
+  it("returns unknown for unrecognised extensions", () => {
+    expect(detectLanguage("file.xyz")).toBe("unknown");
+  });
 });
 
 // ── parseFile — TypeScript ────────────────────────────────────────────────────
@@ -123,11 +141,15 @@ MY_CONST = 42
 `.trim();
 
   it("extracts function symbols", () => {
-    expect(parseFile("app/main.py", PY_SOURCE).symbols.find((s) => s.name === "process")).toBeDefined();
+    expect(
+      parseFile("app/main.py", PY_SOURCE).symbols.find((s) => s.name === "process"),
+    ).toBeDefined();
   });
 
   it("extracts class symbols", () => {
-    expect(parseFile("app/main.py", PY_SOURCE).symbols.find((s) => s.name === "Transformer")).toBeDefined();
+    expect(
+      parseFile("app/main.py", PY_SOURCE).symbols.find((s) => s.name === "Transformer"),
+    ).toBeDefined();
   });
 
   it("records imports", () => {
@@ -295,7 +317,9 @@ export const VALUE = 1;`,
 
   it("returns classes", () => {
     const map = buildCodeMap(FILES);
-    expect(getSymbolsByKind(map, "src/mixed.ts", "class").some((s) => s.name === "MyClass")).toBe(true);
+    expect(getSymbolsByKind(map, "src/mixed.ts", "class").some((s) => s.name === "MyClass")).toBe(
+      true,
+    );
   });
 
   it("returns empty array for unrecognised filePath", () => {

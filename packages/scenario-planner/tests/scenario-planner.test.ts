@@ -16,9 +16,9 @@ function makeScenario(): Scenario {
     .variable("target_users", 10000)
     .assume("Market is ready", 0.8)
     .assume("Competition is low", 0.6)
-    .outcome("Success",  0.5,  8, "Product reaches target users")
+    .outcome("Success", 0.5, 8, "Product reaches target users")
     .outcome("Moderate", 0.35, 3, "Partial adoption")
-    .outcome("Failure",  0.15, -5, "Market rejection")
+    .outcome("Failure", 0.15, -5, "Market rejection")
     .tag("saas", "q3")
     .build();
 }
@@ -90,9 +90,7 @@ describe("predictOutcome", () => {
   });
 
   it("confidenceScore is 1 when no assumptions", () => {
-    const s = new ScenarioBuilder("No assumptions")
-      .outcome("A", 1, 5)
-      .build();
+    const s = new ScenarioBuilder("No assumptions").outcome("A", 1, 5).build();
     expect(predictOutcome(s).confidenceScore).toBe(1);
   });
 
@@ -169,7 +167,7 @@ describe("ScenarioPlan", () => {
   it("rank sorts by expected impact descending", () => {
     const plan = new ScenarioPlan();
     const good = new ScenarioBuilder("Good").outcome("Win", 1, 10).build();
-    const bad  = new ScenarioBuilder("Bad").outcome("Lose", 1, -5).build();
+    const bad = new ScenarioBuilder("Bad").outcome("Lose", 1, -5).build();
     plan.add(bad).add(good);
     const ranked = plan.rank();
     expect(ranked[0]!.scenario.name).toBe("Good");

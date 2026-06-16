@@ -14,6 +14,7 @@
 
 export type ItemStatus = "active" | "archived" | "draft";
 
+/** Knowledge item interface definition. */
 export interface KnowledgeItem {
   id: string;
   title: string;
@@ -26,6 +27,7 @@ export interface KnowledgeItem {
   metadata: Record<string, unknown>;
 }
 
+/** Create item input interface definition. */
 export interface CreateItemInput {
   title: string;
   content: string;
@@ -35,6 +37,7 @@ export interface CreateItemInput {
   metadata?: Record<string, unknown>;
 }
 
+/** Search options interface definition. */
 export interface SearchOptions {
   tags?: string[];
   status?: ItemStatus;
@@ -45,7 +48,9 @@ export interface SearchOptions {
 // ── ID util ───────────────────────────────────────────────────────────────────
 
 let _seq = 0;
-function uid() { return `ki-${Date.now()}-${++_seq}`; }
+function uid() {
+  return `ki-${Date.now()}-${++_seq}`;
+}
 
 // ── KnowledgeStore ────────────────────────────────────────────────────────────
 
@@ -73,7 +78,10 @@ export class KnowledgeStore {
     return this.items.get(id);
   }
 
-  update(id: string, changes: Partial<Omit<KnowledgeItem, "id" | "createdAt">>): KnowledgeItem | undefined {
+  update(
+    id: string,
+    changes: Partial<Omit<KnowledgeItem, "id" | "createdAt">>,
+  ): KnowledgeItem | undefined {
     const item = this.items.get(id);
     if (!item) return undefined;
     const updated: KnowledgeItem = {
@@ -124,7 +132,9 @@ export class KnowledgeStore {
     return opts.limit ? results.slice(0, opts.limit) : results;
   }
 
-  count(): number { return this.items.size; }
+  count(): number {
+    return this.items.size;
+  }
 
   /** Add a tag to an item (idempotent). */
   addTag(id: string, tag: string): KnowledgeItem | undefined {
@@ -204,18 +214,38 @@ export class TagIndex {
 // ── CrossLinker ───────────────────────────────────────────────────────────────
 
 function tokenize(text: string): Set<string> {
-  const stop = new Set(["the", "a", "an", "is", "and", "or", "in", "of", "to", "for", "with", "on", "at"]);
+  const stop = new Set([
+    "the",
+    "a",
+    "an",
+    "is",
+    "and",
+    "or",
+    "in",
+    "of",
+    "to",
+    "for",
+    "with",
+    "on",
+    "at",
+  ]);
   return new Set(
-    text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((w) => w.length > 2 && !stop.has(w)),
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !stop.has(w)),
   );
 }
 
+/** Suggested link interface definition. */
 export interface SuggestedLink {
   id: string;
   title: string;
   score: number;
 }
 
+/** Cross linker. */
 export class CrossLinker {
   /** Return items most similar to the given item based on keyword overlap. */
   suggest(item: KnowledgeItem, candidates: KnowledgeItem[], topK = 5): SuggestedLink[] {
@@ -245,6 +275,7 @@ export interface IngestResult {
   autoLinked: number;
 }
 
+/** Librarian agent. */
 export class LibrarianAgent {
   private store: KnowledgeStore;
   private linker: CrossLinker;
@@ -256,7 +287,9 @@ export class LibrarianAgent {
     this.autoLinkThreshold = opts.autoLinkThreshold ?? 0.15;
   }
 
-  getStore(): KnowledgeStore { return this.store; }
+  getStore(): KnowledgeStore {
+    return this.store;
+  }
 
   /** Ingest a new item: create, auto-suggest links, apply threshold auto-linking. */
   ingest(input: CreateItemInput): IngestResult {

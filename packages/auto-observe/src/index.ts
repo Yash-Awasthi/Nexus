@@ -17,6 +17,7 @@ export type ObservationEventType =
   | "memory.write"
   | (string & {}); // open union
 
+/** Observation event interface definition. */
 export interface ObservationEvent<T = unknown> {
   id: string;
   type: ObservationEventType;
@@ -29,13 +30,14 @@ export interface ObservationEvent<T = unknown> {
   tags?: Record<string, string>;
 }
 
+/** Observer fn type alias. */
 export type ObserverFn<T = unknown> = (event: ObservationEvent<T>) => void | Promise<void>;
 
 // ── ObservationBus ────────────────────────────────────────────────────────────
 
 /** Lightweight pub/sub bus. Subscribe to a specific event type or "*" for all. */
 export class ObservationBus {
-  private readonly _listeners = new Map<string, Set<ObserverFn<unknown>>>();
+  private readonly _listeners = new Map<string, Set<ObserverFn>>();
 
   /**
    * Register a listener for `type` or `"*"` (all events).
@@ -47,19 +49,16 @@ export class ObservationBus {
       set = new Set();
       this._listeners.set(type, set);
     }
-    set.add(fn as ObserverFn<unknown>);
+    set.add(fn as ObserverFn);
     return () => {
-      this._listeners.get(type)?.delete(fn as ObserverFn<unknown>);
+      this._listeners.get(type)?.delete(fn as ObserverFn);
     };
   }
 
   async emit<T = unknown>(event: ObservationEvent<T>): Promise<void> {
     const typed = this._listeners.get(event.type);
     const wildcard = this._listeners.get("*");
-    const fns = [
-      ...(typed ? Array.from(typed) : []),
-      ...(wildcard ? Array.from(wildcard) : []),
-    ];
+    const fns = [...(typed ? Array.from(typed) : []), ...(wildcard ? Array.from(wildcard) : [])];
     await Promise.all(fns.map((fn) => fn(event)));
   }
 
@@ -143,7 +142,7 @@ export class ObservationStore {
     return this._events.length;
   }
 
-  all(): ReadonlyArray<ObservationEvent> {
+  all(): readonly ObservationEvent[] {
     return this._events;
   }
 }
@@ -164,7 +163,9 @@ export class AutoObserver {
   readonly bus: ObservationBus;
   readonly store: ObservationStore;
 
-  constructor(opts: { bus?: ObservationBus; store?: ObservationStore; maxStoreSize?: number } = {}) {
+  constructor(
+    opts: { bus?: ObservationBus; store?: ObservationStore; maxStoreSize?: number } = {},
+  ) {
     this.bus = opts.bus ?? new ObservationBus();
     this.store = opts.store ?? new ObservationStore(opts.maxStoreSize);
     // Auto-record all emitted events
@@ -214,12 +215,14 @@ export interface LLMMessage {
   content: string;
 }
 
+/** Llm request interface definition. */
 export interface LLMRequest {
   model: string;
   messages: LLMMessage[];
   [key: string]: unknown;
 }
 
+/** Llm response interface definition. */
 export interface LLMResponse {
   id: string;
   model: string;
@@ -229,6 +232,7 @@ export interface LLMResponse {
   usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
 }
 
+/** Llm provider interface definition. */
 export interface LLMProvider {
   name: string;
   models: string[];
@@ -255,7 +259,10 @@ export class ObservingLLMProvider implements LLMProvider {
 
   async complete(req: LLMRequest): Promise<LLMResponse> {
     const src = this.source ?? this.inner.name;
-    await this.observer.emit("llm.request", src, { model: req.model, messageCount: req.messages.length });
+    await this.observer.emit("llm.request", src, {
+      model: req.model,
+      messageCount: req.messages.length,
+    });
 
     const t0 = Date.now();
     try {

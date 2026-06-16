@@ -47,6 +47,7 @@ export interface UseEventSourceResult {
  * @param onEvent   Called with the parsed JSON payload on each event
  * @param enabled   Set false to disable the connection (default: true)
  */
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 export function useEventSource<T>(
   path: string,
   eventType: string | null,
@@ -106,7 +107,6 @@ export function useEventSource<T>(
       setStatus("closed");
     };
     // onEvent intentionally omitted from deps — callers should memoize if needed
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, eventType, enabled]);
 
   const close = (): void => {

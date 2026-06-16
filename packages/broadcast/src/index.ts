@@ -9,6 +9,7 @@ export interface BroadcastMessage {
   metadata?: Record<string, unknown>;
 }
 
+/** Recipient interface definition. */
 export interface Recipient {
   id: string;
   email?: string;
@@ -18,8 +19,10 @@ export interface Recipient {
   metadata?: Record<string, unknown>;
 }
 
+/** Delivery status type alias. */
 export type DeliveryStatus = "pending" | "delivered" | "failed";
 
+/** Delivery record interface definition. */
 export interface DeliveryRecord {
   messageId: string;
   recipientId: string;
@@ -29,6 +32,7 @@ export interface DeliveryRecord {
   error?: string;
 }
 
+/** Send result interface definition. */
 export interface SendResult {
   recipientId: string;
   channel: string;
@@ -49,6 +53,7 @@ export interface IBroadcastChannel {
 
 export type SegmentFn = (recipient: Recipient) => boolean;
 
+/** Audience segment. */
 export class AudienceSegment {
   constructor(private readonly filter: SegmentFn) {}
 
@@ -97,6 +102,7 @@ export type FetchFn = (
   },
 ) => Promise<{ ok: boolean; status: number; statusText: string }>;
 
+/** Email sender interface definition. */
 export interface EmailSender {
   send(opts: { to: string; subject: string; body: string }): Promise<void>;
 }
@@ -121,7 +127,12 @@ export class WebhookChannel implements IBroadcastChannel {
 
   async send(message: BroadcastMessage, recipient: Recipient): Promise<SendResult> {
     if (!recipient.webhookUrl) {
-      return { recipientId: recipient.id, channel: this.name, success: false, error: "No webhookUrl" };
+      return {
+        recipientId: recipient.id,
+        channel: this.name,
+        success: false,
+        error: "No webhookUrl",
+      };
     }
     try {
       const res = await this.fetch(recipient.webhookUrl, {
@@ -130,10 +141,20 @@ export class WebhookChannel implements IBroadcastChannel {
           "Content-Type": this.opts.contentType ?? "application/json",
           ...this.opts.headers,
         },
-        body: JSON.stringify({ messageId: message.id, subject: message.subject, body: message.body, metadata: message.metadata }),
+        body: JSON.stringify({
+          messageId: message.id,
+          subject: message.subject,
+          body: message.body,
+          metadata: message.metadata,
+        }),
       });
       if (!res.ok) {
-        return { recipientId: recipient.id, channel: this.name, success: false, error: `HTTP ${res.status}: ${res.statusText}` };
+        return {
+          recipientId: recipient.id,
+          channel: this.name,
+          success: false,
+          error: `HTTP ${res.status}: ${res.statusText}`,
+        };
       }
       return { recipientId: recipient.id, channel: this.name, success: true };
     } catch (err) {
@@ -175,7 +196,7 @@ export class EmailChannel implements IBroadcastChannel {
 /** Records all sends without actually delivering. Useful for tests. */
 export class NullChannel implements IBroadcastChannel {
   readonly name: string;
-  readonly sent: Array<{ message: BroadcastMessage; recipient: Recipient }> = [];
+  readonly sent: { message: BroadcastMessage; recipient: Recipient }[] = [];
   private readonly _canDeliver: (r: Recipient) => boolean;
 
   constructor(name = "null", canDeliver: (r: Recipient) => boolean = () => true) {
@@ -226,10 +247,7 @@ export class BroadcastDispatcher {
    * @param segment  If provided, only recipients matching this segment receive it.
    * @returns Delivery records for all send attempts.
    */
-  async broadcast(
-    message: BroadcastMessage,
-    segment?: AudienceSegment,
-  ): Promise<DeliveryRecord[]> {
+  async broadcast(message: BroadcastMessage, segment?: AudienceSegment): Promise<DeliveryRecord[]> {
     const batch: DeliveryRecord[] = [];
 
     for (const recipient of this._recipients.values()) {

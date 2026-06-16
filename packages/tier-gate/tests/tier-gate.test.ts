@@ -168,7 +168,11 @@ describe("makeTierGatePreHandler", () => {
       sent,
       reply: {
         code(n: number) {
-          return { send(body: unknown) { sent.push({ code: n, body }); } };
+          return {
+            send(body: unknown) {
+              sent.push({ code: n, body });
+            },
+          };
         },
       },
     };

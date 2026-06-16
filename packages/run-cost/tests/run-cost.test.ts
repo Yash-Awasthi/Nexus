@@ -81,7 +81,12 @@ describe("RunCostTracker", () => {
   it("throws for unknown runId in recordStep", () => {
     const tracker = makeTracker();
     expect(() =>
-      tracker.recordStep("nonexistent-id", { step: "x", model: "gpt-4o", inputTokens: 1, outputTokens: 1 }),
+      tracker.recordStep("nonexistent-id", {
+        step: "x",
+        model: "gpt-4o",
+        inputTokens: 1,
+        outputTokens: 1,
+      }),
     ).toThrow();
   });
 
@@ -89,8 +94,18 @@ describe("RunCostTracker", () => {
     const tracker = makeTracker();
     const runId = tracker.startRun("research");
 
-    tracker.recordStep(runId, { step: "classify", model: "gpt-4o", inputTokens: 100, outputTokens: 50 });
-    tracker.recordStep(runId, { step: "summarise", model: "gpt-4o", inputTokens: 200, outputTokens: 100 });
+    tracker.recordStep(runId, {
+      step: "classify",
+      model: "gpt-4o",
+      inputTokens: 100,
+      outputTokens: 50,
+    });
+    tracker.recordStep(runId, {
+      step: "summarise",
+      model: "gpt-4o",
+      inputTokens: 200,
+      outputTokens: 100,
+    });
 
     now += 5000;
     const summary = tracker.endRun(runId);
@@ -118,7 +133,12 @@ describe("RunCostTracker", () => {
   it("peekRun returns summary without ending the run", () => {
     const tracker = makeTracker();
     const runId = tracker.startRun("peek-test");
-    tracker.recordStep(runId, { step: "step1", model: "gpt-4o", inputTokens: 100, outputTokens: 50 });
+    tracker.recordStep(runId, {
+      step: "step1",
+      model: "gpt-4o",
+      inputTokens: 100,
+      outputTokens: 50,
+    });
     const peek = tracker.peekRun(runId);
     expect(peek.steps).toHaveLength(1);
     // Run still active
@@ -129,7 +149,12 @@ describe("RunCostTracker", () => {
     const tracker = makeTracker();
     const runId = tracker.startRun("multi-model");
     tracker.recordStep(runId, { step: "a", model: "gpt-4o", inputTokens: 500, outputTokens: 200 });
-    tracker.recordStep(runId, { step: "b", model: "claude-sonnet-4.6", inputTokens: 300, outputTokens: 100 });
+    tracker.recordStep(runId, {
+      step: "b",
+      model: "claude-sonnet-4.6",
+      inputTokens: 300,
+      outputTokens: 100,
+    });
     const summary = tracker.endRun(runId);
     expect(summary.costByModel["gpt-4o"]).toBeGreaterThan(0);
     expect(summary.costByModel["claude-sonnet-4.6"]).toBeGreaterThan(0);
@@ -138,8 +163,18 @@ describe("RunCostTracker", () => {
   it("tokensByStep aggregates tokens per step name", () => {
     const tracker = makeTracker();
     const runId = tracker.startRun("steps");
-    tracker.recordStep(runId, { step: "classify", model: "gpt-4o", inputTokens: 100, outputTokens: 50 });
-    tracker.recordStep(runId, { step: "classify", model: "gpt-4o", inputTokens: 200, outputTokens: 100 });
+    tracker.recordStep(runId, {
+      step: "classify",
+      model: "gpt-4o",
+      inputTokens: 100,
+      outputTokens: 50,
+    });
+    tracker.recordStep(runId, {
+      step: "classify",
+      model: "gpt-4o",
+      inputTokens: 200,
+      outputTokens: 100,
+    });
     const summary = tracker.endRun(runId);
     // Both "classify" steps are summed
     expect(summary.tokensByStep["classify"]).toBe(450);

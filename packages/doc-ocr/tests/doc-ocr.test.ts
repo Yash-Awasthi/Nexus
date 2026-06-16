@@ -224,10 +224,7 @@ describe("OcrBatchProcessor", () => {
     const engine = new MockOcrEngine();
     const pipeline = new OcrPipeline(engine);
     const processor = new OcrBatchProcessor(pipeline, 1);
-    const results = await processor.process([
-      { sourceId: "p1.pdf" },
-      { sourceId: "p2.pdf" },
-    ]);
+    const results = await processor.process([{ sourceId: "p1.pdf" }, { sourceId: "p2.pdf" }]);
     expect(results).toHaveLength(2);
   });
 });

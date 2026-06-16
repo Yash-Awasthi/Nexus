@@ -5,6 +5,7 @@ import { createHmac, randomUUID } from "node:crypto";
 
 export type HmacFn = (key: string, data: string) => string;
 
+/** Default hmac. */
 export function defaultHmac(key: string, data: string): string {
   return createHmac("sha256", key).update(data).digest("hex");
 }
@@ -31,6 +32,7 @@ export interface GrantPayload {
   metadata?: Record<string, unknown>;
 }
 
+/** Grant token interface definition. */
 export interface GrantToken {
   raw: string;
   payload: GrantPayload;
@@ -45,6 +47,7 @@ export type GrantErrorCode =
   | "REVOKED"
   | "MALFORMED";
 
+/** Grant error. */
 export class GrantError extends Error {
   readonly code: GrantErrorCode;
   constructor(message: string, code: GrantErrorCode) {
@@ -120,6 +123,7 @@ export interface VerifyOpts {
   nowMs?: number;
 }
 
+/** Verify result interface definition. */
 export interface VerifyResult {
   valid: boolean;
   payload?: GrantPayload;
@@ -166,8 +170,7 @@ export class GrantVerifier {
 
     // Check tool scope
     if (opts.requiredTool) {
-      const allowed =
-        payload.tools.includes("*") || payload.tools.includes(opts.requiredTool);
+      const allowed = payload.tools.includes("*") || payload.tools.includes(opts.requiredTool);
       if (!allowed) {
         return {
           valid: false,

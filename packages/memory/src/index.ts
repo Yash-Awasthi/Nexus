@@ -35,21 +35,38 @@ export interface MemoryEntry {
   createdAt: number;
   /** Optional TTL — entry is logically expired after this epoch second */
   expiresAt?: number;
+  /**
+   * Multi-tenant ACL — owning user / tenant identifier.
+   * When set, search() and list() only return entries matching this userId
+   * (if the caller also passes the same userId in MemoryFilter).
+   * Null/undefined entries are treated as shared/system-level memories.
+   */
+  userId?: string;
 }
 
+/** Memory search result interface definition. */
 export interface MemorySearchResult {
   entry: MemoryEntry;
   /** Cosine similarity in [0, 1] — higher is more similar */
   score: number;
 }
 
+/** Memory filter interface definition. */
 export interface MemoryFilter {
   /** Only return entries where metadata matches all supplied key-value pairs */
   metadata?: Record<string, unknown>;
   /** Exclude logically expired entries (default: true) */
   excludeExpired?: boolean;
+  /**
+   * Multi-tenant ACL filter — when provided, only entries with this userId
+   * are returned.  Pass the authenticated user's ID from the API request.
+   * Entries with userId = NULL are never returned when a userId filter is set
+   * (they are system/shared entries — query without userId to see them).
+   */
+  userId?: string;
 }
 
+/** Remember options interface definition. */
 export interface RememberOptions {
   metadata?: Record<string, unknown>;
   /** TTL in seconds from now */
@@ -110,6 +127,7 @@ export type MemoryErrorCode =
   | "NOT_FOUND"
   | "DIMENSION_MISMATCH";
 
+/** Memory error. */
 export class MemoryError extends Error {
   readonly code: MemoryErrorCode;
   constructor(code: MemoryErrorCode, message: string) {
@@ -126,6 +144,7 @@ interface GroqEmbeddingResponse {
   model: string;
 }
 
+/** Groq embedder config interface definition. */
 export interface GroqEmbedderConfig {
   /** Groq API key — defaults to process.env.GROQ_API_KEY */
   apiKey?: string;
@@ -348,12 +367,38 @@ export class PgVectorStore implements IMemoryStore {
           embedding   vector(768) NOT NULL,
           metadata    JSONB       NOT NULL DEFAULT '{}',
           created_at  INTEGER     NOT NULL,
-          expires_at  INTEGER
+          expires_at  INTEGER,
+          user_id     TEXT                                 -- multi-tenant ACL: owning user/tenant
         )
+      `;
+      // Add user_id to existing tables (idempotent — IF NOT EXISTS guard)
+      await this.sql`
+        ALTER TABLE memory_entries
+          ADD COLUMN IF NOT EXISTS user_id TEXT
       `;
       await this.sql`
         CREATE INDEX IF NOT EXISTS memory_entries_created_at_idx
           ON memory_entries (created_at)
+      `;
+      // IVFFlat ANN index — accelerates cosine similarity search by ~10-20× at
+      // 100k+ entries (sequential scan above ~10k costs 200 ms+ per query).
+      // lists=100 is tuned for up to 1 M rows; rule of thumb: lists ≈ sqrt(rows).
+      // Requires pgvector >= 0.4.0. Wrapped so a version mismatch is non-fatal.
+      try {
+        await this.sql`
+          CREATE INDEX IF NOT EXISTS memory_entries_embedding_idx
+            ON memory_entries
+            USING ivfflat (embedding vector_cosine_ops)
+            WITH (lists = 100)
+        `;
+      } catch {
+        // IVFFlat unavailable (pgvector < 0.4 or cold cluster) — falls back to
+        // sequential scan automatically; no impact on correctness.
+      }
+      // Btree index on user_id for multi-tenant ACL lookups
+      await this.sql`
+        CREATE INDEX IF NOT EXISTS memory_entries_user_id_idx
+          ON memory_entries (user_id)
       `;
       this.schemaEnsured = true;
     } catch (cause) {
@@ -368,21 +413,23 @@ export class PgVectorStore implements IMemoryStore {
     const embStr = `[${entry.embedding.join(",")}]`;
     try {
       await this.sql`
-        INSERT INTO memory_entries (id, text, embedding, metadata, created_at, expires_at)
+        INSERT INTO memory_entries (id, text, embedding, metadata, created_at, expires_at, user_id)
         VALUES (
           ${entry.id},
           ${entry.text},
           ${embStr}::vector,
           ${JSON.stringify(entry.metadata)}::jsonb,
           ${entry.createdAt},
-          ${entry.expiresAt ?? null}
+          ${entry.expiresAt ?? null},
+          ${entry.userId ?? null}
         )
         ON CONFLICT (id) DO UPDATE SET
           text       = EXCLUDED.text,
           embedding  = EXCLUDED.embedding,
           metadata   = EXCLUDED.metadata,
           created_at = EXCLUDED.created_at,
-          expires_at = EXCLUDED.expires_at
+          expires_at = EXCLUDED.expires_at,
+          user_id    = EXCLUDED.user_id
       `;
     } catch (cause) {
       throw new MemoryError("STORE_WRITE_FAILED", `save() failed: ${String(cause)}`);
@@ -399,9 +446,14 @@ export class PgVectorStore implements IMemoryStore {
     const embStr = `[${queryEmbedding.join(",")}]`;
     const now = Math.floor(Date.now() / 1000);
     const excludeExpired = filter?.excludeExpired ?? true;
+    const userId = filter?.userId ?? null;
 
     let rows: Record<string, unknown>[];
     try {
+      // probes=10 → search 10% of IVFFlat lists for ~99% recall at 10× the speed
+      // of a full sequential scan.  Default probes=1 gives only ~80% recall.
+      // No-op when the IVFFlat index doesn't exist (falls back to seq scan).
+      await this.sql`SET LOCAL ivfflat.probes = 10`;
       rows = (await this.sql`
         SELECT
           id,
@@ -410,12 +462,17 @@ export class PgVectorStore implements IMemoryStore {
           metadata,
           created_at,
           expires_at,
+          user_id,
           1 - (embedding <=> ${embStr}::vector) AS score
         FROM memory_entries
         WHERE (
           ${excludeExpired ? 1 : 0}::int = 0
           OR expires_at IS NULL
           OR expires_at > ${now}
+        )
+        AND (
+          ${userId}::text IS NULL
+          OR user_id = ${userId}
         )
         ORDER BY embedding <=> ${embStr}::vector
         LIMIT ${limit}
@@ -452,13 +509,18 @@ export class PgVectorStore implements IMemoryStore {
 
     let rows: Record<string, unknown>[];
     try {
+      const listUserId = filter?.userId ?? null;
       rows = (await this.sql`
-        SELECT id, text, embedding::text AS embedding_str, metadata, created_at, expires_at
+        SELECT id, text, embedding::text AS embedding_str, metadata, created_at, expires_at, user_id
         FROM memory_entries
         WHERE (
           ${excludeExpired ? 1 : 0}::int = 0
           OR expires_at IS NULL
           OR expires_at > ${now}
+        )
+        AND (
+          ${listUserId}::text IS NULL
+          OR user_id = ${listUserId}
         )
         ORDER BY created_at DESC
       `) as unknown as Record<string, unknown>[];
@@ -525,6 +587,7 @@ function pgRowToEntry(row: Record<string, unknown>): MemoryEntry {
     metadata: (row.metadata ?? {}) as Record<string, unknown>,
     createdAt: row.created_at as number,
     ...(row.expires_at != null ? { expiresAt: row.expires_at as number } : {}),
+    ...(row.user_id != null ? { userId: row.user_id as string } : {}),
   };
 }
 
@@ -660,6 +723,7 @@ function magnitude(v: number[]): number {
   return Math.sqrt(v.reduce((s, x) => s + x * x, 0));
 }
 
+/** Cosine similarity. */
 export function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0;
   const magA = magnitude(a);
@@ -668,6 +732,7 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   return dot(a, b) / (magA * magB);
 }
 
+/** Normalize. */
 export function normalize(v: number[]): number[] {
   const mag = magnitude(v);
   if (mag === 0) return v;

@@ -3,7 +3,24 @@
   "version": "0.1.0",
   "type": "module",
   "main": "./src/index.ts",
-  "exports": { ".": "./src/index.ts" },
-  "scripts": { "test": "vitest run" },
-  "devDependencies": { "vitest": "*", "typescript": "*" }
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "optionalDependencies": {
+    "ioredis": "^5.0.0"
+  },
+  "devDependencies": {
+    "vitest": "*",
+    "typescript": "*"
+  },
+  "dependencies": {
+    "@nexus/wiki-updater": "workspace:*",
+    "@nexus/wiki": "workspace:*",
+    "@nexus/search-orchestrator": "workspace:*",
+    "@nexus/obs-providers": "workspace:*",
+    "@nexus/knowledge-graph": "workspace:*"
+  }
 }

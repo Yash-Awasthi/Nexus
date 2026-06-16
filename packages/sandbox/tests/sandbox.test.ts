@@ -426,9 +426,7 @@ describe("defaultRunner — success paths", () => {
   });
 
   it("captures stderr separately", async () => {
-    spawnMock.mockReturnValue(
-      makeFakeProc({ stderr: "Warning: deprecated", exitCode: 0 }),
-    );
+    spawnMock.mockReturnValue(makeFakeProc({ stderr: "Warning: deprecated", exitCode: 0 }));
     const result = await defaultRunner("node", ["-e", "x"], {
       timeoutMs: 5000,
       env: {},

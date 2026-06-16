@@ -14,6 +14,7 @@
 
 export type FieldType = "string" | "number" | "boolean" | "date" | "email" | "url";
 
+/** Field schema interface definition. */
 export interface FieldSchema {
   name: string;
   type: FieldType;
@@ -24,25 +25,22 @@ export interface FieldSchema {
   required?: boolean;
 }
 
+/** Extraction result interface definition. */
 export interface ExtractionResult {
   fields: Record<string, unknown>;
   missing: string[];
   durationMs: number;
 }
 
-export interface TableRow {
-  [column: string]: string;
-}
+/** Table row interface definition. */
+export type TableRow = Record<string, string>;
 
 // ── Field extraction ───────────────────────────────────────────────────────────
 
 /**
  * Extract structured fields from `text` using a list of `FieldSchema` definitions.
  */
-export function extractFields(
-  text: string,
-  schema: FieldSchema[],
-): ExtractionResult {
+export function extractFields(text: string, schema: FieldSchema[]): ExtractionResult {
   const t0 = Date.now();
   const fields: Record<string, unknown> = {};
   const missing: string[] = [];
@@ -66,13 +64,17 @@ export function extractFields(
 
 function coerce(raw: string, type: FieldType): unknown {
   switch (type) {
-    case "number":  return Number(raw);
-    case "boolean": return raw.toLowerCase() === "true" || raw === "1";
-    case "date":    return new Date(raw).toISOString();
+    case "number":
+      return Number(raw);
+    case "boolean":
+      return raw.toLowerCase() === "true" || raw === "1";
+    case "date":
+      return new Date(raw).toISOString();
     case "email":
     case "url":
     case "string":
-    default:        return raw;
+    default:
+      return raw;
   }
 }
 
@@ -83,10 +85,7 @@ function coerce(raw: string, type: FieldType): unknown {
  * Replaces `{{key}}` and `{{ key }}` with values from `vars`.
  * Unknown keys are replaced with empty string.
  */
-export function renderTemplate(
-  template: string,
-  vars: Record<string, unknown>,
-): string {
+export function renderTemplate(template: string, vars: Record<string, unknown>): string {
   return template.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, key: string) => {
     const val = getNestedValue(vars, key);
     return val !== undefined ? String(val) : "";
@@ -159,7 +158,8 @@ export function extractLinks(text: string): string[] {
 
 /** Extract all email addresses from text. */
 export function extractEmails(text: string): string[] {
-  const emailRegex = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
+  if (text.length > 1_000_000) throw new Error("input too large for email extraction");
+  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
   return [...new Set(text.match(emailRegex) ?? [])];
 }
 
@@ -170,6 +170,7 @@ export function extractEmails(text: string): string[] {
  * e.g. "Name: Alice\nAge: 30"
  */
 export function extractKeyValues(text: string): Record<string, string> {
+  if (text.length > 1_000_000) throw new Error("input too large for key-value extraction");
   const result: Record<string, string> = {};
   const lineRegex = /^([A-Za-z][\w\s]*?)\s*:\s*(.+)$/gm;
   let match: RegExpExecArray | null;

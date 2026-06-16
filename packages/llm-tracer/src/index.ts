@@ -20,24 +20,27 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type SpanStatus = "ok" | "error" | "unset";
+/** Span kind type alias. */
 export type SpanKind = "root" | "llm" | "tool" | "internal";
 
-export interface SpanAttributes {
-  [key: string]: string | number | boolean | undefined;
-}
+/** Span attributes interface definition. */
+export type SpanAttributes = Record<string, string | number | boolean | undefined>;
 
+/** Span event interface definition. */
 export interface SpanEvent {
   name: string;
   timestampMs: number;
   attributes?: SpanAttributes;
 }
 
+/** Span context interface definition. */
 export interface SpanContext {
   traceId: string;
   spanId: string;
   parentSpanId?: string;
 }
 
+/** Span interface definition. */
 export interface Span {
   context: SpanContext;
   name: string;
@@ -51,6 +54,7 @@ export interface Span {
   error?: string;
 }
 
+/** End span options interface definition. */
 export interface EndSpanOptions {
   status?: SpanStatus;
   error?: string | Error;
@@ -83,9 +87,15 @@ export class ActiveSpan {
     this._onEnd = onEnd;
   }
 
-  get context(): SpanContext { return this._span.context; }
-  get name(): string { return this._span.name; }
-  get isEnded(): boolean { return this._ended; }
+  get context(): SpanContext {
+    return this._span.context;
+  }
+  get name(): string {
+    return this._span.name;
+  }
+  get isEnded(): boolean {
+    return this._ended;
+  }
 
   setAttribute(key: string, value: string | number | boolean): this {
     if (!this._ended) this._span.attributes[key] = value;
@@ -121,7 +131,11 @@ export class ActiveSpan {
   }
 
   snapshot(): Span {
-    return { ...this._span, attributes: { ...this._span.attributes }, events: [...this._span.events] };
+    return {
+      ...this._span,
+      attributes: { ...this._span.attributes },
+      events: [...this._span.events],
+    };
   }
 }
 
@@ -133,6 +147,7 @@ export interface TracerOptions {
   serviceName?: string;
 }
 
+/** I tracer interface definition. */
 export interface ITracer {
   enabled: boolean;
   startSpan(name: string, kind: SpanKind, parentContext?: SpanContext): ActiveSpan;
@@ -140,6 +155,7 @@ export interface ITracer {
   clearSpans(): void;
 }
 
+/** Tracer. */
 export class Tracer implements ITracer {
   enabled: boolean;
   private spans: Span[] = [];
@@ -169,7 +185,9 @@ export class Tracer implements ITracer {
     });
   }
 
-  getSpans(): Span[] { return [...this.spans]; }
+  getSpans(): Span[] {
+    return [...this.spans];
+  }
 
   getSpansByName(name: string): Span[] {
     return this.spans.filter((s) => s.name === name);
@@ -183,9 +201,13 @@ export class Tracer implements ITracer {
     return this.spans.filter((s) => s.context.traceId === traceId);
   }
 
-  clearSpans(): void { this.spans = []; }
+  clearSpans(): void {
+    this.spans = [];
+  }
 
-  spanCount(): number { return this.spans.length; }
+  spanCount(): number {
+    return this.spans.length;
+  }
 }
 
 // ── NoopTracer ────────────────────────────────────────────────────────────────
@@ -205,14 +227,31 @@ class NoopActiveSpan extends ActiveSpan {
       () => {},
     );
   }
-  override setAttribute(): this { return this; }
-  override setAttributes(): this { return this; }
-  override addEvent(): this { return this; }
+  override setAttribute(): this {
+    return this;
+  }
+  override setAttributes(): this {
+    return this;
+  }
+  override addEvent(): this {
+    return this;
+  }
   override end(): Span {
-    return { context: { traceId: "noop", spanId: "noop" }, name: "noop", kind: "internal", startTimeMs: 0, endTimeMs: 0, durationMs: 0, status: "ok", attributes: {}, events: [] };
+    return {
+      context: { traceId: "noop", spanId: "noop" },
+      name: "noop",
+      kind: "internal",
+      startTimeMs: 0,
+      endTimeMs: 0,
+      durationMs: 0,
+      status: "ok",
+      attributes: {},
+      events: [],
+    };
   }
 }
 
+/** Noop tracer. */
 export class NoopTracer implements ITracer {
   enabled = false;
   private static _noop = new NoopActiveSpan();
@@ -220,7 +259,9 @@ export class NoopTracer implements ITracer {
   startSpan(_name: string, _kind?: SpanKind, _parent?: SpanContext): ActiveSpan {
     return NoopTracer._noop;
   }
-  getSpans(): Span[] { return []; }
+  getSpans(): Span[] {
+    return [];
+  }
   clearSpans(): void {}
 }
 
@@ -228,14 +269,24 @@ export class NoopTracer implements ITracer {
 
 let _global: ITracer = new NoopTracer();
 
-export function getTracer(): ITracer { return _global; }
-export function setTracer(t: ITracer): void { _global = t; }
+/** Get tracer. */
+export function getTracer(): ITracer {
+  return _global;
+}
+/** Set tracer. */
+export function setTracer(t: ITracer): void {
+  _global = t;
+}
+/** Enable tracing. */
 export function enableTracing(opts?: TracerOptions): Tracer {
   const t = new Tracer({ enabled: true, ...opts });
   _global = t;
   return t;
 }
-export function disableTracing(): void { _global = new NoopTracer(); }
+/** Disable tracing. */
+export function disableTracing(): void {
+  _global = new NoopTracer();
+}
 
 // ── High-level span helpers ───────────────────────────────────────────────────
 
@@ -256,6 +307,7 @@ export async function traceFlow<T>(
   }
 }
 
+/** Llm span options interface definition. */
 export interface LlmSpanOptions {
   model: string;
   provider: string;
@@ -278,6 +330,7 @@ export function startLlmSpan(opts: LlmSpanOptions, tracer: ITracer = _global): A
   return span;
 }
 
+/** Tool span options interface definition. */
 export interface ToolSpanOptions {
   toolName: string;
   input?: Record<string, unknown>;
@@ -289,7 +342,11 @@ export function startToolSpan(opts: ToolSpanOptions, tracer: ITracer = _global):
   const span = tracer.startSpan(`tool.${opts.toolName}`, "tool", opts.parentContext);
   span.setAttribute("tool.name", opts.toolName);
   if (opts.input) {
-    try { span.setAttribute("tool.input_json", JSON.stringify(opts.input).slice(0, 512)); } catch {}
+    try {
+      span.setAttribute("tool.input_json", JSON.stringify(opts.input).slice(0, 512));
+    } catch {
+      /* noop */
+    }
   }
   return span;
 }

@@ -15,21 +15,21 @@ import {
 describe("TranslationCatalog", () => {
   it("registers and retrieves a locale", () => {
     const cat = new TranslationCatalog();
-    cat.register("en", { "hello": "Hello" });
+    cat.register("en", { hello: "Hello" });
     expect(cat.get("en")?.["hello"]).toBe("Hello");
   });
 
   it("merges additional entries on re-register", () => {
     const cat = new TranslationCatalog();
-    cat.register("en", { "a": "A" });
-    cat.register("en", { "b": "B" });
+    cat.register("en", { a: "A" });
+    cat.register("en", { b: "B" });
     expect(cat.get("en")?.["a"]).toBe("A");
     expect(cat.get("en")?.["b"]).toBe("B");
   });
 
   it("has() returns true for registered locales", () => {
     const cat = new TranslationCatalog();
-    cat.register("fr", { "hello": "Bonjour" });
+    cat.register("fr", { hello: "Bonjour" });
     expect(cat.has("fr")).toBe(true);
     expect(cat.has("de")).toBe(false);
   });
@@ -71,14 +71,14 @@ describe("I18n.t", () => {
 
   it("interpolates variables", () => {
     const cat = new TranslationCatalog();
-    cat.register("en", { "greeting": "Hello, {{name}}!" });
+    cat.register("en", { greeting: "Hello, {{name}}!" });
     const i = new I18n(cat);
     expect(i.t("greeting", { name: "Alice" })).toBe("Hello, Alice!");
   });
 
   it("leaves unresolved variables as-is", () => {
     const cat = new TranslationCatalog();
-    cat.register("en", { "msg": "Hello, {{name}}!" });
+    cat.register("en", { msg: "Hello, {{name}}!" });
     const i = new I18n(cat);
     expect(i.t("msg")).toBe("Hello, {{name}}!");
   });
@@ -134,7 +134,7 @@ describe("I18n.plural", () => {
   it("interpolates custom vars alongside count", () => {
     const cat = new TranslationCatalog();
     cat.register("en", {
-      "items": { one: "{{count}} item in {{place}}", other: "{{count}} items in {{place}}" },
+      items: { one: "{{count}} item in {{place}}", other: "{{count}} items in {{place}}" },
     });
     const i = new I18n(cat);
     expect(i.plural("items", 1, { place: "cart" })).toBe("1 item in cart");

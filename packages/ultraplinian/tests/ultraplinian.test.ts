@@ -63,7 +63,10 @@ describe("scoreResponse", () => {
   });
 
   it("returns a number between 0 and 100", () => {
-    const score = scoreResponse("A decent length answer about the topic with some detail.", "topic question");
+    const score = scoreResponse(
+      "A decent length answer about the topic with some detail.",
+      "topic question",
+    );
     expect(score).toBeGreaterThanOrEqual(0);
     expect(score).toBeLessThanOrEqual(100);
   });
@@ -300,8 +303,8 @@ describe("UltraplinianRunner", () => {
 
   it("throws error for empty model list", async () => {
     const runner = new UltraplinianRunner({ apiKey: "test" });
-    await expect(
-      runner.race({ tier: "fast", messages: [], models: [] }),
-    ).rejects.toThrow(UltraplinianError);
+    await expect(runner.race({ tier: "fast", messages: [], models: [] })).rejects.toThrow(
+      UltraplinianError,
+    );
   });
 });

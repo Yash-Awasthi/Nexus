@@ -40,12 +40,14 @@ export interface McpCallContent {
   uri?: string;
 }
 
+/** Mcp tool call result interface definition. */
 export interface McpToolCallResult {
   content: McpCallContent[];
   isError?: boolean;
   text: string;
 }
 
+/** Mcp tool client interface definition. */
 export interface McpToolClient {
   callTool(name: string, args: Record<string, unknown>): Promise<McpToolCallResult>;
 }
@@ -59,6 +61,7 @@ export interface BulkToolRequest {
   args?: Record<string, unknown>;
 }
 
+/** Bulk call result interface definition. */
 export interface BulkCallResult {
   id: string;
   tool: string;
@@ -69,6 +72,7 @@ export interface BulkCallResult {
   durationMs: number;
 }
 
+/** Bulk call summary interface definition. */
 export interface BulkCallSummary {
   total: number;
   succeeded: number;
@@ -191,6 +195,7 @@ function sleep(ms: number): Promise<void> {
 
 export type ExecutionMode = "parallel" | "sequential";
 
+/** Bulk tool caller config interface definition. */
 export interface BulkToolCallerConfig {
   client: McpToolClient;
   mode?: ExecutionMode;
@@ -200,6 +205,7 @@ export interface BulkToolCallerConfig {
   maxBatchSize?: number;
 }
 
+/** Bulk tool caller. */
 export class BulkToolCaller {
   private readonly client: McpToolClient;
   private readonly mode: ExecutionMode;
@@ -219,9 +225,7 @@ export class BulkToolCaller {
     }
 
     if (this.maxBatchSize > 0 && requests.length > this.maxBatchSize) {
-      throw new Error(
-        `Batch size ${requests.length} exceeds maxBatchSize ${this.maxBatchSize}`,
-      );
+      throw new Error(`Batch size ${requests.length} exceeds maxBatchSize ${this.maxBatchSize}`);
     }
 
     if (this.mode === "sequential") {
@@ -235,10 +239,7 @@ export class BulkToolCaller {
    * Partition requests into batches and execute each batch.
    * Useful when the server has a per-request limit but you have many calls.
    */
-  async callInBatches(
-    requests: BulkToolRequest[],
-    batchSize: number,
-  ): Promise<BulkCallSummary[]> {
+  async callInBatches(requests: BulkToolRequest[], batchSize: number): Promise<BulkCallSummary[]> {
     const summaries: BulkCallSummary[] = [];
 
     for (let i = 0; i < requests.length; i += batchSize) {
@@ -259,6 +260,7 @@ export interface NullMcpClientOptions {
   delayMs?: number;
 }
 
+/** Null mcp tool client. */
 export class NullMcpToolClient implements McpToolClient {
   private readonly responses: Record<string, McpToolCallResult>;
   private readonly errorMsg: string | undefined;

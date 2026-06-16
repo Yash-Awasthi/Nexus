@@ -8,3 +8,5 @@ export * from "./approval-requests.js";
 export * from "./audit-log.js";
 export * from "./memory-entries.js";
 export * from "./billing.js";
+export * from "./forecast-runs.js";
+export * from "./research-runs.js";

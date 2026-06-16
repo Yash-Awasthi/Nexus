@@ -19,6 +19,7 @@
 
 export type SegmentType = "system_prefix" | "context" | "instruction" | "user";
 
+/** Prompt segment interface definition. */
 export interface PromptSegment {
   type: SegmentType;
   text: string;
@@ -28,6 +29,7 @@ export interface PromptSegment {
   tokenEstimate?: number;
 }
 
+/** Cached prompt config interface definition. */
 export interface CachedPromptConfig {
   /** Fixed system prompt shared across many calls — best cache candidate. */
   systemPrefix: string;
@@ -48,11 +50,13 @@ export interface AnthropicContentBlock {
   cache_control?: { type: "ephemeral" };
 }
 
+/** Anthropic message interface definition. */
 export interface AnthropicMessage {
   role: "user" | "assistant";
   content: AnthropicContentBlock[] | string;
 }
 
+/** Anthropic prompt interface definition. */
 export interface AnthropicPrompt {
   system: AnthropicContentBlock[];
   messages: AnthropicMessage[];
@@ -95,9 +99,7 @@ export function buildCachedPrompt(cfg: CachedPromptConfig): AnthropicPrompt {
     system.push({ type: "text", text: instruction });
   }
 
-  const messages: AnthropicMessage[] = [
-    { role: "user", content: userMessage },
-  ];
+  const messages: AnthropicMessage[] = [{ role: "user", content: userMessage }];
 
   return { system, messages };
 }
@@ -139,6 +141,7 @@ export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
+/** Cache savings estimate interface definition. */
 export interface CacheSavingsEstimate {
   totalTokens: number;
   cacheableTokens: number;

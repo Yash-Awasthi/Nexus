@@ -9,25 +9,48 @@ import {
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
 const CODING_CONV: ConversationMessage[] = [
-  { role: "user", content: "I have a bug in my TypeScript function. The async call fails with an error." },
+  {
+    role: "user",
+    content: "I have a bug in my TypeScript function. The async call fails with an error.",
+  },
   { role: "assistant", content: "Let's debug this. Can you share the stack trace?" },
-  { role: "user", content: "TypeError: Cannot read property 'data' of undefined at line 42. How do I fix this?" },
-  { role: "assistant", content: "The error means the API response is undefined. Add null checking before accessing .data." },
+  {
+    role: "user",
+    content: "TypeError: Cannot read property 'data' of undefined at line 42. How do I fix this?",
+  },
+  {
+    role: "assistant",
+    content:
+      "The error means the API response is undefined. Add null checking before accessing .data.",
+  },
   { role: "user", content: "That fixed it! Thanks, great help." },
 ];
 
 const CREATIVE_CONV: ConversationMessage[] = [
   { role: "user", content: "Write me a short story about a robot who learns to paint." },
-  { role: "assistant", content: "In the factory district of Neo-Seoul, unit RX-7 discovered a discarded easel..." },
+  {
+    role: "assistant",
+    content: "In the factory district of Neo-Seoul, unit RX-7 discovered a discarded easel...",
+  },
   { role: "user", content: "I love it! Can you write a poem about the same theme?" },
-  { role: "assistant", content: "Circuits hum in midnight blue, / Steel fingers learn what artists knew..." },
+  {
+    role: "assistant",
+    content: "Circuits hum in midnight blue, / Steel fingers learn what artists knew...",
+  },
 ];
 
 const PLANNING_CONV: ConversationMessage[] = [
   { role: "user", content: "Help me plan the architecture for a microservice deployment." },
-  { role: "assistant", content: "Let's outline the key components: API gateway, service mesh, and monitoring." },
+  {
+    role: "assistant",
+    content: "Let's outline the key components: API gateway, service mesh, and monitoring.",
+  },
   { role: "user", content: "What are the pros and cons of using Kubernetes for this?" },
-  { role: "assistant", content: "Pros: scalability, container orchestration. Cons: steep learning curve, operational overhead." },
+  {
+    role: "assistant",
+    content:
+      "Pros: scalability, container orchestration. Cons: steep learning curve, operational overhead.",
+  },
 ];
 
 const EMPTY_CONV: ConversationMessage[] = [];
@@ -108,7 +131,10 @@ describe("intent detection", () => {
 
   it("detects information_seeking intent (questions)", () => {
     const msgs: ConversationMessage[] = [
-      { role: "user", content: "What is the difference between async/await and promises? How does it work?" },
+      {
+        role: "user",
+        content: "What is the difference between async/await and promises? How does it work?",
+      },
     ];
     const insight = analyzeConversation({ id: "i", messages: msgs });
     const types = insight.intents.map((i) => i.type);
@@ -123,7 +149,10 @@ describe("intent detection", () => {
 
   it("detects task_execution intent", () => {
     const msgs: ConversationMessage[] = [
-      { role: "user", content: "Please write a function that sorts an array. Create a test for it too." },
+      {
+        role: "user",
+        content: "Please write a function that sorts an array. Create a test for it too.",
+      },
     ];
     const insight = analyzeConversation({ id: "t", messages: msgs });
     const types = insight.intents.map((i) => i.type);
@@ -175,7 +204,10 @@ describe("sentiment detection", () => {
 
   it("detects mixed sentiment when both positive and negative terms present", () => {
     const msgs: ConversationMessage[] = [
-      { role: "user", content: "Great progress but still have this terrible error. Thanks for the help though!" },
+      {
+        role: "user",
+        content: "Great progress but still have this terrible error. Thanks for the help though!",
+      },
     ];
     expect(analyzeConversation({ id: "m", messages: msgs }).sentiment).toBe("mixed");
   });

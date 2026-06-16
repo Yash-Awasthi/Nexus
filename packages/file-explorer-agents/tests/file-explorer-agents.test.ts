@@ -38,7 +38,9 @@ describe("CodeSearchAgent", () => {
 
   it("captures handler errors gracefully", async () => {
     const agent = new CodeSearchAgent();
-    agent.inject(async () => { throw new Error("search failed"); });
+    agent.inject(async () => {
+      throw new Error("search failed");
+    });
     const result = await agent.execute({ query: "q" });
     expect(result.success).toBe(false);
     expect(result.error).toContain("search failed");
@@ -83,9 +85,7 @@ describe("DirectoryListerAgent", () => {
   });
 
   it("custom entries override defaults", async () => {
-    const entries: FileEntry[] = [
-      { path: "/src/custom.ts", name: "custom.ts", type: "file" },
-    ];
+    const entries: FileEntry[] = [{ path: "/src/custom.ts", name: "custom.ts", type: "file" }];
     const agent = new DirectoryListerAgent().inject(mockDirectoryListHandler(entries));
     const result = await agent.execute({ path: "/src" });
     const data = result.data as any;

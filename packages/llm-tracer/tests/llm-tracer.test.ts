@@ -20,7 +20,9 @@ import {
 describe("Tracer", () => {
   let tracer: Tracer;
 
-  beforeEach(() => { tracer = new Tracer({ enabled: true }); });
+  beforeEach(() => {
+    tracer = new Tracer({ enabled: true });
+  });
 
   it("starts a span with correct fields", () => {
     const span = tracer.startSpan("test.op", "internal");
@@ -175,10 +177,14 @@ describe("NoopTracer", () => {
 describe("traceFlow", () => {
   it("wraps async fn in a root span", async () => {
     const tracer = new Tracer();
-    const { result, span } = await traceFlow("my.flow", async (s) => {
-      s.setAttribute("step", 1);
-      return 42;
-    }, tracer);
+    const { result, span } = await traceFlow(
+      "my.flow",
+      async (s) => {
+        s.setAttribute("step", 1);
+        return 42;
+      },
+      tracer,
+    );
     expect(result).toBe(42);
     expect(span.kind).toBe("root");
     expect(span.status).toBe("ok");
@@ -188,8 +194,15 @@ describe("traceFlow", () => {
 
   it("marks span error when fn throws", async () => {
     const tracer = new Tracer();
-    await expect(traceFlow("bad.flow", async () => { throw new Error("boom"); }, tracer))
-      .rejects.toThrow("boom");
+    await expect(
+      traceFlow(
+        "bad.flow",
+        async () => {
+          throw new Error("boom");
+        },
+        tracer,
+      ),
+    ).rejects.toThrow("boom");
     expect(tracer.getSpans()[0]!.status).toBe("error");
     expect(tracer.getSpans()[0]!.error).toBe("boom");
   });
@@ -197,11 +210,15 @@ describe("traceFlow", () => {
   it("passes active span so children can reference traceId", async () => {
     const tracer = new Tracer();
     let childCtx: SpanContext | undefined;
-    await traceFlow("root.flow", async (rootSpan) => {
-      const child = tracer.startSpan("child", "llm", rootSpan.context);
-      childCtx = child.context;
-      child.end();
-    }, tracer);
+    await traceFlow(
+      "root.flow",
+      async (rootSpan) => {
+        const child = tracer.startSpan("child", "llm", rootSpan.context);
+        childCtx = child.context;
+        child.end();
+      },
+      tracer,
+    );
     expect(childCtx?.traceId).toBe(tracer.getSpans()[0]!.context.traceId);
   });
 });
@@ -266,7 +283,9 @@ describe("startToolSpan", () => {
 // ── Global tracer API ─────────────────────────────────────────────────────────
 
 describe("Global tracer", () => {
-  afterEach(() => { disableTracing(); });
+  afterEach(() => {
+    disableTracing();
+  });
 
   it("starts as NoopTracer (disabled)", () => {
     disableTracing();

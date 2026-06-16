@@ -26,30 +26,83 @@ const s = {
   title: { fontSize: 24, fontWeight: 700, margin: 0 } as React.CSSProperties,
   layout: { display: "grid", gridTemplateColumns: "320px 1fr", gap: 20 },
   panel: {
-    background: "#161b27", border: "1px solid #1e2535", borderRadius: 10, padding: "20px 24px",
+    background: "#161b27",
+    border: "1px solid #1e2535",
+    borderRadius: 10,
+    padding: "20px 24px",
   } as React.CSSProperties,
-  label: { fontSize: 12, color: "#64748b", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 6, display: "block" },
+  label: {
+    fontSize: 12,
+    color: "#64748b",
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.08em",
+    marginBottom: 6,
+    display: "block",
+  },
   textarea: {
-    width: "100%", background: "#0d1117", border: "1px solid #1e2535", borderRadius: 8,
-    color: "#e2e8f0", fontSize: 14, padding: "10px 12px", resize: "vertical" as const,
-    minHeight: 120, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const,
+    width: "100%",
+    background: "#0d1117",
+    border: "1px solid #1e2535",
+    borderRadius: 8,
+    color: "#e2e8f0",
+    fontSize: 14,
+    padding: "10px 12px",
+    resize: "vertical" as const,
+    minHeight: 120,
+    outline: "none",
+    fontFamily: "inherit",
+    boxSizing: "border-box" as const,
   } as React.CSSProperties,
   select: {
-    width: "100%", background: "#0d1117", border: "1px solid #1e2535", borderRadius: 8,
-    color: "#e2e8f0", fontSize: 13, padding: "8px 10px", marginBottom: 12,
+    width: "100%",
+    background: "#0d1117",
+    border: "1px solid #1e2535",
+    borderRadius: 8,
+    color: "#e2e8f0",
+    fontSize: 13,
+    padding: "8px 10px",
+    marginBottom: 12,
   } as React.CSSProperties,
   genBtn: (loading: boolean): React.CSSProperties => ({
-    width: "100%", background: loading ? "#4c1d95" : "#7c3aed", border: "none", borderRadius: 8,
-    color: "#fff", fontSize: 14, fontWeight: 600, padding: "11px", cursor: loading ? "not-allowed" : "pointer",
-    marginTop: 8, opacity: loading ? 0.7 : 1,
+    width: "100%",
+    background: loading ? "#4c1d95" : "#7c3aed",
+    border: "none",
+    borderRadius: 8,
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: 600,
+    padding: "11px",
+    cursor: loading ? "not-allowed" : "pointer",
+    marginTop: 8,
+    opacity: loading ? 0.7 : 1,
   }),
-  imageGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 },
+  imageGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+    gap: 12,
+  },
   imageCard: {
-    background: "#161b27", border: "1px solid #1e2535", borderRadius: 10, overflow: "hidden",
+    background: "#161b27",
+    border: "1px solid #1e2535",
+    borderRadius: 10,
+    overflow: "hidden",
   } as React.CSSProperties,
-  image: { width: "100%", display: "block", aspectRatio: "1/1", objectFit: "cover" as const, background: "#0d1117" },
+  image: {
+    width: "100%",
+    display: "block",
+    aspectRatio: "1/1",
+    objectFit: "cover" as const,
+    background: "#0d1117",
+  },
   imageCaption: { padding: "10px 12px", fontSize: 12, color: "#64748b", lineHeight: 1.4 },
-  placeholder: { display: "flex", alignItems: "center", justifyContent: "center", aspectRatio: "1/1", color: "#334155", fontSize: 13 },
+  placeholder: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    aspectRatio: "1/1",
+    color: "#334155",
+    fontSize: 13,
+  },
 };
 
 export default function ImageGen() {
@@ -66,12 +119,21 @@ export default function ImageGen() {
     setLoading(true);
     setError(null);
     api
-      .post<{ images: GeneratedImage[] }>("/image-gen/generate", { prompt, negativePrompt: negPrompt, model, size })
+      .post<{ images: GeneratedImage[] }>("/image-gen/generate", {
+        prompt,
+        negativePrompt: negPrompt,
+        model,
+        size,
+      })
       .then((r) => setImages((prev) => [...r.images, ...prev]))
       .catch(() => {
         setImages((prev) => [
           {
-            id: `img${Date.now()}`, url: "", prompt, model, size,
+            id: `img${Date.now()}`,
+            url: "",
+            prompt,
+            model,
+            size,
             createdAt: new Date().toISOString(),
           },
           ...prev,
@@ -107,12 +169,20 @@ export default function ImageGen() {
 
           <label style={{ ...s.label, marginTop: 12 }}>Model</label>
           <select style={s.select} value={model} onChange={(e) => setModel(e.target.value)}>
-            {MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+            {MODELS.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
           </select>
 
           <label style={s.label}>Size</label>
           <select style={s.select} value={size} onChange={(e) => setSize(e.target.value)}>
-            {SIZES.map((sz) => <option key={sz} value={sz}>{sz}</option>)}
+            {SIZES.map((sz) => (
+              <option key={sz} value={sz}>
+                {sz}
+              </option>
+            ))}
           </select>
 
           <button style={s.genBtn(loading)} onClick={generate} disabled={loading || !prompt.trim()}>
@@ -124,8 +194,18 @@ export default function ImageGen() {
 
         <div>
           {images.length === 0 ? (
-            <div style={{ ...s.panel, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
-              <p style={{ color: "#475569", fontSize: 14, textAlign: "center" }}>Generated images will appear here.</p>
+            <div
+              style={{
+                ...s.panel,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: 300,
+              }}
+            >
+              <p style={{ color: "#475569", fontSize: 14, textAlign: "center" }}>
+                Generated images will appear here.
+              </p>
             </div>
           ) : (
             <div style={s.imageGrid}>
@@ -134,13 +214,18 @@ export default function ImageGen() {
                   {img.url ? (
                     <img src={img.url} alt={img.prompt} style={s.image} />
                   ) : (
-                    <div style={{ ...s.image as React.CSSProperties, ...s.placeholder }}>
+                    <div style={{ ...(s.image as React.CSSProperties), ...s.placeholder }}>
                       <span>Image placeholder</span>
                     </div>
                   )}
                   <div style={s.imageCaption}>
-                    <div style={{ color: "#e2e8f0", marginBottom: 4, fontSize: 13 }}>{img.prompt.slice(0, 80)}{img.prompt.length > 80 ? "…" : ""}</div>
-                    <div>{img.model} · {img.size}</div>
+                    <div style={{ color: "#e2e8f0", marginBottom: 4, fontSize: 13 }}>
+                      {img.prompt.slice(0, 80)}
+                      {img.prompt.length > 80 ? "…" : ""}
+                    </div>
+                    <div>
+                      {img.model} · {img.size}
+                    </div>
                   </div>
                 </div>
               ))}

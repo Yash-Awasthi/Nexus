@@ -65,7 +65,9 @@ describe("MockProcess", () => {
   it("kill emits exit and sets killed=true", () => {
     const proc = new MockProcess(1);
     let exitCode: number | null = 999;
-    proc.onExit((code) => { exitCode = code; });
+    proc.onExit((code) => {
+      exitCode = code;
+    });
     proc.kill("SIGKILL");
     expect(proc.killed).toBe(true);
     expect(proc.killSignal).toBe("SIGKILL");
@@ -75,7 +77,9 @@ describe("MockProcess", () => {
   it("emitExit triggers callbacks", () => {
     const proc = new MockProcess(1);
     let received: number | null = undefined as any;
-    proc.onExit((c) => { received = c; });
+    proc.onExit((c) => {
+      received = c;
+    });
     proc.emitExit(0);
     expect(received).toBe(0);
   });
@@ -182,7 +186,9 @@ describe("AuthTokenInjector", () => {
 describe("CliSession", () => {
   let spawner: MockProcessSpawner;
 
-  beforeEach(() => { spawner = new MockProcessSpawner(); });
+  beforeEach(() => {
+    spawner = new MockProcessSpawner();
+  });
 
   it("starts and runs a session", () => {
     const session = new CliSession("s1", spawner, { command: "node", args: ["app.js"] });

@@ -16,6 +16,7 @@
 
 export type SessionStatus = "pending" | "running" | "completed" | "failed" | "aborted";
 
+/** Session record interface definition. */
 export interface SessionRecord {
   id: string;
   status: SessionStatus;
@@ -36,6 +37,7 @@ export type LifecycleEventType =
   | "cleanup_started"
   | "cleanup_finished";
 
+/** Lifecycle event interface definition. */
 export interface LifecycleEvent {
   type: LifecycleEventType;
   sessionId: string;
@@ -43,8 +45,10 @@ export interface LifecycleEvent {
   data?: Record<string, unknown>;
 }
 
+/** Lifecycle listener type alias. */
 export type LifecycleListener = (event: LifecycleEvent) => void;
 
+/** Lifecycle event bus. */
 export class LifecycleEventBus {
   private listeners = new Map<LifecycleEventType | "*", Set<LifecycleListener>>();
 
@@ -58,17 +62,32 @@ export class LifecycleEventBus {
   emit(event: LifecycleEvent): void {
     const specific = this.listeners.get(event.type);
     const wildcard = this.listeners.get("*");
-    specific?.forEach((l) => { try { l(event); } catch { /* isolate */ } });
-    wildcard?.forEach((l) => { try { l(event); } catch { /* isolate */ } });
+    specific?.forEach((l) => {
+      try {
+        l(event);
+      } catch {
+        /* isolate */
+      }
+    });
+    wildcard?.forEach((l) => {
+      try {
+        l(event);
+      } catch {
+        /* isolate */
+      }
+    });
   }
 
-  clear(): void { this.listeners.clear(); }
+  clear(): void {
+    this.listeners.clear();
+  }
 }
 
 // ── SessionStore ──────────────────────────────────────────────────────────────
 
 let _ssSeq = 0;
 
+/** Session store. */
 export class SessionStore {
   private sessions = new Map<string, SessionRecord>();
 
@@ -86,8 +105,12 @@ export class SessionStore {
     return record;
   }
 
-  get(id: string): SessionRecord | undefined { return this.sessions.get(id); }
-  has(id: string): boolean { return this.sessions.has(id); }
+  get(id: string): SessionRecord | undefined {
+    return this.sessions.get(id);
+  }
+  has(id: string): boolean {
+    return this.sessions.has(id);
+  }
 
   update(id: string, patch: Partial<SessionRecord>): SessionRecord {
     const record = this.sessions.get(id);
@@ -97,10 +120,18 @@ export class SessionStore {
     return updated;
   }
 
-  delete(id: string): boolean { return this.sessions.delete(id); }
-  list(): SessionRecord[] { return [...this.sessions.values()]; }
-  count(): number { return this.sessions.size; }
-  clear(): void { this.sessions.clear(); }
+  delete(id: string): boolean {
+    return this.sessions.delete(id);
+  }
+  list(): SessionRecord[] {
+    return [...this.sessions.values()];
+  }
+  count(): number {
+    return this.sessions.size;
+  }
+  clear(): void {
+    this.sessions.clear();
+  }
 
   byStatus(status: SessionStatus): SessionRecord[] {
     return this.list().filter((s) => s.status === status);
@@ -123,10 +154,18 @@ export class IdempotencyGuard {
     return true;
   }
 
-  isCompleted(sessionId: string): boolean { return this.completed.has(sessionId); }
-  reset(sessionId: string): void { this.completed.delete(sessionId); }
-  clear(): void { this.completed.clear(); }
-  size(): number { return this.completed.size; }
+  isCompleted(sessionId: string): boolean {
+    return this.completed.has(sessionId);
+  }
+  reset(sessionId: string): void {
+    this.completed.delete(sessionId);
+  }
+  clear(): void {
+    this.completed.clear();
+  }
+  size(): number {
+    return this.completed.size;
+  }
 }
 
 // ── SessionCompletionHandler ──────────────────────────────────────────────────
@@ -137,12 +176,14 @@ export interface CompletionOptions {
   status?: "completed" | "failed" | "aborted";
 }
 
+/** Completion result interface definition. */
 export interface CompletionResult {
   sessionId: string;
   wasAlreadyCompleted: boolean;
   record: SessionRecord;
 }
 
+/** Session completion handler. */
 export class SessionCompletionHandler {
   private store: SessionStore;
   private bus: LifecycleEventBus;
@@ -178,8 +219,8 @@ export class SessionCompletionHandler {
       status === "completed"
         ? "session_completed"
         : status === "failed"
-        ? "session_failed"
-        : "session_aborted";
+          ? "session_failed"
+          : "session_aborted";
 
     this.bus.emit({
       type: eventType,
@@ -191,7 +232,9 @@ export class SessionCompletionHandler {
     return { sessionId, wasAlreadyCompleted: false, record };
   }
 
-  getGuard(): IdempotencyGuard { return this.guard; }
+  getGuard(): IdempotencyGuard {
+    return this.guard;
+  }
 }
 
 // ── GeneratorExitHandler ──────────────────────────────────────────────────────
@@ -201,12 +244,14 @@ export interface CleanupTask {
   fn: () => Promise<void> | void;
 }
 
+/** Cleanup result interface definition. */
 export interface CleanupResult {
   sessionId: string;
-  tasks: Array<{ name: string; success: boolean; error?: string }>;
+  tasks: { name: string; success: boolean; error?: string }[];
   durationMs: number;
 }
 
+/** Generator exit handler. */
 export class GeneratorExitHandler {
   private bus: LifecycleEventBus;
   private timeoutMs: number;
@@ -226,7 +271,7 @@ export class GeneratorExitHandler {
       try {
         const p = Promise.resolve(task.fn());
         const timeout = new Promise<void>((_, rej) =>
-          setTimeout(() => rej(new Error(`Timeout: ${task.name}`)), this.timeoutMs)
+          setTimeout(() => rej(new Error(`Timeout: ${task.name}`)), this.timeoutMs),
         );
         await Promise.race([p, timeout]);
         results.push({ name: task.name, success: true });
@@ -240,7 +285,12 @@ export class GeneratorExitHandler {
     }
 
     const durationMs = Date.now() - t0;
-    this.bus.emit({ type: "cleanup_finished", sessionId, timestamp: new Date().toISOString(), data: { durationMs } });
+    this.bus.emit({
+      type: "cleanup_finished",
+      sessionId,
+      timestamp: new Date().toISOString(),
+      data: { durationMs },
+    });
 
     return { sessionId, tasks: results, durationMs };
   }

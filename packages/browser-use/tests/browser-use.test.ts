@@ -12,7 +12,10 @@ import {
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-function makeFactory(driver?: NullPageDriver): { factory: PageDriverFactory; driver: NullPageDriver } {
+function makeFactory(driver?: NullPageDriver): {
+  factory: PageDriverFactory;
+  driver: NullPageDriver;
+} {
   const d = driver ?? new NullPageDriver();
   const factory: PageDriverFactory = async () => d;
   return { factory, driver: d };

@@ -80,7 +80,15 @@ export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
   // GET /runtime/tasks/:taskId
   app.get<{ Params: { taskId: string } }>(
     "/runtime/tasks/:taskId",
-    { preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply) => {
       const [row] = await db
         .select()

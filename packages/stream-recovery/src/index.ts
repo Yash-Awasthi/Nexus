@@ -16,14 +16,16 @@
 // ── HoldbackBuffer ────────────────────────────────────────────────────────────
 
 export interface HoldbackOptions {
-  holdMs: number;   // default 750ms
+  holdMs: number; // default 750ms
 }
 
+/** Held chunk interface definition. */
 export interface HeldChunk<T> {
   value: T;
   heldAt: number;
 }
 
+/** Holdback buffer. */
 export class HoldbackBuffer<T> {
   private queue: HeldChunk<T>[] = [];
   private holdMs: number;
@@ -55,9 +57,15 @@ export class HoldbackBuffer<T> {
     return all;
   }
 
-  size(): number { return this.queue.length; }
-  setHoldMs(ms: number): void { this.holdMs = ms; }
-  getHoldMs(): number { return this.holdMs; }
+  size(): number {
+    return this.queue.length;
+  }
+  setHoldMs(ms: number): void {
+    this.holdMs = ms;
+  }
+  getHoldMs(): number {
+    return this.holdMs;
+  }
 }
 
 // ── ToolJsonRepair ────────────────────────────────────────────────────────────
@@ -68,6 +76,7 @@ export interface RepairResult {
   error?: string;
 }
 
+/** Tool json repair. */
 export class ToolJsonRepair {
   /**
    * Attempt to repair truncated JSON by appending missing closers.
@@ -90,11 +99,21 @@ export class ToolJsonRepair {
     let inString = false;
     let escape = false;
 
+    // eslint-disable-next-line @typescript-eslint/prefer-for-of
     for (let i = 0; i < text.length; i++) {
       const ch = text[i]!;
-      if (escape) { escape = false; continue; }
-      if (ch === "\\" && inString) { escape = true; continue; }
-      if (ch === '"' && !escape) { inString = !inString; continue; }
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === "\\" && inString) {
+        escape = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = !inString;
+        continue;
+      }
       if (inString) continue;
       if (ch === "{") openBraces++;
       else if (ch === "}") openBraces--;
@@ -126,10 +145,11 @@ export class ToolJsonRepair {
 
 export const DEFAULT_CONTINUATION_SUFFIXES: Record<string, string> = {
   markdown: "\n\n*[Stream interrupted — continuing...]*\n\n",
-  json:     ',"_continuation":true}',
-  plain:    " [...]",
+  json: ',"_continuation":true}',
+  plain: " [...]",
 };
 
+/** Continuation suffix. */
 export class ContinuationSuffix {
   private suffixes: Record<string, string>;
 
@@ -137,7 +157,7 @@ export class ContinuationSuffix {
     this.suffixes = suffixes ?? DEFAULT_CONTINUATION_SUFFIXES;
   }
 
-  inject(text: string, mode: string = "plain"): string {
+  inject(text: string, mode = "plain"): string {
     const suffix = this.suffixes[mode] ?? this.suffixes["plain"] ?? " [...]";
     return text + suffix;
   }
@@ -156,6 +176,7 @@ export interface RetryStrategyOptions {
   backoffFactor?: number;
 }
 
+/** Retry strategy. */
 export class RetryStrategy {
   readonly maxAttempts: number;
   readonly initialDelayMs: number;
@@ -163,10 +184,10 @@ export class RetryStrategy {
   readonly backoffFactor: number;
 
   constructor(opts: RetryStrategyOptions) {
-    this.maxAttempts    = opts.maxAttempts;
+    this.maxAttempts = opts.maxAttempts;
     this.initialDelayMs = opts.initialDelayMs;
-    this.maxDelayMs     = opts.maxDelayMs     ?? 30_000;
-    this.backoffFactor  = opts.backoffFactor  ?? 2;
+    this.maxDelayMs = opts.maxDelayMs ?? 30_000;
+    this.backoffFactor = opts.backoffFactor ?? 2;
   }
 
   delayFor(attempt: number): number {
@@ -179,17 +200,19 @@ export class RetryStrategy {
   }
 }
 
+/** Default retry strategy. */
 export const DEFAULT_RETRY_STRATEGY = new RetryStrategy({
-  maxAttempts:    5,
+  maxAttempts: 5,
   initialDelayMs: 100,
-  maxDelayMs:     5_000,
-  backoffFactor:  2,
+  maxDelayMs: 5_000,
+  backoffFactor: 2,
 });
 
 // ── StreamRetryHandler ────────────────────────────────────────────────────────
 
 export type StreamFn<T> = () => AsyncIterable<T>;
 
+/** Retry result interface definition. */
 export interface RetryResult<T> {
   values: T[];
   attempts: number;
@@ -197,6 +220,7 @@ export interface RetryResult<T> {
   error?: string;
 }
 
+/** Stream retry handler. */
 export class StreamRetryHandler<T = string> {
   private strategy: RetryStrategy;
 
@@ -204,7 +228,10 @@ export class StreamRetryHandler<T = string> {
     this.strategy = strategy;
   }
 
-  async collect(streamFn: StreamFn<T>, delayFn?: (ms: number) => Promise<void>): Promise<RetryResult<T>> {
+  async collect(
+    streamFn: StreamFn<T>,
+    delayFn?: (ms: number) => Promise<void>,
+  ): Promise<RetryResult<T>> {
     const delay = delayFn ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
     let attempt = 0;
     let lastError: string | undefined;
@@ -233,6 +260,7 @@ export class StreamRetryHandler<T = string> {
 
 export type SseBlockType = "block" | "updateBlock" | "researchComplete" | string;
 
+/** Sse block interface definition. */
 export interface SseBlock {
   id: string;
   type: SseBlockType;
@@ -240,6 +268,7 @@ export interface SseBlock {
   data?: unknown;
 }
 
+/** Close event interface definition. */
 export interface CloseEvent {
   blockId: string;
   type: SseBlockType;
@@ -247,6 +276,7 @@ export interface CloseEvent {
   closedAt: string;
 }
 
+/** Emitted sse tracker. */
 export class EmittedSseTracker {
   private openBlocks = new Map<string, SseBlock>();
   readonly closeEvents: CloseEvent[] = [];
@@ -259,14 +289,24 @@ export class EmittedSseTracker {
     const block = this.openBlocks.get(blockId);
     if (!block) return;
     this.openBlocks.delete(blockId);
-    this.closeEvents.push({ blockId, type: block.type, reason, closedAt: new Date().toISOString() });
+    this.closeEvents.push({
+      blockId,
+      type: block.type,
+      reason,
+      closedAt: new Date().toISOString(),
+    });
   }
 
   /** Close all open blocks (called on stream error or forced termination). */
   closeAll(reason: "error" | "end"): CloseEvent[] {
     const events: CloseEvent[] = [];
     for (const [id, block] of this.openBlocks.entries()) {
-      const ev: CloseEvent = { blockId: id, type: block.type, reason, closedAt: new Date().toISOString() };
+      const ev: CloseEvent = {
+        blockId: id,
+        type: block.type,
+        reason,
+        closedAt: new Date().toISOString(),
+      };
       events.push(ev);
       this.closeEvents.push(ev);
     }
@@ -274,10 +314,19 @@ export class EmittedSseTracker {
     return events;
   }
 
-  hasOpen(blockId: string): boolean { return this.openBlocks.has(blockId); }
-  openCount(): number { return this.openBlocks.size; }
-  getOpen(): SseBlock[] { return [...this.openBlocks.values()]; }
-  clear(): void { this.openBlocks.clear(); this.closeEvents.length = 0; }
+  hasOpen(blockId: string): boolean {
+    return this.openBlocks.has(blockId);
+  }
+  openCount(): number {
+    return this.openBlocks.size;
+  }
+  getOpen(): SseBlock[] {
+    return [...this.openBlocks.values()];
+  }
+  clear(): void {
+    this.openBlocks.clear();
+    this.closeEvents.length = 0;
+  }
 }
 
 // ── StreamRecoveryOrchestrator ────────────────────────────────────────────────
@@ -288,22 +337,25 @@ export interface OrchestratorOptions {
   initialDelayMs?: number;
 }
 
+/** Stream recovery orchestrator. */
 export class StreamRecoveryOrchestrator {
   readonly holdback: HoldbackBuffer<string>;
   readonly jsonRepair: ToolJsonRepair;
   readonly continuation: ContinuationSuffix;
-  readonly retryHandler: StreamRetryHandler<string>;
+  readonly retryHandler: StreamRetryHandler;
   readonly sseTracker: EmittedSseTracker;
 
   constructor(opts: OrchestratorOptions = {}) {
-    this.holdback    = new HoldbackBuffer({ holdMs: opts.holdMs ?? 750 });
-    this.jsonRepair  = new ToolJsonRepair();
+    this.holdback = new HoldbackBuffer({ holdMs: opts.holdMs ?? 750 });
+    this.jsonRepair = new ToolJsonRepair();
     this.continuation = new ContinuationSuffix();
-    this.retryHandler = new StreamRetryHandler<string>(new RetryStrategy({
-      maxAttempts:    opts.maxRetries    ?? 5,
-      initialDelayMs: opts.initialDelayMs ?? 100,
-    }));
-    this.sseTracker  = new EmittedSseTracker();
+    this.retryHandler = new StreamRetryHandler<string>(
+      new RetryStrategy({
+        maxAttempts: opts.maxRetries ?? 5,
+        initialDelayMs: opts.initialDelayMs ?? 100,
+      }),
+    );
+    this.sseTracker = new EmittedSseTracker();
   }
 
   /** Recover from stream failure: close all open SSE blocks + inject continuation. */

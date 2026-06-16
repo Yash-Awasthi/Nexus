@@ -42,11 +42,12 @@ export interface PluginDoc {
   source?: string;
 }
 
+/** Doc annotation interface definition. */
 export interface DocAnnotation {
   /** ISO 8601 dates found in the document. */
   dates?: string[];
   /** Named entities (people, orgs, locations, etc.). */
-  entities?: Array<{ text: string; type: string }>;
+  entities?: { text: string; type: string }[];
   /** Word count. */
   wordCount?: number;
   /** Estimated reading time in seconds. */
@@ -55,6 +56,7 @@ export interface DocAnnotation {
   [key: string]: unknown;
 }
 
+/** Annotated doc interface definition. */
 export interface AnnotatedDoc {
   doc: PluginDoc;
   annotations: DocAnnotation;
@@ -119,19 +121,40 @@ export interface DetectedDate {
 
 const ISO_DATE_RE = /\b(\d{4}[-/]\d{2}[-/]\d{2})\b/g;
 const US_DATE_RE = /\b(\d{1,2}\/\d{1,2}\/\d{2,4})\b/g;
-const EU_DATE_RE = /\b(\d{1,2}[.\-]\d{1,2}[.\-]\d{2,4})\b/g;
-const LONG_DATE_RE = /\b((?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4})\b/gi;
-const SHORT_MONTH_RE = /\b((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[\s.]\s*\d{1,2},?\s+\d{4})\b/gi;
+const EU_DATE_RE = /\b(d{1,2}[.-]d{1,2}[.-]d{2,4})\b/g;
+const LONG_DATE_RE =
+  /\b((?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4})\b/gi;
+const SHORT_MONTH_RE =
+  /\b((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[\s.]\s*\d{1,2},?\s+\d{4})\b/gi;
 
 const MONTH_MAP: Record<string, string> = {
-  january: "01", february: "02", march: "03", april: "04",
-  may: "05", june: "06", july: "07", august: "08",
-  september: "09", october: "10", november: "11", december: "12",
-  jan: "01", feb: "02", mar: "03", apr: "04",
-  jun: "06", jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
+  january: "01",
+  february: "02",
+  march: "03",
+  april: "04",
+  may: "05",
+  june: "06",
+  july: "07",
+  august: "08",
+  september: "09",
+  october: "10",
+  november: "11",
+  december: "12",
+  jan: "01",
+  feb: "02",
+  mar: "03",
+  apr: "04",
+  jun: "06",
+  jul: "07",
+  aug: "08",
+  sep: "09",
+  oct: "10",
+  nov: "11",
+  dec: "12",
 };
 
 function normaliseIso(raw: string): string {
+  if (raw.length > 100) return raw;
   // Already ISO with separator
   const iso = raw.replace(/\//g, "-");
   if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
@@ -164,6 +187,7 @@ function normaliseLongDate(raw: string): string {
 }
 
 function extractDates(content: string): DetectedDate[] {
+  if (content.length > 500_000) return [];
   const found: DetectedDate[] = [];
   const seen = new Set<string>();
 
@@ -203,6 +227,7 @@ function extractDates(content: string): DetectedDate[] {
   return found.sort((a, b) => a.offset - b.offset);
 }
 
+/** Date extraction plugin. */
 export class DateExtractionPlugin implements DocPlugin {
   readonly name = "date-extraction";
 
@@ -222,6 +247,7 @@ export class DateExtractionPlugin implements DocPlugin {
 
 const WORDS_PER_MIN = 200; // average adult reading speed
 
+/** Word count plugin. */
 export class WordCountPlugin implements DocPlugin {
   readonly name = "word-count";
 
@@ -234,20 +260,21 @@ export class WordCountPlugin implements DocPlugin {
 
 // ── Entity tag plugin (keyword-based, no LLM) ─────────────────────────────────
 
-const ENTITY_PATTERNS: Array<{ re: RegExp; type: string }> = [
+const ENTITY_PATTERNS: { re: RegExp; type: string }[] = [
   { re: /\b(?:Mr|Mrs|Ms|Dr|Prof)\.?\s+[A-Z][a-z]+\s+[A-Z][a-z]+\b/g, type: "PERSON" },
   { re: /\b[A-Z][a-z]+\s+(?:Inc|Corp|LLC|Ltd|GmbH|SA|SAS|BV|AG)\.?\b/g, type: "ORG" },
   { re: /\b[A-Z][a-z]+,\s+[A-Z]{2}\b/g, type: "LOCATION" },
   { re: /\bhttps?:\/\/[^\s]+/g, type: "URL" },
-  { re: /\b[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}\b/gi, type: "EMAIL" },
+  { re: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, type: "EMAIL" },
   { re: /\$[\d,]+(?:\.\d{2})?\b|\b[\d,]+(?:\.\d{2})?\s*(?:USD|EUR|GBP|JPY)\b/g, type: "MONEY" },
 ];
 
+/** Entity tag plugin. */
 export class EntityTagPlugin implements DocPlugin {
   readonly name = "entity-tag";
 
   async process(doc: PluginDoc): Promise<Partial<DocAnnotation>> {
-    const entities: Array<{ text: string; type: string }> = [];
+    const entities: { text: string; type: string }[] = [];
     const seen = new Set<string>();
 
     for (const { re, type } of ENTITY_PATTERNS) {

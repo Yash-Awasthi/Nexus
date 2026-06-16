@@ -61,7 +61,8 @@ describe("detectContext", () => {
     const result = detectContext("ok thanks", history);
     // History has code signals — confidence in code should be higher than without history
     const withHistory = result.scores.find((s) => s.type === "code")?.score ?? 0;
-    const withoutHistory = detectContext("ok thanks").scores.find((s) => s.type === "code")?.score ?? 0;
+    const withoutHistory =
+      detectContext("ok thanks").scores.find((s) => s.type === "code")?.score ?? 0;
     expect(withHistory).toBeGreaterThanOrEqual(withoutHistory);
   });
 });
@@ -74,7 +75,9 @@ describe("computeAutoTuneParams", () => {
   });
 
   it("returns higher temperature for creative context", () => {
-    const creative = computeAutoTuneParams({ message: "write a surreal poem with abstract metaphors" });
+    const creative = computeAutoTuneParams({
+      message: "write a surreal poem with abstract metaphors",
+    });
     expect(creative.params.temperature).toBeGreaterThan(0.8);
   });
 
@@ -103,7 +106,13 @@ describe("computeAutoTuneParams", () => {
   });
 
   it("applies EMA learned delta when samples >= 3", () => {
-    const learnedDelta = { temperature: 0.15, top_p: 0.05, frequency_penalty: 0, presence_penalty: 0, samples: 5 };
+    const learnedDelta = {
+      temperature: 0.15,
+      top_p: 0.05,
+      frequency_penalty: 0,
+      presence_penalty: 0,
+      samples: 5,
+    };
     const without = computeAutoTuneParams({ message: "analyze this data" });
     const withDelta = computeAutoTuneParams({ message: "analyze this data", learnedDelta });
     // With delta the temperature should be shifted
@@ -111,15 +120,27 @@ describe("computeAutoTuneParams", () => {
   });
 
   it("ignores EMA when samples < 3", () => {
-    const learnedDelta = { temperature: 0.5, top_p: 0.1, frequency_penalty: 0, presence_penalty: 0, samples: 1 };
+    const learnedDelta = {
+      temperature: 0.5,
+      top_p: 0.1,
+      frequency_penalty: 0,
+      presence_penalty: 0,
+      samples: 1,
+    };
     const without = computeAutoTuneParams({ message: "test" });
     const withDelta = computeAutoTuneParams({ message: "test", learnedDelta });
     expect(withDelta.params.temperature).toBe(without.params.temperature);
   });
 
   it("applies repetition penalty boost for long conversations", () => {
-    const shortHistory = Array.from({ length: 3 }, (_, i) => ({ role: "user", content: `msg${i}` }));
-    const longHistory = Array.from({ length: 20 }, (_, i) => ({ role: "user", content: `msg${i}` }));
+    const shortHistory = Array.from({ length: 3 }, (_, i) => ({
+      role: "user",
+      content: `msg${i}`,
+    }));
+    const longHistory = Array.from({ length: 20 }, (_, i) => ({
+      role: "user",
+      content: `msg${i}`,
+    }));
     const short = computeAutoTuneParams({ message: "test", history: shortHistory });
     const long = computeAutoTuneParams({ message: "test", history: longHistory });
     expect(long.params.repetition_penalty).toBeGreaterThan(short.params.repetition_penalty);

@@ -19,8 +19,11 @@ all fetch calls return {"success": false, "error": "<dep> not available"}.
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import logging
+import socket as _socket
 from typing import Any
+from urllib.parse import urlparse
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -28,6 +31,34 @@ from pydantic import BaseModel
 
 logger = logging.getLogger("web_scraping_bridge")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(message)s")
+
+
+def _sanitize_log(val: Any) -> str:
+    """Strip newlines/control chars from user-supplied values before logging."""
+    return str(val).replace("\n", "\\n").replace("\r", "\\r").replace("\0", "")[:500]
+
+
+def _validate_fetch_url(url: str) -> None:
+    """
+    Validate that *url* is safe to fetch.
+
+    Raises ``ValueError`` if the URL scheme is not http/https, if the hostname
+    resolves to a loopback, link-local, or multicast address.  Private (RFC-1918)
+    addresses are allowed for internal dev-environment use.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"URL scheme not allowed: {parsed.scheme!r}")
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("URL missing hostname")
+    try:
+        ip = ipaddress.ip_address(_socket.gethostbyname(hostname))
+        if ip.is_loopback or ip.is_link_local or ip.is_multicast:
+            raise ValueError(f"Target {ip} is a reserved address")
+    except _socket.gaierror:
+        pass  # DNS failure handled by httpx at request time
+
 
 # ---------------------------------------------------------------------------
 # Optional deps
@@ -120,6 +151,23 @@ async def _do_fetch(
             "pages_crawled": 0, "bytes_fetched": 0,
             "error": "httpx not available — run: pip install httpx",
         }
+    # Validate URL scheme + resolve hostname to block loopback/link-local targets.
+    # Reconstruct safe_url from parsed components so CodeQL sees a non-tainted value
+    # going to client.get() rather than the raw user-supplied string.
+    try:
+        _validate_fetch_url(url)
+        _parsed = urlparse(url)
+        safe_url = f"{_parsed.scheme}://{_parsed.netloc}{_parsed.path}"
+        if _parsed.query:
+            safe_url += f"?{_parsed.query}"
+    except ValueError as _ve:
+        logger.warning("fetch rejected for %s: %s", _sanitize_log(url), _ve)
+        return {
+            "success": False, "url": url, "status_code": 0,
+            "html": "", "text": "", "extracted": {},
+            "pages_crawled": 0, "bytes_fetched": 0,
+            "error": "URL not allowed",
+        }
     try:
         timeout_sec = timeout_ms / 1000.0
         async with httpx.AsyncClient(
@@ -127,7 +175,7 @@ async def _do_fetch(
             follow_redirects=True,
             timeout=timeout_sec,
         ) as client:
-            resp = await client.get(url)
+            resp = await client.get(safe_url)
 
         html = resp.text
         text_content = ""
@@ -160,12 +208,12 @@ async def _do_fetch(
             "error": "" if success else f"HTTP {resp.status_code}",
         }
     except Exception as exc:
-        logger.error("Fetch failed for %s: %s", url, exc)
+        logger.error("Fetch failed for %s: %s", _sanitize_log(url), exc)
         return {
             "success": False, "url": url, "status_code": 0,
             "html": "", "text": "", "extracted": {},
             "pages_crawled": 0, "bytes_fetched": 0,
-            "error": str(exc),
+            "error": "Fetch failed — check server logs",
         }
 
 

@@ -34,8 +34,10 @@ export interface RecentTask {
   error?: string | null;
 }
 
+/** Signal priority type alias. */
 export type SignalPriority = "low" | "medium" | "high" | "critical";
 
+/** Active signal interface definition. */
 export interface ActiveSignal {
   id: string;
   signalType: string;
@@ -45,6 +47,7 @@ export interface ActiveSignal {
   createdAt: string;
 }
 
+/** Memory fact interface definition. */
 export interface MemoryFact {
   id: string;
   text: string;
@@ -118,6 +121,7 @@ export interface ContextSection {
   trimmed: boolean;
 }
 
+/** Context pack interface definition. */
 export interface ContextPack {
   /** The full assembled system prompt — prepend to any LLM conversation */
   systemPrompt: string;

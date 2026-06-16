@@ -18,7 +18,7 @@ export interface IMCPExecutionResult {
   correlationId: string;
 }
 
-export interface IMCPExecutionContext {
+interface IMCPExecutionContext {
   correlationId: string;
   startTime: Date;
   attempt: number;
@@ -45,7 +45,7 @@ export interface IMCPServerRegistry {
   listServers(): Promise<IMCPServerInfo[]>;
 }
 
-export interface IMCPToolAdapter {
+interface IMCPToolAdapter {
   canAdapt(serverName: string, toolName: string): Promise<boolean>;
   invokeTool(task: IMCPTask, context: IMCPExecutionContext): Promise<IMCPExecutionResult>;
 }

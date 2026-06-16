@@ -24,13 +24,15 @@ export type WorkerEventType =
   | "error"
   | "heartbeat";
 
+/** Base worker event interface definition. */
 export interface BaseWorkerEvent {
   type: WorkerEventType;
   sessionId: string;
   timestamp: string; // ISO
-  id: string;        // monotonic per channel
+  id: string; // monotonic per channel
 }
 
+/** Session started event interface definition. */
 export interface SessionStartedEvent extends BaseWorkerEvent {
   type: "session_started";
   model: string;
@@ -38,6 +40,7 @@ export interface SessionStartedEvent extends BaseWorkerEvent {
   metadata?: Record<string, unknown>;
 }
 
+/** New prompt event interface definition. */
 export interface NewPromptEvent extends BaseWorkerEvent {
   type: "new_prompt";
   promptId: string;
@@ -46,6 +49,7 @@ export interface NewPromptEvent extends BaseWorkerEvent {
   tokenEstimate?: number;
 }
 
+/** Observation queued event interface definition. */
 export interface ObservationQueuedEvent extends BaseWorkerEvent {
   type: "observation_queued";
   observationId: string;
@@ -53,6 +57,7 @@ export interface ObservationQueuedEvent extends BaseWorkerEvent {
   priority?: number;
 }
 
+/** Observation processed event interface definition. */
 export interface ObservationProcessedEvent extends BaseWorkerEvent {
   type: "observation_processed";
   observationId: string;
@@ -60,6 +65,7 @@ export interface ObservationProcessedEvent extends BaseWorkerEvent {
   durationMs: number;
 }
 
+/** Session completed event interface definition. */
 export interface SessionCompletedEvent extends BaseWorkerEvent {
   type: "session_completed";
   totalPrompts: number;
@@ -68,12 +74,14 @@ export interface SessionCompletedEvent extends BaseWorkerEvent {
   reason: "user_end" | "timeout" | "max_turns" | "error";
 }
 
+/** Summarize queued event interface definition. */
 export interface SummarizeQueuedEvent extends BaseWorkerEvent {
   type: "summarize_queued";
   targetSessionId: string;
   triggerReason: "context_limit" | "periodic" | "manual";
 }
 
+/** Summarize completed event interface definition. */
 export interface SummarizeCompletedEvent extends BaseWorkerEvent {
   type: "summarize_completed";
   targetSessionId: string;
@@ -81,6 +89,7 @@ export interface SummarizeCompletedEvent extends BaseWorkerEvent {
   durationMs: number;
 }
 
+/** Error event interface definition. */
 export interface ErrorEvent extends BaseWorkerEvent {
   type: "error";
   code: string;
@@ -88,11 +97,13 @@ export interface ErrorEvent extends BaseWorkerEvent {
   fatal: boolean;
 }
 
+/** Heartbeat event interface definition. */
 export interface HeartbeatEvent extends BaseWorkerEvent {
   type: "heartbeat";
   uptimeMs: number;
 }
 
+/** Worker event type alias. */
 export type WorkerEvent =
   | SessionStartedEvent
   | NewPromptEvent
@@ -133,6 +144,8 @@ export class SseSerializer {
 
 export type EventPredicate = (event: WorkerEvent) => boolean;
 
+/** Event filter. */
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class EventFilter {
   static byType(...types: WorkerEventType[]): EventPredicate {
     const set = new Set(types);
@@ -179,9 +192,15 @@ export class EventReplay {
     return this.buffer.slice(idx + 1);
   }
 
-  all(): WorkerEvent[] { return [...this.buffer]; }
-  size(): number { return this.buffer.length; }
-  clear(): void { this.buffer = []; }
+  all(): WorkerEvent[] {
+    return [...this.buffer];
+  }
+  size(): number {
+    return this.buffer.length;
+  }
+  clear(): void {
+    this.buffer = [];
+  }
 }
 
 // ── EventChannel ──────────────────────────────────────────────────────────────
@@ -190,9 +209,13 @@ export type UnsubscribeFn = () => void;
 
 let _globalSeq = 0;
 
+/** Event channel. */
 export class EventChannel {
   readonly sessionId: string;
-  private subscribers = new Map<string, { predicate: EventPredicate | null; handler: (e: WorkerEvent) => void }>();
+  private subscribers = new Map<
+    string,
+    { predicate: EventPredicate | null; handler: (e: WorkerEvent) => void }
+  >();
   private seq = 0;
   private replay: EventReplay;
   private closed = false;
@@ -223,7 +246,11 @@ export class EventChannel {
 
     for (const { predicate, handler } of this.subscribers.values()) {
       if (!predicate || predicate(event)) {
-        try { handler(event); } catch { /* subscriber errors don't break the bus */ }
+        try {
+          handler(event);
+        } catch {
+          /* subscriber errors don't break the bus */
+        }
       }
     }
 
@@ -237,10 +264,19 @@ export class EventChannel {
     }
   }
 
-  close(): void { this.closed = true; this.subscribers.clear(); }
-  get isClosed(): boolean { return this.closed; }
-  get subscriberCount(): number { return this.subscribers.size; }
-  getReplay(): EventReplay { return this.replay; }
+  close(): void {
+    this.closed = true;
+    this.subscribers.clear();
+  }
+  get isClosed(): boolean {
+    return this.closed;
+  }
+  get subscriberCount(): number {
+    return this.subscribers.size;
+  }
+  getReplay(): EventReplay {
+    return this.replay;
+  }
 }
 
 // ── SessionEventBroadcaster ───────────────────────────────────────────────────
@@ -264,15 +300,24 @@ export class SessionEventBroadcaster {
   }
 
   /** Publish to a named session channel. Creates the channel if needed. */
-  publish(sessionId: string, event: Omit<WorkerEvent, "id" | "sessionId" | "timestamp">): WorkerEvent {
+  publish(
+    sessionId: string,
+    event: Omit<WorkerEvent, "id" | "sessionId" | "timestamp">,
+  ): WorkerEvent {
     return this.channel(sessionId).publish(event);
   }
 
   /** Fan-out to ALL open channels. */
-  broadcast(event: Omit<WorkerEvent, "id" | "sessionId" | "timestamp"> & { sessionId: string }): void {
+  broadcast(
+    event: Omit<WorkerEvent, "id" | "sessionId" | "timestamp"> & { sessionId: string },
+  ): void {
     for (const ch of this.channels.values()) {
       if (!ch.isClosed) {
-        try { ch.publish(event); } catch { /* closed channels throw; skip */ }
+        try {
+          ch.publish(event);
+        } catch {
+          /* closed channels throw; skip */
+        }
       }
     }
   }
@@ -280,7 +325,10 @@ export class SessionEventBroadcaster {
   /** Close and remove a channel. */
   closeChannel(sessionId: string): void {
     const ch = this.channels.get(sessionId);
-    if (ch) { ch.close(); this.channels.delete(sessionId); }
+    if (ch) {
+      ch.close();
+      this.channels.delete(sessionId);
+    }
   }
 
   /** Close all channels. */
@@ -289,7 +337,13 @@ export class SessionEventBroadcaster {
     this.channels.clear();
   }
 
-  sessionIds(): string[] { return [...this.channels.keys()]; }
-  hasChannel(sessionId: string): boolean { return this.channels.has(sessionId); }
-  channelCount(): number { return this.channels.size; }
+  sessionIds(): string[] {
+    return [...this.channels.keys()];
+  }
+  hasChannel(sessionId: string): boolean {
+    return this.channels.has(sessionId);
+  }
+  channelCount(): number {
+    return this.channels.size;
+  }
 }

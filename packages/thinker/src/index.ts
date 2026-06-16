@@ -14,6 +14,7 @@
 
 export type StepStatus = "pending" | "running" | "done" | "error";
 
+/** Think step interface definition. */
 export interface ThinkStep {
   index: number;
   prompt: string;
@@ -25,6 +26,7 @@ export interface ThinkStep {
   tokens: number;
 }
 
+/** Think chain interface definition. */
 export interface ThinkChain {
   id: string;
   query: string;
@@ -36,6 +38,7 @@ export interface ThinkChain {
   model: string;
 }
 
+/** Thinker options interface definition. */
 export interface ThinkerOptions {
   model?: string;
   maxSteps?: number;
@@ -44,6 +47,7 @@ export interface ThinkerOptions {
   llmCall?: LlmCallFn;
 }
 
+/** Llm call fn type alias. */
 export type LlmCallFn = (
   prompt: string,
   model: string,
@@ -61,7 +65,9 @@ const DEFAULT_LLM: LlmCallFn = async (prompt, _model) => ({
 // ── ID util ───────────────────────────────────────────────────────────────────
 
 let _seq = 0;
-function uid(prefix: string) { return `${prefix}-${Date.now()}-${++_seq}`; }
+function uid(prefix: string) {
+  return `${prefix}-${Date.now()}-${++_seq}`;
+}
 
 // ── ThinkChain builder ────────────────────────────────────────────────────────
 
@@ -69,7 +75,11 @@ export class ThinkChainBuilder {
   private steps: ThinkStep[] = [];
   private startMs = Date.now();
 
-  constructor(readonly id: string, readonly query: string, readonly model: string) {}
+  constructor(
+    readonly id: string,
+    readonly query: string,
+    readonly model: string,
+  ) {}
 
   addStep(step: Omit<ThinkStep, "index">): this {
     this.steps.push({ index: this.steps.length, ...step });
@@ -119,9 +129,10 @@ export class Thinker {
         .map((s, idx) => `Step ${idx + 1}: ${s.conclusion}`)
         .join("\n");
 
-      const prompt = i === 0
-        ? `Reason step by step to answer: ${base}`
-        : `Previous steps:\n${previousConclusions}\n\nContinue reasoning: ${query}`;
+      const prompt =
+        i === 0
+          ? `Reason step by step to answer: ${base}`
+          : `Previous steps:\n${previousConclusions}\n\nContinue reasoning: ${query}`;
 
       const t0 = Date.now();
       const result = await this.llmCall(prompt, this.model);
@@ -150,6 +161,7 @@ export interface BestOfNOptions {
   llmCall?: LlmCallFn;
 }
 
+/** Best of n. */
 export class BestOfN {
   private n: number;
   private thinker: Thinker;
@@ -214,7 +226,11 @@ export class ThinkingSession {
     return chain;
   }
 
-  cacheSize(): number { return this.cache.size(); }
+  cacheSize(): number {
+    return this.cache.size();
+  }
 
-  clearCache(): void { this.cache.clear(); }
+  clearCache(): void {
+    this.cache.clear();
+  }
 }

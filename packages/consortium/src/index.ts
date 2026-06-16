@@ -25,13 +25,16 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type FetchFn = typeof fetch;
+/** Message role type alias. */
 export type MessageRole = "system" | "user" | "assistant";
 
+/** Consortium message interface definition. */
 export interface ConsortiumMessage {
   role: MessageRole;
   content: string;
 }
 
+/** Sampling params interface definition. */
 export interface SamplingParams {
   temperature?: number;
   max_tokens?: number;
@@ -42,37 +45,55 @@ export interface SamplingParams {
   repetition_penalty?: number;
 }
 
+/** Speed tier type alias. */
 export type SpeedTier = "fast" | "standard" | "smart" | "power" | "ultra";
 
 // ── Models per tier (additive) ────────────────────────────────────────────────
 
 const TIER_MODELS: Record<SpeedTier, readonly string[]> = {
   fast: [
-    "google/gemini-2.5-flash", "deepseek/deepseek-chat", "perplexity/sonar",
-    "meta-llama/llama-3.1-8b-instruct", "moonshotai/kimi-k2.5",
-    "openai/gpt-oss-20b", "google/gemini-3.1-flash-lite",
+    "google/gemini-2.5-flash",
+    "deepseek/deepseek-chat",
+    "perplexity/sonar",
+    "meta-llama/llama-3.1-8b-instruct",
+    "moonshotai/kimi-k2.5",
+    "openai/gpt-oss-20b",
+    "google/gemini-3.1-flash-lite",
     "mistralai/mistral-small-3.2-24b-instruct",
   ],
   standard: [
-    "anthropic/claude-3.5-sonnet", "deepseek/deepseek-v3.2",
-    "openai/gpt-4o", "google/gemini-2.5-pro", "anthropic/claude-sonnet-4.6",
-    "mistralai/mixtral-8x22b-instruct", "meta-llama/llama-3.3-70b-instruct",
+    "anthropic/claude-3.5-sonnet",
+    "deepseek/deepseek-v3.2",
+    "openai/gpt-4o",
+    "google/gemini-2.5-pro",
+    "anthropic/claude-sonnet-4.6",
+    "mistralai/mixtral-8x22b-instruct",
+    "meta-llama/llama-3.3-70b-instruct",
   ],
   smart: [
-    "openai/gpt-5", "openai/gpt-5.3-chat", "google/gemini-3-pro-preview",
-    "anthropic/claude-opus-4.6", "deepseek/deepseek-r1",
+    "openai/gpt-5",
+    "openai/gpt-5.3-chat",
+    "google/gemini-3-pro-preview",
+    "anthropic/claude-opus-4.6",
+    "deepseek/deepseek-r1",
     "nousresearch/hermes-4-405b",
   ],
   power: [
-    "x-ai/grok-4", "openai/gpt-5.4", "qwen/qwen3-235b-a22b",
-    "google/gemini-3.1-pro-preview", "moonshotai/kimi-k2",
+    "x-ai/grok-4",
+    "openai/gpt-5.4",
+    "qwen/qwen3-235b-a22b",
+    "google/gemini-3.1-pro-preview",
+    "moonshotai/kimi-k2",
   ],
   ultra: [
-    "x-ai/grok-4-fast", "anthropic/claude-opus-4",
-    "qwen/qwq-32b", "mistralai/codestral-2508",
+    "x-ai/grok-4-fast",
+    "anthropic/claude-opus-4",
+    "qwen/qwq-32b",
+    "mistralai/codestral-2508",
   ],
 };
 
+/** Get models for tier. */
 export function getModelsForTier(tier: SpeedTier): string[] {
   const order: SpeedTier[] = ["fast", "standard", "smart", "power", "ultra"];
   const idx = order.indexOf(tier);
@@ -92,14 +113,12 @@ const REFUSAL_RE = [
   /As an AI|As a language model/i,
   /I must decline|I have to refuse/i,
 ];
-const PREAMBLE_RE = [
-  /^(Sure|Of course|Certainly|Absolutely)/i,
-  /^I'd be happy to help/i,
-];
+const PREAMBLE_RE = [/^(Sure|Of course|Certainly|Absolutely)/i, /^I'd be happy to help/i];
 const HEADER_RE = /^#{1,3}\s/gm;
 const LIST_RE = /^[\s]*[-*•]\s/gm;
 const CODE_RE = /```/g;
 
+/** Score response. */
 export function scoreResponse(content: string, userQuery: string): number {
   if (!content || content.length < 10) return 0;
   let score = Math.min(content.length / 40, 25);
@@ -110,7 +129,10 @@ export function scoreResponse(content: string, userQuery: string): number {
   const refusals = REFUSAL_RE.filter((p) => p.test(content)).length;
   score += Math.max(25 - refusals * 8, 0);
   score += PREAMBLE_RE.some((p) => p.test(content.trim())) ? 8 : 15;
-  const words = userQuery.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+  const words = userQuery
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length > 3);
   const lower = content.toLowerCase();
   const matched = words.filter((w) => lower.includes(w));
   score += words.length > 0 ? (matched.length / words.length) * 15 : 7.5;
@@ -130,6 +152,7 @@ export interface ModelResult {
 
 const OR_URL = "https://openrouter.ai/api/v1/chat/completions";
 
+/** Query model. */
 export async function queryModel(
   model: string,
   messages: ConsortiumMessage[],
@@ -141,12 +164,14 @@ export async function queryModel(
   const t0 = Date.now();
   try {
     const body: Record<string, unknown> = {
-      model, messages,
+      model,
+      messages,
       temperature: params.temperature ?? 0.7,
       max_tokens: params.max_tokens ?? 4096,
     };
     if (params.top_p !== undefined) body["top_p"] = params.top_p;
-    if (params.frequency_penalty !== undefined) body["frequency_penalty"] = params.frequency_penalty;
+    if (params.frequency_penalty !== undefined)
+      body["frequency_penalty"] = params.frequency_penalty;
 
     const res = await fetchFn(OR_URL, {
       method: "POST",
@@ -162,13 +187,21 @@ export async function queryModel(
 
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = (await res.json()) as Record<string, unknown>;
-    const choices = data["choices"] as Array<Record<string, unknown>> | undefined;
-    const content = String((choices?.[0]?.["message"] as Record<string, unknown> | undefined)?.["content"] ?? "");
+    const choices = data["choices"] as Record<string, unknown>[] | undefined;
+    const content = String(
+      (choices?.[0]?.["message"] as Record<string, unknown> | undefined)?.["content"] ?? "",
+    );
     if (!content) throw new Error("Empty response");
     return { model, content, durationMs: Date.now() - t0, success: true, score: 0 };
   } catch (err) {
-    return { model, content: "", durationMs: Date.now() - t0, success: false,
-      error: err instanceof Error ? err.message : String(err), score: 0 };
+    return {
+      model,
+      content: "",
+      durationMs: Date.now() - t0,
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+      score: 0,
+    };
   }
 }
 
@@ -182,8 +215,10 @@ export const ORCHESTRATOR_MODELS = [
   "anthropic/claude-opus-4.6",
 ] as const;
 
+/** Orchestrator model type alias. */
 export type OrchestratorModel = (typeof ORCHESTRATOR_MODELS)[number] | (string & {});
 
+/** Consortium response interface definition. */
 export interface ConsortiumResponse {
   model: string;
   content: string;
@@ -193,6 +228,7 @@ export interface ConsortiumResponse {
   error?: string;
 }
 
+/** Consortium result interface definition. */
 export interface ConsortiumResult {
   synthesis: string;
   orchestratorModel: string;
@@ -205,14 +241,12 @@ export interface ConsortiumResult {
   };
 }
 
-const CONSORTIUM_SYSTEM_PROMPT =
-  `You are the CONSORTIUM ORCHESTRATOR. Synthesise ground truth from multiple AI model responses into ONE authoritative answer. Be direct, specific, and comprehensive. No meta-commentary about the process — just write the definitive answer.`;
+const CONSORTIUM_SYSTEM_PROMPT = `You are the CONSORTIUM ORCHESTRATOR. Synthesise ground truth from multiple AI model responses into ONE authoritative answer. Be direct, specific, and comprehensive. No meta-commentary about the process — just write the definitive answer.`;
 
-function buildOrchestrationPrompt(
-  userQuery: string,
-  responses: ConsortiumResponse[],
-): string {
-  const successful = responses.filter((r) => r.success && r.content).sort((a, b) => b.score - a.score);
+function buildOrchestrationPrompt(userQuery: string, responses: ConsortiumResponse[]): string {
+  const successful = responses
+    .filter((r) => r.success && r.content)
+    .sort((a, b) => b.score - a.score);
   let p = `## ORIGINAL QUESTION\n\n${userQuery}\n\n## MODEL RESPONSES (${successful.length})\n\n`;
   successful.forEach((r, i) => {
     p += `---\n### Response ${i + 1} (Score: ${r.score}/100)\n\n${r.content}\n\n`;
@@ -229,6 +263,7 @@ export interface CollectionConfig {
   onModelResult?: (result: ModelResult, settled: number, total: number) => void;
 }
 
+/** Collect all responses. */
 export function collectAllResponses(
   models: string[],
   messages: ConsortiumMessage[],
@@ -256,24 +291,27 @@ export function collectAllResponses(
     };
 
     const hardTimer = setTimeout(finish, hardTimeout);
-    setTimeout(() => { if (!resolved && successCount >= minResponses) finish(); }, hardTimeout * 0.8);
+    setTimeout(() => {
+      if (!resolved && successCount >= minResponses) finish();
+    }, hardTimeout * 0.8);
 
     for (const model of models) {
-      queryModel(model, messages, apiKey, params, controller.signal, fetchFn)
-        .then((r) => {
-          if (resolved) return;
-          results.push(r);
-          settled++;
-          if (r.success) successCount++;
-          config.onModelResult?.(r, settled, models.length);
-          if (settled === models.length) finish();
-        });
+      queryModel(model, messages, apiKey, params, controller.signal, fetchFn).then((r) => {
+        if (resolved) return;
+        results.push(r);
+        settled++;
+        if (r.success) successCount++;
+        config.onModelResult?.(r, settled, models.length);
+        // eslint-disable-next-line promise/always-return
+        if (settled === models.length) finish();
+      });
     }
 
     if (models.length === 0) finish();
   });
 }
 
+/** Synthesize. */
 export async function synthesize(
   userQuery: string,
   responses: ConsortiumResponse[],
@@ -287,14 +325,21 @@ export async function synthesize(
     { role: "system", content: CONSORTIUM_SYSTEM_PROMPT },
     { role: "user", content: prompt },
   ];
-  const result = await queryModel(orchestratorModel, messages, apiKey,
-    { temperature: 0.3, max_tokens: maxTokens }, undefined, fetchFn);
+  const result = await queryModel(
+    orchestratorModel,
+    messages,
+    apiKey,
+    { temperature: 0.3, max_tokens: maxTokens },
+    undefined,
+    fetchFn,
+  );
   if (!result.success || !result.content) {
     throw new Error(`Orchestrator (${orchestratorModel}) failed: ${result.error ?? "empty"}`);
   }
   return { synthesis: result.content, durationMs: result.durationMs, model: orchestratorModel };
 }
 
+/** Consortium pipeline config interface definition. */
 export interface ConsortiumPipelineConfig {
   tier: SpeedTier;
   orchestratorModel?: OrchestratorModel;
@@ -302,6 +347,7 @@ export interface ConsortiumPipelineConfig {
   collectionConfig?: CollectionConfig;
 }
 
+/** Run consortium. */
 export async function runConsortium(
   userQuery: string,
   messages: ConsortiumMessage[],
@@ -314,8 +360,12 @@ export async function runConsortium(
   const t0 = Date.now();
 
   const rawResults = await collectAllResponses(
-    models, messages, apiKey, params,
-    config.collectionConfig ?? {}, fetchFn,
+    models,
+    messages,
+    apiKey,
+    params,
+    config.collectionConfig ?? {},
+    fetchFn,
   );
 
   const collectionDuration = Date.now() - t0;
@@ -335,8 +385,12 @@ export async function runConsortium(
   if (successCount === 0) throw new Error("All models failed during collection phase");
 
   const orch = await synthesize(
-    userQuery, scoredResponses, apiKey,
-    config.orchestratorModel, config.maxTokens ?? 8192, fetchFn,
+    userQuery,
+    scoredResponses,
+    apiKey,
+    config.orchestratorModel,
+    config.maxTokens ?? 8192,
+    fetchFn,
   );
 
   return {
@@ -344,6 +398,10 @@ export async function runConsortium(
     orchestratorModel: orch.model,
     orchestratorDurationMs: orch.durationMs,
     responses: scoredResponses,
-    collection: { modelsQueried: models.length, modelsSucceeded: successCount, totalDurationMs: collectionDuration },
+    collection: {
+      modelsQueried: models.length,
+      modelsSucceeded: successCount,
+      totalDurationMs: collectionDuration,
+    },
   };
 }

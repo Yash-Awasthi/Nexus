@@ -27,12 +27,10 @@
  * timer are removed to prevent memory leaks.
  */
 
-import {
-  globalBus,
-  formatSseEvent,
-  formatPing,
-  type SseEvent,
-} from "@nexus/sse";
+import type { ServerResponse } from "http";
+import type { Socket } from "net";
+
+import { globalBus, formatSseEvent, formatPing, type SseEvent } from "@nexus/sse";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
@@ -52,11 +50,7 @@ const SSE_HEADERS = {
  * Open an SSE connection, subscribe to the given channel(s), and handle
  * clean-up on client disconnect.
  */
-function openSseConnection(
-  raw: import("http").ServerResponse,
-  socket: import("net").Socket,
-  channels: string[],
-): void {
+function openSseConnection(raw: ServerResponse, socket: Socket, channels: string[]): void {
   // Write status line + headers (hijacked reply, no Fastify layer)
   raw.writeHead(200, SSE_HEADERS);
 
@@ -64,7 +58,7 @@ function openSseConnection(
   raw.write(":\n\n");
 
   // Subscribe to each channel
-  const listeners: Array<[string, (e: SseEvent) => void]> = channels.map((channel) => {
+  const listeners: [string, (e: SseEvent) => void][] = channels.map((channel) => {
     const listener = (event: SseEvent): void => {
       if (!raw.destroyed) {
         raw.write(formatSseEvent(event));
@@ -101,7 +95,15 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
 
   app.get(
     "/sse/tasks",
-    { preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply): Promise<void> => {
       reply.hijack();
       openSseConnection(reply.raw, request.socket, ["tasks"]);
@@ -112,12 +114,18 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
 
   app.get<{ Params: { taskId: string } }>(
     "/sse/tasks/:taskId",
-    { preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply): Promise<void> => {
       reply.hijack();
-      openSseConnection(reply.raw, request.socket, [
-        `tasks:${request.params.taskId}`,
-      ]);
+      openSseConnection(reply.raw, request.socket, [`tasks:${request.params.taskId}`]);
     },
   );
 
@@ -125,7 +133,15 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
 
   app.get(
     "/sse/signals",
-    { preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply): Promise<void> => {
       reply.hijack();
       openSseConnection(reply.raw, request.socket, ["signals"]);
@@ -136,7 +152,15 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
 
   app.get(
     "/sse/verdicts",
-    { preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply): Promise<void> => {
       reply.hijack();
       openSseConnection(reply.raw, request.socket, ["verdicts"]);
@@ -147,12 +171,18 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
 
   app.get<{ Params: { taskId: string } }>(
     "/sse/verdicts/:taskId",
-    { preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          201: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
     async (request, reply): Promise<void> => {
       reply.hijack();
-      openSseConnection(reply.raw, request.socket, [
-        `verdicts:${request.params.taskId}`,
-      ]);
+      openSseConnection(reply.raw, request.socket, [`verdicts:${request.params.taskId}`]);
     },
   );
 }

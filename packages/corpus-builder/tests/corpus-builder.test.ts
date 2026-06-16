@@ -59,7 +59,14 @@ describe("MockCorpusSearchBackend", () => {
 
   it("accepts custom documents", async () => {
     const docs: CorpusDocument[] = [
-      { id: "custom-1", title: "Custom", content: "Content", source: "mock", topics: [], wordCount: 1 },
+      {
+        id: "custom-1",
+        title: "Custom",
+        content: "Content",
+        source: "mock",
+        topics: [],
+        wordCount: 1,
+      },
     ];
     const backend = new MockCorpusSearchBackend(docs);
     const result = await backend.search("q");

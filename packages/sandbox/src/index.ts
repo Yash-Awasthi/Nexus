@@ -19,10 +19,10 @@
  */
 
 import { spawn } from "child_process";
+import { randomUUID } from "crypto";
 import { writeFile, unlink } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { randomUUID } from "crypto";
 
 import { defineAdapter, requireEnv, type IExecutionContext } from "@nexus/plugin-sdk";
 
@@ -30,6 +30,7 @@ import { defineAdapter, requireEnv, type IExecutionContext } from "@nexus/plugin
 
 export type SandboxLanguage = "javascript" | "typescript" | "python" | "bash";
 
+/** Sandbox task interface definition. */
 export interface SandboxTask {
   taskType: "sandbox.execute";
   /** Source code to execute */
@@ -48,6 +49,7 @@ export interface SandboxTask {
   extraEnv?: Record<string, string>;
 }
 
+/** Sandbox result interface definition. */
 export interface SandboxResult {
   ok: boolean;
   /** stdout output (truncated at 64 KiB) */
@@ -74,6 +76,7 @@ export interface RunnerOptions {
   env: NodeJS.ProcessEnv;
 }
 
+/** Runner result interface definition. */
 export interface RunnerResult {
   stdout: string;
   stderr: string;
@@ -81,11 +84,8 @@ export interface RunnerResult {
   timedOut: boolean;
 }
 
-export type Runner = (
-  cmd: string,
-  args: string[],
-  opts: RunnerOptions,
-) => Promise<RunnerResult>;
+/** Runner type alias. */
+export type Runner = (cmd: string, args: string[], opts: RunnerOptions) => Promise<RunnerResult>;
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -109,9 +109,7 @@ const SAFE_ENV_KEYS: ReadonlySet<string> = new Set([
 
 // ── Safe environment builder ──────────────────────────────────────────────────
 
-export function buildSafeEnv(
-  extraEnv?: Record<string, string>,
-): NodeJS.ProcessEnv {
+export function buildSafeEnv(extraEnv?: Record<string, string>): NodeJS.ProcessEnv {
   const safe: NodeJS.ProcessEnv = {};
 
   for (const key of Array.from(SAFE_ENV_KEYS)) {
@@ -156,20 +154,12 @@ export interface PreparedExecution {
  * Determine the command, args, and code delivery mechanism for a given language.
  * For TypeScript, a temp file path is returned (callers write + delete it).
  */
-export function prepareExecution(
-  language: SandboxLanguage,
-  code: string,
-): PreparedExecution {
+export function prepareExecution(language: SandboxLanguage, code: string): PreparedExecution {
   switch (language) {
     case "javascript":
       return {
         cmd: "node",
-        args: [
-          "--no-addons",
-          "--no-experimental-require-module",
-          "-e",
-          code,
-        ],
+        args: ["--no-addons", "--no-experimental-require-module", "-e", code],
         useStdin: false,
       };
 
@@ -292,7 +282,8 @@ export async function executeCode(
   try {
     // Write temp file for TypeScript
     if (prep.tempFilePath) {
-      await writeFile(prep.tempFilePath, task.code, "utf8");
+      // Use exclusive flag to prevent TOCTOU on the randomised temp path
+      await writeFile(prep.tempFilePath, task.code, { encoding: "utf8", flag: "wx" });
       tempFileWritten = true;
     }
 
@@ -332,10 +323,7 @@ export async function executeCode(
 
 // ── Adapter wiring ────────────────────────────────────────────────────────────
 
-async function execute(
-  task: SandboxTask,
-  ctx: IExecutionContext,
-): Promise<SandboxResult> {
+async function execute(task: SandboxTask, ctx: IExecutionContext): Promise<SandboxResult> {
   // Log the execution (ctx.logger is always available)
   ctx.logger.info("sandbox.execute", {
     language: task.language,
@@ -351,6 +339,7 @@ async function execute(
   return executeCode(task);
 }
 
+/** Sandbox adapter. */
 export const sandboxAdapter = defineAdapter<SandboxTask, SandboxResult>({
   name: "nexus-adapter-sandbox",
   version: "0.1.0",
@@ -396,17 +385,18 @@ export function buildDockerArgs(config: DockerSandboxConfig = {}): string[] {
   return [
     "run",
     "--rm",
-    "--network=none",           // no outbound network access
-    `--memory=${memoryMb}m`,    // hard memory cap
-    `--pids-limit=${pidsLimit}`,// limit fork bombs
-    "--cap-drop=ALL",            // drop all Linux capabilities
+    "--network=none", // no outbound network access
+    `--memory=${memoryMb}m`, // hard memory cap
+    `--pids-limit=${pidsLimit}`, // limit fork bombs
+    "--cap-drop=ALL", // drop all Linux capabilities
     "--security-opt=no-new-privileges", // prevent privilege escalation
     `--cpu-period=${cpuPeriod}`,
     `--cpu-quota=${cpuQuota}`,
     // Mount system tmpdir so TypeScript temp files created by prepareExecution
     // are accessible inside the container with read-only semantics.
-    `-v`, `${tmpdir()}:${tmpdir()}:ro`,
-    "-i",                        // keep stdin open for piped input
+    `-v`,
+    `${tmpdir()}:${tmpdir()}:ro`,
+    "-i", // keep stdin open for piped input
     image,
   ];
 }

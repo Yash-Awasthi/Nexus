@@ -45,6 +45,7 @@ export interface FeedEvent {
   metadata?: Record<string, unknown>;
 }
 
+/** Feed page interface definition. */
 export interface FeedPage<T> {
   domain: string;
   events: T[];
@@ -61,6 +62,7 @@ export interface AviationEvent extends FeedEvent {
   alertType: "delay" | "cancellation" | "diversion" | "notam" | "weather";
 }
 
+/** Climate event interface definition. */
 export interface ClimateEvent extends FeedEvent {
   eventType: "temperature_anomaly" | "precipitation" | "drought" | "flood" | "storm";
   location: string;
@@ -68,12 +70,14 @@ export interface ClimateEvent extends FeedEvent {
   unit?: string;
 }
 
+/** Conflict event interface definition. */
 export interface ConflictEvent extends FeedEvent {
   region: string;
   eventType: "airstrikes" | "clashes" | "ceasefire" | "displacement" | "humanitarian";
   fatalities?: number;
 }
 
+/** Economic event interface definition. */
 export interface EconomicEvent extends FeedEvent {
   indicator: string;
   value: number;
@@ -82,6 +86,7 @@ export interface EconomicEvent extends FeedEvent {
   changePercent?: number;
 }
 
+/** Displacement event interface definition. */
 export interface DisplacementEvent extends FeedEvent {
   country: string;
   displacedCount: number;
@@ -89,6 +94,7 @@ export interface DisplacementEvent extends FeedEvent {
   campName?: string;
 }
 
+/** Cyber event interface definition. */
 export interface CyberEvent extends FeedEvent {
   threatType: "ransomware" | "phishing" | "ddos" | "data_breach" | "vulnerability" | "apt";
   targetSector?: string;
@@ -96,6 +102,7 @@ export interface CyberEvent extends FeedEvent {
   iocs?: string[];
 }
 
+/** Health event interface definition. */
 export interface HealthEvent extends FeedEvent {
   disease: string;
   region: string;
@@ -104,6 +111,7 @@ export interface HealthEvent extends FeedEvent {
   alertLevel: "watch" | "alert" | "outbreak" | "pandemic";
 }
 
+/** Imagery event interface definition. */
 export interface ImageryEvent extends FeedEvent {
   satellite: string;
   coordinates: { lat: number; lon: number };
@@ -112,6 +120,7 @@ export interface ImageryEvent extends FeedEvent {
   imageUrl?: string;
 }
 
+/** Seismology event interface definition. */
 export interface SeismologyEvent extends FeedEvent {
   magnitude: number;
   depth: number;
@@ -120,6 +129,7 @@ export interface SeismologyEvent extends FeedEvent {
   tsunamiWarning: boolean;
 }
 
+/** Wildfire event interface definition. */
 export interface WildfireEvent extends FeedEvent {
   name?: string;
   state: string;
@@ -129,6 +139,7 @@ export interface WildfireEvent extends FeedEvent {
   cause?: string;
 }
 
+/** Maritime event interface definition. */
 export interface MaritimeEvent extends FeedEvent {
   vesselName?: string;
   mmsi?: string;
@@ -147,6 +158,7 @@ export interface FeedAdapterOptions {
   http?: HttpGetFn;
 }
 
+/** Abstract base class for feed adapter. */
 export abstract class FeedAdapter<T extends FeedEvent> {
   abstract readonly domain: string;
   protected baseUrl: string;
@@ -161,9 +173,13 @@ export abstract class FeedAdapter<T extends FeedEvent> {
     this.apiKey = opts.apiKey;
     this.corsOrigin = opts.corsOrigin;
     this.rateLimitRpm = opts.rateLimitRpm ?? 60;
-    this.http = opts.http ?? (async (url, headers) => {
-      throw new Error(`Real HTTP not available. URL: ${url}, Headers: ${JSON.stringify(headers)}`);
-    });
+    this.http =
+      opts.http ??
+      (async (url, headers) => {
+        throw new Error(
+          `Real HTTP not available. URL: ${url}, Headers: ${JSON.stringify(headers)}`,
+        );
+      });
   }
 
   /** Check rate limit — returns true if request is allowed. */
@@ -178,7 +194,7 @@ export abstract class FeedAdapter<T extends FeedEvent> {
 
   /** Build headers for the request. */
   protected buildHeaders(): Record<string, string> {
-    const headers: Record<string, string> = { "Accept": "application/json" };
+    const headers: Record<string, string> = { Accept: "application/json" };
     if (this.apiKey) headers["Authorization"] = `Bearer ${this.apiKey}`;
     if (this.corsOrigin) headers["Origin"] = this.corsOrigin;
     return headers;
@@ -195,108 +211,151 @@ export class AviationFeed extends FeedAdapter<AviationEvent> {
 
   async fetch(): Promise<AviationEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
-    const raw = await this.http(`${this.baseUrl}/aviation/events`, this.buildHeaders()) as AviationEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/aviation/events`,
+      this.buildHeaders(),
+    )) as AviationEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<AviationEvent>("aviation");
   }
 }
 
+/** Climate feed. */
 export class ClimateFeed extends FeedAdapter<ClimateEvent> {
   domain = "climate";
 
   async fetch(): Promise<ClimateEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
-    const raw = await this.http(`${this.baseUrl}/climate/events`, this.buildHeaders()) as ClimateEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/climate/events`,
+      this.buildHeaders(),
+    )) as ClimateEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<ClimateEvent>("climate");
   }
 }
 
+/** Conflict feed. */
 export class ConflictFeed extends FeedAdapter<ConflictEvent> {
   domain = "conflict";
 
   async fetch(): Promise<ConflictEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
-    const raw = await this.http(`${this.baseUrl}/conflict/events`, this.buildHeaders()) as ConflictEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/conflict/events`,
+      this.buildHeaders(),
+    )) as ConflictEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<ConflictEvent>("conflict");
   }
 }
 
+/** Economic feed. */
 export class EconomicFeed extends FeedAdapter<EconomicEvent> {
   domain = "economic";
 
   async fetch(): Promise<EconomicEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
-    const raw = await this.http(`${this.baseUrl}/economic/indicators`, this.buildHeaders()) as EconomicEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/economic/indicators`,
+      this.buildHeaders(),
+    )) as EconomicEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<EconomicEvent>("economic");
   }
 }
 
+/** Displacement feed. */
 export class DisplacementFeed extends FeedAdapter<DisplacementEvent> {
   domain = "displacement";
 
   async fetch(): Promise<DisplacementEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
-    const raw = await this.http(`${this.baseUrl}/displacement/events`, this.buildHeaders()) as DisplacementEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/displacement/events`,
+      this.buildHeaders(),
+    )) as DisplacementEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<DisplacementEvent>("displacement");
   }
 }
 
+/** Cyber feed. */
 export class CyberFeed extends FeedAdapter<CyberEvent> {
   domain = "cyber";
 
   async fetch(): Promise<CyberEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
-    const raw = await this.http(`${this.baseUrl}/cyber/threats`, this.buildHeaders()) as CyberEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/cyber/threats`,
+      this.buildHeaders(),
+    )) as CyberEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<CyberEvent>("cyber");
   }
 }
 
+/** Health feed. */
 export class HealthFeed extends FeedAdapter<HealthEvent> {
   domain = "health";
 
   async fetch(): Promise<HealthEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
-    const raw = await this.http(`${this.baseUrl}/health/alerts`, this.buildHeaders()) as HealthEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/health/alerts`,
+      this.buildHeaders(),
+    )) as HealthEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<HealthEvent>("health");
   }
 }
 
+/** Imagery feed. */
 export class ImageryFeed extends FeedAdapter<ImageryEvent> {
   domain = "imagery";
 
   async fetch(): Promise<ImageryEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
-    const raw = await this.http(`${this.baseUrl}/imagery/events`, this.buildHeaders()) as ImageryEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/imagery/events`,
+      this.buildHeaders(),
+    )) as ImageryEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<ImageryEvent>("imagery");
   }
 }
 
+/** Seismology feed. */
 export class SeismologyFeed extends FeedAdapter<SeismologyEvent> {
   domain = "seismology";
 
   async fetch(opts?: { minMagnitude?: number }): Promise<SeismologyEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
     const qs = opts?.minMagnitude ? `?minMagnitude=${opts.minMagnitude}` : "";
-    const raw = await this.http(`${this.baseUrl}/seismology/events${qs}`, this.buildHeaders()) as SeismologyEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/seismology/events${qs}`,
+      this.buildHeaders(),
+    )) as SeismologyEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<SeismologyEvent>("seismology");
   }
 }
 
+/** Wildfire feed. */
 export class WildfireFeed extends FeedAdapter<WildfireEvent> {
   domain = "wildfire";
 
   async fetch(): Promise<WildfireEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
-    const raw = await this.http(`${this.baseUrl}/wildfire/events`, this.buildHeaders()) as WildfireEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/wildfire/events`,
+      this.buildHeaders(),
+    )) as WildfireEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<WildfireEvent>("wildfire");
   }
 }
 
+/** Maritime feed. */
 export class MaritimeFeed extends FeedAdapter<MaritimeEvent> {
   domain = "maritime";
 
   async fetch(): Promise<MaritimeEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
-    const raw = await this.http(`${this.baseUrl}/maritime/incidents`, this.buildHeaders()) as MaritimeEvent[];
+    const raw = (await this.http(
+      `${this.baseUrl}/maritime/incidents`,
+      this.buildHeaders(),
+    )) as MaritimeEvent[];
     return Array.isArray(raw) ? raw : buildMockResponse<MaritimeEvent>("maritime");
   }
 }
@@ -307,7 +366,9 @@ export class FeedCache {
   private store = new Map<string, { events: FeedEvent[]; expiresAt: number }>();
   private ttlMs: number;
 
-  constructor(ttlMs = 300_000) { this.ttlMs = ttlMs; }
+  constructor(ttlMs = 300_000) {
+    this.ttlMs = ttlMs;
+  }
 
   set(domain: string, events: FeedEvent[]): void {
     this.store.set(domain, { events: [...events], expiresAt: Date.now() + this.ttlMs });
@@ -322,17 +383,36 @@ export class FeedCache {
     return [...entry.events];
   }
 
-  invalidate(domain: string): void { this.store.delete(domain); }
-  clear(): void { this.store.clear(); }
-  size(): number { return this.store.size; }
-  domains(): string[] { return [...this.store.keys()]; }
+  invalidate(domain: string): void {
+    this.store.delete(domain);
+  }
+  clear(): void {
+    this.store.clear();
+  }
+  size(): number {
+    return this.store.size;
+  }
+  domains(): string[] {
+    return [...this.store.keys()];
+  }
 }
 
 // ── FeedRegistry ──────────────────────────────────────────────────────────────
 
-export type DomainName = "aviation" | "climate" | "conflict" | "economic" | "displacement" |
-  "cyber" | "health" | "imagery" | "seismology" | "wildfire" | "maritime";
+export type DomainName =
+  | "aviation"
+  | "climate"
+  | "conflict"
+  | "economic"
+  | "displacement"
+  | "cyber"
+  | "health"
+  | "imagery"
+  | "seismology"
+  | "wildfire"
+  | "maritime";
 
+/** Feed registry. */
 export class FeedRegistry {
   private adapters = new Map<string, FeedAdapter<FeedEvent>>();
   private cache: FeedCache;
@@ -350,7 +430,9 @@ export class FeedRegistry {
     return this.adapters.get(domain);
   }
 
-  domains(): string[] { return [...this.adapters.keys()]; }
+  domains(): string[] {
+    return [...this.adapters.keys()];
+  }
 
   async fetch(domain: string, opts?: Record<string, unknown>): Promise<FeedPage<FeedEvent>> {
     const adapter = this.adapters.get(domain);
@@ -358,24 +440,237 @@ export class FeedRegistry {
 
     const cached = this.cache.get(domain);
     if (cached) {
-      return { domain, events: cached, fetchedAt: new Date().toISOString(), totalCount: cached.length, cached: true };
+      return {
+        domain,
+        events: cached,
+        fetchedAt: new Date().toISOString(),
+        totalCount: cached.length,
+        cached: true,
+      };
     }
 
     const events = await adapter.fetch(opts);
     this.cache.set(domain, events);
-    return { domain, events, fetchedAt: new Date().toISOString(), totalCount: events.length, cached: false };
+    return {
+      domain,
+      events,
+      fetchedAt: new Date().toISOString(),
+      totalCount: events.length,
+      cached: false,
+    };
   }
 
   /** Fetch all registered domains in parallel. */
   async fetchAll(opts?: Record<string, unknown>): Promise<FeedPage<FeedEvent>[]> {
-    return Promise.allSettled(
-      [...this.adapters.keys()].map((d) => this.fetch(d, opts))
-    ).then((results) =>
-      results
-        .filter((r): r is PromiseFulfilledResult<FeedPage<FeedEvent>> => r.status === "fulfilled")
-        .map((r) => r.value)
+    return Promise.allSettled([...this.adapters.keys()].map((d) => this.fetch(d, opts))).then(
+      (results) =>
+        results
+          .filter((r): r is PromiseFulfilledResult<FeedPage<FeedEvent>> => r.status === "fulfilled")
+          .map((r) => r.value),
     );
   }
 
-  getCache(): FeedCache { return this.cache; }
+  getCache(): FeedCache {
+    return this.cache;
+  }
+}
+
+// ── RSS types ─────────────────────────────────────────────────────────────────
+
+export interface RssItem {
+  title: string;
+  link?: string;
+  description?: string;
+  pubDate?: string;
+  guid?: string;
+  author?: string;
+}
+
+/** Rss feed interface definition. */
+export interface RssFeed {
+  title: string;
+  link?: string;
+  description?: string;
+  items: RssItem[];
+  fetchedAt: string;
+}
+
+// ── OPMLParser ────────────────────────────────────────────────────────────────
+
+export interface OPMLOutline {
+  text: string;
+  xmlUrl?: string;
+  htmlUrl?: string;
+  type?: string;
+  title?: string;
+}
+
+/** Opml parser. */
+export class OPMLParser {
+  /** Parse an OPML XML string → flat list of outlines. */
+  parse(xml: string): OPMLOutline[] {
+    if (xml.length > 500_000) throw new Error("OPML input too large");
+    const outlines: OPMLOutline[] = [];
+    const outlineRe = /<outline([^>]*)(?:\/>|>[\s\S]*?<\/outline>)/gi;
+    let match: RegExpExecArray | null;
+    while ((match = outlineRe.exec(xml)) !== null) {
+      const attrs = match[1] ?? "";
+      const outline: OPMLOutline = { text: this.attr(attrs, "text") ?? "" };
+      const xmlUrl = this.attr(attrs, "xmlUrl");
+      const htmlUrl = this.attr(attrs, "htmlUrl");
+      const type = this.attr(attrs, "type");
+      const title = this.attr(attrs, "title");
+      if (xmlUrl) outline.xmlUrl = xmlUrl;
+      if (htmlUrl) outline.htmlUrl = htmlUrl;
+      if (type) outline.type = type;
+      if (title) outline.title = title;
+      outlines.push(outline);
+    }
+    return outlines;
+  }
+
+  /** Extract only feed URLs (outlines that carry xmlUrl). */
+  feedUrls(xml: string): string[] {
+    return this.parse(xml)
+      .filter((o) => o.xmlUrl)
+      .map((o) => o.xmlUrl!);
+  }
+
+  private attr(attrs: string, name: string): string | undefined {
+    if (attrs.length > 10_000) return undefined;
+    const re = new RegExp(`${name}="([^"]*)"`, "i");
+    const m = attrs.match(re);
+    return m ? m[1] : undefined;
+  }
+}
+
+// ── RssFeedAdapter ─────────────────────────────────────────────────────────────
+
+export interface RssFeedAdapterOptions {
+  /** URL of the RSS/Atom feed to fetch. */
+  feedUrl: string;
+  /** Injectable HTTP function — defaults to native fetch. */
+  http?: HttpGetFn;
+  /** Max items to return per fetch (default: 20). */
+  maxItems?: number;
+}
+
+/** Rss feed adapter. */
+export class RssFeedAdapter {
+  readonly feedUrl: string;
+  private http: HttpGetFn;
+  private maxItems: number;
+
+  constructor(opts: RssFeedAdapterOptions) {
+    this.feedUrl = opts.feedUrl;
+    this.maxItems = opts.maxItems ?? 20;
+    this.http =
+      opts.http ??
+      (async (url: string) => {
+        const res = await fetch(url, {
+          headers: { Accept: "application/rss+xml, application/xml, text/xml, */*" },
+        });
+        if (!res.ok) throw new Error(`RSS fetch failed: ${res.status} ${url}`);
+        return res.text();
+      });
+  }
+
+  async fetch(): Promise<RssFeed> {
+    const fetchedAt = new Date().toISOString();
+    const raw = (await this.http(this.feedUrl)) as string;
+    const xml = typeof raw === "string" ? raw : JSON.stringify(raw);
+    return this.parse(xml, fetchedAt);
+  }
+
+  /** Parse RSS 2.0 or Atom XML into a structured RssFeed. */
+  parse(xml: string, fetchedAt = new Date().toISOString()): RssFeed {
+    if (xml.length > 500_000) throw new Error("feed payload too large");
+    const title = this.tag(xml, "title") ?? this.feedUrl;
+    const link = this.tag(xml, "link");
+    const description = this.tag(xml, "description");
+
+    const items: RssItem[] = [];
+
+    // RSS 2.0 <item> blocks
+    const itemRe = /<item[^>]*>([\s\S]*?)<\/item>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = itemRe.exec(xml)) !== null && items.length < this.maxItems) {
+      const b = m[1] ?? "";
+      items.push({
+        title: this.tag(b, "title") ?? "",
+        link: this.tag(b, "link"),
+        description: this.tag(b, "description"),
+        pubDate: this.tag(b, "pubDate"),
+        guid: this.tag(b, "guid"),
+        author: this.tag(b, "author") ?? this.tag(b, "dc:creator"),
+      });
+    }
+
+    // Atom <entry> blocks (fallback when no <item> found)
+    if (items.length === 0) {
+      const entryRe = /<entry[^>]*>([\s\S]*?)<\/entry>/gi;
+      while ((m = entryRe.exec(xml)) !== null && items.length < this.maxItems) {
+        const b = m[1] ?? "";
+        items.push({
+          title: this.tag(b, "title") ?? "",
+          link: this.attrTag(b, "link", "href"),
+          description: this.tag(b, "summary") ?? this.tag(b, "content"),
+          pubDate: this.tag(b, "published") ?? this.tag(b, "updated"),
+          guid: this.tag(b, "id"),
+          author: this.tag(b, "name"),
+        });
+      }
+    }
+
+    return { title, link, description, items, fetchedAt };
+  }
+
+  /** Convert RssFeed items to FeedEvent[] for ingestion into a FeedRegistry. */
+  toFeedEvents(feed: RssFeed, domain = "rss"): FeedEvent[] {
+    return feed.items.map((item, i) => ({
+      id: item.guid ?? item.link ?? `${domain}-${Date.now()}-${i}`,
+      timestamp: item.pubDate
+        ? (() => {
+            try {
+              return new Date(item.pubDate!).toISOString();
+            } catch {
+              return feed.fetchedAt;
+            }
+          })()
+        : feed.fetchedAt,
+      source: feed.title,
+      summary: item.title || (item.description?.slice(0, 120) ?? ""),
+      metadata: {
+        link: item.link,
+        description: item.description,
+        author: item.author,
+        feedUrl: this.feedUrl,
+      },
+    }));
+  }
+
+  // ── Internal helpers ───────────────────────────────────────────────────────
+
+  /** Extract text content of a tag, handling CDATA. */
+  private tag(xml: string, tagName: string): string | undefined {
+    if (xml.length > 500_000) return undefined;
+    // CDATA variant
+    const cdataRe = new RegExp(
+      `<${tagName}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tagName}>`,
+      "i",
+    );
+    let m = xml.match(cdataRe);
+    if (m) return (m[1] ?? "").trim() || undefined;
+    // Plain text variant
+    const plainRe = new RegExp(`<${tagName}[^>]*>([^<]*)<\\/${tagName}>`, "i");
+    m = xml.match(plainRe);
+    return m ? (m[1] ?? "").trim() || undefined : undefined;
+  }
+
+  /** Extract an attribute value from a self-closing tag (e.g. <link href="…"/>). */
+  private attrTag(xml: string, tagName: string, attrName: string): string | undefined {
+    const re = new RegExp(`<${tagName}[^>]*${attrName}="([^"]*)"`, "i");
+    const m = xml.match(re);
+    return m ? m[1] : undefined;
+  }
 }

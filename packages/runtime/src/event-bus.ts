@@ -21,7 +21,7 @@ export interface CausalValidationReport {
   valid: boolean;
 }
 
-export interface EventBusConfig {
+interface EventBusConfig {
   /** Max events retained in the in-memory history ring buffer (default 10000). */
   maxHistorySize?: number;
   /** Optional event store for write-before-dispatch persistence. */
