@@ -111,7 +111,11 @@ describe("GeneralAgent", () => {
 
   it("getModel and getEffort return configured values", () => {
     const mock = new MockAgentBackend();
-    const agent = new GeneralAgent({ backend: mock.asBackend(), model: "claude-opus-4", effort: "high" });
+    const agent = new GeneralAgent({
+      backend: mock.asBackend(),
+      model: "claude-opus-4",
+      effort: "high",
+    });
     expect(agent.getModel()).toBe("claude-opus-4");
     expect(agent.getEffort()).toBe("high");
   });
@@ -127,7 +131,11 @@ describe("SubAgentSpawner", () => {
   it("spawn creates and runs agent with spec", async () => {
     const mock = new MockAgentBackend("search results");
     const spawner = new SubAgentSpawner(mock.asBackend());
-    const spec: SubAgentSpec = { name: "code-searcher", description: "Searches code", model: "gpt-5" };
+    const spec: SubAgentSpec = {
+      name: "code-searcher",
+      description: "Searches code",
+      model: "gpt-5",
+    };
     const result = await spawner.spawn(spec, "find all TODO comments");
     expect(result.name).toBe("code-searcher");
     expect(result.response.content).toBe("search results");
@@ -135,7 +143,9 @@ describe("SubAgentSpawner", () => {
   });
 
   it("spawn captures errors", async () => {
-    const backend = async () => { throw new Error("backend error"); };
+    const backend = async () => {
+      throw new Error("backend error");
+    };
     const spawner = new SubAgentSpawner(backend);
     const spec: SubAgentSpec = { name: "bad-agent", description: "Fails" };
     const result = await spawner.spawn(spec, "do something");

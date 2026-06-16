@@ -118,6 +118,7 @@ export default tseslint.config(
       "**/drizzle.config.ts",
       "**/.docusaurus/**/*.{js,mjs,ts}",
       "apps/docs-site/.docusaurus/**/*",
+      "**/tests/setup.ts",
     ],
     ...tseslint.configs.disableTypeChecked,
   },

@@ -20,7 +20,7 @@ import type { Task } from "./task-router.js";
 // ─── Replay Context Types ───────────────────────────────────────────
 
 /** Options for deterministic replay with side-effect suppression. */
-export interface ReplayOptions {
+interface ReplayOptions {
   /** When true, suppresses all side effects (telemetry, events, RuntimeGraph, persistence). */
   suppressSideEffects?: boolean;
   /** Optional new execution ID for the replayed execution. */
@@ -32,7 +32,7 @@ export interface ReplayOptions {
 }
 
 /** Tracked lineage for a deterministic replay. */
-export interface ReplayLineage {
+interface ReplayLineage {
   originalExecutionId: string;
   replayGeneration: number;
   previousExecutions: { executionId: string; status: string; timestamp: Date }[];
@@ -167,7 +167,7 @@ export class WorkflowTelemetry implements IWorkflowTelemetry {
 
 // ─── Workflow Event Types ────────────────────────────────────────────
 
-export type WorkflowEventType =
+type WorkflowEventType =
   | "workflow:execution_started"
   | "workflow:execution_succeeded"
   | "workflow:execution_failed"
@@ -178,7 +178,7 @@ export type WorkflowEventType =
   | "workflow:approval_needed"
   | "workflow:approval_granted";
 
-export interface WorkflowEvent {
+interface WorkflowEvent {
   type: WorkflowEventType;
   executionId: string;
   workflowId: string;
@@ -186,11 +186,11 @@ export interface WorkflowEvent {
   payload?: Record<string, unknown>;
 }
 
-export type WorkflowEventHandler = (event: WorkflowEvent) => void | Promise<void>;
+type WorkflowEventHandler = (event: WorkflowEvent) => void | Promise<void>;
 
 // ─── Checkpoint Entry ───────────────────────────────────────────────
 
-export interface WorkflowCheckpoint {
+interface WorkflowCheckpoint {
   executionId: string;
   workflowId: string;
   timestamp: Date;

@@ -21,36 +21,42 @@
 
 export type TaskStatus = "pending" | "processing" | "done" | "failed" | "delayed";
 
+/** Task interface definition. */
 export interface Task<T = unknown> {
   id: string;
   name: string;
   payload: T;
   status: TaskStatus;
   createdAt: number;
-  runAt?: number;       // epoch ms, for delayed tasks
+  runAt?: number; // epoch ms, for delayed tasks
   attempts: number;
   maxRetries: number;
   lastError?: string;
   result?: unknown;
 }
 
+/** Enqueue options interface definition. */
 export interface EnqueueOptions {
   delayMs?: number;
   maxRetries?: number;
 }
 
+/** Consume options interface definition. */
 export interface ConsumeOptions {
   groupId?: string;
   batchSize?: number;
 }
 
+/** Task handler type alias. */
 export type TaskHandler<T = unknown> = (task: Task<T>) => Promise<unknown>;
 
+/** Retry policy interface definition. */
 export interface RetryPolicy {
   maxRetries: number;
   backoffMs: (attempt: number) => number;
 }
 
+/** Default retry policy. */
 export const DEFAULT_RETRY_POLICY: RetryPolicy = {
   maxRetries: 3,
   backoffMs: (attempt: number) => Math.min(1_000 * Math.pow(2, attempt), 30_000),
@@ -60,6 +66,7 @@ export const DEFAULT_RETRY_POLICY: RetryPolicy = {
 
 let _taskSeq = 0;
 
+/** In memory stream client. */
 export class InMemoryStreamClient {
   private streams = new Map<string, Task[]>();
   private processed = new Map<string, Task>();
@@ -116,7 +123,9 @@ export class InMemoryStreamClient {
     else this.streams.clear();
   }
 
-  streamNames(): string[] { return [...this.streams.keys()]; }
+  streamNames(): string[] {
+    return [...this.streams.keys()];
+  }
 }
 
 // ── CronScheduler ─────────────────────────────────────────────────────────────
@@ -128,6 +137,7 @@ export interface CronEntry {
   handler: () => Promise<void>;
 }
 
+/** Cron scheduler. */
 export class CronScheduler {
   private entries: CronEntry[] = [];
   private running = false;
@@ -145,7 +155,9 @@ export class CronScheduler {
           await entry.handler();
           entry.lastRunAt = now;
           ran.push(entry.name);
-        } catch { /* isolate */ }
+        } catch {
+          /* isolate */
+        }
       }
     }
     return ran;
@@ -154,7 +166,9 @@ export class CronScheduler {
   start(tickMs = 1_000): void {
     if (this.running) return;
     this.running = true;
-    this.timer = setInterval(() => { void this.tick(); }, tickMs);
+    this.timer = setInterval(() => {
+      void this.tick();
+    }, tickMs);
   }
 
   stop(): void {
@@ -162,9 +176,15 @@ export class CronScheduler {
     this.running = false;
   }
 
-  isRunning(): boolean { return this.running; }
-  entries_(): CronEntry[] { return [...this.entries]; }
-  clear(): void { this.entries = []; }
+  isRunning(): boolean {
+    return this.running;
+  }
+  entries_(): CronEntry[] {
+    return [...this.entries];
+  }
+  clear(): void {
+    this.entries = [];
+  }
 }
 
 // ── TaskQueue ─────────────────────────────────────────────────────────────────
@@ -250,12 +270,20 @@ export class TaskQueue {
     this.cron.register(name, intervalMs, handler);
   }
 
-  async tickCron(): Promise<string[]> { return this.cron.tick(); }
+  async tickCron(): Promise<string[]> {
+    return this.cron.tick();
+  }
 
-  getClient(): InMemoryStreamClient { return this.client; }
-  getCron(): CronScheduler { return this.cron; }
+  getClient(): InMemoryStreamClient {
+    return this.client;
+  }
+  getCron(): CronScheduler {
+    return this.cron;
+  }
 
-  allTasks(): Task[] { return this.client.allTasks(this.stream); }
+  allTasks(): Task[] {
+    return this.client.allTasks(this.stream);
+  }
   tasksByStatus(status: TaskStatus): Task[] {
     return this.allTasks().filter((t) => t.status === status);
   }
@@ -283,3 +311,9 @@ export class SyncTaskRunner {
     return { processed: totalProcessed, failed: totalFailed };
   }
 }
+
+// ── Redis-backed client + async queue ─────────────────────────────────────────
+// ioredis is an optional peer dependency — only instantiate RedisStreamClient
+// when REDIS_URL is set and ioredis is installed.
+
+export { RedisStreamClient, AsyncTaskQueue } from "./redis-stream-client.js";

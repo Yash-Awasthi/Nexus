@@ -54,6 +54,7 @@ export type VoiceErrorCode =
   | "INVALID_AUDIO"
   | "PROVIDER_AUTH_FAILED";
 
+/** Voice error. */
 export class VoiceError extends Error {
   readonly code: VoiceErrorCode;
   readonly context?: Record<string, unknown>;
@@ -70,6 +71,7 @@ export class VoiceError extends Error {
 
 export type AudioFormat = "wav" | "mp3" | "ogg" | "flac" | "webm" | "m4a";
 
+/** Audio buffer interface definition. */
 export interface AudioBuffer {
   /** Raw audio bytes */
   data: Uint8Array;
@@ -120,6 +122,7 @@ export class SilenceVadProvider implements VadProvider {
   }
 }
 
+/** Energy vad config interface definition. */
 export interface EnergyVadConfig {
   /**
    * Minimum RMS energy level (0–1) required to classify audio as speech.
@@ -166,6 +169,7 @@ export class EnergyVadProvider implements VadProvider {
 
     // RMS of (byte − 128) / 128 — centred on PCM silence (0x80)
     let sumSq = 0;
+    // eslint-disable-next-line @typescript-eslint/prefer-for-of
     for (let i = 0; i < samples.length; i++) {
       const norm = (samples[i]! - 128) / 128;
       sumSq += norm * norm;
@@ -186,6 +190,7 @@ export interface TranscribeProvider {
   transcribe(audio: AudioBuffer, opts?: TranscribeOptions): Promise<TranscribeResult>;
 }
 
+/** Transcribe options interface definition. */
 export interface TranscribeOptions {
   /** BCP-47 language code hint (e.g. "en", "es", "fr"). Leave undefined for auto-detect. */
   language?: string;
@@ -195,6 +200,7 @@ export interface TranscribeOptions {
   temperature?: number;
 }
 
+/** Transcribe result interface definition. */
 export interface TranscribeResult {
   /** The transcribed text */
   transcript: string;
@@ -214,6 +220,7 @@ export interface SynthesizeProvider {
   synthesize(text: string, opts?: SynthesizeOptions): Promise<AudioBuffer>;
 }
 
+/** Synthesize options interface definition. */
 export interface SynthesizeOptions {
   /** Voice ID or name (provider-specific) */
   voice?: string;
@@ -259,6 +266,7 @@ export class NullSynthesizeProvider implements SynthesizeProvider {
 
 export type FetchFn = typeof fetch;
 
+/** Groq transcribe config interface definition. */
 export interface GroqTranscribeConfig {
   /** Groq API key — defaults to process.env.GROQ_API_KEY */
   apiKey?: string;
@@ -290,8 +298,7 @@ export class GroqTranscribeProvider implements TranscribeProvider {
   private readonly model: string;
   private readonly fetchFn: FetchFn;
 
-  private static readonly ENDPOINT =
-    "https://api.groq.com/openai/v1/audio/transcriptions";
+  private static readonly ENDPOINT = "https://api.groq.com/openai/v1/audio/transcriptions";
 
   constructor(config: GroqTranscribeConfig = {}) {
     this.apiKey = config.apiKey ?? process.env["GROQ_API_KEY"] ?? "";
@@ -325,11 +332,9 @@ export class GroqTranscribeProvider implements TranscribeProvider {
         body: form,
       });
     } catch (cause) {
-      throw new VoiceError(
-        "TRANSCRIBE_FAILED",
-        `Groq Whisper network error: ${String(cause)}`,
-        { model: this.model },
-      );
+      throw new VoiceError("TRANSCRIBE_FAILED", `Groq Whisper network error: ${String(cause)}`, {
+        model: this.model,
+      });
     }
 
     if (res.status === 401) {
@@ -337,11 +342,10 @@ export class GroqTranscribeProvider implements TranscribeProvider {
     }
 
     if (!res.ok) {
-      throw new VoiceError(
-        "TRANSCRIBE_FAILED",
-        `Groq Whisper API returned ${res.status}`,
-        { model: this.model, status: res.status },
-      );
+      throw new VoiceError("TRANSCRIBE_FAILED", `Groq Whisper API returned ${res.status}`, {
+        model: this.model,
+        status: res.status,
+      });
     }
 
     let json: GroqTranscriptionResponse;
@@ -446,10 +450,7 @@ export class ElevenLabsSynthesizeProvider implements SynthesizeProvider {
         }),
       });
     } catch (cause) {
-      throw new VoiceError(
-        "SYNTHESIZE_FAILED",
-        `ElevenLabs network error: ${String(cause)}`,
-      );
+      throw new VoiceError("SYNTHESIZE_FAILED", `ElevenLabs network error: ${String(cause)}`);
     }
 
     if (res.status === 401) {
@@ -457,11 +458,10 @@ export class ElevenLabsSynthesizeProvider implements SynthesizeProvider {
     }
 
     if (!res.ok) {
-      throw new VoiceError(
-        "SYNTHESIZE_FAILED",
-        `ElevenLabs API returned ${res.status}`,
-        { voiceId, status: res.status },
-      );
+      throw new VoiceError("SYNTHESIZE_FAILED", `ElevenLabs API returned ${res.status}`, {
+        voiceId,
+        status: res.status,
+      });
     }
 
     const arrayBuffer = await res.arrayBuffer();
@@ -489,6 +489,7 @@ export interface VoiceHooks {
   ): Promise<{ handled: number; aborted: boolean; errors: unknown[] }>;
 }
 
+/** Voice session config interface definition. */
 export interface VoiceSessionConfig {
   transcribe: TranscribeProvider;
   /** If omitted, VoiceTurnResult.audio will be undefined */
@@ -509,6 +510,7 @@ export interface VoiceSessionConfig {
   synthesizeOpts?: SynthesizeOptions;
 }
 
+/** Voice turn options interface definition. */
 export interface VoiceTurnOptions {
   /** Per-turn language override */
   language?: string;
@@ -518,6 +520,7 @@ export interface VoiceTurnOptions {
   textOnly?: boolean;
 }
 
+/** Voice turn result interface definition. */
 export interface VoiceTurnResult {
   /** The transcribed text from the audio input */
   transcript: string;
@@ -544,6 +547,7 @@ export interface VoiceTurnResult {
   vadEnergyLevel?: number;
 }
 
+/** Voice session. */
 export class VoiceSession {
   private readonly transcribe: TranscribeProvider;
   private readonly synthesize?: SynthesizeProvider;
@@ -610,11 +614,9 @@ export class VoiceSession {
       });
     } catch (cause) {
       if (cause instanceof VoiceError) throw cause;
-      throw new VoiceError(
-        "TRANSCRIBE_FAILED",
-        `Transcription failed: ${String(cause)}`,
-        { provider: this.transcribe.name },
-      );
+      throw new VoiceError("TRANSCRIBE_FAILED", `Transcription failed: ${String(cause)}`, {
+        provider: this.transcribe.name,
+      });
     }
     const transcribeMs = Date.now() - transcribeStart;
 
@@ -626,11 +628,9 @@ export class VoiceSession {
     try {
       response = await this.handler(transcript);
     } catch (cause) {
-      throw new VoiceError(
-        "HANDLER_FAILED",
-        `Voice handler threw: ${String(cause)}`,
-        { transcript },
-      );
+      throw new VoiceError("HANDLER_FAILED", `Voice handler threw: ${String(cause)}`, {
+        transcript,
+      });
     }
     const handlerMs = Date.now() - handlerStart;
 
@@ -648,11 +648,10 @@ export class VoiceSession {
         });
       } catch (cause) {
         if (cause instanceof VoiceError) throw cause;
-        throw new VoiceError(
-          "SYNTHESIZE_FAILED",
-          `Synthesis failed: ${String(cause)}`,
-          { provider: this.synthesize!.name, responseLength: response.length },
-        );
+        throw new VoiceError("SYNTHESIZE_FAILED", `Synthesis failed: ${String(cause)}`, {
+          provider: this.synthesize!.name,
+          responseLength: response.length,
+        });
       }
       synthesizeMs = Date.now() - synthStart;
     }

@@ -19,6 +19,7 @@
 
 export type SessionStatus = "idle" | "starting" | "running" | "stopping" | "stopped" | "crashed";
 
+/** Spawn options interface definition. */
 export interface SpawnOptions {
   command: string;
   args?: string[];
@@ -27,6 +28,7 @@ export interface SpawnOptions {
   allowedDirs?: string[];
 }
 
+/** Spawn result interface definition. */
 export interface SpawnResult {
   pid: number;
   /** Write to stdin */
@@ -41,6 +43,7 @@ export interface SpawnResult {
   onExit(cb: (code: number | null) => void): void;
 }
 
+/** Process spawner interface definition. */
 export interface ProcessSpawner {
   spawn(opts: SpawnOptions): SpawnResult;
 }
@@ -49,16 +52,20 @@ export interface ProcessSpawner {
 
 export class MockProcess implements SpawnResult {
   pid: number;
-  private stdoutCbs: Array<(line: string) => void> = [];
-  private stderrCbs: Array<(line: string) => void> = [];
-  private exitCbs: Array<(code: number | null) => void> = [];
+  private stdoutCbs: ((line: string) => void)[] = [];
+  private stderrCbs: ((line: string) => void)[] = [];
+  private exitCbs: ((code: number | null) => void)[] = [];
   writtenInputs: string[] = [];
   killed = false;
   killSignal?: string;
 
-  constructor(pid: number) { this.pid = pid; }
+  constructor(pid: number) {
+    this.pid = pid;
+  }
 
-  write(input: string): void { this.writtenInputs.push(input); }
+  write(input: string): void {
+    this.writtenInputs.push(input);
+  }
 
   kill(signal = "SIGTERM"): void {
     this.killed = true;
@@ -66,18 +73,31 @@ export class MockProcess implements SpawnResult {
     this.exitCbs.forEach((cb) => cb(null));
   }
 
-  onStdout(cb: (line: string) => void): void { this.stdoutCbs.push(cb); }
-  onStderr(cb: (line: string) => void): void { this.stderrCbs.push(cb); }
-  onExit(cb: (code: number | null) => void): void { this.exitCbs.push(cb); }
+  onStdout(cb: (line: string) => void): void {
+    this.stdoutCbs.push(cb);
+  }
+  onStderr(cb: (line: string) => void): void {
+    this.stderrCbs.push(cb);
+  }
+  onExit(cb: (code: number | null) => void): void {
+    this.exitCbs.push(cb);
+  }
 
   // Test helpers
-  emitStdout(line: string): void { this.stdoutCbs.forEach((cb) => cb(line)); }
-  emitStderr(line: string): void { this.stderrCbs.forEach((cb) => cb(line)); }
-  emitExit(code: number | null): void { this.exitCbs.forEach((cb) => cb(code)); }
+  emitStdout(line: string): void {
+    this.stdoutCbs.forEach((cb) => cb(line));
+  }
+  emitStderr(line: string): void {
+    this.stderrCbs.forEach((cb) => cb(line));
+  }
+  emitExit(code: number | null): void {
+    this.exitCbs.forEach((cb) => cb(code));
+  }
 }
 
 let _pidSeq = 1000;
 
+/** Mock process spawner. */
 export class MockProcessSpawner implements ProcessSpawner {
   lastOptions?: SpawnOptions;
   processes: MockProcess[] = [];
@@ -100,7 +120,9 @@ export class StderrCapture {
   private lines: string[] = [];
   private maxLines: number;
 
-  constructor(maxLines = 1000) { this.maxLines = maxLines; }
+  constructor(maxLines = 1000) {
+    this.maxLines = maxLines;
+  }
 
   push(line: string): void {
     this.lines.push(line);
@@ -109,10 +131,18 @@ export class StderrCapture {
     }
   }
 
-  recent(n = 50): string[] { return this.lines.slice(-n); }
-  all(): string[] { return [...this.lines]; }
-  clear(): void { this.lines = []; }
-  count(): number { return this.lines.length; }
+  recent(n = 50): string[] {
+    return this.lines.slice(-n);
+  }
+  all(): string[] {
+    return [...this.lines];
+  }
+  clear(): void {
+    this.lines = [];
+  }
+  count(): number {
+    return this.lines.length;
+  }
 }
 
 // ── AllowedDirPolicy ──────────────────────────────────────────────────────────
@@ -121,7 +151,7 @@ export class AllowedDirPolicy {
   private dirs: string[];
 
   constructor(dirs: string[]) {
-    this.dirs = dirs.map((d) => d.endsWith("/") ? d : `${d}/`);
+    this.dirs = dirs.map((d) => (d.endsWith("/") ? d : `${d}/`));
   }
 
   isAllowed(path: string): boolean {
@@ -130,7 +160,9 @@ export class AllowedDirPolicy {
     return this.dirs.some((d) => normalized.startsWith(d) || path === d.slice(0, -1));
   }
 
-  getAllowed(): string[] { return [...this.dirs]; }
+  getAllowed(): string[] {
+    return [...this.dirs];
+  }
 }
 
 // ── AuthTokenInjector ─────────────────────────────────────────────────────────
@@ -147,7 +179,9 @@ export class AuthTokenInjector {
     return { ...env, ...this.tokens };
   }
 
-  clear(): void { this.tokens = {}; }
+  clear(): void {
+    this.tokens = {};
+  }
 }
 
 // ── CliSession ────────────────────────────────────────────────────────────────
@@ -162,11 +196,13 @@ export interface CliSessionOptions {
   stderrMaxLines?: number;
 }
 
+/** Session output interface definition. */
 export interface SessionOutput {
   stdout: string[];
   stderr: string[];
 }
 
+/** Cli session. */
 export class CliSession {
   readonly id: string;
   private status: SessionStatus = "idle";
@@ -177,7 +213,7 @@ export class CliSession {
   private stderrCapture: StderrCapture;
   private dirPolicy?: AllowedDirPolicy;
   private exitCode: number | null = null;
-  private outputListeners: Array<(line: string) => void> = [];
+  private outputListeners: ((line: string) => void)[] = [];
 
   constructor(id: string, spawner: ProcessSpawner, opts: CliSessionOptions) {
     this.id = id;
@@ -189,9 +225,15 @@ export class CliSession {
     }
   }
 
-  getStatus(): SessionStatus { return this.status; }
-  getPid(): number | undefined { return this.proc?.pid; }
-  getExitCode(): number | null { return this.exitCode; }
+  getStatus(): SessionStatus {
+    return this.status;
+  }
+  getPid(): number | undefined {
+    return this.proc?.pid;
+  }
+  getExitCode(): number | null {
+    return this.exitCode;
+  }
 
   start(): void {
     if (this.status !== "idle" && this.status !== "stopped") {
@@ -250,13 +292,16 @@ export class CliSession {
     return this.dirPolicy?.isAllowed(path) ?? true;
   }
 
-  recentStderr(n = 20): string[] { return this.stderrCapture.recent(n); }
+  recentStderr(n = 20): string[] {
+    return this.stderrCapture.recent(n);
+  }
 }
 
 // ── SessionManager ────────────────────────────────────────────────────────────
 
 let _sessionSeq = 0;
 
+/** Session manager. */
 export class SessionManager {
   private sessions = new Map<string, CliSession>();
   private spawner: ProcessSpawner;
@@ -273,9 +318,13 @@ export class SessionManager {
     return session;
   }
 
-  get(id: string): CliSession | undefined { return this.sessions.get(id); }
+  get(id: string): CliSession | undefined {
+    return this.sessions.get(id);
+  }
 
-  list(): CliSession[] { return [...this.sessions.values()]; }
+  list(): CliSession[] {
+    return [...this.sessions.values()];
+  }
 
   remove(id: string): boolean {
     const session = this.sessions.get(id);
@@ -290,5 +339,7 @@ export class SessionManager {
     }
   }
 
-  count(): number { return this.sessions.size; }
+  count(): number {
+    return this.sessions.size;
+  }
 }

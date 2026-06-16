@@ -18,8 +18,10 @@
 
 export type TriggerType = "delta" | "cron" | "nl" | "webhook";
 
+/** Trigger status type alias. */
 export type TriggerStatus = "active" | "paused" | "disabled";
 
+/** Trigger event interface definition. */
 export interface TriggerEvent {
   triggerId: string;
   triggerType: TriggerType;
@@ -27,14 +29,17 @@ export interface TriggerEvent {
   payload: Record<string, unknown>;
 }
 
+/** Destination fn type alias. */
 export type DestinationFn = (event: TriggerEvent) => void | Promise<void>;
 
+/** Destination interface definition. */
 export interface Destination {
   type: "function" | "url";
   fn?: DestinationFn;
   url?: string;
 }
 
+/** Trigger interface definition. */
 export interface Trigger {
   id: string;
   name: string;
@@ -64,6 +69,7 @@ export interface DeltaTriggerConfig {
   destinations?: Destination[];
 }
 
+/** Delta trigger. */
 export class DeltaTrigger implements Trigger {
   readonly id: string;
   readonly name: string;
@@ -86,7 +92,9 @@ export class DeltaTrigger implements Trigger {
   matches(context: Record<string, unknown>): boolean {
     if (this.status !== "active") return false;
     const { field, oldValue, newValue } = context as {
-      field?: string; oldValue?: unknown; newValue?: unknown;
+      field?: string;
+      oldValue?: unknown;
+      newValue?: unknown;
     };
     if (field !== this.field) return false;
     if (oldValue === newValue) return false; // no actual change
@@ -107,9 +115,9 @@ export interface CronTriggerConfig {
 }
 
 function parseCronNextMs(schedule: string, fromMs: number): number {
-  if (schedule === "@hourly")  return fromMs + 3_600_000;
-  if (schedule === "@daily")   return fromMs + 86_400_000;
-  if (schedule === "@weekly")  return fromMs + 604_800_000;
+  if (schedule === "@hourly") return fromMs + 3_600_000;
+  if (schedule === "@daily") return fromMs + 86_400_000;
+  if (schedule === "@weekly") return fromMs + 604_800_000;
   if (schedule === "@minutely") return fromMs + 60_000;
 
   // HH:MM format — next occurrence today or tomorrow
@@ -128,6 +136,7 @@ function parseCronNextMs(schedule: string, fromMs: number): number {
   throw new Error(`Unsupported schedule: ${schedule}`);
 }
 
+/** Cron trigger. */
 export class CronTrigger implements Trigger {
   readonly id: string;
   readonly name: string;
@@ -159,7 +168,9 @@ export class CronTrigger implements Trigger {
   }
 
   /** Force-reset lastFiredMs for testing. */
-  _setLastFiredMs(ms: number): void { this.lastFiredMs = ms; }
+  _setLastFiredMs(ms: number): void {
+    this.lastFiredMs = ms;
+  }
 }
 
 // ── NLTrigger ─────────────────────────────────────────────────────────────────
@@ -175,12 +186,43 @@ export interface NLTriggerConfig {
 }
 
 function extractKeywords(text: string): Set<string> {
-  const stopWords = new Set(["a","an","the","is","are","was","were","in","on","at","to","for","of","and","or","when","if","it","this","that","be","has","have","with","as"]);
+  const stopWords = new Set([
+    "a",
+    "an",
+    "the",
+    "is",
+    "are",
+    "was",
+    "were",
+    "in",
+    "on",
+    "at",
+    "to",
+    "for",
+    "of",
+    "and",
+    "or",
+    "when",
+    "if",
+    "it",
+    "this",
+    "that",
+    "be",
+    "has",
+    "have",
+    "with",
+    "as",
+  ]);
   return new Set(
-    text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((w) => w.length > 2 && !stopWords.has(w)),
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !stopWords.has(w)),
   );
 }
 
+/** Nl trigger. */
 export class NLTrigger implements Trigger {
   readonly id: string;
   readonly name: string;
@@ -224,6 +266,7 @@ export interface WebhookTriggerConfig {
   destinations?: Destination[];
 }
 
+/** Webhook trigger. */
 export class WebhookTrigger implements Trigger {
   readonly id: string;
   readonly name: string;
@@ -256,12 +299,14 @@ export interface EvaluateResult {
   deliveryResults: DeliveryResult[];
 }
 
+/** Delivery result interface definition. */
 export interface DeliveryResult {
   destination: Destination;
   success: boolean;
   error?: string;
 }
 
+/** Trigger registry. */
 export class TriggerRegistry {
   private triggers = new Map<string, Trigger>();
 
@@ -283,7 +328,9 @@ export class TriggerRegistry {
     return type ? all.filter((t) => t.type === type) : all;
   }
 
-  count(): number { return this.triggers.size; }
+  count(): number {
+    return this.triggers.size;
+  }
 
   /**
    * Evaluate all active triggers against the given context.
@@ -323,7 +370,11 @@ export class TriggerRegistry {
       }
       return { destination: dest, success: false, error: "No handler configured" };
     } catch (err) {
-      return { destination: dest, success: false, error: err instanceof Error ? err.message : String(err) };
+      return {
+        destination: dest,
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   }
 }

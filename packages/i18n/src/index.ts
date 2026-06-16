@@ -14,16 +14,20 @@
 
 export type Locale = string; // e.g. "en", "en-US", "hi", "ja"
 
+/** Translation value type alias. */
 export type TranslationValue = string | Record<string, string>;
 
+/** Translation dict type alias. */
 export type TranslationDict = Record<string, TranslationValue>;
 
+/** Plural forms interface definition. */
 export interface PluralForms {
   zero?: string;
   one: string;
   other: string;
 }
 
+/** I18n options interface definition. */
 export interface I18nOptions {
   /** Locale to use. Default: "en" */
   locale?: Locale;
@@ -68,9 +72,9 @@ export class I18n {
 
   constructor(catalog: TranslationCatalog, opts: I18nOptions = {}) {
     this.catalog = catalog;
-    this.locale   = opts.locale ?? "en";
+    this.locale = opts.locale ?? "en";
     this.fallback = opts.fallbackLocale ?? "en";
-    this.pattern  = opts.placeholderPattern ?? /\{\{(\w+)\}\}/g;
+    this.pattern = opts.placeholderPattern ?? /\{\{(\w+)\}\}/g;
   }
 
   setLocale(locale: Locale): this {
@@ -78,7 +82,9 @@ export class I18n {
     return this;
   }
 
-  getLocale(): Locale { return this.locale; }
+  getLocale(): Locale {
+    return this.locale;
+  }
 
   /**
    * Translate a key with optional variable interpolation.
@@ -145,6 +151,7 @@ export interface NumberFormatOptions {
   maximumFractionDigits?: number;
 }
 
+/** Format number. */
 export function formatNumber(
   value: number,
   locale: Locale = "en",
@@ -161,6 +168,7 @@ export function formatNumber(
 
 export type DateStyle = "full" | "long" | "medium" | "short";
 
+/** Format date. */
 export function formatDate(
   date: Date | string | number,
   locale: Locale = "en",
@@ -210,33 +218,34 @@ export function detectLocale(
 // ── Built-in English catalog ──────────────────────────────────────────────────
 
 export const EN_CATALOG: TranslationDict = {
-  "app.title":           "Nexus",
-  "app.loading":         "Loading…",
-  "app.error":           "Something went wrong.",
-  "nav.dashboard":       "Dashboard",
-  "nav.chat":            "Chat",
-  "nav.memory":          "Memory",
-  "nav.discover":        "Discover",
-  "chat.placeholder":    "Type a message…",
-  "chat.send":           "Send",
-  "chat.regenerate":     "Regenerate",
-  "memory.empty":        "No memories stored yet.",
-  "memory.search":       "Search memories…",
-  "common.save":         "Save",
-  "common.cancel":       "Cancel",
-  "common.delete":       "Delete",
-  "common.confirm":      "Are you sure?",
-  "messages.count":      { one: "{{count}} message", other: "{{count}} messages" },
-  "results.count":       { zero: "No results", one: "{{count}} result", other: "{{count}} results" },
+  "app.title": "Nexus",
+  "app.loading": "Loading…",
+  "app.error": "Something went wrong.",
+  "nav.dashboard": "Dashboard",
+  "nav.chat": "Chat",
+  "nav.memory": "Memory",
+  "nav.discover": "Discover",
+  "chat.placeholder": "Type a message…",
+  "chat.send": "Send",
+  "chat.regenerate": "Regenerate",
+  "memory.empty": "No memories stored yet.",
+  "memory.search": "Search memories…",
+  "common.save": "Save",
+  "common.cancel": "Cancel",
+  "common.delete": "Delete",
+  "common.confirm": "Are you sure?",
+  "messages.count": { one: "{{count}} message", other: "{{count}} messages" },
+  "results.count": { zero: "No results", one: "{{count}} result", other: "{{count}} results" },
 };
 
+/** Hi catalog. */
 export const HI_CATALOG: TranslationDict = {
-  "app.title":           "नेक्सस",
-  "app.loading":         "लोड हो रहा है…",
-  "nav.dashboard":       "डैशबोर्ड",
-  "nav.chat":            "चैट",
-  "chat.placeholder":    "संदेश लिखें…",
-  "chat.send":           "भेजें",
-  "common.save":         "सहेजें",
-  "common.cancel":       "रद्द करें",
+  "app.title": "नेक्सस",
+  "app.loading": "लोड हो रहा है…",
+  "nav.dashboard": "डैशबोर्ड",
+  "nav.chat": "चैट",
+  "chat.placeholder": "संदेश लिखें…",
+  "chat.send": "भेजें",
+  "common.save": "सहेजें",
+  "common.cancel": "रद्द करें",
 };

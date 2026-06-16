@@ -22,7 +22,11 @@ const echoSchema: InputSchema = {
   required: ["message"],
 };
 
-const echoDef: McpToolDefinition = { name: "echo", description: "Echo a message", inputSchema: echoSchema };
+const echoDef: McpToolDefinition = {
+  name: "echo",
+  description: "Echo a message",
+  inputSchema: echoSchema,
+};
 
 // ── McpServer — tools ─────────────────────────────────────────────────────────
 

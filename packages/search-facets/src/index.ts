@@ -18,32 +18,38 @@ export interface SearchDoc {
   metadata?: Record<string, string | string[]>;
 }
 
+/** Highlight options interface definition. */
 export interface HighlightOptions {
-  tag?: string;        // default "mark"
-  className?: string;  // default "" (no class attr)
+  tag?: string; // default "mark"
+  className?: string; // default "" (no class attr)
   caseSensitive?: boolean;
 }
 
+/** Facet bucket interface definition. */
 export interface FacetBucket {
   value: string;
   count: number;
 }
 
+/** Facet result interface definition. */
 export interface FacetResult {
   field: string;
   buckets: FacetBucket[];
 }
 
+/** Facet filter interface definition. */
 export interface FacetFilter {
   field: string;
   values: string[];
 }
 
+/** Snippet options interface definition. */
 export interface SnippetOptions {
-  window?: number;     // chars around the match; default 100
-  ellipsis?: string;   // default "…"
+  window?: number; // chars around the match; default 100
+  ellipsis?: string; // default "…"
 }
 
+/** Scored doc interface definition. */
 export interface ScoredDoc {
   doc: SearchDoc;
   score: number;
@@ -55,11 +61,7 @@ export interface ScoredDoc {
  * Wrap every occurrence of each query term in `text` with `<tag>term</tag>`.
  * Returns the highlighted text (no DOM required — pure string manipulation).
  */
-export function highlight(
-  text: string,
-  query: string,
-  opts: HighlightOptions = {},
-): string {
+export function highlight(text: string, query: string, opts: HighlightOptions = {}): string {
   const { tag = "mark", className = "", caseSensitive = false } = opts;
 
   const terms = query
@@ -71,7 +73,7 @@ export function highlight(
   if (terms.length === 0) return text;
 
   const classAttr = className ? ` class="${className}"` : "";
-  const open  = `<${tag}${classAttr}>`;
+  const open = `<${tag}${classAttr}>`;
   const close = `</${tag}>`;
 
   let result = text;
@@ -88,19 +90,15 @@ export function highlight(
 /**
  * Extract a short excerpt from `text` centered around the first occurrence of `query`.
  */
-export function excerptSnippet(
-  text: string,
-  query: string,
-  opts: SnippetOptions = {},
-): string {
+export function excerptSnippet(text: string, query: string, opts: SnippetOptions = {}): string {
   const { window: win = 100, ellipsis = "…" } = opts;
   const idx = text.toLowerCase().indexOf(query.toLowerCase());
   if (idx === -1) return text.slice(0, win * 2) + (text.length > win * 2 ? ellipsis : "");
 
   const start = Math.max(0, idx - win);
-  const end   = Math.min(text.length, idx + query.length + win);
-  const pre   = start > 0 ? ellipsis : "";
-  const post  = end < text.length ? ellipsis : "";
+  const end = Math.min(text.length, idx + query.length + win);
+  const pre = start > 0 ? ellipsis : "";
+  const post = end < text.length ? ellipsis : "";
   return pre + text.slice(start, end) + post;
 }
 

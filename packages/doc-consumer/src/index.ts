@@ -18,9 +18,20 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type MimeType = string;
-export type DocumentType = "text" | "pdf" | "image" | "spreadsheet" | "presentation" | "code" | "archive" | "unknown";
+/** Document type type alias. */
+export type DocumentType =
+  | "text"
+  | "pdf"
+  | "image"
+  | "spreadsheet"
+  | "presentation"
+  | "code"
+  | "archive"
+  | "unknown";
+/** Permission level type alias. */
 export type PermissionLevel = "read" | "write" | "owner" | "none";
 
+/** Ingested document interface definition. */
 export interface IngestedDocument {
   id: string;
   originalPath: string;
@@ -34,9 +45,10 @@ export interface IngestedDocument {
   metadata: Record<string, unknown>;
 }
 
+/** Ingestion request interface definition. */
 export interface IngestionRequest {
   path: string;
-  content: string;       // document content/bytes (base64 or text)
+  content: string; // document content/bytes (base64 or text)
   sizeBytes?: number;
   owner?: string;
   tags?: string[];
@@ -44,6 +56,7 @@ export interface IngestionRequest {
   outputTemplate?: string;
 }
 
+/** Ingestion result interface definition. */
 export interface IngestionResult {
   document?: IngestedDocument;
   status: "success" | "skipped" | "failed";
@@ -66,9 +79,15 @@ export class FileLock {
     this.locks.delete(path);
   }
 
-  isLocked(path: string): boolean { return this.locks.has(path); }
-  lockedPaths(): string[] { return [...this.locks]; }
-  clear(): void { this.locks.clear(); }
+  isLocked(path: string): boolean {
+    return this.locks.has(path);
+  }
+  lockedPaths(): string[] {
+    return [...this.locks];
+  }
+  clear(): void {
+    this.locks.clear();
+  }
 }
 
 // ── ChecksumRegistry ──────────────────────────────────────────────────────────
@@ -83,6 +102,7 @@ export function computeChecksum(content: string): string {
   return hash.toString(16).padStart(8, "0");
 }
 
+/** Checksum registry. */
 export class ChecksumRegistry {
   private checksums = new Map<string, string>(); // checksum → document id
 
@@ -95,47 +115,57 @@ export class ChecksumRegistry {
     return { isDuplicate: false };
   }
 
-  has(checksum: string): boolean { return this.checksums.has(checksum); }
-  getDocumentId(checksum: string): string | undefined { return this.checksums.get(checksum); }
-  remove(checksum: string): void { this.checksums.delete(checksum); }
-  clear(): void { this.checksums.clear(); }
-  size(): number { return this.checksums.size; }
+  has(checksum: string): boolean {
+    return this.checksums.has(checksum);
+  }
+  getDocumentId(checksum: string): string | undefined {
+    return this.checksums.get(checksum);
+  }
+  remove(checksum: string): void {
+    this.checksums.delete(checksum);
+  }
+  clear(): void {
+    this.checksums.clear();
+  }
+  size(): number {
+    return this.checksums.size;
+  }
 }
 
 // ── MimeDetector ──────────────────────────────────────────────────────────────
 
 const MIME_MAP: Record<string, MimeType> = {
-  txt:  "text/plain",
-  md:   "text/markdown",
+  txt: "text/plain",
+  md: "text/markdown",
   html: "text/html",
-  pdf:  "application/pdf",
-  png:  "image/png",
-  jpg:  "image/jpeg",
+  pdf: "application/pdf",
+  png: "image/png",
+  jpg: "image/jpeg",
   jpeg: "image/jpeg",
-  gif:  "image/gif",
+  gif: "image/gif",
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  xls:  "application/vnd.ms-excel",
+  xls: "application/vnd.ms-excel",
   pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  ts:   "text/typescript",
-  js:   "text/javascript",
-  py:   "text/x-python",
-  zip:  "application/zip",
+  ts: "text/typescript",
+  js: "text/javascript",
+  py: "text/x-python",
+  zip: "application/zip",
   json: "application/json",
 };
 
 const TYPE_MAP: Record<MimeType, DocumentType> = {
-  "text/plain":       "text",
-  "text/markdown":    "text",
-  "text/html":        "text",
+  "text/plain": "text",
+  "text/markdown": "text",
+  "text/html": "text",
   "application/json": "code",
-  "text/typescript":  "code",
-  "text/javascript":  "code",
-  "text/x-python":    "code",
-  "application/pdf":  "pdf",
-  "image/png":        "image",
-  "image/jpeg":       "image",
-  "image/gif":        "image",
+  "text/typescript": "code",
+  "text/javascript": "code",
+  "text/x-python": "code",
+  "application/pdf": "pdf",
+  "image/png": "image",
+  "image/jpeg": "image",
+  "image/gif": "image",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "spreadsheet",
   "application/vnd.ms-excel": "spreadsheet",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation": "presentation",
@@ -143,6 +173,7 @@ const TYPE_MAP: Record<MimeType, DocumentType> = {
   "application/zip": "archive",
 };
 
+/** Mime detector. */
 export class MimeDetector {
   detect(path: string): MimeType {
     const ext = path.split(".").pop()?.toLowerCase() ?? "";
@@ -176,8 +207,12 @@ export class PermissionSetter {
 
 // ── IngestionSignal ───────────────────────────────────────────────────────────
 
-export type SignalType = "document_consumption_started" | "document_consumption_finished" | "document_skipped";
+export type SignalType =
+  | "document_consumption_started"
+  | "document_consumption_finished"
+  | "document_skipped";
 
+/** Ingestion signal event interface definition. */
 export interface IngestionSignalEvent {
   type: SignalType;
   documentId: string;
@@ -186,8 +221,10 @@ export interface IngestionSignalEvent {
   metadata?: Record<string, unknown>;
 }
 
+/** Signal handler type alias. */
 export type SignalHandler = (event: IngestionSignalEvent) => void;
 
+/** Ingestion signal bus. */
 export class IngestionSignalBus {
   private handlers = new Set<SignalHandler>();
 
@@ -198,7 +235,11 @@ export class IngestionSignalBus {
 
   emit(event: IngestionSignalEvent): void {
     for (const h of this.handlers) {
-      try { h(event); } catch { /* isolate */ }
+      try {
+        h(event);
+      } catch {
+        /* isolate */
+      }
     }
   }
 }
@@ -211,8 +252,10 @@ export interface WorkflowTriggerResult {
   error?: string;
 }
 
+/** Workflow executor type alias. */
 export type WorkflowExecutor = (workflowId: string, document: IngestedDocument) => Promise<void>;
 
+/** Workflow trigger. */
 export class WorkflowTrigger {
   private executor?: WorkflowExecutor;
 
@@ -253,9 +296,9 @@ export class FilenameTemplater {
     return template
       .replace("{name}", vars.name)
       .replace("{date}", date)
-      .replace("{ext}",  vars.ext)
+      .replace("{ext}", vars.ext)
       .replace("{type}", vars.type)
-      .replace("{id}",   vars.id);
+      .replace("{id}", vars.id);
   }
 
   /** Extract base name and extension from a path. */
@@ -271,6 +314,7 @@ export class FilenameTemplater {
 
 let _docSeq = 0;
 
+/** Doc consumer options interface definition. */
 export interface DocConsumerOptions {
   lock?: FileLock;
   checksumRegistry?: ChecksumRegistry;
@@ -282,6 +326,7 @@ export interface DocConsumerOptions {
   defaultTemplate?: string;
 }
 
+/** Doc consumer. */
 export class DocConsumer {
   private lock: FileLock;
   private checksums: ChecksumRegistry;
@@ -293,13 +338,13 @@ export class DocConsumer {
   private defaultTemplate: string;
 
   constructor(opts: DocConsumerOptions = {}) {
-    this.lock        = opts.lock             ?? new FileLock();
-    this.checksums   = opts.checksumRegistry ?? new ChecksumRegistry();
-    this.mime        = opts.mimeDetector     ?? new MimeDetector();
+    this.lock = opts.lock ?? new FileLock();
+    this.checksums = opts.checksumRegistry ?? new ChecksumRegistry();
+    this.mime = opts.mimeDetector ?? new MimeDetector();
     this.permissions = opts.permissionSetter ?? new PermissionSetter();
-    this.signals     = opts.signalBus        ?? new IngestionSignalBus();
-    this.workflow    = opts.workflowTrigger  ?? new WorkflowTrigger();
-    this.templater   = opts.templater        ?? new FilenameTemplater();
+    this.signals = opts.signalBus ?? new IngestionSignalBus();
+    this.workflow = opts.workflowTrigger ?? new WorkflowTrigger();
+    this.templater = opts.templater ?? new FilenameTemplater();
     this.defaultTemplate = opts.defaultTemplate ?? "{name}-{date}.{ext}";
   }
 
@@ -345,7 +390,12 @@ export class DocConsumer {
       // 5. Output filename
       const { name, ext } = this.templater.parse(request.path);
       const template = request.outputTemplate ?? this.defaultTemplate;
-      const outputPath = this.templater.generate(template, { name, ext, type: documentType, id: docId });
+      const outputPath = this.templater.generate(template, {
+        name,
+        ext,
+        type: documentType,
+        id: docId,
+      });
 
       // 6. Permissions
       const permLevel = this.permissions.defaultFor(documentType, request.owner);
@@ -363,8 +413,8 @@ export class DocConsumer {
         permissions: permLevel,
         ingestedAt: new Date().toISOString(),
         metadata: {
-          tags:  request.tags   ?? [],
-          owner: request.owner  ?? null,
+          tags: request.tags ?? [],
+          owner: request.owner ?? null,
         },
       };
 
@@ -389,7 +439,13 @@ export class DocConsumer {
     }
   }
 
-  getSignalBus(): IngestionSignalBus { return this.signals; }
-  getLock(): FileLock { return this.lock; }
-  getChecksumRegistry(): ChecksumRegistry { return this.checksums; }
+  getSignalBus(): IngestionSignalBus {
+    return this.signals;
+  }
+  getLock(): FileLock {
+    return this.lock;
+  }
+  getChecksumRegistry(): ChecksumRegistry {
+    return this.checksums;
+  }
 }

@@ -178,7 +178,11 @@ describe("TokenEconomicsRenderer", () => {
   });
 
   it("shows remaining turns when provided", () => {
-    const s = r.render({ inputTokensUsed: 0, inputTokenBudget: 1000, remainingConversationTurns: 5 });
+    const s = r.render({
+      inputTokensUsed: 0,
+      inputTokenBudget: 1000,
+      remainingConversationTurns: 5,
+    });
     expect(s.content).toContain("~5");
   });
 
@@ -200,10 +204,7 @@ describe("SectionAssembler", () => {
 
   it("assembles sections in priority order", () => {
     const a = new SectionAssembler();
-    const result = a.assemble([
-      makeSection("LAST", 90),
-      makeSection("FIRST", 10),
-    ]);
+    const result = a.assemble([makeSection("LAST", 90), makeSection("FIRST", 10)]);
     expect(result.indexOf("FIRST")).toBeLessThan(result.indexOf("LAST"));
   });
 
@@ -259,7 +260,7 @@ describe("SectionAssembler", () => {
 describe("Full context assembly", () => {
   it("assembles agent + user + instructions in priority order", () => {
     const agentR = new AgentContextRenderer();
-    const userR  = new UserContextRenderer();
+    const userR = new UserContextRenderer();
     const instrR = new InstructionsRenderer();
     const footer = new FooterRenderer();
 

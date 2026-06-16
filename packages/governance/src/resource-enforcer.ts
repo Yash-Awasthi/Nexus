@@ -18,7 +18,7 @@ import { isSafeUrl } from "./security-utils.js";
 // ── Types ────────────────────────────────────────────────────────────
 
 /** Granular capability descriptor for resource-level enforcement. */
-export type ResourceCapability =
+type ResourceCapability =
   | "network:egress" // Outbound HTTP/S connections
   | "process:spawn" // Spawn child processes
   | "env:read" // Read environment variables
@@ -27,7 +27,7 @@ export type ResourceCapability =
   | "browser:interact" // Browser automation
   | "execution:compute"; // CPU-bound computation
 
-export interface NetworkEgressRule {
+interface NetworkEgressRule {
   allowedHosts: string[]; // e.g. ["api.example.com"]
   allowedPorts: number[]; // e.g. [443]
   allowedProtocols: ("http" | "https" | "ws" | "wss")[];
@@ -35,31 +35,31 @@ export interface NetworkEgressRule {
   blockLoopback: boolean; // Block localhost, 127.0.0.1
 }
 
-export interface ProcessSpawnRule {
+interface ProcessSpawnRule {
   maxProcesses: number; // Max concurrent child processes (0 = disallow)
   allowedBinaries: string[]; // e.g. ["node", "python3", "ffmpeg"]
   allowedEnvpPrefixes: string[]; // Environment var prefixes to pass to children
   sandboxCwd: boolean; // Force cwd inside sandbox root
 }
 
-export interface EnvAccessRule {
+interface EnvAccessRule {
   mode: "allowlist" | "blocklist";
   entries: string[]; // e.g. ["PATH", "HOME", "NODE_ENV"]
 }
 
-export interface ExecutionTimeBudget {
+interface ExecutionTimeBudget {
   maxWallClockMs: number; // Max wall-clock per execution scope
   maxCpuMs: number; // Max CPU time per execution scope (best-effort)
 }
 
-export interface ResourceEnforcerConfig {
+interface ResourceEnforcerConfig {
   networkEgress?: NetworkEgressRule;
   processSpawn?: ProcessSpawnRule;
   envAccess?: EnvAccessRule;
   timeBudget?: ExecutionTimeBudget;
 }
 
-export interface ResourceViolation {
+interface ResourceViolation {
   type: "network_egress" | "process_spawn" | "env_access" | "time_budget";
   detail: string;
   severity: "warn" | "critical";

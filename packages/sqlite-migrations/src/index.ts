@@ -22,12 +22,14 @@ export interface Migration {
   down?: string | string[];
 }
 
+/** Applied migration interface definition. */
 export interface AppliedMigration {
   version: number;
   name: string;
   appliedAt: string; // ISO timestamp
 }
 
+/** Migration result interface definition. */
 export interface MigrationResult {
   version: number;
   name: string;
@@ -36,6 +38,7 @@ export interface MigrationResult {
   durationMs: number;
 }
 
+/** Run report interface definition. */
 export interface RunReport {
   results: MigrationResult[];
   appliedCount: number;
@@ -48,10 +51,12 @@ export interface RunReport {
 
 export interface DbStatement {
   run(...params: unknown[]): void;
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
   get<T = unknown>(...params: unknown[]): T | undefined;
   all<T = unknown>(...params: unknown[]): T[];
 }
 
+/** Db client interface definition. */
 export interface DbClient {
   prepare(sql: string): DbStatement;
   exec(sql: string): void;
@@ -65,9 +70,7 @@ export interface DbClient {
 
 // ── InMemoryDbClient — for tests ──────────────────────────────────────────────
 
-interface InMemRow {
-  [col: string]: unknown;
-}
+type InMemRow = Record<string, unknown>;
 
 /**
  * Minimal in-memory DbClient that understands a tiny subset of SQL:
@@ -90,12 +93,14 @@ export class InMemoryDbClient implements DbClient {
   }
 
   prepare(sql: string): DbStatement {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const self = this;
     return {
       run(...params: unknown[]): void {
         self.execLog.push(`[prepared] ${sql.trim()} params=${JSON.stringify(params)}`);
         self._interpret(sql, params);
       },
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
       get<T>(...params: unknown[]): T | undefined {
         return self._query<T>(sql, params)[0];
       },
@@ -120,24 +125,35 @@ export class InMemoryDbClient implements DbClient {
   // ── Internal mini-SQL interpreter ─────────────────────────────────────────
 
   private _interpret(sql: string, params: unknown[] = []): void {
+    if (sql.length > 100_000) throw new Error("SQL statement too large");
     const s = sql.trim().replace(/\s+/g, " ");
 
     // CREATE TABLE [IF NOT EXISTS] name (col1 type, …)
-    const createMatch = s.match(/CREATE TABLE(?:\s+IF NOT EXISTS)?\s+(\w+)\s*\(/i);
+    const createMatch = /CREATE TABLE(?:\s+IF NOT EXISTS)?\s+(\w+)\s*\(/i.exec(s);
     if (createMatch) {
       const tbl = createMatch[1]!;
       if (!this.tables.has(tbl)) {
         this.tables.set(tbl, []);
         // Parse column names from CREATE TABLE body
         const inner = s.slice(s.indexOf("(") + 1, s.lastIndexOf(")"));
-        const cols = inner.split(",").map((c) => c.trim().split(/\s+/)[0]!).filter((c) => c && !c.toUpperCase().startsWith("PRIMARY") && !c.toUpperCase().startsWith("UNIQUE") && !c.toUpperCase().startsWith("FOREIGN") && !c.toUpperCase().startsWith("CHECK"));
+        const cols = inner
+          .split(",")
+          .map((c) => c.trim().split(/\s+/)[0]!)
+          .filter(
+            (c) =>
+              c &&
+              !c.toUpperCase().startsWith("PRIMARY") &&
+              !c.toUpperCase().startsWith("UNIQUE") &&
+              !c.toUpperCase().startsWith("FOREIGN") &&
+              !c.toUpperCase().startsWith("CHECK"),
+          );
         this.columns.set(tbl, cols);
       }
       return;
     }
 
     // ALTER TABLE name ADD COLUMN colname type
-    const alterMatch = s.match(/ALTER TABLE\s+(\w+)\s+ADD COLUMN\s+(\w+)/i);
+    const alterMatch = /ALTER TABLE\s+(\w+)\s+ADD COLUMN\s+(\w+)/i.exec(s);
     if (alterMatch) {
       const tbl = alterMatch[1]!;
       const col = alterMatch[2]!;
@@ -149,7 +165,9 @@ export class InMemoryDbClient implements DbClient {
     }
 
     // CREATE INDEX [IF NOT EXISTS] name ON table (…)
-    const idxMatch = s.match(/CREATE(?:\s+UNIQUE)?\s+INDEX(?:\s+IF NOT EXISTS)?\s+(\w+)\s+ON\s+(\w+)/i);
+    const idxMatch = /CREATE(?:\s+UNIQUE)?\s+INDEX(?:\s+IF NOT EXISTS)?\s+(\w+)\s+ON\s+(\w+)/i.exec(
+      s,
+    );
     if (idxMatch) {
       const idxName = idxMatch[1]!;
       const tbl = idxMatch[2]!;
@@ -160,7 +178,8 @@ export class InMemoryDbClient implements DbClient {
     }
 
     // INSERT INTO / INSERT OR IGNORE INTO / INSERT OR REPLACE INTO
-    const insertMatch = s.match(/INSERT(?:\s+OR\s+\w+)?\s+INTO\s+(\w+)\s*\(([^)]+)\)\s+VALUES\s*\(([^)]+)\)/i);
+    const insertMatch =
+      /INSERT(?:\s+OR\s+\w+)?\s+INTO\s+(\w+)\s*\(([^)]+)\)\s+VALUES\s*\(([^)]+)\)/i.exec(s);
     if (insertMatch) {
       const tbl = insertMatch[1]!;
       const colNames = insertMatch[2]!.split(",").map((c) => c.trim());
@@ -189,11 +208,14 @@ export class InMemoryDbClient implements DbClient {
     }
 
     // DROP INDEX
-    const dropIdxMatch = s.match(/DROP INDEX(?:\s+IF EXISTS)?\s+(\w+)/i);
+    const dropIdxMatch = /DROP INDEX(?:\s+IF EXISTS)?\s+(\w+)/i.exec(s);
     if (dropIdxMatch) {
       const idxName = dropIdxMatch[1]!;
       for (const [tbl, idxList] of this.indexes) {
-        this.indexes.set(tbl, idxList.filter((i) => i !== idxName));
+        this.indexes.set(
+          tbl,
+          idxList.filter((i) => i !== idxName),
+        );
       }
       return;
     }
@@ -203,9 +225,13 @@ export class InMemoryDbClient implements DbClient {
 
   private _query<T>(sql: string, params: unknown[]): T[] {
     const s = sql.trim().replace(/\s+/g, " ");
+    if (s.length > 10_000) return [];
 
     // SELECT * FROM table WHERE col = ?
-    const selMatch = s.match(/SELECT\s+(.+?)\s+FROM\s+(\w+)(?:\s+WHERE\s+(\w+)\s*=\s*\?)?(?:\s+ORDER BY\s+(\w+))?/i);
+    const selMatch =
+      /SELECT\s+(.+?)\s+FROM\s+(\w+)(?:\s+WHERE\s+(\w+)\s*=\s*\?)?(?:\s+ORDER BY\s+(\w+))?/i.exec(
+        s,
+      );
     if (selMatch) {
       const tbl = selMatch[2]!;
       const whereCol = selMatch[3];
@@ -259,9 +285,7 @@ export class MigrationRunner {
 
   /** Return list of already-applied versions. */
   appliedVersions(): number[] {
-    const stmt = this.db.prepare(
-      `SELECT version FROM ${MIGRATIONS_TABLE} ORDER BY version`
-    );
+    const stmt = this.db.prepare(`SELECT version FROM ${MIGRATIONS_TABLE} ORDER BY version`);
     const rows = stmt.all<{ version: number }>();
     return rows.map((r) => r.version);
   }
@@ -269,12 +293,13 @@ export class MigrationRunner {
   /** Return full applied-migration records. */
   appliedMigrations(): AppliedMigration[] {
     const stmt = this.db.prepare(
-      `SELECT version, name, applied_at FROM ${MIGRATIONS_TABLE} ORDER BY version`
+      `SELECT version, name, applied_at FROM ${MIGRATIONS_TABLE} ORDER BY version`,
     );
     return stmt.all<AppliedMigration>().map((r) => ({
       version: r.version,
       name: r.name,
-      appliedAt: (r as any)["applied_at"] as string,
+
+      appliedAt: (r as unknown)["applied_at"] as string,
     }));
   }
 
@@ -305,9 +330,11 @@ export class MigrationRunner {
             this.db.exec(sql);
           }
           // Record as applied
-          this.db.prepare(
-            `INSERT OR IGNORE INTO ${MIGRATIONS_TABLE} (version, name, applied_at) VALUES (?, ?, ?)`
-          ).run(migration.version, migration.name, new Date().toISOString());
+          this.db
+            .prepare(
+              `INSERT OR IGNORE INTO ${MIGRATIONS_TABLE} (version, name, applied_at) VALUES (?, ?, ?)`,
+            )
+            .run(migration.version, migration.name, new Date().toISOString());
         });
 
         results.push({
@@ -343,7 +370,13 @@ export class MigrationRunner {
     this.init();
     const migration = this.migrations.find((m) => m.version === version);
     if (!migration) {
-      return { version, name: "unknown", status: "failed", error: `Migration v${version} not found`, durationMs: 0 };
+      return {
+        version,
+        name: "unknown",
+        status: "failed",
+        error: `Migration v${version} not found`,
+        durationMs: 0,
+      };
     }
     const applied = new Set(this.appliedVersions());
     if (applied.has(version)) {
@@ -354,13 +387,21 @@ export class MigrationRunner {
       this.db.transaction(() => {
         const stmts = Array.isArray(migration.up) ? migration.up : [migration.up];
         for (const sql of stmts) this.db.exec(sql);
-        this.db.prepare(
-          `INSERT OR IGNORE INTO ${MIGRATIONS_TABLE} (version, name, applied_at) VALUES (?, ?, ?)`
-        ).run(migration.version, migration.name, new Date().toISOString());
+        this.db
+          .prepare(
+            `INSERT OR IGNORE INTO ${MIGRATIONS_TABLE} (version, name, applied_at) VALUES (?, ?, ?)`,
+          )
+          .run(migration.version, migration.name, new Date().toISOString());
       });
       return { version, name: migration.name, status: "applied", durationMs: Date.now() - t0 };
     } catch (err) {
-      return { version, name: migration.name, status: "failed", error: err instanceof Error ? err.message : String(err), durationMs: Date.now() - t0 };
+      return {
+        version,
+        name: migration.name,
+        status: "failed",
+        error: err instanceof Error ? err.message : String(err),
+        durationMs: Date.now() - t0,
+      };
     }
   }
 
@@ -377,7 +418,9 @@ export class MigrationRunner {
 export class SchemaRepair {
   private db: DbClient;
 
-  constructor(db: DbClient) { this.db = db; }
+  constructor(db: DbClient) {
+    this.db = db;
+  }
 
   /**
    * Add a column to a table only if it doesn't already exist.
@@ -417,38 +460,58 @@ export class SchemaRepair {
    * Run a list of repair actions sequentially.
    * Returns a summary of actions taken.
    */
-  repairAll(actions: Array<{
-    type: "addColumn";
-    table: string;
-    column: string;
-    definition: string;
-  } | {
-    type: "ensureIndex";
-    indexName: string;
-    table: string;
-    columns: string;
-    unique?: boolean;
-  } | {
-    type: "rebuildIndex";
-    indexName: string;
-    table: string;
-    columns: string;
-    unique?: boolean;
-  }>): string[] {
+  repairAll(
+    actions: (
+      | {
+          type: "addColumn";
+          table: string;
+          column: string;
+          definition: string;
+        }
+      | {
+          type: "ensureIndex";
+          indexName: string;
+          table: string;
+          columns: string;
+          unique?: boolean;
+        }
+      | {
+          type: "rebuildIndex";
+          indexName: string;
+          table: string;
+          columns: string;
+          unique?: boolean;
+        }
+    )[],
+  ): string[] {
     const log: string[] = [];
     for (const action of actions) {
       if (action.type === "addColumn") {
         const added = this.addColumnIfMissing(action.table, action.column, action.definition);
-        log.push(added
-          ? `addColumn: added ${action.table}.${action.column}`
-          : `addColumn: ${action.table}.${action.column} already exists`);
+        log.push(
+          added
+            ? `addColumn: added ${action.table}.${action.column}`
+            : `addColumn: ${action.table}.${action.column} already exists`,
+        );
       } else if (action.type === "ensureIndex") {
-        const created = this.ensureIndex(action.indexName, action.table, action.columns, action.unique);
-        log.push(created
-          ? `ensureIndex: created ${action.indexName}`
-          : `ensureIndex: ${action.indexName} already exists`);
+        const created = this.ensureIndex(
+          action.indexName,
+          action.table,
+          action.columns,
+          action.unique,
+        );
+        log.push(
+          created
+            ? `ensureIndex: created ${action.indexName}`
+            : `ensureIndex: ${action.indexName} already exists`,
+        );
       } else if (action.type === "rebuildIndex") {
-        const sql = this.rebuildIndex(action.indexName, action.table, action.columns, action.unique);
+        const sql = this.rebuildIndex(
+          action.indexName,
+          action.table,
+          action.columns,
+          action.unique,
+        );
         log.push(`rebuildIndex: rebuilt ${action.indexName} → ${sql}`);
       }
     }

@@ -1,0 +1,596 @@
+openapi: "3.1.0"
+info:
+  title: Nexus API
+  version: "0.1.0"
+  description: |
+    Nexus autonomous orchestration platform — Model Gateway, Council, Memory,
+    Research, Admin, and Billing APIs.
+
+    Authentication: Bearer token via `Authorization: Bearer <NEXUS_API_KEY>`
+    or JWT via `Authorization: Bearer <JWT>` (tier extracted from `tier` claim).
+
+    Dev mode: when `NEXUS_API_KEY` is not set, all auth is bypassed.
+  contact:
+    name: Yash Awasthi
+    url: https://github.com/Yash-Awasthi/nexus
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+
+servers:
+  - url: https://api.nexus.yashawasthi.dev/api/v1
+    description: Production
+  - url: http://localhost:3000/api/v1
+    description: Local development
+
+tags:
+  - name: health
+    description: Liveness and readiness probes
+  - name: gateway
+    description: Model Gateway — Anthropic-compatible proxy
+  - name: council
+    description: Multi-agent deliberation council
+  - name: memory
+    description: Persistent memory store
+  - name: research
+    description: Deep research agent
+  - name: admin
+    description: Route management, stats, traces, settings
+  - name: billing
+    description: Stripe plans, quota, API keys, checkout
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:   { type: string }
+        message: { type: string }
+
+    ChatMessage:
+      type: object
+      required: [role, content]
+      properties:
+        role:    { type: string, enum: [system, user, assistant] }
+        content: { type: string }
+
+    ContentBlock:
+      type: object
+      required: [type, text]
+      properties:
+        type: { type: string, enum: [text] }
+        text: { type: string }
+
+    MessageResponse:
+      type: object
+      required: [type, role, content, usage]
+      properties:
+        type:        { type: string, enum: [message] }
+        id:          { type: string }
+        role:        { type: string, enum: [assistant] }
+        model:       { type: string }
+        content:
+          type: array
+          items: { $ref: "#/components/schemas/ContentBlock" }
+        usage:
+          type: object
+          properties:
+            input_tokens:  { type: integer }
+            output_tokens: { type: integer }
+        stop_reason:  { type: string }
+
+    ModelAlias:
+      type: object
+      required: [id, provider, backend_model, available]
+      properties:
+        id:           { type: string }
+        provider:     { type: string }
+        backend_model:{ type: string }
+        available:    { type: boolean }
+
+    AdminRoute:
+      type: object
+      required: [alias, model, provider]
+      properties:
+        alias:     { type: string }
+        model:     { type: string }
+        provider:  { type: string }
+        overridden:{ type: boolean }
+
+    AdminSettings:
+      type: object
+      properties:
+        tracing:      { type: boolean }
+        logLevel:     { type: string }
+        rateLimitRpm: { type: integer }
+        maxTokens:    { type: integer }
+        defaultModel: { type: string }
+        corsOrigins:
+          type: array
+          items: { type: string }
+
+    TraceEntry:
+      type: object
+      properties:
+        provider:     { type: string }
+        model:        { type: string }
+        status:       { type: string, enum: [success, error, cached] }
+        latencyMs:    { type: number }
+        inputTokens:  { type: integer }
+        outputTokens: { type: integer }
+        identity:     { type: string }
+        ts:           { type: integer }
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ── Health ────────────────────────────────────────────────────────────────────
+
+  /health:
+    get:
+      tags: [health]
+      summary: Liveness probe
+      security: []
+      responses:
+        "200":
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:    { type: string, example: ok }
+                  timestamp: { type: string, format: date-time }
+
+  /health/ready:
+    get:
+      tags: [health]
+      summary: Readiness probe
+      security: []
+      responses:
+        "200": { description: API ready }
+        "503": { description: API not ready }
+
+  # ── Gateway ───────────────────────────────────────────────────────────────────
+
+  /gateway/models:
+    get:
+      tags: [gateway]
+      summary: List model aliases
+      responses:
+        "200":
+          description: Model list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  models:
+                    type: array
+                    items: { $ref: "#/components/schemas/ModelAlias" }
+                  providers: { type: array, items: { type: string } }
+
+  /gateway/messages:
+    post:
+      tags: [gateway]
+      summary: Send messages (Anthropic-compatible)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model, messages]
+              properties:
+                model:
+                  type: string
+                  example: nexus/fast
+                messages:
+                  type: array
+                  items: { $ref: "#/components/schemas/ChatMessage" }
+                system:       { type: string }
+                max_tokens:   { type: integer, default: 2048 }
+                temperature:  { type: number, minimum: 0, maximum: 1 }
+                stream:       { type: boolean, default: false }
+                max_spend_usd:{ type: number, minimum: 0 }
+      responses:
+        "200":
+          description: Message response
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageResponse" }
+        "400": { description: Invalid model or provider not configured }
+        "402": { description: Spend cap exceeded }
+        "401": { description: Unauthorized }
+
+  /gateway/tools:
+    get:
+      tags: [gateway]
+      summary: List available tools
+      responses:
+        "200":
+          description: Tool list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tools:  { type: array, items: { type: object } }
+                  total:  { type: integer }
+
+  /gateway/tools/invoke:
+    post:
+      tags: [gateway]
+      summary: Invoke a registered tool
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:  { type: string }
+                input: { type: object }
+      responses:
+        "200": { description: Tool result }
+        "400": { description: Missing tool name }
+        "422": { description: Unknown tool }
+
+  /gateway/cost-report:
+    get:
+      tags: [gateway]
+      summary: Cost report for gateway runs
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        "200":
+          description: Cost report
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalRuns: { type: integer }
+                  totalUsd:  { type: number }
+                  limit:     { type: integer }
+                  runs:      { type: array, items: { type: object } }
+
+  # ── Council ───────────────────────────────────────────────────────────────────
+
+  /council/deliberate:
+    post:
+      tags: [council]
+      summary: Run multi-agent council deliberation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [proposal]
+              properties:
+                proposal:  { type: string }
+                context:   { type: string }
+                budget_usd:{ type: number }
+                timeout_ms:{ type: integer }
+      responses:
+        "200": { description: Deliberation verdict }
+        "402": { description: Insufficient tier }
+        "401": { description: Unauthorized }
+
+  # ── Memory ────────────────────────────────────────────────────────────────────
+
+  /memory:
+    get:
+      tags: [memory]
+      summary: List memory entries
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: category
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Memory list
+    post:
+      tags: [memory]
+      summary: Store a memory entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:    { type: string }
+                category:   { type: string }
+                tags:       { type: array, items: { type: string } }
+                confidence: { type: number, minimum: 0, maximum: 1 }
+      responses:
+        "201": { description: Memory created }
+
+  # ── Research ──────────────────────────────────────────────────────────────────
+
+  /researcher/jobs:
+    post:
+      tags: [research]
+      summary: Submit a research query
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query: { type: string, minLength: 3 }
+      responses:
+        "201":
+          description: Job created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId: { type: string }
+
+  /researcher/jobs/{jobId}:
+    get:
+      tags: [research]
+      summary: Get research job status
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Job status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:   { type: string }
+                  status:  { type: string, enum: [queued, running, done, error] }
+                  report:  { type: string }
+                  sources: { type: array, items: { type: object } }
+                  error:   { type: string }
+
+  # ── Admin ─────────────────────────────────────────────────────────────────────
+
+  /admin/routes:
+    get:
+      tags: [admin]
+      summary: List model alias routes
+      responses:
+        "200":
+          description: Route list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  routes:
+                    type: array
+                    items: { $ref: "#/components/schemas/AdminRoute" }
+                  total: { type: integer }
+    post:
+      tags: [admin]
+      summary: Add a static route
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [alias, model, provider]
+              properties:
+                alias:    { type: string }
+                model:    { type: string }
+                provider: { type: string }
+      responses:
+        "201": { description: Route created }
+        "400": { description: Invalid request }
+
+  /admin/routes/{alias}/override:
+    post:
+      tags: [admin]
+      summary: Set runtime override for a route
+      parameters:
+        - name: alias
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model]
+              properties:
+                model: { type: string }
+      responses:
+        "200": { description: Override set }
+    delete:
+      tags: [admin]
+      summary: Remove runtime override
+      parameters:
+        - name: alias
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Override removed }
+
+  /admin/stats:
+    get:
+      tags: [admin]
+      summary: Usage stats per alias
+      parameters:
+        - name: alias
+          in: query
+          schema: { type: string }
+      responses:
+        "200": { description: Stats list }
+
+  /admin/traces:
+    get:
+      tags: [admin]
+      summary: Query gateway request log
+      parameters:
+        - name: provider
+          in: query
+          schema: { type: string }
+        - name: model
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string, enum: [success, error, cached] }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 100 }
+        - name: since
+          in: query
+          schema: { type: integer, description: "Unix timestamp ms" }
+        - name: before
+          in: query
+          schema: { type: integer, description: "Unix timestamp ms" }
+      responses:
+        "200":
+          description: Trace entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items: { $ref: "#/components/schemas/TraceEntry" }
+                  total: { type: integer }
+    delete:
+      tags: [admin]
+      summary: Flush trace log
+      responses:
+        "204": { description: Cleared }
+
+  /admin/settings:
+    get:
+      tags: [admin]
+      summary: Get admin settings
+      responses:
+        "200":
+          description: Current settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settings: { $ref: "#/components/schemas/AdminSettings" }
+    post:
+      tags: [admin]
+      summary: Update admin settings (partial)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminSettings" }
+      responses:
+        "200": { description: Updated settings }
+        "400": { description: Invalid value }
+
+  # ── Billing ───────────────────────────────────────────────────────────────────
+
+  /billing/plan:
+    get:
+      tags: [billing]
+      summary: Get current plan definition
+      responses:
+        "200": { description: Plan details }
+
+  /billing/quota:
+    get:
+      tags: [billing]
+      summary: Current quota status
+      responses:
+        "200": { description: Quota details }
+
+  /billing/checkout:
+    post:
+      tags: [billing]
+      summary: Create Stripe Checkout session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plan]
+              properties:
+                plan:       { type: string, enum: [pro, enterprise] }
+                successUrl: { type: string, format: uri }
+                cancelUrl:  { type: string, format: uri }
+      responses:
+        "200":
+          description: Checkout session
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessionId: { type: string }
+                  url:       { type: string, format: uri }
+        "503": { description: Stripe not configured }
+
+  /billing/portal:
+    post:
+      tags: [billing]
+      summary: Create Stripe Customer Portal session
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                returnUrl: { type: string, format: uri }
+      responses:
+        "200":
+          description: Portal session URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: string, format: uri }
+        "404": { description: No Stripe customer linked }
+        "503": { description: Stripe not configured }
+
+  /billing/webhook/stripe:
+    post:
+      tags: [billing]
+      summary: Stripe webhook receiver
+      security: []
+      parameters:
+        - name: stripe-signature
+          in: header
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Acknowledged }
+        "400": { description: Invalid signature }

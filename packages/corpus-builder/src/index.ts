@@ -16,6 +16,7 @@
 
 export type DocumentSource = "web" | "pdf" | "database" | "upload" | "mock";
 
+/** Corpus document interface definition. */
 export interface CorpusDocument {
   id: string;
   title: string;
@@ -28,15 +29,17 @@ export interface CorpusDocument {
   score?: number;
 }
 
+/** Corpus filter interface definition. */
 export interface CorpusFilter {
   topics?: string[];
   sources?: DocumentSource[];
   maxDocuments?: number;
   minWordCount?: number;
-  after?: string;     // ISO-8601
+  after?: string; // ISO-8601
   minScore?: number;
 }
 
+/** Corpus interface definition. */
 export interface Corpus {
   id: string;
   query: string;
@@ -53,12 +56,14 @@ export interface CorpusSearchResult {
   query: string;
 }
 
+/** Corpus search backend interface definition. */
 export interface CorpusSearchBackend {
   search(query: string, filter?: CorpusFilter): Promise<CorpusSearchResult>;
 }
 
-let _cdSeq = 0;
+const _cdSeq = 0;
 
+/** Mock corpus search backend. */
 export class MockCorpusSearchBackend implements CorpusSearchBackend {
   private documents: CorpusDocument[];
   readonly calls: string[] = [];
@@ -123,6 +128,7 @@ export class MockCorpusSearchBackend implements CorpusSearchBackend {
 
 let _corpSeq = 0;
 
+/** Corpus builder. */
 export class CorpusBuilder {
   private backend: CorpusSearchBackend;
 
@@ -153,12 +159,24 @@ export class CorpusStore {
     this.corpora.set(corpus.id, corpus);
   }
 
-  get(id: string): Corpus | undefined { return this.corpora.get(id); }
-  has(id: string): boolean { return this.corpora.has(id); }
-  list(): Corpus[] { return [...this.corpora.values()]; }
-  delete(id: string): boolean { return this.corpora.delete(id); }
-  clear(): void { this.corpora.clear(); }
-  count(): number { return this.corpora.size; }
+  get(id: string): Corpus | undefined {
+    return this.corpora.get(id);
+  }
+  has(id: string): boolean {
+    return this.corpora.has(id);
+  }
+  list(): Corpus[] {
+    return [...this.corpora.values()];
+  }
+  delete(id: string): boolean {
+    return this.corpora.delete(id);
+  }
+  clear(): void {
+    this.corpora.clear();
+  }
+  count(): number {
+    return this.corpora.size;
+  }
 
   /** Find corpus by query string */
   findByQuery(query: string): Corpus | undefined {
@@ -173,6 +191,7 @@ export class CorpusStore {
 
 export type RenderFormat = "markdown" | "text";
 
+/** Corpus renderer. */
 export class CorpusRenderer {
   renderMarkdown(corpus: Corpus): string {
     const lines: string[] = [
@@ -193,11 +212,7 @@ export class CorpusRenderer {
   }
 
   renderText(corpus: Corpus): string {
-    const lines: string[] = [
-      `CORPUS: ${corpus.query}`,
-      `Built: ${corpus.builtAt}`,
-      `---`,
-    ];
+    const lines: string[] = [`CORPUS: ${corpus.query}`, `Built: ${corpus.builtAt}`, `---`];
     for (const doc of corpus.documents) {
       lines.push(`[${doc.title}]`);
       lines.push(doc.content);
@@ -216,13 +231,15 @@ export class CorpusRenderer {
 export interface KnowledgeAnswer {
   question: string;
   answer: string;
-  sourceDocuments: string[];  // document IDs used
+  sourceDocuments: string[]; // document IDs used
   confidence: number;
   corpusId: string;
 }
 
+/** Answer fn type alias. */
 export type AnswerFn = (question: string, context: string) => Promise<string>;
 
+/** Knowledge agent. */
 export class KnowledgeAgent {
   private builder: CorpusBuilder;
   private renderer: CorpusRenderer;
@@ -234,10 +251,7 @@ export class KnowledgeAgent {
     this.answerFn = answerFn;
   }
 
-  async answer(
-    question: string,
-    filter: CorpusFilter = {},
-  ): Promise<KnowledgeAnswer> {
+  async answer(question: string, filter: CorpusFilter = {}): Promise<KnowledgeAnswer> {
     const corpus = await this.builder.build(question, filter);
     const context = this.renderer.renderText(corpus);
     const answer = await this.answerFn(question, context);

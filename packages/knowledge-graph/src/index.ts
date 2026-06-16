@@ -27,21 +27,16 @@ import { createHash } from "node:crypto";
 
 // ── Entity / Relationship types (re-declared; compatible with @nexus/nlp-utils) ─
 
-export type EntityType =
-  | "PERSON"
-  | "ORG"
-  | "LOCATION"
-  | "DATE"
-  | "PRODUCT"
-  | "EVENT"
-  | "OTHER";
+export type EntityType = "PERSON" | "ORG" | "LOCATION" | "DATE" | "PRODUCT" | "EVENT" | "OTHER";
 
+/** Entity interface definition. */
 export interface Entity {
   text: string;
   type: EntityType;
   confidence: number;
 }
 
+/** Relationship interface definition. */
 export interface Relationship {
   subject: string;
   predicate: string;
@@ -61,10 +56,7 @@ export type EntityExtractor = (text: string) => Promise<Entity[]>;
  * Extract subject-predicate-object triples.
  * Compatible with @nexus/nlp-utils extractRelationships (pass directly).
  */
-export type RelationshipExtractor = (
-  text: string,
-  entities: Entity[],
-) => Promise<Relationship[]>;
+export type RelationshipExtractor = (text: string, entities: Entity[]) => Promise<Relationship[]>;
 
 /** No-op entity extractor — returns [] without calling any LLM */
 export const nullEntityExtractor: EntityExtractor = async () => [];
@@ -89,6 +81,7 @@ export interface KGNode {
   updatedAt: number;
 }
 
+/** Kg edge interface definition. */
 export interface KGEdge {
   /** Deterministic id: sha256(subjectId|predicate.lower()|objectId).slice(0,16) */
   id: string;
@@ -112,6 +105,7 @@ export interface NodeQuery {
   limit?: number;
 }
 
+/** Edge query interface definition. */
 export interface EdgeQuery {
   subjectId?: string;
   objectId?: string;
@@ -121,6 +115,7 @@ export interface EdgeQuery {
   limit?: number;
 }
 
+/** Kg stats interface definition. */
 export interface KGStats {
   nodes: number;
   edges: number;
@@ -296,11 +291,7 @@ export function makeNodeId(name: string, type: EntityType): string {
 /**
  * Deterministic edge id: sha256(subjectId|predicate.lower().trim()|objectId).slice(0,16).
  */
-export function makeEdgeId(
-  subjectId: string,
-  predicate: string,
-  objectId: string,
-): string {
+export function makeEdgeId(subjectId: string, predicate: string, objectId: string): string {
   return createHash("sha256")
     .update(`${subjectId}|${predicate.toLowerCase().trim()}|${objectId}`)
     .digest("hex")
@@ -318,6 +309,7 @@ export interface IngestOptions {
   relationshipExtractor?: RelationshipExtractor;
 }
 
+/** Ingest result interface definition. */
 export interface IngestResult {
   nodesAdded: number;
   nodesMerged: number;
@@ -327,19 +319,23 @@ export interface IngestResult {
   relationships: Relationship[];
 }
 
+/** Traversal direction type alias. */
 export type TraversalDirection = "outbound" | "inbound" | "both";
 
+/** Related options interface definition. */
 export interface RelatedOptions {
   direction?: TraversalDirection;
   limit?: number;
 }
 
+/** Related edge interface definition. */
 export interface RelatedEdge {
   node: KGNode;
   edge: KGEdge;
   direction: "outbound" | "inbound";
 }
 
+/** Related result interface definition. */
 export interface RelatedResult {
   node: KGNode | undefined;
   neighbors: RelatedEdge[];
@@ -556,11 +552,9 @@ export type NeonRow = Record<string, unknown>;
  * @param sql    Parameterised SQL string using $1, $2, … placeholders
  * @param params Bound parameter values (may be omitted for DDL)
  */
-export type NeonQueryFn = (
-  sql: string,
-  params?: unknown[],
-) => Promise<{ rows: NeonRow[] }>;
+export type NeonQueryFn = (sql: string, params?: unknown[]) => Promise<{ rows: NeonRow[] }>;
 
+/** Neon kg store config interface definition. */
 export interface NeonKGStoreConfig {
   /** Injectable SQL executor (see NeonQueryFn) */
   query: NeonQueryFn;
@@ -677,10 +671,7 @@ export class NeonKGStore implements KGStore {
   }
 
   async getNode(id: string): Promise<KGNode | undefined> {
-    const { rows } = await this.queryFn(
-      `SELECT * FROM ${this.nodesTable} WHERE id=$1`,
-      [id],
-    );
+    const { rows } = await this.queryFn(`SELECT * FROM ${this.nodesTable} WHERE id=$1`, [id]);
     return rows[0] ? rowToNode(rows[0]) : undefined;
   }
 
@@ -753,10 +744,7 @@ export class NeonKGStore implements KGStore {
   }
 
   async getEdge(id: string): Promise<KGEdge | undefined> {
-    const { rows } = await this.queryFn(
-      `SELECT * FROM ${this.edgesTable} WHERE id=$1`,
-      [id],
-    );
+    const { rows } = await this.queryFn(`SELECT * FROM ${this.edgesTable} WHERE id=$1`, [id]);
     return rows[0] ? rowToEdge(rows[0]) : undefined;
   }
 
@@ -800,9 +788,7 @@ export class NeonKGStore implements KGStore {
     const { rows: nodeRows } = await this.queryFn(
       `SELECT type, COUNT(*) AS cnt FROM ${this.nodesTable} GROUP BY type`,
     );
-    const { rows: edgeRows } = await this.queryFn(
-      `SELECT COUNT(*) AS cnt FROM ${this.edgesTable}`,
-    );
+    const { rows: edgeRows } = await this.queryFn(`SELECT COUNT(*) AS cnt FROM ${this.edgesTable}`);
 
     const nodesByType: Partial<Record<EntityType, number>> = {};
     let totalNodes = 0;

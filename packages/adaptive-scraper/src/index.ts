@@ -15,8 +15,10 @@
 
 export type EngineType = "playwright" | "cdp" | "httpx" | "camoufox";
 
+/** Scrape status type alias. */
 export type ScrapeStatus = "success" | "blocked" | "timeout" | "error" | "cached";
 
+/** Scrape result interface definition. */
 export interface ScrapeResult {
   url: string;
   html: string;
@@ -28,6 +30,7 @@ export interface ScrapeResult {
   statusCode?: number;
 }
 
+/** Scrape options interface definition. */
 export interface ScrapeOptions {
   timeout?: number;
   headers?: Record<string, string>;
@@ -94,6 +97,7 @@ export interface SelectorFallback {
   type: "css" | "xpath" | "text";
 }
 
+/** Element selector. */
 export class ElementSelector {
   private primary: string;
   private fallbacks: SelectorFallback[];
@@ -113,7 +117,11 @@ export class ElementSelector {
     return null;
   }
 
-  private applySelector(html: string, selector: string, type: "css" | "xpath" | "text"): string | null {
+  private applySelector(
+    html: string,
+    selector: string,
+    type: "css" | "xpath" | "text",
+  ): string | null {
     if (type === "text") {
       return html.includes(selector) ? selector : null;
     }
@@ -143,8 +151,12 @@ export class ElementSelector {
     return null;
   }
 
-  getPrimary(): string { return this.primary; }
-  getFallbacks(): SelectorFallback[] { return [...this.fallbacks]; }
+  getPrimary(): string {
+    return this.primary;
+  }
+  getFallbacks(): SelectorFallback[] {
+    return [...this.fallbacks];
+  }
 }
 
 // ── ScrapeCache ───────────────────────────────────────────────────────────────
@@ -153,7 +165,8 @@ export class ScrapeCache {
   private cache = new Map<string, { result: ScrapeResult; expiresAt: number }>();
   private ttlMs: number;
 
-  constructor(ttlMs = 300_000) { // 5 minutes default
+  constructor(ttlMs = 300_000) {
+    // 5 minutes default
     this.ttlMs = ttlMs;
   }
 
@@ -183,7 +196,9 @@ export class ScrapeCache {
     this.cache.clear();
   }
 
-  size(): number { return this.cache.size; }
+  size(): number {
+    return this.cache.size;
+  }
 }
 
 // ── AdaptiveScraper ───────────────────────────────────────────────────────────
@@ -195,6 +210,7 @@ export interface EngineStats {
   successRate: number;
 }
 
+/** Adaptive scraper. */
 export class AdaptiveScraper {
   private engines: ScrapeEngine[];
   private cache: ScrapeCache;
@@ -270,13 +286,17 @@ export interface ScheduledTask {
 
 let _taskSeq = 0;
 
+/** Scrape scheduler. */
 export class ScrapeScheduler {
   private queue: ScheduledTask[] = [];
   private scraper: AdaptiveScraper;
   private concurrency: number;
   private delayBetweenMs: number;
 
-  constructor(scraper: AdaptiveScraper, opts: { concurrency?: number; delayBetweenMs?: number } = {}) {
+  constructor(
+    scraper: AdaptiveScraper,
+    opts: { concurrency?: number; delayBetweenMs?: number } = {},
+  ) {
     this.scraper = scraper;
     this.concurrency = opts.concurrency ?? 1;
     this.delayBetweenMs = opts.delayBetweenMs ?? 500;
@@ -319,7 +339,13 @@ export class ScrapeScheduler {
     return results;
   }
 
-  queueSize(): number { return this.queue.filter((t) => t.status === "pending").length; }
-  allTasks(): ScheduledTask[] { return [...this.queue]; }
-  clearQueue(): void { this.queue = this.queue.filter((t) => t.status !== "pending"); }
+  queueSize(): number {
+    return this.queue.filter((t) => t.status === "pending").length;
+  }
+  allTasks(): ScheduledTask[] {
+    return [...this.queue];
+  }
+  clearQueue(): void {
+    this.queue = this.queue.filter((t) => t.status !== "pending");
+  }
 }

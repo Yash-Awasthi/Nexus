@@ -16,10 +16,16 @@ import {
 
 let _time = 1_000_000;
 const mockNow = () => _time;
-const advanceMs = (ms: number) => { _time += ms; };
-const resetClock = () => { _time = 1_000_000; };
+const advanceMs = (ms: number) => {
+  _time += ms;
+};
+const resetClock = () => {
+  _time = 1_000_000;
+};
 
-function makeRedisClient(): RedisClientLike & { _store: Map<string, { value: string; expiresAt?: number }> } {
+function makeRedisClient(): RedisClientLike & {
+  _store: Map<string, { value: string; expiresAt?: number }>;
+} {
   const store = new Map<string, { value: string; expiresAt?: number }>();
   const now = () => Date.now();
   return {
@@ -27,7 +33,10 @@ function makeRedisClient(): RedisClientLike & { _store: Map<string, { value: str
     async get(key) {
       const entry = store.get(key);
       if (!entry) return null;
-      if (entry.expiresAt !== undefined && now() >= entry.expiresAt) { store.delete(key); return null; }
+      if (entry.expiresAt !== undefined && now() >= entry.expiresAt) {
+        store.delete(key);
+        return null;
+      }
       return entry.value;
     },
     async set(key, value, opts) {
@@ -41,10 +50,14 @@ function makeRedisClient(): RedisClientLike & { _store: Map<string, { value: str
     async del(key) {
       const keys = Array.isArray(key) ? key : [key];
       let count = 0;
-      for (const k of keys) { if (store.delete(k)) count++; }
+      for (const k of keys) {
+        if (store.delete(k)) count++;
+      }
       return count;
     },
-    async exists(key) { return (store.has(key) ? 1 : 0); },
+    async exists(key) {
+      return store.has(key) ? 1 : 0;
+    },
     async keys(pattern) {
       const prefix = pattern.endsWith("*") ? pattern.slice(0, -1) : undefined;
       const result: string[] = [];
@@ -53,11 +66,17 @@ function makeRedisClient(): RedisClientLike & { _store: Map<string, { value: str
       }
       return result;
     },
-    async flushAll() { store.clear(); return "OK"; },
+    async flushAll() {
+      store.clear();
+      return "OK";
+    },
     async eval(_script, { keys, arguments: args }) {
       // Simulate compare-and-delete Lua script
       const val = store.get(keys[0]!);
-      if (val?.value === args[0]) { store.delete(keys[0]!); return 1; }
+      if (val?.value === args[0]) {
+        store.delete(keys[0]!);
+        return 1;
+      }
       return 0;
     },
   };
@@ -341,7 +360,9 @@ describe("RedisKVStore", () => {
 describe("MemoryPubSub", () => {
   let pub: MemoryPubSub;
 
-  beforeEach(() => { pub = new MemoryPubSub(); });
+  beforeEach(() => {
+    pub = new MemoryPubSub();
+  });
 
   it("publish with no subscribers is a no-op", async () => {
     await expect(pub.publish("ch", "data")).resolves.toBeUndefined();
@@ -478,7 +499,11 @@ describe("MemoryDistributedLock", () => {
   });
 
   it("withLock releases lock even when fn throws", async () => {
-    await lock.withLock("res", 1000, async () => { throw new Error("oops"); }).catch(() => null);
+    await lock
+      .withLock("res", 1000, async () => {
+        throw new Error("oops");
+      })
+      .catch(() => null);
     const r = await lock.acquire("res", 100);
     expect(r).toBeDefined();
   });

@@ -96,14 +96,18 @@ describe("FederatedConnectorRegistry.search()", () => {
 
   it("aggregates results from multiple connectors", async () => {
     const r = new FederatedConnectorRegistry();
-    r.register(new NullSearchConnector({
-      id: "github",
-      results: [makeResult("gh-1", "GitHub Issue", "github", 0.9)],
-    }));
-    r.register(new NullSearchConnector({
-      id: "slack",
-      results: [makeResult("sl-1", "Slack Thread", "slack", 0.7)],
-    }));
+    r.register(
+      new NullSearchConnector({
+        id: "github",
+        results: [makeResult("gh-1", "GitHub Issue", "github", 0.9)],
+      }),
+    );
+    r.register(
+      new NullSearchConnector({
+        id: "slack",
+        results: [makeResult("sl-1", "Slack Thread", "slack", 0.7)],
+      }),
+    );
 
     const res = await r.search({ query: "test" });
     expect(res.results).toHaveLength(2);
@@ -114,10 +118,12 @@ describe("FederatedConnectorRegistry.search()", () => {
 
   it("sorts results by score descending", async () => {
     const r = new FederatedConnectorRegistry();
-    r.register(new NullSearchConnector({
-      id: "a",
-      results: [makeResult("1", "Low", "a", 0.2), makeResult("2", "High", "a", 0.9)],
-    }));
+    r.register(
+      new NullSearchConnector({
+        id: "a",
+        results: [makeResult("1", "Low", "a", 0.2), makeResult("2", "High", "a", 0.9)],
+      }),
+    );
     const res = await r.search({ query: "q" });
     expect(res.results[0]!.score).toBeGreaterThanOrEqual(res.results[1]!.score!);
   });
@@ -142,14 +148,18 @@ describe("FederatedConnectorRegistry.search()", () => {
 
   it("deduplicates by url", async () => {
     const r = new FederatedConnectorRegistry();
-    r.register(new NullSearchConnector({
-      id: "a",
-      results: [{ ...makeResult("1", "Doc"), url: "https://example.com/doc" }],
-    }));
-    r.register(new NullSearchConnector({
-      id: "b",
-      results: [{ ...makeResult("2", "Doc Copy"), url: "https://example.com/doc" }],
-    }));
+    r.register(
+      new NullSearchConnector({
+        id: "a",
+        results: [{ ...makeResult("1", "Doc"), url: "https://example.com/doc" }],
+      }),
+    );
+    r.register(
+      new NullSearchConnector({
+        id: "b",
+        results: [{ ...makeResult("2", "Doc Copy"), url: "https://example.com/doc" }],
+      }),
+    );
     const res = await r.search({ query: "q", dedupBy: "url" });
     expect(res.results).toHaveLength(1);
   });
@@ -177,7 +187,9 @@ describe("FederatedConnectorRegistry.search()", () => {
 
   it("times out slow connectors and records error", async () => {
     const r = new FederatedConnectorRegistry();
-    r.register(new NullSearchConnector({ id: "slow", delayMs: 200, results: [makeResult("1", "Late")] }));
+    r.register(
+      new NullSearchConnector({ id: "slow", delayMs: 200, results: [makeResult("1", "Late")] }),
+    );
     const res = await r.search({ query: "q", timeoutMs: 50 });
     expect(res.errors).toHaveLength(1);
     expect(res.errors[0]!.error).toMatch(/timed out/i);

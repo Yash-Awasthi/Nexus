@@ -69,20 +69,14 @@ describe("EventFilter", () => {
   });
 
   it("and returns true only when all predicates pass", () => {
-    const f = EventFilter.and(
-      EventFilter.bySession("s1"),
-      EventFilter.byType("heartbeat"),
-    );
+    const f = EventFilter.and(EventFilter.bySession("s1"), EventFilter.byType("heartbeat"));
     expect(f(makeEvent("s1", { type: "heartbeat" }))).toBe(true);
     expect(f(makeEvent("s2", { type: "heartbeat" }))).toBe(false);
     expect(f(makeEvent("s1", { type: "error" } as any))).toBe(false);
   });
 
   it("or returns true when any predicate passes", () => {
-    const f = EventFilter.or(
-      EventFilter.byType("heartbeat"),
-      EventFilter.byType("error"),
-    );
+    const f = EventFilter.or(EventFilter.byType("heartbeat"), EventFilter.byType("error"));
     expect(f(makeEvent("s1", { type: "heartbeat" }))).toBe(true);
     expect(f(makeEvent("s1", { type: "error" } as any))).toBe(true);
     expect(f(makeEvent("s1", { type: "new_prompt" } as any))).toBe(false);
@@ -162,7 +156,9 @@ describe("EventChannel", () => {
   it("publish assigns sessionId and id automatically", () => {
     const ch = new EventChannel("session-X");
     let ev: WorkerEvent | null = null;
-    ch.subscribe((e) => { ev = e; });
+    ch.subscribe((e) => {
+      ev = e;
+    });
     ch.publish({ type: "heartbeat", uptimeMs: 0 } as any);
     expect(ev!.sessionId).toBe("session-X");
     expect(ev!.id).toBe("1");
@@ -243,8 +239,12 @@ describe("EventChannel", () => {
   it("subscriber errors do not prevent other subscribers from receiving", () => {
     const ch = new EventChannel("s");
     let second = false;
-    ch.subscribe(() => { throw new Error("subscriber crash"); });
-    ch.subscribe(() => { second = true; });
+    ch.subscribe(() => {
+      throw new Error("subscriber crash");
+    });
+    ch.subscribe(() => {
+      second = true;
+    });
     ch.publish({ type: "heartbeat", uptimeMs: 0 } as any);
     expect(second).toBe(true);
   });
@@ -255,7 +255,9 @@ describe("EventChannel", () => {
 describe("SessionEventBroadcaster", () => {
   let broadcaster: SessionEventBroadcaster;
 
-  beforeEach(() => { broadcaster = new SessionEventBroadcaster(); });
+  beforeEach(() => {
+    broadcaster = new SessionEventBroadcaster();
+  });
 
   it("channel creates and returns same instance", () => {
     const ch1 = broadcaster.channel("s1");

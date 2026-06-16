@@ -13,7 +13,7 @@ import { probeFlociHealth } from "./floci-client.js";
 import { dispatchExtendedAction, EXTENDED_FLOCI_ACTIONS } from "./floci-extended.js";
 import type { IRuntimePersistence } from "./interfaces/persistence.interface.js";
 
-export interface FlociAdapterOptions {
+interface FlociAdapterOptions {
   /** Reject tasks that reference unregistered Floci services when true (default: false). */
   strict?: boolean;
   /** Optional persistence layer for recording Floci operation outcomes. */

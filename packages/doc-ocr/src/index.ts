@@ -15,6 +15,7 @@
 
 export type OcrStatus = "success" | "partial" | "failed" | "skipped";
 
+/** Ocr result interface definition. */
 export interface OcrResult {
   id: string;
   sourceId: string; // e.g. file path or URL
@@ -27,13 +28,15 @@ export interface OcrResult {
   metadata: Record<string, unknown>;
 }
 
+/** Extracted date interface definition. */
 export interface ExtractedDate {
-  raw: string;      // original string in text
-  iso: string;      // normalised ISO 8601
+  raw: string; // original string in text
+  iso: string; // normalised ISO 8601
   confidence: number;
   position: number; // character index in text
 }
 
+/** Archive signal type type alias. */
 export type ArchiveSignalType =
   | "contains_date"
   | "references_entity"
@@ -43,12 +46,14 @@ export type ArchiveSignalType =
   | "letterhead"
   | "legal_reference";
 
+/** Archive signal interface definition. */
 export interface ArchiveSignal {
   type: ArchiveSignalType;
   value: string;
   confidence: number;
 }
 
+/** Pipeline result interface definition. */
 export interface PipelineResult {
   ocr: OcrResult;
   dates: ExtractedDate[];
@@ -59,12 +64,15 @@ export interface PipelineResult {
 // ── ID util ───────────────────────────────────────────────────────────────────
 
 let _seq = 0;
-function uid() { return `ocr-${Date.now()}-${++_seq}`; }
+function uid() {
+  return `ocr-${Date.now()}-${++_seq}`;
+}
 
 // ── OcrEngine ─────────────────────────────────────────────────────────────────
 
 export type OcrFn = (sourceId: string, data: Uint8Array | string) => Promise<Omit<OcrResult, "id">>;
 
+/** Ocr engine. */
 export class OcrEngine {
   private fn: OcrFn;
   readonly name: string;
@@ -107,7 +115,7 @@ export class MockOcrEngine extends OcrEngine {
 
 // ── DateExtractor ─────────────────────────────────────────────────────────────
 
-const DATE_PATTERNS: Array<{ re: RegExp; parse: (m: RegExpMatchArray) => string | null }> = [
+const DATE_PATTERNS: { re: RegExp; parse: (m: RegExpMatchArray) => string | null }[] = [
   // ISO: 2024-01-15
   {
     re: /\b(\d{4})-(\d{2})-(\d{2})\b/g,
@@ -130,9 +138,18 @@ const DATE_PATTERNS: Array<{ re: RegExp; parse: (m: RegExpMatchArray) => string 
     re: /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})\b/gi,
     parse: (m) => {
       const months: Record<string, string> = {
-        january: "01", february: "02", march: "03", april: "04",
-        may: "05", june: "06", july: "07", august: "08",
-        september: "09", october: "10", november: "11", december: "12",
+        january: "01",
+        february: "02",
+        march: "03",
+        april: "04",
+        may: "05",
+        june: "06",
+        july: "07",
+        august: "08",
+        september: "09",
+        october: "10",
+        november: "11",
+        december: "12",
       };
       const mo = months[m[1]!.toLowerCase()] ?? "01";
       return `${m[3]}-${mo}-${String(parseInt(m[2]!, 10)).padStart(2, "0")}`;
@@ -143,8 +160,18 @@ const DATE_PATTERNS: Array<{ re: RegExp; parse: (m: RegExpMatchArray) => string 
     re: /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+(\d{1,2}),?\s+(\d{4})\b/gi,
     parse: (m) => {
       const months: Record<string, string> = {
-        jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
-        jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
+        jan: "01",
+        feb: "02",
+        mar: "03",
+        apr: "04",
+        may: "05",
+        jun: "06",
+        jul: "07",
+        aug: "08",
+        sep: "09",
+        oct: "10",
+        nov: "11",
+        dec: "12",
       };
       const mo = months[m[1]!.toLowerCase().replace(".", "")] ?? "01";
       return `${m[3]}-${mo}-${String(parseInt(m[2]!, 10)).padStart(2, "0")}`;
@@ -152,6 +179,7 @@ const DATE_PATTERNS: Array<{ re: RegExp; parse: (m: RegExpMatchArray) => string 
   },
 ];
 
+/** Date extractor. */
 export class DateExtractor {
   extract(text: string): ExtractedDate[] {
     const results: ExtractedDate[] = [];
@@ -184,15 +212,32 @@ export class DateExtractor {
 
 // ── ArchiveSignalDetector ─────────────────────────────────────────────────────
 
-const SIGNAL_PATTERNS: Array<{ type: ArchiveSignalType; re: RegExp; confidence: number }> = [
+const SIGNAL_PATTERNS: { type: ArchiveSignalType; re: RegExp; confidence: number }[] = [
   { type: "invoice_number", re: /\b(invoice|inv\.?|bill)\s*#?\s*(\w{4,})/gi, confidence: 0.9 },
   { type: "legal_reference", re: /\b(section|§|clause|article|act)\s+\d+/gi, confidence: 0.85 },
-  { type: "official_stamp", re: /\b(notarized|certified|official|registered|stamped)\b/gi, confidence: 0.8 },
-  { type: "signature_line", re: /\b(signature|signed by|authorised by|authorized by)\b/gi, confidence: 0.75 },
-  { type: "letterhead", re: /\b(re:|subject:|dear\s+\w+|sincerely|yours faithfully)\b/gi, confidence: 0.7 },
-  { type: "references_entity", re: /\b(company|corp\.?|ltd\.?|inc\.?|llc|plc)\b/gi, confidence: 0.65 },
+  {
+    type: "official_stamp",
+    re: /\b(notarized|certified|official|registered|stamped)\b/gi,
+    confidence: 0.8,
+  },
+  {
+    type: "signature_line",
+    re: /\b(signature|signed by|authorised by|authorized by)\b/gi,
+    confidence: 0.75,
+  },
+  {
+    type: "letterhead",
+    re: /\b(re:|subject:|dear\s+\w+|sincerely|yours faithfully)\b/gi,
+    confidence: 0.7,
+  },
+  {
+    type: "references_entity",
+    re: /\b(company|corp\.?|ltd\.?|inc\.?|llc|plc)\b/gi,
+    confidence: 0.65,
+  },
 ];
 
+/** Archive signal detector. */
 export class ArchiveSignalDetector {
   detect(text: string): ArchiveSignal[] {
     const signals: ArchiveSignal[] = [];
@@ -211,7 +256,8 @@ export class ArchiveSignalDetector {
   /** Compute an aggregate archive score from 0-1. */
   computeScore(signals: ArchiveSignal[], dates: ExtractedDate[]): number {
     const dateBonus = Math.min(dates.length * 0.1, 0.3);
-    const signalScore = signals.reduce((sum, s) => sum + s.confidence, 0) / Math.max(signals.length, 1);
+    const signalScore =
+      signals.reduce((sum, s) => sum + s.confidence, 0) / Math.max(signals.length, 1);
     return Math.min((signalScore * 0.7 + dateBonus) * (signals.length > 0 ? 1 : 0.2), 1);
   }
 }
@@ -245,12 +291,14 @@ export interface BatchJob {
   data?: Uint8Array | string;
 }
 
+/** Batch result interface definition. */
 export interface BatchResult {
   sourceId: string;
   result?: PipelineResult;
   error?: string;
 }
 
+/** Ocr batch processor. */
 export class OcrBatchProcessor {
   private pipeline: OcrPipeline;
   private concurrency: number;

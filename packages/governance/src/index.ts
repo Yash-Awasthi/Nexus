@@ -26,6 +26,7 @@ export interface TaskGovernanceMetadata {
   maxExecutionMs?: number;
 }
 
+/** I task synthesis result interface definition. */
 export interface ITaskSynthesisResult {
   taskId: string;
   serverName?: string;
@@ -38,6 +39,7 @@ export interface ITaskSynthesisResult {
   governanceMetadata?: TaskGovernanceMetadata;
 }
 
+/** I cognitive trace interface definition. */
 export interface ICognitiveTrace {
   planId: string;
   objective: string;
@@ -45,17 +47,20 @@ export interface ICognitiveTrace {
   timestamp: Date;
 }
 
+/** I execution constraint interface definition. */
 export interface IExecutionConstraint {
   name: string;
   validate(task: ITaskSynthesisResult): { success: boolean; reason?: string };
 }
 
+/** I execution policy interface definition. */
 export interface IExecutionPolicy {
   name: string;
   requiresApproval(task: ITaskSynthesisResult): boolean;
   validate(task: ITaskSynthesisResult): { success: boolean; reason?: string };
 }
 
+/** I runtime guardrail interface definition. */
 export interface IRuntimeGuardrail {
   name: string;
   check(
@@ -64,6 +69,7 @@ export interface IRuntimeGuardrail {
   ): { success: boolean; reason?: string };
 }
 
+/** I governance engine interface definition. */
 export interface IGovernanceEngine {
   registerConstraint(constraint: IExecutionConstraint): void;
   registerPolicy(policy: IExecutionPolicy): void;
@@ -93,6 +99,7 @@ export class ResourceScopeConstraint implements IExecutionConstraint {
   }
 }
 
+/** Cost budget constraint. */
 export class CostBudgetConstraint implements IExecutionConstraint {
   name = "CostBudgetConstraint";
   private readonly maxTaskCost: number;
@@ -113,6 +120,7 @@ export class CostBudgetConstraint implements IExecutionConstraint {
   }
 }
 
+/** Timeout constraint. */
 export class TimeoutConstraint implements IExecutionConstraint {
   name = "TimeoutConstraint";
   private readonly maxExecutionMs: number;
@@ -147,6 +155,7 @@ export class DangerousOperationPolicy implements IExecutionPolicy {
   }
 }
 
+/** Wildcard permissions policy. */
 export class WildcardPermissionsPolicy implements IExecutionPolicy {
   name = "WildcardPermissionsPolicy";
 
@@ -191,6 +200,7 @@ export class LoopDetectionGuardrail implements IRuntimeGuardrail {
   }
 }
 
+/** Runaway retries guardrail. */
 export class RunawayRetriesGuardrail implements IRuntimeGuardrail {
   name = "RunawayRetriesGuardrail";
   private readonly maxRetries: number;
@@ -216,6 +226,7 @@ export class RunawayRetriesGuardrail implements IRuntimeGuardrail {
   }
 }
 
+/** Task graph limit guardrail. */
 export class TaskGraphLimitGuardrail implements IRuntimeGuardrail {
   name = "TaskGraphLimitGuardrail";
   private readonly maxTasks: number;
@@ -235,6 +246,7 @@ export class TaskGraphLimitGuardrail implements IRuntimeGuardrail {
   }
 }
 
+/** High cost plan guardrail. */
 export class HighCostPlanGuardrail implements IRuntimeGuardrail {
   name = "HighCostPlanGuardrail";
   private readonly maxPlanCost: number;
@@ -255,6 +267,7 @@ export class HighCostPlanGuardrail implements IRuntimeGuardrail {
   }
 }
 
+/** Duplicate action guardrail. */
 export class DuplicateActionGuardrail implements IRuntimeGuardrail {
   name = "DuplicateActionGuardrail";
   private readonly maxDuplicates: number;

@@ -28,19 +28,19 @@ export interface AssistantStep {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const STEP_ICONS: Record<StepType, string> = {
-  thinking:  "◎",
+  thinking: "◎",
   tool_call: "⚙",
-  search:    "⌕",
-  result:    "✓",
-  note:      "◈",
+  search: "⌕",
+  result: "✓",
+  note: "◈",
 };
 
 const STEP_COLORS: Record<StepType, string> = {
-  thinking:  "#64748b",
+  thinking: "#64748b",
   tool_call: "#7c3aed",
-  search:    "#0284c7",
-  result:    "#16a34a",
-  note:      "#d97706",
+  search: "#0284c7",
+  result: "#16a34a",
+  note: "#d97706",
 };
 
 const s = {
@@ -161,12 +161,18 @@ export function AssistantSteps({
   const [open, setOpen] = useState(defaultOpen);
   if (steps.length === 0 && !streaming) return null;
 
-  const summary = label ?? (streaming ? "Thinking…" : `${steps.length} step${steps.length !== 1 ? "s" : ""}`);
+  const summary =
+    label ?? (streaming ? "Thinking…" : `${steps.length} step${steps.length !== 1 ? "s" : ""}`);
 
   return (
     <div style={s.container}>
       {/* Header */}
-      <div style={s.header(open)} onClick={() => setOpen((v) => !v)} role="button" aria-expanded={open}>
+      <div
+        style={s.header(open)}
+        onClick={() => setOpen((v) => !v)}
+        role="button"
+        aria-expanded={open}
+      >
         <span style={s.headerIcon}>{streaming ? <SpinnerDot /> : "◎"}</span>
         <span style={s.headerLabel}>{summary}</span>
         {steps.length > 0 && <span style={s.chevron(open)}>▾</span>}
@@ -182,9 +188,7 @@ export function AssistantSteps({
               </span>
               <div style={s.stepBody}>
                 <div style={s.stepLabel}>{step.label}</div>
-                {step.content && (
-                  <div style={s.stepContent}>{step.content}</div>
-                )}
+                {step.content && <div style={s.stepContent}>{step.content}</div>}
               </div>
               {step.durationMs !== undefined && (
                 <span style={s.stepDuration}>{step.durationMs}ms</span>
@@ -193,7 +197,9 @@ export function AssistantSteps({
           ))}
           {streaming && (
             <div style={{ ...s.step("thinking"), opacity: 0.5 }}>
-              <span style={s.stepIcon("thinking")}><SpinnerDot /></span>
+              <span style={s.stepIcon("thinking")}>
+                <SpinnerDot />
+              </span>
               <div style={s.stepBody}>
                 <div style={s.stepLabel}>Processing…</div>
               </div>

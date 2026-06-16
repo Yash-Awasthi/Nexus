@@ -33,7 +33,9 @@ function makeThread(messages: ChatMessage[]): ChatThread {
 
 describe("ChatHistoryStore — threads", () => {
   let store: ChatHistoryStore;
-  beforeEach(() => { store = new ChatHistoryStore(); });
+  beforeEach(() => {
+    store = new ChatHistoryStore();
+  });
 
   it("creates a thread with auto-generated id", () => {
     const t = store.createThread("My Chat");
@@ -62,7 +64,8 @@ describe("ChatHistoryStore — threads", () => {
   });
 
   it("threadCount reflects created threads", () => {
-    store.createThread(); store.createThread();
+    store.createThread();
+    store.createThread();
     expect(store.threadCount()).toBe(2);
   });
 
@@ -184,9 +187,9 @@ describe("trimToTokenBudget", () => {
 
   it("drops oldest non-system messages to fit budget", () => {
     const msgs = [
-      makeMsg("user",      "A", 20),
+      makeMsg("user", "A", 20),
       makeMsg("assistant", "B", 20),
-      makeMsg("user",      "C", 20),
+      makeMsg("user", "C", 20),
     ];
     const trimmed = trimToTokenBudget(msgs, 25);
     expect(trimmed.length).toBeLessThan(3);
@@ -195,9 +198,9 @@ describe("trimToTokenBudget", () => {
 
   it("never drops system messages", () => {
     const msgs = [
-      makeMsg("system",    "Sys", 5),
-      makeMsg("user",      "A",   50),
-      makeMsg("assistant", "B",   50),
+      makeMsg("system", "Sys", 5),
+      makeMsg("user", "A", 50),
+      makeMsg("assistant", "B", 50),
     ];
     const trimmed = trimToTokenBudget(msgs, 10);
     expect(trimmed.some((m) => m.role === "system")).toBe(true);
@@ -215,9 +218,9 @@ describe("trimToTokenBudget", () => {
 describe("analyzeThread", () => {
   it("counts messages by role", () => {
     const thread = makeThread([
-      makeMsg("user",      "Q"),
+      makeMsg("user", "Q"),
       makeMsg("assistant", "A"),
-      makeMsg("user",      "Q2"),
+      makeMsg("user", "Q2"),
     ]);
     const stats = analyzeThread(thread);
     expect(stats.userMessages).toBe(2);
@@ -242,7 +245,10 @@ describe("analyzeThread", () => {
   });
 
   it("provides firstMessage and lastMessage excerpts", () => {
-    const thread = makeThread([makeMsg("user", "First message"), makeMsg("assistant", "Last message")]);
+    const thread = makeThread([
+      makeMsg("user", "First message"),
+      makeMsg("assistant", "Last message"),
+    ]);
     const stats = analyzeThread(thread);
     expect(stats.firstMessage).toContain("First");
     expect(stats.lastMessage).toContain("Last");

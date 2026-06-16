@@ -6,7 +6,9 @@ import { MessageTree, BranchManager } from "../src/index.js";
 
 describe("MessageTree — add / get", () => {
   let tree: MessageTree;
-  beforeEach(() => { tree = new MessageTree(); });
+  beforeEach(() => {
+    tree = new MessageTree();
+  });
 
   it("adds root node when no parentId given", () => {
     const n = tree.add({ role: "system", content: "You are helpful" });
@@ -81,9 +83,11 @@ describe("MessageTree — pathTo", () => {
   beforeEach(() => {
     tree = new MessageTree();
     const root = tree.add({ role: "system", content: "sys" });
-    const mid  = tree.add({ role: "user", content: "Q" }, root.id);
+    const mid = tree.add({ role: "user", content: "Q" }, root.id);
     const leaf = tree.add({ role: "assistant", content: "A" }, mid.id);
-    rootId = root.id; midId = mid.id; leafId = leaf.id;
+    rootId = root.id;
+    midId = mid.id;
+    leafId = leaf.id;
   });
 
   it("returns path from root to leaf", () => {
@@ -103,8 +107,8 @@ describe("MessageTree — leaves + level", () => {
   it("leaves() returns nodes with no children", () => {
     const tree = new MessageTree();
     const root = tree.add({ role: "user", content: "root" });
-    const a    = tree.add({ role: "assistant", content: "a" }, root.id);
-    const b    = tree.add({ role: "assistant", content: "b" }, root.id);
+    const a = tree.add({ role: "assistant", content: "a" }, root.id);
+    const b = tree.add({ role: "assistant", content: "b" }, root.id);
     const leaves = tree.leaves();
     expect(leaves.map((l) => l.id)).toContain(a.id);
     expect(leaves.map((l) => l.id)).toContain(b.id);
@@ -125,7 +129,7 @@ describe("MessageTree — fork", () => {
   it("creates a new tree with the ancestor chain", () => {
     const tree = new MessageTree();
     const root = tree.add({ role: "system", content: "sys" });
-    const mid  = tree.add({ role: "user", content: "Q" }, root.id);
+    const mid = tree.add({ role: "user", content: "Q" }, root.id);
     const leaf = tree.add({ role: "assistant", content: "A" }, mid.id);
 
     const forked = tree.fork(leaf.id);
@@ -161,7 +165,9 @@ describe("MessageTree — snapshot / fromSnapshot", () => {
 describe("BranchManager", () => {
   let mgr: BranchManager;
 
-  beforeEach(() => { mgr = new BranchManager(); });
+  beforeEach(() => {
+    mgr = new BranchManager();
+  });
 
   it("creates and retrieves a branch", () => {
     const b = mgr.create("main", "node-1");

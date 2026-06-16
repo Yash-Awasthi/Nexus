@@ -28,6 +28,7 @@ export type AuthErrorCode =
   | "EXPIRED_TOKEN"
   | "INSUFFICIENT_ROLE";
 
+/** Auth error. */
 export class AuthError extends Error {
   readonly code: AuthErrorCode;
   readonly httpStatus: number;
@@ -44,6 +45,7 @@ export class AuthError extends Error {
 
 export type NexusRole = "admin" | "agent" | "read-only";
 
+/** Nexus token payload interface definition. */
 export interface NexusTokenPayload {
   sub: string;
   role: NexusRole;

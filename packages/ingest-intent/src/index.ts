@@ -25,19 +25,21 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface DistillOptions {
-  maxInputChars?: number;    // default 20_000
-  maxOutputTerms?: number;   // default 200
-  failOpen?: boolean;        // default true → return null on failure
+  maxInputChars?: number; // default 20_000
+  maxOutputTerms?: number; // default 200
+  failOpen?: boolean; // default true → return null on failure
 }
 
+/** Distill result interface definition. */
 export interface DistillResult {
-  query: string | null;       // null = fail-open
+  query: string | null; // null = fail-open
   termCount: number;
   inputChars: number;
   truncated: boolean;
   source: "llm" | "fallback" | "null";
 }
 
+/** Llm distill fn type alias. */
 export type LlmDistillFn = (prompt: string) => Promise<string>;
 
 // ── DocumentChunker ───────────────────────────────────────────────────────────
@@ -52,14 +54,60 @@ export class DocumentChunker {
 // ── TermNormalizer ────────────────────────────────────────────────────────────
 
 const STOP_WORDS = new Set([
-  "a", "an", "and", "are", "as", "at", "be", "been", "but", "by",
-  "do", "for", "from", "has", "have", "he", "her", "his", "how", "i",
-  "if", "in", "is", "it", "its", "of", "on", "or", "our", "she",
-  "so", "some", "that", "the", "their", "there", "they", "this", "to",
-  "was", "we", "were", "what", "when", "where", "which", "who", "will",
-  "with", "you", "your",
+  "a",
+  "an",
+  "and",
+  "are",
+  "as",
+  "at",
+  "be",
+  "been",
+  "but",
+  "by",
+  "do",
+  "for",
+  "from",
+  "has",
+  "have",
+  "he",
+  "her",
+  "his",
+  "how",
+  "i",
+  "if",
+  "in",
+  "is",
+  "it",
+  "its",
+  "of",
+  "on",
+  "or",
+  "our",
+  "she",
+  "so",
+  "some",
+  "that",
+  "the",
+  "their",
+  "there",
+  "they",
+  "this",
+  "to",
+  "was",
+  "we",
+  "were",
+  "what",
+  "when",
+  "where",
+  "which",
+  "who",
+  "will",
+  "with",
+  "you",
+  "your",
 ]);
 
+/** Term normalizer. */
 export class TermNormalizer {
   normalize(text: string, maxTerms: number): string[] {
     const raw = text
@@ -72,7 +120,10 @@ export class TermNormalizer {
     const seen = new Set<string>();
     const unique: string[] = [];
     for (const t of raw) {
-      if (!seen.has(t)) { seen.add(t); unique.push(t); }
+      if (!seen.has(t)) {
+        seen.add(t);
+        unique.push(t);
+      }
       if (unique.length >= maxTerms) break;
     }
     return unique;
@@ -128,7 +179,8 @@ export class MockLlmDistiller {
 
 // ── IntentDistiller ───────────────────────────────────────────────────────────
 
-const DISTILL_PROMPT_TEMPLATE = (text: string, maxTerms: number) => `
+const DISTILL_PROMPT_TEMPLATE = (text: string, maxTerms: number) =>
+  `
 You are a BM25 query distiller. Extract the most important search terms from the document below.
 Output ONLY a space-separated list of terms, no punctuation, no explanations.
 Maximum ${maxTerms} terms. Focus on nouns, entities, technical terms, and key concepts.
@@ -138,6 +190,7 @@ ${text}
 
 Terms:`.trim();
 
+/** Intent distiller. */
 export class IntentDistiller {
   private llm?: LlmDistillFn;
   private opts: Required<DistillOptions>;
@@ -147,9 +200,9 @@ export class IntentDistiller {
 
   constructor(opts: DistillOptions = {}) {
     this.opts = {
-      maxInputChars:  opts.maxInputChars  ?? 20_000,
+      maxInputChars: opts.maxInputChars ?? 20_000,
       maxOutputTerms: opts.maxOutputTerms ?? 200,
-      failOpen:       opts.failOpen       ?? true,
+      failOpen: opts.failOpen ?? true,
     };
   }
 

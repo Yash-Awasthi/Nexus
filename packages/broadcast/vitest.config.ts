@@ -5,6 +5,10 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["tests/**/*.test.ts", "src/**/*.test.ts"],
-    coverage: { provider: "v8", reporter: ["text", "lcov"], thresholds: { lines: 70, functions: 98, branches: 70, statements: 70 } },
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "lcov"],
+      thresholds: { lines: 70, functions: 98, branches: 70, statements: 70 },
+    },
   },
 });

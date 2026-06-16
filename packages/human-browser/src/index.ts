@@ -15,8 +15,13 @@
 
 export type ActionType = "move" | "click" | "type" | "scroll" | "wait" | "focus" | "blur";
 
-export interface Point { x: number; y: number; }
+/** Point interface definition. */
+export interface Point {
+  x: number;
+  y: number;
+}
 
+/** Browser action interface definition. */
 export interface BrowserAction {
   type: ActionType;
   payload: Record<string, unknown>;
@@ -33,6 +38,8 @@ export interface TimingOptions {
   jitter?: number;
 }
 
+/** Human timing. */
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class HumanTiming {
   /**
    * Return a human-like delay between minMs and maxMs with optional jitter.
@@ -69,6 +76,7 @@ export interface MouseMove {
   durationMs: number;
 }
 
+/** Mouse simulator. */
 export class MouseSimulator {
   private rng: () => number;
 
@@ -123,6 +131,7 @@ export interface TypingResult {
   errors: number;
 }
 
+/** Keyboard simulator. */
 export class KeyboardSimulator {
   private rng: () => number;
   private wpm: number;
@@ -180,6 +189,7 @@ export interface ScrollChunk {
   delayMs: number;
 }
 
+/** Scroll simulator. */
 export class ScrollSimulator {
   private rng: () => number;
 
@@ -194,7 +204,10 @@ export class ScrollSimulator {
     const sign = totalDelta >= 0 ? 1 : -1;
 
     while (remaining > 0) {
-      const chunk = Math.min(remaining, chunkSize + Math.round((this.rng() - 0.5) * chunkSize * 0.3));
+      const chunk = Math.min(
+        remaining,
+        chunkSize + Math.round((this.rng() - 0.5) * chunkSize * 0.3),
+      );
       chunks.push({
         deltaY: sign * chunk,
         delayMs: HumanTiming.delay({ minMs: 40, maxMs: 120 }, this.rng),
@@ -263,7 +276,9 @@ export class BrowserSession {
     return this;
   }
 
-  getActions(): BrowserAction[] { return [...this.actions]; }
+  getActions(): BrowserAction[] {
+    return [...this.actions];
+  }
 
   totalDuration(): number {
     return this.actions.reduce((sum, a) => sum + a.delayMs, 0);
@@ -279,6 +294,7 @@ export class BrowserSession {
 
 export type ExecutorFn = (action: BrowserAction) => Promise<void> | void;
 
+/** Playback result interface definition. */
 export interface PlaybackResult {
   total: number;
   executed: number;
@@ -286,6 +302,7 @@ export interface PlaybackResult {
   durationMs: number;
 }
 
+/** Action player. */
 export class ActionPlayer {
   private executor: ExecutorFn;
 

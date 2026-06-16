@@ -43,7 +43,9 @@ describe("PluginRunner", () => {
   it("records plugin error without throwing", async () => {
     const broken: DocPlugin = {
       name: "broken",
-      process: async () => { throw new Error("boom"); },
+      process: async () => {
+        throw new Error("boom");
+      },
     };
     const runner = new PluginRunner([broken, new WordCountPlugin()]);
     const result = await runner.run(makeDoc("Some text"));
@@ -144,7 +146,9 @@ describe("DateExtractionPlugin", () => {
 
   it("detectedDates have raw and iso fields", async () => {
     const ann = await plugin.process(doc("2026-06-14"), {});
-    const meta = ann["date-extraction"] as { detectedDates: Array<{ raw: string; iso: string; offset: number }> };
+    const meta = ann["date-extraction"] as {
+      detectedDates: Array<{ raw: string; iso: string; offset: number }>;
+    };
     expect(meta.detectedDates[0]?.raw).toBeTruthy();
     expect(meta.detectedDates[0]?.iso).toBeTruthy();
   });
@@ -238,8 +242,13 @@ describe("EntityTagPlugin", () => {
   });
 
   it("deduplicates identical entities", async () => {
-    const ann = await plugin.process(makeDoc("Email alice@example.com and also alice@example.com again"), {});
-    const emails = (ann.entities ?? []).filter((e) => e.type === "EMAIL" && e.text === "alice@example.com");
+    const ann = await plugin.process(
+      makeDoc("Email alice@example.com and also alice@example.com again"),
+      {},
+    );
+    const emails = (ann.entities ?? []).filter(
+      (e) => e.type === "EMAIL" && e.text === "alice@example.com",
+    );
     expect(emails.length).toBe(1);
   });
 

@@ -49,11 +49,13 @@ export interface MemoryEntry {
   importance?: number;
 }
 
+/** Memory search result interface definition. */
 export interface MemorySearchResult {
   entry: MemoryEntry;
   score: number; // cosine similarity 0–1
 }
 
+/** Memory filter interface definition. */
 export interface MemoryFilter {
   metadata?: Record<string, unknown>;
   excludeExpired?: boolean;
@@ -92,6 +94,7 @@ function magnitude(v: number[]): number {
   return Math.sqrt(v.reduce((s, x) => s + x * x, 0));
 }
 
+/** Cosine similarity. */
 export function cosineSimilarity(a: number[], b: number[]): number {
   const magA = magnitude(a);
   const magB = magnitude(b);
@@ -250,11 +253,7 @@ export class RagtimeRetriever {
    * Stage 1: Vector recall — fetch poolSize candidates by cosine similarity.
    * Stage 2: Rerank — apply composite score; return finalK.
    */
-  async retrieve(
-    query: string,
-    k?: number,
-    filter?: MemoryFilter,
-  ): Promise<RagtimeResult[]> {
+  async retrieve(query: string, k?: number, filter?: MemoryFilter): Promise<RagtimeResult[]> {
     const finalK = k ?? this.finalK;
 
     // Stage 1 — embed query and recall pool
@@ -273,7 +272,8 @@ export class RagtimeRetriever {
 
     // Stage 2 — rerank by composite score
     const scored: RagtimeResult[] = pool.map(({ entry, score: relevance }) => {
-      const importance = (entry.importance ?? (entry.metadata["importance"] as number | undefined) ?? 0.5);
+      const importance =
+        entry.importance ?? (entry.metadata["importance"] as number | undefined) ?? 0.5;
       const ageSeconds = Math.max(0, nowSeconds - entry.createdAt);
       const ageHours = ageSeconds / 3600;
       const recencyDecay = Math.exp(-config.recencyDecayRate * ageHours);
@@ -306,7 +306,8 @@ export class RagtimeRetriever {
     };
 
     const scored: RagtimeResult[] = pool.map(({ entry, score: relevance }) => {
-      const importance = (entry.importance ?? (entry.metadata["importance"] as number | undefined) ?? 0.5);
+      const importance =
+        entry.importance ?? (entry.metadata["importance"] as number | undefined) ?? 0.5;
       const ageSeconds = Math.max(0, nowSeconds - entry.createdAt);
       const ageHours = ageSeconds / 3600;
       const recencyDecay = Math.exp(-config.recencyDecayRate * ageHours);

@@ -21,6 +21,7 @@ export type DocCategory =
   | "general"
   | string;
 
+/** Classification result interface definition. */
 export interface ClassificationResult {
   category: DocCategory;
   confidence: number; // [0, 1]
@@ -29,6 +30,7 @@ export interface ClassificationResult {
   classifiedAt: string;
 }
 
+/** Classifier rule interface definition. */
 export interface ClassifierRule {
   name: string;
   category: DocCategory;
@@ -40,6 +42,7 @@ export interface ClassifierRule {
   weight?: number;
 }
 
+/** Classifier interface definition. */
 export interface Classifier {
   classify(content: string): ClassificationResult;
 }
@@ -50,49 +53,123 @@ export const DEFAULT_RULES: ClassifierRule[] = [
   {
     name: "technical-code",
     category: "technical",
-    keywords: ["function", "class", "import", "export", "interface", "async", "await", "const", "variable"],
+    keywords: [
+      "function",
+      "class",
+      "import",
+      "export",
+      "interface",
+      "async",
+      "await",
+      "const",
+      "variable",
+    ],
     patterns: [/```[\w]*\n/, /\bAPI\b/, /\bendpoint\b/i],
     weight: 1.2,
   },
   {
     name: "legal-contract",
     category: "legal",
-    keywords: ["agreement", "clause", "liability", "indemnify", "warrant", "jurisdiction", "plaintiff", "defendant", "hereby"],
+    keywords: [
+      "agreement",
+      "clause",
+      "liability",
+      "indemnify",
+      "warrant",
+      "jurisdiction",
+      "plaintiff",
+      "defendant",
+      "hereby",
+    ],
     patterns: [/\bwhereas\b/i, /\bpursuant to\b/i, /\bterms and conditions\b/i],
     weight: 1.3,
   },
   {
     name: "financial-report",
     category: "financial",
-    keywords: ["revenue", "profit", "loss", "balance", "assets", "liabilities", "equity", "cash flow", "EBITDA", "fiscal"],
+    keywords: [
+      "revenue",
+      "profit",
+      "loss",
+      "balance",
+      "assets",
+      "liabilities",
+      "equity",
+      "cash flow",
+      "EBITDA",
+      "fiscal",
+    ],
     patterns: [/\$[\d,]+/, /\d+%\s+(?:growth|decline|increase|decrease)/i],
     weight: 1.2,
   },
   {
     name: "marketing-copy",
     category: "marketing",
-    keywords: ["brand", "campaign", "audience", "conversion", "funnel", "CTA", "engagement", "ROI", "impressions", "click-through"],
+    keywords: [
+      "brand",
+      "campaign",
+      "audience",
+      "conversion",
+      "funnel",
+      "CTA",
+      "engagement",
+      "ROI",
+      "impressions",
+      "click-through",
+    ],
     patterns: [/\bcall to action\b/i, /\blead generation\b/i],
     weight: 1.0,
   },
   {
     name: "hr-policy",
     category: "hr",
-    keywords: ["employee", "onboarding", "performance", "benefits", "PTO", "vacation", "salary", "compensation", "recruiter", "interview"],
+    keywords: [
+      "employee",
+      "onboarding",
+      "performance",
+      "benefits",
+      "PTO",
+      "vacation",
+      "salary",
+      "compensation",
+      "recruiter",
+      "interview",
+    ],
     patterns: [/\bhuman resources\b/i, /\bcode of conduct\b/i],
     weight: 1.0,
   },
   {
     name: "research-paper",
     category: "research",
-    keywords: ["abstract", "hypothesis", "methodology", "experiment", "findings", "conclusion", "citation", "references", "dataset"],
+    keywords: [
+      "abstract",
+      "hypothesis",
+      "methodology",
+      "experiment",
+      "findings",
+      "conclusion",
+      "citation",
+      "references",
+      "dataset",
+    ],
     patterns: [/\bet al\./i, /\bp\s*[<>]\s*0\.\d+/],
     weight: 1.1,
   },
   {
     name: "support-ticket",
     category: "support",
-    keywords: ["issue", "bug", "error", "ticket", "resolved", "customer", "request", "workaround", "priority", "escalate"],
+    keywords: [
+      "issue",
+      "bug",
+      "error",
+      "ticket",
+      "resolved",
+      "customer",
+      "request",
+      "workaround",
+      "priority",
+      "escalate",
+    ],
     patterns: [/\bticket\s*#?\d+\b/i, /\bseverity\s*:\s*(low|medium|high|critical)\b/i],
     weight: 1.0,
   },
@@ -192,13 +269,15 @@ export class ClassifierPipeline {
         best = result;
       }
     }
-    return best ?? {
-      category: "general",
-      confidence: 0,
-      matchedRules: [],
-      durationMs: 0,
-      classifiedAt: new Date().toISOString(),
-    };
+    return (
+      best ?? {
+        category: "general",
+        confidence: 0,
+        matchedRules: [],
+        durationMs: 0,
+        classifiedAt: new Date().toISOString(),
+      }
+    );
   }
 }
 

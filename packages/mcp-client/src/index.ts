@@ -88,12 +88,14 @@ export interface McpInputSchema {
   description?: string;
 }
 
+/** Mcp tool definition interface definition. */
 export interface McpToolDefinition {
   name: string;
   description?: string;
   inputSchema: McpInputSchema;
 }
 
+/** Mcp call content interface definition. */
 export interface McpCallContent {
   type: "text" | "image" | "resource";
   text?: string;
@@ -102,6 +104,7 @@ export interface McpCallContent {
   uri?: string;
 }
 
+/** Mcp call result interface definition. */
 export interface McpCallResult {
   content: McpCallContent[];
   isError?: boolean;
@@ -109,6 +112,7 @@ export interface McpCallResult {
   text: string;
 }
 
+/** Mcp resource entry interface definition. */
 export interface McpResourceEntry {
   uri: string;
   name?: string;
@@ -116,6 +120,7 @@ export interface McpResourceEntry {
   mimeType?: string;
 }
 
+/** Mcp resource content interface definition. */
 export interface McpResourceContent {
   uri: string;
   mimeType?: string;
@@ -123,6 +128,7 @@ export interface McpResourceContent {
   blob?: string;
 }
 
+/** Mcp server info interface definition. */
 export interface McpServerInfo {
   name: string;
   version: string;
@@ -135,6 +141,7 @@ export interface McpTransport {
   send(method: string, params?: unknown): Promise<unknown>;
 }
 
+/** Mcp http transport. */
 export class McpHttpTransport implements McpTransport {
   private readonly url: string;
   private readonly headers: Record<string, string>;
@@ -185,11 +192,10 @@ export class McpHttpTransport implements McpTransport {
       const response = (await res.json()) as JsonRpcResponse;
 
       if (isError(response)) {
-        throw new McpClientError(
-          response.error.message,
-          "RPC_ERROR",
-          { code: response.error.code, data: response.error.data },
-        );
+        throw new McpClientError(response.error.message, "RPC_ERROR", {
+          code: response.error.code,
+          data: response.error.data,
+        });
       }
 
       return (response as JsonRpcSuccess).result;
@@ -209,6 +215,7 @@ export interface McpClientConfig {
   timeoutMs?: number;
 }
 
+/** Mcp client. */
 export class McpClient {
   private readonly transport: McpTransport;
   private _serverInfo?: McpServerInfo;
@@ -244,13 +251,23 @@ export class McpClient {
     })) as Record<string, unknown>;
 
     this._serverInfo = {
-      name: String(result["serverInfo"] ? (result["serverInfo"] as Record<string, unknown>)["name"] ?? "" : ""),
-      version: String(result["serverInfo"] ? (result["serverInfo"] as Record<string, unknown>)["version"] ?? "" : ""),
+      name: String(
+        result["serverInfo"]
+          ? ((result["serverInfo"] as Record<string, unknown>)["name"] ?? "")
+          : "",
+      ),
+      version: String(
+        result["serverInfo"]
+          ? ((result["serverInfo"] as Record<string, unknown>)["version"] ?? "")
+          : "",
+      ),
       protocolVersion: String(result["protocolVersion"] ?? ""),
     };
 
     // Notify server we are ready
-    await this.transport.send("notifications/initialized").catch(() => { /* optional */ });
+    await this.transport.send("notifications/initialized").catch(() => {
+      /* optional */
+    });
     this._initialized = true;
     return this._serverInfo;
   }
@@ -296,9 +313,14 @@ export class McpClient {
 
   /** Read a resource by URI. */
   async readResource(uri: string): Promise<McpResourceContent> {
-    const result = (await this.transport.send("resources/read", { uri })) as Record<string, unknown>;
+    const result = (await this.transport.send("resources/read", { uri })) as Record<
+      string,
+      unknown
+    >;
     const contents = result["contents"];
-    const first = Array.isArray(contents) ? (contents[0] as Record<string, unknown> | undefined) : undefined;
+    const first = Array.isArray(contents)
+      ? (contents[0] as Record<string, unknown> | undefined)
+      : undefined;
     return {
       uri,
       mimeType: String(first?.["mimeType"] ?? "text/plain"),

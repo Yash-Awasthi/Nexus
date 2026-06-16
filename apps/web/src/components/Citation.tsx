@@ -169,9 +169,7 @@ export function CitationCard({ source }: CitationCardProps) {
         <div style={s.cardHeader}>
           <div style={s.cardNum}>{source.id}</div>
           <span style={s.cardTitle}>{source.title}</span>
-          {source.source && (
-            <span style={s.cardSourceBadge}>{source.source}</span>
-          )}
+          {source.source && <span style={s.cardSourceBadge}>{source.source}</span>}
         </div>
         {source.excerpt && <div style={s.cardExcerpt}>{source.excerpt}</div>}
         {source.url && (
@@ -211,9 +209,7 @@ export function CitationList({ sources }: CitationListProps) {
 // ── Text parser ───────────────────────────────────────────────────────────────
 
 /** A segment of parsed text — either plain text or a citation reference. */
-export type TextSegment =
-  | { type: "text"; content: string }
-  | { type: "citation"; num: number };
+export type TextSegment = { type: "text"; content: string } | { type: "citation"; num: number };
 
 /**
  * Parse text containing `[[cite:N]]` markers into alternating text/citation segments.

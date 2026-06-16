@@ -46,7 +46,9 @@ describe("InMemoryQueueLane", () => {
 describe("LaneRegistry", () => {
   let reg: LaneRegistry;
 
-  beforeEach(() => { reg = new LaneRegistry(); });
+  beforeEach(() => {
+    reg = new LaneRegistry();
+  });
 
   it("registers and retrieves a lane", () => {
     const lane = new InMemoryQueueLane("emails");
@@ -93,8 +95,14 @@ describe("AlertPolicy", () => {
 
   const baseMetrics = (overrides = {}) => ({
     name: "test",
-    waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0, stalled: 0,
-    paused: false, unavailable: false,
+    waiting: 0,
+    active: 0,
+    completed: 0,
+    failed: 0,
+    delayed: 0,
+    stalled: 0,
+    paused: false,
+    unavailable: false,
     snapshotAt: "",
     ...overrides,
   });
@@ -210,8 +218,15 @@ describe("HealthAggregator", () => {
     status: "healthy",
     metrics: {
       name,
-      waiting: 0, active: 0, completed: 100, failed: 0, delayed: 0, stalled: 0,
-      paused: false, unavailable: false, snapshotAt: "",
+      waiting: 0,
+      active: 0,
+      completed: 100,
+      failed: 0,
+      delayed: 0,
+      stalled: 0,
+      paused: false,
+      unavailable: false,
+      snapshotAt: "",
     },
     alerts: [],
     latencyMs: 5,
@@ -245,8 +260,34 @@ describe("HealthAggregator", () => {
 
   it("aggregates total waiting and failed", () => {
     const result = agg.aggregate([
-      makeHealth("a", { metrics: { name: "a", waiting: 50, failed: 5, active: 2, completed: 0, delayed: 0, stalled: 0, paused: false, unavailable: false, snapshotAt: "" } }),
-      makeHealth("b", { metrics: { name: "b", waiting: 30, failed: 3, active: 1, completed: 0, delayed: 0, stalled: 0, paused: false, unavailable: false, snapshotAt: "" } }),
+      makeHealth("a", {
+        metrics: {
+          name: "a",
+          waiting: 50,
+          failed: 5,
+          active: 2,
+          completed: 0,
+          delayed: 0,
+          stalled: 0,
+          paused: false,
+          unavailable: false,
+          snapshotAt: "",
+        },
+      }),
+      makeHealth("b", {
+        metrics: {
+          name: "b",
+          waiting: 30,
+          failed: 3,
+          active: 1,
+          completed: 0,
+          delayed: 0,
+          stalled: 0,
+          paused: false,
+          unavailable: false,
+          snapshotAt: "",
+        },
+      }),
     ]);
     expect(result.totalWaiting).toBe(80);
     expect(result.totalFailed).toBe(8);
@@ -262,10 +303,62 @@ describe("HealthAggregator", () => {
 
   it("hotspots returns top K lanes by failures", () => {
     const result = agg.aggregate([
-      makeHealth("a", { metrics: { name: "a", failed: 100, waiting: 0, active: 0, completed: 0, delayed: 0, stalled: 0, paused: false, unavailable: false, snapshotAt: "" } }),
-      makeHealth("b", { metrics: { name: "b", failed: 50, waiting: 0, active: 0, completed: 0, delayed: 0, stalled: 0, paused: false, unavailable: false, snapshotAt: "" } }),
-      makeHealth("c", { metrics: { name: "c", failed: 10, waiting: 0, active: 0, completed: 0, delayed: 0, stalled: 0, paused: false, unavailable: false, snapshotAt: "" } }),
-      makeHealth("d", { metrics: { name: "d", failed: 0, waiting: 0, active: 0, completed: 0, delayed: 0, stalled: 0, paused: false, unavailable: false, snapshotAt: "" } }),
+      makeHealth("a", {
+        metrics: {
+          name: "a",
+          failed: 100,
+          waiting: 0,
+          active: 0,
+          completed: 0,
+          delayed: 0,
+          stalled: 0,
+          paused: false,
+          unavailable: false,
+          snapshotAt: "",
+        },
+      }),
+      makeHealth("b", {
+        metrics: {
+          name: "b",
+          failed: 50,
+          waiting: 0,
+          active: 0,
+          completed: 0,
+          delayed: 0,
+          stalled: 0,
+          paused: false,
+          unavailable: false,
+          snapshotAt: "",
+        },
+      }),
+      makeHealth("c", {
+        metrics: {
+          name: "c",
+          failed: 10,
+          waiting: 0,
+          active: 0,
+          completed: 0,
+          delayed: 0,
+          stalled: 0,
+          paused: false,
+          unavailable: false,
+          snapshotAt: "",
+        },
+      }),
+      makeHealth("d", {
+        metrics: {
+          name: "d",
+          failed: 0,
+          waiting: 0,
+          active: 0,
+          completed: 0,
+          delayed: 0,
+          stalled: 0,
+          paused: false,
+          unavailable: false,
+          snapshotAt: "",
+        },
+      }),
     ]);
     const spots = agg.hotspots(result, 2);
     expect(spots).toHaveLength(2);

@@ -24,7 +24,11 @@ import {
 
 const NOW = 1_700_000_000;
 
-function node(name: string, type: KGNode["type"] = "PERSON", overrides: Partial<KGNode> = {}): KGNode {
+function node(
+  name: string,
+  type: KGNode["type"] = "PERSON",
+  overrides: Partial<KGNode> = {},
+): KGNode {
   return {
     id: makeNodeId(name, type),
     name,
@@ -38,7 +42,12 @@ function node(name: string, type: KGNode["type"] = "PERSON", overrides: Partial<
   };
 }
 
-function edge(subjectId: string, predicate: string, objectId: string, overrides: Partial<KGEdge> = {}): KGEdge {
+function edge(
+  subjectId: string,
+  predicate: string,
+  objectId: string,
+  overrides: Partial<KGEdge> = {},
+): KGEdge {
   return {
     id: makeEdgeId(subjectId, predicate, objectId),
     subjectId,
@@ -52,7 +61,9 @@ function edge(subjectId: string, predicate: string, objectId: string, overrides:
   };
 }
 
-function makeStore(): InMemoryKGStore { return new InMemoryKGStore(); }
+function makeStore(): InMemoryKGStore {
+  return new InMemoryKGStore();
+}
 
 function makeEntities(...names: string[]): Entity[] {
   return names.map((name) => ({ text: name, type: "PERSON" as const, confidence: 0.9 }));
@@ -129,7 +140,9 @@ describe("makeEdgeId", () => {
 
 describe("InMemoryKGStore — nodes", () => {
   let store: InMemoryKGStore;
-  beforeEach(() => { store = makeStore(); });
+  beforeEach(() => {
+    store = makeStore();
+  });
 
   it("upsertNode inserts a new node", async () => {
     const n = node("Alice");
@@ -634,7 +647,14 @@ function createInMemoryNeonQuery(tablePrefix = "kg_"): NeonQueryFn {
       if (/^INSERT INTO/i.test(sql.trim())) {
         const [id, name, type, confidence, properties, sources, created_at, updated_at] = params;
         nodesMap.set(id as string, {
-          id, name, type, confidence, properties, sources, created_at, updated_at,
+          id,
+          name,
+          type,
+          confidence,
+          properties,
+          sources,
+          created_at,
+          updated_at,
         });
         return { rows: [] };
       }
@@ -680,9 +700,7 @@ function createInMemoryNeonQuery(tablePrefix = "kg_"): NeonQueryFn {
               results = results.filter((r) => r["type"] === p);
             } else if (/LOWER\(name\) LIKE/i.test(cond)) {
               const pat = (p as string).replace(/%/g, "").toLowerCase();
-              results = results.filter((r) =>
-                (r["name"] as string).toLowerCase().includes(pat),
-              );
+              results = results.filter((r) => (r["name"] as string).toLowerCase().includes(pat));
             } else if (/confidence>=/i.test(cond)) {
               results = results.filter((r) => Number(r["confidence"]) >= Number(p));
             }
@@ -705,9 +723,17 @@ function createInMemoryNeonQuery(tablePrefix = "kg_"): NeonQueryFn {
 
       // INSERT INTO kg_edges (id, subject_id, …) VALUES (…)
       if (/^INSERT INTO/i.test(sql.trim())) {
-        const [id, subject_id, predicate, object_id, confidence, sources, created_at, updated_at] = params;
+        const [id, subject_id, predicate, object_id, confidence, sources, created_at, updated_at] =
+          params;
         edgesMap.set(id as string, {
-          id, subject_id, predicate, object_id, confidence, sources, created_at, updated_at,
+          id,
+          subject_id,
+          predicate,
+          object_id,
+          confidence,
+          sources,
+          created_at,
+          updated_at,
         });
         return { rows: [] };
       }
@@ -748,8 +774,8 @@ function createInMemoryNeonQuery(tablePrefix = "kg_"): NeonQueryFn {
             } else if (/^object_id=/i.test(cond.trim())) {
               results = results.filter((r) => r["object_id"] === p);
             } else if (/LOWER\(predicate\)=/i.test(cond)) {
-              results = results.filter((r) =>
-                (r["predicate"] as string).toLowerCase() === (p as string),
+              results = results.filter(
+                (r) => (r["predicate"] as string).toLowerCase() === (p as string),
               );
             } else if (/confidence>=/i.test(cond)) {
               results = results.filter((r) => Number(r["confidence"]) >= Number(p));
@@ -799,7 +825,9 @@ describe("NeonKGStore — init()", () => {
 describe("NeonKGStore — node operations", () => {
   let store: NeonKGStore;
 
-  beforeEach(async () => { store = await makeNeonStore(); });
+  beforeEach(async () => {
+    store = await makeNeonStore();
+  });
 
   it("upsertNode returns the node and getNode retrieves it", async () => {
     const n = node("Alice");
@@ -826,9 +854,10 @@ describe("NeonKGStore — node operations", () => {
     await store.upsertNode(n);
     await store.upsertNode({ ...n, sources: ["doc-2"] });
     const fetched = await store.getNode(n.id);
-    const srcs = typeof fetched?.sources === "string"
-      ? (JSON.parse(fetched.sources as string) as string[])
-      : (fetched?.sources as string[]);
+    const srcs =
+      typeof fetched?.sources === "string"
+        ? (JSON.parse(fetched.sources as string) as string[])
+        : (fetched?.sources as string[]);
     expect(srcs).toContain("doc-1");
     expect(srcs).toContain("doc-2");
   });

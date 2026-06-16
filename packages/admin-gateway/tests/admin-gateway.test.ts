@@ -13,7 +13,9 @@ import {
 describe("GatewayAdminService — routes", () => {
   let svc: GatewayAdminService;
 
-  beforeEach(() => { svc = new GatewayAdminService(); });
+  beforeEach(() => {
+    svc = new GatewayAdminService();
+  });
 
   it("addRoute + resolveAlias round-trips", () => {
     svc.addRoute("fast", "gpt-4o-mini", "openai");
@@ -113,7 +115,9 @@ describe("GatewayAdminService — routes", () => {
 describe("GatewayAdminService — stats", () => {
   let svc: GatewayAdminService;
 
-  beforeEach(() => { svc = new GatewayAdminService(); });
+  beforeEach(() => {
+    svc = new GatewayAdminService();
+  });
 
   it("recordRequest increments request count", () => {
     svc.recordRequest("fast");

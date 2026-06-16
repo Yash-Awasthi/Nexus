@@ -24,6 +24,7 @@
 
 export type ContextType = "code" | "creative" | "analytical" | "conversational" | "chaotic";
 
+/** Auto tune params interface definition. */
 export interface AutoTuneParams {
   temperature: number;
   top_p: number;
@@ -33,12 +34,14 @@ export interface AutoTuneParams {
   repetition_penalty: number;
 }
 
+/** Context score interface definition. */
 export interface ContextScore {
   type: ContextType;
   score: number;
   percentage: number;
 }
 
+/** Auto tune result interface definition. */
 export interface AutoTuneResult {
   params: AutoTuneParams;
   detectedContext: ContextType;
@@ -154,6 +157,7 @@ export interface EmaStore {
   set(context: ContextType, delta: LearnedDelta): Promise<void>;
 }
 
+/** In memory ema store. */
 export class InMemoryEmaStore implements EmaStore {
   private readonly data = new Map<ContextType, LearnedDelta>();
 
@@ -198,7 +202,7 @@ export async function updateEma(
 
   const updated: LearnedDelta = {
     temperature: prev.temperature * (1 - EMA_ALPHA) + tempAdjust * EMA_ALPHA,
-    top_p: prev.top_p * (1 - EMA_ALPHA) + (tempAdjust * 0.5) * EMA_ALPHA,
+    top_p: prev.top_p * (1 - EMA_ALPHA) + tempAdjust * 0.5 * EMA_ALPHA,
     frequency_penalty: prev.frequency_penalty,
     presence_penalty: prev.presence_penalty,
     samples: prev.samples + 1,
@@ -216,9 +220,10 @@ export interface DetectionResult {
   scores: ContextScore[];
 }
 
+/** Detect context. */
 export function detectContext(
   message: string,
-  history: ReadonlyArray<{ role: string; content: string }> = [],
+  history: readonly { role: string; content: string }[] = [],
 ): DetectionResult {
   const raw: Record<ContextType, number> = {
     code: 0,
@@ -305,7 +310,7 @@ function blendParams(a: AutoTuneParams, b: AutoTuneParams, w: number): AutoTuneP
 
 export interface ComputeOptions {
   message: string;
-  history?: ReadonlyArray<{ role: string; content: string }>;
+  history?: readonly { role: string; content: string }[];
   overrides?: Partial<AutoTuneParams>;
   /** If provided, apply EMA learned adjustments. */
   learnedDelta?: LearnedDelta;
@@ -343,11 +348,20 @@ export function computeAutoTuneParams(opts: ComputeOptions): AutoTuneResult {
     };
   }
 
-  // User overrides take absolute precedence
+  // User overrides take absolute precedence — restrict to known AutoTuneParams
+  // keys to prevent prototype-pollution via __proto__ / constructor injection.
+  const ALLOWED_PARAMS = new Set<string>([
+    "temperature",
+    "top_p",
+    "top_k",
+    "frequency_penalty",
+    "presence_penalty",
+    "repetition_penalty",
+  ]);
   if (overrides) {
     for (const [k, v] of Object.entries(overrides)) {
-      if (v !== undefined) {
-        (params as Record<string, number>)[k] = v;
+      if (v !== undefined && ALLOWED_PARAMS.has(k)) {
+        (params as unknown as Record<string, number>)[k] = v;
       }
     }
   }
@@ -357,11 +371,15 @@ export function computeAutoTuneParams(opts: ComputeOptions): AutoTuneResult {
   const reasoning =
     `Detected: ${type} (${Math.round(confidence * 100)}% confidence)` +
     (convLen > 10 ? ` | Long conversation: +repetition_penalty` : "") +
-    (learnedDelta && learnedDelta.samples >= 3
-      ? ` | EMA (${learnedDelta.samples} samples)`
-      : "");
+    (learnedDelta && learnedDelta.samples >= 3 ? ` | EMA (${learnedDelta.samples} samples)` : "");
 
-  return { params: finalParams, detectedContext: type, confidence, reasoning, contextScores: scores };
+  return {
+    params: finalParams,
+    detectedContext: type,
+    confidence,
+    reasoning,
+    contextScores: scores,
+  };
 }
 
 /** Convenience label map. */

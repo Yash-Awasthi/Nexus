@@ -3,26 +3,30 @@
  * agent-runtime — Step execution loop for multi-step LLM agents.
  *
  * Provides:
- *   • StepInput / StepOutput  — typed step I/O
- *   • ToolStreamParser        — parse tool calls from streamed LLM output
- *   • StrReplaceProcessor     — apply str_replace tool calls to a file map
- *   • CacheControl            — per-step cache control headers/policies
- *   • AgentStepExecutor       — run a single step (prompt → tool calls → results)
- *   • AgentRuntime            — multi-step loop with abort handling
- *   • RuntimeToolSet          — assemble a typed tool set for a run
- *   • MockLlmStream           — injectable streaming LLM test double
+ *   • StepInput / StepOutput    — typed step I/O
+ *   • ToolStreamParser          — parse tool calls from streamed LLM output
+ *   • StrReplaceProcessor       — apply str_replace tool calls to a file map
+ *   • CacheControl              — per-step cache control headers/policies
+ *   • AgentStepExecutor         — run a single step (prompt → tool calls → results)
+ *   • AgentRuntime              — multi-step loop with abort handling
+ *   • RuntimeToolSet            — assemble a typed tool set for a run
+ *   • MockLlmStream             — injectable streaming LLM test double
+ *   • LlmStreamDriver           — structural interface for @nexus/llm-drivers drivers
+ *   • llmDriverToStreamFn       — bridge: LlmDriver.stream() → AsyncIterable<string>
  */
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type RuntimeModel = string;
 
+/** Tool call raw interface definition. */
 export interface ToolCallRaw {
   name: string;
   arguments: Record<string, unknown>;
   callId?: string;
 }
 
+/** Tool result interface definition. */
 export interface ToolResult {
   callId?: string;
   name: string;
@@ -30,6 +34,7 @@ export interface ToolResult {
   error?: string;
 }
 
+/** Step input interface definition. */
 export interface StepInput {
   stepIndex: number;
   instruction: string;
@@ -38,6 +43,7 @@ export interface StepInput {
   abortSignal?: AbortSignal;
 }
 
+/** Step output interface definition. */
 export interface StepOutput {
   stepIndex: number;
   content: string;
@@ -52,18 +58,22 @@ export interface StepOutput {
 
 export type CacheControlPolicy = "no-cache" | "ephemeral" | "persistent";
 
+/** Cache control header interface definition. */
 export interface CacheControlHeader {
   policy: CacheControlPolicy;
   maxAgeMs?: number;
   staleWhileRevalidateMs?: number;
 }
 
+/** Cache policies. */
 export const CACHE_POLICIES: Record<CacheControlPolicy, CacheControlHeader> = {
-  "no-cache":   { policy: "no-cache" },
-  "ephemeral":  { policy: "ephemeral",  maxAgeMs: 60_000 },
-  "persistent": { policy: "persistent", maxAgeMs: 3_600_000, staleWhileRevalidateMs: 60_000 },
+  "no-cache": { policy: "no-cache" },
+  ephemeral: { policy: "ephemeral", maxAgeMs: 60_000 },
+  persistent: { policy: "persistent", maxAgeMs: 3_600_000, staleWhileRevalidateMs: 60_000 },
 };
 
+/** Cache control. */
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class CacheControl {
   static headerFor(policy: CacheControlPolicy): CacheControlHeader {
     return CACHE_POLICIES[policy];
@@ -93,6 +103,10 @@ export class ToolStreamParser {
   }
 
   flush(): ToolCallRaw[] {
+    if (this.buffer.length > 100_000) {
+      this.buffer = "";
+      return [];
+    }
     const calls: ToolCallRaw[] = [];
     const regex = /\[TOOL:(\w+)\]([\s\S]*?)\[\/TOOL\]/g;
     let match: RegExpExecArray | null;
@@ -102,7 +116,9 @@ export class ToolStreamParser {
       const name = match[1]!;
       const argStr = match[2]!.trim();
       try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const args = JSON.parse(argStr);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         calls.push({ name, arguments: args });
       } catch {
         calls.push({ name, arguments: { raw: argStr } });
@@ -120,11 +136,16 @@ export class ToolStreamParser {
 
   /** Strip all TOOL tags and return clean text. */
   static stripTools(text: string): string {
+    if (text.length > 100_000) return text;
     return text.replace(/\[TOOL:\w+\][\s\S]*?\[\/TOOL\]/g, "").trim();
   }
 
-  reset(): void { this.buffer = ""; }
-  getBuffer(): string { return this.buffer; }
+  reset(): void {
+    this.buffer = "";
+  }
+  getBuffer(): string {
+    return this.buffer;
+  }
 }
 
 // ── StrReplaceProcessor ───────────────────────────────────────────────────────
@@ -135,6 +156,7 @@ export interface StrReplaceCall {
   newStr: string;
 }
 
+/** Str replace result interface definition. */
 export interface StrReplaceResult {
   path: string;
   success: boolean;
@@ -142,20 +164,31 @@ export interface StrReplaceResult {
   error?: string;
 }
 
+/** Str replace processor. */
 export class StrReplaceProcessor {
   private files: Map<string, string>;
 
-  constructor(files: Map<string, string> = new Map()) {
+  constructor(files = new Map<string, string>()) {
     this.files = files;
   }
 
   process(call: StrReplaceCall): StrReplaceResult {
     const content = this.files.get(call.path);
     if (content === undefined) {
-      return { path: call.path, success: false, replaced: false, error: `File not found: ${call.path}` };
+      return {
+        path: call.path,
+        success: false,
+        replaced: false,
+        error: `File not found: ${call.path}`,
+      };
     }
     if (!content.includes(call.oldStr)) {
-      return { path: call.path, success: false, replaced: false, error: "String not found in file" };
+      return {
+        path: call.path,
+        success: false,
+        replaced: false,
+        error: "String not found in file",
+      };
     }
     this.files.set(call.path, content.replace(call.oldStr, call.newStr));
     return { path: call.path, success: true, replaced: true };
@@ -165,9 +198,15 @@ export class StrReplaceProcessor {
     return calls.map((c) => this.process(c));
   }
 
-  getFile(path: string): string | undefined { return this.files.get(path); }
-  setFile(path: string, content: string): void { this.files.set(path, content); }
-  snapshot(): Record<string, string> { return Object.fromEntries(this.files); }
+  getFile(path: string): string | undefined {
+    return this.files.get(path);
+  }
+  setFile(path: string, content: string): void {
+    this.files.set(path, content);
+  }
+  snapshot(): Record<string, string> {
+    return Object.fromEntries(this.files);
+  }
 }
 
 // ── RuntimeToolSet ────────────────────────────────────────────────────────────
@@ -178,6 +217,7 @@ export interface RuntimeTool {
   handler: (args: Record<string, unknown>) => Promise<unknown>;
 }
 
+/** Runtime tool set. */
 export class RuntimeToolSet {
   private tools = new Map<string, RuntimeTool>();
 
@@ -186,10 +226,18 @@ export class RuntimeToolSet {
     return this;
   }
 
-  get(name: string): RuntimeTool | undefined { return this.tools.get(name); }
-  has(name: string): boolean { return this.tools.has(name); }
-  names(): string[] { return [...this.tools.keys()]; }
-  list(): RuntimeTool[] { return [...this.tools.values()]; }
+  get(name: string): RuntimeTool | undefined {
+    return this.tools.get(name);
+  }
+  has(name: string): boolean {
+    return this.tools.has(name);
+  }
+  names(): string[] {
+    return [...this.tools.keys()];
+  }
+  list(): RuntimeTool[] {
+    return [...this.tools.values()];
+  }
 
   async invoke(name: string, args: Record<string, unknown>): Promise<ToolResult> {
     const tool = this.tools.get(name);
@@ -219,6 +267,7 @@ export type LlmStreamFn = (
   opts?: { signal?: AbortSignal },
 ) => AsyncIterable<string>;
 
+/** Mock llm stream. */
 export class MockLlmStream {
   private chunks: string[];
   private delayMs: number;
@@ -230,7 +279,12 @@ export class MockLlmStream {
   }
 
   asStream(): LlmStreamFn {
-    return async function* (this: MockLlmStream, _sys: string, user: string, opts?: { signal?: AbortSignal }) {
+    return async function* (
+      this: MockLlmStream,
+      _sys: string,
+      user: string,
+      opts?: { signal?: AbortSignal },
+    ) {
       this.calls.push(user);
       for (const chunk of this.chunks) {
         if (opts?.signal?.aborted) return;
@@ -241,6 +295,104 @@ export class MockLlmStream {
   }
 }
 
+// ── LlmStreamDriver adapter ───────────────────────────────────────────────────
+
+/**
+ * Structural interface matching the stream() signature of @nexus/llm-drivers drivers.
+ * Defined here (not imported) to avoid circular workspace dependencies.
+ * Any LlmDriver from @nexus/llm-drivers satisfies this interface structurally.
+ */
+export interface LlmStreamDriver {
+  readonly model: string;
+  stream(
+    opts: {
+      model?: string;
+      messages: { role: string; content: string }[];
+      systemPrompt?: string;
+      maxTokens?: number;
+      temperature?: number;
+    },
+    handler: (delta: { delta: string; done: boolean }) => void | Promise<void>,
+  ): Promise<unknown>;
+}
+
+/**
+ * Adapts a callback-based LlmDriver.stream() to an AsyncIterable<string>.
+ *
+ * The driver emits deltas via a handler callback; this function bridges that
+ * to an async generator using a queue + Promise resolver pattern.
+ *
+ * Usage:
+ *   import { GroqDriver } from "@nexus/llm-drivers";
+ *   const driver = new GroqDriver({ apiKey: "..." });
+ *   const streamFn = llmDriverToStreamFn(driver);
+ *   const runtime = new AgentRuntime({ llm: streamFn, ... });
+ */
+export function llmDriverToStreamFn(driver: LlmStreamDriver, modelOverride?: string): LlmStreamFn {
+  return async function* (
+    systemPrompt: string,
+    userPrompt: string,
+    opts?: { signal?: AbortSignal },
+  ): AsyncGenerator<string> {
+    // Queue-based bridge: driver pushes chunks here, generator pulls them
+    const queue: string[] = [];
+    let resolve: (() => void) | null = null;
+    let done = false;
+    let streamError: unknown = null;
+
+    const push = (chunk: string): void => {
+      queue.push(chunk);
+      const r = resolve;
+      resolve = null;
+      r?.();
+    };
+
+    const streamPromise = driver
+      .stream(
+        {
+          model: modelOverride ?? driver.model,
+          messages: [{ role: "user", content: userPrompt }],
+          systemPrompt,
+        },
+        (delta) => {
+          if (!delta.done && delta.delta) push(delta.delta);
+        },
+      )
+      .then(() => {
+        done = true;
+        const r = resolve;
+        resolve = null;
+        // eslint-disable-next-line promise/always-return
+        r?.();
+      })
+      .catch((err: unknown) => {
+        streamError = err;
+        done = true;
+        const r = resolve;
+        resolve = null;
+        r?.();
+      });
+
+    // Detach — we drive consumption via the generator below
+    void streamPromise;
+
+    while (!done || queue.length > 0) {
+      if (opts?.signal?.aborted) return;
+
+      if (queue.length > 0) {
+        yield queue.shift()!;
+      } else {
+        // Wait for next push or done signal
+        await new Promise<void>((res) => {
+          resolve = res;
+        });
+      }
+    }
+
+    if (streamError) throw streamError;
+  };
+}
+
 // ── AgentStepExecutor ─────────────────────────────────────────────────────────
 
 export interface StepExecutorOptions {
@@ -249,6 +401,7 @@ export interface StepExecutorOptions {
   systemPrompt: string;
 }
 
+/** Agent step executor. */
 export class AgentStepExecutor {
   private llm: LlmStreamFn;
   private toolSet: RuntimeToolSet;
@@ -273,7 +426,9 @@ export class AgentStepExecutor {
 
     // Stream and collect
     try {
-      for await (const chunk of this.llm(this.systemPrompt, userPrompt, { signal: input.abortSignal })) {
+      for await (const chunk of this.llm(this.systemPrompt, userPrompt, {
+        signal: input.abortSignal,
+      })) {
         if (input.abortSignal?.aborted) {
           return {
             stepIndex: input.stepIndex,
@@ -334,6 +489,7 @@ export interface RuntimeOptions {
   cacheControl?: CacheControlPolicy;
 }
 
+/** Runtime result interface definition. */
 export interface RuntimeResult {
   steps: StepOutput[];
   finalContent: string;
@@ -342,6 +498,7 @@ export interface RuntimeResult {
   totalDurationMs: number;
 }
 
+/** Agent runtime. */
 export class AgentRuntime {
   private executor: AgentStepExecutor;
   private maxSteps: number;
@@ -412,5 +569,107 @@ export class AgentRuntime {
     };
   }
 
-  getExecutor(): AgentStepExecutor { return this.executor; }
+  getExecutor(): AgentStepExecutor {
+    return this.executor;
+  }
+}
+
+// ── spawn_agents tool ─────────────────────────────────────────────────────────
+//
+// Registers a "spawn_agents" tool on any RuntimeToolSet, enabling an agent to
+// fork N child agents that run concurrently and merge their results.
+//
+// Usage:
+//   const toolSet = new RuntimeToolSet();
+//   toolSet.add(makeSpawnAgentsTool(llmFn, { maxConcurrency: 4 }));
+//
+// LLM prompt pattern:
+//   spawn_agents({ tasks: [
+//     { instruction: "Summarise the Q1 earnings report" },
+//     { instruction: "Find the top 3 risks from the risk register" },
+//   ]})
+//
+// Each child is an independent AgentRuntime with its own step budget.
+// Promise.allSettled ensures one failed child never cancels the others.
+
+export interface SpawnAgentTask {
+  /** Instruction passed to the child agent. */
+  instruction: string;
+  /** Optional system-prompt override for this child. */
+  systemPrompt?: string;
+  /** Max steps for this child (overrides the factory default). */
+  maxSteps?: number;
+}
+
+/** Spawn agent result interface definition. */
+export interface SpawnAgentResult {
+  taskIndex: number;
+  instruction: string;
+  finalContent: string;
+  steps: number;
+  /** Set when the child agent threw — other results are still returned. */
+  error?: string;
+}
+
+/** Spawn agents options interface definition. */
+export interface SpawnAgentsOptions {
+  /** Hard cap on concurrent children (default: 5). */
+  maxConcurrency?: number;
+  /** Default step budget per child (default: 3). */
+  maxStepsPerAgent?: number;
+  /** Default system-prompt for child agents. */
+  defaultSystemPrompt?: string;
+}
+
+/**
+ * Factory: returns a RuntimeTool that forks child AgentRuntime instances.
+ *
+ * @param llm     The same LlmStreamFn used by the parent agent.
+ * @param opts    Concurrency / step limits.
+ */
+export function makeSpawnAgentsTool(llm: LlmStreamFn, opts: SpawnAgentsOptions = {}): RuntimeTool {
+  const maxConcurrency = opts.maxConcurrency ?? 5;
+  const maxStepsPerAgent = opts.maxStepsPerAgent ?? 3;
+  const defaultSystemPrompt = opts.defaultSystemPrompt;
+
+  return {
+    name: "spawn_agents",
+    description:
+      "Fork N child agents to execute sub-tasks concurrently and collect results. " +
+      "Each child runs an independent AgentRuntime.  " +
+      "Pass an array of tasks; receives an array of results in the same order. " +
+      `Max concurrent children: ${maxConcurrency}.`,
+    handler: async (args): Promise<SpawnAgentResult[]> => {
+      const rawTasks = (args.tasks as SpawnAgentTask[] | undefined) ?? [];
+      const tasks = rawTasks.slice(0, maxConcurrency);
+
+      const settled = await Promise.allSettled(
+        tasks.map(async (task, i): Promise<SpawnAgentResult> => {
+          const child = new AgentRuntime({
+            llm,
+            maxSteps: task.maxSteps ?? maxStepsPerAgent,
+            systemPrompt: task.systemPrompt ?? defaultSystemPrompt,
+          });
+          const result = await child.run(task.instruction);
+          return {
+            taskIndex: i,
+            instruction: task.instruction,
+            finalContent: result.finalContent,
+            steps: result.steps.length,
+          };
+        }),
+      );
+
+      return settled.map((s, i): SpawnAgentResult => {
+        if (s.status === "fulfilled") return s.value;
+        return {
+          taskIndex: i,
+          instruction: tasks[i]?.instruction ?? "",
+          finalContent: "",
+          steps: 0,
+          error: s.reason instanceof Error ? s.reason.message : String(s.reason),
+        };
+      });
+    },
+  };
 }

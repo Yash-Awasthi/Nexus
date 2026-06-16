@@ -204,7 +204,10 @@ describe("McpClient.callTool", () => {
     const client = new McpClient({ serverUrl: SERVER_URL, fetchFn });
     await client.callTool("read_file", { path: "/etc/hosts" });
 
-    const body = capturedBody as { method: string; params: { name: string; arguments: Record<string, unknown> } };
+    const body = capturedBody as {
+      method: string;
+      params: { name: string; arguments: Record<string, unknown> };
+    };
     expect(body.method).toBe("tools/call");
     expect(body.params.name).toBe("read_file");
     expect(body.params.arguments.path).toBe("/etc/hosts");

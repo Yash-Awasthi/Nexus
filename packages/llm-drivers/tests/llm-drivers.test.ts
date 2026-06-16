@@ -80,7 +80,7 @@ describe("MockTransport", () => {
 
   it("returns configured response", async () => {
     const t = new MockTransport().setResponse({ result: 42 });
-    const r = await t.post("url", {}, {}) as { result: number };
+    const r = (await t.post("url", {}, {})) as { result: number };
     expect(r.result).toBe(42);
   });
 });
@@ -133,7 +133,9 @@ describe("AnthropicDriver", () => {
 
   it("stream emits content then done", async () => {
     const deltas: StreamDelta[] = [];
-    await d.stream(makeOpts(), (d) => { deltas.push(d); });
+    await d.stream(makeOpts(), (d) => {
+      deltas.push(d);
+    });
     expect(deltas.some((d) => d.delta === "Hi there!")).toBe(true);
     expect(deltas[deltas.length - 1]!.done).toBe(true);
   });
@@ -146,15 +148,40 @@ describe("AnthropicDriver", () => {
 // ── OpenAI-compatible drivers ─────────────────────────────────────────────────
 
 describe.each([
-  { name: "GroqDriver",       Factory: GroqDriver,       provider: "groq",       url: "api.groq.com" },
-  { name: "DeepSeekDriver",   Factory: DeepSeekDriver,   provider: "deepseek",   url: "api.deepseek.com" },
-  { name: "MistralDriver",    Factory: MistralDriver,    provider: "mistral",    url: "api.mistral.ai" },
-  { name: "OpenRouterDriver", Factory: OpenRouterDriver, provider: "openrouter", url: "openrouter.ai" },
-  { name: "FireworksDriver",  Factory: FireworksDriver,  provider: "fireworks",  url: "api.fireworks.ai" },
-  { name: "NvidiaNimDriver",  Factory: NvidiaNimDriver,  provider: "nvidia_nim", url: "api.nvidia.com" },
-  { name: "CerebrasDriver",   Factory: CerebrasDriver,   provider: "cerebras",   url: "api.cerebras.ai" },
-  { name: "KimiDriver",       Factory: KimiDriver,       provider: "kimi",       url: "api.moonshot.cn" },
-  { name: "CodestralDriver",  Factory: CodestralDriver,  provider: "codestral",  url: "codestral.mistral.ai" },
+  { name: "GroqDriver", Factory: GroqDriver, provider: "groq", url: "api.groq.com" },
+  {
+    name: "DeepSeekDriver",
+    Factory: DeepSeekDriver,
+    provider: "deepseek",
+    url: "api.deepseek.com",
+  },
+  { name: "MistralDriver", Factory: MistralDriver, provider: "mistral", url: "api.mistral.ai" },
+  {
+    name: "OpenRouterDriver",
+    Factory: OpenRouterDriver,
+    provider: "openrouter",
+    url: "openrouter.ai",
+  },
+  {
+    name: "FireworksDriver",
+    Factory: FireworksDriver,
+    provider: "fireworks",
+    url: "api.fireworks.ai",
+  },
+  {
+    name: "NvidiaNimDriver",
+    Factory: NvidiaNimDriver,
+    provider: "nvidia_nim",
+    url: "api.nvidia.com",
+  },
+  { name: "CerebrasDriver", Factory: CerebrasDriver, provider: "cerebras", url: "api.cerebras.ai" },
+  { name: "KimiDriver", Factory: KimiDriver, provider: "kimi", url: "api.moonshot.cn" },
+  {
+    name: "CodestralDriver",
+    Factory: CodestralDriver,
+    provider: "codestral",
+    url: "codestral.mistral.ai",
+  },
 ] as const)("$name", ({ Factory, provider, url }) => {
   let t: MockTransport;
   let d: InstanceType<typeof Factory>;

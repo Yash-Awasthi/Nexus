@@ -16,7 +16,7 @@ import { loadWorkflowSpecFile, specToWorkflowDefinition } from "./spec-loader.js
 /**
  * In-process MCP transport exposing GhostStack orchestrator capabilities.
  */
-export class GhostStackMcpBridge implements IMCPTransport {
+class GhostStackMcpBridge implements IMCPTransport {
   private connected = false;
 
   constructor(private readonly ctx: GhostStackRuntimeContext) {}

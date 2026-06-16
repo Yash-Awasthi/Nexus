@@ -289,7 +289,12 @@ describe("TriggerRegistry", () => {
 
   it("evaluate delivers to function destination", async () => {
     const received: TriggerEvent[] = [];
-    const dest: Destination = { type: "function", fn: (e) => { received.push(e); } };
+    const dest: Destination = {
+      type: "function",
+      fn: (e) => {
+        received.push(e);
+      },
+    };
     const t = new WebhookTrigger({ name: "t", destinations: [dest] });
     registry.register(t);
     await registry.evaluate({ eventType: "any" });
@@ -309,7 +314,9 @@ describe("TriggerRegistry", () => {
   it("evaluate captures delivery errors", async () => {
     const dest: Destination = {
       type: "function",
-      fn: () => { throw new Error("handler exploded"); },
+      fn: () => {
+        throw new Error("handler exploded");
+      },
     };
     const t = new WebhookTrigger({ name: "t", destinations: [dest] });
     registry.register(t);
@@ -329,7 +336,12 @@ describe("TriggerRegistry", () => {
 
   it("evaluate delivers event payload from context", async () => {
     const received: TriggerEvent[] = [];
-    const dest: Destination = { type: "function", fn: (e) => { received.push(e); } };
+    const dest: Destination = {
+      type: "function",
+      fn: (e) => {
+        received.push(e);
+      },
+    };
     const t = new DeltaTrigger({ name: "d", field: "status", destinations: [dest] });
     registry.register(t);
     await registry.evaluate({ field: "status", oldValue: "a", newValue: "b" });
@@ -341,7 +353,10 @@ describe("TriggerRegistry", () => {
     let resolved = false;
     const dest: Destination = {
       type: "function",
-      fn: async () => { await Promise.resolve(); resolved = true; },
+      fn: async () => {
+        await Promise.resolve();
+        resolved = true;
+      },
     };
     const t = new WebhookTrigger({ name: "t", destinations: [dest] });
     registry.register(t);

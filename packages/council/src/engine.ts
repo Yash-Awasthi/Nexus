@@ -188,7 +188,24 @@ export class DeliberationEngine {
       }
     });
 
-    const rawVotes = await Promise.all(votePromises);
+    // Promise.allSettled so a stray throw that escapes the per-vote try-catch
+    // (e.g. an OOM inside an archetype callback) can never abort all N concurrent
+    // LLM calls and lose the entire deliberation.  Each vote promise already
+    // returns an abstain on expected failures — allSettled is a second safety net.
+    const settled = await Promise.allSettled(votePromises);
+    const rawVotes = settled.map(
+      (s): ModelVote =>
+        s.status === "fulfilled"
+          ? s.value
+          : {
+              model: this.config.defaultModel,
+              provider: "unknown",
+              vote: "abstain",
+              reasoning: `Vote rejected: ${s.reason instanceof Error ? s.reason.message : String(s.reason)}`,
+              confidence: 0,
+              latencyMs: 0,
+            },
+    );
     votes.push(...rawVotes);
 
     // Tally

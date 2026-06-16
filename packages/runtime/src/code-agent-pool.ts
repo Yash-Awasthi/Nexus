@@ -71,7 +71,7 @@ function buildFileTree(rootDir: string, maxDepth = 4, maxFiles = 200): string {
  * Task type: "code_explore"
  * Payload: { prompt: string, rootDir?: string, directories?: string[] }
  */
-export class FilePickerAgent {
+class FilePickerAgent {
   private llm: ILanguageModel;
 
   constructor(llm?: ILanguageModel) {
@@ -169,7 +169,7 @@ Return at most 12 most relevant files. Paths must be relative to the project roo
  * Task type: "code_edit"
  * Payload: { request: string, filePaths?: string[], rootDir?: string }
  */
-export class CodeEditorAgent {
+class CodeEditorAgent {
   private llm: ILanguageModel;
 
   constructor(llm?: ILanguageModel) {
@@ -303,7 +303,7 @@ Make ALL changes in one response.`;
  * Task type: "code_review"
  * Payload: { filePaths?: string[], diff?: string, request?: string, rootDir?: string }
  */
-export class CodeReviewerAgent {
+class CodeReviewerAgent {
   private llm: ILanguageModel;
 
   constructor(llm?: ILanguageModel) {
@@ -404,7 +404,7 @@ Respond as JSON:
  * Task type: "research"
  * Payload: { query: string, depth?: "speed"|"balanced"|"quality" }
  */
-export class ResearcherAgent {
+class ResearcherAgent {
   private searchEngine: WebSearchEngine;
 
   constructor(llm?: ILanguageModel) {
@@ -451,7 +451,7 @@ export class ResearcherAgent {
  * Task type: "reason"
  * Payload: { prompt: string, context?: string, history?: ChatMessage[] }
  */
-export class ThinkerAgent {
+class ThinkerAgent {
   private llm: ILanguageModel;
 
   constructor(llm?: ILanguageModel) {

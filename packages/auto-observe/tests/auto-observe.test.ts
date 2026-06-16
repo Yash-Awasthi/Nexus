@@ -32,7 +32,13 @@ describe("ObservationBus", () => {
     const bus = new ObservationBus();
     const received: ObservationEvent[] = [];
     bus.on("llm.request", (e) => received.push(e));
-    await bus.emit({ id: "1", type: "llm.request", source: "router", data: {}, timestamp: Date.now() });
+    await bus.emit({
+      id: "1",
+      type: "llm.request",
+      source: "router",
+      data: {},
+      timestamp: Date.now(),
+    });
     expect(received).toHaveLength(1);
     expect(received[0]!.type).toBe("llm.request");
   });
@@ -41,8 +47,20 @@ describe("ObservationBus", () => {
     const bus = new ObservationBus();
     const received: ObservationEvent[] = [];
     bus.on("*", (e) => received.push(e));
-    await bus.emit({ id: "1", type: "tool.call", source: "agent", data: {}, timestamp: Date.now() });
-    await bus.emit({ id: "2", type: "llm.response", source: "router", data: {}, timestamp: Date.now() });
+    await bus.emit({
+      id: "1",
+      type: "tool.call",
+      source: "agent",
+      data: {},
+      timestamp: Date.now(),
+    });
+    await bus.emit({
+      id: "2",
+      type: "llm.response",
+      source: "router",
+      data: {},
+      timestamp: Date.now(),
+    });
     expect(received).toHaveLength(2);
   });
 
@@ -85,7 +103,8 @@ describe("ObservationBus", () => {
 
   it("multiple listeners for same type all receive events", async () => {
     const bus = new ObservationBus();
-    let a = 0, b = 0;
+    let a = 0,
+      b = 0;
     bus.on("tool.result", () => a++);
     bus.on("tool.result", () => b++);
     await bus.emit({ id: "1", type: "tool.result", source: "t", data: {}, timestamp: Date.now() });
@@ -103,7 +122,11 @@ describe("ObservationStore", () => {
     store = new ObservationStore();
   });
 
-  function makeEvent(type: string, source = "test", tags?: Record<string, string>): ObservationEvent {
+  function makeEvent(
+    type: string,
+    source = "test",
+    tags?: Record<string, string>,
+  ): ObservationEvent {
     return { id: Math.random().toString(36), type, source, data: {}, timestamp: Date.now(), tags };
   }
 
@@ -269,7 +292,10 @@ describe("ObservingLLMProvider", () => {
   it("passes through the response unchanged", async () => {
     const obs = new AutoObserver();
     const provider = new ObservingLLMProvider(mockProvider("the answer"), obs);
-    const res = await provider.complete({ model: "gpt-4o", messages: [{ role: "user", content: "?" }] });
+    const res = await provider.complete({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: "?" }],
+    });
     expect(res.content).toBe("the answer");
   });
 
@@ -290,7 +316,9 @@ describe("ObservingLLMProvider", () => {
     const failing: LLMProvider = {
       name: "fail",
       models: [],
-      async complete() { throw new Error("overload"); },
+      async complete() {
+        throw new Error("overload");
+      },
     };
     const provider = new ObservingLLMProvider(failing, obs);
     await expect(provider.complete({ model: "x", messages: [] })).rejects.toThrow("overload");
@@ -307,7 +335,13 @@ describe("ObservingLLMProvider", () => {
   it("llm.request data includes messageCount", async () => {
     const obs = new AutoObserver();
     const provider = new ObservingLLMProvider(mockProvider(), obs);
-    await provider.complete({ model: "gpt-4o", messages: [{ role: "user", content: "a" }, { role: "user", content: "b" }] });
+    await provider.complete({
+      model: "gpt-4o",
+      messages: [
+        { role: "user", content: "a" },
+        { role: "user", content: "b" },
+      ],
+    });
     const req = obs.query({ type: "llm.request" })[0];
     expect((req!.data as any).messageCount).toBe(2);
   });

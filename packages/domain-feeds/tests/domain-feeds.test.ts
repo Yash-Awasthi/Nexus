@@ -224,7 +224,10 @@ describe("SeismologyFeed", () => {
     let capturedUrl = "";
     const feed = new SeismologyFeed({
       baseUrl: "https://api.example.com",
-      http: async (url) => { capturedUrl = url; return []; },
+      http: async (url) => {
+        capturedUrl = url;
+        return [];
+      },
     });
     await feed.fetch({ minMagnitude: 5 });
     expect(capturedUrl).toContain("minMagnitude=5");
@@ -234,7 +237,10 @@ describe("SeismologyFeed", () => {
     let capturedUrl = "";
     const feed = new SeismologyFeed({
       baseUrl: "https://api.example.com",
-      http: async (url) => { capturedUrl = url; return []; },
+      http: async (url) => {
+        capturedUrl = url;
+        return [];
+      },
     });
     await feed.fetch();
     expect(capturedUrl).not.toContain("minMagnitude");
@@ -294,7 +300,9 @@ describe("FeedRegistry", () => {
   });
 
   it("fetchAll returns pages for all registered adapters", async () => {
-    registry.register(new AviationFeed({ baseUrl: "https://x.com", http: makeMockHttp(makeAviationEvents(1)) }));
+    registry.register(
+      new AviationFeed({ baseUrl: "https://x.com", http: makeMockHttp(makeAviationEvents(1)) }),
+    );
     registry.register(new ClimateFeed({ baseUrl: "https://x.com", http: makeMockHttp([]) }));
     const pages = await registry.fetchAll();
     expect(pages).toHaveLength(2);
@@ -303,14 +311,20 @@ describe("FeedRegistry", () => {
   });
 
   it("fetchAll filters out failed domains", async () => {
-    registry.register(new AviationFeed({
-      baseUrl: "https://x.com",
-      http: makeMockHttp(makeAviationEvents(1)),
-    }));
-    registry.register(new ClimateFeed({
-      baseUrl: "https://x.com",
-      http: async () => { throw new Error("network error"); },
-    }));
+    registry.register(
+      new AviationFeed({
+        baseUrl: "https://x.com",
+        http: makeMockHttp(makeAviationEvents(1)),
+      }),
+    );
+    registry.register(
+      new ClimateFeed({
+        baseUrl: "https://x.com",
+        http: async () => {
+          throw new Error("network error");
+        },
+      }),
+    );
     const pages = await registry.fetchAll();
     expect(pages).toHaveLength(1);
     expect(pages[0]!.domain).toBe("aviation");
@@ -324,7 +338,10 @@ describe("FeedRegistry", () => {
     let capturedUrl = "";
     const feed = new AviationFeed({
       baseUrl: "https://api.example.com/",
-      http: async (url) => { capturedUrl = url; return []; },
+      http: async (url) => {
+        capturedUrl = url;
+        return [];
+      },
     });
     await feed.fetch();
     expect(capturedUrl).not.toContain("//aviation");

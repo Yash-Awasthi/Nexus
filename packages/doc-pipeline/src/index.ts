@@ -28,6 +28,7 @@ import { defineAdapter, type IExecutionContext } from "@nexus/plugin-sdk";
 
 export type DocFormat = "text" | "markdown" | "html" | "pdf" | "docx";
 
+/** Doc input interface definition. */
 export interface DocInput {
   /** Document format — drives extractor selection */
   format: DocFormat;
@@ -39,6 +40,7 @@ export interface DocInput {
   metadata?: Record<string, unknown>;
 }
 
+/** Chunk options interface definition. */
 export interface ChunkOptions {
   /**
    * Maximum tokens per chunk (estimated at 4 chars/token).
@@ -52,6 +54,7 @@ export interface ChunkOptions {
   overlapTokens?: number;
 }
 
+/** Text chunk interface definition. */
 export interface TextChunk {
   /** Zero-based chunk index within the document */
   index: number;
@@ -61,12 +64,15 @@ export interface TextChunk {
   tokenEstimate: number;
 }
 
+/** Embedding type alias. */
 export type Embedding = number[];
 
+/** Embedded chunk interface definition. */
 export interface EmbeddedChunk extends TextChunk {
   embedding: Embedding;
 }
 
+/** Doc meta interface definition. */
 export interface DocMeta {
   source?: string;
   format: DocFormat;
@@ -75,6 +81,7 @@ export interface DocMeta {
   metadata?: Record<string, unknown>;
 }
 
+/** Store result interface definition. */
 export interface StoreResult {
   /** IDs assigned to the stored chunks (one per chunk, in order) */
   ids: string[];
@@ -82,6 +89,7 @@ export interface StoreResult {
   count: number;
 }
 
+/** Pipeline result interface definition. */
 export interface PipelineResult {
   source?: string;
   format: DocFormat;
@@ -154,19 +162,19 @@ export function estimateTokens(text: string): number {
  *  4. Collapse runs of whitespace to single spaces.
  */
 export function htmlToText(html: string): string {
-  // Drop script / style content wholesale
-  let text = html.replace(/<(script|style)[^>]*>[\s\S]*?<\/(script|style)>/gi, " ");
-  // Remove all remaining tags
-  text = text.replace(/<[^>]+>/g, " ");
-  // Decode XML entities
+  if (html.length > 500_000) html = html.slice(0, 500_000);
+  // Strip ALL HTML markup — /<[^>]*>?/g also covers <!-- comments --> since
+  // the inner "!--…--" chars contain no ">" and the trailing ">" closes the match.
+  let text = html.replace(/<[^>]*>?/g, " ");
+  // Decode XML entities — non-amp entities first to prevent double-decoding
   text = text
-    .replace(/&amp;/gi, "&")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
     .replace(/&apos;/gi, "'")
     .replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(parseInt(code, 10)))
-    .replace(/&nbsp;/gi, " ");
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&"); // &amp; LAST prevents double-decoding of &amp;lt; etc.
   // Collapse whitespace
   return text.replace(/\s+/g, " ").trim();
 }
@@ -194,13 +202,13 @@ export const defaultExtractor: Extractor = async (
 
     case "pdf":
       throw new Error(
-        'PDF extraction requires an external Extractor. ' +
+        "PDF extraction requires an external Extractor. " +
           'Wrap a library such as "pdf-parse" and inject it via opts.extractor.',
       );
 
     case "docx":
       throw new Error(
-        'DOCX extraction requires an external Extractor. ' +
+        "DOCX extraction requires an external Extractor. " +
           'Wrap a library such as "mammoth" and inject it via opts.extractor.',
       );
   }
@@ -370,10 +378,7 @@ export interface DocIngestTask {
   chunkOptions?: ChunkOptions;
 }
 
-async function execute(
-  task: DocIngestTask,
-  ctx: IExecutionContext,
-): Promise<PipelineResult> {
+async function execute(task: DocIngestTask, ctx: IExecutionContext): Promise<PipelineResult> {
   ctx.logger.info("doc.ingest", {
     format: task.format,
     contentLength: task.content.length,
@@ -391,6 +396,7 @@ async function execute(
   );
 }
 
+/** Doc pipeline adapter. */
 export const docPipelineAdapter = defineAdapter<DocIngestTask, PipelineResult>({
   name: "nexus-adapter-doc-pipeline",
   version: "0.1.0",

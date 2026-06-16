@@ -104,7 +104,9 @@ describe("Trigger matching", () => {
   });
 
   it("keyword trigger respects caseSensitive: true", () => {
-    registry.register(makeSkill("k", [{ type: "keyword", keywords: ["Python"], caseSensitive: true }]));
+    registry.register(
+      makeSkill("k", [{ type: "keyword", keywords: ["Python"], caseSensitive: true }]),
+    );
     expect(registry.match("i know python")).toHaveLength(0);
     expect(registry.match("i know Python")).toHaveLength(1);
   });
@@ -220,7 +222,12 @@ describe("SkillRegistry", () => {
   });
 
   it("register throws NO_TRIGGERS for skill with empty triggers array", () => {
-    const skill: Skill<Ctx> = { id: "empty", name: "empty", triggers: [], handler: () => ({ output: "", handled: false }) };
+    const skill: Skill<Ctx> = {
+      id: "empty",
+      name: "empty",
+      triggers: [],
+      handler: () => ({ output: "", handled: false }),
+    };
     expect(() => registry.register(skill)).toThrow(SkillError);
     try {
       registry.register(skill);

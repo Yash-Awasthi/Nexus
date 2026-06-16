@@ -8,6 +8,7 @@ export interface IDocument {
   metadata?: Record<string, unknown>;
 }
 
+/** Search result interface definition. */
 export interface SearchResult {
   id: string;
   score: number;
@@ -15,6 +16,7 @@ export interface SearchResult {
   metadata?: Record<string, unknown>;
 }
 
+/** Search opts interface definition. */
 export interface SearchOpts {
   /** Number of results to return (default: 10). */
   k?: number;
@@ -52,6 +54,7 @@ interface BM25DocEntry {
 const BM25_K1 = 1.5;
 const BM25_B = 0.75;
 
+/** Bm25 index. */
 export class BM25Index implements IFullTextIndex {
   private readonly _docs = new Map<string, BM25DocEntry>();
   /** doc frequency: term → number of docs containing it */
@@ -103,7 +106,7 @@ export class BM25Index implements IFullTextIndex {
     const N = this._docs.size;
     const avgdl = this._totalLength / N;
 
-    const scored: Array<{ id: string; score: number }> = [];
+    const scored: { id: string; score: number }[] = [];
 
     for (const [id, entry] of this._docs) {
       let score = 0;
@@ -112,7 +115,8 @@ export class BM25Index implements IFullTextIndex {
         if (tf === 0) continue;
         const df = this._df.get(term) ?? 0;
         const idf = Math.log((N - df + 0.5) / (df + 0.5) + 1);
-        const norm = tf * (BM25_K1 + 1) / (tf + BM25_K1 * (1 - BM25_B + BM25_B * entry.length / avgdl));
+        const norm =
+          (tf * (BM25_K1 + 1)) / (tf + BM25_K1 * (1 - BM25_B + (BM25_B * entry.length) / avgdl));
         score += idf * norm;
       }
       if (score > minScore) scored.push({ id, score });
@@ -138,6 +142,7 @@ export interface VectorSearchResult {
   score: number;
 }
 
+/** I vector store interface definition. */
 export interface IVectorStore {
   add(id: string, vector: number[]): void;
   remove(id: string): boolean;
@@ -146,7 +151,9 @@ export interface IVectorStore {
 }
 
 function cosineSimilarity(a: number[], b: number[]): number {
-  let dot = 0, na = 0, nb = 0;
+  let dot = 0,
+    na = 0,
+    nb = 0;
   const len = Math.min(a.length, b.length);
   for (let i = 0; i < len; i++) {
     dot += a[i]! * b[i]!;
@@ -157,6 +164,7 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return denom === 0 ? 0 : dot / denom;
 }
 
+/** In memory vector store. */
 export class InMemoryVectorStore implements IVectorStore {
   private readonly _store = new Map<string, number[]>();
 
@@ -184,7 +192,7 @@ export class InMemoryVectorStore implements IVectorStore {
 
 // ── Reciprocal Rank Fusion ────────────────────────────────────────────────────
 
-export type RankedList = ReadonlyArray<{ id: string; score?: number }>;
+export type RankedList = readonly { id: string; score?: number }[];
 
 /**
  * Reciprocal Rank Fusion (RRF) — combines multiple ranked lists.
@@ -192,10 +200,7 @@ export type RankedList = ReadonlyArray<{ id: string; score?: number }>;
  * @param k      Ranking constant (default: 60). Higher = less sensitivity to top ranks.
  * @returns Merged list sorted by RRF score descending.
  */
-export function reciprocalRankFusion(
-  lists: RankedList[],
-  k = 60,
-): Array<{ id: string; score: number }> {
+export function reciprocalRankFusion(lists: RankedList[], k = 60): { id: string; score: number }[] {
   const scores = new Map<string, number>();
 
   for (const list of lists) {
@@ -238,6 +243,7 @@ export interface HybridSearchOpts extends SearchOpts {
   rrfK?: number;
 }
 
+/** Hybrid search engine. */
 export class HybridSearchEngine {
   private readonly _docs = new Map<string, IDocument>();
 

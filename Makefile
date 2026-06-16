@@ -14,7 +14,8 @@
 #   make logs           Tail all container logs
 
 .PHONY: help setup dev-infra dev-infra-down dev-up dev-down dev-logs \
-        migrate migrate-neon db-studio seed build test lint clean
+        migrate migrate-neon db-studio seed build test lint clean \
+        finscrape-up finscrape-down ingest-scan
 
 # ── Default target ────────────────────────────────────────────────────────────
 
@@ -25,24 +26,30 @@ help: ## Show available targets
 
 # ── First-time setup ─────────────────────────────────────────────────────────
 
-setup: ## Install deps and copy .env.example → .env (run once)
-	@if [ ! -f .env ]; then \
-	  cp .env.example .env; \
-	  echo "Created .env from .env.example — fill in GROQ_API_KEY and DATABASE_URL"; \
+setup: ## Generate secret keys + create .env, then install deps (idempotent — safe to re-run)
+	@if [ -f .env ]; then \
+	  echo ".env already exists — skipping key generation (delete it to regenerate)"; \
 	else \
-	  echo ".env already exists — skipping copy"; \
+	  cp .env.example .env; \
+	  sed -i.bak "s|NEXUS_API_KEY=.*|NEXUS_API_KEY=$$(openssl rand -hex 32)|" .env; \
+	  sed -i.bak "s|NEXUS_AUDIT_KEY=.*|NEXUS_AUDIT_KEY=$$(openssl rand -hex 32)|" .env; \
+	  sed -i.bak "s|NEXUS_INGEST_API_KEY=.*|NEXUS_INGEST_API_KEY=$$(openssl rand -hex 32)|" .env; \
+	  sed -i.bak "s|VITE_API_KEY=.*|VITE_API_KEY=$$(grep '^NEXUS_API_KEY=' .env | cut -d= -f2)|" .env; \
+	  rm -f .env.bak; \
+	  echo "✓ .env created with generated secrets:"; \
+	  printf "  NEXUS_API_KEY        = %s\n" "$$(grep '^NEXUS_API_KEY=' .env | cut -d= -f2)"; \
+	  printf "  NEXUS_AUDIT_KEY      = %s\n" "$$(grep '^NEXUS_AUDIT_KEY=' .env | cut -d= -f2)"; \
+	  printf "  NEXUS_INGEST_API_KEY = %s\n" "$$(grep '^NEXUS_INGEST_API_KEY=' .env | cut -d= -f2)"; \
+	  printf "  VITE_API_KEY         = %s (mirrored from NEXUS_API_KEY)\n" "$$(grep '^VITE_API_KEY=' .env | cut -d= -f2)"; \
+	  echo ""; \
+	  echo "Next: set GROQ_API_KEY + DATABASE_URL in .env, then:"; \
+	  echo "  make dev-infra && make migrate && pnpm dev"; \
 	fi
-	pnpm install
-	@echo ""
-	@echo "Next steps:"
-	@echo "  1. Edit .env (set GROQ_API_KEY, DATABASE_URL, NEXUS_API_KEY)"
-	@echo "  2. make dev-infra      # start postgres + redis"
-	@echo "  3. make migrate        # apply schema"
-	@echo "  4. pnpm dev            # start api + worker with hot-reload"
+	@command -v pnpm >/dev/null 2>&1 && pnpm install || echo "pnpm not found — run: npm install -g pnpm && pnpm install"
 
 # ── Infrastructure (postgres + redis only) ───────────────────────────────────
 
-dev-infra: ## Start postgres + redis in the background
+dev-infra: setup ## Start postgres + redis (runs setup first so .env always exists)
 	docker compose up postgres redis -d
 	@echo "Waiting for healthy containers..."
 	@docker compose ps postgres redis
@@ -104,6 +111,24 @@ lint: ## Run ESLint + Prettier check across all packages
 
 typecheck: ## Run TypeScript type-check across all packages
 	pnpm typecheck
+
+# ── fin-scrape bridge ─────────────────────────────────────────────────────────
+
+finscrape-up: ## Start ingest-bridge container (profile: finscrape)
+	docker compose --profile finscrape up ingest-bridge --build -d
+	@echo "ingest-bridge running → http://localhost:8001"
+
+finscrape-down: ## Stop ingest-bridge container
+	docker compose --profile finscrape stop ingest-bridge
+
+ingest-scan: ## Trigger a /scan on the running ingest-bridge (flushes fin-scrape output dir)
+	@BRIDGE_URL=$${BRIDGE_URL:-http://localhost:8001}; \
+	BRIDGE_KEY=$${BRIDGE_API_KEY:-}; \
+	if [ -n "$$BRIDGE_KEY" ]; then \
+	  curl -sf -X POST "$$BRIDGE_URL/scan" -H "Authorization: Bearer $$BRIDGE_KEY" | python3 -m json.tool; \
+	else \
+	  curl -sf -X POST "$$BRIDGE_URL/scan" | python3 -m json.tool; \
+	fi
 
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 

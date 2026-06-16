@@ -21,28 +21,33 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type WorkflowActionType = "email" | "trash" | "move" | "webhook" | "remove-password";
+/** Trigger field type alias. */
 export type TriggerField = "mime_type" | "document_type" | "path_contains" | "tag" | "owner";
 
+/** Trigger condition interface definition. */
 export interface TriggerCondition {
   field: TriggerField;
   operator: "equals" | "contains" | "starts_with" | "ends_with";
   value: string;
 }
 
+/** Workflow action interface definition. */
 export interface WorkflowAction {
   type: WorkflowActionType;
-  params: Record<string, string>;  // Jinja-templatible values
+  params: Record<string, string>; // Jinja-templatible values
 }
 
+/** Workflow definition interface definition. */
 export interface WorkflowDefinition {
   id: string;
   name: string;
   enabled: boolean;
-  conditions: TriggerCondition[];    // ALL must match
+  conditions: TriggerCondition[]; // ALL must match
   actions: WorkflowAction[];
   order?: number;
 }
 
+/** Action context interface definition. */
 export interface ActionContext {
   documentId: string;
   originalPath: string;
@@ -56,6 +61,7 @@ export interface ActionContext {
   [key: string]: unknown;
 }
 
+/** Action result interface definition. */
 export interface ActionResult {
   workflowId: string;
   actionType: WorkflowActionType;
@@ -64,6 +70,7 @@ export interface ActionResult {
   output?: unknown;
 }
 
+/** Workflow run result interface definition. */
 export interface WorkflowRunResult {
   workflowId: string;
   matched: boolean;
@@ -79,8 +86,11 @@ export class JinjaTemplater {
    * Falls back to original placeholder if key not found.
    */
   render(template: string, context: Record<string, unknown>): string {
+    if (template.length > 100_000) throw new Error("template too large for rendering");
     return template.replace(/\{\{([^}]+)\}\}/g, (_match, key) => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const trimmedKey = key.trim();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const value = this.resolveKey(trimmedKey, context);
       return value !== undefined ? String(value) : `{{${trimmedKey}}}`;
     });
@@ -90,14 +100,18 @@ export class JinjaTemplater {
     const parts = key.split(".");
     let current: unknown = context;
     for (const part of parts) {
-      if (current === null || current === undefined || typeof current !== "object") return undefined;
+      if (current === null || current === undefined || typeof current !== "object")
+        return undefined;
       current = (current as Record<string, unknown>)[part];
     }
     return current;
   }
 
   /** Render all string values in a params object. */
-  renderParams(params: Record<string, string>, context: Record<string, unknown>): Record<string, string> {
+  renderParams(
+    params: Record<string, string>,
+    context: Record<string, unknown>,
+  ): Record<string, string> {
     const result: Record<string, string> = {};
     for (const [k, v] of Object.entries(params)) {
       result[k] = this.render(v, context);
@@ -109,29 +123,37 @@ export class JinjaTemplater {
 // ── WorkflowMatcher ───────────────────────────────────────────────────────────
 
 const FIELD_MAP: Record<string, keyof ActionContext> = {
-  mime_type:     "mimeType",
+  mime_type: "mimeType",
   document_type: "documentType",
   path_contains: "originalPath",
-  owner:         "owner",
+  owner: "owner",
   // "tag" intentionally NOT mapped — literal ctx["tag"] lookup (undefined if absent)
 };
 
+/** Workflow matcher. */
 export class WorkflowMatcher {
   matches(doc: ActionContext, condition: TriggerCondition): boolean {
     const contextKey = FIELD_MAP[condition.field] ?? (condition.field as keyof ActionContext);
     const rawValue = doc[contextKey];
     const docValue = Array.isArray(rawValue)
       ? rawValue.join(",")
-      : rawValue !== undefined ? String(rawValue) : "";
+      : rawValue !== undefined
+        ? String(rawValue)
+        : "";
     const cv = condition.value.toLowerCase();
     const dv = docValue.toLowerCase();
 
     switch (condition.operator) {
-      case "equals":      return dv === cv;
-      case "contains":    return dv.includes(cv);
-      case "starts_with": return dv.startsWith(cv);
-      case "ends_with":   return dv.endsWith(cv);
-      default:            return false;
+      case "equals":
+        return dv === cv;
+      case "contains":
+        return dv.includes(cv);
+      case "starts_with":
+        return dv.startsWith(cv);
+      case "ends_with":
+        return dv.endsWith(cv);
+      default:
+        return false;
     }
   }
 
@@ -148,6 +170,7 @@ export type ActionHandlerFn = (
   ctx: ActionContext,
 ) => Promise<unknown>;
 
+/** Action executor. */
 export class ActionExecutor {
   private handler?: ActionHandlerFn;
   private templater = new JinjaTemplater();
@@ -162,7 +185,10 @@ export class ActionExecutor {
     ctx: ActionContext,
     workflowId: string,
   ): Promise<ActionResult> {
-    const renderedParams = this.templater.renderParams(action.params, ctx as Record<string, unknown>);
+    const renderedParams = this.templater.renderParams(
+      action.params,
+      ctx as Record<string, unknown>,
+    );
 
     if (!this.handler) {
       return {
@@ -195,6 +221,7 @@ export interface MockActionCall {
   ctx: ActionContext;
 }
 
+/** Mock action backend. */
 export class MockActionBackend {
   readonly calls: MockActionCall[] = [];
   private throws?: Record<WorkflowActionType, string>;
@@ -265,8 +292,12 @@ export class WorkflowEngine {
     return this.runForDocument(ctx);
   }
 
-  getWorkflows(): WorkflowDefinition[] { return [...this.workflows]; }
-  getExecutor(): ActionExecutor { return this.executor; }
+  getWorkflows(): WorkflowDefinition[] {
+    return [...this.workflows];
+  }
+  getExecutor(): ActionExecutor {
+    return this.executor;
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

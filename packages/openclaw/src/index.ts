@@ -29,6 +29,7 @@ export interface ConversationMessage {
   content: string;
 }
 
+/** Intent type type alias. */
 export type IntentType =
   | "information_seeking"
   | "task_execution"
@@ -40,8 +41,10 @@ export type IntentType =
   | "analysis"
   | "social";
 
+/** Sentiment type alias. */
 export type Sentiment = "positive" | "neutral" | "negative" | "mixed";
 
+/** Intent signal interface definition. */
 export interface IntentSignal {
   type: IntentType;
   confidence: number;
@@ -49,6 +52,7 @@ export interface IntentSignal {
   evidence: string[];
 }
 
+/** Conversation insight interface definition. */
 export interface ConversationInsight {
   conversationId: string;
   analyzedAt: number;
@@ -67,6 +71,7 @@ export interface ConversationInsight {
   summary: string;
 }
 
+/** Analyze options interface definition. */
 export interface AnalyzeOptions {
   id: string;
   messages: ConversationMessage[];
@@ -160,14 +165,31 @@ const TONE_MAP: { pattern: RegExp; tone: string }[] = [
 // ── Theme patterns ────────────────────────────────────────────────────────────
 
 const THEME_MAP: { theme: string; pattern: RegExp }[] = [
-  { theme: "software-development", pattern: /\b(code|function|class|variable|api|endpoint|typescript|javascript|python|rust|sql|git|npm)\b/i },
+  {
+    theme: "software-development",
+    pattern:
+      /\b(code|function|class|variable|api|endpoint|typescript|javascript|python|rust|sql|git|npm)\b/i,
+  },
   { theme: "debugging", pattern: /\b(bug|error|exception|crash|debug|fix|issue)\b/i },
-  { theme: "architecture", pattern: /\b(architecture|design|pattern|system|component|module|service|microservice)\b/i },
+  {
+    theme: "architecture",
+    pattern: /\b(architecture|design|pattern|system|component|module|service|microservice)\b/i,
+  },
   { theme: "testing", pattern: /\b(test|spec|vitest|jest|coverage|assertion|mock|stub)\b/i },
-  { theme: "deployment", pattern: /\b(deploy|ci\/cd|docker|kubernetes|cloud|aws|vercel|production|staging)\b/i },
-  { theme: "security", pattern: /\b(security|auth|authentication|authorization|token|password|vulnerability|pentest)\b/i },
+  {
+    theme: "deployment",
+    pattern: /\b(deploy|ci\/cd|docker|kubernetes|cloud|aws|vercel|production|staging)\b/i,
+  },
+  {
+    theme: "security",
+    pattern:
+      /\b(security|auth|authentication|authorization|token|password|vulnerability|pentest)\b/i,
+  },
   { theme: "data", pattern: /\b(data|database|sql|nosql|schema|query|index|postgres|mongo)\b/i },
-  { theme: "ai-ml", pattern: /\b(model|llm|inference|training|embedding|vector|prompt|ai|machine learning)\b/i },
+  {
+    theme: "ai-ml",
+    pattern: /\b(model|llm|inference|training|embedding|vector|prompt|ai|machine learning)\b/i,
+  },
   { theme: "planning", pattern: /\b(roadmap|plan|milestone|sprint|task|backlog|priority)\b/i },
   { theme: "documentation", pattern: /\b(docs|documentation|readme|comment|explain|describe)\b/i },
 ];
@@ -175,15 +197,97 @@ const THEME_MAP: { theme: string; pattern: RegExp }[] = [
 // ── Stop words ────────────────────────────────────────────────────────────────
 
 const STOP_WORDS = new Set([
-  "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of",
-  "with", "by", "from", "is", "are", "was", "were", "be", "been", "being",
-  "have", "has", "had", "do", "does", "did", "will", "would", "could", "should",
-  "may", "might", "shall", "can", "not", "no", "nor", "so", "yet", "both",
-  "either", "neither", "each", "every", "all", "any", "few", "more", "most",
-  "other", "some", "such", "than", "then", "there", "these", "they", "this",
-  "those", "that", "it", "its", "i", "you", "he", "she", "we", "my", "your",
-  "his", "her", "our", "their", "what", "which", "who", "when", "where", "how",
-  "why", "just", "also", "very", "too", "up", "out", "as", "if", "about",
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "but",
+  "in",
+  "on",
+  "at",
+  "to",
+  "for",
+  "of",
+  "with",
+  "by",
+  "from",
+  "is",
+  "are",
+  "was",
+  "were",
+  "be",
+  "been",
+  "being",
+  "have",
+  "has",
+  "had",
+  "do",
+  "does",
+  "did",
+  "will",
+  "would",
+  "could",
+  "should",
+  "may",
+  "might",
+  "shall",
+  "can",
+  "not",
+  "no",
+  "nor",
+  "so",
+  "yet",
+  "both",
+  "either",
+  "neither",
+  "each",
+  "every",
+  "all",
+  "any",
+  "few",
+  "more",
+  "most",
+  "other",
+  "some",
+  "such",
+  "than",
+  "then",
+  "there",
+  "these",
+  "they",
+  "this",
+  "those",
+  "that",
+  "it",
+  "its",
+  "i",
+  "you",
+  "he",
+  "she",
+  "we",
+  "my",
+  "your",
+  "his",
+  "her",
+  "our",
+  "their",
+  "what",
+  "which",
+  "who",
+  "when",
+  "where",
+  "how",
+  "why",
+  "just",
+  "also",
+  "very",
+  "too",
+  "up",
+  "out",
+  "as",
+  "if",
+  "about",
 ]);
 
 // ── Analyzer ──────────────────────────────────────────────────────────────────
@@ -272,9 +376,7 @@ export class ConversationAnalyzer {
         scored.push({ theme, score: matches.length });
       }
     }
-    return scored
-      .sort((a, b) => b.score - a.score)
-      .map((s) => s.theme);
+    return scored.sort((a, b) => b.score - a.score).map((s) => s.theme);
   }
 
   private extractKeywords(text: string, topK: number): string[] {

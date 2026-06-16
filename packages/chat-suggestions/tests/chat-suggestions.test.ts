@@ -13,16 +13,36 @@ import {
 
 const messages: ChatMessage[] = [
   { role: "user", content: "How do TypeScript generics work?" },
-  { role: "assistant", content: "TypeScript generics allow you to write reusable code that works with multiple types." },
+  {
+    role: "assistant",
+    content: "TypeScript generics allow you to write reusable code that works with multiple types.",
+  },
   { role: "user", content: "Can you show me an example with arrays?" },
-  { role: "assistant", content: "Sure! Here is a generic identity function: function identity<T>(arg: T): T { return arg; }" },
+  {
+    role: "assistant",
+    content:
+      "Sure! Here is a generic identity function: function identity<T>(arg: T): T { return arg; }",
+  },
 ];
 
-const mockLlm: SuggestionLlmFn = async () => JSON.stringify([
-  { text: "What are TypeScript utility types?", category: "related-topic", reasoning: "Related TypeScript concept" },
-  { text: "How does TypeScript handle null types?", category: "deep-dive", reasoning: "Common pain point" },
-  { text: "Show me a generic Promise wrapper", category: "next-step", reasoning: "Natural progression" },
-]);
+const mockLlm: SuggestionLlmFn = async () =>
+  JSON.stringify([
+    {
+      text: "What are TypeScript utility types?",
+      category: "related-topic",
+      reasoning: "Related TypeScript concept",
+    },
+    {
+      text: "How does TypeScript handle null types?",
+      category: "deep-dive",
+      reasoning: "Common pain point",
+    },
+    {
+      text: "Show me a generic Promise wrapper",
+      category: "next-step",
+      reasoning: "Natural progression",
+    },
+  ]);
 
 // ── ContextExtractor ──────────────────────────────────────────────────────────
 
@@ -100,7 +120,8 @@ describe("SuggestionGenerator", () => {
   });
 
   it("assigns default category for missing category field", async () => {
-    const llm: SuggestionLlmFn = async () => JSON.stringify([{ text: "Question?", reasoning: "r" }]);
+    const llm: SuggestionLlmFn = async () =>
+      JSON.stringify([{ text: "Question?", reasoning: "r" }]);
     const gen = new SuggestionGenerator({ llmFn: llm });
     const ctx = new ContextExtractor().extract(messages);
     const [result] = await gen.generate(ctx);
@@ -120,8 +141,24 @@ describe("SuggestionRanker", () => {
   };
 
   const suggestions: SuggestionResult[] = [
-    { id: "s1", text: "What are TypeScript utility types?", category: "related-topic", relevanceScore: 0.7, noveltyScore: 1, finalScore: 0.7, reasoning: "r" },
-    { id: "s2", text: "How does Python work?", category: "related-topic", relevanceScore: 0.3, noveltyScore: 1, finalScore: 0.3, reasoning: "r" },
+    {
+      id: "s1",
+      text: "What are TypeScript utility types?",
+      category: "related-topic",
+      relevanceScore: 0.7,
+      noveltyScore: 1,
+      finalScore: 0.7,
+      reasoning: "r",
+    },
+    {
+      id: "s2",
+      text: "How does Python work?",
+      category: "related-topic",
+      relevanceScore: 0.3,
+      noveltyScore: 1,
+      finalScore: 0.3,
+      reasoning: "r",
+    },
   ];
 
   it("sorts by finalScore descending", () => {
@@ -159,8 +196,13 @@ describe("SuggestionRanker", () => {
 
 describe("SuggestionCache", () => {
   const sampleSuggestion: SuggestionResult = {
-    id: "s1", text: "Try this", category: "next-step",
-    relevanceScore: 0.8, noveltyScore: 0.9, finalScore: 0.84, reasoning: "r",
+    id: "s1",
+    text: "Try this",
+    category: "next-step",
+    relevanceScore: 0.8,
+    noveltyScore: 0.9,
+    finalScore: 0.84,
+    reasoning: "r",
   };
 
   it("stores and retrieves suggestions", () => {

@@ -53,6 +53,7 @@ export type ConnectorErrorCode =
   | "HEALTH_CHECK_FAILED"
   | "DISABLED";
 
+/** Connector error. */
 export class ConnectorError extends Error {
   readonly code: ConnectorErrorCode;
   readonly context?: Record<string, unknown>;
@@ -67,13 +68,9 @@ export class ConnectorError extends Error {
 
 // ── Core types ────────────────────────────────────────────────────────────────
 
-export type ConnectorStatus =
-  | "disconnected"
-  | "connecting"
-  | "connected"
-  | "error"
-  | "disabled";
+export type ConnectorStatus = "disconnected" | "connecting" | "connected" | "error" | "disabled";
 
+/** Connect result interface definition. */
 export interface ConnectResult {
   ok: boolean;
   /** Short error description when ok:false */
@@ -82,6 +79,7 @@ export interface ConnectResult {
   metadata?: Record<string, unknown>;
 }
 
+/** Health check result interface definition. */
 export interface HealthCheckResult {
   ok: boolean;
   latencyMs: number;
@@ -170,7 +168,9 @@ export abstract class BaseConnector implements Connector {
   protected async _doDisconnect(): Promise<void> {}
 
   /** @internal — called by healthCheck() */
-  protected abstract _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }>;
+  protected abstract _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  >;
 
   /** Disable the connector — connect() will immediately return ok:false */
   disable(): void {
@@ -203,7 +203,7 @@ export class NullConnector extends BaseConnector {
     return { ok: true, metadata: { stub: true } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     return { ok: true };
   }
 }
@@ -216,6 +216,7 @@ export interface GitHubConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Git hub connector. */
 export class GitHubConnector extends BaseConnector {
   readonly id = "github";
   readonly name = "GitHub";
@@ -253,7 +254,7 @@ export class GitHubConnector extends BaseConnector {
     };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
     const res = await this.fetchFn(`${GitHubConnector.BASE}/rate_limit`, {
       headers: { Authorization: `Bearer ${this.token}` },
@@ -276,6 +277,7 @@ export interface SlackConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Slack connector. */
 export class SlackConnector extends BaseConnector {
   readonly id = "slack";
   readonly name = "Slack";
@@ -300,12 +302,18 @@ export class SlackConnector extends BaseConnector {
     });
 
     if (!res.ok) return { ok: false, error: `Slack API returned ${res.status}` };
-    const json = (await res.json()) as { ok: boolean; error?: string; team?: string; user?: string; bot_id?: string };
+    const json = (await res.json()) as {
+      ok: boolean;
+      error?: string;
+      team?: string;
+      user?: string;
+      bot_id?: string;
+    };
     if (!json.ok) return { ok: false, error: json.error ?? "auth.test failed" };
     return { ok: true, metadata: { team: json.team, user: json.user, botId: json.bot_id } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
     const res = await this.fetchFn(`${SlackConnector.BASE}/api.test`, {
       headers: { Authorization: `Bearer ${this.token}` },
@@ -323,6 +331,7 @@ export interface GroqConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Groq connector. */
 export class GroqConnector extends BaseConnector {
   readonly id = "groq";
   readonly name = "Groq";
@@ -349,7 +358,7 @@ export class GroqConnector extends BaseConnector {
     return { ok: true, metadata: { modelCount: json.data?.length ?? 0 } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
     const res = await this.fetchFn(`${GroqConnector.BASE}/models`, {
       headers: { Authorization: `Bearer ${this.apiKey}` },
@@ -365,6 +374,7 @@ export interface TavilyConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Tavily connector. */
 export class TavilyConnector extends BaseConnector {
   readonly id = "tavily";
   readonly name = "Tavily";
@@ -400,7 +410,7 @@ export class TavilyConnector extends BaseConnector {
     return { ok: true, metadata: { resultCount: json.results?.length ?? 0 } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
     const res = await this.fetchFn(`${TavilyConnector.BASE}/search`, {
       method: "POST",
@@ -434,6 +444,7 @@ export interface NeonConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Neon connector. */
 export class NeonConnector extends BaseConnector {
   readonly id = "neon";
   readonly name = "Neon";
@@ -457,7 +468,7 @@ export class NeonConnector extends BaseConnector {
     return this._ping();
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
     const result = await this._ping();
     return { ok: result.ok, latencyMs: Date.now() - start, error: result.error };
@@ -493,6 +504,7 @@ export interface LinearConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Linear connector. */
 export class LinearConnector extends BaseConnector {
   readonly id = "linear";
   readonly name = "Linear";
@@ -511,7 +523,7 @@ export class LinearConnector extends BaseConnector {
     return this._query();
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
     const result = await this._query();
     return { ok: result.ok, latencyMs: Date.now() - start, error: result.error };
@@ -532,7 +544,7 @@ export class LinearConnector extends BaseConnector {
 
     const json = (await res.json()) as {
       data?: { viewer?: { id: string; name: string; email: string } };
-      errors?: Array<{ message: string }>;
+      errors?: { message: string }[];
     };
 
     if (json.errors?.length) {
@@ -560,12 +572,14 @@ export interface ConnectAllResult {
   skipped: number;
 }
 
+/** Health check all result interface definition. */
 export interface HealthCheckAllResult {
   results: Record<string, HealthCheckResult>;
   healthy: number;
   unhealthy: number;
 }
 
+/** Connector registry. */
 export class ConnectorRegistry {
   private readonly connectors = new Map<string, Connector>();
 
@@ -692,6 +706,7 @@ export interface SyncedDocument {
   metadata?: Record<string, unknown>;
 }
 
+/** Sync options interface definition. */
 export interface SyncOptions {
   /** Max documents to emit (default: connector-specific) */
   limit?: number;
@@ -701,6 +716,7 @@ export interface SyncOptions {
   query?: string;
 }
 
+/** Document connector interface definition. */
 export interface DocumentConnector extends Connector {
   sync(opts?: SyncOptions): AsyncIterable<SyncedDocument>;
 }
@@ -714,10 +730,7 @@ export function isDocumentConnector(c: Connector): c is DocumentConnector {
 
 // ── BaseDocumentConnector ──────────────────────────────────────────────────────
 
-export abstract class BaseDocumentConnector
-  extends BaseConnector
-  implements DocumentConnector
-{
+export abstract class BaseDocumentConnector extends BaseConnector implements DocumentConnector {
   async *sync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
     yield* this._doSync(opts);
   }
@@ -805,7 +818,7 @@ export class GitHubDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { login: user.login } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
     const res = await this.fetchFn(`${GitHubDocumentConnector.BASE}/rate_limit`, {
       headers: { Authorization: `Bearer ${this.token}` },
@@ -825,7 +838,7 @@ export class GitHubDocumentConnector extends BaseDocumentConnector {
 
     if (!res.ok) return;
 
-    const issues = (await res.json()) as Array<{
+    const issues = (await res.json()) as {
       number: number;
       title: string;
       body?: string;
@@ -833,7 +846,7 @@ export class GitHubDocumentConnector extends BaseDocumentConnector {
       updated_at: string;
       state: string;
       pull_request?: unknown;
-    }>;
+    }[];
 
     const now = Date.now();
     const since = opts?.since;
@@ -843,10 +856,7 @@ export class GitHubDocumentConnector extends BaseDocumentConnector {
 
       if (opts?.query) {
         const q = opts.query.toLowerCase();
-        if (
-          !issue.title.toLowerCase().includes(q) &&
-          !(issue.body ?? "").toLowerCase().includes(q)
-        )
+        if (!issue.title.toLowerCase().includes(q) && !(issue.body ?? "").toLowerCase().includes(q))
           continue;
       }
 
@@ -907,7 +917,7 @@ export class SlackDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { team: json.team } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
     const res = await this.fetchFn(`${SlackDocumentConnector.BASE}/api.test`, {
       headers: { Authorization: `Bearer ${this.token}` },
@@ -934,7 +944,7 @@ export class SlackDocumentConnector extends BaseDocumentConnector {
 
     const json = (await res.json()) as {
       ok: boolean;
-      messages?: Array<{ ts: string; text: string; user?: string }>;
+      messages?: { ts: string; text: string; user?: string }[];
     };
     if (!json.ok || !json.messages) return;
 
@@ -989,7 +999,7 @@ export class WebDocumentConnector extends BaseDocumentConnector {
     }
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     if (this.urls.length === 0) return { ok: true };
     try {
       const res = await this.fetchFn(this.urls[0]!);
@@ -1015,7 +1025,11 @@ export class WebDocumentConnector extends BaseDocumentConnector {
 
         // Derive a title from the first non-empty line, stripping HTML tags
         const firstLine = content.split("\n").find((l) => l.trim().length > 0) ?? url;
-        const title = firstLine.replace(/<[^>]*>/g, "").trim().slice(0, 200) || url;
+        const title =
+          firstLine
+            .replace(/<[^>]*>?/g, "")
+            .trim()
+            .slice(0, 200) || url;
 
         yield {
           id: makeDocId(this.id, url),
@@ -1038,6 +1052,7 @@ export class WebDocumentConnector extends BaseDocumentConnector {
 /** Injectable file reader — matches the signature of fs/promises readFile(path, "utf8") */
 export type ReadFileFn = (path: string) => Promise<string>;
 
+/** File system document connector config interface definition. */
 export interface FileSystemDocumentConnectorConfig {
   /** List of file paths to read */
   paths: string[];
@@ -1072,7 +1087,7 @@ export class FileSystemDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { pathCount: this.paths.length } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     return { ok: true, details: { pathCount: this.paths.length } };
   }
 
@@ -1149,7 +1164,7 @@ export class LinearDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { viewer: json.data?.viewer?.name } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
     const res = await this.fetchFn(LinearDocumentConnector.ENDPOINT, {
       method: "POST",
@@ -1178,14 +1193,14 @@ export class LinearDocumentConnector extends BaseDocumentConnector {
     const json = (await res.json()) as {
       data?: {
         issues?: {
-          nodes: Array<{
+          nodes: {
             id: string;
             title: string;
             description?: string;
             url: string;
             updatedAt: string;
             state?: { name: string };
-          }>;
+          }[];
         };
       };
     };
@@ -1245,17 +1260,23 @@ export class TavilyDocumentConnector extends BaseDocumentConnector {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ api_key: this.apiKey, query, search_depth: "basic", max_results: 1 }),
     });
-    if (res.status === 401 || res.status === 403) return { ok: false, error: "Tavily API key is invalid" };
+    if (res.status === 401 || res.status === 403)
+      return { ok: false, error: "Tavily API key is invalid" };
     if (!res.ok) return { ok: false, error: `Tavily API returned ${res.status}` };
     return { ok: true, metadata: { queryCount: this.queries.length } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
     const res = await this.fetchFn(`${TavilyDocumentConnector.BASE}/search`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ api_key: this.apiKey, query: "health", search_depth: "basic", max_results: 1 }),
+      body: JSON.stringify({
+        api_key: this.apiKey,
+        query: "health",
+        search_depth: "basic",
+        max_results: 1,
+      }),
     });
     return { ok: res.ok, latencyMs: Date.now() - start };
   }
@@ -1284,7 +1305,7 @@ export class TavilyDocumentConnector extends BaseDocumentConnector {
       if (!res.ok) continue;
 
       const json = (await res.json()) as {
-        results?: Array<{ title: string; url: string; content: string; score?: number }>;
+        results?: { title: string; url: string; content: string; score?: number }[];
       };
 
       for (const result of json.results ?? []) {
@@ -1321,6 +1342,7 @@ export interface NeonDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Neon document connector. */
 export class NeonDocumentConnector extends BaseDocumentConnector {
   readonly id = "neon-doc";
   readonly name = "Neon";
@@ -1349,7 +1371,7 @@ export class NeonDocumentConnector extends BaseDocumentConnector {
     return { ok: true };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
     const res = await this.fetchFn(this.cfg.endpointUrl, {
       method: "POST",
@@ -1399,6 +1421,7 @@ export interface RssDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Rss document connector. */
 export class RssDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name: string;
@@ -1424,7 +1447,7 @@ export class RssDocumentConnector extends BaseDocumentConnector {
     return { ok: true };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
     const res = await this.fetchFn(this.feedUrl);
     return { ok: res.ok, latencyMs: Date.now() - start };
@@ -1454,7 +1477,8 @@ export class RssDocumentConnector extends BaseDocumentConnector {
         tagRe("summary").exec(block)?.[1] ??
         ""
       ).trim();
-      const pubDate = tagRe("pubDate").exec(block)?.[1] ?? tagRe("published").exec(block)?.[1] ?? "";
+      const pubDate =
+        tagRe("pubDate").exec(block)?.[1] ?? tagRe("published").exec(block)?.[1] ?? "";
       if (!link) continue;
       yield {
         id: makeDocId(this.id, link),
@@ -1482,11 +1506,14 @@ interface NotionPage {
   id: string;
   url?: string;
   last_edited_time?: string;
-  properties?: Record<string, {
-    type?: string;
-    title?: Array<{ plain_text?: string }>;
-    rich_text?: Array<{ plain_text?: string }>;
-  }>;
+  properties?: Record<
+    string,
+    {
+      type?: string;
+      title?: { plain_text?: string }[];
+      rich_text?: { plain_text?: string }[];
+    }
+  >;
 }
 
 function extractNotionTitle(page: NotionPage): string {
@@ -1497,6 +1524,7 @@ function extractNotionTitle(page: NotionPage): string {
   return page.id;
 }
 
+/** Notion document connector. */
 export class NotionDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Notion";
@@ -1524,15 +1552,19 @@ export class NotionDocumentConnector extends BaseDocumentConnector {
   }
 
   protected async _doConnect(): Promise<ConnectResult> {
-    const res = await this.fetchFn(`${NotionDocumentConnector.BASE}/users/me`, { headers: this.headers });
+    const res = await this.fetchFn(`${NotionDocumentConnector.BASE}/users/me`, {
+      headers: this.headers,
+    });
     if (res.status === 401) return { ok: false, error: "Notion token invalid" };
     if (!res.ok) return { ok: false, error: `Notion returned ${res.status}` };
     return { ok: true };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
-    const res = await this.fetchFn(`${NotionDocumentConnector.BASE}/users/me`, { headers: this.headers });
+    const res = await this.fetchFn(`${NotionDocumentConnector.BASE}/users/me`, {
+      headers: this.headers,
+    });
     return { ok: res.ok, latencyMs: Date.now() - start };
   }
 
@@ -1551,7 +1583,11 @@ export class NotionDocumentConnector extends BaseDocumentConnector {
         { method: "POST", headers: this.headers, body: JSON.stringify(body) },
       );
       if (!res.ok) break;
-      const json = (await res.json()) as { results?: NotionPage[]; has_more?: boolean; next_cursor?: string | null };
+      const json = (await res.json()) as {
+        results?: NotionPage[];
+        has_more?: boolean;
+        next_cursor?: string | null;
+      };
       for (const page of json.results ?? []) {
         if (opts?.limit !== undefined && emitted >= opts.limit) break;
         const title = extractNotionTitle(page);
@@ -1582,6 +1618,7 @@ export interface ConfluenceDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Confluence document connector. */
 export class ConfluenceDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Confluence";
@@ -1610,7 +1647,7 @@ export class ConfluenceDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { user: json.displayName } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
     const res = await this.fetchFn(`${this.cfg.baseUrl}/wiki/rest/api/user/current`, {
       headers: { Authorization: this.authHeader, Accept: "application/json" },
@@ -1635,7 +1672,12 @@ export class ConfluenceDocumentConnector extends BaseDocumentConnector {
       });
       if (!res.ok) break;
       const json = (await res.json()) as {
-        results?: Array<{ id: string; title: string; body?: { storage?: { value?: string } }; _links?: { webui?: string } }>;
+        results?: {
+          id: string;
+          title: string;
+          body?: { storage?: { value?: string } };
+          _links?: { webui?: string };
+        }[];
       };
       const pages = json.results ?? [];
       if (pages.length === 0) break;
@@ -1672,7 +1714,7 @@ export interface JiraDocumentConnectorConfig {
 }
 
 function extractJiraText(
-  doc: { content?: Array<{ content?: Array<{ text?: string }> }> } | undefined,
+  doc: { content?: { content?: { text?: string }[] }[] } | undefined,
 ): string {
   if (!doc?.content) return "";
   return doc.content
@@ -1682,6 +1724,7 @@ function extractJiraText(
     .trim();
 }
 
+/** Jira document connector. */
 export class JiraDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Jira";
@@ -1710,7 +1753,7 @@ export class JiraDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { user: json.displayName } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
     const res = await this.fetchFn(`${this.cfg.baseUrl}/rest/api/3/myself`, {
       headers: { Authorization: this.authHeader, Accept: "application/json" },
@@ -1729,12 +1772,28 @@ export class JiraDocumentConnector extends BaseDocumentConnector {
       if (opts?.limit !== undefined && emitted >= opts.limit) break;
       const res = await this.fetchFn(`${this.cfg.baseUrl}/rest/api/3/search`, {
         method: "POST",
-        headers: { Authorization: this.authHeader, "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ jql, fields: ["summary", "description", "status"], startAt, maxResults }),
+        headers: {
+          Authorization: this.authHeader,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          jql,
+          fields: ["summary", "description", "status"],
+          startAt,
+          maxResults,
+        }),
       });
       if (!res.ok) break;
       const json = (await res.json()) as {
-        issues?: Array<{ key: string; fields?: { summary?: string; description?: { content?: Array<{ content?: Array<{ text?: string }> }> }; status?: { name?: string } } }>;
+        issues?: {
+          key: string;
+          fields?: {
+            summary?: string;
+            description?: { content?: { content?: { text?: string }[] }[] };
+            status?: { name?: string };
+          };
+        }[];
         total?: number;
       };
       const issues = json.issues ?? [];
@@ -1768,6 +1827,7 @@ export interface GitLabDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Git lab document connector. */
 export class GitLabDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "GitLab";
@@ -1788,8 +1848,12 @@ export class GitLabDocumentConnector extends BaseDocumentConnector {
     this.fetchFn = config.fetch ?? fetch;
   }
 
-  private get apiBase(): string { return `${this.baseUrl}/api/v4`; }
-  private get authHeaders(): Record<string, string> { return { "PRIVATE-TOKEN": this.token }; }
+  private get apiBase(): string {
+    return `${this.baseUrl}/api/v4`;
+  }
+  private get authHeaders(): Record<string, string> {
+    return { "PRIVATE-TOKEN": this.token };
+  }
 
   protected async _doConnect(): Promise<ConnectResult> {
     const res = await this.fetchFn(`${this.apiBase}/user`, { headers: this.authHeaders });
@@ -1799,7 +1863,7 @@ export class GitLabDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { username: json.username } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
     const res = await this.fetchFn(`${this.apiBase}/user`, { headers: this.authHeaders });
     return { ok: res.ok, latencyMs: Date.now() - start };
@@ -1809,10 +1873,12 @@ export class GitLabDocumentConnector extends BaseDocumentConnector {
     const pid = encodeURIComponent(String(this.projectId));
     const now = Date.now();
     let emitted = 0;
-    const endpoints: Array<"issues" | "merge_requests"> =
-      this.syncType === "issues" ? ["issues"]
-      : this.syncType === "merge_requests" ? ["merge_requests"]
-      : ["issues", "merge_requests"];
+    const endpoints: ("issues" | "merge_requests")[] =
+      this.syncType === "issues"
+        ? ["issues"]
+        : this.syncType === "merge_requests"
+          ? ["merge_requests"]
+          : ["issues", "merge_requests"];
 
     for (const endpoint of endpoints) {
       let page = 1;
@@ -1823,7 +1889,13 @@ export class GitLabDocumentConnector extends BaseDocumentConnector {
           { headers: this.authHeaders },
         );
         if (!res.ok) break;
-        const items = (await res.json()) as Array<{ iid: number; title: string; description?: string; web_url: string; state?: string }>;
+        const items = (await res.json()) as {
+          iid: number;
+          title: string;
+          description?: string;
+          web_url: string;
+          state?: string;
+        }[];
         if (items.length === 0) break;
         for (const item of items) {
           if (opts?.limit !== undefined && emitted >= opts.limit) break;
@@ -1854,6 +1926,7 @@ export interface HackerNewsDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Hacker news document connector. */
 export class HackerNewsDocumentConnector extends BaseDocumentConnector {
   readonly id = "hackernews-doc";
   readonly name = "Hacker News";
@@ -1874,14 +1947,16 @@ export class HackerNewsDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { storyType: this.storyType } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
     const res = await this.fetchFn(`${HackerNewsDocumentConnector.BASE}/${this.storyType}.json`);
     return { ok: res.ok, latencyMs: Date.now() - start };
   }
 
   protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
-    const listRes = await this.fetchFn(`${HackerNewsDocumentConnector.BASE}/${this.storyType}.json`);
+    const listRes = await this.fetchFn(
+      `${HackerNewsDocumentConnector.BASE}/${this.storyType}.json`,
+    );
     if (!listRes.ok) return;
     const ids = (await listRes.json()) as number[];
     const limit = opts?.limit ?? 30;
@@ -1890,7 +1965,15 @@ export class HackerNewsDocumentConnector extends BaseDocumentConnector {
     for (const id of ids.slice(0, limit)) {
       const itemRes = await this.fetchFn(`${HackerNewsDocumentConnector.BASE}/item/${id}.json`);
       if (!itemRes.ok) continue;
-      const item = (await itemRes.json()) as { id: number; title?: string; url?: string; text?: string; by?: string; score?: number; type?: string };
+      const item = (await itemRes.json()) as {
+        id: number;
+        title?: string;
+        url?: string;
+        text?: string;
+        by?: string;
+        score?: number;
+        type?: string;
+      };
       if (!item.title) continue;
       const url = item.url ?? `https://news.ycombinator.com/item?id=${item.id}`;
       yield {
@@ -1922,6 +2005,7 @@ export interface AirtableDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Airtable document connector. */
 export class AirtableDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Airtable";
@@ -1946,12 +2030,13 @@ export class AirtableDocumentConnector extends BaseDocumentConnector {
       `${AirtableDocumentConnector.BASE}/${this.cfg.baseId}/${encodeURIComponent(this.cfg.tableId)}?maxRecords=1`,
       { headers: this.headers },
     );
-    if (res.status === 401 || res.status === 403) return { ok: false, error: "Airtable API key invalid" };
+    if (res.status === 401 || res.status === 403)
+      return { ok: false, error: "Airtable API key invalid" };
     if (!res.ok) return { ok: false, error: `Airtable returned ${res.status}` };
     return { ok: true };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
     const res = await this.fetchFn(
       `${AirtableDocumentConnector.BASE}/${this.cfg.baseId}/${encodeURIComponent(this.cfg.tableId)}?maxRecords=1`,
@@ -1978,14 +2063,25 @@ export class AirtableDocumentConnector extends BaseDocumentConnector {
       );
       if (!res.ok) break;
 
-      const json = (await res.json()) as { records?: Array<{ id: string; fields?: Record<string, unknown> }>; offset?: string };
+      const json = (await res.json()) as {
+        records?: { id: string; fields?: Record<string, unknown> }[];
+        offset?: string;
+      };
       for (const record of json.records ?? []) {
         if (opts?.limit !== undefined && emitted >= opts.limit) break;
         const fields = record.fields ?? {};
         const title = String(fields[titleField] ?? record.id);
         const content = String(fields[contentField] ?? "");
         const url = `https://airtable.com/${this.cfg.baseId}/${this.cfg.tableId}/${record.id}`;
-        yield { id: makeDocId(this.id, record.id), title, content, sourceUrl: url, connectorId: this.id, syncedAt: now, metadata: { airtableId: record.id } };
+        yield {
+          id: makeDocId(this.id, record.id),
+          title,
+          content,
+          sourceUrl: url,
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { airtableId: record.id },
+        };
         emitted++;
       }
       offset = json.offset;
@@ -2003,6 +2099,7 @@ export interface AsanaDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Asana document connector. */
 export class AsanaDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Asana";
@@ -2025,16 +2122,20 @@ export class AsanaDocumentConnector extends BaseDocumentConnector {
   }
 
   protected async _doConnect(): Promise<ConnectResult> {
-    const res = await this.fetchFn(`${AsanaDocumentConnector.BASE}/users/me`, { headers: this.headers });
+    const res = await this.fetchFn(`${AsanaDocumentConnector.BASE}/users/me`, {
+      headers: this.headers,
+    });
     if (res.status === 401) return { ok: false, error: "Asana token invalid" };
     if (!res.ok) return { ok: false, error: `Asana returned ${res.status}` };
     const json = (await res.json()) as { data?: { name?: string; email?: string } };
     return { ok: true, metadata: { user: json.data?.name, email: json.data?.email } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
-    const res = await this.fetchFn(`${AsanaDocumentConnector.BASE}/users/me`, { headers: this.headers });
+    const res = await this.fetchFn(`${AsanaDocumentConnector.BASE}/users/me`, {
+      headers: this.headers,
+    });
     return { ok: res.ok, latencyMs: Date.now() - start };
   }
 
@@ -2045,16 +2146,33 @@ export class AsanaDocumentConnector extends BaseDocumentConnector {
 
     do {
       if (opts?.limit !== undefined && emitted >= opts.limit) break;
-      const params = new URLSearchParams({ project: this.projectGid, limit: "100", opt_fields: "name,notes,permalink_url" });
+      const params = new URLSearchParams({
+        project: this.projectGid,
+        limit: "100",
+        opt_fields: "name,notes,permalink_url",
+      });
       if (cursor) params.set("offset", cursor);
 
-      const res = await this.fetchFn(`${AsanaDocumentConnector.BASE}/tasks?${params}`, { headers: this.headers });
+      const res = await this.fetchFn(`${AsanaDocumentConnector.BASE}/tasks?${params}`, {
+        headers: this.headers,
+      });
       if (!res.ok) break;
 
-      const json = (await res.json()) as { data?: Array<{ gid: string; name?: string; notes?: string; permalink_url?: string }>; next_page?: { offset?: string } };
+      const json = (await res.json()) as {
+        data?: { gid: string; name?: string; notes?: string; permalink_url?: string }[];
+        next_page?: { offset?: string };
+      };
       for (const task of json.data ?? []) {
         if (opts?.limit !== undefined && emitted >= opts.limit) break;
-        yield { id: makeDocId(this.id, task.gid), title: task.name ?? task.gid, content: task.notes ?? "", sourceUrl: task.permalink_url ?? `https://app.asana.com/0/${this.projectGid}/${task.gid}`, connectorId: this.id, syncedAt: now, metadata: { gid: task.gid } };
+        yield {
+          id: makeDocId(this.id, task.gid),
+          title: task.name ?? task.gid,
+          content: task.notes ?? "",
+          sourceUrl: task.permalink_url ?? `https://app.asana.com/0/${this.projectGid}/${task.gid}`,
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { gid: task.gid },
+        };
         emitted++;
       }
       cursor = json.next_page?.offset;
@@ -2072,6 +2190,7 @@ export interface BitbucketDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Bitbucket document connector. */
 export class BitbucketDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Bitbucket";
@@ -2092,32 +2211,53 @@ export class BitbucketDocumentConnector extends BaseDocumentConnector {
   }
 
   protected async _doConnect(): Promise<ConnectResult> {
-    const res = await this.fetchFn(`${BitbucketDocumentConnector.BASE}/user`, { headers: { Authorization: this.authHeader } });
+    const res = await this.fetchFn(`${BitbucketDocumentConnector.BASE}/user`, {
+      headers: { Authorization: this.authHeader },
+    });
     if (res.status === 401) return { ok: false, error: "Bitbucket credentials invalid" };
     if (!res.ok) return { ok: false, error: `Bitbucket returned ${res.status}` };
     const json = (await res.json()) as { display_name?: string };
     return { ok: true, metadata: { user: json.display_name } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
-    const res = await this.fetchFn(`${BitbucketDocumentConnector.BASE}/user`, { headers: { Authorization: this.authHeader } });
+    const res = await this.fetchFn(`${BitbucketDocumentConnector.BASE}/user`, {
+      headers: { Authorization: this.authHeader },
+    });
     return { ok: res.ok, latencyMs: Date.now() - start };
   }
 
   protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
     const now = Date.now();
-    let url: string | undefined = `${BitbucketDocumentConnector.BASE}/repositories/${this.cfg.workspace}/${this.cfg.repoSlug}/issues?pagelen=50`;
+    let url: string | undefined =
+      `${BitbucketDocumentConnector.BASE}/repositories/${this.cfg.workspace}/${this.cfg.repoSlug}/issues?pagelen=50`;
     let emitted = 0;
 
     while (url) {
       if (opts?.limit !== undefined && emitted >= opts.limit) break;
       const res = await this.fetchFn(url, { headers: { Authorization: this.authHeader } });
       if (!res.ok) break;
-      const json = (await res.json()) as { values?: Array<{ id: number; title: string; content?: { raw?: string }; links?: { html?: { href?: string } } }>; next?: string };
+      const json = (await res.json()) as {
+        values?: {
+          id: number;
+          title: string;
+          content?: { raw?: string };
+          links?: { html?: { href?: string } };
+        }[];
+        next?: string;
+      };
       for (const issue of json.values ?? []) {
         if (opts?.limit !== undefined && emitted >= opts.limit) break;
-        yield { id: makeDocId(this.id, String(issue.id)), title: `Issue #${issue.id}: ${issue.title}`, content: issue.content?.raw ?? "", sourceUrl: issue.links?.html?.href ?? "", connectorId: this.id, syncedAt: now, metadata: { issueId: issue.id } };
+        yield {
+          id: makeDocId(this.id, String(issue.id)),
+          title: `Issue #${issue.id}: ${issue.title}`,
+          content: issue.content?.raw ?? "",
+          sourceUrl: issue.links?.html?.href ?? "",
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { issueId: issue.id },
+        };
         emitted++;
       }
       url = json.next;
@@ -2134,6 +2274,7 @@ export interface BookstackDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Bookstack document connector. */
 export class BookstackDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "BookStack";
@@ -2153,15 +2294,20 @@ export class BookstackDocumentConnector extends BaseDocumentConnector {
   }
 
   protected async _doConnect(): Promise<ConnectResult> {
-    const res = await this.fetchFn(`${this.cfg.baseUrl}/api/users?count=1`, { headers: { Authorization: this.authHeader } });
-    if (res.status === 401 || res.status === 403) return { ok: false, error: "BookStack token invalid" };
+    const res = await this.fetchFn(`${this.cfg.baseUrl}/api/users?count=1`, {
+      headers: { Authorization: this.authHeader },
+    });
+    if (res.status === 401 || res.status === 403)
+      return { ok: false, error: "BookStack token invalid" };
     if (!res.ok) return { ok: false, error: `BookStack returned ${res.status}` };
     return { ok: true };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
-    const res = await this.fetchFn(`${this.cfg.baseUrl}/api/users?count=1`, { headers: { Authorization: this.authHeader } });
+    const res = await this.fetchFn(`${this.cfg.baseUrl}/api/users?count=1`, {
+      headers: { Authorization: this.authHeader },
+    });
     return { ok: res.ok, latencyMs: Date.now() - start };
   }
 
@@ -2172,17 +2318,32 @@ export class BookstackDocumentConnector extends BaseDocumentConnector {
 
     while (true) {
       if (opts?.limit !== undefined && emitted >= opts.limit) break;
-      const res = await this.fetchFn(`${this.cfg.baseUrl}/api/pages?count=50&page=${page}`, { headers: { Authorization: this.authHeader } });
+      const res = await this.fetchFn(`${this.cfg.baseUrl}/api/pages?count=50&page=${page}`, {
+        headers: { Authorization: this.authHeader },
+      });
       if (!res.ok) break;
-      const json = (await res.json()) as { data?: Array<{ id: number; name: string; slug?: string; book_id?: number }>; total?: number };
+      const json = (await res.json()) as {
+        data?: { id: number; name: string; slug?: string; book_id?: number }[];
+        total?: number;
+      };
       const pages = json.data ?? [];
       if (pages.length === 0) break;
       for (const p of pages) {
         if (opts?.limit !== undefined && emitted >= opts.limit) break;
         // Fetch page content
-        const detail = await this.fetchFn(`${this.cfg.baseUrl}/api/pages/${p.id}`, { headers: { Authorization: this.authHeader } });
-        const content = detail.ok ? ((await detail.json()) as { html?: string }).html ?? "" : "";
-        yield { id: makeDocId(this.id, String(p.id)), title: p.name, content, sourceUrl: `${this.cfg.baseUrl}/books/${p.book_id}/page/${p.slug ?? p.id}`, connectorId: this.id, syncedAt: now, metadata: { pageId: p.id } };
+        const detail = await this.fetchFn(`${this.cfg.baseUrl}/api/pages/${p.id}`, {
+          headers: { Authorization: this.authHeader },
+        });
+        const content = detail.ok ? (((await detail.json()) as { html?: string }).html ?? "") : "";
+        yield {
+          id: makeDocId(this.id, String(p.id)),
+          title: p.name,
+          content,
+          sourceUrl: `${this.cfg.baseUrl}/books/${p.book_id}/page/${p.slug ?? p.id}`,
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { pageId: p.id },
+        };
         emitted++;
       }
       if (pages.length < 50) break;
@@ -2200,6 +2361,7 @@ export interface CanvasDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Canvas document connector. */
 export class CanvasDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Canvas";
@@ -2219,16 +2381,20 @@ export class CanvasDocumentConnector extends BaseDocumentConnector {
   }
 
   protected async _doConnect(): Promise<ConnectResult> {
-    const res = await this.fetchFn(`${this.cfg.baseUrl}/api/v1/users/self`, { headers: this.headers });
+    const res = await this.fetchFn(`${this.cfg.baseUrl}/api/v1/users/self`, {
+      headers: this.headers,
+    });
     if (res.status === 401) return { ok: false, error: "Canvas token invalid" };
     if (!res.ok) return { ok: false, error: `Canvas returned ${res.status}` };
     const json = (await res.json()) as { name?: string };
     return { ok: true, metadata: { user: json.name } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
-    const res = await this.fetchFn(`${this.cfg.baseUrl}/api/v1/users/self`, { headers: this.headers });
+    const res = await this.fetchFn(`${this.cfg.baseUrl}/api/v1/users/self`, {
+      headers: this.headers,
+    });
     return { ok: res.ok, latencyMs: Date.now() - start };
   }
 
@@ -2236,19 +2402,37 @@ export class CanvasDocumentConnector extends BaseDocumentConnector {
     const now = Date.now();
     let emitted = 0;
     // Fetch courses first
-    const coursesRes = await this.fetchFn(`${this.cfg.baseUrl}/api/v1/courses?per_page=50`, { headers: this.headers });
+    const coursesRes = await this.fetchFn(`${this.cfg.baseUrl}/api/v1/courses?per_page=50`, {
+      headers: this.headers,
+    });
     if (!coursesRes.ok) return;
-    const courses = (await coursesRes.json()) as Array<{ id: number; name: string }>;
+    const courses = (await coursesRes.json()) as { id: number; name: string }[];
 
     for (const course of courses) {
       if (opts?.limit !== undefined && emitted >= opts.limit) break;
       // Fetch announcements per course
-      const annRes = await this.fetchFn(`${this.cfg.baseUrl}/api/v1/courses/${course.id}/discussion_topics?only_announcements=true&per_page=50`, { headers: this.headers });
+      const annRes = await this.fetchFn(
+        `${this.cfg.baseUrl}/api/v1/courses/${course.id}/discussion_topics?only_announcements=true&per_page=50`,
+        { headers: this.headers },
+      );
       if (!annRes.ok) continue;
-      const announcements = (await annRes.json()) as Array<{ id: number; title: string; message?: string; html_url?: string }>;
+      const announcements = (await annRes.json()) as {
+        id: number;
+        title: string;
+        message?: string;
+        html_url?: string;
+      }[];
       for (const ann of announcements) {
         if (opts?.limit !== undefined && emitted >= opts.limit) break;
-        yield { id: makeDocId(this.id, `${course.id}/${ann.id}`), title: `[${course.name}] ${ann.title}`, content: ann.message ?? "", sourceUrl: ann.html_url ?? "", connectorId: this.id, syncedAt: now, metadata: { courseId: course.id } };
+        yield {
+          id: makeDocId(this.id, `${course.id}/${ann.id}`),
+          title: `[${course.name}] ${ann.title}`,
+          content: ann.message ?? "",
+          sourceUrl: ann.html_url ?? "",
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { courseId: course.id },
+        };
         emitted++;
       }
     }
@@ -2264,6 +2448,7 @@ export interface ClickUpDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Click up document connector. */
 export class ClickUpDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "ClickUp";
@@ -2286,16 +2471,20 @@ export class ClickUpDocumentConnector extends BaseDocumentConnector {
   }
 
   protected async _doConnect(): Promise<ConnectResult> {
-    const res = await this.fetchFn(`${ClickUpDocumentConnector.BASE}/user`, { headers: this.headers });
+    const res = await this.fetchFn(`${ClickUpDocumentConnector.BASE}/user`, {
+      headers: this.headers,
+    });
     if (res.status === 401) return { ok: false, error: "ClickUp API key invalid" };
     if (!res.ok) return { ok: false, error: `ClickUp returned ${res.status}` };
     const json = (await res.json()) as { user?: { username?: string } };
     return { ok: true, metadata: { user: json.user?.username } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
-    const res = await this.fetchFn(`${ClickUpDocumentConnector.BASE}/user`, { headers: this.headers });
+    const res = await this.fetchFn(`${ClickUpDocumentConnector.BASE}/user`, {
+      headers: this.headers,
+    });
     return { ok: res.ok, latencyMs: Date.now() - start };
   }
 
@@ -2303,20 +2492,39 @@ export class ClickUpDocumentConnector extends BaseDocumentConnector {
     const now = Date.now();
     let emitted = 0;
     // Get lists in space
-    const listsRes = await this.fetchFn(`${ClickUpDocumentConnector.BASE}/space/${this.spaceId}/list`, { headers: this.headers });
+    const listsRes = await this.fetchFn(
+      `${ClickUpDocumentConnector.BASE}/space/${this.spaceId}/list`,
+      { headers: this.headers },
+    );
     if (!listsRes.ok) return;
-    const { lists = [] } = (await listsRes.json()) as { lists?: Array<{ id: string; name: string }> };
+    const { lists = [] } = (await listsRes.json()) as {
+      lists?: { id: string; name: string }[];
+    };
 
     for (const list of lists) {
       let page = 0;
       while (true) {
         if (opts?.limit !== undefined && emitted >= opts.limit) break;
-        const res = await this.fetchFn(`${ClickUpDocumentConnector.BASE}/list/${list.id}/task?page=${page}&include_closed=true`, { headers: this.headers });
+        const res = await this.fetchFn(
+          `${ClickUpDocumentConnector.BASE}/list/${list.id}/task?page=${page}&include_closed=true`,
+          { headers: this.headers },
+        );
         if (!res.ok) break;
-        const json = (await res.json()) as { tasks?: Array<{ id: string; name: string; description?: string; url?: string }>; last_page?: boolean };
+        const json = (await res.json()) as {
+          tasks?: { id: string; name: string; description?: string; url?: string }[];
+          last_page?: boolean;
+        };
         for (const task of json.tasks ?? []) {
           if (opts?.limit !== undefined && emitted >= opts.limit) break;
-          yield { id: makeDocId(this.id, task.id), title: `[${list.name}] ${task.name}`, content: task.description ?? "", sourceUrl: task.url ?? `https://app.clickup.com/t/${task.id}`, connectorId: this.id, syncedAt: now, metadata: { taskId: task.id, listId: list.id } };
+          yield {
+            id: makeDocId(this.id, task.id),
+            title: `[${list.name}] ${task.name}`,
+            content: task.description ?? "",
+            sourceUrl: task.url ?? `https://app.clickup.com/t/${task.id}`,
+            connectorId: this.id,
+            syncedAt: now,
+            metadata: { taskId: task.id, listId: list.id },
+          };
           emitted++;
         }
         if (json.last_page) break;
@@ -2335,6 +2543,7 @@ export interface CodaDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Coda document connector. */
 export class CodaDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Coda";
@@ -2357,16 +2566,21 @@ export class CodaDocumentConnector extends BaseDocumentConnector {
   }
 
   protected async _doConnect(): Promise<ConnectResult> {
-    const res = await this.fetchFn(`${CodaDocumentConnector.BASE}/docs/${this.docId}`, { headers: this.headers });
-    if (res.status === 401 || res.status === 403) return { ok: false, error: "Coda API token invalid" };
+    const res = await this.fetchFn(`${CodaDocumentConnector.BASE}/docs/${this.docId}`, {
+      headers: this.headers,
+    });
+    if (res.status === 401 || res.status === 403)
+      return { ok: false, error: "Coda API token invalid" };
     if (!res.ok) return { ok: false, error: `Coda returned ${res.status}` };
     const json = (await res.json()) as { name?: string };
     return { ok: true, metadata: { docName: json.name } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
-    const res = await this.fetchFn(`${CodaDocumentConnector.BASE}/docs/${this.docId}`, { headers: this.headers });
+    const res = await this.fetchFn(`${CodaDocumentConnector.BASE}/docs/${this.docId}`, {
+      headers: this.headers,
+    });
     return { ok: res.ok, latencyMs: Date.now() - start };
   }
 
@@ -2379,15 +2593,38 @@ export class CodaDocumentConnector extends BaseDocumentConnector {
       if (opts?.limit !== undefined && emitted >= opts.limit) break;
       const params = new URLSearchParams({ limit: "50" });
       if (pageToken) params.set("pageToken", pageToken);
-      const res = await this.fetchFn(`${CodaDocumentConnector.BASE}/docs/${this.docId}/pages?${params}`, { headers: this.headers });
+      const res = await this.fetchFn(
+        `${CodaDocumentConnector.BASE}/docs/${this.docId}/pages?${params}`,
+        { headers: this.headers },
+      );
       if (!res.ok) break;
-      const json = (await res.json()) as { items?: Array<{ id: string; name: string; browserLink?: string }>; nextPageToken?: string };
+      const json = (await res.json()) as {
+        items?: { id: string; name: string; browserLink?: string }[];
+        nextPageToken?: string;
+      };
       for (const page of json.items ?? []) {
         if (opts?.limit !== undefined && emitted >= opts.limit) break;
         // Fetch page content export
-        const exportRes = await this.fetchFn(`${CodaDocumentConnector.BASE}/docs/${this.docId}/pages/${page.id}/export`, { method: "POST", headers: { ...this.headers, "Content-Type": "application/json" }, body: JSON.stringify({ outputFormat: "markdown" }) });
-        const content = exportRes.ok ? ((await exportRes.json()) as { markdown?: string }).markdown ?? "" : "";
-        yield { id: makeDocId(this.id, page.id), title: page.name, content, sourceUrl: page.browserLink ?? `https://coda.io/d/${this.docId}/${page.id}`, connectorId: this.id, syncedAt: now, metadata: { pageId: page.id } };
+        const exportRes = await this.fetchFn(
+          `${CodaDocumentConnector.BASE}/docs/${this.docId}/pages/${page.id}/export`,
+          {
+            method: "POST",
+            headers: { ...this.headers, "Content-Type": "application/json" },
+            body: JSON.stringify({ outputFormat: "markdown" }),
+          },
+        );
+        const content = exportRes.ok
+          ? (((await exportRes.json()) as { markdown?: string }).markdown ?? "")
+          : "";
+        yield {
+          id: makeDocId(this.id, page.id),
+          title: page.name,
+          content,
+          sourceUrl: page.browserLink ?? `https://coda.io/d/${this.docId}/${page.id}`,
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { pageId: page.id },
+        };
         emitted++;
       }
       pageToken = json.nextPageToken;
@@ -2405,6 +2642,7 @@ export interface DiscordDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Discord document connector. */
 export class DiscordDocumentConnector extends BaseDocumentConnector {
   readonly id = "discord-doc";
   readonly name = "Discord";
@@ -2426,23 +2664,29 @@ export class DiscordDocumentConnector extends BaseDocumentConnector {
   }
 
   protected async _doConnect(): Promise<ConnectResult> {
-    const res = await this.fetchFn(`${DiscordDocumentConnector.BASE}/users/@me`, { headers: this.headers });
+    const res = await this.fetchFn(`${DiscordDocumentConnector.BASE}/users/@me`, {
+      headers: this.headers,
+    });
     if (res.status === 401) return { ok: false, error: "Discord bot token invalid" };
     if (!res.ok) return { ok: false, error: `Discord returned ${res.status}` };
     const json = (await res.json()) as { username?: string; id?: string };
     return { ok: true, metadata: { bot: json.username, id: json.id } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
-    const res = await this.fetchFn(`${DiscordDocumentConnector.BASE}/users/@me`, { headers: this.headers });
+    const res = await this.fetchFn(`${DiscordDocumentConnector.BASE}/users/@me`, {
+      headers: this.headers,
+    });
     return { ok: res.ok, latencyMs: Date.now() - start };
   }
 
   protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
     const now = Date.now();
     let emitted = 0;
-    const perChannel = opts?.limit ? Math.ceil(opts.limit / Math.max(1, this.channelIds.length)) : 100;
+    const perChannel = opts?.limit
+      ? Math.ceil(opts.limit / Math.max(1, this.channelIds.length))
+      : 100;
 
     for (const channelId of this.channelIds) {
       if (opts?.limit !== undefined && emitted >= opts.limit) break;
@@ -2452,14 +2696,30 @@ export class DiscordDocumentConnector extends BaseDocumentConnector {
       while (fetched < perChannel) {
         const params = new URLSearchParams({ limit: "100" });
         if (before) params.set("before", before);
-        const res = await this.fetchFn(`${DiscordDocumentConnector.BASE}/channels/${channelId}/messages?${params}`, { headers: this.headers });
+        const res = await this.fetchFn(
+          `${DiscordDocumentConnector.BASE}/channels/${channelId}/messages?${params}`,
+          { headers: this.headers },
+        );
         if (!res.ok) break;
-        const messages = (await res.json()) as Array<{ id: string; content?: string; author?: { username?: string }; timestamp?: string }>;
+        const messages = (await res.json()) as {
+          id: string;
+          content?: string;
+          author?: { username?: string };
+          timestamp?: string;
+        }[];
         if (messages.length === 0) break;
         for (const msg of messages) {
           if (opts?.limit !== undefined && emitted >= opts.limit) break;
           if (!msg.content?.trim()) continue;
-          yield { id: makeDocId(this.id, msg.id), title: `Discord message by ${msg.author?.username ?? "unknown"}`, content: msg.content, sourceUrl: `https://discord.com/channels/${channelId}/${msg.id}`, connectorId: this.id, syncedAt: now, metadata: { channelId, author: msg.author?.username, timestamp: msg.timestamp } };
+          yield {
+            id: makeDocId(this.id, msg.id),
+            title: `Discord message by ${msg.author?.username ?? "unknown"}`,
+            content: msg.content,
+            sourceUrl: `https://discord.com/channels/${channelId}/${msg.id}`,
+            connectorId: this.id,
+            syncedAt: now,
+            metadata: { channelId, author: msg.author?.username, timestamp: msg.timestamp },
+          };
           emitted++;
           fetched++;
         }
@@ -2479,6 +2739,7 @@ export interface DiscourseDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Discourse document connector. */
 export class DiscourseDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Discourse";
@@ -2498,15 +2759,19 @@ export class DiscourseDocumentConnector extends BaseDocumentConnector {
   }
 
   protected async _doConnect(): Promise<ConnectResult> {
-    const res = await this.fetchFn(`${this.cfg.baseUrl}/users/${this.cfg.apiUsername}.json`, { headers: this.headers });
+    const res = await this.fetchFn(`${this.cfg.baseUrl}/users/${this.cfg.apiUsername}.json`, {
+      headers: this.headers,
+    });
     if (res.status === 403) return { ok: false, error: "Discourse API key invalid" };
     if (!res.ok) return { ok: false, error: `Discourse returned ${res.status}` };
     return { ok: true };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
-    const res = await this.fetchFn(`${this.cfg.baseUrl}/users/${this.cfg.apiUsername}.json`, { headers: this.headers });
+    const res = await this.fetchFn(`${this.cfg.baseUrl}/users/${this.cfg.apiUsername}.json`, {
+      headers: this.headers,
+    });
     return { ok: res.ok, latencyMs: Date.now() - start };
   }
 
@@ -2517,14 +2782,34 @@ export class DiscourseDocumentConnector extends BaseDocumentConnector {
 
     while (true) {
       if (opts?.limit !== undefined && emitted >= opts.limit) break;
-      const res = await this.fetchFn(`${this.cfg.baseUrl}/latest.json?page=${page}`, { headers: this.headers });
+      const res = await this.fetchFn(`${this.cfg.baseUrl}/latest.json?page=${page}`, {
+        headers: this.headers,
+      });
       if (!res.ok) break;
-      const json = (await res.json()) as { topic_list?: { topics?: Array<{ id: number; title: string; slug?: string; posts_count?: number; excerpt?: string }> } };
+      const json = (await res.json()) as {
+        topic_list?: {
+          topics?: {
+            id: number;
+            title: string;
+            slug?: string;
+            posts_count?: number;
+            excerpt?: string;
+          }[];
+        };
+      };
       const topics = json.topic_list?.topics ?? [];
       if (topics.length === 0) break;
       for (const topic of topics) {
         if (opts?.limit !== undefined && emitted >= opts.limit) break;
-        yield { id: makeDocId(this.id, String(topic.id)), title: topic.title, content: topic.excerpt ?? "", sourceUrl: `${this.cfg.baseUrl}/t/${topic.slug ?? topic.id}/${topic.id}`, connectorId: this.id, syncedAt: now, metadata: { topicId: topic.id, postsCount: topic.posts_count } };
+        yield {
+          id: makeDocId(this.id, String(topic.id)),
+          title: topic.title,
+          content: topic.excerpt ?? "",
+          sourceUrl: `${this.cfg.baseUrl}/t/${topic.slug ?? topic.id}/${topic.id}`,
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { topicId: topic.id, postsCount: topic.posts_count },
+        };
         emitted++;
       }
       page++;
@@ -2541,6 +2826,7 @@ export interface DropboxDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Dropbox document connector. */
 export class DropboxDocumentConnector extends BaseDocumentConnector {
   readonly id = "dropbox-doc";
   readonly name = "Dropbox";
@@ -2561,16 +2847,22 @@ export class DropboxDocumentConnector extends BaseDocumentConnector {
   }
 
   protected async _doConnect(): Promise<ConnectResult> {
-    const res = await this.fetchFn("https://api.dropboxapi.com/2/users/get_current_account", { method: "POST", headers: this.headers });
+    const res = await this.fetchFn("https://api.dropboxapi.com/2/users/get_current_account", {
+      method: "POST",
+      headers: this.headers,
+    });
     if (res.status === 401) return { ok: false, error: "Dropbox access token invalid" };
     if (!res.ok) return { ok: false, error: `Dropbox returned ${res.status}` };
     const json = (await res.json()) as { name?: { display_name?: string }; email?: string };
     return { ok: true, metadata: { user: json.name?.display_name, email: json.email } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
-    const res = await this.fetchFn("https://api.dropboxapi.com/2/users/get_current_account", { method: "POST", headers: this.headers });
+    const res = await this.fetchFn("https://api.dropboxapi.com/2/users/get_current_account", {
+      method: "POST",
+      headers: this.headers,
+    });
     return { ok: res.ok, latencyMs: Date.now() - start };
   }
 
@@ -2586,16 +2878,41 @@ export class DropboxDocumentConnector extends BaseDocumentConnector {
 
     while (hasMore) {
       if (opts?.limit !== undefined && emitted >= opts.limit) break;
-      if (cursor) { url = "https://api.dropboxapi.com/2/files/list_folder/continue"; body = { cursor }; }
+      if (cursor) {
+        url = "https://api.dropboxapi.com/2/files/list_folder/continue";
+        body = { cursor };
+      }
 
-      const res = await this.fetchFn(url, { method: "POST", headers: this.headers, body: JSON.stringify(body) });
+      const res = await this.fetchFn(url, {
+        method: "POST",
+        headers: this.headers,
+        body: JSON.stringify(body),
+      });
       if (!res.ok) break;
-      const json = (await res.json()) as { entries?: Array<{ ".tag"?: string; id?: string; name?: string; path_display?: string; path_lower?: string }>; has_more?: boolean; cursor?: string };
+      const json = (await res.json()) as {
+        entries?: {
+          ".tag"?: string;
+          id?: string;
+          name?: string;
+          path_display?: string;
+          path_lower?: string;
+        }[];
+        has_more?: boolean;
+        cursor?: string;
+      };
 
       for (const entry of json.entries ?? []) {
         if (entry[".tag"] !== "file") continue;
         if (opts?.limit !== undefined && emitted >= opts.limit) break;
-        yield { id: makeDocId(this.id, entry.path_lower ?? entry.id ?? ""), title: entry.name ?? "", content: "", sourceUrl: `https://www.dropbox.com/home${entry.path_display ?? ""}`, connectorId: this.id, syncedAt: now, metadata: { path: entry.path_display } };
+        yield {
+          id: makeDocId(this.id, entry.path_lower ?? entry.id ?? ""),
+          title: entry.name ?? "",
+          content: "",
+          sourceUrl: `https://www.dropbox.com/home${entry.path_display ?? ""}`,
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { path: entry.path_display },
+        };
         emitted++;
       }
       hasMore = json.has_more ?? false;
@@ -2611,6 +2928,7 @@ export interface FirefliesDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Fireflies document connector. */
 export class FirefliesDocumentConnector extends BaseDocumentConnector {
   readonly id = "fireflies-doc";
   readonly name = "Fireflies";
@@ -2629,7 +2947,10 @@ export class FirefliesDocumentConnector extends BaseDocumentConnector {
     return { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" };
   }
 
-  private async gql(query: string, variables?: Record<string, unknown>): Promise<{ data?: Record<string, unknown>; errors?: unknown[] }> {
+  private async gql(
+    query: string,
+    variables?: Record<string, unknown>,
+  ): Promise<{ data?: Record<string, unknown>; errors?: unknown[] }> {
     const res = await this.fetchFn(FirefliesDocumentConnector.BASE, {
       method: "POST",
       headers: this.headers,
@@ -2642,11 +2963,11 @@ export class FirefliesDocumentConnector extends BaseDocumentConnector {
   protected async _doConnect(): Promise<ConnectResult> {
     const result = await this.gql(`query { user { email name } }`);
     if (result.errors?.length) return { ok: false, error: "Fireflies API key invalid" };
-    const user = (result.data?.["user"] as Record<string, unknown> | undefined);
+    const user = result.data?.["user"] as Record<string, unknown> | undefined;
     return { ok: true, metadata: { email: user?.["email"], name: user?.["name"] } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
     const result = await this.gql(`query { user { email } }`);
     return { ok: !result.errors?.length, latencyMs: Date.now() - start };
@@ -2659,9 +2980,23 @@ export class FirefliesDocumentConnector extends BaseDocumentConnector {
       `query Transcripts($limit: Int) { transcripts(limit: $limit) { id title date summary { overview } } }`,
       { limit },
     );
-    const transcripts = (result.data?.["transcripts"] as Array<{ id: string; title?: string; date?: string; summary?: { overview?: string } }>) ?? [];
+    const transcripts =
+      (result.data?.["transcripts"] as {
+        id: string;
+        title?: string;
+        date?: string;
+        summary?: { overview?: string };
+      }[]) ?? [];
     for (const t of transcripts) {
-      yield { id: makeDocId(this.id, t.id), title: t.title ?? t.id, content: t.summary?.overview ?? "", sourceUrl: `https://app.fireflies.ai/view/${t.id}`, connectorId: this.id, syncedAt: now, metadata: { transcriptId: t.id, date: t.date } };
+      yield {
+        id: makeDocId(this.id, t.id),
+        title: t.title ?? t.id,
+        content: t.summary?.overview ?? "",
+        sourceUrl: `https://app.fireflies.ai/view/${t.id}`,
+        connectorId: this.id,
+        syncedAt: now,
+        metadata: { transcriptId: t.id, date: t.date },
+      };
     }
   }
 }
@@ -2674,6 +3009,7 @@ export interface FreshdeskDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Freshdesk document connector. */
 export class FreshdeskDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Freshdesk";
@@ -2695,16 +3031,20 @@ export class FreshdeskDocumentConnector extends BaseDocumentConnector {
   }
 
   protected async _doConnect(): Promise<ConnectResult> {
-    const res = await this.fetchFn(`https://${this.domain}.freshdesk.com/api/v2/agents/me`, { headers: { Authorization: this.authHeader } });
+    const res = await this.fetchFn(`https://${this.domain}.freshdesk.com/api/v2/agents/me`, {
+      headers: { Authorization: this.authHeader },
+    });
     if (res.status === 401) return { ok: false, error: "Freshdesk API key invalid" };
     if (!res.ok) return { ok: false, error: `Freshdesk returned ${res.status}` };
     const json = (await res.json()) as { contact?: { name?: string } };
     return { ok: true, metadata: { user: json.contact?.name } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
-    const res = await this.fetchFn(`https://${this.domain}.freshdesk.com/api/v2/agents/me`, { headers: { Authorization: this.authHeader } });
+    const res = await this.fetchFn(`https://${this.domain}.freshdesk.com/api/v2/agents/me`, {
+      headers: { Authorization: this.authHeader },
+    });
     return { ok: res.ok, latencyMs: Date.now() - start };
   }
 
@@ -2715,13 +3055,29 @@ export class FreshdeskDocumentConnector extends BaseDocumentConnector {
 
     while (true) {
       if (opts?.limit !== undefined && emitted >= opts.limit) break;
-      const res = await this.fetchFn(`https://${this.domain}.freshdesk.com/api/v2/tickets?per_page=100&page=${page}&include=description`, { headers: { Authorization: this.authHeader } });
+      const res = await this.fetchFn(
+        `https://${this.domain}.freshdesk.com/api/v2/tickets?per_page=100&page=${page}&include=description`,
+        { headers: { Authorization: this.authHeader } },
+      );
       if (!res.ok) break;
-      const tickets = (await res.json()) as Array<{ id: number; subject: string; description_text?: string; ticket_url?: string }>;
+      const tickets = (await res.json()) as {
+        id: number;
+        subject: string;
+        description_text?: string;
+        ticket_url?: string;
+      }[];
       if (tickets.length === 0) break;
       for (const t of tickets) {
         if (opts?.limit !== undefined && emitted >= opts.limit) break;
-        yield { id: makeDocId(this.id, String(t.id)), title: `Ticket #${t.id}: ${t.subject}`, content: t.description_text ?? "", sourceUrl: `https://${this.domain}.freshdesk.com/a/tickets/${t.id}`, connectorId: this.id, syncedAt: now, metadata: { ticketId: t.id } };
+        yield {
+          id: makeDocId(this.id, String(t.id)),
+          title: `Ticket #${t.id}: ${t.subject}`,
+          content: t.description_text ?? "",
+          sourceUrl: `https://${this.domain}.freshdesk.com/a/tickets/${t.id}`,
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { ticketId: t.id },
+        };
         emitted++;
       }
       if (tickets.length < 100) break;
@@ -2739,6 +3095,7 @@ export interface GitBookDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Git book document connector. */
 export class GitBookDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "GitBook";
@@ -2761,32 +3118,49 @@ export class GitBookDocumentConnector extends BaseDocumentConnector {
   }
 
   protected async _doConnect(): Promise<ConnectResult> {
-    const res = await this.fetchFn(`${GitBookDocumentConnector.BASE}/user`, { headers: this.headers });
+    const res = await this.fetchFn(`${GitBookDocumentConnector.BASE}/user`, {
+      headers: this.headers,
+    });
     if (res.status === 401) return { ok: false, error: "GitBook token invalid" };
     if (!res.ok) return { ok: false, error: `GitBook returned ${res.status}` };
     const json = (await res.json()) as { displayName?: string; email?: string };
     return { ok: true, metadata: { user: json.displayName, email: json.email } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
-    const res = await this.fetchFn(`${GitBookDocumentConnector.BASE}/user`, { headers: this.headers });
+    const res = await this.fetchFn(`${GitBookDocumentConnector.BASE}/user`, {
+      headers: this.headers,
+    });
     return { ok: res.ok, latencyMs: Date.now() - start };
   }
 
   protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
     const now = Date.now();
     let emitted = 0;
-    let next: string | undefined = `${GitBookDocumentConnector.BASE}/spaces/${this.spaceId}/content/pages`;
+    let next: string | undefined =
+      `${GitBookDocumentConnector.BASE}/spaces/${this.spaceId}/content/pages`;
 
     while (next) {
       if (opts?.limit !== undefined && emitted >= opts.limit) break;
       const res = await this.fetchFn(next, { headers: this.headers });
       if (!res.ok) break;
-      const json = (await res.json()) as { items?: Array<{ id: string; title: string; path?: string; urls?: { app?: string } }>; next?: { url?: string } };
+      const json = (await res.json()) as {
+        items?: { id: string; title: string; path?: string; urls?: { app?: string } }[];
+        next?: { url?: string };
+      };
       for (const page of json.items ?? []) {
         if (opts?.limit !== undefined && emitted >= opts.limit) break;
-        yield { id: makeDocId(this.id, page.id), title: page.title, content: "", sourceUrl: page.urls?.app ?? `https://app.gitbook.com/spaces/${this.spaceId}/pages/${page.id}`, connectorId: this.id, syncedAt: now, metadata: { pageId: page.id, path: page.path } };
+        yield {
+          id: makeDocId(this.id, page.id),
+          title: page.title,
+          content: "",
+          sourceUrl:
+            page.urls?.app ?? `https://app.gitbook.com/spaces/${this.spaceId}/pages/${page.id}`,
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { pageId: page.id, path: page.path },
+        };
         emitted++;
       }
       next = json.next?.url;
@@ -2802,6 +3176,7 @@ export interface GongDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Gong document connector. */
 export class GongDocumentConnector extends BaseDocumentConnector {
   readonly id = "gong-doc";
   readonly name = "Gong";
@@ -2823,15 +3198,19 @@ export class GongDocumentConnector extends BaseDocumentConnector {
   }
 
   protected async _doConnect(): Promise<ConnectResult> {
-    const res = await this.fetchFn(`${GongDocumentConnector.BASE}/v2/users?limit=1`, { headers: { Authorization: this.authHeader } });
+    const res = await this.fetchFn(`${GongDocumentConnector.BASE}/v2/users?limit=1`, {
+      headers: { Authorization: this.authHeader },
+    });
     if (res.status === 401) return { ok: false, error: "Gong credentials invalid" };
     if (!res.ok) return { ok: false, error: `Gong returned ${res.status}` };
     return { ok: true };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
-    const res = await this.fetchFn(`${GongDocumentConnector.BASE}/v2/users?limit=1`, { headers: { Authorization: this.authHeader } });
+    const res = await this.fetchFn(`${GongDocumentConnector.BASE}/v2/users?limit=1`, {
+      headers: { Authorization: this.authHeader },
+    });
     return { ok: res.ok, latencyMs: Date.now() - start };
   }
 
@@ -2849,10 +3228,21 @@ export class GongDocumentConnector extends BaseDocumentConnector {
         headers: { Authorization: this.authHeader },
       });
       if (!res.ok) break;
-      const json = (await res.json()) as { calls?: Array<{ id: string; title?: string; started?: string; url?: string }>; cursor?: string };
+      const json = (await res.json()) as {
+        calls?: { id: string; title?: string; started?: string; url?: string }[];
+        cursor?: string;
+      };
       for (const call of json.calls ?? []) {
         if (opts?.limit !== undefined && emitted >= opts.limit) break;
-        yield { id: makeDocId(this.id, call.id), title: call.title ?? `Call ${call.id}`, content: "", sourceUrl: call.url ?? `https://app.gong.io/call?id=${call.id}`, connectorId: this.id, syncedAt: now, metadata: { callId: call.id, started: call.started } };
+        yield {
+          id: makeDocId(this.id, call.id),
+          title: call.title ?? `Call ${call.id}`,
+          content: "",
+          sourceUrl: call.url ?? `https://app.gong.io/call?id=${call.id}`,
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { callId: call.id, started: call.started },
+        };
         emitted++;
       }
       cursor = json.cursor;
@@ -2870,6 +3260,7 @@ export interface GoogleDriveDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Google drive document connector. */
 export class GoogleDriveDocumentConnector extends BaseDocumentConnector {
   readonly id = "gdrive-doc";
   readonly name = "Google Drive";
@@ -2891,16 +3282,20 @@ export class GoogleDriveDocumentConnector extends BaseDocumentConnector {
   }
 
   protected async _doConnect(): Promise<ConnectResult> {
-    const res = await this.fetchFn("https://www.googleapis.com/oauth2/v2/userinfo", { headers: this.headers });
+    const res = await this.fetchFn("https://www.googleapis.com/oauth2/v2/userinfo", {
+      headers: this.headers,
+    });
     if (res.status === 401) return { ok: false, error: "Google access token invalid" };
     if (!res.ok) return { ok: false, error: `Google returned ${res.status}` };
     const json = (await res.json()) as { name?: string; email?: string };
     return { ok: true, metadata: { user: json.name, email: json.email } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
-    const res = await this.fetchFn("https://www.googleapis.com/oauth2/v2/userinfo", { headers: this.headers });
+    const res = await this.fetchFn("https://www.googleapis.com/oauth2/v2/userinfo", {
+      headers: this.headers,
+    });
     return { ok: res.ok, latencyMs: Date.now() - start };
   }
 
@@ -2918,12 +3313,25 @@ export class GoogleDriveDocumentConnector extends BaseDocumentConnector {
       });
       if (pageToken) params.set("pageToken", pageToken);
 
-      const res = await this.fetchFn(`${GoogleDriveDocumentConnector.BASE}/files?${params}`, { headers: this.headers });
+      const res = await this.fetchFn(`${GoogleDriveDocumentConnector.BASE}/files?${params}`, {
+        headers: this.headers,
+      });
       if (!res.ok) break;
-      const json = (await res.json()) as { files?: Array<{ id: string; name: string; webViewLink?: string; mimeType?: string }>; nextPageToken?: string };
+      const json = (await res.json()) as {
+        files?: { id: string; name: string; webViewLink?: string; mimeType?: string }[];
+        nextPageToken?: string;
+      };
       for (const file of json.files ?? []) {
         if (opts?.limit !== undefined && emitted >= opts.limit) break;
-        yield { id: makeDocId(this.id, file.id), title: file.name, content: "", sourceUrl: file.webViewLink ?? `https://drive.google.com/file/d/${file.id}`, connectorId: this.id, syncedAt: now, metadata: { fileId: file.id, mimeType: file.mimeType } };
+        yield {
+          id: makeDocId(this.id, file.id),
+          title: file.name,
+          content: "",
+          sourceUrl: file.webViewLink ?? `https://drive.google.com/file/d/${file.id}`,
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { fileId: file.id, mimeType: file.mimeType },
+        };
         emitted++;
       }
       pageToken = json.nextPageToken;
@@ -2939,6 +3347,7 @@ export interface GuruDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Guru document connector. */
 export class GuruDocumentConnector extends BaseDocumentConnector {
   readonly id = "guru-doc";
   readonly name = "Guru";
@@ -2960,16 +3369,20 @@ export class GuruDocumentConnector extends BaseDocumentConnector {
   }
 
   protected async _doConnect(): Promise<ConnectResult> {
-    const res = await this.fetchFn(`${GuruDocumentConnector.BASE}/whoami`, { headers: { Authorization: this.authHeader } });
+    const res = await this.fetchFn(`${GuruDocumentConnector.BASE}/whoami`, {
+      headers: { Authorization: this.authHeader },
+    });
     if (res.status === 401) return { ok: false, error: "Guru credentials invalid" };
     if (!res.ok) return { ok: false, error: `Guru returned ${res.status}` };
     const json = (await res.json()) as { email?: string };
     return { ok: true, metadata: { email: json.email } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
-    const res = await this.fetchFn(`${GuruDocumentConnector.BASE}/whoami`, { headers: { Authorization: this.authHeader } });
+    const res = await this.fetchFn(`${GuruDocumentConnector.BASE}/whoami`, {
+      headers: { Authorization: this.authHeader },
+    });
     return { ok: res.ok, latencyMs: Date.now() - start };
   }
 
@@ -2980,13 +3393,30 @@ export class GuruDocumentConnector extends BaseDocumentConnector {
 
     while (true) {
       if (opts?.limit !== undefined && emitted >= opts.limit) break;
-      const res = await this.fetchFn(`${GuruDocumentConnector.BASE}/search/cardmgr?q=&queryType=search&maxResults=50&page=${page}`, { headers: { Authorization: this.authHeader } });
+      const res = await this.fetchFn(
+        `${GuruDocumentConnector.BASE}/search/cardmgr?q=&queryType=search&maxResults=50&page=${page}`,
+        { headers: { Authorization: this.authHeader } },
+      );
       if (!res.ok) break;
-      const cards = (await res.json()) as Array<{ preferredPhrase?: string; id?: string; content?: { text?: string }; htmlContent?: string; shareLink?: string }>;
+      const cards = (await res.json()) as {
+        preferredPhrase?: string;
+        id?: string;
+        content?: { text?: string };
+        htmlContent?: string;
+        shareLink?: string;
+      }[];
       if (cards.length === 0) break;
       for (const card of cards) {
         if (opts?.limit !== undefined && emitted >= opts.limit) break;
-        yield { id: makeDocId(this.id, card.id ?? ""), title: card.preferredPhrase ?? card.id ?? "", content: card.content?.text ?? "", sourceUrl: card.shareLink ?? `https://app.getguru.com/cards/${card.id}`, connectorId: this.id, syncedAt: now, metadata: { cardId: card.id } };
+        yield {
+          id: makeDocId(this.id, card.id ?? ""),
+          title: card.preferredPhrase ?? card.id ?? "",
+          content: card.content?.text ?? "",
+          sourceUrl: card.shareLink ?? `https://app.getguru.com/cards/${card.id}`,
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { cardId: card.id },
+        };
         emitted++;
       }
       if (cards.length < 50) break;
@@ -3000,16 +3430,17 @@ export class GuruDocumentConnector extends BaseDocumentConnector {
 export interface HubSpotDocumentConnectorConfig {
   accessToken: string;
   /** Object types to sync. Default: ["contacts"] */
-  objectTypes?: Array<"contacts" | "companies" | "deals" | "tickets">;
+  objectTypes?: ("contacts" | "companies" | "deals" | "tickets")[];
   fetch?: FetchFn;
 }
 
+/** Hub spot document connector. */
 export class HubSpotDocumentConnector extends BaseDocumentConnector {
   readonly id = "hubspot-doc";
   readonly name = "HubSpot";
 
   private readonly accessToken: string;
-  private readonly objectTypes: Array<"contacts" | "companies" | "deals" | "tickets">;
+  private readonly objectTypes: ("contacts" | "companies" | "deals" | "tickets")[];
   private readonly fetchFn: FetchFn;
   private static readonly BASE = "https://api.hubapi.com";
 
@@ -3025,15 +3456,19 @@ export class HubSpotDocumentConnector extends BaseDocumentConnector {
   }
 
   protected async _doConnect(): Promise<ConnectResult> {
-    const res = await this.fetchFn(`${HubSpotDocumentConnector.BASE}/crm/v3/owners/`, { headers: this.headers });
+    const res = await this.fetchFn(`${HubSpotDocumentConnector.BASE}/crm/v3/owners/`, {
+      headers: this.headers,
+    });
     if (res.status === 401) return { ok: false, error: "HubSpot token invalid" };
     if (!res.ok) return { ok: false, error: `HubSpot returned ${res.status}` };
     return { ok: true };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
-    const res = await this.fetchFn(`${HubSpotDocumentConnector.BASE}/crm/v3/owners/`, { headers: this.headers });
+    const res = await this.fetchFn(`${HubSpotDocumentConnector.BASE}/crm/v3/owners/`, {
+      headers: this.headers,
+    });
     return { ok: res.ok, latencyMs: Date.now() - start };
   }
 
@@ -3047,15 +3482,29 @@ export class HubSpotDocumentConnector extends BaseDocumentConnector {
         if (opts?.limit !== undefined && emitted >= opts.limit) break;
         const params = new URLSearchParams({ limit: "100" });
         if (after) params.set("after", after);
-        const res = await this.fetchFn(`${HubSpotDocumentConnector.BASE}/crm/v3/objects/${objType}?${params}`, { headers: this.headers });
+        const res = await this.fetchFn(
+          `${HubSpotDocumentConnector.BASE}/crm/v3/objects/${objType}?${params}`,
+          { headers: this.headers },
+        );
         if (!res.ok) break;
-        const json = (await res.json()) as { results?: Array<{ id: string; properties?: Record<string, string | null> }>; paging?: { next?: { after?: string } } };
+        const json = (await res.json()) as {
+          results?: { id: string; properties?: Record<string, string | null> }[];
+          paging?: { next?: { after?: string } };
+        };
         for (const obj of json.results ?? []) {
           if (opts?.limit !== undefined && emitted >= opts.limit) break;
           const props = obj.properties ?? {};
           const title = props["name"] ?? props["firstname"] ?? props["subject"] ?? obj.id;
           const content = props["description"] ?? props["notes_last_contacted"] ?? "";
-          yield { id: makeDocId(this.id, `${objType}/${obj.id}`), title: `[${objType}] ${title}`, content: content ?? "", sourceUrl: `https://app.hubspot.com/contacts/${objType}/${obj.id}`, connectorId: this.id, syncedAt: now, metadata: { objectType: objType, objectId: obj.id } };
+          yield {
+            id: makeDocId(this.id, `${objType}/${obj.id}`),
+            title: `[${objType}] ${title}`,
+            content: content ?? "",
+            sourceUrl: `https://app.hubspot.com/contacts/${objType}/${obj.id}`,
+            connectorId: this.id,
+            syncedAt: now,
+            metadata: { objectType: objType, objectId: obj.id },
+          };
           emitted++;
         }
         after = json.paging?.next?.after;
@@ -3078,8 +3527,10 @@ export interface ImapMessage {
   text: string;
 }
 
+/** Imap query fn type alias. */
 export type ImapQueryFn = (opts: { mailbox?: string; limit?: number }) => Promise<ImapMessage[]>;
 
+/** Imap document connector config interface definition. */
 export interface ImapDocumentConnectorConfig {
   host: string;
   port?: number;
@@ -3091,6 +3542,7 @@ export interface ImapDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Imap document connector. */
 export class ImapDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "IMAP Email";
@@ -3119,7 +3571,7 @@ export class ImapDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { note: "no queryFn provided — configure a real IMAP adapter" } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
     try {
       await this.queryFn({ mailbox: this.cfg.mailbox ?? "INBOX", limit: 1 });
@@ -3131,7 +3583,10 @@ export class ImapDocumentConnector extends BaseDocumentConnector {
 
   protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
     const now = Date.now();
-    const messages = await this.queryFn({ mailbox: this.cfg.mailbox ?? "INBOX", limit: opts?.limit });
+    const messages = await this.queryFn({
+      mailbox: this.cfg.mailbox ?? "INBOX",
+      limit: opts?.limit,
+    });
     for (const msg of messages) {
       yield {
         id: makeDocId(this.id, msg.uid),
@@ -3153,6 +3608,7 @@ export interface LoopiODocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Loopi o document connector. */
 export class LoopiODocumentConnector extends BaseDocumentConnector {
   readonly id = "loopio-doc";
   readonly name = "Loopio";
@@ -3172,15 +3628,20 @@ export class LoopiODocumentConnector extends BaseDocumentConnector {
   }
 
   protected async _doConnect(): Promise<ConnectResult> {
-    const res = await this.fetchFn(`${LoopiODocumentConnector.BASE}/entries?limit=1`, { headers: this.headers });
-    if (res.status === 401 || res.status === 403) return { ok: false, error: "Loopio API key invalid" };
+    const res = await this.fetchFn(`${LoopiODocumentConnector.BASE}/entries?limit=1`, {
+      headers: this.headers,
+    });
+    if (res.status === 401 || res.status === 403)
+      return { ok: false, error: "Loopio API key invalid" };
     if (!res.ok) return { ok: false, error: `Loopio returned ${res.status}` };
     return { ok: true };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
-    const res = await this.fetchFn(`${LoopiODocumentConnector.BASE}/entries?limit=1`, { headers: this.headers });
+    const res = await this.fetchFn(`${LoopiODocumentConnector.BASE}/entries?limit=1`, {
+      headers: this.headers,
+    });
     return { ok: res.ok, latencyMs: Date.now() - start };
   }
 
@@ -3191,14 +3652,27 @@ export class LoopiODocumentConnector extends BaseDocumentConnector {
 
     while (true) {
       if (opts?.limit !== undefined && emitted >= opts.limit) break;
-      const res = await this.fetchFn(`${LoopiODocumentConnector.BASE}/entries?limit=50&offset=${offset}`, { headers: this.headers });
+      const res = await this.fetchFn(
+        `${LoopiODocumentConnector.BASE}/entries?limit=50&offset=${offset}`,
+        { headers: this.headers },
+      );
       if (!res.ok) break;
-      const json = (await res.json()) as { items?: Array<{ id: number; question?: string; answer?: string; tags?: string[] }> };
+      const json = (await res.json()) as {
+        items?: { id: number; question?: string; answer?: string; tags?: string[] }[];
+      };
       const items = json.items ?? [];
       if (items.length === 0) break;
       for (const entry of items) {
         if (opts?.limit !== undefined && emitted >= opts.limit) break;
-        yield { id: makeDocId(this.id, String(entry.id)), title: entry.question ?? `Entry ${entry.id}`, content: entry.answer ?? "", sourceUrl: `https://app.loopio.com/library/${entry.id}`, connectorId: this.id, syncedAt: now, metadata: { entryId: entry.id, tags: entry.tags } };
+        yield {
+          id: makeDocId(this.id, String(entry.id)),
+          title: entry.question ?? `Entry ${entry.id}`,
+          content: entry.answer ?? "",
+          sourceUrl: `https://app.loopio.com/library/${entry.id}`,
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { entryId: entry.id, tags: entry.tags },
+        };
         emitted++;
       }
       offset += items.length;
@@ -3219,6 +3693,7 @@ export interface MediaWikiDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Media wiki document connector. */
 export class MediaWikiDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "MediaWiki";
@@ -3234,13 +3709,15 @@ export class MediaWikiDocumentConnector extends BaseDocumentConnector {
   }
 
   protected async _doConnect(): Promise<ConnectResult> {
-    const res = await this.fetchFn(`${this.cfg.apiUrl}?action=query&meta=siteinfo&siprop=general&format=json`);
+    const res = await this.fetchFn(
+      `${this.cfg.apiUrl}?action=query&meta=siteinfo&siprop=general&format=json`,
+    );
     if (!res.ok) return { ok: false, error: `MediaWiki returned ${res.status}` };
     const json = (await res.json()) as { query?: { general?: { sitename?: string } } };
     return { ok: true, metadata: { site: json.query?.general?.sitename } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
     const res = await this.fetchFn(`${this.cfg.apiUrl}?action=query&meta=siteinfo&format=json`);
     return { ok: res.ok, latencyMs: Date.now() - start };
@@ -3255,9 +3732,11 @@ export class MediaWikiDocumentConnector extends BaseDocumentConnector {
       titles = this.cfg.pageTitles;
     } else if (this.cfg.category) {
       // List pages in category
-      const res = await this.fetchFn(`${this.cfg.apiUrl}?action=query&list=categorymembers&cmtitle=Category:${encodeURIComponent(this.cfg.category)}&cmlimit=500&format=json`);
+      const res = await this.fetchFn(
+        `${this.cfg.apiUrl}?action=query&list=categorymembers&cmtitle=Category:${encodeURIComponent(this.cfg.category)}&cmlimit=500&format=json`,
+      );
       if (!res.ok) return;
-      const json = (await res.json()) as { query?: { categorymembers?: Array<{ title: string }> } };
+      const json = (await res.json()) as { query?: { categorymembers?: { title: string }[] } };
       titles = (json.query?.categorymembers ?? []).map((m) => m.title);
     } else {
       return;
@@ -3265,13 +3744,25 @@ export class MediaWikiDocumentConnector extends BaseDocumentConnector {
 
     for (const title of titles) {
       if (opts?.limit !== undefined && emitted >= opts.limit) break;
-      const res = await this.fetchFn(`${this.cfg.apiUrl}?action=query&titles=${encodeURIComponent(title)}&prop=extracts&exintro=true&explaintext=true&format=json`);
+      const res = await this.fetchFn(
+        `${this.cfg.apiUrl}?action=query&titles=${encodeURIComponent(title)}&prop=extracts&exintro=true&explaintext=true&format=json`,
+      );
       if (!res.ok) continue;
-      const json = (await res.json()) as { query?: { pages?: Record<string, { extract?: string; pageid?: number }> } };
+      const json = (await res.json()) as {
+        query?: { pages?: Record<string, { extract?: string; pageid?: number }> };
+      };
       const pages = Object.values(json.query?.pages ?? {});
       for (const page of pages) {
         const url = `${new URL(this.cfg.apiUrl).origin}/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`;
-        yield { id: makeDocId(this.id, title), title, content: page.extract ?? "", sourceUrl: url, connectorId: this.id, syncedAt: now, metadata: { pageId: page.pageid } };
+        yield {
+          id: makeDocId(this.id, title),
+          title,
+          content: page.extract ?? "",
+          sourceUrl: url,
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { pageId: page.pageid },
+        };
         emitted++;
       }
     }
@@ -3290,6 +3781,7 @@ export interface SharePointDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Share point document connector. */
 export class SharePointDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "SharePoint";
@@ -3316,16 +3808,20 @@ export class SharePointDocumentConnector extends BaseDocumentConnector {
   }
 
   protected async _doConnect(): Promise<ConnectResult> {
-    const res = await this.fetchFn(`${SharePointDocumentConnector.GRAPH}/sites/${this.siteId}`, { headers: this.headers });
+    const res = await this.fetchFn(`${SharePointDocumentConnector.GRAPH}/sites/${this.siteId}`, {
+      headers: this.headers,
+    });
     if (res.status === 401) return { ok: false, error: "SharePoint access token invalid" };
     if (!res.ok) return { ok: false, error: `SharePoint returned ${res.status}` };
     const json = (await res.json()) as { displayName?: string };
     return { ok: true, metadata: { site: json.displayName } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
-    const res = await this.fetchFn(`${SharePointDocumentConnector.GRAPH}/sites/${this.siteId}`, { headers: this.headers });
+    const res = await this.fetchFn(`${SharePointDocumentConnector.GRAPH}/sites/${this.siteId}`, {
+      headers: this.headers,
+    });
     return { ok: res.ok, latencyMs: Date.now() - start };
   }
 
@@ -3336,17 +3832,29 @@ export class SharePointDocumentConnector extends BaseDocumentConnector {
       ? `${SharePointDocumentConnector.GRAPH}/sites/${this.siteId}/drives/${this.cfg.driveId}`
       : `${SharePointDocumentConnector.GRAPH}/sites/${this.siteId}/drive`;
 
-    let next: string | undefined = `${driveBase}/root/children?$top=100&$select=id,name,webUrl,file`;
+    let next: string | undefined =
+      `${driveBase}/root/children?$top=100&$select=id,name,webUrl,file`;
 
     while (next) {
       if (opts?.limit !== undefined && emitted >= opts.limit) break;
       const res = await this.fetchFn(next, { headers: this.headers });
       if (!res.ok) break;
-      const json = (await res.json()) as { value?: Array<{ id: string; name: string; webUrl?: string; file?: unknown }>; "@odata.nextLink"?: string };
+      const json = (await res.json()) as {
+        value?: { id: string; name: string; webUrl?: string; file?: unknown }[];
+        "@odata.nextLink"?: string;
+      };
       for (const item of json.value ?? []) {
         if (!item.file) continue; // skip folders
         if (opts?.limit !== undefined && emitted >= opts.limit) break;
-        yield { id: makeDocId(this.id, item.id), title: item.name, content: "", sourceUrl: item.webUrl ?? "", connectorId: this.id, syncedAt: now, metadata: { fileId: item.id } };
+        yield {
+          id: makeDocId(this.id, item.id),
+          title: item.name,
+          content: "",
+          sourceUrl: item.webUrl ?? "",
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { fileId: item.id },
+        };
         emitted++;
       }
       next = json["@odata.nextLink"];
@@ -3363,6 +3871,7 @@ export interface ZendeskDocumentConnectorConfig {
   fetch?: FetchFn;
 }
 
+/** Zendesk document connector. */
 export class ZendeskDocumentConnector extends BaseDocumentConnector {
   readonly id: string;
   readonly name = "Zendesk";
@@ -3377,38 +3886,62 @@ export class ZendeskDocumentConnector extends BaseDocumentConnector {
     this.fetchFn = config.fetch ?? fetch;
   }
 
-  private get apiBase(): string { return `https://${this.cfg.subdomain}.zendesk.com/api/v2`; }
+  private get apiBase(): string {
+    return `https://${this.cfg.subdomain}.zendesk.com/api/v2`;
+  }
   private get authHeader(): string {
     return `Basic ${Buffer.from(`${this.cfg.email}/token:${this.cfg.apiToken}`).toString("base64")}`;
   }
 
   protected async _doConnect(): Promise<ConnectResult> {
-    const res = await this.fetchFn(`${this.apiBase}/users/me.json`, { headers: { Authorization: this.authHeader } });
+    const res = await this.fetchFn(`${this.apiBase}/users/me.json`, {
+      headers: { Authorization: this.authHeader },
+    });
     if (res.status === 401) return { ok: false, error: "Zendesk credentials invalid" };
     if (!res.ok) return { ok: false, error: `Zendesk returned ${res.status}` };
     const json = (await res.json()) as { user?: { name?: string; email?: string } };
     return { ok: true, metadata: { user: json.user?.name, email: json.user?.email } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs">> {
+  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
     const start = Date.now();
-    const res = await this.fetchFn(`${this.apiBase}/users/me.json`, { headers: { Authorization: this.authHeader } });
+    const res = await this.fetchFn(`${this.apiBase}/users/me.json`, {
+      headers: { Authorization: this.authHeader },
+    });
     return { ok: res.ok, latencyMs: Date.now() - start };
   }
 
   protected async *_doSync(opts?: SyncOptions): AsyncIterable<SyncedDocument> {
     const now = Date.now();
     let emitted = 0;
-    let url: string | undefined = `${this.apiBase}/tickets.json?per_page=100&sort_by=updated_at&sort_order=desc`;
+    let url: string | undefined =
+      `${this.apiBase}/tickets.json?per_page=100&sort_by=updated_at&sort_order=desc`;
 
     while (url) {
       if (opts?.limit !== undefined && emitted >= opts.limit) break;
       const res = await this.fetchFn(url, { headers: { Authorization: this.authHeader } });
       if (!res.ok) break;
-      const json = (await res.json()) as { tickets?: Array<{ id: number; subject: string; description?: string; url?: string; status?: string }>; next_page?: string };
+      const json = (await res.json()) as {
+        tickets?: {
+          id: number;
+          subject: string;
+          description?: string;
+          url?: string;
+          status?: string;
+        }[];
+        next_page?: string;
+      };
       for (const t of json.tickets ?? []) {
         if (opts?.limit !== undefined && emitted >= opts.limit) break;
-        yield { id: makeDocId(this.id, String(t.id)), title: `Ticket #${t.id}: ${t.subject}`, content: t.description ?? "", sourceUrl: `https://${this.cfg.subdomain}.zendesk.com/agent/tickets/${t.id}`, connectorId: this.id, syncedAt: now, metadata: { ticketId: t.id, status: t.status } };
+        yield {
+          id: makeDocId(this.id, String(t.id)),
+          title: `Ticket #${t.id}: ${t.subject}`,
+          content: t.description ?? "",
+          sourceUrl: `https://${this.cfg.subdomain}.zendesk.com/agent/tickets/${t.id}`,
+          connectorId: this.id,
+          syncedAt: now,
+          metadata: { ticketId: t.id, status: t.status },
+        };
         emitted++;
       }
       url = json.next_page ?? undefined;

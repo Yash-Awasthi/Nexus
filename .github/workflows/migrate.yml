@@ -1,0 +1,84 @@
+# SPDX-License-Identifier: Apache-2.0
+# Database migration workflow
+#
+# Triggers:
+#   • Automatically on push to main when schema files change
+#   • Manually via workflow_dispatch for any environment
+#
+# How it works:
+#   Runs `pnpm db:migrate` from the @nexus/db package, which executes
+#   Drizzle's migration runner against DATABASE_URL (Neon).
+#   Uses Neon's --no-schema-push for additive-only safety in production.
+name: DB Migrate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/db/src/schema/**"
+      - "packages/db/drizzle/**"
+      - "packages/db/drizzle.config.ts"
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "production"
+        type: choice
+        options: [production, staging]
+      dry_run:
+        description: "Dry-run (print SQL without applying)"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: db-migrate-${{ github.ref }}
+  cancel-in-progress: false   # never cancel an in-flight migration
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  migrate:
+    name: Run Drizzle migrations
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    permissions:
+      contents: read
+      id-token: write   # for OIDC if Neon supports it in future
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build @nexus/db
+        run: pnpm --filter @nexus/db build
+
+      - name: Run migrations (dry-run preview)
+        if: ${{ github.event.inputs.dry_run == 'true' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pnpm --filter @nexus/db db:migrate:dry
+
+      - name: Run migrations
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pnpm --filter @nexus/db db:migrate
+
+      - name: Verify schema health
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pnpm --filter @nexus/db db:check
+        continue-on-error: true   # non-blocking — logs warning, doesn't fail deploy

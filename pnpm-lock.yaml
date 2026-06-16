@@ -80,12 +80,27 @@ importers:
       '@fastify/sensible':
         specifier: ^6.0.4
         version: 6.0.4
+      '@nexus/admin-gateway':
+        specifier: workspace:*
+        version: link:../../packages/admin-gateway
       '@nexus/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@nexus/billing':
+        specifier: workspace:*
+        version: link:../../packages/billing
+      '@nexus/code-repl':
+        specifier: workspace:*
+        version: link:../../packages/code-repl
+      '@nexus/connectors':
+        specifier: workspace:*
+        version: link:../../packages/connectors
       '@nexus/context-pack':
         specifier: workspace:*
         version: link:../../packages/context-pack
+      '@nexus/context-pruner':
+        specifier: workspace:*
+        version: link:../../packages/context-pruner
       '@nexus/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -95,12 +110,39 @@ importers:
       '@nexus/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@nexus/feature-flags':
+        specifier: workspace:*
+        version: link:../../packages/feature-flags
       '@nexus/gateway':
         specifier: workspace:*
         version: link:../../packages/gateway
       '@nexus/governance':
         specifier: workspace:*
         version: link:../../packages/governance
+      '@nexus/hf-research':
+        specifier: workspace:*
+        version: link:../../packages/hf-research
+      '@nexus/image-gen':
+        specifier: workspace:*
+        version: link:../../packages/image-gen
+      '@nexus/knowledge-graph':
+        specifier: workspace:*
+        version: link:../../packages/knowledge-graph
+      '@nexus/llm-drivers':
+        specifier: workspace:*
+        version: link:../../packages/llm-drivers
+      '@nexus/llm-tracer':
+        specifier: workspace:*
+        version: link:../../packages/llm-tracer
+      '@nexus/obs-providers':
+        specifier: workspace:*
+        version: link:../../packages/obs-providers
+      '@nexus/posthog-analytics':
+        specifier: workspace:*
+        version: link:../../packages/posthog-analytics
+      '@nexus/prediction-market':
+        specifier: workspace:*
+        version: link:../../packages/prediction-market
       '@nexus/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
@@ -110,12 +152,27 @@ importers:
       '@nexus/sse':
         specifier: workspace:*
         version: link:../../packages/sse
+      '@nexus/stm':
+        specifier: workspace:*
+        version: link:../../packages/stm
+      '@nexus/stream-recovery':
+        specifier: workspace:*
+        version: link:../../packages/stream-recovery
       '@nexus/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry
+      '@nexus/think-parser':
+        specifier: workspace:*
+        version: link:../../packages/think-parser
+      '@nexus/voice':
+        specifier: workspace:*
+        version: link:../../packages/voice
+      '@nexus/wiki-updater':
+        specifier: workspace:*
+        version: link:../../packages/wiki-updater
       drizzle-orm:
         specifier: ^0.45.2
-        version: 0.45.2(@neondatabase/serverless@0.10.4)(@types/pg@8.11.6)(gel@2.2.0)(pg@8.21.0)
+        version: 0.45.2(@neondatabase/serverless@0.10.4)(@types/pg@8.20.0)(gel@2.2.0)(pg@8.21.0)
       fastify:
         specifier: ^5.8.5
         version: 5.8.5
@@ -236,7 +293,7 @@ importers:
         version: 18.3.7(@types/react@18.3.31)
       '@vitejs/plugin-react':
         specifier: ^4.3.3
-        version: 4.7.0(vite@5.4.21(@types/node@22.19.21)(terser@5.48.0))
+        version: 4.7.0(vite@5.4.21(@types/node@25.9.3)(terser@5.48.0))
       tsx:
         specifier: ^4.19.1
         version: 4.22.4
@@ -245,41 +302,65 @@ importers:
         version: 5.9.3
       vite:
         specifier: ^5.4.11
-        version: 5.4.21(@types/node@22.19.21)(terser@5.48.0)
+        version: 5.4.21(@types/node@25.9.3)(terser@5.48.0)
 
   apps/worker:
     dependencies:
       '@nexus/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@nexus/corpus-builder':
+        specifier: workspace:*
+        version: link:../../packages/corpus-builder
       '@nexus/council':
         specifier: workspace:*
         version: link:../../packages/council
       '@nexus/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@nexus/domain-feeds':
+        specifier: workspace:*
+        version: link:../../packages/domain-feeds
       '@nexus/governance':
         specifier: workspace:*
         version: link:../../packages/governance
+      '@nexus/llm-drivers':
+        specifier: workspace:*
+        version: link:../../packages/llm-drivers
+      '@nexus/obs-providers':
+        specifier: workspace:*
+        version: link:../../packages/obs-providers
       '@nexus/pipeline-signal':
         specifier: workspace:*
         version: link:../../packages/pipeline-signal
+      '@nexus/search-orchestrator':
+        specifier: workspace:*
+        version: link:../../packages/search-orchestrator
       '@nexus/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@nexus/wiki-updater':
+        specifier: workspace:*
+        version: link:../../packages/wiki-updater
       bullmq:
-        specifier: ^5.34.0
-        version: 5.78.0
+        specifier: ^5.78.1
+        version: 5.78.1
       drizzle-orm:
         specifier: ^0.45.2
-        version: 0.45.2(@neondatabase/serverless@0.10.4)(@types/pg@8.11.6)(gel@2.2.0)(pg@8.21.0)
+        version: 0.45.2(@neondatabase/serverless@0.10.4)(@types/pg@8.20.0)(gel@2.2.0)(pg@8.21.0)
       ioredis:
         specifier: ^5.4.1
         version: 5.11.1
+      pg:
+        specifier: ^8.13.3
+        version: 8.21.0
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.21
+      '@types/pg':
+        specifier: ^8.20.0
+        version: 8.20.0
       '@vitest/coverage-v8':
         specifier: ^2.1.8
         version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
@@ -337,7 +418,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
 
   packages/adapters/council:
     dependencies:
@@ -414,8 +495,8 @@ importers:
         specifier: workspace:*
         version: link:../../plugin-sdk
       groq-sdk:
-        specifier: ^0.9.1
-        version: 0.9.1
+        specifier: ^0.37.0
+        version: 0.37.0
     devDependencies:
       typescript:
         specifier: ^5.6.3
@@ -432,7 +513,13 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/adapters/ide:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
 
   packages/adapters/ingest:
     dependencies:
@@ -458,7 +545,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
 
   packages/adapters/linear:
     dependencies:
@@ -468,6 +555,12 @@ importers:
       '@nexus/plugin-sdk':
         specifier: workspace:*
         version: link:../../plugin-sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
+  packages/adapters/mlx:
     devDependencies:
       typescript:
         specifier: ^5.6.3
@@ -484,7 +577,7 @@ importers:
     devDependencies:
       '@types/pg':
         specifier: '*'
-        version: 8.11.6
+        version: 8.20.0
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -500,7 +593,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
 
   packages/adapters/salesforce:
     dependencies:
@@ -513,7 +606,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
 
   packages/adapters/searxng:
     dependencies:
@@ -526,7 +619,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
 
   packages/adapters/slack:
     dependencies:
@@ -574,6 +667,81 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
+  packages/adaptive-scraper:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/admin-gateway:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
+  packages/adr:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/agent-diff:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/agent-runtime:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/agents:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/ai-selector:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/alerts:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
   packages/auth:
     devDependencies:
       typescript:
@@ -581,7 +749,40 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/auto-observe:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/autotune:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/best-of-n:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
 
   packages/billing:
     dependencies:
@@ -590,7 +791,7 @@ importers:
         version: link:../db
       drizzle-orm:
         specifier: ^0.45.2
-        version: 0.45.2(@neondatabase/serverless@0.10.4)(@types/pg@8.11.6)(gel@2.2.0)(pg@8.21.0)
+        version: 0.45.2(@neondatabase/serverless@0.10.4)(@types/pg@8.20.0)(gel@2.2.0)(pg@8.21.0)
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -608,11 +809,168 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
 
+  packages/bots:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/brief-engine:
+    dependencies:
+      '@neondatabase/serverless':
+        specifier: ^0.10.4
+        version: 0.10.4
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/broadcast:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
+  packages/browser-use:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/chat-analyst:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/chat-history:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/chat-suggestions:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/cli-session:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/client-detect:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/code-editor-agent:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/code-map:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/code-repl:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/connectors:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/consortium:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
   packages/context-pack:
     devDependencies:
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
+
+  packages/context-pruner:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/context-sections:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
 
   packages/contracts:
     devDependencies:
@@ -621,7 +979,16 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/corpus-builder:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
 
   packages/council:
     dependencies:
@@ -632,8 +999,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       groq-sdk:
-        specifier: ^0.9.1
-        version: 0.9.1
+        specifier: ^0.37.0
+        version: 0.37.0
     devDependencies:
       typescript:
         specifier: ^5.6.3
@@ -646,20 +1013,20 @@ importers:
         version: 0.10.4
       drizzle-orm:
         specifier: ^0.45.2
-        version: 0.45.2(@neondatabase/serverless@0.10.4)(@types/pg@8.11.6)(gel@2.2.0)(pg@8.21.0)
+        version: 0.45.2(@neondatabase/serverless@0.10.4)(@types/pg@8.20.0)(gel@2.2.0)(pg@8.21.0)
       pg:
         specifier: ^8.13.3
         version: 8.21.0
     devDependencies:
       '@fast-check/vitest':
-        specifier: ^0.1.5
-        version: 0.1.6(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+        specifier: ^0.4.1
+        version: 0.4.1(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
       '@types/pg':
-        specifier: ^8.11.6
-        version: 8.11.6
+        specifier: ^8.20.0
+        version: 8.20.0
       drizzle-kit:
-        specifier: ^0.30.4
-        version: 0.30.6
+        specifier: ^0.31.10
+        version: 0.31.10
       fast-check:
         specifier: ^3.23.2
         version: 3.23.2
@@ -668,7 +1035,61 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/discord-bot:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/doc-acl:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/doc-classifier:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/doc-consumer:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/doc-extractor:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/doc-ocr:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
 
   packages/doc-pipeline:
     dependencies:
@@ -678,13 +1099,70 @@ importers:
     devDependencies:
       '@vitest/coverage-v8':
         specifier: ^2.1.8
-        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
       vitest:
         specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/doc-plugins:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/doc-templates:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
+  packages/doc-workflow:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/doc-workflows:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/domain-feeds:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/domain-forecast:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
 
   packages/evals:
     dependencies:
@@ -705,11 +1183,92 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
 
+  packages/feature-flags:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/federated-connectors:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/file-explorer-agents:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/file-store:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/fts:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
   packages/gateway:
     devDependencies:
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
+
+  packages/gateway-log:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/general-agent:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/geoip:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
 
   packages/governance:
     dependencies:
@@ -718,8 +1277,8 @@ importers:
         version: link:../shared
     devDependencies:
       '@fast-check/vitest':
-        specifier: ^0.1.5
-        version: 0.1.6(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+        specifier: ^0.4.1
+        version: 0.4.1(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
       fast-check:
         specifier: ^3.23.2
         version: 3.23.2
@@ -728,7 +1287,247 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/hf-research:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/hooks:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/human-browser:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/hybrid-search:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/i18n:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/image-gen:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/ingest-intent:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/k8s-sandbox:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/knowledge-graph:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/kv:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/librarian:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/llm-cache:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/llm-drivers:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/llm-router:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/llm-tracer:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/llm-utils:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/load-test:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/mail-ingest:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/mcp-app:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/mcp-bulk:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/mcp-client:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/mcp-grants:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
+  packages/mcp-openapi:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
 
   packages/memory:
     dependencies:
@@ -741,7 +1540,94 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/memory-tools:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/message-renderer:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/message-tree:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/multi-reviewer:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/nlp-utils:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/obs-providers:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/openclaw:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/parseltongue:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
 
   packages/pipeline-signal:
     devDependencies:
@@ -750,19 +1636,154 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/platform-adapters:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/plugin-modes:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
 
   packages/plugin-sdk:
     devDependencies:
       '@vitest/coverage-v8':
         specifier: ^2.1.4
-        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
       vitest:
         specifier: ^2.1.4
-        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/posthog-analytics:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/prediction-market:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/privacy-validator:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/prompt-cache:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/provider-registry:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/proxy-rotation:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/queue-health:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/ragtime:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/reranker:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/researcher:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/rlhf-pipeline:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/run-cost:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
 
   packages/runtime:
     dependencies:
@@ -776,15 +1797,15 @@ importers:
         specifier: workspace:*
         version: link:../telemetry
       bullmq:
-        specifier: ^5.34.0
-        version: 5.78.0
+        specifier: ^5.78.1
+        version: 5.78.1
       js-yaml:
         specifier: ^4.1.0
         version: 4.2.0
     devDependencies:
       '@fast-check/vitest':
-        specifier: ^0.1.5
-        version: 0.1.6(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+        specifier: ^0.4.1
+        version: 0.4.1(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
       '@types/js-yaml':
         specifier: ^4.0.9
         version: 4.0.9
@@ -796,7 +1817,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
 
   packages/sandbox:
     dependencies:
@@ -808,17 +1829,163 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
+  packages/scenario-planner:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/scraping-mcp:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/sdk:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/search-facets:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/search-orchestrator:
+    dependencies:
+      '@neondatabase/serverless':
+        specifier: ^0.10.4
+        version: 0.10.4
+      '@nexus/hybrid-search':
+        specifier: workspace:*
+        version: link:../hybrid-search
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/searxng-client:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/session-lifecycle:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/session-summarizer:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/session-sync:
+    dependencies:
+      '@neondatabase/serverless':
+        specifier: ^0.10.4
+        version: 0.10.4
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/sft-tagger:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
   packages/shared:
     devDependencies:
       '@vitest/coverage-v8':
         specifier: ^2.1.4
-        version: 2.1.9(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
       vitest:
         specifier: ^2.1.4
-        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/skills:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/smart-reader:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/spider:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/sqlite-migrations:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/sqlite-store:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
 
   packages/sse:
     devDependencies:
@@ -826,11 +1993,85 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
+  packages/sse-reconnect:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/stealth-browser:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/stm:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/stream-recovery:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/supervisor:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/task-queue:
+    dependencies:
+      '@nexus/knowledge-graph':
+        specifier: workspace:*
+        version: link:../knowledge-graph
+      '@nexus/obs-providers':
+        specifier: workspace:*
+        version: link:../obs-providers
+      '@nexus/search-orchestrator':
+        specifier: workspace:*
+        version: link:../search-orchestrator
+      '@nexus/wiki':
+        specifier: workspace:*
+        version: link:../wiki
+      '@nexus/wiki-updater':
+        specifier: workspace:*
+        version: link:../wiki-updater
+    optionalDependencies:
+      ioredis:
+        specifier: ^5.0.0
+        version: 5.11.1
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
   packages/telemetry:
     devDependencies:
       '@fast-check/vitest':
-        specifier: ^0.1.5
-        version: 0.1.6(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))
+        specifier: ^0.4.1
+        version: 0.4.1(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
       fast-check:
         specifier: ^3.23.2
         version: 3.23.2
@@ -839,7 +2080,158 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/think-parser:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/thinker:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/tier-gate:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/tmux-cli:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/token-budget:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/tool-registry:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/transcript-store:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/trigger-engine:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/ultraplinian:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/video-search:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/voice:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/weather-feed:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/wiki:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/wiki-updater:
+    dependencies:
+      '@neondatabase/serverless':
+        specifier: ^0.10.4
+        version: 0.10.4
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/worker-events:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
 
 packages:
 
@@ -2194,15 +3586,15 @@ packages:
     resolution: {integrity: sha512-FxEMIkJKnodyA1OaCUoEvbYRkoZlLZ4d/eXFu9Fh8CbBBgP5EmZxrfTRyN0qpXZ4vOvqnE5YdRdcrmUUXuU+dA==}
     deprecated: 'Merged into tsx: https://tsx.is'
 
-  '@esbuild/aix-ppc64@0.19.12':
-    resolution: {integrity: sha512-bmoCYyWdEL3wDQIVbcyzRyeKLgk2WtWLTWz1ZIAZF/EGbNOwSA6ew3PftJ1PqMiOOGu0OyFMzG53L0zqIpPeNA==}
+  '@esbuild/aix-ppc64@0.21.5':
+    resolution: {integrity: sha512-1SDgH6ZSPTlggy1yI6+Dbkiz8xzpHJEVAlF/AM1tHPLsf5STom9rwtjE4hKAF20FfXXNTFqEYXyJNWh1GiZedQ==}
     engines: {node: '>=12'}
     cpu: [ppc64]
     os: [aix]
 
-  '@esbuild/aix-ppc64@0.21.5':
-    resolution: {integrity: sha512-1SDgH6ZSPTlggy1yI6+Dbkiz8xzpHJEVAlF/AM1tHPLsf5STom9rwtjE4hKAF20FfXXNTFqEYXyJNWh1GiZedQ==}
-    engines: {node: '>=12'}
+  '@esbuild/aix-ppc64@0.25.12':
+    resolution: {integrity: sha512-Hhmwd6CInZ3dwpuGTF8fJG6yoWmsToE+vYgD4nytZVxcu1ulHpUQRAB1UJ8+N1Am3Mz4+xOByoQoSZf4D+CpkA==}
+    engines: {node: '>=18'}
     cpu: [ppc64]
     os: [aix]
 
@@ -2218,15 +3610,15 @@ packages:
     cpu: [arm64]
     os: [android]
 
-  '@esbuild/android-arm64@0.19.12':
-    resolution: {integrity: sha512-P0UVNGIienjZv3f5zq0DP3Nt2IE/3plFzuaS96vihvD0Hd6H/q4WXUGpCxD/E8YrSXfNyRPbpTq+T8ZQioSuPA==}
+  '@esbuild/android-arm64@0.21.5':
+    resolution: {integrity: sha512-c0uX9VAUBQ7dTDCjq+wdyGLowMdtR/GoC2U5IYk/7D1H1JYC0qseD7+11iMP2mRLN9RcCMRcjC4YMclCzGwS/A==}
     engines: {node: '>=12'}
     cpu: [arm64]
     os: [android]
 
-  '@esbuild/android-arm64@0.21.5':
-    resolution: {integrity: sha512-c0uX9VAUBQ7dTDCjq+wdyGLowMdtR/GoC2U5IYk/7D1H1JYC0qseD7+11iMP2mRLN9RcCMRcjC4YMclCzGwS/A==}
-    engines: {node: '>=12'}
+  '@esbuild/android-arm64@0.25.12':
+    resolution: {integrity: sha512-6AAmLG7zwD1Z159jCKPvAxZd4y/VTO0VkprYy+3N2FtJ8+BQWFXU+OxARIwA46c5tdD9SsKGZ/1ocqBS/gAKHg==}
+    engines: {node: '>=18'}
     cpu: [arm64]
     os: [android]
 
@@ -2242,15 +3634,15 @@ packages:
     cpu: [arm]
     os: [android]
 
-  '@esbuild/android-arm@0.19.12':
-    resolution: {integrity: sha512-qg/Lj1mu3CdQlDEEiWrlC4eaPZ1KztwGJ9B6J+/6G+/4ewxJg7gqj8eVYWvao1bXrqGiW2rsBZFSX3q2lcW05w==}
+  '@esbuild/android-arm@0.21.5':
+    resolution: {integrity: sha512-vCPvzSjpPHEi1siZdlvAlsPxXl7WbOVUBBAowWug4rJHb68Ox8KualB+1ocNvT5fjv6wpkX6o/iEpbDrf68zcg==}
     engines: {node: '>=12'}
     cpu: [arm]
     os: [android]
 
-  '@esbuild/android-arm@0.21.5':
-    resolution: {integrity: sha512-vCPvzSjpPHEi1siZdlvAlsPxXl7WbOVUBBAowWug4rJHb68Ox8KualB+1ocNvT5fjv6wpkX6o/iEpbDrf68zcg==}
-    engines: {node: '>=12'}
+  '@esbuild/android-arm@0.25.12':
+    resolution: {integrity: sha512-VJ+sKvNA/GE7Ccacc9Cha7bpS8nyzVv0jdVgwNDaR4gDMC/2TTRc33Ip8qrNYUcpkOHUT5OZ0bUcNNVZQ9RLlg==}
+    engines: {node: '>=18'}
     cpu: [arm]
     os: [android]
 
@@ -2266,15 +3658,15 @@ packages:
     cpu: [x64]
     os: [android]
 
-  '@esbuild/android-x64@0.19.12':
-    resolution: {integrity: sha512-3k7ZoUW6Q6YqhdhIaq/WZ7HwBpnFBlW905Fa4s4qWJyiNOgT1dOqDiVAQFwBH7gBRZr17gLrlFCRzF6jFh7Kew==}
+  '@esbuild/android-x64@0.21.5':
+    resolution: {integrity: sha512-D7aPRUUNHRBwHxzxRvp856rjUHRFW1SdQATKXH2hqA0kAZb1hKmi02OpYRacl0TxIGz/ZmXWlbZgjwWYaCakTA==}
     engines: {node: '>=12'}
     cpu: [x64]
     os: [android]
 
-  '@esbuild/android-x64@0.21.5':
-    resolution: {integrity: sha512-D7aPRUUNHRBwHxzxRvp856rjUHRFW1SdQATKXH2hqA0kAZb1hKmi02OpYRacl0TxIGz/ZmXWlbZgjwWYaCakTA==}
-    engines: {node: '>=12'}
+  '@esbuild/android-x64@0.25.12':
+    resolution: {integrity: sha512-5jbb+2hhDHx5phYR2By8GTWEzn6I9UqR11Kwf22iKbNpYrsmRB18aX/9ivc5cabcUiAT/wM+YIZ6SG9QO6a8kg==}
+    engines: {node: '>=18'}
     cpu: [x64]
     os: [android]
 
@@ -2290,15 +3682,15 @@ packages:
     cpu: [arm64]
     os: [darwin]
 
-  '@esbuild/darwin-arm64@0.19.12':
-    resolution: {integrity: sha512-B6IeSgZgtEzGC42jsI+YYu9Z3HKRxp8ZT3cqhvliEHovq8HSX2YX8lNocDn79gCKJXOSaEot9MVYky7AKjCs8g==}
+  '@esbuild/darwin-arm64@0.21.5':
+    resolution: {integrity: sha512-DwqXqZyuk5AiWWf3UfLiRDJ5EDd49zg6O9wclZ7kUMv2WRFr4HKjXp/5t8JZ11QbQfUS6/cRCKGwYhtNAY88kQ==}
     engines: {node: '>=12'}
     cpu: [arm64]
     os: [darwin]
 
-  '@esbuild/darwin-arm64@0.21.5':
-    resolution: {integrity: sha512-DwqXqZyuk5AiWWf3UfLiRDJ5EDd49zg6O9wclZ7kUMv2WRFr4HKjXp/5t8JZ11QbQfUS6/cRCKGwYhtNAY88kQ==}
-    engines: {node: '>=12'}
+  '@esbuild/darwin-arm64@0.25.12':
+    resolution: {integrity: sha512-N3zl+lxHCifgIlcMUP5016ESkeQjLj/959RxxNYIthIg+CQHInujFuXeWbWMgnTo4cp5XVHqFPmpyu9J65C1Yg==}
+    engines: {node: '>=18'}
     cpu: [arm64]
     os: [darwin]
 
@@ -2314,15 +3706,15 @@ packages:
     cpu: [x64]
     os: [darwin]
 
-  '@esbuild/darwin-x64@0.19.12':
-    resolution: {integrity: sha512-hKoVkKzFiToTgn+41qGhsUJXFlIjxI/jSYeZf3ugemDYZldIXIxhvwN6erJGlX4t5h417iFuheZ7l+YVn05N3A==}
+  '@esbuild/darwin-x64@0.21.5':
+    resolution: {integrity: sha512-se/JjF8NlmKVG4kNIuyWMV/22ZaerB+qaSi5MdrXtd6R08kvs2qCN4C09miupktDitvh8jRFflwGFBQcxZRjbw==}
     engines: {node: '>=12'}
     cpu: [x64]
     os: [darwin]
 
-  '@esbuild/darwin-x64@0.21.5':
-    resolution: {integrity: sha512-se/JjF8NlmKVG4kNIuyWMV/22ZaerB+qaSi5MdrXtd6R08kvs2qCN4C09miupktDitvh8jRFflwGFBQcxZRjbw==}
-    engines: {node: '>=12'}
+  '@esbuild/darwin-x64@0.25.12':
+    resolution: {integrity: sha512-HQ9ka4Kx21qHXwtlTUVbKJOAnmG1ipXhdWTmNXiPzPfWKpXqASVcWdnf2bnL73wgjNrFXAa3yYvBSd9pzfEIpA==}
+    engines: {node: '>=18'}
     cpu: [x64]
     os: [darwin]
 
@@ -2338,15 +3730,15 @@ packages:
     cpu: [arm64]
     os: [freebsd]
 
-  '@esbuild/freebsd-arm64@0.19.12':
-    resolution: {integrity: sha512-4aRvFIXmwAcDBw9AueDQ2YnGmz5L6obe5kmPT8Vd+/+x/JMVKCgdcRwH6APrbpNXsPz+K653Qg8HB/oXvXVukA==}
+  '@esbuild/freebsd-arm64@0.21.5':
+    resolution: {integrity: sha512-5JcRxxRDUJLX8JXp/wcBCy3pENnCgBR9bN6JsY4OmhfUtIHe3ZW0mawA7+RDAcMLrMIZaf03NlQiX9DGyB8h4g==}
     engines: {node: '>=12'}
     cpu: [arm64]
     os: [freebsd]
 
-  '@esbuild/freebsd-arm64@0.21.5':
-    resolution: {integrity: sha512-5JcRxxRDUJLX8JXp/wcBCy3pENnCgBR9bN6JsY4OmhfUtIHe3ZW0mawA7+RDAcMLrMIZaf03NlQiX9DGyB8h4g==}
-    engines: {node: '>=12'}
+  '@esbuild/freebsd-arm64@0.25.12':
+    resolution: {integrity: sha512-gA0Bx759+7Jve03K1S0vkOu5Lg/85dou3EseOGUes8flVOGxbhDDh/iZaoek11Y8mtyKPGF3vP8XhnkDEAmzeg==}
+    engines: {node: '>=18'}
     cpu: [arm64]
     os: [freebsd]
 
@@ -2362,15 +3754,15 @@ packages:
     cpu: [x64]
     os: [freebsd]
 
-  '@esbuild/freebsd-x64@0.19.12':
-    resolution: {integrity: sha512-EYoXZ4d8xtBoVN7CEwWY2IN4ho76xjYXqSXMNccFSx2lgqOG/1TBPW0yPx1bJZk94qu3tX0fycJeeQsKovA8gg==}
+  '@esbuild/freebsd-x64@0.21.5':
+    resolution: {integrity: sha512-J95kNBj1zkbMXtHVH29bBriQygMXqoVQOQYA+ISs0/2l3T9/kj42ow2mpqerRBxDJnmkUDCaQT/dfNXWX/ZZCQ==}
     engines: {node: '>=12'}
     cpu: [x64]
     os: [freebsd]
 
-  '@esbuild/freebsd-x64@0.21.5':
-    resolution: {integrity: sha512-J95kNBj1zkbMXtHVH29bBriQygMXqoVQOQYA+ISs0/2l3T9/kj42ow2mpqerRBxDJnmkUDCaQT/dfNXWX/ZZCQ==}
-    engines: {node: '>=12'}
+  '@esbuild/freebsd-x64@0.25.12':
+    resolution: {integrity: sha512-TGbO26Yw2xsHzxtbVFGEXBFH0FRAP7gtcPE7P5yP7wGy7cXK2oO7RyOhL5NLiqTlBh47XhmIUXuGciXEqYFfBQ==}
+    engines: {node: '>=18'}
     cpu: [x64]
     os: [freebsd]
 
@@ -2386,15 +3778,15 @@ packages:
     cpu: [arm64]
     os: [linux]
 
-  '@esbuild/linux-arm64@0.19.12':
-    resolution: {integrity: sha512-EoTjyYyLuVPfdPLsGVVVC8a0p1BFFvtpQDB/YLEhaXyf/5bczaGeN15QkR+O4S5LeJ92Tqotve7i1jn35qwvdA==}
+  '@esbuild/linux-arm64@0.21.5':
+    resolution: {integrity: sha512-ibKvmyYzKsBeX8d8I7MH/TMfWDXBF3db4qM6sy+7re0YXya+K1cem3on9XgdT2EQGMu4hQyZhan7TeQ8XkGp4Q==}
     engines: {node: '>=12'}
     cpu: [arm64]
     os: [linux]
 
-  '@esbuild/linux-arm64@0.21.5':
-    resolution: {integrity: sha512-ibKvmyYzKsBeX8d8I7MH/TMfWDXBF3db4qM6sy+7re0YXya+K1cem3on9XgdT2EQGMu4hQyZhan7TeQ8XkGp4Q==}
-    engines: {node: '>=12'}
+  '@esbuild/linux-arm64@0.25.12':
+    resolution: {integrity: sha512-8bwX7a8FghIgrupcxb4aUmYDLp8pX06rGh5HqDT7bB+8Rdells6mHvrFHHW2JAOPZUbnjUpKTLg6ECyzvas2AQ==}
+    engines: {node: '>=18'}
     cpu: [arm64]
     os: [linux]
 
@@ -2410,15 +3802,15 @@ packages:
     cpu: [arm]
     os: [linux]
 
-  '@esbuild/linux-arm@0.19.12':
-    resolution: {integrity: sha512-J5jPms//KhSNv+LO1S1TX1UWp1ucM6N6XuL6ITdKWElCu8wXP72l9MM0zDTzzeikVyqFE6U8YAV9/tFyj0ti+w==}
+  '@esbuild/linux-arm@0.21.5':
+    resolution: {integrity: sha512-bPb5AHZtbeNGjCKVZ9UGqGwo8EUu4cLq68E95A53KlxAPRmUyYv2D6F0uUI65XisGOL1hBP5mTronbgo+0bFcA==}
     engines: {node: '>=12'}
     cpu: [arm]
     os: [linux]
 
-  '@esbuild/linux-arm@0.21.5':
-    resolution: {integrity: sha512-bPb5AHZtbeNGjCKVZ9UGqGwo8EUu4cLq68E95A53KlxAPRmUyYv2D6F0uUI65XisGOL1hBP5mTronbgo+0bFcA==}
-    engines: {node: '>=12'}
+  '@esbuild/linux-arm@0.25.12':
+    resolution: {integrity: sha512-lPDGyC1JPDou8kGcywY0YILzWlhhnRjdof3UlcoqYmS9El818LLfJJc3PXXgZHrHCAKs/Z2SeZtDJr5MrkxtOw==}
+    engines: {node: '>=18'}
     cpu: [arm]
     os: [linux]
 
@@ -2434,15 +3826,15 @@ packages:
     cpu: [ia32]
     os: [linux]
 
-  '@esbuild/linux-ia32@0.19.12':
-    resolution: {integrity: sha512-Thsa42rrP1+UIGaWz47uydHSBOgTUnwBwNq59khgIwktK6x60Hivfbux9iNR0eHCHzOLjLMLfUMLCypBkZXMHA==}
+  '@esbuild/linux-ia32@0.21.5':
+    resolution: {integrity: sha512-YvjXDqLRqPDl2dvRODYmmhz4rPeVKYvppfGYKSNGdyZkA01046pLWyRKKI3ax8fbJoK5QbxblURkwK/MWY18Tg==}
     engines: {node: '>=12'}
     cpu: [ia32]
     os: [linux]
 
-  '@esbuild/linux-ia32@0.21.5':
-    resolution: {integrity: sha512-YvjXDqLRqPDl2dvRODYmmhz4rPeVKYvppfGYKSNGdyZkA01046pLWyRKKI3ax8fbJoK5QbxblURkwK/MWY18Tg==}
-    engines: {node: '>=12'}
+  '@esbuild/linux-ia32@0.25.12':
+    resolution: {integrity: sha512-0y9KrdVnbMM2/vG8KfU0byhUN+EFCny9+8g202gYqSSVMonbsCfLjUO+rCci7pM0WBEtz+oK/PIwHkzxkyharA==}
+    engines: {node: '>=18'}
     cpu: [ia32]
     os: [linux]
 
@@ -2458,15 +3850,15 @@ packages:
     cpu: [loong64]
     os: [linux]
 
-  '@esbuild/linux-loong64@0.19.12':
-    resolution: {integrity: sha512-LiXdXA0s3IqRRjm6rV6XaWATScKAXjI4R4LoDlvO7+yQqFdlr1Bax62sRwkVvRIrwXxvtYEHHI4dm50jAXkuAA==}
+  '@esbuild/linux-loong64@0.21.5':
+    resolution: {integrity: sha512-uHf1BmMG8qEvzdrzAqg2SIG/02+4/DHB6a9Kbya0XDvwDEKCoC8ZRWI5JJvNdUjtciBGFQ5PuBlpEOXQj+JQSg==}
     engines: {node: '>=12'}
     cpu: [loong64]
     os: [linux]
 
-  '@esbuild/linux-loong64@0.21.5':
-    resolution: {integrity: sha512-uHf1BmMG8qEvzdrzAqg2SIG/02+4/DHB6a9Kbya0XDvwDEKCoC8ZRWI5JJvNdUjtciBGFQ5PuBlpEOXQj+JQSg==}
-    engines: {node: '>=12'}
+  '@esbuild/linux-loong64@0.25.12':
+    resolution: {integrity: sha512-h///Lr5a9rib/v1GGqXVGzjL4TMvVTv+s1DPoxQdz7l/AYv6LDSxdIwzxkrPW438oUXiDtwM10o9PmwS/6Z0Ng==}
+    engines: {node: '>=18'}
     cpu: [loong64]
     os: [linux]
 
@@ -2482,15 +3874,15 @@ packages:
     cpu: [mips64el]
     os: [linux]
 
-  '@esbuild/linux-mips64el@0.19.12':
-    resolution: {integrity: sha512-fEnAuj5VGTanfJ07ff0gOA6IPsvrVHLVb6Lyd1g2/ed67oU1eFzL0r9WL7ZzscD+/N6i3dWumGE1Un4f7Amf+w==}
+  '@esbuild/linux-mips64el@0.21.5':
+    resolution: {integrity: sha512-IajOmO+KJK23bj52dFSNCMsz1QP1DqM6cwLUv3W1QwyxkyIWecfafnI555fvSGqEKwjMXVLokcV5ygHW5b3Jbg==}
     engines: {node: '>=12'}
     cpu: [mips64el]
     os: [linux]
 
-  '@esbuild/linux-mips64el@0.21.5':
-    resolution: {integrity: sha512-IajOmO+KJK23bj52dFSNCMsz1QP1DqM6cwLUv3W1QwyxkyIWecfafnI555fvSGqEKwjMXVLokcV5ygHW5b3Jbg==}
-    engines: {node: '>=12'}
+  '@esbuild/linux-mips64el@0.25.12':
+    resolution: {integrity: sha512-iyRrM1Pzy9GFMDLsXn1iHUm18nhKnNMWscjmp4+hpafcZjrr2WbT//d20xaGljXDBYHqRcl8HnxbX6uaA/eGVw==}
+    engines: {node: '>=18'}
     cpu: [mips64el]
     os: [linux]
 
@@ -2506,15 +3898,15 @@ packages:
     cpu: [ppc64]
     os: [linux]
 
-  '@esbuild/linux-ppc64@0.19.12':
-    resolution: {integrity: sha512-nYJA2/QPimDQOh1rKWedNOe3Gfc8PabU7HT3iXWtNUbRzXS9+vgB0Fjaqr//XNbd82mCxHzik2qotuI89cfixg==}
+  '@esbuild/linux-ppc64@0.21.5':
+    resolution: {integrity: sha512-1hHV/Z4OEfMwpLO8rp7CvlhBDnjsC3CttJXIhBi+5Aj5r+MBvy4egg7wCbe//hSsT+RvDAG7s81tAvpL2XAE4w==}
     engines: {node: '>=12'}
     cpu: [ppc64]
     os: [linux]
 
-  '@esbuild/linux-ppc64@0.21.5':
-    resolution: {integrity: sha512-1hHV/Z4OEfMwpLO8rp7CvlhBDnjsC3CttJXIhBi+5Aj5r+MBvy4egg7wCbe//hSsT+RvDAG7s81tAvpL2XAE4w==}
-    engines: {node: '>=12'}
+  '@esbuild/linux-ppc64@0.25.12':
+    resolution: {integrity: sha512-9meM/lRXxMi5PSUqEXRCtVjEZBGwB7P/D4yT8UG/mwIdze2aV4Vo6U5gD3+RsoHXKkHCfSxZKzmDssVlRj1QQA==}
+    engines: {node: '>=18'}
     cpu: [ppc64]
     os: [linux]
 
@@ -2530,15 +3922,15 @@ packages:
     cpu: [riscv64]
     os: [linux]
 
-  '@esbuild/linux-riscv64@0.19.12':
-    resolution: {integrity: sha512-2MueBrlPQCw5dVJJpQdUYgeqIzDQgw3QtiAHUC4RBz9FXPrskyyU3VI1hw7C0BSKB9OduwSJ79FTCqtGMWqJHg==}
+  '@esbuild/linux-riscv64@0.21.5':
+    resolution: {integrity: sha512-2HdXDMd9GMgTGrPWnJzP2ALSokE/0O5HhTUvWIbD3YdjME8JwvSCnNGBnTThKGEB91OZhzrJ4qIIxk/SBmyDDA==}
     engines: {node: '>=12'}
     cpu: [riscv64]
     os: [linux]
 
-  '@esbuild/linux-riscv64@0.21.5':
-    resolution: {integrity: sha512-2HdXDMd9GMgTGrPWnJzP2ALSokE/0O5HhTUvWIbD3YdjME8JwvSCnNGBnTThKGEB91OZhzrJ4qIIxk/SBmyDDA==}
-    engines: {node: '>=12'}
+  '@esbuild/linux-riscv64@0.25.12':
+    resolution: {integrity: sha512-Zr7KR4hgKUpWAwb1f3o5ygT04MzqVrGEGXGLnj15YQDJErYu/BGg+wmFlIDOdJp0PmB0lLvxFIOXZgFRrdjR0w==}
+    engines: {node: '>=18'}
     cpu: [riscv64]
     os: [linux]
 
@@ -2554,15 +3946,15 @@ packages:
     cpu: [s390x]
     os: [linux]
 
-  '@esbuild/linux-s390x@0.19.12':
-    resolution: {integrity: sha512-+Pil1Nv3Umes4m3AZKqA2anfhJiVmNCYkPchwFJNEJN5QxmTs1uzyy4TvmDrCRNT2ApwSari7ZIgrPeUx4UZDg==}
+  '@esbuild/linux-s390x@0.21.5':
+    resolution: {integrity: sha512-zus5sxzqBJD3eXxwvjN1yQkRepANgxE9lgOW2qLnmr8ikMTphkjgXu1HR01K4FJg8h1kEEDAqDcZQtbrRnB41A==}
     engines: {node: '>=12'}
     cpu: [s390x]
     os: [linux]
 
-  '@esbuild/linux-s390x@0.21.5':
-    resolution: {integrity: sha512-zus5sxzqBJD3eXxwvjN1yQkRepANgxE9lgOW2qLnmr8ikMTphkjgXu1HR01K4FJg8h1kEEDAqDcZQtbrRnB41A==}
-    engines: {node: '>=12'}
+  '@esbuild/linux-s390x@0.25.12':
+    resolution: {integrity: sha512-MsKncOcgTNvdtiISc/jZs/Zf8d0cl/t3gYWX8J9ubBnVOwlk65UIEEvgBORTiljloIWnBzLs4qhzPkJcitIzIg==}
+    engines: {node: '>=18'}
     cpu: [s390x]
     os: [linux]
 
@@ -2578,15 +3970,15 @@ packages:
     cpu: [x64]
     os: [linux]
 
-  '@esbuild/linux-x64@0.19.12':
-    resolution: {integrity: sha512-B71g1QpxfwBvNrfyJdVDexenDIt1CiDN1TIXLbhOw0KhJzE78KIFGX6OJ9MrtC0oOqMWf+0xop4qEU8JrJTwCg==}
+  '@esbuild/linux-x64@0.21.5':
+    resolution: {integrity: sha512-1rYdTpyv03iycF1+BhzrzQJCdOuAOtaqHTWJZCWvijKD2N5Xu0TtVC8/+1faWqcP9iBCWOmjmhoH94dH82BxPQ==}
     engines: {node: '>=12'}
     cpu: [x64]
     os: [linux]
 
-  '@esbuild/linux-x64@0.21.5':
-    resolution: {integrity: sha512-1rYdTpyv03iycF1+BhzrzQJCdOuAOtaqHTWJZCWvijKD2N5Xu0TtVC8/+1faWqcP9iBCWOmjmhoH94dH82BxPQ==}
-    engines: {node: '>=12'}
+  '@esbuild/linux-x64@0.25.12':
+    resolution: {integrity: sha512-uqZMTLr/zR/ed4jIGnwSLkaHmPjOjJvnm6TVVitAa08SLS9Z0VM8wIRx7gWbJB5/J54YuIMInDquWyYvQLZkgw==}
+    engines: {node: '>=18'}
     cpu: [x64]
     os: [linux]
 
@@ -2595,6 +3987,12 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [linux]
+
+  '@esbuild/netbsd-arm64@0.25.12':
+    resolution: {integrity: sha512-xXwcTq4GhRM7J9A8Gv5boanHhRa/Q9KLVmcyXHCTaM4wKfIpWkdXiMog/KsnxzJ0A1+nD+zoecuzqPmCRyBGjg==}
+    engines: {node: '>=18'}
+    cpu: [arm64]
+    os: [netbsd]
 
   '@esbuild/netbsd-arm64@0.28.0':
     resolution: {integrity: sha512-CR/RYotgtCKwtftMwJlUU7xCVNg3lMYZ0RzTmAHSfLCXw3NtZtNpswLEj/Kkf6kEL3Gw+BpOekRX0BYCtklhUw==}
@@ -2608,15 +4006,15 @@ packages:
     cpu: [x64]
     os: [netbsd]
 
-  '@esbuild/netbsd-x64@0.19.12':
-    resolution: {integrity: sha512-3ltjQ7n1owJgFbuC61Oj++XhtzmymoCihNFgT84UAmJnxJfm4sYCiSLTXZtE00VWYpPMYc+ZQmB6xbSdVh0JWA==}
+  '@esbuild/netbsd-x64@0.21.5':
+    resolution: {integrity: sha512-Woi2MXzXjMULccIwMnLciyZH4nCIMpWQAs049KEeMvOcNADVxo0UBIQPfSmxB3CWKedngg7sWZdLvLczpe0tLg==}
     engines: {node: '>=12'}
     cpu: [x64]
     os: [netbsd]
 
-  '@esbuild/netbsd-x64@0.21.5':
-    resolution: {integrity: sha512-Woi2MXzXjMULccIwMnLciyZH4nCIMpWQAs049KEeMvOcNADVxo0UBIQPfSmxB3CWKedngg7sWZdLvLczpe0tLg==}
-    engines: {node: '>=12'}
+  '@esbuild/netbsd-x64@0.25.12':
+    resolution: {integrity: sha512-Ld5pTlzPy3YwGec4OuHh1aCVCRvOXdH8DgRjfDy/oumVovmuSzWfnSJg+VtakB9Cm0gxNO9BzWkj6mtO1FMXkQ==}
+    engines: {node: '>=18'}
     cpu: [x64]
     os: [netbsd]
 
@@ -2625,6 +4023,12 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [netbsd]
+
+  '@esbuild/openbsd-arm64@0.25.12':
+    resolution: {integrity: sha512-fF96T6KsBo/pkQI950FARU9apGNTSlZGsv1jZBAlcLL1MLjLNIWPBkj5NlSz8aAzYKg+eNqknrUJ24QBybeR5A==}
+    engines: {node: '>=18'}
+    cpu: [arm64]
+    os: [openbsd]
 
   '@esbuild/openbsd-arm64@0.28.0':
     resolution: {integrity: sha512-cXb5vApOsRsxsEl4mcZ1XY3D4DzcoMxR/nnc4IyqYs0rTI8ZKmW6kyyg+11Z8yvgMfAEldKzP7AdP64HnSC/6g==}
@@ -2638,15 +4042,15 @@ packages:
     cpu: [x64]
     os: [openbsd]
 
-  '@esbuild/openbsd-x64@0.19.12':
-    resolution: {integrity: sha512-RbrfTB9SWsr0kWmb9srfF+L933uMDdu9BIzdA7os2t0TXhCRjrQyCeOt6wVxr79CKD4c+p+YhCj31HBkYcXebw==}
+  '@esbuild/openbsd-x64@0.21.5':
+    resolution: {integrity: sha512-HLNNw99xsvx12lFBUwoT8EVCsSvRNDVxNpjZ7bPn947b8gJPzeHWyNVhFsaerc0n3TsbOINvRP2byTZ5LKezow==}
     engines: {node: '>=12'}
     cpu: [x64]
     os: [openbsd]
 
-  '@esbuild/openbsd-x64@0.21.5':
-    resolution: {integrity: sha512-HLNNw99xsvx12lFBUwoT8EVCsSvRNDVxNpjZ7bPn947b8gJPzeHWyNVhFsaerc0n3TsbOINvRP2byTZ5LKezow==}
-    engines: {node: '>=12'}
+  '@esbuild/openbsd-x64@0.25.12':
+    resolution: {integrity: sha512-MZyXUkZHjQxUvzK7rN8DJ3SRmrVrke8ZyRusHlP+kuwqTcfWLyqMOE3sScPPyeIXN/mDJIfGXvcMqCgYKekoQw==}
+    engines: {node: '>=18'}
     cpu: [x64]
     os: [openbsd]
 
@@ -2655,6 +4059,12 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [openbsd]
+
+  '@esbuild/openharmony-arm64@0.25.12':
+    resolution: {integrity: sha512-rm0YWsqUSRrjncSXGA7Zv78Nbnw4XL6/dzr20cyrQf7ZmRcsovpcRBdhD43Nuk3y7XIoW2OxMVvwuRvk9XdASg==}
+    engines: {node: '>=18'}
+    cpu: [arm64]
+    os: [openharmony]
 
   '@esbuild/openharmony-arm64@0.28.0':
     resolution: {integrity: sha512-FLGfyizszcef5C3YtoyQDACyg95+dndv79i2EekILBofh5wpCa1KuBqOWKrEHZg3zrL3t5ouE5jgr94vA+Wb2w==}
@@ -2668,15 +4078,15 @@ packages:
     cpu: [x64]
     os: [sunos]
 
-  '@esbuild/sunos-x64@0.19.12':
-    resolution: {integrity: sha512-HKjJwRrW8uWtCQnQOz9qcU3mUZhTUQvi56Q8DPTLLB+DawoiQdjsYq+j+D3s9I8VFtDr+F9CjgXKKC4ss89IeA==}
+  '@esbuild/sunos-x64@0.21.5':
+    resolution: {integrity: sha512-6+gjmFpfy0BHU5Tpptkuh8+uw3mnrvgs+dSPQXQOv3ekbordwnzTVEb4qnIvQcYXq6gzkyTnoZ9dZG+D4garKg==}
     engines: {node: '>=12'}
     cpu: [x64]
     os: [sunos]
 
-  '@esbuild/sunos-x64@0.21.5':
-    resolution: {integrity: sha512-6+gjmFpfy0BHU5Tpptkuh8+uw3mnrvgs+dSPQXQOv3ekbordwnzTVEb4qnIvQcYXq6gzkyTnoZ9dZG+D4garKg==}
-    engines: {node: '>=12'}
+  '@esbuild/sunos-x64@0.25.12':
+    resolution: {integrity: sha512-3wGSCDyuTHQUzt0nV7bocDy72r2lI33QL3gkDNGkod22EsYl04sMf0qLb8luNKTOmgF/eDEDP5BFNwoBKH441w==}
+    engines: {node: '>=18'}
     cpu: [x64]
     os: [sunos]
 
@@ -2692,15 +4102,15 @@ packages:
     cpu: [arm64]
     os: [win32]
 
-  '@esbuild/win32-arm64@0.19.12':
-    resolution: {integrity: sha512-URgtR1dJnmGvX864pn1B2YUYNzjmXkuJOIqG2HdU62MVS4EHpU2946OZoTMnRUHklGtJdJZ33QfzdjGACXhn1A==}
+  '@esbuild/win32-arm64@0.21.5':
+    resolution: {integrity: sha512-Z0gOTd75VvXqyq7nsl93zwahcTROgqvuAcYDUr+vOv8uHhNSKROyU961kgtCD1e95IqPKSQKH7tBTslnS3tA8A==}
     engines: {node: '>=12'}
     cpu: [arm64]
     os: [win32]
 
-  '@esbuild/win32-arm64@0.21.5':
-    resolution: {integrity: sha512-Z0gOTd75VvXqyq7nsl93zwahcTROgqvuAcYDUr+vOv8uHhNSKROyU961kgtCD1e95IqPKSQKH7tBTslnS3tA8A==}
-    engines: {node: '>=12'}
+  '@esbuild/win32-arm64@0.25.12':
+    resolution: {integrity: sha512-rMmLrur64A7+DKlnSuwqUdRKyd3UE7oPJZmnljqEptesKM8wx9J8gx5u0+9Pq0fQQW8vqeKebwNXdfOyP+8Bsg==}
+    engines: {node: '>=18'}
     cpu: [arm64]
     os: [win32]
 
@@ -2716,15 +4126,15 @@ packages:
     cpu: [ia32]
     os: [win32]
 
-  '@esbuild/win32-ia32@0.19.12':
-    resolution: {integrity: sha512-+ZOE6pUkMOJfmxmBZElNOx72NKpIa/HFOMGzu8fqzQJ5kgf6aTGrcJaFsNiVMH4JKpMipyK+7k0n2UXN7a8YKQ==}
+  '@esbuild/win32-ia32@0.21.5':
+    resolution: {integrity: sha512-SWXFF1CL2RVNMaVs+BBClwtfZSvDgtL//G/smwAc5oVK/UPu2Gu9tIaRgFmYFFKrmg3SyAjSrElf0TiJ1v8fYA==}
     engines: {node: '>=12'}
     cpu: [ia32]
     os: [win32]
 
-  '@esbuild/win32-ia32@0.21.5':
-    resolution: {integrity: sha512-SWXFF1CL2RVNMaVs+BBClwtfZSvDgtL//G/smwAc5oVK/UPu2Gu9tIaRgFmYFFKrmg3SyAjSrElf0TiJ1v8fYA==}
-    engines: {node: '>=12'}
+  '@esbuild/win32-ia32@0.25.12':
+    resolution: {integrity: sha512-HkqnmmBoCbCwxUKKNPBixiWDGCpQGVsrQfJoVGYLPT41XWF8lHuE5N6WhVia2n4o5QK5M4tYr21827fNhi4byQ==}
+    engines: {node: '>=18'}
     cpu: [ia32]
     os: [win32]
 
@@ -2740,15 +4150,15 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@esbuild/win32-x64@0.19.12':
-    resolution: {integrity: sha512-T1QyPSDCyMXaO3pzBkF96E8xMkiRYbUEZADd29SyPGabqxMViNoii+NcK7eWJAEoU6RZyEm5lVSIjTmcdoB9HA==}
+  '@esbuild/win32-x64@0.21.5':
+    resolution: {integrity: sha512-tQd/1efJuzPC6rCFwEvLtci/xNFcTZknmXs98FYDfGE4wP9ClFV98nyKrzJKVPMhdDnjzLhdUyMX4PsQAPjwIw==}
     engines: {node: '>=12'}
     cpu: [x64]
     os: [win32]
 
-  '@esbuild/win32-x64@0.21.5':
-    resolution: {integrity: sha512-tQd/1efJuzPC6rCFwEvLtci/xNFcTZknmXs98FYDfGE4wP9ClFV98nyKrzJKVPMhdDnjzLhdUyMX4PsQAPjwIw==}
-    engines: {node: '>=12'}
+  '@esbuild/win32-x64@0.25.12':
+    resolution: {integrity: sha512-alJC0uCZpTFrSL0CCDjcgleBXPnCrEAhTBILpeAp7M/OFgoqtAetfBzX0xM00MUsVVPpVjlPuMbREqnZCXaTnA==}
+    engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
 
@@ -2796,10 +4206,10 @@ packages:
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  '@fast-check/vitest@0.1.6':
-    resolution: {integrity: sha512-/POA3YDsja15aIoXNqQ/vJrm0x7qTRPjL7oDTMLJcOYGqEBjlrmHTKWyRzxgSNa7xyh5B3q8Jib9ALObtMJiEA==}
+  '@fast-check/vitest@0.4.1':
+    resolution: {integrity: sha512-OX6TecB+ZzRfPc49jcPChcV1cf5aDu77CdDU8liecWVam7eD7mPvJNP50b9bBSTxVoGN5wzxrX9PIcCnqgC8bg==}
     peerDependencies:
-      vitest: '>=0.28.1 <1.0.0 || ^1 || ^2 || ^3'
+      vitest: ^4.1.0
 
   '@fastify/ajv-compiler@4.0.5':
     resolution: {integrity: sha512-KoWKW+MhvfTRWL4qrhUwAAZoaChluo0m0vbiJlGMt2GXvL4LVPQEjt8kSpHI3IBq5Rez8fg+XeH3cneztq+C7A==}
@@ -3720,11 +5130,17 @@ packages:
   '@types/node@22.19.21':
     resolution: {integrity: sha512-VMeFBSCKQKmm2swI2kW51SFusDqekC6q9trBCvJ/JliDchFSuoYYKN7yVNjPthP1HKZcx3U1gI/wTcEBjEFKTA==}
 
+  '@types/node@25.9.3':
+    resolution: {integrity: sha512-603BddQMv3pUcr4U2dhujk83N2tTDVr/34wII2B6bJy6g+8WD6yUb11jszNs0gdi4PesVWl7ABt8nYMVpnLUcg==}
+
   '@types/parse-json@4.0.2':
     resolution: {integrity: sha512-dISoDXWWQwUquiKsyZ4Ng+HX2KsPL7LyHKHQwgGFEA3IaKac4Obd+h2a/a6waisAoepJlBcx9paWqjA8/HVjCw==}
 
   '@types/pg@8.11.6':
     resolution: {integrity: sha512-/2WmmBXHLsfRqzfHW7BNZ8SbYzE8OSk7i3WjFYvfgRHj7S1xj+16Je5fUKv3lVdVzk/zn9TXOqf+avFCFIE0yQ==}
+
+  '@types/pg@8.20.0':
+    resolution: {integrity: sha512-bEPFOaMAHTEP1EzpvHTbmwR8UsFyHSKsRisLIHVMXnpNefSbGA1bD6CVy+qKjGSqmZqNqBDV2azOBo8TgkcVow==}
 
   '@types/prismjs@1.26.6':
     resolution: {integrity: sha512-vqlvI7qlMvcCBbVe0AKAb4f97//Hy0EBTaiW8AalRnG/xAN5zOiWWyrNqNXeq8+KAuvRewjCVY1+IPxk4RdNYw==}
@@ -4348,8 +5764,8 @@ packages:
   buffer@5.7.1:
     resolution: {integrity: sha512-EHcyIPBQ4BSGlvjB16k5KgAJ27CIsHY/2JBmCRReo48y9rQ3MaUzWX3KVlBa4U7MyX02HdVj0K7C3WaB3ju7FQ==}
 
-  bullmq@5.78.0:
-    resolution: {integrity: sha512-tT9jJmbobk9ueEfFc22egLmgwCcMGgOjZ5Y1cvgczBPv1JUmC7iHQVbQtqku2YBE5dE9uzdVpxIrBvL/YAjGwA==}
+  bullmq@5.78.1:
+    resolution: {integrity: sha512-zD5IT+qMqbMgPFPdL9FwnZka1bz6nckM+5lXj4N0vsXqdzoVO6wizmXpwsg/4GnHmXJsL7XOKeWA64tYUdPrOA==}
     engines: {node: '>=12.22.0'}
     peerDependencies:
       redis: '>=5.0.0'
@@ -5101,8 +6517,8 @@ packages:
     resolution: {integrity: sha512-tE7ztYzXHIeyvc7N+hR3oi7FIbf/NIjVP9hmAt3yMXzrQ072/fpjGLx2GxNxGxUl5V73MEqYzioOMoVhGMJ5cA==}
     engines: {node: '>=10'}
 
-  drizzle-kit@0.30.6:
-    resolution: {integrity: sha512-U4wWit0fyZuGuP7iNmRleQyK2V8wCuv57vf5l3MnG4z4fzNTjY/U13M8owyQ5RavqvqxBifWORaR3wIUzlN64g==}
+  drizzle-kit@0.31.10:
+    resolution: {integrity: sha512-7OZcmQUrdGI+DUNNsKBn1aW8qSoKuTH7d0mYgSP8bAzdFzKoovxEFnoGQp2dVs82EOJeYycqRtciopszwUf8bw==}
     hasBin: true
 
   drizzle-orm@0.45.2:
@@ -5317,24 +6733,19 @@ packages:
   esast-util-from-js@2.0.1:
     resolution: {integrity: sha512-8Ja+rNJ0Lt56Pcf3TAmpBZjmx8ZcK5Ts4cAzIOjsjevg9oSXJnl6SUQ2EevU8tv3h6ZLWmoKL5H4fgWvdvfETw==}
 
-  esbuild-register@3.6.0:
-    resolution: {integrity: sha512-H2/S7Pm8a9CL1uhp9OvjwrBh5Pvx0H8qVOxNu8Wed9Y7qv56MPtq+GGM8RJpq6glYJn9Wspr8uw7l55uyinNeg==}
-    peerDependencies:
-      esbuild: '>=0.12 <1'
-
   esbuild@0.18.20:
     resolution: {integrity: sha512-ceqxoedUrcayh7Y7ZX6NdbbDzGROiyVBgC4PriJThBKSVPWnnFHZAkfI1lJT8QFkOwH4qOS2SJkS4wvpGl8BpA==}
-    engines: {node: '>=12'}
-    hasBin: true
-
-  esbuild@0.19.12:
-    resolution: {integrity: sha512-aARqgq8roFBj054KvQr5f1sFu0D65G+miZRCuJyJ0G13Zwx7vRar5Zhn2tkQNzIXcBrNVsv/8stehpj+GAjgbg==}
     engines: {node: '>=12'}
     hasBin: true
 
   esbuild@0.21.5:
     resolution: {integrity: sha512-mg3OPMV4hXywwpoDxu3Qda5xCKQi+vCTZq8S9J/EpkhB2HzKXq4SNFZE3+NK93JYxc8VMSep+lOUSC/RVKaBqw==}
     engines: {node: '>=12'}
+    hasBin: true
+
+  esbuild@0.25.12:
+    resolution: {integrity: sha512-bbPBYYrtZbkt6Os6FiTLCTFxvq4tt3JKall1vRwshA3fdVztsLAatFaZobhkBC8/BrPetoa0oksYoKXoG4ryJg==}
+    engines: {node: '>=18'}
     hasBin: true
 
   esbuild@0.28.0:
@@ -5716,6 +7127,10 @@ packages:
     resolution: {integrity: sha512-8RipRLol37bNs2bhoV67fiTEvdTrbMUYcFTiy3+wuuOnUog2QBHCZWXDRijWQfAkhBj2Uf5UnVaiWwA5vdd82w==}
     engines: {node: '>= 6'}
 
+  form-data@4.0.6:
+    resolution: {integrity: sha512-vKatAh4SlVfgbv+YtmhiRjhEMJsYpsG1Y2rMQtR+SVSbytsSD1YGzDIcrAJmdFec88u/+VoGmxnl+80gL1tRCQ==}
+    engines: {node: '>= 6'}
+
   format@0.2.2:
     resolution: {integrity: sha512-wzsgA6WOq+09wrU1tsJ09udeR/YZRaeArL9e1wPbFg3GG2yDnC2ldKpxs4xunpFF9DgqCqOIra3bc1HWrJ37Ww==}
     engines: {node: '>=0.4.x'}
@@ -5953,8 +7368,8 @@ packages:
     resolution: {integrity: sha512-5v6yZd4JK3eMI3FqqCouswVqwugaA9r4dNZB1wwcmrD02QkV5H0y7XBQW8QwQqEaZY1pM9aqORSORhJRdNK44Q==}
     engines: {node: '>=6.0'}
 
-  groq-sdk@0.9.1:
-    resolution: {integrity: sha512-yFZ3+I0Oe/u+4PUKDUG8q5KpP9Hgc+ujhlBaAbcc4EMJb2RMn/atqG8i+Vnk7s+2K4rJ49mviO/kY0i9LbskCA==}
+  groq-sdk@0.37.0:
+    resolution: {integrity: sha512-lT72pcT8b/X5XrzdKf+rWVzUGW1OQSKESmL8fFN5cTbsf02gq6oFam4SVeNtzELt9cYE2Pt3pdGgSImuTbHFDg==}
 
   gtoken@8.0.0:
     resolution: {integrity: sha512-+CqsMbHPiSTdtSO14O51eMNlrp9N79gmeqmXeouJOhfucAedHw9noVe/n5uJk3tbKE6a+6ZCQg3RPhVhHByAIw==}
@@ -8517,8 +9932,8 @@ packages:
     resolution: {integrity: sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA==}
     hasBin: true
 
-  semver@7.8.0:
-    resolution: {integrity: sha512-AcM7dV/5ul4EekoQ29Agm5vri8JNqRyj39o0qpX6vDF2GZrtutZl5RwgD1XnZjiTAfncsJhMI48QQH3sN87YNA==}
+  semver@7.8.1:
+    resolution: {integrity: sha512-rkVq3IXh+4FDGch+KwzX3aV9W3kO54GyEgpvBzSyctDA6Xtd7RJQV1xmXbeQp5v7+VzLOfVqiutSE6GICgPFvg==}
     engines: {node: '>=10'}
     hasBin: true
 
@@ -9086,6 +10501,9 @@ packages:
 
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
+
+  undici-types@7.24.6:
+    resolution: {integrity: sha512-WRNW+sJgj5OBN4/0JpHFqtqzhpbnV0GuB+OozA9gCL7a993SmU+1JBZCzLNxYsbMfIeDL+lTsphD5jN5N+n0zg==}
 
   unicode-canonical-property-names-ecmascript@2.0.1:
     resolution: {integrity: sha512-dA8WbNeb2a6oQzAQ55YlT5vQAWGV9WXOsi3SskE3bcCdM0P4SDd+24zS/OCacdRq5BkdsRj9q3Pg6YyQoxIGqg==}
@@ -11966,10 +13384,10 @@ snapshots:
       '@esbuild-kit/core-utils': 3.3.2
       get-tsconfig: 4.14.0
 
-  '@esbuild/aix-ppc64@0.19.12':
+  '@esbuild/aix-ppc64@0.21.5':
     optional: true
 
-  '@esbuild/aix-ppc64@0.21.5':
+  '@esbuild/aix-ppc64@0.25.12':
     optional: true
 
   '@esbuild/aix-ppc64@0.28.0':
@@ -11978,10 +13396,10 @@ snapshots:
   '@esbuild/android-arm64@0.18.20':
     optional: true
 
-  '@esbuild/android-arm64@0.19.12':
+  '@esbuild/android-arm64@0.21.5':
     optional: true
 
-  '@esbuild/android-arm64@0.21.5':
+  '@esbuild/android-arm64@0.25.12':
     optional: true
 
   '@esbuild/android-arm64@0.28.0':
@@ -11990,10 +13408,10 @@ snapshots:
   '@esbuild/android-arm@0.18.20':
     optional: true
 
-  '@esbuild/android-arm@0.19.12':
+  '@esbuild/android-arm@0.21.5':
     optional: true
 
-  '@esbuild/android-arm@0.21.5':
+  '@esbuild/android-arm@0.25.12':
     optional: true
 
   '@esbuild/android-arm@0.28.0':
@@ -12002,10 +13420,10 @@ snapshots:
   '@esbuild/android-x64@0.18.20':
     optional: true
 
-  '@esbuild/android-x64@0.19.12':
+  '@esbuild/android-x64@0.21.5':
     optional: true
 
-  '@esbuild/android-x64@0.21.5':
+  '@esbuild/android-x64@0.25.12':
     optional: true
 
   '@esbuild/android-x64@0.28.0':
@@ -12014,10 +13432,10 @@ snapshots:
   '@esbuild/darwin-arm64@0.18.20':
     optional: true
 
-  '@esbuild/darwin-arm64@0.19.12':
+  '@esbuild/darwin-arm64@0.21.5':
     optional: true
 
-  '@esbuild/darwin-arm64@0.21.5':
+  '@esbuild/darwin-arm64@0.25.12':
     optional: true
 
   '@esbuild/darwin-arm64@0.28.0':
@@ -12026,10 +13444,10 @@ snapshots:
   '@esbuild/darwin-x64@0.18.20':
     optional: true
 
-  '@esbuild/darwin-x64@0.19.12':
+  '@esbuild/darwin-x64@0.21.5':
     optional: true
 
-  '@esbuild/darwin-x64@0.21.5':
+  '@esbuild/darwin-x64@0.25.12':
     optional: true
 
   '@esbuild/darwin-x64@0.28.0':
@@ -12038,10 +13456,10 @@ snapshots:
   '@esbuild/freebsd-arm64@0.18.20':
     optional: true
 
-  '@esbuild/freebsd-arm64@0.19.12':
+  '@esbuild/freebsd-arm64@0.21.5':
     optional: true
 
-  '@esbuild/freebsd-arm64@0.21.5':
+  '@esbuild/freebsd-arm64@0.25.12':
     optional: true
 
   '@esbuild/freebsd-arm64@0.28.0':
@@ -12050,10 +13468,10 @@ snapshots:
   '@esbuild/freebsd-x64@0.18.20':
     optional: true
 
-  '@esbuild/freebsd-x64@0.19.12':
+  '@esbuild/freebsd-x64@0.21.5':
     optional: true
 
-  '@esbuild/freebsd-x64@0.21.5':
+  '@esbuild/freebsd-x64@0.25.12':
     optional: true
 
   '@esbuild/freebsd-x64@0.28.0':
@@ -12062,10 +13480,10 @@ snapshots:
   '@esbuild/linux-arm64@0.18.20':
     optional: true
 
-  '@esbuild/linux-arm64@0.19.12':
+  '@esbuild/linux-arm64@0.21.5':
     optional: true
 
-  '@esbuild/linux-arm64@0.21.5':
+  '@esbuild/linux-arm64@0.25.12':
     optional: true
 
   '@esbuild/linux-arm64@0.28.0':
@@ -12074,10 +13492,10 @@ snapshots:
   '@esbuild/linux-arm@0.18.20':
     optional: true
 
-  '@esbuild/linux-arm@0.19.12':
+  '@esbuild/linux-arm@0.21.5':
     optional: true
 
-  '@esbuild/linux-arm@0.21.5':
+  '@esbuild/linux-arm@0.25.12':
     optional: true
 
   '@esbuild/linux-arm@0.28.0':
@@ -12086,10 +13504,10 @@ snapshots:
   '@esbuild/linux-ia32@0.18.20':
     optional: true
 
-  '@esbuild/linux-ia32@0.19.12':
+  '@esbuild/linux-ia32@0.21.5':
     optional: true
 
-  '@esbuild/linux-ia32@0.21.5':
+  '@esbuild/linux-ia32@0.25.12':
     optional: true
 
   '@esbuild/linux-ia32@0.28.0':
@@ -12098,10 +13516,10 @@ snapshots:
   '@esbuild/linux-loong64@0.18.20':
     optional: true
 
-  '@esbuild/linux-loong64@0.19.12':
+  '@esbuild/linux-loong64@0.21.5':
     optional: true
 
-  '@esbuild/linux-loong64@0.21.5':
+  '@esbuild/linux-loong64@0.25.12':
     optional: true
 
   '@esbuild/linux-loong64@0.28.0':
@@ -12110,10 +13528,10 @@ snapshots:
   '@esbuild/linux-mips64el@0.18.20':
     optional: true
 
-  '@esbuild/linux-mips64el@0.19.12':
+  '@esbuild/linux-mips64el@0.21.5':
     optional: true
 
-  '@esbuild/linux-mips64el@0.21.5':
+  '@esbuild/linux-mips64el@0.25.12':
     optional: true
 
   '@esbuild/linux-mips64el@0.28.0':
@@ -12122,10 +13540,10 @@ snapshots:
   '@esbuild/linux-ppc64@0.18.20':
     optional: true
 
-  '@esbuild/linux-ppc64@0.19.12':
+  '@esbuild/linux-ppc64@0.21.5':
     optional: true
 
-  '@esbuild/linux-ppc64@0.21.5':
+  '@esbuild/linux-ppc64@0.25.12':
     optional: true
 
   '@esbuild/linux-ppc64@0.28.0':
@@ -12134,10 +13552,10 @@ snapshots:
   '@esbuild/linux-riscv64@0.18.20':
     optional: true
 
-  '@esbuild/linux-riscv64@0.19.12':
+  '@esbuild/linux-riscv64@0.21.5':
     optional: true
 
-  '@esbuild/linux-riscv64@0.21.5':
+  '@esbuild/linux-riscv64@0.25.12':
     optional: true
 
   '@esbuild/linux-riscv64@0.28.0':
@@ -12146,10 +13564,10 @@ snapshots:
   '@esbuild/linux-s390x@0.18.20':
     optional: true
 
-  '@esbuild/linux-s390x@0.19.12':
+  '@esbuild/linux-s390x@0.21.5':
     optional: true
 
-  '@esbuild/linux-s390x@0.21.5':
+  '@esbuild/linux-s390x@0.25.12':
     optional: true
 
   '@esbuild/linux-s390x@0.28.0':
@@ -12158,13 +13576,16 @@ snapshots:
   '@esbuild/linux-x64@0.18.20':
     optional: true
 
-  '@esbuild/linux-x64@0.19.12':
-    optional: true
-
   '@esbuild/linux-x64@0.21.5':
     optional: true
 
+  '@esbuild/linux-x64@0.25.12':
+    optional: true
+
   '@esbuild/linux-x64@0.28.0':
+    optional: true
+
+  '@esbuild/netbsd-arm64@0.25.12':
     optional: true
 
   '@esbuild/netbsd-arm64@0.28.0':
@@ -12173,13 +13594,16 @@ snapshots:
   '@esbuild/netbsd-x64@0.18.20':
     optional: true
 
-  '@esbuild/netbsd-x64@0.19.12':
-    optional: true
-
   '@esbuild/netbsd-x64@0.21.5':
     optional: true
 
+  '@esbuild/netbsd-x64@0.25.12':
+    optional: true
+
   '@esbuild/netbsd-x64@0.28.0':
+    optional: true
+
+  '@esbuild/openbsd-arm64@0.25.12':
     optional: true
 
   '@esbuild/openbsd-arm64@0.28.0':
@@ -12188,13 +13612,16 @@ snapshots:
   '@esbuild/openbsd-x64@0.18.20':
     optional: true
 
-  '@esbuild/openbsd-x64@0.19.12':
-    optional: true
-
   '@esbuild/openbsd-x64@0.21.5':
     optional: true
 
+  '@esbuild/openbsd-x64@0.25.12':
+    optional: true
+
   '@esbuild/openbsd-x64@0.28.0':
+    optional: true
+
+  '@esbuild/openharmony-arm64@0.25.12':
     optional: true
 
   '@esbuild/openharmony-arm64@0.28.0':
@@ -12203,10 +13630,10 @@ snapshots:
   '@esbuild/sunos-x64@0.18.20':
     optional: true
 
-  '@esbuild/sunos-x64@0.19.12':
+  '@esbuild/sunos-x64@0.21.5':
     optional: true
 
-  '@esbuild/sunos-x64@0.21.5':
+  '@esbuild/sunos-x64@0.25.12':
     optional: true
 
   '@esbuild/sunos-x64@0.28.0':
@@ -12215,10 +13642,10 @@ snapshots:
   '@esbuild/win32-arm64@0.18.20':
     optional: true
 
-  '@esbuild/win32-arm64@0.19.12':
+  '@esbuild/win32-arm64@0.21.5':
     optional: true
 
-  '@esbuild/win32-arm64@0.21.5':
+  '@esbuild/win32-arm64@0.25.12':
     optional: true
 
   '@esbuild/win32-arm64@0.28.0':
@@ -12227,10 +13654,10 @@ snapshots:
   '@esbuild/win32-ia32@0.18.20':
     optional: true
 
-  '@esbuild/win32-ia32@0.19.12':
+  '@esbuild/win32-ia32@0.21.5':
     optional: true
 
-  '@esbuild/win32-ia32@0.21.5':
+  '@esbuild/win32-ia32@0.25.12':
     optional: true
 
   '@esbuild/win32-ia32@0.28.0':
@@ -12239,10 +13666,10 @@ snapshots:
   '@esbuild/win32-x64@0.18.20':
     optional: true
 
-  '@esbuild/win32-x64@0.19.12':
+  '@esbuild/win32-x64@0.21.5':
     optional: true
 
-  '@esbuild/win32-x64@0.21.5':
+  '@esbuild/win32-x64@0.25.12':
     optional: true
 
   '@esbuild/win32-x64@0.28.0':
@@ -12294,10 +13721,10 @@ snapshots:
       '@eslint/core': 0.17.0
       levn: 0.4.1
 
-  '@fast-check/vitest@0.1.6(vitest@2.1.9(@types/node@22.19.21)(terser@5.48.0))':
+  '@fast-check/vitest@0.4.1(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))':
     dependencies:
       fast-check: 3.23.2
-      vitest: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+      vitest: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
 
   '@fastify/ajv-compiler@4.0.5':
     dependencies:
@@ -12814,7 +14241,8 @@ snapshots:
       tslib: 2.8.1
       tsyringe: 4.10.0
 
-  '@petamoriken/float16@3.9.3': {}
+  '@petamoriken/float16@3.9.3':
+    optional: true
 
   '@pinojs/redact@0.4.0': {}
 
@@ -13257,7 +14685,7 @@ snapshots:
   '@types/node-fetch@2.6.13':
     dependencies:
       '@types/node': 22.19.21
-      form-data: 4.0.5
+      form-data: 4.0.6
 
   '@types/node@12.20.55': {}
 
@@ -13275,6 +14703,11 @@ snapshots:
     dependencies:
       undici-types: 6.21.0
 
+  '@types/node@25.9.3':
+    dependencies:
+      undici-types: 7.24.6
+    optional: true
+
   '@types/parse-json@4.0.2': {}
 
   '@types/pg@8.11.6':
@@ -13282,6 +14715,12 @@ snapshots:
       '@types/node': 22.19.21
       pg-protocol: 1.14.0
       pg-types: 4.1.0
+
+  '@types/pg@8.20.0':
+    dependencies:
+      '@types/node': 22.19.21
+      pg-protocol: 1.14.0
+      pg-types: 2.2.0
 
   '@types/prismjs@1.26.6': {}
 
@@ -13493,7 +14932,7 @@ snapshots:
 
   '@ungap/structured-clone@1.3.1': {}
 
-  '@vitejs/plugin-react@4.7.0(vite@5.4.21(@types/node@22.19.21)(terser@5.48.0))':
+  '@vitejs/plugin-react@4.7.0(vite@5.4.21(@types/node@25.9.3)(terser@5.48.0))':
     dependencies:
       '@babel/core': 7.29.7
       '@babel/plugin-transform-react-jsx-self': 7.29.7(@babel/core@7.29.7)
@@ -13501,7 +14940,7 @@ snapshots:
       '@rolldown/pluginutils': 1.0.0-beta.27
       '@types/babel__core': 7.20.5
       react-refresh: 0.17.0
-      vite: 5.4.21(@types/node@22.19.21)(terser@5.48.0)
+      vite: 5.4.21(@types/node@25.9.3)(terser@5.48.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -13541,6 +14980,24 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@vitest/coverage-v8@2.1.9(vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0))':
+    dependencies:
+      '@ampproject/remapping': 2.3.0
+      '@bcoe/v8-coverage': 0.2.3
+      debug: 4.4.3
+      istanbul-lib-coverage: 3.2.2
+      istanbul-lib-report: 3.0.1
+      istanbul-lib-source-maps: 5.0.6
+      istanbul-reports: 3.2.0
+      magic-string: 0.30.21
+      magicast: 0.3.5
+      std-env: 3.10.0
+      test-exclude: 7.0.2
+      tinyrainbow: 1.2.0
+      vitest: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+    transitivePeerDependencies:
+      - supports-color
+
   '@vitest/expect@2.1.9':
     dependencies:
       '@vitest/spy': 2.1.9
@@ -13563,6 +15020,14 @@ snapshots:
       magic-string: 0.30.21
     optionalDependencies:
       vite: 5.4.21(@types/node@22.19.21)(terser@5.48.0)
+
+  '@vitest/mocker@2.1.9(vite@5.4.21(@types/node@25.9.3)(terser@5.48.0))':
+    dependencies:
+      '@vitest/spy': 2.1.9
+      estree-walker: 3.0.3
+      magic-string: 0.30.21
+    optionalDependencies:
+      vite: 5.4.21(@types/node@25.9.3)(terser@5.48.0)
 
   '@vitest/pretty-format@2.1.9':
     dependencies:
@@ -14103,13 +15568,13 @@ snapshots:
       base64-js: 1.5.1
       ieee754: 1.2.1
 
-  bullmq@5.78.0:
+  bullmq@5.78.1:
     dependencies:
       cron-parser: 4.9.0
       ioredis: 5.10.1
       msgpackr: 2.0.2
       node-abort-controller: 3.1.1
-      semver: 7.8.0
+      semver: 7.8.1
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
@@ -14886,20 +16351,17 @@ snapshots:
     dependencies:
       is-obj: 2.0.0
 
-  drizzle-kit@0.30.6:
+  drizzle-kit@0.31.10:
     dependencies:
       '@drizzle-team/brocli': 0.10.2
       '@esbuild-kit/esm-loader': 2.6.5
-      esbuild: 0.19.12
-      esbuild-register: 3.6.0(esbuild@0.19.12)
-      gel: 2.2.0
-    transitivePeerDependencies:
-      - supports-color
+      esbuild: 0.25.12
+      tsx: 4.22.4
 
-  drizzle-orm@0.45.2(@neondatabase/serverless@0.10.4)(@types/pg@8.11.6)(gel@2.2.0)(pg@8.21.0):
+  drizzle-orm@0.45.2(@neondatabase/serverless@0.10.4)(@types/pg@8.20.0)(gel@2.2.0)(pg@8.21.0):
     optionalDependencies:
       '@neondatabase/serverless': 0.10.4
-      '@types/pg': 8.11.6
+      '@types/pg': 8.20.0
       gel: 2.2.0
       pg: 8.21.0
 
@@ -14955,7 +16417,8 @@ snapshots:
 
   env-paths@2.2.1: {}
 
-  env-paths@3.0.0: {}
+  env-paths@3.0.0:
+    optional: true
 
   environment@1.1.0: {}
 
@@ -15063,13 +16526,6 @@ snapshots:
       esast-util-from-estree: 2.0.0
       vfile-message: 4.0.3
 
-  esbuild-register@3.6.0(esbuild@0.19.12):
-    dependencies:
-      debug: 4.4.3
-      esbuild: 0.19.12
-    transitivePeerDependencies:
-      - supports-color
-
   esbuild@0.18.20:
     optionalDependencies:
       '@esbuild/android-arm': 0.18.20
@@ -15094,32 +16550,6 @@ snapshots:
       '@esbuild/win32-arm64': 0.18.20
       '@esbuild/win32-ia32': 0.18.20
       '@esbuild/win32-x64': 0.18.20
-
-  esbuild@0.19.12:
-    optionalDependencies:
-      '@esbuild/aix-ppc64': 0.19.12
-      '@esbuild/android-arm': 0.19.12
-      '@esbuild/android-arm64': 0.19.12
-      '@esbuild/android-x64': 0.19.12
-      '@esbuild/darwin-arm64': 0.19.12
-      '@esbuild/darwin-x64': 0.19.12
-      '@esbuild/freebsd-arm64': 0.19.12
-      '@esbuild/freebsd-x64': 0.19.12
-      '@esbuild/linux-arm': 0.19.12
-      '@esbuild/linux-arm64': 0.19.12
-      '@esbuild/linux-ia32': 0.19.12
-      '@esbuild/linux-loong64': 0.19.12
-      '@esbuild/linux-mips64el': 0.19.12
-      '@esbuild/linux-ppc64': 0.19.12
-      '@esbuild/linux-riscv64': 0.19.12
-      '@esbuild/linux-s390x': 0.19.12
-      '@esbuild/linux-x64': 0.19.12
-      '@esbuild/netbsd-x64': 0.19.12
-      '@esbuild/openbsd-x64': 0.19.12
-      '@esbuild/sunos-x64': 0.19.12
-      '@esbuild/win32-arm64': 0.19.12
-      '@esbuild/win32-ia32': 0.19.12
-      '@esbuild/win32-x64': 0.19.12
 
   esbuild@0.21.5:
     optionalDependencies:
@@ -15146,6 +16576,35 @@ snapshots:
       '@esbuild/win32-arm64': 0.21.5
       '@esbuild/win32-ia32': 0.21.5
       '@esbuild/win32-x64': 0.21.5
+
+  esbuild@0.25.12:
+    optionalDependencies:
+      '@esbuild/aix-ppc64': 0.25.12
+      '@esbuild/android-arm': 0.25.12
+      '@esbuild/android-arm64': 0.25.12
+      '@esbuild/android-x64': 0.25.12
+      '@esbuild/darwin-arm64': 0.25.12
+      '@esbuild/darwin-x64': 0.25.12
+      '@esbuild/freebsd-arm64': 0.25.12
+      '@esbuild/freebsd-x64': 0.25.12
+      '@esbuild/linux-arm': 0.25.12
+      '@esbuild/linux-arm64': 0.25.12
+      '@esbuild/linux-ia32': 0.25.12
+      '@esbuild/linux-loong64': 0.25.12
+      '@esbuild/linux-mips64el': 0.25.12
+      '@esbuild/linux-ppc64': 0.25.12
+      '@esbuild/linux-riscv64': 0.25.12
+      '@esbuild/linux-s390x': 0.25.12
+      '@esbuild/linux-x64': 0.25.12
+      '@esbuild/netbsd-arm64': 0.25.12
+      '@esbuild/netbsd-x64': 0.25.12
+      '@esbuild/openbsd-arm64': 0.25.12
+      '@esbuild/openbsd-x64': 0.25.12
+      '@esbuild/openharmony-arm64': 0.25.12
+      '@esbuild/sunos-x64': 0.25.12
+      '@esbuild/win32-arm64': 0.25.12
+      '@esbuild/win32-ia32': 0.25.12
+      '@esbuild/win32-x64': 0.25.12
 
   esbuild@0.28.0:
     optionalDependencies:
@@ -15660,6 +17119,14 @@ snapshots:
       hasown: 2.0.4
       mime-types: 2.1.35
 
+  form-data@4.0.6:
+    dependencies:
+      asynckit: 0.4.0
+      combined-stream: 1.0.8
+      es-set-tostringtag: 2.1.0
+      hasown: 2.0.4
+      mime-types: 2.1.35
+
   format@0.2.2: {}
 
   formatly@0.3.0:
@@ -15761,6 +17228,7 @@ snapshots:
       which: 4.0.0
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   generator-function@2.0.1: {}
 
@@ -15962,7 +17430,7 @@ snapshots:
       section-matter: 1.0.0
       strip-bom-string: 1.0.0
 
-  groq-sdk@0.9.1:
+  groq-sdk@0.37.0:
     dependencies:
       '@types/node': 18.19.130
       '@types/node-fetch': 2.6.13
@@ -16565,7 +18033,8 @@ snapshots:
 
   isexe@2.0.0: {}
 
-  isexe@3.1.5: {}
+  isexe@3.1.5:
+    optional: true
 
   isobject@3.0.1: {}
 
@@ -19070,7 +20539,7 @@ snapshots:
 
   semver@6.3.1: {}
 
-  semver@7.8.0: {}
+  semver@7.8.1: {}
 
   semver@7.8.4: {}
 
@@ -19662,6 +21131,9 @@ snapshots:
 
   undici-types@6.21.0: {}
 
+  undici-types@7.24.6:
+    optional: true
+
   unicode-canonical-property-names-ecmascript@2.0.1: {}
 
   unicode-emoji-modifier-base@1.0.0: {}
@@ -19827,6 +21299,24 @@ snapshots:
       - supports-color
       - terser
 
+  vite-node@2.1.9(@types/node@25.9.3)(terser@5.48.0):
+    dependencies:
+      cac: 6.7.14
+      debug: 4.4.3
+      es-module-lexer: 1.7.0
+      pathe: 1.1.2
+      vite: 5.4.21(@types/node@25.9.3)(terser@5.48.0)
+    transitivePeerDependencies:
+      - '@types/node'
+      - less
+      - lightningcss
+      - sass
+      - sass-embedded
+      - stylus
+      - sugarss
+      - supports-color
+      - terser
+
   vite@5.4.21(@types/node@20.19.43)(terser@5.48.0):
     dependencies:
       esbuild: 0.21.5
@@ -19844,6 +21334,16 @@ snapshots:
       rollup: 4.61.1
     optionalDependencies:
       '@types/node': 22.19.21
+      fsevents: 2.3.3
+      terser: 5.48.0
+
+  vite@5.4.21(@types/node@25.9.3)(terser@5.48.0):
+    dependencies:
+      esbuild: 0.21.5
+      postcss: 8.5.15
+      rollup: 4.61.1
+    optionalDependencies:
+      '@types/node': 25.9.3
       fsevents: 2.3.3
       terser: 5.48.0
 
@@ -19906,6 +21406,41 @@ snapshots:
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 22.19.21
+    transitivePeerDependencies:
+      - less
+      - lightningcss
+      - msw
+      - sass
+      - sass-embedded
+      - stylus
+      - sugarss
+      - supports-color
+      - terser
+
+  vitest@2.1.9(@types/node@25.9.3)(terser@5.48.0):
+    dependencies:
+      '@vitest/expect': 2.1.9
+      '@vitest/mocker': 2.1.9(vite@5.4.21(@types/node@25.9.3)(terser@5.48.0))
+      '@vitest/pretty-format': 2.1.9
+      '@vitest/runner': 2.1.9
+      '@vitest/snapshot': 2.1.9
+      '@vitest/spy': 2.1.9
+      '@vitest/utils': 2.1.9
+      chai: 5.3.3
+      debug: 4.4.3
+      expect-type: 1.3.0
+      magic-string: 0.30.21
+      pathe: 1.1.2
+      std-env: 3.10.0
+      tinybench: 2.9.0
+      tinyexec: 0.3.2
+      tinypool: 1.1.1
+      tinyrainbow: 1.2.0
+      vite: 5.4.21(@types/node@25.9.3)(terser@5.48.0)
+      vite-node: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+      why-is-node-running: 2.3.0
+    optionalDependencies:
+      '@types/node': 25.9.3
     transitivePeerDependencies:
       - less
       - lightningcss
@@ -20138,6 +21673,7 @@ snapshots:
   which@4.0.0:
     dependencies:
       isexe: 3.1.5
+    optional: true
 
   why-is-node-running@2.3.0:
     dependencies:

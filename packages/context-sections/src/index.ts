@@ -22,15 +22,17 @@ export type SectionType =
   | "token-economics"
   | "custom";
 
+/** Section interface definition. */
 export interface Section {
   type: SectionType;
   label?: string;
   content: string;
-  priority: number;   // Lower = rendered first. Default: 50
+  priority: number; // Lower = rendered first. Default: 50
   enabled: boolean;
   tokenEstimate?: number;
 }
 
+/** Section data interface definition. */
 export interface SectionData {
   type: SectionType;
   label?: string;
@@ -38,6 +40,7 @@ export interface SectionData {
   enabled?: boolean;
 }
 
+/** Section renderer interface definition. */
 export interface SectionRenderer<TInput = unknown> {
   type: SectionType;
   render(input: TInput): Section;
@@ -56,14 +59,16 @@ export interface PreviouslySeenInput {
   maxFacts?: number;
 }
 
+/** Previously seen renderer. */
 export class PreviouslySeenRenderer implements SectionRenderer<PreviouslySeenInput> {
   readonly type = "previously-seen" as const;
 
   render({ facts, maxFacts = 20 }: PreviouslySeenInput): Section {
     const limited = facts.slice(0, maxFacts);
-    const content = limited.length > 0
-      ? `The following facts are known from prior conversations:\n${limited.map((f, i) => `${i + 1}. ${f}`).join("\n")}`
-      : "";
+    const content =
+      limited.length > 0
+        ? `The following facts are known from prior conversations:\n${limited.map((f, i) => `${i + 1}. ${f}`).join("\n")}`
+        : "";
     return {
       type: this.type,
       label: "Previously Seen",
@@ -75,6 +80,7 @@ export class PreviouslySeenRenderer implements SectionRenderer<PreviouslySeenInp
   }
 }
 
+/** Agent context input interface definition. */
 export interface AgentContextInput {
   agentName: string;
   role: string;
@@ -82,13 +88,12 @@ export interface AgentContextInput {
   constraints?: string[];
 }
 
+/** Agent context renderer. */
 export class AgentContextRenderer implements SectionRenderer<AgentContextInput> {
   readonly type = "agent-context" as const;
 
   render({ agentName, role, capabilities = [], constraints = [] }: AgentContextInput): Section {
-    const lines = [
-      `You are ${agentName}, ${role}.`,
-    ];
+    const lines = [`You are ${agentName}, ${role}.`];
     if (capabilities.length > 0) {
       lines.push("", "Capabilities:", ...capabilities.map((c) => `• ${c}`));
     }
@@ -107,6 +112,7 @@ export class AgentContextRenderer implements SectionRenderer<AgentContextInput> 
   }
 }
 
+/** User context input interface definition. */
 export interface UserContextInput {
   userId?: string;
   displayName?: string;
@@ -114,6 +120,7 @@ export interface UserContextInput {
   recentTopics?: string[];
 }
 
+/** User context renderer. */
 export class UserContextRenderer implements SectionRenderer<UserContextInput> {
   readonly type = "user-context" as const;
 
@@ -141,11 +148,13 @@ export class UserContextRenderer implements SectionRenderer<UserContextInput> {
   }
 }
 
+/** Instructions input interface definition. */
 export interface InstructionsInput {
   instructions: string;
   header?: string;
 }
 
+/** Instructions renderer. */
 export class InstructionsRenderer implements SectionRenderer<InstructionsInput> {
   readonly type = "instructions" as const;
 
@@ -162,12 +171,14 @@ export class InstructionsRenderer implements SectionRenderer<InstructionsInput> 
   }
 }
 
+/** Footer input interface definition. */
 export interface FooterInput {
   reminder?: string;
   timestamp?: boolean;
   format?: string;
 }
 
+/** Footer renderer. */
 export class FooterRenderer implements SectionRenderer<FooterInput> {
   readonly type = "footer" as const;
 
@@ -188,6 +199,7 @@ export class FooterRenderer implements SectionRenderer<FooterInput> {
   }
 }
 
+/** Token economics input interface definition. */
 export interface TokenEconomicsInput {
   inputTokensUsed: number;
   inputTokenBudget: number;
@@ -195,10 +207,16 @@ export interface TokenEconomicsInput {
   remainingConversationTurns?: number;
 }
 
+/** Token economics renderer. */
 export class TokenEconomicsRenderer implements SectionRenderer<TokenEconomicsInput> {
   readonly type = "token-economics" as const;
 
-  render({ inputTokensUsed, inputTokenBudget, outputTokenBudget, remainingConversationTurns }: TokenEconomicsInput): Section {
+  render({
+    inputTokensUsed,
+    inputTokenBudget,
+    outputTokenBudget,
+    remainingConversationTurns,
+  }: TokenEconomicsInput): Section {
     const pct = Math.round((inputTokensUsed / inputTokenBudget) * 100);
     const remaining = inputTokenBudget - inputTokensUsed;
     const lines = [
@@ -235,14 +253,15 @@ export interface AssemblerOptions {
   labelPrefix?: string;
 }
 
+/** Section assembler. */
 export class SectionAssembler {
   private opts: Required<AssemblerOptions>;
 
   constructor(opts: AssemblerOptions = {}) {
     this.opts = {
-      separator:   opts.separator   ?? "\n\n",
-      maxChars:    opts.maxChars    ?? Infinity,
-      showLabels:  opts.showLabels  ?? false,
+      separator: opts.separator ?? "\n\n",
+      maxChars: opts.maxChars ?? Infinity,
+      showLabels: opts.showLabels ?? false,
       labelPrefix: opts.labelPrefix ?? "## ",
     };
   }
