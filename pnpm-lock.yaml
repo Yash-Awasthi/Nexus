@@ -86,6 +86,9 @@ importers:
       '@nexus/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@nexus/autotune':
+        specifier: workspace:*
+        version: link:../../packages/autotune
       '@nexus/billing':
         specifier: workspace:*
         version: link:../../packages/billing
@@ -110,6 +113,9 @@ importers:
       '@nexus/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@nexus/domain-feeds':
+        specifier: workspace:*
+        version: link:../../packages/domain-feeds
       '@nexus/feature-flags':
         specifier: workspace:*
         version: link:../../packages/feature-flags
@@ -134,9 +140,15 @@ importers:
       '@nexus/llm-tracer':
         specifier: workspace:*
         version: link:../../packages/llm-tracer
+      '@nexus/memory':
+        specifier: workspace:*
+        version: link:../../packages/memory
       '@nexus/obs-providers':
         specifier: workspace:*
         version: link:../../packages/obs-providers
+      '@nexus/parseltongue':
+        specifier: workspace:*
+        version: link:../../packages/parseltongue
       '@nexus/posthog-analytics':
         specifier: workspace:*
         version: link:../../packages/posthog-analytics
@@ -146,6 +158,9 @@ importers:
       '@nexus/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
+      '@nexus/sft-tagger':
+        specifier: workspace:*
+        version: link:../../packages/sft-tagger
       '@nexus/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -264,6 +279,37 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
+  apps/spectre:
+    dependencies:
+      '@nexus/client':
+        specifier: workspace:*
+        version: link:../../packages/client
+      '@nexus/parseltongue':
+        specifier: workspace:*
+        version: link:../../packages/parseltongue
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
+    devDependencies:
+      '@types/react':
+        specifier: ^18.3.12
+        version: 18.3.31
+      '@types/react-dom':
+        specifier: ^18.3.1
+        version: 18.3.7(@types/react@18.3.31)
+      '@vitejs/plugin-react':
+        specifier: ^4.3.3
+        version: 4.7.0(vite@5.4.21(@types/node@25.9.3)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vite:
+        specifier: ^5.4.11
+        version: 5.4.21(@types/node@25.9.3)(terser@5.48.0)
+
   apps/web:
     dependencies:
       react:
@@ -373,6 +419,88 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.21)(terser@5.48.0)
+
+  packages/adapters:
+    dependencies:
+      '@nexus/adapter-betterstack':
+        specifier: workspace:*
+        version: link:betterstack
+      '@nexus/adapter-calendar':
+        specifier: workspace:*
+        version: link:calendar
+      '@nexus/adapter-cloudflare':
+        specifier: workspace:*
+        version: link:cloudflare
+      '@nexus/adapter-confluence':
+        specifier: workspace:*
+        version: link:confluence
+      '@nexus/adapter-council':
+        specifier: workspace:*
+        version: link:council
+      '@nexus/adapter-deep-research':
+        specifier: workspace:*
+        version: link:deep-research
+      '@nexus/adapter-doppler':
+        specifier: workspace:*
+        version: link:doppler
+      '@nexus/adapter-drive':
+        specifier: workspace:*
+        version: link:drive
+      '@nexus/adapter-github':
+        specifier: workspace:*
+        version: link:github
+      '@nexus/adapter-gmail':
+        specifier: workspace:*
+        version: link:gmail
+      '@nexus/adapter-groq':
+        specifier: workspace:*
+        version: link:groq
+      '@nexus/adapter-hubspot':
+        specifier: workspace:*
+        version: link:hubspot
+      '@nexus/adapter-ide':
+        specifier: workspace:*
+        version: link:ide
+      '@nexus/adapter-ingest':
+        specifier: workspace:*
+        version: link:ingest
+      '@nexus/adapter-jira':
+        specifier: workspace:*
+        version: link:jira
+      '@nexus/adapter-linear':
+        specifier: workspace:*
+        version: link:linear
+      '@nexus/adapter-mlx':
+        specifier: workspace:*
+        version: link:mlx
+      '@nexus/adapter-neon':
+        specifier: workspace:*
+        version: link:neon
+      '@nexus/adapter-notion':
+        specifier: workspace:*
+        version: link:notion
+      '@nexus/adapter-salesforce':
+        specifier: workspace:*
+        version: link:salesforce
+      '@nexus/adapter-searxng':
+        specifier: workspace:*
+        version: link:searxng
+      '@nexus/adapter-slack':
+        specifier: workspace:*
+        version: link:slack
+      '@nexus/adapter-supabase':
+        specifier: workspace:*
+        version: link:supabase
+      '@nexus/adapter-tavily':
+        specifier: workspace:*
+        version: link:tavily
+      '@nexus/adapter-vercel':
+        specifier: workspace:*
+        version: link:vercel
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
 
   packages/adapters/betterstack:
     dependencies:
@@ -883,6 +1011,15 @@ importers:
         version: 5.9.3
       vitest:
         specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
+
+  packages/client:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.4
         version: 2.1.9(@types/node@25.9.3)(terser@5.48.0)
 
   packages/client-detect:

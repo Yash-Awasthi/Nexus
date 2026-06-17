@@ -96,9 +96,12 @@ export const api = {
     model = "nexus/smart",
     system?: string,
     onDelta?: (delta: string) => void,
+    obfuscate = false,
+    _stmEnabled = true, // STM is applied server-side; flag reserved for future per-request opt-out
   ): Promise<ChatResponse> => {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (KEY) headers.Authorization = `Bearer ${KEY}`;
+    if (obfuscate) headers["x-nexus-obfuscate"] = "true";
 
     const res = await fetch(`${BASE}/api/v1/gateway/messages`, {
       method: "POST",
@@ -636,4 +639,29 @@ export const api = {
       budgetUsd,
       timeoutMs,
     }),
+
+  // ── GODMODE CLASSIC — Ultraplinian race ────────────────────────────────────
+
+  /** Race N models in parallel via Ultraplinian; returns the best response. */
+  gatewayRace: (
+    messages: ChatMessage[],
+    tier: "fast" | "standard" | "smart" | "power" | "ultra" = "fast",
+    system?: string,
+  ) =>
+    request<{
+      winner: { content: string; model: string; score: number; latencyMs: number };
+      all: { model: string; content: string; score: number; latencyMs: number }[];
+      tier: string;
+      totalMs: number;
+    }>("POST", "/api/v1/gateway/race", {
+      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      tier,
+      ...(system && { system }),
+    }),
+
+  // ── AutoTune rating feedback ───────────────────────────────────────────────
+
+  /** Submit a user rating (1-5) to improve AutoTune EMA for future calls. */
+  autotuneRate: (context: string, rating: number) =>
+    request<{ ok: boolean }>("POST", "/api/v1/autotune/rate", { context, rating }),
 };

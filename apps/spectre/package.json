@@ -1,0 +1,29 @@
+{
+  "name": "@nexus/spectre",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SPECTRE — signal without noise. Multi-model hacker chat interface.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5174",
+    "build": "tsc && vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "clean": "rm -rf dist",
+    "preview": "vite preview --port 5174"
+  },
+  "dependencies": {
+    "@nexus/client": "workspace:*",
+    "@nexus/parseltongue": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

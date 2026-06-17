@@ -456,3 +456,129 @@ export class McpServer {
     return this.callTool(name, args, onProgress);
   }
 }
+
+// ── MCP middleware pipeline ────────────────────────────────────────────────────
+// Ported from PrefectHQ/fastmcp: fastmcp_slim/fastmcp/server/middleware/middleware.py
+// Pattern: composable middleware chain with per-method dispatch hooks.
+//   McpMiddlewareContext<T>  — message envelope with source/type/method/timestamp
+//   McpMiddlewareFn<T, R>    — call_next signature (async, typed)
+//   McpMiddleware            — base class with no-op hooks for every MCP method
+//   composeMcpMiddleware()   — build left-to-right chain from an array
+
+/** MCP JSON-RPC method names that dispatch to dedicated hooks. */
+export type McpMiddlewareMethod =
+  | "initialize"
+  | "tools/call"
+  | "tools/list"
+  | "resources/read"
+  | "resources/list"
+  | "resources/templates/list"
+  | "prompts/get"
+  | "prompts/list";
+
+/**
+ * Unified context passed through every middleware hop.
+ * Ported from fastmcp MiddlewareContext dataclass.
+ */
+export interface McpMiddlewareContext<T = unknown> {
+  /** The raw MCP message payload. */
+  message: T;
+  /** Who originated the message. */
+  source: "client" | "server";
+  /** Whether this is a call/response or a one-way notification. */
+  type: "request" | "notification";
+  /** MCP method string (e.g. "tools/call"). undefined for generic messages. */
+  method?: McpMiddlewareMethod | string;
+  /** ISO-8601 timestamp when the context was created. */
+  timestamp: string;
+}
+
+/** The `call_next` signature — async function that continues the middleware chain. */
+export type McpMiddlewareFn<T = unknown, R = unknown> = (
+  ctx: McpMiddlewareContext<T>
+) => Promise<R>;
+
+/**
+ * Base middleware class with pass-through no-op hooks for every MCP method.
+ * Subclass and override only the hooks you need.
+ *
+ * Ported from fastmcp Middleware base class.
+ *
+ * @example
+ * ```ts
+ * class LoggingMiddleware extends McpMiddleware {
+ *   async onCallTool(ctx, next) {
+ *     console.log("tool call:", (ctx.message as any).name);
+ *     return next(ctx);
+ *   }
+ * }
+ * ```
+ */
+export abstract class McpMiddleware {
+  /** Top-level hook: called for every message regardless of type or method. */
+  async onMessage<T, R>(
+    ctx: McpMiddlewareContext<T>,
+    next: McpMiddlewareFn<T, R>
+  ): Promise<R> {
+    return this._dispatch(ctx, next);
+  }
+
+  protected async _dispatch<T, R>(
+    ctx: McpMiddlewareContext<T>,
+    next: McpMiddlewareFn<T, R>
+  ): Promise<R> {
+    switch (ctx.method) {
+      case "tools/call":
+        return (this.onCallTool as McpMiddlewareFn<T, R>)(ctx, next);
+      case "tools/list":
+        return (this.onListTools as McpMiddlewareFn<T, R>)(ctx, next);
+      case "resources/read":
+        return (this.onReadResource as McpMiddlewareFn<T, R>)(ctx, next);
+      case "resources/list":
+        return (this.onListResources as McpMiddlewareFn<T, R>)(ctx, next);
+      case "resources/templates/list":
+        return (this.onListResourceTemplates as McpMiddlewareFn<T, R>)(ctx, next);
+      case "prompts/get":
+        return (this.onGetPrompt as McpMiddlewareFn<T, R>)(ctx, next);
+      case "prompts/list":
+        return (this.onListPrompts as McpMiddlewareFn<T, R>)(ctx, next);
+      case "initialize":
+        return (this.onInitialize as McpMiddlewareFn<T, R>)(ctx, next);
+      default:
+        return next(ctx);
+    }
+  }
+
+  async onInitialize<T, R>(ctx: McpMiddlewareContext<T>, next: McpMiddlewareFn<T, R>): Promise<R> { return next(ctx); }
+  async onCallTool<T, R>(ctx: McpMiddlewareContext<T>, next: McpMiddlewareFn<T, R>): Promise<R> { return next(ctx); }
+  async onListTools<T, R>(ctx: McpMiddlewareContext<T>, next: McpMiddlewareFn<T, R>): Promise<R> { return next(ctx); }
+  async onReadResource<T, R>(ctx: McpMiddlewareContext<T>, next: McpMiddlewareFn<T, R>): Promise<R> { return next(ctx); }
+  async onListResources<T, R>(ctx: McpMiddlewareContext<T>, next: McpMiddlewareFn<T, R>): Promise<R> { return next(ctx); }
+  async onListResourceTemplates<T, R>(ctx: McpMiddlewareContext<T>, next: McpMiddlewareFn<T, R>): Promise<R> { return next(ctx); }
+  async onGetPrompt<T, R>(ctx: McpMiddlewareContext<T>, next: McpMiddlewareFn<T, R>): Promise<R> { return next(ctx); }
+  async onListPrompts<T, R>(ctx: McpMiddlewareContext<T>, next: McpMiddlewareFn<T, R>): Promise<R> { return next(ctx); }
+}
+
+/**
+ * Compose an array of middleware into a single `call_next` function.
+ * Middlewares execute left-to-right (first in array = outermost wrapper).
+ * Ported from fastmcp make_middleware_wrapper() chain composition.
+ *
+ * @example
+ * ```ts
+ * const handler = composeMcpMiddleware(
+ *   [new LoggingMiddleware(), new AuthMiddleware()],
+ *   async (ctx) => executeRequest(ctx.message)
+ * );
+ * await handler({ message: req, source: "client", type: "request", method: "tools/call", timestamp: new Date().toISOString() });
+ * ```
+ */
+export function composeMcpMiddleware<T = unknown, R = unknown>(
+  middlewares: McpMiddleware[],
+  innerHandler: McpMiddlewareFn<T, R>
+): McpMiddlewareFn<T, R> {
+  return middlewares.reduceRight<McpMiddlewareFn<T, R>>(
+    (next, mw) => (ctx) => mw.onMessage(ctx, next),
+    innerHandler
+  );
+}

@@ -406,3 +406,213 @@ export const docPipelineAdapter = defineAdapter<DocIngestTask, PipelineResult>({
 });
 
 export default docPipelineAdapter;
+
+// ── DocumentConsumer — paperless-ngx-inspired consume + classify + route ───────
+//
+// paperless-ngx: documents are "consumed" from an inbox (folder/upload),
+// automatically classified (type, tags, correspondent), then stored with
+// full-text search. Core pipeline: consume → OCR/extract → classify → tag → store.
+
+export type DocClass = "invoice" | "contract" | "report" | "correspondence" | "form" | "receipt" | "technical" | "legal" | "other";
+
+export interface DocumentClassification {
+  docClass: DocClass;
+  confidence: number;
+  suggestedTags: string[];
+  correspondent?: string;
+  title?: string;
+}
+
+export type ClassifierFn = (text: string, metadata?: Record<string, unknown>) => Promise<DocumentClassification>;
+
+/** Rule-based document classifier (no ML required). */
+export class RuleBasedClassifier {
+  async classify(text: string): Promise<DocumentClassification> {
+    const lower = text.toLowerCase().slice(0, 3000);
+    const suggestedTags: string[] = [];
+    let docClass: DocClass = "other";
+    let confidence = 0.6;
+
+    // Invoice patterns
+    if (/\b(invoice|bill to|amount due|payment due|total amount|subtotal)\b/.test(lower)) {
+      docClass = "invoice"; confidence = 0.9;
+      suggestedTags.push("invoice", "financial");
+    } else if (/\b(contract|agreement|terms and conditions|hereby agree|parties agree)\b/.test(lower)) {
+      docClass = "contract"; confidence = 0.85;
+      suggestedTags.push("contract", "legal");
+    } else if (/\b(report|summary|analysis|findings|conclusion|executive summary)\b/.test(lower)) {
+      docClass = "report"; confidence = 0.75;
+      suggestedTags.push("report");
+    } else if (/\b(dear |sincerely|regards|to whom it may concern|re:|subject:)\b/.test(lower)) {
+      docClass = "correspondence"; confidence = 0.8;
+      suggestedTags.push("correspondence");
+    } else if (/\b(receipt|received|transaction|order #|confirmation)\b/.test(lower)) {
+      docClass = "receipt"; confidence = 0.85;
+      suggestedTags.push("receipt", "financial");
+    } else if (/\b(form|please fill|sign here|date of birth|applicant)\b/.test(lower)) {
+      docClass = "form"; confidence = 0.8;
+      suggestedTags.push("form");
+    } else if (/\b(technical|specification|architecture|implementation|api|function|class)\b/.test(lower)) {
+      docClass = "technical"; confidence = 0.7;
+      suggestedTags.push("technical");
+    } else if (/\b(legal|court|law|statute|regulation|compliance|gdpr|hipaa)\b/.test(lower)) {
+      docClass = "legal"; confidence = 0.8;
+      suggestedTags.push("legal", "compliance");
+    }
+
+    // Date tags
+    const yearMatch = lower.match(/\b(20\d{2})\b/);
+    if (yearMatch) suggestedTags.push(`year:${yearMatch[1]}`);
+
+    // Currency / financial signal
+    if (/\$[\d,]+|\b(usd|eur|gbp|inr)\b/.test(lower)) suggestedTags.push("financial");
+
+    return { docClass, confidence, suggestedTags: [...new Set(suggestedTags)] };
+  }
+}
+
+// ── DocWorkflowRule — conditional routing (paperless workflow pattern) ─────────
+
+export interface DocWorkflowCondition {
+  field: "docClass" | "tag" | "source" | "title";
+  op: "equals" | "contains" | "startsWith";
+  value: string;
+}
+
+export type DocWorkflowAction = "add_tag" | "set_correspondent" | "set_title" | "route_to" | "skip";
+
+export interface DocWorkflowRule {
+  name: string;
+  condition: DocWorkflowCondition;
+  action: DocWorkflowAction;
+  actionValue: string;
+}
+
+export interface DocWorkflowResult {
+  appliedRules: string[];
+  addedTags: string[];
+  correspondent?: string;
+  title?: string;
+  routedTo?: string;
+  skipped: boolean;
+}
+
+/** Document workflow engine. */
+export class DocWorkflowEngine {
+  private rules: DocWorkflowRule[] = [];
+
+  addRule(rule: DocWorkflowRule): this {
+    this.rules.push(rule);
+    return this;
+  }
+
+  apply(classification: DocumentClassification, meta: DocMeta): DocWorkflowResult {
+    const result: DocWorkflowResult = { appliedRules: [], addedTags: [...(classification.suggestedTags ?? [])], skipped: false };
+
+    for (const rule of this.rules) {
+      if (!this._matches(rule.condition, classification, meta)) continue;
+      result.appliedRules.push(rule.name);
+
+      switch (rule.action) {
+        case "add_tag": result.addedTags.push(rule.actionValue); break;
+        case "set_correspondent": result.correspondent = rule.actionValue; break;
+        case "set_title": result.title = rule.actionValue; break;
+        case "route_to": result.routedTo = rule.actionValue; break;
+        case "skip": result.skipped = true; return result;
+      }
+    }
+
+    result.addedTags = [...new Set(result.addedTags)];
+    return result;
+  }
+
+  private _matches(cond: DocWorkflowCondition, cls: DocumentClassification, meta: DocMeta): boolean {
+    let fieldValue = "";
+    if (cond.field === "docClass") fieldValue = cls.docClass;
+    else if (cond.field === "tag") fieldValue = cls.suggestedTags.join(" ");
+    else if (cond.field === "source") fieldValue = meta.source ?? "";
+    else if (cond.field === "title") fieldValue = cls.title ?? "";
+
+    switch (cond.op) {
+      case "equals": return fieldValue === cond.value;
+      case "contains": return fieldValue.includes(cond.value);
+      case "startsWith": return fieldValue.startsWith(cond.value);
+    }
+  }
+}
+
+// ── DocumentConsumer — full consume → classify → workflow → store pipeline ─────
+
+export interface ConsumeResult {
+  source: string;
+  docClass: DocClass;
+  confidence: number;
+  tags: string[];
+  correspondent?: string;
+  title?: string;
+  routedTo?: string;
+  pipeline: PipelineResult;
+  durationMs: number;
+}
+
+export interface DocConsumerOpts {
+  extractor?: Extractor;
+  embedder?: Embedder;
+  store?: ChunkStore;
+  classifier?: ClassifierFn;
+  workflow?: DocWorkflowEngine;
+  chunkOptions?: ChunkOptions;
+}
+
+/** Document consumer — orchestrates the full paperless-style pipeline. */
+export class DocumentConsumer {
+  private classifier: ClassifierFn;
+  private workflow: DocWorkflowEngine;
+  private extractor?: Extractor;
+  private embedder?: Embedder;
+  private store?: ChunkStore;
+  private chunkOptions?: ChunkOptions;
+
+  constructor(opts: DocConsumerOpts = {}) {
+    const ruleClassifier = new RuleBasedClassifier();
+    this.classifier = opts.classifier ?? ((text) => ruleClassifier.classify(text));
+    this.workflow = opts.workflow ?? new DocWorkflowEngine();
+    this.extractor = opts.extractor;
+    this.embedder = opts.embedder;
+    this.store = opts.store;
+    this.chunkOptions = opts.chunkOptions;
+  }
+
+  async consume(input: DocInput): Promise<ConsumeResult> {
+    const start = Date.now();
+
+    // Step 1: classify
+    const plainText = input.format === "text" || input.format === "markdown"
+      ? input.content.slice(0, 5000)
+      : input.content.slice(0, 2000);
+    const classification = await this.classifier(plainText, input.metadata);
+
+    // Step 2: workflow
+    const meta: DocMeta = { source: input.source, format: input.format, metadata: input.metadata };
+    const workflowResult = this.workflow.apply(classification, meta);
+
+    // Step 3: run doc pipeline (extract → chunk → embed → store) if adapters provided
+    let pipeline: PipelineResult = { source: input.source, format: input.format, rawTextLength: 0, chunks: 0, embedded: 0, storeResult: { ids: [], count: 0 }, durationMs: 0 };
+
+    if (this.extractor && this.embedder && this.store) {
+      pipeline = await runDocPipeline(input, { extractor: this.extractor, embedder: this.embedder, store: this.store, chunkOptions: this.chunkOptions });
+    }
+
+    return {
+      source: input.source ?? "unknown",
+      docClass: classification.docClass,
+      confidence: classification.confidence,
+      tags: workflowResult.addedTags,
+      correspondent: workflowResult.correspondent ?? classification.correspondent,
+      title: workflowResult.title ?? classification.title,
+      routedTo: workflowResult.routedTo,
+      pipeline,
+      durationMs: Date.now() - start,
+    };
+  }
+}

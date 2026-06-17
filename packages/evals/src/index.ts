@@ -20,3 +20,27 @@ export { EvalRunner, EvalSuite } from "./runner.js";
 export { exactMatch, fieldsPresent, containsString, matchesSchema, allOf } from "./scorers.js";
 export type { SchemaFieldType, FieldSchema } from "./scorers.js";
 export type { EvalScore, EvalResult, EvalSuiteResult, TaskEvalCase, EvalAdapter } from "./types.js";
+
+// LLM-based evals, spec-driven scenarios, and benchmark regression tracking
+export {
+  llmJudgeScorer,
+  semanticSimilarity,
+  notContains,
+  wordCount,
+  ScenarioRunner,
+  BenchmarkTracker,
+  MLResearchEval,
+} from "./llm-eval.js";
+export type {
+  JudgeLlmFn,
+  AcceptanceCriterion,
+  ScenarioSpec,
+  ScenarioResult,
+  ScenarioRunResult,
+  ScenarioSubjectFn,
+  BenchmarkRun,
+  RegressionAlert,
+  MLEvalSpec,
+  GeneratedEvalCase,
+  EvalGeneratorFn,
+} from "./llm-eval.js";

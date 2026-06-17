@@ -546,3 +546,79 @@ export function createDefaultOrchestrator(strategies?: SearchStrategy[]): Search
 
   return new SearchOrchestrator({ chain: new StrategyChain({ strategies: resolved }) });
 }
+
+// ── SearxNGSearchStrategy ─────────────────────────────────────────────────────
+//
+// Privacy-preserving web search via a self-hosted SearxNG instance.
+// Extracted from Vane (MIT). Set SEARXNG_URL env to your instance.
+// Supports category/engine/language/page-number filtering.
+
+export interface SearxNGOptions {
+  categories?: string[];
+  engines?: string[];
+  language?: string;
+  pageno?: number;
+  timeoutMs?: number;
+}
+
+export interface SearxNGResult {
+  title: string;
+  url: string;
+  content?: string;
+  author?: string;
+  img_src?: string;
+  thumbnail_src?: string;
+}
+
+export interface SearxNGResponse {
+  results: SearxNGResult[];
+  suggestions: string[];
+}
+
+/** Fetch from a SearxNG instance. Set SEARXNG_URL (e.g. http://localhost:8888). */
+export async function searchSearxNG(
+  query: string,
+  opts: SearxNGOptions = {},
+): Promise<SearxNGResponse> {
+  const base = (process.env.SEARXNG_URL ?? "http://localhost:8888").replace(/\/$/, "");
+  const url = new URL(`${base}/search?format=json`);
+  url.searchParams.set("q", query);
+  if (opts.categories?.length) url.searchParams.set("categories", opts.categories.join(","));
+  if (opts.engines?.length) url.searchParams.set("engines", opts.engines.join(","));
+  if (opts.language) url.searchParams.set("language", opts.language);
+  if (opts.pageno) url.searchParams.set("pageno", String(opts.pageno));
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 10_000);
+  try {
+    const res = await fetch(url.toString(), { signal: controller.signal });
+    if (!res.ok) throw new Error(`SearxNG ${res.status}: ${res.statusText}`);
+    const data = await res.json() as { results?: SearxNGResult[]; suggestions?: string[] };
+    return { results: data.results ?? [], suggestions: data.suggestions ?? [] };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** SearchStrategy adapter wrapping SearxNG for use in StrategyChain. */
+export class SearxNGSearchStrategy implements SearchStrategy {
+  readonly name = "mock" as SearchSource; // reuse "mock" slot; override if needed
+  private opts: SearxNGOptions;
+
+  constructor(opts: SearxNGOptions = {}) { this.opts = opts; }
+
+  async search(req: SearchRequest): Promise<SearchResponse> {
+    const start = Date.now();
+    const { results } = await searchSearxNG(req.query, this.opts);
+    const mapped: SearchResult[] = results.slice(0, req.maxResults ?? 10).map((r, i) => ({
+      id: `searxng-${i}`,
+      content: r.content ?? r.title,
+      source: "mock" as SearchSource,
+      type: "document" as SearchResultType,
+      score: 1 - i * 0.05,
+      timestamp: new Date().toISOString(),
+      metadata: { url: r.url, title: r.title, author: r.author },
+    }));
+    return { results: mapped, source: "mock", durationMs: Date.now() - start, totalFound: results.length };
+  }
+}

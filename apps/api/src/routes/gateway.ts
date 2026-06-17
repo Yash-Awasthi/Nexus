@@ -43,8 +43,22 @@ import {
   type LlmRequestOptions,
   type LlmRole,
 } from "@nexus/llm-drivers";
+import {
+  computeAutoTuneParams,
+  detectContext,
+  InMemoryEmaStore,
+} from "@nexus/autotune";
+import {
+  FixedEmbedder,
+  GroqEmbedder,
+  InMemoryStore,
+  MemoryManager,
+  PgVectorStore,
+} from "@nexus/memory";
+import { applyParseltongue, getDefaultConfig as parseltongueDefaultConfig } from "@nexus/parseltongue";
 import { RunCostTracker, InMemoryRunCostStore } from "@nexus/run-cost";
 import { StreamRecoveryOrchestrator } from "@nexus/stream-recovery";
+import { createDefaultPipeline } from "@nexus/stm";
 import { ThinkTagParser } from "@nexus/think-parser";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { globalTierGate, makeTierGatePreHandler } from "@nexus/tier-gate";
@@ -78,6 +92,23 @@ const costTracker = new RunCostTracker({ store: _costStore });
 
 const _RPM_LIMIT = parseInt(process.env.GATEWAY_RPM_LIMIT ?? "60", 10);
 const _tokenBudget = new KVTokenBudget(getSharedKV(), { limit: _RPM_LIMIT, windowMs: 60_000 });
+
+// ── GODMODE singletons ────────────────────────────────────────────────────────
+// AutoTune: EMA store learns from ratings over time.
+// STM pipeline: hedge-reducer + directness-optimizer on every response.
+// Parseltongue: obfuscates trigger words when x-nexus-obfuscate header is set.
+// Memory: auto-ingests each assistant response for long-term recall.
+
+export const _emaStore = new InMemoryEmaStore();
+const _stmPipeline = createDefaultPipeline();
+
+const _memStore = process.env.DATABASE_URL
+  ? new PgVectorStore({ databaseUrl: process.env.DATABASE_URL })
+  : new InMemoryStore();
+const _memEmbedder = process.env.GROQ_API_KEY
+  ? new GroqEmbedder({ apiKey: process.env.GROQ_API_KEY })
+  : new FixedEmbedder();
+export const _gatewayMemory = new MemoryManager({ store: _memStore, embedder: _memEmbedder });
 
 async function _budgetPreHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const identity = (request.headers.authorization as string | undefined)?.slice(7, 27) ?? "anon";
@@ -382,10 +413,45 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
 
       // Prune message history to fit the context window before dispatching.
       // No-op when the thread is short; drops oldest non-system messages when long.
-      const opts = await pruneGatewayMessages(
+      let opts = await pruneGatewayMessages(
         toDriverRequest(request.body, resolvedModel),
         request.body.max_tokens ?? 4096,
       );
+
+      // ── Parseltongue — obfuscate user messages when requested ─────────────
+      // Activated by header: x-nexus-obfuscate: true  OR feature flag.
+      if (request.headers["x-nexus-obfuscate"] === "true") {
+        const ptCfg = parseltongueDefaultConfig();
+        opts = {
+          ...opts,
+          messages: opts.messages.map((m) =>
+            m.role === "user"
+              ? { ...m, content: applyParseltongue(m.content, ptCfg).transformedText }
+              : m,
+          ),
+        };
+      }
+
+      // ── AutoTune — compute optimal sampling params pre-call ───────────────
+      // Detects context type from messages, blends profile, applies EMA.
+      // temperature/top_p on the request body override the tuned values if set.
+      if (!request.body.temperature) {
+        try {
+          const allText = opts.messages.map((m) => m.content).join(" ");
+          const detection = detectContext(allText);
+          const tuned = computeAutoTuneParams({
+            context: detection.type,
+            history: opts.messages.slice(-4).map((m) => ({
+              role: m.role,
+              content: m.content,
+            })),
+            emaStore: _emaStore,
+          });
+          opts = { ...opts, temperature: tuned.params.temperature, topP: tuned.params.top_p };
+        } catch {
+          /* non-fatal — proceed with defaults */
+        }
+      }
 
       const _logStart = Date.now();
       const _logIdent =
@@ -621,11 +687,20 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
           })
           .catch(() => {});
 
+        // ── STM post-processing (non-streaming) ──────────────────────────────
+        let finalContent = response.content;
+        try {
+          const stmResult = _stmPipeline.transform({ text: finalContent });
+          finalContent = stmResult.transformed;
+        } catch {
+          /* non-fatal */
+        }
+
         const responseBody = {
           id: response.id,
           type: "message" as const,
           role: "assistant" as const,
-          content: [{ type: "text" as const, text: response.content }],
+          content: [{ type: "text" as const, text: finalContent }],
           model: response.model,
           stop_reason: response.finishReason ?? null,
           usage: {
@@ -633,6 +708,18 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
             output_tokens: response.usage.outputTokens,
           },
         };
+
+        // ── Phase 3: Memory auto-ingest (fire-and-forget) ────────────────────
+        // Store each assistant response so it's searchable via /memory recall.
+        if (finalContent.length > 20) {
+          const lastUserMsg = opts.messages.filter((m) => m.role === "user").at(-1)?.content ?? "";
+          _gatewayMemory
+            .remember(`Q: ${lastUserMsg.slice(0, 200)}\nA: ${finalContent.slice(0, 1000)}`, {
+              category: "gateway",
+              tags: [resolvedModel, providerName],
+            })
+            .catch(() => {});
+        }
 
         // Cache deterministic responses for future identical requests
         if (PromptCache.isEligible(request.body)) {

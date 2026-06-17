@@ -14,6 +14,14 @@ const MODELS = [
   { id: "nexus/eval", label: "Evaluator (8B)" },
 ];
 
+const RACE_TIERS = [
+  { id: "fast", label: "Fast" },
+  { id: "standard", label: "Standard" },
+  { id: "smart", label: "Smart" },
+] as const;
+
+type ChatMode = "normal" | "classic";
+
 const s = {
   page: {
     display: "flex",
@@ -134,6 +142,66 @@ const s = {
   },
   emptyIcon: { fontSize: 48 },
   emptyHint: { fontSize: 14, color: "#475569", textAlign: "center" as const, maxWidth: 320 },
+  godmodeBar: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "8px 0",
+    borderBottom: "1px solid #1e2535",
+    marginBottom: 10,
+    flexShrink: 0,
+    flexWrap: "wrap" as const,
+  },
+  modeBtn: (active: boolean): React.CSSProperties => ({
+    background: active ? "rgba(124,58,237,0.18)" : "transparent",
+    border: `1px solid ${active ? "#7c3aed" : "#1e2535"}`,
+    borderRadius: 6,
+    color: active ? "#c4b5fd" : "#64748b",
+    cursor: "pointer",
+    fontSize: 11,
+    fontWeight: active ? 700 : 400,
+    padding: "3px 9px",
+    letterSpacing: "0.05em",
+  }),
+  toggleBtn: (on: boolean): React.CSSProperties => ({
+    background: on ? "rgba(124,58,237,0.12)" : "transparent",
+    border: `1px solid ${on ? "#5b21b6" : "#1e2535"}`,
+    borderRadius: 6,
+    color: on ? "#a78bfa" : "#475569",
+    cursor: "pointer",
+    fontSize: 11,
+    padding: "3px 9px",
+  }),
+  raceTierSelect: {
+    background: "#0d1117",
+    border: "1px solid #1e2535",
+    borderRadius: 6,
+    color: "#c4b5fd",
+    fontSize: 11,
+    padding: "3px 7px",
+  } as React.CSSProperties,
+  councilBtn: {
+    marginLeft: "auto",
+    background: "rgba(220,38,38,0.10)",
+    border: "1px solid #7f1d1d",
+    borderRadius: 6,
+    color: "#fca5a5",
+    cursor: "pointer",
+    fontSize: 11,
+    padding: "3px 10px",
+    fontWeight: 600,
+  } as React.CSSProperties,
+  raceWinner: {
+    background: "rgba(124,58,237,0.08)",
+    border: "1px solid #5b21b6",
+    borderRadius: 8,
+    padding: "4px 10px",
+    fontSize: 11,
+    color: "#a78bfa",
+    marginTop: 4,
+    display: "flex",
+    gap: 10,
+  } as React.CSSProperties,
   tokenInfo: {
     fontSize: 11,
     color: "#334155",
@@ -149,6 +217,7 @@ interface DisplayMessage extends ChatMessage {
   tokenUsage?: { input: number; output: number };
   steps?: AssistantStep[];
   rating?: "up" | "down";
+  raceWinner?: { model: string; score: number; latencyMs: number };
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -163,6 +232,12 @@ export default function Chat() {
   const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
   const [contextTokens, setContextTokens] = useState<number>(0);
   const systemPromptRef = useRef<string | null>(null);
+  // GODMODE controls
+  const [mode, setMode] = useState<ChatMode>("normal");
+  const [raceTier, setRaceTier] = useState<"fast" | "standard" | "smart">("fast");
+  const [stmEnabled, setStmEnabled] = useState(true);
+  const [obfuscate, setObfuscate] = useState(false);
+  const [councilLoading, setCouncilLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -224,24 +299,51 @@ export default function Chat() {
         }
       }
 
-      // Stream tokens — each delta is appended to the placeholder as it arrives
-      const res = await api.chatStream(history, model, sysPrompt ?? undefined, (delta) => {
+      if (mode === "classic") {
+        // GODMODE CLASSIC — race N models, pick the winner
+        const raceRes = await api.gatewayRace(history, raceTier, sysPrompt ?? undefined);
         setMessages((prev) =>
-          prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + delta } : m)),
+          prev.map((m) =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: raceRes.winner.content,
+                  raceWinner: {
+                    model: raceRes.winner.model,
+                    score: raceRes.winner.score,
+                    latencyMs: raceRes.winner.latencyMs,
+                  },
+                }
+              : m,
+          ),
         );
-      });
+      } else {
+        // Normal streaming mode — with optional obfuscation header
+        const res = await api.chatStream(
+          history,
+          model,
+          sysPrompt ?? undefined,
+          (delta) => {
+            setMessages((prev) =>
+              prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + delta } : m)),
+            );
+          },
+          obfuscate,
+          stmEnabled,
+        );
 
-      // Final pass: attach token usage metadata once stream is closed
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId
-            ? {
-                ...m,
-                tokenUsage: { input: res.usage.input_tokens, output: res.usage.output_tokens },
-              }
-            : m,
-        ),
-      );
+        // Final pass: attach token usage metadata once stream is closed
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  tokenUsage: { input: res.usage.input_tokens, output: res.usage.output_tokens },
+                }
+              : m,
+          ),
+        );
+      }
     } catch (err) {
       // Drop placeholder only if stream never delivered any content
       setMessages((prev) => prev.filter((m) => m.id !== assistantId || m.content.length > 0));
@@ -259,6 +361,25 @@ export default function Chat() {
       void send();
     }
   };
+
+  // Send last assistant response to Council for deliberation
+  const sendToCouncil = useCallback(async (): Promise<void> => {
+    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+    if (!lastAssistant || councilLoading) return;
+    setCouncilLoading(true);
+    try {
+      // Store content as a signal so council can pick it up
+      await api.post("/signals", {
+        domain: "chat",
+        payload: { content: lastAssistant.content, model },
+        source: "gateway-chat",
+      });
+    } catch {
+      /* non-fatal — council trigger is best-effort */
+    } finally {
+      setCouncilLoading(false);
+    }
+  }, [messages, model, councilLoading]);
 
   const clearHistory = (): void => {
     setMessages([]);
@@ -326,6 +447,53 @@ export default function Chat() {
         </div>
       </div>
 
+      {/* ── GODMODE bar ── */}
+      <div style={s.godmodeBar}>
+        <span style={{ fontSize: 10, color: "#334155", fontWeight: 700, letterSpacing: "0.1em" }}>
+          MODE
+        </span>
+        {(["normal", "classic"] as ChatMode[]).map((m) => (
+          <button key={m} style={s.modeBtn(mode === m)} onClick={() => setMode(m)}>
+            {m === "normal" ? "Normal" : "⚡ CLASSIC"}
+          </button>
+        ))}
+        {mode === "classic" && (
+          <select
+            value={raceTier}
+            onChange={(e) => setRaceTier(e.target.value as typeof raceTier)}
+            style={s.raceTierSelect}
+          >
+            {RACE_TIERS.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        )}
+        <span style={{ fontSize: 10, color: "#334155", fontWeight: 700, letterSpacing: "0.1em", marginLeft: 6 }}>
+          STM
+        </span>
+        <button style={s.toggleBtn(stmEnabled)} onClick={() => setStmEnabled((v) => !v)}>
+          {stmEnabled ? "ON" : "OFF"}
+        </button>
+        <span style={{ fontSize: 10, color: "#334155", fontWeight: 700, letterSpacing: "0.1em" }}>
+          OBFS
+        </span>
+        <button style={s.toggleBtn(obfuscate)} onClick={() => setObfuscate((v) => !v)}>
+          {obfuscate ? "ON" : "OFF"}
+        </button>
+        {messages.some((m) => m.role === "assistant") && (
+          <button
+            style={s.councilBtn}
+            onClick={() => void sendToCouncil()}
+            disabled={councilLoading}
+            title="Send last response to Council for deliberation"
+          >
+            {councilLoading ? "…" : "⚖ Council"}
+          </button>
+        )}
+      </div>
+
       {/* ── Message history ── */}
       <div style={s.history}>
         {messages.length === 0 && !loading && (
@@ -353,6 +521,13 @@ export default function Chat() {
               <AssistantSteps steps={msg.steps} />
             )}
             <div style={s.bubble(msg.role)}>{msg.content}</div>
+            {msg.raceWinner && (
+              <div style={s.raceWinner}>
+                <span>⚡ {msg.raceWinner.model}</span>
+                <span>score {msg.raceWinner.score.toFixed(2)}</span>
+                <span>{msg.raceWinner.latencyMs}ms</span>
+              </div>
+            )}
             {msg.tokenUsage && (
               <span style={s.tokenInfo}>
                 {msg.tokenUsage.input}↑ {msg.tokenUsage.output}↓ tokens

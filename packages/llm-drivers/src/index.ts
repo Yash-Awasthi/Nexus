@@ -945,3 +945,106 @@ export class DriverRegistry {
     return [...this.drivers.keys()];
   }
 }
+
+// ── Local model driver interface ───────────────────────────────────────────────
+// Ported from lyogavin/airllm: air_llm/airllm/airllm_base.py AirLLMBaseModel
+// Pattern: layer-wise inference on consumer hardware — loads one transformer
+// layer at a time, runs a forward pass, frees GPU memory before the next layer.
+// AirLLM is PyTorch/CUDA-only; these are the TypeScript interface definitions
+// that let @nexus/llm-drivers describe, register, and route to local models
+// (Ollama, llama.cpp, GGUF servers) as first-class provider targets.
+
+/**
+ * Weight precision / compression for a locally-loaded model.
+ * Maps to airllm's `compression` parameter (None / "4bit" / "8bit").
+ */
+export type LocalModelPrecision =
+  | "fp16"   // Full 16-bit (default, no compression)
+  | "fp32"   // 32-bit (high accuracy, 2× memory vs fp16)
+  | "int8"   // 8-bit quantization (≈2× speedup, small accuracy loss)
+  | "int4";  // 4-bit quantization (≈4× speedup, moderate accuracy loss)
+
+/**
+ * Strategy for splitting model weights across memory tiers.
+ * Ported from airllm's layer-shard concept.
+ */
+export type LayerShardStrategy =
+  | "none"        // Load entire model into memory at once
+  | "layer"       // Layer-by-layer: load one layer, infer, unload (airllm default)
+  | "pipeline";   // Pipeline-parallel across multiple devices
+
+/** Configuration for a locally-hosted model provider. */
+export interface LocalModelConfig {
+  /** Model identifier — HuggingFace repo id or local file path. */
+  modelId: string;
+  /** HTTP base URL of the local inference server (Ollama, llama.cpp, etc.). */
+  serverUrl: string;
+  /** Compute device hint passed to the server. Default "auto". */
+  device?: "cpu" | "cuda" | "mps" | "auto";
+  /** Weight precision. Default "fp16". */
+  precision?: LocalModelPrecision;
+  /** Layer shard strategy. Default "none" (full load). */
+  shardStrategy?: LayerShardStrategy;
+  /** Maximum sequence length supported by this deployment. Default 4096. */
+  maxSeqLen?: number;
+  /** Optional HuggingFace token for gated models. */
+  hfToken?: string;
+}
+
+/** Metadata returned when a local model is introspected. */
+export interface LocalModelManifest {
+  modelId: string;
+  serverUrl: string;
+  /** Whether the model server is currently reachable. */
+  healthy: boolean;
+  /** Model architecture family (e.g. "llama", "mistral", "qwen"). */
+  architecture?: string;
+  precision: LocalModelPrecision;
+  maxSeqLen: number;
+  contextWindow: number;
+  /** Total parameter count in billions, if reported by the server. */
+  parametersBillions?: number;
+  /** ISO-8601 timestamp of last health check. */
+  lastCheckedAt: string;
+}
+
+/** Probe a local model server and return its manifest. */
+export async function probeLocalModel(
+  config: LocalModelConfig,
+  fetchFn: typeof fetch = fetch
+): Promise<LocalModelManifest> {
+  const baseUrl = config.serverUrl.replace(/\/$/, "");
+  const now = new Date().toISOString();
+  try {
+    const res = await fetchFn(`${baseUrl}/api/tags`, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    // Ollama returns { models: [{ name, details: { family, parameter_size } }] }
+    const data = (await res.json()) as { models?: Array<{ name: string; details?: { family?: string; parameter_size?: string } }> };
+    const match = (data.models ?? []).find(
+      (m) => m.name === config.modelId || m.name.startsWith(config.modelId.split(":")[0] ?? "")
+    );
+    const paramStr = match?.details?.parameter_size ?? "";
+    const paramsBillions = parseFloat(paramStr.replace(/[bB].*/, "")) || undefined;
+    return {
+      modelId: config.modelId,
+      serverUrl: config.serverUrl,
+      healthy: true,
+      architecture: match?.details?.family,
+      precision: config.precision ?? "fp16",
+      maxSeqLen: config.maxSeqLen ?? 4096,
+      contextWindow: config.maxSeqLen ?? 4096,
+      parametersBillions: paramsBillions,
+      lastCheckedAt: now,
+    };
+  } catch {
+    return {
+      modelId: config.modelId,
+      serverUrl: config.serverUrl,
+      healthy: false,
+      precision: config.precision ?? "fp16",
+      maxSeqLen: config.maxSeqLen ?? 4096,
+      contextWindow: config.maxSeqLen ?? 4096,
+      lastCheckedAt: now,
+    };
+  }
+}

@@ -1,0 +1,131 @@
+# SPDX-License-Identifier: Apache-2.0
+# Render.com deployment blueprint
+# Deploy: https://render.com/deploy
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  # ── Nexus API ────────────────────────────────────────────────────────────────
+  - type: web
+    name: nexus-api
+    runtime: docker
+    dockerfilePath: apps/api/Dockerfile
+    dockerContext: .
+    plan: starter
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nexus-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: nexus-redis
+          type: redis
+          property: connectionString
+      - key: NEXUS_API_KEY
+        generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        value: https://nexus-spectre.onrender.com,https://nexus-web.onrender.com
+      - key: LOG_LEVEL
+        value: info
+      - key: OPENROUTER_API_KEY
+        sync: false  # set manually in Render dashboard
+      - key: GROQ_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+    healthCheckPath: /health
+    autoDeploy: true
+
+  # ── Nexus Worker ─────────────────────────────────────────────────────────────
+  - type: worker
+    name: nexus-worker
+    runtime: docker
+    dockerfilePath: apps/worker/Dockerfile
+    dockerContext: .
+    plan: starter
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nexus-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: nexus-redis
+          type: redis
+          property: connectionString
+      - key: NEXUS_API_KEY
+        fromService:
+          name: nexus-api
+          type: web
+          envVarKey: NEXUS_API_KEY
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+    autoDeploy: true
+
+  # ── SPECTRE UI ───────────────────────────────────────────────────────────────
+  - type: web
+    name: nexus-spectre
+    runtime: docker
+    dockerfilePath: apps/spectre/Dockerfile
+    dockerContext: .
+    plan: starter
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          name: nexus-api
+          type: web
+          property: hostURL
+      - key: VITE_API_KEY
+        fromService:
+          name: nexus-api
+          type: web
+          envVarKey: NEXUS_API_KEY
+    healthCheckPath: /health
+    autoDeploy: true
+
+  # ── Python Ingest Service ────────────────────────────────────────────────────
+  - type: worker
+    name: nexus-ingest
+    runtime: docker
+    dockerfilePath: services/ingest/Dockerfile
+    dockerContext: .
+    plan: starter
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nexus-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: nexus-redis
+          type: redis
+          property: connectionString
+      - key: NEXUS_API_KEY
+        fromService:
+          name: nexus-api
+          type: web
+          envVarKey: NEXUS_API_KEY
+      - key: LOG_LEVEL
+        value: info
+    autoDeploy: true
+
+databases:
+  - name: nexus-postgres
+    plan: starter
+    databaseName: nexus
+    user: nexus
+    postgresMajorVersion: "16"
+
+  - name: nexus-redis
+    plan: starter
+    ipAllowList: []
