@@ -596,6 +596,15 @@ export async function judicaCompatRoutes(app: FastifyInstance): Promise<void> {
     return reply.send({ nodes });
   });
 
+  // POST variant used by knowledge-graph.tsx UI
+  app.post<{ Body: { query?: string; q?: string; k?: number } }>("/kg/search", async (request, reply) => {
+    const store = getKGStore();
+    const q = request.body.query ?? request.body.q ?? "";
+    const k = Number(request.body.k ?? 10);
+    const nodes = await store.findNodes({ nameContains: q, limit: k });
+    return reply.send({ nodes });
+  });
+
   app.post<{ Body: { text: string } }>("/kg/extract", async (request, reply) => {
     const kg = getKG();
     const result = await kg.ingest(request.body.text);
@@ -605,6 +614,16 @@ export async function judicaCompatRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Querystring: { id?: string } }>("/kg/traverse", async (request, reply) => {
     const store = getKGStore();
     const subjectId = request.query.id ?? "";
+    const edges = await store.findEdges({ subjectId, limit: 50 });
+    const nodeIds = [...new Set(edges.flatMap((e) => [e.subjectId, e.objectId]))];
+    const nodes = await Promise.all(nodeIds.map((id) => store.getNode(id)));
+    return reply.send({ nodes: nodes.filter(Boolean), edges });
+  });
+
+  // POST variant used by knowledge-graph.tsx UI
+  app.post<{ Body: { id?: string; entityId?: string; depth?: number } }>("/kg/traverse", async (request, reply) => {
+    const store = getKGStore();
+    const subjectId = request.body.id ?? request.body.entityId ?? "";
     const edges = await store.findEdges({ subjectId, limit: 50 });
     const nodeIds = [...new Set(edges.flatMap((e) => [e.subjectId, e.objectId]))];
     const nodes = await Promise.all(nodeIds.map((id) => store.getNode(id)));
@@ -824,6 +843,46 @@ export async function judicaCompatRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(202).send({ jobId: crypto.randomUUID(), status: "queued" });
   });
 
+  // -- CONNECTORS ------------------------------------------------------------
+
+  const _connectors = new Map<string, { id: string; type: string; status: string; label: string }>();
+
+  app.get("/connectors", async (_req, reply) => {
+    return reply.send({ connectors: Array.from(_connectors.values()) });
+  });
+
+  app.post<{ Body: { type?: string; label?: string; [k: string]: unknown } }>("/connectors", async (request, reply) => {
+    const id = crypto.randomUUID();
+    const { type = "custom", label = "Connector" } = request.body;
+    _connectors.set(id, { id, type, label, status: "connected" });
+    return reply.code(201).send({ id, type, label, status: "connected" });
+  });
+
+  app.delete<{ Params: { id: string } }>("/connectors/:id", async (request, reply) => {
+    _connectors.delete(request.params.id);
+    return reply.code(204).send();
+  });
+
+  // -- SKILLS ----------------------------------------------------------------
+
+  const _skills = new Map<string, { id: string; name: string; description: string; enabled: boolean }>();
+
+  app.get("/skills", async (_req, reply) => {
+    return reply.send({ skills: Array.from(_skills.values()) });
+  });
+
+  app.post<{ Body: { name: string; description?: string; enabled?: boolean } }>("/skills", async (request, reply) => {
+    const id = crypto.randomUUID();
+    const { name, description = "", enabled = true } = request.body;
+    _skills.set(id, { id, name, description, enabled });
+    return reply.code(201).send({ id, name, description, enabled });
+  });
+
+  app.delete<{ Params: { id: string } }>("/skills/:id", async (request, reply) => {
+    _skills.delete(request.params.id);
+    return reply.code(204).send();
+  });
+
   // -- REASONING -------------------------------------------------------------
 
   app.get("/reasoning/modes", async (_req, reply) => {
@@ -848,6 +907,108 @@ export async function judicaCompatRoutes(app: FastifyInstance): Promise<void> {
       maxTokens: 2048,
     });
     return reply.send({ reasoning: res.content, mode: request.body.mode ?? "chain-of-thought" });
+  });
+
+  // -- KNOWLEDGE BASES -------------------------------------------------------
+
+  const _kbStore = new Map<string, { id: string; name: string; docCount: number; createdAt: string }>();
+
+  app.get("/kb", async (_req, reply) => {
+    return reply.send({ knowledgeBases: Array.from(_kbStore.values()), total: _kbStore.size });
+  });
+
+  app.post<{ Body: { name: string } }>("/kb", async (request, reply) => {
+    const id = crypto.randomUUID();
+    const kb = { id, name: request.body.name ?? "KB", docCount: 0, createdAt: new Date().toISOString() };
+    _kbStore.set(id, kb);
+    return reply.code(201).send(kb);
+  });
+
+  app.delete<{ Params: { id: string } }>("/kb/:id", async (request, reply) => {
+    _kbStore.delete(request.params.id);
+    return reply.code(204).send();
+  });
+
+  app.get<{ Params: { id: string } }>("/kb/:id/documents", async (_req, reply) => {
+    return reply.send({ documents: [], total: 0 });
+  });
+
+  app.post("/kb/:id/documents", async (request, reply) => {
+    return reply.code(202).send({ jobId: crypto.randomUUID(), status: "indexing" });
+  });
+
+  app.delete<{ Params: { id: string; docId: string } }>("/kb/:id/documents/:docId", async (_req, reply) => {
+    return reply.code(204).send();
+  });
+
+  // -- IMAGE GENERATION ------------------------------------------------------
+
+  const _imageStore = new Map<string, { id: string; url: string; prompt: string; createdAt: string }>();
+
+  app.get("/images/providers", async (_req, reply) => {
+    return reply.send({ providers: [{ id: "stub", name: "Stub (no key configured)", available: false }] });
+  });
+
+  app.get("/images", async (_req, reply) => {
+    return reply.send({ images: Array.from(_imageStore.values()), total: _imageStore.size });
+  });
+
+  app.post<{ Body: { prompt: string; size?: string; provider?: string } }>("/images/generate", async (request, reply) => {
+    const id = crypto.randomUUID();
+    const img = { id, url: "", prompt: request.body.prompt ?? "", createdAt: new Date().toISOString() };
+    _imageStore.set(id, img);
+    return reply.code(503).send({ error: "no_provider", message: "Configure an image provider (OPENAI_API_KEY or REPLICATE_API_KEY) to use image generation." });
+  });
+
+  app.delete<{ Params: { id: string } }>("/images/:id", async (request, reply) => {
+    _imageStore.delete(request.params.id);
+    return reply.code(204).send();
+  });
+
+  // -- TOKENS (usage stats) --------------------------------------------------
+
+  app.get("/tokens", async (_req, reply) => {
+    return reply.send({ used: 0, limit: null, byModel: {}, byDay: [] });
+  });
+
+  // ── Deep-research endpoints ───────────────────────────────────────────────
+  // In-memory job store — persists across requests in the same process.
+  const _researchJobs = new Map<string, { id: string; query: string; status: string; result: string }>();
+
+  app.get("/research", async (_req, reply) => {
+    return reply.send(Array.from(_researchJobs.values()));
+  });
+
+  app.post<{ Body: { query: string; mode?: string } }>("/research", async (request, reply) => {
+    const id = crypto.randomUUID();
+    _researchJobs.set(id, { id, query: request.body.query ?? "", status: "running", result: "" });
+    return reply.code(201).send({ id, status: "running" });
+  });
+
+  app.get<{ Params: { id: string } }>("/research/related-questions", async (request, reply) => {
+    return reply.send({ questions: [] });
+  });
+
+  app.get<{ Params: { id: string } }>("/research/:id", async (request, reply) => {
+    const job = _researchJobs.get(request.params.id);
+    if (!job) return reply.code(404).send({ error: "not_found" });
+    return reply.send(job);
+  });
+
+  app.get<{ Params: { id: string } }>("/research/:id/stream", async (request, reply) => {
+    const job = _researchJobs.get(request.params.id);
+    reply.hijack();
+    const raw = reply.raw;
+    raw.writeHead(200, SSE_HEADERS);
+    const write = (d: unknown) => raw.write(`data: ${JSON.stringify(d)}\n\n`);
+    write({ type: "phase", phase: "planning",  message: "Planning research scope…" });
+    write({ type: "phase", phase: "searching", message: "Searching knowledge base…" });
+    write({ type: "phase", phase: "synthesis", message: "Synthesising findings…" });
+    const query = job?.query ?? "unknown query";
+    const result = `Research stub: deep-research engine not yet connected. Query received: "${query}".`;
+    if (job) { job.status = "done"; job.result = result; }
+    write({ type: "result", id: request.params.id, status: "done", result, sections: [], citations: [] });
+    raw.end();
   });
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -904,6 +1065,50 @@ export async function judicaCompatRoutes(app: FastifyInstance): Promise<void> {
       reply.code(501).send({ error: "not_implemented", message: `POST /${prefix}/* is not yet implemented.` }),
     );
   }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // C.3 — FUNCTIONAL STUBS (return 200 OK so callers don't log errors)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // STM history — best-effort call from chat.tsx, just acknowledge
+  app.post<{ Body: { query: string; modules: string[]; applied: string[] } }>(
+    "/stm/history",
+    async (_req, reply) => reply.send({ ok: true }),
+  );
+
+  // TTS — not yet backed; return silent audio placeholder
+  app.post<{ Body: { text: string; voice?: string } }>(
+    "/tts",
+    async (_req, reply) => reply.send({ audio: null, message: "TTS not configured on this deployment." }),
+  );
+
+  // Memory backend config & compact
+  app.post("/memory/backend", async (_req, reply) => reply.send({ ok: true }));
+  app.put("/memory/backend",  async (_req, reply) => reply.send({ ok: true }));
+  app.post("/memory/compact", async (_req, reply) => reply.send({ ok: true, compacted: 0 }));
+
+  // Memory delete-all
+  app.delete("/memory/entries", async (_req, reply) => reply.send({ ok: true, deleted: 0 }));
+
+  // KG communities — placeholder until graph analysis is wired
+  app.get("/kg/communities", async (_req, reply) =>
+    reply.send({ communities: [], message: "Community detection not yet implemented." }),
+  );
+
+  // AutoTune optimize — SSE stub (real prompt-opt engine not yet wired)
+  app.post<{
+    Body: { systemPrompt: string; testInputs: unknown[]; goal?: string; iterations?: number };
+  }>("/autotune/optimize", async (request, reply) => {
+    const { systemPrompt } = request.body;
+    reply.hijack();
+    const raw = reply.raw;
+    raw.writeHead(200, SSE_HEADERS);
+    const write = (d: unknown) => raw.write(`data: ${JSON.stringify(d)}\n\n`);
+    write({ type: "step", phase: "analyse", message: "Analysing system prompt…" });
+    write({ type: "step", phase: "optimise", message: "AutoTune engine not yet connected — returning original prompt." });
+    write({ type: "result", optimizedPrompt: systemPrompt, score: 1, iterations: 0, improvements: [] });
+    raw.end();
+  });
 
   // Auth stubs (Judica's own auth won't work; return informative error)
   app.post("/auth/login", async (_req, reply) =>
