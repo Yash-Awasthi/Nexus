@@ -71,6 +71,7 @@ import { sseRoutes } from "./routes/sse.js";
 import { stmRoutes } from "./routes/stm.js";
 import { voiceRoutes } from "./routes/voice.js";
 import { wikiRoutes } from "./routes/wiki.js";
+import { judicaCompatRoutes } from "./routes/judica-compat.js";
 
 // Augment FastifyRequest to carry optional trace span
 declare module "fastify" {
@@ -304,6 +305,13 @@ export async function buildServer(): Promise<FastifyInstance> {
     },
     { prefix: "/api/v1" },
   );
+
+  // ── Judica-compat routes (/api/* — no version prefix) ─────────────────────
+  // Bridges the Judica/apps/ui frontend's call surface to the Nexus backend.
+  // Provides: ultraplinian stream, godmode stream, A/B comparison, memory,
+  // knowledge-graph, settings, rooms, workflows, parseltongue, providers,
+  // and stubs for advanced features not yet backed by packages.
+  await app.register(judicaCompatRoutes, { prefix: "/api" });
 
   // ── Global error handler ──────────────────────────────────────────────────
   app.setErrorHandler((error: FastifyError, request, reply) => {
