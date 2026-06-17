@@ -136,8 +136,19 @@ export function onDone(cb: (data: { round: number }) => void): () => void {
 // ── Thread management (localStorage-backed in web mode) ───────────────────────
 
 const THREADS_KEY = "nexus_threads";
+const MSGS_PREFIX  = "nexus_messages_";
 
 interface StoredThread { id: string; title: string; updated_at: number; }
+
+interface StoredGroup {
+  id: string;
+  round: number;
+  prompt: string;
+  opinions: Record<string, string>;
+  verdict: string;
+  error: string;
+  done: boolean;
+}
 
 function _loadThreads(): StoredThread[] {
   try {
@@ -167,11 +178,36 @@ export async function createThread(): Promise<string> {
 export async function deleteThread(id: string) {
   if (isMolecule()) return (window as any).molecule.deleteThread(id);
   _saveThreads(_loadThreads().filter((t) => t.id !== id));
+  localStorage.removeItem(MSGS_PREFIX + id);
 }
 
-export async function getMessages(_threadId: string) {
-  if (isMolecule()) return (window as any).molecule.getMessages(_threadId);
-  return []; // messages live in React state; persistence not yet implemented
+// ── Message persistence helpers ────────────────────────────────────────────────
+
+function _loadGroups(threadId: string): StoredGroup[] {
+  try {
+    const raw = localStorage.getItem(MSGS_PREFIX + threadId);
+    return raw ? (JSON.parse(raw) as StoredGroup[]) : [];
+  } catch { return []; }
+}
+
+/** Persist finalized MsgGroups for a thread. Call after a round completes (done=true). */
+export function saveGroups(threadId: string, groups: StoredGroup[]) {
+  localStorage.setItem(MSGS_PREFIX + threadId, JSON.stringify(groups));
+}
+
+export async function getMessages(threadId: string) {
+  if (isMolecule()) return (window as any).molecule.getMessages(threadId);
+  // Deserialize stored groups into the flat message format hydrateThread expects
+  const groups = _loadGroups(threadId);
+  const msgs: Array<{ id: string; role: string; member: string | null; content: string; round: number }> = [];
+  for (const g of groups) {
+    if (g.prompt)   msgs.push({ id: g.id + "_u", role: "user",    member: null,  content: g.prompt,  round: g.round });
+    for (const [label, text] of Object.entries(g.opinions)) {
+      if (text)     msgs.push({ id: g.id + "_" + label, role: "opinion", member: label, content: text, round: g.round });
+    }
+    if (g.verdict)  msgs.push({ id: g.id + "_v", role: "verdict", member: null,  content: g.verdict, round: g.round });
+  }
+  return msgs;
 }
 
 export async function getMemory(): Promise<string> {

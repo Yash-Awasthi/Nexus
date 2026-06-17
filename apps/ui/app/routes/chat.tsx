@@ -16,6 +16,7 @@ import {
   toggleGlass,
   type MoleculeOpinion,
   type MoleculeVerdict,
+  saveGroups,
 } from "~/lib/deliberate";
 import {
   loadCouncilMembers,
@@ -186,13 +187,16 @@ export default function Chat() {
         if (!prev.length) return prev;
         const last = prev[prev.length - 1];
         const updated = { ...last, done: true };
+        const finalGroups = [...prev.slice(0, -1), updated];
+        // Persist to localStorage so messages survive a refresh
+        if (!isMolecule()) saveGroups(threadId, finalGroups);
         // auto-title the thread after round 1
         if (data.round === 1 && last.prompt) {
           setThreads(ts => ts.map(t =>
             t.id === threadId ? { ...t, title: threadTitle(last.prompt) } : t
           ));
         }
-        return [...prev.slice(0, -1), updated];
+        return finalGroups;
       });
     });
 
@@ -427,6 +431,13 @@ export default function Chat() {
         .col-muted           { opacity: 0.35; filter: saturate(0); }
         .copy-btn:hover      { color: #00ff88 !important; }
       `}</style>
+
+      {/* ─── Web mode banner ─────────────────────────────────────────────── */}
+      {!isMolecule() && (
+        <div style={{ background: "#0a1a0a", borderBottom: `1px solid ${C.border}`, padding: "4px 14px", fontSize: "10px", color: C.greenDim, letterSpacing: "0.08em", flexShrink: 0 }}>
+          WEB MODE — configure API-mode members in Settings → Council to enable chat
+        </div>
+      )}
 
       {/* ─── Header ─────────────────────────────────────────────────────── */}
       <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "7px 14px", borderBottom: `1px solid ${C.border}`, background: C.bgAlt, flexShrink: 0, position: "relative", zIndex: 30 }}>
