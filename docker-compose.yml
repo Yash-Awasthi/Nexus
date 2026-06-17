@@ -144,6 +144,31 @@ services:
     profiles:
       - dev # opt-in: docker compose --profile dev up
 
+  # ── SPECTRE hacker chat UI ──────────────────────────────────────────────────
+  # Vite SPA served via nginx at http://localhost:5174
+  # Opt-in: docker compose --profile spectre up spectre
+  spectre:
+    build:
+      context: .
+      dockerfile: apps/spectre/Dockerfile
+    container_name: nexus-spectre
+    restart: unless-stopped
+    ports:
+      - "5174:80"
+    environment:
+      VITE_API_URL: http://localhost:3000
+      VITE_API_KEY: ${NEXUS_API_KEY}
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+    profiles:
+      - spectre
+
   # ── fin-scrape → Nexus ingest bridge ────────────────────────────────────────
   # Thin FastAPI bridge that watches a shared volume for JSON files written by the
   # fin-scrape Python scraper and forwards them to POST /api/v1/ingest/events.

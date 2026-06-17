@@ -8,7 +8,7 @@ FROM node:26-alpine AS deps
 WORKDIR /app
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@9.14.4 --activate
+RUN npm install -g pnpm@9.14.4 --no-fund --no-audit
 
 # Copy workspace manifests (needed for pnpm workspaces)
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
@@ -21,6 +21,9 @@ COPY packages/contracts/package.json ./packages/contracts/
 COPY packages/db/package.json ./packages/db/
 COPY packages/governance/package.json ./packages/governance/
 COPY packages/memory/package.json ./packages/memory/
+COPY packages/autotune/package.json ./packages/autotune/
+COPY packages/parseltongue/package.json ./packages/parseltongue/
+COPY packages/sft-tagger/package.json ./packages/sft-tagger/
 COPY packages/runtime/package.json ./packages/runtime/
 COPY packages/council/package.json ./packages/council/
 COPY packages/telemetry/package.json ./packages/telemetry/
@@ -29,6 +32,7 @@ COPY apps/api/package.json ./apps/api/
 RUN pnpm install --frozen-lockfile --filter @nexus/api --filter @nexus/auth \
     --filter @nexus/shared --filter @nexus/contracts --filter @nexus/db \
     --filter @nexus/governance --filter @nexus/memory \
+    --filter @nexus/autotune --filter @nexus/parseltongue --filter @nexus/sft-tagger \
     --filter @nexus/runtime --filter @nexus/council --filter @nexus/telemetry
 
 # ─── Stage 2: development — hot-reload via tsx (no compiled dist needed) ─────
@@ -40,6 +44,7 @@ RUN pnpm install --frozen-lockfile \
     --filter @nexus/api --filter @nexus/auth \
     --filter @nexus/shared --filter @nexus/contracts --filter @nexus/db \
     --filter @nexus/governance --filter @nexus/memory \
+    --filter @nexus/autotune --filter @nexus/parseltongue --filter @nexus/sft-tagger \
     --filter @nexus/runtime --filter @nexus/council --filter @nexus/telemetry
 
 # Source is bind-mounted at runtime — no COPY here
@@ -63,6 +68,9 @@ RUN pnpm --filter @nexus/shared build && \
     pnpm --filter @nexus/telemetry build && \
     pnpm --filter @nexus/governance build && \
     pnpm --filter @nexus/memory build && \
+    pnpm --filter @nexus/autotune build && \
+    pnpm --filter @nexus/parseltongue build && \
+    pnpm --filter @nexus/sft-tagger build && \
     pnpm --filter @nexus/runtime build && \
     pnpm --filter @nexus/council build && \
     pnpm --filter @nexus/auth build && \
@@ -74,7 +82,8 @@ WORKDIR /app
 RUN pnpm install --frozen-lockfile --prod \
     --filter @nexus/api --filter @nexus/auth --filter @nexus/shared \
     --filter @nexus/contracts --filter @nexus/db --filter @nexus/governance \
-    --filter @nexus/memory --filter @nexus/runtime --filter @nexus/council \
+    --filter @nexus/memory --filter @nexus/autotune --filter @nexus/parseltongue \
+    --filter @nexus/sft-tagger --filter @nexus/runtime --filter @nexus/council \
     --filter @nexus/telemetry
 
 # ─── Stage 4: runner ─────────────────────────────────────────────────────────
@@ -92,6 +101,9 @@ COPY --from=builder --chown=nexus:nexus /app/packages/contracts/dist ./packages/
 COPY --from=builder --chown=nexus:nexus /app/packages/db/dist ./packages/db/dist
 COPY --from=builder --chown=nexus:nexus /app/packages/governance/dist ./packages/governance/dist
 COPY --from=builder --chown=nexus:nexus /app/packages/memory/dist ./packages/memory/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/autotune/dist ./packages/autotune/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/parseltongue/dist ./packages/parseltongue/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/sft-tagger/dist ./packages/sft-tagger/dist
 COPY --from=builder --chown=nexus:nexus /app/packages/runtime/dist ./packages/runtime/dist
 COPY --from=builder --chown=nexus:nexus /app/packages/council/dist ./packages/council/dist
 COPY --from=builder --chown=nexus:nexus /app/packages/telemetry/dist ./packages/telemetry/dist

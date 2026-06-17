@@ -712,3 +712,172 @@ export function createAudioBuffer(
         : new Uint8Array(data);
   return { data: bytes, format, sampleRate, durationSeconds };
 }
+
+// ── VoxCPMSynthesizeProvider — tokenizer-free TTS (VoxCPM2 API pattern) ───────
+//
+// VoxCPM2 (OpenBMB/VoxCPM): 2B-param diffusion autoregressive TTS, 30 languages,
+// voice design from text description, voice cloning from reference audio, 48kHz.
+// Exposes an OpenAI-compatible HTTP API via vLLM-Omni / Nano-vLLM serving.
+//
+// This provider targets the OpenAI-compatible TTS endpoint that VoxCPM2 serves
+// when deployed via vllm-omni. Falls back to ElevenLabs-compatible API shape.
+
+export interface VoxCPMConfig {
+  /** Base URL of the VoxCPM2 deployment. Default: process.env.VOXCPM_URL */
+  baseUrl?: string;
+  /** API key for the VoxCPM endpoint. Default: process.env.VOXCPM_API_KEY */
+  apiKey?: string;
+  /** Model variant. Default: "voxcpm2" */
+  model?: string;
+  /** Output sample rate. VoxCPM2 natively outputs 48kHz. Default: 48000 */
+  sampleRate?: number;
+}
+
+export interface VoxCPMVoiceDesign {
+  /** Natural language description of the voice: "young female, warm tone, slow pace" */
+  description: string;
+}
+
+export interface VoxCPMCloneRef {
+  /** Reference audio as base64-encoded WAV/MP3 */
+  audioBase64: string;
+  /** Transcript of the reference audio (required for faithful cloning) */
+  transcript: string;
+}
+
+/**
+ * VoxCPM2 TTS provider — tokenizer-free multilingual synthesis.
+ * Targets the OpenAI-compatible /v1/audio/speech endpoint that VoxCPM2 serves.
+ *
+ * Three synthesis modes:
+ *   • Standard: voice = string (voice ID or preset name)
+ *   • Design:   voice = VoxCPMVoiceDesign (generated from text description)
+ *   • Clone:    voice = VoxCPMCloneRef (cloned from reference audio + transcript)
+ */
+export class VoxCPMSynthesizeProvider implements SynthesizeProvider {
+  readonly name = "voxcpm";
+  private baseUrl: string;
+  private apiKey: string;
+  private model: string;
+  private sampleRate: number;
+
+  constructor(config: VoxCPMConfig = {}) {
+    this.baseUrl = (config.baseUrl ?? process.env["VOXCPM_URL"] ?? "").replace(/\/$/, "");
+    this.apiKey = config.apiKey ?? process.env["VOXCPM_API_KEY"] ?? "";
+    this.model = config.model ?? "voxcpm2";
+    this.sampleRate = config.sampleRate ?? 48_000;
+  }
+
+  async synthesize(text: string, opts: SynthesizeOptions = {}): Promise<AudioBuffer> {
+    if (!this.baseUrl) {
+      throw new VoiceError("PROVIDER_AUTH_FAILED", "VoxCPM URL not configured. Set VOXCPM_URL.");
+    }
+
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (this.apiKey) headers["Authorization"] = `Bearer ${this.apiKey}`;
+
+    // Build voice parameter based on opts.voice type
+    let voiceParam: string | Record<string, unknown> = "default";
+    if (typeof opts.voice === "string") {
+      voiceParam = opts.voice;
+    } else if (opts.voice && typeof opts.voice === "object") {
+      const v = opts.voice as VoxCPMVoiceDesign | VoxCPMCloneRef;
+      if ("description" in v) {
+        // Voice design mode
+        voiceParam = { type: "design", description: v.description };
+      } else if ("audioBase64" in v) {
+        // Voice cloning mode
+        voiceParam = { type: "clone", audio: v.audioBase64, transcript: v.transcript };
+      }
+    }
+
+    const body = JSON.stringify({
+      model: this.model,
+      input: text.slice(0, 4096),
+      voice: voiceParam,
+      response_format: "wav",
+      speed: 1.0,
+    });
+
+    let res: Response;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 60_000);
+      res = await fetch(`${this.baseUrl}/v1/audio/speech`, {
+        method: "POST", headers, body, signal: controller.signal,
+      });
+      clearTimeout(timer);
+    } catch (cause) {
+      throw new VoiceError("SYNTHESIZE_FAILED", `VoxCPM network error: ${String(cause)}`);
+    }
+
+    if (res.status === 401 || res.status === 403) {
+      throw new VoiceError("PROVIDER_AUTH_FAILED", "VoxCPM API key is invalid or missing");
+    }
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new VoiceError("SYNTHESIZE_FAILED", `VoxCPM API returned ${res.status}`, { body: body.slice(0, 200) });
+    }
+
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    return { data: bytes, format: "wav", sampleRate: this.sampleRate };
+  }
+}
+
+// ── OpenAICompatibleSynthesizeProvider — generic OpenAI TTS API wrapper ────────
+//
+// Covers any deployment exposing the OpenAI /v1/audio/speech endpoint:
+// OpenAI, Azure OpenAI, local TTS servers, or VoxCPM2 / Kokoro / Coqui.
+
+export interface OpenAITTSConfig {
+  baseUrl?: string;
+  apiKey?: string;
+  model?: string;
+  defaultVoice?: string;
+}
+
+/** Open a i compatible synthesize provider. */
+export class OpenAICompatibleSynthesizeProvider implements SynthesizeProvider {
+  readonly name = "openai-tts";
+  private baseUrl: string;
+  private apiKey: string;
+  private model: string;
+  private defaultVoice: string;
+
+  constructor(config: OpenAITTSConfig = {}) {
+    this.baseUrl = (config.baseUrl ?? process.env["OPENAI_BASE_URL"] ?? "https://api.openai.com").replace(/\/$/, "");
+    this.apiKey = config.apiKey ?? process.env["OPENAI_API_KEY"] ?? "";
+    this.model = config.model ?? "tts-1";
+    this.defaultVoice = config.defaultVoice ?? "alloy";
+  }
+
+  async synthesize(text: string, opts: SynthesizeOptions = {}): Promise<AudioBuffer> {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (this.apiKey) headers["Authorization"] = `Bearer ${this.apiKey}`;
+
+    const body = JSON.stringify({
+      model: this.model,
+      input: text.slice(0, 4096),
+      voice: typeof opts.voice === "string" ? opts.voice : this.defaultVoice,
+      response_format: "mp3",
+    });
+
+    let res: Response;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 60_000);
+      res = await fetch(`${this.baseUrl}/v1/audio/speech`, {
+        method: "POST", headers, body, signal: controller.signal,
+      });
+      clearTimeout(timer);
+    } catch (cause) {
+      throw new VoiceError("SYNTHESIZE_FAILED", `OpenAI TTS network error: ${String(cause)}`);
+    }
+
+    if (res.status === 401 || res.status === 403) throw new VoiceError("PROVIDER_AUTH_FAILED", "OpenAI API key invalid");
+    if (!res.ok) throw new VoiceError("SYNTHESIZE_FAILED", `OpenAI TTS API returned ${res.status}`);
+
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    return { data: bytes, format: "mp3", sampleRate: 24_000 };
+  }
+}

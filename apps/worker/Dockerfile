@@ -5,7 +5,7 @@
 FROM node:26-alpine AS deps
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@9.14.4 --activate
+RUN npm install -g pnpm@9.14.4 --no-fund --no-audit
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY turbo.json ./

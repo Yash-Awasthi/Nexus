@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# npm publish — triggered by Changesets release PRs being merged.
+# npm publish — manual only. Requires NPM_TOKEN secret.
 #
 # What this publishes:
 #   @nexus/cli      — nexus CLI (apps/cli)
@@ -12,18 +12,10 @@
 # Secrets required (set in repo settings → Secrets → Actions):
 #   NPM_TOKEN — npm automation token (read+write, no MFA)
 #
-# Trigger:
-#   Push to main where any package.json has version bump
-#   OR manual workflow_dispatch for emergency publish
+# Trigger: workflow_dispatch only (prevents spurious fires on package.json edits)
 name: npm Publish
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "apps/cli/package.json"
-      - "packages/*/package.json"
-
   workflow_dispatch:
     inputs:
       package:
@@ -32,7 +24,7 @@ on:
 
 concurrency:
   group: npm-publish
-  cancel-in-progress: false   # never cancel a publish in flight
+  cancel-in-progress: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -43,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write   # for npm provenance attestation
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -66,16 +58,12 @@ jobs:
 
       - name: Run tests
         run: pnpm test --filter="./packages/*"
-        continue-on-error: false   # block publish if tests fail
 
       - name: Publish changed packages (Changesets)
-        run: |
-          # Changesets handles version bumping + tag creation
-          # Only publishes packages whose version has been bumped
-          pnpm changeset publish --no-git-tag
+        run: pnpm changeset publish --no-git-tag
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: "true"   # attach provenance attestation
+          NPM_CONFIG_PROVENANCE: "true"
 
       - name: Tag published versions
         run: |
@@ -86,7 +74,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Notify on Slack/Discord after successful publish (optional)
   notify:
     name: Post-publish notification
     runs-on: ubuntu-latest

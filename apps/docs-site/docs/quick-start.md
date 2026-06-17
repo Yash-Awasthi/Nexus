@@ -30,7 +30,8 @@ Open `.env` and set the required values:
 ```bash
 NEXUS_API_KEY=your-local-dev-key
 NEXUS_AUDIT_KEY=any-32-char-secret
-GROQ_API_KEY=gsk_...          # from console.groq.com
+GROQ_API_KEY=gsk_...             # from console.groq.com (free tier works)
+OPENROUTER_API_KEY=sk-or-...     # from openrouter.ai — needed for SPECTRE / ULTRAPLINIAN
 NEXUS_INGEST_API_KEY=local-ingest-key
 ```
 
@@ -93,9 +94,37 @@ nexus council deliberate \
 
 Navigate to http://localhost:5173 to see the NEXUS dashboard.
 
+## 8. Launch SPECTRE (optional)
+
+SPECTRE is the hacker-aesthetic multi-model chat UI. Run it alongside the API:
+
+```bash
+# In a separate terminal (needs the API running on :3000)
+VITE_API_URL=http://localhost:3000 VITE_API_KEY=your-local-dev-key pnpm dev:spectre
+```
+
+Navigate to http://localhost:5174 for SPECTRE. See [SPECTRE](./spectre) for full details.
+
+## 9. Use the SDK in your own app
+
+```ts
+import { NexusClient } from "@nexus/client";
+
+const nexus = new NexusClient({ baseUrl: "http://localhost:3000", apiKey: "your-local-dev-key" });
+const res = await nexus.gateway.sendMessage({
+  model: "nexus/smart",
+  messages: [{ role: "user", content: "What is NEXUS?" }],
+});
+console.log(res.content[0].text);
+```
+
+See [SDK Reference](./sdk) for the full API.
+
 ## What's next?
 
 - [Architecture](./architecture) — understand the system design
+- [SDK Reference](./sdk) — typed SDK for external consumers
+- [SPECTRE](./spectre) — hacker chat UI
 - [Plugin Author Guide](./plugin-author-guide) — add your own adapter
 - [CLI Reference](./cli-reference) — all CLI commands
 - [API Reference](./api-reference) — REST API docs

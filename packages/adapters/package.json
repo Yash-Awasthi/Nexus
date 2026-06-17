@@ -1,0 +1,52 @@
+{
+  "name": "@nexus/adapters",
+  "version": "0.1.0",
+  "private": false,
+  "description": "NEXUS root adapters barrel package",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "dev": "tsc --project tsconfig.json --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist coverage"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "@nexus/adapter-betterstack": "workspace:*",
+    "@nexus/adapter-calendar": "workspace:*",
+    "@nexus/adapter-cloudflare": "workspace:*",
+    "@nexus/adapter-confluence": "workspace:*",
+    "@nexus/adapter-council": "workspace:*",
+    "@nexus/adapter-deep-research": "workspace:*",
+    "@nexus/adapter-doppler": "workspace:*",
+    "@nexus/adapter-drive": "workspace:*",
+    "@nexus/adapter-github": "workspace:*",
+    "@nexus/adapter-gmail": "workspace:*",
+    "@nexus/adapter-groq": "workspace:*",
+    "@nexus/adapter-hubspot": "workspace:*",
+    "@nexus/adapter-ide": "workspace:*",
+    "@nexus/adapter-ingest": "workspace:*",
+    "@nexus/adapter-jira": "workspace:*",
+    "@nexus/adapter-linear": "workspace:*",
+    "@nexus/adapter-mlx": "workspace:*",
+    "@nexus/adapter-neon": "workspace:*",
+    "@nexus/adapter-notion": "workspace:*",
+    "@nexus/adapter-salesforce": "workspace:*",
+    "@nexus/adapter-searxng": "workspace:*",
+    "@nexus/adapter-slack": "workspace:*",
+    "@nexus/adapter-supabase": "workspace:*",
+    "@nexus/adapter-tavily": "workspace:*",
+    "@nexus/adapter-vercel": "workspace:*"
+  }
+}

@@ -20,7 +20,46 @@ import { randomUUID } from "crypto";
 
 import type { FastifyInstance } from "fastify";
 
+import {
+  createDefaultRegistry,
+  DeltaEngine,
+  SweepOrchestrator,
+  TelegramAlerter,
+} from "@nexus/domain-feeds";
+
 import { requireAuth } from "../middleware/auth.js";
+
+// ── Intelligence sweep singletons (process-scoped) ────────────────────────────
+
+const _intelRegistry = createDefaultRegistry();
+const _sweepOrchestrator = new SweepOrchestrator(_intelRegistry, 20);
+const _deltaEngine = new DeltaEngine();
+
+let _telegramAlerter: TelegramAlerter | null = null;
+if (process.env["TELEGRAM_BOT_TOKEN"] && process.env["TELEGRAM_CHAT_ID"]) {
+  _telegramAlerter = new TelegramAlerter({
+    botToken: process.env["TELEGRAM_BOT_TOKEN"],
+    chatId: process.env["TELEGRAM_CHAT_ID"],
+    commandHandler: async (cmd) => {
+      if (cmd === "/status") {
+        const last = _sweepOrchestrator.lastSweep();
+        if (!last) return "No sweep data yet. Run /sweep first.";
+        return `✅ ${last.meta.sourcesOk} up / ❌ ${last.meta.sourcesDown} down — ${last.meta.totalEvents} events — ${last.timestamp}`;
+      }
+      if (cmd === "/sweep") {
+        const result = await _sweepOrchestrator.sweep();
+        return `Sweep complete: ${result.meta.totalEvents} events from ${result.meta.sourcesOk} sources in ${result.meta.sweepMs}ms`;
+      }
+      if (cmd === "/brief") {
+        const last = _sweepOrchestrator.lastSweep();
+        if (!last) return "No sweep data yet.";
+        const lines = last.domains.map((d) => `• ${d.domain}: ${d.totalCount} events`);
+        return `Intelligence brief — ${last.timestamp}\n${lines.join("\n")}`;
+      }
+      return null;
+    },
+  });
+}
 
 // ── In-memory feed store ──────────────────────────────────────────────────────
 
@@ -138,6 +177,95 @@ export async function domainFeedsRoutes(app: FastifyInstance): Promise<void> {
     if (entries.length > 500) entries.splice(0, entries.length - 500);
 
     return reply.code(201).send(entry);
+  });
+
+  // ── Intelligence feed routes (live API adapters) ──────────────────────────
+
+  /** POST /domain-feeds/intel/sweep — run a full parallel sweep of all real adapters */
+  app.post("/domain-feeds/intel/sweep", { preHandler: requireAuth }, async (_req, reply) => {
+    const result = await _sweepOrchestrator.sweep();
+
+    // Compute delta and push Telegram alerts if configured
+    const history = _sweepOrchestrator.sweepHistory();
+    if (history.length >= 2 && _telegramAlerter) {
+      const delta = _deltaEngine.compute(history[0]!, history[1]!);
+      if (delta.summary.totalChanges > 0) {
+        _telegramAlerter.sendDelta(delta).catch(() => {});
+      }
+    }
+
+    return reply.send({
+      timestamp: result.timestamp,
+      sourcesOk: result.meta.sourcesOk,
+      sourcesDown: result.meta.sourcesDown,
+      totalEvents: result.meta.totalEvents,
+      sweepMs: result.meta.sweepMs,
+      health: result.health,
+    });
+  });
+
+  /** GET /domain-feeds/intel/status — last sweep health summary */
+  app.get("/domain-feeds/intel/status", { preHandler: requireAuth }, async (_req, reply) => {
+    const last = _sweepOrchestrator.lastSweep();
+    if (!last) return reply.code(404).send({ error: "No sweep has run yet. POST /domain-feeds/intel/sweep first." });
+    return reply.send({
+      timestamp: last.timestamp,
+      sourcesOk: last.meta.sourcesOk,
+      sourcesDown: last.meta.sourcesDown,
+      totalEvents: last.meta.totalEvents,
+      sweepMs: last.meta.sweepMs,
+      health: last.health,
+    });
+  });
+
+  /** GET /domain-feeds/intel/:domain — events from last sweep for a specific domain */
+  app.get<{ Params: { domain: string }; Querystring: { limit?: string } }>(
+    "/domain-feeds/intel/:domain",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const last = _sweepOrchestrator.lastSweep();
+      if (!last) return reply.code(404).send({ error: "No sweep data yet." });
+
+      const page = last.domains.find((d) => d.domain === request.params.domain);
+      if (!page) {
+        return reply.code(404).send({
+          error: `Domain "${request.params.domain}" not in last sweep. Available: ${last.domains.map((d) => d.domain).join(", ")}`,
+        });
+      }
+
+      const limit = Math.min(parseInt(request.query.limit ?? "50"), 200);
+      return reply.send({ ...page, events: page.events.slice(0, limit) });
+    },
+  );
+
+  /** GET /domain-feeds/intel/brief — compact text summary of last sweep */
+  app.get("/domain-feeds/intel/brief", { preHandler: requireAuth }, async (_req, reply) => {
+    const last = _sweepOrchestrator.lastSweep();
+    if (!last) return reply.code(404).send({ error: "No sweep data yet." });
+
+    const history = _sweepOrchestrator.sweepHistory();
+    const delta = history.length >= 2 ? _deltaEngine.compute(history[0]!, history[1]!) : null;
+
+    const domainSummary = last.domains.map((d) => ({
+      domain: d.domain, count: d.totalCount,
+      topEvent: d.events[0]?.summary ?? null,
+      topSeverity: d.events[0]?.severity ?? null,
+    }));
+
+    return reply.send({
+      timestamp: last.timestamp,
+      meta: last.meta,
+      domains: domainSummary,
+      delta: delta ? {
+        direction: delta.summary.direction,
+        totalChanges: delta.summary.totalChanges,
+        criticalChanges: delta.summary.criticalChanges,
+        topSignals: [
+          ...delta.signals.new.slice(0, 3),
+          ...delta.signals.escalated.filter((s) => s.severity === "critical").slice(0, 3),
+        ],
+      } : null,
+    });
   });
 
   /** DELETE /domain-feeds/:domain/entries/:id */

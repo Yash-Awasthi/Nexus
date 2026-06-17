@@ -23,6 +23,7 @@ import {
   type DataTier,
   type SampleTag,
 } from "@nexus/hf-research";
+import { RuleTagger, QualityScorer } from "@nexus/sft-tagger";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuthWithTier, getTierFromRequest } from "../middleware/auth.js";
@@ -126,13 +127,33 @@ export async function corpusBuilderRoutes(app: FastifyInstance): Promise<void> {
       metadata?: Record<string, unknown>;
     };
   }>("/corpus/samples", { preHandler: requireAuthWithTier }, async (request, reply) => {
+    // SFT auto-tag: derive tag from rule-based tagger; fall back to caller-supplied or neutral
+    let autoTag: SampleTag = request.body.tag ?? "neutral";
+    let qualityScore: number | undefined;
+    try {
+      const tagger = new RuleTagger();
+      const scorer = new QualityScorer();
+      const tagResult = tagger.tag({ role: "assistant", content: request.body.completion });
+      if (tagResult.label === "preferred" || tagResult.label === "rejected") {
+        autoTag = tagResult.label as SampleTag;
+      }
+      qualityScore = scorer.score({
+        prompt: request.body.prompt,
+        completion: request.body.completion,
+      });
+    } catch {
+      // non-fatal — proceed with fallback tag
+    }
     const sample = batchStore.addSample({
       prompt: request.body.prompt,
       completion: request.body.completion,
-      tag: request.body.tag ?? "neutral",
+      tag: autoTag,
       model: request.body.model,
       sessionId: request.body.sessionId,
-      metadata: request.body.metadata,
+      metadata: {
+        ...request.body.metadata,
+        ...(qualityScore !== undefined ? { qualityScore } : {}),
+      },
     });
     return reply.code(201).send(sample);
   });

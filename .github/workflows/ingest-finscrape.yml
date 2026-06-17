@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: Apache-2.0
+# Automated fin-scrape → ingest-py → Nexus signal ingestion
+#
+# Runs every 30 min. Calls ingest-py /scan endpoint which picks up
+# any JSON files written by fin-scrape and forwards them to the Nexus
+# ingest API as structured signal events.
+#
+# Secrets required:
+#   INGEST_PY_URL      — base URL of the ingest-py service (e.g. https://ingest.nexus.dev)
+#   NEXUS_INGEST_TOKEN — bearer token for the ingest-py /scan endpoint
+name: Ingest fin-scrape signals
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # every 30 minutes
+  workflow_dispatch:           # also triggerable manually
+
+concurrency:
+  group: ingest-finscrape
+  cancel-in-progress: true    # cancel stale run if a new one starts
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  scan:
+    name: Trigger ingest-py scan
+    runs-on: ubuntu-latest
+    if: vars.INGEST_PY_URL != ''
+
+    steps:
+      - name: Call ingest-py /scan
+        run: |
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
+            -X POST "${{ vars.INGEST_PY_URL }}/scan" \
+            -H "Authorization: Bearer ${{ secrets.NEXUS_INGEST_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          echo "HTTP $STATUS"
+          [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ] || exit 1
+
+      - name: Summary
+        run: |
+          echo "## fin-scrape scan triggered" >> $GITHUB_STEP_SUMMARY
+          echo "Triggered at $(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_STEP_SUMMARY

@@ -332,3 +332,143 @@ export class OcrBatchProcessor {
     return results;
   }
 }
+
+// ── dots.ocr VLM Document Parsing Patterns ───────────────────────────────────
+// Extracted from: rednote-hilab/dots.ocr
+// 1.7B VLM-based multilingual document layout parsing via OpenAI-compatible vLLM endpoint.
+// Single model replaces layout-detection + text-recognition + reading-order pipelines.
+
+/** Pixel constraints for image preprocessing before VLM inference. */
+export const DOTS_OCR_MIN_PIXELS = 3136;
+export const DOTS_OCR_MAX_PIXELS = 11_289_600;
+/** Resize factor — dimensions must be multiples of this value. */
+export const DOTS_OCR_IMAGE_FACTOR = 28;
+
+/**
+ * Prompt mode controls what the VLM outputs.
+ * Switch modes by changing only the prompt — no model change required.
+ */
+export type OcrPromptMode =
+  | "prompt_layout_all_en"    // Full parse: bbox + category + text (JSON)
+  | "prompt_layout_only_en"   // Detection only: bbox + category, no text (JSON)
+  | "prompt_ocr"              // Plain text extraction (no headers/footers)
+  | "prompt_grounding_ocr"    // Extract text within a given bounding box
+  | "prompt_web_parsing"      // Webpage layout parsing (JSON)
+  | "prompt_scene_spotting"   // Scene text detection and recognition
+  | "prompt_image_to_svg";    // Generate SVG code from image
+
+/**
+ * Document layout element categories output by dots.ocr.
+ * Covers full academic/enterprise document taxonomy.
+ */
+export type OcrLayoutCategory =
+  | "Caption"
+  | "Footnote"
+  | "Formula"       // text formatted as LaTeX
+  | "List-item"
+  | "Page-footer"
+  | "Page-header"
+  | "Picture"       // text field omitted
+  | "Section-header"
+  | "Table"         // text formatted as HTML
+  | "Text"          // text formatted as Markdown
+  | "Title";        // text formatted as Markdown
+
+/**
+ * Bounding box in [x1, y1, x2, y2] pixel coordinates.
+ * Coordinates are relative to the input image dimensions.
+ */
+export type OcrBoundingBox = [number, number, number, number];
+
+/**
+ * A single parsed layout element from dots.ocr output.
+ * Text format depends on category:
+ *   Formula → LaTeX, Table → HTML, Picture → omitted, others → Markdown.
+ * Elements are sorted in human reading order.
+ */
+export interface OcrLayoutElement {
+  bbox: OcrBoundingBox;
+  category: OcrLayoutCategory;
+  /** Absent for Picture elements. */
+  text?: string;
+}
+
+/** Full structured parse result for a single document page. */
+export interface OcrPageResult {
+  /** 0-indexed page number. */
+  pageIndex: number;
+  /** Width of the page image in pixels (after preprocessing). */
+  width: number;
+  /** Height of the page image in pixels (after preprocessing). */
+  height: number;
+  elements: OcrLayoutElement[];
+  /** Raw JSON string returned by the model (before parsing). */
+  raw?: string;
+}
+
+/** Configuration for the dots.ocr vLLM inference server. */
+export interface OcrInferenceConfig {
+  protocol?: "http" | "https";
+  ip?: string;
+  port?: number;
+  /** HuggingFace model ID served by the vLLM instance. */
+  modelName?: string;
+  temperature?: number;
+  topP?: number;
+  /** Maximum tokens the model may generate per page. Default 32768. */
+  maxCompletionTokens?: number;
+  /** Parallel inference threads for multi-page documents. Default 64. */
+  numThreads?: number;
+  /** PDF rendering DPI. Higher = better quality, more pixels. Default 200. */
+  dpi?: number;
+  minPixels?: number;
+  maxPixels?: number;
+}
+
+/**
+ * Build the OpenAI-compatible base URL for a dots.ocr vLLM server.
+ * e.g. buildOcrServerUrl({ ip: "10.0.0.1", port: 8080 }) → "http://10.0.0.1:8080/v1"
+ */
+export function buildOcrServerUrl(cfg: OcrInferenceConfig = {}): string {
+  const { protocol = "http", ip = "localhost", port = 8000 } = cfg;
+  return `${protocol}://${ip}:${port}/v1`;
+}
+
+/**
+ * Special image token sequence injected before the prompt text.
+ * Required by vLLM ≥ 0.11.0 to prevent a newline being inserted before the prompt.
+ */
+export const DOTS_OCR_IMAGE_TOKENS = "<|img|><|imgpad|><|endofimg|>";
+
+/**
+ * Resize a dimension to the nearest multiple of IMAGE_FACTOR.
+ * Mirrors dots.ocr smart_resize() preprocessing.
+ */
+export function snapToImageFactor(value: number): number {
+  return Math.round(value / DOTS_OCR_IMAGE_FACTOR) * DOTS_OCR_IMAGE_FACTOR;
+}
+
+/**
+ * Clamp pixel count to the [MIN, MAX] range enforced by dots.ocr.
+ * Returns true if the image is within bounds without resizing.
+ */
+export function isWithinOcrPixelBounds(pixelCount: number): boolean {
+  return pixelCount >= DOTS_OCR_MIN_PIXELS && pixelCount <= DOTS_OCR_MAX_PIXELS;
+}
+
+/** Filter elements by category from a page result. */
+export function filterByCategory(
+  page: OcrPageResult,
+  ...categories: OcrLayoutCategory[]
+): OcrLayoutElement[] {
+  const set = new Set<OcrLayoutCategory>(categories);
+  return page.elements.filter((el) => set.has(el.category));
+}
+
+/** Extract plain text from all elements in reading order, joining with newlines. */
+export function extractPageText(page: OcrPageResult): string {
+  return page.elements
+    .filter((el) => el.text != null)
+    .map((el) => el.text!)
+    .join("\n");
+}

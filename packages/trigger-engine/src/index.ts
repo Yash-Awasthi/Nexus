@@ -378,3 +378,238 @@ export class TriggerRegistry {
     }
   }
 }
+
+// ── Remote function / trigger primitives (from iii SDK) ───────────────────────
+//
+// Extracted from iii-hq/iii iii-browser SDK. These complement the local
+// trigger matching above with a remote invocation layer: functions are
+// registered with an engine (over WebSocket or HTTP), triggers bind to them,
+// and callers invoke them via `trigger()` with sync/async/void/enqueue actions.
+//
+// ISdk               — full engine SDK interface
+// RemoteFunctionHandler — typed async function handler
+// TriggerHandler<T>  — pluggable trigger-type lifecycle (register/unregister)
+// TriggerConfig<T>   — config passed to TriggerHandler on lifecycle events
+// TriggerTypeRef<T>  — typed handle for a registered trigger type
+// FunctionRef        — handle for a registered function (id + unregister)
+// ApiRequest<TBody>  — structured HTTP trigger request payload
+// ApiResponse<S,B>   — structured HTTP trigger response
+
+/**
+ * Typed async handler for a remotely-registered function.
+ *
+ * @typeParam TInput  – Invocation payload type.
+ * @typeParam TOutput – Return value type.
+ *
+ * @example
+ * ```ts
+ * const greet: RemoteFunctionHandler<{ name: string }, { message: string }> =
+ *   async (data) => ({ message: `Hello, ${data.name}!` });
+ * ```
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type RemoteFunctionHandler<TInput = any, TOutput = any> = (
+  data: TInput,
+) => Promise<TOutput>;
+
+/**
+ * Configuration passed to a TriggerHandler on register/unregister lifecycle events.
+ *
+ * @typeParam TConfig – Trigger-specific configuration shape.
+ */
+export type TriggerConfig<TConfig> = {
+  /** Trigger instance ID. */
+  id: string;
+  /** ID of the function to invoke when the trigger fires. */
+  function_id: string;
+  /** Trigger-specific configuration. */
+  config: TConfig;
+};
+
+/**
+ * Handler interface for pluggable trigger types.
+ * Implement this to define how a custom trigger type registers and
+ * unregisters instances (e.g. cron scheduler, webhook subscription).
+ *
+ * @typeParam TConfig – Trigger-specific configuration shape.
+ *
+ * @example
+ * ```ts
+ * const cronHandler: TriggerHandler<{ expression: string }> = {
+ *   async registerTrigger({ id, function_id, config }) {
+ *     startCronJob(id, config.expression, () => sdk.trigger({ function_id, payload: {} }));
+ *   },
+ *   async unregisterTrigger({ id }) {
+ *     stopCronJob(id);
+ *   },
+ * };
+ * ```
+ */
+export type TriggerHandler<TConfig> = {
+  registerTrigger(config: TriggerConfig<TConfig>): Promise<void>;
+  unregisterTrigger(config: TriggerConfig<TConfig>): Promise<void>;
+};
+
+/**
+ * Typed handle returned when registering a trigger type.
+ * Provides convenience methods scoped to the type so callers don't repeat `type`.
+ *
+ * @typeParam TConfig – Trigger-specific configuration shape.
+ */
+export type TriggerTypeRef<TConfig = unknown> = {
+  /** Trigger type identifier. */
+  id: string;
+  /** Register a trigger bound to this trigger type. */
+  registerTrigger(functionId: string, config: TConfig): RemoteTrigger;
+  /** Register a function and immediately bind it to this trigger type. */
+  registerFunction(
+    functionId: string,
+    handler: RemoteFunctionHandler,
+    config: TConfig,
+  ): FunctionRef;
+  /** Unregister this trigger type from the engine. */
+  unregister(): void;
+};
+
+/** Handle returned when registering a remote trigger. */
+export type RemoteTrigger = {
+  /** Remove this trigger from the engine. */
+  unregister(): void;
+};
+
+/** Handle returned when registering a remote function. */
+export type FunctionRef = {
+  /** Unique function identifier. */
+  id: string;
+  /** Remove this function from the engine. */
+  unregister(): void;
+};
+
+/**
+ * Structured HTTP request received by a function registered with an HTTP trigger.
+ *
+ * @typeParam TBody – Parsed request body type.
+ */
+export type ApiRequest<TBody = unknown> = {
+  path_params: Record<string, string>;
+  query_params: Record<string, string | string[]>;
+  body: TBody;
+  headers: Record<string, string | string[]>;
+  method: string;
+};
+
+/**
+ * Structured HTTP response returned from HTTP function handlers.
+ *
+ * @typeParam TStatus – HTTP status code literal type.
+ * @typeParam TBody   – Response body type.
+ *
+ * @example
+ * ```ts
+ * const res: ApiResponse = { status_code: 200, body: { ok: true } };
+ * ```
+ */
+export type ApiResponse<
+  TStatus extends number = number,
+  TBody = string | Record<string, unknown>,
+> = {
+  status_code: TStatus;
+  headers?: Record<string, string>;
+  body?: TBody;
+};
+
+/**
+ * Full SDK interface for an iii-style function/trigger engine.
+ * Implement against any engine backend (WebSocket, HTTP, in-process).
+ */
+export interface ISdk {
+  /** Register a function with a local handler. */
+  registerFunction(
+    functionId: string,
+    handler: RemoteFunctionHandler,
+    options?: Omit<{ id: string; description?: string }, 'id'>,
+  ): FunctionRef;
+  /** Register a trigger instance against a registered trigger type. */
+  registerTrigger(trigger: {
+    type: string;
+    function_id: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    config: any;
+  }): RemoteTrigger;
+  /** Register a custom trigger type. */
+  registerTriggerType<TConfig>(
+    triggerType: { id: string; description?: string },
+    handler: TriggerHandler<TConfig>,
+  ): TriggerTypeRef<TConfig>;
+  /** Unregister a trigger type. */
+  unregisterTriggerType(triggerType: { id: string }): void;
+  /** Invoke a function and return its result. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  trigger<TInput, TOutput>(request: {
+    function_id: string;
+    payload: TInput;
+    timeoutMs?: number;
+  }): Promise<TOutput>;
+  /** Subscribe to engine connection-state transitions. Returns an unsubscribe fn. */
+  addConnectionStateListener(
+    handler: (state: 'connecting' | 'connected' | 'disconnected' | 'error') => void,
+  ): () => void;
+  /** Gracefully shut down the engine connection. */
+  shutdown(): Promise<void>;
+}
+
+// ── InvocationError + isErrorBody (from iii SDK) ─────────────────────────────
+//
+// Typed error class for SDK function invocations. Wraps engine rejection
+// payloads (RBAC, handler failure, timeout) into a self-describing class
+// with a stable `code` field — callers no longer get `[object Object]`.
+
+export interface InvocationErrorInit {
+  code: string;
+  message: string;
+  functionId?: string;
+  stacktrace?: string;
+}
+
+/**
+ * Typed error for failed SDK function invocations.
+ * Disambiguate via `err.code` (e.g. "FORBIDDEN", "TIMEOUT", "HANDLER_ERROR").
+ */
+export class InvocationError extends Error {
+  readonly code: string;
+  readonly functionId?: string;
+  readonly stacktrace?: string;
+
+  constructor(init: InvocationErrorInit) {
+    super(`${init.code}: ${init.message}`);
+    this.name = "InvocationError";
+    this.code = init.code;
+    this.functionId = init.functionId;
+    this.stacktrace = init.stacktrace;
+  }
+}
+
+/**
+ * Type guard for the wire `ErrorBody` the engine sends in invocation results.
+ * Distinguishes engine rejections from JS `Error` instances thrown elsewhere.
+ *
+ * @example
+ * ```ts
+ * try { await sdk.trigger(...) } catch (err) {
+ *   if (isErrorBody(err)) console.error(err.code, err.message);
+ * }
+ * ```
+ */
+export function isErrorBody(value: unknown): value is {
+  code: string;
+  message: string;
+  stacktrace?: string;
+} {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as { code?: unknown; message?: unknown; stacktrace?: unknown };
+  return (
+    typeof v.code === "string" &&
+    typeof v.message === "string" &&
+    (v.stacktrace === undefined || typeof v.stacktrace === "string")
+  );
+}
