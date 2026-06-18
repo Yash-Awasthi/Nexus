@@ -11,6 +11,7 @@
  */
 
 import {
+  EvalRunner,
   allOf,
   containsString,
   exactMatch,
@@ -18,6 +19,7 @@ import {
   matchesSchema,
   type EvalScore,
   type FieldSchema,
+  type EvalSuiteResult,
 } from "@nexus/evals";
 import type { FastifyInstance } from "fastify";
 
@@ -183,29 +185,93 @@ export async function evalsRoutes(app: FastifyInstance): Promise<void> {
   /**
    * POST /evals/run
    *
-   * Stub endpoint for running a named eval case.
-   * Full eval suites run via vitest / CI; this endpoint enables external orchestration.
+   * Run one or more named eval cases using EvalRunner with built-in scorers.
+   * Accepts a single case or a suite array.
    *
    * Body:
-   *   name      — eval case name
-   *   task      — task payload (arbitrary JSON)
-   *   expected  — expected output for basic exact_match check
+   *   name      — suite name (for reporting)
+   *   cases     — array of { name, task, expected, scorer, params?, passThreshold? }
+   *
+   * Scorer options (same as POST /evals/score):
+   *   exact_match, fields_present, contains_string, matches_schema, all_of
+   *
+   * Returns: EvalSuiteResult { suiteName, total, passed, failed, passRate, results[] }
    */
   app.post<{
-    Body: { name: string; task: Record<string, unknown>; expected?: unknown };
+    Body: {
+      name: string;
+      cases: {
+        name: string;
+        task: Record<string, unknown>;
+        expected?: unknown;
+        scorer?: ScorerName;
+        params?: Record<string, unknown>;
+        passThreshold?: number;
+      }[];
+    };
   }>("/evals/run", { preHandler: requireAuth }, async (request, reply) => {
-    const { name, task, expected } = request.body;
+    const { name, cases } = request.body;
+    if (!name) return reply.code(400).send({ error: "name is required" });
+    if (!Array.isArray(cases) || cases.length === 0) {
+      return reply.code(400).send({ error: "cases must be a non-empty array" });
+    }
 
-    if (!name || !task) return reply.code(400).send({ error: "name and task are required" });
+    // Build a lightweight inline adapter — just returns task as output
+    // so scorers compare against the task payload itself (useful for schema / field checks)
+    // or the provided expected value via exact_match.
+    const adapter = {
+      name: "inline",
+      execute: async (task: Record<string, unknown>) => task,
+    };
 
-    // Stub: return a placeholder result — real runs happen in CI via EvalRunner
-    return reply.code(201).send({
-      name,
-      status: "stub",
-      message: "Eval cases run via vitest/CI; this endpoint records the request only",
-      task,
-      expected: expected ?? null,
-      durationMs: 0,
+    const runner = new EvalRunner(adapter);
+
+    const evalCases = cases.map((c) => {
+      const scorerName: ScorerName = c.scorer ?? "exact_match";
+      const params = c.params ?? {};
+
+      let scorerFn: (output: unknown) => EvalScore;
+      switch (scorerName) {
+        case "exact_match":
+          scorerFn = exactMatch(c.expected ?? params["expected"]);
+          break;
+        case "fields_present":
+          scorerFn = fieldsPresent(...((params["fields"] as string[]) ?? []));
+          break;
+        case "contains_string":
+          scorerFn = containsString((params["substring"] as string) ?? "");
+          break;
+        case "matches_schema":
+          scorerFn = matchesSchema((params["schema"] as FieldSchema) ?? {});
+          break;
+        case "all_of": {
+          const specs = (params["scorers"] as { scorer: ScorerName; params?: Record<string, unknown> }[]) ?? [];
+          scorerFn = allOf(
+            ...specs.map((s) => {
+              switch (s.scorer) {
+                case "exact_match": return exactMatch(s.params?.["expected"]);
+                case "fields_present": return fieldsPresent(...((s.params?.["fields"] as string[]) ?? []));
+                case "contains_string": return containsString((s.params?.["substring"] as string) ?? "");
+                case "matches_schema": return matchesSchema((s.params?.["schema"] as FieldSchema) ?? {});
+                default: return exactMatch(undefined);
+              }
+            }),
+          );
+          break;
+        }
+        default:
+          scorerFn = exactMatch(c.expected);
+      }
+
+      return {
+        name: c.name,
+        task: c.task,
+        scorer: scorerFn,
+        passThreshold: c.passThreshold ?? 1.0,
+      };
     });
+
+    const result: EvalSuiteResult = await runner.run(name, evalCases);
+    return reply.code(201).send(result);
   });
 }

@@ -43,6 +43,8 @@ import {
   NeonKGStore,
   KnowledgeGraph,
   type KGStore,
+  clusterGraph,
+  buildCommunities,
   type NeonQueryFn,
 } from "@nexus/knowledge-graph";
 import {
@@ -63,6 +65,26 @@ import {
 } from "@nexus/image-gen";
 import { WebResearcher, type SearchResult as ResearchSearchResult } from "@nexus/researcher";
 import { computeAutoTuneParams, InMemoryEmaStore } from "@nexus/drift";
+import { MemoryTokenBudget } from "@nexus/token-budget";
+import { STMPipeline } from "@nexus/stm";
+import {
+  AgentRuntime,
+  RuntimeToolSet,
+  llmDriverToStreamFn,
+} from "@nexus/agent-runtime";
+import {
+  KernelManager,
+  DockerReplExecutor,
+  MockReplExecutor,
+  isDockerAvailable,
+  type ReplLanguage,
+} from "@nexus/code-repl";
+import {
+  StealthBrowser,
+  PatchrightDriver,
+  MockBrowserDriver,
+  isPatchrightAvailable,
+} from "@nexus/stealth-browser";
 import type { FastifyInstance } from "fastify";
 import { Pool } from "pg";
 
@@ -1765,14 +1787,317 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // ══════════════════════════════════════════════════════════════════════════
+  // C.3 — code-agent: sandboxed code execution via @nexus/code-repl
+  //        Routes: POST /code-agent/execute (one-shot)
+  //                POST /code-agent/sessions (create persistent kernel)
+  //                GET  /code-agent/sessions (list sessions)
+  //                POST /code-agent/sessions/:id/execute (stateful run)
+  //                DELETE /code-agent/sessions/:id (destroy session)
+  //        Also wires: POST /build/run (same executor, build-task flavour)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  const _dockerReady = isDockerAvailable();
+  const _kernelManager = new KernelManager({ executor: new DockerReplExecutor(), jupyterMode: true });
+  const _fallbackKernelManager = new KernelManager({ executor: new MockReplExecutor(), jupyterMode: true });
+
+  async function _getKernelManager(): Promise<KernelManager> {
+    return (await _dockerReady) ? _kernelManager : _fallbackKernelManager;
+  }
+
+  /**
+   * POST /code-agent/execute — one-shot stateless code execution.
+   * Body: { code: string, language?: "python"|"r"|"julia", timeoutMs?: number }
+   */
+  app.post<{
+    Body: { code: string; language?: ReplLanguage; timeoutMs?: number };
+  }>(
+    "/code-agent/execute",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["code"],
+          properties: {
+            code: { type: "string", maxLength: 32_768 },
+            language: { type: "string", enum: ["python", "r", "julia"] },
+            timeoutMs: { type: "number", minimum: 100, maximum: 30_000 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { code, language = "python", timeoutMs = 10_000 } = request.body;
+      const km = await _getKernelManager();
+      const session = km.create(language);
+      try {
+        const result = await session.execute({ code, timeoutMs });
+        return reply.send({
+          language,
+          stdout: result.stdout,
+          stderr: result.stderr,
+          displayData: result.displayData,
+          lastExpression: result.lastExpression,
+          executionCount: session.executionCount,
+        });
+      } finally {
+        km.destroy(session.id);
+      }
+    },
+  );
+
+  /** POST /code-agent/sessions — create a persistent kernel session. */
+  app.post<{ Body: { language?: ReplLanguage } }>(
+    "/code-agent/sessions",
+    {
+      schema: {
+        body: {
+          type: "object",
+          properties: { language: { type: "string", enum: ["python", "r", "julia"] } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const language = request.body?.language ?? "python";
+      const km = await _getKernelManager();
+      const session = km.create(language);
+      return reply.code(201).send({
+        sessionId: session.id,
+        language,
+        createdAt: now(),
+      });
+    },
+  );
+
+  /** GET /code-agent/sessions — list active kernel sessions. */
+  app.get("/code-agent/sessions", async (_req, reply) => {
+    const km = await _getKernelManager();
+    return reply.send({
+      sessions: km.list().map((s) => ({
+        sessionId: s.id,
+        language: s.language,
+        executionCount: s.executionCount,
+        lastUsedAt: s.state_.lastUsedAt ?? null,
+      })),
+    });
+  });
+
+  /**
+   * POST /code-agent/sessions/:id/execute — run code in an existing session.
+   * Body: { code: string, timeoutMs?: number }
+   */
+  app.post<{
+    Params: { id: string };
+    Body: { code: string; timeoutMs?: number };
+  }>(
+    "/code-agent/sessions/:id/execute",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["code"],
+          properties: {
+            code: { type: "string", maxLength: 32_768 },
+            timeoutMs: { type: "number", minimum: 100, maximum: 30_000 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const km = await _getKernelManager();
+      const session = km.get(request.params.id);
+      if (!session) {
+        return reply.code(404).send({ error: "session_not_found", sessionId: request.params.id });
+      }
+      const { code, timeoutMs = 10_000 } = request.body;
+      const result = await session.execute({ code, timeoutMs });
+      return reply.send({
+        sessionId: request.params.id,
+        stdout: result.stdout,
+        stderr: result.stderr,
+        displayData: result.displayData,
+        lastExpression: result.lastExpression,
+        executionCount: session.executionCount,
+      });
+    },
+  );
+
+  /** DELETE /code-agent/sessions/:id — destroy a kernel session. */
+  app.delete<{ Params: { id: string } }>(
+    "/code-agent/sessions/:id",
+    async (request, reply) => {
+      const km = await _getKernelManager();
+      if (!km.has(request.params.id)) {
+        return reply.code(404).send({ error: "session_not_found" });
+      }
+      km.destroy(request.params.id);
+      return reply.code(204).send();
+    },
+  );
+
+  /**
+   * POST /build/run — compile/build task via sandboxed REPL.
+   * Body: { code: string, language?: "python"|"r"|"julia", timeoutMs?: number }
+   */
+  app.post<{
+    Body: { code: string; language?: ReplLanguage; timeoutMs?: number };
+  }>(
+    "/build/run",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["code"],
+          properties: {
+            code: { type: "string", maxLength: 32_768 },
+            language: { type: "string", enum: ["python", "r", "julia"] },
+            timeoutMs: { type: "number", minimum: 100, maximum: 60_000 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { code, language = "python", timeoutMs = 30_000 } = request.body;
+      const km = await _getKernelManager();
+      const session = km.create(language);
+      try {
+        const result = await session.execute({ code, timeoutMs });
+        return reply.send({
+          language,
+          stdout: result.stdout,
+          stderr: result.stderr,
+          lastExpression: result.lastExpression,
+          success: result.stderr.length === 0,
+        });
+      } finally {
+        km.destroy(session.id);
+      }
+    },
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // C.4 — browser-agent: headless web automation via @nexus/stealth-browser
+  //        Routes: POST /browser-agent/navigate
+  //                POST /browser-agent/scrape
+  //                POST /browser-agent/screenshot
+  //        Lazy-init: PatchrightDriver when available, MockBrowserDriver fallback
+  // ══════════════════════════════════════════════════════════════════════════
+
+  let _stealthBrowser: StealthBrowser | null = null;
+
+  async function _getBrowser(): Promise<StealthBrowser> {
+    if (_stealthBrowser) return _stealthBrowser;
+    const patchrightOk = await isPatchrightAvailable();
+    const driver = patchrightOk ? new PatchrightDriver() : new MockBrowserDriver();
+    _stealthBrowser = new StealthBrowser({ driver });
+    return _stealthBrowser;
+  }
+
+  /**
+   * POST /browser-agent/navigate — navigate to a URL, return title + HTML content.
+   * Body: { url: string }
+   */
+  app.post<{ Body: { url: string } }>(
+    "/browser-agent/navigate",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["url"],
+          properties: { url: { type: "string", format: "uri", maxLength: 2048 } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const browser = await _getBrowser();
+      return browser.withPage(async (page) => {
+        const nav = await page.goto(request.body.url);
+        const content = await page.content();
+        const title = await page.title();
+        return reply.send({
+          url: nav.finalUrl ?? request.body.url,
+          statusCode: nav.statusCode ?? null,
+          title,
+          content,
+        });
+      });
+    },
+  );
+
+  /**
+   * POST /browser-agent/scrape — navigate + extract text content via innerText eval.
+   * Body: { url: string }
+   */
+  app.post<{ Body: { url: string } }>(
+    "/browser-agent/scrape",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["url"],
+          properties: { url: { type: "string", format: "uri", maxLength: 2048 } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const browser = await _getBrowser();
+      return browser.withPage(async (page) => {
+        await page.goto(request.body.url);
+        const title = await page.title();
+        // Extract visible text and all href links via JS eval
+        const text = await page.evaluate<string>(
+          "() => document.body?.innerText ?? ''",
+        );
+        const links = await page.evaluate<string[]>(
+          "() => Array.from(document.querySelectorAll('a[href]')).map(a => a.href).filter(h => h.startsWith('http')).slice(0, 100)",
+        );
+        return reply.send({ url: request.body.url, title, text, links });
+      });
+    },
+  );
+
+  /**
+   * POST /browser-agent/screenshot — navigate + capture screenshot as base64 PNG.
+   * Body: { url: string, fullPage?: boolean }
+   */
+  app.post<{ Body: { url: string; fullPage?: boolean } }>(
+    "/browser-agent/screenshot",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["url"],
+          properties: {
+            url: { type: "string", format: "uri", maxLength: 2048 },
+            fullPage: { type: "boolean" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const browser = await _getBrowser();
+      return browser.withPage(async (page) => {
+        await page.goto(request.body.url);
+        const title = await page.title();
+        const screenshot = await page.screenshot({ fullPage: request.body.fullPage ?? false });
+        return reply.send({
+          url: request.body.url,
+          title,
+          screenshot: screenshot.toString("base64"),
+          mimeType: "image/png",
+        });
+      });
+    },
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
   // C.2 — STUBS (features not yet backed, return 501 or empty payload)
   // ══════════════════════════════════════════════════════════════════════════
 
   const STUB_PREFIXES = [
     "blind-council",
-    "browser-agent",
-    "build",
-    "code-agent",
+    // "browser-agent" — removed from stubs; real routes wired below
+    // "build" — removed from stubs; wired to code-repl below
+    // "code-agent" — removed from stubs; real routes wired below
     // "craft" — removed from stubs; real routes wired below
     "cross-memory",
     "echo-chamber",
@@ -1858,7 +2183,92 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     });
   }
 
+  // ── Token-conservation: real budget check + consume actions ─────────────────
+  // These routes overlay the CRUD scaffold above with actual TokenBudget logic.
+  const _tokenBudgets = new Map<string, InstanceType<typeof MemoryTokenBudget>>();
+  function _getTokenBudget(userId: string, limitTokens = 100_000): InstanceType<typeof MemoryTokenBudget> {
+    if (!_tokenBudgets.has(userId)) {
+      _tokenBudgets.set(userId, new MemoryTokenBudget({ limitTokens }));
+    }
+    return _tokenBudgets.get(userId)!;
+  }
+
+  /** POST /token-conservation/check — check budget status for a user */
+  app.post<{ Body: { userId?: string; limitTokens?: number } }>(
+    "/token-conservation/check",
+    async (request, reply) => {
+      const userId = request.body?.userId ?? "default";
+      const budget = _getTokenBudget(userId, request.body?.limitTokens);
+      const status = budget.status();
+      return reply.send({ userId, ...status });
+    },
+  );
+
+  /** POST /token-conservation/consume — consume tokens from a user's budget */
+  app.post<{ Body: { userId?: string; tokens: number; limitTokens?: number } }>(
+    "/token-conservation/consume",
+    async (request, reply) => {
+      const { userId = "default", tokens, limitTokens } = request.body ?? {};
+      if (!tokens || tokens < 1) return reply.code(400).send({ error: "tokens must be a positive integer" });
+      const budget = _getTokenBudget(userId, limitTokens);
+      try {
+        await budget.consume(tokens, { strict: true });
+        return reply.send({ userId, consumed: tokens, remaining: budget.status().remaining });
+      } catch {
+        const status = budget.status();
+        return reply.code(429).send({
+          error: "budget_exceeded",
+          userId,
+          requested: tokens,
+          remaining: status.remaining,
+          limitTokens: status.limitTokens,
+        });
+      }
+    },
+  );
+
+  /** POST /token-conservation/reset — reset a user's token budget */
+  app.post<{ Body: { userId?: string } }>(
+    "/token-conservation/reset",
+    async (request, reply) => {
+      const userId = request.body?.userId ?? "default";
+      _tokenBudgets.delete(userId);
+      return reply.send({ userId, reset: true });
+    },
+  );
+
+  // ── Verbosity: real STM transform pipeline ────────────────────────────────
+  // STMPipeline() with no args builds the default registry (HedgeReducer + DirectnessOptimizer).
+  const _stmPipeline = new STMPipeline();
+
+  /** POST /verbosity/transform — run text through STM directness + hedge reduction */
+  app.post<{ Body: { text: string; maxChars?: number } }>(
+    "/verbosity/transform",
+    async (request, reply) => {
+      const { text, maxChars = 50_000 } = request.body ?? {};
+      if (!text) return reply.code(400).send({ error: "text is required" });
+      try {
+        const result = _stmPipeline.transform({ text, maxChars });
+        return reply.send({
+          original: result.original,
+          transformed: result.transformed,
+          originalLength: result.original.length,
+          transformedLength: result.transformed.length,
+          reduction: result.original.length - result.transformed.length,
+          reductionPct: result.original.length > 0
+            ? Math.round((1 - result.transformed.length / result.original.length) * 100)
+            : 0,
+          truncated: result.truncated,
+          modules: result.modules.map((m) => ({ id: (m as any).moduleId ?? m, applied: true })),
+        });
+      } catch (err) {
+        return reply.code(500).send({ error: err instanceof Error ? err.message : String(err) });
+      }
+    },
+  );
+
   // -- WEB SCRAPING (real — HttpxEngine via @nexus/adaptive-scraper) -----------
+
 
   app.get("/web-scraping/providers", async (_req, reply) => {
     return reply.send({
@@ -2397,9 +2807,33 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   // Memory delete-all
   app.delete("/memory/entries", async (_req, reply) => reply.send({ ok: true, deleted: 0 }));
 
-  // KG communities — placeholder until graph analysis is wired
-  app.get("/kg/communities", async (_req, reply) =>
-    reply.send({ communities: [], message: "Community detection not yet implemented." }),
+  // KG communities — hierarchical label-propagation clustering via @nexus/knowledge-graph
+  app.get<{ Querystring: { maxLevels?: string; maxClusterSize?: string } }>(
+    "/kg/communities",
+    async (request, reply) => {
+      try {
+        const store = getKGStore();
+        const maxLevels = Math.min(parseInt(request.query.maxLevels ?? "2", 10) || 2, 4);
+        const maxClusterSize = Math.min(parseInt(request.query.maxClusterSize ?? "10", 10) || 10, 50);
+
+        const clusters = await clusterGraph(store, { maxLevels, maxClusterSize });
+        const communities = buildCommunities(clusters);
+
+        return reply.send({
+          communities,
+          total: communities.length,
+          levels: maxLevels,
+          message: communities.length === 0
+            ? "No entities in graph yet — ingest documents first."
+            : `${communities.length} communities detected across ${maxLevels} level(s).`,
+        });
+      } catch (err) {
+        return reply.code(500).send({
+          error: "community_detection_failed",
+          message: err instanceof Error ? err.message : String(err),
+        });
+      }
+    },
   );
 
   // AutoTune optimize — real prompt optimization via LLM + EMA context detection

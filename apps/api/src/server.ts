@@ -71,8 +71,14 @@ import { sseRoutes } from "./routes/sse.js";
 import { stmRoutes } from "./routes/stm.js";
 import { voiceRoutes } from "./routes/voice.js";
 import { wikiRoutes } from "./routes/wiki.js";
+import { authUsersRoutes } from "./routes/auth-users.js";
+import { workspacesRoutes } from "./routes/workspaces.js";
+import { mfaRoutes } from "./routes/mfa.js";
+import { adminUsersRoutes } from "./routes/admin-users.js";
 import { apiBridgeRoutes } from "./routes/api-bridge.js";
 import { conductorRoutes } from "./routes/conductor-route.js";
+import { oidcRoutes } from "./routes/oidc.js";
+import { scimRoutes } from "./routes/scim.js";
 
 // Augment FastifyRequest to carry optional trace span
 declare module "fastify" {
@@ -301,8 +307,20 @@ export async function buildServer(): Promise<FastifyInstance> {
       // Z — OAuth SSO (Google + GitHub)
       await api.register(oauthRoutes);
 
+      // Enterprise — user auth, workspaces, MFA
+      await api.register(authUsersRoutes);
+      await api.register(workspacesRoutes);
+      await api.register(mfaRoutes);
+
       // AF — Libertas: public free-tier endpoint (no auth required)
       await api.register(libertasRoutes);
+
+      // Enterprise — SCIM 2.0 provisioning + admin user management
+      await api.register(scimRoutes);
+      await api.register(adminUsersRoutes);
+
+      // Enterprise — generic OIDC SSO (Okta, Azure AD, Keycloak, etc.)
+      await api.register(oidcRoutes);
     },
     { prefix: "/api/v1" },
   );
