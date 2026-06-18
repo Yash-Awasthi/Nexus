@@ -79,6 +79,7 @@ import { apiBridgeRoutes } from "./routes/api-bridge.js";
 import { conductorRoutes } from "./routes/conductor-route.js";
 import { oidcRoutes } from "./routes/oidc.js";
 import { scimRoutes } from "./routes/scim.js";
+import { samlRoutes } from "./routes/saml.js";
 
 // Augment FastifyRequest to carry optional trace span
 declare module "fastify" {
@@ -321,6 +322,9 @@ export async function buildServer(): Promise<FastifyInstance> {
 
       // Enterprise — generic OIDC SSO (Okta, Azure AD, Keycloak, etc.)
       await api.register(oidcRoutes);
+
+      // Enterprise — SAML 2.0 SSO (Okta, Azure AD, Google Workspace, etc.)
+      await api.register(samlRoutes);
     },
     { prefix: "/api/v1" },
   );
