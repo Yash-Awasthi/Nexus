@@ -111,4 +111,6 @@ export default [
   route("token-conservation", "routes/token-conservation.tsx"),
   route("specialisation", "routes/specialisation.tsx"),
   route("skill-selection", "routes/skill-selection.tsx"),
+  route("codegen", "routes/codegen.tsx"),
+  route("ghoststack", "routes/ghoststack.tsx"),
 ] satisfies RouteConfig;

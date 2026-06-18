@@ -1390,7 +1390,7 @@ export class RssFeedAdapter {
     this.maxItems = opts.maxItems ?? 20;
     this.http = opts.http ?? ((url: string) =>
       fetch(url, { headers: { Accept: "application/rss+xml, application/xml, text/xml, */*" } })
-        .then((r) => { if (!r.ok) throw new Error(`RSS fetch failed: ${r.status} ${url}`); return r.text(); }),
+        .then((r) => { if (!r.ok) throw new Error(`RSS fetch failed: ${r.status} ${url}`); return r.text(); })
     );
   }
 

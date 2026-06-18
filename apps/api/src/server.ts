@@ -72,6 +72,7 @@ import { stmRoutes } from "./routes/stm.js";
 import { voiceRoutes } from "./routes/voice.js";
 import { wikiRoutes } from "./routes/wiki.js";
 import { judicaCompatRoutes } from "./routes/judica-compat.js";
+import { ghoststackRoutes } from "./routes/ghoststack-route.js";
 
 // Augment FastifyRequest to carry optional trace span
 declare module "fastify" {
@@ -312,6 +313,12 @@ export async function buildServer(): Promise<FastifyInstance> {
   // knowledge-graph, settings, rooms, workflows, parseltongue, providers,
   // and stubs for advanced features not yet backed by packages.
   await app.register(judicaCompatRoutes, { prefix: "/api" });
+
+  // ── GhostStack orchestration routes (/api/v1/gs/*) ────────────────────────
+  await app.register(
+    async (gsApi) => { await gsApi.register(ghoststackRoutes); },
+    { prefix: "/api/v1" },
+  );
 
   // ── Global error handler ──────────────────────────────────────────────────
   app.setErrorHandler((error: FastifyError, request, reply) => {

@@ -45,6 +45,7 @@
     "@nexus/image-gen": "workspace:*",
     "@nexus/knowledge-graph": "workspace:*",
     "@nexus/llm-drivers": "workspace:*",
+    "@nexus/ghoststack": "workspace:*",
     "@nexus/llm-tracer": "workspace:*",
     "@nexus/obs-providers": "workspace:*",
     "@nexus/posthog-analytics": "workspace:*",
