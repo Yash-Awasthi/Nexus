@@ -133,7 +133,7 @@ export default function Home() {
   useEffect(() => {
     if (!user?.id) return;
     try {
-      const raw = localStorage.getItem(`judica-chats-${user.id}`);
+      const raw = localStorage.getItem(`nexus-chats-${user.id}`);
       const all: StoredConv[] = raw ? JSON.parse(raw) : [];
       setRecentConvs(all.slice(0, 5));
     } catch {
@@ -408,7 +408,7 @@ export default function Home() {
                 icon={Zap}
                 label="ULTRAPLINIAN"
                 description="Multi-council debate engine"
-                to="/ultraplinian"
+                to="/gauntlet"
                 color="bg-yellow-400/10 text-yellow-400"
               />
               <FeatureCard

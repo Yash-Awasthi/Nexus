@@ -13,7 +13,7 @@ import type {
   IWorkflowApprovalPolicy,
   IWorkflowConstraint,
 } from "./interfaces/workflow.interface.js";
-import type { GhostStackOrchestrator } from "./orchestrator.js";
+import type { ConductorOrchestrator } from "./orchestrator.js";
 import type { RuntimeGraph } from "./runtime-graph.js";
 import type { Task } from "./task-router.js";
 
@@ -230,7 +230,7 @@ export class WorkflowEngine implements IWorkflowReplay {
   constructor(
     private registry: IWorkflowRegistry,
     private telemetry: IWorkflowTelemetry,
-    private orchestrator: GhostStackOrchestrator,
+    private orchestrator: ConductorOrchestrator,
     private approvalWorkflow?: IApprovalWorkflow,
     private persistence?: IRuntimePersistence,
     private eventBus?: IEventBus,
@@ -476,7 +476,7 @@ export class WorkflowEngine implements IWorkflowReplay {
       this.telemetry.recordApprovalDecision(executionId, true);
     }
 
-    // 3. Submit and Drive Execution using GhostStack Orchestrator
+    // 3. Submit and Drive Execution using Conductor Orchestrator
     try {
       const completedTaskIds = existingCp?.completedTaskIds ?? [];
       const failedTaskIds = existingCp?.failedTaskIds ?? [];
@@ -1178,7 +1178,7 @@ export class GovernedEtlWorkflowTemplate implements IWorkflowTemplate {
   createWorkflow(params: Record<string, unknown>): IWorkflowDefinition {
     const prefix = (params.id as string | undefined) || "governed-etl";
     const sourceUrl = (params.source_url as string) || "https://news.ycombinator.com";
-    const bucketName = (params.target_s3_bucket as string) || "ghoststack-etl-archive";
+    const bucketName = (params.target_s3_bucket as string) || "conductor-etl-archive";
     const pattern = (params.transform_pattern as string) || "(?:AI|LLM|Agent|GPT|Cognitive)";
 
     return {

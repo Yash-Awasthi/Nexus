@@ -75,7 +75,7 @@ function ImageCard({
     if (!src) return;
     const a = document.createElement("a");
     a.href = src;
-    a.download = `judica-img-${img.id}.png`;
+    a.download = `nexus-img-${img.id}.png`;
     a.click();
   };
 

@@ -170,7 +170,7 @@ function TraceDetailPanel({
 const TYPE_OPTIONS = [
   { value: "all",        label: "All types" },
   { value: "deliberate", label: "Deliberate" },
-  { value: "ultraplinian", label: "ULTRAPLINIAN" },
+  { value: "gauntlet", label: "Gauntlet" },
   { value: "research",   label: "Research" },
   { value: "chat",       label: "Chat" },
   { value: "embedding",  label: "Embedding" },

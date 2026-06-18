@@ -28,7 +28,7 @@ import { adminRoutes } from "./routes/admin.js";
 import { agentsRoutes } from "./routes/agents.js";
 import { alertsRoutes } from "./routes/alerts.js";
 import { auditRoutes } from "./routes/audit.js";
-import { autotuneRoutes } from "./routes/autotune.js";
+import { driftRoutes } from "./routes/drift.js";
 import { billingRoutes } from "./routes/billing.js";
 import { botsRoutes } from "./routes/bots.js";
 import { briefRoutes } from "./routes/brief.js";
@@ -58,7 +58,7 @@ import { memoryRoutes } from "./routes/memory.js";
 import { metricsRoutes } from "./routes/metrics.js";
 import { oauthRoutes } from "./routes/oauth.js";
 import { obsProvidersRoutes } from "./routes/obs-providers.js";
-import { parseltongueRoutes } from "./routes/parseltongue.js";
+import { redteamRoutes } from "./routes/redteam.js";
 import { predictionMarketRoutes } from "./routes/prediction-market.js";
 import { researcherRoutes } from "./routes/researcher.js";
 import { rlhfRoutes } from "./routes/rlhf.js";
@@ -71,8 +71,8 @@ import { sseRoutes } from "./routes/sse.js";
 import { stmRoutes } from "./routes/stm.js";
 import { voiceRoutes } from "./routes/voice.js";
 import { wikiRoutes } from "./routes/wiki.js";
-import { judicaCompatRoutes } from "./routes/judica-compat.js";
-import { ghoststackRoutes } from "./routes/ghoststack-route.js";
+import { apiBridgeRoutes } from "./routes/api-bridge.js";
+import { conductorRoutes } from "./routes/conductor-route.js";
 
 // Augment FastifyRequest to carry optional trace span
 declare module "fastify" {
@@ -275,8 +275,8 @@ export async function buildServer(): Promise<FastifyInstance> {
       await api.register(docPipelineRoutes);
       await api.register(mcpRoutes);
 
-      // O — autotune sampling params + EMA feedback
-      await api.register(autotuneRoutes);
+      // O — drift: adaptive sampling params + EMA feedback
+      await api.register(driftRoutes);
 
       // R — hooks registry + alert engine
       await api.register(hooksRoutes);
@@ -294,8 +294,8 @@ export async function buildServer(): Promise<FastifyInstance> {
       await api.register(evalsRoutes);
       await api.register(scenarioPlannerRoutes);
 
-      // Y — parseltongue obfuscation + Prometheus metrics
-      await api.register(parseltongueRoutes);
+      // Y — redteam: input perturbation + Prometheus metrics
+      await api.register(redteamRoutes);
       await api.register(metricsRoutes);
 
       // Z — OAuth SSO (Google + GitHub)
@@ -307,16 +307,16 @@ export async function buildServer(): Promise<FastifyInstance> {
     { prefix: "/api/v1" },
   );
 
-  // ── Judica-compat routes (/api/* — no version prefix) ─────────────────────
-  // Bridges the Judica/apps/ui frontend's call surface to the Nexus backend.
-  // Provides: ultraplinian stream, godmode stream, A/B comparison, memory,
-  // knowledge-graph, settings, rooms, workflows, parseltongue, providers,
-  // and stubs for advanced features not yet backed by packages.
-  await app.register(judicaCompatRoutes, { prefix: "/api" });
+  // ── API-bridge routes (/api/* — no version prefix) ─────────────────────
+  // Bridges legacy frontend call surface to the Nexus backend.
+  // Provides: gauntlet stream, godmode stream, A/B comparison, memory,
+  // knowledge-graph, settings, rooms, workflows, redteam, providers,
+  // and stubs for features not yet backed by packages.
+  await app.register(apiBridgeRoutes, { prefix: "/api" });
 
-  // ── GhostStack orchestration routes (/api/v1/gs/*) ────────────────────────
+  // ── Conductor orchestration routes (/api/v1/gs/*) ────────────────────────
   await app.register(
-    async (gsApi) => { await gsApi.register(ghoststackRoutes); },
+    async (gsApi) => { await gsApi.register(conductorRoutes); },
     { prefix: "/api/v1" },
   );
 

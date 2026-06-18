@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Language model providers for GhostStack.
+ * Language model providers for Conductor.
  *
  * GroqModelProvider  — fast cloud inference via Groq REST API
  * FreeModelProvider  — multi-backend routing (OpenRouter / Ollama / local)

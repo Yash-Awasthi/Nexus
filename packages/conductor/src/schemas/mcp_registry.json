@@ -1,0 +1,39 @@
+{
+  "version": "1.0",
+  "servers": [
+    {
+      "name": "conductor",
+      "description": "GhostStack orchestration runtime — exposes workflow, memory, agent-bus, circuit-breaker, runtime-graph, and Floci emulation tools.",
+      "transport": "stdio",
+      "command": "python runtime/mcp/conductor_mcp_server.py",
+      "tools": [
+        "conductor_health",
+        "conductor_runtime_snapshot",
+        "conductor_list_workflows",
+        "conductor_load_spec",
+        "conductor_execute_workflow",
+        "conductor_workflow_cancel",
+        "conductor_workflow_resume",
+        "conductor_workflow_checkpoints",
+        "conductor_workflow_replay",
+        "conductor_run_e2e",
+        "conductor_floci_execute",
+        "conductor_sandbox_write",
+        "conductor_sandbox_read",
+        "conductor_sandbox_list",
+        "conductor_memory_stats",
+        "conductor_memory_store",
+        "conductor_memory_query",
+        "conductor_agent_capabilities",
+        "conductor_agent_send",
+        "conductor_agent_find",
+        "conductor_circuit_state",
+        "conductor_circuit_reset",
+        "conductor_floci_extended",
+        "conductor_diagnostics",
+        "conductor_health_history",
+        "conductor_runtime_graph"
+      ]
+    }
+  ]
+}

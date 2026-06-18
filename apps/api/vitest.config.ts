@@ -11,10 +11,10 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "lcov"],
       include: ["src/**/*.ts"],
-      // Exclude server entry points — index.ts, ghoststack-server.ts, and
+      // Exclude server entry points — index.ts, conductor-server.ts, and
       // runtime-server.ts require live infrastructure (DB, Redis, runtime
       // process) and are covered by integration/e2e tests, not unit tests.
-      exclude: ["src/index.ts", "src/ghoststack-server.ts", "src/runtime-server.ts"],
+      exclude: ["src/index.ts", "src/conductor-server.ts", "src/runtime-server.ts"],
       thresholds: {
         // Phase 1 achieved: gateway + admin + libertas + lib tests added.
         // Raise incrementally as route unit tests are added:

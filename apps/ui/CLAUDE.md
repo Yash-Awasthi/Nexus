@@ -29,16 +29,16 @@ NOT Cloudflare Workers. NOT SSR. NOT Electron. NOT Durable Objects.
 
 All API calls go to `apps/api` (Fastify). Two prefixes:
 - `/api/v1/*` — versioned Nexus API (requires auth)
-- `/api/*`    — judica-compat bridge (no auth, uses server-side env keys)
+- `/api/*`    — api-bridge (no auth, uses server-side env keys)
 
-### Key endpoints (judica-compat, no auth needed)
+### Key endpoints (api-bridge, no auth needed)
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | /api/chat/stream | Multi-model council SSE stream |
-| POST | /api/ultraplinian/stream | Race N models, pick winner |
+| POST | /api/gauntlet/stream | Race N models, pick winner |
 | POST | /api/godmode/stream | Parallel council race |
 | GET  | /api/providers | List available drivers |
-| POST | /api/parseltongue/analyze | Red-team text transform |
+| POST | /api/redteam/analyze | Red-team text transform |
 | GET  | /api/memory/entries | Memory entries list |
 | GET  | /api/kg/graph | Knowledge graph nodes |
 

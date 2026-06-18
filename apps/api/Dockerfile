@@ -39,12 +39,12 @@ COPY apps/api/package.json ./apps/api/
 RUN pnpm install --frozen-lockfile --filter @nexus/api --filter @nexus/auth \
     --filter @nexus/shared --filter @nexus/contracts --filter @nexus/db \
     --filter @nexus/governance --filter @nexus/memory \
-    --filter @nexus/autotune --filter @nexus/parseltongue --filter @nexus/sft-tagger \
+    --filter @nexus/drift --filter @nexus/redteam --filter @nexus/sft-tagger \
     --filter @nexus/runtime --filter @nexus/council --filter @nexus/telemetry \
     --filter @nexus/adaptive-scraper --filter @nexus/researcher \
     --filter @nexus/image-gen --filter @nexus/knowledge-graph \
-    --filter @nexus/llm-drivers --filter @nexus/ultraplinian \
-    --filter @nexus/ghoststack
+    --filter @nexus/llm-drivers --filter @nexus/gauntlet \
+    --filter @nexus/conductor
 
 # ─── Stage 2: development — hot-reload via tsx (no compiled dist needed) ─────
 FROM deps AS development
@@ -55,12 +55,12 @@ RUN pnpm install --frozen-lockfile \
     --filter @nexus/api --filter @nexus/auth \
     --filter @nexus/shared --filter @nexus/contracts --filter @nexus/db \
     --filter @nexus/governance --filter @nexus/memory \
-    --filter @nexus/autotune --filter @nexus/parseltongue --filter @nexus/sft-tagger \
+    --filter @nexus/drift --filter @nexus/redteam --filter @nexus/sft-tagger \
     --filter @nexus/runtime --filter @nexus/council --filter @nexus/telemetry \
     --filter @nexus/adaptive-scraper --filter @nexus/researcher \
     --filter @nexus/image-gen --filter @nexus/knowledge-graph \
-    --filter @nexus/llm-drivers --filter @nexus/ultraplinian \
-    --filter @nexus/ghoststack
+    --filter @nexus/llm-drivers --filter @nexus/gauntlet \
+    --filter @nexus/conductor
 
 # Source is bind-mounted at runtime — no COPY here
 ENV NODE_ENV=development
@@ -83,8 +83,8 @@ RUN pnpm --filter @nexus/shared build && \
     pnpm --filter @nexus/telemetry build && \
     pnpm --filter @nexus/governance build && \
     pnpm --filter @nexus/memory build && \
-    pnpm --filter @nexus/autotune build && \
-    pnpm --filter @nexus/parseltongue build && \
+    pnpm --filter @nexus/drift build && \
+    pnpm --filter @nexus/redteam build && \
     pnpm --filter @nexus/sft-tagger build && \
     pnpm --filter @nexus/runtime build && \
     pnpm --filter @nexus/council build && \
@@ -94,8 +94,8 @@ RUN pnpm --filter @nexus/shared build && \
     pnpm --filter @nexus/image-gen build && \
     pnpm --filter @nexus/knowledge-graph build && \
     pnpm --filter @nexus/llm-drivers build && \
-    pnpm --filter @nexus/ultraplinian build && \
-    pnpm --filter @nexus/ghoststack build && \
+    pnpm --filter @nexus/gauntlet build && \
+    pnpm --filter @nexus/conductor build && \
     pnpm --filter @nexus/api build
 
 # ─── Stage 3: pruner — production-only node_modules (eliminates devDep CVEs) ──
@@ -104,13 +104,13 @@ WORKDIR /app
 RUN pnpm install --frozen-lockfile --prod \
     --filter @nexus/api --filter @nexus/auth --filter @nexus/shared \
     --filter @nexus/contracts --filter @nexus/db --filter @nexus/governance \
-    --filter @nexus/memory --filter @nexus/autotune --filter @nexus/parseltongue \
+    --filter @nexus/memory --filter @nexus/drift --filter @nexus/redteam \
     --filter @nexus/sft-tagger --filter @nexus/runtime --filter @nexus/council \
     --filter @nexus/telemetry --filter @nexus/adaptive-scraper \
     --filter @nexus/researcher --filter @nexus/image-gen \
     --filter @nexus/knowledge-graph --filter @nexus/llm-drivers \
-    --filter @nexus/ultraplinian \
-    --filter @nexus/ghoststack
+    --filter @nexus/gauntlet \
+    --filter @nexus/conductor
 
 # ─── Stage 4: runner ─────────────────────────────────────────────────────────
 FROM node:26-alpine AS runner

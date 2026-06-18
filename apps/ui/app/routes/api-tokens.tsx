@@ -357,7 +357,7 @@ export default function APITokens() {
         <CardContent className="pt-4 pb-4">
           <p className="text-xs font-medium mb-2">Usage</p>
           <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap">
-{`curl https://your-judica.app/api/chat \\
+{`curl https://your-nexus.app/api/chat \\
   -H "Authorization: Bearer nexus_<your_token>" \\
   -H "Content-Type: application/json" \\
   -d '{"message": "Hello"}'`}

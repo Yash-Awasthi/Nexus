@@ -5,7 +5,7 @@
 
 ## Current State (as of 2026-06-18)
 
-*Build: GREEN ✓ | All 105 routes registered ✓ | API coverage: COMPLETE ✓ | TS (judica-compat + domain-feeds): CLEAN ✓*
+*Build: GREEN ✓ | All 105 routes registered ✓ | API coverage: COMPLETE ✓ | TS (api-bridge + domain-feeds): CLEAN ✓*
 
 ### What shipped this session
 | Commit | What |
@@ -14,7 +14,7 @@
 | 893e332 | PersistentStore<T> persistence layer — pg/fs dual backing, all 20 stub stores now persist across restarts |
 | 3128ce6 | P2-P5: real cost tracking, LLM evaluation scoring, codegen compile fix, STM with real autotune params |
 | 123a716 | Fix codegen route (routes.ts 404) + Dockerfile missing 6 packages (deploy blocker) |
-| (latest) | Fix 5 semantic TS errors in judica-compat.ts; wire speculative/run (draft+verify LLM); wire TTS (OpenAI TTS-1); fix domain-feeds syntax error |
+| (latest) | Fix 5 semantic TS errors in api-bridge.ts; wire speculative/run (draft+verify LLM); wire TTS (OpenAI TTS-1); fix domain-feeds syntax error |
 
 ### Functional status — ALL PAGES
 | Page | Status |
@@ -23,7 +23,7 @@
 | deep-research.tsx | REAL — WebResearcher + Tavily/DDG + LLM synthesis |
 | scrape.tsx | REAL — HttpxEngine HTTP scraping + crawl |
 | craft.tsx | REAL — LLM content generation |
-| autotune.tsx | REAL — 3-phase eval + prompt improvement loop |
+| drift.tsx | REAL — 3-phase eval + prompt improvement loop |
 | extraction.tsx | REAL — LLM schema inference + structured extraction |
 | sandbox.tsx | REAL — node:vm JS execution |
 | quality.tsx | REAL — hallucination scoring + speculative draft+verify |
@@ -44,7 +44,7 @@
 | codegen.tsx | REAL — LLM codegen + TS compile (LLM static analysis) + iterate + diff |
 | evaluation.tsx | REAL — LLM scoring (quality/coherence/consensus/diversity) + persistent results |
 | costs.tsx | REAL — per-request cost tracking via _llm() helper |
-| stm.tsx | REAL — @nexus/autotune computeAutoTuneParams, EMA store |
+| stm.tsx | REAL — @nexus/drift computeAutoTuneParams, EMA store |
 | tts (chat) | REAL — OpenAI TTS-1 if OPENAI_API_KEY; graceful null otherwise |
 | workflows.tsx | CRUD + persistent |
 | connectors-sync.tsx | CRUD + polling + persistent |
@@ -73,7 +73,7 @@
 ## Immediate Next Actions (execute in order)
 
 ### 1. Migrate remaining driver.complete() calls to _llm()
-About 25 older routes (council, gateway, parseltongue, etc.) call driver.complete() directly and bypass _trackCost(). Convert them to _llm() so costs.tsx shows accurate full-platform spend.
+About 25 older routes (council, gateway, redteam, etc.) call driver.complete() directly and bypass _trackCost(). Convert them to _llm() so costs.tsx shows accurate full-platform spend.
 
 ### 2. Wire fine-tune when OPENAI_API_KEY present
 Return real OpenAI fine-tuning job list/create/cancel when process.env.OPENAI_API_KEY is set. Currently always 501.
@@ -92,7 +92,7 @@ Confirm the Dockerfile fix (123a716) resolves the pnpm frozen-lockfile failure o
 
 ## Commit Log (recent)
 - 123a716  fix codegen route registration + Dockerfile 6 missing packages
-- 3128ce6  P2-P5: cost tracking, evaluation, codegen, STM autotune
+- 3128ce6  P2-P5: cost tracking, evaluation, codegen, STM drift
 - 893e332  PersistentStore<T> persistence layer — pg/fs dual backing
 - 2417bc3  extract 4 shared helpers (-165 lines)
 

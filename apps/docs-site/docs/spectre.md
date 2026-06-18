@@ -43,7 +43,7 @@ Standard multi-model chat with session history stored in `localStorage`. Feature
 | 💀 PHANTOM-FAST | meta-llama/llama-3.1-8b-instruct |
 
 ### ULTRAPLINIAN
-Powered by `@nexus/ultraplinian`. Select a tier, send a query — all models in that tier race in parallel waves (12 models/wave, 150ms stagger). Results are scored 0–100 on substance, directness, and relevance. Winner displayed prominently; full ranked table collapsible below.
+Powered by `@nexus/gauntlet`. Select a tier, send a query — all models in that tier race in parallel waves (12 models/wave, 150ms stagger). Results are scored 0–100 on substance, directness, and relevance. Winner displayed prominently; full ranked table collapsible below.
 
 | Tier | Approx models |
 |---|---|
@@ -54,7 +54,7 @@ Powered by `@nexus/ultraplinian`. Select a tier, send a query — all models in 
 | 🔱 ULTRA | ~51 |
 
 ### PARSELTONGUE
-Powered by `@nexus/parseltongue`. Input perturbation for red-teaming research:
+Powered by `@nexus/redteam`. Input perturbation for red-teaming research:
 - Live preview of perturbed output as you type
 - 6 techniques: LEET, UNICODE, ZWJ, MIXCASE, PHONETIC, RANDOM
 - 3 intensities: LIGHT / MEDIUM / HEAVY
@@ -98,7 +98,7 @@ apps/spectre/src/
     Parseltongue.tsx   ← Perturbation UI
 ```
 
-SPECTRE calls the Nexus API via `@nexus/client`. `@nexus/parseltongue` is imported directly (pure TypeScript, no API call) for the live perturbation preview.
+SPECTRE calls the Nexus API via `@nexus/client`. `@nexus/redteam` is imported directly (pure TypeScript, no API call) for the live perturbation preview.
 
 ## Deployment
 

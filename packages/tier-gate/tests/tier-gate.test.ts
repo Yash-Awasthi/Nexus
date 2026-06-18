@@ -108,9 +108,9 @@ describe("TierGateRegistry", () => {
 
 describe("TierGateError", () => {
   it("carries feature, requiredTier, userTier, code", () => {
-    const err = new TierGateError("ultraplinian", "pro", "free");
+    const err = new TierGateError("gauntlet", "pro", "free");
     expect(err.code).toBe("TIER_GATE_DENIED");
-    expect(err.feature).toBe("ultraplinian");
+    expect(err.feature).toBe("gauntlet");
     expect(err.requiredTier).toBe("pro");
     expect(err.userTier).toBe("free");
     expect(err instanceof Error).toBe(true);
@@ -134,12 +134,12 @@ describe("globalTierGate", () => {
     }
   });
 
-  it("blocks ultraplinian for free", () => {
-    expect(globalTierGate.check("ultraplinian", "free")).toBe(false);
+  it("blocks gauntlet for free", () => {
+    expect(globalTierGate.check("gauntlet", "free")).toBe(false);
   });
 
-  it("allows ultraplinian for pro", () => {
-    expect(globalTierGate.check("ultraplinian", "pro")).toBe(true);
+  it("allows gauntlet for pro", () => {
+    expect(globalTierGate.check("gauntlet", "pro")).toBe(true);
   });
 
   it("blocks council for pro", () => {
@@ -183,27 +183,27 @@ describe("makeTierGatePreHandler", () => {
   }
 
   it("passes without reply when tier is sufficient", async () => {
-    const handler = makeTierGatePreHandler({ feature: "ultraplinian" });
+    const handler = makeTierGatePreHandler({ feature: "gauntlet" });
     const { sent, reply } = makeReply();
     await handler(makeRequest("pro"), reply);
     expect(sent).toHaveLength(0);
   });
 
   it("replies 403 with TIER_GATE_DENIED when tier is insufficient", async () => {
-    const handler = makeTierGatePreHandler({ feature: "ultraplinian" });
+    const handler = makeTierGatePreHandler({ feature: "gauntlet" });
     const { sent, reply } = makeReply();
     await handler(makeRequest("free"), reply);
     expect(sent).toHaveLength(1);
     expect(sent[0]!.code).toBe(403);
     const body = sent[0]!.body as Record<string, unknown>;
     expect(body.code).toBe("TIER_GATE_DENIED");
-    expect(body.feature).toBe("ultraplinian");
+    expect(body.feature).toBe("gauntlet");
     expect(body.requiredTier).toBe("pro");
     expect(body.userTier).toBe("free");
   });
 
   it("defaults to 'free' when no x-nexus-tier header present", async () => {
-    const handler = makeTierGatePreHandler({ feature: "ultraplinian" });
+    const handler = makeTierGatePreHandler({ feature: "gauntlet" });
     const { sent, reply } = makeReply();
     await handler({}, reply);
     expect(sent[0]!.code).toBe(403);
@@ -237,7 +237,7 @@ describe("makeTierGatePreHandler", () => {
   });
 
   it("enterprise tier passes pro-gated feature", async () => {
-    const handler = makeTierGatePreHandler({ feature: "ultraplinian" });
+    const handler = makeTierGatePreHandler({ feature: "gauntlet" });
     const { sent, reply } = makeReply();
     await handler(makeRequest("enterprise"), reply);
     expect(sent).toHaveLength(0);
