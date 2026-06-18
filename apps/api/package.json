@@ -25,6 +25,8 @@
     "@fastify/cors": "^11.2.0",
     "@fastify/helmet": "^13.0.2",
     "@fastify/sensible": "^6.0.4",
+    "@nexus/adaptive-scraper": "workspace:*",
+    "@nexus/researcher": "workspace:*",
     "@nexus/admin-gateway": "workspace:*",
     "@nexus/autotune": "workspace:*",
     "@nexus/auth": "workspace:*",

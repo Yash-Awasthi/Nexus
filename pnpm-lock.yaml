@@ -80,6 +80,9 @@ importers:
       '@fastify/sensible':
         specifier: ^6.0.4
         version: 6.0.4
+      '@nexus/adaptive-scraper':
+        specifier: workspace:*
+        version: link:../../packages/adaptive-scraper
       '@nexus/admin-gateway':
         specifier: workspace:*
         version: link:../../packages/admin-gateway
@@ -155,6 +158,9 @@ importers:
       '@nexus/prediction-market':
         specifier: workspace:*
         version: link:../../packages/prediction-market
+      '@nexus/researcher':
+        specifier: workspace:*
+        version: link:../../packages/researcher
       '@nexus/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
