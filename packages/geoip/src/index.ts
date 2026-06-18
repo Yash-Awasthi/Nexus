@@ -15,18 +15,19 @@
 
 export interface GeoIpRecord {
   ip: string;
-  country: string;        // "United States"
-  countryCode: string;    // "US" (ISO 3166-1 alpha-2)
-  continent: string;      // "North America"
+  country: string; // "United States"
+  countryCode: string; // "US" (ISO 3166-1 alpha-2)
+  continent: string; // "North America"
   city?: string;
   lat: number;
   lng: number;
-  timezone: string;       // IANA tz, e.g. "America/New_York"
-  locale: string;         // BCP-47, e.g. "en-US"
+  timezone: string; // IANA tz, e.g. "America/New_York"
+  locale: string; // BCP-47, e.g. "en-US"
   isEu: boolean;
   postalCode?: string;
 }
 
+/** Raw mmdb record interface definition. */
 export interface RawMmdbRecord {
   country?: { names?: { en?: string }; iso_code?: string };
   continent?: { names?: { en?: string } };
@@ -38,35 +39,125 @@ export interface RawMmdbRecord {
 // ── Locale map (40+ countries) ────────────────────────────────────────────────
 
 export const LOCALE_MAP: Record<string, string> = {
-  AF: "fa-AF", AL: "sq-AL", DZ: "ar-DZ", AR: "es-AR", AM: "hy-AM",
-  AU: "en-AU", AT: "de-AT", AZ: "az-AZ", BH: "ar-BH", BY: "be-BY",
-  BE: "nl-BE", BR: "pt-BR", BG: "bg-BG", CA: "en-CA", CL: "es-CL",
-  CN: "zh-CN", CO: "es-CO", HR: "hr-HR", CZ: "cs-CZ", DK: "da-DK",
-  EG: "ar-EG", EE: "et-EE", FI: "fi-FI", FR: "fr-FR", GE: "ka-GE",
-  DE: "de-DE", GR: "el-GR", HK: "zh-HK", HU: "hu-HU", IN: "hi-IN",
-  ID: "id-ID", IR: "fa-IR", IQ: "ar-IQ", IE: "en-IE", IL: "he-IL",
-  IT: "it-IT", JP: "ja-JP", JO: "ar-JO", KZ: "kk-KZ", KE: "sw-KE",
-  KR: "ko-KR", KW: "ar-KW", LV: "lv-LV", LB: "ar-LB", LT: "lt-LT",
-  MK: "mk-MK", MY: "ms-MY", MX: "es-MX", MA: "ar-MA", NL: "nl-NL",
-  NZ: "en-NZ", NG: "en-NG", NO: "no-NO", OM: "ar-OM", PK: "ur-PK",
-  PH: "fil-PH", PL: "pl-PL", PT: "pt-PT", QA: "ar-QA", RO: "ro-RO",
-  RU: "ru-RU", SA: "ar-SA", RS: "sr-RS", SG: "en-SG", SK: "sk-SK",
-  SI: "sl-SI", ZA: "en-ZA", ES: "es-ES", SE: "sv-SE", CH: "de-CH",
-  TW: "zh-TW", TH: "th-TH", TN: "ar-TN", TR: "tr-TR", UA: "uk-UA",
-  AE: "ar-AE", GB: "en-GB", US: "en-US", UZ: "uz-UZ", VN: "vi-VN",
+  AF: "fa-AF",
+  AL: "sq-AL",
+  DZ: "ar-DZ",
+  AR: "es-AR",
+  AM: "hy-AM",
+  AU: "en-AU",
+  AT: "de-AT",
+  AZ: "az-AZ",
+  BH: "ar-BH",
+  BY: "be-BY",
+  BE: "nl-BE",
+  BR: "pt-BR",
+  BG: "bg-BG",
+  CA: "en-CA",
+  CL: "es-CL",
+  CN: "zh-CN",
+  CO: "es-CO",
+  HR: "hr-HR",
+  CZ: "cs-CZ",
+  DK: "da-DK",
+  EG: "ar-EG",
+  EE: "et-EE",
+  FI: "fi-FI",
+  FR: "fr-FR",
+  GE: "ka-GE",
+  DE: "de-DE",
+  GR: "el-GR",
+  HK: "zh-HK",
+  HU: "hu-HU",
+  IN: "hi-IN",
+  ID: "id-ID",
+  IR: "fa-IR",
+  IQ: "ar-IQ",
+  IE: "en-IE",
+  IL: "he-IL",
+  IT: "it-IT",
+  JP: "ja-JP",
+  JO: "ar-JO",
+  KZ: "kk-KZ",
+  KE: "sw-KE",
+  KR: "ko-KR",
+  KW: "ar-KW",
+  LV: "lv-LV",
+  LB: "ar-LB",
+  LT: "lt-LT",
+  MK: "mk-MK",
+  MY: "ms-MY",
+  MX: "es-MX",
+  MA: "ar-MA",
+  NL: "nl-NL",
+  NZ: "en-NZ",
+  NG: "en-NG",
+  NO: "no-NO",
+  OM: "ar-OM",
+  PK: "ur-PK",
+  PH: "fil-PH",
+  PL: "pl-PL",
+  PT: "pt-PT",
+  QA: "ar-QA",
+  RO: "ro-RO",
+  RU: "ru-RU",
+  SA: "ar-SA",
+  RS: "sr-RS",
+  SG: "en-SG",
+  SK: "sk-SK",
+  SI: "sl-SI",
+  ZA: "en-ZA",
+  ES: "es-ES",
+  SE: "sv-SE",
+  CH: "de-CH",
+  TW: "zh-TW",
+  TH: "th-TH",
+  TN: "ar-TN",
+  TR: "tr-TR",
+  UA: "uk-UA",
+  AE: "ar-AE",
+  GB: "en-GB",
+  US: "en-US",
+  UZ: "uz-UZ",
+  VN: "vi-VN",
 };
 
 /** EU member-state country codes. */
 const EU_COUNTRIES = new Set([
-  "AT","BE","BG","CY","CZ","DE","DK","EE","ES","FI",
-  "FR","GR","HR","HU","IE","IT","LT","LU","LV","MT",
-  "NL","PL","PT","RO","SE","SI","SK",
+  "AT",
+  "BE",
+  "BG",
+  "CY",
+  "CZ",
+  "DE",
+  "DK",
+  "EE",
+  "ES",
+  "FI",
+  "FR",
+  "GR",
+  "HR",
+  "HU",
+  "IE",
+  "IT",
+  "LT",
+  "LU",
+  "LV",
+  "MT",
+  "NL",
+  "PL",
+  "PT",
+  "RO",
+  "SE",
+  "SI",
+  "SK",
 ]);
 
+/** Lookup locale. */
 export function lookupLocale(countryCode: string): string {
   return LOCALE_MAP[countryCode] ?? `en-${countryCode}`;
 }
 
+/** Is eu country. */
 export function isEuCountry(countryCode: string): boolean {
   return EU_COUNTRIES.has(countryCode);
 }
@@ -83,7 +174,10 @@ export class MockMmdbReader implements MmdbReader {
   private entries = new Map<string, RawMmdbRecord>();
   private defaultRecord: RawMmdbRecord | null;
 
-  constructor(defaults: Record<string, RawMmdbRecord> = {}, defaultRecord: RawMmdbRecord | null = null) {
+  constructor(
+    defaults: Record<string, RawMmdbRecord> = {},
+    defaultRecord: RawMmdbRecord | null = null,
+  ) {
     for (const [ip, rec] of Object.entries(defaults)) {
       this.entries.set(ip, rec);
     }
@@ -98,14 +192,19 @@ export class MockMmdbReader implements MmdbReader {
     return this.entries.get(ip) ?? this.defaultRecord;
   }
 
-  delete(ip: string): void { this.entries.delete(ip); }
-  clear(): void { this.entries.clear(); }
+  delete(ip: string): void {
+    this.entries.delete(ip);
+  }
+  clear(): void {
+    this.entries.clear();
+  }
 }
 
 // ── GeoIpCache ────────────────────────────────────────────────────────────────
 
 const DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
+/** Geo ip cache. */
 export class GeoIpCache {
   private cache = new Map<string, { record: GeoIpRecord; expiresAt: number }>();
   private ttlMs: number;
@@ -128,16 +227,25 @@ export class GeoIpCache {
     return entry.record;
   }
 
-  invalidate(ip: string): void { this.cache.delete(ip); }
-  clear(): void { this.cache.clear(); }
-  size(): number { return this.cache.size; }
+  invalidate(ip: string): void {
+    this.cache.delete(ip);
+  }
+  clear(): void {
+    this.cache.clear();
+  }
+  size(): number {
+    return this.cache.size;
+  }
 
   /** Remove all expired entries. */
   prune(): number {
     const now = Date.now();
     let pruned = 0;
     for (const [ip, entry] of this.cache) {
-      if (now > entry.expiresAt) { this.cache.delete(ip); pruned++; }
+      if (now > entry.expiresAt) {
+        this.cache.delete(ip);
+        pruned++;
+      }
     }
     return pruned;
   }
@@ -160,6 +268,7 @@ export function isPrivateIp(ip: string): boolean {
   return false;
 }
 
+/** Normalize ip. */
 export function normalizeIp(ip: string): string {
   return ip.trim().replace(/^::ffff:/, ""); // strip IPv4-mapped IPv6 prefix
 }
@@ -185,6 +294,7 @@ const PRIVATE_FALLBACK: GeoIpRecord = {
   isEu: false,
 };
 
+/** Geo ip resolver. */
 export class GeoIpResolver {
   private reader: MmdbReader;
   private cache: GeoIpCache;
@@ -239,9 +349,13 @@ export class GeoIpResolver {
   }
 
   /** Invalidate cached record for an IP. */
-  invalidate(ip: string): void { this.cache.invalidate(normalizeIp(ip)); }
+  invalidate(ip: string): void {
+    this.cache.invalidate(normalizeIp(ip));
+  }
 
-  getCache(): GeoIpCache { return this.cache; }
+  getCache(): GeoIpCache {
+    return this.cache;
+  }
 }
 
 // ── Background refresh stub ───────────────────────────────────────────────────
@@ -252,6 +366,7 @@ export interface RefreshScheduler {
   readonly isRunning: boolean;
 }
 
+/** Periodic cache refresher. */
 export class PeriodicCacheRefresher implements RefreshScheduler {
   private timer: ReturnType<typeof setInterval> | null = null;
   private cache: GeoIpCache;
@@ -264,12 +379,19 @@ export class PeriodicCacheRefresher implements RefreshScheduler {
 
   start(): void {
     if (this.timer) return;
-    this.timer = setInterval(() => { this.cache.prune(); }, this.intervalMs);
+    this.timer = setInterval(() => {
+      this.cache.prune();
+    }, this.intervalMs);
   }
 
   stop(): void {
-    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
   }
 
-  get isRunning(): boolean { return this.timer !== null; }
+  get isRunning(): boolean {
+    return this.timer !== null;
+  }
 }

@@ -499,7 +499,7 @@ describe("PollingFlagStore — cache operations", () => {
 
 describe("PollingFlagStore — start()", () => {
   it("polls the URL on start() and populates cache", async () => {
-    const fetchFn = vi.fn().mockResolvedValue(mockResponse({ "my.flag": true, "count": 5 }));
+    const fetchFn = vi.fn().mockResolvedValue(mockResponse({ "my.flag": true, count: 5 }));
     const store = new PollingFlagStore({ url: "http://localhost/flags", fetch: fetchFn });
     await store.start();
     store.stop();
@@ -587,7 +587,7 @@ describe("FileFlagStore — load()", () => {
   it("populates cache from valid JSON file", async () => {
     const readFile: FlagReadFileFn = vi
       .fn()
-      .mockResolvedValue(JSON.stringify({ "feat.on": true, "count": 7 }));
+      .mockResolvedValue(JSON.stringify({ "feat.on": true, count: 7 }));
     const store = new FileFlagStore({ path: "/flags.json", readFile });
     await store.load();
     expect(store.get("feat.on")).toBe(true);
@@ -595,7 +595,9 @@ describe("FileFlagStore — load()", () => {
   });
 
   it("silently returns empty cache on ENOENT / read error", async () => {
-    const readFile: FlagReadFileFn = vi.fn().mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+    const readFile: FlagReadFileFn = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
     const store = new FileFlagStore({ path: "/missing.json", readFile });
     await store.load();
     expect(store.getAll()).toEqual({});
@@ -669,9 +671,11 @@ describe("FileFlagStore — cache operations", () => {
 describe("FileFlagStore — round-trip", () => {
   it("persist then load restores all flags", async () => {
     const disk: Record<string, string> = {};
-    const readFile: FlagReadFileFn = vi.fn().mockImplementation((p) =>
-      p in disk ? Promise.resolve(disk[p]!) : Promise.reject(new Error("ENOENT")),
-    );
+    const readFile: FlagReadFileFn = vi
+      .fn()
+      .mockImplementation((p) =>
+        p in disk ? Promise.resolve(disk[p]!) : Promise.reject(new Error("ENOENT")),
+      );
     const writeFile: FlagWriteFileFn = vi.fn().mockImplementation((p, c) => {
       disk[p] = c;
       return Promise.resolve();

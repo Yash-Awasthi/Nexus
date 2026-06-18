@@ -26,7 +26,7 @@ import type { RuntimeGraph } from "./runtime-graph.js";
 // ─── Types ───────────────────────────────────────────────────────────
 
 /** Named configuration object for RuntimeCompactor — replaces 7 optional positional params */
-export interface RuntimeCompactorConfig {
+interface RuntimeCompactorConfig {
   persistence?: IRuntimePersistence;
   queue?: IQueueBackend;
   leakDetector?: LeakDetector;
@@ -38,7 +38,7 @@ export interface RuntimeCompactorConfig {
   logger?: ILogger;
 }
 
-export interface CompactionReport {
+interface CompactionReport {
   timestamp: string;
   subsystems: {
     eventBus: {
@@ -67,7 +67,7 @@ export interface CompactionReport {
   };
 }
 
-export interface LeakReport {
+interface LeakReport {
   timestamp: string;
   detected: boolean;
   subscriptions: {
@@ -85,7 +85,7 @@ export interface LeakReport {
   warnings: string[];
 }
 
-export interface ResourceQuota {
+interface ResourceQuota {
   maxHistorySize: number;
   maxEventStoreLines: number;
   maxPersistenceFileSizeMB: number;
@@ -94,7 +94,7 @@ export interface ResourceQuota {
   maxDeadLetterJobs: number;
 }
 
-export interface QuotaViolation {
+interface QuotaViolation {
   subsystem: string;
   metric: string;
   current: number;
@@ -313,7 +313,7 @@ export class ResourceQuotaManager {
 
 // ─── Runtime Compactor ───────────────────────────────────────────────
 
-export interface CompactorOptions {
+interface CompactorOptions {
   /** Max age in ms for event history compaction (default 1 hour) */
   maxEventAgeMs?: number;
   /** Enable auto-compaction on schedule */

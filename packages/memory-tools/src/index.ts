@@ -94,6 +94,7 @@ export interface MemoryExport {
   entries: MemoryEntry[];
 }
 
+/** Export options interface definition. */
 export interface ExportOptions {
   /**
    * When false, expired entries (expiresAt < now) are excluded.
@@ -147,11 +148,13 @@ export interface ImportOptions {
   similarityThreshold?: number;
 }
 
+/** Import error interface definition. */
 export interface ImportError {
   id: string;
   error: string;
 }
 
+/** Import result interface definition. */
 export interface ImportResult {
   /** Entries successfully saved to the store */
   imported: number;
@@ -221,6 +224,7 @@ export async function importMemory(
 
 export type DeduplicationStrategy = "exact" | "fingerprint" | "embedding";
 
+/** Duplicate group interface definition. */
 export interface DuplicateGroup {
   /** The entry that will be / was kept (lowest createdAt) */
   canonical: MemoryEntry;
@@ -230,6 +234,7 @@ export interface DuplicateGroup {
   strategy: DeduplicationStrategy;
 }
 
+/** Deduplication result interface definition. */
 export interface DeduplicationResult {
   /** Entries kept in the store */
   kept: number;
@@ -239,6 +244,7 @@ export interface DeduplicationResult {
   groups: DuplicateGroup[];
 }
 
+/** Deduplicate options interface definition. */
 export interface DeduplicateOptions {
   /** Default: "fingerprint" */
   strategy?: DeduplicationStrategy;
@@ -484,4 +490,135 @@ export class MemoryToolsError extends Error {
     super(message);
     this.name = "MemoryToolsError";
   }
+}
+
+// ── Extended memory item model ─────────────────────────────────────────────────
+// Ported from thedotmack/claude-mem: src/core/schemas/memory-item.ts
+// Pattern: rich MemoryItem with structured extraction fields (facts, concepts,
+// filesRead/Modified), provenance tracking via MemorySource, and ContextPack
+// for token-budgeted session injection.
+
+/** Classification of how a memory item was produced. */
+export type MemoryItemKind =
+  | "observation" // Captured from agent tool usage / session events
+  | "summary"     // Compressed multi-observation summary
+  | "prompt"      // Injected via user prompt
+  | "manual";     // Manually authored / imported
+
+/** Provenance source type for a MemoryItem. */
+export type MemorySourceType =
+  | "observation"
+  | "session_summary"
+  | "user_prompt"
+  | "manual"
+  | "import";
+
+/**
+ * Rich memory item with structured knowledge extraction fields.
+ * Ported from claude-mem MemoryItemSchema (Zod → TS interface).
+ *
+ * Key fields beyond the base memory record:
+ *   - `facts[]`         — discrete factual claims extracted from the session
+ *   - `concepts[]`      — higher-level concepts / entities identified
+ *   - `filesRead[]`     — files read during the session (provenance)
+ *   - `filesModified[]` — files written/modified (provenance)
+ *   - `narrative`       — free-form prose summary of what happened
+ */
+export interface ExtendedMemoryItem {
+  id: string;
+  projectId: string;
+  serverSessionId?: string | null;
+  kind: MemoryItemKind;
+  /** Fine-grained type tag within the kind (e.g. "code_change", "decision"). */
+  type: string;
+  title?: string | null;
+  subtitle?: string | null;
+  /** Short text representation; may be null for summary-only items. */
+  text?: string | null;
+  /** Prose narrative of the session or event. */
+  narrative?: string | null;
+  /** Discrete factual claims. */
+  facts: string[];
+  /** Higher-level concept / entity names. */
+  concepts: string[];
+  /** Paths of files read during the session. */
+  filesRead: string[];
+  /** Paths of files modified during the session. */
+  filesModified: string[];
+  metadata: Record<string, unknown>;
+  createdAtEpoch: number;
+  updatedAtEpoch: number;
+}
+
+/** Input type for creating a new ExtendedMemoryItem (omits server-set fields). */
+export type CreateExtendedMemoryItem = Omit<
+  ExtendedMemoryItem,
+  "id" | "createdAtEpoch" | "updatedAtEpoch"
+> & Partial<Pick<ExtendedMemoryItem, "serverSessionId" | "title" | "subtitle" | "text" | "narrative">>;
+
+/**
+ * Provenance record linking a MemoryItem to its originating source.
+ * Ported from claude-mem MemorySourceSchema.
+ */
+export interface MemoryItemSource {
+  id: string;
+  memoryItemId: string;
+  sourceType: MemorySourceType;
+  /** URI of the original source (file path, URL, tool ID, etc.). */
+  sourceUri?: string | null;
+  metadata: Record<string, unknown>;
+  createdAtEpoch: number;
+}
+
+/**
+ * A token-budgeted collection of memory items ready for session injection.
+ * Ported from claude-mem ContextPackSchema.
+ *
+ * Fill `items` with the highest-relevance memories up to `tokenBudget`;
+ * the consumer slices the context window accordingly before injecting.
+ */
+export interface ContextPack {
+  projectId: string;
+  serverSessionId?: string | null;
+  /** Unix epoch (ms) when this pack was assembled. */
+  generatedAtEpoch: number;
+  /** Maximum token budget for this pack; null = unlimited. */
+  tokenBudget?: number | null;
+  items: ExtendedMemoryItem[];
+  metadata: Record<string, unknown>;
+}
+
+/** Estimate token count of a context pack (rough: 1 token ≈ 4 chars). */
+export function estimateContextPackTokens(pack: ContextPack): number {
+  const totalChars = pack.items.reduce((sum, item) => {
+    const text = [
+      item.title,
+      item.text,
+      item.narrative,
+      ...(item.facts ?? []),
+      ...(item.concepts ?? []),
+    ]
+      .filter(Boolean)
+      .join(" ");
+    return sum + text.length;
+  }, 0);
+  return Math.ceil(totalChars / 4);
+}
+
+/**
+ * Trim a context pack to fit within its token budget.
+ * Drops items from the end (lowest priority) until the budget is met.
+ * Items should be pre-sorted highest-priority first before calling.
+ */
+export function trimContextPackTobudget(pack: ContextPack): ContextPack {
+  if (!pack.tokenBudget) return pack;
+  const items: ExtendedMemoryItem[] = [];
+  let tokens = 0;
+  for (const item of pack.items) {
+    const itemTokens = estimateContextPackTokens({ ...pack, items: [item] });
+    if (tokens + itemTokens > pack.tokenBudget) break;
+    items.push(item);
+    tokens += itemTokens;
+  }
+  return { ...pack, items };
 }

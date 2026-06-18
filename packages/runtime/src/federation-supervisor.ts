@@ -6,10 +6,10 @@ import * as path from "path";
 import { McpServerHost } from "./adapters/mcp-server-host.js";
 import { runDockerCompose } from "./docker-compose-runner.js";
 import { probeFlociHealth, resolveFlociEndpoint } from "./floci-client.js";
-import type { GhostStackConfig } from "./ghoststack-config.js";
-import { loadGhostStackConfig } from "./ghoststack-config.js";
-import type { GhostStackServer } from "./ghoststack-server.js";
-import { createGhostStackServer } from "./ghoststack-server.js";
+import type { ConductorConfig } from "./conductor-config.js";
+import { loadConductorConfig } from "./conductor-config.js";
+import type { ConductorServer } from "./conductor-server.js";
+import { createConductorServer } from "./conductor-server.js";
 import type { RuntimeGraph } from "./runtime-graph.js";
 
 export interface FederationServiceStatus {
@@ -90,8 +90,8 @@ function isProcessRunning(pid: number): boolean {
 
 export class FederationSupervisor {
   private readonly repoRoot: string;
-  private config: GhostStackConfig;
-  private gsServer: GhostStackServer | null = null;
+  private config: ConductorConfig;
+  private gsServer: ConductorServer | null = null;
   private mcpHost: McpServerHost | null = null;
   private weStartedFlociDocker = false;
   private startedAt: string | null = null;
@@ -99,9 +99,9 @@ export class FederationSupervisor {
   /** Signal handler references for cleanup on stop() — prevents handler accumulation on repeated start() calls */
   private signalHandlers: { signal: string; handler: () => void }[] = [];
 
-  constructor(repoRoot: string, config?: GhostStackConfig) {
+  constructor(repoRoot: string, config?: ConductorConfig) {
     this.repoRoot = repoRoot;
-    this.config = config ?? loadGhostStackConfig(repoRoot);
+    this.config = config ?? loadConductorConfig(repoRoot);
   }
 
   static statePath(repoRoot: string): string {
@@ -197,7 +197,7 @@ export class FederationSupervisor {
       await this.runtimeGraph.addNode(`fed:${name}`, type, name, {
         status,
         metadata,
-        dependencies: ["ghoststack-runtime"],
+        dependencies: ["conductor-runtime"],
       });
     } catch {
       await this.runtimeGraph.updateNodeStatus(`fed:${name}`, status, metadata);
@@ -264,11 +264,11 @@ export class FederationSupervisor {
         const state = JSON.parse(fs.readFileSync(statePath, "utf8")) as PersistedState;
         if (state.apiPid && isProcessRunning(state.apiPid)) {
           throw new Error(
-            `GhostStack is already running (API PID: ${state.apiPid}). Stop it first with 'gs stop'`,
+            `Conductor is already running (API PID: ${state.apiPid}). Stop it first with 'gs stop'`,
           );
         }
       } catch (err) {
-        if ((err as Error).message.includes("GhostStack is already running")) throw err;
+        if ((err as Error).message.includes("Conductor is already running")) throw err;
         // corrupt state file, we will clear it
         this.clearState();
       }
@@ -321,7 +321,7 @@ export class FederationSupervisor {
     }
 
     // 2. Orchestrator API next
-    this.gsServer = await createGhostStackServer(this.repoRoot);
+    this.gsServer = await createConductorServer(this.repoRoot);
     services.push({
       name: "orchestrator",
       status: "healthy",

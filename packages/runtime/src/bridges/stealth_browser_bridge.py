@@ -42,6 +42,12 @@ from pydantic import BaseModel
 logger = logging.getLogger("stealth_browser_bridge")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(message)s")
 
+
+def _sanitize_log(val: Any) -> str:
+    """Strip newlines/control chars from user-supplied values before logging."""
+    return str(val).replace("\n", "\\n").replace("\r", "\\r").replace("\0", "")[:500]
+
+
 _CLOAKBROWSER_PATH: str = os.environ.get("CLOAKBROWSER_PATH", "")
 
 # ---------------------------------------------------------------------------
@@ -123,7 +129,7 @@ def _scrapling_extract(
                 matched = page.css(sel).getall()
                 results[sel] = [str(m) for m in matched if m is not None]
             except Exception as exc:
-                logger.debug("Scrapling selector %r failed: %s", sel, exc)
+                logger.debug("Scrapling selector %r failed: %s", _sanitize_log(sel), exc)
                 results[sel] = []
     except Exception as exc:
         logger.warning("Scrapling extraction failed: %s", exc)
@@ -251,7 +257,7 @@ def create_app() -> FastAPI:
                 "final_url": url,
                 "screenshot_b64": "",
                 "extracted": {},
-                "error": str(exc),
+                "error": "Browser session failed — check server logs",
             }
         finally:
             await page.close()

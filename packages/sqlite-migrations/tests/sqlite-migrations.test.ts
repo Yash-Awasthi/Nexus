@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, beforeEach } from "vitest";
-import {
-  InMemoryDbClient,
-  MigrationRunner,
-  SchemaRepair,
-  type Migration,
-} from "../src/index.js";
+import { InMemoryDbClient, MigrationRunner, SchemaRepair, type Migration } from "../src/index.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -77,17 +72,27 @@ describe("InMemoryDbClient", () => {
 
   it("INSERT OR IGNORE skips duplicate version", () => {
     const db = new InMemoryDbClient();
-    db.exec("CREATE TABLE IF NOT EXISTS _schema_migrations (version INTEGER PRIMARY KEY, name TEXT, applied_at TEXT)");
-    db.prepare("INSERT OR IGNORE INTO _schema_migrations (version, name, applied_at) VALUES (?, ?, ?)").run(1, "m1", "t1");
-    db.prepare("INSERT OR IGNORE INTO _schema_migrations (version, name, applied_at) VALUES (?, ?, ?)").run(1, "m1-dup", "t2");
-    const rows = db.prepare("SELECT * FROM _schema_migrations ORDER BY version").all<{ version: number }>();
+    db.exec(
+      "CREATE TABLE IF NOT EXISTS _schema_migrations (version INTEGER PRIMARY KEY, name TEXT, applied_at TEXT)",
+    );
+    db.prepare(
+      "INSERT OR IGNORE INTO _schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
+    ).run(1, "m1", "t1");
+    db.prepare(
+      "INSERT OR IGNORE INTO _schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
+    ).run(1, "m1-dup", "t2");
+    const rows = db
+      .prepare("SELECT * FROM _schema_migrations ORDER BY version")
+      .all<{ version: number }>();
     expect(rows).toHaveLength(1);
   });
 
   it("transaction wraps and executes fn", () => {
     const db = new InMemoryDbClient();
     let ran = false;
-    db.transaction(() => { ran = true; });
+    db.transaction(() => {
+      ran = true;
+    });
     expect(ran).toBe(true);
   });
 

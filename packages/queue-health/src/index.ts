@@ -30,8 +30,10 @@ export interface QueueMetrics {
   snapshotAt: string;
 }
 
+/** Lane status type alias. */
 export type LaneStatus = "healthy" | "degraded" | "unavailable" | "unknown";
 
+/** Lane health interface definition. */
 export interface LaneHealth {
   name: string;
   status: LaneStatus;
@@ -61,10 +63,14 @@ export interface InMemoryLaneState {
   throwOnGet?: boolean;
 }
 
+/** In memory queue lane. */
 export class InMemoryQueueLane implements QueueLane {
   private state: InMemoryLaneState;
 
-  constructor(public readonly name: string, state: InMemoryLaneState = {}) {
+  constructor(
+    public readonly name: string,
+    state: InMemoryLaneState = {},
+  ) {
     this.state = { ...state };
   }
 
@@ -113,7 +119,9 @@ export class LaneRegistry {
     return [...this.lanes.keys()];
   }
 
-  count(): number { return this.lanes.size; }
+  count(): number {
+    return this.lanes.size;
+  }
 }
 
 // ── AlertPolicy ───────────────────────────────────────────────────────────────
@@ -126,6 +134,7 @@ export interface AlertThresholds {
   maxDelayed?: number;
 }
 
+/** Default thresholds. */
 export const DEFAULT_THRESHOLDS: AlertThresholds = {
   maxWaiting: 1000,
   maxFailed: 50,
@@ -134,6 +143,7 @@ export const DEFAULT_THRESHOLDS: AlertThresholds = {
   maxDelayed: 200,
 };
 
+/** Alert policy. */
 export class AlertPolicy {
   private thresholds: AlertThresholds;
 
@@ -152,19 +162,29 @@ export class AlertPolicy {
     if (metrics.paused) alerts.push(`Queue '${metrics.name}' is paused`);
 
     if (this.thresholds.maxWaiting !== undefined && metrics.waiting > this.thresholds.maxWaiting) {
-      alerts.push(`Queue '${metrics.name}' has ${metrics.waiting} waiting jobs (threshold: ${this.thresholds.maxWaiting})`);
+      alerts.push(
+        `Queue '${metrics.name}' has ${metrics.waiting} waiting jobs (threshold: ${this.thresholds.maxWaiting})`,
+      );
     }
     if (this.thresholds.maxFailed !== undefined && metrics.failed > this.thresholds.maxFailed) {
-      alerts.push(`Queue '${metrics.name}' has ${metrics.failed} failed jobs (threshold: ${this.thresholds.maxFailed})`);
+      alerts.push(
+        `Queue '${metrics.name}' has ${metrics.failed} failed jobs (threshold: ${this.thresholds.maxFailed})`,
+      );
     }
     if (this.thresholds.maxStalled !== undefined && metrics.stalled > this.thresholds.maxStalled) {
-      alerts.push(`Queue '${metrics.name}' has ${metrics.stalled} stalled jobs (threshold: ${this.thresholds.maxStalled})`);
+      alerts.push(
+        `Queue '${metrics.name}' has ${metrics.stalled} stalled jobs (threshold: ${this.thresholds.maxStalled})`,
+      );
     }
     if (this.thresholds.maxActive !== undefined && metrics.active > this.thresholds.maxActive) {
-      alerts.push(`Queue '${metrics.name}' has ${metrics.active} active jobs (threshold: ${this.thresholds.maxActive})`);
+      alerts.push(
+        `Queue '${metrics.name}' has ${metrics.active} active jobs (threshold: ${this.thresholds.maxActive})`,
+      );
     }
     if (this.thresholds.maxDelayed !== undefined && metrics.delayed > this.thresholds.maxDelayed) {
-      alerts.push(`Queue '${metrics.name}' has ${metrics.delayed} delayed jobs (threshold: ${this.thresholds.maxDelayed})`);
+      alerts.push(
+        `Queue '${metrics.name}' has ${metrics.delayed} delayed jobs (threshold: ${this.thresholds.maxDelayed})`,
+      );
     }
 
     return alerts;
@@ -184,6 +204,7 @@ export interface MonitorOptions {
   timeoutMs?: number;
 }
 
+/** Health monitor. */
 export class HealthMonitor {
   private registry: LaneRegistry;
   private policy: AlertPolicy;
@@ -201,15 +222,21 @@ export class HealthMonitor {
 
     try {
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("timeout")), this.timeoutMs)
+        setTimeout(() => reject(new Error("timeout")), this.timeoutMs),
       );
       const raw = await Promise.race([lane.getMetrics(), timeoutPromise]);
       metrics = { name: lane.name, snapshotAt: new Date().toISOString(), ...raw };
     } catch {
       metrics = {
         name: lane.name,
-        waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0, stalled: 0,
-        paused: false, unavailable: true,
+        waiting: 0,
+        active: 0,
+        completed: 0,
+        failed: 0,
+        delayed: 0,
+        stalled: 0,
+        paused: false,
+        unavailable: true,
         snapshotAt: new Date().toISOString(),
       };
     }
@@ -248,6 +275,7 @@ export interface AggregatedHealth {
   lanes: LaneHealth[];
 }
 
+/** Health aggregator. */
 export class HealthAggregator {
   aggregate(healths: LaneHealth[]): AggregatedHealth {
     const healthyCount = healths.filter((h) => h.status === "healthy").length;

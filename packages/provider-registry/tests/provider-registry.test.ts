@@ -1,12 +1,33 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
-import { ProviderRegistry, globalRegistry, BUILTIN_MODELS, type ModelDefinition } from "../src/index.js";
+import {
+  ProviderRegistry,
+  globalRegistry,
+  BUILTIN_MODELS,
+  type ModelDefinition,
+} from "../src/index.js";
 
-function makeModel(id: string, provider = "test", overrides: Partial<ModelDefinition> = {}): ModelDefinition {
+function makeModel(
+  id: string,
+  provider = "test",
+  overrides: Partial<ModelDefinition> = {},
+): ModelDefinition {
   return {
-    id, provider, name: id, contextWindow: 8192, maxOutputTokens: 2048,
-    costPerInputToken: 1e-6, costPerOutputToken: 2e-6,
-    capabilities: { vision: false, functionCalling: true, streaming: true, promptCaching: false, jsonMode: true, systemPrompt: true },
+    id,
+    provider,
+    name: id,
+    contextWindow: 8192,
+    maxOutputTokens: 2048,
+    costPerInputToken: 1e-6,
+    costPerOutputToken: 2e-6,
+    capabilities: {
+      vision: false,
+      functionCalling: true,
+      streaming: true,
+      promptCaching: false,
+      jsonMode: true,
+      systemPrompt: true,
+    },
     ...overrides,
   };
 }
@@ -28,21 +49,45 @@ describe("ProviderRegistry", () => {
 
   it("list() returns all models", () => {
     const r = new ProviderRegistry();
-    r.register(makeModel("a/1")); r.register(makeModel("b/2"));
+    r.register(makeModel("a/1"));
+    r.register(makeModel("b/2"));
     expect(r.list()).toHaveLength(2);
   });
 
   it("list() filters by provider", () => {
     const r = new ProviderRegistry();
-    r.register(makeModel("a/1", "openai")); r.register(makeModel("b/1", "anthropic"));
+    r.register(makeModel("a/1", "openai"));
+    r.register(makeModel("b/1", "anthropic"));
     expect(r.list({ provider: "openai" })).toHaveLength(1);
     expect(r.list({ provider: "openai" })[0]!.provider).toBe("openai");
   });
 
   it("list() filters by capability", () => {
     const r = new ProviderRegistry();
-    r.register(makeModel("a/1", "x", { capabilities: { vision: true, functionCalling: true, streaming: true, promptCaching: false, jsonMode: true, systemPrompt: true } }));
-    r.register(makeModel("b/1", "x", { capabilities: { vision: false, functionCalling: true, streaming: true, promptCaching: false, jsonMode: true, systemPrompt: true } }));
+    r.register(
+      makeModel("a/1", "x", {
+        capabilities: {
+          vision: true,
+          functionCalling: true,
+          streaming: true,
+          promptCaching: false,
+          jsonMode: true,
+          systemPrompt: true,
+        },
+      }),
+    );
+    r.register(
+      makeModel("b/1", "x", {
+        capabilities: {
+          vision: false,
+          functionCalling: true,
+          streaming: true,
+          promptCaching: false,
+          jsonMode: true,
+          systemPrompt: true,
+        },
+      }),
+    );
     expect(r.list({ capability: "vision" })).toHaveLength(1);
   });
 
@@ -74,7 +119,18 @@ describe("ProviderRegistry", () => {
 
   it("supportsCapability() returns correct value", () => {
     const r = new ProviderRegistry();
-    r.register(makeModel("m", "x", { capabilities: { vision: true, functionCalling: false, streaming: true, promptCaching: false, jsonMode: true, systemPrompt: true } }));
+    r.register(
+      makeModel("m", "x", {
+        capabilities: {
+          vision: true,
+          functionCalling: false,
+          streaming: true,
+          promptCaching: false,
+          jsonMode: true,
+          systemPrompt: true,
+        },
+      }),
+    );
     expect(r.supportsCapability("m", "vision")).toBe(true);
     expect(r.supportsCapability("m", "functionCalling")).toBe(false);
     expect(r.supportsCapability("missing", "vision")).toBe(false);
@@ -97,7 +153,9 @@ describe("ProviderRegistry", () => {
 
   it("providers() returns unique provider names", () => {
     const r = new ProviderRegistry();
-    r.register(makeModel("a/1", "openai")); r.register(makeModel("a/2", "openai")); r.register(makeModel("b/1", "anthropic"));
+    r.register(makeModel("a/1", "openai"));
+    r.register(makeModel("a/2", "openai"));
+    r.register(makeModel("b/1", "anthropic"));
     const p = r.providers();
     expect(p).toContain("openai");
     expect(p).toContain("anthropic");
@@ -137,7 +195,11 @@ describe("globalRegistry", () => {
   });
 
   it("estimateCost for 1M input + 100k output with sonnet", () => {
-    const cost = globalRegistry.estimateCost("anthropic/claude-3-5-sonnet-20241022", 1_000_000, 100_000);
+    const cost = globalRegistry.estimateCost(
+      "anthropic/claude-3-5-sonnet-20241022",
+      1_000_000,
+      100_000,
+    );
     expect(cost).toBeCloseTo(3.0 + 1.5); // $3 input + $1.5 output
   });
 });

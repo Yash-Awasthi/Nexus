@@ -9,6 +9,7 @@ export interface KeywordTrigger {
   caseSensitive?: boolean;
 }
 
+/** Regex trigger interface definition. */
 export interface RegexTrigger {
   type: "regex";
   /** Pattern string — compiled to a RegExp on match. */
@@ -16,10 +17,12 @@ export interface RegexTrigger {
   flags?: string;
 }
 
+/** Always trigger interface definition. */
 export interface AlwaysTrigger {
   type: "always";
 }
 
+/** Trigger type alias. */
 export type Trigger = KeywordTrigger | RegexTrigger | AlwaysTrigger;
 
 // ── Skill types ───────────────────────────────────────────────────────────────
@@ -31,16 +34,19 @@ export interface SkillContext<TContext = unknown> {
   context: TContext;
 }
 
+/** Skill result interface definition. */
 export interface SkillResult {
   output: string;
   handled: boolean;
   metadata?: Record<string, unknown>;
 }
 
+/** Skill handler type alias. */
 export type SkillHandler<TContext = unknown> = (
   ctx: SkillContext<TContext>,
 ) => Promise<SkillResult> | SkillResult;
 
+/** Skill interface definition. */
 export interface Skill<TContext = unknown> {
   id: string;
   name: string;
@@ -52,6 +58,7 @@ export interface Skill<TContext = unknown> {
   metadata?: Record<string, unknown>;
 }
 
+/** Matched skill interface definition. */
 export interface MatchedSkill<TContext = unknown> {
   skill: Skill<TContext>;
   trigger: Trigger;

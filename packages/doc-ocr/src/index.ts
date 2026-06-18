@@ -15,6 +15,7 @@
 
 export type OcrStatus = "success" | "partial" | "failed" | "skipped";
 
+/** Ocr result interface definition. */
 export interface OcrResult {
   id: string;
   sourceId: string; // e.g. file path or URL
@@ -27,13 +28,15 @@ export interface OcrResult {
   metadata: Record<string, unknown>;
 }
 
+/** Extracted date interface definition. */
 export interface ExtractedDate {
-  raw: string;      // original string in text
-  iso: string;      // normalised ISO 8601
+  raw: string; // original string in text
+  iso: string; // normalised ISO 8601
   confidence: number;
   position: number; // character index in text
 }
 
+/** Archive signal type type alias. */
 export type ArchiveSignalType =
   | "contains_date"
   | "references_entity"
@@ -43,12 +46,14 @@ export type ArchiveSignalType =
   | "letterhead"
   | "legal_reference";
 
+/** Archive signal interface definition. */
 export interface ArchiveSignal {
   type: ArchiveSignalType;
   value: string;
   confidence: number;
 }
 
+/** Pipeline result interface definition. */
 export interface PipelineResult {
   ocr: OcrResult;
   dates: ExtractedDate[];
@@ -59,12 +64,15 @@ export interface PipelineResult {
 // ── ID util ───────────────────────────────────────────────────────────────────
 
 let _seq = 0;
-function uid() { return `ocr-${Date.now()}-${++_seq}`; }
+function uid() {
+  return `ocr-${Date.now()}-${++_seq}`;
+}
 
 // ── OcrEngine ─────────────────────────────────────────────────────────────────
 
 export type OcrFn = (sourceId: string, data: Uint8Array | string) => Promise<Omit<OcrResult, "id">>;
 
+/** Ocr engine. */
 export class OcrEngine {
   private fn: OcrFn;
   readonly name: string;
@@ -107,7 +115,7 @@ export class MockOcrEngine extends OcrEngine {
 
 // ── DateExtractor ─────────────────────────────────────────────────────────────
 
-const DATE_PATTERNS: Array<{ re: RegExp; parse: (m: RegExpMatchArray) => string | null }> = [
+const DATE_PATTERNS: { re: RegExp; parse: (m: RegExpMatchArray) => string | null }[] = [
   // ISO: 2024-01-15
   {
     re: /\b(\d{4})-(\d{2})-(\d{2})\b/g,
@@ -130,9 +138,18 @@ const DATE_PATTERNS: Array<{ re: RegExp; parse: (m: RegExpMatchArray) => string 
     re: /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})\b/gi,
     parse: (m) => {
       const months: Record<string, string> = {
-        january: "01", february: "02", march: "03", april: "04",
-        may: "05", june: "06", july: "07", august: "08",
-        september: "09", october: "10", november: "11", december: "12",
+        january: "01",
+        february: "02",
+        march: "03",
+        april: "04",
+        may: "05",
+        june: "06",
+        july: "07",
+        august: "08",
+        september: "09",
+        october: "10",
+        november: "11",
+        december: "12",
       };
       const mo = months[m[1]!.toLowerCase()] ?? "01";
       return `${m[3]}-${mo}-${String(parseInt(m[2]!, 10)).padStart(2, "0")}`;
@@ -143,8 +160,18 @@ const DATE_PATTERNS: Array<{ re: RegExp; parse: (m: RegExpMatchArray) => string 
     re: /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+(\d{1,2}),?\s+(\d{4})\b/gi,
     parse: (m) => {
       const months: Record<string, string> = {
-        jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
-        jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
+        jan: "01",
+        feb: "02",
+        mar: "03",
+        apr: "04",
+        may: "05",
+        jun: "06",
+        jul: "07",
+        aug: "08",
+        sep: "09",
+        oct: "10",
+        nov: "11",
+        dec: "12",
       };
       const mo = months[m[1]!.toLowerCase().replace(".", "")] ?? "01";
       return `${m[3]}-${mo}-${String(parseInt(m[2]!, 10)).padStart(2, "0")}`;
@@ -152,6 +179,7 @@ const DATE_PATTERNS: Array<{ re: RegExp; parse: (m: RegExpMatchArray) => string 
   },
 ];
 
+/** Date extractor. */
 export class DateExtractor {
   extract(text: string): ExtractedDate[] {
     const results: ExtractedDate[] = [];
@@ -184,15 +212,32 @@ export class DateExtractor {
 
 // ── ArchiveSignalDetector ─────────────────────────────────────────────────────
 
-const SIGNAL_PATTERNS: Array<{ type: ArchiveSignalType; re: RegExp; confidence: number }> = [
+const SIGNAL_PATTERNS: { type: ArchiveSignalType; re: RegExp; confidence: number }[] = [
   { type: "invoice_number", re: /\b(invoice|inv\.?|bill)\s*#?\s*(\w{4,})/gi, confidence: 0.9 },
   { type: "legal_reference", re: /\b(section|§|clause|article|act)\s+\d+/gi, confidence: 0.85 },
-  { type: "official_stamp", re: /\b(notarized|certified|official|registered|stamped)\b/gi, confidence: 0.8 },
-  { type: "signature_line", re: /\b(signature|signed by|authorised by|authorized by)\b/gi, confidence: 0.75 },
-  { type: "letterhead", re: /\b(re:|subject:|dear\s+\w+|sincerely|yours faithfully)\b/gi, confidence: 0.7 },
-  { type: "references_entity", re: /\b(company|corp\.?|ltd\.?|inc\.?|llc|plc)\b/gi, confidence: 0.65 },
+  {
+    type: "official_stamp",
+    re: /\b(notarized|certified|official|registered|stamped)\b/gi,
+    confidence: 0.8,
+  },
+  {
+    type: "signature_line",
+    re: /\b(signature|signed by|authorised by|authorized by)\b/gi,
+    confidence: 0.75,
+  },
+  {
+    type: "letterhead",
+    re: /\b(re:|subject:|dear\s+\w+|sincerely|yours faithfully)\b/gi,
+    confidence: 0.7,
+  },
+  {
+    type: "references_entity",
+    re: /\b(company|corp\.?|ltd\.?|inc\.?|llc|plc)\b/gi,
+    confidence: 0.65,
+  },
 ];
 
+/** Archive signal detector. */
 export class ArchiveSignalDetector {
   detect(text: string): ArchiveSignal[] {
     const signals: ArchiveSignal[] = [];
@@ -211,7 +256,8 @@ export class ArchiveSignalDetector {
   /** Compute an aggregate archive score from 0-1. */
   computeScore(signals: ArchiveSignal[], dates: ExtractedDate[]): number {
     const dateBonus = Math.min(dates.length * 0.1, 0.3);
-    const signalScore = signals.reduce((sum, s) => sum + s.confidence, 0) / Math.max(signals.length, 1);
+    const signalScore =
+      signals.reduce((sum, s) => sum + s.confidence, 0) / Math.max(signals.length, 1);
     return Math.min((signalScore * 0.7 + dateBonus) * (signals.length > 0 ? 1 : 0.2), 1);
   }
 }
@@ -245,12 +291,14 @@ export interface BatchJob {
   data?: Uint8Array | string;
 }
 
+/** Batch result interface definition. */
 export interface BatchResult {
   sourceId: string;
   result?: PipelineResult;
   error?: string;
 }
 
+/** Ocr batch processor. */
 export class OcrBatchProcessor {
   private pipeline: OcrPipeline;
   private concurrency: number;
@@ -283,4 +331,144 @@ export class OcrBatchProcessor {
 
     return results;
   }
+}
+
+// ── dots.ocr VLM Document Parsing Patterns ───────────────────────────────────
+// Extracted from: rednote-hilab/dots.ocr
+// 1.7B VLM-based multilingual document layout parsing via OpenAI-compatible vLLM endpoint.
+// Single model replaces layout-detection + text-recognition + reading-order pipelines.
+
+/** Pixel constraints for image preprocessing before VLM inference. */
+export const DOTS_OCR_MIN_PIXELS = 3136;
+export const DOTS_OCR_MAX_PIXELS = 11_289_600;
+/** Resize factor — dimensions must be multiples of this value. */
+export const DOTS_OCR_IMAGE_FACTOR = 28;
+
+/**
+ * Prompt mode controls what the VLM outputs.
+ * Switch modes by changing only the prompt — no model change required.
+ */
+export type OcrPromptMode =
+  | "prompt_layout_all_en"    // Full parse: bbox + category + text (JSON)
+  | "prompt_layout_only_en"   // Detection only: bbox + category, no text (JSON)
+  | "prompt_ocr"              // Plain text extraction (no headers/footers)
+  | "prompt_grounding_ocr"    // Extract text within a given bounding box
+  | "prompt_web_parsing"      // Webpage layout parsing (JSON)
+  | "prompt_scene_spotting"   // Scene text detection and recognition
+  | "prompt_image_to_svg";    // Generate SVG code from image
+
+/**
+ * Document layout element categories output by dots.ocr.
+ * Covers full academic/enterprise document taxonomy.
+ */
+export type OcrLayoutCategory =
+  | "Caption"
+  | "Footnote"
+  | "Formula"       // text formatted as LaTeX
+  | "List-item"
+  | "Page-footer"
+  | "Page-header"
+  | "Picture"       // text field omitted
+  | "Section-header"
+  | "Table"         // text formatted as HTML
+  | "Text"          // text formatted as Markdown
+  | "Title";        // text formatted as Markdown
+
+/**
+ * Bounding box in [x1, y1, x2, y2] pixel coordinates.
+ * Coordinates are relative to the input image dimensions.
+ */
+export type OcrBoundingBox = [number, number, number, number];
+
+/**
+ * A single parsed layout element from dots.ocr output.
+ * Text format depends on category:
+ *   Formula → LaTeX, Table → HTML, Picture → omitted, others → Markdown.
+ * Elements are sorted in human reading order.
+ */
+export interface OcrLayoutElement {
+  bbox: OcrBoundingBox;
+  category: OcrLayoutCategory;
+  /** Absent for Picture elements. */
+  text?: string;
+}
+
+/** Full structured parse result for a single document page. */
+export interface OcrPageResult {
+  /** 0-indexed page number. */
+  pageIndex: number;
+  /** Width of the page image in pixels (after preprocessing). */
+  width: number;
+  /** Height of the page image in pixels (after preprocessing). */
+  height: number;
+  elements: OcrLayoutElement[];
+  /** Raw JSON string returned by the model (before parsing). */
+  raw?: string;
+}
+
+/** Configuration for the dots.ocr vLLM inference server. */
+export interface OcrInferenceConfig {
+  protocol?: "http" | "https";
+  ip?: string;
+  port?: number;
+  /** HuggingFace model ID served by the vLLM instance. */
+  modelName?: string;
+  temperature?: number;
+  topP?: number;
+  /** Maximum tokens the model may generate per page. Default 32768. */
+  maxCompletionTokens?: number;
+  /** Parallel inference threads for multi-page documents. Default 64. */
+  numThreads?: number;
+  /** PDF rendering DPI. Higher = better quality, more pixels. Default 200. */
+  dpi?: number;
+  minPixels?: number;
+  maxPixels?: number;
+}
+
+/**
+ * Build the OpenAI-compatible base URL for a dots.ocr vLLM server.
+ * e.g. buildOcrServerUrl({ ip: "10.0.0.1", port: 8080 }) → "http://10.0.0.1:8080/v1"
+ */
+export function buildOcrServerUrl(cfg: OcrInferenceConfig = {}): string {
+  const { protocol = "http", ip = "localhost", port = 8000 } = cfg;
+  return `${protocol}://${ip}:${port}/v1`;
+}
+
+/**
+ * Special image token sequence injected before the prompt text.
+ * Required by vLLM ≥ 0.11.0 to prevent a newline being inserted before the prompt.
+ */
+export const DOTS_OCR_IMAGE_TOKENS = "<|img|><|imgpad|><|endofimg|>";
+
+/**
+ * Resize a dimension to the nearest multiple of IMAGE_FACTOR.
+ * Mirrors dots.ocr smart_resize() preprocessing.
+ */
+export function snapToImageFactor(value: number): number {
+  return Math.round(value / DOTS_OCR_IMAGE_FACTOR) * DOTS_OCR_IMAGE_FACTOR;
+}
+
+/**
+ * Clamp pixel count to the [MIN, MAX] range enforced by dots.ocr.
+ * Returns true if the image is within bounds without resizing.
+ */
+export function isWithinOcrPixelBounds(pixelCount: number): boolean {
+  return pixelCount >= DOTS_OCR_MIN_PIXELS && pixelCount <= DOTS_OCR_MAX_PIXELS;
+}
+
+/** Filter elements by category from a page result. */
+export function filterByCategory(
+  page: OcrPageResult,
+  ...categories: OcrLayoutCategory[]
+): OcrLayoutElement[] {
+  const set = new Set<OcrLayoutCategory>(categories);
+  return page.elements.filter((el) => set.has(el.category));
+}
+
+/** Extract plain text from all elements in reading order, joining with newlines. */
+export function extractPageText(page: OcrPageResult): string {
+  return page.elements
+    .filter((el) => el.text != null)
+    .map((el) => el.text!)
+    .join("\n");
 }

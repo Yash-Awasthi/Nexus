@@ -1,0 +1,84 @@
+# SPDX-License-Identifier: Apache-2.0
+# Nexus Worker — Kubernetes Deployment
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexus-worker
+  namespace: nexus
+  labels:
+    app.kubernetes.io/name: nexus
+    app.kubernetes.io/component: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nexus
+      app.kubernetes.io/component: worker
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nexus
+        app.kubernetes.io/component: worker
+    spec:
+      serviceAccountName: nexus-worker
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      terminationGracePeriodSeconds: 60   # longer — let jobs drain
+      containers:
+        - name: worker
+          image: ghcr.io/yash-awasthi/nexus-worker:latest
+          imagePullPolicy: Always
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: LOG_LEVEL
+              value: info
+          envFrom:
+            - secretRef:
+                name: nexus-api-secrets   # shared secrets
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+          livenessProbe:
+            exec:
+              # Worker health: check process is alive
+              command: ["node", "-e", "process.exit(0)"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          securityContext:
+            readOnlyRootFilesystem: false   # worker writes temp files
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: nexus-worker-hpa
+  namespace: nexus
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nexus-worker
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80

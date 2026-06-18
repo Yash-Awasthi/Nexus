@@ -34,13 +34,22 @@ export interface StrReplaceOptions {
  * Replace the first (and by default only) occurrence of `oldStr` with `newStr`.
  * Throws DiffError if oldStr is not found or appears multiple times (when requireUnique).
  */
-export function strReplace(content: string, oldStr: string, newStr: string, opts?: StrReplaceOptions): string {
+export function strReplace(
+  content: string,
+  oldStr: string,
+  newStr: string,
+  opts?: StrReplaceOptions,
+): string {
   const { requireUnique = true } = opts ?? {};
   const idx = content.indexOf(oldStr);
   if (idx === -1) throw new DiffError("NOT_FOUND", `str_replace: old string not found:\n${oldStr}`);
   if (requireUnique) {
     const second = content.indexOf(oldStr, idx + 1);
-    if (second !== -1) throw new DiffError("AMBIGUOUS", `str_replace: old string appears multiple times — use more context`);
+    if (second !== -1)
+      throw new DiffError(
+        "AMBIGUOUS",
+        `str_replace: old string appears multiple times — use more context`,
+      );
   }
   return content.slice(0, idx) + newStr + content.slice(idx + oldStr.length);
 }
@@ -56,11 +65,13 @@ export function generateDiff(original: string, modified: string, path = "file"):
   const modLines = modified.split("\n");
 
   const hunks: string[] = [];
-  let i = 0, j = 0;
+  let i = 0,
+    j = 0;
 
   while (i < origLines.length || j < modLines.length) {
     if (i < origLines.length && j < modLines.length && origLines[i] === modLines[j]) {
-      i++; j++;
+      i++;
+      j++;
       continue;
     }
     // Collect a hunk
@@ -76,7 +87,8 @@ export function generateDiff(original: string, modified: string, path = "file"):
       if (origLine === modLine && origLine !== undefined) break;
       if (i < origLines.length) removed.push({ line: i, text: origLines[i]! });
       if (j < modLines.length) added.push({ line: j, text: modLines[j]! });
-      i++; j++;
+      i++;
+      j++;
     }
 
     if (removed.length === 0 && added.length === 0) break;
@@ -115,8 +127,11 @@ export function applyPatch(original: string, patch: string): PatchResult {
 
   while (i < patchLines.length) {
     const line = patchLines[i]!;
-    const hunkHeader = line.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/);
-    if (!hunkHeader) { i++; continue; }
+    const hunkHeader = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(line);
+    if (!hunkHeader) {
+      i++;
+      continue;
+    }
 
     const origStart = parseInt(hunkHeader[1]!) - 1 + offset;
     i++;
@@ -124,7 +139,12 @@ export function applyPatch(original: string, patch: string): PatchResult {
     const removals: string[] = [];
     const insertions: string[] = [];
 
-    while (i < patchLines.length && !patchLines[i]!.startsWith("@@") && !patchLines[i]!.startsWith("---") && !patchLines[i]!.startsWith("+++")) {
+    while (
+      i < patchLines.length &&
+      !patchLines[i]!.startsWith("@@") &&
+      !patchLines[i]!.startsWith("---") &&
+      !patchLines[i]!.startsWith("+++")
+    ) {
       const pl = patchLines[i]!;
       if (pl.startsWith("-")) removals.push(pl.slice(1));
       else if (pl.startsWith("+")) insertions.push(pl.slice(1));
@@ -135,7 +155,10 @@ export function applyPatch(original: string, patch: string): PatchResult {
     for (let r = 0; r < removals.length; r++) {
       const expected = lines[origStart + r];
       if (expected !== removals[r]) {
-        throw new DiffError("PATCH_FAILED", `Hunk line mismatch at line ${origStart + r + 1}: expected "${removals[r]}", got "${expected}"`);
+        throw new DiffError(
+          "PATCH_FAILED",
+          `Hunk line mismatch at line ${origStart + r + 1}: expected "${removals[r]}", got "${expected}"`,
+        );
       }
     }
 

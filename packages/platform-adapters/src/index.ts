@@ -14,6 +14,7 @@
 
 export type Platform = "telegram" | "slack" | "discord";
 
+/** Incoming message interface definition. */
 export interface IncomingMessage {
   platform: Platform;
   userId: string;
@@ -22,6 +23,7 @@ export interface IncomingMessage {
   raw: unknown;
 }
 
+/** Outgoing message interface definition. */
 export interface OutgoingMessage {
   chatId: string;
   text?: string;
@@ -30,12 +32,14 @@ export interface OutgoingMessage {
   parseMode?: "Markdown" | "HTML" | "plain";
 }
 
+/** Send result interface definition. */
 export interface SendResult {
   success: boolean;
   messageId?: string;
   error?: string;
 }
 
+/** Platform adapter interface definition. */
 export interface PlatformAdapter {
   readonly platform: Platform;
   parse(rawPayload: unknown): IncomingMessage | null;
@@ -48,11 +52,15 @@ export interface HttpSender {
   post(url: string, body: unknown, headers: Record<string, string>): Promise<unknown>;
 }
 
+/** Mock http sender. */
 export class MockHttpSender implements HttpSender {
-  readonly calls: Array<{ url: string; body: unknown }> = [];
+  readonly calls: { url: string; body: unknown }[] = [];
   private result: unknown = { ok: true };
 
-  setResult(r: unknown): this { this.result = r; return this; }
+  setResult(r: unknown): this {
+    this.result = r;
+    return this;
+  }
 
   async post(url: string, body: unknown, _h: Record<string, string>): Promise<unknown> {
     this.calls.push({ url, body });
@@ -67,6 +75,7 @@ export interface TelegramConfig {
   baseUrl?: string;
 }
 
+/** Telegram update interface definition. */
 export interface TelegramUpdate {
   update_id: number;
   message?: {
@@ -83,6 +92,7 @@ export interface TelegramUpdate {
   };
 }
 
+/** Telegram adapter. */
 export class TelegramAdapter implements PlatformAdapter {
   readonly platform = "telegram" as const;
   private config: Required<TelegramConfig>;
@@ -115,10 +125,10 @@ export class TelegramAdapter implements PlatformAdapter {
       const msg = update.message;
       return {
         platform: this.platform,
-        userId:   String(msg.from?.id ?? "unknown"),
-        chatId:   String(msg.chat.id),
-        text:     msg.text ?? "",
-        raw:      update,
+        userId: String(msg.from?.id ?? "unknown"),
+        chatId: String(msg.chat.id),
+        text: msg.text ?? "",
+        raw: update,
       };
     }
 
@@ -127,10 +137,10 @@ export class TelegramAdapter implements PlatformAdapter {
       const cb = update.callback_query;
       return {
         platform: this.platform,
-        userId:   String(cb.from.id),
-        chatId:   String(cb.message?.chat.id ?? "0"),
-        text:     cb.data ?? "",
-        raw:      update,
+        userId: String(cb.from.id),
+        chatId: String(cb.message?.chat.id ?? "0"),
+        text: cb.data ?? "",
+        raw: update,
       };
     }
 
@@ -141,13 +151,16 @@ export class TelegramAdapter implements PlatformAdapter {
     const url = `${this.config.baseUrl}/bot${this.config.botToken}/sendMessage`;
     const body: Record<string, unknown> = {
       chat_id: msg.chatId,
-      text:    msg.text ?? "",
+      text: msg.text ?? "",
     };
     if (msg.parseMode && msg.parseMode !== "plain") {
       body["parse_mode"] = msg.parseMode;
     }
     try {
-      const raw = await this.sender.post(url, body, {}) as { ok?: boolean; result?: { message_id?: number } };
+      const raw = (await this.sender.post(url, body, {})) as {
+        ok?: boolean;
+        result?: { message_id?: number };
+      };
       return {
         success: raw.ok === true,
         messageId: raw.result?.message_id !== undefined ? String(raw.result.message_id) : undefined,
@@ -166,6 +179,7 @@ export interface SlackConfig {
   baseUrl?: string;
 }
 
+/** Slack event payload interface definition. */
 export interface SlackEventPayload {
   type: string;
   event?: {
@@ -183,6 +197,7 @@ export interface SlackEventPayload {
   text?: string;
 }
 
+/** Slack adapter. */
 export class SlackAdapter implements PlatformAdapter {
   readonly platform = "slack" as const;
   private config: Required<SlackConfig>;
@@ -220,10 +235,10 @@ export class SlackAdapter implements PlatformAdapter {
       if (!ev.user || !ev.channel) return null;
       return {
         platform: this.platform,
-        userId:   ev.user,
-        chatId:   ev.channel,
-        text:     ev.text ?? "",
-        raw:      payload,
+        userId: ev.user,
+        chatId: ev.channel,
+        text: ev.text ?? "",
+        raw: payload,
       };
     }
 
@@ -231,10 +246,10 @@ export class SlackAdapter implements PlatformAdapter {
     if (payload.command) {
       return {
         platform: this.platform,
-        userId:   payload.user_id ?? "unknown",
-        chatId:   payload.channel_id ?? "unknown",
-        text:     `${payload.command} ${payload.text ?? ""}`.trim(),
-        raw:      payload,
+        userId: payload.user_id ?? "unknown",
+        chatId: payload.channel_id ?? "unknown",
+        text: `${payload.command} ${payload.text ?? ""}`.trim(),
+        raw: payload,
       };
     }
 
@@ -244,20 +259,18 @@ export class SlackAdapter implements PlatformAdapter {
   async send(msg: OutgoingMessage): Promise<SendResult> {
     const body: Record<string, unknown> = {
       channel: msg.chatId,
-      text:    msg.text ?? "",
+      text: msg.text ?? "",
     };
     if (msg.blocks) body["blocks"] = msg.blocks;
 
     try {
-      const raw = await this.sender.post(
-        `${this.config.baseUrl}/chat.postMessage`,
-        body,
-        { Authorization: `Bearer ${this.config.botToken}` },
-      ) as { ok?: boolean; ts?: string; error?: string };
+      const raw = (await this.sender.post(`${this.config.baseUrl}/chat.postMessage`, body, {
+        Authorization: `Bearer ${this.config.botToken}`,
+      })) as { ok?: boolean; ts?: string; error?: string };
       return {
-        success:   raw.ok === true,
+        success: raw.ok === true,
         messageId: raw.ts,
-        error:     raw.error,
+        error: raw.error,
       };
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -269,12 +282,16 @@ export class SlackAdapter implements PlatformAdapter {
 
 export type AdapterConfig =
   | ({ platform: "telegram" } & TelegramConfig)
-  | ({ platform: "slack" }    & SlackConfig);
+  | ({ platform: "slack" } & SlackConfig);
 
+/** Create adapter. */
 export function createAdapter(config: AdapterConfig, sender?: HttpSender): PlatformAdapter {
   switch (config.platform) {
-    case "telegram": return new TelegramAdapter(config, sender);
-    case "slack":    return new SlackAdapter(config, sender);
-    default: throw new Error(`Unknown platform: ${(config as { platform: string }).platform}`);
+    case "telegram":
+      return new TelegramAdapter(config, sender);
+    case "slack":
+      return new SlackAdapter(config, sender);
+    default:
+      throw new Error(`Unknown platform: ${(config as { platform: string }).platform}`);
   }
 }

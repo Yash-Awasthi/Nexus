@@ -21,8 +21,24 @@ const fastLlm: LlmCallFn = async (prompt, _model) => ({
 describe("ThinkChainBuilder", () => {
   it("builds a chain with steps", () => {
     const b = new ThinkChainBuilder("c1", "test query", "gpt-4o");
-    b.addStep({ prompt: "p1", scratchpad: "s1", conclusion: "c1", confidence: 0.9, status: "done", durationMs: 10, tokens: 5 });
-    b.addStep({ prompt: "p2", scratchpad: "s2", conclusion: "c2", confidence: 0.7, status: "done", durationMs: 8, tokens: 4 });
+    b.addStep({
+      prompt: "p1",
+      scratchpad: "s1",
+      conclusion: "c1",
+      confidence: 0.9,
+      status: "done",
+      durationMs: 10,
+      tokens: 5,
+    });
+    b.addStep({
+      prompt: "p2",
+      scratchpad: "s2",
+      conclusion: "c2",
+      confidence: 0.7,
+      status: "done",
+      durationMs: 8,
+      tokens: 4,
+    });
     const chain = b.build();
     expect(chain.steps).toHaveLength(2);
     expect(chain.steps[0]!.index).toBe(0);
@@ -58,7 +74,10 @@ describe("Thinker", () => {
 
   it("stops early when minConfidence reached after first step", async () => {
     const highConfLlm: LlmCallFn = async () => ({
-      scratchpad: "s", conclusion: "done", confidence: 0.99, tokens: 5,
+      scratchpad: "s",
+      conclusion: "done",
+      confidence: 0.99,
+      tokens: 5,
     });
     const t = new Thinker({ llmCall: highConfLlm, maxSteps: 5, minConfidence: 0.9 });
     const chain = await t.think("q");
@@ -132,7 +151,16 @@ describe("ReasoningCache", () => {
   it("clears cache", () => {
     const cache = new ReasoningCache();
     const t = new Thinker({ llmCall: fastLlm });
-    cache.set("q", { id: "x", query: "q", steps: [], finalAnswer: "", totalConfidence: 0, totalTokens: 0, durationMs: 0, model: "m" });
+    cache.set("q", {
+      id: "x",
+      query: "q",
+      steps: [],
+      finalAnswer: "",
+      totalConfidence: 0,
+      totalTokens: 0,
+      durationMs: 0,
+      model: "m",
+    });
     cache.clear();
     expect(cache.size()).toBe(0);
     expect(cache.has("q")).toBe(false);

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# GhostStack Federation Compose
+# Conductor Federation Compose
 #
 # Starts the complete federation stack: Floci (AWS emulator) + Redis + Postgres.
 # Used by FederationSupervisor.startFlociDocker() and `make dev-fed`.
@@ -8,7 +8,7 @@
 #   docker compose -f packages/runtime/docker/docker-compose.federation.yaml up -d
 #   docker compose -f packages/runtime/docker/docker-compose.federation.yaml down --remove-orphans
 
-name: ghoststack-federation
+name: conductor-federation
 
 services:
   # ── Floci — lightweight AWS emulator (LocalStack-compatible) ─────────────

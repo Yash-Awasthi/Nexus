@@ -116,7 +116,15 @@ describe("SearxngClient", () => {
     const urls: string[] = [];
     const http: HttpGetFn = async (url) => {
       urls.push(url);
-      return { query: "q", results: [], suggestions: [], answers: [], infoboxes: [], number_of_results: 0, latency: 0 };
+      return {
+        query: "q",
+        results: [],
+        suggestions: [],
+        answers: [],
+        infoboxes: [],
+        number_of_results: 0,
+        latency: 0,
+      };
     };
     const client = new SearxngClient("https://sx.com", {
       http,
@@ -131,7 +139,15 @@ describe("SearxngClient", () => {
     const urls: string[] = [];
     const http: HttpGetFn = async (url) => {
       urls.push(url);
-      return { query: "q", results: [], suggestions: [], answers: [], infoboxes: [], number_of_results: 0, latency: 0 };
+      return {
+        query: "q",
+        results: [],
+        suggestions: [],
+        answers: [],
+        infoboxes: [],
+        number_of_results: 0,
+        latency: 0,
+      };
     };
     const client = new SearxngClient("https://sx.com", {
       http,
@@ -241,16 +257,16 @@ describe("MultiEngineRouter", () => {
     const results = [{ ...sampleResult, url: "https://x.com", score: 0.5 }];
     const c1 = new SearxngClient("https://sx1.com", { http: makeMockHttp(results) });
 
-    const router = new MultiEngineRouter([
-      { client: c1, weight: 2, name: "i1" },
-    ]);
+    const router = new MultiEngineRouter([{ client: c1, weight: 2, name: "i1" }]);
     const result = await router.search("q");
     // score should be 0.5 * 2 = 1.0
     expect(result.results[0]!.score).toBeCloseTo(1.0);
   });
 
   it("handles instance failures gracefully", async () => {
-    const failHttp: HttpGetFn = async () => { throw new Error("down"); };
+    const failHttp: HttpGetFn = async () => {
+      throw new Error("down");
+    };
     const c1 = new SearxngClient("https://down.com", { http: failHttp });
     const c2 = new SearxngClient("https://up.com", { http: makeMockHttp([sampleResult]) });
 

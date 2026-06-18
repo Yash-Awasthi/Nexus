@@ -32,6 +32,7 @@ export interface BonMessage {
   content: string;
 }
 
+/** Bon llm response interface definition. */
 export interface BonLlmResponse {
   content: string;
   model: string;
@@ -39,8 +40,12 @@ export interface BonLlmResponse {
   durationMs?: number;
 }
 
+/** Bon llm client interface definition. */
 export interface BonLlmClient {
-  complete(messages: BonMessage[], opts?: { temperature?: number; maxTokens?: number }): Promise<BonLlmResponse>;
+  complete(
+    messages: BonMessage[],
+    opts?: { temperature?: number; maxTokens?: number },
+  ): Promise<BonLlmResponse>;
 }
 
 // ── Scorer ────────────────────────────────────────────────────────────────────
@@ -59,6 +64,7 @@ export interface BonCandidate {
   error?: string;
 }
 
+/** Bon result interface definition. */
 export interface BonResult {
   /** The highest-scoring candidate. */
   best: BonCandidate;
@@ -93,7 +99,10 @@ export function defaultScorer(content: string, prompt: string): number {
   const codeBlocks = (content.match(CODE_RE) ?? []).length / 2;
   score += Math.min(headers * 3 + lists * 2 + codeBlocks * 5, 25);
   score += HEDGE_RE.test(content) ? 0 : 20;
-  const words = prompt.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+  const words = prompt
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length > 3);
   const lower = content.toLowerCase();
   const matched = words.filter((w) => lower.includes(w));
   score += words.length > 0 ? (matched.length / words.length) * 25 : 12.5;
@@ -113,6 +122,7 @@ export interface BestOfNConfig {
   role?: "thinker" | "editor" | string;
 }
 
+/** Generate request interface definition. */
 export interface GenerateRequest {
   prompt: string;
   /** Optional system prompt prepended to all N calls. */
@@ -197,7 +207,7 @@ export class BestOfNGenerator {
         content: res.content,
         model: res.model,
         score,
-        durationMs: res.durationMs ?? (Date.now() - t0),
+        durationMs: res.durationMs ?? Date.now() - t0,
         success: true,
       };
     } catch (err) {

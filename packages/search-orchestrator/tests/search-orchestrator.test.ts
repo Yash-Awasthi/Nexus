@@ -67,9 +67,27 @@ describe("MockSearchStrategy", () => {
 
 describe("applyFilters", () => {
   const results: SearchResult[] = [
-    makeResult({ id: "1", projectId: "proj-a", type: "document", score: 0.9, timestamp: "2026-01-10T00:00:00.000Z" }),
-    makeResult({ id: "2", projectId: "proj-b", type: "code",     score: 0.5, timestamp: "2026-01-20T00:00:00.000Z" }),
-    makeResult({ id: "3", projectId: "proj-a", type: "message",  score: 0.7, timestamp: "2026-01-15T00:00:00.000Z" }),
+    makeResult({
+      id: "1",
+      projectId: "proj-a",
+      type: "document",
+      score: 0.9,
+      timestamp: "2026-01-10T00:00:00.000Z",
+    }),
+    makeResult({
+      id: "2",
+      projectId: "proj-b",
+      type: "code",
+      score: 0.5,
+      timestamp: "2026-01-20T00:00:00.000Z",
+    }),
+    makeResult({
+      id: "3",
+      projectId: "proj-a",
+      type: "message",
+      score: 0.7,
+      timestamp: "2026-01-15T00:00:00.000Z",
+    }),
   ];
 
   it("filters by projectId", () => {
@@ -92,7 +110,7 @@ describe("applyFilters", () => {
 
   it("filters by after/before", () => {
     const out = applyFilters(results, {
-      after:  "2026-01-12T00:00:00.000Z",
+      after: "2026-01-12T00:00:00.000Z",
       before: "2026-01-18T00:00:00.000Z",
     });
     expect(out).toHaveLength(1);
@@ -110,9 +128,9 @@ describe("applyFilters", () => {
 
 describe("StrategyChain", () => {
   it("returns first non-empty result (fallback mode)", async () => {
-    const empty  = new MockSearchStrategy("chroma", { empty: true });
+    const empty = new MockSearchStrategy("chroma", { empty: true });
     const filled = new MockSearchStrategy("sqlite");
-    const chain  = new StrategyChain({ strategies: [empty, filled] });
+    const chain = new StrategyChain({ strategies: [empty, filled] });
     const response = await chain.search({ query: "q" });
     expect(response.results.length).toBeGreaterThan(0);
     expect(response.source).toBe("sqlite");
@@ -123,8 +141,8 @@ describe("StrategyChain", () => {
 
   it("skips failed strategies and tries next", async () => {
     const failing = new MockSearchStrategy("chroma", { throws: "down" });
-    const ok      = new MockSearchStrategy("sqlite");
-    const chain   = new StrategyChain({ strategies: [failing, ok] });
+    const ok = new MockSearchStrategy("sqlite");
+    const chain = new StrategyChain({ strategies: [failing, ok] });
     const response = await chain.search({ query: "q" });
     expect(response.results.length).toBeGreaterThan(0);
   });

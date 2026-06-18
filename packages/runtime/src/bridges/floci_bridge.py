@@ -46,6 +46,12 @@ import httpx
 logger = logging.getLogger("floci_bridge")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(message)s")
 
+
+def _sanitize_log(val: Any) -> str:
+    """Strip newlines/control chars from user-supplied values before logging."""
+    return str(val).replace("\n", "\\n").replace("\r", "\\r").replace("\0", "")[:500]
+
+
 FLOCI_BACKEND_URL: str = os.environ.get("FLOCI_BACKEND_URL", "http://localhost:4566")
 AWS_REGION: str = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
 
@@ -282,7 +288,8 @@ def create_app() -> FastAPI:
                 resp = await client.get(f"{FLOCI_BACKEND_URL}/_localstack/health")
                 floci_ok = resp.status_code < 400
         except Exception as exc:
-            floci_error = str(exc)
+            logger.error("Floci health probe failed: %s", exc)
+            floci_error = "unreachable"
 
         return {
             "status": "ok",
@@ -306,8 +313,8 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:
             # boto3 ClientError or connection errors
-            logger.error("Floci action %s failed: %s", action, exc)
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
+            logger.error("Floci action %s failed: %s", _sanitize_log(action), exc)
+            raise HTTPException(status_code=502, detail="Upstream service error — check server logs") from exc
 
     return app
 

@@ -170,6 +170,7 @@ export class NexusAdapterError extends Error {
   }
 }
 
+/** Adapter timeout error. */
 export class AdapterTimeoutError extends NexusAdapterError {
   constructor(adapterName: string, taskType: string, timeoutMs: number) {
     super(
@@ -181,6 +182,7 @@ export class AdapterTimeoutError extends NexusAdapterError {
   }
 }
 
+/** Adapter config error. */
 export class AdapterConfigError extends NexusAdapterError {
   constructor(adapterName: string, missingKey: string) {
     super(
@@ -192,6 +194,7 @@ export class AdapterConfigError extends NexusAdapterError {
   }
 }
 
+/** Adapter http error. */
 export class AdapterHttpError extends NexusAdapterError {
   constructor(
     adapterName: string,
@@ -243,5 +246,197 @@ export async function withTimeout<T>(
     return await Promise.race([promise, timeoutPromise]);
   } finally {
     if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+// ── Social Media Provider Contracts ──────────────────────────────────────────
+// Extracted from: gitroomhq/postiz-app libraries/nestjs-libraries/src/integrations/
+// Defines the canonical interface every social-platform adapter must implement.
+// Covers: OAuth2 flow, multi-account publishing, scheduled post delivery, analytics.
+
+/** OAuth2 client credentials for platform-specific app registration. */
+export interface SocialClientInformation {
+  clientId: string;
+  clientSecret: string;
+  /** Instance URL for self-hosted platforms (e.g. Mastodon, Lemmy). */
+  instanceUrl?: string;
+}
+
+/** OAuth2 tokens returned after a successful authentication exchange. */
+export interface SocialAuthTokenDetails {
+  /** Platform user/page ID */
+  id: string;
+  /** Display name of the authenticated account */
+  name: string;
+  accessToken: string;
+  refreshToken?: string;
+  /** Seconds until accessToken expires */
+  expiresIn?: number;
+  picture?: string;
+  username: string;
+  error?: string;
+  /** Extra settings the platform requires (e.g. page selector checkboxes). */
+  additionalSettings?: Array<{
+    title: string;
+    description: string;
+    type: "checkbox" | "text" | "textarea";
+    value: unknown;
+    regex?: string;
+  }>;
+}
+
+/** Response payload from `generateAuthUrl`. */
+export interface SocialAuthUrlResponse {
+  url: string;
+  /** PKCE code verifier — store this until the callback */
+  codeVerifier: string;
+  /** CSRF state token */
+  state: string;
+}
+
+/** A single analytics series returned by a platform. */
+export interface SocialAnalyticsData {
+  label: string;
+  data: Array<{ total: string; date: string }>;
+  percentageChange: number;
+}
+
+/** Media item (image or video) attached to a post. */
+export interface SocialMediaContent {
+  type: "image" | "video";
+  /** URL or local path to the media file */
+  path: string;
+  alt?: string;
+  thumbnail?: string;
+  /** Used by some platforms to seek to a thumbnail frame (seconds) */
+  thumbnailTimestamp?: number;
+}
+
+/** Poll attached to a post. */
+export interface SocialPollDetails {
+  options: string[];
+  /** Duration in hours */
+  duration: number;
+}
+
+/** Per-post publication details sent to a social adapter. */
+export interface SocialPostDetails<TSettings = unknown> {
+  /** Internal DB id of this post record */
+  id: string;
+  message: string;
+  settings: TSettings;
+  media?: SocialMediaContent[];
+  poll?: SocialPollDetails;
+}
+
+/** Result returned by a social adapter after a successful publish. */
+export interface SocialPostResponse {
+  /** Internal DB id of the post record */
+  id: string;
+  /** ID returned by the platform for the published post */
+  postId: string;
+  /** Public URL of the post on the platform */
+  releaseURL: string;
+  /** Platform-specific status string */
+  status: string;
+}
+
+/** Page/channel selector result (e.g. Facebook pages, LinkedIn pages). */
+export interface SocialPageInfo {
+  id: string;
+  name: string;
+  accessToken: string;
+  picture: string;
+  username: string;
+}
+
+/**
+ * Core interface every social media adapter must implement.
+ * Extend SocialProviderBase and add `identifier` + `post()` at minimum.
+ */
+export interface ISocialProvider {
+  /** Unique platform slug, e.g. "twitter", "linkedin", "bluesky" */
+  identifier: string;
+  /** Human-readable platform name */
+  name: string;
+  /** OAuth2 scopes required by this provider */
+  scopes: string[];
+  /** Rich-text editor type used in the compose UI */
+  editor: "none" | "normal" | "markdown" | "html";
+  /** Whether auth happens in a sub-step (e.g. page-level tokens) */
+  isBetweenSteps: boolean;
+  /** Max character count for a single post */
+  maxLength(additionalSettings?: unknown): number;
+
+  // OAuth lifecycle
+  generateAuthUrl(clientInfo?: SocialClientInformation): Promise<SocialAuthUrlResponse>;
+  authenticate(
+    params: { code: string; codeVerifier: string; refresh?: string },
+    clientInfo?: SocialClientInformation,
+  ): Promise<SocialAuthTokenDetails | string>;
+  refreshToken(refreshToken: string): Promise<SocialAuthTokenDetails>;
+
+  // Publishing
+  post(
+    id: string,
+    accessToken: string,
+    postDetails: SocialPostDetails[],
+  ): Promise<SocialPostResponse[]>;
+  comment?(
+    id: string,
+    postId: string,
+    lastCommentId: string | undefined,
+    accessToken: string,
+    postDetails: SocialPostDetails[],
+  ): Promise<SocialPostResponse[]>;
+
+  // Analytics
+  analytics?(id: string, accessToken: string, date: number): Promise<SocialAnalyticsData[]>;
+  postAnalytics?(
+    integrationId: string,
+    accessToken: string,
+    postId: string,
+    fromDate: number,
+  ): Promise<SocialAnalyticsData[]>;
+
+  // Optional capabilities
+  fetchPageInformation?(accessToken: string, data: unknown): Promise<SocialPageInfo>;
+  reConnect?(
+    id: string,
+    requiredId: string,
+    accessToken: string,
+  ): Promise<Pick<SocialAuthTokenDetails, "id" | "name" | "picture" | "username">>;
+  mention?(
+    token: string,
+    data: { query: string },
+    id: string,
+  ): Promise<Array<{ id: string; label: string; image: string; doNotCache?: boolean }> | { none: true }>;
+  mentionFormat?(idOrHandle: string, name: string): string;
+
+  /** Validate media attached to a post before publishing. Returns true or an error message. */
+  checkValidity(
+    posts: Array<Array<{ path: string; thumbnail?: string }>>,
+    settings: unknown,
+    additionalSettings: unknown[],
+  ): Promise<string | true>;
+}
+
+/** Error thrown when a social token needs refresh (retryable). */
+export class SocialRefreshTokenError extends Error {
+  readonly identifier: string;
+  constructor(identifier: string, message = "Token refresh required") {
+    super(message);
+    this.name = "SocialRefreshTokenError";
+    this.identifier = identifier;
+  }
+}
+
+/** Error thrown when the platform rejected the post payload (retryable). */
+export class SocialBadBodyError extends Error {
+  readonly identifier: string;
+  constructor(identifier: string, message = "Bad post body") {
+    super(message);
+    this.name = "SocialBadBodyError";
+    this.identifier = identifier;
   }
 }

@@ -27,7 +27,9 @@ function advanceTime(ms: number) {
   _time += ms;
 }
 
-function makeEntry(overrides: Partial<Omit<GatewayLogEntry, "id">> = {}): Omit<GatewayLogEntry, "id"> {
+function makeEntry(
+  overrides: Partial<Omit<GatewayLogEntry, "id">> = {},
+): Omit<GatewayLogEntry, "id"> {
   return {
     timestamp: _time,
     model: "gpt-4o",
@@ -108,9 +110,25 @@ describe("computeStats", () => {
 
   it("counts successes, errors, cached", () => {
     const entries: GatewayLogEntry[] = [
-      { id: "1", timestamp: 1, model: "m", provider: "p", status: "success", latencyMs: 100, usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 } },
+      {
+        id: "1",
+        timestamp: 1,
+        model: "m",
+        provider: "p",
+        status: "success",
+        latencyMs: 100,
+        usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+      },
       { id: "2", timestamp: 2, model: "m", provider: "p", status: "error", latencyMs: 50 },
-      { id: "3", timestamp: 3, model: "m", provider: "p", status: "cached", latencyMs: 10, usage: { promptTokens: 5, completionTokens: 10, totalTokens: 15 } },
+      {
+        id: "3",
+        timestamp: 3,
+        model: "m",
+        provider: "p",
+        status: "cached",
+        latencyMs: 10,
+        usage: { promptTokens: 5, completionTokens: 10, totalTokens: 15 },
+      },
     ];
     const s = computeStats(entries);
     expect(s.totalRequests).toBe(3);
@@ -130,9 +148,33 @@ describe("computeStats", () => {
 
   it("computes tokensByProvider", () => {
     const entries: GatewayLogEntry[] = [
-      { id: "1", timestamp: 1, model: "m", provider: "openai", status: "success", latencyMs: 100, usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 } },
-      { id: "2", timestamp: 2, model: "m", provider: "openai", status: "success", latencyMs: 100, usage: { promptTokens: 5, completionTokens: 10, totalTokens: 15 } },
-      { id: "3", timestamp: 3, model: "m", provider: "groq", status: "success", latencyMs: 100, usage: { promptTokens: 20, completionTokens: 40, totalTokens: 60 } },
+      {
+        id: "1",
+        timestamp: 1,
+        model: "m",
+        provider: "openai",
+        status: "success",
+        latencyMs: 100,
+        usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+      },
+      {
+        id: "2",
+        timestamp: 2,
+        model: "m",
+        provider: "openai",
+        status: "success",
+        latencyMs: 100,
+        usage: { promptTokens: 5, completionTokens: 10, totalTokens: 15 },
+      },
+      {
+        id: "3",
+        timestamp: 3,
+        model: "m",
+        provider: "groq",
+        status: "success",
+        latencyMs: 100,
+        usage: { promptTokens: 20, completionTokens: 40, totalTokens: 60 },
+      },
     ];
     const s = computeStats(entries);
     expect(s.tokensByProvider["openai"]).toBe(45);
@@ -143,7 +185,14 @@ describe("computeStats", () => {
     const entries: GatewayLogEntry[] = [
       { id: "1", timestamp: 1, model: "gpt-4o", provider: "p", status: "success", latencyMs: 100 },
       { id: "2", timestamp: 2, model: "gpt-4o", provider: "p", status: "success", latencyMs: 100 },
-      { id: "3", timestamp: 3, model: "claude-3-5", provider: "p", status: "success", latencyMs: 100 },
+      {
+        id: "3",
+        timestamp: 3,
+        model: "claude-3-5",
+        provider: "p",
+        status: "success",
+        latencyMs: 100,
+      },
     ];
     const s = computeStats(entries);
     expect(s.requestsByModel["gpt-4o"]).toBe(2);
@@ -268,7 +317,13 @@ describe("MemoryGatewayLog", () => {
 
   // stats
   it("stats returns aggregate metrics", async () => {
-    await log.append(makeEntry({ status: "success", latencyMs: 100, usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 } }));
+    await log.append(
+      makeEntry({
+        status: "success",
+        latencyMs: 100,
+        usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+      }),
+    );
     await log.append(makeEntry({ status: "error", latencyMs: 50, usage: undefined }));
     const s = await log.stats();
     expect(s.totalRequests).toBe(2);
@@ -363,7 +418,12 @@ describe("KVGatewayLog", () => {
   });
 
   it("stats aggregates entries", async () => {
-    await log.append(makeEntry({ status: "success", usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 } }));
+    await log.append(
+      makeEntry({
+        status: "success",
+        usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+      }),
+    );
     await log.append(makeEntry({ status: "error", usage: undefined }));
     const s = await log.stats();
     expect(s.totalRequests).toBe(2);
@@ -422,11 +482,7 @@ describe("LoggingLLMProvider", () => {
 
   // Cached logging
   it("logs status as 'cached' when response.cached is true", async () => {
-    const p = new LoggingLLMProvider(
-      makeProvider(makeResponse({ cached: true })),
-      log,
-      { now },
-    );
+    const p = new LoggingLLMProvider(makeProvider(makeResponse({ cached: true })), log, { now });
     await p.complete(makeRequest());
     const entries = await log.query();
     expect(entries[0].status).toBe("cached");

@@ -70,7 +70,7 @@ export interface IExecutionEnvironment {
   telemetry: IEnvironmentTelemetry;
 }
 
-export interface ICapabilityPolicy {
+interface ICapabilityPolicy {
   evaluateCapability(
     taskType: string,
     environment: IExecutionEnvironment,

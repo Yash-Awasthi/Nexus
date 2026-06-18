@@ -1,0 +1,25 @@
+{
+  "name": "@nexus/conductor",
+  "version": "1.2.0",
+  "description": "Conductor — multi-agent orchestration runtime with queue, governance, and job lifecycle management",
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "axios": "^1.17.0",
+    "js-yaml": "^4.1.1"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "typescript": "^5.4.0"
+  }
+}

@@ -99,7 +99,11 @@ describe("StrReplaceTool", () => {
     const fs = new InMemoryFileSystem();
     await fs.write("/f.ts", "const x = 1;\nconst y = 2;");
     const tool = new StrReplaceTool(fs);
-    const result = await tool.execute({ path: "/f.ts", oldStr: "const x = 1;", newStr: "const x = 42;" });
+    const result = await tool.execute({
+      path: "/f.ts",
+      oldStr: "const x = 1;",
+      newStr: "const x = 42;",
+    });
     expect(result.success).toBe(true);
     expect(result.replaced).toBe(true);
     expect(await fs.read("/f.ts")).toContain("const x = 42;");
@@ -128,7 +132,10 @@ describe("EditorToolExecutor", () => {
   it("executes write_file call", async () => {
     const fs = new InMemoryFileSystem();
     const executor = new EditorToolExecutor(fs);
-    const call: EditorToolCall = { tool: "write_file", params: { path: "/out.ts", content: "hello" } };
+    const call: EditorToolCall = {
+      tool: "write_file",
+      params: { path: "/out.ts", content: "hello" },
+    };
     const result = await executor.execute(call);
     expect(result.success).toBe(true);
     expect(result.tool).toBe("write_file");
@@ -138,7 +145,10 @@ describe("EditorToolExecutor", () => {
     const fs = new InMemoryFileSystem();
     await fs.write("/f.ts", "old content");
     const executor = new EditorToolExecutor(fs);
-    const call: EditorToolCall = { tool: "str_replace", params: { path: "/f.ts", oldStr: "old", newStr: "new" } };
+    const call: EditorToolCall = {
+      tool: "str_replace",
+      params: { path: "/f.ts", oldStr: "old", newStr: "new" },
+    };
     const result = await executor.execute(call);
     expect(result.success).toBe(true);
     expect(result.tool).toBe("str_replace");
@@ -216,7 +226,9 @@ describe("CodeEditorAgent", () => {
   });
 
   it("extracts thinking from reasoning model response", async () => {
-    const mock = new MockModelBackend({ text: "<think>\nAnalyze carefully\n</think>\n\nEdited successfully." });
+    const mock = new MockModelBackend({
+      text: "<think>\nAnalyze carefully\n</think>\n\nEdited successfully.",
+    });
     const agent = new CodeEditorAgent({ model: "deepseek-coder", backend: mock.asBackend() });
     const result = await agent.edit({ instruction: "Fix bug" });
     expect(result.output.thinking).toBe("Analyze carefully");

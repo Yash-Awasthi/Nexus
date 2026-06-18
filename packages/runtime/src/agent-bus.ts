@@ -63,7 +63,7 @@ export interface IAgentBus {
   getCapabilities(): Promise<AgentCapability[]>;
 }
 
-export interface AgentBusOptions {
+interface AgentBusOptions {
   /**
    * Maximum number of messages retained in the in-memory ring buffer.
    * Oldest messages are evicted when the cap is reached.

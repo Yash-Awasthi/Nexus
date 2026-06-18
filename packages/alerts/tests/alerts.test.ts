@@ -26,18 +26,26 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 
 let _time = 1_000_000;
-function mockNow() { return _time; }
-function advanceMs(ms: number) { _time += ms; }
-function resetClock() { _time = 1_000_000; }
+function mockNow() {
+  return _time;
+}
+function advanceMs(ms: number) {
+  _time += ms;
+}
+function resetClock() {
+  _time = 1_000_000;
+}
 
 function makeHooks(): AlertHooks {
   return { emit: vi.fn().mockResolvedValue({ handled: 1, aborted: false, errors: [] }) };
 }
 
-function makeEngine(opts: {
-  channels?: AlertChannel[];
-  hooks?: AlertHooks;
-} = {}): AlertEngine {
+function makeEngine(
+  opts: {
+    channels?: AlertChannel[];
+    hooks?: AlertHooks;
+  } = {},
+): AlertEngine {
   return new AlertEngine({ now: mockNow, ...opts });
 }
 
@@ -160,7 +168,11 @@ describe("AlertEngine — rule management", () => {
   it("addRule throws DUPLICATE_RULE when id already registered", () => {
     engine.addRule(costRule);
     let caught: AlertError | undefined;
-    try { engine.addRule(costRule); } catch (e) { caught = e as AlertError; }
+    try {
+      engine.addRule(costRule);
+    } catch (e) {
+      caught = e as AlertError;
+    }
     expect(caught?.code).toBe("DUPLICATE_RULE");
   });
 
@@ -172,7 +184,11 @@ describe("AlertEngine — rule management", () => {
 
   it("removeRule throws RULE_NOT_FOUND when id unknown", () => {
     let caught: AlertError | undefined;
-    try { engine.removeRule("nope"); } catch (e) { caught = e as AlertError; }
+    try {
+      engine.removeRule("nope");
+    } catch (e) {
+      caught = e as AlertError;
+    }
     expect(caught?.code).toBe("RULE_NOT_FOUND");
   });
 
@@ -187,7 +203,11 @@ describe("AlertEngine — rule management", () => {
 
   it("updateRule throws RULE_NOT_FOUND when id unknown", () => {
     let caught: AlertError | undefined;
-    try { engine.updateRule("nope", { severity: "info" }); } catch (e) { caught = e as AlertError; }
+    try {
+      engine.updateRule("nope", { severity: "info" });
+    } catch (e) {
+      caught = e as AlertError;
+    }
     expect(caught?.code).toBe("RULE_NOT_FOUND");
   });
 
@@ -312,7 +332,9 @@ describe("AlertEngine — pattern conditions", () => {
 
   it("pattern does not fire when substring absent", async () => {
     engine.addRule({
-      id: "r", name: "r", metric: "m",
+      id: "r",
+      name: "r",
+      metric: "m",
       condition: { type: "pattern", pattern: "ERROR" },
       severity: "info",
     });
@@ -322,7 +344,9 @@ describe("AlertEngine — pattern conditions", () => {
 
   it("pattern ignoreCase matches case-insensitively", async () => {
     engine.addRule({
-      id: "r", name: "r", metric: "m",
+      id: "r",
+      name: "r",
+      metric: "m",
       condition: { type: "pattern", pattern: "error", ignoreCase: true },
       severity: "warning",
     });
@@ -332,7 +356,9 @@ describe("AlertEngine — pattern conditions", () => {
 
   it("pattern regex mode matches regexp", async () => {
     engine.addRule({
-      id: "r", name: "r", metric: "m",
+      id: "r",
+      name: "r",
+      metric: "m",
       condition: { type: "pattern", pattern: "^ERR\\d+", regex: true },
       severity: "critical",
     });
@@ -342,7 +368,9 @@ describe("AlertEngine — pattern conditions", () => {
 
   it("pattern regex with ignoreCase flag", async () => {
     engine.addRule({
-      id: "r", name: "r", metric: "m",
+      id: "r",
+      name: "r",
+      metric: "m",
       condition: { type: "pattern", pattern: "timeout", regex: true, ignoreCase: true },
       severity: "warning",
     });
@@ -352,7 +380,9 @@ describe("AlertEngine — pattern conditions", () => {
 
   it("pattern does not fire when value is non-string", async () => {
     engine.addRule({
-      id: "r", name: "r", metric: "m",
+      id: "r",
+      name: "r",
+      metric: "m",
       condition: { type: "pattern", pattern: "x" },
       severity: "info",
     });
@@ -464,7 +494,9 @@ describe("AlertEngine — composite conditions", () => {
 
   it("composite with pattern child fires correctly", async () => {
     engine.addRule({
-      id: "combo2", name: "combo2", metric: "m",
+      id: "combo2",
+      name: "combo2",
+      metric: "m",
       condition: {
         type: "composite",
         conditions: [
@@ -785,7 +817,9 @@ describe("FileAlertRuleStore", () => {
   });
 
   it("loadRules() returns [] when file is missing (readFile throws)", async () => {
-    const readFile: AlertReadFileFn = vi.fn(async () => { throw new Error("ENOENT"); });
+    const readFile: AlertReadFileFn = vi.fn(async () => {
+      throw new Error("ENOENT");
+    });
     const store = new FileAlertRuleStore({ path: "/missing.json", readFile });
     expect(await store.loadRules()).toEqual([]);
   });
@@ -858,7 +892,10 @@ describe("persistEngineTo", () => {
 describe("loadEngineFromStore", () => {
   it("loads rules from store into a new engine", async () => {
     const store = new MemoryAlertRuleStore();
-    await store.saveRules([thresholdRule("r1", "cpu", "gt", 80), thresholdRule("r2", "mem", "gt", 90)]);
+    await store.saveRules([
+      thresholdRule("r1", "cpu", "gt", 80),
+      thresholdRule("r2", "mem", "gt", 90),
+    ]);
     const engine = await loadEngineFromStore(store);
     expect(engine.listRules()).toHaveLength(2);
     expect(engine.getRule("r1")).toBeDefined();
@@ -1123,7 +1160,9 @@ describe("MemoryAlertCooldownStore", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("AlertEngine — cooldown persistence", () => {
-  beforeEach(() => { resetClock(); });
+  beforeEach(() => {
+    resetClock();
+  });
 
   it("loadCooldowns returns 0 when no cooldownStore configured", async () => {
     const engine = new AlertEngine({ now: mockNow });
@@ -1225,7 +1264,9 @@ describe("AlertEngine — cooldown persistence", () => {
 
     // Session 1: fire and persist (cooldownMs 500_000 < _time 1_000_000 so first call fires)
     const engine1 = new AlertEngine({ now: mockNow, cooldownStore });
-    engine1.addRule(thresholdRule("latency", "lat", "gt", 100, "critical", { cooldownMs: 500_000 }));
+    engine1.addRule(
+      thresholdRule("latency", "lat", "gt", 100, "critical", { cooldownMs: 500_000 }),
+    );
     await persistEngineTo(engine1, ruleStore);
     await engine1.evaluate("lat", 200);
 

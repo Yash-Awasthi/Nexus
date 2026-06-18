@@ -87,7 +87,7 @@ export type {
 export { RuntimeDiagnosticAPI } from "./diagnostic-api.js";
 
 // ── MCP bridge ────────────────────────────────────────────────────────────────
-export { registerGhostStackMcpBridge, GHOSTSTACK_MCP_TOOLS } from "./ghoststack-mcp-bridge.js";
+export { registerConductorMcpBridge, GHOSTSTACK_MCP_TOOLS } from "./conductor-mcp-bridge.js";
 
 // ── Planning engine ───────────────────────────────────────────────────────────
 export { PlanningEngine } from "./planning-engine.js";
@@ -102,7 +102,7 @@ export type { WorkflowSpecTask, WorkflowSpecFile } from "./spec-loader.js";
 
 // ── Runtime context factory ───────────────────────────────────────────────────
 export { createRuntimeContext, startRuntime, stopRuntime } from "./runtime-context.js";
-export type { GhostStackRuntimeContext } from "./runtime-context.js";
+export type { ConductorRuntimeContext } from "./runtime-context.js";
 
 // ── Adapter manifest ──────────────────────────────────────────────────────────
 export { ADAPTER_MANIFEST, getManifestEntry } from "./adapters/manifest.js";
@@ -117,13 +117,13 @@ export type {
   FederationSupervisorStatus,
 } from "./federation-supervisor.js";
 
-// ── GhostStack config ─────────────────────────────────────────────────────────
-export { loadGhostStackConfig } from "./ghoststack-config.js";
-export type { GhostStackConfig, GhostStackFeatures } from "./ghoststack-config.js";
+// ── Conductor config ─────────────────────────────────────────────────────────
+export { loadConductorConfig } from "./conductor-config.js";
+export type { ConductorConfig, ConductorFeatures } from "./conductor-config.js";
 
-// ── GhostStack server ─────────────────────────────────────────────────────────
-export { createGhostStackServer } from "./ghoststack-server.js";
-export type { GhostStackServer } from "./ghoststack-server.js";
+// ── Conductor server ─────────────────────────────────────────────────────────
+export { createConductorServer } from "./conductor-server.js";
+export type { ConductorServer } from "./conductor-server.js";
 
 // ── Bootstrap & healthcheck ───────────────────────────────────────────────────
 export { bootstrap } from "./bootstrap.js";

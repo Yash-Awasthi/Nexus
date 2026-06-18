@@ -1,0 +1,13 @@
+{
+  "apiPort": 3000,
+  "flociUrl": "http://localhost:4566",
+  "mcpPort": 8100,
+  "dataDir": "./data-runtime",
+  "features": {
+    "flociAutostart": true,
+    "flociStrict": false,
+    "offlineMode": true,
+    "mcpBridge": true,
+    "mcpExternal": true
+  }
+}

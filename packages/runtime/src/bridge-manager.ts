@@ -3,7 +3,7 @@
  * BridgeManager — manages Python subprocess bridges for native execution capabilities.
  *
  * Each bridge is a FastAPI server on a dedicated localhost port.
- * BridgeManager spawns, monitors, and terminates them as part of the GhostStack lifecycle.
+ * BridgeManager spawns, monitors, and terminates them as part of the Conductor lifecycle.
  *
  * Usage:
  *   const mgr = new BridgeManager();
@@ -19,12 +19,7 @@ import * as http from "http";
 import { fileURLToPath } from "node:url";
 import * as path from "path";
 
-export type BridgeName =
-  | "stealth-browser"
-  | "scraping"
-  | "local-inference"
-  | "mcp-server"
-  | "floci";
+type BridgeName = "stealth-browser" | "scraping" | "local-inference" | "mcp-server" | "floci";
 
 interface BridgeConfig {
   script: string; // relative to runtime/bridges/

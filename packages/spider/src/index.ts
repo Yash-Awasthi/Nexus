@@ -54,6 +54,7 @@ export interface CrawlTarget {
   headers?: Record<string, string>;
 }
 
+/** Crawled page interface definition. */
 export interface CrawledPage {
   url: string;
   finalUrl: string; // after redirects
@@ -67,6 +68,7 @@ export interface CrawledPage {
   proxyUsed?: string;
 }
 
+/** Crawl summary interface definition. */
 export interface CrawlSummary {
   totalPages: number;
   successPages: number;
@@ -76,10 +78,11 @@ export interface CrawlSummary {
   seedUrl: string;
 }
 
+/** Crawl checkpoint interface definition. */
 export interface CrawlCheckpoint {
   seedUrl: string;
   visited: string[];
-  queue: Array<{ url: string; depth: number }>;
+  queue: { url: string; depth: number }[];
   createdAt: number;
 }
 
@@ -106,6 +109,7 @@ export interface Proxy {
   auth?: { username: string; password: string };
 }
 
+/** I proxy rotator interface definition. */
 export interface IProxyRotator {
   next(sessionKey?: string): Proxy | undefined;
   markSuccess(proxy: Proxy, latencyMs?: number): void;
@@ -136,7 +140,10 @@ export class MemoryCookieJar implements ICookieJar {
   setCookies(url: string, headers: string[]): void {
     const domain = this._domain(url);
     let jar = this.cookies.get(domain);
-    if (!jar) { jar = new Map(); this.cookies.set(domain, jar); }
+    if (!jar) {
+      jar = new Map();
+      this.cookies.set(domain, jar);
+    }
     for (const header of headers) {
       const nameVal = header.split(";")[0]?.trim();
       if (!nameVal) continue;
@@ -147,10 +154,16 @@ export class MemoryCookieJar implements ICookieJar {
   }
 
   private _domain(url: string): string {
-    try { return new URL(url).hostname; } catch { return url; }
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return url;
+    }
   }
 
-  clear(): void { this.cookies.clear(); }
+  clear(): void {
+    this.cookies.clear();
+  }
 }
 
 // ── robots.txt ────────────────────────────────────────────────────────────────
@@ -191,6 +204,7 @@ function isAllowedByRobots(rules: RobotsRules, path: string): boolean {
 // ── Sitemap parser ────────────────────────────────────────────────────────────
 
 function parseSitemapUrls(xml: string): string[] {
+  if (xml.length > 500_000) return [];
   const urls: string[] = [];
   // <loc>…</loc> in both urlset and sitemapindex
   for (const match of xml.matchAll(/<loc>(.*?)<\/loc>/g)) {
@@ -203,7 +217,14 @@ function parseSitemapUrls(xml: string): string[] {
 // ── Link extractor ────────────────────────────────────────────────────────────
 
 export function extractLinks(html: string, baseUrl: string): string[] {
-  const base = (() => { try { return new URL(baseUrl); } catch { return null; } })();
+  if (html.length > 500_000) return [];
+  const base = (() => {
+    try {
+      return new URL(baseUrl);
+    } catch {
+      return null;
+    }
+  })();
   if (!base) return [];
 
   const hrefs: string[] = [];
@@ -224,7 +245,9 @@ export function extractLinks(html: string, baseUrl: string): string[] {
       // Only follow http/https links
       if (u.protocol !== "http:" && u.protocol !== "https:") continue;
       resolved.push(u.toString());
-    } catch { /* skip malformed */ }
+    } catch {
+      /* skip malformed */
+    }
   }
   // Deduplicate
   return [...new Set(resolved)];
@@ -260,8 +283,12 @@ function matchesPattern(url: string, patterns: RegExp[]): boolean {
 
 // ── CrawlScheduler ────────────────────────────────────────────────────────────
 
-interface QueueEntry { url: string; depth: number; }
+interface QueueEntry {
+  url: string;
+  depth: number;
+}
 
+/** Crawl scheduler. */
 export class CrawlScheduler {
   private readonly _queue: QueueEntry[] = [];
   private readonly _visited = new Set<string>();
@@ -286,8 +313,12 @@ export class CrawlScheduler {
     return this._visited.has(normalizeUrl(url));
   }
 
-  get queueLength(): number { return this._queue.length; }
-  get visitedCount(): number { return this._visited.size; }
+  get queueLength(): number {
+    return this._queue.length;
+  }
+  get visitedCount(): number {
+    return this._visited.size;
+  }
 
   checkpoint(seedUrl: string): CrawlCheckpoint {
     return {
@@ -325,6 +356,7 @@ export interface SpiderConfig {
   maxRetries?: number;
 }
 
+/** Spider. */
 export class Spider {
   private readonly fetch: FetchFn;
   private readonly proxy?: IProxyRotator;
@@ -351,9 +383,15 @@ export class Spider {
     this.maxRetries = config.maxRetries ?? 1;
   }
 
-  pause(): void { this._paused = true; }
-  resume(): void { this._paused = false; }
-  stop(): void { this._stopped = true; }
+  pause(): void {
+    this._paused = true;
+  }
+  resume(): void {
+    this._paused = false;
+  }
+  stop(): void {
+    this._stopped = true;
+  }
 
   checkpoint(): CrawlCheckpoint {
     return this._scheduler.checkpoint(this._currentSeedUrl);
@@ -396,7 +434,13 @@ export class Spider {
   // ── Sitemap ─────────────────────────────────────────────────────────────────
 
   private async _fetchSitemapUrls(target: CrawlTarget): Promise<string[]> {
-    const origin = (() => { try { return new URL(target.url).origin; } catch { return ""; } })();
+    const origin = (() => {
+      try {
+        return new URL(target.url).origin;
+      } catch {
+        return "";
+      }
+    })();
     const sitemapUrl = target.sitemapUrl ?? `${origin}/sitemap.xml`;
     try {
       const res = await this.fetch(sitemapUrl, {
@@ -412,7 +456,9 @@ export class Spider {
           try {
             const subRes = await this.fetch(subUrl, { headers: { "user-agent": this.userAgent } });
             if (subRes.ok) nested.push(...parseSitemapUrls(await subRes.text()));
-          } catch { /* skip */ }
+          } catch {
+            /* skip */
+          }
         }
         return nested;
       }
@@ -424,11 +470,7 @@ export class Spider {
 
   // ── Fetch a single page ─────────────────────────────────────────────────────
 
-  private async _fetchPage(
-    url: string,
-    depth: number,
-    target: CrawlTarget,
-  ): Promise<CrawledPage> {
+  private async _fetchPage(url: string, depth: number, target: CrawlTarget): Promise<CrawledPage> {
     const proxy = this.proxy?.next(new URL(url).hostname);
     const cookieHeader = this.cookieJar.getCookieHeader(url);
     const baseHeaders: Record<string, string> = {
@@ -453,7 +495,9 @@ export class Spider {
 
         // Build headers map
         const headers: Record<string, string> = {};
-        res.headers.forEach((v, k) => { headers[k] = v; });
+        res.headers.forEach((v, k) => {
+          headers[k] = v;
+        });
 
         const html = res.ok ? await res.text() : "";
         const links = res.ok ? extractLinks(html, res.url || url) : [];
@@ -510,8 +554,15 @@ export class Spider {
     const respectRobots = target.respectRobotsTxt ?? true;
     const delayMs = target.requestDelayMs ?? 0;
 
-    const seedOrigin = (() => { try { return new URL(target.url).origin; } catch { return ""; } })();
-    const allowedDomains = target.allowedDomains ?? (seedOrigin ? [new URL(target.url).hostname] : []);
+    const seedOrigin = (() => {
+      try {
+        return new URL(target.url).origin;
+      } catch {
+        return "";
+      }
+    })();
+    const allowedDomains =
+      target.allowedDomains ?? (seedOrigin ? [new URL(target.url).hostname] : []);
 
     if (!this._wasRestored) {
       this._scheduler = new CrawlScheduler();
@@ -544,22 +595,31 @@ export class Spider {
       const { url, depth } = entry;
 
       // Depth gate
-      if (depth > maxDepth) { skippedPages++; continue; }
+      if (depth > maxDepth) {
+        skippedPages++;
+        continue;
+      }
 
       // Domain filter
-      if (!matchesDomain(url, allowedDomains)) { skippedPages++; continue; }
+      if (!matchesDomain(url, allowedDomains)) {
+        skippedPages++;
+        continue;
+      }
 
       // Pattern filters
       if (target.allowedPatterns?.length && !matchesPattern(url, target.allowedPatterns)) {
-        skippedPages++; continue;
+        skippedPages++;
+        continue;
       }
       if (target.blockedPatterns?.length && matchesPattern(url, target.blockedPatterns)) {
-        skippedPages++; continue;
+        skippedPages++;
+        continue;
       }
 
       // robots.txt
       if (respectRobots && !(await this._allowedByRobots(url))) {
-        skippedPages++; continue;
+        skippedPages++;
+        continue;
       }
 
       // Rate limit

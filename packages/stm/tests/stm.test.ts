@@ -16,7 +16,9 @@ import {
 describe("HedgeReducer", () => {
   const m = new HedgeReducer();
 
-  it("has correct id", () => { expect(m.id).toBe("hedge-reducer"); });
+  it("has correct id", () => {
+    expect(m.id).toBe("hedge-reducer");
+  });
 
   it("removes 'It is important to note that'", () => {
     const result = m.apply("It is important to note that the sky is blue.");
@@ -56,7 +58,9 @@ describe("HedgeReducer", () => {
 describe("DirectnessOptimizer", () => {
   const m = new DirectnessOptimizer();
 
-  it("has correct id", () => { expect(m.id).toBe("directness-optimizer"); });
+  it("has correct id", () => {
+    expect(m.id).toBe("directness-optimizer");
+  });
 
   it("replaces 'in order to' with 'to'", () => {
     expect(m.apply("Use this in order to succeed.")).toContain("to succeed");
@@ -181,8 +185,14 @@ describe("STMRegistry", () => {
 describe("applySTMs", () => {
   it("applies modules in order", () => {
     const order: string[] = [];
-    const a = new MockSTMModule("a", (t) => { order.push("a"); return t; });
-    const b = new MockSTMModule("b", (t) => { order.push("b"); return t; });
+    const a = new MockSTMModule("a", (t) => {
+      order.push("a");
+      return t;
+    });
+    const b = new MockSTMModule("b", (t) => {
+      order.push("b");
+      return t;
+    });
     applySTMs("text", [a, b]);
     expect(order).toEqual(["a", "b"]);
   });
@@ -226,9 +236,7 @@ describe("STMPipeline", () => {
   });
 
   it("applies only specified moduleIds", () => {
-    const reg = new STMRegistry()
-      .register(new HedgeReducer())
-      .register(new DirectnessOptimizer());
+    const reg = new STMRegistry().register(new HedgeReducer()).register(new DirectnessOptimizer());
     const pipeline = new STMPipeline(reg);
     const result = pipeline.transform({
       text: "in order to test this",
@@ -241,7 +249,9 @@ describe("STMPipeline", () => {
   it("throws for unknown moduleId", () => {
     const reg = new STMRegistry();
     const pipeline = new STMPipeline(reg);
-    expect(() => pipeline.transform({ text: "text", moduleIds: ["unknown-module"] })).toThrow("STM module not found");
+    expect(() => pipeline.transform({ text: "text", moduleIds: ["unknown-module"] })).toThrow(
+      "STM module not found",
+    );
   });
 
   it("truncates at maxChars", () => {

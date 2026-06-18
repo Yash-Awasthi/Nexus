@@ -1,0 +1,10 @@
+# GhostStack Runtime Configuration
+# Core runtime settings for execution environment.
+
+version: "1.0.0"
+environment: "development"
+primary_llm: "local"
+local_backup: "data-runtime/backups"
+storage:
+  mode: "hybrid"
+  interval_sec: 30

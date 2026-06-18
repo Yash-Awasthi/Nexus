@@ -186,17 +186,29 @@ describe("generateOpenApiSpec", () => {
   });
 
   it("includes serverUrl in servers array when provided", () => {
-    const spec = generateOpenApiSpec([READ_FILE_TOOL], { title: "T", version: "0", serverUrl: "https://api.example.com" });
+    const spec = generateOpenApiSpec([READ_FILE_TOOL], {
+      title: "T",
+      version: "0",
+      serverUrl: "https://api.example.com",
+    });
     expect(spec.servers?.[0]?.url).toBe("https://api.example.com");
   });
 
   it("respects custom basePath", () => {
-    const spec = generateOpenApiSpec([READ_FILE_TOOL], { title: "T", version: "0", basePath: "/mcp" });
+    const spec = generateOpenApiSpec([READ_FILE_TOOL], {
+      title: "T",
+      version: "0",
+      basePath: "/mcp",
+    });
     expect(spec.paths["/mcp/read_file"]).toBeDefined();
   });
 
   it("can disable the listing endpoint", () => {
-    const spec = generateOpenApiSpec([READ_FILE_TOOL], { title: "T", version: "0", includeListing: false });
+    const spec = generateOpenApiSpec([READ_FILE_TOOL], {
+      title: "T",
+      version: "0",
+      includeListing: false,
+    });
     expect(spec.paths["/tools"]).toBeUndefined();
   });
 });

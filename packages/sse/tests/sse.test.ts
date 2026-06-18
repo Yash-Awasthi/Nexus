@@ -316,7 +316,13 @@ describe("publishSignal", () => {
   it("event id contains the signalId", () => {
     const listener = vi.fn();
     globalBus.subscribe("signals", listener);
-    publishSignal({ signalId: "sig-42", signalType: "x", summary: "y", priority: "low", createdAt: "" });
+    publishSignal({
+      signalId: "sig-42",
+      signalType: "x",
+      summary: "y",
+      priority: "low",
+      createdAt: "",
+    });
 
     const event = listener.mock.calls[0]?.[0] as SseEvent;
     expect(event.id).toBe("signal-sig-42");
@@ -350,7 +356,13 @@ describe("publishVerdict", () => {
     const specific = vi.fn();
     globalBus.subscribe("verdicts:task-99", specific);
 
-    publishVerdict({ verdictId: "v2", taskId: "task-99", outcome: "rejected", rationale: "x", createdAt: "" });
+    publishVerdict({
+      verdictId: "v2",
+      taskId: "task-99",
+      outcome: "rejected",
+      rationale: "x",
+      createdAt: "",
+    });
 
     expect(specific).toHaveBeenCalledTimes(1);
   });

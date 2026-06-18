@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Runtime Graph — Unified Topology for GhostStack Resources
+ * Runtime Graph — Unified Topology for Conductor Resources
  *
  * Tracks all resources (workflows, Floci services, MCP servers, agents, tasks)
  * in a single graph with dependency relationships, health status, and
@@ -20,7 +20,7 @@ import type { IRuntimePersistence } from "./interfaces/persistence.interface.js"
 
 // ─── Types ───────────────────────────────────────────────────────────
 
-export type ResourceType =
+type ResourceType =
   | "workflow"
   | "floci_s3_bucket"
   | "floci_sqs_queue"
@@ -31,9 +31,9 @@ export type ResourceType =
   | "agent"
   | "task_execution";
 
-export type ResourceStatus = "active" | "degraded" | "failed" | "pending" | "removed";
+type ResourceStatus = "active" | "degraded" | "failed" | "pending" | "removed";
 
-export interface ResourceNode {
+interface ResourceNode {
   id: string;
   type: ResourceType;
   name: string;
@@ -44,14 +44,14 @@ export interface ResourceNode {
   updatedAt: Date;
 }
 
-export interface ResourceEdge {
+interface ResourceEdge {
   from: string;
   to: string;
   relationship: "depends_on" | "triggers" | "manages" | "routes_to";
   metadata?: Record<string, unknown>;
 }
 
-export interface RuntimeGraphSnapshot {
+interface RuntimeGraphSnapshot {
   nodes: ResourceNode[];
   edges: ResourceEdge[];
   summary: {
@@ -65,7 +65,7 @@ export interface RuntimeGraphSnapshot {
   timestamp: Date;
 }
 
-export interface GraphIntegrityReport {
+interface GraphIntegrityReport {
   valid: boolean;
   nodeCount: number;
   edgeCount: number;
@@ -84,7 +84,7 @@ export interface GraphIntegrityReport {
 }
 
 /** Mutation journal entry for replay/forensics */
-export interface MutationJournalEntry {
+interface MutationJournalEntry {
   opId: string;
   op: "addNode" | "updateNode" | "removeNode" | "addEdge" | "removeEdge" | "repair" | "bulk";
   timestamp: Date;
@@ -95,7 +95,7 @@ export interface MutationJournalEntry {
 }
 
 /** Integrity checkpoint — saves graph state + integrity report at a point in time */
-export interface IntegrityCheckpoint {
+interface IntegrityCheckpoint {
   id: string;
   timestamp: Date;
   snapshot: RuntimeGraphSnapshot;
@@ -105,7 +105,7 @@ export interface IntegrityCheckpoint {
 
 // ─── Error Types ─────────────────────────────────────────────────────
 
-export class GraphMutationError extends Error {
+class GraphMutationError extends Error {
   constructor(
     message: string,
     public op: string,
@@ -116,7 +116,7 @@ export class GraphMutationError extends Error {
   }
 }
 
-export class GraphConsistencyError extends Error {
+class GraphConsistencyError extends Error {
   constructor(
     message: string,
     public report: GraphIntegrityReport,

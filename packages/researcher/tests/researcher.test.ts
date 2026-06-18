@@ -12,8 +12,20 @@ import {
 // ── WebResearcher ─────────────────────────────────────────────────────────────
 
 const mockSearch: WebSearchFn = async (query) => [
-  { url: "https://a.com", title: "A Result", snippet: `snippet for ${query}`, score: 0.9, source: "web" },
-  { url: "https://b.com", title: "B Result", snippet: `another ${query} result`, score: 0.7, source: "web" },
+  {
+    url: "https://a.com",
+    title: "A Result",
+    snippet: `snippet for ${query}`,
+    score: 0.9,
+    source: "web",
+  },
+  {
+    url: "https://b.com",
+    title: "B Result",
+    snippet: `another ${query} result`,
+    score: 0.7,
+    source: "web",
+  },
 ];
 
 describe("WebResearcher", () => {
@@ -51,9 +63,24 @@ describe("CorpusResearcher", () => {
   beforeEach(() => {
     corpus = new CorpusResearcher();
     corpus
-      .addDocument({ id: "d1", title: "TypeScript Handbook", content: "TypeScript is a typed superset of JavaScript with strong type system features and interfaces" })
-      .addDocument({ id: "d2", title: "Python Tutorial", content: "Python is a dynamic language used for data science machine learning and web development" })
-      .addDocument({ id: "d3", title: "TypeScript Performance", content: "Optimise TypeScript compilation performance with project references and incremental builds" });
+      .addDocument({
+        id: "d1",
+        title: "TypeScript Handbook",
+        content:
+          "TypeScript is a typed superset of JavaScript with strong type system features and interfaces",
+      })
+      .addDocument({
+        id: "d2",
+        title: "Python Tutorial",
+        content:
+          "Python is a dynamic language used for data science machine learning and web development",
+      })
+      .addDocument({
+        id: "d3",
+        title: "TypeScript Performance",
+        content:
+          "Optimise TypeScript compilation performance with project references and incremental builds",
+      });
   });
 
   it("searches and returns ranked results", () => {
@@ -81,7 +108,12 @@ describe("CorpusResearcher", () => {
   });
 
   it("uses doc url when provided", () => {
-    corpus.addDocument({ id: "d4", title: "TS docs", content: "TypeScript official documentation guide", url: "https://typescriptlang.org" });
+    corpus.addDocument({
+      id: "d4",
+      title: "TS docs",
+      content: "TypeScript official documentation guide",
+      url: "https://typescriptlang.org",
+    });
     const results = corpus.search("TypeScript documentation");
     const withUrl = results.find((r) => r.url === "https://typescriptlang.org");
     expect(withUrl).toBeDefined();
@@ -155,7 +187,11 @@ describe("ResearchSession", () => {
   it("combines web and corpus results", async () => {
     const web = new WebResearcher({ searchFn: mockSearch });
     const corp = new CorpusResearcher();
-    corp.addDocument({ id: "d1", title: "TypeScript Guide", content: "TypeScript typed javascript superset features" });
+    corp.addDocument({
+      id: "d1",
+      title: "TypeScript Guide",
+      content: "TypeScript typed javascript superset features",
+    });
 
     const session = new ResearchSession({ webResearcher: web, corpusResearcher: corp });
     const finding = await session.research("TypeScript");
@@ -181,21 +217,27 @@ describe("ResearchSession", () => {
   });
 
   it("works with only web researcher", async () => {
-    const session = new ResearchSession({ webResearcher: new WebResearcher({ searchFn: mockSearch }) });
+    const session = new ResearchSession({
+      webResearcher: new WebResearcher({ searchFn: mockSearch }),
+    });
     const finding = await session.research("q");
     expect(finding.corpusFindings).toBeNull();
     expect(finding.webFindings).not.toBeNull();
   });
 
   it("tracks history", async () => {
-    const session = new ResearchSession({ webResearcher: new WebResearcher({ searchFn: mockSearch }) });
+    const session = new ResearchSession({
+      webResearcher: new WebResearcher({ searchFn: mockSearch }),
+    });
     await session.research("q1");
     await session.research("q2");
     expect(session.getHistory()).toHaveLength(2);
   });
 
   it("clearHistory empties history", async () => {
-    const session = new ResearchSession({ webResearcher: new WebResearcher({ searchFn: mockSearch }) });
+    const session = new ResearchSession({
+      webResearcher: new WebResearcher({ searchFn: mockSearch }),
+    });
     await session.research("q");
     session.clearHistory();
     expect(session.getHistory()).toHaveLength(0);
@@ -206,7 +248,9 @@ describe("ResearchSession", () => {
       { url: "https://low.com", title: "Low", snippet: "s", score: 0.2, source: "web" },
       { url: "https://high.com", title: "High", snippet: "s", score: 0.9, source: "web" },
     ];
-    const session = new ResearchSession({ webResearcher: new WebResearcher({ searchFn: lowHighSearch }) });
+    const session = new ResearchSession({
+      webResearcher: new WebResearcher({ searchFn: lowHighSearch }),
+    });
     const finding = await session.research("q");
     expect(finding.allResults[0]!.score).toBeGreaterThanOrEqual(finding.allResults[1]!.score);
   });

@@ -24,7 +24,9 @@ function makeInput(overrides: Partial<CreateAdrInput> = {}): CreateAdrInput {
 
 describe("AdrStore — create", () => {
   let store: AdrStore;
-  beforeEach(() => { store = new AdrStore(); });
+  beforeEach(() => {
+    store = new AdrStore();
+  });
 
   it("creates an ADR with auto-incrementing id", () => {
     const a = store.create(makeInput());
@@ -65,7 +67,9 @@ describe("AdrStore — create", () => {
 
 describe("AdrStore — get/delete/count", () => {
   let store: AdrStore;
-  beforeEach(() => { store = new AdrStore(); });
+  beforeEach(() => {
+    store = new AdrStore();
+  });
 
   it("get retrieves by id", () => {
     const a = store.create(makeInput());
@@ -95,7 +99,9 @@ describe("AdrStore — get/delete/count", () => {
 
 describe("AdrStore — update", () => {
   let store: AdrStore;
-  beforeEach(() => { store = new AdrStore(); });
+  beforeEach(() => {
+    store = new AdrStore();
+  });
 
   it("updates status", () => {
     const a = store.create(makeInput());

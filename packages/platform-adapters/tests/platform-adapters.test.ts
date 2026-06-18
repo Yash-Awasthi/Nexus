@@ -106,7 +106,11 @@ describe("TelegramAdapter — send", () => {
   });
 
   it("returns success:false on network error", async () => {
-    const badSender = { post: async () => { throw new Error("network error"); } };
+    const badSender = {
+      post: async () => {
+        throw new Error("network error");
+      },
+    };
     const a = new TelegramAdapter({ botToken: "t" }, badSender);
     const r = await a.send({ chatId: "1", text: "hi" });
     expect(r.success).toBe(false);

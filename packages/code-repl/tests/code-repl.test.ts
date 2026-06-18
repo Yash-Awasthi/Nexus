@@ -85,7 +85,12 @@ describe("JupyterMode.wrap", () => {
 
 describe("MockReplExecutor", () => {
   it("execute records calls and returns behavior", async () => {
-    const exec = new MockReplExecutor({ stdout: "hello\n", stderr: "", exitCode: 0, durationMs: 5 });
+    const exec = new MockReplExecutor({
+      stdout: "hello\n",
+      stderr: "",
+      exitCode: 0,
+      durationMs: 5,
+    });
     const result = await exec.execute("python", "print('hello')", {} as any);
     expect(result.stdout).toBe("hello\n");
     expect(result.exitCode).toBe(0);
@@ -99,10 +104,7 @@ describe("MockReplExecutor", () => {
   });
 
   it("cycles through behavior array", async () => {
-    const exec = new MockReplExecutor([
-      { stdout: "first" },
-      { stdout: "second" },
-    ]);
+    const exec = new MockReplExecutor([{ stdout: "first" }, { stdout: "second" }]);
     const r1 = await exec.execute("python", "1", {} as any);
     const r2 = await exec.execute("python", "2", {} as any);
     const r3 = await exec.execute("python", "3", {} as any); // wraps to last
@@ -114,7 +116,9 @@ describe("MockReplExecutor", () => {
   it("calls onExecute with code and state", async () => {
     let capturedCode = "";
     const exec = new MockReplExecutor({
-      onExecute: (code) => { capturedCode = code; },
+      onExecute: (code) => {
+        capturedCode = code;
+      },
     });
     await exec.execute("python", "test_code", {} as any);
     expect(capturedCode).toBe("test_code");
@@ -149,7 +153,11 @@ describe("KernelSession", () => {
 
   it("applies JupyterMode wrapping by default", async () => {
     let capturedCode = "";
-    const exec = new MockReplExecutor({ onExecute: (code) => { capturedCode = code; } });
+    const exec = new MockReplExecutor({
+      onExecute: (code) => {
+        capturedCode = code;
+      },
+    });
     const session = new KernelSession("python", exec, true);
     await session.execute({ code: "1 + 2" });
     expect(capturedCode).toContain("__repl_last__");
@@ -157,7 +165,11 @@ describe("KernelSession", () => {
 
   it("skips JupyterMode wrapping when disabled", async () => {
     let capturedCode = "";
-    const exec = new MockReplExecutor({ onExecute: (code) => { capturedCode = code; } });
+    const exec = new MockReplExecutor({
+      onExecute: (code) => {
+        capturedCode = code;
+      },
+    });
     const session = new KernelSession("python", exec, false);
     await session.execute({ code: "1 + 2" });
     expect(capturedCode).toBe("1 + 2");

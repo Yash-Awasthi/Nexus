@@ -11,7 +11,7 @@ export interface PortsConfig {
   [key: string]: number;
 }
 
-export interface ServiceDefinition {
+interface ServiceDefinition {
   cmd?: string;
   image?: string;
   type: "docker" | "process" | "external";
@@ -22,7 +22,7 @@ export interface ServicesConfig {
   services: Record<string, ServiceDefinition>;
 }
 
-export interface HealthcheckDefinition {
+interface HealthcheckDefinition {
   path: string;
   interval: number;
 }
@@ -49,7 +49,7 @@ export interface IConfigLoader {
   loadRuntime(): Promise<RuntimeConfig>;
 }
 
-export interface YAMLConfigLoaderOptions {
+interface YAMLConfigLoaderOptions {
   portsPath: string;
   servicesPath: string;
   healthchecksPath: string;

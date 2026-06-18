@@ -14,6 +14,7 @@
 
 export type ChatRole = "user" | "assistant" | "system";
 
+/** Chat message interface definition. */
 export interface ChatMessage {
   id: string;
   role: ChatRole;
@@ -24,6 +25,7 @@ export interface ChatMessage {
   metadata?: Record<string, unknown>;
 }
 
+/** Chat thread interface definition. */
 export interface ChatThread {
   id: string;
   title?: string;
@@ -33,6 +35,7 @@ export interface ChatThread {
   metadata?: Record<string, unknown>;
 }
 
+/** Thread summary interface definition. */
 export interface ThreadSummary {
   threadId: string;
   title?: string;
@@ -90,7 +93,9 @@ export class ChatHistoryStore {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
-  threadCount(): number { return this.threads.size; }
+  threadCount(): number {
+    return this.threads.size;
+  }
 
   // ── Message operations ─────────────────────────────────────────────────────
 
@@ -144,9 +149,9 @@ export class ChatHistoryStore {
   /**
    * Search across all threads for messages containing `query`.
    */
-  searchMessages(query: string, limit = 20): Array<{ thread: ChatThread; message: ChatMessage }> {
+  searchMessages(query: string, limit = 20): { thread: ChatThread; message: ChatMessage }[] {
     const q = query.toLowerCase();
-    const results: Array<{ thread: ChatThread; message: ChatMessage }> = [];
+    const results: { thread: ChatThread; message: ChatMessage }[] = [];
     for (const thread of this.threads.values()) {
       for (const msg of thread.messages) {
         if (msg.content.toLowerCase().includes(q)) {
@@ -168,7 +173,7 @@ export class ChatHistoryStore {
  */
 export function trimToTokenBudget(messages: ChatMessage[], tokenBudget: number): ChatMessage[] {
   const systemMessages = messages.filter((m) => m.role === "system");
-  let nonSystem = messages.filter((m) => m.role !== "system");
+  const nonSystem = messages.filter((m) => m.role !== "system");
   let total = messages.reduce((s, m) => s + (m.tokens ?? estimateTokens(m.content)), 0);
 
   while (total > tokenBudget && nonSystem.length > 0) {
@@ -191,18 +196,19 @@ export interface ThreadStats {
   modelsUsed: string[];
 }
 
+/** Analyze thread. */
 export function analyzeThread(thread: ChatThread): ThreadStats {
   const models = new Set<string>();
   for (const m of thread.messages) {
     if (m.model) models.add(m.model);
   }
   return {
-    messageCount:      thread.messages.length,
-    userMessages:      thread.messages.filter((m) => m.role === "user").length,
+    messageCount: thread.messages.length,
+    userMessages: thread.messages.filter((m) => m.role === "user").length,
     assistantMessages: thread.messages.filter((m) => m.role === "assistant").length,
-    estimatedTokens:   thread.messages.reduce((s, m) => s + (m.tokens ?? 0), 0),
-    firstMessage:      thread.messages[0]?.content.slice(0, 80),
-    lastMessage:       thread.messages[thread.messages.length - 1]?.content.slice(0, 80),
-    modelsUsed:        [...models],
+    estimatedTokens: thread.messages.reduce((s, m) => s + (m.tokens ?? 0), 0),
+    firstMessage: thread.messages[0]?.content.slice(0, 80),
+    lastMessage: thread.messages[thread.messages.length - 1]?.content.slice(0, 80),
+    modelsUsed: [...models],
   };
 }

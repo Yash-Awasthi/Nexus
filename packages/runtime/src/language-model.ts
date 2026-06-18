@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Language model providers for GhostStack.
+ * Language model providers for Conductor.
  *
  * GroqModelProvider  — fast cloud inference via Groq REST API
  * FreeModelProvider  — multi-backend routing (OpenRouter / Ollama / local)
@@ -117,7 +117,7 @@ function* _parseSseLines(raw: string): Iterable<string> {
 
 const GROQ_API_BASE = "https://api.groq.com/openai/v1";
 
-export class GroqModelProvider implements ILanguageModel {
+class GroqModelProvider implements ILanguageModel {
   readonly modelId: string;
   private apiKey: string;
   private model: string;
@@ -228,9 +228,9 @@ export class GroqModelProvider implements ILanguageModel {
 // Multi-backend routing: tries providers in order, falls back on error.
 // Provider strings: "openrouter:<model>", "ollama:<model>", "groq:<model>"
 
-export type ProviderRoute = `openrouter:${string}` | `ollama:${string}` | `groq:${string}`;
+type ProviderRoute = `openrouter:${string}` | `ollama:${string}` | `groq:${string}`;
 
-export interface FreeModelProviderConfig {
+interface FreeModelProviderConfig {
   routes: ProviderRoute[];
   /** API keys per provider */
   keys?: {
@@ -241,7 +241,7 @@ export interface FreeModelProviderConfig {
   ollamaBase?: string;
 }
 
-export class FreeModelProvider implements ILanguageModel {
+class FreeModelProvider implements ILanguageModel {
   readonly modelId: string;
   private readonly config: FreeModelProviderConfig;
   private readonly ollamaBase: string;

@@ -12,8 +12,10 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type FeedbackRating = "thumbs_up" | "thumbs_down" | "neutral";
+/** Feedback source type alias. */
 export type FeedbackSource = "ui" | "api" | "automated";
 
+/** Feedback entry interface definition. */
 export interface FeedbackEntry {
   id: string;
   sessionId: string;
@@ -29,6 +31,7 @@ export interface FeedbackEntry {
   createdAt: string;
 }
 
+/** Preference pair interface definition. */
 export interface PreferencePair {
   id: string;
   promptText: string;
@@ -39,6 +42,7 @@ export interface PreferencePair {
   createdAt: string;
 }
 
+/** Reward signal interface definition. */
 export interface RewardSignal {
   sessionId: string;
   totalFeedback: number;
@@ -48,6 +52,7 @@ export interface RewardSignal {
   rewardScore: number; // (positive - negative) / total ∈ [-1, 1]
 }
 
+/** Feedback filter interface definition. */
 export interface FeedbackFilter {
   sessionId?: string;
   rating?: FeedbackRating;
@@ -67,13 +72,11 @@ function uid(prefix: string): string {
 
 export class FeedbackStore {
   private entries = new Map<string, FeedbackEntry>();
-  private pairs   = new Map<string, PreferencePair>();
+  private pairs = new Map<string, PreferencePair>();
 
   // ── Feedback ───────────────────────────────────────────────────────────────
 
-  addFeedback(
-    data: Omit<FeedbackEntry, "id" | "createdAt">,
-  ): FeedbackEntry {
+  addFeedback(data: Omit<FeedbackEntry, "id" | "createdAt">): FeedbackEntry {
     const entry: FeedbackEntry = {
       ...data,
       id: uid("fb"),
@@ -90,10 +93,10 @@ export class FeedbackStore {
   queryFeedback(filter: FeedbackFilter = {}): FeedbackEntry[] {
     let results = [...this.entries.values()];
     if (filter.sessionId) results = results.filter((e) => e.sessionId === filter.sessionId);
-    if (filter.rating)    results = results.filter((e) => e.rating === filter.rating);
-    if (filter.model)     results = results.filter((e) => e.model === filter.model);
-    if (filter.userId)    results = results.filter((e) => e.userId === filter.userId);
-    if (filter.source)    results = results.filter((e) => e.source === filter.source);
+    if (filter.rating) results = results.filter((e) => e.rating === filter.rating);
+    if (filter.model) results = results.filter((e) => e.model === filter.model);
+    if (filter.userId) results = results.filter((e) => e.userId === filter.userId);
+    if (filter.source) results = results.filter((e) => e.source === filter.source);
     return results.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
 
@@ -101,13 +104,13 @@ export class FeedbackStore {
     return this.entries.delete(id);
   }
 
-  feedbackCount(): number { return this.entries.size; }
+  feedbackCount(): number {
+    return this.entries.size;
+  }
 
   // ── Preference pairs ───────────────────────────────────────────────────────
 
-  addPreferencePair(
-    data: Omit<PreferencePair, "id" | "createdAt">,
-  ): PreferencePair {
+  addPreferencePair(data: Omit<PreferencePair, "id" | "createdAt">): PreferencePair {
     const pair: PreferencePair = {
       ...data,
       id: uid("pp"),
@@ -125,7 +128,9 @@ export class FeedbackStore {
     return [...this.pairs.values()];
   }
 
-  pairCount(): number { return this.pairs.size; }
+  pairCount(): number {
+    return this.pairs.size;
+  }
 
   // ── Generate preference pairs from thumbs up/down feedback ────────────────
 
@@ -138,7 +143,7 @@ export class FeedbackStore {
 
     for (const entry of this.entries.values()) {
       const existing = byPrompt.get(entry.promptText) ?? { pos: [], neg: [] };
-      if (entry.rating === "thumbs_up")   existing.pos.push(entry);
+      if (entry.rating === "thumbs_up") existing.pos.push(entry);
       if (entry.rating === "thumbs_down") existing.neg.push(entry);
       byPrompt.set(entry.promptText, existing);
     }
@@ -149,7 +154,7 @@ export class FeedbackStore {
         for (const n of neg) {
           const pair = this.addPreferencePair({
             promptText: prompt,
-            chosen:  p.responseText,
+            chosen: p.responseText,
             rejected: n.responseText,
             model: p.model,
             sessionId: p.sessionId,
@@ -167,10 +172,17 @@ export class FeedbackStore {
     const entries = this.queryFeedback({ sessionId });
     const positiveCount = entries.filter((e) => e.rating === "thumbs_up").length;
     const negativeCount = entries.filter((e) => e.rating === "thumbs_down").length;
-    const neutralCount  = entries.filter((e) => e.rating === "neutral").length;
+    const neutralCount = entries.filter((e) => e.rating === "neutral").length;
     const total = entries.length;
     const rewardScore = total === 0 ? 0 : (positiveCount - negativeCount) / total;
-    return { sessionId, totalFeedback: total, positiveCount, negativeCount, neutralCount, rewardScore };
+    return {
+      sessionId,
+      totalFeedback: total,
+      positiveCount,
+      negativeCount,
+      neutralCount,
+      rewardScore,
+    };
   }
 }
 
@@ -186,9 +198,7 @@ export class PipelineExporter {
   toJSONL(): string {
     return this.store
       .listPreferencePairs()
-      .map((p) =>
-        JSON.stringify({ prompt: p.promptText, chosen: p.chosen, rejected: p.rejected }),
-      )
+      .map((p) => JSON.stringify({ prompt: p.promptText, chosen: p.chosen, rejected: p.rejected }))
       .join("\n");
   }
 

@@ -188,7 +188,24 @@ export class DeliberationEngine {
       }
     });
 
-    const rawVotes = await Promise.all(votePromises);
+    // Promise.allSettled so a stray throw that escapes the per-vote try-catch
+    // (e.g. an OOM inside an archetype callback) can never abort all N concurrent
+    // LLM calls and lose the entire deliberation.  Each vote promise already
+    // returns an abstain on expected failures — allSettled is a second safety net.
+    const settled = await Promise.allSettled(votePromises);
+    const rawVotes = settled.map(
+      (s): ModelVote =>
+        s.status === "fulfilled"
+          ? s.value
+          : {
+              model: this.config.defaultModel,
+              provider: "unknown",
+              vote: "abstain",
+              reasoning: `Vote rejected: ${s.reason instanceof Error ? s.reason.message : String(s.reason)}`,
+              confidence: 0,
+              latencyMs: 0,
+            },
+    );
     votes.push(...rawVotes);
 
     // Tally
@@ -265,4 +282,139 @@ export class DeliberationEngine {
     const abstainCount = votes.filter((v) => v.vote === "abstain").length;
     return `Council ${outcome}. ${yesCount} YES / ${noCount} NO / ${abstainCount} ABSTAIN. Majority: ${majority.toUpperCase()}.`;
   }
+}
+
+// ── Financial deliberation schemas ────────────────────────────────────────────
+// Ported from TauricResearch/TradingAgents: tradingagents/agents/schemas.py
+// Pattern: multi-agent financial deliberation with 3 structured roles:
+//   ResearchManager  → ResearchPlan   (5-tier rating + rationale)
+//   Trader           → TraderProposal  (3-tier action + entry/stop/sizing)
+//   PortfolioManager → PortfolioDecision (final rating + thesis + price target)
+// Plus: SentimentAnalyst → SentimentReport (6-tier band + 0–10 score)
+// These types are the council output layer for financial decision deliberation.
+
+/** 5-tier portfolio rating (Research Manager + Portfolio Manager). */
+export type PortfolioRating =
+  | "Buy"
+  | "Overweight"
+  | "Hold"
+  | "Underweight"
+  | "Sell";
+
+/** 3-tier transaction direction (Trader agent). */
+export type TraderAction = "Buy" | "Hold" | "Sell";
+
+/** 6-tier sentiment band (Sentiment Analyst). */
+export type SentimentBand =
+  | "Bullish"
+  | "Mildly Bullish"
+  | "Neutral"
+  | "Mixed"
+  | "Mildly Bearish"
+  | "Bearish";
+
+/**
+ * Structured investment plan from the Research Manager.
+ * Synthesises bull/bear debate into a directional recommendation with
+ * concrete actions for the downstream Trader agent.
+ */
+export interface ResearchPlan {
+  recommendation: PortfolioRating;
+  /** Prose summary of key bull/bear points and the deciding argument. */
+  rationale: string;
+  /** Concrete entry/sizing/risk instructions for the Trader. */
+  strategicActions: string;
+}
+
+/**
+ * Concrete transaction proposal from the Trader agent.
+ * Translates the Research Manager's plan into an executable order proposal.
+ */
+export interface TraderProposal {
+  action: TraderAction;
+  /** 2–4 sentence justification anchored in analyst reports. */
+  reasoning: string;
+  /** Optional limit entry price in quote currency. */
+  entryPrice?: number;
+  /** Optional stop-loss price. */
+  stopLoss?: number;
+  /** Optional sizing guidance, e.g. "5% of portfolio". */
+  positionSizing?: string;
+}
+
+/**
+ * Final portfolio decision from the Portfolio Manager.
+ * Synthesises all analyst debate into a rated investment thesis.
+ */
+export interface PortfolioDecision {
+  rating: PortfolioRating;
+  /** 2–4 sentence action plan covering entry, sizing, risk levels, time horizon. */
+  executiveSummary: string;
+  /** Detailed thesis anchored in specific analyst evidence. */
+  investmentThesis: string;
+  /** Optional price target in quote currency. */
+  priceTarget?: number;
+  /** Optional holding period, e.g. "3–6 months". */
+  timeHorizon?: string;
+}
+
+/**
+ * Structured sentiment report from the Sentiment Analyst.
+ * Replaces free-form prose so downstream agents can read overallBand
+ * and overallScore without regex fragility.
+ */
+export interface SentimentReport {
+  overallBand: SentimentBand;
+  /** Sentiment intensity 0–10 (0 = max bearish, 5 = neutral, 10 = max bullish). */
+  overallScore: number;
+  /** Data quality confidence of the assessment. */
+  confidence: "low" | "medium" | "high";
+  /** Full narrative with source breakdown, divergences, themes, risks. */
+  narrative: string;
+}
+
+/**
+ * Post-trade reflection record from the Reflector.
+ * Ported from TradingAgents Reflector.reflect_on_final_decision().
+ * Stored in the decision log; re-injected into future agent prompts as lessons.
+ */
+export interface FinancialReflectionRecord {
+  /** ISO-8601 timestamp of the reflection. */
+  createdAt: string;
+  /** The original decision text being reflected on. */
+  originalDecision: string;
+  /** Actual raw return of the trade (e.g. 0.03 = +3%). */
+  rawReturn: number;
+  /** Alpha vs benchmark (e.g. -0.01 = underperformed SPY by 1%). */
+  alphaReturn: number;
+  /** Benchmark name used for alpha comparison (default "SPY"). */
+  benchmarkName: string;
+  /** 2–4 sentence lesson: directional correctness, thesis assessment, future lesson. */
+  lesson: string;
+}
+
+/**
+ * Parse a PortfolioRating from LLM output text.
+ * Handles case-insensitive match and common variations.
+ * Ported from TradingAgents agents/utils/rating.py parse_rating().
+ */
+export function parsePortfolioRating(text: string): PortfolioRating {
+  const t = text.toLowerCase();
+  if (t.includes("strong buy") || t.includes("buy")) return "Buy";
+  if (t.includes("overweight")) return "Overweight";
+  if (t.includes("underweight")) return "Underweight";
+  if (t.includes("strong sell") || t.includes("sell")) return "Sell";
+  return "Hold";
+}
+
+/** Convert a PortfolioRating to a numeric signal (-2 to +2). */
+export function ratingToSignal(rating: PortfolioRating): number {
+  const map: Record<PortfolioRating, number> = {
+    Buy: 2,
+    Overweight: 1,
+    Hold: 0,
+    Underweight: -1,
+    Sell: -2,
+  };
+  return map[rating];
 }

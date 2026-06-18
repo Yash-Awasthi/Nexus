@@ -198,6 +198,7 @@ export const directionalOptimizer: STMModule = {
   version: "1.0.0",
   enabled: false,
   transformer: (input: string): string => {
+    if (input.length > 100_000) return input;
     // Pattern: "<subject> is/are/was/were <past-participle> by <agent>"
     // → "<agent> <verb> <subject>"
     // This covers the most common passive construction.

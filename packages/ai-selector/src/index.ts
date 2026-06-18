@@ -35,12 +35,14 @@
 
 export type SelectorStrategy = "css" | "xpath" | "text";
 
+/** Selector example interface definition. */
 export interface SelectorExample {
   description: string;
   selector: string;
   strategy: SelectorStrategy;
 }
 
+/** Element selector request interface definition. */
 export interface ElementSelectorRequest {
   /** Raw HTML of the page or relevant section. Will be truncated if too long. */
   html: string;
@@ -54,6 +56,7 @@ export interface ElementSelectorRequest {
   hint?: string;
 }
 
+/** Element selector result interface definition. */
 export interface ElementSelectorResult {
   selector: string;
   strategy: SelectorStrategy;
@@ -95,11 +98,13 @@ export class AISelectorError extends Error {
 
 export type MessageRole = "system" | "user" | "assistant";
 
+/** Llm message interface definition. */
 export interface LLMMessage {
   role: MessageRole;
   content: string;
 }
 
+/** Llm request interface definition. */
 export interface LLMRequest {
   model: string;
   messages: LLMMessage[];
@@ -107,10 +112,12 @@ export interface LLMRequest {
   temperature?: number;
 }
 
+/** Llm response interface definition. */
 export interface LLMResponse {
   content: string;
 }
 
+/** Llm provider interface definition. */
 export interface LLMProvider {
   readonly name: string;
   readonly models: readonly string[];
@@ -123,10 +130,13 @@ export interface LLMProvider {
  * Strip script/style blocks, collapse whitespace, and truncate to maxChars.
  */
 export function truncateHtml(html: string, maxChars = 8000): string {
+  if (html.length > 500_000) return html.slice(0, maxChars) + "…[truncated]";
+  // Strip ALL HTML markup rather than selectively removing dangerous tags.
+  // Selective script/style removal is a "bad-tag-filter" (bypassable);
+  // stripping every tag is safer and sufficient for AI context prep.
   let cleaned = html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<[^>]*>?/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
@@ -144,7 +154,9 @@ function buildFindPrompt(req: ElementSelectorRequest, html: string): string {
     req.examples && req.examples.length > 0
       ? "\n\nExamples:\n" +
         req.examples
-          .map((e) => `- Description: "${e.description}"\n  Selector: ${e.selector} (${e.strategy})`)
+          .map(
+            (e) => `- Description: "${e.description}"\n  Selector: ${e.selector} (${e.strategy})`,
+          )
           .join("\n")
       : "";
 
@@ -189,8 +201,8 @@ function parseSingle(raw: string): ElementSelectorResult | undefined {
     if (!parsed.selector || parsed.confidence === 0) return undefined;
     return {
       selector: parsed.selector,
-      strategy: (parsed.strategy as SelectorStrategy) ?? "css",
-      confidence: Number(parsed.confidence ?? 0),
+      strategy: parsed.strategy! ?? "css",
+      confidence: parsed.confidence ?? 0,
       explanation: parsed.explanation,
     };
   } catch {
@@ -202,13 +214,13 @@ function parseMultiple(raw: string): ElementSelectorResult[] {
   try {
     const match = /\[[\s\S]*?\]/.exec(raw);
     if (!match) return [];
-    const parsed = JSON.parse(match[0]) as Array<Partial<ElementSelectorResult>>;
+    const parsed = JSON.parse(match[0]) as Partial<ElementSelectorResult>[];
     return parsed
-      .filter((r) => r.selector && Number(r.confidence ?? 0) > 0)
+      .filter((r) => r.selector && (r.confidence ?? 0) > 0)
       .map((r) => ({
         selector: r.selector!,
-        strategy: (r.strategy as SelectorStrategy) ?? "css",
-        confidence: Number(r.confidence ?? 0),
+        strategy: r.strategy! ?? "css",
+        confidence: r.confidence ?? 0,
         explanation: r.explanation,
       }))
       .sort((a, b) => b.confidence - a.confidence);
@@ -229,6 +241,7 @@ export interface LLMAISelectorConfig {
   temperature?: number;
 }
 
+/** Llmai selector. */
 export class LLMAISelector implements IAISelector {
   private readonly maxHtmlChars: number;
 
@@ -274,8 +287,12 @@ export class LLMAISelector implements IAISelector {
 
 /** Always returns no results. Useful as a disabled fallback in tests. */
 export class NullAISelector implements IAISelector {
-  async find(): Promise<ElementSelectorResult | undefined> { return undefined; }
-  async findAll(): Promise<ElementSelectorResult[]> { return []; }
+  async find(): Promise<ElementSelectorResult | undefined> {
+    return undefined;
+  }
+  async findAll(): Promise<ElementSelectorResult[]> {
+    return [];
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -288,6 +305,7 @@ export interface StaticSelector {
   description?: string;
 }
 
+/** Cascade selector config interface definition. */
 export interface CascadeSelectorConfig {
   /** Static selectors to try first. */
   statics: StaticSelector[];
@@ -312,7 +330,8 @@ export class CascadeSelector implements IAISelector {
       config.validate ??
       // Default naive validator: check if any attribute value or class name
       // approximating the selector exists in the raw HTML.
-      ((sel, html) => html.includes(sel.selector.replace(/[.#\[\]>+~*:^$|]/g, "").split(" ")[0] ?? ""));
+      ((sel, html) =>
+        html.includes(sel.selector.replace(/[.#[\]>+~*:^$|]/g, "").split(" ")[0] ?? ""));
   }
 
   async find(request: ElementSelectorRequest): Promise<ElementSelectorResult | undefined> {

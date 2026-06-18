@@ -15,10 +15,9 @@
 
 // ── Base types ────────────────────────────────────────────────────────────────
 
-export interface AgentInput {
-  [key: string]: unknown;
-}
+export type AgentInput = Record<string, unknown>;
 
+/** Agent output interface definition. */
 export interface AgentOutput {
   success: boolean;
   data: unknown;
@@ -26,8 +25,10 @@ export interface AgentOutput {
   tokensUsed?: number;
 }
 
+/** Agent handler type alias. */
 export type AgentHandler<I extends AgentInput, O> = (input: I, ctx?: AgentContext) => Promise<O>;
 
+/** Agent context interface definition. */
 export interface AgentContext {
   sessionId?: string;
   workspacePath?: string;
@@ -55,6 +56,7 @@ export interface CodeSearchInput extends AgentInput {
   projectPath?: string;
 }
 
+/** Code search result interface definition. */
 export interface CodeSearchResult {
   path: string;
   snippet: string;
@@ -62,12 +64,14 @@ export interface CodeSearchResult {
   relevanceScore: number;
 }
 
+/** Code search output interface definition. */
 export interface CodeSearchOutput {
   results: CodeSearchResult[];
   query: string;
   totalFound: number;
 }
 
+/** Code search agent. */
 export class CodeSearchAgent {
   private handler?: AgentHandler<CodeSearchInput, CodeSearchOutput>;
 
@@ -77,12 +81,17 @@ export class CodeSearchAgent {
   }
 
   async execute(input: CodeSearchInput, ctx?: AgentContext): Promise<AgentOutput> {
-    if (!this.handler) return { success: false, data: null, error: "CodeSearchAgent: no handler injected" };
+    if (!this.handler)
+      return { success: false, data: null, error: "CodeSearchAgent: no handler injected" };
     try {
       const data = await this.handler(input, ctx);
       return { success: true, data };
     } catch (err) {
-      return { success: false, data: null, error: err instanceof Error ? err.message : String(err) };
+      return {
+        success: false,
+        data: null,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   }
 
@@ -105,12 +114,14 @@ export interface DirectoryListInput extends AgentInput {
   pattern?: string;
 }
 
+/** Directory list output interface definition. */
 export interface DirectoryListOutput {
   entries: FileEntry[];
   path: string;
   totalEntries: number;
 }
 
+/** Directory lister agent. */
 export class DirectoryListerAgent {
   private handler?: AgentHandler<DirectoryListInput, DirectoryListOutput>;
 
@@ -120,12 +131,17 @@ export class DirectoryListerAgent {
   }
 
   async execute(input: DirectoryListInput, ctx?: AgentContext): Promise<AgentOutput> {
-    if (!this.handler) return { success: false, data: null, error: "DirectoryListerAgent: no handler injected" };
+    if (!this.handler)
+      return { success: false, data: null, error: "DirectoryListerAgent: no handler injected" };
     try {
       const data = await this.handler(input, ctx);
       return { success: true, data };
     } catch (err) {
-      return { success: false, data: null, error: err instanceof Error ? err.message : String(err) };
+      return {
+        success: false,
+        data: null,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   }
 
@@ -143,12 +159,14 @@ export interface FileListInput extends AgentInput {
   maxFiles?: number;
 }
 
+/** File list output interface definition. */
 export interface FileListOutput {
   files: FileEntry[];
   directory: string;
   totalFiles: number;
 }
 
+/** File lister agent. */
 export class FileListerAgent {
   private handler?: AgentHandler<FileListInput, FileListOutput>;
 
@@ -158,12 +176,17 @@ export class FileListerAgent {
   }
 
   async execute(input: FileListInput, ctx?: AgentContext): Promise<AgentOutput> {
-    if (!this.handler) return { success: false, data: null, error: "FileListerAgent: no handler injected" };
+    if (!this.handler)
+      return { success: false, data: null, error: "FileListerAgent: no handler injected" };
     try {
       const data = await this.handler(input, ctx);
       return { success: true, data };
     } catch (err) {
-      return { success: false, data: null, error: err instanceof Error ? err.message : String(err) };
+      return {
+        success: false,
+        data: null,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   }
 
@@ -176,16 +199,18 @@ export class FileListerAgent {
 
 export interface FilePickerInput extends AgentInput {
   description: string;
-  candidates: string[];  // list of file paths to pick from
+  candidates: string[]; // list of file paths to pick from
   context?: string;
 }
 
+/** File picker output interface definition. */
 export interface FilePickerOutput {
   pickedPath: string | null;
   reasoning: string;
   alternatives?: string[];
 }
 
+/** File picker agent. */
 export class FilePickerAgent {
   private handler?: AgentHandler<FilePickerInput, FilePickerOutput>;
 
@@ -195,12 +220,17 @@ export class FilePickerAgent {
   }
 
   async execute(input: FilePickerInput, ctx?: AgentContext): Promise<AgentOutput> {
-    if (!this.handler) return { success: false, data: null, error: "FilePickerAgent: no handler injected" };
+    if (!this.handler)
+      return { success: false, data: null, error: "FilePickerAgent: no handler injected" };
     try {
       const data = await this.handler(input, ctx);
       return { success: true, data };
     } catch (err) {
-      return { success: false, data: null, error: err instanceof Error ? err.message : String(err) };
+      return {
+        success: false,
+        data: null,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   }
 
@@ -217,12 +247,14 @@ export interface GlobMatchInput extends AgentInput {
   negatePatterns?: string[];
 }
 
+/** Glob match output interface definition. */
 export interface GlobMatchOutput {
   matched: string[];
   unmatched: string[];
   totalMatched: number;
 }
 
+/** Glob matcher agent. */
 export class GlobMatcherAgent {
   private handler?: AgentHandler<GlobMatchInput, GlobMatchOutput>;
 
@@ -232,12 +264,17 @@ export class GlobMatcherAgent {
   }
 
   async execute(input: GlobMatchInput, ctx?: AgentContext): Promise<AgentOutput> {
-    if (!this.handler) return { success: false, data: null, error: "GlobMatcherAgent: no handler injected" };
+    if (!this.handler)
+      return { success: false, data: null, error: "GlobMatcherAgent: no handler injected" };
     try {
       const data = await this.handler(input, ctx);
       return { success: true, data };
     } catch (err) {
-      return { success: false, data: null, error: err instanceof Error ? err.message : String(err) };
+      return {
+        success: false,
+        data: null,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   }
 
@@ -248,45 +285,76 @@ export class GlobMatcherAgent {
 
 // ── MockHandlers (for testing) ────────────────────────────────────────────────
 
-export function mockCodeSearchHandler(results: CodeSearchResult[] = []): AgentHandler<CodeSearchInput, CodeSearchOutput> {
+export function mockCodeSearchHandler(
+  results: CodeSearchResult[] = [],
+): AgentHandler<CodeSearchInput, CodeSearchOutput> {
   return async (input) => ({
-    results: results.length > 0 ? results : [
-      { path: "src/main.ts", snippet: `// code for: ${input.query}`, lineNumber: 1, relevanceScore: 0.9 },
-    ],
+    results:
+      results.length > 0
+        ? results
+        : [
+            {
+              path: "src/main.ts",
+              snippet: `// code for: ${input.query.replace(/[^\w\s.-]/g, "")}`,
+              lineNumber: 1,
+              relevanceScore: 0.9,
+            },
+          ],
     query: input.query,
     totalFound: results.length || 1,
   });
 }
 
-export function mockDirectoryListHandler(entries: FileEntry[] = []): AgentHandler<DirectoryListInput, DirectoryListOutput> {
+/** Mock directory list handler. */
+export function mockDirectoryListHandler(
+  entries: FileEntry[] = [],
+): AgentHandler<DirectoryListInput, DirectoryListOutput> {
   return async (input) => ({
-    entries: entries.length > 0 ? entries : [
-      { path: `${input.path}/file.ts`, name: "file.ts", type: "file", extension: "ts" },
-      { path: `${input.path}/subdir`, name: "subdir", type: "directory" },
-    ],
+    entries:
+      entries.length > 0
+        ? entries
+        : [
+            { path: `${input.path}/file.ts`, name: "file.ts", type: "file", extension: "ts" },
+            { path: `${input.path}/subdir`, name: "subdir", type: "directory" },
+          ],
     path: input.path,
     totalEntries: entries.length || 2,
   });
 }
 
-export function mockFileListHandler(files: FileEntry[] = []): AgentHandler<FileListInput, FileListOutput> {
+/** Mock file list handler. */
+export function mockFileListHandler(
+  files: FileEntry[] = [],
+): AgentHandler<FileListInput, FileListOutput> {
   return async (input) => ({
-    files: files.length > 0 ? files : [
-      { path: `${input.directory}/index.ts`, name: "index.ts", type: "file", extension: "ts" },
-    ],
+    files:
+      files.length > 0
+        ? files
+        : [
+            {
+              path: `${input.directory}/index.ts`,
+              name: "index.ts",
+              type: "file",
+              extension: "ts",
+            },
+          ],
     directory: input.directory,
     totalFiles: files.length || 1,
   });
 }
 
-export function mockFilePickerHandler(picked: string | null = "src/main.ts"): AgentHandler<FilePickerInput, FilePickerOutput> {
+/** Mock file picker handler. */
+export function mockFilePickerHandler(
+  picked: string | null = "src/main.ts",
+): AgentHandler<FilePickerInput, FilePickerOutput> {
   return async (input) => ({
-    pickedPath: picked ?? (input.candidates[0] ?? null),
+    pickedPath: picked ?? input.candidates[0] ?? null,
     reasoning: "Best match based on description",
     alternatives: input.candidates.slice(1),
   });
 }
 
+/** Mock glob match handler. */
 export function mockGlobMatchHandler(): AgentHandler<GlobMatchInput, GlobMatchOutput> {
   return async (input) => {
     // Simple glob simulation: pattern ending in /* matches files in that dir
@@ -301,7 +369,7 @@ export function mockGlobMatchHandler(): AgentHandler<GlobMatchInput, GlobMatchOu
           const dir = pat.slice(0, -2);
           return p.startsWith(dir) && !p.slice(dir.length + 1).includes("/");
         }
-        return p === pat || p.endsWith(pat.replace("*", ""));
+        return p === pat || p.endsWith(pat.replaceAll("*", ""));
       });
       (matches ? matched : unmatched).push(p);
     }
@@ -319,6 +387,7 @@ export interface FileExplorerAgents {
   globMatcher: GlobMatcherAgent;
 }
 
+/** Create file explorer agents. */
 export function createFileExplorerAgents(): FileExplorerAgents {
   return {
     codeSearch: new CodeSearchAgent(),
@@ -329,6 +398,7 @@ export function createFileExplorerAgents(): FileExplorerAgents {
   };
 }
 
+/** Create mock file explorer agents. */
 export function createMockFileExplorerAgents(): FileExplorerAgents {
   const agents = createFileExplorerAgents();
   agents.codeSearch.inject(mockCodeSearchHandler());

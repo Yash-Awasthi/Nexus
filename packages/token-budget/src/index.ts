@@ -39,6 +39,7 @@ export class BudgetError extends Error {
   }
 }
 
+/** Budget exceeded error. */
 export class BudgetExceededError extends BudgetError {
   constructor(
     public readonly identity: string,
@@ -66,6 +67,7 @@ export interface BudgetStatus {
   windowMs: number;
 }
 
+/** Consume options interface definition. */
 export interface ConsumeOptions {
   /** Identity to charge (e.g. user ID). */
   identity: string;
@@ -73,6 +75,7 @@ export interface ConsumeOptions {
   tokens: number;
 }
 
+/** Budget config interface definition. */
 export interface BudgetConfig {
   /** Max tokens per window per identity. */
   limit: number;
@@ -185,6 +188,7 @@ export class MemoryTokenBudget implements TokenBudget {
 
 export interface KVStoreLike {
   get<T>(key: string): Promise<T | undefined>;
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
   set<T>(key: string, value: T, ttlMs?: number): Promise<void>;
   delete(key: string): Promise<void>;
 }
@@ -233,11 +237,7 @@ export class KVTokenBudget implements TokenBudget {
   }
 
   private async _save(identity: string, events: TokenEvent[]): Promise<void> {
-    await this.kv.set<KVBudgetRecord>(
-      this._k(identity),
-      { events },
-      this.config.windowMs,
-    );
+    await this.kv.set<KVBudgetRecord>(this._k(identity), { events }, this.config.windowMs);
   }
 
   private _computeStatus(identity: string, active: TokenEvent[]): BudgetStatus {
@@ -288,17 +288,20 @@ export class KVTokenBudget implements TokenBudget {
 
 export type MessageRole = "system" | "user" | "assistant";
 
+/** Llm message interface definition. */
 export interface LLMMessage {
   role: MessageRole;
   content: string;
 }
 
+/** Llm usage interface definition. */
 export interface LLMUsage {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
 }
 
+/** Llm request interface definition. */
 export interface LLMRequest {
   model: string;
   messages: LLMMessage[];
@@ -307,6 +310,7 @@ export interface LLMRequest {
   metadata?: Record<string, unknown>;
 }
 
+/** Llm response interface definition. */
 export interface LLMResponse {
   id: string;
   model: string;
@@ -317,6 +321,7 @@ export interface LLMResponse {
   cached?: boolean;
 }
 
+/** Llm provider interface definition. */
 export interface LLMProvider {
   readonly name: string;
   readonly models: readonly string[];
@@ -365,8 +370,7 @@ export class BudgetedLLMProvider implements LLMProvider {
     this.name = `budgeted(${inner.name})`;
     this.models = inner.models;
     this.identityFn =
-      opts.identityFn ??
-      ((req) => (req.metadata?.identity as string | undefined) ?? "default");
+      opts.identityFn ?? ((req) => (req.metadata?.identity as string | undefined) ?? "default");
     this.tokenCountMode = opts.tokenCountMode ?? "total";
   }
 
@@ -388,12 +392,7 @@ export class BudgetedLLMProvider implements LLMProvider {
     // Pre-flight: check if there's any remaining budget
     const current = await this.budget.status(identity);
     if (current.remaining === 0) {
-      throw new BudgetExceededError(
-        identity,
-        current.consumed,
-        current.limit,
-        current.resetAt,
-      );
+      throw new BudgetExceededError(identity, current.consumed, current.limit, current.resetAt);
     }
 
     // Execute the request

@@ -4,7 +4,9 @@ import { FeedbackStore, PipelineExporter } from "../src/index.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makeStore() { return new FeedbackStore(); }
+function makeStore() {
+  return new FeedbackStore();
+}
 
 function addFb(
   store: FeedbackStore,
@@ -19,11 +21,11 @@ function addFb(
   }> = {},
 ) {
   return store.addFeedback({
-    sessionId:    overrides.sessionId    ?? "s1",
-    messageId:    overrides.messageId    ?? "m1",
-    promptText:   overrides.promptText   ?? "What is TypeScript?",
+    sessionId: overrides.sessionId ?? "s1",
+    messageId: overrides.messageId ?? "m1",
+    promptText: overrides.promptText ?? "What is TypeScript?",
     responseText: overrides.responseText ?? "TypeScript is a typed superset of JavaScript.",
-    model:        overrides.model        ?? "claude-3",
+    model: overrides.model ?? "claude-3",
     rating,
     source: "ui",
     userId: overrides.userId ?? "user-1",
@@ -34,7 +36,9 @@ function addFb(
 
 describe("FeedbackStore — addFeedback", () => {
   let store: FeedbackStore;
-  beforeEach(() => { store = makeStore(); });
+  beforeEach(() => {
+    store = makeStore();
+  });
 
   it("adds feedback and returns entry with id", () => {
     const e = addFb(store);
@@ -73,9 +77,9 @@ describe("FeedbackStore — queryFeedback", () => {
   let store: FeedbackStore;
   beforeEach(() => {
     store = makeStore();
-    addFb(store, "thumbs_up",   { sessionId: "s1", model: "claude-3", userId: "alice" });
-    addFb(store, "thumbs_down", { sessionId: "s1", model: "gpt-4",    userId: "bob" });
-    addFb(store, "neutral",     { sessionId: "s2", model: "claude-3", userId: "alice" });
+    addFb(store, "thumbs_up", { sessionId: "s1", model: "claude-3", userId: "alice" });
+    addFb(store, "thumbs_down", { sessionId: "s1", model: "gpt-4", userId: "bob" });
+    addFb(store, "neutral", { sessionId: "s2", model: "claude-3", userId: "alice" });
   });
 
   it("returns all entries without filter", () => {
@@ -108,7 +112,9 @@ describe("FeedbackStore — queryFeedback", () => {
 
 describe("FeedbackStore — preference pairs", () => {
   let store: FeedbackStore;
-  beforeEach(() => { store = makeStore(); });
+  beforeEach(() => {
+    store = makeStore();
+  });
 
   it("adds and retrieves preference pairs", () => {
     const p = store.addPreferencePair({
@@ -135,7 +141,7 @@ describe("FeedbackStore — preference pairs", () => {
 describe("FeedbackStore — generatePreferencePairs", () => {
   it("generates pairs from thumbs_up vs thumbs_down on same prompt", () => {
     const store = makeStore();
-    addFb(store, "thumbs_up",   { promptText: "Q?", responseText: "Good response" });
+    addFb(store, "thumbs_up", { promptText: "Q?", responseText: "Good response" });
     addFb(store, "thumbs_down", { promptText: "Q?", responseText: "Bad response" });
     const pairs = store.generatePreferencePairs();
     expect(pairs).toHaveLength(1);
@@ -151,8 +157,8 @@ describe("FeedbackStore — generatePreferencePairs", () => {
 
   it("generates M×N pairs for M positive and N negative", () => {
     const store = makeStore();
-    addFb(store, "thumbs_up",   { promptText: "Q?", responseText: "G1" });
-    addFb(store, "thumbs_up",   { promptText: "Q?", responseText: "G2" });
+    addFb(store, "thumbs_up", { promptText: "Q?", responseText: "G1" });
+    addFb(store, "thumbs_up", { promptText: "Q?", responseText: "G2" });
     addFb(store, "thumbs_down", { promptText: "Q?", responseText: "B1" });
     const pairs = store.generatePreferencePairs();
     expect(pairs).toHaveLength(2); // 2 × 1
@@ -162,8 +168,8 @@ describe("FeedbackStore — generatePreferencePairs", () => {
 describe("FeedbackStore — computeRewardSignal", () => {
   it("computes correct rewardScore", () => {
     const store = makeStore();
-    addFb(store, "thumbs_up",   { sessionId: "s1" });
-    addFb(store, "thumbs_up",   { sessionId: "s1" });
+    addFb(store, "thumbs_up", { sessionId: "s1" });
+    addFb(store, "thumbs_up", { sessionId: "s1" });
     addFb(store, "thumbs_down", { sessionId: "s1" });
     const signal = store.computeRewardSignal("s1");
     expect(signal.positiveCount).toBe(2);
@@ -217,7 +223,7 @@ describe("PipelineExporter", () => {
   });
 
   it("feedbackToJSONL supports filter", () => {
-    addFb(store, "thumbs_up",   { sessionId: "s1" });
+    addFb(store, "thumbs_up", { sessionId: "s1" });
     addFb(store, "thumbs_down", { sessionId: "s2" });
     const jsonl = exporter.feedbackToJSONL({ sessionId: "s1" });
     const lines = jsonl.split("\n").filter(Boolean);

@@ -34,14 +34,9 @@ export interface SseEvent<T = unknown> {
 
 // ── Domain event payloads ─────────────────────────────────────────────────────
 
-export type TaskStatus =
-  | "queued"
-  | "running"
-  | "completed"
-  | "failed"
-  | "cancelled"
-  | "paused";
+export type TaskStatus = "queued" | "running" | "completed" | "failed" | "cancelled" | "paused";
 
+/** Task update payload interface definition. */
 export interface TaskUpdatePayload {
   taskId: string;
   status: TaskStatus;
@@ -53,8 +48,10 @@ export interface TaskUpdatePayload {
   updatedAt: string;
 }
 
+/** Signal priority type alias. */
 export type SignalPriority = "low" | "medium" | "high" | "critical";
 
+/** Signal payload interface definition. */
 export interface SignalPayload {
   signalId: string;
   signalType: string;
@@ -63,8 +60,10 @@ export interface SignalPayload {
   createdAt: string;
 }
 
+/** Verdict outcome type alias. */
 export type VerdictOutcome = "approved" | "rejected" | "deferred" | "escalated";
 
+/** Verdict payload interface definition. */
 export interface VerdictPayload {
   verdictId: string;
   taskId?: string;

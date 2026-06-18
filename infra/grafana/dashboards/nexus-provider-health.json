@@ -1,0 +1,209 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Gateway Success vs Error Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "nexus_gateway_requests_total{status=\"success\"}",
+          "legendFormat": "Success",
+          "refId": "A"
+        },
+        {
+          "expr": "nexus_gateway_requests_total{status=\"error\"}",
+          "legendFormat": "Error",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "SLO Error Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 20 },
+          "color": { "mode": "fixed", "fixedColor": "red" }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "nexus_slo_error_rate",
+          "legendFormat": "Error rate",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Token Throughput (input + output)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 20, "stacking": { "mode": "normal" } }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "nexus_gateway_tokens_total{type=\"input\"}",
+          "legendFormat": "Input tokens",
+          "refId": "A"
+        },
+        {
+          "expr": "nexus_gateway_tokens_total{type=\"output\"}",
+          "legendFormat": "Output tokens",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "SLO Total Requests",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "nexus_slo_total_requests",
+          "legendFormat": "Total requests",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Conductor Runtime Status",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "Idle" }, "1": { "text": "Active" } } }
+          ]
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "nexus_conductor_initialised",
+          "legendFormat": "Conductor",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Conductor Jobs — Running vs Failed vs Blocked",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "bars", "fillOpacity": 70 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "nexus_conductor_jobs_total{status=\"running\"}",
+          "legendFormat": "Running",
+          "refId": "A"
+        },
+        {
+          "expr": "nexus_conductor_jobs_total{status=\"failed\"}",
+          "legendFormat": "Failed",
+          "refId": "B"
+        },
+        {
+          "expr": "nexus_conductor_jobs_total{status=\"blocked\"}",
+          "legendFormat": "Blocked (governance)",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "Process Heap vs RSS",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "process_heap_bytes",
+          "legendFormat": "Heap used",
+          "refId": "A"
+        },
+        {
+          "expr": "process_rss_bytes",
+          "legendFormat": "RSS",
+          "refId": "B"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["nexus", "providers", "conductor"],
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "NEXUS_PROMETHEUS" },
+        "hide": 0
+      }
+    ]
+  },
+  "time": { "from": "now-3h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Nexus Provider & Conductor Health",
+  "uid": "nexus-provider-health",
+  "version": 1
+}

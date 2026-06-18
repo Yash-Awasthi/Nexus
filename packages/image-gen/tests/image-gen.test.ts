@@ -17,9 +17,7 @@ import {
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-function makeFetch(
-  responses: Array<{ ok: boolean; status?: number; body?: unknown }>,
-): FetchFn {
+function makeFetch(responses: Array<{ ok: boolean; status?: number; body?: unknown }>): FetchFn {
   let idx = 0;
   return vi.fn(async () => {
     const r = responses[idx++] ?? { ok: true, status: 200, body: {} };
@@ -180,7 +178,10 @@ describe("OpenAIImageProvider", () => {
     const fetchFn = makeFetch([openAIResponse()]);
     const p = new OpenAIImageProvider({ apiKey: "sk-test", fetch: fetchFn });
     await p.generate("a cat");
-    const headers = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.headers as Record<string, string>;
+    const headers = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.headers as Record<
+      string,
+      string
+    >;
     expect(headers["Authorization"]).toBe("Bearer sk-test");
   });
 
@@ -188,7 +189,9 @@ describe("OpenAIImageProvider", () => {
     const fetchFn = makeFetch([openAIResponse(2)]);
     const p = new OpenAIImageProvider({ apiKey: "k", fetch: fetchFn });
     await p.generate("x", { n: 2, size: "512x512" });
-    const body = JSON.parse((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
+    const body = JSON.parse(
+      (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string,
+    );
     expect(body).toMatchObject({ n: 2, size: "512x512", model: "dall-e-3" });
   });
 
@@ -196,7 +199,9 @@ describe("OpenAIImageProvider", () => {
     const fetchFn = makeFetch([openAIResponse()]);
     const p = new OpenAIImageProvider({ apiKey: "k", fetch: fetchFn });
     await p.generate("x", { quality: "hd", style: "vivid" });
-    const body = JSON.parse((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
+    const body = JSON.parse(
+      (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string,
+    );
     expect(body).toMatchObject({ quality: "hd", style: "vivid" });
   });
 
@@ -233,21 +238,27 @@ describe("OpenAIImageProvider", () => {
   });
 
   it("throws CONTENT_POLICY on 400 with content policy message", async () => {
-    const fetchFn = makeFetch([{
-      ok: false,
-      status: 400,
-      body: { error: { message: "Your request was rejected as a result of our content policy." } },
-    }]);
+    const fetchFn = makeFetch([
+      {
+        ok: false,
+        status: 400,
+        body: {
+          error: { message: "Your request was rejected as a result of our content policy." },
+        },
+      },
+    ]);
     const p = new OpenAIImageProvider({ apiKey: "k", fetch: fetchFn });
     await expect(p.generate("violent content")).rejects.toMatchObject({ code: "CONTENT_POLICY" });
   });
 
   it("throws INVALID_PROMPT on 400 without content policy message", async () => {
-    const fetchFn = makeFetch([{
-      ok: false,
-      status: 400,
-      body: { error: { message: "prompt too long" } },
-    }]);
+    const fetchFn = makeFetch([
+      {
+        ok: false,
+        status: 400,
+        body: { error: { message: "prompt too long" } },
+      },
+    ]);
     const p = new OpenAIImageProvider({ apiKey: "k", fetch: fetchFn });
     await expect(p.generate("x")).rejects.toMatchObject({ code: "INVALID_PROMPT" });
   });
@@ -268,7 +279,9 @@ describe("OpenAIImageProvider", () => {
     const fetchFn = makeFetch([openAIResponse()]);
     const p = new OpenAIImageProvider({ apiKey: "k", model: "dall-e-2", fetch: fetchFn });
     await p.generate("x");
-    const body = JSON.parse((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
+    const body = JSON.parse(
+      (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string,
+    );
     expect(body.model).toBe("dall-e-2");
   });
 });
@@ -300,7 +313,10 @@ describe("ReplicateProvider", () => {
     const fetchFn = makeFetch(replicateResponses());
     const p = new ReplicateProvider({ apiToken: "r8_secret", fetch: fetchFn, sleep: noSleep });
     await p.generate("x");
-    const headers = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.headers as Record<string, string>;
+    const headers = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.headers as Record<
+      string,
+      string
+    >;
     expect(headers["Authorization"]).toBe("Token r8_secret");
   });
 
@@ -308,8 +324,15 @@ describe("ReplicateProvider", () => {
     const fetchFn = makeFetch(replicateResponses());
     const p = new ReplicateProvider({ apiToken: "t", fetch: fetchFn, sleep: noSleep });
     await p.generate("space whale", { n: 2, size: "512x512" });
-    const body = JSON.parse((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
-    expect(body.input).toMatchObject({ prompt: "space whale", width: 512, height: 512, num_outputs: 2 });
+    const body = JSON.parse(
+      (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string,
+    );
+    expect(body.input).toMatchObject({
+      prompt: "space whale",
+      width: 512,
+      height: 512,
+      num_outputs: 2,
+    });
   });
 
   it("polls until succeeded and returns image URLs", async () => {
@@ -323,14 +346,23 @@ describe("ReplicateProvider", () => {
   it("polls multiple times before succeeded", async () => {
     const processing = {
       ok: true,
-      body: { id: "p1", status: "processing", urls: { get: "https://api.replicate.com/v1/predictions/p1" } },
+      body: {
+        id: "p1",
+        status: "processing",
+        urls: { get: "https://api.replicate.com/v1/predictions/p1" },
+      },
     };
     const done = {
       ok: true,
       body: { id: "p1", status: "succeeded", output: ["https://img.example.com/out.png"] },
     };
     const fetchFn = makeFetch([processing, processing, processing, done]);
-    const p = new ReplicateProvider({ apiToken: "t", fetch: fetchFn, sleep: noSleep, pollIntervalMs: 0 });
+    const p = new ReplicateProvider({
+      apiToken: "t",
+      fetch: fetchFn,
+      sleep: noSleep,
+      pollIntervalMs: 0,
+    });
     const imgs = await p.generate("x");
     expect(imgs[0]!.url).toContain("example.com");
     // 1 create + 3 poll = 4 fetches
@@ -362,11 +394,19 @@ describe("ReplicateProvider", () => {
   });
 
   it("throws PROVIDER_ERROR on poll network failure", async () => {
-    const creating = { ok: true, body: { id: "p1", status: "processing", urls: { get: "https://api.replicate.com/v1/predictions/p1" } } };
+    const creating = {
+      ok: true,
+      body: {
+        id: "p1",
+        status: "processing",
+        urls: { get: "https://api.replicate.com/v1/predictions/p1" },
+      },
+    };
     let calls = 0;
     const badFetch: FetchFn = vi.fn(async () => {
       calls++;
-      if (calls === 1) return { ok: true, status: 200, json: async () => creating.body } as Response;
+      if (calls === 1)
+        return { ok: true, status: 200, json: async () => creating.body } as Response;
       throw new Error("poll network down");
     });
     const p = new ReplicateProvider({ apiToken: "t", fetch: badFetch, sleep: noSleep });
@@ -376,11 +416,20 @@ describe("ReplicateProvider", () => {
   it("throws POLL_TIMEOUT when deadline exceeded", async () => {
     const processing = {
       ok: true,
-      body: { id: "p1", status: "processing", urls: { get: "https://api.replicate.com/v1/predictions/p1" } },
+      body: {
+        id: "p1",
+        status: "processing",
+        urls: { get: "https://api.replicate.com/v1/predictions/p1" },
+      },
     };
     const fetchFn = makeFetch(Array(20).fill(processing));
     // timeoutMs=0 forces immediate timeout after first poll
-    const p = new ReplicateProvider({ apiToken: "t", fetch: fetchFn, sleep: noSleep, timeoutMs: 0 });
+    const p = new ReplicateProvider({
+      apiToken: "t",
+      fetch: fetchFn,
+      sleep: noSleep,
+      timeoutMs: 0,
+    });
     await expect(p.generate("x")).rejects.toMatchObject({ code: "POLL_TIMEOUT" });
   });
 
@@ -402,7 +451,9 @@ describe("ReplicateProvider", () => {
     const fetchFn = makeFetch(replicateResponses());
     const p = new ReplicateProvider({ apiToken: "t", fetch: fetchFn, sleep: noSleep });
     await p.generate("x", { negativePrompt: "blurry, ugly" });
-    const body = JSON.parse((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
+    const body = JSON.parse(
+      (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string,
+    );
     expect(body.input.negative_prompt).toBe("blurry, ugly");
   });
 
@@ -410,13 +461,22 @@ describe("ReplicateProvider", () => {
     const fetchFn = makeFetch(replicateResponses());
     const p = new ReplicateProvider({ apiToken: "t", fetch: fetchFn, sleep: noSleep });
     await p.generate("x", { seed: 42, numInferenceSteps: 50 });
-    const body = JSON.parse((fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
+    const body = JSON.parse(
+      (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string,
+    );
     expect(body.input).toMatchObject({ seed: 42, num_inference_steps: 50 });
   });
 
   it("returns empty array when output is null", async () => {
     const fetchFn = makeFetch([
-      { ok: true, body: { id: "p1", status: "starting", urls: { get: "https://api.replicate.com/v1/predictions/p1" } } },
+      {
+        ok: true,
+        body: {
+          id: "p1",
+          status: "starting",
+          urls: { get: "https://api.replicate.com/v1/predictions/p1" },
+        },
+      },
       { ok: true, body: { id: "p1", status: "succeeded", output: null } },
     ]);
     const p = new ReplicateProvider({ apiToken: "t", fetch: fetchFn, sleep: noSleep });
@@ -448,10 +508,13 @@ describe("ImageGenerator — basic flow", () => {
   });
 
   it("passes opts through to provider", async () => {
-    provider = { name: "mock", generate: vi.fn().mockResolvedValue([{ format: "png", width: 512, height: 512 }]) };
+    provider = {
+      name: "mock",
+      generate: vi.fn().mockResolvedValue([{ format: "png", width: 512, height: 512 }]),
+    };
     const gen = new ImageGenerator({ provider, sleep: noSleep });
     await gen.generate("x", { n: 2, size: "512x512" });
-    expect((provider.generate as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(
+    expect(provider.generate as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(
       "x",
       expect.objectContaining({ n: 2, size: "512x512" }),
     );
@@ -497,7 +560,9 @@ describe("ImageGenerator — basic flow", () => {
   it("uses custom name in hook payloads", async () => {
     const gen = new ImageGenerator({ provider, hooks, name: "my-gen", sleep: noSleep });
     await gen.generate("x");
-    expect((hooks.emit as ReturnType<typeof vi.fn>).mock.calls[0]![1]).toMatchObject({ gen: "my-gen" });
+    expect((hooks.emit as ReturnType<typeof vi.fn>).mock.calls[0]![1]).toMatchObject({
+      gen: "my-gen",
+    });
   });
 });
 
@@ -568,8 +633,9 @@ describe("ImageGenerator — retry", () => {
     const hooks = makeHooks();
     const gen = new ImageGenerator({ provider: failing, hooks, maxAttempts: 2, sleep: noSleep });
     await expect(gen.generate("x")).rejects.toBeDefined();
-    const errorPayload = (hooks.emit as ReturnType<typeof vi.fn>).mock.calls
-      .find((c) => c[0] === "task.error")![1];
+    const errorPayload = (hooks.emit as ReturnType<typeof vi.fn>).mock.calls.find(
+      (c) => c[0] === "task.error",
+    )![1];
     expect(errorPayload).toMatchObject({ code: "PROVIDER_ERROR", attempts: 2 });
   });
 
@@ -592,7 +658,12 @@ describe("ImageGenerator — retry", () => {
         return [{ format: "png" as const, width: 1024, height: 1024 }];
       }),
     };
-    const gen = new ImageGenerator({ provider: flaky, maxAttempts: 3, baseDelayMs: 100, sleep: sleepFn });
+    const gen = new ImageGenerator({
+      provider: flaky,
+      maxAttempts: 3,
+      baseDelayMs: 100,
+      sleep: sleepFn,
+    });
     await gen.generate("x");
     expect(sleepFn).toHaveBeenCalledTimes(2);
     // Exponential: 100, 200

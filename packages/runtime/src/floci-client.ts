@@ -3,7 +3,7 @@
  * Floci client — resolves and probes the Floci local AWS emulator endpoint.
  *
  * Floci is a lightweight LocalStack-compatible emulator that runs alongside
- * the GhostStack runtime. This module provides endpoint resolution and health
+ * the Conductor runtime. This module provides endpoint resolution and health
  * probing as pure functions with no side effects.
  */
 
@@ -28,7 +28,7 @@ export async function probeFlociHealth(
 ): Promise<FlociHealth> {
   const resolvedEndpoint = endpoint ?? resolveFlociEndpoint();
   // Floci serves /_localstack/health for LocalStack backward compatibility.
-  // It does NOT have a /_floci/health endpoint — that was a GhostStack invention.
+  // It does NOT have a /_floci/health endpoint — that was a Conductor invention.
   const healthPath = "/_localstack/health";
   const start = Date.now();
   try {

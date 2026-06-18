@@ -24,10 +24,18 @@ function makeMsg(id = "msg1"): BroadcastMessage {
 }
 
 function makeRecipient(overrides: Partial<Recipient> = {}): Recipient {
-  return { id: "r1", email: "user@example.com", webhookUrl: "https://hook.example.com", ...overrides };
+  return {
+    id: "r1",
+    email: "user@example.com",
+    webhookUrl: "https://hook.example.com",
+    ...overrides,
+  };
 }
 
-function makeFetch(ok = true, status = 200): { fetch: FetchFn; calls: Array<{ url: string; body: string }> } {
+function makeFetch(
+  ok = true,
+  status = 200,
+): { fetch: FetchFn; calls: Array<{ url: string; body: string }> } {
   const calls: Array<{ url: string; body: string }> = [];
   const fetch: FetchFn = async (url, init) => {
     calls.push({ url, body: init?.body ?? "" });
@@ -39,7 +47,9 @@ function makeFetch(ok = true, status = 200): { fetch: FetchFn; calls: Array<{ ur
 function makeEmailSender(): { sender: EmailSender; sent: Array<{ to: string; subject: string }> } {
   const sent: Array<{ to: string; subject: string }> = [];
   const sender: EmailSender = {
-    async send({ to, subject }) { sent.push({ to, subject }); },
+    async send({ to, subject }) {
+      sent.push({ to, subject });
+    },
   };
   return { sender, sent };
 }
@@ -142,7 +152,9 @@ describe("WebhookChannel", () => {
   });
 
   it("send returns success=false when fetch throws", async () => {
-    const fetch: FetchFn = async () => { throw new Error("timeout"); };
+    const fetch: FetchFn = async () => {
+      throw new Error("timeout");
+    };
     const ch = new WebhookChannel(fetch);
     const r = await ch.send(makeMsg(), makeRecipient());
     expect(r.success).toBe(false);
@@ -192,7 +204,11 @@ describe("EmailChannel", () => {
   });
 
   it("send returns success=false when sender throws", async () => {
-    const failSender: EmailSender = { async send() { throw new Error("SMTP error"); } };
+    const failSender: EmailSender = {
+      async send() {
+        throw new Error("SMTP error");
+      },
+    };
     const ch = new EmailChannel(failSender);
     const r = await ch.send(makeMsg(), makeRecipient());
     expect(r.success).toBe(false);
@@ -317,7 +333,12 @@ describe("BroadcastDispatcher", () => {
     const failCh: IBroadcastChannel = {
       name: "fail",
       canDeliver: () => true,
-      send: async (msg, r) => ({ recipientId: r.id, channel: "fail", success: false, error: "oops" }),
+      send: async (msg, r) => ({
+        recipientId: r.id,
+        channel: "fail",
+        success: false,
+        error: "oops",
+      }),
     };
     dispatcher.addChannel(failCh);
     dispatcher.addRecipient(makeRecipient());
@@ -337,7 +358,10 @@ describe("BroadcastDispatcher", () => {
 interface IBroadcastChannel {
   name: string;
   canDeliver(recipient: Recipient): boolean;
-  send(message: BroadcastMessage, recipient: Recipient): Promise<import("../src/index.js").SendResult>;
+  send(
+    message: BroadcastMessage,
+    recipient: Recipient,
+  ): Promise<import("../src/index.js").SendResult>;
 }
 
 // ── BroadcastError ────────────────────────────────────────────────────────────

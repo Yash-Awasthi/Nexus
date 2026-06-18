@@ -267,7 +267,9 @@ describe("detectLanguage", () => {
   });
 
   it("detects German", () => {
-    const r = detectLanguage("Der schnelle braune Fuchs springt über den faulen Hund. Das ist nicht gut.");
+    const r = detectLanguage(
+      "Der schnelle braune Fuchs springt über den faulen Hund. Das ist nicht gut.",
+    );
     expect(r.language).toBe("de");
   });
 
@@ -296,12 +298,7 @@ describe("detectLanguage", () => {
   });
 
   it("confidence is between 0 and 1", () => {
-    const texts = [
-      "Hello world",
-      "你好世界",
-      "Привет мир",
-      "مرحبا",
-    ];
+    const texts = ["Hello world", "你好世界", "Привет мир", "مرحبا"];
     for (const t of texts) {
       const r = detectLanguage(t);
       expect(r.confidence).toBeGreaterThanOrEqual(0);
@@ -460,7 +457,7 @@ describe("extractEntities", () => {
   });
 
   it("handles LLM response with markdown fences", async () => {
-    const llm = makeLlm("```json\n[{\"text\":\"Paris\",\"type\":\"LOCATION\",\"confidence\":0.9}]\n```");
+    const llm = makeLlm('```json\n[{"text":"Paris","type":"LOCATION","confidence":0.9}]\n```');
     const entities = await extractEntities("Paris is the capital.", llm);
     expect(entities).toHaveLength(1);
     expect(entities[0]?.text).toBe("Paris");
@@ -473,7 +470,9 @@ describe("extractEntities", () => {
   });
 
   it("filters out entries with empty text", async () => {
-    const llm = makeLlm('[{"text":"","type":"PERSON","confidence":0.9},{"text":"Alice","type":"PERSON","confidence":0.8}]');
+    const llm = makeLlm(
+      '[{"text":"","type":"PERSON","confidence":0.9},{"text":"Alice","type":"PERSON","confidence":0.8}]',
+    );
     const entities = await extractEntities("Alice said hi.", llm);
     expect(entities).toHaveLength(1);
     expect(entities[0]?.text).toBe("Alice");
@@ -548,7 +547,7 @@ describe("extractRelationships", () => {
 
   it("handles markdown-fenced response", async () => {
     const llm = makeLlm(
-      "```json\n[{\"subject\":\"A\",\"predicate\":\"knows\",\"object\":\"B\",\"confidence\":0.7}]\n```",
+      '```json\n[{"subject":"A","predicate":"knows","object":"B","confidence":0.7}]\n```',
     );
     const rels = await extractRelationships("A knows B.", entities, llm);
     expect(rels).toHaveLength(1);
@@ -570,9 +569,7 @@ describe("extractRelationships", () => {
   });
 
   it("clamps confidence to [0, 1]", async () => {
-    const llm = makeLlm(
-      '[{"subject":"A","predicate":"p","object":"B","confidence":5.0}]',
-    );
+    const llm = makeLlm('[{"subject":"A","predicate":"p","object":"B","confidence":5.0}]');
     const rels = await extractRelationships("text", entities, llm);
     expect(rels[0]?.confidence).toBe(1);
   });
@@ -674,8 +671,7 @@ describe("chunkBySemantic — edge cases", () => {
   });
 
   it("tokenEstimate matches estimateTokens for every chunk", () => {
-    const text =
-      "Dogs are loyal pets. Dogs love to play fetch. Quantum computing uses qubits.";
+    const text = "Dogs are loyal pets. Dogs love to play fetch. Quantum computing uses qubits.";
     const chunks = chunkBySemantic(text);
     for (const c of chunks) {
       expect(c.tokenEstimate).toBe(estimateTokens(c.text));
@@ -711,8 +707,7 @@ describe("chunkBySemantic — topic cohesion", () => {
   });
 
   it("threshold=0 groups all sentences (always similar enough)", () => {
-    const text =
-      "Alpha beta gamma. Delta epsilon zeta. Eta theta iota.";
+    const text = "Alpha beta gamma. Delta epsilon zeta. Eta theta iota.";
     const chunks = chunkBySemantic(text, { similarityThreshold: 0 });
     // With threshold 0, every sentence meets ≥ 0 → all merge
     expect(chunks).toHaveLength(1);

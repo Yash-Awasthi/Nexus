@@ -84,7 +84,7 @@ describe("ToolJsonRepair", () => {
   });
 
   it("repairs missing closing bracket", () => {
-    const r = repair.repair('[1,2,3');
+    const r = repair.repair("[1,2,3");
     expect(r.wasRepaired).toBe(true);
     expect(() => JSON.parse(r.repaired)).not.toThrow();
   });
@@ -180,7 +180,6 @@ describe("StreamRetryHandler", () => {
 
   async function* alwaysFails(): AsyncIterable<string> {
     throw new Error("always fails");
-    yield "unreachable";
   }
 
   const noop = async () => {};
@@ -193,7 +192,9 @@ describe("StreamRetryHandler", () => {
   });
 
   it("retries on failure and succeeds", async () => {
-    const handler = new StreamRetryHandler<string>(new RetryStrategy({ maxAttempts: 3, initialDelayMs: 0 }));
+    const handler = new StreamRetryHandler<string>(
+      new RetryStrategy({ maxAttempts: 3, initialDelayMs: 0 }),
+    );
     const call = { n: 0 };
     const result = await handler.collect(() => failOnce(call), noop);
     expect(result.succeeded).toBe(true);
@@ -201,7 +202,9 @@ describe("StreamRetryHandler", () => {
   });
 
   it("returns failed result after maxAttempts", async () => {
-    const handler = new StreamRetryHandler<string>(new RetryStrategy({ maxAttempts: 2, initialDelayMs: 0 }));
+    const handler = new StreamRetryHandler<string>(
+      new RetryStrategy({ maxAttempts: 2, initialDelayMs: 0 }),
+    );
     const result = await handler.collect(() => alwaysFails(), noop);
     expect(result.succeeded).toBe(false);
     expect(result.error).toBeDefined();

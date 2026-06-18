@@ -29,7 +29,10 @@ describe("RuleTagger", () => {
   });
 
   it("tags assistant chain-of-thought", () => {
-    const turn = makeTurn("assistant", "Let me think step by step. First, we need to understand the input. Second, sort it.");
+    const turn = makeTurn(
+      "assistant",
+      "Let me think step by step. First, we need to understand the input. Second, sort it.",
+    );
     const tag = tagger.tag(turn);
     expect(tag.label).toBe("chain-of-thought");
   });
@@ -47,19 +50,25 @@ describe("RuleTagger", () => {
   });
 
   it("tags task completion", () => {
-    const turn = makeTurn("assistant", "Here's the function you requested: ```python def sort_list(x): return sorted(x)```");
+    const turn = makeTurn(
+      "assistant",
+      "Here's the function you requested: ```python def sort_list(x): return sorted(x)```",
+    );
     const tag = tagger.tag(turn);
     expect(["task-completion", "response"]).toContain(tag.label);
   });
 
   it("tags tool use", () => {
-    const turn = makeTurn("assistant", 'Making a tool_call to search for results.');
+    const turn = makeTurn("assistant", "Making a tool_call to search for results.");
     const tag = tagger.tag(turn);
     expect(tag.label).toBe("tool-use");
   });
 
   it("tags error", () => {
-    const turn = makeTurn("assistant", "Sorry, something went wrong while processing your request.");
+    const turn = makeTurn(
+      "assistant",
+      "Sorry, something went wrong while processing your request.",
+    );
     const tag = tagger.tag(turn);
     expect(tag.label).toBe("error");
   });
@@ -75,7 +84,10 @@ describe("RuleTagger", () => {
   it("tagAll processes multiple turns", () => {
     const turns = [
       makeTurn("user", "Please explain TypeScript generics."),
-      makeTurn("assistant", "Here's an explanation: TypeScript generics allow you to write reusable code."),
+      makeTurn(
+        "assistant",
+        "Here's an explanation: TypeScript generics allow you to write reusable code.",
+      ),
     ];
     const tags = tagger.tagAll(turns);
     expect(tags).toHaveLength(2);
@@ -101,7 +113,10 @@ describe("QualityScorer", () => {
   it("scores higher with instruction + response", () => {
     const turns = [
       makeTurn("user", "Please write hello world in Python."),
-      makeTurn("assistant", "Here's the code: print('Hello, World!') This should work for your use case."),
+      makeTurn(
+        "assistant",
+        "Here's the code: print('Hello, World!') This should work for your use case.",
+      ),
     ];
     const tagger = new RuleTagger();
     const tags = tagger.tagAll(turns);
@@ -126,12 +141,18 @@ describe("QualityScorer", () => {
 describe("SftDataset", () => {
   let dataset: SftDataset;
 
-  beforeEach(() => { dataset = new SftDataset(); });
+  beforeEach(() => {
+    dataset = new SftDataset();
+  });
 
   it("adds a conversation and returns sample", () => {
     const sample = dataset.addConversation([
       { role: "user", content: "Please explain closures in JavaScript." },
-      { role: "assistant", content: "Here's a detailed explanation of closures: A closure is a function that retains access to its outer scope even after the outer function has returned." },
+      {
+        role: "assistant",
+        content:
+          "Here's a detailed explanation of closures: A closure is a function that retains access to its outer scope even after the outer function has returned.",
+      },
     ]);
     expect(sample.id).toMatch(/^sample-/);
     expect(sample.turns).toHaveLength(2);
@@ -141,16 +162,15 @@ describe("SftDataset", () => {
   });
 
   it("assigns turn IDs", () => {
-    const sample = dataset.addConversation([
-      { role: "user", content: "Hi" },
-    ]);
+    const sample = dataset.addConversation([{ role: "user", content: "Hi" }]);
     expect(sample.turns[0]!.id).toMatch(/^turn-/);
   });
 
   it("stores source field", () => {
-    const sample = dataset.addConversation([
-      { role: "user", content: "Hello?" },
-    ], "chat_export_2024");
+    const sample = dataset.addConversation(
+      [{ role: "user", content: "Hello?" }],
+      "chat_export_2024",
+    );
     expect(sample.source).toBe("chat_export_2024");
   });
 
@@ -187,14 +207,27 @@ describe("DatasetFilter", () => {
 
   beforeEach(() => {
     dataset = new SftDataset();
-    dataset.addConversation([
-      { role: "user", content: "Please write a detailed Python sorting function with documentation and tests." },
-      { role: "assistant", content: "Here's the function you requested with full documentation and examples of how to use it in production code." },
-    ], "source-a");
-    dataset.addConversation([
-      { role: "user", content: "Hi" },
-      { role: "assistant", content: "I can't help with that unfortunately." },
-    ], "source-b");
+    dataset.addConversation(
+      [
+        {
+          role: "user",
+          content: "Please write a detailed Python sorting function with documentation and tests.",
+        },
+        {
+          role: "assistant",
+          content:
+            "Here's the function you requested with full documentation and examples of how to use it in production code.",
+        },
+      ],
+      "source-a",
+    );
+    dataset.addConversation(
+      [
+        { role: "user", content: "Hi" },
+        { role: "assistant", content: "I can't help with that unfortunately." },
+      ],
+      "source-b",
+    );
   });
 
   it("filters by minQualityScore", () => {

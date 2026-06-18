@@ -2,10 +2,10 @@
 # @nexus/worker — multi-stage Docker build
 # Build: docker build -t nexus-worker -f apps/worker/Dockerfile .
 
-FROM node:22-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@9.14.4 --activate
+RUN npm install -g pnpm@9.14.4 --no-fund --no-audit
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY turbo.json ./
@@ -71,7 +71,7 @@ RUN pnpm install --frozen-lockfile --prod \
     --filter @nexus/runtime --filter @nexus/council --filter @nexus/telemetry
 
 # ─── Stage 4: runner ─────────────────────────────────────────────────────────
-FROM node:22-alpine AS runner
+FROM node:26-alpine AS runner
 WORKDIR /app
 
 RUN addgroup -g 1001 nexus && adduser -u 1001 -G nexus -s /bin/sh -D nexus

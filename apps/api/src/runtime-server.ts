@@ -2,9 +2,9 @@
 /** Re-exports for Docker CMD and legacy imports */
 import { fileURLToPath } from "node:url";
 
-import { createGhostStackServer, startHttpServer } from "./ghoststack-server.js";
+import { createConductorServer, startHttpServer } from "./conductor-server.js";
 
-export { createGhostStackServer, startHttpServer };
+export { createConductorServer, startHttpServer };
 
 // ESM entry-point guard — replaces the CJS `require.main === module` pattern.
 // Runs only when this file is invoked directly (node runtime-server.js).
