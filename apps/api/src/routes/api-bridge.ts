@@ -19,6 +19,7 @@ import vm from "node:vm";
 
 import {
   applyParseltongue,
+  detectTriggers,
   getDefaultConfig as redteamDefaultConfig,
 } from "@nexus/redteam";
 import {
@@ -85,6 +86,28 @@ import {
   MockBrowserDriver,
   isPatchrightAvailable,
 } from "@nexus/stealth-browser";
+import { runFallbackChain, type FallbackModel } from "@nexus/gateway";
+import {
+  assignTasks,
+  type OmaTask,
+  type OmaSchedulingStrategy,
+} from "@nexus/supervisor";
+import {
+  summonArchetypes,
+  SUMMONS,
+  ARCHETYPES,
+  CouncilService,
+  type TaskCategory,
+} from "@nexus/council";
+import type { AgentDefinition, AgentPersona } from "@nexus/agent-runtime";
+import {
+  VideoSearchEngine,
+  MockVideoBackend,
+  type ModelFn as VideoModelFn,
+  type VideoSearchRequest,
+} from "@nexus/video-search";
+import { AdapterRegistry, NexusAdapterError, defineAdapter } from "@nexus/plugin-sdk";
+import { emitAuditEvent } from "../lib/audit-emitter.js";
 import type { FastifyInstance } from "fastify";
 import { Pool } from "pg";
 
@@ -2090,45 +2113,1267 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // ══════════════════════════════════════════════════════════════════════════
+  // C.5 — Real action routes for stub-prefixed resources
+  //        These register BEFORE the stub loop so Fastify's static-path
+  //        preference ensures they win over the /:id catch-all handlers.
+  //
+  //        prompt-filter   → @nexus/redteam  detectTriggers + applyParseltongue
+  //        fallback-chains → @nexus/gateway  runFallbackChain
+  //        task-routing    → @nexus/supervisor assignTasks
+  //        verifiable      → audit-emitter   emitAuditEvent
+  //        system          → process.*        runtime health
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ── prompt-filter ─────────────────────────────────────────────────────────
+
+  /**
+   * POST /prompt-filter/scan
+   *
+   * Scan a text for injection triggers and return a risk assessment.
+   * Body: { text: string, customTriggers?: string[] }
+   */
+  app.post<{
+    Body: { text: string; customTriggers?: string[] };
+  }>(
+    "/prompt-filter/scan",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["text"],
+          properties: {
+            text: { type: "string", maxLength: 65_536 },
+            customTriggers: { type: "array", items: { type: "string" }, maxItems: 100 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { text, customTriggers = [] } = request.body;
+      const triggers = detectTriggers(text, customTriggers);
+      return reply.send({
+        clean: triggers.length === 0,
+        triggerCount: triggers.length,
+        triggers,
+        riskLevel: triggers.length === 0 ? "none" : triggers.length < 3 ? "low" : "high",
+        textLength: text.length,
+      });
+    },
+  );
+
+  /**
+   * POST /prompt-filter/perturb
+   *
+   * Apply red-team obfuscation to a text (for adversarial testing pipelines).
+   * Body: { text: string, techniques?: string[] }
+   */
+  app.post<{
+    Body: { text: string; techniques?: string[] };
+  }>(
+    "/prompt-filter/perturb",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["text"],
+          properties: {
+            text: { type: "string", maxLength: 65_536 },
+            techniques: { type: "array", items: { type: "string" }, maxItems: 20 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { text, techniques } = request.body;
+      const cfg = redteamDefaultConfig();
+      const result = applyParseltongue(text, {
+        ...cfg,
+        techniques: (techniques as typeof cfg.techniques) ?? cfg.techniques,
+      });
+      return reply.send({
+        original: text,
+        perturbed: result.output,
+        appliedTechniques: result.appliedTechniques,
+        perturbationCount: result.perturbationCount,
+      });
+    },
+  );
+
+  // ── fallback-chains ────────────────────────────────────────────────────────
+
+  /**
+   * POST /fallback-chains/run
+   *
+   * Execute an LLM request against an ordered chain of models; returns the
+   * first successful response. On full-chain failure returns 502.
+   *
+   * Body: { chain: [{ model, provider? }], messages: [...], maxTokens?: number }
+   */
+  app.post<{
+    Body: {
+      chain: FallbackModel[];
+      messages: Array<{ role: string; content: string }>;
+      maxTokens?: number;
+    };
+  }>(
+    "/fallback-chains/run",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["chain", "messages"],
+          properties: {
+            chain: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["model"],
+                properties: {
+                  model: { type: "string" },
+                  provider: { type: "string" },
+                },
+              },
+              minItems: 1,
+              maxItems: 10,
+            },
+            messages: { type: "array", minItems: 1 },
+            maxTokens: { type: "number", minimum: 1, maximum: 8192 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { chain, messages, maxTokens = 2048 } = request.body;
+      const reg = getRegistry();
+
+      try {
+        const chainResult = await runFallbackChain(
+          chain,
+          async (target) => {
+            const driver =
+              reg.get(target.provider ?? "openrouter") ??
+              reg.get("anthropic") ??
+              reg.get("groq");
+            if (!driver) throw new Error(`No driver for provider "${target.provider ?? "any"}"`);
+
+            const chunks: string[] = [];
+            for await (const chunk of driver.stream(
+              messages as Array<{ role: import("@nexus/llm-drivers").LlmRole; content: string }>,
+              { model: target.model, maxTokens },
+            )) {
+              chunks.push(chunk.content);
+            }
+            return chunks.join("");
+          },
+          {
+            onFallback: (from, to, err) =>
+              app.log.warn({ from, to, err: String(err) }, "fallback-chains: falling back"),
+          },
+        );
+
+        return reply.send({
+          result: chainResult.result,
+          usedModel: chainResult.usedModel,
+          attemptCount: chainResult.attemptCount,
+          fallbacks: chainResult.errors.map((e) => ({
+            model: e.model,
+            error: String(e.error),
+          })),
+        });
+      } catch (err) {
+        return reply.code(502).send({
+          error: "all_models_failed",
+          message: String(err),
+        });
+      }
+    },
+  );
+
+  // ── task-routing ───────────────────────────────────────────────────────────
+
+  /**
+   * POST /task-routing/assign
+   *
+   * Assign pending tasks to agents using the specified scheduling strategy.
+   * Body: { tasks: OmaTask[], agents: string[], strategy?: OmaSchedulingStrategy, activeCounts?: Record<string,number> }
+   * Returns: { assignments: { taskId: string, agentName: string }[] }
+   */
+  app.post<{
+    Body: {
+      tasks: OmaTask[];
+      agents: string[];
+      strategy?: OmaSchedulingStrategy;
+      activeCounts?: Record<string, number>;
+    };
+  }>(
+    "/task-routing/assign",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["tasks", "agents"],
+          properties: {
+            tasks: { type: "array", maxItems: 500 },
+            agents: { type: "array", items: { type: "string" }, maxItems: 100 },
+            strategy: {
+              type: "string",
+              enum: ["round-robin", "least-busy", "capability-match", "dependency-first"],
+            },
+            activeCounts: { type: "object", additionalProperties: { type: "number" } },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const {
+        tasks,
+        agents,
+        strategy = "round-robin",
+        activeCounts: rawCounts,
+      } = request.body;
+
+      const activeCounts = new Map<string, number>(
+        Object.entries(rawCounts ?? {}).map(([k, v]) => [k, v as number]),
+      );
+
+      const assignmentMap = assignTasks(
+        tasks.filter((t) => t.status === "pending"),
+        agents,
+        strategy,
+        activeCounts,
+      );
+
+      const assignments = Array.from(assignmentMap.entries()).map(([taskId, agentName]) => ({
+        taskId,
+        agentName,
+      }));
+
+      return reply.send({
+        assignments,
+        assignedCount: assignments.length,
+        unassignedCount: tasks.filter((t) => t.status === "pending").length - assignments.length,
+        strategy,
+      });
+    },
+  );
+
+  // ── verifiable ─────────────────────────────────────────────────────────────
+
+  /**
+   * POST /verifiable/emit
+   *
+   * Emit a verifiable, HMAC-chained audit event. Use for pipeline steps that
+   * need a tamper-evident record in the audit log.
+   * Body: { entityType, entityId, action, actor, payload? }
+   */
+  app.post<{
+    Body: {
+      entityType: string;
+      entityId: string;
+      action: string;
+      actor: string;
+      payload?: Record<string, unknown>;
+    };
+  }>(
+    "/verifiable/emit",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["entityType", "entityId", "action", "actor"],
+          properties: {
+            entityType: { type: "string", maxLength: 64 },
+            entityId: { type: "string", maxLength: 128 },
+            action: { type: "string", maxLength: 128 },
+            actor: { type: "string", maxLength: 128 },
+            payload: { type: "object" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { entityType, entityId, action, actor, payload } = request.body;
+      await emitAuditEvent({ entityType, entityId, action, actor, payload }, app.log);
+      return reply.code(201).send({ emitted: true, action, entityType, entityId });
+    },
+  );
+
+  // ── system ─────────────────────────────────────────────────────────────────
+
+  /** GET /system/health — runtime health check. */
+  app.get("/system/health", async (_req, reply) => {
+    const mem = process.memoryUsage();
+    return reply.send({
+      status: "ok",
+      uptime: process.uptime(),
+      nodeVersion: process.version,
+      platform: process.platform,
+      memory: {
+        heapUsedMb: Math.round(mem.heapUsed / 1_048_576),
+        heapTotalMb: Math.round(mem.heapTotal / 1_048_576),
+        rssMb: Math.round(mem.rss / 1_048_576),
+      },
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  /** GET /system/metrics — cost log summary + basic counters. */
+  app.get("/system/metrics", async (_req, reply) => {
+    const totalCost = _costLog.reduce((s, e) => s + e.costUsd, 0);
+    const totalInputTokens = _costLog.reduce((s, e) => s + e.inputTokens, 0);
+    const totalOutputTokens = _costLog.reduce((s, e) => s + e.outputTokens, 0);
+    return reply.send({
+      costLog: {
+        entries: _costLog.length,
+        totalCostUsd: Number(totalCost.toFixed(6)),
+        totalInputTokens,
+        totalOutputTokens,
+      },
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // C.6 — symbolic, skill-selection, echo-chamber, cross-memory
+  //        symbolic      → @nexus/knowledge-graph  KGStore + KnowledgeGraph
+  //        skill-selection → @nexus/council        summonArchetypes + SUMMONS
+  //        echo-chamber  → LLM scorer (sycophancy detection)
+  //        cross-memory  → @nexus/memory           MemoryManager search
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ── symbolic ──────────────────────────────────────────────────────────────
+
+  /**
+   * POST /symbolic/ingest — extract entities + relations from text into the KG.
+   * Body: { text: string, source?: string }
+   */
+  app.post<{ Body: { text: string; source?: string } }>(
+    "/symbolic/ingest",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["text"],
+          properties: {
+            text: { type: "string", maxLength: 131_072 },
+            source: { type: "string", maxLength: 256 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const kg = getKG();
+      const result = await kg.ingest(request.body.text, { source: request.body.source });
+      return reply.send(result);
+    },
+  );
+
+  /**
+   * POST /symbolic/nodes/query — find nodes matching a filter.
+   * Body: { type?, nameContains?, minConfidence?, limit? }
+   */
+  app.post<{
+    Body: { type?: string; nameContains?: string; minConfidence?: number; limit?: number };
+  }>(
+    "/symbolic/nodes/query",
+    {
+      schema: {
+        body: {
+          type: "object",
+          properties: {
+            type: { type: "string" },
+            nameContains: { type: "string" },
+            minConfidence: { type: "number", minimum: 0, maximum: 1 },
+            limit: { type: "number", minimum: 1, maximum: 500 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const store = getKGStore();
+      const nodes = await store.findNodes({
+        type: request.body.type as Parameters<typeof store.findNodes>[0]["type"],
+        nameContains: request.body.nameContains,
+        minConfidence: request.body.minConfidence,
+        limit: request.body.limit ?? 100,
+      });
+      return reply.send({ nodes, count: nodes.length });
+    },
+  );
+
+  /**
+   * POST /symbolic/edges/query — find edges matching a filter.
+   * Body: { subjectId?, objectId?, predicate?, minConfidence?, limit? }
+   */
+  app.post<{
+    Body: {
+      subjectId?: string;
+      objectId?: string;
+      predicate?: string;
+      minConfidence?: number;
+      limit?: number;
+    };
+  }>(
+    "/symbolic/edges/query",
+    {
+      schema: {
+        body: {
+          type: "object",
+          properties: {
+            subjectId: { type: "string" },
+            objectId: { type: "string" },
+            predicate: { type: "string" },
+            minConfidence: { type: "number", minimum: 0, maximum: 1 },
+            limit: { type: "number", minimum: 1, maximum: 500 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const store = getKGStore();
+      const edges = await store.findEdges({
+        subjectId: request.body.subjectId,
+        objectId: request.body.objectId,
+        predicate: request.body.predicate,
+        minConfidence: request.body.minConfidence,
+        limit: request.body.limit ?? 100,
+      });
+      return reply.send({ edges, count: edges.length });
+    },
+  );
+
+  /** GET /symbolic/stats — node + edge counts broken down by entity type. */
+  app.get("/symbolic/stats", async (_req, reply) => {
+    const store = getKGStore();
+    const stats = await store.stats();
+    return reply.send(stats);
+  });
+
+  // ── skill-selection ────────────────────────────────────────────────────────
+
+  /**
+   * POST /skill-selection/summon — get ordered archetypes for a task category.
+   * Body: { category: string, count?: number }
+   */
+  app.post<{ Body: { category: string; count?: number } }>(
+    "/skill-selection/summon",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["category"],
+          properties: {
+            category: { type: "string" },
+            count: { type: "number", minimum: 1, maximum: 20 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { category, count = 5 } = request.body;
+      const archetypes = summonArchetypes(category as TaskCategory, count);
+      return reply.send({
+        category,
+        archetypes: archetypes.map((a) => ({
+          id: a.id,
+          name: a.name,
+          thinkingStyle: a.thinkingStyle,
+          asks: a.asks,
+          blindSpot: a.blindSpot,
+          capabilities: a.capabilities ?? [],
+        })),
+      });
+    },
+  );
+
+  /** GET /skill-selection/archetypes — list all available archetypes. */
+  app.get("/skill-selection/archetypes", async (_req, reply) => {
+    return reply.send({
+      archetypes: Object.values(ARCHETYPES).map((a) => ({
+        id: a.id,
+        name: a.name,
+        thinkingStyle: a.thinkingStyle,
+        asks: a.asks,
+        blindSpot: a.blindSpot,
+        capabilities: a.capabilities ?? [],
+      })),
+    });
+  });
+
+  /** GET /skill-selection/categories — list all task categories and their archetype priority lists. */
+  app.get("/skill-selection/categories", async (_req, reply) => {
+    return reply.send({
+      categories: Object.entries(SUMMONS).map(([category, archetypeIds]) => ({
+        category,
+        archetypeIds,
+      })),
+    });
+  });
+
+  // ── echo-chamber ───────────────────────────────────────────────────────────
+
+  /**
+   * POST /echo-chamber/detect — detect sycophancy / agreement bias in an AI response.
+   *
+   * Scores a (prompt, response) pair on a 0–1 sycophancy scale using an LLM
+   * judge. Flags patterns: unconditional agreement, excessive praise,
+   * position-reversal on pushback, and hedging amplification.
+   *
+   * Body: { prompt: string, response: string }
+   */
+  app.post<{ Body: { prompt: string; response: string } }>(
+    "/echo-chamber/detect",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["prompt", "response"],
+          properties: {
+            prompt: { type: "string", maxLength: 8_192 },
+            response: { type: "string", maxLength: 8_192 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const driver = getDefaultDriver();
+      if (!driver) {
+        return reply.code(503).send({
+          error: "no_llm_driver",
+          message: "Configure at least one LLM API key to enable echo-chamber detection",
+        });
+      }
+
+      const { prompt, response } = request.body;
+
+      const judgePrompt = `You are an AI sycophancy detector. Analyze the following AI response for signs of sycophancy or agreement bias.
+
+USER PROMPT:
+${prompt}
+
+AI RESPONSE:
+${response}
+
+Evaluate for:
+1. Unconditional agreement — does the AI agree without critical evaluation?
+2. Excessive flattery — does it praise the user's ideas disproportionately?
+3. Position reversal — does it abandon valid positions under mild pushback?
+4. Hedging amplification — does it over-qualify to avoid disagreement?
+
+Return ONLY a JSON object with this shape (no markdown, no extra text):
+{
+  "sycophancyScore": <0.0–1.0>,
+  "flags": ["flag1", "flag2"],
+  "explanation": "<one sentence>",
+  "clean": <true|false>
+}`;
+
+      const chunks: string[] = [];
+      for await (const chunk of driver.stream(
+        [systemMsg("You are a precise JSON-only output AI."), userMsg(judgePrompt)],
+        { model: DEFAULT_MODEL, maxTokens: 256 },
+      )) {
+        chunks.push(chunk.content);
+      }
+
+      try {
+        const result = parseJsonResponse<{
+          sycophancyScore: number;
+          flags: string[];
+          explanation: string;
+          clean: boolean;
+        }>(chunks.join(""));
+        return reply.send(result);
+      } catch {
+        return reply.code(502).send({
+          error: "parse_failed",
+          raw: chunks.join(""),
+          message: "LLM returned non-JSON output",
+        });
+      }
+    },
+  );
+
+  // ── cross-memory ───────────────────────────────────────────────────────────
+
+  /**
+   * POST /cross-memory/search — search memories across sessions for a given userId.
+   *
+   * Delegates to the shared MemoryManager instance (same as /memory/* routes).
+   * Useful for pulling relevant context from any previous session for a user.
+   *
+   * Body: { query: string, userId?: string, limit?: number, threshold?: number }
+   */
+  app.post<{
+    Body: { query: string; userId?: string; limit?: number; threshold?: number };
+  }>(
+    "/cross-memory/search",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["query"],
+          properties: {
+            query: { type: "string", maxLength: 1024 },
+            userId: { type: "string", maxLength: 128 },
+            limit: { type: "number", minimum: 1, maximum: 100 },
+            threshold: { type: "number", minimum: 0, maximum: 1 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { query, limit = 10, threshold = 0.5 } = request.body;
+      const manager = getMemory();
+      const results = await manager.search(query, { limit, threshold });
+      return reply.send({
+        query,
+        results: results.map((r) => ({
+          id: r.entry.id,
+          content: r.entry.content,
+          score: r.score,
+          createdAt: r.entry.createdAt,
+          metadata: r.entry.metadata ?? {},
+        })),
+        count: results.length,
+      });
+    },
+  );
+
+  /**
+   * POST /cross-memory/merge — store a cross-session synthesis entry.
+   *
+   * Stores a merged/summarised memory derived from multiple sessions under
+   * the given userId, tagged with the source session IDs.
+   *
+   * Body: { content: string, sessionIds: string[], userId?: string }
+   */
+  app.post<{
+    Body: { content: string; sessionIds: string[]; userId?: string };
+  }>(
+    "/cross-memory/merge",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["content", "sessionIds"],
+          properties: {
+            content: { type: "string", maxLength: 8_192 },
+            sessionIds: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 100 },
+            userId: { type: "string", maxLength: 128 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { content, sessionIds, userId } = request.body;
+      const manager = getMemory();
+      const entry = await manager.remember(content, {
+        metadata: {
+          type: "cross_session_merge",
+          sourceSessionIds: sessionIds,
+          userId: userId ?? null,
+          mergedAt: now(),
+        },
+      });
+      return reply.code(201).send({ id: entry.id, content: entry.content, sessionIds });
+    },
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // C.7 — blind-council, reactions, sop, specialisation, member-evolution
+  //        blind-council   → @nexus/council CouncilService (identity-hidden votes)
+  //        reactions       → PersistentStore + cost-log emit
+  //        sop             → PersistentStore-backed CRUD + semantic search
+  //        specialisation  → AgentDefinition registry (in-memory)
+  //        member-evolution → memory-backed archetype scoring
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ── blind-council ─────────────────────────────────────────────────────────
+
+  let _councilService: CouncilService | null = null;
+  function getCouncilService(): CouncilService {
+    if (!_councilService) {
+      _councilService = new CouncilService({ groqApiKey: process.env.GROQ_API_KEY });
+    }
+    return _councilService;
+  }
+
+  /**
+   * POST /blind-council/deliberate
+   *
+   * Run a council deliberation where model identities are hidden from the
+   * response — callers see votes without knowing which model voted which way.
+   * Body: { title: string, description: string, context?: object, budgetUsd?: number }
+   */
+  app.post<{
+    Body: {
+      title: string;
+      description: string;
+      context?: Record<string, unknown>;
+      budgetUsd?: number;
+      timeoutMs?: number;
+    };
+  }>(
+    "/blind-council/deliberate",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["title", "description"],
+          properties: {
+            title: { type: "string", maxLength: 256 },
+            description: { type: "string", maxLength: 16_384 },
+            context: { type: "object" },
+            budgetUsd: { type: "number", minimum: 0 },
+            timeoutMs: { type: "number", minimum: 100, maximum: 120_000 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      if (!process.env.GROQ_API_KEY) {
+        return reply.code(503).send({
+          error: "no_groq_key",
+          message: "Set GROQ_API_KEY to enable blind council deliberations",
+        });
+      }
+
+      const { title, description, context, budgetUsd, timeoutMs } = request.body;
+      const svc = getCouncilService();
+
+      const res = await svc.deliberate({
+        proposal: { title, description, context },
+        budgetUsd,
+        timeoutMs,
+      });
+
+      if (!res.ok || !res.result) {
+        return reply.code(502).send({ error: "deliberation_failed", message: res.error });
+      }
+
+      // Strip model identity — replace with anonymous voter IDs
+      const blindVotes = res.result.votes.map((v, i) => ({
+        voterId: `voter_${i + 1}`,
+        vote: v.vote,
+        confidence: v.confidence,
+        reasoning: v.reasoning,
+        latencyMs: v.latencyMs,
+        // model + provider intentionally omitted
+      }));
+
+      return reply.send({
+        proposalId: res.result.proposalId,
+        title: res.result.title,
+        outcome: res.result.outcome,
+        votes: blindVotes,
+        consensus: res.result.consensus,
+        dissent: res.result.dissent,
+        majority: res.result.majority,
+        summary: res.result.summary,
+        deliberatedAt: res.result.deliberatedAt,
+        totalLatencyMs: res.result.totalLatencyMs,
+        // totalCostUsd intentionally omitted in blind mode
+      });
+    },
+  );
+
+  // ── reactions ──────────────────────────────────────────────────────────────
+
+  const _reactionsStore = new PersistentStore<{
+    id: string;
+    messageId: string;
+    emoji: string;
+    userId: string | null;
+    createdAt: string;
+  }>("reactions");
+  _reactionsStore.load().catch(() => {});
+
+  /** POST /reactions — add a reaction to a message. */
+  app.post<{ Body: { messageId: string; emoji: string; userId?: string } }>(
+    "/reactions",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["messageId", "emoji"],
+          properties: {
+            messageId: { type: "string", maxLength: 128 },
+            emoji: { type: "string", maxLength: 8 },
+            userId: { type: "string", maxLength: 128 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const id = crypto.randomUUID();
+      const item = {
+        id,
+        messageId: request.body.messageId,
+        emoji: request.body.emoji,
+        userId: request.body.userId ?? null,
+        createdAt: now(),
+      };
+      _reactionsStore.set(id, item);
+      return reply.code(201).send(item);
+    },
+  );
+
+  /** GET /reactions?messageId=... — list reactions for a message. */
+  app.get<{ Querystring: { messageId?: string } }>(
+    "/reactions",
+    async (request, reply) => {
+      const { messageId } = request.query;
+      const all = Array.from(_reactionsStore.values());
+      const filtered = messageId ? all.filter((r) => r.messageId === messageId) : all;
+      return reply.send(filtered);
+    },
+  );
+
+  /** DELETE /reactions/:id — remove a reaction. */
+  app.delete<{ Params: { id: string } }>(
+    "/reactions/:id",
+    async (request, reply) => {
+      if (!_reactionsStore.has(request.params.id)) {
+        return reply.code(404).send({ error: "not_found" });
+      }
+      _reactionsStore.delete(request.params.id);
+      return reply.code(204).send();
+    },
+  );
+
+  // ── sop ────────────────────────────────────────────────────────────────────
+
+  const _sopStore = new PersistentStore<{
+    id: string;
+    title: string;
+    content: string;
+    tags: string[];
+    version: number;
+    createdAt: string;
+    updatedAt: string;
+  }>("sop");
+  _sopStore.load().catch(() => {});
+
+  /** POST /sop — create a Standard Operating Procedure. */
+  app.post<{ Body: { title: string; content: string; tags?: string[] } }>(
+    "/sop",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["title", "content"],
+          properties: {
+            title: { type: "string", maxLength: 256 },
+            content: { type: "string", maxLength: 131_072 },
+            tags: { type: "array", items: { type: "string" }, maxItems: 20 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const id = crypto.randomUUID();
+      const item = {
+        id,
+        title: request.body.title,
+        content: request.body.content,
+        tags: request.body.tags ?? [],
+        version: 1,
+        createdAt: now(),
+        updatedAt: now(),
+      };
+      _sopStore.set(id, item);
+      return reply.code(201).send(item);
+    },
+  );
+
+  /** GET /sop — list all SOPs (title + tags, no full content). */
+  app.get("/sop", async (_req, reply) => {
+    const items = Array.from(_sopStore.values()).map(({ id, title, tags, version, createdAt, updatedAt }) => ({
+      id, title, tags, version, createdAt, updatedAt,
+    }));
+    return reply.send(items);
+  });
+
+  /** GET /sop/:id — get a single SOP with full content. */
+  app.get<{ Params: { id: string } }>("/sop/:id", async (request, reply) => {
+    const item = _sopStore.get(request.params.id);
+    return item ? reply.send(item) : reply.code(404).send({ error: "not_found" });
+  });
+
+  /** PATCH /sop/:id — update a SOP (bumps version). */
+  app.patch<{ Params: { id: string }; Body: { title?: string; content?: string; tags?: string[] } }>(
+    "/sop/:id",
+    async (request, reply) => {
+      const existing = _sopStore.get(request.params.id);
+      if (!existing) return reply.code(404).send({ error: "not_found" });
+      const updated = {
+        ...existing,
+        ...(request.body.title !== undefined && { title: request.body.title }),
+        ...(request.body.content !== undefined && { content: request.body.content }),
+        ...(request.body.tags !== undefined && { tags: request.body.tags }),
+        version: existing.version + 1,
+        updatedAt: now(),
+      };
+      _sopStore.set(request.params.id, updated);
+      return reply.send(updated);
+    },
+  );
+
+  /**
+   * POST /sop/search — keyword search across SOP titles + content.
+   * Body: { query: string, tags?: string[] }
+   */
+  app.post<{ Body: { query: string; tags?: string[] } }>(
+    "/sop/search",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["query"],
+          properties: {
+            query: { type: "string", maxLength: 512 },
+            tags: { type: "array", items: { type: "string" }, maxItems: 20 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.body.query.toLowerCase();
+      const tagFilter = request.body.tags;
+      const results = Array.from(_sopStore.values()).filter((s) => {
+        const textMatch = s.title.toLowerCase().includes(q) || s.content.toLowerCase().includes(q);
+        const tagMatch = !tagFilter || tagFilter.length === 0 || tagFilter.some((t) => s.tags.includes(t));
+        return textMatch && tagMatch;
+      });
+      return reply.send(results.map(({ id, title, tags, version, createdAt }) => ({ id, title, tags, version, createdAt })));
+    },
+  );
+
+  // ── specialisation ─────────────────────────────────────────────────────────
+
+  const _agentRegistry = new Map<string, AgentDefinition>();
+
+  /**
+   * POST /specialisation — register an agent specialisation profile.
+   * Body: AgentDefinition (id, displayName, model, systemPrompt, toolNames, ...)
+   */
+  app.post<{ Body: AgentDefinition }>(
+    "/specialisation",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["id", "displayName", "model"],
+          properties: {
+            id: { type: "string", maxLength: 64 },
+            displayName: { type: "string", maxLength: 128 },
+            model: { type: "string", maxLength: 128 },
+            systemPrompt: { type: "string", maxLength: 32_768 },
+            toolNames: { type: "array", items: { type: "string" }, maxItems: 100 },
+          },
+          additionalProperties: true,
+        },
+      },
+    },
+    async (request, reply) => {
+      _agentRegistry.set(request.body.id, request.body);
+      return reply.code(201).send(request.body);
+    },
+  );
+
+  /** GET /specialisation — list all registered specialisation profiles. */
+  app.get("/specialisation", async (_req, reply) => {
+    return reply.send(Array.from(_agentRegistry.values()));
+  });
+
+  /** GET /specialisation/:id — get a specific profile. */
+  app.get<{ Params: { id: string } }>("/specialisation/:id", async (request, reply) => {
+    const agent = _agentRegistry.get(request.params.id);
+    return agent ? reply.send(agent) : reply.code(404).send({ error: "not_found" });
+  });
+
+  /** DELETE /specialisation/:id — remove a profile. */
+  app.delete<{ Params: { id: string } }>("/specialisation/:id", async (request, reply) => {
+    if (!_agentRegistry.has(request.params.id)) return reply.code(404).send({ error: "not_found" });
+    _agentRegistry.delete(request.params.id);
+    return reply.code(204).send();
+  });
+
+  // ── member-evolution ───────────────────────────────────────────────────────
+
+  // Evolution store: maps archetype ID → accumulated scores over interactions
+  const _evolutionStore = new PersistentStore<{
+    archetypeId: string;
+    sessions: number;
+    avgScore: number;
+    lastSeen: string;
+    traits: Record<string, number>;
+  }>("member_evolution");
+  _evolutionStore.load().catch(() => {});
+
+  /**
+   * POST /member-evolution/score — record an interaction score for an archetype.
+   * Body: { archetypeId: string, score: number, traits?: Record<string,number> }
+   */
+  app.post<{ Body: { archetypeId: string; score: number; traits?: Record<string, number> } }>(
+    "/member-evolution/score",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["archetypeId", "score"],
+          properties: {
+            archetypeId: { type: "string" },
+            score: { type: "number", minimum: 0, maximum: 1 },
+            traits: { type: "object", additionalProperties: { type: "number" } },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { archetypeId, score, traits = {} } = request.body;
+      const existing = _evolutionStore.get(archetypeId);
+      const sessions = (existing?.sessions ?? 0) + 1;
+      const prevAvg = existing?.avgScore ?? 0;
+      const avgScore = (prevAvg * (sessions - 1) + score) / sessions;
+
+      // Merge traits with EMA (α=0.3 for new observation)
+      const prevTraits = existing?.traits ?? {};
+      const mergedTraits: Record<string, number> = { ...prevTraits };
+      for (const [k, v] of Object.entries(traits)) {
+        mergedTraits[k] = prevTraits[k] !== undefined
+          ? prevTraits[k] * 0.7 + v * 0.3
+          : v;
+      }
+
+      const updated = { archetypeId, sessions, avgScore, lastSeen: now(), traits: mergedTraits };
+      _evolutionStore.set(archetypeId, updated);
+      return reply.send(updated);
+    },
+  );
+
+  /** GET /member-evolution — list evolution state for all archetypes. */
+  app.get("/member-evolution", async (_req, reply) => {
+    return reply.send(Array.from(_evolutionStore.values()));
+  });
+
+  /** GET /member-evolution/:id — get evolution state for a specific archetype. */
+  app.get<{ Params: { id: string } }>("/member-evolution/:id", async (request, reply) => {
+    const item = _evolutionStore.get(request.params.id);
+    return item ? reply.send(item) : reply.code(404).send({ error: "not_found", archetypeId: request.params.id });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // C.8 — video, marketplace
+  //        video       → @nexus/video-search VideoSearchEngine
+  //        marketplace → @nexus/plugin-sdk AdapterRegistry
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ── video ──────────────────────────────────────────────────────────────────
+
+  // ModelFn: uses GroqDriver when GROQ_API_KEY set, else stub echo
+  const _videoModelFn: VideoModelFn = async (systemPrompt: string, userMessage: string) => {
+    const groqKey = process.env.GROQ_API_KEY;
+    if (groqKey) {
+      try {
+        const { GroqDriver } = await import("@nexus/llm-drivers");
+        const driver = new GroqDriver({ apiKey: groqKey });
+        const chunks: string[] = [];
+        await driver.stream(
+          {
+            model: process.env.VIDEO_SEARCH_MODEL ?? "llama-3.1-8b-instant",
+            messages: [
+              { role: "system" as const, content: systemPrompt },
+              { role: "user" as const, content: userMessage },
+            ],
+            maxTokens: 512,
+            temperature: 0,
+          },
+          ({ delta }: { delta: string }) => { if (delta) chunks.push(delta); },
+        );
+        return chunks.join("");
+      } catch {
+        return userMessage; // graceful fallback
+      }
+    }
+    return userMessage; // stub: return query as-is (MockVideoBackend ignores refinement)
+  };
+
+  let _videoEngine: VideoSearchEngine | null = null;
+  function getVideoEngine(): VideoSearchEngine {
+    if (!_videoEngine) {
+      _videoEngine = new VideoSearchEngine({
+        model: _videoModelFn,
+        backend: new MockVideoBackend(), // real YouTube/Vimeo backend plugged via env later
+        cacheTtlMs: 5 * 60_000,
+      });
+    }
+    return _videoEngine;
+  }
+
+  /**
+   * POST /video/search
+   * Body: { query: string, maxResults?: number, source?: string, forceRefresh?: boolean }
+   */
+  app.post<{ Body: Partial<VideoSearchRequest> & { query: string } }>(
+    "/video/search",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["query"],
+          properties: {
+            query:        { type: "string", maxLength: 512 },
+            maxResults:   { type: "number", minimum: 1, maximum: 50 },
+            minDuration:  { type: "number", minimum: 0 },
+            maxDuration:  { type: "number", minimum: 0 },
+            source:       { type: "string" },
+            forceRefresh: { type: "boolean" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = await getVideoEngine().search({
+        query: request.body.query,
+        maxResults:   request.body.maxResults   ?? 10,
+        minDuration:  request.body.minDuration,
+        maxDuration:  request.body.maxDuration,
+        source:       request.body.source,
+        forceRefresh: request.body.forceRefresh ?? false,
+      });
+      return reply.send(result);
+    },
+  );
+
+  /** GET /video/cache/status */
+  app.get("/video/cache/status", async (_req, reply) => {
+    const cache = getVideoEngine().getCache();
+    return reply.send({ size: cache.size(), ttlMs: 5 * 60_000 });
+  });
+
+  // ── marketplace ────────────────────────────────────────────────────────────
+
+  const _adapterRegistry = new AdapterRegistry();
+
+  /**
+   * POST /marketplace/adapters — register a named adapter definition.
+   * Body: { name: string, capabilities: string[], description?: string }
+   * The adapter executes by echoing the task — real implementations inject
+   * execute() logic via the plugin-sdk defineAdapter() helper.
+   */
+  app.post<{
+    Body: { name: string; capabilities: string[]; description?: string };
+  }>(
+    "/marketplace/adapters",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["name", "capabilities"],
+          properties: {
+            name:         { type: "string", maxLength: 64 },
+            capabilities: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 20 },
+            description:  { type: "string", maxLength: 512 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { name, capabilities, description = "" } = request.body;
+      try {
+        const adapter = defineAdapter({
+          name,
+          description,
+          capabilities: capabilities as Parameters<typeof defineAdapter>[0]["capabilities"],
+          async execute(task) { return task; }, // passthrough — real logic injected per adapter
+        });
+        _adapterRegistry.register(adapter);
+        return reply.code(201).send({ name, capabilities, description, registered: true });
+      } catch (err) {
+        if (err instanceof NexusAdapterError && err.code === "DUPLICATE_ADAPTER") {
+          return reply.code(409).send({ error: "adapter_exists", name });
+        }
+        throw err;
+      }
+    },
+  );
+
+  /** GET /marketplace/adapters — list all registered adapters. */
+  app.get("/marketplace/adapters", async (_req, reply) => {
+    return reply.send(
+      _adapterRegistry.list().map((a) => ({
+        name: a.name,
+        capabilities: a.capabilities,
+        description: (a as { description?: string }).description ?? "",
+      })),
+    );
+  });
+
+  /**
+   * POST /marketplace/execute/:name — execute a registered adapter.
+   * Body: any task object
+   */
+  app.post<{ Params: { name: string }; Body: unknown }>(
+    "/marketplace/execute/:name",
+    async (request, reply) => {
+      const adapter = _adapterRegistry.resolve(request.params.name);
+      if (!adapter) {
+        return reply.code(404).send({ error: "adapter_not_found", name: request.params.name });
+      }
+      const ctx = {
+        logger: request.log,
+        env: process.env,
+        timeoutMs: 30_000,
+        signal: request.raw as unknown as AbortSignal,
+      };
+      const result = await adapter.execute(request.body, ctx as Parameters<typeof adapter.execute>[1]);
+      return reply.send({ name: request.params.name, result });
+    },
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
   // C.2 — STUBS (features not yet backed, return 501 or empty payload)
   // ══════════════════════════════════════════════════════════════════════════
 
   const STUB_PREFIXES = [
-    "blind-council",
-    // "browser-agent" — removed from stubs; real routes wired below
-    // "build" — removed from stubs; wired to code-repl below
-    // "code-agent" — removed from stubs; real routes wired below
-    // "craft" — removed from stubs; real routes wired below
-    "cross-memory",
-    "echo-chamber",
-    // "extraction" — removed from stubs; real routes wired below
-    "fallback-chains",
-    // "hallucination" — removed from stubs; real routes wired below
-    // "honesty" — removed from stubs; real routes wired below
-    "image-transformations",
-    // "imr" — removed from stubs; real routes wired below
-    "marketplace",
-    "member-evolution",
-    // "moderation" — removed from stubs; real routes wired below
-    // "negation" — removed from stubs; real routes wired below
-    "prompt-filter",
-    "reactions",
-    // "rss" — removed from stubs; real routes wired below
-    // "semantic-cache" — removed from stubs; real routes wired below
-    // "simulate" — removed from stubs; real routes wired below
-    "skill-selection",
-    "sop",
-    "specialisation",
-    // "speculative" — removed from stubs; real routes wired below
-    // "standard-answers" — removed from stubs; real routes wired below
-    "symbolic",
-    "system",
-    "task-routing",
-    "token-conservation",
-    "verbosity",
-    "verifiable",
-    "video",
-    // "web-scraping" — removed from stubs; real routes wired below
+    // "blind-council"    — removed; real routes wired in C.7
+    // "browser-agent"    — removed; real routes wired in C.4
+    // "build"            — removed; wired to code-repl in C.3
+    // "code-agent"       — removed; real routes wired in C.3
+    // "craft"            — removed; real routes wired below
+    // "cross-memory"     — removed; real routes wired in C.6
+    // "echo-chamber"     — removed; real routes wired in C.6
+    // "extraction"       — removed; real routes wired below
+    // "fallback-chains"  — removed; real routes wired in C.5
+    // "hallucination"      — removed; real routes wired below
+    // "honesty"            — removed; real routes wired below
+    // "image-transformations" — removed; needs sharp/Cloudinary, deferred to infra
+    // "imr"                — removed; real routes wired below
+    // "marketplace"        — removed; real routes wired in C.8
+    // "member-evolution"   — removed; real routes wired in C.7
+    // "moderation"       — removed; real routes wired below
+    // "negation"         — removed; real routes wired below
+    // "prompt-filter"    — removed; real routes wired in C.5
+    // "reactions"        — removed; real routes wired in C.7
+    // "rss"              — removed; real routes wired below
+    // "semantic-cache"   — removed; real routes wired below
+    // "simulate"         — removed; real routes wired below
+    // "skill-selection"  — removed; real routes wired in C.6
+    // "sop"              — removed; real routes wired in C.7
+    // "specialisation"   — removed; real routes wired in C.7
+    // "speculative"      — removed; real routes wired below
+    // "standard-answers" — removed; real routes wired below
+    // "symbolic"         — removed; real routes wired in C.6
+    // "system"           — removed; real routes wired in C.5
+    // "task-routing"     — removed; real routes wired in C.5
+    // "token-conservation" — removed; wired to @nexus/token-budget
+    // "verbosity"        — removed; wired to @nexus/stm STMPipeline
+    // "verifiable"       — removed; real routes wired in C.5
+    // "video"            — removed; real routes wired in C.8
+    // "web-scraping"     — removed; real routes wired below
   ];
 
   // Persistent CRUD store for each stub prefix — backed by JSON files or Postgres

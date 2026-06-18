@@ -63,30 +63,30 @@ These 21 routes have full CRUD (GET list, GET by id, POST, PUT, PATCH, DELETE) b
 
 | Prefix | Route pattern | What real wiring looks like |
 |---|---|---|
-| `blind-council` | `/blind-council/*` | Multi-provider deliberation without knowing which model responds — wire to `CouncilService` with identity hidden |
+| `blind-council` | `/blind-council/*` | ✓ Wired — `POST /blind-council/deliberate` via `@nexus/council` `CouncilService`; model identity stripped from votes (voterId anonymised) |
 | `browser-agent` | `/browser-agent/*` | ✓ Wired — `POST /navigate` (HTML + title), `POST /scrape` (text + links via JS eval), `POST /screenshot` (base64 PNG). PatchrightDriver when available, MockBrowserDriver fallback. |
 | `build` | `/build/*` | ✓ Wired — `POST /build/run` via DockerReplExecutor; MockReplExecutor fallback. |
 | `code-agent` | `/code-agent/*` | ✓ Wired — `POST /execute` (one-shot), `POST /sessions` (create kernel), `GET /sessions` (list), `POST /sessions/:id/execute` (stateful), `DELETE /sessions/:id` (destroy). Docker-backed, mock fallback. |
-| `cross-memory` | `/cross-memory/*` | Cross-session memory merging — wire to `MemoryGraph` + user ACL lookup |
-| `echo-chamber` | `/echo-chamber/*` | Agreement bias detection — wire LLM scorer to flag yes-man responses |
-| `fallback-chains` | `/fallback-chains/*` | Wire to `@nexus/gateway` `FallbackChain` — define ordered provider fallback sequences |
-| `image-transformations` | `/image-transformations/*` | Wire to image manipulation library (sharp/jimp) or OpenAI image edit API |
-| `marketplace` | `/marketplace/*` | Plugin/adapter marketplace — wire to `@nexus/plugin-sdk` registry |
-| `member-evolution` | `/member-evolution/*` | Council member persona evolution over time — wire to memory + scoring |
-| `prompt-filter` | `/prompt-filter/*` | Wire to `@nexus/redteam` — input filtering and perturbation detection |
-| `reactions` | `/reactions/*` | Message reaction system — simple association store, wire to gateway log |
-| `skill-selection` | `/skill-selection/*` | Wire to council archetype SUMMONS map + `AgentDefinition.toolNames` |
-| `sop` | `/sop/*` | Standard operating procedures — wire to document store + retrieval |
-| `specialisation` | `/specialisation/*` | Agent specialisation profiles — wire to `AgentDefinition` + `AgentPersona` |
-| `symbolic` | `/symbolic/*` | Symbolic reasoning engine — wire to knowledge-graph entity/relation system |
-| `system` | `/system/*` | System health/config endpoints — wire to actual runtime metrics |
-| `task-routing` | `/task-routing/*` | Wire to `@nexus/supervisor` `OmaSchedulingStrategy` |
-| `token-conservation` | `/token-conservation/*` | CRUD storage wired ✓; action routes `/check`, `/consume`, `/reset` wired to `@nexus/token-budget` MemoryTokenBudget ✓ |
-| `verbosity` | `/verbosity/*` | CRUD storage wired ✓; `/transform` action wired to `@nexus/stm` STMPipeline (HedgeReducer + DirectnessOptimizer) ✓ |
-| `verifiable` | `/verifiable/*` | Verifiable pipeline audit — wire to `@nexus/telemetry` HMAC audit log |
-| `video` | `/video/*` | Wire to video extraction/transcript pipeline |
+| `cross-memory` | `/cross-memory/*` | ✓ Wired — `POST /cross-memory/search` (semantic search across sessions via MemoryManager), `POST /cross-memory/merge` (store cross-session synthesis entry) |
+| `echo-chamber` | `/echo-chamber/*` | ✓ Wired — `POST /echo-chamber/detect` (LLM judge scores sycophancy 0–1; flags unconditional agreement, flattery, position-reversal, hedging) |
+| `fallback-chains` | `/fallback-chains/*` | ✓ Wired — `POST /fallback-chains/run` via `@nexus/gateway` `runFallbackChain`; tries each model in order, returns first success + fallback error log |
+| `image-transformations` | `/image-transformations/*` | Deferred — needs `sharp`/`jimp`/Cloudinary; no `@nexus/image-transformations` package. Removed from STUB_PREFIXES loop. |
+| `marketplace` | `/marketplace/*` | ✓ Wired — `POST /marketplace/adapters` (register `AdapterDefinition`), `GET /marketplace/adapters` (list), `POST /marketplace/execute/:name` (run adapter); `@nexus/plugin-sdk` `AdapterRegistry` |
+| `member-evolution` | `/member-evolution/*` | ✓ Wired — `POST /member-evolution/score` (EMA α=0.3 trait scoring), `GET /member-evolution` (all archetypes), `GET /member-evolution/:id` (single archetype state) |
+| `prompt-filter` | `/prompt-filter/*` | ✓ Wired — `POST /prompt-filter/scan` (trigger detection via `@nexus/redteam` `detectTriggers`), `POST /prompt-filter/perturb` (adversarial obfuscation via `applyParseltongue`) |
+| `reactions` | `/reactions/*` | ✓ Wired — `POST /reactions` (add emoji reaction), `GET /reactions?messageId=` (list), `DELETE /reactions/:id` (remove); PersistentStore-backed |
+| `skill-selection` | `/skill-selection/*` | ✓ Wired — `POST /skill-selection/summon` (get archetypes for task category), `GET /archetypes` (list all), `GET /categories` (list SUMMONS map) |
+| `sop` | `/sop/*` | ✓ Wired — `POST /sop` (create), `GET /sop` (list), `GET /sop/:id` (full content), `PATCH /sop/:id` (versioned update), `POST /sop/search` (keyword + tag filter) |
+| `specialisation` | `/specialisation/*` | ✓ Wired — `POST /specialisation` (register AgentDefinition), `GET /specialisation` (list), `GET /specialisation/:id`, `DELETE /specialisation/:id`; in-memory registry |
+| `symbolic` | `/symbolic/*` | ✓ Wired — `POST /symbolic/ingest` (entity+relation extraction), `POST /nodes/query` + `POST /edges/query` (KGStore filter), `GET /symbolic/stats` |
+| `system` | `/system/*` | ✓ Wired — `GET /system/health` (uptime, memory, node version), `GET /system/metrics` (cost log summary) |
+| `task-routing` | `/task-routing/*` | ✓ Wired — `POST /task-routing/assign` via `@nexus/supervisor` `assignTasks`; round-robin/least-busy/capability-match/dependency-first strategies |
+| `token-conservation` | `/token-conservation/*` | ✓ Wired — CRUD storage + action routes `/check`, `/consume`, `/reset` wired to `@nexus/token-budget` MemoryTokenBudget |
+| `verbosity` | `/verbosity/*` | ✓ Wired — CRUD storage + `/transform` action wired to `@nexus/stm` STMPipeline (HedgeReducer + DirectnessOptimizer) |
+| `verifiable` | `/verifiable/*` | ✓ Wired — `POST /verifiable/emit` writes HMAC-chained entry to audit log via `audit-emitter.ts` |
+| `video` | `/video/*` | ✓ Wired — `POST /video/search` (LLM-intent extraction + ranking via `@nexus/video-search` `VideoSearchEngine`; GroqDriver model fn, MockVideoBackend); `GET /video/cache/status` |
 
-**Wire priority:** `code-agent` and `browser-agent` are highest value. `token-conservation` and `verbosity` are trivially wireable (packages already exist).
+*All Category C prefixes wired or intentionally deferred. `image-transformations` is the only remaining unimplemented prefix — needs an external image-processing package.*
 
 ---
 
@@ -105,10 +105,11 @@ Full route files where the implementation is a skeleton or uses deterministic pl
 
 | File | Current state | What needs wiring |
 |---|---|---|
-| `apps/api/src/routes/oauth.ts` | ✓ Wired | Google + GitHub OAuth upsert → users table; issues proper access+refresh token pair; emailVerified=true for OAuth users. Generic OIDC (Okta/Azure) still pending. |
-| `apps/api/src/routes/chat-analyst.ts` | Partial | Verify all analyst route handlers are fully wired |
+| `apps/api/src/routes/oauth.ts` | ✓ Wired | Google + GitHub OAuth upsert → users table; issues proper access+refresh token pair; emailVerified=true for OAuth users. |
+| `apps/api/src/routes/oidc.ts` | ✓ Wired | Generic OIDC SSO (Okta/Azure AD/Keycloak/Auth0); RS256/ES256 via node:crypto JWKS; 5-min discovery cache; kid-based auto-refresh. |
+| `apps/api/src/routes/chat-analyst.ts` | ✓ Verified | All 5 routes fully wired: GroqDriver→OpenRouterDriver→stub fallback; KV-backed cross-pod session persistence; SSE stream with heartbeat; rate limiting via AnalystRateLimiter. |
 | `apps/api/src/routes/image-gen.ts` | Deterministic placeholder fallback | Fallback is fine for dev; ensure primary path (DALL-E/Stability) is exercised in staging |
-| `apps/api/src/routes/scraping-mcp.ts` | MCP tool wiring | Verify `@nexus/scraping-mcp` adapter integration is live end-to-end |
+| `apps/api/src/routes/scraping-mcp.ts` | ✓ Verified | Auto-wires StealthBrowserScrapingBackend when patchright available; falls back to MockScrapingBackend. All 9 routes wired to `ScrapingMcpServer.call()`. |
 
 ---
 
@@ -119,9 +120,9 @@ These packages compile and have correct interfaces but their implementations are
 | Package | Stub | What's needed |
 |---|---|---|
 | `@nexus/knowledge-graph` | Community detection not wired to graph analysis | Implement Leiden clustering over `MemoryGraph` edges |
-| `@nexus/reranker` | `PassThroughReranker` is the default | Wire a real reranker (Cohere rerank API or cross-encoder) |
-| `@nexus/session-summarizer` | Summary prompt uses `{count}` placeholder | Verify LLM caller is wired; test against real conversation history |
-| `@nexus/llm-router` | `NullProvider` is fallback | Ensure cost+latency-aware routing actually fires against real providers in production |
+| `@nexus/reranker` | ✓ Verified — `BM25Reranker` is production-ready (TF-IDF/BM25, zero deps); `NullReranker` is test-only no-op; `FunctionReranker` injectable scoring fn. | — |
+| `@nexus/session-summarizer` | ✓ Verified — `LLMSessionSummarizer` wired to injectable `LLMProvider`; `{count}` placeholder correctly replaced at runtime; `AutoCompressor` with configurable token budget trigger. | — |
+| `@nexus/llm-router` | ✓ Verified — `ClaudeProvider`, `GroqProvider`, `OpenAIProvider` all wired; routing strategies: first/round-robin/least-latency (EMA); fallback chains on transient errors; `NullProvider` is test-only. | — |
 | `@nexus/connectors` | `NullConnector` is the default | Wire real connector implementations for each integration |
 | `@nexus/image-gen` | `NullImageProvider` returns placeholder images | Ensure DALL-E/Stability provider is wired when API keys present |
 | `@nexus/i18n` | Stub translations | Add real locale strings when UI goes multilingual |
@@ -153,4 +154,4 @@ These packages compile and have correct interfaces but their implementations are
 
 ---
 
-*Last updated: 2026-06-18 (session 3). Update this file when stubs are wired — move entries to the relevant ADR or close them.*
+*Last updated: 2026-06-18 (session 4). Update this file when stubs are wired — move entries to the relevant ADR or close them.*
