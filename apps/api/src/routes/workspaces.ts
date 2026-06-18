@@ -271,6 +271,12 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
         .set({ deletedAt: new Date() })
         .where(eq(workspaces.id, id));
 
+      emitAuditEvent(
+        { eventType: "workspace.deleted", actorId: userId ?? "unknown",
+          resourceType: "workspace", resourceId: id, payload: { workspaceId: id } },
+        request.log,
+      );
+
       return reply.code(204).send();
     },
   );
@@ -493,6 +499,22 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
         .where(eq(workspaceMembers.id, targetMembership.id))
         .returning();
 
+      emitAuditEvent(
+        {
+          eventType: "workspace.member.role_changed",
+          actorId: callerId ?? "unknown",
+          resourceType: "workspace_member",
+          resourceId: targetMembership.id,
+          payload: {
+            workspaceId,
+            targetUserId,
+            previousRole: targetMembership.role,
+            newRole: request.body.role,
+          },
+        },
+        request.log,
+      );
+
       return reply.send(updated);
     },
   );
@@ -537,6 +559,17 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
             eq(workspaceMembers.userId, targetUserId),
           ),
         );
+
+      emitAuditEvent(
+        {
+          eventType: "workspace.member.removed",
+          actorId: callerId ?? "unknown",
+          resourceType: "workspace_member",
+          resourceId: `${workspaceId}:${targetUserId}`,
+          payload: { workspaceId, targetUserId, self: callerId === targetUserId },
+        },
+        request.log,
+      );
 
       return reply.code(204).send();
     },

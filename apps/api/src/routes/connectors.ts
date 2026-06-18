@@ -30,6 +30,8 @@ import {
   GroqConnector,
   TavilyConnector,
   NeonConnector,
+  SlackConnector,
+  LinearConnector,
   NullConnector,
 } from "@nexus/connectors";
 import type { FastifyInstance } from "fastify";
@@ -71,11 +73,29 @@ if (process.env.DATABASE_URL) {
   registry.register(new NullConnector("neon", "Neon DB"));
 }
 
-// Add placeholder connectors for common integrations not yet configured
+// Wire real connectors when credentials present; fall back to NullConnector
+if (process.env.SLACK_BOT_TOKEN) {
+  registry.register(
+    new SlackConnector({
+      token: process.env.SLACK_BOT_TOKEN,
+      signingSecret: process.env.SLACK_SIGNING_SECRET,
+    }),
+  );
+} else if (!registry.get("slack")) {
+  registry.register(new NullConnector("slack", "Slack"));
+}
+
+if (process.env.LINEAR_API_KEY) {
+  registry.register(new LinearConnector({ apiKey: process.env.LINEAR_API_KEY }));
+} else if (!registry.get("linear")) {
+  registry.register(new NullConnector("linear", "Linear"));
+}
+
+// Static placeholder connectors for integrations without dedicated connector classes yet
 const PLACEHOLDER_CONNECTORS = [
-  { id: "slack", name: "Slack", type: "messaging" },
-  { id: "notion", name: "Notion", type: "docs" },
-  { id: "linear", name: "Linear", type: "issues" },
+  { id: "notion",    name: "Notion",    type: "docs" },
+  { id: "bitbucket", name: "Bitbucket", type: "git" },
+  { id: "jira",      name: "Jira",      type: "issues" },
 ];
 for (const p of PLACEHOLDER_CONNECTORS) {
   if (!registry.get(p.id)) {
