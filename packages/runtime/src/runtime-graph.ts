@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Runtime Graph — Unified Topology for GhostStack Resources
+ * Runtime Graph — Unified Topology for Conductor Resources
  *
  * Tracks all resources (workflows, Floci services, MCP servers, agents, tasks)
  * in a single graph with dependency relationships, health status, and

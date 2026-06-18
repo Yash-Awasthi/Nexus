@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Vendored app integration policy for GhostStack federation.
+ * Vendored app integration policy for Conductor federation.
  * Orchestrator stays lean; heavy services are Docker-first.
  */
 
@@ -8,7 +8,7 @@ export type AdapterIntegrationMode =
   | "orchestrated" // thin TS adapter + optional Docker
   | "docker-only"
   | "optional"
-  | "reference"; // vendored copy only, no GhostStack wiring yet
+  | "reference"; // vendored copy only, no Conductor wiring yet
 
 export interface AdapterManifestEntry {
   id: string;
@@ -61,7 +61,7 @@ export const ADAPTER_MANIFEST: AdapterManifestEntry[] = [
     mode: "orchestrated",
     defaultPort: 7704,
     healthPath: "/health",
-    description: "MCP server exposing GhostStack capabilities as tools over HTTP.",
+    description: "MCP server exposing Conductor capabilities as tools over HTTP.",
   },
   {
     id: "web-search",

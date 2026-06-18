@@ -105,7 +105,7 @@ export default function ChatDetailPage() {
   useEffect(() => {
     if (!user?.id) return;
     try {
-      const raw = localStorage.getItem(`judica-chats-${user.id}`);
+      const raw = localStorage.getItem(`nexus-chats-${user.id}`);
       const all: StoredConv[] = raw ? JSON.parse(raw) : [];
       setConversations(all);
     } catch { setConversations([]); }

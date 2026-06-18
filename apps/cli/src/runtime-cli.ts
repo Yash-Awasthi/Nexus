@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 /**
- * GhostStack operator CLI (`gs` / `ghoststack`)
+ * Conductor operator CLI (`gs` / `conductor`)
  */
 import * as fs from "fs";
 import { createRequire } from "node:module";
@@ -73,7 +73,7 @@ Commands:
   version              Print GhostStack version and runtime info
   help                 Show this help
 
-Config: ghoststack.config.json + .env (see ghoststack.config.example.json)
+Config: conductor.config.json + .env (see conductor.config.example.json)
 `);
 }
 
@@ -99,8 +99,8 @@ async function cmdInit(): Promise<void> {
     console.log(`[scaffold] Created demo specs directory: ${demoSpecsDir}`);
   }
 
-  // Create ghoststack.config.json if not exists (wx flag = exclusive create, avoids TOCTOU)
-  const configPath = path.join(repoRoot, "ghoststack.config.json");
+  // Create conductor.config.json if not exists (wx flag = exclusive create, avoids TOCTOU)
+  const configPath = path.join(repoRoot, "conductor.config.json");
   try {
     const defaultConfig = {
       apiPort: 3000,
@@ -206,7 +206,7 @@ GHOSTSTACK_MCP_EXTERNAL=true
           action: "create_s3_bucket",
           priority: "medium",
           arguments: {
-            bucketName: "ghoststack-tech-archive",
+            bucketName: "conductor-tech-archive",
             sourceTaskId: "transform-news",
           },
           dependencies: ["transform-news"],

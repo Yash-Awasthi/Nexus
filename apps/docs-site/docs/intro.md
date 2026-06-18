@@ -41,11 +41,11 @@ Most AI agent frameworks bolt on governance and observability as afterthoughts. 
 | `@nexus/agent-runtime`   | Multi-step LLM tool loop, spawn_agents, swarm layer                |
 | `@nexus/council`         | Multi-model deliberation: allSettled fanout, voting, synthesis     |
 | `@nexus/llm-drivers`     | 15 provider drivers with native SSE/NDJSON streaming               |
-| `@nexus/ultraplinian`    | Race N models in parallel waves; composite scorer; 5 tiers         |
+| `@nexus/gauntlet`    | Race N models in parallel waves; composite scorer; 5 tiers         |
 | `@nexus/memory`          | pgvector store, MemoryGraph BFS, TTL, multi-tenant ACL             |
-| `@nexus/ragtime`         | RAG: chunk → embed → hybrid retrieve → rerank                      |
-| `@nexus/parseltongue`    | Input perturbation engine (6 techniques × 3 intensities)           |
-| `@nexus/autotune`        | EMA adaptive sampling parameter tuning                             |
+| `@nexus/retrieval`         | RAG: chunk → embed → hybrid retrieve → rerank                      |
+| `@nexus/redteam`    | Input perturbation engine (6 techniques × 3 intensities)           |
+| `@nexus/drift`        | EMA adaptive sampling parameter tuning                             |
 | `@nexus/stm`             | Semantic transformation: hedge reducer, directness optimizer       |
 | `@nexus/supervisor`      | Multi-agent DAG scheduler (OmaTask, dependency-first, BFS)         |
 | `@nexus/gateway`         | IProvider failover, model alias routing, Singleflight coalescer    |

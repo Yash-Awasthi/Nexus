@@ -13,7 +13,7 @@ export type EggId =
   | "godmode_text"
   | "logo_tripleclick"
   | "elder_hash"
-  | "ultraplinian_reverse";
+  | "gauntlet_reverse";
 
 export interface EggEvent {
   id:      EggId;
@@ -82,7 +82,7 @@ export function initEasterEggs(onEgg: (egg: EggEvent) => void) {
       if (ultraBuffer === ULTRA_REVERSED) {
         ultraBuffer = "";
         onEgg({
-          id:      "ultraplinian_reverse",
+          id:      "gauntlet_reverse",
           message: "NAINIILPARLU — Tier 51 unlocked. The elder himself would be proud.",
         });
       }

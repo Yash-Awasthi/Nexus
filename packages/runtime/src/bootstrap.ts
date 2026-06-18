@@ -44,7 +44,7 @@ export async function bootstrap() {
       "\n[BOOT] Showcase skipped. Set GHOSTSTACK_BOOTSTRAP_SHOWCASE=true to run demo workflows.",
     );
     console.log("[BOOT] For a persistent API, run: npm start\n");
-    ctx.metrics.recordTiming("ghoststack.bootstrap.total_ms", Date.now() - bootStarted);
+    ctx.metrics.recordTiming("conductor.bootstrap.total_ms", Date.now() - bootStarted);
     return;
   }
 
@@ -122,8 +122,8 @@ export async function bootstrap() {
     `[SHOWCASE] SECURE Workflow execution completed after approval: status = \x1b[32m${approvedResult.status}\x1b[0m`,
   );
 
-  ctx.metrics.recordTiming("ghoststack.bootstrap.total_ms", Date.now() - bootStarted);
-  console.log(`[BOOT] ghoststack.bootstrap.total_ms=${Date.now() - bootStarted}`);
+  ctx.metrics.recordTiming("conductor.bootstrap.total_ms", Date.now() - bootStarted);
+  console.log(`[BOOT] conductor.bootstrap.total_ms=${Date.now() - bootStarted}`);
 
   console.log(
     "\n\x1b[35m===============================================================================",

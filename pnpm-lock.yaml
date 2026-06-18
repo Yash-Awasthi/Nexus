@@ -89,7 +89,7 @@ importers:
       '@nexus/auth':
         specifier: workspace:*
         version: link:../../packages/auth
-      '@nexus/autotune':
+      '@nexus/drift':
         specifier: workspace:*
         version: link:../../packages/autotune
       '@nexus/billing':
@@ -149,7 +149,7 @@ importers:
       '@nexus/obs-providers':
         specifier: workspace:*
         version: link:../../packages/obs-providers
-      '@nexus/parseltongue':
+      '@nexus/redteam':
         specifier: workspace:*
         version: link:../../packages/parseltongue
       '@nexus/posthog-analytics':

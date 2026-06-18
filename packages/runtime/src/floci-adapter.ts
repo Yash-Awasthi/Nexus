@@ -2,7 +2,7 @@
 /**
  * FlociExecutionAdapter — executes tasks against the Floci local AWS emulator.
  *
- * Floci is a lightweight LocalStack-compatible emulator bundled with GhostStack.
+ * Floci is a lightweight LocalStack-compatible emulator bundled with Conductor.
  * This adapter translates task payloads into Floci API calls and handles
  * event emission for the runtime's event bus.
  */

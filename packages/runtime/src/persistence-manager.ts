@@ -76,7 +76,7 @@ export class FileEventStore implements IEventStore {
     if (corruptLines.length > 0) {
       const quarantinePath = `${this.filePath}.corrupt.${Date.now()}.jsonl`;
       fs.appendFileSync(quarantinePath, corruptLines.join("\n") + "\n", "utf8");
-      const msg = `[GhostStack] event log replay skipped ${this.lastReplayCorruptLines} corrupt JSONL line(s); quarantined to ${quarantinePath}`;
+      const msg = `[Conductor] event log replay skipped ${this.lastReplayCorruptLines} corrupt JSONL line(s); quarantined to ${quarantinePath}`;
       if (this.logger) {
         this.logger.warn(msg);
       } else {
@@ -142,7 +142,7 @@ export class FileRuntimePersistence implements IRuntimePersistence {
       if (fs.existsSync(this.filePath)) {
         fs.copyFileSync(this.filePath, corruptPath);
       }
-      const corruptMsg = `[GhostStack] state file corrupt; reset to {} (backup: ${corruptPath})`;
+      const corruptMsg = `[Conductor] state file corrupt; reset to {} (backup: ${corruptPath})`;
       if (this.logger) {
         this.logger.warn(corruptMsg);
       } else {
@@ -173,7 +173,7 @@ export class FileRuntimePersistence implements IRuntimePersistence {
           const expected = JSON.stringify(state);
           if (written !== expected) {
             // Write verification failed — attempt a second write
-            const verifyMsg = `[GhostStackPersistence] Write-verify mismatch for key: ${key}. Rewriting...`;
+            const verifyMsg = `[ConductorPersistence] Write-verify mismatch for key: ${key}. Rewriting...`;
             if (this.logger) {
               this.logger.warn(verifyMsg);
             } else {

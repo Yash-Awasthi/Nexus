@@ -6,6 +6,8 @@
  * POST   /api/v1/memory           — remember a new text entry
  * DELETE /api/v1/memory/:id       — forget a single entry by id
  * GET    /api/v1/memory/list      — list all entries (no embedding, fast path)
+ * POST   /api/v1/memory/compact      — compact memory, keep newest N entries
+ * DELETE /api/v1/memory/entries      — bulk-delete entries by ID list
  *
  * Backing store:
  *   PgVectorStore  — when DATABASE_URL is set (pgvector + Neon serverless)
@@ -28,8 +30,8 @@ import {
   RagtimeRetriever,
   type IEmbedder as IRagtimeEmbedder,
   type IMemoryStore as IRagtimeMemoryStore,
-  type MemoryFilter as RagtimeMemoryFilter,
-} from "@nexus/ragtime";
+  type MemoryFilter as RetrievalMemoryFilter,
+} from "@nexus/retrieval";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
@@ -48,7 +50,7 @@ const manager = new MemoryManager({ store, embedder });
 
 // RagtimeRetriever — two-stage recall+rerank for the GET /memory endpoint.
 // Store and embedder from @nexus/memory are structurally compatible with
-// @nexus/ragtime's IMemoryStore / IEmbedder interfaces.
+// @nexus/retrieval's IMemoryStore / IEmbedder interfaces.
 const retriever = new RagtimeRetriever({
   store: store as unknown as IRagtimeMemoryStore,
   embedder: embedder as unknown as IRagtimeEmbedder,
@@ -76,11 +78,11 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
     // RagtimeRetriever: two-stage recall (cosine pool) + composite rerank
     // (α·relevance + β·importance + γ·recency_decay).
     // Filter by metadata.userId for multi-tenant isolation.
-    const ragtimeFilter: RagtimeMemoryFilter | undefined = userId
+    const retrievalFilter: RetrievalMemoryFilter | undefined = userId
       ? { metadata: { userId } }
       : undefined;
 
-    const results = await retriever.retrieve(query, limit, ragtimeFilter);
+    const results = await retriever.retrieve(query, limit, retrievalFilter);
 
     return reply.send({
       results: results.map((r) => ({
@@ -220,3 +222,97 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 }
+
+  /**
+   * DELETE /memory/entries
+   *
+   * Bulk-delete memory entries by ID list.
+   * Body: { ids: string[] }
+   * Returns: { deleted: number, errors: string[] }
+   */
+  app.delete<{ Body: { ids: string[] } }>(
+    "/memory/entries",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["ids"],
+          properties: { ids: { type: "array", items: { type: "string" }, maxItems: 500 } },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: { deleted: { type: "number" }, errors: { type: "array", items: { type: "string" } } },
+          },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (request, reply) => {
+      const { ids } = request.body;
+      let deleted = 0;
+      const errors: string[] = [];
+      await Promise.all(
+        ids.map(async (id) => {
+          try {
+            await manager.forget(id);
+            deleted++;
+          } catch (e) {
+            errors.push(`${id}: ${String(e)}`);
+          }
+        }),
+      );
+      return reply.send({ deleted, errors });
+    },
+  );
+
+  /**
+   * POST /memory/compact
+   *
+   * Compacts memory by retaining only the newest `keepLast` entries (default 200)
+   * and deleting older entries. Entries are sorted by createdAt descending.
+   * Returns: { compacted: number, kept: number }
+   */
+  app.post<{ Body: { keepLast?: number; userId?: string } }>(
+    "/memory/compact",
+    {
+      schema: {
+        body: {
+          type: "object",
+          properties: {
+            keepLast: { type: "number", minimum: 1, maximum: 2000, default: 200 },
+            userId: { type: "string" },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: { compacted: { type: "number" }, kept: { type: "number" } },
+          },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (request, reply) => {
+      const keepLast = request.body?.keepLast ?? 200;
+      const userId = request.body?.userId;
+      const filter = userId ? { metadata: { userId } } : undefined;
+      const all = await manager.list(filter);
+
+      // Sort by createdAt descending — newest first
+      all.sort((a, b) => {
+        const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return tb - ta;
+      });
+
+      const toDelete = all.slice(keepLast);
+      let compacted = 0;
+      await Promise.all(
+        toDelete.map(async (entry) => {
+          try { await manager.forget(entry.id); compacted++; } catch { /* non-fatal */ }
+        }),
+      );
+      return reply.send({ compacted, kept: all.length - compacted });
+    },
+  );

@@ -31,5 +31,5 @@ from consideration.
 
 | Repository | Status |
 | --- | --- |
-| `Yash-Awasthi/onyx-foss` | Private or does not exist under this name. Audit blocked. Target was `@nexus/ragtime` for search pipeline patterns. Re-evaluate if access is granted. |
+| `Yash-Awasthi/onyx-foss` | Private or does not exist under this name. Audit blocked. Target was `@nexus/retrieval` for search pipeline patterns. Re-evaluate if access is granted. |
 | `frappe/erpnext` | Rejected after deep audit — 100% Frappe-framework coupled (DB, ORM, errors, config, i18n). Zero portable subsystems. Do not re-attempt. See decision 2026-06-16. |

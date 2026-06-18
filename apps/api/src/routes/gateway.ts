@@ -47,7 +47,7 @@ import {
   computeAutoTuneParams,
   detectContext,
   InMemoryEmaStore,
-} from "@nexus/autotune";
+} from "@nexus/drift";
 import {
   FixedEmbedder,
   GroqEmbedder,
@@ -55,7 +55,7 @@ import {
   MemoryManager,
   PgVectorStore,
 } from "@nexus/memory";
-import { applyParseltongue, getDefaultConfig as parseltongueDefaultConfig } from "@nexus/parseltongue";
+import { applyParseltongue, getDefaultConfig as redteamDefaultConfig } from "@nexus/redteam";
 import { RunCostTracker, InMemoryRunCostStore } from "@nexus/run-cost";
 import { StreamRecoveryOrchestrator } from "@nexus/stream-recovery";
 import { createDefaultPipeline } from "@nexus/stm";
@@ -70,7 +70,7 @@ import {
   type SpeedTier,
   type UltraplinianMessage,
   type SamplingParams as UltraplinianSamplingParams,
-} from "@nexus/ultraplinian";
+} from "@nexus/gauntlet";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 
 import { getPromptCache, PromptCache, type CacheableRequest } from "../lib/prompt-cache.js";
@@ -421,7 +421,7 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
       // ── Parseltongue — obfuscate user messages when requested ─────────────
       // Activated by header: x-nexus-obfuscate: true  OR feature flag.
       if (request.headers["x-nexus-obfuscate"] === "true") {
-        const ptCfg = parseltongueDefaultConfig();
+        const ptCfg = redteamDefaultConfig();
         opts = {
           ...opts,
           messages: opts.messages.map((m) =>
@@ -830,7 +830,7 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
       preHandler: [
         requireAuth,
         makeTierGatePreHandler({
-          feature: "ultraplinian",
+          feature: "gauntlet",
           getTier: (req) => getTierFromRequest(req as Parameters<typeof getTierFromRequest>[0]),
         }),
       ],
@@ -838,7 +838,7 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       if (!_ultraRunner) {
         return reply.code(503).send({
-          error: "ultraplinian_unavailable",
+          error: "gauntlet_unavailable",
           message: "OPENROUTER_API_KEY is not configured",
         });
       }

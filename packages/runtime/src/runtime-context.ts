@@ -35,13 +35,13 @@ import { FileQueueBackend } from "./file-queue-backend.js";
 import { FlociExecutionAdapter } from "./floci-adapter.js";
 import { resolveFlociEndpoint } from "./floci-client.js";
 import { EXTENDED_FLOCI_ACTIONS } from "./floci-extended.js";
-import { GHOSTSTACK_MCP_TOOLS } from "./ghoststack-mcp-bridge.js";
+import { GHOSTSTACK_MCP_TOOLS } from "./conductor-mcp-bridge.js";
 import type { IQueueBackend } from "./interfaces/queue.interface.js";
 import { createLanguageModel } from "./language-model.js";
 import { LocalInferenceAdapter } from "./local-inference-adapter.js";
 import { MemoryStore, TraceIndexer } from "./memory-store.js";
 import { MetricsCollector, TraceRecorder, DiagnosticEnricher } from "./observability-manager.js";
-import { GhostStackOrchestrator } from "./orchestrator.js";
+import { ConductorOrchestrator } from "./orchestrator.js";
 import {
   FileEventStore,
   FileRuntimePersistence,
@@ -71,7 +71,7 @@ import {
   GovernedEtlWorkflowTemplate,
 } from "./workflow-engine.js";
 
-export interface GhostStackRuntimeContext {
+export interface ConductorRuntimeContext {
   repoRoot: string;
   sandbox: RuntimeSandboxLayout;
   runtimeDbDir: string;
@@ -85,7 +85,7 @@ export interface GhostStackRuntimeContext {
   discovery: LocalServiceDiscovery;
   healthMonitor: HealthMonitor;
   approval: ApprovalWorkflow;
-  orchestrator: GhostStackOrchestrator;
+  orchestrator: ConductorOrchestrator;
   registry: WorkflowRegistry;
   workflowTelemetry: WorkflowTelemetry;
   workflowEngine: WorkflowEngine;
@@ -119,7 +119,7 @@ export interface GhostStackRuntimeContext {
   cleanup: (() => void)[];
 }
 
-export async function createRuntimeContext(repoRoot: string): Promise<GhostStackRuntimeContext> {
+export async function createRuntimeContext(repoRoot: string): Promise<ConductorRuntimeContext> {
   // Load .env file before anything reads process.env — existing vars always win.
   loadEnvFromRoot(repoRoot);
 
@@ -132,7 +132,7 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
     portsPath: path.join(repoRoot, "runtime", "ports.yaml"),
     servicesPath: path.join(repoRoot, "runtime", "services.yaml"),
     healthchecksPath: path.join(repoRoot, "runtime", "healthchecks.yaml"),
-    runtimePath: path.join(repoRoot, "runtime", "ghoststack.runtime.yaml"),
+    runtimePath: path.join(repoRoot, "runtime", "conductor.runtime.yaml"),
   });
 
   const logger = new StructuredLogger();
@@ -275,7 +275,7 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
   governanceEngine.registerGuardrail(new RunawayRetriesGuardrail(5));
   governanceEngine.registerGuardrail(new TaskGraphLimitGuardrail(50));
 
-  const orchestrator = GhostStackOrchestrator.create({
+  const orchestrator = ConductorOrchestrator.create({
     runtimeManager,
     eventBus,
     taskRouter,
@@ -301,13 +301,13 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
     metadata: { endpoint: resolveFlociEndpoint() },
     status: "pending",
   });
-  runtimeGraph.addNode("ghoststack-runtime", "agent", "GhostStack Runtime", {
+  runtimeGraph.addNode("conductor-runtime", "agent", "Conductor Runtime", {
     metadata: { version: "1.1.0" },
     status: "active",
   });
 
   // Register MCP bridge as a node
-  runtimeGraph.addNode("mcp-bridge", "mcp_server", "GhostStack MCP Bridge", {
+  runtimeGraph.addNode("mcp-bridge", "mcp_server", "Conductor MCP Bridge", {
     metadata: { tools: GHOSTSTACK_MCP_TOOLS.length },
     status: "active",
   });
@@ -467,7 +467,7 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
         {
           metadata: { workflowId: wfEvent.workflowId, executionId: wfEvent.executionId },
           status: "active",
-          dependencies: ["ghoststack-runtime"],
+          dependencies: ["conductor-runtime"],
         },
       );
     }
@@ -574,7 +574,7 @@ export async function createRuntimeContext(repoRoot: string): Promise<GhostStack
 }
 
 /** Boot orchestrator replay + federation health probes + compaction scheduling. */
-export async function startRuntime(ctx: GhostStackRuntimeContext): Promise<string[]> {
+export async function startRuntime(ctx: ConductorRuntimeContext): Promise<string[]> {
   const services = await ctx.orchestrator.start();
   await ctx.healthMonitor.startMonitoring();
   const flociHealth = await ctx.flociAdapter.probeHealth();
@@ -601,7 +601,7 @@ export async function startRuntime(ctx: GhostStackRuntimeContext): Promise<strin
  * (e.g. health monitor disconnect) does not prevent subsequent steps
  * from running (e.g. persisting final state, cleaning subscriptions).
  */
-export async function stopRuntime(ctx: GhostStackRuntimeContext): Promise<void> {
+export async function stopRuntime(ctx: ConductorRuntimeContext): Promise<void> {
   const errors: string[] = [];
 
   // 1. Stop health monitoring

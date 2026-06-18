@@ -105,7 +105,7 @@ export function getModelsForTier(tier: SpeedTier): string[] {
   return out;
 }
 
-// ── Scoring (inlined from ultraplinian) ──────────────────────────────────────
+// ── Scoring (inlined from gauntlet) ──────────────────────────────────────
 
 const REFUSAL_RE = [
   /I cannot|I can't|I'm unable to/i,

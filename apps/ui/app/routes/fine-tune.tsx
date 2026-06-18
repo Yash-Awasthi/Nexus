@@ -100,7 +100,7 @@ export default function FineTune() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "judica-finetune.jsonl";
+      a.download = "nexus-finetune.jsonl";
       a.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -250,7 +250,7 @@ export default function FineTune() {
             {exporting ? (
               <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generating JSONL…</>
             ) : (
-              <><Download className="w-4 h-4 mr-2" />Download judica-finetune.jsonl</>
+              <><Download className="w-4 h-4 mr-2" />Download nexus-finetune.jsonl</>
             )}
           </Button>
           {!dataset?.eligible && (

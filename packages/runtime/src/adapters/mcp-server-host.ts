@@ -22,7 +22,7 @@ export class McpServerHost {
   private readonly python: string;
 
   constructor(options: McpServerHostOptions) {
-    this.scriptPath = path.join(options.repoRoot, "runtime", "mcp", "ghoststack_mcp_server.py");
+    this.scriptPath = path.join(options.repoRoot, "runtime", "mcp", "conductor_mcp_server.py");
     this.apiUrl = options.apiUrl ?? process.env.GHOSTSTACK_API_URL ?? "http://127.0.0.1:3000";
     this.mcpPort = options.mcpPort ?? Number(process.env.GHOSTSTACK_MCP_PORT ?? "8100");
     this.python = options.pythonCommand ?? process.env.GHOSTSTACK_PYTHON ?? "python";

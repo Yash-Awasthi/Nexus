@@ -4,7 +4,7 @@ import * as path from "path";
 
 import { loadEnvFile } from "./env-loader.js";
 
-export interface GhostStackConfig {
+export interface ConductorConfig {
   apiPort: number;
   flociUrl: string;
   mcpPort: number;
@@ -18,7 +18,7 @@ export interface GhostStackConfig {
   };
 }
 
-const DEFAULTS: GhostStackConfig = {
+const DEFAULTS: ConductorConfig = {
   apiPort: 3000,
   flociUrl: "http://localhost:4566",
   mcpPort: 8100,
@@ -58,7 +58,7 @@ function parseCliArgs(): Record<string, string> {
   return out;
 }
 
-function validateConfig(config: GhostStackConfig): void {
+function validateConfig(config: ConductorConfig): void {
   const errors: string[] = [];
 
   if (isNaN(config.apiPort) || config.apiPort < 1 || config.apiPort > 65535) {
@@ -93,21 +93,21 @@ function validateConfig(config: GhostStackConfig): void {
   }
 }
 
-/** Load `.env`, optional `ghoststack.config.json`, apply env overrides and command line flags. */
-export function loadGhostStackConfig(repoRoot: string): GhostStackConfig {
+/** Load `.env`, optional `conductor.config.json`, apply env overrides and command line flags. */
+export function loadConductorConfig(repoRoot: string): ConductorConfig {
   loadEnvFile(path.join(repoRoot, ".env"));
 
-  const configPath = path.join(repoRoot, "ghoststack.config.json");
-  let fileConfig: Partial<GhostStackConfig> = {};
+  const configPath = path.join(repoRoot, "conductor.config.json");
+  let fileConfig: Partial<ConductorConfig> = {};
   if (fs.existsSync(configPath)) {
     try {
       fileConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
     } catch (err) {
-      throw new Error(`Invalid ghoststack.config.json: ${(err as Error).message}`);
+      throw new Error(`Invalid conductor.config.json: ${(err as Error).message}`);
     }
   }
 
-  const merged: GhostStackConfig = {
+  const merged: ConductorConfig = {
     apiPort: fileConfig.apiPort ?? DEFAULTS.apiPort,
     flociUrl: fileConfig.flociUrl ?? DEFAULTS.flociUrl,
     mcpPort: fileConfig.mcpPort ?? DEFAULTS.mcpPort,
