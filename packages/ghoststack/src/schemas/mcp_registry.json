@@ -1,0 +1,39 @@
+{
+  "version": "1.0",
+  "servers": [
+    {
+      "name": "ghoststack",
+      "description": "GhostStack orchestration runtime — exposes workflow, memory, agent-bus, circuit-breaker, runtime-graph, and Floci emulation tools.",
+      "transport": "stdio",
+      "command": "python runtime/mcp/ghoststack_mcp_server.py",
+      "tools": [
+        "ghoststack_health",
+        "ghoststack_runtime_snapshot",
+        "ghoststack_list_workflows",
+        "ghoststack_load_spec",
+        "ghoststack_execute_workflow",
+        "ghoststack_workflow_cancel",
+        "ghoststack_workflow_resume",
+        "ghoststack_workflow_checkpoints",
+        "ghoststack_workflow_replay",
+        "ghoststack_run_e2e",
+        "ghoststack_floci_execute",
+        "ghoststack_sandbox_write",
+        "ghoststack_sandbox_read",
+        "ghoststack_sandbox_list",
+        "ghoststack_memory_stats",
+        "ghoststack_memory_store",
+        "ghoststack_memory_query",
+        "ghoststack_agent_capabilities",
+        "ghoststack_agent_send",
+        "ghoststack_agent_find",
+        "ghoststack_circuit_state",
+        "ghoststack_circuit_reset",
+        "ghoststack_floci_extended",
+        "ghoststack_diagnostics",
+        "ghoststack_health_history",
+        "ghoststack_runtime_graph"
+      ]
+    }
+  ]
+}
