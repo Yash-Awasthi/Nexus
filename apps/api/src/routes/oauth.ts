@@ -27,28 +27,12 @@
  *  - No state is stored server-side after the JWT is issued (stateless).
  */
 
-import { createHmac, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 
 import type { FastifyInstance } from "fastify";
 
 import { getSharedKV } from "../lib/shared-kv.js";
 
-// ── JWT issuer (HS256 — compatible with verifier in auth.ts) ──────────────────
-
-function _b64url(data: string): string {
-  return Buffer.from(data).toString("base64url");
-}
-
-function _issueJwt(payload: Record<string, unknown>): string {
-  const secret = process.env.NEXUS_JWT_SECRET;
-  if (!secret) throw new Error("NEXUS_JWT_SECRET not set — cannot issue JWT");
-  const now = Math.floor(Date.now() / 1_000);
-  const full = { iat: now, exp: now + 86_400, ...payload };
-  const h = _b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const p = _b64url(JSON.stringify(full));
-  const sig = createHmac("sha256", secret).update(`${h}.${p}`).digest("base64url");
-  return `${h}.${p}.${sig}`;
-}
 
 // ── OAuth provider constants ───────────────────────────────────────────────────
 
@@ -82,6 +66,78 @@ async function _consumeState(state: string): Promise<boolean> {
 }
 
 // ── Route plugin ──────────────────────────────────────────────────────────────
+
+
+// ── OAuth user upsert + token issuance ────────────────────────────────────────
+
+const _OAUTH_ACCESS_TTL_SEC = 15 * 60;
+const _OAUTH_REFRESH_TTL_MS = 30 * 24 * 3600 * 1000;
+
+function _sha256hex(s: string): string {
+  return createHash("sha256").update(s).digest("hex");
+}
+
+async function upsertOAuthUser(
+  email: string,
+  name: string | undefined,
+  provider: string,
+  userAgent: string | undefined,
+): Promise<{ accessToken: string; refreshToken: string; userId: string }> {
+  const secret = process.env.NEXUS_JWT_SECRET;
+  if (!secret) throw new Error("NEXUS_JWT_SECRET not set");
+
+  let userId: string;
+  let role = "member";
+  let tier = "free";
+
+  if (process.env.DATABASE_URL) {
+    const normalEmail = email.toLowerCase().trim();
+    const [existing] = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.email, normalEmail), isNull(users.deletedAt)))
+      .limit(1);
+
+    if (existing) {
+      userId = existing.id;
+      role = existing.role;
+      tier = existing.tier;
+    } else {
+      const [created] = await db
+        .insert(users)
+        .values({
+          email: normalEmail,
+          passwordHash: `oauth:${provider}:no-password`,
+          name: name?.trim() ?? null,
+          role: "member",
+          tier: "free",
+          emailVerified: true,
+        })
+        .returning();
+      if (!created) throw new Error("User insert failed");
+      userId = created.id;
+    }
+  } else {
+    userId = `${provider}:${_sha256hex(email).slice(0, 16)}`;
+  }
+
+  const accessToken = signJwt(
+    { sub: userId, role: role as "admin" | "agent" | "read-only", tier, exp: Math.floor(Date.now() / 1000) + _OAUTH_ACCESS_TTL_SEC },
+    secret,
+  );
+
+  const rawRefresh = randomBytes(32).toString("hex");
+  if (process.env.DATABASE_URL) {
+    await db.insert(refreshTokens).values({
+      userId,
+      tokenHash: _sha256hex(rawRefresh),
+      expiresAt: new Date(Date.now() + _OAUTH_REFRESH_TTL_MS),
+      userAgent: userAgent ?? null,
+    });
+  }
+
+  return { accessToken, refreshToken: rawRefresh, userId };
+}
 
 export async function oauthRoutes(app: FastifyInstance): Promise<void> {
   // ── Google ──────────────────────────────────────────────────────────────────
@@ -152,16 +208,11 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
           headers: { Authorization: `Bearer ${tokens.access_token}` },
         });
         const user = (await userRes.json()) as { sub?: string; email?: string; name?: string };
-        const userId = `google:${user.sub ?? user.email ?? "unknown"}`;
-
-        const token = _issueJwt({
-          sub: userId,
-          email: user.email,
-          name: user.name,
-          provider: "google",
-          tier: "free",
-        });
-        return reply.send({ token, userId, email: user.email });
+        const email = user.email ?? user.sub ?? "unknown@google.com";
+        const { accessToken, refreshToken, userId } = await upsertOAuthUser(
+          email, user.name, "google", request.headers["user-agent"],
+        );
+        return reply.send({ accessToken, refreshToken, userId, email, provider: "google" });
       } catch (err) {
         app.log.error(err, "Google OAuth callback error");
         return reply.code(500).send({ error: "oauth_failed" });
@@ -244,16 +295,11 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
           email?: string;
           name?: string;
         };
-        const userId = `github:${user.id ?? user.login ?? "unknown"}`;
-
-        const token = _issueJwt({
-          sub: userId,
-          email: user.email,
-          name: user.name ?? user.login,
-          provider: "github",
-          tier: "free",
-        });
-        return reply.send({ token, userId, email: user.email });
+        const email = user.email ?? `${user.login ?? "unknown"}@users.noreply.github.com`;
+        const { accessToken, refreshToken, userId } = await upsertOAuthUser(
+          email, user.name ?? user.login, "github", request.headers["user-agent"],
+        );
+        return reply.send({ accessToken, refreshToken, userId, email, provider: "github" });
       } catch (err) {
         app.log.error(err, "GitHub OAuth callback error");
         return reply.code(500).send({ error: "oauth_failed" });
