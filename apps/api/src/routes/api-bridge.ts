@@ -105,8 +105,19 @@ import {
   MockVideoBackend,
   type ModelFn as VideoModelFn,
   type VideoSearchRequest,
+  type VideoBackend,
+  type VideoResult,
 } from "@nexus/video-search";
 import { AdapterRegistry, NexusAdapterError, defineAdapter } from "@nexus/plugin-sdk";
+import {
+  ImageTransformer,
+  isSharpAvailable,
+  type ResizeOptions,
+  type CropOptions,
+  type ConvertOptions,
+  type WatermarkOptions,
+  type ImageFormat,
+} from "@nexus/image-transformations";
 import { emitAuditEvent } from "../lib/audit-emitter.js";
 import type { FastifyInstance } from "fastify";
 import { Pool } from "pg";
@@ -3173,6 +3184,45 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
 
   // ── video ──────────────────────────────────────────────────────────────────
 
+  // YouTube Data API v3 backend (wired when YOUTUBE_API_KEY is set)
+  class YouTubeVideoBackend implements VideoBackend {
+    constructor(private readonly apiKey: string) {}
+    async search(query: string, maxResults: number): Promise<VideoResult[]> {
+      const url = new URL("https://www.googleapis.com/youtube/v3/search");
+      url.searchParams.set("part", "snippet");
+      url.searchParams.set("q", query);
+      url.searchParams.set("maxResults", String(Math.min(maxResults, 50)));
+      url.searchParams.set("type", "video");
+      url.searchParams.set("key", this.apiKey);
+
+      const res = await fetch(url.toString());
+      if (!res.ok) return [];
+
+      const data = (await res.json()) as {
+        items?: {
+          id: { videoId: string };
+          snippet: {
+            title: string;
+            description: string;
+            channelTitle: string;
+            publishedAt: string;
+            thumbnails: { default?: { url: string } };
+          };
+        }[];
+      };
+
+      return (data.items ?? []).map((item) => ({
+        id:           item.id.videoId,
+        title:        item.snippet.title,
+        url:          `https://www.youtube.com/watch?v=${item.id.videoId}`,
+        thumbnailUrl: item.snippet.thumbnails.default?.url,
+        source:       "youtube",
+        description:  item.snippet.description,
+        publishedAt:  item.snippet.publishedAt,
+      }));
+    }
+  }
+
   // ModelFn: uses GroqDriver when GROQ_API_KEY set, else stub echo
   const _videoModelFn: VideoModelFn = async (systemPrompt: string, userMessage: string) => {
     const groqKey = process.env.GROQ_API_KEY;
@@ -3204,9 +3254,12 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   let _videoEngine: VideoSearchEngine | null = null;
   function getVideoEngine(): VideoSearchEngine {
     if (!_videoEngine) {
+      const backend: VideoBackend = process.env.YOUTUBE_API_KEY
+        ? new YouTubeVideoBackend(process.env.YOUTUBE_API_KEY)
+        : new MockVideoBackend();
       _videoEngine = new VideoSearchEngine({
-        model: _videoModelFn,
-        backend: new MockVideoBackend(), // real YouTube/Vimeo backend plugged via env later
+        model:      _videoModelFn,
+        backend,
         cacheTtlMs: 5 * 60_000,
       });
     }
@@ -3331,6 +3384,195 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
       };
       const result = await adapter.execute(request.body, ctx as Parameters<typeof adapter.execute>[1]);
       return reply.send({ name: request.params.name, result });
+    },
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // C.9 — image-transformations
+  //        Uses @nexus/image-transformations → sharp (optional); passthrough
+  //        when sharp not installed so routes stay functional in CI/serverless.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  const _imgTransformer = new ImageTransformer();
+
+  /** GET /image-transformations/status — sharp availability probe */
+  app.get("/image-transformations/status", async (_req, reply) => {
+    const sharpAvailable = await isSharpAvailable();
+    return reply.send({ sharpAvailable, passthrough: !sharpAvailable });
+  });
+
+  /**
+   * POST /image-transformations/resize
+   * Body: { image: string (base64), width?, height?, fit?, background?, format? }
+   */
+  app.post<{
+    Body: { image: string; format?: ImageFormat } & ResizeOptions;
+  }>(
+    "/image-transformations/resize",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["image"],
+          properties: {
+            image:      { type: "string" },
+            width:      { type: "number", minimum: 1 },
+            height:     { type: "number", minimum: 1 },
+            fit:        { type: "string", enum: ["cover", "contain", "fill", "inside", "outside"] },
+            background: { type: "string" },
+            format:     { type: "string", enum: ["jpeg", "png", "webp", "avif", "gif", "tiff"] },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { image, format, ...resizeOpts } = request.body;
+      const input = Buffer.from(image, "base64");
+      const result = await _imgTransformer.resize(input, resizeOpts, format);
+      return reply.send({
+        image: result.buffer.toString("base64"),
+        format: result.format,
+        width: result.width,
+        height: result.height,
+        byteSize: result.byteSize,
+        passthrough: result.passthrough,
+      });
+    },
+  );
+
+  /**
+   * POST /image-transformations/crop
+   * Body: { image: string (base64), left, top, width, height, format? }
+   */
+  app.post<{
+    Body: { image: string; format?: ImageFormat } & CropOptions;
+  }>(
+    "/image-transformations/crop",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["image", "left", "top", "width", "height"],
+          properties: {
+            image:  { type: "string" },
+            left:   { type: "number", minimum: 0 },
+            top:    { type: "number", minimum: 0 },
+            width:  { type: "number", minimum: 1 },
+            height: { type: "number", minimum: 1 },
+            format: { type: "string", enum: ["jpeg", "png", "webp", "avif", "gif", "tiff"] },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { image, format, ...cropOpts } = request.body;
+      const input = Buffer.from(image, "base64");
+      const result = await _imgTransformer.crop(input, cropOpts as CropOptions, format);
+      return reply.send({
+        image: result.buffer.toString("base64"),
+        format: result.format,
+        width: result.width,
+        height: result.height,
+        byteSize: result.byteSize,
+        passthrough: result.passthrough,
+      });
+    },
+  );
+
+  /**
+   * POST /image-transformations/convert
+   * Body: { image: string (base64), format, quality? }
+   */
+  app.post<{
+    Body: { image: string } & ConvertOptions;
+  }>(
+    "/image-transformations/convert",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["image", "format"],
+          properties: {
+            image:   { type: "string" },
+            format:  { type: "string", enum: ["jpeg", "png", "webp", "avif", "gif", "tiff"] },
+            quality: { type: "number", minimum: 1, maximum: 100 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { image, ...convertOpts } = request.body;
+      const input = Buffer.from(image, "base64");
+      const result = await _imgTransformer.convert(input, convertOpts as ConvertOptions);
+      return reply.send({
+        image: result.buffer.toString("base64"),
+        format: result.format,
+        width: result.width,
+        height: result.height,
+        byteSize: result.byteSize,
+        passthrough: result.passthrough,
+      });
+    },
+  );
+
+  /**
+   * POST /image-transformations/watermark
+   * Body: { image: string (base64), text, colour?, fontSize?, gravity?, format? }
+   */
+  app.post<{
+    Body: { image: string; format?: ImageFormat } & WatermarkOptions;
+  }>(
+    "/image-transformations/watermark",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["image", "text"],
+          properties: {
+            image:    { type: "string" },
+            text:     { type: "string", maxLength: 256 },
+            colour:   { type: "string" },
+            fontSize: { type: "number", minimum: 8, maximum: 256 },
+            gravity:  { type: "string" },
+            format:   { type: "string", enum: ["jpeg", "png", "webp", "avif", "gif", "tiff"] },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { image, format, ...wmOpts } = request.body;
+      const input = Buffer.from(image, "base64");
+      const result = await _imgTransformer.watermark(input, wmOpts as WatermarkOptions, format);
+      return reply.send({
+        image: result.buffer.toString("base64"),
+        format: result.format,
+        width: result.width,
+        height: result.height,
+        byteSize: result.byteSize,
+        passthrough: result.passthrough,
+      });
+    },
+  );
+
+  /**
+   * POST /image-transformations/metadata
+   * Body: { image: string (base64) }
+   */
+  app.post<{ Body: { image: string } }>(
+    "/image-transformations/metadata",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["image"],
+          properties: { image: { type: "string" } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const input = Buffer.from(request.body.image, "base64");
+      const meta  = await _imgTransformer.metadata(input);
+      return reply.send(meta);
     },
   );
 
