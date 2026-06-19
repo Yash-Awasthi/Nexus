@@ -26,6 +26,11 @@ export default defineConfig({
         target: API_TARGET,
         changeOrigin: true,
       },
+      // Proxy /health and /health/* to the API for the status page
+      "/health": {
+        target: API_TARGET,
+        changeOrigin: true,
+      },
     },
   },
 });

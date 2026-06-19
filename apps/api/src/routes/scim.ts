@@ -435,10 +435,15 @@ export async function scimRoutes(app: FastifyInstance): Promise<void> {
     "/scim/v2/Groups",
     { preHandler: requireScimAuth },
     async (request, reply) => {
-      const slug = (request.body.externalId ?? request.body.displayName)
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "")
+      // Build slug without regex quantifiers on user input to avoid ReDoS
+      const rawSlug = (request.body.externalId ?? request.body.displayName).toLowerCase();
+      const slug = rawSlug
+        .split("")
+        .map((c) => (/[a-z0-9]/.test(c) ? c : "-"))
+        .join("")
+        .split("-")
+        .filter(Boolean)
+        .join("-")
         .slice(0, 48);
 
       // Use first member as owner, or a system user

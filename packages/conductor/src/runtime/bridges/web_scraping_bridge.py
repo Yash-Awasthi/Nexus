@@ -32,7 +32,7 @@ except ImportError:
     _SCRAPLING_AVAILABLE = False
 
 try:
-    from scrapling.fetchers import PlayWrightFetcher as _JsFetcher
+    import scrapling.fetchers  # noqa: F401 — check module availability only
     _JS_FETCHER_AVAILABLE = True
 except ImportError:
     _JS_FETCHER_AVAILABLE = False
@@ -85,7 +85,7 @@ def _extract_selectors(response: Any, selectors: list[str]) -> dict[str, str]:
             try:
                 elements = page.css(sel)
                 extracted[sel] = " | ".join(el.text for el in elements if el.text)
-            except Exception:
+            except Exception:  # selector not found in page — return empty
                 extracted[sel] = ""
     except Exception:
         pass
@@ -205,7 +205,7 @@ async def spider(req: SpiderRequest):
                         page = response.html_parser
                         elems = page.css(sel)
                         all_extracted[sel].extend(el.text for el in elems if el.text)
-                    except Exception:
+                    except Exception:  # CSS selector extraction failed — skip this selector
                         pass
 
                 if depth < req.max_depth:
@@ -216,9 +216,9 @@ async def spider(req: SpiderRequest):
                             full = urljoin(url, href)
                             if urlparse(full).netloc == base_domain and full not in visited:
                                 queue.append((full, depth + 1))
-                    except Exception:
+                    except Exception:  # link extraction failed — skip this page
                         pass
-            except Exception:
+            except Exception:  # page fetch failed — continue with next URL
                 continue
 
         merged_extracted = {k: " | ".join(v) for k, v in all_extracted.items()}

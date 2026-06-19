@@ -33,7 +33,7 @@ function parseContent(
 }
 
 export function CitationRenderer({ content, citations }: CitationRendererProps) {
-  const [hoveredId, setHoveredId] = useState<number | null>(null);
+  const [_hoveredId, setHoveredId] = useState<number | null>(null);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [cardPos, setCardPos] = useState<{ top: number; left: number } | undefined>();
 

@@ -77,7 +77,6 @@ export default function CouncilCheckpoints() {
   const [selectedStep, setSelectedStep] = useState<number | null>(null);
   const [stepDetail, setStepDetail] = useState<StepDetail | null>(null);
   const [loadingStep, setLoadingStep] = useState(false);
-  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
 
   // Replay
   const [replayStep, setReplayStep] = useState<number | null>(null);
@@ -163,14 +162,6 @@ export default function CouncilCheckpoints() {
     setReplayResult(null);
     setDeleting(false);
   }, [runInfo]);
-
-  const toggleKey = (key: string) => {
-    setExpandedKeys((prev) => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
-  };
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">

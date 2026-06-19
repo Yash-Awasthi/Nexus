@@ -17,7 +17,6 @@ import {
   CopyIcon,
   HistoryIcon,
   WrenchIcon,
-  LayersIcon,
 } from "lucide-react";
 
 import { Button } from "~/components/ui/button";

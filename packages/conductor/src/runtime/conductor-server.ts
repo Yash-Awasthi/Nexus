@@ -332,10 +332,12 @@ export async function createConductorServer(repoRoot: string): Promise<Conductor
       res.statusCode = 405;
       res.end(JSON.stringify({ error: `Method not allowed: ${method} ${pathname}` }));
     } catch (err: any) {
-      const message = err?.message || String(err);
-      res.statusCode = message.startsWith("Not Found") ? 404 : 500;
+      // Log full error internally; never expose message or stack to callers
+      ctx.logger.error({ err }, "Conductor HTTP handler error");
+      const isNotFound = (err as { message?: string })?.message?.startsWith("Not Found") ?? false;
+      res.statusCode = isNotFound ? 404 : 500;
       res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ error: message }));
+      res.end(JSON.stringify({ error: isNotFound ? "Not Found" : "Internal Server Error" }));
       ctx.metrics.increment("http.errors", 1);
     } finally {
       ctx.metrics.recordTiming("http.request_ms", Date.now() - reqStarted, { route: pathname });
