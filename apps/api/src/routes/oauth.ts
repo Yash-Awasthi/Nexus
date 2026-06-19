@@ -316,4 +316,79 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
       }
     },
   );
+
+  // ── Slack ──────────────────────────────────────────────────────────────────
+
+  /**
+   * GET /oauth/slack
+   * Redirect to Slack OAuth consent screen.
+   * Requires SLACK_CLIENT_ID env var.
+   */
+  app.get("/oauth/slack", async (_request, reply) => {
+    const clientId = process.env.SLACK_CLIENT_ID;
+    if (!clientId) {
+      return reply
+        .code(501)
+        .send({ error: "Slack OAuth not configured (SLACK_CLIENT_ID missing)" });
+    }
+    const state = await _genState();
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: `${_redirectBase()}/api/v1/oauth/slack/callback`,
+      scope: "channels:history channels:read users:read",
+      state,
+    });
+    return reply.redirect(`https://slack.com/oauth/v2/authorize?${params}`);
+  });
+
+  /** GET /oauth/slack/callback */
+  app.get<{ Querystring: { code?: string; state?: string; error?: string } }>(
+    "/oauth/slack/callback",
+    async (request, reply) => {
+      const { code, state, error } = request.query;
+      if (error) return reply.code(400).send({ error });
+      if (!code) return reply.code(400).send({ error: "missing_code" });
+      if (!state || !(await _consumeState(state))) {
+        return reply.code(400).send({ error: "invalid_state" });
+      }
+      const clientId = process.env.SLACK_CLIENT_ID;
+      const clientSecret = process.env.SLACK_CLIENT_SECRET;
+      if (!clientId || !clientSecret) {
+        return reply.code(501).send({ error: "Slack OAuth not configured" });
+      }
+      try {
+        const tokenRes = await fetch("https://slack.com/api/oauth.v2.access", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            code,
+            client_id: clientId,
+            client_secret: clientSecret,
+            redirect_uri: `${_redirectBase()}/api/v1/oauth/slack/callback`,
+          }),
+        });
+        const data = (await tokenRes.json()) as {
+          ok: boolean;
+          access_token?: string;
+          team?: { name?: string };
+          authed_user?: { id?: string };
+          error?: string;
+        };
+        if (!data.ok || !data.access_token) {
+          return reply.code(401).send({ error: data.error ?? "token_exchange_failed" });
+        }
+        const email = `${data.authed_user?.id ?? "slack_user"}@slack.workspace`;
+        const { accessToken, refreshToken, userId } = await upsertOAuthUser(
+          email,
+          data.team?.name,
+          "slack",
+          request.headers["user-agent"],
+        );
+        return reply.send({ accessToken, refreshToken, userId, provider: "slack" });
+      } catch (err) {
+        app.log.error(err, "Slack OAuth callback error");
+        return reply.code(500).send({ error: "oauth_failed" });
+      }
+    },
+  );
 }

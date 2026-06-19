@@ -1653,6 +1653,59 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     { executionId: string; status: string; output: string; error?: string; durationMs: number }
   >();
 
+  // Piston public API — supports Python, Bash, TypeScript, and 70+ others
+  const PISTON_URL = process.env.PISTON_URL ?? "https://emkc.org/api/v2/piston";
+  const PISTON_LANG_MAP: Record<string, { language: string; version: string; filename: string }> = {
+    python:     { language: "python",     version: "3.10.0", filename: "main.py"  },
+    bash:       { language: "bash",       version: "5.2.0",  filename: "main.sh"  },
+    typescript: { language: "typescript", version: "5.0.3",  filename: "main.ts"  },
+    r:          { language: "r",          version: "4.1.1",  filename: "main.r"   },
+    ruby:       { language: "ruby",       version: "3.0.1",  filename: "main.rb"  },
+    go:         { language: "go",         version: "1.21.0", filename: "main.go"  },
+    rust:       { language: "rust",       version: "1.68.2", filename: "main.rs"  },
+  };
+
+  async function _runViaPiston(
+    code: string,
+    language: string,
+  ): Promise<{ stdout: string; stderr: string; exitCode: number; durationMs: number }> {
+    const mapping = PISTON_LANG_MAP[language.toLowerCase()];
+    if (!mapping) throw new Error(`Unsupported language: ${language}`);
+    const t0 = Date.now();
+    const res = await fetch(`${PISTON_URL}/execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        language: mapping.language,
+        version: mapping.version,
+        files: [{ name: mapping.filename, content: code }],
+      }),
+    });
+    const data = (await res.json()) as {
+      run?: { stdout: string; stderr: string; code: number; output: string };
+      message?: string;
+    };
+    const run = data.run;
+    if (!run) throw new Error(data.message ?? "Piston returned no run result");
+    return {
+      stdout: run.stdout ?? run.output ?? "",
+      stderr: run.stderr ?? "",
+      exitCode: run.code ?? 0,
+      durationMs: Date.now() - t0,
+    };
+  }
+
+  /** GET /sandbox/status — overall sandbox availability (no execution ID needed). */
+  app.get("/sandbox/status", async (_request, reply) => {
+    const dockerAvail = await _dockerReady;
+    return reply.send({
+      available: true,
+      dockerAvailable: dockerAvail,
+      pistonAvailable: true,
+      languages: ["javascript", "typescript", "python", "bash", "r", "ruby", "go", "rust"],
+    });
+  });
+
   app.post<{ Body: { code: string; language?: string } }>(
     "/sandbox/execute",
     async (request, reply) => {
@@ -1660,16 +1713,40 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
       const executionId = crypto.randomUUID();
       const lang = language.toLowerCase();
 
-      if (lang !== "javascript" && lang !== "js" && lang !== "typescript" && lang !== "ts") {
-        const result = {
-          executionId,
-          status: "unsupported",
-          output: "",
-          error: `${language} execution requires Docker runtime. Only JavaScript is supported in this deployment.`,
-          durationMs: 0,
-        };
-        _sandboxResults.set(executionId, result);
-        return reply.code(202).send(result);
+      // Non-JS languages → route through Piston
+      if (lang !== "javascript" && lang !== "js") {
+        const pistonLang = lang === "typescript" || lang === "ts" ? "typescript" : lang;
+        try {
+          const t0 = Date.now();
+          const pResult = await _runViaPiston(code, pistonLang);
+          const result = {
+            executionId,
+            status: pResult.exitCode === 0 ? "done" : "error",
+            output: pResult.stdout,
+            error: pResult.stderr || undefined,
+            stdout: pResult.stdout,
+            stderr: pResult.stderr,
+            exitCode: pResult.exitCode,
+            language: pistonLang,
+            durationMs: pResult.durationMs,
+          };
+          _sandboxResults.set(executionId, result);
+          return reply.code(201).send(result);
+        } catch (e) {
+          const result = {
+            executionId,
+            status: "error",
+            output: "",
+            error: e instanceof Error ? e.message : String(e),
+            stdout: "",
+            stderr: e instanceof Error ? e.message : String(e),
+            exitCode: 1,
+            language: lang,
+            durationMs: Date.now(),
+          };
+          _sandboxResults.set(executionId, result);
+          return reply.code(201).send(result);
+        }
       }
 
       // JavaScript: run in isolated vm context with timeout
@@ -1710,6 +1787,11 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
         status: error ? "error" : "done",
         output,
         error,
+        // Normalized fields matching UI ExecResult interface
+        stdout: error ? output : output,
+        stderr: error ? error : "",
+        exitCode: error ? 1 : 0,
+        language: "javascript",
         durationMs: Date.now() - t0,
       };
       _sandboxResults.set(executionId, result);
@@ -2830,6 +2912,143 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     }
     km.destroy(request.params.id);
     return reply.code(204).send();
+  });
+
+  /**
+   * POST /code-agent/run — LLM writes code for a task, then executes it.
+   * Body: { task: string, language?: string, apiKey?: string, model?: string, provider?: string }
+   * Returns AgentSession shape.
+   */
+  app.post<{
+    Body: {
+      task: string;
+      language?: string;
+      apiKey?: string;
+      model?: string;
+      provider?: string;
+    };
+  }>("/code-agent/run", async (request, reply) => {
+    const {
+      task,
+      language = "python",
+      apiKey,
+      model = "llama-3.3-70b-versatile",
+      provider = "groq",
+    } = request.body;
+
+    const sessionId = crypto.randomUUID();
+    const createdAt = new Date().toISOString();
+
+    // Resolve API key: body > env Groq key (platform default) > error
+    const resolvedKey =
+      apiKey ||
+      (provider === "groq" || provider === "openai"
+        ? process.env[`${provider.toUpperCase()}_API_KEY`]
+        : null) ||
+      process.env.GROQ_API_KEY;
+
+    if (!resolvedKey) {
+      return reply.code(402).send({
+        error: "no_api_key",
+        message: "Add your API key in Language Models settings (BYOK) to use Code Agent.",
+      });
+    }
+
+    // Choose LLM endpoint
+    const isGroq = provider === "groq" || (!apiKey && process.env.GROQ_API_KEY);
+    const llmUrl = isGroq
+      ? "https://api.groq.com/openai/v1/chat/completions"
+      : "https://api.openai.com/v1/chat/completions";
+    const llmModel = isGroq ? model : (model || "gpt-4o-mini");
+
+    const systemPrompt = `You are a code generation assistant. Write clean, runnable ${language} code to complete the task.
+Output ONLY the code — no markdown fences, no explanation, no comments unless required by the code.`;
+
+    try {
+      // Step 1: Generate code via LLM
+      const llmRes = await fetch(llmUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${resolvedKey}`,
+        },
+        body: JSON.stringify({
+          model: llmModel,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: task },
+          ],
+          temperature: 0.2,
+          max_tokens: 2048,
+        }),
+      });
+
+      if (!llmRes.ok) {
+        const errBody = await llmRes.text().catch(() => "");
+        return reply.code(502).send({ error: "llm_failed", message: errBody });
+      }
+
+      const llmData = (await llmRes.json()) as {
+        choices?: { message?: { content?: string } }[];
+        error?: { message: string };
+      };
+
+      const generatedCode = llmData.choices?.[0]?.message?.content?.trim() ?? "";
+      if (!generatedCode) {
+        return reply.code(502).send({ error: "empty_code", message: "LLM returned no code" });
+      }
+
+      // Step 2: Execute the generated code
+      const lang = language.toLowerCase();
+      let finalOutput = "";
+      let finalError: string | undefined;
+      let iterations = 1;
+
+      if (lang === "javascript" || lang === "js") {
+        // VM execution
+        const logs: string[] = [];
+        const ctx = vm.createContext({
+          console: {
+            log: (...a: unknown[]) => logs.push(a.map(String).join(" ")),
+            error: (...a: unknown[]) => logs.push("[err] " + a.map(String).join(" ")),
+          },
+          Math, JSON, parseInt, parseFloat, isNaN, isFinite,
+        });
+        try {
+          const ret = vm.runInContext(generatedCode, ctx, { timeout: 5000 });
+          finalOutput = [...logs, ret !== undefined ? String(ret) : ""].filter(Boolean).join("\n");
+        } catch (e) {
+          finalError = e instanceof Error ? e.message : String(e);
+          finalOutput = logs.join("\n");
+        }
+      } else {
+        // Piston execution
+        try {
+          const pr = await _runViaPiston(generatedCode, lang);
+          finalOutput = pr.stdout;
+          finalError = pr.exitCode !== 0 ? pr.stderr : undefined;
+        } catch (e) {
+          finalError = e instanceof Error ? e.message : String(e);
+        }
+      }
+
+      return reply.send({
+        sessionId,
+        task,
+        language,
+        status: finalError ? "error" : "success",
+        iterations,
+        code: generatedCode,
+        finalOutput: finalOutput || undefined,
+        finalError,
+        createdAt,
+      });
+    } catch (err) {
+      return reply.code(500).send({
+        error: "agent_failed",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
   });
 
   /**
@@ -7728,211 +7947,263 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   // Endpoints: GET/POST /api/build/tasks, PATCH /:id/status,
   //            POST /:id/claim|release|submit, DELETE /:id, POST /steal
 
-  interface _BuildTask {
-    id: number;
-    userId: number;
-    parentId: number | null;
-    title: string;
-    description: string | null;
-    status: string;
-    claimedBy: string | null;
-    claimedAt: string | null;
-    output: string | null;
-    submittedAt: string | null;
-    isLocked: boolean;
-    meta: Record<string, unknown>;
-    createdAt: string;
-    updatedAt: string;
-  }
+  // ── Build Tasks (DB-backed, persisted in Neon build_tasks table) ───────────
+  // Frontend: apps/ui/app/routes/build.tsx
+  // Endpoints: GET /build/tasks, POST /build/tasks, POST /build/tasks/steal,
+  //            PATCH /build/tasks/:id/status, POST /build/tasks/:id/claim,
+  //            POST /build/tasks/:id/release, POST /build/tasks/:id/submit, DELETE /build/tasks/:id
 
-  let _btId = 1;
-  const _buildTaskStore = new Map<number, _BuildTask>();
   const _btNow = () => new Date().toISOString();
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function _btRow(row: any) {
+    return {
+      id: row.id,
+      userId: row.user_id,
+      parentId: row.parent_id ?? null,
+      title: row.title,
+      description: row.description ?? null,
+      status: row.status,
+      claimedBy: row.claimed_by ?? null,
+      claimedAt: row.claimed_at ? new Date(row.claimed_at as string).toISOString() : null,
+      output: row.output ?? null,
+      submittedAt: row.submitted_at ? new Date(row.submitted_at as string).toISOString() : null,
+      isLocked: row.is_locked ?? false,
+      meta: row.meta ?? {},
+      createdAt: new Date(row.created_at as string).toISOString(),
+      updatedAt: new Date(row.updated_at as string).toISOString(),
+    };
+  }
+
   app.get("/build/tasks", async (_req, reply) => {
-    return reply.send({ tasks: [..._buildTaskStore.values()] });
+    const pool = _getPool();
+    if (!pool) return reply.send({ tasks: [] });
+    const { rows } = await pool.query(
+      "SELECT * FROM build_tasks ORDER BY created_at DESC LIMIT 200",
+    );
+    return reply.send({ tasks: rows.map(_btRow) });
   });
 
   // IMPORTANT: register /steal before /:id routes so static path wins
   app.post<{ Body: { agentId?: string } }>("/build/tasks/steal", async (request, reply) => {
+    const pool = _getPool();
+    if (!pool) return reply.send({ task: null, message: "DB unavailable" });
     const agentId = request.body?.agentId ?? "agent";
-    const available = [..._buildTaskStore.values()].find(
-      (t) => t.status === "planned" && !t.claimedBy,
+    const { rows } = await pool.query(
+      `UPDATE build_tasks SET status='claimed', claimed_by=$1, claimed_at=NOW(), updated_at=NOW()
+       WHERE id = (
+         SELECT id FROM build_tasks WHERE status='planned' AND claimed_by IS NULL
+         ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED
+       ) RETURNING *`,
+      [agentId],
     );
-    if (!available) return reply.send({ task: null, message: "No available tasks" });
-    available.status = "claimed";
-    available.claimedBy = agentId;
-    available.claimedAt = _btNow();
-    available.updatedAt = _btNow();
-    _buildTaskStore.set(available.id, available);
-    return reply.send({ task: available });
+    if (!rows.length) return reply.send({ task: null, message: "No available tasks" });
+    return reply.send({ task: _btRow(rows[0]) });
   });
 
   app.post<{
     Body: { title: string; description?: string; status?: string; parentId?: number | null };
   }>("/build/tasks", async (request, reply) => {
+    const pool = _getPool();
     const { title, description = null, status = "planned", parentId = null } = request.body ?? {};
     if (!title?.trim()) return reply.code(400).send({ error: "title required" });
-    const task: _BuildTask = {
-      id: _btId++,
-      userId: 1,
-      parentId: parentId ?? null,
-      title: title.trim(),
-      description: description ?? null,
-      status,
-      claimedBy: null,
-      claimedAt: null,
-      output: null,
-      submittedAt: null,
-      isLocked: false,
-      meta: {},
-      createdAt: _btNow(),
-      updatedAt: _btNow(),
-    };
-    _buildTaskStore.set(task.id, task);
-    return reply.code(201).send(task);
+    if (!pool) return reply.code(503).send({ error: "DB unavailable" });
+    const { rows } = await pool.query(
+      `INSERT INTO build_tasks (title, description, status, parent_id)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [title.trim(), description, status, parentId],
+    );
+    return reply.code(201).send(_btRow(rows[0]));
   });
 
-  app.patch<{ Params: { id: string }; Body: { status?: string; feedback?: string } }>(
+  app.patch<{ Params: { id: string }; Body: { status?: string } }>(
     "/build/tasks/:id/status",
     async (request, reply) => {
+      const pool = _getPool();
+      if (!pool) return reply.code(503).send({ error: "DB unavailable" });
       const id = parseInt(request.params.id, 10);
-      const task = _buildTaskStore.get(id);
-      if (!task) return reply.code(404).send({ error: "not found" });
-      if (request.body?.status) task.status = request.body.status;
-      task.updatedAt = _btNow();
-      _buildTaskStore.set(id, task);
-      return reply.send(task);
+      const { rows } = await pool.query(
+        "UPDATE build_tasks SET status=$1, updated_at=NOW() WHERE id=$2 RETURNING *",
+        [request.body?.status ?? "planned", id],
+      );
+      if (!rows.length) return reply.code(404).send({ error: "not found" });
+      return reply.send(_btRow(rows[0]));
     },
   );
 
   app.post<{ Params: { id: string } }>("/build/tasks/:id/claim", async (request, reply) => {
+    const pool = _getPool();
+    if (!pool) return reply.code(503).send({ error: "DB unavailable" });
     const id = parseInt(request.params.id, 10);
-    const task = _buildTaskStore.get(id);
-    if (!task) return reply.code(404).send({ error: "not found" });
-    task.status = "claimed";
-    task.claimedBy = "user";
-    task.claimedAt = _btNow();
-    task.updatedAt = _btNow();
-    _buildTaskStore.set(id, task);
-    return reply.send(task);
+    const { rows } = await pool.query(
+      "UPDATE build_tasks SET status='claimed', claimed_by='user', claimed_at=NOW(), updated_at=NOW() WHERE id=$1 RETURNING *",
+      [id],
+    );
+    if (!rows.length) return reply.code(404).send({ error: "not found" });
+    return reply.send(_btRow(rows[0]));
   });
 
   app.post<{ Params: { id: string } }>("/build/tasks/:id/release", async (request, reply) => {
+    const pool = _getPool();
+    if (!pool) return reply.code(503).send({ error: "DB unavailable" });
     const id = parseInt(request.params.id, 10);
-    const task = _buildTaskStore.get(id);
-    if (!task) return reply.code(404).send({ error: "not found" });
-    task.status = "planned";
-    task.claimedBy = null;
-    task.claimedAt = null;
-    task.updatedAt = _btNow();
-    _buildTaskStore.set(id, task);
-    return reply.send(task);
+    const { rows } = await pool.query(
+      "UPDATE build_tasks SET status='planned', claimed_by=NULL, claimed_at=NULL, updated_at=NOW() WHERE id=$1 RETURNING *",
+      [id],
+    );
+    if (!rows.length) return reply.code(404).send({ error: "not found" });
+    return reply.send(_btRow(rows[0]));
   });
 
   app.post<{ Params: { id: string }; Body: { output: string } }>(
     "/build/tasks/:id/submit",
     async (request, reply) => {
+      const pool = _getPool();
+      if (!pool) return reply.code(503).send({ error: "DB unavailable" });
       const id = parseInt(request.params.id, 10);
-      const task = _buildTaskStore.get(id);
-      if (!task) return reply.code(404).send({ error: "not found" });
-      task.status = "review";
-      task.output = request.body?.output ?? "";
-      task.submittedAt = _btNow();
-      task.updatedAt = _btNow();
-      _buildTaskStore.set(id, task);
-      return reply.send(task);
+      const { rows } = await pool.query(
+        "UPDATE build_tasks SET status='review', output=$1, submitted_at=NOW(), updated_at=NOW() WHERE id=$2 RETURNING *",
+        [request.body?.output ?? "", id],
+      );
+      if (!rows.length) return reply.code(404).send({ error: "not found" });
+      return reply.send(_btRow(rows[0]));
     },
   );
 
   app.delete<{ Params: { id: string } }>("/build/tasks/:id", async (request, reply) => {
-    const id = parseInt(request.params.id, 10);
-    _buildTaskStore.delete(id);
+    const pool = _getPool();
+    if (!pool) return reply.code(503).send({ error: "DB unavailable" });
+    await pool.query("DELETE FROM build_tasks WHERE id=$1", [parseInt(request.params.id, 10)]);
     return reply.send({ ok: true });
   });
 
-  // ── Prompts (in-memory, versioned) ─────────────────────────────────────────
+  // ── Prompts (DB-backed, versioned, persisted in Neon prompts table) ─────────
   // Frontend: apps/ui/app/routes/prompts.tsx
   // Endpoints: GET/POST /api/prompts, GET/DELETE /api/prompts/:id,
   //            POST /api/prompts/:id/versions
 
-  interface _PromptVersion {
-    id: string;
-    versionNum: number;
-    content: string;
-    model: string | null;
-    temperature: number | null;
-    createdAt: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function _promptRow(p: any, versions: any[]) {
+    return {
+      id: p.id,
+      name: p.name,
+      description: p.description ?? null,
+      createdAt: new Date(p.created_at as string).toISOString(),
+      versions: versions.map((v) => ({
+        id: v.id,
+        versionNum: v.version_num,
+        content: v.content,
+        model: v.model ?? null,
+        temperature: v.temperature != null ? Number(v.temperature) : null,
+        createdAt: new Date(v.created_at as string).toISOString(),
+      })),
+    };
   }
-  interface _Prompt {
-    id: string;
-    name: string;
-    description: string | null;
-    createdAt: string;
-    versions: _PromptVersion[];
-  }
-  const _promptStore = new Map<string, _Prompt>();
-  const _puid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
   app.get("/prompts", async (_req, reply) => {
-    return reply.send({ prompts: [..._promptStore.values()] });
+    const pool = _getPool();
+    if (!pool) return reply.send({ prompts: [] });
+    const { rows: prompts } = await pool.query("SELECT * FROM prompts ORDER BY created_at DESC");
+    if (!prompts.length) return reply.send({ prompts: [] });
+    const { rows: versions } = await pool.query(
+      "SELECT * FROM prompt_versions WHERE prompt_id = ANY($1) ORDER BY version_num DESC",
+      [prompts.map((p) => p.id)],
+    );
+    const vMap = new Map<string, Record<string, unknown>[]>();
+    for (const v of versions) {
+      const arr = vMap.get(v.prompt_id as string) ?? [];
+      arr.push(v);
+      vMap.set(v.prompt_id as string, arr);
+    }
+    return reply.send({
+      prompts: prompts.map((p) => _promptRow(p, vMap.get(p.id as string) ?? [])),
+    });
   });
 
   app.post<{ Body: { name: string; description?: string; content?: string } }>(
     "/prompts",
     async (request, reply) => {
+      const pool = _getPool();
+      if (!pool) return reply.code(503).send({ error: "DB unavailable" });
       const { name, description, content } = request.body ?? {};
       if (!name?.trim()) return reply.code(400).send({ error: "name required" });
-      const now = _btNow();
-      const version: _PromptVersion = {
-        id: _puid(),
-        versionNum: 1,
-        content: content ?? "# {{role}}\n\nYou are a helpful assistant.\n\n## Instructions\n\n{{instructions}}\n\n## Input\n\n{{input}}",
-        model: null,
-        temperature: null,
-        createdAt: now,
-      };
-      const prompt: _Prompt = {
-        id: _puid(),
-        name: name.trim(),
-        description: description ?? null,
-        createdAt: now,
-        versions: [version],
-      };
-      _promptStore.set(prompt.id, prompt);
-      return reply.code(201).send(prompt);
+      const defaultContent =
+        content ??
+        "# {{role}}\n\nYou are a helpful assistant.\n\n## Instructions\n\n{{instructions}}\n\n## Input\n\n{{input}}";
+      const pRows = await pool.query(
+        "INSERT INTO prompts (name, description) VALUES ($1, $2) RETURNING *",
+        [name.trim(), description ?? null],
+      );
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const p = pRows.rows[0] as any;
+      const vRows = await pool.query(
+        "INSERT INTO prompt_versions (prompt_id, version_num, content) VALUES ($1, 1, $2) RETURNING *",
+        [p.id, defaultContent],
+      );
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const v = vRows.rows[0] as any;
+      return reply.code(201).send(_promptRow(p, [v]));
     },
   );
 
   app.get<{ Params: { id: string } }>("/prompts/:id", async (request, reply) => {
-    const p = _promptStore.get(request.params.id);
+    const pool = _getPool();
+    if (!pool) return reply.code(503).send({ error: "DB unavailable" });
+    const pResult = await pool.query("SELECT * FROM prompts WHERE id=$1", [request.params.id]);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const p = pResult.rows[0] as any;
     if (!p) return reply.code(404).send({ error: "not found" });
-    return reply.send(p);
+    const { rows: versions } = await pool.query(
+      "SELECT * FROM prompt_versions WHERE prompt_id=$1 ORDER BY version_num DESC",
+      [p.id],
+    );
+    return reply.send(_promptRow(p, versions));
   });
 
   app.post<{
     Params: { id: string };
     Body: { content: string; model?: string; temperature?: number };
   }>("/prompts/:id/versions", async (request, reply) => {
-    const p = _promptStore.get(request.params.id);
+    const pool = _getPool();
+    if (!pool) return reply.code(503).send({ error: "DB unavailable" });
+    const pResult = await pool.query("SELECT * FROM prompts WHERE id=$1", [request.params.id]);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const p = pResult.rows[0] as any;
     if (!p) return reply.code(404).send({ error: "not found" });
     const { content = "", model = null, temperature = null } = request.body ?? {};
-    const nextNum = (p.versions[0]?.versionNum ?? 0) + 1;
-    const version: _PromptVersion = {
-      id: _puid(),
-      versionNum: nextNum,
-      content,
-      model,
-      temperature,
-      createdAt: _btNow(),
-    };
-    p.versions = [version];
-    _promptStore.set(p.id, p);
-    return reply.send(version);
+    const maxResult = await pool.query(
+      "SELECT COALESCE(MAX(version_num), 0) AS max FROM prompt_versions WHERE prompt_id=$1",
+      [p.id],
+    );
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+    const nextNum = (Number((maxResult.rows[0] as any)?.max) ?? 0) + 1;
+    const vResult = await pool.query(
+      "INSERT INTO prompt_versions (prompt_id, version_num, content, model, temperature) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+      [p.id, nextNum, content, model, temperature],
+    );
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const v = vResult.rows[0] as any;
+    await pool.query("UPDATE prompts SET updated_at=NOW() WHERE id=$1", [p.id]);
+    return reply.send({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      id: v.id,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      versionNum: v.version_num,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      content: v.content,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      model: v.model ?? null,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      temperature: v.temperature != null ? Number(v.temperature) : null,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      createdAt: new Date(v.created_at as string).toISOString(),
+    });
   });
 
   app.delete<{ Params: { id: string } }>("/prompts/:id", async (request, reply) => {
-    _promptStore.delete(request.params.id);
+    const pool = _getPool();
+    if (!pool) return reply.code(503).send({ error: "DB unavailable" });
+    await pool.query("DELETE FROM prompts WHERE id=$1", [request.params.id]);
     return reply.send({ ok: true });
   });
 
