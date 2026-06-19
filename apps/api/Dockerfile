@@ -278,12 +278,12 @@ COPY --from=pruner --chown=nexus:nexus /deploy ./
 USER nexus
 
 ENV NODE_ENV=production
-ENV PORT=3001
+ENV PORT=10000
 ENV HOST=0.0.0.0
 
-EXPOSE 3001
+EXPOSE 10000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD wget -qO- http://localhost:3001/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD wget -qO- http://localhost:${PORT}/health || exit 1
 
 CMD ["node", "dist/index.js"]
