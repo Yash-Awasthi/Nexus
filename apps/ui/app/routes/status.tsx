@@ -2,51 +2,131 @@
 "use client";
 
 import type { Route } from "./+types/status";
+import { useEffect, useState } from "react";
 import { Badge } from "~/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Card, CardContent, CardDescription, CardTitle } from "~/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { Check, Activity } from "lucide-react";
+import { Check, Activity, RefreshCw } from "lucide-react";
 import { FadeIn, StaggerChildren, StaggerItem, DottedGrid } from "~/components/animations";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Status - JUDICA" },
+    { title: "Status - NEXUS" },
     {
       name: "description",
-      content: "JUDICA platform status and service health monitoring.",
+      content: "NEXUS platform status and service health monitoring.",
     },
   ];
 }
 
-const services = [
-  { name: "API Server", uptime: 99.9, status: "Operational" as const },
-  {
-    name: "Cloud Configuration",
-    uptime: 99.5,
-    status: "Operational" as const,
-  },
-  { name: "Frontend Status", uptime: 99.8, status: "Operational" as const },
-  { name: "Background Jobs", uptime: 99.7, status: "Operational" as const },
-];
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-// Generate fake 30-day uptime bars: mostly green with occasional gray
-function generateUptimeDays(): boolean[] {
-  const days: boolean[] = [];
-  for (let i = 0; i < 30; i++) {
-    // ~97% chance of green per day
-    days.push(Math.random() > 0.03);
-  }
-  // Ensure last 7 days are all green (recent stability)
-  for (let i = 23; i < 30; i++) {
-    days[i] = true;
-  }
-  return days;
+interface HealthLiveness {
+  status: "ok" | "error";
+  version: string;
+  timestamp: string;
 }
 
-// Precompute so they don't change on re-render in SSR
-const serviceUptimeDays = services.map(() => generateUptimeDays());
+interface HealthReady {
+  status: "ready" | "not_ready";
+  checks: Record<string, string>;
+}
+
+interface ServiceStatus {
+  name: string;
+  status: "Operational" | "Degraded" | "Unknown";
+  detail: string;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+async function fetchLiveness(): Promise<HealthLiveness> {
+  const res = await fetch("/health", { cache: "no-store" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json() as Promise<HealthLiveness>;
+}
+
+async function fetchReadiness(): Promise<HealthReady> {
+  const res = await fetch("/health/ready", { cache: "no-store" });
+  // 503 is a valid readiness failure — still parse the body
+  return res.json() as Promise<HealthReady>;
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Status() {
+  const [liveness, setLiveness] = useState<HealthLiveness | null>(null);
+  const [readiness, setReadiness] = useState<HealthReady | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [lastChecked, setLastChecked] = useState<Date | null>(null);
+
+  const refresh = async () => {
+    setLoading(true);
+    try {
+      const [live, ready] = await Promise.allSettled([fetchLiveness(), fetchReadiness()]);
+      setLiveness(
+        live.status === "fulfilled"
+          ? live.value
+          : { status: "error", version: "unknown", timestamp: new Date().toISOString() },
+      );
+      setReadiness(
+        ready.status === "fulfilled"
+          ? ready.value
+          : { status: "not_ready", checks: { api: "unreachable" } },
+      );
+    } finally {
+      setLoading(false);
+      setLastChecked(new Date());
+    }
+  };
+
+  useEffect(() => {
+    void refresh();
+    const interval = setInterval(() => void refresh(), 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Derive service list from liveness + readiness checks
+  const services: ServiceStatus[] = [
+    {
+      name: "API Server",
+      status: liveness?.status === "ok" ? "Operational" : liveness ? "Degraded" : "Unknown",
+      detail:
+        liveness?.status === "ok"
+          ? `v${liveness.version}`
+          : loading
+            ? "Checking..."
+            : "Unreachable",
+    },
+    ...(readiness
+      ? Object.entries(readiness.checks).map(([key, val]) => ({
+          name: key === "db" ? "PostgreSQL" : key.charAt(0).toUpperCase() + key.slice(1),
+          status: (val === "ok" ? "Operational" : "Degraded") as ServiceStatus["status"],
+          detail: val === "ok" ? "Connected" : val,
+        }))
+      : [
+          {
+            name: "PostgreSQL",
+            status: "Unknown" as const,
+            detail: loading ? "Checking..." : "Unknown",
+          },
+        ]),
+  ];
+
+  const allOperational = services.every((s) => s.status === "Operational");
+  const anyDegraded = services.some((s) => s.status === "Degraded");
+
+  const overallLabel =
+    loading && !lastChecked
+      ? "Checking services..."
+      : allOperational
+        ? "All services operational"
+        : anyDegraded
+          ? "Partial degradation"
+          : "Checking services...";
+
+  const overallColor = allOperational ? "emerald" : anyDegraded ? "amber" : "zinc";
+
   return (
     <div className="min-h-screen">
       <style>
@@ -59,9 +139,9 @@ export default function Status() {
             0%, 100% { box-shadow: 0 0 8px rgba(16,185,129,0.3); }
             50% { box-shadow: 0 0 24px rgba(16,185,129,0.5); }
           }
-          @keyframes uptimeFill {
-            from { transform: scaleX(0); }
-            to { transform: scaleX(1); }
+          @keyframes amberGlow {
+            0%, 100% { box-shadow: 0 0 8px rgba(245,158,11,0.3); }
+            50% { box-shadow: 0 0 24px rgba(245,158,11,0.5); }
           }
         `}
       </style>
@@ -78,8 +158,13 @@ export default function Status() {
             Platform Status
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-            Real-time health monitoring for the JUDICA platform.
+            Real-time health monitoring for the NEXUS platform.
           </p>
+          {lastChecked && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Last checked {lastChecked.toLocaleTimeString()} · auto-refreshes every 30s
+            </p>
+          )}
         </FadeIn>
       </section>
 
@@ -87,11 +172,42 @@ export default function Status() {
         {/* Overall status banner */}
         <FadeIn>
           <div
-            className="mb-8 flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4"
-            style={{ animation: "greenGlow 3s ease-in-out infinite" }}
+            className={`mb-8 flex items-center justify-between gap-3 rounded-lg border p-4 ${
+              overallColor === "emerald"
+                ? "border-emerald-500/30 bg-emerald-500/5"
+                : overallColor === "amber"
+                  ? "border-amber-500/30 bg-amber-500/5"
+                  : "border-border/40 bg-muted/20"
+            }`}
+            style={{
+              animation:
+                overallColor === "emerald"
+                  ? "greenGlow 3s ease-in-out infinite"
+                  : overallColor === "amber"
+                    ? "amberGlow 3s ease-in-out infinite"
+                    : undefined,
+            }}
           >
-            <div className="h-3 w-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
-            <span className="font-display text-lg font-semibold">All services are online</span>
+            <div className="flex items-center gap-3">
+              <div
+                className={`h-3 w-3 rounded-full ${
+                  overallColor === "emerald"
+                    ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"
+                    : overallColor === "amber"
+                      ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]"
+                      : "bg-zinc-400"
+                }`}
+              />
+              <span className="font-display text-lg font-semibold">{overallLabel}</span>
+            </div>
+            <button
+              onClick={() => void refresh()}
+              disabled={loading}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
+              Refresh
+            </button>
           </div>
         </FadeIn>
 
@@ -105,50 +221,56 @@ export default function Status() {
 
             <TabsContent value="status">
               <StaggerChildren className="space-y-4" staggerDelay={0.1}>
-                {services.map((service, idx) => (
+                {services.map((service) => (
                   <StaggerItem key={service.name}>
                     <Card>
                       <CardContent className="py-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                            <div
+                              className={`h-2.5 w-2.5 rounded-full ${
+                                service.status === "Operational"
+                                  ? "bg-emerald-500"
+                                  : service.status === "Degraded"
+                                    ? "bg-amber-500"
+                                    : "bg-zinc-400"
+                              }`}
+                            />
                             <span className="font-medium">{service.name}</span>
                           </div>
                           <div className="flex items-center gap-4">
-                            <span className="text-sm text-muted-foreground">
-                              {service.uptime}% uptime
+                            <span className="text-sm text-muted-foreground font-mono">
+                              {service.detail}
                             </span>
                             <Badge
                               variant="secondary"
-                              className="border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
-                              style={{ animation: "operationalPulse 3s ease-in-out infinite" }}
+                              className={
+                                service.status === "Operational"
+                                  ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
+                                  : service.status === "Degraded"
+                                    ? "border-amber-500/20 bg-amber-500/10 text-amber-400"
+                                    : "border-border bg-muted text-muted-foreground"
+                              }
+                              style={
+                                service.status === "Operational"
+                                  ? { animation: "operationalPulse 3s ease-in-out infinite" }
+                                  : undefined
+                              }
                             >
                               {service.status}
                             </Badge>
                           </div>
-                        </div>
-                        {/* 30-day uptime bar */}
-                        <div className="mt-3 flex gap-0.5">
-                          {serviceUptimeDays[idx].map((up, dayIdx) => (
-                            <div
-                              key={dayIdx}
-                              className={`h-8 flex-1 rounded-sm origin-left ${up ? "bg-emerald-500/40" : "bg-muted-foreground/20"}`}
-                              title={`Day ${dayIdx + 1}: ${up ? "Operational" : "Degraded"}`}
-                              style={{
-                                animation: `uptimeFill 0.6s ease-out ${dayIdx * 0.02}s both`,
-                              }}
-                            />
-                          ))}
-                        </div>
-                        <div className="mt-1 flex justify-between text-xs text-muted-foreground">
-                          <span>30 days ago</span>
-                          <span>Today</span>
                         </div>
                       </CardContent>
                     </Card>
                   </StaggerItem>
                 ))}
               </StaggerChildren>
+              {liveness && (
+                <p className="mt-6 text-center text-xs text-muted-foreground font-mono">
+                  API timestamp: {new Date(liveness.timestamp).toUTCString()}
+                </p>
+              )}
             </TabsContent>
 
             <TabsContent value="maintenance">
@@ -160,8 +282,8 @@ export default function Status() {
                     </div>
                     <CardTitle className="font-display mb-2">No maintenance scheduled</CardTitle>
                     <CardDescription>
-                      There are no upcoming maintenance windows. We'll post updates here before any
-                      planned downtime.
+                      There are no upcoming maintenance windows. We&apos;ll post updates here before
+                      any planned downtime.
                     </CardDescription>
                   </CardContent>
                 </Card>

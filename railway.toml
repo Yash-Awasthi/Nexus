@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: Apache-2.0
+# Railway deployment configuration for NEXUS
+#
+# Deploy to Railway:
+#   1. Click the "Deploy on Railway" button in README
+#   2. Railway will create 4 services from this config:
+#      - nexus-api    (Fastify API + worker)
+#      - nexus-ui     (React SPA served by nginx)
+#      - PostgreSQL   (Railway plugin)
+#      - Redis        (Railway plugin)
+#   3. Set required env vars in each service's Variables tab
+#
+# Required env vars:
+#   DATABASE_URL   — auto-set by Railway PostgreSQL plugin
+#   REDIS_URL      — auto-set by Railway Redis plugin
+#   JWT_SECRET     — generate with: openssl rand -hex 32
+#   HMAC_KEY       — generate with: openssl rand -hex 32
+#   SCRYPT_SECRET  — generate with: openssl rand -hex 32
+#   NODE_ENV=production
+#
+# Optional (enables specific providers):
+#   OPENAI_API_KEY, ANTHROPIC_API_KEY, GROQ_API_KEY, GEMINI_API_KEY
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "apps/api/Dockerfile"
+watchPatterns = ["apps/api/**", "packages/**"]
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 120
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 5
+
+[[services]]
+name = "nexus-api"
+source = "."
+
+[services.build]
+builder = "dockerfile"
+dockerfilePath = "apps/api/Dockerfile"
+
+[services.deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 120
+restartPolicyType = "on_failure"
+
+[[services]]
+name = "nexus-ui"
+source = "."
+
+[services.build]
+builder = "dockerfile"
+dockerfilePath = "apps/ui/Dockerfile"
+
+[services.deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 60
+restartPolicyType = "on_failure"
