@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Semantic Cache — manage the semantic similarity cache for LLM responses.
  *
@@ -105,7 +106,8 @@ export default function SemanticCache() {
 
   const lookup = useCallback(async () => {
     if (!lookupQuery.trim()) return;
-    setLooking(true); setLookupResult(null);
+    setLooking(true);
+    setLookupResult(null);
     const r = await fetch("/api/semantic-cache/lookup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -116,7 +118,8 @@ export default function SemanticCache() {
   }, [lookupQuery]);
 
   const invalidate = useCallback(async () => {
-    setInvalidating(true); setInvalidateMsg("");
+    setInvalidating(true);
+    setInvalidateMsg("");
     const body: Record<string, string> = {};
     if (invalidateQuery.trim()) body.query = invalidateQuery.trim();
     const r = await fetch("/api/semantic-cache/invalidate", {
@@ -133,7 +136,8 @@ export default function SemanticCache() {
   }, [invalidateQuery, loadStats]);
 
   const saveConfig = useCallback(async () => {
-    setSavingConfig(true); setErr("");
+    setSavingConfig(true);
+    setErr("");
     const r = await fetch("/api/semantic-cache/config", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -170,7 +174,8 @@ export default function SemanticCache() {
       {/* Stats */}
       {loadingStats ? (
         <div className="flex items-center gap-2 text-muted-foreground text-sm">
-          <Loader2 className="w-4 h-4 animate-spin" />Loading stats…
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Loading stats…
         </div>
       ) : stats ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -178,29 +183,44 @@ export default function SemanticCache() {
             <CardContent className="pt-4">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Entries</p>
               <p className="text-2xl font-bold">{stats.totalEntries.toLocaleString()}</p>
-              {stats.sizeBytes && <p className="text-xs text-muted-foreground mt-1">{(stats.sizeBytes / 1024).toFixed(1)} KB</p>}
+              {stats.sizeBytes && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {(stats.sizeBytes / 1024).toFixed(1)} KB
+                </p>
+              )}
             </CardContent>
           </Card>
           <Card className="border-green-200 dark:border-green-800">
             <CardContent className="pt-4">
               <p className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                <Zap className="w-3 h-3" />Hit Rate
+                <Zap className="w-3 h-3" />
+                Hit Rate
               </p>
               <p className="text-2xl font-bold text-green-600">{hitRatePct}%</p>
-              <p className="text-xs text-muted-foreground mt-1">{stats.totalHits.toLocaleString()} hits</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {stats.totalHits.toLocaleString()} hits
+              </p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Misses</p>
               <p className="text-2xl font-bold">{Math.round(stats.missRate * 100)}%</p>
-              <p className="text-xs text-muted-foreground mt-1">{stats.totalMisses.toLocaleString()} misses</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {stats.totalMisses.toLocaleString()} misses
+              </p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Avg Similarity</p>
-              <p className="text-2xl font-bold">{stats.avgSimilarityScore !== undefined ? `${Math.round(stats.avgSimilarityScore * 100)}%` : "—"}</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                Avg Similarity
+              </p>
+              <p className="text-2xl font-bold">
+                {stats.avgSimilarityScore !== undefined
+                  ? `${Math.round(stats.avgSimilarityScore * 100)}%`
+                  : "—"}
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -211,12 +231,21 @@ export default function SemanticCache() {
         <Card>
           <CardContent className="pt-4">
             <div className="flex justify-between text-sm mb-2">
-              <span className="flex items-center gap-1 text-green-600"><CheckCircle className="w-3.5 h-3.5" />Hits</span>
+              <span className="flex items-center gap-1 text-green-600">
+                <CheckCircle className="w-3.5 h-3.5" />
+                Hits
+              </span>
               <span className="font-medium">{hitRatePct}%</span>
-              <span className="flex items-center gap-1 text-muted-foreground"><XCircle className="w-3.5 h-3.5" />Misses</span>
+              <span className="flex items-center gap-1 text-muted-foreground">
+                <XCircle className="w-3.5 h-3.5" />
+                Misses
+              </span>
             </div>
             <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
-              <div className="bg-green-500 h-3 rounded-full transition-all" style={{ width: `${hitRatePct}%` }} />
+              <div
+                className="bg-green-500 h-3 rounded-full transition-all"
+                style={{ width: `${hitRatePct}%` }}
+              />
             </div>
           </CardContent>
         </Card>
@@ -224,43 +253,76 @@ export default function SemanticCache() {
 
       <Tabs defaultValue="lookup">
         <TabsList>
-          <TabsTrigger value="lookup"><Search className="w-4 h-4 mr-1" />Lookup</TabsTrigger>
-          <TabsTrigger value="invalidate"><Trash2 className="w-4 h-4 mr-1" />Invalidate</TabsTrigger>
-          <TabsTrigger value="config"><Settings className="w-4 h-4 mr-1" />Config</TabsTrigger>
+          <TabsTrigger value="lookup">
+            <Search className="w-4 h-4 mr-1" />
+            Lookup
+          </TabsTrigger>
+          <TabsTrigger value="invalidate">
+            <Trash2 className="w-4 h-4 mr-1" />
+            Invalidate
+          </TabsTrigger>
+          <TabsTrigger value="config">
+            <Settings className="w-4 h-4 mr-1" />
+            Config
+          </TabsTrigger>
         </TabsList>
 
         {/* Lookup */}
         <TabsContent value="lookup" className="mt-4 space-y-3">
           <Card>
             <CardContent className="pt-4 space-y-3">
-              <p className="text-sm text-muted-foreground">Check whether a query would be served from the cache.</p>
+              <p className="text-sm text-muted-foreground">
+                Check whether a query would be served from the cache.
+              </p>
               <div className="flex gap-2">
                 <Input
                   placeholder="Enter a query to test cache hit…"
                   value={lookupQuery}
-                  onChange={e => setLookupQuery(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && lookup()}
+                  onChange={(e) => setLookupQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && lookup()}
                   className="flex-1"
                 />
                 <Button onClick={lookup} disabled={looking || !lookupQuery.trim()}>
-                  {looking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                  {looking ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Search className="w-4 h-4" />
+                  )}
                 </Button>
               </div>
               {lookupResult && (
-                <div className={`p-3 rounded-lg border text-sm ${lookupResult.hit ? "border-green-200 bg-green-50 dark:bg-green-950/20" : "border-muted bg-muted/30"}`}>
+                <div
+                  className={`p-3 rounded-lg border text-sm ${lookupResult.hit ? "border-green-200 bg-green-50 dark:bg-green-950/20" : "border-muted bg-muted/30"}`}
+                >
                   <div className="flex items-center gap-2 mb-2">
-                    {lookupResult.hit
-                      ? <><CheckCircle className="w-4 h-4 text-green-600" /><span className="font-medium text-green-700 dark:text-green-400">Cache HIT</span></>
-                      : <><XCircle className="w-4 h-4 text-muted-foreground" /><span className="font-medium text-muted-foreground">Cache MISS</span></>}
+                    {lookupResult.hit ? (
+                      <>
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                        <span className="font-medium text-green-700 dark:text-green-400">
+                          Cache HIT
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="w-4 h-4 text-muted-foreground" />
+                        <span className="font-medium text-muted-foreground">Cache MISS</span>
+                      </>
+                    )}
                     {lookupResult.score !== undefined && (
-                      <Badge variant="outline">similarity: {Math.round(lookupResult.score * 100)}%</Badge>
+                      <Badge variant="outline">
+                        similarity: {Math.round(lookupResult.score * 100)}%
+                      </Badge>
                     )}
                   </div>
                   {lookupResult.hit && lookupResult.cachedResponse && (
-                    <p className="text-xs text-muted-foreground line-clamp-3">{lookupResult.cachedResponse}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-3">
+                      {lookupResult.cachedResponse}
+                    </p>
                   )}
                   {lookupResult.cachedAt && (
-                    <p className="text-xs text-muted-foreground mt-1">Cached: {new Date(lookupResult.cachedAt).toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Cached: {new Date(lookupResult.cachedAt).toLocaleString()}
+                    </p>
                   )}
                 </div>
               )}
@@ -279,18 +341,20 @@ export default function SemanticCache() {
                 <Input
                   placeholder="Query to invalidate (or leave blank to clear all)…"
                   value={invalidateQuery}
-                  onChange={e => setInvalidateQuery(e.target.value)}
+                  onChange={(e) => setInvalidateQuery(e.target.value)}
                   className="flex-1"
                 />
-                <Button
-                  variant="destructive"
-                  onClick={invalidate}
-                  disabled={invalidating}
-                >
-                  {invalidating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                <Button variant="destructive" onClick={invalidate} disabled={invalidating}>
+                  {invalidating ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
                 </Button>
               </div>
-              {invalidateMsg && <p className="text-sm text-green-600 dark:text-green-400">{invalidateMsg}</p>}
+              {invalidateMsg && (
+                <p className="text-sm text-green-600 dark:text-green-400">{invalidateMsg}</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -299,7 +363,8 @@ export default function SemanticCache() {
         <TabsContent value="config" className="mt-4 space-y-3">
           {loadingConfig ? (
             <div className="flex items-center gap-2 text-muted-foreground text-sm py-8 justify-center">
-              <Loader2 className="w-4 h-4 animate-spin" />Loading config…
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Loading config…
             </div>
           ) : config ? (
             <Card>
@@ -307,24 +372,39 @@ export default function SemanticCache() {
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium">Enabled</label>
                   <button
-                    onClick={() => setEditConfig(prev => ({ ...prev, enabled: !prev.enabled }))}
+                    onClick={() => setEditConfig((prev) => ({ ...prev, enabled: !prev.enabled }))}
                     className={`w-12 h-6 rounded-full transition-colors relative ${editConfig.enabled ? "bg-green-500" : "bg-slate-300 dark:bg-slate-600"}`}
                   >
-                    <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${editConfig.enabled ? "translate-x-6" : "translate-x-0.5"}`} />
+                    <span
+                      className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${editConfig.enabled ? "translate-x-6" : "translate-x-0.5"}`}
+                    />
                   </button>
                 </div>
                 <div className="space-y-1">
                   <label className="text-sm font-medium flex justify-between">
                     Similarity Threshold
-                    <span className="font-normal text-muted-foreground">{((editConfig.similarityThreshold ?? 0.9) * 100).toFixed(0)}%</span>
+                    <span className="font-normal text-muted-foreground">
+                      {((editConfig.similarityThreshold ?? 0.9) * 100).toFixed(0)}%
+                    </span>
                   </label>
                   <input
-                    type="range" min={0.5} max={1.0} step={0.01}
+                    type="range"
+                    min={0.5}
+                    max={1.0}
+                    step={0.01}
                     value={editConfig.similarityThreshold ?? 0.9}
-                    onChange={e => setEditConfig(prev => ({ ...prev, similarityThreshold: parseFloat(e.target.value) }))}
+                    onChange={(e) =>
+                      setEditConfig((prev) => ({
+                        ...prev,
+                        similarityThreshold: parseFloat(e.target.value),
+                      }))
+                    }
                     className="w-full accent-primary"
                   />
-                  <div className="flex justify-between text-xs text-muted-foreground"><span>Looser</span><span>Stricter</span></div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Looser</span>
+                    <span>Stricter</span>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
@@ -332,7 +412,12 @@ export default function SemanticCache() {
                     <Input
                       type="number"
                       value={editConfig.maxEntries ?? 10000}
-                      onChange={e => setEditConfig(prev => ({ ...prev, maxEntries: parseInt(e.target.value) || 10000 }))}
+                      onChange={(e) =>
+                        setEditConfig((prev) => ({
+                          ...prev,
+                          maxEntries: parseInt(e.target.value) || 10000,
+                        }))
+                      }
                     />
                   </div>
                   <div className="space-y-1">
@@ -340,21 +425,39 @@ export default function SemanticCache() {
                     <Input
                       type="number"
                       value={editConfig.ttlSeconds ?? 86400}
-                      onChange={e => setEditConfig(prev => ({ ...prev, ttlSeconds: parseInt(e.target.value) || 86400 }))}
+                      onChange={(e) =>
+                        setEditConfig((prev) => ({
+                          ...prev,
+                          ttlSeconds: parseInt(e.target.value) || 86400,
+                        }))
+                      }
                     />
                   </div>
                 </div>
                 {config.embeddingModel && (
-                  <p className="text-xs text-muted-foreground">Embedding model: {config.embeddingModel}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Embedding model: {config.embeddingModel}
+                  </p>
                 )}
                 {err && <p className="text-red-500 text-xs">{err}</p>}
                 <Button onClick={saveConfig} disabled={savingConfig}>
-                  {savingConfig ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Saving…</> : "Save Config"}
+                  {savingConfig ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Saving…
+                    </>
+                  ) : (
+                    "Save Config"
+                  )}
                 </Button>
               </CardContent>
             </Card>
           ) : (
-            <Card><CardContent className="pt-8 pb-8 text-center text-muted-foreground">No config available</CardContent></Card>
+            <Card>
+              <CardContent className="pt-8 pb-8 text-center text-muted-foreground">
+                No config available
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
       </Tabs>

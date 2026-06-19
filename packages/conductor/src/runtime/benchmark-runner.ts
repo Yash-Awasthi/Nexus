@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { LocalEventBus } from "../orchestration/event-bus";
 import { FileRuntimePersistence } from "../orchestration/persistence-manager";
 import { MemoryQueueBackend } from "../orchestration/queue-backend";
@@ -30,7 +31,15 @@ async function runBenchmarks() {
   const tracer = new TraceRecorder();
 
   const adapter = new BrowserExecutionAdapter(new EnvironmentTelemetry(), true);
-  const executor = new TaskExecutor(queue, eventBus, persistence, logger, [adapter], metrics, tracer);
+  const executor = new TaskExecutor(
+    queue,
+    eventBus,
+    persistence,
+    logger,
+    [adapter],
+    metrics,
+    tracer,
+  );
 
   // 1. Warm-up Pass
   console.log("[BENCH] Running warm-up pass (10 sequential tasks)...");
@@ -61,7 +70,7 @@ async function runBenchmarks() {
   console.log("[BENCH] Measuring 100 concurrent persistence writes (contention)...");
   const startConcurrent = process.hrtime.bigint();
   const writePromises = Array.from({ length: 100 }).map((_, i) =>
-    persistence.saveState(`concurrent-key-${i}`, { value: i })
+    persistence.saveState(`concurrent-key-${i}`, { value: i }),
   );
   await Promise.all(writePromises);
   const endConcurrent = process.hrtime.bigint();
@@ -77,12 +86,12 @@ async function runBenchmarks() {
       payload: {
         type: "browser",
         action: "navigate",
-        params: { url: "https://example.com" }
+        params: { url: "https://example.com" },
       },
       priority: "medium",
       retries: 0,
       maxRetries: 3,
-      createdAt: new Date()
+      createdAt: new Date(),
     };
     await queue.push(job);
     await executor.executeNext();
@@ -91,15 +100,21 @@ async function runBenchmarks() {
   const totalTaskMs = Number(endTask - startTask) / 1_000_000;
   const avgTaskMs = totalTaskMs / totalTasks;
 
-  console.log("\n\x1b[32m================ GHOSTSTACK V1.1 BENCHMARK REPORT ================\x1b[0m");
+  console.log(
+    "\n\x1b[32m================ GHOSTSTACK V1.1 BENCHMARK REPORT ================\x1b[0m",
+  );
   console.log(`| Metric                                | Value            |`);
   console.log(`|---------------------------------------|------------------|`);
   console.log(`| Avg Persistence Write Latency (Seq)   | ${avgWriteMs.toFixed(3)} ms        |`);
   console.log(`| Avg Persistence Read Latency (Seq)    | ${avgReadMs.toFixed(3)} ms        |`);
   console.log(`| Concurrent Lock Contention (100 ops)  | ${concurrentMs.toFixed(2)} ms       |`);
   console.log(`| Avg Task Execution Latency (Broker)   | ${avgTaskMs.toFixed(3)} ms        |`);
-  console.log(`| System Dispatch Throughput           | ${(1000 / avgTaskMs).toFixed(0)} tasks/sec    |`);
-  console.log("\x1b[32m==================================================================\x1b[0m\n");
+  console.log(
+    `| System Dispatch Throughput           | ${(1000 / avgTaskMs).toFixed(0)} tasks/sec    |`,
+  );
+  console.log(
+    "\x1b[32m==================================================================\x1b[0m\n",
+  );
 
   const docsDir = path.join(__dirname, "../docs");
   if (!fs.existsSync(docsDir)) {

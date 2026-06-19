@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Craft — AI-powered document generation from templates.
  *
@@ -39,7 +40,13 @@ interface CraftTemplate {
   name: string;
   description?: string;
   category?: string;
-  fields?: { name: string; label: string; type: "text" | "textarea" | "select"; options?: string[]; required?: boolean }[];
+  fields?: {
+    name: string;
+    label: string;
+    type: "text" | "textarea" | "select";
+    options?: string[];
+    required?: boolean;
+  }[];
   exampleOutput?: string;
 }
 
@@ -71,7 +78,9 @@ function GenerateTab({ templates }: { templates: CraftTemplate[] }) {
 
   const generate = useCallback(async () => {
     if (!selectedTemplate) return;
-    setGenerating(true); setErr(""); setResult(null);
+    setGenerating(true);
+    setErr("");
+    setResult(null);
     const r = await fetch("/api/craft/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -88,11 +97,13 @@ function GenerateTab({ templates }: { templates: CraftTemplate[] }) {
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `craft-${craftId}.md`; a.click();
+    a.href = url;
+    a.download = `craft-${craftId}.md`;
+    a.click();
     URL.revokeObjectURL(url);
   };
 
-  const categories = Array.from(new Set(templates.map(t => t.category).filter(Boolean)));
+  const categories = Array.from(new Set(templates.map((t) => t.category).filter(Boolean)));
 
   return (
     <div className="space-y-4">
@@ -100,52 +111,70 @@ function GenerateTab({ templates }: { templates: CraftTemplate[] }) {
       {!selectedTemplate ? (
         <div className="space-y-4">
           {categories.length > 0 ? (
-            categories.map(cat => (
+            categories.map((cat) => (
               <div key={cat}>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">{cat}</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                  {cat}
+                </p>
                 <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  {templates.filter(t => t.category === cat).map(t => (
-                    <button
-                      key={t.id}
-                      onClick={() => selectTemplate(t)}
-                      className="text-left border rounded-lg p-3 hover:border-primary/40 hover:bg-muted/30 transition-colors group"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="text-sm font-medium">{t.name}</p>
-                          {t.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{t.description}</p>}
+                  {templates
+                    .filter((t) => t.category === cat)
+                    .map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => selectTemplate(t)}
+                        className="text-left border rounded-lg p-3 hover:border-primary/40 hover:bg-muted/30 transition-colors group"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="text-sm font-medium">{t.name}</p>
+                            {t.description && (
+                              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                                {t.description}
+                              </p>
+                            )}
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary shrink-0 mt-0.5" />
                         </div>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary shrink-0 mt-0.5" />
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    ))}
                 </div>
               </div>
             ))
           ) : (
             <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {templates.map(t => (
+              {templates.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => selectTemplate(t)}
                   className="text-left border rounded-lg p-3 hover:border-primary/40 hover:bg-muted/30 transition-colors"
                 >
                   <p className="text-sm font-medium">{t.name}</p>
-                  {t.description && <p className="text-xs text-muted-foreground mt-0.5">{t.description}</p>}
+                  {t.description && (
+                    <p className="text-xs text-muted-foreground mt-0.5">{t.description}</p>
+                  )}
                 </button>
               ))}
             </div>
           )}
           {templates.length === 0 && (
-            <Card><CardContent className="pt-8 pb-8 text-center text-muted-foreground">No templates available</CardContent></Card>
+            <Card>
+              <CardContent className="pt-8 pb-8 text-center text-muted-foreground">
+                No templates available
+              </CardContent>
+            </Card>
           )}
         </div>
       ) : (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setSelectedTemplate(null)}>← Back</Button>
+            <Button variant="ghost" size="sm" onClick={() => setSelectedTemplate(null)}>
+              ← Back
+            </Button>
             <h2 className="text-lg font-semibold">{selectedTemplate.name}</h2>
-            {selectedTemplate.category && <Badge variant="outline">{selectedTemplate.category}</Badge>}
+            {selectedTemplate.category && (
+              <Badge variant="outline">{selectedTemplate.category}</Badge>
+            )}
           </div>
           {selectedTemplate.description && (
             <p className="text-sm text-muted-foreground">{selectedTemplate.description}</p>
@@ -154,7 +183,7 @@ function GenerateTab({ templates }: { templates: CraftTemplate[] }) {
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-3">
               {selectedTemplate.fields && selectedTemplate.fields.length > 0 ? (
-                selectedTemplate.fields.map(field => (
+                selectedTemplate.fields.map((field) => (
                   <div key={field.name} className="space-y-1">
                     <label className="text-sm font-medium">
                       {field.label} {field.required && <span className="text-red-500">*</span>}
@@ -164,23 +193,33 @@ function GenerateTab({ templates }: { templates: CraftTemplate[] }) {
                         rows={3}
                         placeholder={`Enter ${field.label.toLowerCase()}…`}
                         value={fields[field.name] ?? ""}
-                        onChange={e => setFields(prev => ({ ...prev, [field.name]: e.target.value }))}
+                        onChange={(e) =>
+                          setFields((prev) => ({ ...prev, [field.name]: e.target.value }))
+                        }
                         className="resize-none"
                       />
                     ) : field.type === "select" ? (
                       <select
                         className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
                         value={fields[field.name] ?? ""}
-                        onChange={e => setFields(prev => ({ ...prev, [field.name]: e.target.value }))}
+                        onChange={(e) =>
+                          setFields((prev) => ({ ...prev, [field.name]: e.target.value }))
+                        }
                       >
                         <option value="">Select…</option>
-                        {field.options?.map(o => <option key={o} value={o}>{o}</option>)}
+                        {field.options?.map((o) => (
+                          <option key={o} value={o}>
+                            {o}
+                          </option>
+                        ))}
                       </select>
                     ) : (
                       <Input
                         placeholder={`Enter ${field.label.toLowerCase()}…`}
                         value={fields[field.name] ?? ""}
-                        onChange={e => setFields(prev => ({ ...prev, [field.name]: e.target.value }))}
+                        onChange={(e) =>
+                          setFields((prev) => ({ ...prev, [field.name]: e.target.value }))
+                        }
                       />
                     )}
                   </div>
@@ -192,21 +231,33 @@ function GenerateTab({ templates }: { templates: CraftTemplate[] }) {
                     rows={4}
                     placeholder="Describe what you want to generate…"
                     value={fields.instructions ?? ""}
-                    onChange={e => setFields({ instructions: e.target.value })}
+                    onChange={(e) => setFields({ instructions: e.target.value })}
                     className="resize-none"
                   />
                 </div>
               )}
               {err && <p className="text-red-500 text-xs">{err}</p>}
               <Button onClick={generate} disabled={generating} className="w-full">
-                {generating ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Generating…</> : <><Play className="w-4 h-4 mr-2" />Generate</>}
+                {generating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Generating…
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 mr-2" />
+                    Generate
+                  </>
+                )}
               </Button>
             </div>
 
             <div className="space-y-2">
               {selectedTemplate.exampleOutput && !result && (
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Example output</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
+                    Example output
+                  </p>
                   <div className="text-xs text-muted-foreground bg-muted p-3 rounded-md max-h-48 overflow-auto whitespace-pre-wrap">
                     {selectedTemplate.exampleOutput}
                   </div>
@@ -215,10 +266,21 @@ function GenerateTab({ templates }: { templates: CraftTemplate[] }) {
               {result && result.content && (
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Generated document</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                      Generated document
+                    </p>
                     <div className="flex items-center gap-1">
-                      {result.wordCount && <span className="text-xs text-muted-foreground">{result.wordCount} words</span>}
-                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => downloadDoc(result.id)}>
+                      {result.wordCount && (
+                        <span className="text-xs text-muted-foreground">
+                          {result.wordCount} words
+                        </span>
+                      )}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6"
+                        onClick={() => downloadDoc(result.id)}
+                      >
                         <Download className="w-3 h-3" />
                       </Button>
                     </div>
@@ -246,9 +308,13 @@ function HistoryTab() {
   const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/craft").then(r => r.ok ? r.json() : { documents: [] }).then(d => {
-      setDocs(d.documents ?? d);
-    }).catch(() => {}).finally(() => setLoading(false));
+    fetch("/api/craft")
+      .then((r) => (r.ok ? r.json() : { documents: [] }))
+      .then((d) => {
+        setDocs(d.documents ?? d);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   const loadDoc = async (id: string) => {
@@ -262,7 +328,7 @@ function HistoryTab() {
     if (!confirm("Delete this document?")) return;
     setDeleting(id);
     await fetch(`/api/craft/${id}`, { method: "DELETE" }).catch(() => {});
-    setDocs(prev => prev.filter(d => d.id !== id));
+    setDocs((prev) => prev.filter((d) => d.id !== id));
     if (selected?.id === id) setSelected(null);
     setDeleting(null);
   };
@@ -272,17 +338,33 @@ function HistoryTab() {
     if (!r?.ok) return;
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `craft-${craftId}.md`; a.click();
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `craft-${craftId}.md`;
+    a.click();
     URL.revokeObjectURL(url);
   };
 
-  if (loading) return <div className="flex items-center gap-2 text-muted-foreground py-8 justify-center"><Loader2 className="w-4 h-4 animate-spin" />Loading…</div>;
-  if (!docs.length) return <Card><CardContent className="pt-8 pb-8 text-center text-muted-foreground">No documents generated yet</CardContent></Card>;
+  if (loading)
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground py-8 justify-center">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        Loading…
+      </div>
+    );
+  if (!docs.length)
+    return (
+      <Card>
+        <CardContent className="pt-8 pb-8 text-center text-muted-foreground">
+          No documents generated yet
+        </CardContent>
+      </Card>
+    );
 
   return (
     <div className="grid md:grid-cols-3 gap-4">
       <div className="space-y-1.5 max-h-[500px] overflow-y-auto">
-        {docs.map(doc => (
+        {docs.map((doc) => (
           <div
             key={doc.id}
             className={`border rounded-lg p-3 cursor-pointer hover:bg-muted/50 transition-colors ${selected?.id === doc.id ? "bg-muted border-primary/30" : ""}`}
@@ -290,15 +372,40 @@ function HistoryTab() {
           >
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{doc.title ?? doc.templateName ?? "Untitled"}</p>
-                <p className="text-xs text-muted-foreground">{new Date(doc.createdAt).toLocaleDateString()}</p>
+                <p className="text-sm font-medium truncate">
+                  {doc.title ?? doc.templateName ?? "Untitled"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {new Date(doc.createdAt).toLocaleDateString()}
+                </p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                <Badge variant={doc.status === "done" ? "default" : doc.status === "failed" ? "destructive" : "secondary"} className="text-xs">
+                <Badge
+                  variant={
+                    doc.status === "done"
+                      ? "default"
+                      : doc.status === "failed"
+                        ? "destructive"
+                        : "secondary"
+                  }
+                  className="text-xs"
+                >
                   {doc.status}
                 </Badge>
-                <Button size="icon" variant="ghost" className="h-6 w-6 text-red-400" onClick={e => { e.stopPropagation(); deleteDoc(doc.id); }}>
-                  {deleting === doc.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6 text-red-400"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteDoc(doc.id);
+                  }}
+                >
+                  {deleting === doc.id ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-3 h-3" />
+                  )}
                 </Button>
               </div>
             </div>
@@ -307,13 +414,17 @@ function HistoryTab() {
       </div>
       <div className="md:col-span-2">
         {loadingDoc ? (
-          <div className="flex items-center gap-2 text-muted-foreground py-8 justify-center"><Loader2 className="w-4 h-4 animate-spin" />Loading…</div>
+          <div className="flex items-center gap-2 text-muted-foreground py-8 justify-center">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Loading…
+          </div>
         ) : selected?.content ? (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">{selected.title ?? "Document"}</h3>
               <Button size="sm" variant="outline" onClick={() => downloadDoc(selected.id)}>
-                <Download className="w-3 h-3 mr-1" />Download
+                <Download className="w-3 h-3 mr-1" />
+                Download
               </Button>
             </div>
             <div className="text-sm bg-muted p-4 rounded-md max-h-[460px] overflow-auto whitespace-pre-wrap">
@@ -340,9 +451,13 @@ export default function Craft() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/craft/templates").then(r => r.ok ? r.json() : { templates: [] }).then(d => {
-      setTemplates(d.templates ?? d);
-    }).catch(() => {}).finally(() => setLoading(false));
+    fetch("/api/craft/templates")
+      .then((r) => (r.ok ? r.json() : { templates: [] }))
+      .then((d) => {
+        setTemplates(d.templates ?? d);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   return (
@@ -359,13 +474,20 @@ export default function Craft() {
 
       {loading ? (
         <div className="flex items-center gap-2 text-muted-foreground text-sm">
-          <Loader2 className="w-4 h-4 animate-spin" />Loading templates…
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Loading templates…
         </div>
       ) : (
         <Tabs defaultValue="generate">
           <TabsList>
-            <TabsTrigger value="generate"><Play className="w-4 h-4 mr-1" />Generate</TabsTrigger>
-            <TabsTrigger value="history"><History className="w-4 h-4 mr-1" />History</TabsTrigger>
+            <TabsTrigger value="generate">
+              <Play className="w-4 h-4 mr-1" />
+              Generate
+            </TabsTrigger>
+            <TabsTrigger value="history">
+              <History className="w-4 h-4 mr-1" />
+              History
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="generate" className="mt-4">
             <GenerateTab templates={templates} />

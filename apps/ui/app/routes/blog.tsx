@@ -1,15 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
 "use client";
 
 import type { Route } from "./+types/blog";
 import { Link } from "react-router";
 import { Badge } from "~/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { ArrowRight } from "lucide-react";
 import {
   FadeIn,
@@ -113,8 +108,7 @@ export default function Blog() {
             Insights & Updates
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-            Engineering deep dives, product updates, and research on multi-agent
-            deliberation.
+            Engineering deep dives, product updates, and research on multi-agent deliberation.
           </p>
         </FadeIn>
       </section>
@@ -140,16 +134,13 @@ export default function Blog() {
                           className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium transition-shadow duration-300 hover:shadow-[0_0_8px_var(--glow-color)] ${categoryColors[post.category] ?? ""}`}
                           style={
                             {
-                              "--glow-color":
-                                categoryGlowColors[post.category] ?? "transparent",
+                              "--glow-color": categoryGlowColors[post.category] ?? "transparent",
                             } as React.CSSProperties
                           }
                         >
                           {post.category}
                         </span>
-                        <span className="text-xs text-muted-foreground">
-                          {post.date}
-                        </span>
+                        <span className="text-xs text-muted-foreground">{post.date}</span>
                       </div>
                       <CardTitle className="font-display text-lg leading-snug">
                         {post.title}

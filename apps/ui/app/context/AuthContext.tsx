@@ -1,8 +1,12 @@
+// SPDX-License-Identifier: Apache-2.0
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 
 export interface AuthUser {
   id: string;
   username: string;
+  email?: string;
+  role?: string;
+  customInstructions?: string;
 }
 
 interface AuthContextType {
@@ -10,6 +14,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   setUser: (user: AuthUser | null) => void;
+  login: (username: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -49,8 +54,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => setUser(null);
 
+  const login = async (username: string, password: string) => {
+    const res = await fetch("/api/v1/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    if (!res.ok) throw new Error(await res.text().catch(() => "Login failed"));
+    const data = (await res.json()) as { user: AuthUser };
+    setUser(data.user);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, setUser, logout }}>
+    <AuthContext.Provider
+      value={{ user, isAuthenticated: !!user, isLoading, setUser, login, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

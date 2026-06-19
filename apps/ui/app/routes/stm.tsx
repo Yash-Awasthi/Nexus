@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * STM — Short-Term Memory
  *
@@ -24,11 +25,11 @@ import {
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface SessionEntry {
-  id:        string;
+  id: string;
   timestamp: number;
-  query:     string;
-  modules:   STMModuleId[];
-  applied:   string[];
+  query: string;
+  modules: STMModuleId[];
+  applied: string[];
 }
 
 // ── Hooks ─────────────────────────────────────────────────────────────────────
@@ -43,16 +44,22 @@ function useSessionHistory() {
         const data = await res.json();
         setHistory(data.entries ?? []);
       }
-    } catch { /* offline */ }
+    } catch {
+      /* offline */
+    }
   };
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    refresh();
+  }, []);
 
   const clear = async () => {
     try {
       await fetch("/api/stm/history", { method: "DELETE" });
       setHistory([]);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   };
 
   return { history, refresh, clear };
@@ -61,30 +68,28 @@ function useSessionHistory() {
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 export default function STMPage() {
-  const [active, setActive]               = useState<STMModuleId[]>([]);
-  const [expanded, setExpanded]           = useState<string | null>(null);
-  const { history, refresh, clear }       = useSessionHistory();
+  const [active, setActive] = useState<STMModuleId[]>([]);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const { history, refresh, clear } = useSessionHistory();
 
   useEffect(() => {
     setActive(loadActiveSTM());
   }, []);
 
   const toggle = async (id: STMModuleId) => {
-    const next = active.includes(id)
-      ? active.filter((m) => m !== id)
-      : [...active, id];
+    const next = active.includes(id) ? active.filter((m) => m !== id) : [...active, id];
 
-    const module     = STM_MODULES.find((m) => m.id === id);
-    const conflicts  = module?.conflictsWith ?? [];
-    const clean      = next.filter((m) => !conflicts.includes(m as STMModuleId) || m === id);
+    const module = STM_MODULES.find((m) => m.id === id);
+    const conflicts = module?.conflictsWith ?? [];
+    const clean = next.filter((m) => !conflicts.includes(m as STMModuleId) || m === id);
 
     setActive(clean);
     saveActiveSTM(clean);
 
     fetch("/api/stm/active", {
-      method:  "POST",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ modules: clean }),
+      body: JSON.stringify({ modules: clean }),
     }).catch(() => {});
   };
 
@@ -92,7 +97,6 @@ export default function STMPage() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-
       {/* Left — module control */}
       <aside
         className="w-80 shrink-0 flex flex-col border-r border-border"
@@ -105,14 +109,16 @@ export default function STMPage() {
             <p className="text-xs text-muted-foreground">Prompt modifiers per round</p>
           </div>
           {active.length > 0 && (
-            <Badge variant="outline" className="ml-auto text-xs">{active.length} active</Badge>
+            <Badge variant="outline" className="ml-auto text-xs">
+              {active.length} active
+            </Badge>
           )}
         </div>
 
         <ScrollArea className="flex-1">
           <div className="p-4 space-y-2.5">
             {STM_MODULES.map((m) => {
-              const isActive    = active.includes(m.id);
+              const isActive = active.includes(m.id);
               const hasConflict = conflicts.some((c) => c.includes(m.label));
 
               return (
@@ -121,7 +127,7 @@ export default function STMPage() {
                   className="p-3.5 rounded-xl transition-all"
                   style={{
                     background: isActive ? "hsl(var(--primary)/0.09)" : "hsl(var(--muted)/0.35)",
-                    border:     `1px solid ${isActive ? "hsl(var(--primary)/0.35)" : "hsl(var(--border)/0.5)"}`,
+                    border: `1px solid ${isActive ? "hsl(var(--primary)/0.35)" : "hsl(var(--border)/0.5)"}`,
                   }}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -139,7 +145,8 @@ export default function STMPage() {
                         </p>
                         {m.conflictsWith && m.conflictsWith.length > 0 && (
                           <p className="text-[10px] text-muted-foreground/50 mt-1">
-                            Conflicts: {m.conflictsWith
+                            Conflicts:{" "}
+                            {m.conflictsWith
                               .map((c) => STM_MODULES.find((x) => x.id === c)?.label ?? c)
                               .join(", ")}
                           </p>
@@ -169,7 +176,10 @@ export default function STMPage() {
             {conflicts.length > 0 && (
               <div
                 className="flex items-start gap-2 p-2.5 rounded-lg text-xs mt-2"
-                style={{ background: "hsl(38 92% 50%/0.1)", border: "1px solid hsl(38 92% 50%/0.3)" }}
+                style={{
+                  background: "hsl(38 92% 50%/0.1)",
+                  border: "1px solid hsl(38 92% 50%/0.3)",
+                }}
               >
                 <AlertTriangle className="size-3.5 text-amber-500 shrink-0 mt-0.5" />
                 <span className="text-amber-600 dark:text-amber-400">{conflicts.join("; ")}</span>
@@ -188,12 +198,7 @@ export default function STMPage() {
             <p className="text-xs text-muted-foreground">STM modules applied per deliberation</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs gap-1.5"
-              onClick={refresh}
-            >
+            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5" onClick={refresh}>
               <RefreshCcw className="size-3" /> Refresh
             </Button>
             {history.length > 0 && (
@@ -216,8 +221,8 @@ export default function STMPage() {
               <div>
                 <p className="text-sm font-medium">No injection history</p>
                 <p className="text-xs text-muted-foreground mt-2 max-w-xs">
-                  Enable STM modules on the left, then run a deliberation.
-                  Each round's injections are logged here.
+                  Enable STM modules on the left, then run a deliberation. Each round's injections
+                  are logged here.
                 </p>
               </div>
             </div>
@@ -268,7 +273,10 @@ export default function STMPage() {
                           <div
                             key={i}
                             className="rounded-lg p-3 font-mono text-[10px] text-muted-foreground leading-relaxed"
-                            style={{ background: "hsl(var(--muted)/0.5)", border: "1px solid hsl(var(--border)/0.4)" }}
+                            style={{
+                              background: "hsl(var(--muted)/0.5)",
+                              border: "1px solid hsl(var(--border)/0.4)",
+                            }}
                           >
                             {injection}
                           </div>

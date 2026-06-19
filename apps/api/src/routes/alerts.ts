@@ -103,6 +103,7 @@ globalHooks.on(
   async (_payload) => {
     await alertEngine.evaluate("task.errors", 1).catch(() => {});
     await _publishAlertEvent("task.errors", 1);
+    return {};
   },
   { label: "alerts:task.error" },
 );
@@ -115,6 +116,7 @@ globalHooks.on(
       await alertEngine.evaluate("gateway.latency", durationMs).catch(() => {});
       await _publishAlertEvent("gateway.latency", durationMs);
     }
+    return {};
   },
   { label: "alerts:task.after" },
 );
@@ -171,8 +173,8 @@ export async function alertsRoutes(app: FastifyInstance): Promise<void> {
         // response is ever rendered in an HTML context by a downstream client.
         const safe = {
           ...request.body,
-          message: encodeURIComponent(request.body.message ?? ""),
           metric: encodeURIComponent(request.body.metric ?? ""),
+          name: encodeURIComponent(request.body.name ?? ""),
         };
         return reply.code(201).send(safe);
       } catch (err) {

@@ -21,15 +21,62 @@ import {
   KnowledgeGraph,
   makeNodeId,
   makeEdgeId,
-  nullEntityExtractor,
-  nullRelationshipExtractor,
   type NeonQueryFn,
   type EntityType,
 } from "@nexus/knowledge-graph";
+import { ClaudeProvider, GroqProvider, LLMRouter } from "@nexus/llm-router";
+import {
+  extractEntities,
+  extractRelationships,
+  nullNlpLlmClient,
+  type NlpLlmClient,
+} from "@nexus/nlp-utils";
 import type { FastifyInstance } from "fastify";
 import { Pool } from "pg";
 
 import { requireAuth } from "../middleware/auth.js";
+
+// ── NLP LLM adapter — wraps LLMRouter into NlpLlmClient for entity extraction ─
+
+function buildNlpClient(): NlpLlmClient {
+  const providers = [];
+  if (process.env.GROQ_API_KEY) {
+    providers.push(new GroqProvider({ apiKey: process.env.GROQ_API_KEY }));
+  }
+  if (process.env.ANTHROPIC_API_KEY) {
+    providers.push(new ClaudeProvider({ apiKey: process.env.ANTHROPIC_API_KEY }));
+  }
+  if (providers.length === 0) return nullNlpLlmClient;
+
+  const router = new LLMRouter({
+    providers,
+    aliases: [
+      { alias: "nexus/fast", provider: "groq", model: "llama-3.1-70b-versatile" },
+      { alias: "nexus/fast", provider: "claude", model: "claude-haiku-4-5" },
+    ],
+    fallbacks: {},
+    strategy: "first",
+  });
+
+  return async (messages, opts) => {
+    const resp = await router.complete({
+      model: "nexus/fast",
+      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      maxTokens: opts?.maxTokens ?? 512,
+      temperature: opts?.temperature ?? 0.0,
+    });
+    return { content: resp.content, model: resp.model };
+  };
+}
+
+const _nlpLlm = buildNlpClient();
+
+// Entity / relationship extractors backed by nlp-utils + LLM (or null if no key)
+const _entityExtractor = (text: string) => extractEntities(text, _nlpLlm);
+const _relationshipExtractor = (
+  text: string,
+  entities: Parameters<typeof extractRelationships>[1],
+) => extractRelationships(text, entities, _nlpLlm);
 
 // ── Store bootstrap — Postgres when available, in-memory fallback ─────────────
 
@@ -49,7 +96,7 @@ if (process.env.DATABASE_URL) {
   store = new InMemoryKGStore();
 }
 
-const kg = new KnowledgeGraph(store, nullEntityExtractor, nullRelationshipExtractor);
+const kg = new KnowledgeGraph(store, _entityExtractor, _relationshipExtractor);
 
 // Seed the in-memory store with example nodes (skipped when Neon is active)
 if (!(store instanceof NeonKGStore)) {

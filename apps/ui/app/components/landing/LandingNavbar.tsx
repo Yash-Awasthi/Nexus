@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
 
@@ -27,17 +28,21 @@ export function LandingNavbar() {
               <span className="text-xs font-bold text-[#4d7cff]">ai</span>
               <div className="absolute inset-0 rounded-lg bg-[#4d7cff]/10 blur-sm" />
             </div>
-            <span className="text-lg font-bold tracking-tight text-white">
-              Nexus
-            </span>
+            <span className="text-lg font-bold tracking-tight text-white">Nexus</span>
           </Link>
 
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-sm text-white/60 hover:text-white transition-colors">
+            <a
+              href="#features"
+              className="text-sm text-white/60 hover:text-white transition-colors"
+            >
               Features
             </a>
-            <a href="#how-it-works" className="text-sm text-white/60 hover:text-white transition-colors">
+            <a
+              href="#how-it-works"
+              className="text-sm text-white/60 hover:text-white transition-colors"
+            >
               How It Works
             </a>
             <a href="#council" className="text-sm text-white/60 hover:text-white transition-colors">
@@ -66,7 +71,13 @@ export function LandingNavbar() {
             className="md:hidden text-white/70 hover:text-white p-2"
             onClick={() => setMenuOpen(!menuOpen)}
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
               {menuOpen ? (
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               ) : (
@@ -79,12 +90,37 @@ export function LandingNavbar() {
         {/* Mobile menu */}
         {menuOpen && (
           <div className="md:hidden border-t border-white/5 py-4 space-y-3">
-            <a href="#features" className="block text-sm text-white/60 hover:text-white py-1" onClick={() => setMenuOpen(false)}>Features</a>
-            <a href="#how-it-works" className="block text-sm text-white/60 hover:text-white py-1" onClick={() => setMenuOpen(false)}>How It Works</a>
-            <a href="#council" className="block text-sm text-white/60 hover:text-white py-1" onClick={() => setMenuOpen(false)}>The Council</a>
+            <a
+              href="#features"
+              className="block text-sm text-white/60 hover:text-white py-1"
+              onClick={() => setMenuOpen(false)}
+            >
+              Features
+            </a>
+            <a
+              href="#how-it-works"
+              className="block text-sm text-white/60 hover:text-white py-1"
+              onClick={() => setMenuOpen(false)}
+            >
+              How It Works
+            </a>
+            <a
+              href="#council"
+              className="block text-sm text-white/60 hover:text-white py-1"
+              onClick={() => setMenuOpen(false)}
+            >
+              The Council
+            </a>
             <div className="flex gap-3 pt-2">
-              <Link to="/login" className="text-sm text-white/70 hover:text-white px-3 py-1.5">Sign In</Link>
-              <Link to="/register" className="text-sm font-medium text-white bg-[#4d7cff] px-4 py-2 rounded-lg">Get Started</Link>
+              <Link to="/login" className="text-sm text-white/70 hover:text-white px-3 py-1.5">
+                Sign In
+              </Link>
+              <Link
+                to="/register"
+                className="text-sm font-medium text-white bg-[#4d7cff] px-4 py-2 rounded-lg"
+              >
+                Get Started
+              </Link>
             </div>
           </div>
         )}

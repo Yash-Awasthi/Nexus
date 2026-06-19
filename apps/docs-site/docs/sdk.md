@@ -24,9 +24,9 @@ pnpm add github:Yash-Awasthi/Nexus#main --filter @nexus/client
 import { NexusClient } from "@nexus/client";
 
 const nexus = new NexusClient({
-  baseUrl: "http://localhost:3000",  // or your production URL
+  baseUrl: "http://localhost:3000", // or your production URL
   apiKey: process.env.NEXUS_API_KEY,
-  timeout: 30_000,                   // optional, default 30s
+  timeout: 30_000, // optional, default 30s
 });
 ```
 
@@ -39,7 +39,7 @@ Direct LLM access via the Nexus model gateway.
 ```ts
 // Single-turn chat
 const res = await nexus.gateway.sendMessage({
-  model: "nexus/smart",       // or "anthropic/claude-3.5-sonnet", "openai/gpt-4o", etc.
+  model: "nexus/smart", // or "anthropic/claude-3.5-sonnet", "openai/gpt-4o", etc.
   messages: [{ role: "user", content: "Explain monads" }],
   system: "Be concise.",
   temperature: 0.7,
@@ -58,7 +58,7 @@ for await (const event of nexus.gateway.sendMessageStream({
 
 // Race all models on a tier (ULTRAPLINIAN)
 const race = await nexus.gateway.race({
-  tier: "fast",               // fast | standard | smart | power | ultra
+  tier: "fast", // fast | standard | smart | power | ultra
   messages: [{ role: "user", content: "Best sorting algorithm?" }],
 });
 console.log(race.winner.model, race.winner.score, race.winner.content);
@@ -82,11 +82,11 @@ Multi-model deliberation via the council engine.
 const verdict = await nexus.council.deliberate({
   proposal: "Should we deploy version 2.0 to production?",
   context: "All tests passing. Zero critical bugs.",
-  budget: 0.10,               // max USD spend
+  budget: 0.1, // max USD spend
 });
-console.log(verdict.result);          // "approve" | "reject" | "defer"
-console.log(verdict.confidence);      // 0–1
-console.log(verdict.reasoning);       // synthesised reasoning
+console.log(verdict.result); // "approve" | "reject" | "defer"
+console.log(verdict.confidence); // 0–1
+console.log(verdict.reasoning); // synthesised reasoning
 
 // List stored verdicts
 const { verdicts } = await nexus.council.getVerdicts({ limit: 20, offset: 0 });
@@ -185,6 +185,7 @@ try {
 ```
 
 `NexusError` properties:
+
 - `code` — machine-readable error code (e.g. `"UNAUTHORIZED"`, `"RATE_LIMITED"`)
 - `statusCode` — HTTP status
 - `message` — human-readable description

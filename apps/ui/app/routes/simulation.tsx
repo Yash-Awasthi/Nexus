@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Multi-Agent World Simulation — Phase 5.3
  *
@@ -20,13 +21,7 @@
  */
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "~/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "~/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
@@ -128,8 +123,13 @@ export default function Simulation() {
   const [loadingPersonas, setLoadingPersonas] = useState(false);
   const [showPersonaForm, setShowPersonaForm] = useState(false);
   const [newPersona, setNewPersona] = useState({
-    name: "", backstory: "", goals: "", traits: "", expertise: "",
-    communicationStyle: "", constraints: "",
+    name: "",
+    backstory: "",
+    goals: "",
+    traits: "",
+    expertise: "",
+    communicationStyle: "",
+    constraints: "",
   });
   const [creatingPersona, setCreatingPersona] = useState(false);
 
@@ -138,7 +138,10 @@ export default function Simulation() {
   const [loadingEnvs, setLoadingEnvs] = useState(false);
   const [showEnvForm, setShowEnvForm] = useState(false);
   const [newEnv, setNewEnv] = useState({
-    name: "", description: "", initialState: "", rules: "",
+    name: "",
+    description: "",
+    initialState: "",
+    rules: "",
   });
   const [creatingEnv, setCreatingEnv] = useState(false);
 
@@ -148,7 +151,10 @@ export default function Simulation() {
   const [selectedRun, setSelectedRun] = useState<Simulation | null>(null);
   const [showRunForm, setShowRunForm] = useState(false);
   const [newRun, setNewRun] = useState({
-    name: "", environmentId: "", personaIds: [] as string[], maxTicks: 10,
+    name: "",
+    environmentId: "",
+    personaIds: [] as string[],
+    maxTicks: 10,
   });
   const [creatingRun, setCreatingRun] = useState(false);
   const [ticking, setTicking] = useState(false);
@@ -189,7 +195,11 @@ export default function Simulation() {
     setLoadingRuns(false);
   }, []);
 
-  useEffect(() => { loadPersonas(); loadEnvironments(); loadRuns(); }, [loadPersonas, loadEnvironments, loadRuns]);
+  useEffect(() => {
+    loadPersonas();
+    loadEnvironments();
+    loadRuns();
+  }, [loadPersonas, loadEnvironments, loadRuns]);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -208,19 +218,41 @@ export default function Simulation() {
         body: JSON.stringify({
           name: newPersona.name.trim(),
           backstory: newPersona.backstory.trim(),
-          goals: newPersona.goals.split(",").map(s => s.trim()).filter(Boolean),
-          traits: newPersona.traits.split(",").map(s => s.trim()).filter(Boolean),
-          expertise: newPersona.expertise.split(",").map(s => s.trim()).filter(Boolean),
+          goals: newPersona.goals
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+          traits: newPersona.traits
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+          expertise: newPersona.expertise
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
           communicationStyle: newPersona.communicationStyle.trim() || "neutral",
-          constraints: newPersona.constraints.split(",").map(s => s.trim()).filter(Boolean),
+          constraints: newPersona.constraints
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
         }),
       });
       if (r.ok) {
         setShowPersonaForm(false);
-        setNewPersona({ name: "", backstory: "", goals: "", traits: "", expertise: "", communicationStyle: "", constraints: "" });
+        setNewPersona({
+          name: "",
+          backstory: "",
+          goals: "",
+          traits: "",
+          expertise: "",
+          communicationStyle: "",
+          constraints: "",
+        });
         loadPersonas();
       }
-    } finally { setCreatingPersona(false); }
+    } finally {
+      setCreatingPersona(false);
+    }
   }, [newPersona, loadPersonas]);
 
   // ── Environment CRUD ──────────────────────────────────────────────────────
@@ -236,7 +268,10 @@ export default function Simulation() {
           name: newEnv.name.trim(),
           description: newEnv.description.trim(),
           initialState: newEnv.initialState.trim(),
-          rules: newEnv.rules.split("\n").map(s => s.trim()).filter(Boolean),
+          rules: newEnv.rules
+            .split("\n")
+            .map((s) => s.trim())
+            .filter(Boolean),
         }),
       });
       if (r.ok) {
@@ -244,7 +279,9 @@ export default function Simulation() {
         setNewEnv({ name: "", description: "", initialState: "", rules: "" });
         loadEnvironments();
       }
-    } finally { setCreatingEnv(false); }
+    } finally {
+      setCreatingEnv(false);
+    }
   }, [newEnv, loadEnvironments]);
 
   // ── Run CRUD ──────────────────────────────────────────────────────────────
@@ -266,7 +303,9 @@ export default function Simulation() {
         setSelectedRun(data.simulation ?? data);
         setTab("runs");
       }
-    } finally { setCreatingRun(false); }
+    } finally {
+      setCreatingRun(false);
+    }
   }, [newRun, loadRuns]);
 
   const tickSimulation = useCallback(async (sim: Simulation) => {
@@ -278,17 +317,23 @@ export default function Simulation() {
         const data = await r.json();
         const updated = data.simulation ?? data;
         setSelectedRun(updated);
-        setRuns(prev => prev.map(s => s.id === updated.id ? updated : s));
+        setRuns((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
       }
-    } finally { setTicking(false); }
+    } finally {
+      setTicking(false);
+    }
   }, []);
 
   const startAutoTick = useCallback(async (sim: Simulation) => {
     autoRef.current = true;
     setAutoTicking(true);
     let current = sim;
-    while (autoRef.current && current.currentTick < current.maxTicks && current.status !== "completed") {
-      await new Promise(r => setTimeout(r, 800));
+    while (
+      autoRef.current &&
+      current.currentTick < current.maxTicks &&
+      current.status !== "completed"
+    ) {
+      await new Promise((r) => setTimeout(r, 800));
       if (!autoRef.current) break;
       try {
         const r2 = await fetch(`/api/simulate/runs/${current.id}/tick`, { method: "POST" });
@@ -296,8 +341,10 @@ export default function Simulation() {
         const data = await r2.json();
         current = data.simulation ?? data;
         setSelectedRun({ ...current });
-        setRuns(prev => prev.map(s => s.id === current.id ? current : s));
-      } catch { break; }
+        setRuns((prev) => prev.map((s) => (s.id === current.id ? current : s)));
+      } catch {
+        break;
+      }
     }
     autoRef.current = false;
     setAutoTicking(false);
@@ -310,7 +357,7 @@ export default function Simulation() {
         const data = await r.json();
         const updated = data.simulation ?? data;
         setSelectedRun(updated);
-        setRuns(prev => prev.map(s => s.id === updated.id ? updated : s));
+        setRuns((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
       }
     } catch {}
   }, []);
@@ -327,7 +374,7 @@ export default function Simulation() {
     if (!chatPersona || !chatInput.trim()) return;
     const msg = chatInput.trim();
     setChatInput("");
-    setChatMessages(prev => [...prev, { role: "user", content: msg }]);
+    setChatMessages((prev) => [...prev, { role: "user", content: msg }]);
     setChatSending(true);
     try {
       const r = await fetch(`/api/simulate/personas/${chatPersona.id}/chat`, {
@@ -340,9 +387,14 @@ export default function Simulation() {
       });
       if (r.ok) {
         const data = await r.json();
-        setChatMessages(prev => [...prev, { role: "assistant", content: data.response ?? data.message ?? "" }]);
+        setChatMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: data.response ?? data.message ?? "" },
+        ]);
       }
-    } finally { setChatSending(false); }
+    } finally {
+      setChatSending(false);
+    }
   }, [chatPersona, chatInput, chatMessages, selectedRun]);
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -361,7 +413,7 @@ export default function Simulation() {
           </p>
         </div>
         <div className="flex gap-2">
-          {(["runs", "personas", "environments"] as const).map(t => (
+          {(["runs", "personas", "environments"] as const).map((t) => (
             <Button
               key={t}
               size="sm"
@@ -398,12 +450,14 @@ export default function Simulation() {
                 <CardContent className="pt-6 pb-6 text-center space-y-3">
                   <Cpu className="w-10 h-10 mx-auto opacity-40 text-muted-foreground" />
                   <p className="text-sm text-muted-foreground">No simulations yet</p>
-                  <Button size="sm" onClick={() => setShowRunForm(true)}>Create first run</Button>
+                  <Button size="sm" onClick={() => setShowRunForm(true)}>
+                    Create first run
+                  </Button>
                 </CardContent>
               </Card>
             )}
 
-            {runs.map(run => (
+            {runs.map((run) => (
               <Card
                 key={run.id}
                 className={`cursor-pointer hover:bg-accent/50 transition-colors border-2 ${
@@ -418,7 +472,9 @@ export default function Simulation() {
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span>{run.personaIds.length} agents</span>
-                    <span>tick {run.currentTick}/{run.maxTicks}</span>
+                    <span>
+                      tick {run.currentTick}/{run.maxTicks}
+                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -456,9 +512,11 @@ export default function Simulation() {
                             onClick={() => tickSimulation(selectedRun)}
                             disabled={ticking || selectedRun.currentTick >= selectedRun.maxTicks}
                           >
-                            {ticking
-                              ? <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                              : <SkipForward className="w-3 h-3 mr-1" />}
+                            {ticking ? (
+                              <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                            ) : (
+                              <SkipForward className="w-3 h-3 mr-1" />
+                            )}
                             Next tick
                           </Button>
                           <Button
@@ -471,7 +529,13 @@ export default function Simulation() {
                           </Button>
                         </>
                       ) : (
-                        <Button size="sm" variant="destructive" onClick={() => { autoRef.current = false; }}>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => {
+                            autoRef.current = false;
+                          }}
+                        >
                           <Loader2 className="w-3 h-3 animate-spin mr-1" />
                           Stop
                         </Button>
@@ -492,7 +556,9 @@ export default function Simulation() {
                       <div className="w-full bg-muted rounded-full h-2">
                         <div
                           className="bg-emerald-500 h-2 rounded-full transition-all"
-                          style={{ width: `${Math.round((selectedRun.currentTick / selectedRun.maxTicks) * 100)}%` }}
+                          style={{
+                            width: `${Math.round((selectedRun.currentTick / selectedRun.maxTicks) * 100)}%`,
+                          }}
                         />
                       </div>
                     </div>
@@ -511,7 +577,7 @@ export default function Simulation() {
                       </p>
                     ) : (
                       <div className="space-y-3 max-h-96 overflow-y-auto">
-                        {[...selectedRun.tickLog].reverse().map(tick => (
+                        {[...selectedRun.tickLog].reverse().map((tick) => (
                           <div key={tick.tick} className="border-l-2 border-emerald-400 pl-3">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
@@ -526,7 +592,9 @@ export default function Simulation() {
                             <div className="space-y-1">
                               {tick.actions.map((action, i) => (
                                 <div key={i} className="text-xs space-y-0.5">
-                                  <span className="font-medium text-foreground">{action.personaName}:</span>{" "}
+                                  <span className="font-medium text-foreground">
+                                    {action.personaName}:
+                                  </span>{" "}
                                   <span className="text-muted-foreground">{action.action}</span>
                                   {action.reasoning && (
                                     <p className="text-xs text-muted-foreground/60 italic pl-2">
@@ -565,7 +633,7 @@ export default function Simulation() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {personas.map(p => (
+            {personas.map((p) => (
               <Card key={p.id} className="hover:shadow-md transition-shadow">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
@@ -585,8 +653,10 @@ export default function Simulation() {
                   <p className="text-xs text-muted-foreground line-clamp-2">{p.backstory}</p>
                   {p.traits.length > 0 && (
                     <div className="flex flex-wrap gap-1">
-                      {p.traits.slice(0, 4).map(t => (
-                        <Badge key={t} variant="secondary" className="text-xs font-normal">{t}</Badge>
+                      {p.traits.slice(0, 4).map((t) => (
+                        <Badge key={t} variant="secondary" className="text-xs font-normal">
+                          {t}
+                        </Badge>
                       ))}
                     </div>
                   )}
@@ -632,7 +702,7 @@ export default function Simulation() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {environments.map(e => (
+            {environments.map((e) => (
               <Card key={e.id}>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center gap-2">
@@ -644,7 +714,8 @@ export default function Simulation() {
                   <p className="text-xs text-muted-foreground">{e.description}</p>
                   {e.initialState && (
                     <p className="text-xs text-muted-foreground">
-                      <span className="font-medium text-foreground">Initial state:</span> {e.initialState}
+                      <span className="font-medium text-foreground">Initial state:</span>{" "}
+                      {e.initialState}
                     </p>
                   )}
                   {e.rules.length > 0 && (
@@ -652,7 +723,9 @@ export default function Simulation() {
                       <p className="text-xs font-medium">Rules:</p>
                       <ul className="list-disc list-inside space-y-0.5">
                         {e.rules.slice(0, 3).map((r, i) => (
-                          <li key={i} className="text-xs text-muted-foreground">{r}</li>
+                          <li key={i} className="text-xs text-muted-foreground">
+                            {r}
+                          </li>
                         ))}
                       </ul>
                     </div>
@@ -685,17 +758,52 @@ export default function Simulation() {
             <DialogTitle>New Persona</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <Input placeholder="Name *" value={newPersona.name} onChange={e => setNewPersona(p => ({ ...p, name: e.target.value }))} />
-            <Textarea placeholder="Backstory *" rows={3} value={newPersona.backstory} onChange={e => setNewPersona(p => ({ ...p, backstory: e.target.value }))} className="resize-none" />
-            <Input placeholder="Goals (comma-separated)" value={newPersona.goals} onChange={e => setNewPersona(p => ({ ...p, goals: e.target.value }))} />
-            <Input placeholder="Traits (comma-separated)" value={newPersona.traits} onChange={e => setNewPersona(p => ({ ...p, traits: e.target.value }))} />
-            <Input placeholder="Expertise (comma-separated)" value={newPersona.expertise} onChange={e => setNewPersona(p => ({ ...p, expertise: e.target.value }))} />
-            <Input placeholder="Communication style" value={newPersona.communicationStyle} onChange={e => setNewPersona(p => ({ ...p, communicationStyle: e.target.value }))} />
-            <Input placeholder="Constraints (comma-separated)" value={newPersona.constraints} onChange={e => setNewPersona(p => ({ ...p, constraints: e.target.value }))} />
+            <Input
+              placeholder="Name *"
+              value={newPersona.name}
+              onChange={(e) => setNewPersona((p) => ({ ...p, name: e.target.value }))}
+            />
+            <Textarea
+              placeholder="Backstory *"
+              rows={3}
+              value={newPersona.backstory}
+              onChange={(e) => setNewPersona((p) => ({ ...p, backstory: e.target.value }))}
+              className="resize-none"
+            />
+            <Input
+              placeholder="Goals (comma-separated)"
+              value={newPersona.goals}
+              onChange={(e) => setNewPersona((p) => ({ ...p, goals: e.target.value }))}
+            />
+            <Input
+              placeholder="Traits (comma-separated)"
+              value={newPersona.traits}
+              onChange={(e) => setNewPersona((p) => ({ ...p, traits: e.target.value }))}
+            />
+            <Input
+              placeholder="Expertise (comma-separated)"
+              value={newPersona.expertise}
+              onChange={(e) => setNewPersona((p) => ({ ...p, expertise: e.target.value }))}
+            />
+            <Input
+              placeholder="Communication style"
+              value={newPersona.communicationStyle}
+              onChange={(e) => setNewPersona((p) => ({ ...p, communicationStyle: e.target.value }))}
+            />
+            <Input
+              placeholder="Constraints (comma-separated)"
+              value={newPersona.constraints}
+              onChange={(e) => setNewPersona((p) => ({ ...p, constraints: e.target.value }))}
+            />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPersonaForm(false)}>Cancel</Button>
-            <Button onClick={createPersona} disabled={creatingPersona || !newPersona.name || !newPersona.backstory}>
+            <Button variant="outline" onClick={() => setShowPersonaForm(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={createPersona}
+              disabled={creatingPersona || !newPersona.name || !newPersona.backstory}
+            >
               {creatingPersona ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Create
             </Button>
@@ -710,13 +818,37 @@ export default function Simulation() {
             <DialogTitle>New Environment</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <Input placeholder="Name *" value={newEnv.name} onChange={e => setNewEnv(v => ({ ...v, name: e.target.value }))} />
-            <Textarea placeholder="Description" rows={2} value={newEnv.description} onChange={e => setNewEnv(v => ({ ...v, description: e.target.value }))} className="resize-none" />
-            <Textarea placeholder="Initial world state (paragraph)" rows={2} value={newEnv.initialState} onChange={e => setNewEnv(v => ({ ...v, initialState: e.target.value }))} className="resize-none" />
-            <Textarea placeholder="Rules (one per line)" rows={3} value={newEnv.rules} onChange={e => setNewEnv(v => ({ ...v, rules: e.target.value }))} className="resize-none font-mono text-sm" />
+            <Input
+              placeholder="Name *"
+              value={newEnv.name}
+              onChange={(e) => setNewEnv((v) => ({ ...v, name: e.target.value }))}
+            />
+            <Textarea
+              placeholder="Description"
+              rows={2}
+              value={newEnv.description}
+              onChange={(e) => setNewEnv((v) => ({ ...v, description: e.target.value }))}
+              className="resize-none"
+            />
+            <Textarea
+              placeholder="Initial world state (paragraph)"
+              rows={2}
+              value={newEnv.initialState}
+              onChange={(e) => setNewEnv((v) => ({ ...v, initialState: e.target.value }))}
+              className="resize-none"
+            />
+            <Textarea
+              placeholder="Rules (one per line)"
+              rows={3}
+              value={newEnv.rules}
+              onChange={(e) => setNewEnv((v) => ({ ...v, rules: e.target.value }))}
+              className="resize-none font-mono text-sm"
+            />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEnvForm(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowEnvForm(false)}>
+              Cancel
+            </Button>
             <Button onClick={createEnvironment} disabled={creatingEnv || !newEnv.name}>
               {creatingEnv ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Create
@@ -735,35 +867,37 @@ export default function Simulation() {
             <Input
               placeholder="Run name *"
               value={newRun.name}
-              onChange={e => setNewRun(r => ({ ...r, name: e.target.value }))}
+              onChange={(e) => setNewRun((r) => ({ ...r, name: e.target.value }))}
             />
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Environment *</label>
               <select
                 className="w-full border rounded-md p-2 text-sm bg-background"
                 value={newRun.environmentId}
-                onChange={e => setNewRun(r => ({ ...r, environmentId: e.target.value }))}
+                onChange={(e) => setNewRun((r) => ({ ...r, environmentId: e.target.value }))}
               >
                 <option value="">Select environment…</option>
-                {environments.map(e => (
-                  <option key={e.id} value={e.id}>{e.name}</option>
+                {environments.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name}
+                  </option>
                 ))}
               </select>
             </div>
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Personas * (select multiple)</label>
               <div className="border rounded-md p-2 max-h-36 overflow-y-auto space-y-1">
-                {personas.map(p => (
+                {personas.map((p) => (
                   <label key={p.id} className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={newRun.personaIds.includes(p.id)}
-                      onChange={e => {
-                        setNewRun(r => ({
+                      onChange={(e) => {
+                        setNewRun((r) => ({
                           ...r,
                           personaIds: e.target.checked
                             ? [...r.personaIds, p.id]
-                            : r.personaIds.filter(id => id !== p.id),
+                            : r.personaIds.filter((id) => id !== p.id),
                         }));
                       }}
                     />
@@ -771,7 +905,9 @@ export default function Simulation() {
                   </label>
                 ))}
                 {personas.length === 0 && (
-                  <p className="text-xs text-muted-foreground">No personas yet — create some first</p>
+                  <p className="text-xs text-muted-foreground">
+                    No personas yet — create some first
+                  </p>
                 )}
               </div>
             </div>
@@ -783,15 +919,24 @@ export default function Simulation() {
                 min={1}
                 max={50}
                 value={newRun.maxTicks}
-                onChange={e => setNewRun(r => ({ ...r, maxTicks: parseInt(e.target.value) || 10 }))}
+                onChange={(e) =>
+                  setNewRun((r) => ({ ...r, maxTicks: parseInt(e.target.value) || 10 }))
+                }
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRunForm(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowRunForm(false)}>
+              Cancel
+            </Button>
             <Button
               onClick={createRun}
-              disabled={creatingRun || !newRun.name || !newRun.environmentId || newRun.personaIds.length === 0}
+              disabled={
+                creatingRun ||
+                !newRun.name ||
+                !newRun.environmentId ||
+                newRun.personaIds.length === 0
+              }
             >
               {creatingRun ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Create simulation
@@ -801,7 +946,12 @@ export default function Simulation() {
       </Dialog>
 
       {/* Chat with persona */}
-      <Dialog open={!!chatPersona} onOpenChange={open => { if (!open) setChatPersona(null); }}>
+      <Dialog
+        open={!!chatPersona}
+        onOpenChange={(open) => {
+          if (!open) setChatPersona(null);
+        }}
+      >
         <DialogContent className="max-w-lg h-[550px] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -809,10 +959,7 @@ export default function Simulation() {
               Chat with {chatPersona?.name}
             </DialogTitle>
           </DialogHeader>
-          <div
-            ref={chatRef}
-            className="flex-1 overflow-y-auto space-y-3 py-2 px-1"
-          >
+          <div ref={chatRef} className="flex-1 overflow-y-auto space-y-3 py-2 px-1">
             {chatMessages.length === 0 && (
               <p className="text-xs text-muted-foreground text-center py-4">
                 Start chatting — {chatPersona?.name} will stay in character
@@ -847,8 +994,13 @@ export default function Simulation() {
             <Input
               placeholder={`Message ${chatPersona?.name}…`}
               value={chatInput}
-              onChange={e => setChatInput(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); } }}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  sendChat();
+                }
+              }}
               disabled={chatSending}
             />
             <Button size="icon" onClick={sendChat} disabled={chatSending || !chatInput.trim()}>

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { useRef, useEffect } from "react";
 import { Link } from "react-router";
 
@@ -21,12 +22,14 @@ export function CtaSection() {
               duration: 0.8,
               ease: "power2.out",
               scrollTrigger: { trigger: ref.current, start: "top 80%" },
-            }
+            },
           );
         }
-      }
+      },
     );
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (

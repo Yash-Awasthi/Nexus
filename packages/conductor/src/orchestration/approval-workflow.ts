@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { IApprovalWorkflow, IApprovalRecord } from "./interfaces/governance.interface";
 import { IEventStore } from "./interfaces/persistence.interface";
 import { IEventBus } from "./event-bus";
@@ -28,14 +29,20 @@ export class ApprovalWorkflow implements IApprovalWorkflow {
         const payload = e.payload as IApprovalRecord;
         recordsMap.set(payload.approvalId, {
           ...payload,
-          requestTimestamp: new Date(payload.requestTimestamp)
+          requestTimestamp: new Date(payload.requestTimestamp),
         });
-      } else if (e.event === "approval_approved" || e.event === "approval_denied" || e.event === "approval_expired") {
+      } else if (
+        e.event === "approval_approved" ||
+        e.event === "approval_denied" ||
+        e.event === "approval_expired"
+      ) {
         const payload = e.payload as IApprovalRecord;
         const existing = recordsMap.get(payload.approvalId);
         if (existing) {
           existing.status = payload.status;
-          existing.decisionTimestamp = payload.decisionTimestamp ? new Date(payload.decisionTimestamp) : undefined;
+          existing.decisionTimestamp = payload.decisionTimestamp
+            ? new Date(payload.decisionTimestamp)
+            : undefined;
           existing.decidedBy = payload.decidedBy;
         }
       }
@@ -51,7 +58,7 @@ export class ApprovalWorkflow implements IApprovalWorkflow {
       approvalId,
       taskId,
       status: "pending",
-      requestTimestamp: new Date()
+      requestTimestamp: new Date(),
     };
 
     recordsMap.set(approvalId, record);

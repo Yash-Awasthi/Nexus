@@ -1,10 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
 "use client";
 
 export function GlowOrbs({ className }: { className?: string }) {
   return (
-    <div
-      className={`absolute inset-0 overflow-hidden pointer-events-none ${className ?? ""}`}
-    >
+    <div className={`absolute inset-0 overflow-hidden pointer-events-none ${className ?? ""}`}>
       <style>
         {`
           @keyframes orbFloat1 {

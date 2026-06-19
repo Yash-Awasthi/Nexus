@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
@@ -41,7 +42,8 @@ const builtinArchetypes: Archetype[] = [
     icon: "🏗️",
     color: "bg-blue-500/20 border-blue-500/30",
     thinkingStyle: "Systems Design",
-    description: "Approaches problems through systems thinking, focusing on scalability, modularity, and long-term architectural decisions.",
+    description:
+      "Approaches problems through systems thinking, focusing on scalability, modularity, and long-term architectural decisions.",
   },
   {
     id: "pragmatist",
@@ -49,7 +51,8 @@ const builtinArchetypes: Archetype[] = [
     icon: "⚡",
     color: "bg-amber-500/20 border-amber-500/30",
     thinkingStyle: "Practical Solutions",
-    description: "Favors battle-tested, production-ready solutions. Prioritizes shipping speed, maintainability, and developer experience.",
+    description:
+      "Favors battle-tested, production-ready solutions. Prioritizes shipping speed, maintainability, and developer experience.",
   },
   {
     id: "ethicist",
@@ -57,7 +60,8 @@ const builtinArchetypes: Archetype[] = [
     icon: "⚖️",
     color: "bg-purple-500/20 border-purple-500/30",
     thinkingStyle: "Ethical Analysis",
-    description: "Evaluates decisions through privacy, fairness, and societal impact lenses. Ensures compliance and responsible AI use.",
+    description:
+      "Evaluates decisions through privacy, fairness, and societal impact lenses. Ensures compliance and responsible AI use.",
   },
   {
     id: "scientist",
@@ -65,7 +69,8 @@ const builtinArchetypes: Archetype[] = [
     icon: "🔬",
     color: "bg-green-500/20 border-green-500/30",
     thinkingStyle: "Empirical Reasoning",
-    description: "Demands evidence and data. Designs experiments, questions assumptions, and follows the scientific method rigorously.",
+    description:
+      "Demands evidence and data. Designs experiments, questions assumptions, and follows the scientific method rigorously.",
   },
   {
     id: "creative",
@@ -73,7 +78,8 @@ const builtinArchetypes: Archetype[] = [
     icon: "🎨",
     color: "bg-pink-500/20 border-pink-500/30",
     thinkingStyle: "Lateral Thinking",
-    description: "Generates unconventional ideas and novel approaches. Excels at brainstorming and breaking out of established patterns.",
+    description:
+      "Generates unconventional ideas and novel approaches. Excels at brainstorming and breaking out of established patterns.",
   },
   {
     id: "skeptic",
@@ -81,7 +87,8 @@ const builtinArchetypes: Archetype[] = [
     icon: "🔍",
     color: "bg-red-500/20 border-red-500/30",
     thinkingStyle: "Critical Analysis",
-    description: "Challenges assumptions, identifies logical fallacies, and stress-tests arguments. The devil's advocate of the council.",
+    description:
+      "Challenges assumptions, identifies logical fallacies, and stress-tests arguments. The devil's advocate of the council.",
   },
   {
     id: "mentor",
@@ -89,7 +96,8 @@ const builtinArchetypes: Archetype[] = [
     icon: "📚",
     color: "bg-cyan-500/20 border-cyan-500/30",
     thinkingStyle: "Educational",
-    description: "Explains complex concepts clearly, provides learning paths, and adapts explanations to the audience's knowledge level.",
+    description:
+      "Explains complex concepts clearly, provides learning paths, and adapts explanations to the audience's knowledge level.",
   },
   {
     id: "strategist",
@@ -97,7 +105,8 @@ const builtinArchetypes: Archetype[] = [
     icon: "♟️",
     color: "bg-indigo-500/20 border-indigo-500/30",
     thinkingStyle: "Strategic Planning",
-    description: "Thinks in terms of long-term positioning, competitive advantage, and risk-reward trade-offs across multiple time horizons.",
+    description:
+      "Thinks in terms of long-term positioning, competitive advantage, and risk-reward trade-offs across multiple time horizons.",
   },
   {
     id: "optimizer",
@@ -105,7 +114,8 @@ const builtinArchetypes: Archetype[] = [
     icon: "📈",
     color: "bg-emerald-500/20 border-emerald-500/30",
     thinkingStyle: "Performance Tuning",
-    description: "Focuses on efficiency, performance, and resource optimization. Finds bottlenecks and eliminates waste systematically.",
+    description:
+      "Focuses on efficiency, performance, and resource optimization. Finds bottlenecks and eliminates waste systematically.",
   },
   {
     id: "historian",
@@ -113,7 +123,8 @@ const builtinArchetypes: Archetype[] = [
     icon: "📜",
     color: "bg-orange-500/20 border-orange-500/30",
     thinkingStyle: "Historical Context",
-    description: "Draws on historical precedents and patterns. Understands why past decisions were made and what can be learned from them.",
+    description:
+      "Draws on historical precedents and patterns. Understands why past decisions were made and what can be learned from them.",
   },
   {
     id: "futurist",
@@ -121,7 +132,8 @@ const builtinArchetypes: Archetype[] = [
     icon: "🔮",
     color: "bg-violet-500/20 border-violet-500/30",
     thinkingStyle: "Forward Thinking",
-    description: "Projects current trends forward, anticipates future challenges, and designs for tomorrow's requirements today.",
+    description:
+      "Projects current trends forward, anticipates future challenges, and designs for tomorrow's requirements today.",
   },
   {
     id: "advocate",
@@ -129,7 +141,8 @@ const builtinArchetypes: Archetype[] = [
     icon: "🗣️",
     color: "bg-teal-500/20 border-teal-500/30",
     thinkingStyle: "User Empathy",
-    description: "Champions the end user's perspective. Ensures solutions are accessible, intuitive, and genuinely solve user problems.",
+    description:
+      "Champions the end user's perspective. Ensures solutions are accessible, intuitive, and genuinely solve user problems.",
   },
   {
     id: "guardian",
@@ -137,7 +150,8 @@ const builtinArchetypes: Archetype[] = [
     icon: "🛡️",
     color: "bg-slate-500/20 border-slate-500/30",
     thinkingStyle: "Security First",
-    description: "Prioritizes security, reliability, and risk mitigation. Identifies vulnerabilities and ensures defense-in-depth.",
+    description:
+      "Prioritizes security, reliability, and risk mitigation. Identifies vulnerabilities and ensures defense-in-depth.",
   },
 ];
 
@@ -195,7 +209,9 @@ function ArchetypeDialog({ open, onOpenChange, onSave, initial, title }: Archety
         <div className="space-y-4 py-2">
           <div className="grid grid-cols-[80px_1fr] gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="arch-icon" className="text-xs">Icon</Label>
+              <Label htmlFor="arch-icon" className="text-xs">
+                Icon
+              </Label>
               <Input
                 id="arch-icon"
                 value={form.icon}
@@ -206,7 +222,9 @@ function ArchetypeDialog({ open, onOpenChange, onSave, initial, title }: Archety
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="arch-name" className="text-xs">Name <span className="text-destructive">*</span></Label>
+              <Label htmlFor="arch-name" className="text-xs">
+                Name <span className="text-destructive">*</span>
+              </Label>
               <Input
                 id="arch-name"
                 value={form.name}
@@ -218,7 +236,9 @@ function ArchetypeDialog({ open, onOpenChange, onSave, initial, title }: Archety
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="arch-thinking" className="text-xs">Thinking Style</Label>
+            <Label htmlFor="arch-thinking" className="text-xs">
+              Thinking Style
+            </Label>
             <Input
               id="arch-thinking"
               value={form.thinkingStyle}
@@ -229,7 +249,9 @@ function ArchetypeDialog({ open, onOpenChange, onSave, initial, title }: Archety
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="arch-desc" className="text-xs">Description</Label>
+            <Label htmlFor="arch-desc" className="text-xs">
+              Description
+            </Label>
             <Textarea
               id="arch-desc"
               value={form.description}
@@ -241,7 +263,9 @@ function ArchetypeDialog({ open, onOpenChange, onSave, initial, title }: Archety
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="arch-prompt" className="text-xs">System Prompt</Label>
+            <Label htmlFor="arch-prompt" className="text-xs">
+              System Prompt
+            </Label>
             <Textarea
               id="arch-prompt"
               value={form.systemPrompt}
@@ -254,7 +278,9 @@ function ArchetypeDialog({ open, onOpenChange, onSave, initial, title }: Archety
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="arch-model" className="text-xs">Model</Label>
+              <Label htmlFor="arch-model" className="text-xs">
+                Model
+              </Label>
               <select
                 id="arch-model"
                 value={form.model}
@@ -262,14 +288,19 @@ function ArchetypeDialog({ open, onOpenChange, onSave, initial, title }: Archety
                 className="w-full h-9 text-sm bg-background border border-border rounded-md px-3 text-foreground"
               >
                 {store.allModels.map((m) => (
-                  <option key={m.id} value={m.id}>{m.label}</option>
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
                 ))}
               </select>
             </div>
 
             <div className="space-y-1.5">
               <Label htmlFor="arch-temp" className="text-xs">
-                Temperature: <span className="font-mono text-muted-foreground">{form.temperature.toFixed(1)}</span>
+                Temperature:{" "}
+                <span className="font-mono text-muted-foreground">
+                  {form.temperature.toFixed(1)}
+                </span>
               </Label>
               <input
                 id="arch-temp"
@@ -278,7 +309,9 @@ function ArchetypeDialog({ open, onOpenChange, onSave, initial, title }: Archety
                 max={2}
                 step={0.1}
                 value={form.temperature}
-                onChange={(e) => setForm((f) => ({ ...f, temperature: parseFloat(e.target.value) }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, temperature: parseFloat(e.target.value) }))
+                }
                 className="w-full accent-primary mt-2"
               />
             </div>
@@ -326,7 +359,9 @@ function ViewDetailsDialog({ open, onOpenChange, archetype }: ViewDetailsDialogP
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -419,7 +454,9 @@ export default function ArchetypesPage() {
                     <span className="text-2xl">{arch.icon}</span>
                     <div>
                       <CardTitle className="text-sm">{arch.name}</CardTitle>
-                      <span className="text-[11px] text-muted-foreground">{arch.thinkingStyle}</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {arch.thinkingStyle}
+                      </span>
                     </div>
                   </div>
                   <DropdownMenu>
@@ -469,9 +506,7 @@ export default function ArchetypesPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  {arch.description}
-                </p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{arch.description}</p>
                 {arch.isCustom && (
                   <div className="mt-2 flex items-center gap-1.5">
                     <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">
@@ -499,7 +534,9 @@ export default function ArchetypesPage() {
       {/* Edit dialog */}
       <ArchetypeDialog
         open={!!editTarget}
-        onOpenChange={(o) => { if (!o) setEditTarget(null); }}
+        onOpenChange={(o) => {
+          if (!o) setEditTarget(null);
+        }}
         onSave={handleEdit}
         initial={
           editTarget
@@ -520,7 +557,9 @@ export default function ArchetypesPage() {
       {/* View Details dialog */}
       <ViewDetailsDialog
         open={!!viewTarget}
-        onOpenChange={(o) => { if (!o) setViewTarget(null); }}
+        onOpenChange={(o) => {
+          if (!o) setViewTarget(null);
+        }}
         archetype={viewTarget}
       />
     </div>

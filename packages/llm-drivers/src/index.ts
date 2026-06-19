@@ -959,19 +959,19 @@ export class DriverRegistry {
  * Maps to airllm's `compression` parameter (None / "4bit" / "8bit").
  */
 export type LocalModelPrecision =
-  | "fp16"   // Full 16-bit (default, no compression)
-  | "fp32"   // 32-bit (high accuracy, 2× memory vs fp16)
-  | "int8"   // 8-bit quantization (≈2× speedup, small accuracy loss)
-  | "int4";  // 4-bit quantization (≈4× speedup, moderate accuracy loss)
+  | "fp16" // Full 16-bit (default, no compression)
+  | "fp32" // 32-bit (high accuracy, 2× memory vs fp16)
+  | "int8" // 8-bit quantization (≈2× speedup, small accuracy loss)
+  | "int4"; // 4-bit quantization (≈4× speedup, moderate accuracy loss)
 
 /**
  * Strategy for splitting model weights across memory tiers.
  * Ported from airllm's layer-shard concept.
  */
 export type LayerShardStrategy =
-  | "none"        // Load entire model into memory at once
-  | "layer"       // Layer-by-layer: load one layer, infer, unload (airllm default)
-  | "pipeline";   // Pipeline-parallel across multiple devices
+  | "none" // Load entire model into memory at once
+  | "layer" // Layer-by-layer: load one layer, infer, unload (airllm default)
+  | "pipeline"; // Pipeline-parallel across multiple devices
 
 /** Configuration for a locally-hosted model provider. */
 export interface LocalModelConfig {
@@ -1011,7 +1011,7 @@ export interface LocalModelManifest {
 /** Probe a local model server and return its manifest. */
 export async function probeLocalModel(
   config: LocalModelConfig,
-  fetchFn: typeof fetch = fetch
+  fetchFn: typeof fetch = fetch,
 ): Promise<LocalModelManifest> {
   const baseUrl = config.serverUrl.replace(/\/$/, "");
   const now = new Date().toISOString();
@@ -1019,9 +1019,11 @@ export async function probeLocalModel(
     const res = await fetchFn(`${baseUrl}/api/tags`, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     // Ollama returns { models: [{ name, details: { family, parameter_size } }] }
-    const data = (await res.json()) as { models?: Array<{ name: string; details?: { family?: string; parameter_size?: string } }> };
+    const data = (await res.json()) as {
+      models?: Array<{ name: string; details?: { family?: string; parameter_size?: string } }>;
+    };
     const match = (data.models ?? []).find(
-      (m) => m.name === config.modelId || m.name.startsWith(config.modelId.split(":")[0] ?? "")
+      (m) => m.name === config.modelId || m.name.startsWith(config.modelId.split(":")[0] ?? ""),
     );
     const paramStr = match?.details?.parameter_size ?? "";
     const paramsBillions = parseFloat(paramStr.replace(/[bB].*/, "")) || undefined;

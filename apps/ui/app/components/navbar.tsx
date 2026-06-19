@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { Link, useLocation } from "react-router";
 import { useState, useRef, useEffect } from "react";
 import { useTheme } from "~/context/ThemeContext";
@@ -33,7 +34,7 @@ import { Button } from "~/components/ui/button";
 
 const GithubIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
   </svg>
 );
 
@@ -41,25 +42,70 @@ const productItems = [
   {
     label: "Core Features",
     items: [
-      { name: "AI Council", desc: "Multi-agent deliberation engine", href: "/product/council", icon: Users },
-      { name: "Knowledge Bases", desc: "RAG-powered knowledge retrieval", href: "/product/knowledge", icon: Search },
-      { name: "Workflows", desc: "Visual DAG workflow builder", href: "/product/workflows", icon: Workflow },
-      { name: "Archetypes", desc: "14 distinct agent personalities", href: "/product/archetypes", icon: Sparkles },
+      {
+        name: "AI Council",
+        desc: "Multi-agent deliberation engine",
+        href: "/product/council",
+        icon: Users,
+      },
+      {
+        name: "Knowledge Bases",
+        desc: "RAG-powered knowledge retrieval",
+        href: "/product/knowledge",
+        icon: Search,
+      },
+      {
+        name: "Workflows",
+        desc: "Visual DAG workflow builder",
+        href: "/product/workflows",
+        icon: Workflow,
+      },
+      {
+        name: "Archetypes",
+        desc: "14 distinct agent personalities",
+        href: "/product/archetypes",
+        icon: Sparkles,
+      },
     ],
   },
   {
     label: "More",
     items: [
-      { name: "Connectors", desc: "19 LLM providers, 51 data sources", href: "/product/connectors", icon: Plug },
-      { name: "Developer Platform", desc: "API, MCP & SDK access", href: "/product/developer-platform", icon: Code2 },
-      { name: "Deliberation Modes", desc: "5 thinking styles for every task", href: "/product/deliberation-modes", icon: Lightbulb },
-      { name: "Desktop App", desc: "Native app for all platforms", href: "/product/desktop-app", icon: Monitor },
+      {
+        name: "Connectors",
+        desc: "19 LLM providers, 51 data sources",
+        href: "/product/connectors",
+        icon: Plug,
+      },
+      {
+        name: "Developer Platform",
+        desc: "API, MCP & SDK access",
+        href: "/product/developer-platform",
+        icon: Code2,
+      },
+      {
+        name: "Deliberation Modes",
+        desc: "5 thinking styles for every task",
+        href: "/product/deliberation-modes",
+        icon: Lightbulb,
+      },
+      {
+        name: "Desktop App",
+        desc: "Native app for all platforms",
+        href: "/product/desktop-app",
+        icon: Monitor,
+      },
     ],
   },
 ];
 
 const resourceItems = [
-  { name: "Docs", href: "https://github.com/Yash-Awasthi/Nexus/wiki", icon: BookOpen, external: true },
+  {
+    name: "Docs",
+    href: "https://github.com/Yash-Awasthi/Nexus/wiki",
+    icon: BookOpen,
+    external: true,
+  },
   { name: "Blog", href: "/blog", icon: FileText },
   { name: "LLM Leaderboard", href: "/llm-leaderboard", icon: BarChart3 },
   { name: "Infra Calculator", href: "/infra-calculator", icon: Calculator },
@@ -79,13 +125,13 @@ const dropdownVariants = {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: { duration: 0.18, ease: [0.23, 1, 0.32, 1] },
+    transition: { duration: 0.18, ease: [0.23, 1, 0.32, 1] as [number, number, number, number] },
   },
   exit: {
     opacity: 0,
     y: -6,
     scale: 0.97,
-    transition: { duration: 0.12, ease: "easeIn" },
+    transition: { duration: 0.12, ease: "easeIn" as const },
   },
 };
 
@@ -123,7 +169,9 @@ function DropdownMenu({
         className="group flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-2 relative"
       >
         {label}
-        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+        <ChevronDown
+          className={`h-3.5 w-3.5 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+        />
         {/* Hover underline animation */}
         <span className="absolute bottom-0 left-3 right-3 h-px bg-gradient-to-r from-blue-500 to-violet-500 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
       </button>
@@ -144,7 +192,15 @@ function DropdownMenu({
   );
 }
 
-function NavLink({ to, children, isActive }: { to: string; children: React.ReactNode; isActive: boolean }) {
+function NavLink({
+  to,
+  children,
+  isActive,
+}: {
+  to: string;
+  children: React.ReactNode;
+  isActive: boolean;
+}) {
   return (
     <Link
       to={to}
@@ -209,7 +265,9 @@ export function Navbar() {
               <div className="grid grid-cols-2 gap-0 p-2 w-[520px]">
                 {productItems.map((group) => (
                   <div key={group.label} className="p-2">
-                    <p className="text-xs font-medium text-muted-foreground mb-2 px-2">{group.label}</p>
+                    <p className="text-xs font-medium text-muted-foreground mb-2 px-2">
+                      {group.label}
+                    </p>
                     {group.items.map((item) => (
                       <Link
                         key={item.href}
@@ -235,7 +293,7 @@ export function Navbar() {
               onClose={() => setOpenMenu(null)}
             >
               <div className="p-2 w-[200px]">
-                {resourceItems.map((item) => (
+                {resourceItems.map((item) =>
                   item.external ? (
                     <a
                       key={item.name}
@@ -256,8 +314,8 @@ export function Navbar() {
                       <item.icon className="h-4 w-4 text-muted-foreground" />
                       {item.name}
                     </Link>
-                  )
-                ))}
+                  ),
+                )}
               </div>
             </DropdownMenu>
 
@@ -355,35 +413,57 @@ export function Navbar() {
               <div className="py-4 space-y-4">
                 <div>
                   <p className="text-xs font-medium text-muted-foreground mb-2 px-1">Product</p>
-                  {productItems.flatMap((g) => g.items).map((item) => (
-                    <Link key={item.href} to={item.href} className="block px-1 py-2 text-sm hover:text-foreground text-muted-foreground">
-                      {item.name}
-                    </Link>
-                  ))}
+                  {productItems
+                    .flatMap((g) => g.items)
+                    .map((item) => (
+                      <Link
+                        key={item.href}
+                        to={item.href}
+                        className="block px-1 py-2 text-sm hover:text-foreground text-muted-foreground"
+                      >
+                        {item.name}
+                      </Link>
+                    ))}
                 </div>
                 <div>
                   <p className="text-xs font-medium text-muted-foreground mb-2 px-1">Resources</p>
-                  {resourceItems.map((item) => (
+                  {resourceItems.map((item) =>
                     item.external ? (
-                      <a key={item.name} href={item.href} target="_blank" rel="noopener noreferrer" className="block px-1 py-2 text-sm hover:text-foreground text-muted-foreground">
+                      <a
+                        key={item.name}
+                        href={item.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block px-1 py-2 text-sm hover:text-foreground text-muted-foreground"
+                      >
                         {item.name}
                       </a>
                     ) : (
-                      <Link key={item.name} to={item.href} className="block px-1 py-2 text-sm hover:text-foreground text-muted-foreground">
+                      <Link
+                        key={item.name}
+                        to={item.href}
+                        className="block px-1 py-2 text-sm hover:text-foreground text-muted-foreground"
+                      >
                         {item.name}
                       </Link>
-                    )
-                  ))}
+                    ),
+                  )}
                 </div>
                 <div>
                   <p className="text-xs font-medium text-muted-foreground mb-2 px-1">Company</p>
                   {companyItems.map((item) => (
-                    <Link key={item.name} to={item.href} className="block px-1 py-2 text-sm hover:text-foreground text-muted-foreground">
+                    <Link
+                      key={item.name}
+                      to={item.href}
+                      className="block px-1 py-2 text-sm hover:text-foreground text-muted-foreground"
+                    >
                       {item.name}
                     </Link>
                   ))}
                 </div>
-                <Link to="/pricing" className="block px-1 py-2 text-sm font-medium">Pricing</Link>
+                <Link to="/pricing" className="block px-1 py-2 text-sm font-medium">
+                  Pricing
+                </Link>
                 <div className="flex gap-2 pt-2">
                   <Button variant="outline" size="sm" asChild className="flex-1">
                     <Link to="/login">Sign In</Link>

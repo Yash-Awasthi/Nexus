@@ -18,14 +18,13 @@
 
 import { randomUUID } from "crypto";
 
-import type { FastifyInstance } from "fastify";
-
 import {
   createDefaultRegistry,
   DeltaEngine,
   SweepOrchestrator,
   TelegramAlerter,
 } from "@nexus/domain-feeds";
+import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
 
@@ -207,7 +206,10 @@ export async function domainFeedsRoutes(app: FastifyInstance): Promise<void> {
   /** GET /domain-feeds/intel/status — last sweep health summary */
   app.get("/domain-feeds/intel/status", { preHandler: requireAuth }, async (_req, reply) => {
     const last = _sweepOrchestrator.lastSweep();
-    if (!last) return reply.code(404).send({ error: "No sweep has run yet. POST /domain-feeds/intel/sweep first." });
+    if (!last)
+      return reply
+        .code(404)
+        .send({ error: "No sweep has run yet. POST /domain-feeds/intel/sweep first." });
     return reply.send({
       timestamp: last.timestamp,
       sourcesOk: last.meta.sourcesOk,
@@ -247,7 +249,8 @@ export async function domainFeedsRoutes(app: FastifyInstance): Promise<void> {
     const delta = history.length >= 2 ? _deltaEngine.compute(history[0]!, history[1]!) : null;
 
     const domainSummary = last.domains.map((d) => ({
-      domain: d.domain, count: d.totalCount,
+      domain: d.domain,
+      count: d.totalCount,
       topEvent: d.events[0]?.summary ?? null,
       topSeverity: d.events[0]?.severity ?? null,
     }));
@@ -256,15 +259,17 @@ export async function domainFeedsRoutes(app: FastifyInstance): Promise<void> {
       timestamp: last.timestamp,
       meta: last.meta,
       domains: domainSummary,
-      delta: delta ? {
-        direction: delta.summary.direction,
-        totalChanges: delta.summary.totalChanges,
-        criticalChanges: delta.summary.criticalChanges,
-        topSignals: [
-          ...delta.signals.new.slice(0, 3),
-          ...delta.signals.escalated.filter((s) => s.severity === "critical").slice(0, 3),
-        ],
-      } : null,
+      delta: delta
+        ? {
+            direction: delta.summary.direction,
+            totalChanges: delta.summary.totalChanges,
+            criticalChanges: delta.summary.criticalChanges,
+            topSignals: [
+              ...delta.signals.new.slice(0, 3),
+              ...delta.signals.escalated.filter((s) => s.severity === "critical").slice(0, 3),
+            ],
+          }
+        : null,
     });
   });
 

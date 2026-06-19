@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import type { Meta, StoryObj } from "@storybook/react";
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
@@ -61,9 +62,7 @@ const StatCard = ({
     </CardHeader>
     <CardContent>
       <p style={{ fontSize: "11px", opacity: 0.6 }}>
-        {trend && (
-          <span style={{ color: "#10b981", fontWeight: 600 }}>{trend} </span>
-        )}
+        {trend && <span style={{ color: "#10b981", fontWeight: 600 }}>{trend} </span>}
         {description}
       </p>
     </CardContent>
@@ -163,7 +162,9 @@ export const Default: Story = {
           <CardHeader>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <CardTitle>Agent Fleet</CardTitle>
-              <Button size="sm" variant="outline">View All</Button>
+              <Button size="sm" variant="outline">
+                View All
+              </Button>
             </div>
             <CardDescription>Active and idle agents</CardDescription>
           </CardHeader>
@@ -183,11 +184,36 @@ export const Default: Story = {
           </CardHeader>
           <CardContent>
             {[
-              { icon: CheckCircleIcon, text: "Research Agent completed task #284", time: "2m ago", color: "#10b981" },
-              { icon: ActivityIcon, text: "Data Analyst started new analysis", time: "5m ago", color: "#3b82f6" },
-              { icon: ClockIcon, text: "Knowledge base synced (847 docs)", time: "12m ago", color: "#f59e0b" },
-              { icon: CheckCircleIcon, text: "Code Review Agent finished PR #142", time: "18m ago", color: "#10b981" },
-              { icon: TrendingUpIcon, text: "Memory consolidation completed", time: "1h ago", color: "#a855f7" },
+              {
+                icon: CheckCircleIcon,
+                text: "Research Agent completed task #284",
+                time: "2m ago",
+                color: "#10b981",
+              },
+              {
+                icon: ActivityIcon,
+                text: "Data Analyst started new analysis",
+                time: "5m ago",
+                color: "#3b82f6",
+              },
+              {
+                icon: ClockIcon,
+                text: "Knowledge base synced (847 docs)",
+                time: "12m ago",
+                color: "#f59e0b",
+              },
+              {
+                icon: CheckCircleIcon,
+                text: "Code Review Agent finished PR #142",
+                time: "18m ago",
+                color: "#10b981",
+              },
+              {
+                icon: TrendingUpIcon,
+                text: "Memory consolidation completed",
+                time: "1h ago",
+                color: "#a855f7",
+              },
             ].map((event, i) => (
               <div
                 key={i}

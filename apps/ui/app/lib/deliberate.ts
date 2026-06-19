@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Deliberation bridge — dual-mode:
  *   1. Electron desktop: delegates to window.molecule IPC (unchanged)
@@ -10,6 +11,12 @@ export interface MoleculeOpinion {
   text: string;
   summary: string;
   round: number;
+  /** archetype name — present in council stream responses */
+  archetype?: string;
+  /** display name for the council member */
+  name?: string;
+  /** confidence score [0-1] */
+  confidence?: number;
 }
 
 export interface MoleculeVerdict {
@@ -71,9 +78,9 @@ export async function deliberate(args: {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      message:  args.message,
+      message: args.message,
       members,
-      round:    args.round,
+      round: args.round,
       threadId: args.threadId,
     }),
   });
@@ -83,8 +90,8 @@ export async function deliberate(args: {
   }
 
   const reader = res.body.getReader();
-  const dec    = new TextDecoder();
-  let buf      = "";
+  const dec = new TextDecoder();
+  let buf = "";
 
   while (true) {
     const { done, value } = await reader.read();
@@ -136,9 +143,13 @@ export function onDone(cb: (data: { round: number }) => void): () => void {
 // ── Thread management (localStorage-backed in web mode) ───────────────────────
 
 const THREADS_KEY = "nexus_threads";
-const MSGS_PREFIX  = "nexus_messages_";
+const MSGS_PREFIX = "nexus_messages_";
 
-interface StoredThread { id: string; title: string; updated_at: number; }
+interface StoredThread {
+  id: string;
+  title: string;
+  updated_at: number;
+}
 
 interface StoredGroup {
   id: string;
@@ -154,7 +165,9 @@ function _loadThreads(): StoredThread[] {
   try {
     const raw = localStorage.getItem(THREADS_KEY);
     return raw ? (JSON.parse(raw) as StoredThread[]) : [];
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 function _saveThreads(t: StoredThread[]) {
@@ -187,7 +200,9 @@ function _loadGroups(threadId: string): StoredGroup[] {
   try {
     const raw = localStorage.getItem(MSGS_PREFIX + threadId);
     return raw ? (JSON.parse(raw) as StoredGroup[]) : [];
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 /** Persist finalized MsgGroups for a thread. Call after a round completes (done=true). */
@@ -199,13 +214,34 @@ export async function getMessages(threadId: string) {
   if (isMolecule()) return (window as any).molecule.getMessages(threadId);
   // Deserialize stored groups into the flat message format hydrateThread expects
   const groups = _loadGroups(threadId);
-  const msgs: Array<{ id: string; role: string; member: string | null; content: string; round: number }> = [];
+  const msgs: Array<{
+    id: string;
+    role: string;
+    member: string | null;
+    content: string;
+    round: number;
+  }> = [];
   for (const g of groups) {
-    if (g.prompt)   msgs.push({ id: g.id + "_u", role: "user",    member: null,  content: g.prompt,  round: g.round });
+    if (g.prompt)
+      msgs.push({ id: g.id + "_u", role: "user", member: null, content: g.prompt, round: g.round });
     for (const [label, text] of Object.entries(g.opinions)) {
-      if (text)     msgs.push({ id: g.id + "_" + label, role: "opinion", member: label, content: text, round: g.round });
+      if (text)
+        msgs.push({
+          id: g.id + "_" + label,
+          role: "opinion",
+          member: label,
+          content: text,
+          round: g.round,
+        });
     }
-    if (g.verdict)  msgs.push({ id: g.id + "_v", role: "verdict", member: null,  content: g.verdict, round: g.round });
+    if (g.verdict)
+      msgs.push({
+        id: g.id + "_v",
+        role: "verdict",
+        member: null,
+        content: g.verdict,
+        round: g.round,
+      });
   }
   return msgs;
 }
@@ -229,8 +265,8 @@ export async function connectProvider(provider: string): Promise<void> {
   if (isMolecule()) return (window as any).molecule.connectProvider(provider);
   const urls: Record<string, string> = {
     chatgpt: "https://chat.openai.com",
-    gemini:  "https://gemini.google.com/app",
-    claude:  "https://claude.ai",
+    gemini: "https://gemini.google.com/app",
+    claude: "https://claude.ai",
   };
   window.open(urls[provider] ?? `https://${provider}.com`, "_blank");
 }

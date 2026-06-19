@@ -1,13 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
 import type { Route } from "./+types/product.knowledge";
 import { ProductPage } from "~/components/product-page";
-import {
-  FileSearch,
-  Globe,
-  Layers,
-  ArrowUpDown,
-  SlidersHorizontal,
-  Database,
-} from "lucide-react";
+import { FileSearch, Globe, Layers, ArrowUpDown, SlidersHorizontal, Database } from "lucide-react";
 
 export function meta({}: Route.MetaArgs) {
   return [

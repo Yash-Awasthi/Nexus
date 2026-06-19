@@ -43,7 +43,7 @@ services:
       - key: LOG_LEVEL
         value: info
       - key: OPENROUTER_API_KEY
-        sync: false   # set manually in Render dashboard
+        sync: false # set manually in Render dashboard
       - key: GROQ_API_KEY
         sync: false
       - key: ANTHROPIC_API_KEY

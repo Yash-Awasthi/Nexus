@@ -1,12 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
 import type { Route } from "./+types/product.deliberation-modes";
 import { ProductPage } from "~/components/product-page";
-import {
-  Users,
-  HelpCircle,
-  Swords,
-  FlaskConical,
-  Weight,
-} from "lucide-react";
+import { Users, HelpCircle, Swords, FlaskConical, Weight } from "lucide-react";
 
 export function meta({}: Route.MetaArgs) {
   return [

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * What-If Scenarios — branch a simulation run and compare alternative paths.
  *
@@ -76,7 +77,8 @@ export default function WhatIf() {
 
   const loadBranches = useCallback(async () => {
     if (!simId.trim()) return;
-    setLoadingBranches(true); setErr("");
+    setLoadingBranches(true);
+    setErr("");
     const r = await fetch(`/api/simulate/runs/${simId.trim()}/branches`).catch(() => null);
     if (r?.ok) {
       const d = await r.json();
@@ -87,7 +89,8 @@ export default function WhatIf() {
 
   const createBranch = useCallback(async () => {
     if (!simId.trim()) return;
-    setCreating(true); setErr("");
+    setCreating(true);
+    setErr("");
     const r = await fetch(`/api/simulate/runs/${simId.trim()}/branches`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -98,33 +101,43 @@ export default function WhatIf() {
     }).catch(() => null);
     if (r?.ok) {
       const b = await r.json();
-      setBranches(prev => [...prev, b]);
-      setNewName(""); setNewConditions("");
+      setBranches((prev) => [...prev, b]);
+      setNewName("");
+      setNewConditions("");
     } else setErr("Create branch failed");
     setCreating(false);
   }, [simId, newName, newConditions]);
 
-  const tickBranch = useCallback(async (branchId: string) => {
-    setTicking(branchId);
-    const r = await fetch(`/api/simulate/branches/${branchId}/tick`, { method: "POST" }).catch(() => null);
-    if (r?.ok) {
-      const updated = await r.json();
-      setBranches(prev => prev.map(b => b.id === branchId ? { ...b, ...updated } : b));
-      if (selected?.id === branchId) setSelected(updated);
-    }
-    setTicking(null);
-  }, [selected]);
+  const tickBranch = useCallback(
+    async (branchId: string) => {
+      setTicking(branchId);
+      const r = await fetch(`/api/simulate/branches/${branchId}/tick`, { method: "POST" }).catch(
+        () => null,
+      );
+      if (r?.ok) {
+        const updated = await r.json();
+        setBranches((prev) => prev.map((b) => (b.id === branchId ? { ...b, ...updated } : b)));
+        if (selected?.id === branchId) setSelected(updated);
+      }
+      setTicking(null);
+    },
+    [selected],
+  );
 
-  const deleteBranch = useCallback(async (id: string) => {
-    if (!confirm("Delete this branch?")) return;
-    await fetch(`/api/simulate/branches/${id}`, { method: "DELETE" }).catch(() => {});
-    setBranches(prev => prev.filter(b => b.id !== id));
-    if (selected?.id === id) setSelected(null);
-  }, [selected]);
+  const deleteBranch = useCallback(
+    async (id: string) => {
+      if (!confirm("Delete this branch?")) return;
+      await fetch(`/api/simulate/branches/${id}`, { method: "DELETE" }).catch(() => {});
+      setBranches((prev) => prev.filter((b) => b.id !== id));
+      if (selected?.id === id) setSelected(null);
+    },
+    [selected],
+  );
 
   const compare = useCallback(async () => {
     if (!simId.trim() || branches.length < 2) return;
-    setComparing(true); setCompareResult(null);
+    setComparing(true);
+    setCompareResult(null);
     const r = await fetch(`/api/simulate/runs/${simId.trim()}/compare`).catch(() => null);
     if (r?.ok) setCompareResult(await r.json());
     setComparing(false);
@@ -150,12 +163,16 @@ export default function WhatIf() {
             <Input
               placeholder="Enter the simulation run ID to branch from…"
               value={simId}
-              onChange={e => setSimId(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && loadBranches()}
+              onChange={(e) => setSimId(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && loadBranches()}
               className="flex-1 font-mono text-sm"
             />
             <Button onClick={loadBranches} disabled={loadingBranches || !simId.trim()}>
-              {loadingBranches ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+              {loadingBranches ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Search className="w-4 h-4" />
+              )}
             </Button>
           </div>
           {err && <p className="text-red-500 text-xs">{err}</p>}
@@ -170,7 +187,11 @@ export default function WhatIf() {
               <h2 className="text-sm font-semibold">Branches ({branches.length})</h2>
               {branches.length >= 2 && (
                 <Button size="sm" variant="outline" onClick={compare} disabled={comparing}>
-                  {comparing ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <BarChart2 className="w-3 h-3 mr-1" />}
+                  {comparing ? (
+                    <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                  ) : (
+                    <BarChart2 className="w-3 h-3 mr-1" />
+                  )}
                   Compare
                 </Button>
               )}
@@ -182,25 +203,29 @@ export default function WhatIf() {
                 <Input
                   placeholder="Branch name (optional)"
                   value={newName}
-                  onChange={e => setNewName(e.target.value)}
+                  onChange={(e) => setNewName(e.target.value)}
                   className="text-sm h-8"
                 />
                 <Textarea
                   rows={2}
                   placeholder="Different conditions or interventions…"
                   value={newConditions}
-                  onChange={e => setNewConditions(e.target.value)}
+                  onChange={(e) => setNewConditions(e.target.value)}
                   className="resize-none text-xs"
                 />
                 <Button size="sm" className="w-full" onClick={createBranch} disabled={creating}>
-                  {creating ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Plus className="w-3 h-3 mr-1" />}
+                  {creating ? (
+                    <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                  ) : (
+                    <Plus className="w-3 h-3 mr-1" />
+                  )}
                   Fork Branch
                 </Button>
               </CardContent>
             </Card>
 
             {/* Branch list */}
-            {branches.map(b => (
+            {branches.map((b) => (
               <div
                 key={b.id}
                 className={`border rounded-lg p-2.5 cursor-pointer hover:bg-muted/40 transition-colors ${selected?.id === b.id ? "bg-muted border-primary/30" : ""}`}
@@ -209,11 +234,23 @@ export default function WhatIf() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 min-w-0">
                     <GitBranch className="w-3.5 h-3.5 text-lime-600 shrink-0" />
-                    <span className="text-sm font-medium truncate">{b.name ?? b.id.slice(0, 8)}</span>
+                    <span className="text-sm font-medium truncate">
+                      {b.name ?? b.id.slice(0, 8)}
+                    </span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Badge variant="secondary" className="text-xs">t={b.tick}</Badge>
-                    <Button size="icon" variant="ghost" className="h-6 w-6 text-red-400" onClick={e => { e.stopPropagation(); deleteBranch(b.id); }}>
+                    <Badge variant="secondary" className="text-xs">
+                      t={b.tick}
+                    </Badge>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6 text-red-400"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteBranch(b.id);
+                      }}
+                    >
                       <Trash2 className="w-3 h-3" />
                     </Button>
                   </div>
@@ -230,9 +267,19 @@ export default function WhatIf() {
                   <CardTitle className="text-base flex items-center justify-between">
                     <span>{selected.name ?? "Branch " + selected.id.slice(0, 8)}</span>
                     <div className="flex gap-2">
-                      <Badge variant={selected.status === "done" ? "default" : "secondary"}>{selected.status}</Badge>
-                      <Button size="sm" onClick={() => tickBranch(selected.id)} disabled={ticking === selected.id || selected.status === "done"}>
-                        {ticking === selected.id ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Play className="w-3 h-3 mr-1" />}
+                      <Badge variant={selected.status === "done" ? "default" : "secondary"}>
+                        {selected.status}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        onClick={() => tickBranch(selected.id)}
+                        disabled={ticking === selected.id || selected.status === "done"}
+                      >
+                        {ticking === selected.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                        ) : (
+                          <Play className="w-3 h-3 mr-1" />
+                        )}
                         Tick
                       </Button>
                     </div>
@@ -240,20 +287,29 @@ export default function WhatIf() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>Tick: <strong>{selected.tick}</strong></span>
+                    <span>
+                      Tick: <strong>{selected.tick}</strong>
+                    </span>
                   </div>
                   {selected.conditions && (
                     <div>
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Conditions</p>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                        Conditions
+                      </p>
                       <p className="text-sm text-muted-foreground">{selected.conditions}</p>
                     </div>
                   )}
                   {selected.events && selected.events.length > 0 && (
                     <div>
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Events</p>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                        Events
+                      </p>
                       <div className="space-y-1 max-h-48 overflow-y-auto">
                         {selected.events.map((ev, i) => (
-                          <div key={i} className="text-xs text-muted-foreground flex items-start gap-1">
+                          <div
+                            key={i}
+                            className="text-xs text-muted-foreground flex items-start gap-1"
+                          >
                             <ChevronRight className="w-3 h-3 shrink-0 mt-0.5" />
                             {ev}
                           </div>
@@ -280,15 +336,19 @@ export default function WhatIf() {
                     <BarChart2 className="w-4 h-4 text-lime-600" />
                     Comparison
                     {compareResult.winner && (
-                      <Badge className="bg-lime-100 text-lime-700 dark:bg-lime-900/40 dark:text-lime-400">Winner: {compareResult.winner}</Badge>
+                      <Badge className="bg-lime-100 text-lime-700 dark:bg-lime-900/40 dark:text-lime-400">
+                        Winner: {compareResult.winner}
+                      </Badge>
                     )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {compareResult.branches.map(b => (
+                  {compareResult.branches.map((b) => (
                     <div key={b.id} className="border rounded-md p-3">
                       <p className="text-sm font-medium">{b.name ?? b.id.slice(0, 8)}</p>
-                      {b.outcome && <p className="text-xs text-muted-foreground mt-1">{b.outcome}</p>}
+                      {b.outcome && (
+                        <p className="text-xs text-muted-foreground mt-1">{b.outcome}</p>
+                      )}
                       {b.metrics && Object.keys(b.metrics).length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-2">
                           {Object.entries(b.metrics).map(([k, v]) => (

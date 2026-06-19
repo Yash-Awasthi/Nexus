@@ -112,9 +112,9 @@ export class I18n {
     if (count === 0 && forms["zero"]) {
       form = forms["zero"];
     } else if (count === 1) {
-      form = forms["one"];
+      form = forms["one"] ?? key;
     } else {
-      form = forms["other"];
+      form = forms["other"] ?? key;
     }
     return this.interpolate(form, { count, ...vars });
   }

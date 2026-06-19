@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useEasterEggs } from "~/hooks/useEasterEggs";
 import { EasterEggToast } from "~/components/EasterEggToast";
@@ -108,15 +109,11 @@ import { AuthProvider, useAuth } from "~/context/AuthContext";
 import type { Route } from "./+types/root";
 import "./app.css";
 
-const PUBLIC_PATHS = new Set([
-  "/", "/login", "/register", "/setup",
-]);
+const PUBLIC_PATHS = new Set(["/", "/login", "/register", "/setup"]);
 
 function isPublicPath(pathname: string) {
   return (
-    PUBLIC_PATHS.has(pathname) ||
-    pathname.startsWith("/product/") ||
-    pathname.startsWith("/api/")
+    PUBLIC_PATHS.has(pathname) || pathname.startsWith("/product/") || pathname.startsWith("/api/")
   );
 }
 
@@ -167,49 +164,36 @@ const navGroups = [
     ],
   },
   {
+    label: "G0DM0D3",
+    items: [
+      { to: "/god-mode", icon: Eye, label: "God Mode" },
+      { to: "/gauntlet", icon: Zap, label: "Gauntlet" },
+      { to: "/redteam", icon: Code2, label: "Red Team" },
+      { to: "/stm", icon: MemoryStick, label: "STM" },
+      { to: "/drift", icon: SlidersHorizontal, label: "Drift" },
+      { to: "/blind-council", icon: EyeOff, label: "Blind Council" },
+    ],
+  },
+  {
+    label: "Research",
+    items: [
+      { to: "/deep-research", icon: Search, label: "Deep Research" },
+      { to: "/ab-compare", icon: Trophy, label: "A/B Arena" },
+      { to: "/simulation", icon: Swords, label: "Simulation" },
+      { to: "/knowledge-graph", icon: Network, label: "Knowledge Graph" },
+      { to: "/agents", icon: Bot, label: "Agents" },
+    ],
+  },
+  {
     label: "Workspace",
     items: [
       { to: "/projects", icon: FolderOpen, label: "Projects" },
       { to: "/evaluation", icon: ClipboardCheck, label: "Evaluation" },
       { to: "/marketplace", icon: Store, label: "Marketplace" },
       { to: "/build", icon: Hammer, label: "Build" },
-      { to: "/god-mode", icon: Eye, label: "God Mode" },
-      { to: "/gauntlet", icon: Zap, label: "Gauntlet" },
-      { to: "/redteam", icon: Code2, label: "Red Team" },
-      { to: "/drift", icon: SlidersHorizontal, label: "Drift" },
-      { to: "/stm", icon: MemoryStick, label: "STM" },
-      { to: "/deep-research", icon: Search, label: "Deep Research" },
-      { to: "/image-gen", icon: ImageIcon, label: "Image Gen" },
-      { to: "/ab-compare", icon: Trophy, label: "A/B Arena" },
-      { to: "/simulation", icon: Swords, label: "Simulation" },
-      { to: "/knowledge-graph", icon: Network, label: "Knowledge Graph" },
-      { to: "/fine-tune", icon: Cpu, label: "Fine-Tune" },
       { to: "/sandbox", icon: Terminal, label: "Sandbox" },
-      { to: "/codegen", icon: Code2, label: "CodeGen" },
-      { to: "/agents", icon: Bot, label: "Agents" },
-      { to: "/image-transform", icon: Wand2, label: "Image Transform" },
-      { to: "/extraction", icon: Braces, label: "Extraction" },
-      { to: "/echo-chamber", icon: Waves, label: "Echo Chamber" },
-      { to: "/council-checkpoints", icon: History, label: "Checkpoints" },
-      { to: "/reasoning", icon: Brain, label: "Reasoning" },
-      { to: "/craft", icon: PenTool, label: "Craft" },
-      { to: "/video-transcript", icon: Video, label: "Video Transcript" },
-      { to: "/rss", icon: Rss, label: "RSS Feeds" },
-      { to: "/task-routing", icon: RouteIcon, label: "Task Routing" },
-      { to: "/interrupt-resume", icon: PauseCircle, label: "Interrupt/Resume" },
-      { to: "/blind-council", icon: EyeOff, label: "Blind Council" },
-      { to: "/what-if", icon: GitMerge, label: "What-If" },
-      { to: "/verifiable", icon: ShieldCheck, label: "Verifiable" },
-      { to: "/honesty", icon: Scale, label: "Honesty" },
-      { to: "/sop", icon: ClipboardList, label: "SOPs" },
-      { to: "/prompt-filter", icon: Filter, label: "Prompt Filter" },
-      { to: "/member-evolution", icon: TrendingUp, label: "Member Evolution" },
-      { to: "/negation", icon: AlertTriangle, label: "Negation" },
-      { to: "/cross-memory", icon: Brain, label: "Cross-Memory" },
-      { to: "/verbosity", icon: Volume2, label: "Verbosity" },
-      { to: "/token-conservation", icon: Minimize2, label: "Token Conservation" },
-      { to: "/specialisation", icon: Microscope, label: "Specialisation" },
-      { to: "/skill-selection", icon: Wrench, label: "Skill Selection" },
+      { to: "/fine-tune", icon: Cpu, label: "Fine-Tune" },
+      { to: "/image-gen", icon: ImageIcon, label: "Image Gen" },
     ],
   },
   {
@@ -252,7 +236,7 @@ const navGroups = [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationMismatch>
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -265,7 +249,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="apple-mobile-web-app-title" content="Nexus" />
         <Meta />
         <Links />
-        <script dangerouslySetInnerHTML={{ __html: `
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
           (function() {
             try {
               var theme = localStorage.getItem('nexus_theme') || 'default-dark';
@@ -283,7 +269,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
               if (theme === 'dark') root.classList.add('dark');
             } catch(e) {}
           })();
-        `}} />
+        `,
+          }}
+        />
       </head>
       <body>
         {children}
@@ -300,9 +288,7 @@ function NavItem({
   item: { to: string; icon: React.ElementType; label: string; end?: boolean };
 }) {
   const location = useLocation();
-  const isActive = item.end
-    ? location.pathname === item.to
-    : location.pathname.startsWith(item.to);
+  const isActive = item.end ? location.pathname === item.to : location.pathname.startsWith(item.to);
 
   return (
     <SidebarMenuItem>
@@ -325,11 +311,7 @@ function ThemeToggleButton() {
         tooltip={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
         className="flex items-center gap-2 text-muted-foreground hover:text-foreground cursor-pointer"
       >
-        {theme === "dark" ? (
-          <Sun className="size-4" />
-        ) : (
-          <Moon className="size-4" />
-        )}
+        {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
         <span className="group-data-[collapsible=icon]:hidden text-xs">
           {theme === "dark" ? "Light Mode" : "Dark Mode"}
         </span>
@@ -341,18 +323,18 @@ function ThemeToggleButton() {
 // ── Notification bell ─────────────────────────────────────────────────────────
 
 interface Notif {
-  id:        number;
-  type:      string;
-  title:     string;
-  message?:  string;
-  isRead:    boolean;
+  id: number;
+  type: string;
+  title: string;
+  message?: string;
+  isRead: boolean;
   createdAt: string;
 }
 
 function NotificationBell() {
-  const [open,        setOpen]        = useState(false);
-  const [unread,      setUnread]      = useState(0);
-  const [notifs,      setNotifs]      = useState<Notif[]>([]);
+  const [open, setOpen] = useState(false);
+  const [unread, setUnread] = useState(0);
+  const [notifs, setNotifs] = useState<Notif[]>([]);
   const [loadingList, setLoadingList] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -365,7 +347,9 @@ function NotificationBell() {
         const data = await res.json();
         setUnread(data.unreadCount ?? 0);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   // Fetch full notification list (only when panel opens)
@@ -378,7 +362,9 @@ function NotificationBell() {
         setNotifs(data.notifications ?? []);
         setUnread(data.unreadCount ?? 0);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setLoadingList(false);
   }, []);
 
@@ -386,7 +372,9 @@ function NotificationBell() {
   useEffect(() => {
     fetchCount();
     timerRef.current = setInterval(fetchCount, 60_000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [fetchCount]);
 
   // Fetch full list when opened
@@ -409,9 +397,11 @@ function NotificationBell() {
   const markRead = async (id: number) => {
     try {
       await fetch(`/api/notifications/${id}/read`, { method: "POST" });
-      setNotifs((prev) => prev.map((n) => n.id === id ? { ...n, isRead: true } : n));
+      setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
       setUnread((c) => Math.max(0, c - 1));
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   };
 
   const dismiss = async (id: number, e: React.MouseEvent) => {
@@ -420,7 +410,9 @@ function NotificationBell() {
       await fetch(`/api/notifications/${id}/dismiss`, { method: "POST" });
       setNotifs((prev) => prev.filter((n) => n.id !== id));
       setUnread((c) => Math.max(0, c - 1));
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   };
 
   const dismissAll = async () => {
@@ -428,7 +420,9 @@ function NotificationBell() {
       await fetch("/api/notifications/dismiss-all", { method: "POST" });
       setNotifs([]);
       setUnread(0);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   };
 
   return (
@@ -484,7 +478,9 @@ function NotificationBell() {
               notifs.map((n) => (
                 <div
                   key={n.id}
-                  onClick={() => { if (!n.isRead) markRead(n.id); }}
+                  onClick={() => {
+                    if (!n.isRead) markRead(n.id);
+                  }}
                   className="flex items-start gap-2 px-3 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors group/item"
                   style={{ borderBottom: "1px solid hsl(var(--border)/0.4)" }}
                 >
@@ -492,11 +488,15 @@ function NotificationBell() {
                     <span className="mt-1.5 size-1.5 rounded-full bg-primary shrink-0" />
                   )}
                   <div className={`flex-1 min-w-0 ${n.isRead ? "pl-3.5" : ""}`}>
-                    <p className={`text-xs font-medium leading-tight ${n.isRead ? "text-muted-foreground" : ""}`}>
+                    <p
+                      className={`text-xs font-medium leading-tight ${n.isRead ? "text-muted-foreground" : ""}`}
+                    >
                       {n.title}
                     </p>
                     {n.message && (
-                      <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">
+                        {n.message}
+                      </p>
                     )}
                     <p className="text-[10px] text-muted-foreground/60 mt-1">
                       {new Date(n.createdAt).toLocaleString()}
@@ -527,12 +527,15 @@ function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="px-3 py-4">
         <div className="flex items-center justify-between">
-          <NavLink to="/dashboard" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
+          <NavLink
+            to="/dashboard"
+            className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center"
+          >
             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-bold">
-              J
+              N
             </div>
             <span className="text-sm font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
-              JUDICA
+              NEXUS
             </span>
           </NavLink>
           <NotificationBell />
@@ -561,9 +564,7 @@ function AppSidebar() {
                   {initials}
                 </div>
                 <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-                  <span className="text-xs font-medium leading-none">
-                    {displayName}
-                  </span>
+                  <span className="text-xs font-medium leading-none">{displayName}</span>
                   <span className="text-[10px] text-muted-foreground leading-tight mt-0.5">
                     {user?.role ?? ""}
                   </span>
@@ -597,9 +598,9 @@ export default function App() {
   // Register PWA service worker
   useEffect(() => {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      navigator.serviceWorker
-        .register("/sw.js", { scope: "/" })
-        .catch(() => { /* non-fatal in dev */ });
+      navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {
+        /* non-fatal in dev */
+      });
     }
   }, []);
 
@@ -637,7 +638,7 @@ export default function App() {
               <main className="flex-1 overflow-auto">
                 <div className="flex items-center gap-2 border-b border-border px-4 py-2 md:hidden">
                   <SidebarTrigger />
-                  <span className="text-sm font-semibold">JUDICA</span>
+                  <span className="text-sm font-semibold">NEXUS</span>
                 </div>
                 <Outlet />
               </main>
@@ -658,9 +659,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   if (isRouteErrorResponse(error)) {
     message = error.status === 404 ? "404" : "Error";
     details =
-      error.status === 404
-        ? "The requested page could not be found."
-        : error.statusText || details;
+      error.status === 404 ? "The requested page could not be found." : error.statusText || details;
   } else if (error && error instanceof Error) {
     details = error.message;
     stack = import.meta.env.DEV ? error.stack : undefined;

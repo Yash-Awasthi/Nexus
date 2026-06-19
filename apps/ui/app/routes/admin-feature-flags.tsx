@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Feature Flags — Admin management of feature flags.
  *
@@ -78,10 +79,15 @@ export default function AdminFeatureFlags() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { loadFlags(); }, [loadFlags]);
+  useEffect(() => {
+    loadFlags();
+  }, [loadFlags]);
 
   const createFlag = useCallback(async () => {
-    if (!newFlag.key.trim()) { setErr("Key is required"); return; }
+    if (!newFlag.key.trim()) {
+      setErr("Key is required");
+      return;
+    }
     setCreating(true);
     setErr("");
     try {
@@ -95,12 +101,19 @@ export default function AdminFeatureFlags() {
           enabled: false,
         }),
       });
-      if (!r.ok) { const d = await r.json(); setErr(d.error ?? "Create failed"); return; }
+      if (!r.ok) {
+        const d = await r.json();
+        setErr(d.error ?? "Create failed");
+        return;
+      }
       setShowCreate(false);
       setNewFlag({ key: "", description: "", rolloutPercent: "100" });
       loadFlags();
-    } catch { setErr("Create failed"); }
-    finally { setCreating(false); }
+    } catch {
+      setErr("Create failed");
+    } finally {
+      setCreating(false);
+    }
   }, [newFlag, loadFlags]);
 
   const toggleFlag = useCallback(async (flag: FeatureFlag) => {
@@ -111,7 +124,7 @@ export default function AdminFeatureFlags() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...flag, enabled: !flag.enabled }),
       });
-      setFlags(prev => prev.map(f => f.id === flag.id ? { ...f, enabled: !f.enabled } : f));
+      setFlags((prev) => prev.map((f) => (f.id === flag.id ? { ...f, enabled: !f.enabled } : f)));
     } catch {}
     setToggling(null);
   }, []);
@@ -123,7 +136,7 @@ export default function AdminFeatureFlags() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...flag, rolloutPercent: pct }),
       });
-      setFlags(prev => prev.map(f => f.id === flag.id ? { ...f, rolloutPercent: pct } : f));
+      setFlags((prev) => prev.map((f) => (f.id === flag.id ? { ...f, rolloutPercent: pct } : f)));
     } catch {}
   }, []);
 
@@ -132,17 +145,18 @@ export default function AdminFeatureFlags() {
     setDeleting(id);
     try {
       await fetch(`/api/feature-flags/admin/flags/${id}`, { method: "DELETE" });
-      setFlags(prev => prev.filter(f => f.id !== id));
+      setFlags((prev) => prev.filter((f) => f.id !== id));
     } catch {}
     setDeleting(null);
   }, []);
 
-  const filtered = flags.filter(f =>
-    f.key.toLowerCase().includes(searchFilter.toLowerCase()) ||
-    (f.description ?? "").toLowerCase().includes(searchFilter.toLowerCase())
+  const filtered = flags.filter(
+    (f) =>
+      f.key.toLowerCase().includes(searchFilter.toLowerCase()) ||
+      (f.description ?? "").toLowerCase().includes(searchFilter.toLowerCase()),
   );
 
-  const enabledCount = flags.filter(f => f.enabled).length;
+  const enabledCount = flags.filter((f) => f.enabled).length;
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -172,7 +186,7 @@ export default function AdminFeatureFlags() {
       <Input
         placeholder="Search flags…"
         value={searchFilter}
-        onChange={e => setSearchFilter(e.target.value)}
+        onChange={(e) => setSearchFilter(e.target.value)}
         className="max-w-sm"
       />
 
@@ -220,7 +234,7 @@ export default function AdminFeatureFlags() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {filtered.map(flag => (
+          {filtered.map((flag) => (
             <Card key={flag.id} className={flag.enabled ? "" : "opacity-75"}>
               <CardContent className="pt-4 pb-4">
                 <div className="flex items-start gap-4">
@@ -244,11 +258,17 @@ export default function AdminFeatureFlags() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <code className="text-sm font-mono font-medium">{flag.key}</code>
                       <Badge
-                        className={flag.enabled
-                          ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
-                          : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"}
+                        className={
+                          flag.enabled
+                            ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
+                            : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                        }
                       >
-                        {flag.enabled ? <CheckCircle className="w-2.5 h-2.5 mr-1" /> : <XCircle className="w-2.5 h-2.5 mr-1" />}
+                        {flag.enabled ? (
+                          <CheckCircle className="w-2.5 h-2.5 mr-1" />
+                        ) : (
+                          <XCircle className="w-2.5 h-2.5 mr-1" />
+                        )}
                         {flag.enabled ? "on" : "off"}
                       </Badge>
                     </div>
@@ -266,7 +286,7 @@ export default function AdminFeatureFlags() {
                           min={0}
                           max={100}
                           value={flag.rolloutPercent ?? 100}
-                          onChange={e => updateRollout(flag, parseInt(e.target.value))}
+                          onChange={(e) => updateRollout(flag, parseInt(e.target.value))}
                           className="w-32 h-1.5 accent-primary"
                         />
                         <span className="text-xs text-muted-foreground w-10">
@@ -278,7 +298,8 @@ export default function AdminFeatureFlags() {
                       {flag.userOverrides && Object.keys(flag.userOverrides).length > 0 && (
                         <span className="text-xs text-muted-foreground flex items-center gap-1">
                           <Users className="w-3 h-3" />
-                          {Object.keys(flag.userOverrides).length} override{Object.keys(flag.userOverrides).length > 1 ? "s" : ""}
+                          {Object.keys(flag.userOverrides).length} override
+                          {Object.keys(flag.userOverrides).length > 1 ? "s" : ""}
                         </span>
                       )}
                     </div>
@@ -291,9 +312,11 @@ export default function AdminFeatureFlags() {
                     onClick={() => deleteFlag(flag.id)}
                     disabled={deleting === flag.id}
                   >
-                    {deleting === flag.id
-                      ? <Loader2 className="w-3 h-3 animate-spin" />
-                      : <Trash2 className="w-3 h-3" />}
+                    {deleting === flag.id ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3 h-3" />
+                    )}
                   </Button>
                 </div>
               </CardContent>
@@ -314,7 +337,7 @@ export default function AdminFeatureFlags() {
               <Input
                 placeholder="e.g. enable_new_chat_ui"
                 value={newFlag.key}
-                onChange={e => setNewFlag(f => ({ ...f, key: e.target.value }))}
+                onChange={(e) => setNewFlag((f) => ({ ...f, key: e.target.value }))}
                 className="font-mono"
               />
               <p className="text-xs text-muted-foreground">Lowercase, underscores only</p>
@@ -324,7 +347,7 @@ export default function AdminFeatureFlags() {
               <Input
                 placeholder="What does this flag control?"
                 value={newFlag.description}
-                onChange={e => setNewFlag(f => ({ ...f, description: e.target.value }))}
+                onChange={(e) => setNewFlag((f) => ({ ...f, description: e.target.value }))}
               />
             </div>
             <div className="space-y-1">
@@ -335,16 +358,20 @@ export default function AdminFeatureFlags() {
                   min={0}
                   max={100}
                   value={parseInt(newFlag.rolloutPercent) || 100}
-                  onChange={e => setNewFlag(f => ({ ...f, rolloutPercent: e.target.value }))}
+                  onChange={(e) => setNewFlag((f) => ({ ...f, rolloutPercent: e.target.value }))}
                   className="flex-1 accent-primary"
                 />
-                <span className="text-sm font-medium w-10 text-right">{newFlag.rolloutPercent}%</span>
+                <span className="text-sm font-medium w-10 text-right">
+                  {newFlag.rolloutPercent}%
+                </span>
               </div>
             </div>
             {err && <p className="text-red-500 text-xs">{err}</p>}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowCreate(false)}>
+              Cancel
+            </Button>
             <Button onClick={createFlag} disabled={creating || !newFlag.key.trim()}>
               {creating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Create (disabled by default)

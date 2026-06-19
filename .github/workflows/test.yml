@@ -20,21 +20,36 @@ jobs:
         with:
           node-version: "20.19.0"
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+
+      # Use --no-frozen-lockfile so the lockfile can auto-heal when workspace
+      # package.json files diverge from the checked-in lock (e.g. after manual
+      # package.json edits). Frozen mode is enforced in the build matrix.
+      - run: pnpm install --no-frozen-lockfile
+
+      # Build all packages so cross-package type imports resolve at test time.
       - run: pnpm build
-      - run: pnpm run test -- --coverage
+
+      # Run vitest from the workspace root so the root vitest.config.ts
+      # controls the include globs (packages/*/tests/**) rather than having
+      # each per-package script inherit the root config from a subdirectory,
+      # which would cause "No test files found" failures.
+      - name: Run unit tests with coverage
+        run: pnpm exec vitest run --coverage
         env:
           # Schema tests are type-only (no live queries), but the db client
           # throws at import time without DATABASE_URL.  A placeholder URL
           # satisfies the guard; no real connection is made.
           DATABASE_URL: postgresql://test:test@localhost/nexus_ci
+
       - name: Upload coverage
         uses: codecov/codecov-action@v7
         if: always()
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: unit
-          files: packages/*/coverage/lcov.info
+          # Coverage is written to the workspace root coverage/ dir when vitest
+          # is run from root (not per-package coverage dirs).
+          files: coverage/lcov.info,packages/*/coverage/lcov.info
           fail_ci_if_error: false
 
   e2e:
@@ -61,7 +76,7 @@ jobs:
         with:
           node-version: "20.19.0"
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
       - run: pnpm build
       - name: Enable pgvector extension
         run: PGPASSWORD=nexus psql -h localhost -U nexus -d nexus_e2e -c "CREATE EXTENSION IF NOT EXISTS vector;"

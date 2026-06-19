@@ -1,13 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
 import type { Route } from "./+types/product.desktop-app";
 import { ProductPage } from "~/components/product-page";
-import {
-  Monitor,
-  WifiOff,
-  PanelTop,
-  Keyboard,
-  LayoutDashboard,
-  RefreshCw,
-} from "lucide-react";
+import { Monitor, WifiOff, PanelTop, Keyboard, LayoutDashboard, RefreshCw } from "lucide-react";
 
 export function meta({}: Route.MetaArgs) {
   return [

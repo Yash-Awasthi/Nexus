@@ -40,7 +40,9 @@ async function requireAdminRole(request: FastifyRequest, reply: FastifyReply): P
     .limit(1);
 
   if (!user || (user.role !== "admin" && user.role !== "owner")) {
-    await reply.code(403).send({ error: "admin_required", message: "This endpoint requires the admin role" });
+    await reply
+      .code(403)
+      .send({ error: "admin_required", message: "This endpoint requires the admin role" });
   }
 }
 
@@ -67,8 +69,10 @@ function safeUserAdmin(u: typeof users.$inferSelect) {
 
 export async function adminUsersRoutes(app: FastifyInstance): Promise<void> {
   if (!process.env.DATABASE_URL) {
-    const na = async (_: unknown, reply: { code: (n: number) => { send: (v: unknown) => unknown } }) =>
-      reply.code(503).send({ error: "DATABASE_URL not configured" });
+    const na = async (
+      _: unknown,
+      reply: { code: (n: number) => { send: (v: unknown) => unknown } },
+    ) => reply.code(503).send({ error: "DATABASE_URL not configured" });
     app.get("/admin/users*", na);
     app.post("/admin/users*", na);
     app.patch("/admin/users*", na);
@@ -79,39 +83,35 @@ export async function adminUsersRoutes(app: FastifyInstance): Promise<void> {
   /** GET /admin/users?active=true&tier=pro&limit=100&offset=0 */
   app.get<{
     Querystring: { active?: string; tier?: string; role?: string; limit?: string; offset?: string };
-  }>(
-    "/admin/users",
-    { preHandler: requireAdminRole },
-    async (request, reply) => {
-      const limit = Math.min(parseInt(request.query.limit ?? "100", 10), 500);
-      const offset = parseInt(request.query.offset ?? "0", 10);
+  }>("/admin/users", { preHandler: requireAdminRole }, async (request, reply) => {
+    const limit = Math.min(parseInt(request.query.limit ?? "100", 10), 500);
+    const offset = parseInt(request.query.offset ?? "0", 10);
 
-      let query = db.select().from(users);
+    let query = db.select().from(users);
 
-      if (request.query.active === "true") {
-        query = query.where(isNull(users.deletedAt)) as typeof query;
-      } else if (request.query.active === "false") {
-        query = query.where(isNotNull(users.deletedAt)) as typeof query;
-      }
+    if (request.query.active === "true") {
+      query = query.where(isNull(users.deletedAt)) as typeof query;
+    } else if (request.query.active === "false") {
+      query = query.where(isNotNull(users.deletedAt)) as typeof query;
+    }
 
-      const rows = await query.orderBy(desc(users.createdAt)).limit(limit).offset(offset);
+    const rows = await query.orderBy(desc(users.createdAt)).limit(limit).offset(offset);
 
-      let filtered = rows;
-      if (request.query.tier) {
-        filtered = filtered.filter((u) => u.tier === request.query.tier);
-      }
-      if (request.query.role) {
-        filtered = filtered.filter((u) => u.role === request.query.role);
-      }
+    let filtered = rows;
+    if (request.query.tier) {
+      filtered = filtered.filter((u) => u.tier === request.query.tier);
+    }
+    if (request.query.role) {
+      filtered = filtered.filter((u) => u.role === request.query.role);
+    }
 
-      return reply.send({
-        users: filtered.map(safeUserAdmin),
-        total: filtered.length,
-        limit,
-        offset,
-      });
-    },
-  );
+    return reply.send({
+      users: filtered.map(safeUserAdmin),
+      total: filtered.length,
+      limit,
+      offset,
+    });
+  });
 
   /** GET /admin/users/:id */
   app.get<{ Params: { id: string } }>(
@@ -148,7 +148,8 @@ export async function adminUsersRoutes(app: FastifyInstance): Promise<void> {
       const updates: Record<string, unknown> = {};
       if (request.body.tier) updates.tier = request.body.tier;
       if (request.body.role) updates.role = request.body.role;
-      if (request.body.emailVerified !== undefined) updates.emailVerified = request.body.emailVerified;
+      if (request.body.emailVerified !== undefined)
+        updates.emailVerified = request.body.emailVerified;
       if (request.body.name !== undefined) updates.name = request.body.name.trim();
 
       if (Object.keys(updates).length === 0) {

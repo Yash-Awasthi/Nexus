@@ -1,6 +1,7 @@
-"use client"
+// SPDX-License-Identifier: Apache-2.0
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
   PlusIcon,
   Trash2Icon,
@@ -9,24 +10,23 @@ import {
   KeyIcon,
   GlobeIcon,
   MonitorSmartphoneIcon,
-  ChromeIcon,
   SettingsIcon,
   CodeIcon,
   EyeIcon,
   EyeOffIcon,
-} from "lucide-react"
+} from "lucide-react";
 
-import { Button } from "~/components/ui/button"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "~/components/ui/card"
-import { Input } from "~/components/ui/input"
-import { Badge } from "~/components/ui/badge"
+import { Button } from "~/components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "~/components/ui/card";
+import { Input } from "~/components/ui/input";
+import { Badge } from "~/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select"
+} from "~/components/ui/select";
 import {
   Dialog,
   DialogTrigger,
@@ -36,56 +36,67 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
-} from "~/components/ui/dialog"
+} from "~/components/ui/dialog";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type Surface = "chrome_extension" | "slack_bot" | "discord_bot" | "widget" | "desktop" | "mobile"
-type WidgetTheme = "light" | "dark" | "auto"
-type WidgetPosition = "bottom-right" | "bottom-left"
+type Surface = "chrome_extension" | "slack_bot" | "discord_bot" | "widget" | "desktop" | "mobile";
+type WidgetTheme = "light" | "dark" | "auto";
+type WidgetPosition = "bottom-right" | "bottom-left";
 
 interface Widget {
-  id: string
-  name: string
-  allowedOrigins: string[]
-  apiKey: string
-  theme: WidgetTheme
-  position: WidgetPosition
-  customCss: string | null
-  isActive: boolean
-  createdAt: string
-  updatedAt: string
+  id: string;
+  name: string;
+  allowedOrigins: string[];
+  apiKey: string;
+  theme: WidgetTheme;
+  position: WidgetPosition;
+  customCss: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface SurfaceToken {
-  id: string
-  surface: Surface
-  label: string
-  lastUsedAt: string | null
-  expiresAt: string | null
-  createdAt: string
+  id: string;
+  surface: Surface;
+  label: string;
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
 }
 
 interface UsageStats {
-  tokensBySurface: Record<string, number>
-  widgets: { total: number; active: number }
+  tokensBySurface: Record<string, number>;
+  widgets: { total: number; active: number };
 }
 
 interface SurfaceAccessManagerProps {
-  apiBase?: string
-  className?: string
+  apiBase?: string;
+  className?: string;
 }
 
 // ─── Surface metadata ────────────────────────────────────────────────────────
 
-const SURFACE_META: Record<Surface, { label: string; icon: React.ElementType; description: string }> = {
-  chrome_extension: { label: "Chrome Extension", icon: ChromeIcon, description: "Browser sidebar + popup" },
+const SURFACE_META: Record<
+  Surface,
+  { label: string; icon: React.ElementType; description: string }
+> = {
+  chrome_extension: {
+    label: "Chrome Extension",
+    icon: GlobeIcon,
+    description: "Browser sidebar + popup",
+  },
   slack_bot: { label: "Slack Bot", icon: GlobeIcon, description: "Slack workspace integration" },
   discord_bot: { label: "Discord Bot", icon: GlobeIcon, description: "Discord server integration" },
   widget: { label: "Website Widget", icon: CodeIcon, description: "Embeddable chat widget" },
-  desktop: { label: "Desktop App", icon: MonitorSmartphoneIcon, description: "Native desktop application" },
+  desktop: {
+    label: "Desktop App",
+    icon: MonitorSmartphoneIcon,
+    description: "Native desktop application",
+  },
   mobile: { label: "Mobile App", icon: MonitorSmartphoneIcon, description: "Mobile application" },
-}
+};
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
 
@@ -96,12 +107,12 @@ async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
       "Content-Type": "application/json",
       ...init?.headers,
     },
-  })
+  });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body.error ?? `Request failed: ${res.status}`)
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `Request failed: ${res.status}`);
   }
-  return res.json() as Promise<T>
+  return res.json() as Promise<T>;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -110,12 +121,12 @@ export default function SurfaceAccessManager({
   apiBase = "",
   className = "",
 }: SurfaceAccessManagerProps) {
-  const [widgets, setWidgets] = React.useState<Widget[]>([])
-  const [tokens, setTokens] = React.useState<SurfaceToken[]>([])
-  const [stats, setStats] = React.useState<UsageStats | null>(null)
-  const [error, setError] = React.useState<string | null>(null)
-  const [tab, setTab] = React.useState<"widgets" | "tokens" | "setup">("widgets")
-  const [copied, setCopied] = React.useState<string | null>(null)
+  const [widgets, setWidgets] = React.useState<Widget[]>([]);
+  const [tokens, setTokens] = React.useState<SurfaceToken[]>([]);
+  const [stats, setStats] = React.useState<UsageStats | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [tab, setTab] = React.useState<"widgets" | "tokens" | "setup">("widgets");
+  const [copied, setCopied] = React.useState<string | null>(null);
 
   // ─── Fetch data ──────────────────────────────────────────────────────────
 
@@ -125,17 +136,19 @@ export default function SurfaceAccessManager({
         apiFetch<{ widgets: Widget[] }>(`${apiBase}/api/surfaces/widgets`),
         apiFetch<{ tokens: SurfaceToken[] }>(`${apiBase}/api/surfaces/tokens`),
         apiFetch<UsageStats>(`${apiBase}/api/surfaces/stats`),
-      ])
-      setWidgets(wRes.widgets)
-      setTokens(tRes.tokens)
-      setStats(sRes)
-      setError(null)
+      ]);
+      setWidgets(wRes.widgets);
+      setTokens(tRes.tokens);
+      setStats(sRes);
+      setError(null);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to load data")
+      setError(e instanceof Error ? e.message : "Failed to load data");
     }
-  }, [apiBase])
+  }, [apiBase]);
 
-  React.useEffect(() => { loadData() }, [loadData])
+  React.useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // ─── Widget actions ──────────────────────────────────────────────────────
 
@@ -145,74 +158,77 @@ export default function SurfaceAccessManager({
         method: "POST",
         body: JSON.stringify({
           name,
-          allowedOrigins: origins.split(",").map(s => s.trim()).filter(Boolean),
+          allowedOrigins: origins
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
         }),
-      })
-      await loadData()
+      });
+      await loadData();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to create widget")
+      setError(e instanceof Error ? e.message : "Failed to create widget");
     }
-  }
+  };
 
   const deleteWidget = async (id: string) => {
     try {
-      await apiFetch(`${apiBase}/api/surfaces/widgets/${id}`, { method: "DELETE" })
-      await loadData()
+      await apiFetch(`${apiBase}/api/surfaces/widgets/${id}`, { method: "DELETE" });
+      await loadData();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to delete widget")
+      setError(e instanceof Error ? e.message : "Failed to delete widget");
     }
-  }
+  };
 
   const toggleWidget = async (id: string, isActive: boolean) => {
     try {
       await apiFetch(`${apiBase}/api/surfaces/widgets/${id}`, {
         method: "PUT",
         body: JSON.stringify({ isActive }),
-      })
-      await loadData()
+      });
+      await loadData();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to update widget")
+      setError(e instanceof Error ? e.message : "Failed to update widget");
     }
-  }
+  };
 
   // ─── Token actions ───────────────────────────────────────────────────────
 
-  const [newTokenValue, setNewTokenValue] = React.useState<string | null>(null)
+  const [newTokenValue, setNewTokenValue] = React.useState<string | null>(null);
 
   const createToken = async (surface: Surface, label: string, expiresInDays?: number) => {
     try {
       const result = await apiFetch<{ token: string }>(`${apiBase}/api/surfaces/tokens`, {
         method: "POST",
         body: JSON.stringify({ surface, label, expiresInDays }),
-      })
-      setNewTokenValue(result.token)
-      await loadData()
+      });
+      setNewTokenValue(result.token);
+      await loadData();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to create token")
+      setError(e instanceof Error ? e.message : "Failed to create token");
     }
-  }
+  };
 
   const revokeToken = async (id: string) => {
     try {
-      await apiFetch(`${apiBase}/api/surfaces/tokens/${id}`, { method: "DELETE" })
-      await loadData()
+      await apiFetch(`${apiBase}/api/surfaces/tokens/${id}`, { method: "DELETE" });
+      await loadData();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to revoke token")
+      setError(e instanceof Error ? e.message : "Failed to revoke token");
     }
-  }
+  };
 
   // ─── Clipboard ───────────────────────────────────────────────────────────
 
   const copyToClipboard = async (text: string, key: string) => {
-    await navigator.clipboard.writeText(text)
-    setCopied(key)
-    setTimeout(() => setCopied(null), 2000)
-  }
+    await navigator.clipboard.writeText(text);
+    setCopied(key);
+    setTimeout(() => setCopied(null), 2000);
+  };
 
   const getEmbedSnippet = (widget: Widget) => {
-    const base = apiBase || window.location.origin
-    return `<script src="${base}/api/surfaces/embed.js"\n  data-api-key="${widget.apiKey}"\n  data-theme="${widget.theme}"\n  data-position="${widget.position}"></script>`
-  }
+    const base = apiBase || window.location.origin;
+    return `<script src="${base}/api/surfaces/embed.js"\n  data-api-key="${widget.apiKey}"\n  data-theme="${widget.theme}"\n  data-position="${widget.position}"></script>`;
+  };
 
   // ─── Render ──────────────────────────────────────────────────────────────
 
@@ -291,7 +307,11 @@ export default function SurfaceAccessManager({
                         onClick={() => toggleWidget(w.id, !w.isActive)}
                         title={w.isActive ? "Deactivate" : "Activate"}
                       >
-                        {w.isActive ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+                        {w.isActive ? (
+                          <EyeOffIcon className="h-4 w-4" />
+                        ) : (
+                          <EyeIcon className="h-4 w-4" />
+                        )}
                       </Button>
                       <Button
                         variant="ghost"
@@ -304,7 +324,8 @@ export default function SurfaceAccessManager({
                     </div>
                   </div>
                   <CardDescription>
-                    Theme: {w.theme} | Position: {w.position} | Origins: {w.allowedOrigins.length > 0 ? w.allowedOrigins.join(", ") : "any"}
+                    Theme: {w.theme} | Position: {w.position} | Origins:{" "}
+                    {w.allowedOrigins.length > 0 ? w.allowedOrigins.join(", ") : "any"}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -374,11 +395,15 @@ export default function SurfaceAccessManager({
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      copyToClipboard(newTokenValue, "new-token")
-                      setTimeout(() => setNewTokenValue(null), 3000)
+                      copyToClipboard(newTokenValue, "new-token");
+                      setTimeout(() => setNewTokenValue(null), 3000);
                     }}
                   >
-                    {copied === "new-token" ? <CheckIcon className="h-4 w-4" /> : <CopyIcon className="h-4 w-4" />}
+                    {copied === "new-token" ? (
+                      <CheckIcon className="h-4 w-4" />
+                    ) : (
+                      <CopyIcon className="h-4 w-4" />
+                    )}
                   </Button>
                 </div>
               </CardContent>
@@ -406,7 +431,7 @@ export default function SurfaceAccessManager({
                 </thead>
                 <tbody>
                   {tokens.map((t) => {
-                    const meta = SURFACE_META[t.surface]
+                    const meta = SURFACE_META[t.surface];
                     return (
                       <tr key={t.id} className="border-b last:border-0">
                         <td className="px-4 py-2">
@@ -437,7 +462,7 @@ export default function SurfaceAccessManager({
                           </Button>
                         </td>
                       </tr>
-                    )
+                    );
                   })}
                 </tbody>
               </table>
@@ -452,7 +477,7 @@ export default function SurfaceAccessManager({
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <ChromeIcon className="h-5 w-5" />
+                <GlobeIcon className="h-5 w-5" />
                 Chrome Extension
               </CardTitle>
               <CardDescription>
@@ -461,7 +486,9 @@ export default function SurfaceAccessManager({
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
-                <li>Generate a <strong>Chrome Extension</strong> access token in the Tokens tab.</li>
+                <li>
+                  Generate a <strong>Chrome Extension</strong> access token in the Tokens tab.
+                </li>
                 <li>
                   Download or build the extension from{" "}
                   <code className="rounded bg-muted px-1 py-0.5 text-xs">extensions/chrome/</code>.
@@ -473,7 +500,8 @@ export default function SurfaceAccessManager({
                 </li>
                 <li>Open the extension options and paste your API URL and token.</li>
                 <li>
-                  Press <kbd className="rounded border bg-muted px-1.5 py-0.5 text-xs">Ctrl+Shift+A</kbd>{" "}
+                  Press{" "}
+                  <kbd className="rounded border bg-muted px-1.5 py-0.5 text-xs">Ctrl+Shift+A</kbd>{" "}
                   to open the council sidebar on any page.
                 </li>
               </ol>
@@ -505,13 +533,14 @@ export default function SurfaceAccessManager({
                 <GlobeIcon className="h-5 w-5" />
                 Slack / Discord Bots
               </CardTitle>
-              <CardDescription>
-                Bring the council into your team chat.
-              </CardDescription>
+              <CardDescription>Bring the council into your team chat.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
-                <li>Generate a <strong>Slack Bot</strong> or <strong>Discord Bot</strong> token in the Tokens tab.</li>
+                <li>
+                  Generate a <strong>Slack Bot</strong> or <strong>Discord Bot</strong> token in the
+                  Tokens tab.
+                </li>
                 <li>Configure the bot integration in your workspace/server settings.</li>
                 <li>The bot uses the same council and knowledge base as the web app.</li>
               </ol>
@@ -524,13 +553,14 @@ export default function SurfaceAccessManager({
                 <MonitorSmartphoneIcon className="h-5 w-5" />
                 Desktop / Mobile
               </CardTitle>
-              <CardDescription>
-                Use the council from native applications.
-              </CardDescription>
+              <CardDescription>Use the council from native applications.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
-                <li>Generate a <strong>Desktop</strong> or <strong>Mobile</strong> token in the Tokens tab.</li>
+                <li>
+                  Generate a <strong>Desktop</strong> or <strong>Mobile</strong> token in the Tokens
+                  tab.
+                </li>
                 <li>Open the desktop/mobile app and enter your API URL + token in settings.</li>
                 <li>Same agents, same knowledge base, accessible natively.</li>
               </ol>
@@ -539,24 +569,28 @@ export default function SurfaceAccessManager({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ─── Create Widget Dialog ────────────────────────────────────────────────────
 
-function CreateWidgetDialog({ onCreate }: { onCreate: (name: string, origins: string) => Promise<void> }) {
-  const [name, setName] = React.useState("")
-  const [origins, setOrigins] = React.useState("")
-  const [loading, setLoading] = React.useState(false)
+function CreateWidgetDialog({
+  onCreate,
+}: {
+  onCreate: (name: string, origins: string) => Promise<void>;
+}) {
+  const [name, setName] = React.useState("");
+  const [origins, setOrigins] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
 
   const handleCreate = async () => {
-    if (!name.trim()) return
-    setLoading(true)
-    await onCreate(name.trim(), origins)
-    setName("")
-    setOrigins("")
-    setLoading(false)
-  }
+    if (!name.trim()) return;
+    setLoading(true);
+    await onCreate(name.trim(), origins);
+    setName("");
+    setOrigins("");
+    setLoading(false);
+  };
 
   return (
     <Dialog>
@@ -606,7 +640,7 @@ function CreateWidgetDialog({ onCreate }: { onCreate: (name: string, origins: st
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 // ─── Create Token Dialog ─────────────────────────────────────────────────────
@@ -614,22 +648,22 @@ function CreateWidgetDialog({ onCreate }: { onCreate: (name: string, origins: st
 function CreateTokenDialog({
   onCreate,
 }: {
-  onCreate: (surface: Surface, label: string, expiresInDays?: number) => Promise<void>
+  onCreate: (surface: Surface, label: string, expiresInDays?: number) => Promise<void>;
 }) {
-  const [surface, setSurface] = React.useState<Surface>("chrome_extension")
-  const [label, setLabel] = React.useState("")
-  const [expiresInDays, setExpiresInDays] = React.useState("")
-  const [loading, setLoading] = React.useState(false)
+  const [surface, setSurface] = React.useState<Surface>("chrome_extension");
+  const [label, setLabel] = React.useState("");
+  const [expiresInDays, setExpiresInDays] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
 
   const handleCreate = async () => {
-    if (!label.trim()) return
-    setLoading(true)
-    const days = expiresInDays ? parseInt(expiresInDays, 10) : undefined
-    await onCreate(surface, label.trim(), days)
-    setLabel("")
-    setExpiresInDays("")
-    setLoading(false)
-  }
+    if (!label.trim()) return;
+    setLoading(true);
+    const days = expiresInDays ? parseInt(expiresInDays, 10) : undefined;
+    await onCreate(surface, label.trim(), days);
+    setLabel("");
+    setExpiresInDays("");
+    setLoading(false);
+  };
 
   return (
     <Dialog>
@@ -694,5 +728,5 @@ function CreateTokenDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

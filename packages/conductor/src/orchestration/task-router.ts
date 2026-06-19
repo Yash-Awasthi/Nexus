@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { IEventBus } from "./event-bus";
 import { IEventStore } from "./interfaces/persistence.interface";
 

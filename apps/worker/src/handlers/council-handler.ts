@@ -15,9 +15,13 @@
  */
 
 import type { CouncilRequest, ModelVote } from "@nexus/contracts";
-import type { ILLMTransport, ILLMMessage, ILLMResponse } from "@nexus/council";
-import { CouncilService } from "@nexus/council";
-import type { CouncilPersistPayload } from "@nexus/council";
+import {
+  CouncilService,
+  type ILLMTransport,
+  type ILLMMessage,
+  type ILLMResponse,
+  type CouncilPersistPayload,
+} from "@nexus/council";
 import { db } from "@nexus/db";
 import { verdicts, councilTranscripts } from "@nexus/db/schema";
 import {

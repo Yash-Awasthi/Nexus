@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import * as fs from "fs";
 import * as path from "path";
 
@@ -31,7 +32,7 @@ export function assertPathDescendsFrom(ancestorRaw: string, descendantRaw: strin
   const rel = path.relative(ancestor, descendant);
   if (rel.startsWith("..") || path.isAbsolute(rel)) {
     throw new Error(
-      `Path boundary violation: "${descendantRaw}" is not contained within root "${ancestorRaw}" (resolved: ${descendant} vs ${ancestor})`
+      `Path boundary violation: "${descendantRaw}" is not contained within root "${ancestorRaw}" (resolved: ${descendant} vs ${ancestor})`,
     );
   }
   return descendant;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 "use client";
 
 import { motion } from "framer-motion";
@@ -26,16 +27,12 @@ const itemVariants = {
     y: 0,
     transition: {
       duration: 0.5,
-      ease: "easeOut",
+      ease: "easeOut" as const,
     },
   },
 };
 
-export function StaggerChildren({
-  children,
-  className,
-  staggerDelay = 0.1,
-}: StaggerChildrenProps) {
+export function StaggerChildren({ children, className, staggerDelay = 0.1 }: StaggerChildrenProps) {
   return (
     <motion.div
       variants={containerVariants(staggerDelay)}
@@ -49,13 +46,7 @@ export function StaggerChildren({
   );
 }
 
-export function StaggerItem({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+export function StaggerItem({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <motion.div variants={itemVariants} className={className}>
       {children}

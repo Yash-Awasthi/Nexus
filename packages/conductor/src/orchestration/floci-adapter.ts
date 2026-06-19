@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { IExecutionAdapter, IExecutionContext } from "./interfaces/execution.interface";
 import {
   FlociClientError,
@@ -5,13 +6,13 @@ import {
   flociFetch,
   normalizeFlociEndpoint,
   probeFlociHealth,
-  resolveFlociEndpoint
+  resolveFlociEndpoint,
 } from "./floci-client";
 import {
   flociCreateLambdaFunction,
   flociDeleteLambdaFunction,
   flociInvokeLambda,
-  NormalizedFlociResult
+  NormalizedFlociResult,
 } from "./floci-lambda";
 import { IRuntimePersistence } from "./interfaces/persistence.interface";
 
@@ -87,7 +88,8 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
   async probeHealth(): Promise<FlociHealthStatus> {
     // Use a short timeout (200ms) when we know we're offline, to avoid
     // blocking startup for 12+ seconds on unreachable health probe paths.
-    const offline = process.env.GHOSTSTACK_OFFLINE_MODE === "1" ||
+    const offline =
+      process.env.GHOSTSTACK_OFFLINE_MODE === "1" ||
       (process.env.GHOSTSTACK_OFFLINE_MODE ?? "").toLowerCase() === "true";
     const timeoutMs = offline ? 200 : 4000;
     this.lastHealth = await probeFlociHealth(this.endpoint, timeoutMs);
@@ -107,18 +109,18 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
       if (this.strict) {
         throw new FlociClientError(
           `Floci strict mode: emulator not reachable at ${this.endpoint} (${status.error})`,
-          "UNREACHABLE"
+          "UNREACHABLE",
         );
       }
       context.logger?.warn?.("Floci health check failed (non-strict)", {
         endpoint: this.endpoint,
-        error: status.error
+        error: status.error,
       });
     } else {
       context.logger?.info?.("Floci health check OK", {
         endpoint: this.endpoint,
         healthPath: status.healthPath,
-        latencyMs: status.latencyMs
+        latencyMs: status.latencyMs,
       });
     }
     return status;
@@ -132,7 +134,7 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
     context.logger?.info?.(`Floci adapter dispatching action: ${action}`, {
       taskId: context.taskId,
       endpoint: this.endpoint,
-      strict: this.strict
+      strict: this.strict,
     });
 
     if (this.strict || action === "health") {
@@ -146,7 +148,7 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
         endpoint: this.endpoint,
         strict: this.strict,
         health: this.lastHealth,
-        latencyMs: Date.now() - started
+        latencyMs: Date.now() - started,
       };
     }
 
@@ -174,10 +176,7 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
         result = await this.runDeleteLambda(payload, context);
         break;
       default:
-        throw new FlociClientError(
-          `Unsupported Floci action: ${action}`,
-          "UNKNOWN_ACTION"
-        );
+        throw new FlociClientError(`Unsupported Floci action: ${action}`, "UNKNOWN_ACTION");
     }
 
     result.flociLatencyMs = Date.now() - started;
@@ -187,7 +186,7 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
       action,
       status: result.status,
       service: result.service,
-      mocked: result.mocked
+      mocked: result.mocked,
     });
     return result;
   }
@@ -196,7 +195,7 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
   async executeAction(
     action: string,
     payload: Record<string, unknown>,
-    context: IExecutionContext
+    context: IExecutionContext,
   ): Promise<Record<string, unknown>> {
     return this.execute({ type: "floci", payload: { action, ...payload } }, context);
   }
@@ -209,7 +208,7 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
       mocked: norm.mocked,
       httpStatus: norm.httpStatus,
       flociRequestMs: norm.flociRequestMs,
-      data: norm.data
+      data: norm.data,
     };
   }
 
@@ -217,7 +216,7 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
     context: IExecutionContext,
     service: string,
     mockBody: Record<string, unknown>,
-    err?: unknown
+    err?: unknown,
   ): Record<string, unknown> {
     if (this.strict) {
       throw err instanceof FlociClientError
@@ -226,7 +225,7 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
     }
     if (!this.allowMockFallback) {
       throw new Error(
-        `Floci unavailable and mock fallback disabled (set GHOSTSTACK_OFFLINE_MODE=true or GHOSTSTACK_FLOCI_MOCK_FALLBACK=true): ${err}`
+        `Floci unavailable and mock fallback disabled (set GHOSTSTACK_OFFLINE_MODE=true or GHOSTSTACK_FLOCI_MOCK_FALLBACK=true): ${err}`,
       );
     }
     context.logger?.warn?.(`Floci ${service}: using offline mock`, { error: err });
@@ -241,14 +240,14 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
       const res = await flociFetch(this.endpoint, {
         requestUrl: `${this.endpoint}/${bucketName}`,
         method: "PUT",
-        timeoutMs: 15000
+        timeoutMs: 15000,
       });
       if (res.ok) {
         // Emit S3 object created event for pipeline triggering
         await this.emitFlociEvent("floci_s3_object_created", {
           bucketName,
           key: "", // bucket creation doesn't create an object, but signals availability
-          action: "create_s3_bucket"
+          action: "create_s3_bucket",
         });
         return {
           status: "success",
@@ -257,7 +256,7 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
           bucketUrl: `${this.endpoint}/${bucketName}`,
           mocked: false,
           httpStatus: res.status,
-          flociRequestMs: res.latencyMs
+          flociRequestMs: res.latencyMs,
         };
       }
       if (this.strict) {
@@ -265,14 +264,22 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
           `Floci S3 create bucket failed: HTTP ${res.status}`,
           "HTTP_ERROR",
           res.status,
-          res.bodyText.slice(0, 500)
+          res.bodyText.slice(0, 500),
         );
       }
     } catch (err) {
-      return this.mockOrThrow(context, "s3", { bucketName, bucketUrl: `${this.endpoint}/${bucketName}` }, err);
+      return this.mockOrThrow(
+        context,
+        "s3",
+        { bucketName, bucketUrl: `${this.endpoint}/${bucketName}` },
+        err,
+      );
     }
 
-    return this.mockOrThrow(context, "s3", { bucketName, bucketUrl: `${this.endpoint}/${bucketName}` });
+    return this.mockOrThrow(context, "s3", {
+      bucketName,
+      bucketUrl: `${this.endpoint}/${bucketName}`,
+    });
   }
 
   private async runSqsCreateQueue(payload: Record<string, unknown>, context: IExecutionContext) {
@@ -283,14 +290,14 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
       const params = new URLSearchParams({
         Action: "CreateQueue",
         QueueName: queueName,
-        Version: "2012-11-05"
+        Version: "2012-11-05",
       });
       const res = await flociFetch(this.endpoint, {
         requestUrl: `${this.endpoint}/`,
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: params.toString(),
-        timeoutMs: 15000
+        timeoutMs: 15000,
       });
       if (res.ok) {
         return {
@@ -300,24 +307,29 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
           queueUrl: `${this.endpoint}/000000000000/${queueName}`,
           mocked: false,
           httpStatus: res.status,
-          flociRequestMs: res.latencyMs
+          flociRequestMs: res.latencyMs,
         };
       }
       if (this.strict) {
-        throw new FlociClientError(`Floci SQS failed: HTTP ${res.status}`, "HTTP_ERROR", res.status, res.bodyText);
+        throw new FlociClientError(
+          `Floci SQS failed: HTTP ${res.status}`,
+          "HTTP_ERROR",
+          res.status,
+          res.bodyText,
+        );
       }
     } catch (err) {
       return this.mockOrThrow(
         context,
         "sqs",
         { queueName, queueUrl: `${this.endpoint}/000000000000/${queueName}` },
-        err
+        err,
       );
     }
 
     return this.mockOrThrow(context, "sqs", {
       queueName,
-      queueUrl: `${this.endpoint}/000000000000/${queueName}`
+      queueUrl: `${this.endpoint}/000000000000/${queueName}`,
     });
   }
 
@@ -330,17 +342,17 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
         TableName: tableName,
         KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
         AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
-        ProvisionedThroughput: { ReadCapacityUnits: 5, WriteCapacityUnits: 5 }
+        ProvisionedThroughput: { ReadCapacityUnits: 5, WriteCapacityUnits: 5 },
       };
       const res = await flociFetch(this.endpoint, {
         requestUrl: `${this.endpoint}/`,
         method: "POST",
         headers: {
           "Content-Type": "application/x-amz-json-1.0",
-          "X-Amz-Target": "DynamoDB_20120810.CreateTable"
+          "X-Amz-Target": "DynamoDB_20120810.CreateTable",
         },
         body: JSON.stringify(ddbPayload),
-        timeoutMs: 15000
+        timeoutMs: 15000,
       });
       if (res.ok) {
         return {
@@ -349,11 +361,16 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
           tableName,
           mocked: false,
           httpStatus: res.status,
-          flociRequestMs: res.latencyMs
+          flociRequestMs: res.latencyMs,
         };
       }
       if (this.strict) {
-        throw new FlociClientError(`Floci DynamoDB failed: HTTP ${res.status}`, "HTTP_ERROR", res.status, res.bodyText);
+        throw new FlociClientError(
+          `Floci DynamoDB failed: HTTP ${res.status}`,
+          "HTTP_ERROR",
+          res.status,
+          res.bodyText,
+        );
       }
     } catch (err) {
       return this.mockOrThrow(context, "dynamodb", { tableName }, err);
@@ -370,7 +387,7 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
       const norm = await flociCreateLambdaFunction(this.endpoint, functionName, {
         handlerBody: payload.handlerBody as string | undefined,
         runtime: payload.runtime as string | undefined,
-        timeout: payload.timeout as number | undefined
+        timeout: payload.timeout as number | undefined,
       });
       return this.fromNormalized(norm);
     } catch (err) {
@@ -378,7 +395,7 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
         context,
         "lambda",
         { functionName, action: "create_lambda", data: { FunctionName: functionName } },
-        err
+        err,
       );
     }
   }
@@ -392,7 +409,7 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
         functionName,
         payload: payload.event ?? payload.payload ?? {},
         invocationType: (payload.invocationType as "RequestResponse") ?? "RequestResponse",
-        qualifier: payload.qualifier as string | undefined
+        qualifier: payload.qualifier as string | undefined,
       });
       return this.fromNormalized(norm);
     } catch (err) {
@@ -402,9 +419,9 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
         {
           functionName,
           action: "invoke_lambda",
-          data: { statusCode: 200, body: "mocked-invoke", mocked: true }
+          data: { statusCode: 200, body: "mocked-invoke", mocked: true },
         },
-        err
+        err,
       );
     }
   }
@@ -421,7 +438,7 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
         context,
         "lambda",
         { functionName, action: "delete_lambda", data: { deleted: true } },
-        err
+        err,
       );
     }
   }
@@ -461,7 +478,7 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
           if (resolvedLines && resolvedLines.length > 0) {
             context.logger?.info?.("filter_content: resolved source from persistence", {
               sourceTaskId,
-              lineCount: resolvedLines.length
+              lineCount: resolvedLines.length,
             });
           } else {
             resolvedLines = undefined;
@@ -493,7 +510,7 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
       "Machine learning model deployment pipeline achieves 99.95% uptime through automated rollback and canary testing",
       "Real-time data ingestion framework processes 500K events/second with exactly-once semantics and automatic retry logic",
       "Observability platform correlates metrics, traces, and logs in unified dashboard reducing MTTR by 65%",
-      "Security compliance automation ensures SOC2 and HIPAA requirements through continuous policy enforcement and audit logging"
+      "Security compliance automation ensures SOC2 and HIPAA requirements through continuous policy enforcement and audit logging",
     ];
     const linesToFilter = resolvedLines ?? sampleLines;
     const matches = linesToFilter.filter((line) => regex.test(line));
@@ -503,7 +520,7 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
       sourceTaskId,
       usedLiveData,
       matchCount: matches.length,
-      totalLines: linesToFilter.length
+      totalLines: linesToFilter.length,
     });
 
     return {
@@ -515,7 +532,7 @@ export class FlociExecutionAdapter implements IExecutionAdapter {
       totalLines: linesToFilter.length,
       matchCount: matches.length,
       usedLiveData,
-      mocked: !usedLiveData
+      mocked: !usedLiveData,
     };
   }
 }

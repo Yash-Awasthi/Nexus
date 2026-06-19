@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * A/B Model Comparison — Arena-style side-by-side model evaluation.
  * Connects to /api/ab/run, /api/ab/:id/preference, /api/ab, /api/ab/stats
@@ -125,8 +126,14 @@ export default function ABCompare() {
   }, [loadHistory, loadStats]);
 
   const runComparison = useCallback(async () => {
-    if (!prompt.trim()) { setErr("Enter a prompt first."); return; }
-    if (modelA === modelB) { setErr("Pick two different models."); return; }
+    if (!prompt.trim()) {
+      setErr("Enter a prompt first.");
+      return;
+    }
+    if (modelA === modelB) {
+      setErr("Pick two different models.");
+      return;
+    }
     setErr("");
     setRunning(true);
     setCurrent(null);
@@ -148,27 +155,33 @@ export default function ABCompare() {
     }
   }, [prompt, modelA, modelB, loadHistory, loadStats]);
 
-  const vote = useCallback(async (pref: "A" | "B" | "tie" | "both_bad") => {
-    if (!current) return;
-    setVoting(true);
-    try {
-      await fetch(`/api/ab/${current.id}/preference`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ preference: pref }),
-      });
-      setCurrent({ ...current, userPreference: pref });
-      loadHistory();
-      loadStats();
-    } finally {
-      setVoting(false);
-    }
-  }, [current, loadHistory, loadStats]);
+  const vote = useCallback(
+    async (pref: "A" | "B" | "tie" | "both_bad") => {
+      if (!current) return;
+      setVoting(true);
+      try {
+        await fetch(`/api/ab/${current.id}/preference`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ preference: pref }),
+        });
+        setCurrent({ ...current, userPreference: pref });
+        loadHistory();
+        loadStats();
+      } finally {
+        setVoting(false);
+      }
+    },
+    [current, loadHistory, loadStats],
+  );
 
   const loadResult = useCallback(async (id: string) => {
     try {
       const r = await fetch(`/api/ab/${id}`);
-      if (r.ok) { setCurrent(await r.json()); setTab("arena"); }
+      if (r.ok) {
+        setCurrent(await r.json());
+        setTab("arena");
+      }
     } catch {}
   }, []);
 
@@ -188,7 +201,7 @@ export default function ABCompare() {
           </p>
         </div>
         <div className="flex gap-2">
-          {(["arena", "history", "stats"] as const).map(t => (
+          {(["arena", "history", "stats"] as const).map((t) => (
             <Button
               key={t}
               variant={tab === t ? "default" : "outline"}
@@ -210,24 +223,36 @@ export default function ABCompare() {
             <CardContent className="pt-4 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Model A</label>
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Model A
+                  </label>
                   <Select value={modelA} onValueChange={setModelA}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {MODELS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                      {MODELS.map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {m}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Model B</label>
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Model B
+                  </label>
                   <Select value={modelB} onValueChange={setModelB}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {MODELS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                      {MODELS.map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {m}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -236,7 +261,7 @@ export default function ABCompare() {
               <Textarea
                 placeholder="Enter your prompt here…"
                 value={prompt}
-                onChange={e => setPrompt(e.target.value)}
+                onChange={(e) => setPrompt(e.target.value)}
                 rows={4}
                 className="resize-none"
               />
@@ -249,9 +274,13 @@ export default function ABCompare() {
                 className="w-full"
               >
                 {running ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Running both models…</>
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Running both models…
+                  </>
                 ) : (
-                  <><Zap className="w-4 h-4 mr-2" /> Run Comparison</>
+                  <>
+                    <Zap className="w-4 h-4 mr-2" /> Run Comparison
+                  </>
                 )}
               </Button>
             </CardContent>
@@ -262,7 +291,7 @@ export default function ABCompare() {
             <div className="space-y-4">
               {/* Side-by-side responses */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {(["A", "B"] as const).map(side => {
+                {(["A", "B"] as const).map((side) => {
                   const model = side === "A" ? current.modelA : current.modelB;
                   const response = side === "A" ? current.responseA : current.responseB;
                   const latency = side === "A" ? current.latencyAMs : current.latencyBMs;
@@ -276,37 +305,46 @@ export default function ABCompare() {
                     <Card
                       key={side}
                       className={`border-2 transition-colors ${
-                        preferred ? "border-green-500" :
-                        evalWinner ? "border-blue-500" : "border-border"
+                        preferred
+                          ? "border-green-500"
+                          : evalWinner
+                            ? "border-blue-500"
+                            : "border-border"
                       }`}
                     >
                       <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Badge variant={side === "A" ? "default" : "secondary"} className="font-mono">
+                            <Badge
+                              variant={side === "A" ? "default" : "secondary"}
+                              className="font-mono"
+                            >
                               Model {side}
                             </Badge>
                             <span className="text-xs text-muted-foreground">{model}</span>
                           </div>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             {isFaster && (
-                              <Badge variant="outline" className="text-green-600 border-green-600 text-[10px]">
+                              <Badge
+                                variant="outline"
+                                className="text-green-600 border-green-600 text-[10px]"
+                              >
                                 faster
                               </Badge>
                             )}
                             <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />{ms(latency)}
+                              <Clock className="w-3 h-3" />
+                              {ms(latency)}
                             </span>
                             <span className="flex items-center gap-1">
-                              <DollarSign className="w-3 h-3" />{cost(c)}
+                              <DollarSign className="w-3 h-3" />
+                              {cost(c)}
                             </span>
                           </div>
                         </div>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                          {response}
-                        </p>
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{response}</p>
                       </CardContent>
                     </Card>
                   );
@@ -321,7 +359,9 @@ export default function ABCompare() {
                       🤖 AI Blind Evaluation — Winner:{" "}
                       <span className="font-bold">Model {current.blindEvaluation.winner}</span>
                     </p>
-                    <p className="text-xs text-muted-foreground">{current.blindEvaluation.reasoning}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {current.blindEvaluation.reasoning}
+                    </p>
                   </CardContent>
                 </Card>
               )}
@@ -330,7 +370,9 @@ export default function ABCompare() {
               {!current.userPreference ? (
                 <Card>
                   <CardContent className="pt-4">
-                    <p className="text-sm font-medium mb-3 text-center">Which response is better?</p>
+                    <p className="text-sm font-medium mb-3 text-center">
+                      Which response is better?
+                    </p>
                     <div className="flex gap-2 justify-center flex-wrap">
                       <Button
                         onClick={() => vote("A")}
@@ -341,11 +383,7 @@ export default function ABCompare() {
                         <ThumbsUp className="w-4 h-4 mr-2" />
                         Model A is better
                       </Button>
-                      <Button
-                        onClick={() => vote("tie")}
-                        disabled={voting}
-                        variant="outline"
-                      >
+                      <Button onClick={() => vote("tie")} disabled={voting} variant="outline">
                         <Minus className="w-4 h-4 mr-2" />
                         Tie
                       </Button>
@@ -374,9 +412,13 @@ export default function ABCompare() {
                 <div className="text-center text-sm text-muted-foreground py-2">
                   ✓ Voted:{" "}
                   <span className="font-medium text-foreground capitalize">
-                    {current.userPreference === "A" ? `Model A (${current.modelA}) is better` :
-                     current.userPreference === "B" ? `Model B (${current.modelB}) is better` :
-                     current.userPreference === "tie" ? "Tie" : "Both bad"}
+                    {current.userPreference === "A"
+                      ? `Model A (${current.modelA}) is better`
+                      : current.userPreference === "B"
+                        ? `Model B (${current.modelB}) is better`
+                        : current.userPreference === "tie"
+                          ? "Tie"
+                          : "Both bad"}
                   </span>
                 </div>
               )}
@@ -398,7 +440,7 @@ export default function ABCompare() {
           {history.length === 0 && (
             <p className="text-muted-foreground text-sm text-center py-8">No comparisons yet</p>
           )}
-          {history.map(item => (
+          {history.map((item) => (
             <Card
               key={item.id}
               className="cursor-pointer hover:bg-accent/50 transition-colors"
@@ -416,14 +458,19 @@ export default function ABCompare() {
                     {item.userPreference && (
                       <Badge
                         variant={
-                          item.userPreference === "tie" ? "outline" :
-                          item.userPreference === "both_bad" ? "destructive" : "default"
+                          item.userPreference === "tie"
+                            ? "outline"
+                            : item.userPreference === "both_bad"
+                              ? "destructive"
+                              : "default"
                         }
                         className="text-xs"
                       >
-                        {item.userPreference === "A" ? `A wins` :
-                         item.userPreference === "B" ? `B wins` :
-                         item.userPreference}
+                        {item.userPreference === "A"
+                          ? `A wins`
+                          : item.userPreference === "B"
+                            ? `B wins`
+                            : item.userPreference}
                       </Badge>
                     )}
                     <span className="text-xs text-muted-foreground">{timeAgo(item.createdAt)}</span>
@@ -440,7 +487,9 @@ export default function ABCompare() {
       {tab === "stats" && (
         <div className="space-y-4">
           {!stats ? (
-            <p className="text-muted-foreground text-sm text-center py-8">No stats yet — run some comparisons first</p>
+            <p className="text-muted-foreground text-sm text-center py-8">
+              No stats yet — run some comparisons first
+            </p>
           ) : (
             <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -464,14 +513,19 @@ export default function ABCompare() {
 
               {/* Preference breakdown */}
               <Card>
-                <CardHeader><CardTitle className="text-base">Preference Breakdown</CardTitle></CardHeader>
+                <CardHeader>
+                  <CardTitle className="text-base">Preference Breakdown</CardTitle>
+                </CardHeader>
                 <CardContent>
                   {Object.entries(stats.preferenceBreakdown ?? {}).length === 0 ? (
                     <p className="text-sm text-muted-foreground">No votes yet</p>
                   ) : (
                     <div className="space-y-2">
                       {Object.entries(stats.preferenceBreakdown).map(([pref, count]) => {
-                        const total = Object.values(stats.preferenceBreakdown).reduce((a, b) => a + b, 0);
+                        const total = Object.values(stats.preferenceBreakdown).reduce(
+                          (a, b) => a + b,
+                          0,
+                        );
                         const pct = Math.round((count / total) * 100);
                         return (
                           <div key={pref} className="flex items-center gap-3">
@@ -496,7 +550,9 @@ export default function ABCompare() {
               {/* Model win rates */}
               {stats.modelWinRates && Object.keys(stats.modelWinRates).length > 0 && (
                 <Card>
-                  <CardHeader><CardTitle className="text-base">Model Win Rates</CardTitle></CardHeader>
+                  <CardHeader>
+                    <CardTitle className="text-base">Model Win Rates</CardTitle>
+                  </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
                       {Object.entries(stats.modelWinRates)

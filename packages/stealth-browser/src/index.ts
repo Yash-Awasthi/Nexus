@@ -438,7 +438,7 @@ export class PatchrightDriver implements BrowserDriver {
     if (shouldCanvasNoise) {
       // Perturb canvas pixel values by ±1 to defeat canvas fingerprinting
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      await (context as unknown).addInitScript(`
+      await (context as { addInitScript(s: string): Promise<void> }).addInitScript(`
         (function () {
           const origToDataURL = HTMLCanvasElement.prototype.toDataURL;
           HTMLCanvasElement.prototype.toDataURL = function (type, quality) {
@@ -461,7 +461,7 @@ export class PatchrightDriver implements BrowserDriver {
     if (shouldWebGlNoise) {
       // Randomise WebGL renderer/vendor strings to prevent GPU fingerprinting
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      await (context as unknown).addInitScript(`
+      await (context as { addInitScript(s: string): Promise<void> }).addInitScript(`
         (function () {
           const getParameter = WebGLRenderingContext.prototype.getParameter;
           WebGLRenderingContext.prototype.getParameter = function (param) {
@@ -482,7 +482,7 @@ export class PatchrightDriver implements BrowserDriver {
     if (shouldBlockWebRtc) {
       // Override RTCPeerConnection to block local IP leaks
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      await (context as unknown).addInitScript(`
+      await (context as { addInitScript(s: string): Promise<void> }).addInitScript(`
         (function () {
           const Orig = window.RTCPeerConnection;
           if (!Orig) return;

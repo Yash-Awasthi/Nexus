@@ -317,14 +317,17 @@ describe("FeedRegistry", () => {
         http: makeMockHttp(makeAviationEvents(1)),
       }),
     );
-    registry.register(
-      new ClimateFeed({
-        baseUrl: "https://x.com",
-        http: async () => {
-          throw new Error("network error");
-        },
-      }),
-    );
+    // A concrete FeedAdapter subclass that always throws — ensures fetchAll's
+    // Promise.allSettled rejection filtering is tested without relying on
+    // catch-and-mock behaviour from real adapters.
+    class ErrorFeed extends FeedAdapter<never> {
+      readonly domain = "error-source";
+      async fetch(): Promise<never[]> {
+        throw new Error("network error");
+      }
+    }
+    registry.register(new ErrorFeed({ baseUrl: "https://x.com" }));
+
     const pages = await registry.fetchAll();
     expect(pages).toHaveLength(1);
     expect(pages[0]!.domain).toBe("aviation");

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { ITaskDependencyResolver } from "./interfaces/execution.interface";
 import { Task } from "./task-router";
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Negation — detect, store, and inject negation rules into conversations.
  *
@@ -48,7 +49,10 @@ function DetectTab() {
 
   const detect = useCallback(async () => {
     if (!text.trim()) return;
-    setLoading(true); setErr(""); setResult(null); setAdded(false);
+    setLoading(true);
+    setErr("");
+    setResult(null);
+    setAdded(false);
     const r = await fetch("/api/negation/detect", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -79,12 +83,22 @@ function DetectTab() {
             rows={4}
             placeholder="Enter text to analyze for negation patterns…"
             value={text}
-            onChange={e => setText(e.target.value)}
+            onChange={(e) => setText(e.target.value)}
             className="resize-none"
           />
           {err && <p className="text-red-500 text-xs">{err}</p>}
           <Button onClick={detect} disabled={loading || !text.trim()}>
-            {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Detecting…</> : <><Search className="w-4 h-4 mr-2" />Detect</>}
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Detecting…
+              </>
+            ) : (
+              <>
+                <Search className="w-4 h-4 mr-2" />
+                Detect
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>
@@ -93,15 +107,25 @@ function DetectTab() {
         <Card className={result.found ? "border-orange-200 dark:border-orange-800" : ""}>
           <CardContent className="pt-4 space-y-3">
             <div className="flex items-center gap-2">
-              {result.found
-                ? <AlertTriangle className="w-4 h-4 text-orange-500" />
-                : <span className="text-sm text-muted-foreground">No negation patterns found</span>}
-              {result.found && <span className="text-sm font-medium">{result.count ?? result.patterns?.length} pattern(s) detected</span>}
+              {result.found ? (
+                <AlertTriangle className="w-4 h-4 text-orange-500" />
+              ) : (
+                <span className="text-sm text-muted-foreground">No negation patterns found</span>
+              )}
+              {result.found && (
+                <span className="text-sm font-medium">
+                  {result.count ?? result.patterns?.length} pattern(s) detected
+                </span>
+              )}
             </div>
             {result.patterns?.map((p, i) => (
               <div key={i} className="flex items-center gap-2 text-sm">
-                <Badge variant="secondary" className="text-xs">{p.type ?? "negation"}</Badge>
-                <code className="text-xs bg-muted px-1.5 py-0.5 rounded flex-1 truncate">{p.span ?? p.pattern}</code>
+                <Badge variant="secondary" className="text-xs">
+                  {p.type ?? "negation"}
+                </Badge>
+                <code className="text-xs bg-muted px-1.5 py-0.5 rounded flex-1 truncate">
+                  {p.span ?? p.pattern}
+                </code>
               </div>
             ))}
             {result.found && result.patterns?.length && (
@@ -109,11 +133,25 @@ function DetectTab() {
                 <Input
                   placeholder="Conversation ID to save rules to…"
                   value={convId}
-                  onChange={e => setConvId(e.target.value)}
+                  onChange={(e) => setConvId(e.target.value)}
                   className="flex-1"
                 />
-                <Button size="sm" onClick={addAll} disabled={adding || !convId.trim() || added} variant="outline">
-                  {adding ? <Loader2 className="w-3 h-3 animate-spin" /> : added ? "Saved" : <><Plus className="w-3 h-3 mr-1" />Save</>}
+                <Button
+                  size="sm"
+                  onClick={addAll}
+                  disabled={adding || !convId.trim() || added}
+                  variant="outline"
+                >
+                  {adding ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : added ? (
+                    "Saved"
+                  ) : (
+                    <>
+                      <Plus className="w-3 h-3 mr-1" />
+                      Save
+                    </>
+                  )}
                 </Button>
               </div>
             )}
@@ -135,7 +173,9 @@ function ManageTab() {
 
   const load = useCallback(async () => {
     if (!convId.trim()) return;
-    setLoading(true); setErr(""); setRules([]);
+    setLoading(true);
+    setErr("");
+    setRules([]);
     const r = await fetch(`/api/negation/${encodeURIComponent(convId.trim())}`).catch(() => null);
     if (r?.ok) {
       const d = await r.json();
@@ -145,13 +185,17 @@ function ManageTab() {
   }, [convId]);
 
   const deleteRule = async (ruleId: string) => {
-    await fetch(`/api/negation/${encodeURIComponent(convId)}/${ruleId}`, { method: "DELETE" }).catch(() => null);
-    setRules(prev => prev.filter(r => r.id !== ruleId));
+    await fetch(`/api/negation/${encodeURIComponent(convId)}/${ruleId}`, {
+      method: "DELETE",
+    }).catch(() => null);
+    setRules((prev) => prev.filter((r) => r.id !== ruleId));
   };
 
   const clearAll = useCallback(async () => {
     setClearing(true);
-    await fetch(`/api/negation/${encodeURIComponent(convId)}`, { method: "DELETE" }).catch(() => null);
+    await fetch(`/api/negation/${encodeURIComponent(convId)}`, { method: "DELETE" }).catch(
+      () => null,
+    );
     setRules([]);
     setClearing(false);
   }, [convId]);
@@ -164,8 +208,8 @@ function ManageTab() {
             <Input
               placeholder="Conversation ID…"
               value={convId}
-              onChange={e => setConvId(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && load()}
+              onChange={(e) => setConvId(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && load()}
               className="flex-1"
             />
             <Button onClick={load} disabled={loading || !convId.trim()}>
@@ -182,16 +226,34 @@ function ManageTab() {
             <CardTitle className="text-sm flex items-center justify-between">
               <span>{rules.length} rule(s)</span>
               <Button size="sm" variant="destructive" onClick={clearAll} disabled={clearing}>
-                {clearing ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Trash2 className="w-3 h-3 mr-1" />Clear All</>}
+                {clearing ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <>
+                    <Trash2 className="w-3 h-3 mr-1" />
+                    Clear All
+                  </>
+                )}
               </Button>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {rules.map(rule => (
+            {rules.map((rule) => (
               <div key={rule.id} className="flex items-center gap-2 text-sm">
-                {rule.type && <Badge variant="secondary" className="text-xs shrink-0">{rule.type}</Badge>}
-                <code className="flex-1 text-xs bg-muted px-1.5 py-0.5 rounded truncate">{rule.pattern}</code>
-                <Button size="icon" variant="ghost" className="h-6 w-6 text-red-400 shrink-0" onClick={() => deleteRule(rule.id)}>
+                {rule.type && (
+                  <Badge variant="secondary" className="text-xs shrink-0">
+                    {rule.type}
+                  </Badge>
+                )}
+                <code className="flex-1 text-xs bg-muted px-1.5 py-0.5 rounded truncate">
+                  {rule.pattern}
+                </code>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6 text-red-400 shrink-0"
+                  onClick={() => deleteRule(rule.id)}
+                >
                   <Trash2 className="w-3 h-3" />
                 </Button>
               </div>
@@ -200,7 +262,11 @@ function ManageTab() {
         </Card>
       )}
       {!loading && rules.length === 0 && convId && (
-        <Card><CardContent className="pt-8 pb-8 text-center text-muted-foreground text-sm">No rules for this conversation</CardContent></Card>
+        <Card>
+          <CardContent className="pt-8 pb-8 text-center text-muted-foreground text-sm">
+            No rules for this conversation
+          </CardContent>
+        </Card>
       )}
     </div>
   );
@@ -216,7 +282,9 @@ function InjectTab() {
 
   const inject = useCallback(async () => {
     if (!convId.trim()) return;
-    setLoading(true); setErr(""); setResult(null);
+    setLoading(true);
+    setErr("");
+    setResult(null);
     const r = await fetch("/api/negation/inject", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -237,19 +305,35 @@ function InjectTab() {
           <Input
             placeholder="Conversation ID…"
             value={convId}
-            onChange={e => setConvId(e.target.value)}
+            onChange={(e) => setConvId(e.target.value)}
           />
           {err && <p className="text-red-500 text-xs">{err}</p>}
           <Button onClick={inject} disabled={loading || !convId.trim()}>
-            {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Injecting…</> : <><Zap className="w-4 h-4 mr-2" />Inject Rules</>}
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Injecting…
+              </>
+            ) : (
+              <>
+                <Zap className="w-4 h-4 mr-2" />
+                Inject Rules
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>
       {result && (
         <Card className="border-green-200 dark:border-green-800">
           <CardContent className="pt-4">
-            <p className="text-sm font-medium text-green-700 dark:text-green-400">{result.message ?? "Injected successfully"}</p>
-            {result.injected !== undefined && <p className="text-xs text-muted-foreground mt-1">{result.injected} rule(s) injected</p>}
+            <p className="text-sm font-medium text-green-700 dark:text-green-400">
+              {result.message ?? "Injected successfully"}
+            </p>
+            {result.injected !== undefined && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {result.injected} rule(s) injected
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
@@ -273,13 +357,25 @@ export default function Negation() {
       </div>
       <Tabs defaultValue="detect">
         <TabsList>
-          <TabsTrigger value="detect"><Search className="w-4 h-4 mr-1" />Detect</TabsTrigger>
+          <TabsTrigger value="detect">
+            <Search className="w-4 h-4 mr-1" />
+            Detect
+          </TabsTrigger>
           <TabsTrigger value="manage">Manage</TabsTrigger>
-          <TabsTrigger value="inject"><Zap className="w-4 h-4 mr-1" />Inject</TabsTrigger>
+          <TabsTrigger value="inject">
+            <Zap className="w-4 h-4 mr-1" />
+            Inject
+          </TabsTrigger>
         </TabsList>
-        <TabsContent value="detect" className="mt-4"><DetectTab /></TabsContent>
-        <TabsContent value="manage" className="mt-4"><ManageTab /></TabsContent>
-        <TabsContent value="inject" className="mt-4"><InjectTab /></TabsContent>
+        <TabsContent value="detect" className="mt-4">
+          <DetectTab />
+        </TabsContent>
+        <TabsContent value="manage" className="mt-4">
+          <ManageTab />
+        </TabsContent>
+        <TabsContent value="inject" className="mt-4">
+          <InjectTab />
+        </TabsContent>
       </Tabs>
     </div>
   );

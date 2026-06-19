@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Dashboard — main landing page after login.
  *
@@ -12,9 +13,23 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router";
 import {
-  MessageSquare, Plus, ArrowRight, Zap, Search, Brain,
-  Plug, AlertCircle, Eye, RefreshCw, TrendingUp,
-  Clock, DollarSign, MemoryStick, Loader2,
+  MessageSquare,
+  Plus,
+  ArrowRight,
+  Zap,
+  Search,
+  Brain,
+  Plug,
+  AlertCircle,
+  Eye,
+  RefreshCw,
+  TrendingUp,
+  Clock,
+  DollarSign,
+  MemoryStick,
+  Loader2,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
@@ -25,7 +40,7 @@ import type { Route } from "./+types/home";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "JUDICA - Dashboard" },
+    { title: "NEXUS - Dashboard" },
     { name: "description", content: "AI-powered deliberation platform" },
   ];
 }
@@ -38,30 +53,41 @@ export function clientLoader() {
 
 interface AnalyticsOverview {
   totalConversations: number;
-  totalMessages:      number;
-  totalTokensUsed:    number;
-  totalCostUsd:       number;
-  avgLatencyMs:       number;
+  totalMessages: number;
+  totalTokensUsed: number;
+  totalCostUsd: number;
+  avgLatencyMs: number;
 }
 
 interface StoredConv {
-  id:    string;
+  id: string;
   title: string;
-  date:  string;
-  mode:  string;
+  date: string;
+  mode: string;
 }
 
 interface ResearchJob {
-  id:        string;
-  query:     string;
-  status:    string;
+  id: string;
+  query: string;
+  status: string;
   createdAt: string;
+}
+
+interface ProviderStatus {
+  id: string;
+  name: string;
+  models: number;
+  connected: boolean;
 }
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
 
 function StatCard({
-  icon: Icon, label, value, sub, color = "text-primary",
+  icon: Icon,
+  label,
+  value,
+  sub,
+  color = "text-primary",
 }: {
   icon: React.ElementType;
   label: string;
@@ -90,7 +116,11 @@ function StatCard({
 // ── Feature shortcut ───────────────────────────────────────────────────────────
 
 function FeatureCard({
-  icon: Icon, label, description, to, color,
+  icon: Icon,
+  label,
+  description,
+  to,
+  color,
 }: {
   icon: React.ElementType;
   label: string;
@@ -122,12 +152,15 @@ export default function Home() {
   const { user } = useAuth();
 
   // Local state
-  const [recentConvs,     setRecentConvs]     = useState<StoredConv[]>([]);
-  const [analytics,       setAnalytics]       = useState<AnalyticsOverview | null>(null);
-  const [connectorCount,  setConnectorCount]  = useState<{ total: number; errors: number } | null>(null);
-  const [recentResearch,  setRecentResearch]  = useState<ResearchJob[]>([]);
-  const [loading,         setLoading]         = useState(true);
-  const [refreshing,      setRefreshing]      = useState(false);
+  const [recentConvs, setRecentConvs] = useState<StoredConv[]>([]);
+  const [analytics, setAnalytics] = useState<AnalyticsOverview | null>(null);
+  const [connectorCount, setConnectorCount] = useState<{ total: number; errors: number } | null>(
+    null,
+  );
+  const [recentResearch, setRecentResearch] = useState<ResearchJob[]>([]);
+  const [providers, setProviders] = useState<ProviderStatus[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Load from localStorage
   useEffect(() => {
@@ -149,18 +182,20 @@ export default function Home() {
     await Promise.allSettled([
       // Analytics overview
       fetch("/api/analytics/overview")
-        .then((r) => r.ok ? r.json() : null)
-        .then((data) => { if (data) setAnalytics(data); })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data) setAnalytics(data);
+        })
         .catch(() => {}),
 
       // Connector summary
       fetch("/api/connectors?limit=100")
-        .then((r) => r.ok ? r.json() : null)
+        .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
           if (!data) return;
           const list = data.connectors ?? [];
           setConnectorCount({
-            total:  list.length,
+            total: list.length,
             errors: list.filter((c: any) => c.status === "error").length,
           });
         })
@@ -168,8 +203,42 @@ export default function Home() {
 
       // Recent research jobs
       fetch("/api/research?limit=3")
-        .then((r) => r.ok ? r.json() : null)
-        .then((data) => { if (data?.jobs) setRecentResearch(data.jobs); })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data?.jobs) setRecentResearch(data.jobs);
+        })
+        .catch(() => {}),
+
+      // Provider status
+      fetch("/api/providers")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (!data?.providers) return;
+          const connected = new Map<string, number>();
+          for (const p of data.providers as any[]) {
+            const key = (p.provider ?? p.type ?? "custom").toLowerCase();
+            connected.set(key, (connected.get(key) ?? 0) + (p.model ? 1 : 0));
+          }
+          const DISPLAY: Record<string, string> = {
+            openai: "OpenAI",
+            anthropic: "Anthropic",
+            google: "Google Gemini",
+            groq: "Groq",
+            ollama: "Ollama",
+            openrouter: "OpenRouter",
+            mistral: "Mistral",
+          };
+          setProviders(
+            ["openai", "anthropic", "google", "groq", "ollama", "openrouter", "mistral"].map(
+              (id) => ({
+                id,
+                name: DISPLAY[id] ?? id,
+                models: connected.get(id) ?? 0,
+                connected: connected.has(id),
+              }),
+            ),
+          );
+        })
         .catch(() => {}),
     ]);
 
@@ -177,32 +246,32 @@ export default function Home() {
     setRefreshing(false);
   }, []);
 
-  useEffect(() => { fetchStats(); }, [fetchStats]);
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   const displayName = user?.username ?? "there";
 
   // Format helpers
   const fmtTokens = (n: number) =>
-    n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M`
-    : n >= 1_000   ? `${(n / 1_000).toFixed(1)}k`
-    : String(n);
+    n >= 1_000_000
+      ? `${(n / 1_000_000).toFixed(1)}M`
+      : n >= 1_000
+        ? `${(n / 1_000).toFixed(1)}k`
+        : String(n);
 
   const fmtCost = (usd: number) =>
-    usd < 0.01 ? `$${(usd * 100).toFixed(2)}¢`
-    : `$${usd.toFixed(2)}`;
+    usd < 0.01 ? `$${(usd * 100).toFixed(2)}¢` : `$${usd.toFixed(2)}`;
 
   const fmtLatency = (ms: number) =>
     ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`;
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
-
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Welcome back, {displayName}
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight">Welcome back, {displayName}</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Your private AI deliberation workspace
           </p>
@@ -265,7 +334,6 @@ export default function Home() {
 
       {/* Main content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
         {/* Recent Deliberations — 2/3 width */}
         <div className="lg:col-span-2 space-y-4">
           <Card>
@@ -299,7 +367,9 @@ export default function Home() {
                         <MessageSquare className="size-3.5 shrink-0 text-muted-foreground" />
                         <p className="text-sm font-medium truncate">{conv.title}</p>
                         {conv.mode && (
-                          <Badge variant="outline" className="text-[10px] h-4 px-1 shrink-0">{conv.mode}</Badge>
+                          <Badge variant="outline" className="text-[10px] h-4 px-1 shrink-0">
+                            {conv.mode}
+                          </Badge>
                         )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0 text-xs text-muted-foreground">
@@ -309,7 +379,12 @@ export default function Home() {
                     </Link>
                   ))}
                   <div className="pt-1">
-                    <Button variant="outline" size="sm" className="w-full h-7 text-xs gap-1.5" asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full h-7 text-xs gap-1.5"
+                      asChild
+                    >
                       <Link to="/chat">
                         <Plus className="size-3" /> New Deliberation
                       </Link>
@@ -339,9 +414,11 @@ export default function Home() {
                   >
                     <span
                       className={`text-[10px] font-mono shrink-0 ${
-                        job.status === "done"   ? "text-green-400"
-                        : job.status === "failed" ? "text-destructive"
-                        : "text-amber-400"
+                        job.status === "done"
+                          ? "text-green-400"
+                          : job.status === "failed"
+                            ? "text-destructive"
+                            : "text-amber-400"
                       }`}
                     >
                       ●
@@ -359,7 +436,6 @@ export default function Home() {
 
         {/* Right column — 1/3 width */}
         <div className="space-y-4">
-
           {/* Connectors status */}
           <Card>
             <CardHeader className="pb-3">
@@ -380,7 +456,9 @@ export default function Home() {
               ) : (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground text-xs">{connectorCount.total} connected</span>
+                    <span className="text-muted-foreground text-xs">
+                      {connectorCount.total} connected
+                    </span>
                     {connectorCount.errors > 0 && (
                       <div className="flex items-center gap-1 text-destructive text-xs">
                         <AlertCircle className="size-3" />
@@ -393,6 +471,49 @@ export default function Home() {
                   </Button>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Provider Status */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Brain className="size-3.5 text-primary" /> Providers
+                </span>
+                <span className="text-[10px] font-normal text-muted-foreground">
+                  {providers.filter((p) => p.connected).length}/{providers.length} connected
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0 space-y-1">
+              {providers.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Loading…</p>
+              ) : (
+                providers.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between py-1">
+                    <span className="text-xs text-muted-foreground">{p.name}</span>
+                    {p.connected ? (
+                      <span className="flex items-center gap-1 text-[10px] text-green-400">
+                        <CheckCircle2 className="size-3" />
+                        {p.models > 0
+                          ? `${p.models} model${p.models !== 1 ? "s" : ""}`
+                          : "connected"}
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-[10px] text-muted-foreground/50">
+                        <XCircle className="size-3" />
+                        Not connected
+                      </span>
+                    )}
+                  </div>
+                ))
+              )}
+              <div className="pt-1">
+                <Button variant="outline" size="sm" className="w-full h-7 text-xs" asChild>
+                  <a href="/language-models">Manage providers</a>
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
@@ -434,7 +555,6 @@ export default function Home() {
               />
             </CardContent>
           </Card>
-
         </div>
       </div>
     </div>

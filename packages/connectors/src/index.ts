@@ -203,7 +203,9 @@ export class NullConnector extends BaseConnector {
     return { ok: true, metadata: { stub: true } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     return { ok: true };
   }
 }
@@ -254,7 +256,9 @@ export class GitHubConnector extends BaseConnector {
     };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${GitHubConnector.BASE}/rate_limit`, {
       headers: { Authorization: `Bearer ${this.token}` },
@@ -313,7 +317,9 @@ export class SlackConnector extends BaseConnector {
     return { ok: true, metadata: { team: json.team, user: json.user, botId: json.bot_id } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${SlackConnector.BASE}/api.test`, {
       headers: { Authorization: `Bearer ${this.token}` },
@@ -358,7 +364,9 @@ export class GroqConnector extends BaseConnector {
     return { ok: true, metadata: { modelCount: json.data?.length ?? 0 } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${GroqConnector.BASE}/models`, {
       headers: { Authorization: `Bearer ${this.apiKey}` },
@@ -410,7 +418,9 @@ export class TavilyConnector extends BaseConnector {
     return { ok: true, metadata: { resultCount: json.results?.length ?? 0 } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${TavilyConnector.BASE}/search`, {
       method: "POST",
@@ -468,7 +478,9 @@ export class NeonConnector extends BaseConnector {
     return this._ping();
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const result = await this._ping();
     return { ok: result.ok, latencyMs: Date.now() - start, error: result.error };
@@ -523,7 +535,9 @@ export class LinearConnector extends BaseConnector {
     return this._query();
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const result = await this._query();
     return { ok: result.ok, latencyMs: Date.now() - start, error: result.error };
@@ -555,6 +569,205 @@ export class LinearConnector extends BaseConnector {
     return {
       ok: !!viewer?.id,
       metadata: { id: viewer?.id, name: viewer?.name, email: viewer?.email },
+    };
+  }
+}
+
+// ── NotionConnector ───────────────────────────────────────────────────────────
+
+export interface NotionConnectorConfig {
+  /** Notion integration token (starts with "secret_") */
+  apiKey: string;
+  fetch?: FetchFn;
+}
+
+/** Notion connector — verifies integration token via GET /v1/users/me. */
+export class NotionConnector extends BaseConnector {
+  readonly id = "notion";
+  readonly name = "Notion";
+
+  private readonly apiKey: string;
+  private readonly fetchFn: FetchFn;
+  private static readonly BASE = "https://api.notion.com/v1";
+  private static readonly VER = "2022-06-28";
+
+  constructor(config: NotionConnectorConfig) {
+    super();
+    this.apiKey = config.apiKey;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    return this._ping();
+  }
+
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
+    const start = Date.now();
+    const result = await this._ping();
+    return { ok: result.ok, latencyMs: Date.now() - start, error: result.error };
+  }
+
+  private async _ping(): Promise<ConnectResult> {
+    const res = await this.fetchFn(`${NotionConnector.BASE}/users/me`, {
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Notion-Version": NotionConnector.VER,
+      },
+    });
+
+    if (res.status === 401) return { ok: false, error: "Notion integration token is invalid" };
+    if (res.status === 403) return { ok: false, error: "Notion token lacks read-user permission" };
+    if (!res.ok) return { ok: false, error: `Notion API returned ${res.status}` };
+
+    const json = (await res.json()) as { id?: string; name?: string; type?: string };
+    return {
+      ok: !!json.id,
+      metadata: { id: json.id, name: json.name, type: json.type },
+    };
+  }
+}
+
+// ── BitbucketConnector ────────────────────────────────────────────────────────
+
+export interface BitbucketConnectorConfig {
+  /** Bitbucket username (for App Password auth) */
+  username?: string;
+  /** Bitbucket App Password */
+  appPassword?: string;
+  /** Bearer token (alternative to username+appPassword) */
+  token?: string;
+  fetch?: FetchFn;
+}
+
+/** Bitbucket connector — verifies credentials via GET /2.0/user. */
+export class BitbucketConnector extends BaseConnector {
+  readonly id = "bitbucket";
+  readonly name = "Bitbucket";
+
+  private readonly authHeader: string;
+  private readonly fetchFn: FetchFn;
+  private static readonly BASE = "https://api.bitbucket.org/2.0";
+
+  constructor(config: BitbucketConnectorConfig) {
+    super();
+    this.fetchFn = config.fetch ?? fetch;
+    if (config.token) {
+      this.authHeader = `Bearer ${config.token}`;
+    } else if (config.username && config.appPassword) {
+      this.authHeader = `Basic ${Buffer.from(`${config.username}:${config.appPassword}`).toString("base64")}`;
+    } else {
+      this.authHeader = "";
+    }
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    return this._ping();
+  }
+
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
+    const start = Date.now();
+    const result = await this._ping();
+    return { ok: result.ok, latencyMs: Date.now() - start, error: result.error };
+  }
+
+  private async _ping(): Promise<ConnectResult> {
+    if (!this.authHeader)
+      return {
+        ok: false,
+        error:
+          "No Bitbucket credentials configured (set BITBUCKET_TOKEN or BITBUCKET_USERNAME + BITBUCKET_APP_PASSWORD)",
+      };
+
+    const res = await this.fetchFn(`${BitbucketConnector.BASE}/user`, {
+      headers: { Authorization: this.authHeader },
+    });
+
+    if (res.status === 401) return { ok: false, error: "Bitbucket credentials are invalid" };
+    if (res.status === 403)
+      return { ok: false, error: "Bitbucket token lacks user:read permission" };
+    if (!res.ok) return { ok: false, error: `Bitbucket API returned ${res.status}` };
+
+    const json = (await res.json()) as {
+      uuid?: string;
+      display_name?: string;
+      account_id?: string;
+    };
+    return {
+      ok: !!json.account_id,
+      metadata: { uuid: json.uuid, displayName: json.display_name, accountId: json.account_id },
+    };
+  }
+}
+
+// ── JiraConnector ─────────────────────────────────────────────────────────────
+
+export interface JiraConnectorConfig {
+  /** Atlassian host e.g. "yourcompany.atlassian.net" */
+  host: string;
+  /** Atlassian account email */
+  email: string;
+  /** Jira API token (from id.atlassian.com/manage-profile/security/api-tokens) */
+  apiToken: string;
+  fetch?: FetchFn;
+}
+
+/** Jira connector — verifies credentials via GET /rest/api/3/myself. */
+export class JiraConnector extends BaseConnector {
+  readonly id = "jira";
+  readonly name = "Jira";
+
+  private readonly host: string;
+  private readonly authHeader: string;
+  private readonly fetchFn: FetchFn;
+
+  constructor(config: JiraConnectorConfig) {
+    super();
+    this.host = config.host.replace(/\/$/, "");
+    this.authHeader = `Basic ${Buffer.from(`${config.email}:${config.apiToken}`).toString("base64")}`;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  protected async _doConnect(): Promise<ConnectResult> {
+    return this._ping();
+  }
+
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
+    const start = Date.now();
+    const result = await this._ping();
+    return { ok: result.ok, latencyMs: Date.now() - start, error: result.error };
+  }
+
+  private async _ping(): Promise<ConnectResult> {
+    const url = `https://${this.host}/rest/api/3/myself`;
+    const res = await this.fetchFn(url, {
+      headers: {
+        Authorization: this.authHeader,
+        Accept: "application/json",
+      },
+    });
+
+    if (res.status === 401) return { ok: false, error: "Jira credentials are invalid" };
+    if (res.status === 403) return { ok: false, error: "Jira token lacks browse permission" };
+    if (!res.ok) return { ok: false, error: `Jira API returned ${res.status}` };
+
+    const json = (await res.json()) as {
+      accountId?: string;
+      displayName?: string;
+      emailAddress?: string;
+    };
+    return {
+      ok: !!json.accountId,
+      metadata: {
+        accountId: json.accountId,
+        displayName: json.displayName,
+        email: json.emailAddress,
+      },
     };
   }
 }
@@ -818,7 +1031,9 @@ export class GitHubDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { login: user.login } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${GitHubDocumentConnector.BASE}/rate_limit`, {
       headers: { Authorization: `Bearer ${this.token}` },
@@ -917,7 +1132,9 @@ export class SlackDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { team: json.team } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${SlackDocumentConnector.BASE}/api.test`, {
       headers: { Authorization: `Bearer ${this.token}` },
@@ -999,7 +1216,9 @@ export class WebDocumentConnector extends BaseDocumentConnector {
     }
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     if (this.urls.length === 0) return { ok: true };
     try {
       const res = await this.fetchFn(this.urls[0]!);
@@ -1087,7 +1306,9 @@ export class FileSystemDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { pathCount: this.paths.length } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     return { ok: true, details: { pathCount: this.paths.length } };
   }
 
@@ -1164,7 +1385,9 @@ export class LinearDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { viewer: json.data?.viewer?.name } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(LinearDocumentConnector.ENDPOINT, {
       method: "POST",
@@ -1266,7 +1489,9 @@ export class TavilyDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { queryCount: this.queries.length } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${TavilyDocumentConnector.BASE}/search`, {
       method: "POST",
@@ -1371,7 +1596,9 @@ export class NeonDocumentConnector extends BaseDocumentConnector {
     return { ok: true };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(this.cfg.endpointUrl, {
       method: "POST",
@@ -1447,7 +1674,9 @@ export class RssDocumentConnector extends BaseDocumentConnector {
     return { ok: true };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(this.feedUrl);
     return { ok: res.ok, latencyMs: Date.now() - start };
@@ -1560,7 +1789,9 @@ export class NotionDocumentConnector extends BaseDocumentConnector {
     return { ok: true };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${NotionDocumentConnector.BASE}/users/me`, {
       headers: this.headers,
@@ -1647,7 +1878,9 @@ export class ConfluenceDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { user: json.displayName } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${this.cfg.baseUrl}/wiki/rest/api/user/current`, {
       headers: { Authorization: this.authHeader, Accept: "application/json" },
@@ -1753,7 +1986,9 @@ export class JiraDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { user: json.displayName } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${this.cfg.baseUrl}/rest/api/3/myself`, {
       headers: { Authorization: this.authHeader, Accept: "application/json" },
@@ -1863,7 +2098,9 @@ export class GitLabDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { username: json.username } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${this.apiBase}/user`, { headers: this.authHeaders });
     return { ok: res.ok, latencyMs: Date.now() - start };
@@ -1947,7 +2184,9 @@ export class HackerNewsDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { storyType: this.storyType } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${HackerNewsDocumentConnector.BASE}/${this.storyType}.json`);
     return { ok: res.ok, latencyMs: Date.now() - start };
@@ -2036,7 +2275,9 @@ export class AirtableDocumentConnector extends BaseDocumentConnector {
     return { ok: true };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(
       `${AirtableDocumentConnector.BASE}/${this.cfg.baseId}/${encodeURIComponent(this.cfg.tableId)}?maxRecords=1`,
@@ -2131,7 +2372,9 @@ export class AsanaDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { user: json.data?.name, email: json.data?.email } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${AsanaDocumentConnector.BASE}/users/me`, {
       headers: this.headers,
@@ -2220,7 +2463,9 @@ export class BitbucketDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { user: json.display_name } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${BitbucketDocumentConnector.BASE}/user`, {
       headers: { Authorization: this.authHeader },
@@ -2303,7 +2548,9 @@ export class BookstackDocumentConnector extends BaseDocumentConnector {
     return { ok: true };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${this.cfg.baseUrl}/api/users?count=1`, {
       headers: { Authorization: this.authHeader },
@@ -2390,7 +2637,9 @@ export class CanvasDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { user: json.name } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${this.cfg.baseUrl}/api/v1/users/self`, {
       headers: this.headers,
@@ -2480,7 +2729,9 @@ export class ClickUpDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { user: json.user?.username } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${ClickUpDocumentConnector.BASE}/user`, {
       headers: this.headers,
@@ -2576,7 +2827,9 @@ export class CodaDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { docName: json.name } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${CodaDocumentConnector.BASE}/docs/${this.docId}`, {
       headers: this.headers,
@@ -2673,7 +2926,9 @@ export class DiscordDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { bot: json.username, id: json.id } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${DiscordDocumentConnector.BASE}/users/@me`, {
       headers: this.headers,
@@ -2767,7 +3022,9 @@ export class DiscourseDocumentConnector extends BaseDocumentConnector {
     return { ok: true };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${this.cfg.baseUrl}/users/${this.cfg.apiUsername}.json`, {
       headers: this.headers,
@@ -2857,7 +3114,9 @@ export class DropboxDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { user: json.name?.display_name, email: json.email } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn("https://api.dropboxapi.com/2/users/get_current_account", {
       method: "POST",
@@ -2967,7 +3226,9 @@ export class FirefliesDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { email: user?.["email"], name: user?.["name"] } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const result = await this.gql(`query { user { email } }`);
     return { ok: !result.errors?.length, latencyMs: Date.now() - start };
@@ -3040,7 +3301,9 @@ export class FreshdeskDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { user: json.contact?.name } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`https://${this.domain}.freshdesk.com/api/v2/agents/me`, {
       headers: { Authorization: this.authHeader },
@@ -3127,7 +3390,9 @@ export class GitBookDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { user: json.displayName, email: json.email } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${GitBookDocumentConnector.BASE}/user`, {
       headers: this.headers,
@@ -3206,7 +3471,9 @@ export class GongDocumentConnector extends BaseDocumentConnector {
     return { ok: true };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${GongDocumentConnector.BASE}/v2/users?limit=1`, {
       headers: { Authorization: this.authHeader },
@@ -3291,7 +3558,9 @@ export class GoogleDriveDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { user: json.name, email: json.email } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn("https://www.googleapis.com/oauth2/v2/userinfo", {
       headers: this.headers,
@@ -3378,7 +3647,9 @@ export class GuruDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { email: json.email } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${GuruDocumentConnector.BASE}/whoami`, {
       headers: { Authorization: this.authHeader },
@@ -3464,7 +3735,9 @@ export class HubSpotDocumentConnector extends BaseDocumentConnector {
     return { ok: true };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${HubSpotDocumentConnector.BASE}/crm/v3/owners/`, {
       headers: this.headers,
@@ -3571,7 +3844,9 @@ export class ImapDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { note: "no queryFn provided — configure a real IMAP adapter" } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     try {
       await this.queryFn({ mailbox: this.cfg.mailbox ?? "INBOX", limit: 1 });
@@ -3637,7 +3912,9 @@ export class LoopiODocumentConnector extends BaseDocumentConnector {
     return { ok: true };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${LoopiODocumentConnector.BASE}/entries?limit=1`, {
       headers: this.headers,
@@ -3717,7 +3994,9 @@ export class MediaWikiDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { site: json.query?.general?.sitename } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${this.cfg.apiUrl}?action=query&meta=siteinfo&format=json`);
     return { ok: res.ok, latencyMs: Date.now() - start };
@@ -3817,7 +4096,9 @@ export class SharePointDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { site: json.displayName } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${SharePointDocumentConnector.GRAPH}/sites/${this.siteId}`, {
       headers: this.headers,
@@ -3903,7 +4184,9 @@ export class ZendeskDocumentConnector extends BaseDocumentConnector {
     return { ok: true, metadata: { user: json.user?.name, email: json.user?.email } };
   }
 
-  protected async _doHealthCheck(): Promise<Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }> {
+  protected async _doHealthCheck(): Promise<
+    Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
+  > {
     const start = Date.now();
     const res = await this.fetchFn(`${this.apiBase}/users/me.json`, {
       headers: { Authorization: this.authHeader },

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { useState, useEffect } from "react";
 import { useAuth } from "~/context/AuthContext";
 import { cn } from "~/lib/utils";
@@ -72,15 +73,15 @@ function GoogleIcon() {
 
 export default function ProfilePage() {
   const { user } = useAuth();
-  const displayName   = user?.username ?? "User";
-  const email         = user?.email    ?? "";
-  const role          = user?.role     ?? "user";
+  const displayName = user?.username ?? "User";
+  const email = user?.email ?? "";
+  const role = user?.role ?? "user";
 
   const [name, setName] = useState(displayName);
   const [customInstructions, setCustomInstructions] = useState(user?.customInstructions ?? "");
   const { theme: currentTheme, setTheme: applyTheme } = useTheme();
   const [themeSelection, setThemeSelection] = useState<"auto" | "light" | "dark">(
-    currentTheme === "dark" ? "dark" : currentTheme === "light" ? "light" : "auto"
+    currentTheme === "dark" ? "dark" : currentTheme === "light" ? "light" : "auto",
   );
   const [defaultPreset, setDefaultPreset] = useState("default");
   const [defaultRounds, setDefaultRounds] = useState("3");
@@ -100,21 +101,22 @@ export default function ProfilePage() {
     }
   }, [user?.id]);
 
-  const initials = (name || displayName)
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2) || "?";
+  const initials =
+    (name || displayName)
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2) || "?";
 
   async function handleSaveInstructions() {
     setIsSavingInstructions(true);
     setSaveError(null);
     try {
       const res = await fetch("/api/auth/me", {
-        method:  "PATCH",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ custom_instructions: customInstructions }),
+        body: JSON.stringify({ custom_instructions: customInstructions }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -144,11 +146,7 @@ export default function ProfilePage() {
               {role}
             </Badge>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsEditing(!isEditing)}
-          >
+          <Button variant="outline" size="sm" onClick={() => setIsEditing(!isEditing)}>
             <Pencil className="size-3 mr-1" />
             {isEditing ? "Done" : "Edit Profile"}
           </Button>
@@ -175,12 +173,7 @@ export default function ProfilePage() {
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
               <div className="relative">
-                <Input
-                  id="email"
-                  value={email}
-                  disabled
-                  className="opacity-60"
-                />
+                <Input id="email" value={email} disabled className="opacity-60" />
                 <Mail className="absolute right-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
               </div>
             </div>
@@ -200,9 +193,7 @@ export default function ProfilePage() {
         <Card>
           <CardHeader>
             <CardTitle>Custom Instructions</CardTitle>
-            <CardDescription>
-              Customize how the AI council responds to your queries
-            </CardDescription>
+            <CardDescription>Customize how the AI council responds to your queries</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Textarea
@@ -216,9 +207,7 @@ export default function ProfilePage() {
               className="resize-none"
               placeholder="Enter custom instructions for the AI council..."
             />
-            {saveError && (
-              <p className="text-xs text-destructive">{saveError}</p>
-            )}
+            {saveError && <p className="text-xs text-destructive">{saveError}</p>}
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
                 {customInstructions.length}/2000
@@ -257,7 +246,9 @@ export default function ProfilePage() {
                   onClick={() => {
                     setThemeSelection(value);
                     if (value === "auto") {
-                      const prefersDark = typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches;
+                      const prefersDark =
+                        typeof window !== "undefined" &&
+                        window.matchMedia("(prefers-color-scheme: dark)").matches;
                       applyTheme(prefersDark ? "dark" : "light");
                     } else {
                       applyTheme(value);
@@ -265,7 +256,7 @@ export default function ProfilePage() {
                   }}
                   className={cn(
                     "flex-1",
-                    themeSelection === value && "ring-2 ring-primary/30 border-primary/50"
+                    themeSelection === value && "ring-2 ring-primary/30 border-primary/50",
                   )}
                 >
                   <Icon className="size-3.5 mr-1.5" />
@@ -280,9 +271,7 @@ export default function ProfilePage() {
         <Card>
           <CardHeader>
             <CardTitle>Council Defaults</CardTitle>
-            <CardDescription>
-              Configure default settings for new council sessions
-            </CardDescription>
+            <CardDescription>Configure default settings for new council sessions</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
@@ -322,9 +311,7 @@ export default function ProfilePage() {
         <Card>
           <CardHeader>
             <CardTitle>Connected Accounts</CardTitle>
-            <CardDescription>
-              Manage your connected third-party accounts
-            </CardDescription>
+            <CardDescription>Manage your connected third-party accounts</CardDescription>
           </CardHeader>
           <CardContent className="space-y-1">
             <div className="flex items-center justify-between py-2">
@@ -379,11 +366,7 @@ export default function ProfilePage() {
                   Permanently remove all your conversation history
                 </p>
               </div>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setDeleteDialogOpen(true)}
-              >
+              <Button variant="destructive" size="sm" onClick={() => setDeleteDialogOpen(true)}>
                 <Trash2 className="size-3 mr-1" />
                 Delete All
               </Button>

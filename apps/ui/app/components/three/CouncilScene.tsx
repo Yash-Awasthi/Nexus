@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
@@ -28,7 +29,13 @@ function CouncilTable() {
       {/* Table surface */}
       <mesh position={[0, -0.2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <cylinderGeometry args={[1.4, 1.4, 0.03, 32]} />
-        <meshStandardMaterial color="#0a0a1a" roughness={0.8} metalness={0.2} transparent opacity={0.6} />
+        <meshStandardMaterial
+          color="#0a0a1a"
+          roughness={0.8}
+          metalness={0.2}
+          transparent
+          opacity={0.6}
+        />
       </mesh>
       {/* Glowing ring edge */}
       <mesh ref={ringRef} position={[0, -0.18, 0]} rotation={[-Math.PI / 2, 0, 0]}>

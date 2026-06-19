@@ -17,20 +17,32 @@
  *   Timing-safe compares everywhere (timingSafeEqual).
  */
 
-import { createHash, randomBytes, scrypt as _scrypt, timingSafeEqual } from "node:crypto";
+import { randomBytes, scrypt as _scrypt, timingSafeEqual } from "node:crypto";
+import type { ScryptOptions } from "node:crypto";
 import { promisify } from "node:util";
 
-import { signJwt, verifyJwt } from "@nexus/auth";
+import { signJwt } from "@nexus/auth";
 import { db } from "@nexus/db";
-import { users, refreshTokens, passwordResetTokens, emailVerificationTokens } from "@nexus/db/schema";
+import {
+  users,
+  refreshTokens,
+  passwordResetTokens,
+  emailVerificationTokens,
+} from "@nexus/db/schema";
 import { eq, and, gt, isNull, desc } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
-import { requireAuth } from "../middleware/auth.js";
 import { emitAuditEvent } from "../lib/audit-emitter.js";
+import { sha256hex } from "../lib/crypto-utils.js";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
+import { requireAuth } from "../middleware/auth.js";
 
-const scrypt = promisify(_scrypt);
+const scrypt = promisify(_scrypt) as (
+  password: Buffer | string,
+  salt: Buffer | string,
+  keylen: number,
+  options: ScryptOptions,
+) => Promise<Buffer>;
 
 // ── Crypto helpers ────────────────────────────────────────────────────────────
 
@@ -72,32 +84,23 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
   return timingSafeEqual(derived, expected);
 }
 
-function sha256hex(data: string): string {
-  return createHash("sha256").update(data).digest("hex");
-}
-
 function generateRefreshToken(): string {
   return randomBytes(32).toString("hex");
 }
 
 // ── JWT issuance ──────────────────────────────────────────────────────────────
 
-const ACCESS_TOKEN_TTL_SEC = 15 * 60;       // 15 minutes
+const ACCESS_TOKEN_TTL_SEC = 15 * 60; // 15 minutes
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 3600 * 1000; // 30 days
 
-function issueAccessToken(
-  userId: string,
-  role: string,
-  tier: string,
-  secret: string,
-): string {
+function issueAccessToken(userId: string, role: string, tier: string, secret: string): string {
   return signJwt(
     {
       sub: userId,
       role: role as "admin" | "agent" | "read-only",
       tier,
       exp: Math.floor(Date.now() / 1000) + ACCESS_TOKEN_TTL_SEC,
-    },
+    } as Parameters<typeof signJwt>[0],
     secret,
   );
 }
@@ -163,8 +166,13 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
 
   if (!dbAvailable) {
     // Graceful degradation — auth routes return 503 with clear message
-    const notConfigured = async (_req: unknown, reply: { code: (n: number) => { send: (v: unknown) => unknown } }) =>
-      reply.code(503).send({ error: "auth_unavailable", message: "DATABASE_URL is not configured" });
+    const notConfigured = async (
+      _req: unknown,
+      reply: { code: (n: number) => { send: (v: unknown) => unknown } },
+    ) =>
+      reply
+        .code(503)
+        .send({ error: "auth_unavailable", message: "DATABASE_URL is not configured" });
     app.post("/auth/register", notConfigured);
     app.post("/auth/login", notConfigured);
     app.post("/auth/refresh", notConfigured);
@@ -297,11 +305,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
       const normalEmail = email.trim().toLowerCase();
 
       // Always do scrypt work to prevent user-enumeration via timing
-      const DUMMY_HASH =
-        "scrypt$" +
-        "0".repeat(64) +
-        "$" +
-        "0".repeat(128);
+      const DUMMY_HASH = "scrypt$" + "0".repeat(64) + "$" + "0".repeat(128);
 
       const [user] = await db
         .select()
@@ -397,10 +401,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
       }
 
       // Atomic rotation — revoke old, issue new
-      await db
-        .update(refreshTokens)
-        .set({ revokedAt: now })
-        .where(eq(refreshTokens.id, stored.id));
+      await db.update(refreshTokens).set({ revokedAt: now }).where(eq(refreshTokens.id, stored.id));
 
       const [user] = await db
         .select()
@@ -468,35 +469,31 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
    * Return the authenticated user's profile.
    * Reads userId from the JWT sub claim.
    */
-  app.get(
-    "/auth/me",
-    { preHandler: requireAuth },
-    async (request, reply) => {
-      const userId = request.nexusUserId;
-      if (!userId) {
-        // API key auth — no user record; return minimal profile
-        return reply.send({
-          id: null,
-          email: null,
-          name: "API Key User",
-          role: "member",
-          tier: request.nexusTier ?? "free",
-          emailVerified: false,
-          mfaEnabled: false,
-          authMethod: "api_key",
-        });
-      }
+  app.get("/auth/me", { preHandler: requireAuth }, async (request, reply) => {
+    const userId = request.nexusUserId;
+    if (!userId) {
+      // API key auth — no user record; return minimal profile
+      return reply.send({
+        id: null,
+        email: null,
+        name: "API Key User",
+        role: "member",
+        tier: request.nexusTier ?? "free",
+        emailVerified: false,
+        mfaEnabled: false,
+        authMethod: "api_key",
+      });
+    }
 
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(and(eq(users.id, userId), isNull(users.deletedAt)))
-        .limit(1);
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+      .limit(1);
 
-      if (!user) return reply.code(404).send({ error: "user_not_found" });
-      return reply.send({ ...safeUser(user), authMethod: "jwt" });
-    },
-  );
+    if (!user) return reply.code(404).send({ error: "user_not_found" });
+    return reply.send({ ...safeUser(user), authMethod: "jwt" });
+  });
 
   /**
    * PATCH /auth/me
@@ -548,11 +545,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: "no_changes", message: "No valid fields to update" });
       }
 
-      const [updated] = await db
-        .update(users)
-        .set(updates)
-        .where(eq(users.id, userId))
-        .returning();
+      const [updated] = await db.update(users).set(updates).where(eq(users.id, userId)).returning();
 
       if (!updated) return reply.code(404).send({ error: "user_not_found" });
       return reply.send(safeUser(updated));
@@ -704,10 +697,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
         .set({ usedAt: now })
         .where(eq(passwordResetTokens.id, stored.id));
 
-      await db
-        .update(users)
-        .set({ passwordHash: newPasswordHash })
-        .where(eq(users.id, user.id));
+      await db.update(users).set({ passwordHash: newPasswordHash }).where(eq(users.id, user.id));
 
       await db
         .update(refreshTokens)
@@ -737,41 +727,37 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
    * List all active (non-revoked, non-expired) refresh token sessions
    * for the currently authenticated user. Does not return token hashes.
    */
-  app.get(
-    "/auth/sessions",
-    { preHandler: requireAuth },
-    async (request, reply) => {
-      const userId = request.nexusUserId;
-      if (!userId) return reply.code(403).send({ error: "jwt_required" });
+  app.get("/auth/sessions", { preHandler: requireAuth }, async (request, reply) => {
+    const userId = request.nexusUserId;
+    if (!userId) return reply.code(403).send({ error: "jwt_required" });
 
-      const now = new Date();
-      const sessions = await db
-        .select({
-          id: refreshTokens.id,
-          userAgent: refreshTokens.userAgent,
-          createdAt: refreshTokens.createdAt,
-          expiresAt: refreshTokens.expiresAt,
-        })
-        .from(refreshTokens)
-        .where(
-          and(
-            eq(refreshTokens.userId, userId),
-            isNull(refreshTokens.revokedAt),
-            gt(refreshTokens.expiresAt, now),
-          ),
-        )
-        .orderBy(desc(refreshTokens.createdAt));
+    const now = new Date();
+    const sessions = await db
+      .select({
+        id: refreshTokens.id,
+        userAgent: refreshTokens.userAgent,
+        createdAt: refreshTokens.createdAt,
+        expiresAt: refreshTokens.expiresAt,
+      })
+      .from(refreshTokens)
+      .where(
+        and(
+          eq(refreshTokens.userId, userId),
+          isNull(refreshTokens.revokedAt),
+          gt(refreshTokens.expiresAt, now),
+        ),
+      )
+      .orderBy(desc(refreshTokens.createdAt));
 
-      return reply.send({
-        sessions: sessions.map((s) => ({
-          id: s.id,
-          userAgent: s.userAgent ?? null,
-          createdAt: s.createdAt.toISOString(),
-          expiresAt: s.expiresAt.toISOString(),
-        })),
-      });
-    },
-  );
+    return reply.send({
+      sessions: sessions.map((s) => ({
+        id: s.id,
+        userAgent: s.userAgent ?? null,
+        createdAt: s.createdAt.toISOString(),
+        expiresAt: s.expiresAt.toISOString(),
+      })),
+    });
+  });
 
   /**
    * DELETE /auth/sessions/:id
@@ -781,34 +767,30 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
    */
   app.delete<{
     Params: { id: string };
-  }>(
-    "/auth/sessions/:id",
-    { preHandler: requireAuth },
-    async (request, reply) => {
-      const userId = request.nexusUserId;
-      if (!userId) return reply.code(403).send({ error: "jwt_required" });
+  }>("/auth/sessions/:id", { preHandler: requireAuth }, async (request, reply) => {
+    const userId = request.nexusUserId;
+    if (!userId) return reply.code(403).send({ error: "jwt_required" });
 
-      const { id: sessionId } = request.params;
+    const { id: sessionId } = request.params;
 
-      // Verify the session belongs to the requesting user before revoking
-      const [session] = await db
-        .select({ id: refreshTokens.id, userId: refreshTokens.userId })
-        .from(refreshTokens)
-        .where(eq(refreshTokens.id, sessionId))
-        .limit(1);
+    // Verify the session belongs to the requesting user before revoking
+    const [session] = await db
+      .select({ id: refreshTokens.id, userId: refreshTokens.userId })
+      .from(refreshTokens)
+      .where(eq(refreshTokens.id, sessionId))
+      .limit(1);
 
-      if (!session || session.userId !== userId) {
-        return reply.code(404).send({ error: "session_not_found" });
-      }
+    if (!session || session.userId !== userId) {
+      return reply.code(404).send({ error: "session_not_found" });
+    }
 
-      await db
-        .update(refreshTokens)
-        .set({ revokedAt: new Date() })
-        .where(and(eq(refreshTokens.id, sessionId), isNull(refreshTokens.revokedAt)));
+    await db
+      .update(refreshTokens)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(refreshTokens.id, sessionId), isNull(refreshTokens.revokedAt)));
 
-      return reply.code(204).send();
-    },
-  );
+    return reply.code(204).send();
+  });
 
   // ── Email verification ─────────────────────────────────────────────────────
 
@@ -875,10 +857,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
         expiresAt,
       });
 
-      app.log.info(
-        { verifyToken: rawToken, email: user.email },
-        "email-verification-token-issued",
-      );
+      app.log.info({ verifyToken: rawToken, email: user.email }, "email-verification-token-issued");
 
       if (process.env.NODE_ENV !== "production") {
         return reply.code(200).send({
@@ -939,10 +918,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
         .set({ usedAt: now })
         .where(eq(emailVerificationTokens.id, stored.id));
 
-      await db
-        .update(users)
-        .set({ emailVerified: true })
-        .where(eq(users.id, stored.userId));
+      await db.update(users).set({ emailVerified: true }).where(eq(users.id, stored.userId));
 
       emitAuditEvent(
         {

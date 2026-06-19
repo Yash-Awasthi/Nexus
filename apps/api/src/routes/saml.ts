@@ -26,12 +26,13 @@
  */
 
 import { createHash, createHmac, createVerify, randomBytes, createPublicKey } from "node:crypto";
-import { inflateRawSync, deflateRawSync } from "node:zlib";
-import type { FastifyInstance } from "fastify";
+import { deflateRawSync } from "node:zlib";
 
+import { signJwt } from "@nexus/auth";
 import { db } from "@nexus/db";
 import { users, refreshTokens } from "@nexus/db/schema";
 import { eq } from "drizzle-orm";
+import type { FastifyInstance } from "fastify";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -46,7 +47,7 @@ function nowSec(): number {
 }
 
 function isoNow(offsetSeconds = 0): string {
-  return new Date((Date.now() + offsetSeconds * 1_000)).toISOString().replace(/\.\d+Z$/, "Z");
+  return new Date(Date.now() + offsetSeconds * 1_000).toISOString().replace(/\.\d+Z$/, "Z");
 }
 
 function safeBase64Encode(buf: Buffer): string {
@@ -142,7 +143,7 @@ function xmlTextContent(xml: string, tagName: string): string | undefined {
 }
 
 function xmlGetElement(xml: string, tagName: string): string | undefined {
-  const re = new RegExp(`<[^>]*${tagName}[^>]*>[\\s\\S]*?<\/[^>]*${tagName}>`, "i");
+  const re = new RegExp(`<[^>]*${tagName}[^>]*>[\\s\\S]*?</[^>]*${tagName}>`, "i");
   return re.exec(xml)?.[0];
 }
 
@@ -152,28 +153,33 @@ function parseAssertion(responseXml: string): SamlAssertion | null {
     const nameId = xmlTextContent(responseXml, "NameID");
     if (!nameId) return null;
 
-    const email = nameId.includes("@") ? nameId : xmlAttr(responseXml, "emailAddress") ?? nameId;
+    const email = nameId.includes("@") ? nameId : (xmlAttr(responseXml, "emailAddress") ?? nameId);
 
     // Conditions
     const conditionsEl = xmlGetElement(responseXml, "Conditions");
-    const notBefore    = conditionsEl ? xmlAttr(conditionsEl, "NotBefore")    : undefined;
+    const notBefore = conditionsEl ? xmlAttr(conditionsEl, "NotBefore") : undefined;
     const notOnOrAfter = conditionsEl ? xmlAttr(conditionsEl, "NotOnOrAfter") : undefined;
 
     // Audience
     const audienceEl = xmlGetElement(responseXml, "AudienceRestriction");
-    const audience   = audienceEl ? xmlTextContent(audienceEl, "Audience") : undefined;
+    const audience = audienceEl ? xmlTextContent(audienceEl, "Audience") : undefined;
 
     // Attributes (common mappings from Okta/Azure/G Suite)
     const attrs: Record<string, string> = {};
-    const attrRe = /Name="([^"]+)"[^>]*>[\s\S]*?<[^>]*AttributeValue[^>]*>([^<]*)<\/[^>]*AttributeValue>/gi;
+    const attrRe =
+      /Name="([^"]+)"[^>]*>[\s\S]*?<[^>]*AttributeValue[^>]*>([^<]*)<\/[^>]*AttributeValue>/gi;
     let attrMatch: RegExpExecArray | null;
     while ((attrMatch = attrRe.exec(responseXml)) !== null) {
       attrs[attrMatch[1]!] = attrMatch[2]!.trim();
     }
 
-    const firstName = attrs["firstName"] ?? attrs["givenName"] ??
+    const firstName =
+      attrs["firstName"] ??
+      attrs["givenName"] ??
       attrs["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"];
-    const lastName  = attrs["lastName"] ?? attrs["sn"] ??
+    const lastName =
+      attrs["lastName"] ??
+      attrs["sn"] ??
       attrs["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname"];
 
     // SubjectConfirmation InResponseTo
@@ -184,9 +190,12 @@ function parseAssertion(responseXml: string): SamlAssertion | null {
 
     return {
       nameId,
-      email: (attrs["email"] ?? attrs["emailAddress"] ??
+      email: (
+        attrs["email"] ??
+        attrs["emailAddress"] ??
         attrs["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"] ??
-        email).toLowerCase(),
+        email
+      ).toLowerCase(),
       firstName,
       lastName,
       sessionIndex,
@@ -232,16 +241,10 @@ function verifySamlSignature(responseXml: string, idpCert: string): boolean {
 
 async function upsertSamlUser(
   assertion: SamlAssertion,
-  idpEntityId: string,
+  _idpEntityId: string,
   userAgent: string,
 ): Promise<{ accessToken: string; refreshToken: string; userId: string }> {
-  const { createHash: sha, randomBytes: rb } = await import("node:crypto");
-  const { SignJWT } = await import("jose");
-
-  const JWT_SECRET  = process.env.NEXUS_JWT_SECRET ?? "dev-secret-change-me";
-  const JWT_ISSUER  = process.env.NEXUS_JWT_ISSUER ?? "nexus-api";
-  const JWT_AUDIENCE = process.env.NEXUS_JWT_AUDIENCE ?? "nexus-client";
-  const secretKey   = new TextEncoder().encode(JWT_SECRET);
+  const JWT_SECRET = process.env.NEXUS_JWT_SECRET ?? "dev-secret-change-me";
 
   // Upsert user
   const [existing] = await db
@@ -266,34 +269,35 @@ async function upsertSamlUser(
       .insert(users)
       .values({
         email: assertion.email,
-        name: [assertion.firstName, assertion.lastName].filter(Boolean).join(" ") || assertion.email,
-        passwordHash: "",     // no password for SSO users
-        emailVerified: true,  // IdP has verified the email
+        name:
+          [assertion.firstName, assertion.lastName].filter(Boolean).join(" ") || assertion.email,
+        passwordHash: "", // no password for SSO users
+        emailVerified: true, // IdP has verified the email
       })
       .returning({ id: users.id });
     userId = newUser!.id;
   }
 
-  // Issue access token (15 min)
-  const accessToken = await new SignJWT({ sub: userId, provider: "saml", idp: idpEntityId })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime("15m")
-    .setIssuer(JWT_ISSUER)
-    .setAudience(JWT_AUDIENCE)
-    .sign(secretKey);
+  // Issue access token (15 min) via @nexus/auth signJwt (HS256)
+  const accessToken = signJwt(
+    {
+      sub: userId,
+      role: "read-only",
+      exp: Math.floor(Date.now() / 1_000) + 15 * 60,
+    } as Parameters<typeof signJwt>[0],
+    JWT_SECRET,
+  );
 
   // Opaque refresh token (30 days)
-  const rawRefresh  = rb(32).toString("hex");
-  const tokenHash   = sha("sha256").update(rawRefresh).digest("hex");
-  const expiresAt   = new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000);
+  const rawRefresh = randomBytes(32).toString("hex");
+  const tokenHash = createHash("sha256").update(rawRefresh).digest("hex");
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000);
 
   await db.insert(refreshTokens).values({
     userId,
     tokenHash,
     expiresAt,
     userAgent,
-    ipAddress: null,
   });
 
   return { accessToken, refreshToken: rawRefresh, userId };
@@ -331,11 +335,13 @@ export async function samlRoutes(app: FastifyInstance): Promise<void> {
       ["get", "/auth/saml/login"],
       ["post", "/auth/saml/callback"],
     ] as const) {
-      app[method](path, async (_req: unknown, reply: { code: (n: number) => { send: (b: unknown) => unknown } }) =>
-        reply.code(501).send({
-          error: "saml_not_configured",
-          message: "Set NEXUS_SAML_ENABLED=true and all NEXUS_SAML_* env vars to enable SAML SSO",
-        }),
+      app[method](
+        path,
+        async (_req: unknown, reply: { code: (n: number) => { send: (b: unknown) => unknown } }) =>
+          reply.code(501).send({
+            error: "saml_not_configured",
+            message: "Set NEXUS_SAML_ENABLED=true and all NEXUS_SAML_* env vars to enable SAML SSO",
+          }),
       );
     }
     return;
@@ -348,7 +354,7 @@ export async function samlRoutes(app: FastifyInstance): Promise<void> {
   app.get("/auth/saml/metadata", async (_req, reply) => {
     try {
       const spEntityId = env("NEXUS_SAML_SP_ENTITY_ID");
-      const acsUrl     = env("NEXUS_SAML_SP_ACS_URL");
+      const acsUrl = env("NEXUS_SAML_SP_ACS_URL");
       reply.header("Content-Type", "application/xml; charset=utf-8");
       return reply.send(buildMetadataXml(spEntityId, acsUrl));
     } catch (err) {
@@ -361,45 +367,43 @@ export async function samlRoutes(app: FastifyInstance): Promise<void> {
    * Initiates SP-initiated SSO via HTTP-Redirect binding.
    * Stores state in a signed cookie, redirects browser to IdP.
    */
-  app.get<{ Querystring: { redirect?: string } }>(
-    "/auth/saml/login",
-    async (request, reply) => {
-      try {
-        const idpSsoUrl  = env("NEXUS_SAML_IDP_SSO_URL");
-        const spEntityId = env("NEXUS_SAML_SP_ENTITY_ID");
-        const acsUrl     = env("NEXUS_SAML_SP_ACS_URL");
+  app.get<{ Querystring: { redirect?: string } }>("/auth/saml/login", async (request, reply) => {
+    try {
+      const idpSsoUrl = env("NEXUS_SAML_IDP_SSO_URL");
+      const spEntityId = env("NEXUS_SAML_SP_ENTITY_ID");
+      const acsUrl = env("NEXUS_SAML_SP_ACS_URL");
 
-        const requestId    = `_${randomBytes(16).toString("hex")}`;
-        const relayState   = request.query.redirect ?? "/";
-        const state        = makeState(relayState);
-        const authnRequest = buildAuthnRequest(requestId, spEntityId, acsUrl);
-        const encoded      = encodeAuthnRequest(authnRequest);
+      const requestId = `_${randomBytes(16).toString("hex")}`;
+      const relayState = request.query.redirect ?? "/";
+      const state = makeState(relayState);
+      const authnRequest = buildAuthnRequest(requestId, spEntityId, acsUrl);
+      const encoded = encodeAuthnRequest(authnRequest);
 
-        const params = new URLSearchParams({
-          SAMLRequest: encoded,
-          RelayState:  state,
-        });
+      const params = new URLSearchParams({
+        SAMLRequest: encoded,
+        RelayState: state,
+      });
 
-        // Store requestId in a short-lived signed cookie for InResponseTo validation
-        const cookieVal = createHmac(
-          "sha256",
-          process.env.NEXUS_SAML_COOKIE_SECRET ?? "dev-secret",
-        ).update(requestId).digest("hex");
+      // Store requestId in a short-lived signed cookie for InResponseTo validation
+      const cookieVal = createHmac("sha256", process.env.NEXUS_SAML_COOKIE_SECRET ?? "dev-secret")
+        .update(requestId)
+        .digest("hex");
 
-        reply.setCookie("saml_req_id", `${requestId}:${cookieVal}`, {
-          httpOnly: true,
-          secure:   process.env.NODE_ENV === "production",
-          sameSite: "lax",
-          maxAge:   600, // 10 minutes
-          path:     "/",
-        });
+      (
+        reply as unknown as { setCookie(n: string, v: string, o: Record<string, unknown>): void }
+      ).setCookie("saml_req_id", `${requestId}:${cookieVal}`, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 600,
+        path: "/",
+      });
 
-        return reply.redirect(`${idpSsoUrl}?${params.toString()}`);
-      } catch (err) {
-        return reply.code(503).send({ error: "saml_config_error", message: (err as Error).message });
-      }
-    },
-  );
+      return reply.redirect(`${idpSsoUrl}?${params.toString()}`);
+    } catch (err) {
+      return reply.code(503).send({ error: "saml_config_error", message: (err as Error).message });
+    }
+  });
 
   /**
    * POST /auth/saml/callback
@@ -408,88 +412,89 @@ export async function samlRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{
     Body: { SAMLResponse?: string; RelayState?: string };
-  }>(
-    "/auth/saml/callback",
-    async (request, reply) => {
-      try {
-        const idpEntityId = env("NEXUS_SAML_IDP_ENTITY_ID");
-        const idpCert     = env("NEXUS_SAML_IDP_CERT");
-        const spEntityId  = env("NEXUS_SAML_SP_ENTITY_ID");
-        const frontendUrl = process.env.NEXUS_FRONTEND_URL ?? "http://localhost:5173";
+  }>("/auth/saml/callback", async (request, reply) => {
+    try {
+      const idpEntityId = env("NEXUS_SAML_IDP_ENTITY_ID");
+      const idpCert = env("NEXUS_SAML_IDP_CERT");
+      const spEntityId = env("NEXUS_SAML_SP_ENTITY_ID");
+      const frontendUrl = process.env.NEXUS_FRONTEND_URL ?? "http://localhost:5173";
 
-        const { SAMLResponse, RelayState } = request.body;
+      const { SAMLResponse, RelayState } = request.body;
 
-        if (!SAMLResponse) {
-          return reply.code(400).send({ error: "missing_saml_response" });
-        }
-
-        // Decode SAML response
-        const responseXml = Buffer.from(SAMLResponse, "base64").toString("utf8");
-
-        // 1 — Verify signature
-        if (!verifySamlSignature(responseXml, idpCert)) {
-          request.log.warn("SAML signature verification failed");
-          return reply.code(401).send({ error: "invalid_signature" });
-        }
-
-        // 2 — Parse assertion
-        const assertion = parseAssertion(responseXml);
-        if (!assertion || !assertion.email) {
-          return reply.code(400).send({ error: "assertion_parse_failed" });
-        }
-
-        // 3 — Validate InResponseTo (CSRF protection)
-        const reqCookie = (request.cookies as Record<string, string>)["saml_req_id"] ?? "";
-        if (reqCookie && assertion.inResponseTo) {
-          const [storedId, storedSig] = reqCookie.split(":");
-          const expectedSig = createHmac(
-            "sha256",
-            process.env.NEXUS_SAML_COOKIE_SECRET ?? "dev-secret",
-          ).update(storedId ?? "").digest("hex");
-          if (storedSig !== expectedSig || storedId !== assertion.inResponseTo) {
-            return reply.code(401).send({ error: "inresponseto_mismatch" });
-          }
-        }
-        // Clear cookie
-        reply.clearCookie("saml_req_id", { path: "/" });
-
-        // 4 — Validate time conditions
-        const now = new Date();
-        if (assertion.notBefore && new Date(assertion.notBefore) > new Date(now.getTime() + 60_000)) {
-          return reply.code(401).send({ error: "assertion_not_yet_valid" });
-        }
-        if (assertion.notOnOrAfter && new Date(assertion.notOnOrAfter) < new Date(now.getTime() - 60_000)) {
-          return reply.code(401).send({ error: "assertion_expired" });
-        }
-
-        // 5 — Validate Audience
-        if (assertion.audience && assertion.audience !== spEntityId) {
-          return reply.code(401).send({
-            error: "audience_mismatch",
-            expected: spEntityId,
-            got: assertion.audience,
-          });
-        }
-
-        // 6 — Upsert user + issue tokens
-        const userAgent = request.headers["user-agent"] ?? "";
-        const { accessToken, refreshToken } = await upsertSamlUser(
-          assertion,
-          idpEntityId,
-          userAgent,
-        );
-
-        // 7 — Redirect to frontend with tokens
-        const stateResult = RelayState ? verifyState(RelayState) : null;
-        const destination = stateResult?.relayState ?? "/";
-
-        return reply.redirect(
-          `${frontendUrl}${destination}?access_token=${accessToken}&refresh_token=${refreshToken}`,
-        );
-      } catch (err) {
-        request.log.error({ err }, "SAML callback error");
-        return reply.code(500).send({ error: "saml_callback_error" });
+      if (!SAMLResponse) {
+        return reply.code(400).send({ error: "missing_saml_response" });
       }
-    },
-  );
+
+      // Decode SAML response
+      const responseXml = Buffer.from(SAMLResponse, "base64").toString("utf8");
+
+      // 1 — Verify signature
+      if (!verifySamlSignature(responseXml, idpCert)) {
+        request.log.warn("SAML signature verification failed");
+        return reply.code(401).send({ error: "invalid_signature" });
+      }
+
+      // 2 — Parse assertion
+      const assertion = parseAssertion(responseXml);
+      if (!assertion || !assertion.email) {
+        return reply.code(400).send({ error: "assertion_parse_failed" });
+      }
+
+      // 3 — Validate InResponseTo (CSRF protection)
+      const reqCookie =
+        (request as unknown as { cookies: Record<string, string> }).cookies["saml_req_id"] ?? "";
+      if (reqCookie && assertion.inResponseTo) {
+        const [storedId, storedSig] = reqCookie.split(":");
+        const expectedSig = createHmac(
+          "sha256",
+          process.env.NEXUS_SAML_COOKIE_SECRET ?? "dev-secret",
+        )
+          .update(storedId ?? "")
+          .digest("hex");
+        if (storedSig !== expectedSig || storedId !== assertion.inResponseTo) {
+          return reply.code(401).send({ error: "inresponseto_mismatch" });
+        }
+      }
+      // Clear cookie
+      (
+        reply as unknown as { clearCookie(n: string, o: Record<string, unknown>): void }
+      ).clearCookie("saml_req_id", { path: "/" });
+
+      // 4 — Validate time conditions
+      const now = new Date();
+      if (assertion.notBefore && new Date(assertion.notBefore) > new Date(now.getTime() + 60_000)) {
+        return reply.code(401).send({ error: "assertion_not_yet_valid" });
+      }
+      if (
+        assertion.notOnOrAfter &&
+        new Date(assertion.notOnOrAfter) < new Date(now.getTime() - 60_000)
+      ) {
+        return reply.code(401).send({ error: "assertion_expired" });
+      }
+
+      // 5 — Validate Audience
+      if (assertion.audience && assertion.audience !== spEntityId) {
+        return reply.code(401).send({
+          error: "audience_mismatch",
+          expected: spEntityId,
+          got: assertion.audience,
+        });
+      }
+
+      // 6 — Upsert user + issue tokens
+      const userAgent = request.headers["user-agent"] ?? "";
+      const { accessToken, refreshToken } = await upsertSamlUser(assertion, idpEntityId, userAgent);
+
+      // 7 — Redirect to frontend with tokens
+      const stateResult = RelayState ? verifyState(RelayState) : null;
+      const destination = stateResult?.relayState ?? "/";
+
+      return reply.redirect(
+        `${frontendUrl}${destination}?access_token=${accessToken}&refresh_token=${refreshToken}`,
+      );
+    } catch (err) {
+      request.log.error({ err }, "SAML callback error");
+      return reply.code(500).send({ error: "saml_callback_error" });
+    }
+  });
 }

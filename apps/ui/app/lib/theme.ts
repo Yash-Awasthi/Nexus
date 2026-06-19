@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Theme management
  *
@@ -8,36 +9,36 @@
 export type ThemeId = "default-light" | "default-dark" | "matrix" | "glyph";
 
 export interface Theme {
-  id:          ThemeId;
-  label:       string;
+  id: ThemeId;
+  label: string;
   description: string;
-  preview:     string;  // short CSS color preview
+  preview: string; // short CSS color preview
 }
 
 export const THEMES: Theme[] = [
   {
-    id:          "default-light",
-    label:       "Default Light",
+    id: "default-light",
+    label: "Default Light",
     description: "Warm parchment — amber gold accents",
-    preview:     "#f5f0e8",
+    preview: "#f5f0e8",
   },
   {
-    id:          "default-dark",
-    label:       "Default Dark",
+    id: "default-dark",
+    label: "Default Dark",
     description: "Deep charcoal — warm gold accents",
-    preview:     "#141210",
+    preview: "#141210",
   },
   {
-    id:          "matrix",
-    label:       "Matrix",
+    id: "matrix",
+    label: "Matrix",
     description: "Phosphor green on black. The one.",
-    preview:     "#001800",
+    preview: "#001800",
   },
   {
-    id:          "glyph",
-    label:       "Glyph",
+    id: "glyph",
+    label: "Glyph",
     description: "Electric violet, zero radius, hacker dark",
-    preview:     "#0a0814",
+    preview: "#0a0814",
   },
 ];
 
@@ -47,7 +48,9 @@ export function getStoredTheme(): ThemeId {
   try {
     const raw = localStorage.getItem(THEME_KEY);
     if (raw && THEMES.find((t) => t.id === raw)) return raw as ThemeId;
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return "default-dark";
 }
 

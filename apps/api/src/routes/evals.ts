@@ -245,15 +245,21 @@ export async function evalsRoutes(app: FastifyInstance): Promise<void> {
           scorerFn = matchesSchema((params["schema"] as FieldSchema) ?? {});
           break;
         case "all_of": {
-          const specs = (params["scorers"] as { scorer: ScorerName; params?: Record<string, unknown> }[]) ?? [];
+          const specs =
+            (params["scorers"] as { scorer: ScorerName; params?: Record<string, unknown> }[]) ?? [];
           scorerFn = allOf(
             ...specs.map((s) => {
               switch (s.scorer) {
-                case "exact_match": return exactMatch(s.params?.["expected"]);
-                case "fields_present": return fieldsPresent(...((s.params?.["fields"] as string[]) ?? []));
-                case "contains_string": return containsString((s.params?.["substring"] as string) ?? "");
-                case "matches_schema": return matchesSchema((s.params?.["schema"] as FieldSchema) ?? {});
-                default: return exactMatch(undefined);
+                case "exact_match":
+                  return exactMatch(s.params?.["expected"]);
+                case "fields_present":
+                  return fieldsPresent(...((s.params?.["fields"] as string[]) ?? []));
+                case "contains_string":
+                  return containsString((s.params?.["substring"] as string) ?? "");
+                case "matches_schema":
+                  return matchesSchema((s.params?.["schema"] as FieldSchema) ?? {});
+                default:
+                  return exactMatch(undefined);
               }
             }),
           );

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Chat Detail — /chat/:id
  *
@@ -50,11 +51,11 @@ interface Message {
 // ─── Archetype display config ─────────────────────────────────────────────────
 
 const ARCHETYPE_COLORS: Array<{ color: string; badgeColor: string; icon: string }> = [
-  { color: "bg-blue-500/20 text-blue-400",     badgeColor: "border-blue-500/30",   icon: "🏗️" },
-  { color: "bg-amber-500/20 text-amber-400",   badgeColor: "border-amber-500/30",  icon: "⚡" },
+  { color: "bg-blue-500/20 text-blue-400", badgeColor: "border-blue-500/30", icon: "🏗️" },
+  { color: "bg-amber-500/20 text-amber-400", badgeColor: "border-amber-500/30", icon: "⚡" },
   { color: "bg-purple-500/20 text-purple-400", badgeColor: "border-purple-500/30", icon: "⚖️" },
-  { color: "bg-green-500/20 text-green-400",   badgeColor: "border-green-500/30",  icon: "🔬" },
-  { color: "bg-red-500/20 text-red-400",       badgeColor: "border-red-500/30",    icon: "🎯" },
+  { color: "bg-green-500/20 text-green-400", badgeColor: "border-green-500/30", icon: "🔬" },
+  { color: "bg-red-500/20 text-red-400", badgeColor: "border-red-500/30", icon: "🎯" },
 ];
 
 function colorForArchetype(name: string, index: number) {
@@ -65,38 +66,43 @@ function colorForArchetype(name: string, index: number) {
 // Map raw API message to our Message shape
 function mapMessage(raw: any, index: number): Message {
   const role: Message["role"] =
-    raw.role === "user" || raw.type === "user" ? "user"
-    : raw.role === "verdict" || raw.type === "verdict" ? "verdict"
-    : raw.role === "system" ? "system"
-    : "archetype";
+    raw.role === "user" || raw.type === "user"
+      ? "user"
+      : raw.role === "verdict" || raw.type === "verdict"
+        ? "verdict"
+        : raw.role === "system"
+          ? "system"
+          : "archetype";
   const name = raw.name ?? raw.archetypeName ?? raw.author ?? undefined;
-  const cfg = name ? colorForArchetype(name, index) : ARCHETYPE_COLORS[index % ARCHETYPE_COLORS.length];
+  const cfg = name
+    ? colorForArchetype(name, index)
+    : ARCHETYPE_COLORS[index % ARCHETYPE_COLORS.length];
   return {
-    id:         String(raw.id ?? `msg-${index}`),
+    id: String(raw.id ?? `msg-${index}`),
     role,
     name,
-    icon:       raw.icon ?? (role === "archetype" ? cfg.icon : undefined),
-    color:      raw.color ?? (role === "archetype" ? cfg.color : undefined),
+    icon: raw.icon ?? (role === "archetype" ? cfg.icon : undefined),
+    color: raw.color ?? (role === "archetype" ? cfg.color : undefined),
     badgeColor: raw.badgeColor ?? (role === "archetype" ? cfg.badgeColor : undefined),
     confidence: raw.confidence ?? raw.score ?? undefined,
-    content:    raw.content ?? raw.text ?? raw.body ?? "",
-    createdAt:  raw.createdAt ?? raw.created_at ?? undefined,
+    content: raw.content ?? raw.text ?? raw.body ?? "",
+    createdAt: raw.createdAt ?? raw.created_at ?? undefined,
   };
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ChatDetailPage() {
-  const { id }   = useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
 
   const [conversations, setConversations] = useState<StoredConv[]>([]);
-  const [messages,      setMessages]      = useState<Message[]>([]);
-  const [loading,       setLoading]       = useState(true);
-  const [sending,       setSending]       = useState(false);
-  const [inputValue,    setInputValue]    = useState("");
-  const [threadId,      setThreadId]      = useState<string | null>(null);
-  const [error,         setError]         = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [inputValue, setInputValue] = useState("");
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const currentConv = conversations.find((c) => c.id === id);
@@ -108,7 +114,9 @@ export default function ChatDetailPage() {
       const raw = localStorage.getItem(`nexus-chats-${user.id}`);
       const all: StoredConv[] = raw ? JSON.parse(raw) : [];
       setConversations(all);
-    } catch { setConversations([]); }
+    } catch {
+      setConversations([]);
+    }
   }, [user?.id]);
 
   // ── Load thread messages from API ─────────────────────────────────────────
@@ -137,7 +145,9 @@ export default function ChatDetailPage() {
     }
   }, [id]);
 
-  useEffect(() => { loadMessages(); }, [loadMessages]);
+  useEffect(() => {
+    loadMessages();
+  }, [loadMessages]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -161,7 +171,7 @@ export default function ChatDetailPage() {
 
     let opIdx = 0;
     try {
-      const tid = threadId ?? await createThread();
+      const tid = threadId ?? (await createThread());
       if (!threadId) setThreadId(tid);
 
       await new Promise<void>((resolve, reject) => {
@@ -177,7 +187,7 @@ export default function ChatDetailPage() {
           opIdx++;
           setMessages((prev) => {
             const existing = prev.findIndex((m) => m.id === msg.id);
-            if (existing >= 0) return prev.map((m) => m.id === msg.id ? msg : m);
+            if (existing >= 0) return prev.map((m) => (m.id === msg.id ? msg : m));
             return [...prev, msg];
           });
         });
@@ -192,7 +202,9 @@ export default function ChatDetailPage() {
         });
 
         const unsubD = onDone(() => {
-          unsubO(); unsubV(); unsubD();
+          unsubO();
+          unsubV();
+          unsubD();
           resolve();
         });
 
@@ -201,7 +213,11 @@ export default function ChatDetailPage() {
     } catch {
       setMessages((prev) => [
         ...prev,
-        { id: "err-" + Date.now(), role: "system", content: "Failed to get a response. Please try again." },
+        {
+          id: "err-" + Date.now(),
+          role: "system",
+          content: "Failed to get a response. Please try again.",
+        },
       ]);
     } finally {
       setSending(false);
@@ -230,7 +246,9 @@ export default function ChatDetailPage() {
         </div>
         <div className="flex-1 overflow-y-auto">
           {conversations.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-6 px-3">No conversations yet.</p>
+            <p className="text-xs text-muted-foreground text-center py-6 px-3">
+              No conversations yet.
+            </p>
           ) : (
             conversations.map((conv) => (
               <Link
@@ -244,14 +262,14 @@ export default function ChatDetailPage() {
                     <span className="text-sm font-medium truncate block">{conv.title}</span>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       {conv.mode && (
-                        <Badge variant="outline" className="text-[10px] h-3.5 px-1 py-0">{conv.mode}</Badge>
+                        <Badge variant="outline" className="text-[10px] h-3.5 px-1 py-0">
+                          {conv.mode}
+                        </Badge>
                       )}
                       <span className="text-xs text-muted-foreground">{conv.date}</span>
                     </div>
                   </div>
-                  {conv.id === id && (
-                    <ChevronRight className="size-3 text-primary shrink-0 mt-1" />
-                  )}
+                  {conv.id === id && <ChevronRight className="size-3 text-primary shrink-0 mt-1" />}
                 </div>
               </Link>
             ))
@@ -267,7 +285,9 @@ export default function ChatDetailPage() {
             {currentConv?.title ?? `Conversation ${id}`}
           </h2>
           {currentConv?.mode && (
-            <Badge variant="outline" className="text-[10px] shrink-0">{currentConv.mode}</Badge>
+            <Badge variant="outline" className="text-[10px] shrink-0">
+              {currentConv.mode}
+            </Badge>
           )}
           <Button
             variant="ghost"
@@ -290,12 +310,16 @@ export default function ChatDetailPage() {
           ) : error ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
               <p className="text-sm text-destructive">{error}</p>
-              <Button variant="outline" size="sm" onClick={loadMessages}>Try again</Button>
+              <Button variant="outline" size="sm" onClick={loadMessages}>
+                Try again
+              </Button>
             </div>
           ) : messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
               <MessageSquare className="size-10 text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">No messages yet. Ask the council something below.</p>
+              <p className="text-sm text-muted-foreground">
+                No messages yet. Ask the council something below.
+              </p>
             </div>
           ) : (
             messages.map((msg) => {
@@ -317,7 +341,9 @@ export default function ChatDetailPage() {
                         <CheckCircle className="size-4 text-primary" />
                         <span className="text-sm font-semibold">Council Verdict</span>
                       </div>
-                      <div className="text-sm whitespace-pre-line leading-relaxed">{msg.content}</div>
+                      <div className="text-sm whitespace-pre-line leading-relaxed">
+                        {msg.content}
+                      </div>
                     </CardContent>
                   </Card>
                 );
@@ -326,7 +352,9 @@ export default function ChatDetailPage() {
               if (msg.role === "system") {
                 return (
                   <div key={msg.id} className="flex justify-center">
-                    <span className="text-xs text-muted-foreground bg-muted px-3 py-1 rounded-full">{msg.content}</span>
+                    <span className="text-xs text-muted-foreground bg-muted px-3 py-1 rounded-full">
+                      {msg.content}
+                    </span>
                   </div>
                 );
               }
@@ -376,16 +404,19 @@ export default function ChatDetailPage() {
             <Input
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) handleSend(); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) handleSend();
+              }}
               placeholder="Ask the council a follow-up…"
               className="flex-1"
               disabled={sending}
             />
             <Button size="sm" onClick={handleSend} disabled={!inputValue.trim() || sending}>
-              {sending
-                ? <Loader2 className="size-3.5 animate-spin" />
-                : <Send className="size-3.5" />
-              }
+              {sending ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Send className="size-3.5" />
+              )}
             </Button>
           </div>
         </div>

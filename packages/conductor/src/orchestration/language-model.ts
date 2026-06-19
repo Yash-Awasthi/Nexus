@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Language model providers for Conductor.
  *
@@ -20,11 +21,7 @@ import {
 
 // ─── Shared HTTP helpers ──────────────────────────────────────────────────────
 
-function httpsPost(
-  url: string,
-  headers: Record<string, string>,
-  body: unknown
-): Promise<string> {
+function httpsPost(url: string, headers: Record<string, string>, body: unknown): Promise<string> {
   return new Promise((resolve, reject) => {
     const payload = JSON.stringify(body);
     const parsed = new URL(url);
@@ -35,8 +32,8 @@ function httpsPost(
       headers: {
         "Content-Type": "application/json",
         "Content-Length": Buffer.byteLength(payload),
-        ...headers
-      }
+        ...headers,
+      },
     };
     const req = (parsed.protocol === "https:" ? https : http).request(options, (res) => {
       const chunks: Buffer[] = [];
@@ -52,7 +49,7 @@ function httpsPost(
 async function* streamHttpsPost(
   url: string,
   headers: Record<string, string>,
-  body: unknown
+  body: unknown,
 ): AsyncIterable<string> {
   const payload = JSON.stringify(body);
   const parsed = new URL(url);
@@ -63,8 +60,8 @@ async function* streamHttpsPost(
     headers: {
       "Content-Type": "application/json",
       "Content-Length": Buffer.byteLength(payload),
-      ...headers
-    }
+      ...headers,
+    },
   };
 
   const chunks: string[] = [];
@@ -137,7 +134,7 @@ export class GroqModelProvider implements ILanguageModel {
       role: m.role,
       content: m.content,
       ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}),
-      ...(m.tool_call_id ? { tool_call_id: m.tool_call_id } : {})
+      ...(m.tool_call_id ? { tool_call_id: m.tool_call_id } : {}),
     }));
   }
 
@@ -146,7 +143,7 @@ export class GroqModelProvider implements ILanguageModel {
       model: this.model,
       messages: this.buildMessages(params),
       max_tokens: params.maxTokens ?? 2048,
-      temperature: params.temperature ?? 0.7
+      temperature: params.temperature ?? 0.7,
     };
     if (params.tools) body.tools = params.tools;
 
@@ -161,12 +158,16 @@ export class GroqModelProvider implements ILanguageModel {
       messages: this.buildMessages(params),
       max_tokens: params.maxTokens ?? 2048,
       temperature: params.temperature ?? 0.7,
-      stream: true
+      stream: true,
     };
     if (params.tools) body.tools = params.tools;
 
     let buffer = "";
-    for await (const raw of streamHttpsPost(`${GROQ_API_BASE}/chat/completions`, this.authHeader, body)) {
+    for await (const raw of streamHttpsPost(
+      `${GROQ_API_BASE}/chat/completions`,
+      this.authHeader,
+      body,
+    )) {
       buffer += raw;
       const lines = buffer.split("\n");
       buffer = lines.pop() ?? "";
@@ -191,7 +192,7 @@ export class GroqModelProvider implements ILanguageModel {
     const callerHasSystemMessage = params.messages.some((m) => m.role === "system");
     const schemaMsg: ChatMessage = {
       role: "user",
-      content: `JSON Schema to conform to:\n${JSON.stringify(params.schema, null, 2)}`
+      content: `JSON Schema to conform to:\n${JSON.stringify(params.schema, null, 2)}`,
     };
     const prefixMessages: ChatMessage[] = callerHasSystemMessage
       ? [schemaMsg]
@@ -199,19 +200,19 @@ export class GroqModelProvider implements ILanguageModel {
           {
             role: "system",
             content:
-              "You are a structured data extractor. Respond ONLY with valid JSON matching the schema provided. No explanation, no markdown fences."
+              "You are a structured data extractor. Respond ONLY with valid JSON matching the schema provided. No explanation, no markdown fences.",
           },
-          schemaMsg
+          schemaMsg,
         ];
     const body = {
       model: this.model,
       messages: [...prefixMessages, ...params.messages].map((m) => ({
         role: m.role,
-        content: m.content
+        content: m.content,
       })),
       max_tokens: params.maxTokens ?? 1024,
       temperature: params.temperature ?? 0.2,
-      response_format: { type: "json_object" }
+      response_format: { type: "json_object" },
     };
     const raw = await httpsPost(`${GROQ_API_BASE}/chat/completions`, this.authHeader, body);
     const parsed = JSON.parse(raw);
@@ -259,19 +260,23 @@ export class FreeModelProvider implements ILanguageModel {
         const body = {
           model,
           messages: params.messages.map((m) => ({ role: m.role, content: m.content })),
-          max_tokens: params.maxTokens ?? 2048
+          max_tokens: params.maxTokens ?? 2048,
         };
-        const raw = await httpsPost("https://openrouter.ai/api/v1/chat/completions", {
-          Authorization: `Bearer ${this.config.keys.openrouter}`,
-          "HTTP-Referer": "https://github.com/Yash-Awasthi/Ghoststack"
-        }, body);
+        const raw = await httpsPost(
+          "https://openrouter.ai/api/v1/chat/completions",
+          {
+            Authorization: `Bearer ${this.config.keys.openrouter}`,
+            "HTTP-Referer": "https://github.com/Yash-Awasthi/Ghoststack",
+          },
+          body,
+        );
         return JSON.parse(raw)?.choices?.[0]?.message?.content ?? null;
       }
       if (provider === "ollama") {
         const body = {
           model,
           prompt: params.messages.map((m) => `${m.role}: ${m.content}`).join("\n"),
-          stream: false
+          stream: false,
         };
         const raw = await httpsPost(`${this.ollamaBase}/api/generate`, {}, body);
         return JSON.parse(raw)?.response ?? null;
@@ -306,7 +311,9 @@ export class FreeModelProvider implements ILanguageModel {
         return;
       }
     }
-    throw new Error(`FreeModelProvider: all routes exhausted for streaming (${this.config.routes.join(", ")})`);
+    throw new Error(
+      `FreeModelProvider: all routes exhausted for streaming (${this.config.routes.join(", ")})`,
+    );
   }
 
   async generateObject<T>(params: GenerateObjectParams<T>): Promise<T> {
@@ -315,18 +322,20 @@ export class FreeModelProvider implements ILanguageModel {
       messages: [
         {
           role: "system",
-          content:
-            "Respond ONLY with valid JSON matching the schema. No markdown fences."
+          content: "Respond ONLY with valid JSON matching the schema. No markdown fences.",
         },
         {
           role: "user",
-          content: `Schema:\n${JSON.stringify(params.schema)}\n\nMessages:\n${params.messages.map((m) => `${m.role}: ${m.content}`).join("\n")}`
-        }
-      ]
+          content: `Schema:\n${JSON.stringify(params.schema)}\n\nMessages:\n${params.messages.map((m) => `${m.role}: ${m.content}`).join("\n")}`,
+        },
+      ],
     };
     const raw = await this.generateText(augmented);
     // Strip markdown code fences if model added them
-    const cleaned = raw.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim();
+    const cleaned = raw
+      .replace(/^```(?:json)?\n?/m, "")
+      .replace(/\n?```$/m, "")
+      .trim();
     return JSON.parse(cleaned) as T;
   }
 }

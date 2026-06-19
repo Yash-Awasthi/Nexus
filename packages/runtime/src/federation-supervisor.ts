@@ -4,12 +4,12 @@ import * as net from "net";
 import * as path from "path";
 
 import { McpServerHost } from "./adapters/mcp-server-host.js";
-import { runDockerCompose } from "./docker-compose-runner.js";
-import { probeFlociHealth, resolveFlociEndpoint } from "./floci-client.js";
 import type { ConductorConfig } from "./conductor-config.js";
 import { loadConductorConfig } from "./conductor-config.js";
 import type { ConductorServer } from "./conductor-server.js";
 import { createConductorServer } from "./conductor-server.js";
+import { runDockerCompose } from "./docker-compose-runner.js";
+import { probeFlociHealth, resolveFlociEndpoint } from "./floci-client.js";
 import type { RuntimeGraph } from "./runtime-graph.js";
 
 export interface FederationServiceStatus {

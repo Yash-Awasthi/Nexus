@@ -1,22 +1,12 @@
+// SPDX-License-Identifier: Apache-2.0
 "use client";
 
 import type { Route } from "./+types/status";
 import { Badge } from "~/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Check, Activity } from "lucide-react";
-import {
-  FadeIn,
-  StaggerChildren,
-  StaggerItem,
-  DottedGrid,
-} from "~/components/animations";
+import { FadeIn, StaggerChildren, StaggerItem, DottedGrid } from "~/components/animations";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -101,9 +91,7 @@ export default function Status() {
             style={{ animation: "greenGlow 3s ease-in-out infinite" }}
           >
             <div className="h-3 w-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
-            <span className="font-display text-lg font-semibold">
-              All services are online
-            </span>
+            <span className="font-display text-lg font-semibold">All services are online</span>
           </div>
         </FadeIn>
 
@@ -170,12 +158,10 @@ export default function Status() {
                     <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10">
                       <Check className="h-6 w-6 text-emerald-500" />
                     </div>
-                    <CardTitle className="font-display mb-2">
-                      No maintenance scheduled
-                    </CardTitle>
+                    <CardTitle className="font-display mb-2">No maintenance scheduled</CardTitle>
                     <CardDescription>
-                      There are no upcoming maintenance windows. We'll post updates
-                      here before any planned downtime.
+                      There are no upcoming maintenance windows. We'll post updates here before any
+                      planned downtime.
                     </CardDescription>
                   </CardContent>
                 </Card>
@@ -189,12 +175,10 @@ export default function Status() {
                     <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10">
                       <Check className="h-6 w-6 text-emerald-500" />
                     </div>
-                    <CardTitle className="font-display mb-2">
-                      No incidents reported
-                    </CardTitle>
+                    <CardTitle className="font-display mb-2">No incidents reported</CardTitle>
                     <CardDescription>
-                      All systems have been operating normally. Past incidents will
-                      be documented here.
+                      All systems have been operating normally. Past incidents will be documented
+                      here.
                     </CardDescription>
                   </CardContent>
                 </Card>

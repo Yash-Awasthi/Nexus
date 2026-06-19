@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * SOPs — Standard Operating Procedures for AI workflows.
  *
@@ -63,8 +64,8 @@ export default function SOP() {
 
   useEffect(() => {
     fetch("/api/sop/templates")
-      .then(r => r.ok ? r.json() : { templates: [] })
-      .then(d => setTemplates(d.templates ?? d))
+      .then((r) => (r.ok ? r.json() : { templates: [] }))
+      .then((d) => setTemplates(d.templates ?? d))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -78,7 +79,9 @@ export default function SOP() {
 
   const run = useCallback(async () => {
     if (!selected) return;
-    setRunning(true); setErr(""); setResult(null);
+    setRunning(true);
+    setErr("");
+    setResult(null);
     const r = await fetch("/api/sop/run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -89,10 +92,11 @@ export default function SOP() {
     setRunning(false);
   }, [selected, inputs]);
 
-  const categories = Array.from(new Set(templates.map(t => t.category).filter(Boolean)));
-  const filtered = templates.filter(t =>
-    t.name.toLowerCase().includes(filter.toLowerCase()) ||
-    (t.description ?? "").toLowerCase().includes(filter.toLowerCase())
+  const categories = Array.from(new Set(templates.map((t) => t.category).filter(Boolean)));
+  const filtered = templates.filter(
+    (t) =>
+      t.name.toLowerCase().includes(filter.toLowerCase()) ||
+      (t.description ?? "").toLowerCase().includes(filter.toLowerCase()),
   );
 
   return (
@@ -109,7 +113,8 @@ export default function SOP() {
 
       {loading ? (
         <div className="flex items-center gap-2 text-muted-foreground py-12 justify-center">
-          <Loader2 className="w-5 h-5 animate-spin" />Loading SOPs…
+          <Loader2 className="w-5 h-5 animate-spin" />
+          Loading SOPs…
         </div>
       ) : (
         <div className="grid md:grid-cols-3 gap-6">
@@ -118,13 +123,13 @@ export default function SOP() {
             <Input
               placeholder="Search SOPs…"
               value={filter}
-              onChange={e => setFilter(e.target.value)}
+              onChange={(e) => setFilter(e.target.value)}
               className="h-8 text-sm"
             />
             {filtered.length === 0 ? (
               <p className="text-sm text-muted-foreground">No SOPs found</p>
             ) : (
-              filtered.map(t => (
+              filtered.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => selectTemplate(t)}
@@ -133,11 +138,27 @@ export default function SOP() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium">{t.name}</p>
-                      {t.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{t.description}</p>}
+                      {t.description && (
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                          {t.description}
+                        </p>
+                      )}
                       <div className="flex items-center gap-2 mt-1.5">
-                        {t.category && <Badge variant="secondary" className="text-xs">{t.category}</Badge>}
-                        {t.steps && <span className="text-xs text-muted-foreground">{t.steps.length} steps</span>}
-                        {t.estimatedMinutes && <span className="text-xs text-muted-foreground">~{t.estimatedMinutes}min</span>}
+                        {t.category && (
+                          <Badge variant="secondary" className="text-xs">
+                            {t.category}
+                          </Badge>
+                        )}
+                        {t.steps && (
+                          <span className="text-xs text-muted-foreground">
+                            {t.steps.length} steps
+                          </span>
+                        )}
+                        {t.estimatedMinutes && (
+                          <span className="text-xs text-muted-foreground">
+                            ~{t.estimatedMinutes}min
+                          </span>
+                        )}
                       </div>
                     </div>
                     <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 group-hover:text-primary mt-0.5" />
@@ -174,10 +195,17 @@ export default function SOP() {
                     {/* Step preview */}
                     {selected.steps && selected.steps.length > 0 && (
                       <div className="space-y-1">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Steps</p>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          Steps
+                        </p>
                         {selected.steps.map((step, i) => (
-                          <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <span className="w-5 h-5 rounded-full bg-muted text-xs flex items-center justify-center shrink-0">{i + 1}</span>
+                          <div
+                            key={i}
+                            className="flex items-center gap-2 text-sm text-muted-foreground"
+                          >
+                            <span className="w-5 h-5 rounded-full bg-muted text-xs flex items-center justify-center shrink-0">
+                              {i + 1}
+                            </span>
                             {step}
                           </div>
                         ))}
@@ -187,8 +215,10 @@ export default function SOP() {
                     {/* Inputs */}
                     {selected.inputs && selected.inputs.length > 0 && (
                       <div className="space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Inputs</p>
-                        {selected.inputs.map(inp => (
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          Inputs
+                        </p>
+                        {selected.inputs.map((inp) => (
                           <div key={inp.name} className="space-y-1">
                             <label className="text-sm font-medium">
                               {inp.label} {inp.required && <span className="text-red-500">*</span>}
@@ -196,7 +226,9 @@ export default function SOP() {
                             <Input
                               placeholder={`Enter ${inp.label.toLowerCase()}…`}
                               value={inputs[inp.name] ?? ""}
-                              onChange={e => setInputs(prev => ({ ...prev, [inp.name]: e.target.value }))}
+                              onChange={(e) =>
+                                setInputs((prev) => ({ ...prev, [inp.name]: e.target.value }))
+                              }
                             />
                           </div>
                         ))}
@@ -206,7 +238,17 @@ export default function SOP() {
                     {err && <p className="text-red-500 text-xs">{err}</p>}
 
                     <Button onClick={run} disabled={running} className="w-full">
-                      {running ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Running SOP…</> : <><Play className="w-4 h-4 mr-2" />Run SOP</>}
+                      {running ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          Running SOP…
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-4 h-4 mr-2" />
+                          Run SOP
+                        </>
+                      )}
                     </Button>
                   </CardContent>
                 </Card>
@@ -215,26 +257,56 @@ export default function SOP() {
                 {result && (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
-                      {result.success
-                        ? <CheckCircle className="w-5 h-5 text-green-500" />
-                        : <XCircle className="w-5 h-5 text-red-500" />}
-                      <span className="font-medium">{result.success ? "SOP Completed Successfully" : "SOP Failed"}</span>
-                      {result.durationMs && <Badge variant="outline">{(result.durationMs / 1000).toFixed(1)}s</Badge>}
+                      {result.success ? (
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-red-500" />
+                      )}
+                      <span className="font-medium">
+                        {result.success ? "SOP Completed Successfully" : "SOP Failed"}
+                      </span>
+                      {result.durationMs && (
+                        <Badge variant="outline">{(result.durationMs / 1000).toFixed(1)}s</Badge>
+                      )}
                     </div>
 
                     {/* Step results */}
                     <div className="space-y-2">
-                      {result.stepResults.map(step => (
-                        <Card key={step.stepNumber} className={step.status === "failed" ? "border-red-200 dark:border-red-800" : step.status === "skipped" ? "opacity-50" : ""}>
+                      {result.stepResults.map((step) => (
+                        <Card
+                          key={step.stepNumber}
+                          className={
+                            step.status === "failed"
+                              ? "border-red-200 dark:border-red-800"
+                              : step.status === "skipped"
+                                ? "opacity-50"
+                                : ""
+                          }
+                        >
                           <CardContent className="pt-3 pb-3">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="w-5 h-5 rounded-full bg-muted text-xs flex items-center justify-center shrink-0">{step.stepNumber}</span>
-                              <span className="text-sm font-medium">{step.stepName ?? `Step ${step.stepNumber}`}</span>
-                              <Badge variant={step.status === "done" ? "default" : step.status === "failed" ? "destructive" : "secondary"} className="text-xs ml-auto">
+                              <span className="w-5 h-5 rounded-full bg-muted text-xs flex items-center justify-center shrink-0">
+                                {step.stepNumber}
+                              </span>
+                              <span className="text-sm font-medium">
+                                {step.stepName ?? `Step ${step.stepNumber}`}
+                              </span>
+                              <Badge
+                                variant={
+                                  step.status === "done"
+                                    ? "default"
+                                    : step.status === "failed"
+                                      ? "destructive"
+                                      : "secondary"
+                                }
+                                className="text-xs ml-auto"
+                              >
                                 {step.status}
                               </Badge>
                             </div>
-                            <p className="text-sm text-muted-foreground line-clamp-3">{step.output}</p>
+                            <p className="text-sm text-muted-foreground line-clamp-3">
+                              {step.output}
+                            </p>
                           </CardContent>
                         </Card>
                       ))}
@@ -242,7 +314,9 @@ export default function SOP() {
 
                     {result.finalOutput && (
                       <Card className="border-primary/20">
-                        <CardHeader className="pb-2"><CardTitle className="text-sm">Final Output</CardTitle></CardHeader>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm">Final Output</CardTitle>
+                        </CardHeader>
                         <CardContent>
                           <p className="text-sm whitespace-pre-wrap">{result.finalOutput}</p>
                         </CardContent>

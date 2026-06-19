@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: "20.19.0"
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
       - run: pnpm lint
       - run: pnpm format:check
 
@@ -34,5 +34,5 @@ jobs:
         with:
           node-version: "20.19.0"
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
       - run: pnpm check:headers

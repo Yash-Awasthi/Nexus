@@ -45,7 +45,7 @@ export interface IMCPServerRegistry {
   listServers(): Promise<IMCPServerInfo[]>;
 }
 
-interface IMCPToolAdapter {
+export interface IMCPToolAdapter {
   canAdapt(serverName: string, toolName: string): Promise<boolean>;
   invokeTool(task: IMCPTask, context: IMCPExecutionContext): Promise<IMCPExecutionResult>;
 }

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Standard Answers — curated canonical Q&A pairs.
  *
@@ -87,7 +88,9 @@ export default function StandardAnswers() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { loadAnswers(); }, [loadAnswers]);
+  useEffect(() => {
+    loadAnswers();
+  }, [loadAnswers]);
 
   const openCreate = useCallback(() => {
     setEditing(null);
@@ -102,14 +105,20 @@ export default function StandardAnswers() {
   }, []);
 
   const saveAnswer = useCallback(async () => {
-    if (!form.question.trim() || !form.answer.trim()) { setErr("Question and answer are required"); return; }
+    if (!form.question.trim() || !form.answer.trim()) {
+      setErr("Question and answer are required");
+      return;
+    }
     setSaving(true);
     setErr("");
     try {
       const body = {
         question: form.question.trim(),
         answer: form.answer.trim(),
-        tags: form.tags.split(",").map(t => t.trim()).filter(Boolean),
+        tags: form.tags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
       };
       let r: Response;
       if (editing) {
@@ -125,11 +134,18 @@ export default function StandardAnswers() {
           body: JSON.stringify(body),
         });
       }
-      if (!r.ok) { const d = await r.json(); setErr(d.error ?? "Save failed"); return; }
+      if (!r.ok) {
+        const d = await r.json();
+        setErr(d.error ?? "Save failed");
+        return;
+      }
       setShowForm(false);
       loadAnswers();
-    } catch { setErr("Save failed"); }
-    finally { setSaving(false); }
+    } catch {
+      setErr("Save failed");
+    } finally {
+      setSaving(false);
+    }
   }, [form, editing, loadAnswers]);
 
   const deleteAnswer = useCallback(async (id: string) => {
@@ -137,7 +153,7 @@ export default function StandardAnswers() {
     setDeleting(id);
     try {
       await fetch(`/api/standard-answers/${id}`, { method: "DELETE" });
-      setAnswers(prev => prev.filter(a => a.id !== id));
+      setAnswers((prev) => prev.filter((a) => a.id !== id));
     } catch {}
     setDeleting(null);
   }, []);
@@ -157,10 +173,11 @@ export default function StandardAnswers() {
     setTesting(false);
   }, [testQuery]);
 
-  const filtered = answers.filter(a =>
-    a.question.toLowerCase().includes(searchFilter.toLowerCase()) ||
-    a.answer.toLowerCase().includes(searchFilter.toLowerCase()) ||
-    (a.tags ?? []).some(t => t.toLowerCase().includes(searchFilter.toLowerCase()))
+  const filtered = answers.filter(
+    (a) =>
+      a.question.toLowerCase().includes(searchFilter.toLowerCase()) ||
+      a.answer.toLowerCase().includes(searchFilter.toLowerCase()) ||
+      (a.tags ?? []).some((t) => t.toLowerCase().includes(searchFilter.toLowerCase())),
   );
 
   return (
@@ -198,20 +215,26 @@ export default function StandardAnswers() {
             <Input
               placeholder="Enter a query to check if it matches a standard answer…"
               value={testQuery}
-              onChange={e => setTestQuery(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && testMatch()}
+              onChange={(e) => setTestQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && testMatch()}
               className="flex-1"
             />
             <Button onClick={testMatch} disabled={testing || !testQuery.trim()} variant="outline">
-              {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+              {testing ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Search className="w-4 h-4" />
+              )}
             </Button>
           </div>
           {matchResult && (
-            <div className={`p-3 rounded-lg text-sm ${
-              matchResult.matched
-                ? "bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800"
-                : "bg-muted"
-            }`}>
+            <div
+              className={`p-3 rounded-lg text-sm ${
+                matchResult.matched
+                  ? "bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800"
+                  : "bg-muted"
+              }`}
+            >
               {matchResult.matched ? (
                 <>
                   <div className="flex items-center gap-2 mb-2">
@@ -239,10 +262,12 @@ export default function StandardAnswers() {
         <Input
           placeholder="Filter answers…"
           value={searchFilter}
-          onChange={e => setSearchFilter(e.target.value)}
+          onChange={(e) => setSearchFilter(e.target.value)}
           className="max-w-sm"
         />
-        <span className="text-sm text-muted-foreground">{filtered.length} of {answers.length}</span>
+        <span className="text-sm text-muted-foreground">
+          {filtered.length} of {answers.length}
+        </span>
       </div>
 
       {/* Answer list */}
@@ -259,13 +284,15 @@ export default function StandardAnswers() {
               {searchFilter ? `No answers match "${searchFilter}"` : "No standard answers yet"}
             </p>
             {!searchFilter && (
-              <Button size="sm" onClick={openCreate}>Add first answer</Button>
+              <Button size="sm" onClick={openCreate}>
+                Add first answer
+              </Button>
             )}
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-3">
-          {filtered.map(a => (
+          {filtered.map((a) => (
             <Card key={a.id} className={!a.enabled ? "opacity-60" : ""}>
               <CardContent className="pt-4">
                 <div className="flex items-start justify-between gap-3">
@@ -281,8 +308,10 @@ export default function StandardAnswers() {
                     <p className="text-sm text-muted-foreground line-clamp-2 mb-2">{a.answer}</p>
                     {(a.tags ?? []).length > 0 && (
                       <div className="flex flex-wrap gap-1">
-                        {a.tags!.map(t => (
-                          <Badge key={t} variant="secondary" className="text-xs font-normal">{t}</Badge>
+                        {a.tags!.map((t) => (
+                          <Badge key={t} variant="secondary" className="text-xs font-normal">
+                            {t}
+                          </Badge>
                         ))}
                       </div>
                     )}
@@ -303,9 +332,11 @@ export default function StandardAnswers() {
                       onClick={() => deleteAnswer(a.id)}
                       disabled={deleting === a.id}
                     >
-                      {deleting === a.id
-                        ? <Loader2 className="w-3 h-3 animate-spin" />
-                        : <Trash2 className="w-3 h-3" />}
+                      {deleting === a.id ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-3 h-3" />
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -327,7 +358,7 @@ export default function StandardAnswers() {
               <Input
                 placeholder="What is the refund policy?"
                 value={form.question}
-                onChange={e => setForm(f => ({ ...f, question: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, question: e.target.value }))}
               />
             </div>
             <div className="space-y-1">
@@ -335,7 +366,7 @@ export default function StandardAnswers() {
               <Textarea
                 placeholder="We offer a 30-day refund policy…"
                 value={form.answer}
-                onChange={e => setForm(f => ({ ...f, answer: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, answer: e.target.value }))}
                 rows={5}
                 className="resize-none"
               />
@@ -345,13 +376,15 @@ export default function StandardAnswers() {
               <Input
                 placeholder="billing, refund, policy (comma-separated)"
                 value={form.tags}
-                onChange={e => setForm(f => ({ ...f, tags: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
               />
             </div>
             {err && <p className="text-red-500 text-xs">{err}</p>}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowForm(false)}>
+              Cancel
+            </Button>
             <Button onClick={saveAnswer} disabled={saving || !form.question || !form.answer}>
               {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               {editing ? "Save changes" : "Create"}

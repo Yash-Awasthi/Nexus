@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { useState, useEffect } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -6,7 +7,13 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "~/components/ui/tabs";
 import { Textarea } from "~/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +21,17 @@ import {
   DialogTitle,
   DialogFooter,
 } from "~/components/ui/dialog";
-import { Store, Star, Download, Search, Plus, Check, Loader2, FileDown, Trash2 } from "lucide-react";
+import {
+  Store,
+  Star,
+  Download,
+  Search,
+  Plus,
+  Check,
+  Loader2,
+  FileDown,
+  Trash2,
+} from "lucide-react";
 
 type ItemType = "archetype" | "workflow" | "prompt" | "skill";
 
@@ -163,10 +180,14 @@ export default function MarketplacePage() {
     fetch("/api/marketplace?limit=100")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data) => {
-        const list: MarketplaceItem[] = Array.isArray(data) ? data : (data?.items ?? data?.data ?? []);
+        const list: MarketplaceItem[] = Array.isArray(data)
+          ? data
+          : (data?.items ?? data?.data ?? []);
         if (list.length > 0) setItems(list);
       })
-      .catch(() => { /* keep initialItems as fallback */ });
+      .catch(() => {
+        /* keep initialItems as fallback */
+      });
 
     // Load user's starred and installed state
     fetch("/api/marketplace/me")
@@ -196,13 +217,15 @@ export default function MarketplacePage() {
       if (wasStarred) {
         next.delete(id);
         setItems((items) =>
-          items.map((item) => (item.id === id ? { ...item, stars: Math.max(0, item.stars - 1) } : item))
+          items.map((item) =>
+            item.id === id ? { ...item, stars: Math.max(0, item.stars - 1) } : item,
+          ),
         );
         fetch(`/api/marketplace/${id}/star`, { method: "DELETE" }).catch(() => {});
       } else {
         next.add(id);
         setItems((items) =>
-          items.map((item) => (item.id === id ? { ...item, stars: item.stars + 1 } : item))
+          items.map((item) => (item.id === id ? { ...item, stars: item.stars + 1 } : item)),
         );
         fetch(`/api/marketplace/${id}/star`, { method: "POST" }).catch(() => {});
       }
@@ -214,9 +237,15 @@ export default function MarketplacePage() {
     if (installing.has(id)) return;
     if (installed.has(id)) {
       // Uninstall — optimistic
-      setInstalled((prev) => { const next = new Set(prev); next.delete(id); return next; });
+      setInstalled((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       setItems((items) =>
-        items.map((item) => (item.id === id ? { ...item, installs: Math.max(0, item.installs - 1) } : item))
+        items.map((item) =>
+          item.id === id ? { ...item, installs: Math.max(0, item.installs - 1) } : item,
+        ),
       );
       fetch(`/api/marketplace/${id}/install`, { method: "DELETE" }).catch(() => {});
       return;
@@ -226,10 +255,14 @@ export default function MarketplacePage() {
     fetch(`/api/marketplace/${id}/install`, { method: "POST" })
       .catch(() => {})
       .finally(() => {
-        setInstalling((prev) => { const next = new Set(prev); next.delete(id); return next; });
+        setInstalling((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
         setInstalled((prev) => new Set(prev).add(id));
         setItems((items) =>
-          items.map((item) => (item.id === id ? { ...item, installs: item.installs + 1 } : item))
+          items.map((item) => (item.id === id ? { ...item, installs: item.installs + 1 } : item)),
         );
       });
   };
@@ -281,18 +314,28 @@ export default function MarketplacePage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name:        publishForm.name,
+        name: publishForm.name,
         description: publishForm.description,
-        type:        publishForm.type,
-        content:     publishForm.content,
-        tags:        publishForm.tags.split(",").map((t) => t.trim()).filter(Boolean),
+        type: publishForm.type,
+        content: publishForm.content,
+        tags: publishForm.tags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
       }),
     })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((created: MarketplaceItem) => {
         if (created?.id && created.id !== optimisticId) {
-          setItems((prev) => prev.map((item) => item.id === optimisticId ? { ...item, id: created.id } : item));
-          setInstalled((prev) => { const next = new Set(prev); next.delete(optimisticId); next.add(created.id); return next; });
+          setItems((prev) =>
+            prev.map((item) => (item.id === optimisticId ? { ...item, id: created.id } : item)),
+          );
+          setInstalled((prev) => {
+            const next = new Set(prev);
+            next.delete(optimisticId);
+            next.add(created.id);
+            return next;
+          });
         }
       })
       .catch(() => {});
@@ -387,11 +430,21 @@ export default function MarketplacePage() {
 
             {/* Right: type tabs */}
             <TabsList className="h-8">
-              <TabsTrigger value="all" className="text-xs h-full">All</TabsTrigger>
-              <TabsTrigger value="archetype" className="text-xs h-full">Archetypes</TabsTrigger>
-              <TabsTrigger value="workflow" className="text-xs h-full">Workflows</TabsTrigger>
-              <TabsTrigger value="prompt" className="text-xs h-full">Prompts</TabsTrigger>
-              <TabsTrigger value="skill" className="text-xs h-full">Skills</TabsTrigger>
+              <TabsTrigger value="all" className="text-xs h-full">
+                All
+              </TabsTrigger>
+              <TabsTrigger value="archetype" className="text-xs h-full">
+                Archetypes
+              </TabsTrigger>
+              <TabsTrigger value="workflow" className="text-xs h-full">
+                Workflows
+              </TabsTrigger>
+              <TabsTrigger value="prompt" className="text-xs h-full">
+                Prompts
+              </TabsTrigger>
+              <TabsTrigger value="skill" className="text-xs h-full">
+                Skills
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -421,7 +474,9 @@ export default function MarketplacePage() {
                         <span>by {item.author}</span>
                         <div className="flex items-center gap-3">
                           <span className="flex items-center gap-1">
-                            <Star className={`size-3 ${isStarred ? "fill-yellow-400 text-yellow-400" : ""}`} />
+                            <Star
+                              className={`size-3 ${isStarred ? "fill-yellow-400 text-yellow-400" : ""}`}
+                            />
                             {item.stars}
                           </span>
                           <span className="flex items-center gap-1">
@@ -438,7 +493,9 @@ export default function MarketplacePage() {
                           size="sm"
                           variant="ghost"
                           className={`h-7 w-7 p-0 shrink-0 ${
-                            isStarred ? "text-yellow-400 hover:text-yellow-300" : "text-muted-foreground"
+                            isStarred
+                              ? "text-yellow-400 hover:text-yellow-300"
+                              : "text-muted-foreground"
                           }`}
                           onClick={(e) => {
                             e.stopPropagation();

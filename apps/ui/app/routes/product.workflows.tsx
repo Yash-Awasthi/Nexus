@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import type { Route } from "./+types/product.workflows";
 import { ProductPage } from "~/components/product-page";
 import {

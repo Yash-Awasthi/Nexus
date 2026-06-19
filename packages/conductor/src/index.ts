@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @nexus/conductor — Conductor multi-agent orchestration runtime
  *
@@ -56,4 +57,7 @@ export { ScrapingExecutionAdapter } from "./orchestration/scraping-adapter";
 // Interfaces
 export type { ILanguageModel } from "./orchestration/interfaces/language-model.interface";
 export type { IQueueBackend } from "./orchestration/interfaces/queue.interface";
-export type { IPlanningEngine, IGovernanceEngine } from "./orchestration/interfaces/governance.interface";
+export type {
+  IPlanningEngine,
+  IGovernanceEngine,
+} from "./orchestration/interfaces/governance.interface";

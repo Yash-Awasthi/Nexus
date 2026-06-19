@@ -1,14 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
 import type { Route } from "./+types/product.archetypes";
 import { ProductPage } from "~/components/product-page";
-import {
-  Compass,
-  ShieldAlert,
-  FlaskConical,
-  Combine,
-  Scale,
-  Flame,
-  Sparkles,
-} from "lucide-react";
+import { Compass, ShieldAlert, FlaskConical, Combine, Scale, Flame, Sparkles } from "lucide-react";
 
 export function meta({}: Route.MetaArgs) {
   return [

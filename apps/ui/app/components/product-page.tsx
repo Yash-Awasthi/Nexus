@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 "use client";
 
 import { Link } from "react-router";
@@ -86,7 +87,11 @@ export function ProductPage({
               </MagneticButton>
               <MagneticButton>
                 <Button size="lg" variant="outline" asChild>
-                  <a href="https://github.com/Yash-Awasthi/Nexus" target="_blank" rel="noopener noreferrer">
+                  <a
+                    href="https://github.com/Yash-Awasthi/Nexus"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     View on GitHub
                   </a>
                 </Button>
@@ -112,7 +117,12 @@ export function ProductPage({
                     <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-500/0 to-transparent group-hover:via-blue-500/70 transition-all duration-500" />
 
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 mb-4">
-                      <AnimatedIcon icon={feature.icon} animation="float" size={20} className="text-primary" />
+                      <AnimatedIcon
+                        icon={feature.icon}
+                        animation="float"
+                        size={20}
+                        className="text-primary"
+                      />
                     </div>
                     <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">
@@ -190,7 +200,9 @@ export function ProductPage({
         <DottedGrid />
 
         <FadeIn className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="font-display text-3xl sm:text-4xl font-bold mb-4">Ready to get started?</h2>
+          <h2 className="font-display text-3xl sm:text-4xl font-bold mb-4">
+            Ready to get started?
+          </h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
             Deploy JUDICA in minutes. Open source, self-hosted, and enterprise-ready.
           </p>

@@ -1,9 +1,159 @@
+// SPDX-License-Identifier: Apache-2.0
 import { useState, useEffect } from "react";
-import {
-  AVAILABLE_PROVIDERS,
-  type ConnectedProvider,
-  type Provider,
-} from "~/lib/mock-data";
+// ── Provider catalogue (static config, not live data) ─────────────────────────
+
+interface ProviderModel {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+interface Provider {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  models: ProviderModel[];
+  apiKeyPlaceholder?: string;
+  supportsBaseUrl?: boolean;
+}
+
+interface ConnectedProvider {
+  id: string;
+  providerId: string;
+  displayName: string;
+  apiKey: string;
+  baseUrl?: string;
+  enabledModels: string[];
+  isDefault: boolean;
+}
+
+const AVAILABLE_PROVIDERS: Provider[] = [
+  {
+    id: "openai",
+    name: "OpenAI",
+    description: "GPT-4o, GPT-4, and more",
+    icon: "openai",
+    apiKeyPlaceholder: "sk-...",
+    models: [
+      { id: "gpt-4o", name: "GPT-4o", description: "Most capable model" },
+      { id: "gpt-4o-mini", name: "GPT-4o Mini", description: "Fast and affordable" },
+      { id: "gpt-4-turbo", name: "GPT-4 Turbo", description: "High intelligence" },
+      { id: "gpt-4", name: "GPT-4", description: "Original GPT-4" },
+      { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo", description: "Fast legacy model" },
+      { id: "o1", name: "o1", description: "Reasoning model" },
+      { id: "o1-mini", name: "o1 Mini", description: "Fast reasoning" },
+    ],
+  },
+  {
+    id: "anthropic",
+    name: "Anthropic",
+    description: "Claude 4, Claude 3.5, and more",
+    icon: "anthropic",
+    apiKeyPlaceholder: "sk-ant-...",
+    models: [
+      { id: "claude-opus-4-6", name: "Claude Opus 4.6", description: "Most capable" },
+      { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", description: "Balanced performance" },
+      { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", description: "Fast and efficient" },
+      { id: "claude-3-5-sonnet", name: "Claude 3.5 Sonnet", description: "Previous generation" },
+      { id: "claude-3-opus", name: "Claude 3 Opus", description: "Previous generation" },
+    ],
+  },
+  {
+    id: "google",
+    name: "Google Gemini",
+    description: "Gemini Pro, Flash, and Ultra",
+    icon: "google",
+    apiKeyPlaceholder: "AI...",
+    models: [
+      { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", description: "Most capable" },
+      { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", description: "Fast and efficient" },
+      { id: "gemini-2.0-pro", name: "Gemini 2.0 Pro", description: "Previous gen" },
+      { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", description: "Long context" },
+    ],
+  },
+  {
+    id: "groq",
+    name: "Groq",
+    description: "Ultra-fast inference engine",
+    icon: "groq",
+    apiKeyPlaceholder: "gsk_...",
+    models: [
+      { id: "llama-3.3-70b", name: "Llama 3.3 70B", description: "Fast and capable" },
+      { id: "llama-3.1-8b", name: "Llama 3.1 8B", description: "Ultra-fast" },
+      { id: "mixtral-8x7b", name: "Mixtral 8x7B", description: "Mixture of experts" },
+      { id: "gemma2-9b", name: "Gemma 2 9B", description: "Google open model" },
+    ],
+  },
+  {
+    id: "ollama",
+    name: "Ollama",
+    description: "Run models locally",
+    icon: "ollama",
+    supportsBaseUrl: true,
+    models: [
+      { id: "llama3.3", name: "Llama 3.3", description: "Meta's latest" },
+      { id: "mistral", name: "Mistral", description: "Mistral 7B" },
+      { id: "codellama", name: "Code Llama", description: "Code generation" },
+      { id: "phi3", name: "Phi-3", description: "Microsoft's small model" },
+    ],
+  },
+  {
+    id: "openrouter",
+    name: "OpenRouter",
+    description: "Access multiple providers via one API",
+    icon: "openrouter",
+    apiKeyPlaceholder: "sk-or-...",
+    models: [
+      { id: "auto", name: "Auto", description: "Best model for the task" },
+      { id: "openrouter/optimus", name: "Optimus", description: "OpenRouter's pick" },
+    ],
+  },
+  {
+    id: "mistral",
+    name: "Mistral",
+    description: "Mistral Large, Medium, and Small",
+    icon: "mistral",
+    apiKeyPlaceholder: "...",
+    models: [
+      { id: "mistral-large", name: "Mistral Large", description: "Most capable" },
+      { id: "mistral-medium", name: "Mistral Medium", description: "Balanced" },
+      { id: "mistral-small", name: "Mistral Small", description: "Fast" },
+      { id: "codestral", name: "Codestral", description: "Code generation" },
+    ],
+  },
+  {
+    id: "cerebras",
+    name: "Cerebras",
+    description: "Ultra-fast wafer-scale inference",
+    icon: "cerebras",
+    apiKeyPlaceholder: "csk-...",
+    models: [
+      { id: "llama-3.3-70b-cerebras", name: "Llama 3.3 70B", description: "Fast inference" },
+      { id: "llama-3.1-8b-cerebras", name: "Llama 3.1 8B", description: "Ultra-fast" },
+    ],
+  },
+  {
+    id: "cohere",
+    name: "Cohere",
+    description: "Command R and enterprise models",
+    icon: "cohere",
+    apiKeyPlaceholder: "...",
+    models: [
+      { id: "command-r-plus", name: "Command R+", description: "Most capable" },
+      { id: "command-r", name: "Command R", description: "Fast and efficient" },
+      { id: "command-light", name: "Command Light", description: "Lightweight" },
+    ],
+  },
+  {
+    id: "custom",
+    name: "Custom",
+    description: "Connect any OpenAI-compatible API",
+    icon: "custom",
+    supportsBaseUrl: true,
+    models: [],
+  },
+];
 import { cn } from "~/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
@@ -78,18 +228,18 @@ export default function LanguageModelsPage() {
   useEffect(() => {
     setProvidersLoading(true);
     fetch("/api/providers")
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!data?.providers) return;
         // Map API response to ConnectedProvider shape
         const mapped: ConnectedProvider[] = data.providers.map((p: any) => ({
-          id:            String(p.id),
-          providerId:    p.provider ?? p.type ?? "custom",
-          displayName:   p.name,
-          apiKey:        p.apiKey ?? "••••",
-          baseUrl:       p.baseUrl,
+          id: String(p.id),
+          providerId: p.provider ?? p.type ?? "custom",
+          displayName: p.name,
+          apiKey: p.apiKey ?? "••••",
+          baseUrl: p.baseUrl,
           enabledModels: p.model ? [p.model] : [],
-          isDefault:     false,
+          isDefault: false,
         }));
         setConnectedProviders(mapped);
       })
@@ -121,7 +271,7 @@ export default function LanguageModelsPage() {
   const [customModelName, setCustomModelName] = useState("");
 
   const availableToConnect = AVAILABLE_PROVIDERS.filter(
-    (p) => !connectedProviders.some((cp) => cp.providerId === p.id)
+    (p) => !connectedProviders.some((cp) => cp.providerId === p.id),
   );
 
   function openConnectDialog(provider: Provider) {
@@ -171,35 +321,39 @@ export default function LanguageModelsPage() {
       }
       // Create new / re-create
       const res = await fetch("/api/providers", {
-        method:  "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({
-          name:     formDisplayName || editingProvider.name,
-          type:     editingProvider.id,
+        body: JSON.stringify({
+          name: formDisplayName || editingProvider.name,
+          type: editingProvider.id,
           provider: editingProvider.id,
-          apiKey:   formApiKey,
-          model:    formEnabledModels[0] ?? editingProvider.models?.[0]?.id ?? "",
-          baseUrl:  formBaseUrl || undefined,
+          apiKey: formApiKey,
+          model: formEnabledModels[0] ?? editingProvider.models?.[0]?.id ?? "",
+          baseUrl: formBaseUrl || undefined,
         }),
       });
       if (res.ok) {
         const data = await res.json();
         const newConn: ConnectedProvider = {
-          id:            String(data.provider?.id ?? `conn-${Date.now()}`),
-          providerId:    editingProvider.id,
-          displayName:   formDisplayName || editingProvider.name,
-          apiKey:        formApiKey ? "••••" + formApiKey.slice(-4) : "••••",
-          baseUrl:       formBaseUrl || undefined,
+          id: String(data.provider?.id ?? `conn-${Date.now()}`),
+          providerId: editingProvider.id,
+          displayName: formDisplayName || editingProvider.name,
+          apiKey: formApiKey ? "••••" + formApiKey.slice(-4) : "••••",
+          baseUrl: formBaseUrl || undefined,
           enabledModels: formEnabledModels,
-          isDefault:     connectedProviders.length === 0,
+          isDefault: connectedProviders.length === 0,
         };
         if (editingConnection) {
-          setConnectedProviders((prev) => prev.map((cp) => cp.id === editingConnection.id ? newConn : cp));
+          setConnectedProviders((prev) =>
+            prev.map((cp) => (cp.id === editingConnection.id ? newConn : cp)),
+          );
         } else {
           setConnectedProviders((prev) => [...prev, newConn]);
         }
       }
-    } catch { /* ignore — optimistically updated */ }
+    } catch {
+      /* ignore — optimistically updated */
+    }
     setIsSaving(false);
     setDialogOpen(false);
   }
@@ -207,15 +361,15 @@ export default function LanguageModelsPage() {
   async function handleDelete(connectionId: string) {
     try {
       await fetch(`/api/providers/${connectionId}`, { method: "DELETE" });
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setConnectedProviders((prev) => prev.filter((cp) => cp.id !== connectionId));
   }
 
   function handleInlineKeySave(connectionId: string) {
     setConnectedProviders((prev) =>
-      prev.map((cp) =>
-        cp.id === connectionId ? { ...cp, apiKey: inlineKeyValue } : cp
-      )
+      prev.map((cp) => (cp.id === connectionId ? { ...cp, apiKey: inlineKeyValue } : cp)),
     );
     setInlineKeyEditing(null);
     setInlineKeyValue("");
@@ -233,7 +387,7 @@ export default function LanguageModelsPage() {
 
   function toggleModel(modelId: string) {
     setFormEnabledModels((prev) =>
-      prev.includes(modelId) ? prev.filter((id) => id !== modelId) : [...prev, modelId]
+      prev.includes(modelId) ? prev.filter((id) => id !== modelId) : [...prev, modelId],
     );
   }
 
@@ -340,16 +494,12 @@ export default function LanguageModelsPage() {
                             {cp.isDefault && <Badge variant="secondary">Default</Badge>}
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            {cp.enabledModels.length} model{cp.enabledModels.length !== 1 ? "s" : ""}{" "}
-                            enabled
+                            {cp.enabledModels.length} model
+                            {cp.enabledModels.length !== 1 ? "s" : ""} enabled
                           </p>
                         </div>
                         <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => openEditDialog(cp)}
-                          >
+                          <Button variant="ghost" size="icon-sm" onClick={() => openEditDialog(cp)}>
                             <Settings className="size-3.5" />
                           </Button>
                           <Button
@@ -466,7 +616,9 @@ export default function LanguageModelsPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium">{m.label}</span>
-                          <Badge variant="secondary" className="text-[10px]">Custom</Badge>
+                          <Badge variant="secondary" className="text-[10px]">
+                            Custom
+                          </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground truncate">{m.apiUrl}</p>
                       </div>
@@ -498,11 +650,7 @@ export default function LanguageModelsPage() {
                       <p className="text-sm font-medium">{provider.name}</p>
                       <p className="text-xs text-muted-foreground">{provider.description}</p>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openConnectDialog(provider)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => openConnectDialog(provider)}>
                       <Plus className="size-3 mr-1" />
                       Connect
                     </Button>
@@ -519,7 +667,9 @@ export default function LanguageModelsPage() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 {editingProvider && getProviderIcon(editingProvider.icon)}
-                {editingConnection ? `Edit ${editingProvider?.name}` : `Connect ${editingProvider?.name}`}
+                {editingConnection
+                  ? `Edit ${editingProvider?.name}`
+                  : `Connect ${editingProvider?.name}`}
               </DialogTitle>
               <DialogDescription>
                 {editingConnection
@@ -560,11 +710,7 @@ export default function LanguageModelsPage() {
                       className="absolute right-1 top-1/2 -translate-y-1/2"
                       onClick={() => setShowApiKey(!showApiKey)}
                     >
-                      {showApiKey ? (
-                        <EyeOff className="size-3" />
-                      ) : (
-                        <Eye className="size-3" />
-                      )}
+                      {showApiKey ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
                     </Button>
                   </div>
                 </div>
@@ -613,7 +759,7 @@ export default function LanguageModelsPage() {
                           onClick={() => toggleModel(model.id)}
                           className={cn(
                             "flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted",
-                            isEnabled && "bg-muted/50"
+                            isEnabled && "bg-muted/50",
                           )}
                         >
                           <div
@@ -621,7 +767,7 @@ export default function LanguageModelsPage() {
                               "flex items-center justify-center size-4 rounded border transition-colors",
                               isEnabled
                                 ? "bg-primary border-primary text-primary-foreground"
-                                : "border-muted-foreground/30"
+                                : "border-muted-foreground/30",
                             )}
                           >
                             {isEnabled && <Check className="size-3" />}

@@ -14,7 +14,7 @@
  * POST /api/v1/billing/webhook/stripe  — Stripe webhook handler
  */
 
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
 
@@ -164,7 +164,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
     },
     async (_req, reply) => {
       if (!DB_AVAILABLE) {
-        return reply
+        return (reply as FastifyReply)
           .code(503)
           .send({ error: "Database not configured — API key management requires DATABASE_URL" });
       }
@@ -213,7 +213,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       if (!DB_AVAILABLE) {
-        return reply
+        return (reply as FastifyReply)
           .code(503)
           .send({ error: "Database not configured — API key management requires DATABASE_URL" });
       }
@@ -236,7 +236,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
         });
       } catch (err: unknown) {
         const e = err as { message?: string };
-        return reply.code(400).send({ error: e.message });
+        return (reply as FastifyReply).code(400).send({ error: e.message });
       }
     },
   );
@@ -252,17 +252,17 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       if (!DB_AVAILABLE) {
-        return reply
+        return (reply as FastifyReply)
           .code(503)
           .send({ error: "Database not configured — API key management requires DATABASE_URL" });
       }
       const { revokeApiKey } = await import("@nexus/billing");
       try {
         await revokeApiKey(request.params.id);
-        return reply.code(204).send();
+        return (reply as FastifyReply).code(204).send();
       } catch (err: unknown) {
         const e = err as { message?: string };
-        return reply.code(404).send({ error: e.message ?? "Key not found" });
+        return (reply as FastifyReply).code(404).send({ error: e.message ?? "Key not found" });
       }
     },
   );
@@ -351,7 +351,9 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const stripeKey = process.env.STRIPE_SECRET_KEY;
       if (!stripeKey) {
-        return reply.code(503).send({ error: "Stripe not configured — set STRIPE_SECRET_KEY" });
+        return (reply as FastifyReply)
+          .code(503)
+          .send({ error: "Stripe not configured — set STRIPE_SECRET_KEY" });
       }
 
       // Price IDs from env (set in Stripe dashboard → Product catalog)
@@ -361,7 +363,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
       };
       const priceId = priceIds[request.body.plan];
       if (!priceId) {
-        return reply.code(503).send({
+        return (reply as FastifyReply).code(503).send({
           error: `STRIPE_PRICE_${request.body.plan.toUpperCase()} env var not set`,
         });
       }
@@ -397,7 +399,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
 
         if (!res.ok) {
           const err = (await res.json()) as { error?: { message?: string } };
-          return reply.code(502).send({
+          return (reply as FastifyReply).code(502).send({
             error: `Stripe error: ${err.error?.message ?? res.statusText}`,
           });
         }
@@ -406,7 +408,9 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
         return reply.send({ sessionId: session.id, url: session.url });
       } catch (err: unknown) {
         const e = err as { message?: string };
-        return reply.code(500).send({ error: e.message ?? "Checkout session creation failed" });
+        return (reply as FastifyReply)
+          .code(500)
+          .send({ error: e.message ?? "Checkout session creation failed" });
       }
     },
   );
@@ -436,7 +440,9 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const stripeKey = process.env.STRIPE_SECRET_KEY;
       if (!stripeKey) {
-        return reply.code(503).send({ error: "Stripe not configured — set STRIPE_SECRET_KEY" });
+        return (reply as FastifyReply)
+          .code(503)
+          .send({ error: "Stripe not configured — set STRIPE_SECRET_KEY" });
       }
 
       const origin = process.env.OAUTH_REDIRECT_BASE_URL ?? "http://localhost:5173";
@@ -461,7 +467,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
       }
 
       if (!customerId) {
-        return reply.code(404).send({
+        return (reply as FastifyReply).code(404).send({
           error: "No Stripe customer linked to this account. Complete a checkout first.",
         });
       }
@@ -483,7 +489,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
 
         if (!res.ok) {
           const err = (await res.json()) as { error?: { message?: string } };
-          return reply.code(502).send({
+          return (reply as FastifyReply).code(502).send({
             error: `Stripe error: ${err.error?.message ?? res.statusText}`,
           });
         }
@@ -492,7 +498,9 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
         return reply.send({ url: session.url });
       } catch (err: unknown) {
         const e = err as { message?: string };
-        return reply.code(500).send({ error: e.message ?? "Portal session creation failed" });
+        return (reply as FastifyReply)
+          .code(500)
+          .send({ error: e.message ?? "Portal session creation failed" });
       }
     },
   );
@@ -527,7 +535,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
         } catch (err: unknown) {
           const e = err as { name?: string; message?: string };
           if (e.name === "StripeSignatureError") {
-            return reply.code(400).send({ error: "Invalid Stripe signature" });
+            return (reply as FastifyReply).code(400).send({ error: "Invalid Stripe signature" });
           }
           app.log.error({ err }, "Stripe webhook processing error");
         }

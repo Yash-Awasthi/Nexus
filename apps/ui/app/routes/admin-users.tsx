@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { useState, useEffect } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -24,19 +25,83 @@ interface User {
 }
 
 const MOCK_USERS: User[] = [
-  { id: "1", name: "Alice Chen",    email: "alice@example.com",  role: "admin",  status: "active",   lastActive: "Just now",    initials: "AC" },
-  { id: "2", name: "Bob Martinez",  email: "bob@example.com",    role: "editor", status: "active",   lastActive: "5 min ago",   initials: "BM" },
-  { id: "3", name: "Carol Johnson", email: "carol@example.com",  role: "viewer", status: "active",   lastActive: "1 hour ago",  initials: "CJ" },
-  { id: "4", name: "David Kim",     email: "david@example.com",  role: "editor", status: "active",   lastActive: "2 hours ago", initials: "DK" },
-  { id: "5", name: "Elena Popov",   email: "elena@example.com",  role: "admin",  status: "active",   lastActive: "3 hours ago", initials: "EP" },
-  { id: "6", name: "Frank Weber",   email: "frank@example.com",  role: "viewer", status: "inactive", lastActive: "1 week ago",  initials: "FW" },
-  { id: "7", name: "Grace Liu",     email: "grace@example.com",  role: "editor", status: "active",   lastActive: "Yesterday",   initials: "GL" },
-  { id: "8", name: "Hassan Ali",    email: "hassan@example.com", role: "viewer", status: "inactive", lastActive: "2 weeks ago", initials: "HA" },
+  {
+    id: "1",
+    name: "Alice Chen",
+    email: "alice@example.com",
+    role: "admin",
+    status: "active",
+    lastActive: "Just now",
+    initials: "AC",
+  },
+  {
+    id: "2",
+    name: "Bob Martinez",
+    email: "bob@example.com",
+    role: "editor",
+    status: "active",
+    lastActive: "5 min ago",
+    initials: "BM",
+  },
+  {
+    id: "3",
+    name: "Carol Johnson",
+    email: "carol@example.com",
+    role: "viewer",
+    status: "active",
+    lastActive: "1 hour ago",
+    initials: "CJ",
+  },
+  {
+    id: "4",
+    name: "David Kim",
+    email: "david@example.com",
+    role: "editor",
+    status: "active",
+    lastActive: "2 hours ago",
+    initials: "DK",
+  },
+  {
+    id: "5",
+    name: "Elena Popov",
+    email: "elena@example.com",
+    role: "admin",
+    status: "active",
+    lastActive: "3 hours ago",
+    initials: "EP",
+  },
+  {
+    id: "6",
+    name: "Frank Weber",
+    email: "frank@example.com",
+    role: "viewer",
+    status: "inactive",
+    lastActive: "1 week ago",
+    initials: "FW",
+  },
+  {
+    id: "7",
+    name: "Grace Liu",
+    email: "grace@example.com",
+    role: "editor",
+    status: "active",
+    lastActive: "Yesterday",
+    initials: "GL",
+  },
+  {
+    id: "8",
+    name: "Hassan Ali",
+    email: "hassan@example.com",
+    role: "viewer",
+    status: "inactive",
+    lastActive: "2 weeks ago",
+    initials: "HA",
+  },
 ];
 
 export default function AdminUsersPage() {
-  const [search,  setSearch]  = useState("");
-  const [users,   setUsers]   = useState<User[]>(MOCK_USERS);
+  const [search, setSearch] = useState("");
+  const [users, setUsers] = useState<User[]>(MOCK_USERS);
   const [loading, setLoading] = useState(true);
 
   // ── Fetch users from backend ──────────────────────────────────────────────
@@ -47,7 +112,9 @@ export default function AdminUsersPage() {
         const list: User[] = Array.isArray(data) ? data : (data?.users ?? []);
         if (list.length > 0) setUsers(list);
       })
-      .catch(() => { /* fall back to MOCK_USERS */ })
+      .catch(() => {
+        /* fall back to MOCK_USERS */
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -55,14 +122,12 @@ export default function AdminUsersPage() {
     (u) =>
       !search ||
       u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase())
+      u.email.toLowerCase().includes(search.toLowerCase()),
   );
 
   // Optimistic role update — persists to backend fire-and-forget
   const updateRole = (userId: string, newRole: string) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
-    );
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
     fetch(`/api/admin/users/${userId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -110,11 +175,21 @@ export default function AdminUsersPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">User</th>
-                      <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">Email</th>
-                      <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">Role</th>
-                      <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">Status</th>
-                      <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">Last Active</th>
+                      <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">
+                        User
+                      </th>
+                      <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">
+                        Email
+                      </th>
+                      <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">
+                        Role
+                      </th>
+                      <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">
+                        Status
+                      </th>
+                      <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">
+                        Last Active
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -123,17 +198,16 @@ export default function AdminUsersPage() {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
                             <Avatar className="size-7">
-                              <AvatarFallback className="text-[10px]">{user.initials}</AvatarFallback>
+                              <AvatarFallback className="text-[10px]">
+                                {user.initials}
+                              </AvatarFallback>
                             </Avatar>
                             <span className="text-sm font-medium">{user.name}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-muted-foreground">{user.email}</td>
                         <td className="px-4 py-3">
-                          <Select
-                            value={user.role}
-                            onValueChange={(v) => updateRole(user.id, v)}
-                          >
+                          <Select value={user.role} onValueChange={(v) => updateRole(user.id, v)}>
                             <SelectTrigger className="w-28 h-6">
                               <SelectValue />
                             </SelectTrigger>

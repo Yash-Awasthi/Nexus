@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
 import { Switch } from "~/components/ui/switch";
@@ -11,12 +12,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "~/components/ui/collapsible";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "~/components/ui/collapsible";
-import { Settings, Shield, MessageSquare, Brain, Gauge, ChevronDown, Filter, AlignLeft, Users, Plus, Trash2, Globe, Key, Loader2, CheckCircle2, Link2, MemoryStick } from "lucide-react";
+  Settings,
+  Shield,
+  MessageSquare,
+  Brain,
+  Gauge,
+  ChevronDown,
+  Filter,
+  AlignLeft,
+  Users,
+  Plus,
+  Trash2,
+  Globe,
+  Key,
+  Loader2,
+  CheckCircle2,
+  Link2,
+  MemoryStick,
+} from "lucide-react";
 import { STMPanel } from "~/components/STMPanel";
 import {
   type CouncilMember,
@@ -37,7 +52,7 @@ const BROWSER_PROVIDERS = [
     description: "Uses your ChatGPT Plus / Team subscription",
     logo: (
       <svg viewBox="0 0 24 24" className="size-6" fill="currentColor">
-        <path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872zm16.597 3.855l-5.843-3.368 2.02-1.167a.076.076 0 0 1 .071 0l4.83 2.786a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.402-.678zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365l2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z"/>
+        <path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872zm16.597 3.855l-5.843-3.368 2.02-1.167a.076.076 0 0 1 .071 0l4.83 2.786a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.402-.678zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365l2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z" />
       </svg>
     ),
   },
@@ -47,11 +62,21 @@ const BROWSER_PROVIDERS = [
     description: "Uses your Google account — Gemini Advanced optional",
     logo: (
       <svg viewBox="0 0 24 24" className="size-6" fill="none">
-        <path d="M12 24A14.304 14.304 0 0 0 0 12 14.304 14.304 0 0 0 12 0a14.304 14.304 0 0 0 12 12 14.304 14.304 0 0 0-12 12z" fill="url(#gemini-grad)"/>
+        <path
+          d="M12 24A14.304 14.304 0 0 0 0 12 14.304 14.304 0 0 0 12 0a14.304 14.304 0 0 0 12 12 14.304 14.304 0 0 0-12 12z"
+          fill="url(#gemini-grad)"
+        />
         <defs>
-          <linearGradient id="gemini-grad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#4285F4"/>
-            <stop offset="1" stopColor="#34A853"/>
+          <linearGradient
+            id="gemini-grad"
+            x1="0"
+            y1="0"
+            x2="24"
+            y2="24"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop stopColor="#4285F4" />
+            <stop offset="1" stopColor="#34A853" />
           </linearGradient>
         </defs>
       </svg>
@@ -63,7 +88,7 @@ const BROWSER_PROVIDERS = [
     description: "Uses your Anthropic / Claude Pro subscription",
     logo: (
       <svg viewBox="0 0 24 24" className="size-6" fill="currentColor">
-        <path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128-2.962-.77-.284-.283v-.351l.256-.283 4.5.064.13-.13v-.283l-4.629-1.424-.387-.516.129-.477.411-.194 5.077 1.295.098-.098-.048-.177L9.01 8.287l.098-.597.468-.258.597.194 2.109 4.242.09-.012.645-5.025.354-.384.497.065.32.384-.226 5.045.069.069 2.281-4.403.516-.258.565.258.113.636-3.242 5.433.048.177 4.952-1.296.42.194.13.413-.387.529-4.548 1.424v.283l.13.13h4.484l.256.283v.354l-.256.283-4.484.77-.098.11.098.256 4.71 2.647.097.516-.29.484-5.654-1.682-.128.064-1.069 4.823-.485.388-.515-.388-1.066-4.823-.13-.064-5.65 1.682-.293-.484.1-.516z"/>
+        <path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128-2.962-.77-.284-.283v-.351l.256-.283 4.5.064.13-.13v-.283l-4.629-1.424-.387-.516.129-.477.411-.194 5.077 1.295.098-.098-.048-.177L9.01 8.287l.098-.597.468-.258.597.194 2.109 4.242.09-.012.645-5.025.354-.384.497.065.32.384-.226 5.045.069.069 2.281-4.403.516-.258.565.258.113.636-3.242 5.433.048.177 4.952-1.296.42.194.13.413-.387.529-4.548 1.424v.283l.13.13h4.484l.256.283v.354l-.256.283-4.484.77-.098.11.098.256 4.71 2.647.097.516-.29.484-5.654-1.682-.128.064-1.069 4.823-.485.388-.515-.388-1.066-4.823-.13-.064-5.65 1.682-.293-.484.1-.516z" />
       </svg>
     ),
   },
@@ -71,7 +96,9 @@ const BROWSER_PROVIDERS = [
 
 function ConnectedAccountsCard() {
   const [statuses, setStatuses] = useState<Record<string, boolean | null>>({
-    chatgpt: null, gemini: null, claude: null,
+    chatgpt: null,
+    gemini: null,
+    claude: null,
   });
   const [connecting, setConnecting] = useState<string | null>(null);
 
@@ -98,7 +125,8 @@ function ConnectedAccountsCard() {
           Connected Accounts
         </CardTitle>
         <CardDescription>
-          Connect your existing subscriptions — no API key needed. Nexus opens a sign-in window and saves your session.
+          Connect your existing subscriptions — no API key needed. Nexus opens a sign-in window and
+          saves your session.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -117,9 +145,15 @@ function ConnectedAccountsCard() {
                   {status === null ? (
                     <Loader2 className="size-3 animate-spin text-muted-foreground" />
                   ) : status ? (
-                    <><CheckCircle2 className="size-3.5 text-green-500" /><span className="text-green-600 dark:text-green-400">Connected</span></>
+                    <>
+                      <CheckCircle2 className="size-3.5 text-green-500" />
+                      <span className="text-green-600 dark:text-green-400">Connected</span>
+                    </>
                   ) : (
-                    <><span className="size-2 rounded-full bg-amber-400 inline-block" /><span className="text-muted-foreground">Not signed in</span></>
+                    <>
+                      <span className="size-2 rounded-full bg-amber-400 inline-block" />
+                      <span className="text-muted-foreground">Not signed in</span>
+                    </>
                   )}
                 </div>
                 <Button
@@ -130,11 +164,20 @@ function ConnectedAccountsCard() {
                   disabled={isConnecting}
                 >
                   {isConnecting ? (
-                    <><Loader2 className="size-3 animate-spin" />Opening…</>
+                    <>
+                      <Loader2 className="size-3 animate-spin" />
+                      Opening…
+                    </>
                   ) : status ? (
-                    <><Globe className="size-3" />Reconnect</>
+                    <>
+                      <Globe className="size-3" />
+                      Reconnect
+                    </>
                   ) : (
-                    <><Globe className="size-3" />Sign in</>
+                    <>
+                      <Globe className="size-3" />
+                      Sign in
+                    </>
                   )}
                 </Button>
               </div>
@@ -190,7 +233,10 @@ function MemberRow({
 
   // Check connection status when member is in browser mode
   useEffect(() => {
-    if (!canBrowser || member.mode !== "browser") { setConnected(null); return; }
+    if (!canBrowser || member.mode !== "browser") {
+      setConnected(null);
+      return;
+    }
     isProviderConnected(member.id).then(setConnected);
   }, [member.id, member.mode, canBrowser]);
 
@@ -218,7 +264,9 @@ function MemberRow({
   };
 
   return (
-    <div className={`rounded-lg border p-4 space-y-3 transition-opacity ${member.enabled ? "" : "opacity-50"}`}>
+    <div
+      className={`rounded-lg border p-4 space-y-3 transition-opacity ${member.enabled ? "" : "opacity-50"}`}
+    >
       {/* Header row */}
       <div className="flex items-center gap-3">
         <Switch
@@ -292,9 +340,13 @@ function MemberRow({
             disabled={connecting}
           >
             {connecting ? (
-              <><Loader2 className="size-3 animate-spin" /> Opening…</>
+              <>
+                <Loader2 className="size-3 animate-spin" /> Opening…
+              </>
             ) : (
-              <><Globe className="size-3" /> {connected ? "Re-connect" : "Connect account"}</>
+              <>
+                <Globe className="size-3" /> {connected ? "Re-connect" : "Connect account"}
+              </>
             )}
           </Button>
           <span className="text-xs text-muted-foreground">
@@ -413,35 +465,40 @@ export default function SettingsPage() {
   const [quotasOpen, setQuotasOpen] = useState(false);
 
   // Quotas from API
-  const [quotas, setQuotas] = useState<{ requests: number; requestsLimit: number; tokens: number; tokensLimit: number } | null>(null);
+  const [quotas, setQuotas] = useState<{
+    requests: number;
+    requestsLimit: number;
+    tokens: number;
+    tokensLimit: number;
+  } | null>(null);
 
   // ── Load preferences from backend ──────────────────────────────────────────
   useEffect(() => {
     fetch("/api/settings/preferences")
-      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data) => {
-        if (data.autoCouncil     !== undefined) setAutoCouncil(data.autoCouncil);
-        if (data.debateRound     !== undefined) setDebateRound(data.debateRound);
-        if (data.coldValidator   !== undefined) setColdValidator(data.coldValidator);
-        if (data.piiDetection    !== undefined) setPiiDetection(data.piiDetection);
-        if (data.autoAnonymize   !== undefined) setAutoAnonymize(data.autoAnonymize);
-        if (data.blockProfanity  !== undefined) setBlockProfanity(data.blockProfanity);
+        if (data.autoCouncil !== undefined) setAutoCouncil(data.autoCouncil);
+        if (data.debateRound !== undefined) setDebateRound(data.debateRound);
+        if (data.coldValidator !== undefined) setColdValidator(data.coldValidator);
+        if (data.piiDetection !== undefined) setPiiDetection(data.piiDetection);
+        if (data.autoAnonymize !== undefined) setAutoAnonymize(data.autoAnonymize);
+        if (data.blockProfanity !== undefined) setBlockProfanity(data.blockProfanity);
         if (data.blockAdultContent !== undefined) setBlockAdultContent(data.blockAdultContent);
-        if (data.verbosityLevel  !== undefined) setVerbosityLevel(data.verbosityLevel);
+        if (data.verbosityLevel !== undefined) setVerbosityLevel(data.verbosityLevel);
         if (data.deliberationMode !== undefined) setDeliberationMode(data.deliberationMode);
-        if (data.enableStreaming  !== undefined) setEnableStreaming(data.enableStreaming);
+        if (data.enableStreaming !== undefined) setEnableStreaming(data.enableStreaming);
       })
       .catch(() => {});
 
     // Load quotas from analytics overview
     fetch("/api/analytics/overview")
-      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data) => {
         setQuotas({
-          requests:      data.requestsToday    ?? data.conversationsToday ?? 0,
-          requestsLimit: data.requestsLimit    ?? 100,
-          tokens:        data.totalTokensUsed  ?? 0,
-          tokensLimit:   data.tokensLimit      ?? 1_000_000,
+          requests: data.requestsToday ?? data.conversationsToday ?? 0,
+          requestsLimit: data.requestsLimit ?? 100,
+          tokens: data.totalTokensUsed ?? 0,
+          tokensLimit: data.tokensLimit ?? 1_000_000,
         });
       })
       .catch(() => {});
@@ -450,17 +507,34 @@ export default function SettingsPage() {
   // ── Save preferences when any toggle changes ───────────────────────────────
   useEffect(() => {
     const prefs = {
-      autoCouncil, debateRound, coldValidator, piiDetection,
-      autoAnonymize, blockProfanity, blockAdultContent,
-      verbosityLevel, deliberationMode, enableStreaming,
+      autoCouncil,
+      debateRound,
+      coldValidator,
+      piiDetection,
+      autoAnonymize,
+      blockProfanity,
+      blockAdultContent,
+      verbosityLevel,
+      deliberationMode,
+      enableStreaming,
     };
     fetch("/api/settings/preferences", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(prefs),
     }).catch(() => {});
-  }, [autoCouncil, debateRound, coldValidator, piiDetection, autoAnonymize,
-      blockProfanity, blockAdultContent, verbosityLevel, deliberationMode, enableStreaming]);
+  }, [
+    autoCouncil,
+    debateRound,
+    coldValidator,
+    piiDetection,
+    autoAnonymize,
+    blockProfanity,
+    blockAdultContent,
+    verbosityLevel,
+    deliberationMode,
+    enableStreaming,
+  ]);
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -486,7 +560,9 @@ export default function SettingsPage() {
               Council Members
             </CardTitle>
             <CardDescription>
-              Toggle members on/off. Switch between <strong>Browser</strong> (uses your existing subscription — no API key) or <strong>API</strong> (uses a key you provide). Mix and match freely.
+              Toggle members on/off. Switch between <strong>Browser</strong> (uses your existing
+              subscription — no API key) or <strong>API</strong> (uses a key you provide). Mix and
+              match freely.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -520,9 +596,7 @@ export default function SettingsPage() {
               <Brain className="size-4" />
               Council Behaviour
             </CardTitle>
-            <CardDescription>
-              Control how the council deliberates
-            </CardDescription>
+            <CardDescription>Control how the council deliberates</CardDescription>
           </CardHeader>
           <CardContent className="divide-y divide-border">
             <ToggleRow
@@ -558,7 +632,9 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between py-4">
               <div className="space-y-0.5">
                 <Label className="text-sm font-medium">Default Deliberation Mode</Label>
-                <p className="text-sm text-muted-foreground">Reasoning strategy for council sessions</p>
+                <p className="text-sm text-muted-foreground">
+                  Reasoning strategy for council sessions
+                </p>
               </div>
               <Select value={deliberationMode} onValueChange={setDeliberationMode}>
                 <SelectTrigger className="w-44">
@@ -662,8 +738,11 @@ export default function SettingsPage() {
               STM Modules
             </CardTitle>
             <CardDescription>
-              Prompt modifiers applied to every council member each round.
-              Visit <a href="/stm" className="text-primary hover:underline">STM</a> for full session history.
+              Prompt modifiers applied to every council member each round. Visit{" "}
+              <a href="/stm" className="text-primary hover:underline">
+                STM
+              </a>{" "}
+              for full session history.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -680,7 +759,9 @@ export default function SettingsPage() {
                     <Gauge className="size-4" />
                     Quotas &amp; Limits
                   </CardTitle>
-                  <ChevronDown className={`size-4 text-muted-foreground transition-transform ${quotasOpen ? "rotate-180" : ""}`} />
+                  <ChevronDown
+                    className={`size-4 text-muted-foreground transition-transform ${quotasOpen ? "rotate-180" : ""}`}
+                  />
                 </div>
                 <CardDescription>View current usage against daily limits</CardDescription>
               </CardHeader>
@@ -696,19 +777,34 @@ export default function SettingsPage() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span>Daily Requests</span>
-                        <span className="text-muted-foreground">{quotas.requests.toLocaleString()} / {quotas.requestsLimit.toLocaleString()}</span>
+                        <span className="text-muted-foreground">
+                          {quotas.requests.toLocaleString()} /{" "}
+                          {quotas.requestsLimit.toLocaleString()}
+                        </span>
                       </div>
                       <div className="h-2 rounded-full bg-muted overflow-hidden">
-                        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(100, (quotas.requests / quotas.requestsLimit) * 100).toFixed(1)}%` }} />
+                        <div
+                          className="h-full rounded-full bg-primary transition-all"
+                          style={{
+                            width: `${Math.min(100, (quotas.requests / quotas.requestsLimit) * 100).toFixed(1)}%`,
+                          }}
+                        />
                       </div>
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span>Daily Tokens</span>
-                        <span className="text-muted-foreground">{quotas.tokens.toLocaleString()} / {quotas.tokensLimit.toLocaleString()}</span>
+                        <span className="text-muted-foreground">
+                          {quotas.tokens.toLocaleString()} / {quotas.tokensLimit.toLocaleString()}
+                        </span>
                       </div>
                       <div className="h-2 rounded-full bg-muted overflow-hidden">
-                        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(100, (quotas.tokens / quotas.tokensLimit) * 100).toFixed(1)}%` }} />
+                        <div
+                          className="h-full rounded-full bg-primary transition-all"
+                          style={{
+                            width: `${Math.min(100, (quotas.tokens / quotas.tokensLimit) * 100).toFixed(1)}%`,
+                          }}
+                        />
                       </div>
                     </div>
                   </>
