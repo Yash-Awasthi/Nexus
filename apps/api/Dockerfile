@@ -205,8 +205,11 @@ RUN pnpm --filter @nexus/shared build && \
     pnpm --filter @nexus/image-transformations build && \
     pnpm --filter @nexus/api build
 
-# ─── Stage 3: pruner — self-contained prod deploy via pnpm deploy ─────────────
-FROM deps AS pruner
+# ─── Stage 3: pruner — pnpm deploy FROM builder so workspace dist/ files exist ─
+# Critical: must base on builder, not deps. pnpm deploy copies workspace packages
+# including their compiled dist/ — if based on deps, workspace dist/ is absent and
+# node cannot resolve @nexus/* imports at runtime → container exits → update_failed.
+FROM builder AS pruner
 WORKDIR /app
 RUN pnpm --filter @nexus/api deploy --prod /deploy
 
@@ -217,66 +220,19 @@ WORKDIR /app
 # Non-root user for security
 RUN addgroup -g 1001 nexus && adduser -u 1001 -G nexus -s /bin/sh -D nexus
 
-# Use prod-only node_modules from pruner (no esbuild, vitest, vite, etc.)
-COPY --from=pruner --chown=nexus:nexus /deploy/node_modules ./node_modules
-COPY --from=builder --chown=nexus:nexus /app/packages/auth/dist ./packages/auth/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/shared/dist ./packages/shared/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/contracts/dist ./packages/contracts/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/db/dist ./packages/db/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/governance/dist ./packages/governance/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/memory/dist ./packages/memory/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/sft-tagger/dist ./packages/sft-tagger/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/runtime/dist ./packages/runtime/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/council/dist ./packages/council/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/telemetry/dist ./packages/telemetry/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/adaptive-scraper/dist ./packages/adaptive-scraper/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/researcher/dist ./packages/researcher/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/image-gen/dist ./packages/image-gen/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/knowledge-graph/dist ./packages/knowledge-graph/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/llm-drivers/dist ./packages/llm-drivers/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/kv/dist ./packages/kv/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/tier-gate/dist ./packages/tier-gate/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/admin-gateway/dist ./packages/admin-gateway/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/agents/dist ./packages/agents/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/hooks/dist ./packages/hooks/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/alerts/dist ./packages/alerts/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/gateway/dist ./packages/gateway/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/plugin-sdk/dist ./packages/plugin-sdk/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/token-budget/dist ./packages/token-budget/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/billing/dist ./packages/billing/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/bots/dist ./packages/bots/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/connectors/dist ./packages/connectors/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/context-pack/dist ./packages/context-pack/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/context-pruner/dist ./packages/context-pruner/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/doc-pipeline/dist ./packages/doc-pipeline/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/evals/dist ./packages/evals/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/feature-flags/dist ./packages/feature-flags/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/gateway-log/dist ./packages/gateway-log/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/lens/dist ./packages/lens/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/llm-router/dist ./packages/llm-router/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/mail-ingest/dist ./packages/mail-ingest/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/nlp-utils/dist ./packages/nlp-utils/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/reranker/dist ./packages/reranker/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/retrieval/dist ./packages/retrieval/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/run-cost/dist ./packages/run-cost/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/sse/dist ./packages/sse/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/voice/dist ./packages/voice/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/domain-feeds/dist ./packages/domain-feeds/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/obs-providers/dist ./packages/obs-providers/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/wiki-updater/dist ./packages/wiki-updater/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/image-transformations/dist ./packages/image-transformations/dist
-COPY --from=builder --chown=nexus:nexus /app/apps/api/dist ./apps/api/dist
-COPY --from=builder --chown=nexus:nexus /app/apps/api/package.json ./apps/api/
+# /deploy contains: dist/ (api compiled output) + node_modules/ (all runtime deps
+# including workspace packages with their dist/ files intact — no symlinks)
+COPY --from=pruner --chown=nexus:nexus /deploy ./
 
 USER nexus
 
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=3001
 ENV HOST=0.0.0.0
 
-EXPOSE 3000
+EXPOSE 3001
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://localhost:3000/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD wget -qO- http://localhost:3001/health || exit 1
 
-CMD ["node", "apps/api/dist/index.js"]
+CMD ["node", "dist/index.js"]
