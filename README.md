@@ -21,7 +21,10 @@
     <img src="https://img.shields.io/badge/Node-20+-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node">
     <img src="https://img.shields.io/badge/pnpm-9+-f69220?style=flat-square&logo=pnpm&logoColor=white" alt="pnpm">
     <img src="https://img.shields.io/badge/packages-107-8b5cf6?style=flat-square" alt="Packages">
-    <img src="https://img.shields.io/badge/tests-4476%20passing-22c55e?style=flat-square" alt="Tests">
+    <img src="https://img.shields.io/badge/tests-4542%20passing-22c55e?style=flat-square" alt="Tests">
+    <a href="https://railway.app/new/template?template=https://github.com/Yash-Awasthi/Nexus">
+      <img src="https://railway.app/button.svg" alt="Deploy on Railway" height="20">
+    </a>
   </p>
 </div>
 
