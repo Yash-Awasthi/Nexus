@@ -9,12 +9,10 @@ const PORT = parseInt(process.env.PORT ?? "3000", 10);
 const HOST = process.env.HOST ?? "0.0.0.0";
 
 // ── Startup validation ────────────────────────────────────────────────────────
-// Run before the Fastify instance starts. Hard-fails on missing auth key so the
-// process crashes loudly instead of silently rejecting every authenticated request.
-// DB / Redis failures are warnings — routes degrade to in-memory fallbacks.
+// Hard-fails only on missing auth key. DB / Redis pings run in the background
+// AFTER the server is already listening so Render's health check passes fast.
 
-async function validateStartup(): Promise<void> {
-  // ── Required env vars ────────────────────────────────────────────────────
+function validateApiKey(): void {
   if (!process.env.NEXUS_API_KEY) {
     console.error(
       "[startup] FATAL: NEXUS_API_KEY is not set — " +
@@ -22,7 +20,9 @@ async function validateStartup(): Promise<void> {
     );
     process.exit(1);
   }
+}
 
+async function pingConnections(): Promise<void> {
   // ── Database ping ────────────────────────────────────────────────────────
   if (process.env.DATABASE_URL) {
     try {
@@ -51,7 +51,6 @@ async function validateStartup(): Promise<void> {
   // ── Redis ping ───────────────────────────────────────────────────────────
   if (process.env.REDIS_URL) {
     try {
-      // Dynamic import keeps ioredis out of the module graph when not needed
       const ioredis = await import("ioredis");
       const Redis = ioredis.default ?? ioredis;
       const redis = new (Redis as unknown as new (
@@ -83,17 +82,25 @@ async function validateStartup(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  await validateStartup();
+  // Fail fast on missing required env var (synchronous, no I/O)
+  validateApiKey();
 
   const app = await buildServer();
 
   try {
+    // Start listening FIRST so Render's health check passes immediately.
+    // DB / Redis pings run in the background — failures are warnings only.
     await app.listen({ port: PORT, host: HOST });
     app.log.info(`@nexus/api listening on ${HOST}:${PORT}`);
   } catch (err) {
     app.log.fatal(err);
     process.exit(1);
   }
+
+  // Non-blocking connection probes — logged but never crash the server
+  pingConnections().catch((err) =>
+    console.warn("[startup] connection probe error:", err),
+  );
 }
 
 // Handle graceful shutdown
