@@ -8,12 +8,10 @@ import {
   PlayIcon,
   PauseIcon,
   CodeIcon,
-  ListOrderedIcon,
   CheckIcon,
   AlertTriangleIcon,
   ClockIcon,
   SettingsIcon,
-  CopyIcon,
   FileTextIcon,
   ShieldIcon,
   SearchIcon,
@@ -847,7 +845,7 @@ export default function HookExtensionManager({
       {/* ─── Test Dialog ───────────────────────────────────────────────────── */}
       {testHookId !== null && (
         <Dialog
-          open={testHookId !== null}
+          open
           onOpenChange={(open) => {
             if (!open) {
               setTestHookId(null);

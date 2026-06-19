@@ -27,8 +27,6 @@ import {
   Plug,
   CheckCircle2,
   ExternalLink,
-  Key,
-  Globe,
   Loader2,
   ArrowRight,
 } from "lucide-react";

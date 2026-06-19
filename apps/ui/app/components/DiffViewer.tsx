@@ -84,7 +84,6 @@ function buildHunks(filename: string, original: string, modified: string): Hunk[
   const hunks: Hunk[] = [];
   let oldLine = 1,
     newLine = 1;
-  let currentHunk: Hunk | null = null;
   const CONTEXT = 3;
 
   // Collect changed regions with context

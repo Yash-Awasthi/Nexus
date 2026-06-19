@@ -21,17 +21,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "~/components/ui/dialog";
-import {
-  Store,
-  Star,
-  Download,
-  Search,
-  Plus,
-  Check,
-  Loader2,
-  FileDown,
-  Trash2,
-} from "lucide-react";
+import { Store, Star, Download, Search, Plus, Loader2, FileDown, Trash2 } from "lucide-react";
 
 type ItemType = "archetype" | "workflow" | "prompt" | "skill";
 

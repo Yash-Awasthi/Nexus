@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import React, { useRef, useEffect } from "react";
+import React, { useRef } from "react";
 
 interface CodeEditorProps {
   value: string;

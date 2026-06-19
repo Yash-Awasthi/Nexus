@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef } from "react";
 
 interface AttachedFile {
   id: string;

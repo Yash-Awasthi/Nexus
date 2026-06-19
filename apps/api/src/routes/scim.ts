@@ -438,7 +438,8 @@ export async function scimRoutes(app: FastifyInstance): Promise<void> {
       const slug = (request.body.externalId ?? request.body.displayName)
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "")
+        .replace(/^-+/, "")
+        .replace(/-+$/, "")
         .slice(0, 48);
 
       // Use first member as owner, or a system user
