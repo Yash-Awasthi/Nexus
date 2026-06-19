@@ -84,9 +84,9 @@ export default function About() {
               NEXUS routes prompts across 15 LLM providers, runs multi-model council votes via{" "}
               <code className="text-sm font-mono text-foreground">Promise.allSettled</code>, manages
               long-term memory in pgvector with graph-based retrieval, executes sandboxed code in
-              Docker containers, ingests data from 16 domain feeds, and processes documents through a
-              full extract → classify → OCR → index pipeline. The Fastify API has 61 route modules.
-              The React UI has 100+ routes all wired to real backends.
+              Docker containers, ingests data from 16 domain feeds, and processes documents through
+              a full extract → classify → OCR → index pipeline. The Fastify API has 61 route
+              modules. The React UI has 100+ routes all wired to real backends.
             </p>
           </div>
         </FadeIn>
@@ -127,9 +127,8 @@ export default function About() {
         <FadeIn>
           <h2 className="font-display text-3xl font-bold">Built by</h2>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground">
-            NEXUS was created by{" "}
-            <span className="font-medium text-foreground">Yash Awasthi</span> and is open to
-            contributors. Apache 2.0 licensed.
+            NEXUS was created by <span className="font-medium text-foreground">Yash Awasthi</span>{" "}
+            and is open to contributors. Apache 2.0 licensed.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
             <Button variant="outline" size="lg" asChild>

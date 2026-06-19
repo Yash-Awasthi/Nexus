@@ -31,16 +31,16 @@
 
 NEXUS is a TypeScript monorepo that provides the backend and frontend for running multi-agent AI workflows. It handles LLM routing across 15 providers, multi-model council deliberation, long-term memory with pgvector, sandboxed code execution, document ingestion, and a React dashboard wired to all of it.
 
-| Capability | Implementation |
-| --- | --- |
-| Multi-model voting | Council — N models via `Promise.allSettled`, failure-isolated |
-| Context management | `LlmCompactor` + `MicroCompactor` — dual-trigger (count + token threshold) |
-| Provider failover | `classifyFailoverError()` — 3-category, 30+ pattern classifier; auto-retry |
-| Orchestration | `VersionedPlan` + `ChannelIndex` — 13 lifecycle states, immutable snapshots |
-| Code execution | `DockerReplExecutor` — `--network none`, 256MB cap, read-only FS |
-| Cost tracking | `_trackCost()` → `_costLog[]` → Prometheus `/api/v1/metrics` |
-| Memory | pgvector + `MemoryGraph` BFS — IVFFlat ANN, TTL, multi-tenant ACL |
-| Feed polling | BullMQ repeatable jobs — Redis-locked, crash-resilient |
+| Capability         | Implementation                                                              |
+| ------------------ | --------------------------------------------------------------------------- |
+| Multi-model voting | Council — N models via `Promise.allSettled`, failure-isolated               |
+| Context management | `LlmCompactor` + `MicroCompactor` — dual-trigger (count + token threshold)  |
+| Provider failover  | `classifyFailoverError()` — 3-category, 30+ pattern classifier; auto-retry  |
+| Orchestration      | `VersionedPlan` + `ChannelIndex` — 13 lifecycle states, immutable snapshots |
+| Code execution     | `DockerReplExecutor` — `--network none`, 256MB cap, read-only FS            |
+| Cost tracking      | `_trackCost()` → `_costLog[]` → Prometheus `/api/v1/metrics`                |
+| Memory             | pgvector + `MemoryGraph` BFS — IVFFlat ANN, TTL, multi-tenant ACL           |
+| Feed polling       | BullMQ repeatable jobs — Redis-locked, crash-resilient                      |
 
 ---
 
@@ -479,45 +479,45 @@ Every request emits:
 
 ## Core packages
 
-| Package | Description |
-| --- | --- |
-| `@nexus/agent-runtime` | Multi-step LLM tool loop, `spawn_agents`, swarm layer (VersionedPlan, ChannelIndex, 13 lifecycle states), exponential backoff (base 1s, cap 8s, 3 max retries) |
-| `@nexus/council` | Multi-model deliberation: Promise.allSettled fanout, synthesis, guardrails, archetype personas (11 types, YAML-driven) |
-| `@nexus/llm-drivers` | 15 provider drivers, native SSE/NDJSON ReadableStream |
-| `@nexus/llm-router` | Dynamic routing by cost, latency, and capability |
-| `@nexus/gateway` | IProvider, model alias routing, classifyFailoverError() (3-category, 30+ patterns), FallbackChain, CostCallbackRegistry, Singleflight<T> |
-| `@nexus/mcp-client` | MCP consumer: JSON-RPC 2.0 HTTP, injectable fetch |
-| `@nexus/mcp-bulk` | Batch MCP tool invocation |
-| `@nexus/mcp-openapi` | Auto-generate MCP tools from OpenAPI specs |
-| `@nexus/code-repl` | DockerReplExecutor — Python/R/Julia, --network none, 256MB cap, SessionReaper |
-| `@nexus/memory` | pgvector, IVFFlat ANN (lists=100), MemoryGraph BFS (0.7^depth decay), IStream/IState, TTL, ACL, BM25+RRF hybrid |
-| `@nexus/memory-tools` | High-level remember() / recall() / forget() |
-| `@nexus/stm` | HedgeReducer, DirectnessOptimizer, TruncationGuard, STMPipeline, RollingWindow |
-| `@nexus/context-pruner` | LlmCompactor + MicroCompactor, dual-trigger (count OR token), isBlocked guard |
-| `@nexus/trigger-engine` | ISdk: registerFunction(), registerTrigger(), InvocationError |
-| `@nexus/stream-recovery` | ChannelWriter/ChannelReader WebSocket pair, 64KB binary framing |
-| `@nexus/runtime` | Circuit breaker FSM, crash recovery (snapshot+WAL), OTel tracing, queue backends |
-| `@nexus/conductor` | Orchestrator (11 blueprints, GovernanceEngine, TaskExecutor), CJS package, ESM bridge |
-| `@nexus/pipeline-signal` | ingest → classify → Signal worker (7 rules, LISTEN/NOTIFY hot path) |
-| `@nexus/domain-feeds` | 16 global intel domains, BullMQ repeatable jobs, AcademicPaper, titlesAreDuplicate() |
-| `@nexus/retrieval` | RAG: chunk→embed→retrieve→rerank, Jaccard+cosine hybrid, sub-query decomposition |
-| `@nexus/knowledge-graph` | Entity+relation graph, Leiden clustering, multi-hop BFS, KGSearchType (6 modes) |
-| `@nexus/gauntlet` | Races 47 models in waves of 12, 150ms stagger, scoreResponse() 0-100, 5 SpeedTiers |
-| `@nexus/supervisor` | OmaTask DAG (6 statuses), OmaSchedulingStrategy (4 modes), countBlockedDependents() BFS |
-| `@nexus/drift` | EMA adaptive parameter tuning |
-| `@nexus/redteam` | Input perturbation engine |
-| `@nexus/evals` | LLM evaluation: scorers, test runner, result types |
-| `@nexus/doc-pipeline` | extract → classify → OCR → index |
-| `@nexus/doc-ocr` | OcrPromptMode (7 modes), OcrLayoutCategory (11 types), LaTeX/HTML table extraction |
-| `@nexus/prediction-market` | Polymarket+Kalshi+Metaculus CLOB backends, order book (L1/L2/L3), impliedProbability() |
-| `@nexus/telemetry` | OTel bootstrap, HMAC-chained audit log, Prometheus formatters, MODEL_PRICE_TABLE (18 models) |
-| `@nexus/auth` | API key + HS256 JWT, Fastify preHandler hook |
-| `@nexus/db` | Drizzle ORM — 7 schemas, typed migrations, query helpers |
-| `@nexus/adapters` | Barrel — re-exports all 25 @nexus/adapter-* sub-packages |
-| `@nexus/plugin-sdk` | defineAdapter(), ISocialProvider contracts, capability types, test harness |
-| `@nexus/client` | Typed isomorphic SDK — gateway/council/memory/agents/research namespaces |
-| `@nexus/contracts` | OpenAPI 3.1 + AsyncAPI 3.0 machine-readable specs |
-| `@nexus/shared` | Result<T,E>, Zod utilities, shared types |
+| Package                    | Description                                                                                                                                                    |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@nexus/agent-runtime`     | Multi-step LLM tool loop, `spawn_agents`, swarm layer (VersionedPlan, ChannelIndex, 13 lifecycle states), exponential backoff (base 1s, cap 8s, 3 max retries) |
+| `@nexus/council`           | Multi-model deliberation: Promise.allSettled fanout, synthesis, guardrails, archetype personas (11 types, YAML-driven)                                         |
+| `@nexus/llm-drivers`       | 15 provider drivers, native SSE/NDJSON ReadableStream                                                                                                          |
+| `@nexus/llm-router`        | Dynamic routing by cost, latency, and capability                                                                                                               |
+| `@nexus/gateway`           | IProvider, model alias routing, classifyFailoverError() (3-category, 30+ patterns), FallbackChain, CostCallbackRegistry, Singleflight<T>                       |
+| `@nexus/mcp-client`        | MCP consumer: JSON-RPC 2.0 HTTP, injectable fetch                                                                                                              |
+| `@nexus/mcp-bulk`          | Batch MCP tool invocation                                                                                                                                      |
+| `@nexus/mcp-openapi`       | Auto-generate MCP tools from OpenAPI specs                                                                                                                     |
+| `@nexus/code-repl`         | DockerReplExecutor — Python/R/Julia, --network none, 256MB cap, SessionReaper                                                                                  |
+| `@nexus/memory`            | pgvector, IVFFlat ANN (lists=100), MemoryGraph BFS (0.7^depth decay), IStream/IState, TTL, ACL, BM25+RRF hybrid                                                |
+| `@nexus/memory-tools`      | High-level remember() / recall() / forget()                                                                                                                    |
+| `@nexus/stm`               | HedgeReducer, DirectnessOptimizer, TruncationGuard, STMPipeline, RollingWindow                                                                                 |
+| `@nexus/context-pruner`    | LlmCompactor + MicroCompactor, dual-trigger (count OR token), isBlocked guard                                                                                  |
+| `@nexus/trigger-engine`    | ISdk: registerFunction(), registerTrigger(), InvocationError                                                                                                   |
+| `@nexus/stream-recovery`   | ChannelWriter/ChannelReader WebSocket pair, 64KB binary framing                                                                                                |
+| `@nexus/runtime`           | Circuit breaker FSM, crash recovery (snapshot+WAL), OTel tracing, queue backends                                                                               |
+| `@nexus/conductor`         | Orchestrator (11 blueprints, GovernanceEngine, TaskExecutor), CJS package, ESM bridge                                                                          |
+| `@nexus/pipeline-signal`   | ingest → classify → Signal worker (7 rules, LISTEN/NOTIFY hot path)                                                                                            |
+| `@nexus/domain-feeds`      | 16 global intel domains, BullMQ repeatable jobs, AcademicPaper, titlesAreDuplicate()                                                                           |
+| `@nexus/retrieval`         | RAG: chunk→embed→retrieve→rerank, Jaccard+cosine hybrid, sub-query decomposition                                                                               |
+| `@nexus/knowledge-graph`   | Entity+relation graph, Leiden clustering, multi-hop BFS, KGSearchType (6 modes)                                                                                |
+| `@nexus/gauntlet`          | Races 47 models in waves of 12, 150ms stagger, scoreResponse() 0-100, 5 SpeedTiers                                                                             |
+| `@nexus/supervisor`        | OmaTask DAG (6 statuses), OmaSchedulingStrategy (4 modes), countBlockedDependents() BFS                                                                        |
+| `@nexus/drift`             | EMA adaptive parameter tuning                                                                                                                                  |
+| `@nexus/redteam`           | Input perturbation engine                                                                                                                                      |
+| `@nexus/evals`             | LLM evaluation: scorers, test runner, result types                                                                                                             |
+| `@nexus/doc-pipeline`      | extract → classify → OCR → index                                                                                                                               |
+| `@nexus/doc-ocr`           | OcrPromptMode (7 modes), OcrLayoutCategory (11 types), LaTeX/HTML table extraction                                                                             |
+| `@nexus/prediction-market` | Polymarket+Kalshi+Metaculus CLOB backends, order book (L1/L2/L3), impliedProbability()                                                                         |
+| `@nexus/telemetry`         | OTel bootstrap, HMAC-chained audit log, Prometheus formatters, MODEL_PRICE_TABLE (18 models)                                                                   |
+| `@nexus/auth`              | API key + HS256 JWT, Fastify preHandler hook                                                                                                                   |
+| `@nexus/db`                | Drizzle ORM — 7 schemas, typed migrations, query helpers                                                                                                       |
+| `@nexus/adapters`          | Barrel — re-exports all 25 @nexus/adapter-\* sub-packages                                                                                                      |
+| `@nexus/plugin-sdk`        | defineAdapter(), ISocialProvider contracts, capability types, test harness                                                                                     |
+| `@nexus/client`            | Typed isomorphic SDK — gateway/council/memory/agents/research namespaces                                                                                       |
+| `@nexus/contracts`         | OpenAPI 3.1 + AsyncAPI 3.0 machine-readable specs                                                                                                              |
+| `@nexus/shared`            | Result<T,E>, Zod utilities, shared types                                                                                                                       |
 
 ---
 
@@ -570,21 +570,21 @@ See [`infra/terraform/`](infra/terraform/) for GKE and EKS provisioning modules.
 
 ## Environment variables
 
-| Variable | Required | Description |
-| --- | --- | --- |
-| `DATABASE_URL` | yes | PostgreSQL (pgvector enabled) |
-| `REDIS_URL` | yes | Redis for BullMQ |
-| `NEXUS_API_KEY` | yes | Master gateway auth key |
-| `NEXUS_AUDIT_KEY` | yes | HMAC key for audit log chaining |
-| `GROQ_API_KEY` | yes | Primary LLM + embeddings |
-| `OPENAI_API_KEY` | optional | OpenAI (fine-tune, TTS-1, council) |
-| `ANTHROPIC_API_KEY` | optional | Claude models |
-| `GEMINI_API_KEY` | optional | Gemini models |
-| `OPENWEATHER_API_KEY` | optional | Weather feed polling |
-| `NEWS_API_KEY` | optional | News feed polling |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | optional | Jaeger/Tempo trace export |
-| `METRICS_NO_AUTH` | optional | `true` = allow Prometheus scrape without Bearer token |
-| `COUNCIL_MIN_PRIORITY` | optional | Minimum signal priority for council (default: `high`) |
+| Variable                      | Required | Description                                           |
+| ----------------------------- | -------- | ----------------------------------------------------- |
+| `DATABASE_URL`                | yes      | PostgreSQL (pgvector enabled)                         |
+| `REDIS_URL`                   | yes      | Redis for BullMQ                                      |
+| `NEXUS_API_KEY`               | yes      | Master gateway auth key                               |
+| `NEXUS_AUDIT_KEY`             | yes      | HMAC key for audit log chaining                       |
+| `GROQ_API_KEY`                | yes      | Primary LLM + embeddings                              |
+| `OPENAI_API_KEY`              | optional | OpenAI (fine-tune, TTS-1, council)                    |
+| `ANTHROPIC_API_KEY`           | optional | Claude models                                         |
+| `GEMINI_API_KEY`              | optional | Gemini models                                         |
+| `OPENWEATHER_API_KEY`         | optional | Weather feed polling                                  |
+| `NEWS_API_KEY`                | optional | News feed polling                                     |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | optional | Jaeger/Tempo trace export                             |
+| `METRICS_NO_AUTH`             | optional | `true` = allow Prometheus scrape without Bearer token |
+| `COUNCIL_MIN_PRIORITY`        | optional | Minimum signal priority for council (default: `high`) |
 
 Full reference: `.env.example`
 
@@ -618,14 +618,14 @@ Design invariants:
 
 18 locked ADRs in [`docs/adr/`](docs/adr/). Notable:
 
-| ADR | Decision |
-| --- | --- |
-| [ADR-0002](docs/adr/0002-postgres-sole-state.md) | PostgreSQL is the sole authoritative state store |
-| [ADR-0006](docs/adr/0006-apache-2-license.md) | Apache 2.0 (patent grant) |
-| [ADR-0008](docs/adr/0008-plugin-sdk-first-class.md) | Plugin SDK is a first-class citizen |
-| [ADR-0009](docs/adr/0009-versioned-api.md) | API versioning from day one (`/api/v1/`) |
-| [ADR-0010](docs/adr/0010-hmac-chained-audit-log.md) | HMAC-chained audit log for tamper evidence |
-| [ADR-0017](docs/adr/0017-coverage-floor-80.md) | 80% coverage floor enforced in CI |
+| ADR                                                 | Decision                                         |
+| --------------------------------------------------- | ------------------------------------------------ |
+| [ADR-0002](docs/adr/0002-postgres-sole-state.md)    | PostgreSQL is the sole authoritative state store |
+| [ADR-0006](docs/adr/0006-apache-2-license.md)       | Apache 2.0 (patent grant)                        |
+| [ADR-0008](docs/adr/0008-plugin-sdk-first-class.md) | Plugin SDK is a first-class citizen              |
+| [ADR-0009](docs/adr/0009-versioned-api.md)          | API versioning from day one (`/api/v1/`)         |
+| [ADR-0010](docs/adr/0010-hmac-chained-audit-log.md) | HMAC-chained audit log for tamper evidence       |
+| [ADR-0017](docs/adr/0017-coverage-floor-80.md)      | 80% coverage floor enforced in CI                |
 
 Key implementation decisions:
 
