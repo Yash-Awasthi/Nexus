@@ -1,0 +1,20 @@
+{
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm --filter @nexus/ui build",
+  "outputDirectory": "apps/ui/build/client",
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "https://nexus-api-8xr0.onrender.com/api/$1" },
+    { "source": "/health",   "destination": "https://nexus-api-8xr0.onrender.com/health" },
+    { "source": "/health/(.*)", "destination": "https://nexus-api-8xr0.onrender.com/health/$1" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options",        "value": "DENY" },
+        { "key": "Referrer-Policy",        "value": "strict-origin-when-cross-origin" }
+      ]
+    }
+  ]
+}
