@@ -101,10 +101,42 @@ export default defineConfig({
     ],
     coverage: {
       provider: "v8",
-      reporter: ["text", "lcov", "html"],
-      // Thresholds intentionally omitted — coverage is tracked via Codecov.
-      // Re-enable per-package thresholds once baseline is established.
-      exclude: ["**/dist/**", "**/node_modules/**", "**/*.gen.ts", "**/src/index.ts"],
+      reporter: ["text", "lcov", "html", "json"],
+      // Scope coverage to package source only.
+      // apps/api route tests and apps/worker e2e tests require a live Fastify
+      // server + Postgres + Redis and run in the dedicated e2e CI job — measuring
+      // them here would produce artificially low line coverage and make thresholds
+      // impossible to enforce meaningfully.
+      include: ["packages/*/src/**/*.ts"],
+      exclude: [
+        "**/dist/**",
+        "**/node_modules/**",
+        "**/*.gen.ts",
+        "**/*.d.ts",
+        // Barrel re-export files — no executable logic
+        "**/src/index.ts",
+        // Pure-type / spec packages — nothing to instrument
+        "packages/contracts/**",
+        "packages/shared/**",
+        // Infrastructure packages — require live Docker / Redis / Postgres to
+        // exercise meaningfully. Covered by the dedicated e2e CI job instead.
+        "packages/conductor/**",
+        "packages/runtime/**",
+        "packages/task-queue/**",
+        // Telemetry bootstrap (OTel init, pino logger, SLO tracker) and LLM
+        // evaluation framework require live providers; excluded from unit coverage.
+        "packages/telemetry/**",
+        "packages/evals/**",
+      ],
+      thresholds: {
+        statements: 90,
+        lines: 90,
+        functions: 90,
+        // Branches get 5 points of headroom: catch-block error shapes and
+        // platform-specific fallbacks (Docker unavailable, pgvector < 0.4) are
+        // tested at integration level, not unit level.
+        branches: 85,
+      },
     },
   },
 });

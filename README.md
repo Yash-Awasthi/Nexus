@@ -241,47 +241,107 @@ nexus/
 
 ---
 
-## Quick start
+## Running NEXUS
 
-**Prerequisites:** Node 20+, pnpm 9+, Docker + Docker Compose
+### Option A — Full Docker stack (simplest)
+
+Everything containerised. No Node install required on the host.
 
 ```bash
-# 1. Clone and install
 git clone https://github.com/Yash-Awasthi/Nexus.git
 cd Nexus
+
+cp .env.example .env
+# Open .env and set at minimum:
+#   NEXUS_API_KEY=<any string>
+#   GROQ_API_KEY=<your Groq key>      ← used as the default LLM provider
+# DATABASE_URL and REDIS_URL are pre-filled for the local compose stack
+
+docker compose up
+```
+
+| Service                    | URL                   |
+| -------------------------- | --------------------- |
+| API                        | http://localhost:3000 |
+| UI (nginx-served build)    | http://localhost:4173 |
+| Bull Board (queue monitor) | http://localhost:3002 |
+| Ingest (Python)            | http://localhost:8000 |
+
+Health check: `curl http://localhost:3000/api/v1/health`
+
+To stop: `docker compose down`
+
+---
+
+### Option B — Local dev (hot reload, faster iteration)
+
+**Prerequisites:** Node 20+, pnpm 9+, Docker (for Postgres + Redis only)
+
+```bash
+git clone https://github.com/Yash-Awasthi/Nexus.git
+cd Nexus
+
+# 1. Install dependencies
 pnpm install
 
-# 2. Start infrastructure
+# 2. Start Postgres and Redis only
 docker compose up -d postgres redis
 
 # 3. Configure environment
 cp .env.example .env
-# Edit .env — minimum: DATABASE_URL, REDIS_URL, NEXUS_API_KEY, GROQ_API_KEY
+# Set NEXUS_API_KEY and GROQ_API_KEY at minimum
+# DATABASE_URL and REDIS_URL default values already match the compose stack
 
-# 4. Migrate database
-pnpm --filter @nexus/db migrate
+# 4. Run database migrations
+pnpm db:migrate
 
-# 5. Build all packages
+# 5. Build all 107 packages (required once; turbo caches subsequent runs)
 pnpm build
 
-# 6. Start dev servers (api + ui + worker in parallel via turbo)
+# 6. Start all dev servers in parallel
 pnpm dev
 ```
 
-API at `http://localhost:3000` · UI at `http://localhost:5173`
+| Process           | URL                   | Notes                             |
+| ----------------- | --------------------- | --------------------------------- |
+| API (Fastify)     | http://localhost:3000 | Hot-reloads on save via tsx watch |
+| UI (React Router) | http://localhost:5173 | Vite HMR                          |
+| Worker (BullMQ)   | —                     | Consumes signal + task queues     |
+
+Verify: `curl -H "Authorization: Bearer $NEXUS_API_KEY" http://localhost:3000/api/v1/health`
 
 ```bash
-# Observability stack (Prometheus + Grafana + Jaeger + OTel Collector)
-docker compose -f docker-compose.yml \
-  -f infra/docker/docker-compose.observability.yml \
-  --profile observability up
-
-# Grafana at :3001  (admin / nexus-dev) — dashboards auto-provisioned
-# Prometheus at :9090
-# Jaeger UI at :16686
+# Test the gateway with a real LLM call (needs GROQ_API_KEY in .env)
+curl -X POST http://localhost:3000/api/v1/gateway/messages \
+  -H "Authorization: Bearer $NEXUS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"nexus/fast","messages":[{"role":"user","content":"ping"}]}'
 ```
 
-> Sandboxed code execution (`/api/v1/code-repl`) requires Docker running. API falls back to `MockReplExecutor` automatically if Docker is unavailable.
+---
+
+### Option C — Observability stack
+
+```bash
+# Starts Prometheus + Grafana + Jaeger + OTel Collector alongside the core stack
+docker compose --profile observability up
+```
+
+| Service    | URL                    | Credentials       |
+| ---------- | ---------------------- | ----------------- |
+| Grafana    | http://localhost:3001  | admin / nexus-dev |
+| Prometheus | http://localhost:9090  | —                 |
+| Jaeger     | http://localhost:16686 | —                 |
+
+Grafana dashboards auto-provision from `infra/grafana/dashboards/`.
+
+---
+
+### Notes
+
+- Sandboxed code execution (`/api/v1/code-repl`) requires Docker running. The API falls back to `MockReplExecutor` automatically when Docker is not available.
+- The Python ingest service (`services/ingest`) is optional for core API functionality. Start it with `docker compose up ingest` when you need adapter-driven data ingestion.
+- `pnpm build` only needs to run once per session. After that, `pnpm dev` uses turbo watch mode and rebuilds changed packages automatically.
 
 ---
 
@@ -603,7 +663,7 @@ k6 run infra/k6/soak.js           # 5-min soak at 200 VU
 bash infra/chaos/pod-kill.sh      # Kill random pod, observe recovery
 ```
 
-Coverage floor: **80%** (CI enforced — ADR-0017).
+Coverage floor: **90% lines/statements/functions, 85% branches** (CI enforced — ADR-0017). Scoped to `packages/*/src/**` — app route handlers are measured in the e2e job.
 
 Design invariants:
 
@@ -618,14 +678,14 @@ Design invariants:
 
 18 locked ADRs in [`docs/adr/`](docs/adr/). Notable:
 
-| ADR                                                 | Decision                                         |
-| --------------------------------------------------- | ------------------------------------------------ |
-| [ADR-0002](docs/adr/0002-postgres-sole-state.md)    | PostgreSQL is the sole authoritative state store |
-| [ADR-0006](docs/adr/0006-apache-2-license.md)       | Apache 2.0 (patent grant)                        |
-| [ADR-0008](docs/adr/0008-plugin-sdk-first-class.md) | Plugin SDK is a first-class citizen              |
-| [ADR-0009](docs/adr/0009-versioned-api.md)          | API versioning from day one (`/api/v1/`)         |
-| [ADR-0010](docs/adr/0010-hmac-chained-audit-log.md) | HMAC-chained audit log for tamper evidence       |
-| [ADR-0017](docs/adr/0017-coverage-floor-80.md)      | 80% coverage floor enforced in CI                |
+| ADR                                                 | Decision                                                    |
+| --------------------------------------------------- | ----------------------------------------------------------- |
+| [ADR-0002](docs/adr/0002-postgres-sole-state.md)    | PostgreSQL is the sole authoritative state store            |
+| [ADR-0006](docs/adr/0006-apache-2-license.md)       | Apache 2.0 (patent grant)                                   |
+| [ADR-0008](docs/adr/0008-plugin-sdk-first-class.md) | Plugin SDK is a first-class citizen                         |
+| [ADR-0009](docs/adr/0009-versioned-api.md)          | API versioning from day one (`/api/v1/`)                    |
+| [ADR-0010](docs/adr/0010-hmac-chained-audit-log.md) | HMAC-chained audit log for tamper evidence                  |
+| [ADR-0017](docs/adr/0017-coverage-floor-80.md)      | 90% line/function coverage floor on packages (85% branches) |
 
 Key implementation decisions:
 
