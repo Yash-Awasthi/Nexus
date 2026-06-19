@@ -2,12 +2,13 @@
   "name": "@nexus/stream-recovery",
   "version": "0.1.0",
   "type": "module",
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./dist/index.js"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "build": "tsc --project tsconfig.json"
   },
   "devDependencies": {
     "vitest": "*",

@@ -203,6 +203,29 @@ RUN pnpm --filter @nexus/shared build && \
     pnpm --filter @nexus/obs-providers build && \
     pnpm --filter @nexus/wiki-updater build && \
     pnpm --filter @nexus/image-transformations build && \
+    pnpm --filter @nexus/llm-tracer build && \
+    pnpm --filter @nexus/posthog-analytics build && \
+    pnpm --filter @nexus/stm build && \
+    pnpm --filter @nexus/agent-runtime build && \
+    pnpm --filter @nexus/brief-engine build && \
+    pnpm --filter @nexus/chat-analyst build && \
+    pnpm --filter @nexus/code-repl build && \
+    pnpm --filter @nexus/domain-forecast build && \
+    pnpm --filter @nexus/geoip build && \
+    pnpm --filter @nexus/hf-research build && \
+    pnpm --filter @nexus/i18n build && \
+    pnpm --filter @nexus/prediction-market build && \
+    pnpm --filter @nexus/rlhf-pipeline build && \
+    pnpm --filter @nexus/scenario-planner build && \
+    pnpm --filter @nexus/scraping-mcp build && \
+    pnpm --filter @nexus/session-sync build && \
+    pnpm --filter @nexus/stealth-browser build && \
+    pnpm --filter @nexus/stream-recovery build && \
+    pnpm --filter @nexus/supervisor build && \
+    pnpm --filter @nexus/think-parser build && \
+    pnpm --filter @nexus/tool-registry build && \
+    pnpm --filter @nexus/video-search build && \
+    pnpm --filter @nexus/wiki build && \
     pnpm --filter @nexus/api build
 
 # ─── Stage 3: pruner — pnpm deploy FROM builder so workspace dist/ files exist ─
