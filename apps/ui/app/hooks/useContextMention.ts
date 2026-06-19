@@ -102,10 +102,8 @@ export function useContextMention(
         return true;
       }
       if (e.key === "Enter") {
-        if (isOpen) {
-          e.preventDefault();
-          return true;
-        }
+        e.preventDefault();
+        return true;
       }
       return false;
     },

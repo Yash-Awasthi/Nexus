@@ -92,7 +92,6 @@ export default function SOP() {
     setRunning(false);
   }, [selected, inputs]);
 
-  const categories = Array.from(new Set(templates.map((t) => t.category).filter(Boolean)));
   const filtered = templates.filter(
     (t) =>
       t.name.toLowerCase().includes(filter.toLowerCase()) ||

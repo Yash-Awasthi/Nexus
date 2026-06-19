@@ -18,7 +18,7 @@ import { Badge } from "~/components/ui/badge";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { ImageIcon, Film, Upload, Loader2, Download, Wand2, RefreshCw, X } from "lucide-react";
+import { ImageIcon, Film, Upload, Loader2, Download, Wand2, X } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

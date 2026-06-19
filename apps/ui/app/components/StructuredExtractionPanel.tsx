@@ -6,14 +6,10 @@ import {
   PlusIcon,
   Trash2Icon,
   PlayIcon,
-  SearchIcon,
-  DownloadIcon,
   CheckCircleIcon,
   XCircleIcon,
   ClockIcon,
   ZapIcon,
-  GlobeIcon,
-  EyeIcon,
   LayoutTemplateIcon,
   WandIcon,
   TableIcon,
@@ -21,7 +17,6 @@ import {
   FileTextIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  CopyIcon,
   Loader2Icon,
   RefreshCwIcon,
 } from "lucide-react";
@@ -39,7 +34,6 @@ import {
 } from "~/components/ui/select";
 import {
   Dialog,
-  DialogTrigger,
   DialogContent,
   DialogHeader,
   DialogTitle,

@@ -27,7 +27,15 @@ import { eq, isNull, and } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
 import { emitAuditEvent } from "../lib/audit-emitter.js";
+import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
 import { requireAuth } from "../middleware/auth.js";
+
+// 5 MFA attempts per 15 minutes per IP — prevents brute-force TOTP attacks
+const mfaRateLimit = makeRateLimitPreHandler({
+  limit: 5,
+  windowMs: 15 * 60 * 1000,
+  keyPrefix: "auth:mfa",
+});
 
 // ── Base32 encoding/decoding (RFC 4648 — used by TOTP apps) ──────────────────
 
@@ -228,7 +236,7 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Body: { code: string } }>(
     "/mfa/verify",
     {
-      preHandler: requireAuth,
+      preHandler: [requireAuth, mfaRateLimit],
       schema: {
         body: {
           type: "object",
@@ -283,6 +291,7 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Body: { userId: string; code: string } }>(
     "/mfa/validate",
     {
+      preHandler: mfaRateLimit,
       schema: {
         body: {
           type: "object",

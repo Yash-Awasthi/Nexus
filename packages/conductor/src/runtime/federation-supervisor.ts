@@ -543,12 +543,7 @@ export class FederationSupervisor {
     services.push(apiStatus);
 
     const mcpPort = this.config.mcpPort;
-    let mcpStatus: FederationServiceStatus = {
-      name: "mcp-server",
-      status: "offline",
-      port: mcpPort,
-      pid: mcpPid,
-    };
+    let mcpStatus: FederationServiceStatus;
     try {
       await fetch(`http://127.0.0.1:${mcpPort}/mcp`, { signal: AbortSignal.timeout(2000) });
       mcpStatus = {

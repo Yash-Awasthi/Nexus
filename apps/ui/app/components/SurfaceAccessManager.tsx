@@ -10,7 +10,6 @@ import {
   KeyIcon,
   GlobeIcon,
   MonitorSmartphoneIcon,
-  SettingsIcon,
   CodeIcon,
   EyeIcon,
   EyeOffIcon,

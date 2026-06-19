@@ -367,43 +367,49 @@ export async function samlRoutes(app: FastifyInstance): Promise<void> {
    * Initiates SP-initiated SSO via HTTP-Redirect binding.
    * Stores state in a signed cookie, redirects browser to IdP.
    */
-  app.get<{ Querystring: { redirect?: string } }>("/auth/saml/login", async (request, reply) => {
-    try {
-      const idpSsoUrl = env("NEXUS_SAML_IDP_SSO_URL");
-      const spEntityId = env("NEXUS_SAML_SP_ENTITY_ID");
-      const acsUrl = env("NEXUS_SAML_SP_ACS_URL");
+  app.get<{ Querystring: { redirect?: string } }>(
+    "/auth/saml/login",
+    { preHandler: samlLoginRateLimit },
+    async (request, reply) => {
+      try {
+        const idpSsoUrl = env("NEXUS_SAML_IDP_SSO_URL");
+        const spEntityId = env("NEXUS_SAML_SP_ENTITY_ID");
+        const acsUrl = env("NEXUS_SAML_SP_ACS_URL");
 
-      const requestId = `_${randomBytes(16).toString("hex")}`;
-      const relayState = request.query.redirect ?? "/";
-      const state = makeState(relayState);
-      const authnRequest = buildAuthnRequest(requestId, spEntityId, acsUrl);
-      const encoded = encodeAuthnRequest(authnRequest);
+        const requestId = `_${randomBytes(16).toString("hex")}`;
+        const relayState = request.query.redirect ?? "/";
+        const state = makeState(relayState);
+        const authnRequest = buildAuthnRequest(requestId, spEntityId, acsUrl);
+        const encoded = encodeAuthnRequest(authnRequest);
 
-      const params = new URLSearchParams({
-        SAMLRequest: encoded,
-        RelayState: state,
-      });
+        const params = new URLSearchParams({
+          SAMLRequest: encoded,
+          RelayState: state,
+        });
 
-      // Store requestId in a short-lived signed cookie for InResponseTo validation
-      const cookieVal = createHmac("sha256", process.env.NEXUS_SAML_COOKIE_SECRET ?? "dev-secret")
-        .update(requestId)
-        .digest("hex");
+        // Store requestId in a short-lived signed cookie for InResponseTo validation
+        const cookieVal = createHmac("sha256", process.env.NEXUS_SAML_COOKIE_SECRET ?? "dev-secret")
+          .update(requestId)
+          .digest("hex");
 
-      (
-        reply as unknown as { setCookie(n: string, v: string, o: Record<string, unknown>): void }
-      ).setCookie("saml_req_id", `${requestId}:${cookieVal}`, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 600,
-        path: "/",
-      });
+        (
+          reply as unknown as { setCookie(n: string, v: string, o: Record<string, unknown>): void }
+        ).setCookie("saml_req_id", `${requestId}:${cookieVal}`, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          maxAge: 600,
+          path: "/",
+        });
 
-      return reply.redirect(`${idpSsoUrl}?${params.toString()}`);
-    } catch (err) {
-      return reply.code(503).send({ error: "saml_config_error", message: (err as Error).message });
-    }
-  });
+        return reply.redirect(`${idpSsoUrl}?${params.toString()}`);
+      } catch (err) {
+        return reply
+          .code(503)
+          .send({ error: "saml_config_error", message: (err as Error).message });
+      }
+    },
+  );
 
   /**
    * POST /auth/saml/callback
@@ -412,7 +418,7 @@ export async function samlRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{
     Body: { SAMLResponse?: string; RelayState?: string };
-  }>("/auth/saml/callback", async (request, reply) => {
+  }>("/auth/saml/callback", { preHandler: samlCallbackRateLimit }, async (request, reply) => {
     try {
       const idpEntityId = env("NEXUS_SAML_IDP_ENTITY_ID");
       const idpCert = env("NEXUS_SAML_IDP_CERT");

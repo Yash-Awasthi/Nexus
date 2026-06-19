@@ -18,7 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Textarea } from "~/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { Route, Loader2, BarChart2, Settings, Play, RefreshCw, Zap, Brain } from "lucide-react";
+import { Route, Loader2, BarChart2, Settings, Play, RefreshCw, Brain } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

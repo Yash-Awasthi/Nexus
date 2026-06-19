@@ -164,14 +164,6 @@ export default function CouncilCheckpoints() {
     setDeleting(false);
   }, [runInfo]);
 
-  const toggleKey = (key: string) => {
-    setExpandedKeys((prev) => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
-  };
-
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       {/* Header */}

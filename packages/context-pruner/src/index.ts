@@ -565,11 +565,21 @@ ${toolResults}${_NO_TOOLS_TRAILER}`;
  */
 export function formatCompactSummary(rawSummary: string): string {
   let formatted = rawSummary;
-  formatted = formatted.replace(/<analysis>[\s\S]*?<\/analysis>/, "");
-  const summaryMatch = /<summary>([\s\S]*?)<\/summary>/.exec(formatted);
-  if (summaryMatch) {
-    const content = summaryMatch[1] ?? "";
-    formatted = formatted.replace(/<summary>[\s\S]*?<\/summary>/, `Summary:\n${content.trim()}`);
+  // Strip <analysis>...</analysis> block (string split to avoid ReDoS)
+  const aStart = formatted.indexOf("<analysis>");
+  const aEnd = formatted.indexOf("</analysis>");
+  if (aStart !== -1 && aEnd !== -1 && aEnd > aStart) {
+    formatted = formatted.slice(0, aStart) + formatted.slice(aEnd + "</analysis>".length);
+  }
+  // Extract <summary>...</summary> content (string split to avoid ReDoS)
+  const sOpen = formatted.indexOf("<summary>");
+  const sClose = formatted.indexOf("</summary>");
+  if (sOpen !== -1 && sClose !== -1 && sClose > sOpen) {
+    const summaryContent = formatted.slice(sOpen + "<summary>".length, sClose).trim();
+    formatted =
+      formatted.slice(0, sOpen) +
+      `Summary:\n${summaryContent}` +
+      formatted.slice(sClose + "</summary>".length);
   }
   formatted = formatted.replace(/\n\n+/g, "\n\n");
   return formatted.trim();
