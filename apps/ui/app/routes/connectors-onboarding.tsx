@@ -58,7 +58,7 @@ const CONNECTORS: ConnectorDef[] = [
     icon: "🗂",
     category: "Productivity",
     authType: "oauth",
-    oauthUrl: "/api/auth/google",
+    oauthUrl: "/api/v1/oauth/google",
     description: "Index files and folders from your Google Drive",
   },
   {
@@ -97,7 +97,7 @@ const CONNECTORS: ConnectorDef[] = [
     icon: "🐙",
     category: "Engineering",
     authType: "oauth",
-    oauthUrl: "/api/auth/github",
+    oauthUrl: "/api/v1/oauth/github",
     description: "Index repositories, issues, PRs, and wikis",
   },
   {
@@ -146,7 +146,7 @@ const CONNECTORS: ConnectorDef[] = [
     icon: "💬",
     category: "Messaging",
     authType: "oauth",
-    oauthUrl: "/api/connectors/oauth/slack",
+    oauthUrl: "/api/v1/oauth/slack",
     description: "Sync Slack channels and messages",
   },
   {

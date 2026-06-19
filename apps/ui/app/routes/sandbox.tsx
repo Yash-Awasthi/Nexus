@@ -142,7 +142,10 @@ export default function Sandbox() {
   const loadAgentSessions = useCallback(async () => {
     try {
       const r = await fetch("/api/code-agent/sessions");
-      if (r.ok) setAgentSessions(await r.json());
+      if (r.ok) {
+        const d = await r.json();
+        setAgentSessions(Array.isArray(d) ? d : (d?.sessions ?? []));
+      }
     } catch {}
   }, []);
 
@@ -167,7 +170,17 @@ export default function Sandbox() {
         setErr(d.error ?? "Execution failed");
         return;
       }
-      setResult(await r.json());
+      const raw = await r.json();
+      // Normalize API shape: backend returns {output, error, durationMs, status}
+      // UI expects {stdout, stderr, exitCode, durationMs, language, truncated}
+      setResult({
+        stdout: raw.stdout ?? raw.output ?? "",
+        stderr: raw.stderr ?? raw.error ?? "",
+        exitCode: raw.exitCode ?? (raw.status === "error" ? 1 : raw.error ? 1 : 0),
+        durationMs: raw.durationMs ?? 0,
+        language: raw.language ?? language,
+        truncated: raw.truncated ?? false,
+      });
     } catch {
       setErr("Execution failed");
     } finally {
