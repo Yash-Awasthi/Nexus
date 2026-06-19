@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { useRef, useEffect, useState, lazy, Suspense } from "react";
 
 const CouncilCanvas = lazy(() => import("~/components/three/CouncilScene"));
@@ -15,7 +16,9 @@ export function CouncilSection() {
   const sectionRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { setIsClient(true); }, []);
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,12 +38,14 @@ export function CouncilSection() {
               stagger: 0.15,
               ease: "power2.out",
               scrollTrigger: { trigger: headingRef.current, start: "top 80%" },
-            }
+            },
           );
         }
-      }
+      },
     );
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (

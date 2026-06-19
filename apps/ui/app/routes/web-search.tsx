@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Web Search — live search across the web with provider selection.
  *
@@ -62,8 +63,8 @@ export default function WebSearch() {
 
   useEffect(() => {
     fetch("/api/web-search/providers")
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
         if (d) {
           setProviders(d.providers ?? []);
           setPreferred(d.preferred ?? "");
@@ -95,7 +96,7 @@ export default function WebSearch() {
       }
       const data: SearchResponse = await r.json();
       setResults(data);
-      setHistory(prev => [data, ...prev.filter(h => h.query !== q)].slice(0, 10));
+      setHistory((prev) => [data, ...prev.filter((h) => h.query !== q)].slice(0, 10));
     } catch {
       setErr("Search failed");
     } finally {
@@ -114,7 +115,11 @@ export default function WebSearch() {
     if (days === 0) return "today";
     if (days === 1) return "yesterday";
     if (days < 30) return `${days}d ago`;
-    return new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    return new Date(d).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   }
 
   return (
@@ -127,7 +132,12 @@ export default function WebSearch() {
         </h1>
         <p className="text-muted-foreground text-sm mt-1">
           Live search via {providers.length > 0 ? providers.join(", ") : "configured providers"}
-          {preferred && <span> · preferred: <span className="font-medium">{preferred}</span></span>}
+          {preferred && (
+            <span>
+              {" "}
+              · preferred: <span className="font-medium">{preferred}</span>
+            </span>
+          )}
         </p>
       </div>
 
@@ -140,7 +150,7 @@ export default function WebSearch() {
             className="pl-9 pr-9"
             placeholder="Search the web…"
             value={query}
-            onChange={e => setQuery(e.target.value)}
+            onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
           />
           {query && (
@@ -160,28 +170,30 @@ export default function WebSearch() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="auto">Auto</SelectItem>
-              {providers.map(p => (
-                <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>
+              {providers.map((p) => (
+                <SelectItem key={p} value={p} className="capitalize">
+                  {p}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         )}
 
-        <Select value={String(maxResults)} onValueChange={v => setMaxResults(Number(v))}>
+        <Select value={String(maxResults)} onValueChange={(v) => setMaxResults(Number(v))}>
           <SelectTrigger className="w-20">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {[5, 10, 20, 30].map(n => (
-              <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+            {[5, 10, 20, 30].map((n) => (
+              <SelectItem key={n} value={String(n)}>
+                {n}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
 
         <Button onClick={handleSearch} disabled={loading || !query.trim()}>
-          {loading
-            ? <Loader2 className="w-4 h-4 animate-spin" />
-            : <Search className="w-4 h-4" />}
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
         </Button>
       </div>
 
@@ -197,7 +209,9 @@ export default function WebSearch() {
         <div className="space-y-3">
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="font-medium text-foreground">"{results.query}"</span>
-            {results.totalResults !== undefined && <span>{results.totalResults.toLocaleString()} results</span>}
+            {results.totalResults !== undefined && (
+              <span>{results.totalResults.toLocaleString()} results</span>
+            )}
             {results.searchTime !== undefined && (
               <span className="flex items-center gap-1">
                 <Clock className="w-3 h-3" />
@@ -236,10 +250,14 @@ export default function WebSearch() {
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           {r.publishedAt && (
-                            <span className="text-xs text-muted-foreground">{timeAgo(r.publishedAt)}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {timeAgo(r.publishedAt)}
+                            </span>
                           )}
                           {r.source && (
-                            <Badge variant="outline" className="text-xs">{r.source}</Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {r.source}
+                            </Badge>
                           )}
                           <ExternalLink className="w-3 h-3 text-muted-foreground group-hover:text-foreground" />
                         </div>
@@ -261,7 +279,10 @@ export default function WebSearch() {
             <button
               key={i}
               className="w-full text-left flex items-center gap-2 text-sm px-3 py-2 rounded-lg hover:bg-accent transition-colors"
-              onClick={() => { setQuery(h.query); setResults(h); }}
+              onClick={() => {
+                setQuery(h.query);
+                setResults(h);
+              }}
             >
               <Clock className="w-3 h-3 text-muted-foreground shrink-0" />
               <span className="flex-1">{h.query}</span>

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 "use client";
 
 export function DottedGrid({ className }: { className?: string }) {
@@ -14,10 +15,7 @@ export function DottedGrid({ className }: { className?: string }) {
           }
         `}
       </style>
-      <svg
-        className="dotted-grid-pattern w-full h-full"
-        xmlns="http://www.w3.org/2000/svg"
-      >
+      <svg className="dotted-grid-pattern w-full h-full" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <pattern
             id="dotted-grid"

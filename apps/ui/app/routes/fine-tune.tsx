@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Fine-Tune Pipeline — Phase 2.11
  *
@@ -53,11 +54,7 @@ interface JobResult {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const BASE_MODELS = [
-  "gpt-4o-mini-2024-07-18",
-  "gpt-3.5-turbo-0125",
-  "gpt-4o-2024-08-06",
-];
+const BASE_MODELS = ["gpt-4o-mini-2024-07-18", "gpt-3.5-turbo-0125", "gpt-4o-2024-08-06"];
 
 const MIN_EXAMPLES = 50;
 
@@ -85,7 +82,9 @@ export default function FineTune() {
     }
   }, []);
 
-  useEffect(() => { fetchDataset(); }, [fetchDataset]);
+  useEffect(() => {
+    fetchDataset();
+  }, [fetchDataset]);
 
   const handleExport = useCallback(async () => {
     setExporting(true);
@@ -130,9 +129,7 @@ export default function FineTune() {
     }
   }, [baseModel]);
 
-  const progressPct = dataset
-    ? Math.min(100, Math.round((dataset.count / MIN_EXAMPLES) * 100))
-    : 0;
+  const progressPct = dataset ? Math.min(100, Math.round((dataset.count / MIN_EXAMPLES) * 100)) : 0;
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
@@ -214,7 +211,9 @@ export default function FineTune() {
 
               {!dataset.eligible && (
                 <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
-                  <p className="font-medium text-foreground mb-1">How to collect examples faster:</p>
+                  <p className="font-medium text-foreground mb-1">
+                    How to collect examples faster:
+                  </p>
                   <ul className="list-disc list-inside space-y-1 text-xs">
                     <li>Run deliberations and upvote/downvote model responses</li>
                     <li>Use GODMODE CLASSIC to rate parallel responses</li>
@@ -237,7 +236,8 @@ export default function FineTune() {
             Export Training Data
           </CardTitle>
           <CardDescription>
-            Download your rated examples as JSONL — compatible with OpenAI and many fine-tune frameworks
+            Download your rated examples as JSONL — compatible with OpenAI and many fine-tune
+            frameworks
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -248,9 +248,15 @@ export default function FineTune() {
             className="w-full"
           >
             {exporting ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generating JSONL…</>
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Generating JSONL…
+              </>
             ) : (
-              <><Download className="w-4 h-4 mr-2" />Download nexus-finetune.jsonl</>
+              <>
+                <Download className="w-4 h-4 mr-2" />
+                Download nexus-finetune.jsonl
+              </>
             )}
           </Button>
           {!dataset?.eligible && (
@@ -269,7 +275,8 @@ export default function FineTune() {
             Start Fine-Tune Job
           </CardTitle>
           <CardDescription>
-            Uploads your JSONL and initiates an OpenAI fine-tune job. Never runs automatically — your decision only.
+            Uploads your JSONL and initiates an OpenAI fine-tune job. Never runs automatically —
+            your decision only.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -280,8 +287,10 @@ export default function FineTune() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {BASE_MODELS.map(m => (
-                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                {BASE_MODELS.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {m}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -298,17 +307,23 @@ export default function FineTune() {
           )}
 
           {jobResult && (
-            <div className={`flex items-start gap-2 text-sm p-3 rounded-lg ${
-              jobResult.success
-                ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400"
-                : "bg-red-50 dark:bg-red-950/30 text-red-600"
-            }`}>
-              {jobResult.success
-                ? <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                : <XCircle className="w-4 h-4 mt-0.5 shrink-0" />}
+            <div
+              className={`flex items-start gap-2 text-sm p-3 rounded-lg ${
+                jobResult.success
+                  ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400"
+                  : "bg-red-50 dark:bg-red-950/30 text-red-600"
+              }`}
+            >
+              {jobResult.success ? (
+                <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              ) : (
+                <XCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              )}
               <div>
                 <p className="font-medium">{jobResult.success ? "Job started!" : "Job failed"}</p>
-                {jobResult.jobId && <p className="text-xs mt-1 font-mono">Job ID: {jobResult.jobId}</p>}
+                {jobResult.jobId && (
+                  <p className="text-xs mt-1 font-mono">Job ID: {jobResult.jobId}</p>
+                )}
                 {jobResult.status && <p className="text-xs mt-1">Status: {jobResult.status}</p>}
                 {jobResult.message && <p className="text-xs mt-1">{jobResult.message}</p>}
               </div>
@@ -321,14 +336,22 @@ export default function FineTune() {
             className="w-full"
           >
             {initiating ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Starting job…</>
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Starting job…
+              </>
             ) : (
-              <><Play className="w-4 h-4 mr-2" />Initiate Fine-Tune Job</>
+              <>
+                <Play className="w-4 h-4 mr-2" />
+                Initiate Fine-Tune Job
+              </>
             )}
           </Button>
 
           <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-3 text-xs text-amber-700 dark:text-amber-400">
-            ⚠ This will upload your training data to OpenAI and incur fine-tuning costs (~$3–8 for a typical 100-example dataset). The job runs asynchronously — check OpenAI dashboard for status.
+            ⚠ This will upload your training data to OpenAI and incur fine-tuning costs (~$3–8 for a
+            typical 100-example dataset). The job runs asynchronously — check OpenAI dashboard for
+            status.
           </div>
         </CardContent>
       </Card>

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Connector Sync Dashboard
  *
@@ -13,58 +14,65 @@ import { Button } from "~/components/ui/button";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { Input } from "~/components/ui/input";
 import {
-  RefreshCw, Search, Plug, CheckCircle2, AlertCircle, Clock, Loader2, Radio,
+  RefreshCw,
+  Search,
+  Plug,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  Loader2,
+  Radio,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Connector {
-  id:           string;
-  name:         string;
-  source:       string;
-  status:       "active" | "error" | "disabled" | "not_attempted";
-  lastSyncAt?:  string;
-  syncedDocs:   number;
-  errorMsg?:    string;
+  id: string;
+  name: string;
+  source: string;
+  status: "active" | "error" | "disabled" | "not_attempted";
+  lastSyncAt?: string;
+  syncedDocs: number;
+  errorMsg?: string;
 }
 
 // ── Connector status helpers ──────────────────────────────────────────────────
 
 const STATUS_ICONS: Record<Connector["status"], React.ReactNode> = {
-  active:        <CheckCircle2 className="size-3.5 text-green-400" />,
-  error:         <AlertCircle  className="size-3.5 text-destructive" />,
-  disabled:      <Clock        className="size-3.5 text-muted-foreground" />,
-  not_attempted: <Clock        className="size-3.5 text-muted-foreground" />,
+  active: <CheckCircle2 className="size-3.5 text-green-400" />,
+  error: <AlertCircle className="size-3.5 text-destructive" />,
+  disabled: <Clock className="size-3.5 text-muted-foreground" />,
+  not_attempted: <Clock className="size-3.5 text-muted-foreground" />,
 };
 
 const STATUS_LABEL: Record<Connector["status"], string> = {
-  active:        "Active",
-  error:         "Error",
-  disabled:      "Disabled",
+  active: "Active",
+  error: "Error",
+  disabled: "Disabled",
   not_attempted: "Never synced",
 };
 
 // ── Sync job status shape (for live-polling active jobs) ──────────────────────
 
 interface SyncJob {
-  id:          string;
+  id: string;
   connectorId: string;
-  status:      "pending" | "running" | "completed" | "failed";
-  startedAt?:  string;
+  status: "pending" | "running" | "completed" | "failed";
+  startedAt?: string;
   completedAt?: string;
 }
 
 const POLL_INTERVAL_MS = 5_000; // refresh active jobs every 5 s
 
 export default function ConnectorsSyncPage() {
-  const [connectors, setConnectors]   = useState<Connector[]>([]);
-  const [loading, setLoading]         = useState(false);
-  const [search, setSearch]           = useState("");
-  const [selected, setSelected]       = useState<string | null>(null);
-  const [error, setError]             = useState<string | null>(null);
+  const [connectors, setConnectors] = useState<Connector[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
-  const [activeJobs, setActiveJobs]   = useState<SyncJob[]>([]);
-  const [polling, setPolling]         = useState(false);
+  const [activeJobs, setActiveJobs] = useState<SyncJob[]>([]);
+  const [polling, setPolling] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const selectedRef = useRef<string | null>(null);
 
@@ -79,13 +87,13 @@ export default function ConnectorsSyncPage() {
       if (!res.ok) throw new Error(`Failed to load connectors (${res.status})`);
       const data = await res.json();
       const list: Connector[] = (data.connectors ?? []).map((c: any) => ({
-        id:          c.id,
-        name:        c.name,
-        source:      c.source ?? c.connectorType ?? "unknown",
-        status:      c.status ?? "not_attempted",
-        lastSyncAt:  c.lastSuccessfulIndexTime ?? c.lastSyncAt,
-        syncedDocs:  c.totalDocCount ?? 0,
-        errorMsg:    c.errorMsg,
+        id: c.id,
+        name: c.name,
+        source: c.source ?? c.connectorType ?? "unknown",
+        status: c.status ?? "not_attempted",
+        lastSyncAt: c.lastSuccessfulIndexTime ?? c.lastSyncAt,
+        syncedDocs: c.totalDocCount ?? 0,
+        errorMsg: c.errorMsg,
       }));
       setConnectors(list);
       setLastRefreshed(new Date());
@@ -105,10 +113,10 @@ export default function ConnectorsSyncPage() {
       if (!res.ok) return;
       const data = await res.json();
       const jobs: SyncJob[] = (data.jobs ?? []).map((j: any) => ({
-        id:          j.id,
+        id: j.id,
         connectorId: j.connectorId ?? id,
-        status:      j.status,
-        startedAt:   j.startedAt,
+        status: j.status,
+        startedAt: j.startedAt,
         completedAt: j.completedAt,
       }));
       setActiveJobs(jobs);
@@ -140,20 +148,21 @@ export default function ConnectorsSyncPage() {
     };
   }, [selected, fetchActiveJobs]);
 
-  useEffect(() => { fetchConnectors(); }, [fetchConnectors]);
+  useEffect(() => {
+    fetchConnectors();
+  }, [fetchConnectors]);
 
   const filtered = connectors.filter(
     (c) =>
       !search ||
       c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.source.toLowerCase().includes(search.toLowerCase())
+      c.source.toLowerCase().includes(search.toLowerCase()),
   );
 
   const selectedConnector = connectors.find((c) => c.id === selected);
 
   return (
     <div className="flex h-screen overflow-hidden">
-
       {/* Left — connector list */}
       <aside
         className="w-72 shrink-0 flex flex-col border-r border-border"
@@ -218,10 +227,7 @@ export default function ConnectorsSyncPage() {
                   onClick={() => setSelected(c.id)}
                   className="w-full flex items-start gap-2.5 p-2.5 rounded-lg text-left transition-colors"
                   style={{
-                    background:
-                      selected === c.id
-                        ? "hsl(var(--primary)/0.1)"
-                        : "transparent",
+                    background: selected === c.id ? "hsl(var(--primary)/0.1)" : "transparent",
                     border: `1px solid ${selected === c.id ? "hsl(var(--primary)/0.25)" : "transparent"}`,
                   }}
                 >
@@ -229,11 +235,10 @@ export default function ConnectorsSyncPage() {
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium truncate">{c.name}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10px] text-muted-foreground capitalize">{c.source}</span>
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] h-3.5 px-1 py-0"
-                      >
+                      <span className="text-[10px] text-muted-foreground capitalize">
+                        {c.source}
+                      </span>
+                      <Badge variant="outline" className="text-[10px] h-3.5 px-1 py-0">
                         {c.syncedDocs} docs
                       </Badge>
                     </div>
@@ -250,9 +255,7 @@ export default function ConnectorsSyncPage() {
         </ScrollArea>
 
         {/* Stats footer */}
-        <div
-          className="border-t border-border px-4 py-2.5 flex justify-between text-[10px] text-muted-foreground"
-        >
+        <div className="border-t border-border px-4 py-2.5 flex justify-between text-[10px] text-muted-foreground">
           <span>{connectors.filter((c) => c.status === "active").length} active</span>
           <span>{connectors.filter((c) => c.status === "error").length} errors</span>
           <span>{connectors.length} total</span>
@@ -281,7 +284,9 @@ export default function ConnectorsSyncPage() {
                 </div>
               )}
               {selectedConnector.errorMsg && (
-                <div className="ml-2 text-xs text-destructive truncate max-w-xs">{selectedConnector.errorMsg}</div>
+                <div className="ml-2 text-xs text-destructive truncate max-w-xs">
+                  {selectedConnector.errorMsg}
+                </div>
               )}
             </>
           ) : (

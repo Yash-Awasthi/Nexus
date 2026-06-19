@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Runtime Compactor — Centralized Resource Compaction & Leak Detection
  *
@@ -115,7 +116,8 @@ const DEFAULT_QUOTAS: ResourceQuota = {
 // ─── Leak Detector ───────────────────────────────────────────────────
 
 export class LeakDetector {
-  private readings: Array<{ timestamp: Date; heapUsedMB: number; activeSubscriptions: number }> = [];
+  private readings: Array<{ timestamp: Date; heapUsedMB: number; activeSubscriptions: number }> =
+    [];
   private readonly MAX_READINGS = 20;
 
   constructor(
@@ -125,7 +127,7 @@ export class LeakDetector {
       memoryGrowthThresholdMBperMin?: number;
       /** Suspect subscription leak if count grows more than this per minute (default 10) */
       subscriptionGrowthThresholdPerMin?: number;
-    }
+    },
   ) {}
 
   /**
@@ -140,7 +142,11 @@ export class LeakDetector {
     const warnings: string[] = [];
 
     // Record this reading
-    this.readings.push({ timestamp: now, heapUsedMB, activeSubscriptions: stats.activeSubscriptions });
+    this.readings.push({
+      timestamp: now,
+      heapUsedMB,
+      activeSubscriptions: stats.activeSubscriptions,
+    });
     if (this.readings.length > this.MAX_READINGS) {
       this.readings.shift();
     }
@@ -153,12 +159,13 @@ export class LeakDetector {
       const last = this.readings[this.readings.length - 1];
       const elapsedMinutes = (last.timestamp.getTime() - first.timestamp.getTime()) / 60000;
       if (elapsedMinutes > 0) {
-        growthRateMBperMin = Math.round(((last.heapUsedMB - first.heapUsedMB) / elapsedMinutes) * 100) / 100;
+        growthRateMBperMin =
+          Math.round(((last.heapUsedMB - first.heapUsedMB) / elapsedMinutes) * 100) / 100;
         const threshold = this.options?.memoryGrowthThresholdMBperMin ?? 50;
         if (growthRateMBperMin > threshold && elapsedMinutes > 1) {
           suspiciousMemoryGrowth = true;
           warnings.push(
-            `Suspicious memory growth: ${growthRateMBperMin} MB/min (threshold: ${threshold} MB/min)`
+            `Suspicious memory growth: ${growthRateMBperMin} MB/min (threshold: ${threshold} MB/min)`,
           );
         }
       }
@@ -172,12 +179,15 @@ export class LeakDetector {
       const last = this.readings[this.readings.length - 1];
       const elapsedMinutes = (last.timestamp.getTime() - first.timestamp.getTime()) / 60000;
       if (elapsedMinutes > 0) {
-        growthRatePerMin = Math.round(((last.activeSubscriptions - first.activeSubscriptions) / elapsedMinutes) * 100) / 100;
+        growthRatePerMin =
+          Math.round(
+            ((last.activeSubscriptions - first.activeSubscriptions) / elapsedMinutes) * 100,
+          ) / 100;
         const threshold = this.options?.subscriptionGrowthThresholdPerMin ?? 10;
         if (growthRatePerMin > threshold && elapsedMinutes > 1) {
           suspiciousSubscriptionGrowth = true;
           warnings.push(
-            `Suspicious subscription growth: ${growthRatePerMin}/min (threshold: ${threshold}/min)`
+            `Suspicious subscription growth: ${growthRatePerMin}/min (threshold: ${threshold}/min)`,
           );
         }
       }
@@ -193,9 +203,13 @@ export class LeakDetector {
       },
       memory: {
         heapUsedMB,
-        heapGrowthMB: this.readings.length >= 2
-          ? Math.round((this.readings[this.readings.length - 1].heapUsedMB - this.readings[0].heapUsedMB) * 100) / 100
-          : 0,
+        heapGrowthMB:
+          this.readings.length >= 2
+            ? Math.round(
+                (this.readings[this.readings.length - 1].heapUsedMB - this.readings[0].heapUsedMB) *
+                  100,
+              ) / 100
+            : 0,
         suspiciousGrowth: suspiciousMemoryGrowth,
         growthRateMBperMin,
       },
@@ -217,7 +231,7 @@ export class ResourceQuotaManager {
 
   constructor(
     quotas?: Partial<ResourceQuota>,
-    private metrics?: MetricsCollector
+    private metrics?: MetricsCollector,
   ) {
     this.quotas = { ...DEFAULT_QUOTAS, ...quotas };
   }
@@ -234,10 +248,7 @@ export class ResourceQuotaManager {
    * Check all quotas against current runtime state.
    * Returns list of violations sorted by severity.
    */
-  check(
-    eventBusStats: EventBusStats,
-    queueBackend?: IQueueBackend
-  ): QuotaViolation[] {
+  check(eventBusStats: EventBusStats, queueBackend?: IQueueBackend): QuotaViolation[] {
     const violations: QuotaViolation[] = [];
     const mem = process.memoryUsage();
     const heapPercent = (mem.heapUsed / mem.heapTotal) * 100;
@@ -327,7 +338,7 @@ export class RuntimeCompactor {
 
   constructor(
     private eventBus: IEventBus,
-    config: RuntimeCompactorConfig = {}
+    config: RuntimeCompactorConfig = {},
   ) {
     this.config = config;
     if (config.options?.autoCompact && config.options?.compactIntervalMs) {
@@ -370,7 +381,10 @@ export class RuntimeCompactor {
 
     // Check quota violations
     if (this.config.quotaManager) {
-      const violations = this.config.quotaManager.check(this.eventBus.getStats(), this.config.queue);
+      const violations = this.config.quotaManager.check(
+        this.eventBus.getStats(),
+        this.config.queue,
+      );
       if (violations.some((v) => v.severity === "critical")) {
         return true;
       }
@@ -437,7 +451,9 @@ export class RuntimeCompactor {
     }
 
     // ── 3. Clear RuntimeGraph journal ────────────────────────────────
-    const journalSizeBefore = this.config.runtimeGraph ? this.config.runtimeGraph.getJournal().length : 0;
+    const journalSizeBefore = this.config.runtimeGraph
+      ? this.config.runtimeGraph.getJournal().length
+      : 0;
     if (this.config.runtimeGraph) {
       this.config.runtimeGraph.clearJournal();
     }

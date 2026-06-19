@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * BridgeManager — manages Python subprocess bridges for native execution capabilities.
  *
@@ -19,16 +20,16 @@ import * as http from "http";
 export type BridgeName = "stealth-browser" | "scraping" | "local-inference" | "mcp-server";
 
 interface BridgeConfig {
-  script: string;  // relative to runtime/bridges/
+  script: string; // relative to runtime/bridges/
   port: number;
   healthPath: string;
 }
 
 const BRIDGE_CONFIGS: Record<BridgeName, BridgeConfig> = {
-  "stealth-browser": { script: "stealth_browser_bridge.py",  port: 7701, healthPath: "/health" },
-  "scraping":        { script: "web_scraping_bridge.py",     port: 7702, healthPath: "/health" },
-  "local-inference": { script: "local_inference_bridge.py",  port: 7703, healthPath: "/health" },
-  "mcp-server":      { script: "mcp_server_bridge.py",       port: 7704, healthPath: "/health" }
+  "stealth-browser": { script: "stealth_browser_bridge.py", port: 7701, healthPath: "/health" },
+  scraping: { script: "web_scraping_bridge.py", port: 7702, healthPath: "/health" },
+  "local-inference": { script: "local_inference_bridge.py", port: 7703, healthPath: "/health" },
+  "mcp-server": { script: "mcp_server_bridge.py", port: 7704, healthPath: "/health" },
 };
 
 const BRIDGES_DIR = path.join(__dirname, "bridges");
@@ -54,7 +55,7 @@ export class BridgeManager {
     const proc = spawn(python, [scriptPath, "--port", String(cfg.port)], {
       cwd: BRIDGES_DIR,
       env: { ...process.env },
-      stdio: ["ignore", "pipe", "pipe"]
+      stdio: ["ignore", "pipe", "pipe"],
     });
 
     proc.stdout?.on("data", (d: Buffer) => {
@@ -116,7 +117,7 @@ export class BridgeManager {
       }
     }
     throw new Error(
-      `Bridge "${name}" did not become healthy after ${HEALTH_CHECK_MAX_ATTEMPTS * HEALTH_CHECK_INTERVAL_MS}ms`
+      `Bridge "${name}" did not become healthy after ${HEALTH_CHECK_MAX_ATTEMPTS * HEALTH_CHECK_INTERVAL_MS}ms`,
     );
   }
 
@@ -127,7 +128,10 @@ export class BridgeManager {
         res.resume();
       });
       req.on("error", () => resolve(false));
-      req.setTimeout(400, () => { req.destroy(); resolve(false); });
+      req.setTimeout(400, () => {
+        req.destroy();
+        resolve(false);
+      });
     });
   }
 
@@ -143,8 +147,8 @@ export class BridgeManager {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Content-Length": Buffer.byteLength(payload)
-        }
+          "Content-Length": Buffer.byteLength(payload),
+        },
       };
       const req = http.request(options, (res) => {
         const chunks: Buffer[] = [];

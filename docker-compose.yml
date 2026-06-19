@@ -65,8 +65,13 @@ services:
       dockerfile: apps/api/Dockerfile
     container_name: nexus-migrate
     restart: "no"
-    command: ["node", "--experimental-vm-modules", "-e",
-      "import('@nexus/db').then(m => m.runMigrations()).then(() => process.exit(0)).catch(e => { console.error(e); process.exit(1); })"]
+    command:
+      [
+        "node",
+        "--experimental-vm-modules",
+        "-e",
+        "import('@nexus/db').then(m => m.runMigrations()).then(() => process.exit(0)).catch(e => { console.error(e); process.exit(1); })",
+      ]
     environment:
       DATABASE_URL: postgresql://nexus:nexus_dev_password@postgres:5432/nexus
     depends_on:

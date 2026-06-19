@@ -42,5 +42,11 @@
       "required": ["pending_approval_count", "approved_count", "rejected_count"]
     }
   },
-  "required": ["engine_version", "status", "active_worker_threads", "last_heartbeat", "queue_metrics"]
+  "required": [
+    "engine_version",
+    "status",
+    "active_worker_threads",
+    "last_heartbeat",
+    "queue_metrics"
+  ]
 }

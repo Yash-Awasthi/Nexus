@@ -29,6 +29,7 @@ import {
 import type { FastifyInstance } from "fastify";
 import { Pool } from "pg";
 
+import { evictOldestEntry } from "../lib/lru-utils.js";
 import { requireAuth } from "../middleware/auth.js";
 
 // ── Search backend factory ────────────────────────────────────────────────────
@@ -218,10 +219,7 @@ const runStore = new Map<string, RunRecord>();
 const RUN_CAP = 500;
 
 function storeInMemory(record: RunRecord): void {
-  if (runStore.size >= RUN_CAP) {
-    const oldest = runStore.keys().next().value;
-    if (oldest) runStore.delete(oldest);
-  }
+  evictOldestEntry(runStore, RUN_CAP);
   runStore.set(record.runId, record);
 }
 

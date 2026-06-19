@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { IExecutionAdapter } from "./execution.interface";
 
 export interface IBrowserTask {
@@ -72,7 +73,7 @@ export interface IExecutionEnvironment {
 export interface ICapabilityPolicy {
   evaluateCapability(
     taskType: string,
-    environment: IExecutionEnvironment
+    environment: IExecutionEnvironment,
   ): Promise<{
     allowed: boolean;
     reason?: string;

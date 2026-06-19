@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import type { Meta, StoryObj } from "@storybook/react";
 import React from "react";
 import {
@@ -60,7 +61,9 @@ export const Default: Story = {
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <BotIcon size={20} />
               <span style={{ fontWeight: 600, fontSize: "14px" }}>AI Council</span>
-              <Badge variant="secondary" style={{ marginLeft: "auto" }}>Beta</Badge>
+              <Badge variant="secondary" style={{ marginLeft: "auto" }}>
+                Beta
+              </Badge>
             </div>
           </SidebarHeader>
 

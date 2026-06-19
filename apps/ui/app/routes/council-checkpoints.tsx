@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Council Checkpoints — time-travel debugging for council deliberation runs.
  *
@@ -90,7 +91,11 @@ export default function CouncilCheckpoints() {
 
   const loadRun = useCallback(async () => {
     if (!runId.trim()) return;
-    setLoadingRun(true); setErr(""); setRunInfo(null); setStepDetail(null); setReplayResult(null);
+    setLoadingRun(true);
+    setErr("");
+    setRunInfo(null);
+    setStepDetail(null);
+    setReplayResult(null);
     const r = await fetch(`/api/council-checkpoints/runs/${runId.trim()}`).catch(() => null);
     if (r?.ok) setRunInfo(await r.json());
     else setErr("Run not found");
@@ -99,7 +104,8 @@ export default function CouncilCheckpoints() {
 
   const saveCheckpoint = useCallback(async () => {
     if (!runInfo) return;
-    setSavingCheckpoint(true); setSaveMsg("");
+    setSavingCheckpoint(true);
+    setSaveMsg("");
     const r = await fetch(`/api/council-checkpoints/runs/${runInfo.runId}/save`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -113,37 +119,53 @@ export default function CouncilCheckpoints() {
     setSavingCheckpoint(false);
   }, [runInfo, saveLabel, loadRun]);
 
-  const loadStep = useCallback(async (stepIndex: number) => {
-    if (!runInfo) return;
-    setSelectedStep(stepIndex); setLoadingStep(true); setStepDetail(null);
-    const r = await fetch(`/api/council-checkpoints/runs/${runInfo.runId}/checkpoints/${stepIndex}`).catch(() => null);
-    if (r?.ok) setStepDetail(await r.json());
-    setLoadingStep(false);
-  }, [runInfo]);
+  const loadStep = useCallback(
+    async (stepIndex: number) => {
+      if (!runInfo) return;
+      setSelectedStep(stepIndex);
+      setLoadingStep(true);
+      setStepDetail(null);
+      const r = await fetch(
+        `/api/council-checkpoints/runs/${runInfo.runId}/checkpoints/${stepIndex}`,
+      ).catch(() => null);
+      if (r?.ok) setStepDetail(await r.json());
+      setLoadingStep(false);
+    },
+    [runInfo],
+  );
 
-  const replay = useCallback(async (fromStep: number) => {
-    if (!runInfo) return;
-    setReplaying(true); setReplayResult(null); setReplayStep(fromStep);
-    const r = await fetch(`/api/council-checkpoints/runs/${runInfo.runId}/replay`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fromStep }),
-    }).catch(() => null);
-    if (r?.ok) setReplayResult(await r.json());
-    else setErr("Replay failed");
-    setReplaying(false);
-  }, [runInfo]);
+  const replay = useCallback(
+    async (fromStep: number) => {
+      if (!runInfo) return;
+      setReplaying(true);
+      setReplayResult(null);
+      setReplayStep(fromStep);
+      const r = await fetch(`/api/council-checkpoints/runs/${runInfo.runId}/replay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fromStep }),
+      }).catch(() => null);
+      if (r?.ok) setReplayResult(await r.json());
+      else setErr("Replay failed");
+      setReplaying(false);
+    },
+    [runInfo],
+  );
 
   const deleteRun = useCallback(async () => {
     if (!runInfo || !confirm("Delete all checkpoints for this run?")) return;
     setDeleting(true);
-    await fetch(`/api/council-checkpoints/runs/${runInfo.runId}`, { method: "DELETE" }).catch(() => {});
-    setRunInfo(null); setStepDetail(null); setReplayResult(null);
+    await fetch(`/api/council-checkpoints/runs/${runInfo.runId}`, { method: "DELETE" }).catch(
+      () => {},
+    );
+    setRunInfo(null);
+    setStepDetail(null);
+    setReplayResult(null);
     setDeleting(false);
   }, [runInfo]);
 
   const toggleKey = (key: string) => {
-    setExpandedKeys(prev => {
+    setExpandedKeys((prev) => {
       const next = new Set(prev);
       next.has(key) ? next.delete(key) : next.add(key);
       return next;
@@ -171,12 +193,16 @@ export default function CouncilCheckpoints() {
             <Input
               placeholder="Enter run ID (e.g. from a council deliberation)…"
               value={runId}
-              onChange={e => setRunId(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && loadRun()}
+              onChange={(e) => setRunId(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && loadRun()}
               className="flex-1 font-mono text-sm"
             />
             <Button onClick={loadRun} disabled={loadingRun || !runId.trim()}>
-              {loadingRun ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+              {loadingRun ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Search className="w-4 h-4" />
+              )}
             </Button>
           </div>
           {err && <p className="text-red-500 text-xs">{err}</p>}
@@ -188,17 +214,26 @@ export default function CouncilCheckpoints() {
           {/* Left: checkpoint list */}
           <div className="space-y-3 md:col-span-1">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold">
-                Checkpoints ({runInfo.checkpoints.length})
-              </h2>
-              <Button size="icon" variant="ghost" className="h-7 w-7 text-red-400" onClick={deleteRun} disabled={deleting}>
-                {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+              <h2 className="text-sm font-semibold">Checkpoints ({runInfo.checkpoints.length})</h2>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 text-red-400"
+                onClick={deleteRun}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Trash2 className="w-3 h-3" />
+                )}
               </Button>
             </div>
 
             {runInfo.query && (
               <div className="text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
-                <span className="font-medium">Query: </span>{runInfo.query}
+                <span className="font-medium">Query: </span>
+                {runInfo.query}
               </div>
             )}
 
@@ -207,11 +242,21 @@ export default function CouncilCheckpoints() {
               <Input
                 placeholder="Label (optional)"
                 value={saveLabel}
-                onChange={e => setSaveLabel(e.target.value)}
+                onChange={(e) => setSaveLabel(e.target.value)}
                 className="text-xs h-8 flex-1"
               />
-              <Button size="sm" variant="outline" onClick={saveCheckpoint} disabled={savingCheckpoint} className="h-8">
-                {savingCheckpoint ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3 mr-1" />}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={saveCheckpoint}
+                disabled={savingCheckpoint}
+                className="h-8"
+              >
+                {savingCheckpoint ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Save className="w-3 h-3 mr-1" />
+                )}
                 Save
               </Button>
             </div>
@@ -219,10 +264,12 @@ export default function CouncilCheckpoints() {
 
             {/* Checkpoint items */}
             {runInfo.checkpoints.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-4 text-center">No checkpoints saved yet</p>
+              <p className="text-xs text-muted-foreground py-4 text-center">
+                No checkpoints saved yet
+              </p>
             ) : (
               <div className="space-y-1">
-                {runInfo.checkpoints.map(cp => (
+                {runInfo.checkpoints.map((cp) => (
                   <button
                     key={cp.stepIndex}
                     onClick={() => loadStep(cp.stepIndex)}
@@ -231,9 +278,17 @@ export default function CouncilCheckpoints() {
                     <div className="flex items-center gap-2">
                       <GitCommit className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                       <span className="font-medium">Step {cp.stepIndex}</span>
-                      {cp.label && <Badge variant="outline" className="text-xs">{cp.label}</Badge>}
+                      {cp.label && (
+                        <Badge variant="outline" className="text-xs">
+                          {cp.label}
+                        </Badge>
+                      )}
                     </div>
-                    {cp.summary && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{cp.summary}</p>}
+                    {cp.summary && (
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                        {cp.summary}
+                      </p>
+                    )}
                     <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
                       <Clock className="w-2.5 h-2.5" />
                       {new Date(cp.savedAt).toLocaleString()}
@@ -248,7 +303,8 @@ export default function CouncilCheckpoints() {
           <div className="md:col-span-2 space-y-4">
             {loadingStep ? (
               <div className="flex items-center gap-2 text-muted-foreground py-8 justify-center">
-                <Loader2 className="w-4 h-4 animate-spin" />Loading checkpoint…
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Loading checkpoint…
               </div>
             ) : stepDetail ? (
               <>
@@ -256,10 +312,22 @@ export default function CouncilCheckpoints() {
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base flex items-center justify-between">
                       <span>Step {stepDetail.stepIndex} State</span>
-                      <Button size="sm" onClick={() => replay(stepDetail.stepIndex)} disabled={replaying}>
-                        {replaying && replayStep === stepDetail.stepIndex
-                          ? <><Loader2 className="w-3 h-3 animate-spin mr-1" />Replaying…</>
-                          : <><Play className="w-3 h-3 mr-1" />Replay from here</>}
+                      <Button
+                        size="sm"
+                        onClick={() => replay(stepDetail.stepIndex)}
+                        disabled={replaying}
+                      >
+                        {replaying && replayStep === stepDetail.stepIndex ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                            Replaying…
+                          </>
+                        ) : (
+                          <>
+                            <Play className="w-3 h-3 mr-1" />
+                            Replay from here
+                          </>
+                        )}
                       </Button>
                     </CardTitle>
                   </CardHeader>
@@ -268,8 +336,13 @@ export default function CouncilCheckpoints() {
                     {stepDetail.messages && stepDetail.messages.length > 0 && (
                       <div className="space-y-2 mb-4">
                         {stepDetail.messages.map((msg, i) => (
-                          <div key={i} className={`text-sm p-2 rounded-md ${msg.role === "assistant" ? "bg-muted" : "bg-primary/5"}`}>
-                            <span className="text-xs font-medium text-muted-foreground uppercase">{msg.role}</span>
+                          <div
+                            key={i}
+                            className={`text-sm p-2 rounded-md ${msg.role === "assistant" ? "bg-muted" : "bg-primary/5"}`}
+                          >
+                            <span className="text-xs font-medium text-muted-foreground uppercase">
+                              {msg.role}
+                            </span>
                             <p className="mt-0.5 text-sm">{msg.content}</p>
                           </div>
                         ))}
@@ -277,7 +350,9 @@ export default function CouncilCheckpoints() {
                     )}
                     {/* Raw state */}
                     <details>
-                      <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">Raw state</summary>
+                      <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                        Raw state
+                      </summary>
                       <pre className="text-xs bg-muted p-3 rounded-md mt-2 overflow-auto max-h-64">
                         {JSON.stringify(stepDetail.state, null, 2)}
                       </pre>
@@ -287,22 +362,40 @@ export default function CouncilCheckpoints() {
 
                 {/* Replay result */}
                 {replayResult && replayStep === stepDetail.stepIndex && (
-                  <Card className={replayResult.success ? "border-green-200 dark:border-green-800" : "border-red-200 dark:border-red-800"}>
+                  <Card
+                    className={
+                      replayResult.success
+                        ? "border-green-200 dark:border-green-800"
+                        : "border-red-200 dark:border-red-800"
+                    }
+                  >
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base">Replay Result</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Badge className={replayResult.success ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
+                        <Badge
+                          className={
+                            replayResult.success
+                              ? "bg-green-100 text-green-700"
+                              : "bg-red-100 text-red-700"
+                          }
+                        >
                           {replayResult.success ? "Success" : "Failed"}
                         </Badge>
                         {replayResult.newRunId && (
-                          <span className="text-xs text-muted-foreground font-mono">New run: {replayResult.newRunId}</span>
+                          <span className="text-xs text-muted-foreground font-mono">
+                            New run: {replayResult.newRunId}
+                          </span>
                         )}
-                        {replayResult.steps && <Badge variant="outline">{replayResult.steps} steps</Badge>}
+                        {replayResult.steps && (
+                          <Badge variant="outline">{replayResult.steps} steps</Badge>
+                        )}
                       </div>
                       {replayResult.output && (
-                        <p className="text-sm whitespace-pre-wrap bg-muted/30 p-3 rounded-md">{replayResult.output}</p>
+                        <p className="text-sm whitespace-pre-wrap bg-muted/30 p-3 rounded-md">
+                          {replayResult.output}
+                        </p>
                       )}
                     </CardContent>
                   </Card>

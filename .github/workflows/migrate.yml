@@ -35,7 +35,7 @@ on:
 
 concurrency:
   group: db-migrate-${{ github.ref }}
-  cancel-in-progress: false   # never cancel an in-flight migration
+  cancel-in-progress: false # never cancel an in-flight migration
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -47,7 +47,7 @@ jobs:
     environment: ${{ github.event.inputs.environment || 'production' }}
     permissions:
       contents: read
-      id-token: write   # for OIDC if Neon supports it in future
+      id-token: write # for OIDC if Neon supports it in future
 
     steps:
       - uses: actions/checkout@v4
@@ -81,4 +81,4 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: pnpm --filter @nexus/db db:check
-        continue-on-error: true   # non-blocking — logs warning, doesn't fail deploy
+        continue-on-error: true # non-blocking — logs warning, doesn't fail deploy

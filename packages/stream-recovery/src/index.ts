@@ -384,16 +384,13 @@ export const ChannelDirection = {
   Read: "read",
   Write: "write",
 } as const;
-export type ChannelDirection =
-  (typeof ChannelDirection)[keyof typeof ChannelDirection];
+export type ChannelDirection = (typeof ChannelDirection)[keyof typeof ChannelDirection];
 
 /**
  * Discriminated runtime tag for a streaming channel item.
  * Use factory helpers to construct; use `.type` to discriminate.
  */
-export type ChannelItem =
-  | { type: "text"; value: string }
-  | { type: "binary"; value: Uint8Array };
+export type ChannelItem = { type: "text"; value: string } | { type: "binary"; value: Uint8Array };
 
 export const ChannelItem = {
   Text(value: string): ChannelItem {
@@ -446,12 +443,7 @@ export class ChannelWriter {
   private readonly url: string;
 
   constructor(engineWsBase: string, ref: StreamChannelRef) {
-    this.url = buildChannelUrl(
-      engineWsBase,
-      ref.channel_id,
-      ref.access_key,
-      "write",
-    );
+    this.url = buildChannelUrl(engineWsBase, ref.channel_id, ref.access_key, "write");
   }
 
   private ensureConnected(): void {
@@ -495,15 +487,11 @@ export class ChannelWriter {
       const end = Math.min(offset + ChannelWriter.FRAME_SIZE, data.length);
       const chunk = data.subarray(offset, end);
       const buffer =
-        chunk.buffer instanceof ArrayBuffer
-          ? chunk.buffer
-          : new ArrayBuffer(chunk.byteLength);
+        chunk.buffer instanceof ArrayBuffer ? chunk.buffer : new ArrayBuffer(chunk.byteLength);
       if (!(chunk.buffer instanceof ArrayBuffer)) {
         new Uint8Array(buffer).set(chunk);
       }
-      this._sendRaw(
-        buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength),
-      );
+      this._sendRaw(buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength));
       offset = end;
     }
   }
@@ -557,12 +545,7 @@ export class ChannelReader {
   private readonly url: string;
 
   constructor(engineWsBase: string, ref: StreamChannelRef) {
-    this.url = buildChannelUrl(
-      engineWsBase,
-      ref.channel_id,
-      ref.access_key,
-      "read",
-    );
+    this.url = buildChannelUrl(engineWsBase, ref.channel_id, ref.access_key, "read");
   }
 
   private ensureConnected(): void {
@@ -667,9 +650,7 @@ export function isChannelRef(value: unknown): value is StreamChannelRef {
  * // [["result.channel", { channel_id: "...", access_key: "...", direction: "read" }]]
  * ```
  */
-export function extractChannelRefs(
-  data: unknown,
-): Array<[string, StreamChannelRef]> {
+export function extractChannelRefs(data: unknown): Array<[string, StreamChannelRef]> {
   const refs: Array<[string, StreamChannelRef]> = [];
   _extractRefsRecursive(data, "", refs);
   return refs;
@@ -732,7 +713,8 @@ export function http<TBody = unknown>(
   return async (req) => {
     const { response, ...request } = req as HttpRequest<TBody> & { response: ChannelWriter };
     const res: HttpResponse = {
-      status: (code) => response.sendMessage(JSON.stringify({ type: "set_status", status_code: code })),
+      status: (code) =>
+        response.sendMessage(JSON.stringify({ type: "set_status", status_code: code })),
       headers: (h) => response.sendMessage(JSON.stringify({ type: "set_headers", headers: h })),
       stream: { end: (data) => response.sendMessage(data) },
       close: () => response.close(),

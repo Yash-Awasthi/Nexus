@@ -371,11 +371,11 @@ function buildScrapeHeaders(extraHeaders?: Record<string, string>): Record<strin
   const ua = pickUA();
   return {
     "User-Agent": ua,
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
     "Accept-Encoding": "gzip, deflate, br",
     "Cache-Control": "no-cache",
-    "Pragma": "no-cache",
+    Pragma: "no-cache",
     "Sec-Fetch-Dest": "document",
     "Sec-Fetch-Mode": "navigate",
     "Sec-Fetch-Site": "none",
@@ -420,17 +420,42 @@ export class HttpxEngine implements ScrapeEngine {
       clearTimeout(timer);
 
       if (!res.ok) {
-        return { url, html: "", text: "", status: res.status === 403 ? "blocked" : "error", engine: "httpx", durationMs: Date.now() - t0, statusCode: res.status };
+        return {
+          url,
+          html: "",
+          text: "",
+          status: res.status === 403 ? "blocked" : "error",
+          engine: "httpx",
+          durationMs: Date.now() - t0,
+          statusCode: res.status,
+        };
       }
 
       const html = await res.text();
       const text = extractText(html);
 
-      return { url, html, text, status: "success", engine: "httpx", durationMs: Date.now() - t0, statusCode: res.status, headers: Object.fromEntries(res.headers.entries()) };
+      return {
+        url,
+        html,
+        text,
+        status: "success",
+        engine: "httpx",
+        durationMs: Date.now() - t0,
+        statusCode: res.status,
+        headers: Object.fromEntries(res.headers.entries()),
+      };
     } catch (e) {
       clearTimeout(timer);
-      const isTimeout = e instanceof Error && (e.name === "AbortError" || e.message.includes("abort"));
-      return { url, html: "", text: "", status: isTimeout ? "timeout" : "error", engine: "httpx", durationMs: Date.now() - t0 };
+      const isTimeout =
+        e instanceof Error && (e.name === "AbortError" || e.message.includes("abort"));
+      return {
+        url,
+        html: "",
+        text: "",
+        status: isTimeout ? "timeout" : "error",
+        engine: "httpx",
+        durationMs: Date.now() - t0,
+      };
     }
   }
 }
@@ -439,7 +464,12 @@ export class HttpxEngine implements ScrapeEngine {
 //
 // Scrapling spider pattern: per-domain throttling + automatic proxy rotation.
 
-export interface ProxyEntry { url: string; used: number; failures: number; lastUsedAt: number }
+export interface ProxyEntry {
+  url: string;
+  used: number;
+  failures: number;
+  lastUsedAt: number;
+}
 
 /** Proxy rotating engine */
 export class ProxyRotatingEngine implements ScrapeEngine {
@@ -450,7 +480,11 @@ export class ProxyRotatingEngine implements ScrapeEngine {
   private domainDelays = new Map<string, number>();
   private perDomainDelayMs: number;
 
-  constructor(inner: ScrapeEngine, proxies: string[], opts: { perDomainDelayMs?: number; priority?: number } = {}) {
+  constructor(
+    inner: ScrapeEngine,
+    proxies: string[],
+    opts: { perDomainDelayMs?: number; priority?: number } = {},
+  ) {
     this.inner = inner;
     this.type = inner.type;
     this.priority = opts.priority ?? inner.priority;
@@ -466,7 +500,9 @@ export class ProxyRotatingEngine implements ScrapeEngine {
     this.domainDelays.set(domain, Date.now());
 
     const proxy = this._pickProxy();
-    const mergedOpts = proxy ? { ...opts, headers: { ...opts.headers, "X-Proxy": proxy.url } } : opts;
+    const mergedOpts = proxy
+      ? { ...opts, headers: { ...opts.headers, "X-Proxy": proxy.url } }
+      : opts;
 
     const result = await this.inner.scrape(url, mergedOpts);
 
@@ -479,15 +515,21 @@ export class ProxyRotatingEngine implements ScrapeEngine {
     return result;
   }
 
-  addProxy(url: string): void { this.proxies.push({ url, used: 0, failures: 0, lastUsedAt: 0 }); }
-  removeProxy(url: string): void { this.proxies = this.proxies.filter((p) => p.url !== url); }
-  proxyStats(): ProxyEntry[] { return [...this.proxies]; }
+  addProxy(url: string): void {
+    this.proxies.push({ url, used: 0, failures: 0, lastUsedAt: 0 });
+  }
+  removeProxy(url: string): void {
+    this.proxies = this.proxies.filter((p) => p.url !== url);
+  }
+  proxyStats(): ProxyEntry[] {
+    return [...this.proxies];
+  }
 
   private _pickProxy(): ProxyEntry | null {
     if (!this.proxies.length) return null;
     // Prefer least recently used + lowest failure rate
     return this.proxies.reduce((best, p) =>
-      (p.lastUsedAt + p.failures * 5_000) < (best.lastUsedAt + best.failures * 5_000) ? p : best,
+      p.lastUsedAt + p.failures * 5_000 < best.lastUsedAt + best.failures * 5_000 ? p : best,
     );
   }
 }
@@ -497,11 +539,21 @@ export class ProxyRotatingEngine implements ScrapeEngine {
 // Scrapling spider API: start_urls, async parse() callbacks, Request/Response
 // objects, concurrent crawling with per-domain throttling.
 
-export interface SpiderRequest { url: string; meta?: Record<string, unknown> }
-export type SpiderParseFn = (result: ScrapeResult, meta: Record<string, unknown>) => Promise<SpiderRequest[]>;
+export interface SpiderRequest {
+  url: string;
+  meta?: Record<string, unknown>;
+}
+export type SpiderParseFn = (
+  result: ScrapeResult,
+  meta: Record<string, unknown>,
+) => Promise<SpiderRequest[]>;
 
 export interface SpiderStats {
-  queued: number; running: number; done: number; failed: number; blocked: number;
+  queued: number;
+  running: number;
+  done: number;
+  failed: number;
+  blocked: number;
   requestsPerSecond: number;
 }
 
@@ -538,8 +590,12 @@ export class SpiderCrawler {
     await this._drain();
   }
 
-  pause(): void { this.paused = true; }
-  resume(): void { this.paused = false; }
+  pause(): void {
+    this.paused = true;
+  }
+  resume(): void {
+    this.paused = false;
+  }
 
   getStats(): SpiderStats {
     const elapsed = (Date.now() - this.stats.startTime) / 1000;
@@ -549,7 +605,8 @@ export class SpiderCrawler {
       done: this.stats.done,
       failed: this.stats.failed,
       blocked: this.stats.blocked,
-      requestsPerSecond: elapsed > 0 ? Math.round((this.stats.done + this.stats.failed) / elapsed * 100) / 100 : 0,
+      requestsPerSecond:
+        elapsed > 0 ? Math.round(((this.stats.done + this.stats.failed) / elapsed) * 100) / 100 : 0,
     };
   }
 
@@ -559,37 +616,53 @@ export class SpiderCrawler {
       try {
         const host = new URL(req.url).hostname;
         if (!this.opts.allowedDomains.some((d) => host.endsWith(d))) return;
-      } catch { return; }
+      } catch {
+        return;
+      }
     }
     this.seen.add(req.url);
     this.queue.push(req);
   }
 
   private async _drain(): Promise<void> {
-    while ((this.queue.length > 0 || this.stats.running > 0) && this.seen.size <= this.opts.maxRequests) {
-      if (this.paused) { await new Promise((r) => setTimeout(r, 200)); continue; }
+    while (
+      (this.queue.length > 0 || this.stats.running > 0) &&
+      this.seen.size <= this.opts.maxRequests
+    ) {
+      if (this.paused) {
+        await new Promise((r) => setTimeout(r, 200));
+        continue;
+      }
 
       const slots = this.opts.concurrency - this.stats.running;
       const batch = this.queue.splice(0, slots);
-      if (!batch.length) { await new Promise((r) => setTimeout(r, 50)); continue; }
+      if (!batch.length) {
+        await new Promise((r) => setTimeout(r, 50));
+        continue;
+      }
 
       this.stats.running += batch.length;
-      await Promise.all(batch.map(async (req) => {
-        try {
-          if (this.opts.downloadDelayMs > 0) await new Promise((r) => setTimeout(r, this.opts.downloadDelayMs));
-          const result = await this.scraper.scrape(req.url, {});
-          if (result.status === "success") {
-            const newRequests = await this.parseFn(result, req.meta ?? {});
-            for (const nr of newRequests) this._enqueue(nr);
-            this.stats.done++;
-          } else if (result.status === "blocked") {
-            this.stats.blocked++;
-          } else {
+      await Promise.all(
+        batch.map(async (req) => {
+          try {
+            if (this.opts.downloadDelayMs > 0)
+              await new Promise((r) => setTimeout(r, this.opts.downloadDelayMs));
+            const result = await this.scraper.scrape(req.url, {});
+            if (result.status === "success") {
+              const newRequests = await this.parseFn(result, req.meta ?? {});
+              for (const nr of newRequests) this._enqueue(nr);
+              this.stats.done++;
+            } else if (result.status === "blocked") {
+              this.stats.blocked++;
+            } else {
+              this.stats.failed++;
+            }
+          } catch {
             this.stats.failed++;
           }
-        } catch { this.stats.failed++; }
-        this.stats.running--;
-      }));
+          this.stats.running--;
+        }),
+      );
     }
   }
 }
@@ -601,7 +674,7 @@ export class SpiderCrawler {
 
 export interface SelectorRecord {
   original: string;
-  confirmed: string[];   // selectors that previously found content
+  confirmed: string[]; // selectors that previously found content
   failedAt?: string;
   updatedAt: string;
 }
@@ -618,14 +691,22 @@ export class AdaptiveSelectorStore {
       if (!existing.confirmed.includes(selector)) existing.confirmed.push(selector);
       existing.updatedAt = new Date().toISOString();
     } else {
-      this.records.set(key, { original: selector, confirmed: [selector], updatedAt: new Date().toISOString() });
+      this.records.set(key, {
+        original: selector,
+        confirmed: [selector],
+        updatedAt: new Date().toISOString(),
+      });
     }
   }
 
   /** Record a failed selector — trigger drift detection. */
   fail(url: string, selector: string): void {
     const key = this._key(url, selector);
-    const existing = this.records.get(key) ?? { original: selector, confirmed: [], updatedAt: new Date().toISOString() };
+    const existing = this.records.get(key) ?? {
+      original: selector,
+      confirmed: [],
+      updatedAt: new Date().toISOString(),
+    };
     existing.failedAt = new Date().toISOString();
     this.records.set(key, existing);
   }
@@ -640,11 +721,16 @@ export class AdaptiveSelectorStore {
     return !!r?.failedAt && r.confirmed.length > 0;
   }
 
-  allRecords(): Map<string, SelectorRecord> { return new Map(this.records); }
+  allRecords(): Map<string, SelectorRecord> {
+    return new Map(this.records);
+  }
 
   private _key(url: string, selector: string): string {
-    try { return `${new URL(url).hostname}::${selector}`; }
-    catch { return `${url}::${selector}`; }
+    try {
+      return `${new URL(url).hostname}::${selector}`;
+    } catch {
+      return `${url}::${selector}`;
+    }
   }
 }
 
@@ -691,10 +777,10 @@ export function parseRobotsTxt(
   let crawlDelayMs: number | null = null;
 
   for (const raw of lines) {
-    const line = raw.split("#")[0].trim();
+    const line = (raw.split("#")[0] ?? "").trim();
     if (!line) continue;
     const [field, ...rest] = line.split(":");
-    const key = field.trim().toLowerCase();
+    const key = (field ?? "").trim().toLowerCase();
     const val = rest.join(":").trim();
 
     if (key === "user-agent") {
@@ -767,5 +853,7 @@ export class RobotsChecker {
   }
 
   /** Clear the cache (force re-fetch on next check). */
-  clear(): void { this._cache.clear(); }
+  clear(): void {
+    this._cache.clear();
+  }
 }

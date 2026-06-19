@@ -163,8 +163,12 @@ export function estimateTokens(text: string): number {
  */
 export function htmlToText(html: string): string {
   if (html.length > 500_000) html = html.slice(0, 500_000);
-  // Strip ALL HTML markup — /<[^>]*>?/g also covers <!-- comments --> since
-  // the inner "!--…--" chars contain no ">" and the trailing ">" closes the match.
+  // Remove script and style blocks — their content must be stripped entirely,
+  // not just the surrounding tags.
+  html = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ");
+  html = html.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ");
+  // Strip ALL remaining HTML markup — /<[^>]*>?/g also covers <!-- comments -->
+  // since the inner "!--…--" chars contain no ">" and the trailing ">" closes.
   let text = html.replace(/<[^>]*>?/g, " ");
   // Decode XML entities — non-amp entities first to prevent double-decoding
   text = text
@@ -379,6 +383,7 @@ export interface DocIngestTask {
 }
 
 async function execute(task: DocIngestTask, ctx: IExecutionContext): Promise<PipelineResult> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
   ctx.logger.info("doc.ingest", {
     format: task.format,
     contentLength: task.content.length,
@@ -397,6 +402,7 @@ async function execute(task: DocIngestTask, ctx: IExecutionContext): Promise<Pip
 }
 
 /** Doc pipeline adapter. */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
 export const docPipelineAdapter = defineAdapter<DocIngestTask, PipelineResult>({
   name: "nexus-adapter-doc-pipeline",
   version: "0.1.0",
@@ -413,7 +419,16 @@ export default docPipelineAdapter;
 // automatically classified (type, tags, correspondent), then stored with
 // full-text search. Core pipeline: consume → OCR/extract → classify → tag → store.
 
-export type DocClass = "invoice" | "contract" | "report" | "correspondence" | "form" | "receipt" | "technical" | "legal" | "other";
+export type DocClass =
+  | "invoice"
+  | "contract"
+  | "report"
+  | "correspondence"
+  | "form"
+  | "receipt"
+  | "technical"
+  | "legal"
+  | "other";
 
 export interface DocumentClassification {
   docClass: DocClass;
@@ -423,7 +438,10 @@ export interface DocumentClassification {
   title?: string;
 }
 
-export type ClassifierFn = (text: string, metadata?: Record<string, unknown>) => Promise<DocumentClassification>;
+export type ClassifierFn = (
+  text: string,
+  metadata?: Record<string, unknown>,
+) => Promise<DocumentClassification>;
 
 /** Rule-based document classifier (no ML required). */
 export class RuleBasedClassifier {
@@ -435,33 +453,45 @@ export class RuleBasedClassifier {
 
     // Invoice patterns
     if (/\b(invoice|bill to|amount due|payment due|total amount|subtotal)\b/.test(lower)) {
-      docClass = "invoice"; confidence = 0.9;
+      docClass = "invoice";
+      confidence = 0.9;
       suggestedTags.push("invoice", "financial");
-    } else if (/\b(contract|agreement|terms and conditions|hereby agree|parties agree)\b/.test(lower)) {
-      docClass = "contract"; confidence = 0.85;
+    } else if (
+      /\b(contract|agreement|terms and conditions|hereby agree|parties agree)\b/.test(lower)
+    ) {
+      docClass = "contract";
+      confidence = 0.85;
       suggestedTags.push("contract", "legal");
     } else if (/\b(report|summary|analysis|findings|conclusion|executive summary)\b/.test(lower)) {
-      docClass = "report"; confidence = 0.75;
+      docClass = "report";
+      confidence = 0.75;
       suggestedTags.push("report");
     } else if (/\b(dear |sincerely|regards|to whom it may concern|re:|subject:)\b/.test(lower)) {
-      docClass = "correspondence"; confidence = 0.8;
+      docClass = "correspondence";
+      confidence = 0.8;
       suggestedTags.push("correspondence");
     } else if (/\b(receipt|received|transaction|order #|confirmation)\b/.test(lower)) {
-      docClass = "receipt"; confidence = 0.85;
+      docClass = "receipt";
+      confidence = 0.85;
       suggestedTags.push("receipt", "financial");
     } else if (/\b(form|please fill|sign here|date of birth|applicant)\b/.test(lower)) {
-      docClass = "form"; confidence = 0.8;
+      docClass = "form";
+      confidence = 0.8;
       suggestedTags.push("form");
-    } else if (/\b(technical|specification|architecture|implementation|api|function|class)\b/.test(lower)) {
-      docClass = "technical"; confidence = 0.7;
+    } else if (
+      /\b(technical|specification|architecture|implementation|api|function|class)\b/.test(lower)
+    ) {
+      docClass = "technical";
+      confidence = 0.7;
       suggestedTags.push("technical");
     } else if (/\b(legal|court|law|statute|regulation|compliance|gdpr|hipaa)\b/.test(lower)) {
-      docClass = "legal"; confidence = 0.8;
+      docClass = "legal";
+      confidence = 0.8;
       suggestedTags.push("legal", "compliance");
     }
 
     // Date tags
-    const yearMatch = lower.match(/\b(20\d{2})\b/);
+    const yearMatch = /\b(20\d{2})\b/.exec(lower);
     if (yearMatch) suggestedTags.push(`year:${yearMatch[1]}`);
 
     // Currency / financial signal
@@ -507,18 +537,32 @@ export class DocWorkflowEngine {
   }
 
   apply(classification: DocumentClassification, meta: DocMeta): DocWorkflowResult {
-    const result: DocWorkflowResult = { appliedRules: [], addedTags: [...(classification.suggestedTags ?? [])], skipped: false };
+    const result: DocWorkflowResult = {
+      appliedRules: [],
+      addedTags: [...(classification.suggestedTags ?? [])],
+      skipped: false,
+    };
 
     for (const rule of this.rules) {
       if (!this._matches(rule.condition, classification, meta)) continue;
       result.appliedRules.push(rule.name);
 
       switch (rule.action) {
-        case "add_tag": result.addedTags.push(rule.actionValue); break;
-        case "set_correspondent": result.correspondent = rule.actionValue; break;
-        case "set_title": result.title = rule.actionValue; break;
-        case "route_to": result.routedTo = rule.actionValue; break;
-        case "skip": result.skipped = true; return result;
+        case "add_tag":
+          result.addedTags.push(rule.actionValue);
+          break;
+        case "set_correspondent":
+          result.correspondent = rule.actionValue;
+          break;
+        case "set_title":
+          result.title = rule.actionValue;
+          break;
+        case "route_to":
+          result.routedTo = rule.actionValue;
+          break;
+        case "skip":
+          result.skipped = true;
+          return result;
       }
     }
 
@@ -526,7 +570,11 @@ export class DocWorkflowEngine {
     return result;
   }
 
-  private _matches(cond: DocWorkflowCondition, cls: DocumentClassification, meta: DocMeta): boolean {
+  private _matches(
+    cond: DocWorkflowCondition,
+    cls: DocumentClassification,
+    meta: DocMeta,
+  ): boolean {
     let fieldValue = "";
     if (cond.field === "docClass") fieldValue = cls.docClass;
     else if (cond.field === "tag") fieldValue = cls.suggestedTags.join(" ");
@@ -534,9 +582,12 @@ export class DocWorkflowEngine {
     else if (cond.field === "title") fieldValue = cls.title ?? "";
 
     switch (cond.op) {
-      case "equals": return fieldValue === cond.value;
-      case "contains": return fieldValue.includes(cond.value);
-      case "startsWith": return fieldValue.startsWith(cond.value);
+      case "equals":
+        return fieldValue === cond.value;
+      case "contains":
+        return fieldValue.includes(cond.value);
+      case "startsWith":
+        return fieldValue.startsWith(cond.value);
     }
   }
 }
@@ -587,20 +638,40 @@ export class DocumentConsumer {
     const start = Date.now();
 
     // Step 1: classify
-    const plainText = input.format === "text" || input.format === "markdown"
-      ? input.content.slice(0, 5000)
-      : input.content.slice(0, 2000);
+    const plainText =
+      input.format === "text" || input.format === "markdown"
+        ? input.content.slice(0, 5000)
+        : input.content.slice(0, 2000);
     const classification = await this.classifier(plainText, input.metadata);
 
     // Step 2: workflow
-    const meta: DocMeta = { source: input.source, format: input.format, metadata: input.metadata };
+    const meta: DocMeta = {
+      source: input.source,
+      format: input.format,
+      metadata: input.metadata,
+      totalChunks: 0,
+      processedAt: new Date().toISOString(),
+    };
     const workflowResult = this.workflow.apply(classification, meta);
 
     // Step 3: run doc pipeline (extract → chunk → embed → store) if adapters provided
-    let pipeline: PipelineResult = { source: input.source, format: input.format, rawTextLength: 0, chunks: 0, embedded: 0, storeResult: { ids: [], count: 0 }, durationMs: 0 };
+    let pipeline: PipelineResult = {
+      source: input.source,
+      format: input.format,
+      rawTextLength: 0,
+      chunks: 0,
+      embedded: 0,
+      storeResult: { ids: [], count: 0 },
+      durationMs: 0,
+    };
 
     if (this.extractor && this.embedder && this.store) {
-      pipeline = await runDocPipeline(input, { extractor: this.extractor, embedder: this.embedder, store: this.store, chunkOptions: this.chunkOptions });
+      pipeline = await runDocPipeline(input, {
+        extractor: this.extractor,
+        embedder: this.embedder,
+        store: this.store,
+        chunkOptions: this.chunkOptions,
+      });
     }
 
     return {

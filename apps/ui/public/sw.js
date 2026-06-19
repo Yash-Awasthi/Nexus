@@ -9,17 +9,11 @@
  * Cache names are versioned — bump CACHE_VERSION on deploy to purge stale caches.
  */
 
-const CACHE_VERSION   = "v1";
-const SHELL_CACHE     = `judica-shell-${CACHE_VERSION}`;
-const STATIC_CACHE    = `judica-static-${CACHE_VERSION}`;
+const CACHE_VERSION = "v1";
+const SHELL_CACHE = `judica-shell-${CACHE_VERSION}`;
+const STATIC_CACHE = `judica-static-${CACHE_VERSION}`;
 
-const SHELL_URLS = [
-  "/",
-  "/dashboard",
-  "/chat",
-  "/manifest.json",
-  "/favicon.svg",
-];
+const SHELL_URLS = ["/", "/dashboard", "/chat", "/manifest.json", "/favicon.svg"];
 
 // ── Install ───────────────────────────────────────────────────────────────────
 
@@ -28,8 +22,8 @@ self.addEventListener("install", (event) => {
     caches.open(SHELL_CACHE).then((cache) =>
       cache.addAll(SHELL_URLS).catch(() => {
         // Non-fatal: some shell URLs may 404 during dev
-      })
-    )
+      }),
+    ),
   );
   // Take control immediately — no need to wait for old SW to unload
   self.skipWaiting();
@@ -39,13 +33,13 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((k) => k !== SHELL_CACHE && k !== STATIC_CACHE)
-          .map((k) => caches.delete(k))
-      )
-    )
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys.filter((k) => k !== SHELL_CACHE && k !== STATIC_CACHE).map((k) => caches.delete(k)),
+        ),
+      ),
   );
   self.clients.claim();
 });
@@ -75,8 +69,8 @@ self.addEventListener("fetch", (event) => {
 // ── Strategies ───────────────────────────────────────────────────────────────
 
 async function cacheFirst(request, cacheName) {
-  const cache    = await caches.open(cacheName);
-  const cached   = await cache.match(request);
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(request);
   if (cached) return cached;
 
   const response = await fetch(request);
@@ -85,8 +79,8 @@ async function cacheFirst(request, cacheName) {
 }
 
 async function staleWhileRevalidate(request, cacheName) {
-  const cache    = await caches.open(cacheName);
-  const cached   = await cache.match(request);
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(request);
 
   const fetchPromise = fetch(request)
     .then((response) => {
@@ -119,7 +113,7 @@ self.addEventListener("push", (event) => {
       icon: "/favicon.svg",
       badge: "/favicon.svg",
       data: { url: data.url ?? "/dashboard" },
-    })
+    }),
   );
 });
 
@@ -127,12 +121,10 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const url = event.notification.data?.url ?? "/dashboard";
   event.waitUntil(
-    clients
-      .matchAll({ type: "window", includeUncontrolled: true })
-      .then((clientList) => {
-        const existing = clientList.find((c) => c.url.includes(url));
-        if (existing) return existing.focus();
-        return clients.openWindow(url);
-      })
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      const existing = clientList.find((c) => c.url.includes(url));
+      if (existing) return existing.focus();
+      return clients.openWindow(url);
+    }),
   );
 });

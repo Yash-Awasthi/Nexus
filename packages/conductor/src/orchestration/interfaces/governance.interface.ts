@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 export interface ITaskSynthesisResult {
   taskId: string;
   serverName?: string;
@@ -64,6 +65,8 @@ export interface IGovernanceEngine {
   registerConstraint(constraint: IExecutionConstraint): void;
   registerPolicy(policy: IExecutionPolicy): void;
   registerGuardrail(guardrail: IRuntimeGuardrail): void;
-  evaluateTask(task: ITaskSynthesisResult): Promise<{ allowed: boolean; requiresApproval: boolean; reason?: string }>;
+  evaluateTask(
+    task: ITaskSynthesisResult,
+  ): Promise<{ allowed: boolean; requiresApproval: boolean; reason?: string }>;
   evaluatePlan(plan: ICognitiveTrace): Promise<{ allowed: boolean; reason?: string }>;
 }

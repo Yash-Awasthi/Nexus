@@ -1,4 +1,9 @@
-import { IScrapingExecutionAdapter, IScrapingTask, IEnvironmentTelemetry } from "./interfaces/environment.interface";
+// SPDX-License-Identifier: Apache-2.0
+import {
+  IScrapingExecutionAdapter,
+  IScrapingTask,
+  IEnvironmentTelemetry,
+} from "./interfaces/environment.interface";
 import { IExecutionContext } from "./interfaces/execution.interface";
 import { isSafeUrl } from "./security-utils";
 import { getBridgeManager, BridgeManager } from "../runtime/bridge-manager";
@@ -6,7 +11,7 @@ import { getBridgeManager, BridgeManager } from "../runtime/bridge-manager";
 export class ScrapingExecutionAdapter implements IScrapingExecutionAdapter {
   constructor(
     private telemetry: IEnvironmentTelemetry,
-    private isOfflineMode = true
+    private isOfflineMode = true,
   ) {}
 
   canExecute(taskType: string): boolean {
@@ -20,7 +25,7 @@ export class ScrapingExecutionAdapter implements IScrapingExecutionAdapter {
       url: payload.url || "",
       selectors: payload.selectors || [],
       maxDepth: payload.maxDepth || 1,
-      maxRequests: payload.maxRequests || 5
+      maxRequests: payload.maxRequests || 5,
     };
     return this.executeScrapingTask(scrapingTask);
   }
@@ -42,7 +47,7 @@ export class ScrapingExecutionAdapter implements IScrapingExecutionAdapter {
         success: false,
         data: { error: "BLOCKED_BY_SAFETY_POLICY" },
         requestsCount,
-        bytesFetched
+        bytesFetched,
       };
     }
 
@@ -66,7 +71,7 @@ export class ScrapingExecutionAdapter implements IScrapingExecutionAdapter {
         success: true,
         data,
         requestsCount,
-        bytesFetched
+        bytesFetched,
       };
     }
 
@@ -76,7 +81,8 @@ export class ScrapingExecutionAdapter implements IScrapingExecutionAdapter {
       const baseUrl = await mgr.url("scraping");
 
       // Choose stealth mode for sites likely to have bot protection
-      const useStealthMode = task.url.includes("cloudflare") ||
+      const useStealthMode =
+        task.url.includes("cloudflare") ||
         task.url.includes("linkedin") ||
         task.url.includes("twitter") ||
         (task as any).stealth === true;
@@ -98,7 +104,7 @@ export class ScrapingExecutionAdapter implements IScrapingExecutionAdapter {
         selectors: task.selectors || [],
         timeout: 30_000,
         disable_resources: true,
-        block_ads: true
+        block_ads: true,
       });
 
       if (!result.success) {
@@ -123,7 +129,7 @@ export class ScrapingExecutionAdapter implements IScrapingExecutionAdapter {
         success: false,
         data: { error: err.message },
         requestsCount,
-        bytesFetched
+        bytesFetched,
       };
     }
   }

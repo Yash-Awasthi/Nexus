@@ -14,14 +14,62 @@
 
 import crypto from "node:crypto";
 import fs from "node:fs";
+import type { ServerResponse } from "node:http";
 import path from "node:path";
 import vm from "node:vm";
 
+import { AdaptiveScraper, HttpxEngine } from "@nexus/adaptive-scraper";
+import type { AgentDefinition } from "@nexus/agent-runtime";
 import {
-  applyParseltongue,
-  detectTriggers,
-  getDefaultConfig as redteamDefaultConfig,
-} from "@nexus/redteam";
+  KernelManager,
+  DockerReplExecutor,
+  MockReplExecutor,
+  isDockerAvailable,
+  type ReplLanguage,
+} from "@nexus/code-repl";
+import {
+  summonArchetypes,
+  SUMMONS,
+  ARCHETYPES,
+  CouncilService,
+  type Archetype,
+  type TaskCategory,
+} from "@nexus/council";
+import { computeAutoTuneParams, InMemoryEmaStore } from "@nexus/drift";
+import { runFallbackChain, type FallbackModel } from "@nexus/gateway";
+import {
+  raceModels,
+  scoreResponse,
+  getModelsForTier,
+  ULTRAPLINIAN_MODELS,
+  type ModelResult,
+  type SpeedTier,
+} from "@nexus/gauntlet";
+import {
+  ImageGenerator,
+  OpenAIImageProvider,
+  ReplicateProvider,
+  type ImageSize,
+} from "@nexus/image-gen";
+import {
+  ImageTransformer,
+  isSharpAvailable,
+  type ResizeOptions,
+  type CropOptions,
+  type ConvertOptions,
+  type WatermarkOptions,
+  type ImageFormat,
+} from "@nexus/image-transformations";
+import {
+  InMemoryKGStore,
+  NeonKGStore,
+  KnowledgeGraph,
+  type KGStore,
+  type NeonRow,
+  clusterGraph,
+  buildCommunities,
+  type NeonQueryFn,
+} from "@nexus/knowledge-graph";
 import {
   DriverRegistry,
   AnthropicDriver,
@@ -39,67 +87,22 @@ import {
   MemoryManager,
   PgVectorStore,
 } from "@nexus/memory";
+import { AdapterRegistry, NexusAdapterError, defineAdapter } from "@nexus/plugin-sdk";
 import {
-  InMemoryKGStore,
-  NeonKGStore,
-  KnowledgeGraph,
-  type KGStore,
-  clusterGraph,
-  buildCommunities,
-  type NeonQueryFn,
-} from "@nexus/knowledge-graph";
-import {
-  raceModels,
-  scoreResponse,
-  getModelsForTier,
-  ULTRAPLINIAN_MODELS,
-  type ModelResult,
-  type SpeedTier,
-} from "@nexus/gauntlet";
-import { AdaptiveScraper, HttpxEngine } from "@nexus/adaptive-scraper";
-import {
-  ImageGenerator,
-  OpenAIImageProvider,
-  ReplicateProvider,
-  NullImageProvider,
-  type ImageSize,
-} from "@nexus/image-gen";
+  applyParseltongue,
+  detectTriggers,
+  getDefaultConfig as redteamDefaultConfig,
+} from "@nexus/redteam";
 import { WebResearcher, type SearchResult as ResearchSearchResult } from "@nexus/researcher";
-import { computeAutoTuneParams, InMemoryEmaStore } from "@nexus/drift";
-import { MemoryTokenBudget } from "@nexus/token-budget";
-import { STMPipeline } from "@nexus/stm";
-import {
-  AgentRuntime,
-  RuntimeToolSet,
-  llmDriverToStreamFn,
-} from "@nexus/agent-runtime";
-import {
-  KernelManager,
-  DockerReplExecutor,
-  MockReplExecutor,
-  isDockerAvailable,
-  type ReplLanguage,
-} from "@nexus/code-repl";
 import {
   StealthBrowser,
   PatchrightDriver,
   MockBrowserDriver,
   isPatchrightAvailable,
 } from "@nexus/stealth-browser";
-import { runFallbackChain, type FallbackModel } from "@nexus/gateway";
-import {
-  assignTasks,
-  type OmaTask,
-  type OmaSchedulingStrategy,
-} from "@nexus/supervisor";
-import {
-  summonArchetypes,
-  SUMMONS,
-  ARCHETYPES,
-  CouncilService,
-  type TaskCategory,
-} from "@nexus/council";
-import type { AgentDefinition, AgentPersona } from "@nexus/agent-runtime";
+import { STMPipeline } from "@nexus/stm";
+import { assignTasks, type OmaTask, type OmaSchedulingStrategy } from "@nexus/supervisor";
+import { MemoryTokenBudget } from "@nexus/token-budget";
 import {
   VideoSearchEngine,
   MockVideoBackend,
@@ -108,19 +111,11 @@ import {
   type VideoBackend,
   type VideoResult,
 } from "@nexus/video-search";
-import { AdapterRegistry, NexusAdapterError, defineAdapter } from "@nexus/plugin-sdk";
-import {
-  ImageTransformer,
-  isSharpAvailable,
-  type ResizeOptions,
-  type CropOptions,
-  type ConvertOptions,
-  type WatermarkOptions,
-  type ImageFormat,
-} from "@nexus/image-transformations";
-import { emitAuditEvent } from "../lib/audit-emitter.js";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import { Pool } from "pg";
+
+import { emitAuditEvent } from "../lib/audit-emitter.js";
+import { sha256hex } from "../lib/crypto-utils.js";
 
 // ── SSE helpers ───────────────────────────────────────────────────────────────
 
@@ -131,7 +126,7 @@ const SSE_HEADERS = {
   "X-Accel-Buffering": "no",
 };
 
-function sseWrite(raw: import("node:http").ServerResponse, ev: unknown): void {
+function sseWrite(raw: ServerResponse, ev: unknown): void {
   if (!raw.destroyed) raw.write(`data: ${JSON.stringify(ev)}\n\n`);
 }
 
@@ -142,11 +137,16 @@ function getRegistry(): DriverRegistry {
   if (_registry) return _registry;
   const reg = new DriverRegistry();
   if (process.env.GROQ_API_KEY) reg.register(new GroqDriver({ apiKey: process.env.GROQ_API_KEY }));
-  if (process.env.ANTHROPIC_API_KEY) reg.register(new AnthropicDriver({ apiKey: process.env.ANTHROPIC_API_KEY }));
-  if (process.env.GEMINI_API_KEY) reg.register(new GeminiDriver({ apiKey: process.env.GEMINI_API_KEY }));
-  if (process.env.DEEPSEEK_API_KEY) reg.register(new DeepSeekDriver({ apiKey: process.env.DEEPSEEK_API_KEY }));
-  if (process.env.MISTRAL_API_KEY) reg.register(new MistralDriver({ apiKey: process.env.MISTRAL_API_KEY }));
-  if (process.env.OPENROUTER_API_KEY) reg.register(new OpenRouterDriver({ apiKey: process.env.OPENROUTER_API_KEY }));
+  if (process.env.ANTHROPIC_API_KEY)
+    reg.register(new AnthropicDriver({ apiKey: process.env.ANTHROPIC_API_KEY }));
+  if (process.env.GEMINI_API_KEY)
+    reg.register(new GeminiDriver({ apiKey: process.env.GEMINI_API_KEY }));
+  if (process.env.DEEPSEEK_API_KEY)
+    reg.register(new DeepSeekDriver({ apiKey: process.env.DEEPSEEK_API_KEY }));
+  if (process.env.MISTRAL_API_KEY)
+    reg.register(new MistralDriver({ apiKey: process.env.MISTRAL_API_KEY }));
+  if (process.env.OPENROUTER_API_KEY)
+    reg.register(new OpenRouterDriver({ apiKey: process.env.OPENROUTER_API_KEY }));
   _registry = reg;
   return reg;
 }
@@ -166,40 +166,53 @@ function getDefaultDriver() {
 }
 
 /** Strip markdown code fences then JSON.parse — handles ` ```json ` and ` ``` ` variants. */
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 function parseJsonResponse<T = unknown>(content: string): T {
   return JSON.parse(content.replace(/^```(?:json)?\n?|```$/g, "").trim()) as T;
 }
 
 /** Typed LLM message constructors. */
-const userMsg   = (content: string) => ({ role: "user"   as LlmRole, content });
+const userMsg = (content: string) => ({ role: "user" as LlmRole, content });
 const systemMsg = (content: string) => ({ role: "system" as LlmRole, content });
 
 // ── Cost tracking ─────────────────────────────────────────────────────────────
 
-interface CostEntry { ts: string; model: string; inputTokens: number; outputTokens: number; costUsd: number; }
+interface CostEntry {
+  ts: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+}
 const _costLog: CostEntry[] = [];
 
 const _PRICES: Record<string, [number, number]> = {
-  "anthropic/claude-3.5-haiku":   [0.80,  4.00],
-  "anthropic/claude-3.5-sonnet":  [3.00, 15.00],
-  "anthropic/claude-3-opus":      [15.0, 75.00],
-  "openai/gpt-4o":                [2.50, 10.00],
-  "openai/gpt-4o-mini":           [0.15,  0.60],
-  "groq/llama-3.1-8b-instant":    [0.05,  0.08],
-  "groq/llama-3.3-70b-versatile": [0.59,  0.79],
+  "anthropic/claude-3.5-haiku": [0.8, 4.0],
+  "anthropic/claude-3.5-sonnet": [3.0, 15.0],
+  "anthropic/claude-3-opus": [15.0, 75.0],
+  "openai/gpt-4o": [2.5, 10.0],
+  "openai/gpt-4o-mini": [0.15, 0.6],
+  "groq/llama-3.1-8b-instant": [0.05, 0.08],
+  "groq/llama-3.3-70b-versatile": [0.59, 0.79],
 };
 
 function _trackCost(model: string, usage?: { inputTokens?: number; outputTokens?: number }) {
-  const inp = usage?.inputTokens  ?? 0;
+  const inp = usage?.inputTokens ?? 0;
   const out = usage?.outputTokens ?? 0;
-  const [pi, po] = _PRICES[model] ?? [1.00, 3.00];
-  _costLog.push({ ts: now(), model, inputTokens: inp, outputTokens: out, costUsd: (inp * pi + out * po) / 1_000_000 });
+  const [pi, po] = _PRICES[model] ?? [1.0, 3.0];
+  _costLog.push({
+    ts: now(),
+    model,
+    inputTokens: inp,
+    outputTokens: out,
+    costUsd: (inp * pi + out * po) / 1_000_000,
+  });
   if (_costLog.length > 10_000) _costLog.splice(0, _costLog.length - 10_000);
 }
 
 /** One-line LLM call with automatic cost tracking. Returns content string. */
 async function _llm(
-  messages: Array<{ role: LlmRole; content: string }>,
+  messages: { role: LlmRole; content: string }[],
   maxTokens = 512,
   model = DEFAULT_MODEL,
 ): Promise<string> {
@@ -219,8 +232,8 @@ async function _llm(
 
 const _DATA_DIR = process.env.NEXUS_DATA_DIR ?? path.join(process.cwd(), "data", "stores");
 
-let _pgPool: import("pg").Pool | null = null;
-function _getPool(): import("pg").Pool | null {
+let _pgPool: Pool | null = null;
+function _getPool(): Pool | null {
   if (_pgPool !== undefined) return _pgPool;
   if (process.env.DATABASE_URL) {
     _pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -259,23 +272,38 @@ class PersistentStore<T> {
           [this._name],
         );
         for (const r of rows) this._mem.set(r.id, r.data);
-      } catch { /* table not yet created — first boot */ }
+      } catch {
+        /* table not yet created — first boot */
+      }
     } else {
       try {
         const file = path.join(_DATA_DIR, `${this._name}.json`);
         const items = JSON.parse(fs.readFileSync(file, "utf8")) as T[];
-        for (const item of items) this._mem.set(item["id"] as string, item);
-      } catch { /* first run — no file yet */ }
+        for (const item of items) this._mem.set((item as { id: string })["id"], item);
+      } catch {
+        /* first run — no file yet */
+      }
     }
   }
 
   // ── Map-compatible interface ───────────────────────────────────────────────
 
-  get(id: string): T | undefined { return this._mem.get(id); }
-  has(id: string): boolean       { return this._mem.has(id); }
-  get size(): number             { return this._mem.size; }
-  values(): IterableIterator<T>  { return this._mem.values(); }
-  delete(id: string): void       { this._mem.delete(id); this._write(id, null); }
+  get(id: string): T | undefined {
+    return this._mem.get(id);
+  }
+  has(id: string): boolean {
+    return this._mem.has(id);
+  }
+  get size(): number {
+    return this._mem.size;
+  }
+  values(): IterableIterator<T> {
+    return this._mem.values();
+  }
+  delete(id: string): void {
+    this._mem.delete(id);
+    this._write(id, null);
+  }
 
   set(id: string, val: T): void {
     this._mem.set(id, val);
@@ -288,12 +316,16 @@ class PersistentStore<T> {
     const pool = _getPool();
     if (pool) {
       if (val === null) {
-        pool.query("DELETE FROM nexus_kv WHERE collection=$1 AND id=$2", [this._name, id]).catch(() => {});
+        pool
+          .query("DELETE FROM nexus_kv WHERE collection=$1 AND id=$2", [this._name, id])
+          .catch(() => {});
       } else {
-        pool.query(
-          "INSERT INTO nexus_kv (collection,id,data) VALUES($1,$2,$3) ON CONFLICT (collection,id) DO UPDATE SET data=$3",
-          [this._name, id, val as unknown],
-        ).catch(() => {});
+        pool
+          .query(
+            "INSERT INTO nexus_kv (collection,id,data) VALUES($1,$2,$3) ON CONFLICT (collection,id) DO UPDATE SET data=$3",
+            [this._name, id, val as unknown],
+          )
+          .catch(() => {});
       }
     } else {
       // JSON file — write entire collection (small stores, infrequent writes)
@@ -303,7 +335,9 @@ class PersistentStore<T> {
           path.join(_DATA_DIR, `${this._name}.json`),
           JSON.stringify(Array.from(this._mem.values()), null, 2),
         );
-      } catch { /* ignore write errors (read-only fs) */ }
+      } catch {
+        /* ignore write errors (read-only fs) */
+      }
     }
   }
 }
@@ -320,12 +354,16 @@ let _imageGen: ImageGenerator | null = null;
 function getImageGen(): { gen: ImageGenerator; provider: string } | null {
   if (_imageGen) return { gen: _imageGen, provider: _imageGenProvider };
   if (process.env.OPENAI_API_KEY) {
-    _imageGen = new ImageGenerator({ provider: new OpenAIImageProvider({ apiKey: process.env.OPENAI_API_KEY }) });
+    _imageGen = new ImageGenerator({
+      provider: new OpenAIImageProvider({ apiKey: process.env.OPENAI_API_KEY }),
+    });
     _imageGenProvider = "openai-dalle";
     return { gen: _imageGen, provider: _imageGenProvider };
   }
   if (process.env.REPLICATE_API_KEY) {
-    _imageGen = new ImageGenerator({ provider: new ReplicateProvider({ apiKey: process.env.REPLICATE_API_KEY }) });
+    _imageGen = new ImageGenerator({
+      provider: new ReplicateProvider({ apiToken: process.env.REPLICATE_API_KEY }),
+    });
     _imageGenProvider = "replicate";
     return { gen: _imageGen, provider: _imageGenProvider };
   }
@@ -354,7 +392,7 @@ function getKGStore(): KGStore {
   if (process.env.DATABASE_URL) {
     const pool = new Pool({ connectionString: process.env.DATABASE_URL });
     const queryFn: NeonQueryFn = (sql, params) =>
-      pool.query(sql, params as unknown[]).then((r) => r.rows);
+      pool.query(sql, params!).then((r) => ({ rows: r.rows as NeonRow[] }));
     _kgStore = new NeonKGStore({ query: queryFn });
   } else {
     _kgStore = new InMemoryKGStore();
@@ -364,7 +402,7 @@ function getKGStore(): KGStore {
 
 function getKG(): KnowledgeGraph {
   if (_kg) return _kg;
-  _kg = new KnowledgeGraph({ store: getKGStore() });
+  _kg = new KnowledgeGraph(getKGStore());
   return _kg;
 }
 
@@ -402,12 +440,14 @@ interface AbResult {
 
 const _abStore = new Map<string, AbResult>();
 const _settingsStore = new Map<string, unknown>();
-const _roomsStore = new Map<string, { id: string; name: string; createdAt: string; members: string[] }>();
+const _roomsStore = new Map<
+  string,
+  { id: string; name: string; createdAt: string; members: string[] }
+>();
 
 // ── Route registrations ───────────────────────────────────────────────────────
 
 export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
-
   // Ensure Postgres KV table exists (no-op if no DATABASE_URL)
   await _ensureTable();
 
@@ -415,21 +455,63 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   // Each store loads its data from JSON files or Postgres on first boot.
   // Route handlers use them exactly like a Map — .get/.set/.delete/.values.
 
-  const _workflowStore  = new PersistentStore<{ id: string; name: string; steps: unknown[]; status: string; createdAt: string }>("workflows");
-  const _connectors     = new PersistentStore<{ id: string; type: string; status: string; label: string }>("connectors");
-  const _craftStore     = new PersistentStore<{ id: string; template: string; prompt: string; result: string; createdAt: string }>("craft");
-  const _skills         = new PersistentStore<{ id: string; name: string; description: string; enabled: boolean }>("skills");
-  const _kbStore        = new PersistentStore<{ id: string; name: string; docCount: number; createdAt: string }>("kb");
-  const _imageStore     = new PersistentStore<{ id: string; url: string; b64?: string; prompt: string; revisedPrompt?: string; provider?: string; createdAt: string }>("images");
-  const _imrRuns        = new PersistentStore<ImrRun>("imr_runs");
-  const _stdAnswers     = new PersistentStore<StdAnswer>("standard_answers");
-  const _rssFeeds       = new PersistentStore<RssFeed>("rss_feeds");
-  const _rssItems       = new PersistentStore<RssItem>("rss_items");
+  const _workflowStore = new PersistentStore<{
+    id: string;
+    name: string;
+    steps: unknown[];
+    status: string;
+    createdAt: string;
+  }>("workflows");
+  const _connectors = new PersistentStore<{
+    id: string;
+    type: string;
+    status: string;
+    label: string;
+  }>("connectors");
+  const _craftStore = new PersistentStore<{
+    id: string;
+    template: string;
+    prompt: string;
+    result: string;
+    createdAt: string;
+  }>("craft");
+  const _skills = new PersistentStore<{
+    id: string;
+    name: string;
+    description: string;
+    enabled: boolean;
+  }>("skills");
+  const _kbStore = new PersistentStore<{
+    id: string;
+    name: string;
+    docCount: number;
+    createdAt: string;
+  }>("kb");
+  const _imageStore = new PersistentStore<{
+    id: string;
+    url: string;
+    b64?: string;
+    prompt: string;
+    revisedPrompt?: string;
+    provider?: string;
+    createdAt: string;
+  }>("images");
+  const _imrRuns = new PersistentStore<ImrRun>("imr_runs");
+  const _stdAnswers = new PersistentStore<StdAnswer>("standard_answers");
+  const _rssFeeds = new PersistentStore<RssFeed>("rss_feeds");
+  const _rssItems = new PersistentStore<RssItem>("rss_items");
 
   await Promise.all([
-    _workflowStore.load(), _connectors.load(), _craftStore.load(),
-    _skills.load(), _kbStore.load(), _imageStore.load(),
-    _imrRuns.load(), _stdAnswers.load(), _rssFeeds.load(), _rssItems.load(),
+    _workflowStore.load(),
+    _connectors.load(),
+    _craftStore.load(),
+    _skills.load(),
+    _kbStore.load(),
+    _imageStore.load(),
+    _imrRuns.load(),
+    _stdAnswers.load(),
+    _rssFeeds.load(),
+    _rssItems.load(),
   ]);
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -446,7 +528,9 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
       const speedTier = numericToSpeedTier(numTier);
 
       if (!process.env.OPENROUTER_API_KEY) {
-        return reply.code(503).send({ error: "gauntlet_unavailable", message: "OPENROUTER_API_KEY not configured" });
+        return reply
+          .code(503)
+          .send({ error: "gauntlet_unavailable", message: "OPENROUTER_API_KEY not configured" });
       }
 
       // Build model list capped to the numeric tier count
@@ -535,81 +619,88 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
     Body: {
       question: string;
-      members: { id: string; label: string; provider: string; model: string; apiKey?: string; baseUrl?: string }[];
+      members: {
+        id: string;
+        label: string;
+        provider: string;
+        model: string;
+        apiKey?: string;
+        baseUrl?: string;
+      }[];
     };
-  }>(
-    "/godmode/stream",
-    async (request, reply) => {
-      const { question, members } = request.body;
-      const reg = getRegistry();
+  }>("/godmode/stream", async (request, reply) => {
+    const { question, members } = request.body;
+    const reg = getRegistry();
 
-      reply.hijack();
-      const raw = reply.raw;
-      raw.writeHead(200, SSE_HEADERS);
+    reply.hijack();
+    const raw = reply.raw;
+    raw.writeHead(200, SSE_HEADERS);
 
-      sseWrite(raw, {
-        type: "init",
-        members: members.map((m) => ({ id: m.id, label: m.label, model: m.model })),
-      });
+    sseWrite(raw, {
+      type: "init",
+      members: members.map((m) => ({ id: m.id, label: m.label, model: m.model })),
+    });
 
-      const raceStart = Date.now();
-      let successCount = 0;
-      let fastestId: string | null = null;
-      let fastestMs = Infinity;
+    const raceStart = Date.now();
+    let successCount = 0;
+    let fastestId: string | null = null;
+    let fastestMs = Infinity;
 
-      await Promise.allSettled(
-        members.map(async (member) => {
-          const start = Date.now();
-          try {
-            const driver = reg.get(member.provider) ?? reg.get("openrouter");
-            if (!driver) throw new Error(`No driver for provider: ${member.provider}`);
+    await Promise.allSettled(
+      members.map(async (member) => {
+        const start = Date.now();
+        try {
+          const driver = reg.get(member.provider) ?? reg.get("openrouter");
+          if (!driver) throw new Error(`No driver for provider: ${member.provider}`);
 
-            const res = await driver.complete({
-              model: member.model,
-              messages: [{ role: "user" as LlmRole, content: question }],
-              maxTokens: 1024,
-            });
-            _trackCost(member.model, res.usage);
+          const res = await driver.complete({
+            model: member.model,
+            messages: [{ role: "user" as LlmRole, content: question }],
+            maxTokens: 1024,
+          });
+          _trackCost(member.model, res.usage);
 
-            const latencyMs = Date.now() - start;
-            if (latencyMs < fastestMs) { fastestMs = latencyMs; fastestId = member.id; }
-            successCount++;
-
-            sseWrite(raw, {
-              type: "response",
-              id: member.id,
-              text: res.content,
-              latencyMs,
-              tokens: (res.usage?.inputTokens ?? 0) + (res.usage?.outputTokens ?? 0),
-              status: "done",
-            });
-          } catch (err) {
-            const latencyMs = Date.now() - start;
-            sseWrite(raw, {
-              type: "response",
-              id: member.id,
-              text: "",
-              latencyMs,
-              tokens: 0,
-              status: "error",
-              error: err instanceof Error ? err.message : String(err),
-            });
+          const latencyMs = Date.now() - start;
+          if (latencyMs < fastestMs) {
+            fastestMs = latencyMs;
+            fastestId = member.id;
           }
-        }),
-      );
+          successCount++;
 
-      sseWrite(raw, {
-        type: "done",
-        totalMs: Date.now() - raceStart,
-        responseCount: members.length,
-        successCount,
-        fastestId,
-        fastestLabel: members.find((m) => m.id === fastestId)?.label ?? null,
-      });
+          sseWrite(raw, {
+            type: "response",
+            id: member.id,
+            text: res.content,
+            latencyMs,
+            tokens: (res.usage?.inputTokens ?? 0) + (res.usage?.outputTokens ?? 0),
+            status: "done",
+          });
+        } catch (err) {
+          const latencyMs = Date.now() - start;
+          sseWrite(raw, {
+            type: "response",
+            id: member.id,
+            text: "",
+            latencyMs,
+            tokens: 0,
+            status: "error",
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }),
+    );
 
-      if (!raw.destroyed) raw.end();
-    },
-  );
+    sseWrite(raw, {
+      type: "done",
+      totalMs: Date.now() - raceStart,
+      responseCount: members.length,
+      successCount,
+      fastestId,
+      fastestLabel: members.find((m) => m.id === fastestId)?.label ?? null,
+    });
+
+    if (!raw.destroyed) raw.end();
+  });
 
   // ══════════════════════════════════════════════════════════════════════════
   // B.3 — A/B COMPARISON
@@ -633,29 +724,49 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
       const [resultA, resultB] = await Promise.allSettled([
         (async () => {
           const s = Date.now();
-          const r = await driver.complete({ model: modelA, messages: [{ role: "user" as LlmRole, content: prompt }], maxTokens: 1024 });
+          const r = await driver.complete({
+            model: modelA,
+            messages: [{ role: "user" as LlmRole, content: prompt }],
+            maxTokens: 1024,
+          });
           _trackCost(modelA, r.usage);
-          return { content: r.content, latency: Date.now() - s, tokens: (r.usage?.inputTokens ?? 0) + (r.usage?.outputTokens ?? 0) };
+          return {
+            content: r.content,
+            latency: Date.now() - s,
+            tokens: (r.usage?.inputTokens ?? 0) + (r.usage?.outputTokens ?? 0),
+          };
         })(),
         (async () => {
           const s = Date.now();
-          const r = await driver.complete({ model: modelB, messages: [{ role: "user" as LlmRole, content: prompt }], maxTokens: 1024 });
+          const r = await driver.complete({
+            model: modelB,
+            messages: [{ role: "user" as LlmRole, content: prompt }],
+            maxTokens: 1024,
+          });
           _trackCost(modelB, r.usage);
-          return { content: r.content, latency: Date.now() - s, tokens: (r.usage?.inputTokens ?? 0) + (r.usage?.outputTokens ?? 0) };
+          return {
+            content: r.content,
+            latency: Date.now() - s,
+            tokens: (r.usage?.inputTokens ?? 0) + (r.usage?.outputTokens ?? 0),
+          };
         })(),
       ]);
 
       const id = crypto.randomUUID();
-      const scoreA = resultA.status === "fulfilled" ? scoreResponse(resultA.value.content, prompt) : 0;
-      const scoreB = resultB.status === "fulfilled" ? scoreResponse(resultB.value.content, prompt) : 0;
+      const scoreA =
+        resultA.status === "fulfilled" ? scoreResponse(resultA.value.content, prompt) : 0;
+      const scoreB =
+        resultB.status === "fulfilled" ? scoreResponse(resultB.value.content, prompt) : 0;
 
       const result: AbResult = {
         id,
         prompt,
         modelA,
         modelB,
-        responseA: resultA.status === "fulfilled" ? resultA.value.content : `Error: ${resultA.reason}`,
-        responseB: resultB.status === "fulfilled" ? resultB.value.content : `Error: ${resultB.reason}`,
+        responseA:
+          resultA.status === "fulfilled" ? resultA.value.content : `Error: ${resultA.reason}`,
+        responseB:
+          resultB.status === "fulfilled" ? resultB.value.content : `Error: ${resultB.reason}`,
         latencyA: resultA.status === "fulfilled" ? resultA.value.latency : 0,
         latencyB: resultB.status === "fulfilled" ? resultB.value.latency : 0,
         tokensA: resultA.status === "fulfilled" ? resultA.value.tokens : 0,
@@ -670,9 +781,11 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   );
 
   app.get("/ab", async (_req, reply) => {
-    return reply.send([..._abStore.values()].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    ));
+    return reply.send(
+      [..._abStore.values()].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      ),
+    );
   });
 
   app.get("/ab/stats", async (_req, reply) => {
@@ -683,9 +796,16 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
         if (!modelStats[m]) modelStats[m] = { wins: 0, losses: 0, ties: 0 };
       }
       const pref = r.userPreference ?? r.winner;
-      if (pref === "A") { modelStats[r.modelA]!.wins++; modelStats[r.modelB]!.losses++; }
-      else if (pref === "B") { modelStats[r.modelB]!.wins++; modelStats[r.modelA]!.losses++; }
-      else if (pref === "tie") { modelStats[r.modelA]!.ties++; modelStats[r.modelB]!.ties++; }
+      if (pref === "A") {
+        modelStats[r.modelA]!.wins++;
+        modelStats[r.modelB]!.losses++;
+      } else if (pref === "B") {
+        modelStats[r.modelB]!.wins++;
+        modelStats[r.modelA]!.losses++;
+      } else if (pref === "tie") {
+        modelStats[r.modelA]!.ties++;
+        modelStats[r.modelB]!.ties++;
+      }
     }
     return reply.send({ totalRuns: results.length, modelStats });
   });
@@ -732,9 +852,9 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{
     Body: {
-      message:  string;
-      members:  Array<{ label: string; provider: string; model: string }>;
-      round:    number;
+      message: string;
+      members: { label: string; provider: string; model: string }[];
+      round: number;
       threadId: string;
     };
   }>("/chat/stream", async (request, reply) => {
@@ -753,7 +873,8 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     if (enabled.length === 0) {
       sseWrite(raw, {
         type: "error",
-        message: "No configured providers match the requested council members. Set API keys in .env.",
+        message:
+          "No configured providers match the requested council members. Set API keys in .env.",
       });
       raw.end();
       return;
@@ -767,18 +888,18 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
         try {
           await driver.stream(
             {
-              model:    member.model,
+              model: member.model,
               messages: [{ role: "user" as LlmRole, content: message }],
               maxTokens: 2048,
             },
             (delta) => {
               if (delta.delta) {
                 sseWrite(raw, {
-                  type:     "opinion",
+                  type: "opinion",
                   provider: member.provider,
-                  label:    member.label,
-                  text:     delta.delta,
-                  summary:  "",
+                  label: member.label,
+                  text: delta.delta,
+                  summary: "",
                   round,
                 });
               }
@@ -786,11 +907,11 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
           );
         } catch (err) {
           sseWrite(raw, {
-            type:     "opinion",
+            type: "opinion",
             provider: member.provider,
-            label:    member.label,
-            text:     `[${member.label} error: ${(err as Error).message}]`,
-            summary:  "",
+            label: member.label,
+            text: `[${member.label} error: ${(err as Error).message}]`,
+            summary: "",
             round,
           });
         }
@@ -813,7 +934,11 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
       const { text, config } = request.body;
       const cfg = { ...redteamDefaultConfig(), ...(config ?? {}) };
       const transformed = applyParseltongue(text, cfg as Parameters<typeof applyParseltongue>[1]);
-      return reply.send({ original: text, transformed, changed: transformed !== text });
+      return reply.send({
+        original: text,
+        transformed,
+        changed: transformed.transformedText !== text,
+      });
     },
   );
 
@@ -825,12 +950,12 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
       const mem = getMemory();
       const { limit = 20, query } = request.query;
       if (query) {
-        const results = await mem.recall(query, Number(limit));
+        const results = await mem.recall(query, limit);
         const entries = results.map((r) => ({ ...r.entry, score: r.score }));
         return reply.send({ entries, total: entries.length });
       }
       const entries = await mem.list();
-      return reply.send({ entries: entries.slice(0, Number(limit)), total: entries.length });
+      return reply.send({ entries: entries.slice(0, limit), total: entries.length });
     },
   );
 
@@ -861,25 +986,31 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Querystring: { limit?: number; q?: string } }>("/kg/graph", async (request, reply) => {
     const store = getKGStore();
     const { limit = 50, q } = request.query;
-    const nodes = await store.findNodes(q ? { nameContains: q, limit: Number(limit) } : { limit: Number(limit) });
-    const edges = await store.findEdges({ limit: Number(limit) });
+    const nodes = await store.findNodes(q ? { nameContains: q, limit } : { limit });
+    const edges = await store.findEdges({ limit });
     return reply.send({ nodes, edges });
   });
 
   app.get<{ Querystring: { q?: string; k?: number } }>("/kg/search", async (request, reply) => {
     const store = getKGStore();
-    const nodes = await store.findNodes({ nameContains: request.query.q ?? "", limit: Number(request.query.k ?? 10) });
+    const nodes = await store.findNodes({
+      nameContains: request.query.q ?? "",
+      limit: request.query.k ?? 10,
+    });
     return reply.send({ nodes });
   });
 
   // POST variant used by knowledge-graph.tsx UI
-  app.post<{ Body: { query?: string; q?: string; k?: number } }>("/kg/search", async (request, reply) => {
-    const store = getKGStore();
-    const q = request.body.query ?? request.body.q ?? "";
-    const k = Number(request.body.k ?? 10);
-    const nodes = await store.findNodes({ nameContains: q, limit: k });
-    return reply.send({ nodes });
-  });
+  app.post<{ Body: { query?: string; q?: string; k?: number } }>(
+    "/kg/search",
+    async (request, reply) => {
+      const store = getKGStore();
+      const q = request.body.query ?? request.body.q ?? "";
+      const k = request.body.k ?? 10;
+      const nodes = await store.findNodes({ nameContains: q, limit: k });
+      return reply.send({ nodes });
+    },
+  );
 
   app.post<{ Body: { text: string } }>("/kg/extract", async (request, reply) => {
     const kg = getKG();
@@ -897,14 +1028,17 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // POST variant used by knowledge-graph.tsx UI
-  app.post<{ Body: { id?: string; entityId?: string; depth?: number } }>("/kg/traverse", async (request, reply) => {
-    const store = getKGStore();
-    const subjectId = request.body.id ?? request.body.entityId ?? "";
-    const edges = await store.findEdges({ subjectId, limit: 50 });
-    const nodeIds = [...new Set(edges.flatMap((e) => [e.subjectId, e.objectId]))];
-    const nodes = await Promise.all(nodeIds.map((id) => store.getNode(id)));
-    return reply.send({ nodes: nodes.filter(Boolean), edges });
-  });
+  app.post<{ Body: { id?: string; entityId?: string; depth?: number } }>(
+    "/kg/traverse",
+    async (request, reply) => {
+      const store = getKGStore();
+      const subjectId = request.body.id ?? request.body.entityId ?? "";
+      const edges = await store.findEdges({ subjectId, limit: 50 });
+      const nodeIds = [...new Set(edges.flatMap((e) => [e.subjectId, e.objectId]))];
+      const nodes = await Promise.all(nodeIds.map((id) => store.getNode(id)));
+      return reply.send({ nodes: nodes.filter(Boolean), edges });
+    },
+  );
 
   // -- KNOWLEDGE BASES -------------------------------------------------------
   // Alias to /kg routes under /kb namespace
@@ -1002,39 +1136,234 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // -- REPOS -----------------------------------------------------------------
+  // Calls GitHub REST API when GITHUB_TOKEN is set; TTL-cached 10 min to
+  // avoid burning the 5000 req/hr authenticated rate limit on UI polling.
+
+  interface GhRepo {
+    id: number;
+    name: string;
+    full_name: string;
+    html_url: string;
+    description: string | null;
+    private: boolean;
+    stargazers_count: number;
+    updated_at: string;
+    language: string | null;
+    default_branch: string;
+  }
+
+  // Repo transform extracted to eliminate copy-paste between /repos and /repos/github
+  function _toRepoView(r: GhRepo) {
+    return {
+      id: r.id,
+      name: r.name,
+      fullName: r.full_name,
+      url: r.html_url,
+      description: r.description,
+      private: r.private,
+      stars: r.stargazers_count,
+      updatedAt: r.updated_at,
+      language: r.language,
+      defaultBranch: r.default_branch,
+    };
+  }
+
+  let _repoCache: { data: GhRepo[]; expiresAt: number } | null = null;
+  const REPO_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+  async function _listGithubRepos(): Promise<GhRepo[]> {
+    const token = process.env.GITHUB_TOKEN;
+    if (!token) return [];
+    if (_repoCache && Date.now() < _repoCache.expiresAt) return _repoCache.data;
+    try {
+      const res = await fetch(
+        "https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+          },
+          signal: AbortSignal.timeout(10_000),
+        },
+      );
+      if (!res.ok) return _repoCache?.data ?? [];
+      const data = (await res.json()) as GhRepo[];
+      _repoCache = { data, expiresAt: Date.now() + REPO_TTL_MS };
+      return data;
+    } catch {
+      return _repoCache?.data ?? []; // return stale on timeout/error
+    }
+  }
 
   app.get("/repos", async (_req, reply) => {
-    return reply.send({ repos: [], message: "Connect a GitHub token via Settings → Connectors to list repos." });
+    const repos = await _listGithubRepos();
+    if (repos.length === 0 && !process.env.GITHUB_TOKEN) {
+      return reply.send({ repos: [], message: "Set GITHUB_TOKEN to list repos." });
+    }
+    return reply.send({ repos: repos.map(_toRepoView) });
   });
 
   app.get("/repos/github", async (_req, reply) => {
-    return reply.send({ repos: [] });
+    return reply.send({ repos: (await _listGithubRepos()).map(_toRepoView) });
   });
 
   // -- API TOKENS ------------------------------------------------------------
+  // In-memory API token store. Each token is hashed for safe listing;
+  // the raw value is returned only at creation time.
+
+  interface ApiToken {
+    id: string;
+    name: string;
+    prefix: string;
+    hash: string;
+    scopes: string[];
+    createdAt: string;
+    lastUsedAt: string | null;
+  }
+  const _apiTokens = new Map<string, ApiToken>();
 
   app.get("/tokens", async (_req, reply) => {
-    return reply.send({ tokens: [] });
-  });
-
-  app.post<{ Body: { name: string; scopes?: string[] } }>("/tokens", async (request, reply) => {
-    return reply.code(201).send({
-      id: crypto.randomUUID(),
-      name: request.body.name,
-      token: `nxk_${crypto.randomBytes(24).toString("hex")}`,
-      scopes: request.body.scopes ?? ["*"],
-      createdAt: now(),
+    return reply.send({
+      tokens: Array.from(_apiTokens.values()).map(
+        ({ id, name, prefix, scopes, createdAt, lastUsedAt }) => ({
+          id,
+          name,
+          prefix,
+          scopes,
+          createdAt,
+          lastUsedAt,
+        }),
+      ),
     });
   });
 
+  app.post<{ Body: { name: string; scopes?: string[] } }>("/tokens", async (request, reply) => {
+    const raw = `nxk_${crypto.randomBytes(24).toString("hex")}`;
+    const hash = sha256hex(raw);
+    const id = crypto.randomUUID();
+    const entry: ApiToken = {
+      id,
+      name: request.body.name,
+      prefix: raw.slice(0, 10),
+      hash,
+      scopes: request.body.scopes ?? ["*"],
+      createdAt: now(),
+      lastUsedAt: null,
+    };
+    _apiTokens.set(id, entry);
+    return reply.code(201).send({
+      id,
+      name: entry.name,
+      token: raw,
+      prefix: entry.prefix,
+      scopes: entry.scopes,
+      createdAt: entry.createdAt,
+    });
+  });
+
+  app.delete<{ Params: { id: string } }>("/tokens/:id", async (request, reply) => {
+    if (!_apiTokens.has(request.params.id))
+      return reply.code(404).send({ error: "Token not found" });
+    _apiTokens.delete(request.params.id);
+    return reply.code(204).send();
+  });
+
   // -- WEB SEARCH ------------------------------------------------------------
+  // Delegates to Tavily when TAVILY_API_KEY is set, then SearXNG, then returns
+  // an empty result set with a setup message. Provider is determined once inside
+  // _webSearch and returned so the route handler doesn't re-read env vars.
+
+  interface WebSearchHit {
+    url: string;
+    title: string;
+    snippet: string;
+    score: number;
+  }
+
+  async function _webSearch(
+    query: string,
+  ): Promise<{ results: WebSearchHit[]; provider: string | null }> {
+    if (process.env.TAVILY_API_KEY) {
+      try {
+        const res = await fetch("https://api.tavily.com/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            api_key: process.env.TAVILY_API_KEY,
+            query,
+            search_depth: "basic",
+            max_results: 10,
+            include_answer: false,
+          }),
+          signal: AbortSignal.timeout(8_000),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as {
+            results?: { url: string; title: string; content: string; score?: number }[];
+          };
+          return {
+            results: (data.results ?? []).map((r) => ({
+              url: r.url,
+              title: r.title,
+              snippet: r.content?.slice(0, 300) ?? "",
+              score: r.score ?? 0.8,
+            })),
+            provider: "tavily",
+          };
+        }
+      } catch {
+        /* timeout or network error — fall through to SearXNG */
+      }
+    }
+    if (process.env.SEARXNG_URL) {
+      try {
+        const base = process.env.SEARXNG_URL.replace(/\/$/, "");
+        const res = await fetch(`${base}/search?q=${encodeURIComponent(query)}&format=json`, {
+          headers: { Accept: "application/json" },
+          signal: AbortSignal.timeout(8_000),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as {
+            results?: { url: string; title: string; content?: string }[];
+          };
+          return {
+            results: (data.results ?? []).slice(0, 10).map((r, i) => ({
+              url: r.url,
+              title: r.title,
+              snippet: r.content?.slice(0, 300) ?? "",
+              score: 1 - i * 0.05,
+            })),
+            provider: "searxng",
+          };
+        }
+      } catch {
+        /* timeout or network error */
+      }
+    }
+    return { results: [], provider: null };
+  }
 
   app.post<{ Body: { query: string } }>("/web-search", async (request, reply) => {
-    return reply.send({ results: [], query: request.body.query, message: "Connect Tavily API key to enable web search." });
+    const query = (request.body.query ?? "").trim();
+    if (!query) return reply.code(400).send({ error: "query is required" });
+    const { results, provider } = await _webSearch(query);
+    return reply.send({
+      results,
+      query,
+      total: results.length,
+      provider,
+      ...(provider ? {} : { message: "Set TAVILY_API_KEY or SEARXNG_URL to enable web search." }),
+    });
   });
 
   app.get("/web-search/providers", async (_req, reply) => {
-    return reply.send({ providers: [{ id: "tavily", name: "Tavily", available: !!process.env.TAVILY_API_KEY }] });
+    return reply.send({
+      providers: [
+        { id: "tavily", name: "Tavily", available: !!process.env.TAVILY_API_KEY },
+        { id: "searxng", name: "SearXNG", available: !!process.env.SEARXNG_URL },
+      ],
+    });
   });
 
   // -- COSTS -----------------------------------------------------------------
@@ -1043,7 +1372,7 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
 
   function _costsInWindow(days: number) {
     const cutoff = Date.now() - days * 86_400_000;
-    return _costLog.filter(e => new Date(e.ts).getTime() >= cutoff);
+    return _costLog.filter((e) => new Date(e.ts).getTime() >= cutoff);
   }
 
   app.get<{ Querystring: { days?: string } }>("/costs/dashboard", async (req, reply) => {
@@ -1060,20 +1389,30 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     // Group by model
     const byModel: Record<string, number> = {};
     for (const e of entries) byModel[e.model] = (byModel[e.model] ?? 0) + e.costUsd;
-    return reply.send({ totalUsd: Math.round(totalUsd * 10_000) / 10_000, totalTokens, byDay, byModel, period: `${days} days`, requests: entries.length });
+    return reply.send({
+      totalUsd: Math.round(totalUsd * 10_000) / 10_000,
+      totalTokens,
+      byDay,
+      byModel,
+      period: `${days} days`,
+      requests: entries.length,
+    });
   });
 
   app.get("/costs/breakdown", async (_req, reply) => {
     const breakdown = Object.entries(
       _costLog.reduce<Record<string, { calls: number; tokens: number; usd: number }>>((acc, e) => {
         if (!acc[e.model]) acc[e.model] = { calls: 0, tokens: 0, usd: 0 };
-        acc[e.model].calls += 1;
-        acc[e.model].tokens += e.inputTokens + e.outputTokens;
-        acc[e.model].usd += e.costUsd;
+        acc[e.model]!.calls += 1;
+        acc[e.model]!.tokens += e.inputTokens + e.outputTokens;
+        acc[e.model]!.usd += e.costUsd;
         return acc;
       }, {}),
     ).map(([model, stats]) => ({ model, ...stats, usd: Math.round(stats.usd * 10_000) / 10_000 }));
-    return reply.send({ breakdown, totalUsd: Math.round(_costLog.reduce((s, e) => s + e.costUsd, 0) * 10_000) / 10_000 });
+    return reply.send({
+      breakdown,
+      totalUsd: Math.round(_costLog.reduce((s, e) => s + e.costUsd, 0) * 10_000) / 10_000,
+    });
   });
 
   app.get("/costs/per-provider", async (_req, reply) => {
@@ -1082,7 +1421,10 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
       const provider = e.model.split("/")[0] ?? e.model;
       map[provider] = (map[provider] ?? 0) + e.costUsd;
     }
-    const providers = Object.entries(map).map(([name, usd]) => ({ name, usd: Math.round(usd * 10_000) / 10_000 }));
+    const providers = Object.entries(map).map(([name, usd]) => ({
+      name,
+      usd: Math.round(usd * 10_000) / 10_000,
+    }));
     return reply.send({ providers });
   });
 
@@ -1091,27 +1433,37 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     const stats: Record<string, { tokens: number; usd: number }> = {};
     for (const e of _costLog) {
       if (!stats[e.model]) stats[e.model] = { tokens: 0, usd: 0 };
-      stats[e.model].tokens += e.inputTokens + e.outputTokens;
-      stats[e.model].usd += e.costUsd;
+      stats[e.model]!.tokens += e.inputTokens + e.outputTokens;
+      stats[e.model]!.usd += e.costUsd;
     }
     const efficiency = Object.entries(stats).map(([model, { tokens, usd }]) => ({
-      model, tokensPerDollar: usd > 0 ? Math.round(tokens / usd) : 0,
+      model,
+      tokensPerDollar: usd > 0 ? Math.round(tokens / usd) : 0,
     }));
     return reply.send({ efficiency });
   });
 
   app.get("/costs/organization", async (_req, reply) => {
     const totalUsd = _costLog.reduce((s, e) => s + e.costUsd, 0);
-    return reply.send({ totalUsd: Math.round(totalUsd * 10_000) / 10_000, seats: 1, perSeatUsd: Math.round(totalUsd * 10_000) / 10_000 });
+    return reply.send({
+      totalUsd: Math.round(totalUsd * 10_000) / 10_000,
+      seats: 1,
+      perSeatUsd: Math.round(totalUsd * 10_000) / 10_000,
+    });
   });
 
   app.get("/costs/limits", async (_req, reply) => {
-    return reply.send({ limits: { monthly_usd: null, daily_usd: null }, note: "Set limits via env NEXUS_MONTHLY_LIMIT_USD and NEXUS_DAILY_LIMIT_USD" });
+    return reply.send({
+      limits: { monthly_usd: null, daily_usd: null },
+      note: "Set limits via env NEXUS_MONTHLY_LIMIT_USD and NEXUS_DAILY_LIMIT_USD",
+    });
   });
 
   app.get("/costs/pricing", async (_req, reply) => {
     const models = Object.entries(_PRICES).map(([model, [input, output]]) => ({
-      model, inputPer1MTokens: input, outputPer1MTokens: output,
+      model,
+      inputPer1MTokens: input,
+      outputPer1MTokens: output,
     }));
     return reply.send({ models });
   });
@@ -1126,15 +1478,20 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/fine-tune/dataset", async (_req, reply) => {
     const apiKey = process.env.OPENAI_API_KEY;
-    const examples = Array.from(_evalStore.values()).filter(e => e.quality >= 4);
+    const examples = Array.from(_evalStore.values()).filter((e) => e.quality >= 4);
     let jobs: unknown[] = [];
     if (apiKey) {
       try {
         const r = await fetch("https://api.openai.com/v1/fine_tuning/jobs?limit=10", {
           headers: { Authorization: `Bearer ${apiKey}` },
         });
-        if (r.ok) { const d = (await r.json()) as { data?: unknown[] }; jobs = d.data ?? []; }
-      } catch { /* offline gracefully */ }
+        if (r.ok) {
+          const d = (await r.json()) as { data?: unknown[] };
+          jobs = d.data ?? [];
+        }
+      } catch {
+        /* offline gracefully */
+      }
     }
     return reply.send({
       success: true,
@@ -1144,129 +1501,253 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
       jobs,
       threshold: 10,
       message: apiKey
-        ? (examples.length >= 10 ? `${examples.length} eligible examples ready.` : `Need ${10 - examples.length} more rated examples (threshold: 10).`)
+        ? examples.length >= 10
+          ? `${examples.length} eligible examples ready.`
+          : `Need ${10 - examples.length} more rated examples (threshold: 10).`
         : "Add OPENAI_API_KEY to enable fine-tuning.",
     });
   });
 
   app.get("/fine-tune/export", async (_req, reply) => {
-    const examples = Array.from(_evalStore.values()).filter(e => e.quality >= 4);
+    const examples = Array.from(_evalStore.values()).filter((e) => e.quality >= 4);
     if (examples.length === 0) {
-      return reply.code(404).send({ error: "no_data", message: "No rated examples yet. Score responses in the Evaluation page first." });
+      return reply.code(404).send({
+        error: "no_data",
+        message: "No rated examples yet. Score responses in the Evaluation page first.",
+      });
     }
-    const lines = examples.map(e => JSON.stringify({
-      messages: [
-        { role: "system", content: "You are a helpful AI assistant participating in a council deliberation." },
-        { role: "user", content: e.conversation ?? `Evaluation ${e.id}` },
-        { role: "assistant", content: `High-quality response. Quality score: ${e.quality}/5. Coherence: ${e.coherence}/5. Consensus: ${e.consensus}/5.` },
-      ],
-    })).join("\n");
+    const lines = examples
+      .map((e) =>
+        JSON.stringify({
+          messages: [
+            {
+              role: "system",
+              content: "You are a helpful AI assistant participating in a council deliberation.",
+            },
+            { role: "user", content: e.conversation ?? `Evaluation ${e.id}` },
+            {
+              role: "assistant",
+              content: `High-quality response. Quality score: ${e.quality}/5. Coherence: ${e.coherence}/5. Consensus: ${e.consensus}/5.`,
+            },
+          ],
+        }),
+      )
+      .join("\n");
     reply.header("Content-Type", "application/jsonl");
-    reply.header("Content-Disposition", `attachment; filename="nexus-finetune-${now().slice(0, 10)}.jsonl"`);
+    reply.header(
+      "Content-Disposition",
+      `attachment; filename="nexus-finetune-${now().slice(0, 10)}.jsonl"`,
+    );
     return reply.send(lines);
   });
 
-  app.post<{ Body: { baseModel?: string; model?: string } }>("/fine-tune/initiate", async (req, reply) => {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return reply.code(501).send({ error: "not_configured", message: "Fine-tuning requires OPENAI_API_KEY." });
-    const examples = Array.from(_evalStore.values()).filter(e => e.quality >= 4);
-    if (examples.length < 10) {
-      return reply.code(422).send({ error: "insufficient_data", message: `Need at least 10 rated examples (have ${examples.length}). Rate more responses in the Evaluation page.` });
-    }
-    const jsonl = examples.map(e => JSON.stringify({
-      messages: [
-        { role: "system", content: "You are a helpful AI assistant participating in a council deliberation." },
-        { role: "user", content: e.conversation ?? `Evaluation ${e.id}` },
-        { role: "assistant", content: `High-quality response. Quality score: ${e.quality}/5. Coherence: ${e.coherence}/5. Consensus: ${e.consensus}/5.` },
-      ],
-    })).join("\n");
-    // 1. Upload dataset file
-    const formData = new FormData();
-    formData.append("file", new Blob([jsonl], { type: "application/jsonl" }), "dataset.jsonl");
-    formData.append("purpose", "fine-tune");
-    let fileId: string;
-    try {
-      const uploadR = await fetch("https://api.openai.com/v1/files", {
-        method: "POST", headers: { Authorization: `Bearer ${apiKey}` }, body: formData,
-      });
-      if (!uploadR.ok) {
-        const e = (await uploadR.json()) as { error?: { message?: string } };
-        return reply.code(502).send({ error: "upload_failed", message: e.error?.message ?? uploadR.statusText });
+  app.post<{ Body: { baseModel?: string; model?: string } }>(
+    "/fine-tune/initiate",
+    async (req, reply) => {
+      // BYOK: platform key → x-openai-key header → stored user provider key
+      const userId = (req as any).user?.id ?? "anonymous";
+      const headerKey = req.headers["x-openai-key"] as string | undefined;
+      const storedEntry = [..._providerKeys.values()].find(
+        (k) => k.userId === userId && k.provider === "openai",
+      );
+      const storedKey = storedEntry
+        ? (() => {
+            try {
+              return decryptKey(storedEntry.encryptedKey, storedEntry.iv, storedEntry.authTag);
+            } catch {
+              return undefined;
+            }
+          })()
+        : undefined;
+      const apiKey = process.env.OPENAI_API_KEY || headerKey || storedKey;
+      if (!apiKey)
+        return reply.code(503).send({
+          error: "not_configured",
+          message:
+            "Fine-tuning requires an OpenAI key. Set OPENAI_API_KEY, pass x-openai-key header, or store via POST /user/provider-keys.",
+        });
+      const examples = Array.from(_evalStore.values()).filter((e) => e.quality >= 4);
+      if (examples.length < 10) {
+        return reply.code(422).send({
+          error: "insufficient_data",
+          message: `Need at least 10 rated examples (have ${examples.length}). Rate more responses in the Evaluation page.`,
+        });
       }
-      fileId = ((await uploadR.json()) as { id: string }).id;
-    } catch (e) {
-      return reply.code(502).send({ error: "upload_failed", message: e instanceof Error ? e.message : String(e) });
-    }
-    // 2. Create fine-tune job
-    try {
-      const jobR = await fetch("https://api.openai.com/v1/fine_tuning/jobs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ training_file: fileId, model: req.body?.baseModel ?? req.body?.model ?? "gpt-4o-mini-2024-07-18" }),
-      });
-      if (!jobR.ok) {
-        const e = (await jobR.json()) as { error?: { message?: string } };
-        return reply.code(502).send({ error: "job_create_failed", message: e.error?.message ?? jobR.statusText });
+      const jsonl = examples
+        .map((e) =>
+          JSON.stringify({
+            messages: [
+              {
+                role: "system",
+                content: "You are a helpful AI assistant participating in a council deliberation.",
+              },
+              { role: "user", content: e.conversation ?? `Evaluation ${e.id}` },
+              {
+                role: "assistant",
+                content: `High-quality response. Quality score: ${e.quality}/5. Coherence: ${e.coherence}/5. Consensus: ${e.consensus}/5.`,
+              },
+            ],
+          }),
+        )
+        .join("\n");
+      // 1. Upload dataset file
+      const formData = new FormData();
+      formData.append("file", new Blob([jsonl], { type: "application/jsonl" }), "dataset.jsonl");
+      formData.append("purpose", "fine-tune");
+      let fileId: string;
+      try {
+        const uploadR = await fetch("https://api.openai.com/v1/files", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}` },
+          body: formData,
+        });
+        if (!uploadR.ok) {
+          const e = (await uploadR.json()) as { error?: { message?: string } };
+          return reply
+            .code(502)
+            .send({ error: "upload_failed", message: e.error?.message ?? uploadR.statusText });
+        }
+        fileId = ((await uploadR.json()) as { id: string }).id;
+      } catch (e) {
+        return reply
+          .code(502)
+          .send({ error: "upload_failed", message: e instanceof Error ? e.message : String(e) });
       }
-      const job = (await jobR.json()) as { id: string; status: string };
-      return reply.code(202).send({ success: true, jobId: job.id, status: job.status, fileId, examples: examples.length });
-    } catch (e) {
-      return reply.code(502).send({ error: "job_create_failed", message: e instanceof Error ? e.message : String(e) });
-    }
-  });
+      // 2. Create fine-tune job
+      try {
+        const jobR = await fetch("https://api.openai.com/v1/fine_tuning/jobs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            training_file: fileId,
+            model: req.body?.baseModel ?? req.body?.model ?? "gpt-4o-mini-2024-07-18",
+          }),
+        });
+        if (!jobR.ok) {
+          const e = (await jobR.json()) as { error?: { message?: string } };
+          return reply
+            .code(502)
+            .send({ error: "job_create_failed", message: e.error?.message ?? jobR.statusText });
+        }
+        const job = (await jobR.json()) as { id: string; status: string };
+        return reply.code(202).send({
+          success: true,
+          jobId: job.id,
+          status: job.status,
+          fileId,
+          examples: examples.length,
+        });
+      } catch (e) {
+        return reply.code(502).send({
+          error: "job_create_failed",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    },
+  );
 
   // -- SANDBOX (alias to code-repl) ------------------------------------------
 
-  const _sandboxResults = new Map<string, { executionId: string; status: string; output: string; error?: string; durationMs: number }>();
+  const _sandboxResults = new Map<
+    string,
+    { executionId: string; status: string; output: string; error?: string; durationMs: number }
+  >();
 
-  app.post<{ Body: { code: string; language?: string } }>("/sandbox/execute", async (request, reply) => {
-    const { code, language = "javascript" } = request.body;
-    const executionId = crypto.randomUUID();
-    const lang = language.toLowerCase();
+  app.post<{ Body: { code: string; language?: string } }>(
+    "/sandbox/execute",
+    async (request, reply) => {
+      const { code, language = "javascript" } = request.body;
+      const executionId = crypto.randomUUID();
+      const lang = language.toLowerCase();
 
-    if (lang !== "javascript" && lang !== "js" && lang !== "typescript" && lang !== "ts") {
-      const result = { executionId, status: "unsupported", output: "", error: `${language} execution requires Docker runtime. Only JavaScript is supported in this deployment.`, durationMs: 0 };
+      if (lang !== "javascript" && lang !== "js" && lang !== "typescript" && lang !== "ts") {
+        const result = {
+          executionId,
+          status: "unsupported",
+          output: "",
+          error: `${language} execution requires Docker runtime. Only JavaScript is supported in this deployment.`,
+          durationMs: 0,
+        };
+        _sandboxResults.set(executionId, result);
+        return reply.code(202).send(result);
+      }
+
+      // JavaScript: run in isolated vm context with timeout
+      const t0 = Date.now();
+      const logs: string[] = [];
+      const ctx = vm.createContext({
+        console: {
+          log: (...a: unknown[]) => logs.push(a.map(String).join(" ")),
+          error: (...a: unknown[]) => logs.push("[err] " + a.map(String).join(" ")),
+          warn: (...a: unknown[]) => logs.push("[warn] " + a.map(String).join(" ")),
+        },
+        Math,
+        JSON,
+        parseInt,
+        parseFloat,
+        isNaN,
+        isFinite,
+        encodeURIComponent,
+        decodeURIComponent,
+        setTimeout: undefined,
+        setInterval: undefined,
+        fetch: undefined,
+        require: undefined,
+      });
+      let output = "";
+      let error: string | undefined;
+      try {
+        const returnVal = vm.runInContext(code, ctx, { timeout: 5000, filename: "sandbox.js" });
+        output = [...logs, returnVal !== undefined ? String(returnVal) : ""]
+          .filter(Boolean)
+          .join("\n");
+      } catch (e) {
+        error = e instanceof Error ? e.message : String(e);
+        output = logs.join("\n");
+      }
+      const result = {
+        executionId,
+        status: error ? "error" : "done",
+        output,
+        error,
+        durationMs: Date.now() - t0,
+      };
       _sandboxResults.set(executionId, result);
-      return reply.code(202).send(result);
-    }
-
-    // JavaScript: run in isolated vm context with timeout
-    const t0 = Date.now();
-    const logs: string[] = [];
-    const ctx = vm.createContext({
-      console: { log: (...a: unknown[]) => logs.push(a.map(String).join(" ")), error: (...a: unknown[]) => logs.push("[err] " + a.map(String).join(" ")), warn: (...a: unknown[]) => logs.push("[warn] " + a.map(String).join(" ")) },
-      Math, JSON, parseInt, parseFloat, isNaN, isFinite, encodeURIComponent, decodeURIComponent,
-      setTimeout: undefined, setInterval: undefined, fetch: undefined, require: undefined,
-    });
-    let output = ""; let error: string | undefined;
-    try {
-      const returnVal = vm.runInContext(code, ctx, { timeout: 5000, filename: "sandbox.js" });
-      output = [...logs, returnVal !== undefined ? String(returnVal) : ""].filter(Boolean).join("\n");
-    } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
-      output = logs.join("\n");
-    }
-    const result = { executionId, status: error ? "error" : "done", output, error, durationMs: Date.now() - t0 };
-    _sandboxResults.set(executionId, result);
-    return reply.code(201).send(result);
-  });
+      return reply.code(201).send(result);
+    },
+  );
 
   app.get<{ Params: { id: string } }>("/sandbox/status/:id", async (request, reply) => {
-    return reply.send(_sandboxResults.get(request.params.id) ?? { executionId: request.params.id, status: "not_found" });
+    return reply.send(
+      _sandboxResults.get(request.params.id) ?? {
+        executionId: request.params.id,
+        status: "not_found",
+      },
+    );
   });
 
   // -- EVALUATION (alias to evals) -------------------------------------------
 
   // -- EVALUATION (LLM-backed scoring) ----------------------------------------
 
-  interface EvalEntry { id: string; conversation: string; quality: number; coherence: number; consensus: number; diversity: number; date: string; }
+  interface EvalEntry {
+    id: string;
+    conversation: string;
+    quality: number;
+    coherence: number;
+    consensus: number;
+    diversity: number;
+    date: string;
+  }
   const _evalStore = new PersistentStore<EvalEntry>("eval_results");
   await _evalStore.load();
 
   app.get<{ Querystring: { days?: string } }>("/evaluation/dashboard", async (req, reply) => {
     const days = parseInt(req.query.days ?? "30", 10);
     const cutoff = Date.now() - days * 86_400_000;
-    const entries = Array.from(_evalStore.values()).filter(e => new Date(e.date).getTime() >= cutoff);
+    const entries = Array.from(_evalStore.values()).filter(
+      (e) => new Date(e.date).getTime() >= cutoff,
+    );
     const avg = (key: keyof EvalEntry) =>
       entries.length ? entries.reduce((s, e) => s + (e[key] as number), 0) / entries.length : 0;
     return reply.send({
@@ -1274,9 +1755,9 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
       totalRuns: entries.length,
       currentPerformance: {
         overallScore: Math.round(avg("quality") * 100) / 100,
-        quality:      Math.round(avg("coherence")  * 100) / 100,
-        consensus:    Math.round(avg("consensus")  * 100) / 100,
-        diversity:    Math.round(avg("diversity")  * 100) / 100,
+        quality: Math.round(avg("coherence") * 100) / 100,
+        consensus: Math.round(avg("consensus") * 100) / 100,
+        diversity: Math.round(avg("diversity") * 100) / 100,
       },
     });
   });
@@ -1284,10 +1765,11 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   app.get("/evaluation/metrics", async (_req, reply) => {
     const entries = Array.from(_evalStore.values());
     if (!entries.length) return reply.send({ metrics: [], message: "No evaluation runs yet." });
-    const avg = (key: keyof EvalEntry) => entries.reduce((s, e) => s + (e[key] as number), 0) / entries.length;
+    const avg = (key: keyof EvalEntry) =>
+      entries.reduce((s, e) => s + (e[key] as number), 0) / entries.length;
     return reply.send({
       metrics: [
-        { name: "Quality",   value: Math.round(avg("quality")   * 100) / 100, trend: "stable" },
+        { name: "Quality", value: Math.round(avg("quality") * 100) / 100, trend: "stable" },
         { name: "Coherence", value: Math.round(avg("coherence") * 100) / 100, trend: "stable" },
         { name: "Consensus", value: Math.round(avg("consensus") * 100) / 100, trend: "stable" },
         { name: "Diversity", value: Math.round(avg("diversity") * 100) / 100, trend: "stable" },
@@ -1296,28 +1778,44 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get("/evaluation/results", async (_req, reply) => {
-    return reply.send({ results: Array.from(_evalStore.values()).sort((a, b) => b.date.localeCompare(a.date)) });
+    return reply.send({
+      results: Array.from(_evalStore.values()).sort((a, b) => b.date.localeCompare(a.date)),
+    });
   });
 
   app.post<{ Body: EvalEntry }>("/evaluation/results", async (req, reply) => {
-    const entry: EvalEntry = { ...req.body, id: req.body.id ?? crypto.randomUUID(), date: req.body.date ?? now().slice(0, 10) };
+    const entry: EvalEntry = {
+      ...req.body,
+      id: req.body.id ?? crypto.randomUUID(),
+      date: req.body.date ?? now().slice(0, 10),
+    };
     _evalStore.set(entry.id, entry);
     return reply.code(201).send(entry);
   });
 
   app.post<{ Body: { topic?: string; prompt?: string } }>("/evaluate", async (req, reply) => {
-    const prompt = req.body.prompt ?? req.body.topic ?? "Evaluate the quality of this council deliberation.";
+    const prompt =
+      req.body.prompt ?? req.body.topic ?? "Evaluate the quality of this council deliberation.";
     // LLM-scored eval run
-    const scoreText = await _llm([
-      systemMsg("You are an AI evaluation system. Score the given topic on four dimensions: quality, coherence, consensus, diversity. Each score is 0.0–1.0. Return only JSON: {quality, coherence, consensus, diversity}"),
-      userMsg(prompt),
-    ], 128);
-    let scores = { quality: 0.75, coherence: 0.72, consensus: 0.68, diversity: 0.81 };
-    try { Object.assign(scores, parseJsonResponse(scoreText)); } catch { /* use defaults */ }
+    const scoreText = await _llm(
+      [
+        systemMsg(
+          "You are an AI evaluation system. Score the given topic on four dimensions: quality, coherence, consensus, diversity. Each score is 0.0–1.0. Return only JSON: {quality, coherence, consensus, diversity}",
+        ),
+        userMsg(prompt),
+      ],
+      128,
+    );
+    const scores = { quality: 0.75, coherence: 0.72, consensus: 0.68, diversity: 0.81 };
+    try {
+      Object.assign(scores, parseJsonResponse(scoreText));
+    } catch {
+      /* use defaults */
+    }
     const entry: EvalEntry = {
       id: crypto.randomUUID(),
       conversation: prompt.slice(0, 80),
-      quality:   Math.min(1, Math.max(0, scores.quality)),
+      quality: Math.min(1, Math.max(0, scores.quality)),
       coherence: Math.min(1, Math.max(0, scores.coherence)),
       consensus: Math.min(1, Math.max(0, scores.consensus)),
       diversity: Math.min(1, Math.max(0, scores.diversity)),
@@ -1331,23 +1829,39 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
 
   // -- ADMIN -----------------------------------------------------------------
 
-  const _adminUsers = new Map<string, { id: string; email: string; role: string; status: string; createdAt: string }>([
-    ["local", { id: "local", email: "admin@nexus.local", role: "admin", status: "active", createdAt: now() }],
+  const _adminUsers = new Map<
+    string,
+    { id: string; email: string; role: string; status: string; createdAt: string }
+  >([
+    [
+      "local",
+      {
+        id: "local",
+        email: "admin@nexus.local",
+        role: "admin",
+        status: "active",
+        createdAt: now(),
+      },
+    ],
   ]);
 
   app.get("/admin/users", async (_req, reply) => {
     return reply.send({ users: Array.from(_adminUsers.values()), total: _adminUsers.size });
   });
 
-  app.put<{ Params: { id: string }; Body: { role?: string; status?: string } }>("/admin/users/:id", async (request, reply) => {
-    const user = _adminUsers.get(request.params.id);
-    if (!user) return reply.code(404).send({ error: "not_found" });
-    const updated = { ...user, ...request.body };
-    _adminUsers.set(request.params.id, updated);
-    return reply.send(updated);
-  });
+  app.put<{ Params: { id: string }; Body: { role?: string; status?: string } }>(
+    "/admin/users/:id",
+    async (request, reply) => {
+      const user = _adminUsers.get(request.params.id);
+      if (!user) return reply.code(404).send({ error: "not_found" });
+      const updated = { ...user, ...request.body };
+      _adminUsers.set(request.params.id, updated);
+      return reply.send(updated);
+    },
+  );
 
-  const _auditLog: Array<{ id: string; action: string; user: string; resource: string; ts: string }> = [];
+  const _auditLog: { id: string; action: string; user: string; resource: string; ts: string }[] =
+    [];
 
   app.get("/admin/audit-logs", async (_req, reply) => {
     return reply.send({ logs: _auditLog, total: _auditLog.length });
@@ -1355,20 +1869,187 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
 
   // -- BILLING ---------------------------------------------------------------
 
+  // -- BILLING (free + BYOK — no subscriptions) ---------------------------------
+  //
+  // Nexus is free to use. Users bring their own API keys (BYOK) for LLM providers.
+  // No Stripe, no checkout, no paywalls.
+
   app.get("/billing/plans", async (_req, reply) => {
     return reply.send({
+      model: "free+byok",
       plans: [
-        { id: "free",       name: "Free",       price: 0,    features: ["10k tokens/mo", "1 user"] },
-        { id: "pro",        name: "Pro",         price: 29,   features: ["5M tokens/mo", "5 users", "Priority support"] },
-        { id: "enterprise", name: "Enterprise",  price: null, features: ["Unlimited tokens", "Unlimited users", "SLA"] },
+        {
+          id: "free",
+          name: "Free",
+          price: 0,
+          features: ["Unlimited usage", "All features included", "Self-hosted or cloud"],
+        },
+        {
+          id: "byok",
+          name: "BYOK",
+          price: 0,
+          features: [
+            "Bring your own OpenAI / Anthropic / Groq key",
+            "Full cost control",
+            "Zero markup",
+          ],
+        },
       ],
       current: "free",
+      note: "Nexus is free. Add your own provider keys under /user/provider-keys to unlock LLM features.",
     });
   });
 
   app.post("/billing/checkout", async (_req, reply) => {
-    return reply.code(501).send({ error: "billing_not_configured", message: "Configure Stripe keys to enable billing." });
+    return reply.send({
+      ok: true,
+      message: "No checkout needed — Nexus is free. Use /user/provider-keys to add your LLM keys.",
+    });
   });
+
+  // -- BYOK PROVIDER KEYS --------------------------------------------------------
+  //
+  // Users store their own LLM provider API keys. Keys are encrypted at rest with
+  // AES-256-GCM using a server-side encryption key derived from NEXUS_ENCRYPTION_KEY
+  // (falls back to a deterministic dev key — warn in production).
+  //
+  // Stored: { id, userId, provider, keyPrefix (first 8 chars), encryptedKey, iv, authTag, createdAt }
+  // Returned: id, provider, keyPrefix, createdAt only — never the raw key.
+
+  type ProviderName = "openai" | "anthropic" | "groq" | "replicate" | "stability";
+
+  interface StoredProviderKey {
+    id: string;
+    userId: string;
+    provider: ProviderName;
+    keyPrefix: string;
+    encryptedKey: string; // hex
+    iv: string; // hex, 12 bytes
+    authTag: string; // hex, 16 bytes
+    createdAt: string;
+  }
+
+  const _providerKeys = new Map<string, StoredProviderKey>(); // keyed by id
+
+  function getEncryptionKey(): Buffer {
+    const raw = process.env.NEXUS_ENCRYPTION_KEY;
+    if (!raw) {
+      // Dev fallback — log warning once
+      process.emitWarning(
+        "NEXUS_ENCRYPTION_KEY not set — using insecure dev key. Set it in production.",
+        "NexusBYOK",
+      );
+      return Buffer.alloc(32, 0x4e); // 'N' * 32
+    }
+    // Accept hex (64 chars) or raw string (padded/truncated to 32 bytes)
+    if (/^[0-9a-fA-F]{64}$/.test(raw)) return Buffer.from(raw, "hex");
+    return Buffer.from(raw.slice(0, 32).padEnd(32, "0"), "utf8");
+  }
+
+  function encryptKey(plaintext: string): { encrypted: string; iv: string; authTag: string } {
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv("aes-256-gcm", getEncryptionKey(), iv);
+    const enc = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+    return {
+      encrypted: enc.toString("hex"),
+      iv: iv.toString("hex"),
+      authTag: cipher.getAuthTag().toString("hex"),
+    };
+  }
+
+  function decryptKey(encrypted: string, iv: string, authTag: string): string {
+    const decipher = crypto.createDecipheriv(
+      "aes-256-gcm",
+      getEncryptionKey(),
+      Buffer.from(iv, "hex"),
+    );
+    decipher.setAuthTag(Buffer.from(authTag, "hex"));
+    return Buffer.concat([
+      decipher.update(Buffer.from(encrypted, "hex")),
+      decipher.final(),
+    ]).toString("utf8");
+  }
+
+  const VALID_PROVIDERS: ProviderName[] = ["openai", "anthropic", "groq", "replicate", "stability"];
+
+  // POST /user/provider-keys — store a new provider key
+  app.post<{ Body: { provider: string; apiKey: string; label?: string } }>(
+    "/user/provider-keys",
+    async (request, reply) => {
+      const { provider, apiKey } = request.body ?? {};
+      if (!provider || !apiKey)
+        return reply.code(400).send({ error: "provider and apiKey are required" });
+      if (!VALID_PROVIDERS.includes(provider as ProviderName)) {
+        return reply.code(400).send({ error: "invalid_provider", valid: VALID_PROVIDERS });
+      }
+      if (apiKey.length < 8) return reply.code(400).send({ error: "apiKey too short" });
+
+      // One key per provider per user — overwrite if exists
+      const userId = (request as any).user?.id ?? "anonymous";
+      const existingId = [..._providerKeys.values()].find(
+        (k) => k.userId === userId && k.provider === (provider as ProviderName),
+      )?.id;
+      if (existingId) _providerKeys.delete(existingId);
+
+      const { encrypted, iv, authTag } = encryptKey(apiKey);
+      const entry: StoredProviderKey = {
+        id: crypto.randomUUID(),
+        userId,
+        provider: provider as ProviderName,
+        keyPrefix: apiKey.slice(0, 8),
+        encryptedKey: encrypted,
+        iv,
+        authTag,
+        createdAt: new Date().toISOString(),
+      };
+      _providerKeys.set(entry.id, entry);
+
+      return reply.code(201).send({
+        id: entry.id,
+        provider: entry.provider,
+        keyPrefix: entry.keyPrefix,
+        createdAt: entry.createdAt,
+      });
+    },
+  );
+
+  // GET /user/provider-keys — list stored keys (prefix only, never raw key)
+  app.get("/user/provider-keys", async (request, reply) => {
+    const userId = (request as any).user?.id ?? "anonymous";
+    const keys = [..._providerKeys.values()]
+      .filter((k) => k.userId === userId)
+      .map(({ id, provider, keyPrefix, createdAt }) => ({ id, provider, keyPrefix, createdAt }));
+    return reply.send({ keys, total: keys.length });
+  });
+
+  // DELETE /user/provider-keys/:id — remove a stored key
+  app.delete<{ Params: { id: string } }>("/user/provider-keys/:id", async (request, reply) => {
+    const userId = (request as any).user?.id ?? "anonymous";
+    const entry = _providerKeys.get(request.params.id);
+    if (!entry) return reply.code(404).send({ error: "not_found" });
+    if (entry.userId !== userId) return reply.code(403).send({ error: "forbidden" });
+    _providerKeys.delete(request.params.id);
+    return reply.send({ ok: true });
+  });
+
+  // GET /user/provider-keys/resolve/:provider — internal helper (returns decrypted key for LLM router)
+  // Not authenticated by user auth — called server-side only. Not exposed in public API docs.
+  app.get<{ Params: { provider: string } }>(
+    "/user/provider-keys/resolve/:provider",
+    async (request, reply) => {
+      const userId = (request as any).user?.id ?? "anonymous";
+      const entry = [..._providerKeys.values()].find(
+        (k) => k.userId === userId && k.provider === (request.params.provider as ProviderName),
+      );
+      if (!entry) return reply.code(404).send({ error: "no_key_for_provider" });
+      try {
+        const plaintext = decryptKey(entry.encryptedKey, entry.iv, entry.authTag);
+        return reply.send({ provider: entry.provider, apiKey: plaintext });
+      } catch {
+        return reply.code(500).send({ error: "decryption_failed" });
+      }
+    },
+  );
 
   // -- FEATURE FLAGS ---------------------------------------------------------
 
@@ -1378,29 +2059,36 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     return reply.send({ flags: Object.fromEntries(_flags) });
   });
 
-  app.post<{ Body: { key: string; enabled: boolean } }>("/feature-flags/admin/flags", async (request, reply) => {
-    _flags.set(request.body.key, request.body.enabled);
-    return reply.send({ ok: true });
-  });
+  app.post<{ Body: { key: string; enabled: boolean } }>(
+    "/feature-flags/admin/flags",
+    async (request, reply) => {
+      _flags.set(request.body.key, request.body.enabled);
+      return reply.send({ ok: true });
+    },
+  );
 
   // -- FEEDBACK --------------------------------------------------------------
 
-  app.get("/feedback/stats", async (_req, reply) => reply.send({ total: 0, byRating: {}, byModel: {} }));
+  app.get("/feedback/stats", async (_req, reply) =>
+    reply.send({ total: 0, byRating: {}, byModel: {} }),
+  );
   app.get("/feedback/export", async (_req, reply) => reply.send({ entries: [] }));
 
   // -- CONNECTORS -----------------------------------------------------------
-
 
   app.get("/connectors", async (_req, reply) => {
     return reply.send({ connectors: Array.from(_connectors.values()) });
   });
 
-  app.post<{ Body: { type?: string; label?: string; [k: string]: unknown } }>("/connectors", async (request, reply) => {
-    const id = crypto.randomUUID();
-    const { type = "custom", label = "Connector" } = request.body;
-    _connectors.set(id, { id, type, label, status: "connected" });
-    return reply.code(201).send({ id, type, label, status: "connected" });
-  });
+  app.post<{ Body: { type?: string; label?: string; [k: string]: unknown } }>(
+    "/connectors",
+    async (request, reply) => {
+      const id = crypto.randomUUID();
+      const { type = "custom", label = "Connector" } = request.body;
+      _connectors.set(id, { id, type, label, status: "connected" });
+      return reply.code(201).send({ id, type, label, status: "connected" });
+    },
+  );
 
   app.delete<{ Params: { id: string } }>("/connectors/:id", async (request, reply) => {
     _connectors.delete(request.params.id);
@@ -1412,17 +2100,18 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post<{ Params: { id: string } }>("/connectors/:id/sync", async (request, reply) => {
-    return reply.code(202).send({ jobId: crypto.randomUUID(), status: "queued", connectorId: request.params.id });
+    return reply
+      .code(202)
+      .send({ jobId: crypto.randomUUID(), status: "queued", connectorId: request.params.id });
   });
 
   // -- CRAFT (LLM-powered content generation) --------------------------------
 
-
   const CRAFT_TEMPLATES = [
-    { id: "blog-post",       name: "Blog Post",        description: "Long-form blog article" },
-    { id: "email",           name: "Email",            description: "Professional email draft" },
-    { id: "product-desc",    name: "Product Description", description: "Compelling product copy" },
-    { id: "social-post",     name: "Social Post",      description: "Engaging social media post" },
+    { id: "blog-post", name: "Blog Post", description: "Long-form blog article" },
+    { id: "email", name: "Email", description: "Professional email draft" },
+    { id: "product-desc", name: "Product Description", description: "Compelling product copy" },
+    { id: "social-post", name: "Social Post", description: "Engaging social media post" },
     { id: "executive-summary", name: "Executive Summary", description: "Concise exec summary" },
   ];
 
@@ -1482,14 +2171,64 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
 
   // -- EXTRACTION (LLM-powered structured data extraction) ------------------
 
-  const _schemaStore = new Map<string, { id: string; name: string; schema: unknown; createdAt: string }>();
-  const _extractionJobs = new Map<string, { id: string; status: string; result: unknown; createdAt: string }>();
+  const _schemaStore = new Map<
+    string,
+    { id: string; name: string; schema: unknown; createdAt: string }
+  >();
+  const _extractionJobs = new Map<
+    string,
+    { id: string; status: string; result: unknown; createdAt: string }
+  >();
 
   const EXTRACTION_TEMPLATES = [
-    { id: "contact",  name: "Contact Info",   schema: { type:"object", properties:{ name:{type:"string"}, email:{type:"string"}, phone:{type:"string"} } } },
-    { id: "event",    name: "Event",           schema: { type:"object", properties:{ title:{type:"string"}, date:{type:"string"}, location:{type:"string"} } } },
-    { id: "product",  name: "Product",         schema: { type:"object", properties:{ name:{type:"string"}, price:{type:"number"}, description:{type:"string"} } } },
-    { id: "invoice",  name: "Invoice",         schema: { type:"object", properties:{ vendor:{type:"string"}, amount:{type:"number"}, dueDate:{type:"string"} } } },
+    {
+      id: "contact",
+      name: "Contact Info",
+      schema: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          email: { type: "string" },
+          phone: { type: "string" },
+        },
+      },
+    },
+    {
+      id: "event",
+      name: "Event",
+      schema: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          date: { type: "string" },
+          location: { type: "string" },
+        },
+      },
+    },
+    {
+      id: "product",
+      name: "Product",
+      schema: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          price: { type: "number" },
+          description: { type: "string" },
+        },
+      },
+    },
+    {
+      id: "invoice",
+      name: "Invoice",
+      schema: {
+        type: "object",
+        properties: {
+          vendor: { type: "string" },
+          amount: { type: "number" },
+          dueDate: { type: "string" },
+        },
+      },
+    },
   ];
 
   // Schema inference via LLM
@@ -1499,20 +2238,34 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     const driver = getDefaultDriver();
     if (!driver) {
       // Best-effort heuristic schema when no LLM available
-      return reply.send({ schema: { type: "object", properties: { content: { type: "string" } }, required: ["content"] } });
+      return reply.send({
+        schema: {
+          type: "object",
+          properties: { content: { type: "string" } },
+          required: ["content"],
+        },
+      });
     }
     const res = await driver.complete({
       model: DEFAULT_MODEL,
-      messages: [{
-        role: "user" as LlmRole,
-        content: `Analyse this text and infer a JSON Schema (draft-07) that describes the key structured data it contains.\nReturn ONLY valid JSON — no explanation.\n\nText:\n${text.slice(0, 2000)}`,
-      }],
+      messages: [
+        {
+          role: "user" as LlmRole,
+          content: `Analyse this text and infer a JSON Schema (draft-07) that describes the key structured data it contains.\nReturn ONLY valid JSON — no explanation.\n\nText:\n${text.slice(0, 2000)}`,
+        },
+      ],
       maxTokens: 512,
     });
     _trackCost(DEFAULT_MODEL, res.usage);
     let schema: unknown;
-    try { schema = parseJsonResponse(res.content); }
-    catch { schema = { type: "object", properties: { extracted: { type: "string", description: res.content } } }; }
+    try {
+      schema = parseJsonResponse(res.content);
+    } catch {
+      schema = {
+        type: "object",
+        properties: { extracted: { type: "string", description: res.content } },
+      };
+    }
     return reply.send({ schema });
   });
 
@@ -1522,73 +2275,109 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     if (!driver) return { raw: text.slice(0, 200) };
     const res = await driver.complete({
       model: DEFAULT_MODEL,
-      messages: [{
-        role: "user" as LlmRole,
-        content: `Extract structured data from the following text according to this JSON Schema.\nReturn ONLY valid JSON.\n\nSchema:\n${JSON.stringify(schema, null, 2)}\n\nText:\n${text.slice(0, 3000)}`,
-      }],
+      messages: [
+        {
+          role: "user" as LlmRole,
+          content: `Extract structured data from the following text according to this JSON Schema.\nReturn ONLY valid JSON.\n\nSchema:\n${JSON.stringify(schema, null, 2)}\n\nText:\n${text.slice(0, 3000)}`,
+        },
+      ],
       maxTokens: 1024,
     });
     _trackCost(DEFAULT_MODEL, res.usage);
-    try { return parseJsonResponse(res.content); }
-    catch { return { raw: res.content }; }
+    try {
+      return parseJsonResponse(res.content);
+    } catch {
+      return { raw: res.content };
+    }
   };
 
-  app.post<{ Body: { text: string; schema?: unknown; schemaId?: string } }>("/extraction/preview", async (request, reply) => {
-    const { text, schema, schemaId } = request.body;
-    const resolvedSchema = schema ?? _schemaStore.get(schemaId ?? "")?.schema ?? EXTRACTION_TEMPLATES[0]?.schema;
-    const result = await _extractWithLLM(text, resolvedSchema);
-    return reply.send({ preview: result, schema: resolvedSchema });
-  });
+  app.post<{ Body: { text: string; schema?: unknown; schemaId?: string } }>(
+    "/extraction/preview",
+    async (request, reply) => {
+      const { text, schema, schemaId } = request.body;
+      const resolvedSchema =
+        schema ?? _schemaStore.get(schemaId ?? "")?.schema ?? EXTRACTION_TEMPLATES[0]?.schema;
+      const result = await _extractWithLLM(text, resolvedSchema);
+      return reply.send({ preview: result, schema: resolvedSchema });
+    },
+  );
 
-  app.post<{ Body: { text: string; schema?: unknown; schemaId?: string } }>("/extraction/run", async (request, reply) => {
-    const { text, schema, schemaId } = request.body;
-    const resolvedSchema = schema ?? _schemaStore.get(schemaId ?? "")?.schema ?? EXTRACTION_TEMPLATES[0]?.schema;
-    const result = await _extractWithLLM(text, resolvedSchema);
-    const id = crypto.randomUUID();
-    _extractionJobs.set(id, { id, status: "done", result, createdAt: now() });
-    return reply.code(201).send({ id, result, status: "done" });
-  });
+  app.post<{ Body: { text: string; schema?: unknown; schemaId?: string } }>(
+    "/extraction/run",
+    async (request, reply) => {
+      const { text, schema, schemaId } = request.body;
+      const resolvedSchema =
+        schema ?? _schemaStore.get(schemaId ?? "")?.schema ?? EXTRACTION_TEMPLATES[0]?.schema;
+      const result = await _extractWithLLM(text, resolvedSchema);
+      const id = crypto.randomUUID();
+      _extractionJobs.set(id, { id, status: "done", result, createdAt: now() });
+      return reply.code(201).send({ id, result, status: "done" });
+    },
+  );
 
-  app.get("/extraction/templates", async (_req, reply) => reply.send({ templates: EXTRACTION_TEMPLATES }));
+  app.get("/extraction/templates", async (_req, reply) =>
+    reply.send({ templates: EXTRACTION_TEMPLATES }),
+  );
 
-  app.get("/extraction/schemas", async (_req, reply) => reply.send({ schemas: Array.from(_schemaStore.values()) }));
-  app.post<{ Body: { name: string; schema: unknown } }>("/extraction/schemas", async (request, reply) => {
-    const id = crypto.randomUUID();
-    _schemaStore.set(id, { id, name: request.body.name, schema: request.body.schema, createdAt: now() });
-    return reply.code(201).send({ id, name: request.body.name });
-  });
+  app.get("/extraction/schemas", async (_req, reply) =>
+    reply.send({ schemas: Array.from(_schemaStore.values()) }),
+  );
+  app.post<{ Body: { name: string; schema: unknown } }>(
+    "/extraction/schemas",
+    async (request, reply) => {
+      const id = crypto.randomUUID();
+      _schemaStore.set(id, {
+        id,
+        name: request.body.name,
+        schema: request.body.schema,
+        createdAt: now(),
+      });
+      return reply.code(201).send({ id, name: request.body.name });
+    },
+  );
   app.delete<{ Params: { id: string } }>("/extraction/schemas/:id", async (request, reply) => {
-    _schemaStore.delete(request.params.id); return reply.code(204).send();
+    _schemaStore.delete(request.params.id);
+    return reply.code(204).send();
   });
 
-  app.get("/extraction/jobs", async (_req, reply) => reply.send({ jobs: Array.from(_extractionJobs.values()) }));
+  app.get("/extraction/jobs", async (_req, reply) =>
+    reply.send({ jobs: Array.from(_extractionJobs.values()) }),
+  );
   app.get<{ Params: { id: string } }>("/extraction/jobs/:id", async (request, reply) => {
-    return reply.send(_extractionJobs.get(request.params.id) ?? reply.code(404).send({ error: "not_found" }));
+    return reply.send(
+      _extractionJobs.get(request.params.id) ?? reply.code(404).send({ error: "not_found" }),
+    );
   });
   app.delete<{ Params: { id: string } }>("/extraction/jobs/:id", async (request, reply) => {
-    _extractionJobs.delete(request.params.id); return reply.code(204).send();
+    _extractionJobs.delete(request.params.id);
+    return reply.code(204).send();
   });
   app.get<{ Params: { id: string } }>("/extraction/jobs/:id/export", async (request, reply) => {
     const job = _extractionJobs.get(request.params.id);
     if (!job) return reply.code(404).send({ error: "not_found" });
     reply.header("Content-Type", "application/json");
-    reply.header("Content-Disposition", `attachment; filename="extraction-${request.params.id}.json"`);
+    reply.header(
+      "Content-Disposition",
+      `attachment; filename="extraction-${request.params.id}.json"`,
+    );
     return reply.send(JSON.stringify(job.result, null, 2));
   });
 
   // -- SKILLS ----------------------------------------------------------------
 
-
   app.get("/skills", async (_req, reply) => {
     return reply.send({ skills: Array.from(_skills.values()) });
   });
 
-  app.post<{ Body: { name: string; description?: string; enabled?: boolean } }>("/skills", async (request, reply) => {
-    const id = crypto.randomUUID();
-    const { name, description = "", enabled = true } = request.body;
-    _skills.set(id, { id, name, description, enabled });
-    return reply.code(201).send({ id, name, description, enabled });
-  });
+  app.post<{ Body: { name: string; description?: string; enabled?: boolean } }>(
+    "/skills",
+    async (request, reply) => {
+      const id = crypto.randomUUID();
+      const { name, description = "", enabled = true } = request.body;
+      _skills.set(id, { id, name, description, enabled });
+      return reply.code(201).send({ id, name, description, enabled });
+    },
+  );
 
   app.delete<{ Params: { id: string } }>("/skills/:id", async (request, reply) => {
     _skills.delete(request.params.id);
@@ -1600,29 +2389,43 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   app.get("/reasoning/modes", async (_req, reply) => {
     return reply.send({
       modes: [
-        { id: "chain-of-thought", label: "Chain of Thought", description: "Step-by-step reasoning" },
-        { id: "tree-of-thought", label: "Tree of Thought", description: "Branching reasoning paths" },
+        {
+          id: "chain-of-thought",
+          label: "Chain of Thought",
+          description: "Step-by-step reasoning",
+        },
+        {
+          id: "tree-of-thought",
+          label: "Tree of Thought",
+          description: "Branching reasoning paths",
+        },
         { id: "reflexion", label: "Reflexion", description: "Self-critique and revision" },
       ],
     });
   });
 
-  app.post<{ Body: { question: string; mode?: string } }>("/reasoning/run", async (request, reply) => {
-    const driver = getDefaultDriver();
-    if (!driver) return reply.code(503).send({ error: "No driver available" });
+  app.post<{ Body: { question: string; mode?: string } }>(
+    "/reasoning/run",
+    async (request, reply) => {
+      const driver = getDefaultDriver();
+      if (!driver) return reply.code(503).send({ error: "No driver available" });
 
-    const system = "Think step by step. Show your reasoning explicitly before giving the final answer.";
-    const res = await driver.complete({
-      model: "anthropic/claude-3.5-sonnet",
-      messages: [{ role: "system" as LlmRole, content: system }, { role: "user" as LlmRole, content: request.body.question }],
-      maxTokens: 2048,
-    });
-    _trackCost("anthropic/claude-3.5-sonnet", res.usage);
-    return reply.send({ reasoning: res.content, mode: request.body.mode ?? "chain-of-thought" });
-  });
+      const system =
+        "Think step by step. Show your reasoning explicitly before giving the final answer.";
+      const res = await driver.complete({
+        model: "anthropic/claude-3.5-sonnet",
+        messages: [
+          { role: "system" as LlmRole, content: system },
+          { role: "user" as LlmRole, content: request.body.question },
+        ],
+        maxTokens: 2048,
+      });
+      _trackCost("anthropic/claude-3.5-sonnet", res.usage);
+      return reply.send({ reasoning: res.content, mode: request.body.mode ?? "chain-of-thought" });
+    },
+  );
 
   // -- KNOWLEDGE BASES -------------------------------------------------------
-
 
   app.get("/kb", async (_req, reply) => {
     return reply.send({ knowledgeBases: Array.from(_kbStore.values()), total: _kbStore.size });
@@ -1648,18 +2451,20 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(202).send({ jobId: crypto.randomUUID(), status: "indexing" });
   });
 
-  app.delete<{ Params: { id: string; docId: string } }>("/kb/:id/documents/:docId", async (_req, reply) => {
-    return reply.code(204).send();
-  });
+  app.delete<{ Params: { id: string; docId: string } }>(
+    "/kb/:id/documents/:docId",
+    async (_req, reply) => {
+      return reply.code(204).send();
+    },
+  );
 
   // -- IMAGE GENERATION ------------------------------------------------------
-
 
   app.get("/images/providers", async (_req, reply) => {
     return reply.send({
       providers: [
-        { id: "openai-dalle", name: "DALL·E 3 (OpenAI)",  available: !!process.env.OPENAI_API_KEY },
-        { id: "replicate",    name: "Replicate",           available: !!process.env.REPLICATE_API_KEY },
+        { id: "openai-dalle", name: "DALL·E 3 (OpenAI)", available: !!process.env.OPENAI_API_KEY },
+        { id: "replicate", name: "Replicate", available: !!process.env.REPLICATE_API_KEY },
       ],
     });
   });
@@ -1668,58 +2473,76 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     return reply.send({ images: Array.from(_imageStore.values()), total: _imageStore.size });
   });
 
-  app.post<{ Body: { prompt: string; size?: string; quality?: string; style?: string; provider?: string } }>(
-    "/images/generate",
-    async (request, reply) => {
-      const { prompt, size = "1024x1024", quality = "standard", style = "vivid" } = request.body;
-      if (!prompt) return reply.code(400).send({ error: "prompt_required" });
-      const gen = getImageGen();
-      if (!gen) {
-        return reply.code(503).send({
-          error: "no_provider",
-          message: "Set OPENAI_API_KEY or REPLICATE_API_KEY to enable image generation.",
-        });
-      }
-      try {
-        const result = await gen.gen.generate(prompt, {
-          size: size as ImageSize,
-          quality: quality as "standard" | "hd",
-          style: style as "vivid" | "natural",
-          n: 1,
-        });
-        const img = result.images[0];
-        const id = crypto.randomUUID();
-        const record = {
-          id,
-          url: img?.url ?? "",
-          b64: img?.b64,
-          prompt,
-          revisedPrompt: img?.revisedPrompt,
-          provider: gen.provider,
-          createdAt: now(),
-        };
-        _imageStore.set(id, record);
-        return reply.code(201).send(record);
-      } catch (err) {
-        return reply.code(502).send({ error: "generation_failed", message: String(err) });
-      }
-    },
-  );
+  app.post<{
+    Body: { prompt: string; size?: string; quality?: string; style?: string; provider?: string };
+  }>("/images/generate", async (request, reply) => {
+    const { prompt, size = "1024x1024", quality = "standard", style = "vivid" } = request.body;
+    if (!prompt) return reply.code(400).send({ error: "prompt_required" });
+    const gen = getImageGen();
+    if (!gen) {
+      return reply.code(503).send({
+        error: "no_provider",
+        message: "Set OPENAI_API_KEY or REPLICATE_API_KEY to enable image generation.",
+      });
+    }
+    try {
+      const result = await gen.gen.generate(prompt, {
+        size: size as ImageSize,
+        quality: quality as "standard" | "hd",
+        style: style as "vivid" | "natural",
+        n: 1,
+      });
+      const img = result.images[0];
+      const id = crypto.randomUUID();
+      const record = {
+        id,
+        url: img?.url ?? "",
+        b64: img?.data ? Buffer.from(img.data).toString("base64") : undefined,
+        prompt,
+        revisedPrompt: img?.revisedPrompt,
+        provider: gen.provider,
+        createdAt: now(),
+      };
+      _imageStore.set(id, record);
+      return reply.code(201).send(record);
+    } catch (err) {
+      return reply.code(502).send({ error: "generation_failed", message: String(err) });
+    }
+  });
 
   app.delete<{ Params: { id: string } }>("/images/:id", async (request, reply) => {
     _imageStore.delete(request.params.id);
     return reply.code(204).send();
   });
 
-  // -- TOKENS (usage stats) --------------------------------------------------
+  // -- TOKEN USAGE (LLM token consumption stats) ----------------------------
+  // Distinct from /tokens (API key management). Reads from _costLog accumulated
+  // by _llm() helper calls.
 
-  app.get("/tokens", async (_req, reply) => {
-    return reply.send({ used: 0, limit: null, byModel: {}, byDay: [] });
+  app.get("/token-usage", async (_req, reply) => {
+    // Single pass over _costLog: compute used, byModel, byDay simultaneously
+    let used = 0;
+    const byModel: Record<string, number> = {};
+    const byDayMap: Record<string, number> = {};
+    for (const e of _costLog) {
+      const tokens = e.inputTokens + e.outputTokens;
+      used += tokens;
+      byModel[e.model] = (byModel[e.model] ?? 0) + tokens;
+      const d = e.ts.slice(0, 10);
+      byDayMap[d] = (byDayMap[d] ?? 0) + tokens;
+    }
+    const byDay = Object.entries(byDayMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, tokens]) => ({ date, tokens }));
+    return reply.send({ used, limit: null, byModel, byDay });
   });
 
   // ── Deep-research endpoints ───────────────────────────────────────────────
   // In-memory job store — persists across requests in the same process.
-  const _researchJobs = new Map<string, { id: string; query: string; status: string; result: string }>();
+  const _researchJobs = new Map<
+    string,
+    { id: string; query: string; status: string; result: string }
+  >();
 
   app.get("/research", async (_req, reply) => {
     return reply.send(Array.from(_researchJobs.values()));
@@ -1746,7 +2569,9 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     reply.hijack();
     const raw = reply.raw;
     raw.writeHead(200, SSE_HEADERS);
-    const write = (d: unknown) => { if (!raw.destroyed) raw.write(`data: ${JSON.stringify(d)}\n\n`); };
+    const write = (d: unknown) => {
+      if (!raw.destroyed) raw.write(`data: ${JSON.stringify(d)}\n\n`);
+    };
     const query = job?.query ?? "unknown query";
 
     write({ type: "phase", phase: "planning", message: "Planning research scope…" });
@@ -1762,19 +2587,43 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
             body: JSON.stringify({ api_key: tavilyKey, query: q, max_results: 6 }),
           });
           if (!r.ok) return [];
-          const data = (await r.json()) as { results?: Array<{ url: string; title?: string; content?: string; score?: number }> };
+          const data = (await r.json()) as {
+            results?: { url: string; title?: string; content?: string; score?: number }[];
+          };
           return (data.results ?? []).map((x) => ({
-            url: x.url, title: x.title ?? x.url, snippet: x.content ?? "", score: x.score ?? 0, source: "web" as const,
+            url: x.url,
+            title: x.title ?? x.url,
+            snippet: x.content ?? "",
+            score: x.score ?? 0,
+            source: "web" as const,
           }));
         }
       : async (q: string): Promise<ResearchSearchResult[]> => {
-          write({ type: "phase", phase: "searching", message: "No TAVILY_API_KEY — scraping query context…" });
+          write({
+            type: "phase",
+            phase: "searching",
+            message: "No TAVILY_API_KEY — scraping query context…",
+          });
           // Fallback: search DuckDuckGo HTML (no key needed) and parse result URLs
           try {
-            const html = await getScraper().scrape(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`, { timeout: 10_000 });
-            const urls = [...html.text.matchAll(/https?:\/\/[^\s"')>]+/g)].map((m) => m[0]).filter((u) => !u.includes("duckduckgo")).slice(0, 4);
-            return urls.map((url) => ({ url, title: url, snippet: "", score: 0.5, source: "web" as const }));
-          } catch { return []; }
+            const html = await getScraper().scrape(
+              `https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`,
+              { timeout: 10_000 },
+            );
+            const urls = [...html.text.matchAll(/https?:\/\/[^\s"')>]+/g)]
+              .map((m) => m[0])
+              .filter((u) => !u.includes("duckduckgo"))
+              .slice(0, 4);
+            return urls.map((url) => ({
+              url,
+              title: url,
+              snippet: "",
+              score: 0.5,
+              source: "web" as const,
+            }));
+          } catch {
+            return [];
+          }
         };
 
     // Build synthesizeFn — use first available LLM driver
@@ -1786,12 +2635,22 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
           ? `Found ${results.length} results for "${q}". Top source: ${results[0]?.url}`
           : `No results found for "${q}". Configure TAVILY_API_KEY for web search.`;
       }
-      const context = results.slice(0, 5).map((r) => `Source: ${r.url}\n${r.snippet}`).join("\n\n");
+      const context = results
+        .slice(0, 5)
+        .map((r) => `Source: ${r.url}\n${r.snippet}`)
+        .join("\n\n");
       const res = await driver.complete({
         model: DEFAULT_MODEL,
         messages: [
-          { role: "system" as LlmRole, content: "You are a research assistant. Synthesise the provided search results into a clear, factual summary." },
-          { role: "user" as LlmRole, content: `Research question: ${q}\n\nSearch results:\n${context}\n\nProvide a concise synthesis.` },
+          {
+            role: "system" as LlmRole,
+            content:
+              "You are a research assistant. Synthesise the provided search results into a clear, factual summary.",
+          },
+          {
+            role: "user" as LlmRole,
+            content: `Research question: ${q}\n\nSearch results:\n${context}\n\nProvide a concise synthesis.`,
+          },
         ],
         maxTokens: 1024,
       });
@@ -1802,7 +2661,10 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     try {
       const researcher = new WebResearcher({ searchFn, synthesizeFn, maxResults: 6 });
       const finding = await researcher.research(query);
-      if (job) { job.status = "done"; job.result = finding.synthesis; }
+      if (job) {
+        job.status = "done";
+        job.result = finding.synthesis;
+      }
       write({
         type: "result",
         id: request.params.id,
@@ -1814,7 +2676,9 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
         results: finding.results,
       });
     } catch (err) {
-      if (job) { job.status = "error"; }
+      if (job) {
+        job.status = "error";
+      }
       write({ type: "error", message: String(err) });
     }
     raw.end();
@@ -1831,8 +2695,14 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   // ══════════════════════════════════════════════════════════════════════════
 
   const _dockerReady = isDockerAvailable();
-  const _kernelManager = new KernelManager({ executor: new DockerReplExecutor(), jupyterMode: true });
-  const _fallbackKernelManager = new KernelManager({ executor: new MockReplExecutor(), jupyterMode: true });
+  const _kernelManager = new KernelManager({
+    executor: new DockerReplExecutor(),
+    jupyterMode: true,
+  });
+  const _fallbackKernelManager = new KernelManager({
+    executor: new MockReplExecutor(),
+    jupyterMode: true,
+  });
 
   async function _getKernelManager(): Promise<KernelManager> {
     return (await _dockerReady) ? _kernelManager : _fallbackKernelManager;
@@ -1956,17 +2826,14 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   );
 
   /** DELETE /code-agent/sessions/:id — destroy a kernel session. */
-  app.delete<{ Params: { id: string } }>(
-    "/code-agent/sessions/:id",
-    async (request, reply) => {
-      const km = await _getKernelManager();
-      if (!km.has(request.params.id)) {
-        return reply.code(404).send({ error: "session_not_found" });
-      }
-      km.destroy(request.params.id);
-      return reply.code(204).send();
-    },
-  );
+  app.delete<{ Params: { id: string } }>("/code-agent/sessions/:id", async (request, reply) => {
+    const km = await _getKernelManager();
+    if (!km.has(request.params.id)) {
+      return reply.code(404).send({ error: "session_not_found" });
+    }
+    km.destroy(request.params.id);
+    return reply.code(204).send();
+  });
 
   /**
    * POST /build/run — compile/build task via sandboxed REPL.
@@ -2048,8 +2915,8 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
         const content = await page.content();
         const title = await page.title();
         return reply.send({
-          url: nav.finalUrl ?? request.body.url,
-          statusCode: nav.statusCode ?? null,
+          url: nav.url ?? request.body.url,
+          statusCode: nav.status ?? null,
           title,
           content,
         });
@@ -2078,9 +2945,7 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
         await page.goto(request.body.url);
         const title = await page.title();
         // Extract visible text and all href links via JS eval
-        const text = await page.evaluate<string>(
-          "() => document.body?.innerText ?? ''",
-        );
+        const text = await page.evaluate<string>("() => document.body?.innerText ?? ''");
         const links = await page.evaluate<string[]>(
           "() => Array.from(document.querySelectorAll('a[href]')).map(a => a.href).filter(h => h.startsWith('http')).slice(0, 100)",
         );
@@ -2199,13 +3064,13 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
       const cfg = redteamDefaultConfig();
       const result = applyParseltongue(text, {
         ...cfg,
-        techniques: (techniques as typeof cfg.techniques) ?? cfg.techniques,
+        technique: (techniques?.[0] as typeof cfg.technique) ?? cfg.technique,
       });
       return reply.send({
         original: text,
-        perturbed: result.output,
-        appliedTechniques: result.appliedTechniques,
-        perturbationCount: result.perturbationCount,
+        perturbed: result.transformedText,
+        appliedTechniques: result.techniqueUsed,
+        perturbationCount: result.transformations.length,
       });
     },
   );
@@ -2223,7 +3088,7 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
     Body: {
       chain: FallbackModel[];
-      messages: Array<{ role: string; content: string }>;
+      messages: { role: string; content: string }[];
       maxTokens?: number;
     };
   }>(
@@ -2262,18 +3127,20 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
           chain,
           async (target) => {
             const driver =
-              reg.get(target.provider ?? "openrouter") ??
-              reg.get("anthropic") ??
-              reg.get("groq");
+              reg.get(target.provider ?? "openrouter") ?? reg.get("anthropic") ?? reg.get("groq");
             if (!driver) throw new Error(`No driver for provider "${target.provider ?? "any"}"`);
 
             const chunks: string[] = [];
-            for await (const chunk of driver.stream(
-              messages as Array<{ role: import("@nexus/llm-drivers").LlmRole; content: string }>,
-              { model: target.model, maxTokens },
-            )) {
-              chunks.push(chunk.content);
-            }
+            await driver.stream(
+              {
+                model: target.model,
+                messages: messages as { role: LlmRole; content: string }[],
+                maxTokens,
+              },
+              (delta) => {
+                if (delta.delta) chunks.push(delta.delta);
+              },
+            );
             return chunks.join("");
           },
           {
@@ -2336,12 +3203,7 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (request, reply) => {
-      const {
-        tasks,
-        agents,
-        strategy = "round-robin",
-        activeCounts: rawCounts,
-      } = request.body;
+      const { tasks, agents, strategy = "round-robin", activeCounts: rawCounts } = request.body;
 
       const activeCounts = new Map<string, number>(
         Object.entries(rawCounts ?? {}).map(([k, v]) => [k, v as number]),
@@ -2601,7 +3463,7 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   /** GET /skill-selection/archetypes — list all available archetypes. */
   app.get("/skill-selection/archetypes", async (_req, reply) => {
     return reply.send({
-      archetypes: Object.values(ARCHETYPES).map((a) => ({
+      archetypes: (Object.values(ARCHETYPES) as Archetype[]).map((a) => ({
         id: a.id,
         name: a.name,
         thinkingStyle: a.thinkingStyle,
@@ -2681,12 +3543,16 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
 }`;
 
       const chunks: string[] = [];
-      for await (const chunk of driver.stream(
-        [systemMsg("You are a precise JSON-only output AI."), userMsg(judgePrompt)],
-        { model: DEFAULT_MODEL, maxTokens: 256 },
-      )) {
-        chunks.push(chunk.content);
-      }
+      await driver.stream(
+        {
+          model: DEFAULT_MODEL,
+          messages: [systemMsg("You are a precise JSON-only output AI."), userMsg(judgePrompt)],
+          maxTokens: 256,
+        },
+        (delta) => {
+          if (delta.delta) chunks.push(delta.delta);
+        },
+      );
 
       try {
         const result = parseJsonResponse<{
@@ -2735,14 +3601,14 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
       },
     },
     async (request, reply) => {
-      const { query, limit = 10, threshold = 0.5 } = request.body;
+      const { query, limit = 10, threshold: _threshold = 0.5 } = request.body;
       const manager = getMemory();
-      const results = await manager.search(query, { limit, threshold });
+      const results = await manager.recall(query, limit);
       return reply.send({
         query,
         results: results.map((r) => ({
           id: r.entry.id,
-          content: r.entry.content,
+          content: r.entry.text,
           score: r.score,
           createdAt: r.entry.createdAt,
           metadata: r.entry.metadata ?? {},
@@ -2788,7 +3654,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
           mergedAt: now(),
         },
       });
-      return reply.code(201).send({ id: entry.id, content: entry.content, sessionIds });
+      return reply.code(201).send({ id: entry.id, content: entry.text, sessionIds });
     },
   );
 
@@ -2932,27 +3798,21 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   );
 
   /** GET /reactions?messageId=... — list reactions for a message. */
-  app.get<{ Querystring: { messageId?: string } }>(
-    "/reactions",
-    async (request, reply) => {
-      const { messageId } = request.query;
-      const all = Array.from(_reactionsStore.values());
-      const filtered = messageId ? all.filter((r) => r.messageId === messageId) : all;
-      return reply.send(filtered);
-    },
-  );
+  app.get<{ Querystring: { messageId?: string } }>("/reactions", async (request, reply) => {
+    const { messageId } = request.query;
+    const all = Array.from(_reactionsStore.values());
+    const filtered = messageId ? all.filter((r) => r.messageId === messageId) : all;
+    return reply.send(filtered);
+  });
 
   /** DELETE /reactions/:id — remove a reaction. */
-  app.delete<{ Params: { id: string } }>(
-    "/reactions/:id",
-    async (request, reply) => {
-      if (!_reactionsStore.has(request.params.id)) {
-        return reply.code(404).send({ error: "not_found" });
-      }
-      _reactionsStore.delete(request.params.id);
-      return reply.code(204).send();
-    },
-  );
+  app.delete<{ Params: { id: string } }>("/reactions/:id", async (request, reply) => {
+    if (!_reactionsStore.has(request.params.id)) {
+      return reply.code(404).send({ error: "not_found" });
+    }
+    _reactionsStore.delete(request.params.id);
+    return reply.code(204).send();
+  });
 
   // ── sop ────────────────────────────────────────────────────────────────────
 
@@ -3001,9 +3861,16 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
 
   /** GET /sop — list all SOPs (title + tags, no full content). */
   app.get("/sop", async (_req, reply) => {
-    const items = Array.from(_sopStore.values()).map(({ id, title, tags, version, createdAt, updatedAt }) => ({
-      id, title, tags, version, createdAt, updatedAt,
-    }));
+    const items = Array.from(_sopStore.values()).map(
+      ({ id, title, tags, version, createdAt, updatedAt }) => ({
+        id,
+        title,
+        tags,
+        version,
+        createdAt,
+        updatedAt,
+      }),
+    );
     return reply.send(items);
   });
 
@@ -3014,23 +3881,23 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   });
 
   /** PATCH /sop/:id — update a SOP (bumps version). */
-  app.patch<{ Params: { id: string }; Body: { title?: string; content?: string; tags?: string[] } }>(
-    "/sop/:id",
-    async (request, reply) => {
-      const existing = _sopStore.get(request.params.id);
-      if (!existing) return reply.code(404).send({ error: "not_found" });
-      const updated = {
-        ...existing,
-        ...(request.body.title !== undefined && { title: request.body.title }),
-        ...(request.body.content !== undefined && { content: request.body.content }),
-        ...(request.body.tags !== undefined && { tags: request.body.tags }),
-        version: existing.version + 1,
-        updatedAt: now(),
-      };
-      _sopStore.set(request.params.id, updated);
-      return reply.send(updated);
-    },
-  );
+  app.patch<{
+    Params: { id: string };
+    Body: { title?: string; content?: string; tags?: string[] };
+  }>("/sop/:id", async (request, reply) => {
+    const existing = _sopStore.get(request.params.id);
+    if (!existing) return reply.code(404).send({ error: "not_found" });
+    const updated = {
+      ...existing,
+      ...(request.body.title !== undefined && { title: request.body.title }),
+      ...(request.body.content !== undefined && { content: request.body.content }),
+      ...(request.body.tags !== undefined && { tags: request.body.tags }),
+      version: existing.version + 1,
+      updatedAt: now(),
+    };
+    _sopStore.set(request.params.id, updated);
+    return reply.send(updated);
+  });
 
   /**
    * POST /sop/search — keyword search across SOP titles + content.
@@ -3055,10 +3922,19 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
       const tagFilter = request.body.tags;
       const results = Array.from(_sopStore.values()).filter((s) => {
         const textMatch = s.title.toLowerCase().includes(q) || s.content.toLowerCase().includes(q);
-        const tagMatch = !tagFilter || tagFilter.length === 0 || tagFilter.some((t) => s.tags.includes(t));
+        const tagMatch =
+          !tagFilter || tagFilter.length === 0 || tagFilter.some((t) => s.tags.includes(t));
         return textMatch && tagMatch;
       });
-      return reply.send(results.map(({ id, title, tags, version, createdAt }) => ({ id, title, tags, version, createdAt })));
+      return reply.send(
+        results.map(({ id, title, tags, version, createdAt }) => ({
+          id,
+          title,
+          tags,
+          version,
+          createdAt,
+        })),
+      );
     },
   );
 
@@ -3154,9 +4030,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
       const prevTraits = existing?.traits ?? {};
       const mergedTraits: Record<string, number> = { ...prevTraits };
       for (const [k, v] of Object.entries(traits)) {
-        mergedTraits[k] = prevTraits[k] !== undefined
-          ? prevTraits[k] * 0.7 + v * 0.3
-          : v;
+        mergedTraits[k] = prevTraits[k] !== undefined ? prevTraits[k] * 0.7 + v * 0.3 : v;
       }
 
       const updated = { archetypeId, sessions, avgScore, lastSeen: now(), traits: mergedTraits };
@@ -3173,7 +4047,9 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   /** GET /member-evolution/:id — get evolution state for a specific archetype. */
   app.get<{ Params: { id: string } }>("/member-evolution/:id", async (request, reply) => {
     const item = _evolutionStore.get(request.params.id);
-    return item ? reply.send(item) : reply.code(404).send({ error: "not_found", archetypeId: request.params.id });
+    return item
+      ? reply.send(item)
+      : reply.code(404).send({ error: "not_found", archetypeId: request.params.id });
   });
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -3212,13 +4088,13 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
       };
 
       return (data.items ?? []).map((item) => ({
-        id:           item.id.videoId,
-        title:        item.snippet.title,
-        url:          `https://www.youtube.com/watch?v=${item.id.videoId}`,
+        id: item.id.videoId,
+        title: item.snippet.title,
+        url: `https://www.youtube.com/watch?v=${item.id.videoId}`,
         thumbnailUrl: item.snippet.thumbnails.default?.url,
-        source:       "youtube",
-        description:  item.snippet.description,
-        publishedAt:  item.snippet.publishedAt,
+        source: "youtube",
+        description: item.snippet.description,
+        publishedAt: item.snippet.publishedAt,
       }));
     }
   }
@@ -3241,7 +4117,9 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
             maxTokens: 512,
             temperature: 0,
           },
-          ({ delta }: { delta: string }) => { if (delta) chunks.push(delta); },
+          ({ delta }: { delta: string }) => {
+            if (delta) chunks.push(delta);
+          },
         );
         return chunks.join("");
       } catch {
@@ -3258,7 +4136,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
         ? new YouTubeVideoBackend(process.env.YOUTUBE_API_KEY)
         : new MockVideoBackend();
       _videoEngine = new VideoSearchEngine({
-        model:      _videoModelFn,
+        model: _videoModelFn,
         backend,
         cacheTtlMs: 5 * 60_000,
       });
@@ -3278,11 +4156,11 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
           type: "object",
           required: ["query"],
           properties: {
-            query:        { type: "string", maxLength: 512 },
-            maxResults:   { type: "number", minimum: 1, maximum: 50 },
-            minDuration:  { type: "number", minimum: 0 },
-            maxDuration:  { type: "number", minimum: 0 },
-            source:       { type: "string" },
+            query: { type: "string", maxLength: 512 },
+            maxResults: { type: "number", minimum: 1, maximum: 50 },
+            minDuration: { type: "number", minimum: 0 },
+            maxDuration: { type: "number", minimum: 0 },
+            source: { type: "string" },
             forceRefresh: { type: "boolean" },
           },
         },
@@ -3291,10 +4169,10 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     async (request, reply) => {
       const result = await getVideoEngine().search({
         query: request.body.query,
-        maxResults:   request.body.maxResults   ?? 10,
-        minDuration:  request.body.minDuration,
-        maxDuration:  request.body.maxDuration,
-        source:       request.body.source,
+        maxResults: request.body.maxResults ?? 10,
+        minDuration: request.body.minDuration,
+        maxDuration: request.body.maxDuration,
+        source: request.body.source,
         forceRefresh: request.body.forceRefresh ?? false,
       });
       return reply.send(result);
@@ -3327,9 +4205,9 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
           type: "object",
           required: ["name", "capabilities"],
           properties: {
-            name:         { type: "string", maxLength: 64 },
+            name: { type: "string", maxLength: 64 },
             capabilities: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 20 },
-            description:  { type: "string", maxLength: 512 },
+            description: { type: "string", maxLength: 512 },
           },
         },
       },
@@ -3339,9 +4217,12 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
       try {
         const adapter = defineAdapter({
           name,
-          description,
+          version: "1.0.0",
           capabilities: capabilities as Parameters<typeof defineAdapter>[0]["capabilities"],
-          async execute(task) { return task; }, // passthrough — real logic injected per adapter
+          taskTypes: capabilities as readonly string[],
+          async execute(task, _ctx) {
+            return task;
+          }, // passthrough — real logic injected per adapter
         });
         _adapterRegistry.register(adapter);
         return reply.code(201).send({ name, capabilities, description, registered: true });
@@ -3382,7 +4263,10 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
         timeoutMs: 30_000,
         signal: request.raw as unknown as AbortSignal,
       };
-      const result = await adapter.execute(request.body, ctx as Parameters<typeof adapter.execute>[1]);
+      const result = await adapter.execute(
+        request.body,
+        ctx as unknown as Parameters<typeof adapter.execute>[1],
+      );
       return reply.send({ name: request.params.name, result });
     },
   );
@@ -3415,12 +4299,12 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
           type: "object",
           required: ["image"],
           properties: {
-            image:      { type: "string" },
-            width:      { type: "number", minimum: 1 },
-            height:     { type: "number", minimum: 1 },
-            fit:        { type: "string", enum: ["cover", "contain", "fill", "inside", "outside"] },
+            image: { type: "string" },
+            width: { type: "number", minimum: 1 },
+            height: { type: "number", minimum: 1 },
+            fit: { type: "string", enum: ["cover", "contain", "fill", "inside", "outside"] },
             background: { type: "string" },
-            format:     { type: "string", enum: ["jpeg", "png", "webp", "avif", "gif", "tiff"] },
+            format: { type: "string", enum: ["jpeg", "png", "webp", "avif", "gif", "tiff"] },
           },
         },
       },
@@ -3454,10 +4338,10 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
           type: "object",
           required: ["image", "left", "top", "width", "height"],
           properties: {
-            image:  { type: "string" },
-            left:   { type: "number", minimum: 0 },
-            top:    { type: "number", minimum: 0 },
-            width:  { type: "number", minimum: 1 },
+            image: { type: "string" },
+            left: { type: "number", minimum: 0 },
+            top: { type: "number", minimum: 0 },
+            width: { type: "number", minimum: 1 },
             height: { type: "number", minimum: 1 },
             format: { type: "string", enum: ["jpeg", "png", "webp", "avif", "gif", "tiff"] },
           },
@@ -3493,8 +4377,8 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
           type: "object",
           required: ["image", "format"],
           properties: {
-            image:   { type: "string" },
-            format:  { type: "string", enum: ["jpeg", "png", "webp", "avif", "gif", "tiff"] },
+            image: { type: "string" },
+            format: { type: "string", enum: ["jpeg", "png", "webp", "avif", "gif", "tiff"] },
             quality: { type: "number", minimum: 1, maximum: 100 },
           },
         },
@@ -3529,12 +4413,12 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
           type: "object",
           required: ["image", "text"],
           properties: {
-            image:    { type: "string" },
-            text:     { type: "string", maxLength: 256 },
-            colour:   { type: "string" },
+            image: { type: "string" },
+            text: { type: "string", maxLength: 256 },
+            colour: { type: "string" },
             fontSize: { type: "number", minimum: 8, maximum: 256 },
-            gravity:  { type: "string" },
-            format:   { type: "string", enum: ["jpeg", "png", "webp", "avif", "gif", "tiff"] },
+            gravity: { type: "string" },
+            format: { type: "string", enum: ["jpeg", "png", "webp", "avif", "gif", "tiff"] },
           },
         },
       },
@@ -3571,111 +4455,23 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     },
     async (request, reply) => {
       const input = Buffer.from(request.body.image, "base64");
-      const meta  = await _imgTransformer.metadata(input);
+      const meta = await _imgTransformer.metadata(input);
       return reply.send(meta);
     },
   );
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // C.2 — STUBS (features not yet backed, return 501 or empty payload)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  const STUB_PREFIXES = [
-    // "blind-council"    — removed; real routes wired in C.7
-    // "browser-agent"    — removed; real routes wired in C.4
-    // "build"            — removed; wired to code-repl in C.3
-    // "code-agent"       — removed; real routes wired in C.3
-    // "craft"            — removed; real routes wired below
-    // "cross-memory"     — removed; real routes wired in C.6
-    // "echo-chamber"     — removed; real routes wired in C.6
-    // "extraction"       — removed; real routes wired below
-    // "fallback-chains"  — removed; real routes wired in C.5
-    // "hallucination"      — removed; real routes wired below
-    // "honesty"            — removed; real routes wired below
-    // "image-transformations" — removed; needs sharp/Cloudinary, deferred to infra
-    // "imr"                — removed; real routes wired below
-    // "marketplace"        — removed; real routes wired in C.8
-    // "member-evolution"   — removed; real routes wired in C.7
-    // "moderation"       — removed; real routes wired below
-    // "negation"         — removed; real routes wired below
-    // "prompt-filter"    — removed; real routes wired in C.5
-    // "reactions"        — removed; real routes wired in C.7
-    // "rss"              — removed; real routes wired below
-    // "semantic-cache"   — removed; real routes wired below
-    // "simulate"         — removed; real routes wired below
-    // "skill-selection"  — removed; real routes wired in C.6
-    // "sop"              — removed; real routes wired in C.7
-    // "specialisation"   — removed; real routes wired in C.7
-    // "speculative"      — removed; real routes wired below
-    // "standard-answers" — removed; real routes wired below
-    // "symbolic"         — removed; real routes wired in C.6
-    // "system"           — removed; real routes wired in C.5
-    // "task-routing"     — removed; real routes wired in C.5
-    // "token-conservation" — removed; wired to @nexus/token-budget
-    // "verbosity"        — removed; wired to @nexus/stm STMPipeline
-    // "verifiable"       — removed; real routes wired in C.5
-    // "video"            — removed; real routes wired in C.8
-    // "web-scraping"     — removed; real routes wired below
-  ];
-
-  // Persistent CRUD store for each stub prefix — backed by JSON files or Postgres
-  const _stubStores = new Map<string, PersistentStore<Record<string, unknown>>>();
-  function _stubStore(prefix: string): PersistentStore<Record<string, unknown>> {
-    if (!_stubStores.has(prefix)) {
-      const store = new PersistentStore<Record<string, unknown>>(`stub_${prefix}`);
-      store.load().catch(() => {}); // fire-and-forget; routes serve empty until loaded (fast)
-      _stubStores.set(prefix, store);
-    }
-    return _stubStores.get(prefix)!;
-  }
-
-  for (const prefix of STUB_PREFIXES) {
-    // GET list
-    app.get(`/${prefix}`, async (_req, reply) => reply.send(Array.from(_stubStore(prefix).values())));
-    // GET by id
-    app.get<{ Params: { id: string } }>(`/${prefix}/:id`, async (req, reply) => {
-      const item = _stubStore(prefix).get(req.params.id);
-      return item ? reply.send(item) : reply.code(404).send({ error: "not_found" });
-    });
-    // GET sub-resource
-    app.get(`/${prefix}/:id/*`, async (_req, reply) => reply.send({ data: null }));
-    // POST create
-    app.post<{ Body: Record<string, unknown> }>(`/${prefix}`, async (req, reply) => {
-      const id = crypto.randomUUID();
-      const item = { id, ...req.body, createdAt: now() };
-      _stubStore(prefix).set(id, item);
-      return reply.code(201).send(item);
-    });
-    // POST to named action (e.g. /echo-chamber/detect, /task-routing/classify)
-    app.post<{ Params: { id: string }; Body: Record<string, unknown> }>(`/${prefix}/:id`, async (req, reply) => {
-      return reply.send({ ok: true, action: req.params.id, result: null });
-    });
-    // POST sub-action with deeper path (e.g. /build/tasks/steal)
-    app.post<{ Params: { id: string } }>(`/${prefix}/:id/*`, async (req, reply) => {
-      return reply.send({ ok: true, id: req.params.id });
-    });
-    // PUT + PATCH update (identical semantics — shared handler)
-    const _upsertHandler = async (req: { params: { id: string }; body: Record<string, unknown> }, reply: { send: (v: unknown) => unknown }) => {
-      const store = _stubStore(prefix);
-      const updated = { ...(store.get(req.params.id) ?? { id: req.params.id }), ...req.body, updatedAt: now() };
-      store.set(req.params.id, updated);
-      return reply.send(updated);
-    };
-    app.put<{ Params: { id: string }; Body: Record<string, unknown> }>(`/${prefix}/:id`, _upsertHandler);
-    app.patch<{ Params: { id: string }; Body: Record<string, unknown> }>(`/${prefix}/:id`, _upsertHandler);
-    // DELETE
-    app.delete<{ Params: { id: string } }>(`/${prefix}/:id`, async (req, reply) => {
-      _stubStore(prefix).delete(req.params.id);
-      return reply.code(204).send();
-    });
-  }
-
   // ── Token-conservation: real budget check + consume actions ─────────────────
   // These routes overlay the CRUD scaffold above with actual TokenBudget logic.
   const _tokenBudgets = new Map<string, InstanceType<typeof MemoryTokenBudget>>();
-  function _getTokenBudget(userId: string, limitTokens = 100_000): InstanceType<typeof MemoryTokenBudget> {
+  function _getTokenBudget(
+    userId: string,
+    limitTokens = 100_000,
+  ): InstanceType<typeof MemoryTokenBudget> {
     if (!_tokenBudgets.has(userId)) {
-      _tokenBudgets.set(userId, new MemoryTokenBudget({ limitTokens }));
+      _tokenBudgets.set(
+        userId,
+        new MemoryTokenBudget({ limit: limitTokens, windowMs: 60 * 60 * 1000 }),
+      );
     }
     return _tokenBudgets.get(userId)!;
   }
@@ -3686,7 +4482,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     async (request, reply) => {
       const userId = request.body?.userId ?? "default";
       const budget = _getTokenBudget(userId, request.body?.limitTokens);
-      const status = budget.status();
+      const status = await budget.status(userId);
       return reply.send({ userId, ...status });
     },
   );
@@ -3696,33 +4492,34 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     "/token-conservation/consume",
     async (request, reply) => {
       const { userId = "default", tokens, limitTokens } = request.body ?? {};
-      if (!tokens || tokens < 1) return reply.code(400).send({ error: "tokens must be a positive integer" });
+      if (!tokens || tokens < 1)
+        return (reply as FastifyReply)
+          .code(400)
+          .send({ error: "tokens must be a positive integer" });
       const budget = _getTokenBudget(userId, limitTokens);
       try {
-        await budget.consume(tokens, { strict: true });
-        return reply.send({ userId, consumed: tokens, remaining: budget.status().remaining });
+        await budget.consume({ identity: userId, tokens });
+        const status = await budget.status(userId);
+        return reply.send({ userId, consumed: tokens, remaining: status.remaining });
       } catch {
-        const status = budget.status();
-        return reply.code(429).send({
+        const status = await budget.status(userId);
+        return (reply as FastifyReply).code(429).send({
           error: "budget_exceeded",
           userId,
           requested: tokens,
           remaining: status.remaining,
-          limitTokens: status.limitTokens,
+          limitTokens: status.limit,
         });
       }
     },
   );
 
   /** POST /token-conservation/reset — reset a user's token budget */
-  app.post<{ Body: { userId?: string } }>(
-    "/token-conservation/reset",
-    async (request, reply) => {
-      const userId = request.body?.userId ?? "default";
-      _tokenBudgets.delete(userId);
-      return reply.send({ userId, reset: true });
-    },
-  );
+  app.post<{ Body: { userId?: string } }>("/token-conservation/reset", async (request, reply) => {
+    const userId = request.body?.userId ?? "default";
+    _tokenBudgets.delete(userId);
+    return reply.send({ userId, reset: true });
+  });
 
   // ── Verbosity: real STM transform pipeline ────────────────────────────────
   // STMPipeline() with no args builds the default registry (HedgeReducer + DirectnessOptimizer).
@@ -3742,9 +4539,10 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
           originalLength: result.original.length,
           transformedLength: result.transformed.length,
           reduction: result.original.length - result.transformed.length,
-          reductionPct: result.original.length > 0
-            ? Math.round((1 - result.transformed.length / result.original.length) * 100)
-            : 0,
+          reductionPct:
+            result.original.length > 0
+              ? Math.round((1 - result.transformed.length / result.original.length) * 100)
+              : 0,
           truncated: result.truncated,
           modules: result.modules.map((m) => ({ id: (m as any).moduleId ?? m, applied: true })),
         });
@@ -3756,13 +4554,12 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
 
   // -- WEB SCRAPING (real — HttpxEngine via @nexus/adaptive-scraper) -----------
 
-
   app.get("/web-scraping/providers", async (_req, reply) => {
     return reply.send({
       providers: [
-        { id: "httpx",      name: "HTTPX (built-in)",  available: true },
-        { id: "firecrawl",  name: "Firecrawl",         available: !!process.env.FIRECRAWL_API_KEY },
-        { id: "exa",        name: "Exa",               available: !!process.env.EXA_API_KEY },
+        { id: "httpx", name: "HTTPX (built-in)", available: true },
+        { id: "firecrawl", name: "Firecrawl", available: !!process.env.FIRECRAWL_API_KEY },
+        { id: "exa", name: "Exa", available: !!process.env.EXA_API_KEY },
       ],
     });
   });
@@ -3798,10 +4595,18 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
         // Extract up to maxPages-1 same-origin links from HTML
         const origin = new URL(url).origin;
         const hrefs = [...seed.html.matchAll(/href="([^"]+)"/gi)]
-          .map((m) => { try { return new URL(m[1]!, url).href; } catch { return null; } })
+          .map((m) => {
+            try {
+              return new URL(m[1]!, url).href;
+            } catch {
+              return null;
+            }
+          })
           .filter((h): h is string => !!h && h.startsWith(origin))
           .slice(0, maxPages - 1);
-        const rest = await Promise.allSettled(hrefs.map((h) => scraper.scrape(h, { timeout: 15_000 })));
+        const rest = await Promise.allSettled(
+          hrefs.map((h) => scraper.scrape(h, { timeout: 15_000 })),
+        );
         for (const r of rest) if (r.status === "fulfilled") pages.push(r.value);
       }
       return reply.send({ pages, total: pages.length });
@@ -3813,35 +4618,47 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     "/web-scraping/exa/search",
     async (request, reply) => {
       const apiKey = process.env.EXA_API_KEY;
-      if (!apiKey) return reply.code(503).send({ error: "no_exa_key", message: "Set EXA_API_KEY to enable Exa search." });
+      if (!apiKey)
+        return reply
+          .code(503)
+          .send({ error: "no_exa_key", message: "Set EXA_API_KEY to enable Exa search." });
       const res = await fetch("https://api.exa.ai/search", {
         method: "POST",
         headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
-        body: JSON.stringify({ query: request.body.query, numResults: request.body.numResults ?? 5 }),
+        body: JSON.stringify({
+          query: request.body.query,
+          numResults: request.body.numResults ?? 5,
+        }),
       });
-      if (!res.ok) return reply.code(res.status).send({ error: "exa_error", message: await res.text() });
+      if (!res.ok)
+        return reply.code(res.status).send({ error: "exa_error", message: await res.text() });
       return reply.send(await res.json());
     },
   );
 
-  app.post<{ Body: { ids: string[] } }>(
-    "/web-scraping/exa/contents",
-    async (request, reply) => {
-      const apiKey = process.env.EXA_API_KEY;
-      if (!apiKey) return reply.code(503).send({ error: "no_exa_key", message: "Set EXA_API_KEY to enable Exa content extraction." });
-      const res = await fetch("https://api.exa.ai/contents", {
-        method: "POST",
-        headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: request.body.ids }),
+  app.post<{ Body: { ids: string[] } }>("/web-scraping/exa/contents", async (request, reply) => {
+    const apiKey = process.env.EXA_API_KEY;
+    if (!apiKey)
+      return reply.code(503).send({
+        error: "no_exa_key",
+        message: "Set EXA_API_KEY to enable Exa content extraction.",
       });
-      if (!res.ok) return reply.code(res.status).send({ error: "exa_error", message: await res.text() });
-      return reply.send(await res.json());
-    },
-  );
+    const res = await fetch("https://api.exa.ai/contents", {
+      method: "POST",
+      headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: request.body.ids }),
+    });
+    if (!res.ok)
+      return reply.code(res.status).send({ error: "exa_error", message: await res.text() });
+    return reply.send(await res.json());
+  });
 
   // -- NEGATION DETECTION (LLM-based) ----------------------------------------
 
-  const _negationRules = new Map<string, Map<string, { id: string; pattern: string; confidence: number }>>();
+  const _negationRules = new Map<
+    string,
+    Map<string, { id: string; pattern: string; confidence: number }>
+  >();
 
   app.post<{ Body: { text: string } }>("/negation/detect", async (request, reply) => {
     const { text } = request.body;
@@ -3849,15 +4666,25 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     if (!driver) return reply.send({ patterns: [], detected: 0 });
     const res = await driver.complete({
       model: DEFAULT_MODEL,
-      messages: [{ role: "user" as LlmRole, content: `Detect negation patterns, contradictions, and logical negations in this text.\nReturn JSON: { patterns: Array<{ id: string, pattern: string, confidence: number }>, detected: number }\n\nText:\n${text.slice(0, 800)}` }],
+      messages: [
+        {
+          role: "user" as LlmRole,
+          content: `Detect negation patterns, contradictions, and logical negations in this text.\nReturn JSON: { patterns: Array<{ id: string, pattern: string, confidence: number }>, detected: number }\n\nText:\n${text.slice(0, 800)}`,
+        },
+      ],
       maxTokens: 512,
     });
     _trackCost(DEFAULT_MODEL, res.usage);
-    try { return reply.send(parseJsonResponse(res.content)); }
-    catch { return reply.send({ patterns: [], detected: 0 }); }
+    try {
+      return reply.send(parseJsonResponse(res.content));
+    } catch {
+      return reply.send({ patterns: [], detected: 0 });
+    }
   });
 
-  app.post<{ Body: { convId: string; patterns: Array<{ id: string; pattern: string; confidence: number }> } }>("/negation/add", async (request, reply) => {
+  app.post<{
+    Body: { convId: string; patterns: { id: string; pattern: string; confidence: number }[] };
+  }>("/negation/add", async (request, reply) => {
     const { convId, patterns } = request.body;
     if (!_negationRules.has(convId)) _negationRules.set(convId, new Map());
     for (const p of patterns) _negationRules.get(convId)!.set(p.id ?? crypto.randomUUID(), p);
@@ -3869,10 +4696,13 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     return reply.send({ rules: rules ? Array.from(rules.values()) : [] });
   });
 
-  app.delete<{ Params: { convId: string; ruleId: string } }>("/negation/:convId/:ruleId", async (request, reply) => {
-    _negationRules.get(request.params.convId)?.delete(request.params.ruleId);
-    return reply.code(204).send();
-  });
+  app.delete<{ Params: { convId: string; ruleId: string } }>(
+    "/negation/:convId/:ruleId",
+    async (request, reply) => {
+      _negationRules.get(request.params.convId)?.delete(request.params.ruleId);
+      return reply.code(204).send();
+    },
+  );
 
   app.delete<{ Params: { convId: string } }>("/negation/:convId", async (request, reply) => {
     _negationRules.delete(request.params.convId);
@@ -3882,19 +4712,39 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   app.post<{ Body: { convId: string } }>("/negation/inject", async (request, reply) => {
     const rules = _negationRules.get(request.body.convId);
     const injected = rules?.size ?? 0;
-    return reply.send({ message: injected ? `Injected ${injected} negation rules into context.` : "No rules found for this conversation.", injected });
+    return reply.send({
+      message: injected
+        ? `Injected ${injected} negation rules into context.`
+        : "No rules found for this conversation.",
+      injected,
+    });
   });
 
   // -- INTERRUPT-MIDWAY-RESUME (IMR) -----------------------------------------
 
   type ImrStatus = "running" | "interrupted" | "resumed" | "done" | "failed";
-  interface ImrRun { id: string; query: string; status: ImrStatus; createdAt: string; interruptedAt?: string; resumedAt?: string; output?: string; progress?: number; }
+  interface ImrRun {
+    id: string;
+    query: string;
+    status: ImrStatus;
+    createdAt: string;
+    interruptedAt?: string;
+    resumedAt?: string;
+    output?: string;
+    progress?: number;
+  }
 
   app.get("/imr/runs", async (_req, reply) => reply.send({ runs: Array.from(_imrRuns.values()) }));
 
   app.post<{ Body: { query: string } }>("/imr/runs", async (request, reply) => {
     const id = crypto.randomUUID();
-    const run: ImrRun = { id, query: request.body.query ?? "", status: "running", createdAt: now(), progress: 10 };
+    const run: ImrRun = {
+      id,
+      query: request.body.query ?? "",
+      status: "running",
+      createdAt: now(),
+      progress: 10,
+    };
     _imrRuns.set(id, run);
     return reply.code(201).send(run);
   });
@@ -3905,30 +4755,46 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     return reply.send(run);
   });
 
-  app.post<{ Params: { id: string }; Body: { reason?: string } }>("/imr/runs/:id/interrupt", async (request, reply) => {
-    const run = _imrRuns.get(request.params.id);
-    if (!run) return reply.code(404).send({ error: "not_found" });
-    run.status = "interrupted"; run.interruptedAt = now();
-    return reply.send(run);
-  });
+  app.post<{ Params: { id: string }; Body: { reason?: string } }>(
+    "/imr/runs/:id/interrupt",
+    async (request, reply) => {
+      const run = _imrRuns.get(request.params.id);
+      if (!run) return reply.code(404).send({ error: "not_found" });
+      run.status = "interrupted";
+      run.interruptedAt = now();
+      return reply.send(run);
+    },
+  );
 
-  app.patch<{ Params: { id: string }; Body: { query?: string } }>("/imr/runs/:id/modify", async (request, reply) => {
-    const run = _imrRuns.get(request.params.id);
-    if (!run) return reply.code(404).send({ error: "not_found" });
-    if (request.body.query) run.query = request.body.query;
-    return reply.send(run);
-  });
+  app.patch<{ Params: { id: string }; Body: { query?: string } }>(
+    "/imr/runs/:id/modify",
+    async (request, reply) => {
+      const run = _imrRuns.get(request.params.id);
+      if (!run) return reply.code(404).send({ error: "not_found" });
+      if (request.body.query) run.query = request.body.query;
+      return reply.send(run);
+    },
+  );
 
   app.post<{ Params: { id: string } }>("/imr/runs/:id/resume", async (request, reply) => {
     const run = _imrRuns.get(request.params.id);
     if (!run) return reply.code(404).send({ error: "not_found" });
-    run.status = "resumed"; run.resumedAt = now();
+    run.status = "resumed";
+    run.resumedAt = now();
     // Generate output via LLM on resume
     const driver = getDefaultDriver();
     if (driver) {
-      const res = await driver.complete({ model: DEFAULT_MODEL, messages: [{ role: "user" as LlmRole, content: `Resume and complete this task: ${run.query}` }], maxTokens: 512 });
+      const res = await driver.complete({
+        model: DEFAULT_MODEL,
+        messages: [
+          { role: "user" as LlmRole, content: `Resume and complete this task: ${run.query}` },
+        ],
+        maxTokens: 512,
+      });
       _trackCost(DEFAULT_MODEL, res.usage);
-      run.output = res.content; run.progress = 100; run.status = "done";
+      run.output = res.content;
+      run.progress = 100;
+      run.status = "done";
     }
     return reply.send(run);
   });
@@ -3940,51 +4806,132 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
 
   // -- MULTI-AGENT SIMULATION (Generative Agents pattern) -------------------
 
-  interface SimPersona { id: string; name: string; backstory: string; goals: string[]; traits: string[]; expertise: string[]; communicationStyle: string; constraints: string[]; memory: string[]; createdAt: string; }
-  interface SimEnvironment { id: string; name: string; description: string; initialState: string; rules: string[]; createdAt: string; }
-  interface SimRun { id: string; name: string; environmentId: string; personaIds: string[]; status: string; currentTick: number; maxTicks: number; tickLog: unknown[]; createdAt: string; }
+  interface SimPersona {
+    id: string;
+    name: string;
+    backstory: string;
+    goals: string[];
+    traits: string[];
+    expertise: string[];
+    communicationStyle: string;
+    constraints: string[];
+    memory: string[];
+    createdAt: string;
+  }
+  interface SimEnvironment {
+    id: string;
+    name: string;
+    description: string;
+    initialState: string;
+    rules: string[];
+    createdAt: string;
+  }
+  interface SimRun {
+    id: string;
+    name: string;
+    environmentId: string;
+    personaIds: string[];
+    status: string;
+    currentTick: number;
+    maxTicks: number;
+    tickLog: unknown[];
+    createdAt: string;
+  }
 
-  const _personas    = new Map<string, SimPersona>();
-  const _simEnvs     = new Map<string, SimEnvironment>();
-  const _simRuns     = new Map<string, SimRun>();
+  const _personas = new Map<string, SimPersona>();
+  const _simEnvs = new Map<string, SimEnvironment>();
+  const _simRuns = new Map<string, SimRun>();
 
   // Personas
-  app.get("/simulate/personas", async (_req, reply) => reply.send({ personas: Array.from(_personas.values()) }));
+  app.get("/simulate/personas", async (_req, reply) =>
+    reply.send({ personas: Array.from(_personas.values()) }),
+  );
   app.post<{ Body: Partial<SimPersona> }>("/simulate/personas", async (request, reply) => {
     const id = crypto.randomUUID();
-    const p: SimPersona = { id, name: request.body.name ?? "Agent", backstory: request.body.backstory ?? "", goals: request.body.goals ?? [], traits: request.body.traits ?? [], expertise: request.body.expertise ?? [], communicationStyle: request.body.communicationStyle ?? "neutral", constraints: request.body.constraints ?? [], memory: [], createdAt: now() };
+    const p: SimPersona = {
+      id,
+      name: request.body.name ?? "Agent",
+      backstory: request.body.backstory ?? "",
+      goals: request.body.goals ?? [],
+      traits: request.body.traits ?? [],
+      expertise: request.body.expertise ?? [],
+      communicationStyle: request.body.communicationStyle ?? "neutral",
+      constraints: request.body.constraints ?? [],
+      memory: [],
+      createdAt: now(),
+    };
     _personas.set(id, p);
     return reply.code(201).send(p);
   });
-  app.delete<{ Params: { id: string } }>("/simulate/personas/:id", async (req, reply) => { _personas.delete(req.params.id); return reply.code(204).send(); });
+  app.delete<{ Params: { id: string } }>("/simulate/personas/:id", async (req, reply) => {
+    _personas.delete(req.params.id);
+    return reply.code(204).send();
+  });
 
   // Persona chat — respond in-character
-  app.post<{ Params: { id: string }; Body: { messages: Array<{ role: string; content: string }>; message?: string } }>("/simulate/personas/:id/chat", async (request, reply) => {
+  app.post<{
+    Params: { id: string };
+    Body: { messages: { role: string; content: string }[]; message?: string };
+  }>("/simulate/personas/:id/chat", async (request, reply) => {
     const persona = _personas.get(request.params.id);
     if (!persona) return reply.code(404).send({ error: "not_found" });
     const driver = getDefaultDriver();
-    if (!driver) return reply.send({ role: "assistant", content: `[${persona.name}]: No LLM driver configured.` });
+    if (!driver)
+      return reply.send({
+        role: "assistant",
+        content: `[${persona.name}]: No LLM driver configured.`,
+      });
     const sysprompt = `You are ${persona.name}. ${persona.backstory}\nGoals: ${persona.goals.join(", ")}\nTraits: ${persona.traits.join(", ")}\nCommunication style: ${persona.communicationStyle}\nConstraints: ${persona.constraints.join(", ")}\nRespond in character.`;
-    const userMsg = request.body.message ?? (request.body.messages?.at(-1)?.content ?? "Hello");
-    const res = await driver.complete({ model: DEFAULT_MODEL, messages: [{ role: "system" as LlmRole, content: sysprompt }, { role: "user" as LlmRole, content: userMsg }], maxTokens: 512 });
+    const userMsg = request.body.message ?? request.body.messages?.at(-1)?.content ?? "Hello";
+    const res = await driver.complete({
+      model: DEFAULT_MODEL,
+      messages: [
+        { role: "system" as LlmRole, content: sysprompt },
+        { role: "user" as LlmRole, content: userMsg },
+      ],
+      maxTokens: 512,
+    });
     _trackCost(DEFAULT_MODEL, res.usage);
     return reply.send({ role: "assistant", content: res.content });
   });
 
   // Environments
-  app.get("/simulate/environments", async (_req, reply) => reply.send({ environments: Array.from(_simEnvs.values()) }));
+  app.get("/simulate/environments", async (_req, reply) =>
+    reply.send({ environments: Array.from(_simEnvs.values()) }),
+  );
   app.post<{ Body: Partial<SimEnvironment> }>("/simulate/environments", async (request, reply) => {
     const id = crypto.randomUUID();
-    const env: SimEnvironment = { id, name: request.body.name ?? "World", description: request.body.description ?? "", initialState: request.body.initialState ?? "", rules: request.body.rules ?? [], createdAt: now() };
+    const env: SimEnvironment = {
+      id,
+      name: request.body.name ?? "World",
+      description: request.body.description ?? "",
+      initialState: request.body.initialState ?? "",
+      rules: request.body.rules ?? [],
+      createdAt: now(),
+    };
     _simEnvs.set(id, env);
     return reply.code(201).send(env);
   });
 
   // Simulation runs
-  app.get("/simulate/runs", async (_req, reply) => reply.send({ runs: Array.from(_simRuns.values()) }));
-  app.post<{ Body: { name?: string; environmentId: string; personaIds: string[]; maxTicks?: number } }>("/simulate/runs", async (request, reply) => {
+  app.get("/simulate/runs", async (_req, reply) =>
+    reply.send({ runs: Array.from(_simRuns.values()) }),
+  );
+  app.post<{
+    Body: { name?: string; environmentId: string; personaIds: string[]; maxTicks?: number };
+  }>("/simulate/runs", async (request, reply) => {
     const id = crypto.randomUUID();
-    const run: SimRun = { id, name: request.body.name ?? "Simulation", environmentId: request.body.environmentId, personaIds: request.body.personaIds, status: "idle", currentTick: 0, maxTicks: request.body.maxTicks ?? 20, tickLog: [], createdAt: now() };
+    const run: SimRun = {
+      id,
+      name: request.body.name ?? "Simulation",
+      environmentId: request.body.environmentId,
+      personaIds: request.body.personaIds,
+      status: "idle",
+      currentTick: 0,
+      maxTicks: request.body.maxTicks ?? 20,
+      tickLog: [],
+      createdAt: now(),
+    };
     _simRuns.set(id, run);
     return reply.code(201).send(run);
   });
@@ -3993,31 +4940,58 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   app.post<{ Params: { id: string } }>("/simulate/runs/:id/tick", async (request, reply) => {
     const run = _simRuns.get(request.params.id);
     if (!run) return reply.code(404).send({ error: "not_found" });
-    if (run.currentTick >= run.maxTicks) { run.status = "completed"; return reply.send(run); }
+    if (run.currentTick >= run.maxTicks) {
+      run.status = "completed";
+      return reply.send(run);
+    }
     run.status = "running";
     const env = _simEnvs.get(run.environmentId);
     const driver = getDefaultDriver();
-    const personas = run.personaIds.map((pid) => _personas.get(pid)).filter(Boolean) as SimPersona[];
+    const personas = run.personaIds
+      .map((pid) => _personas.get(pid))
+      .filter(Boolean) as SimPersona[];
     const tick = run.currentTick + 1;
     const actions: unknown[] = [];
     if (driver && personas.length > 0) {
-      const worldCtx = env ? `Environment: ${env.name}. ${env.description}. State: ${env.initialState}` : "Unknown environment";
-      const prevTick = (run.tickLog as Array<{ actions: unknown[] }>).at(-1);
-      const recentEvents = prevTick ? `Previous tick events: ${JSON.stringify(prevTick.actions)}` : "First tick.";
+      const worldCtx = env
+        ? `Environment: ${env.name}. ${env.description}. State: ${env.initialState}`
+        : "Unknown environment";
+      const prevTick = (run.tickLog as { actions: unknown[] }[]).at(-1);
+      const recentEvents = prevTick
+        ? `Previous tick events: ${JSON.stringify(prevTick.actions)}`
+        : "First tick.";
       for (const p of personas) {
         const prompt = `${worldCtx}\n${recentEvents}\nYou are ${p.name}. ${p.backstory}\nGoals: ${p.goals.join(", ")}\nWhat do you do this tick? Return JSON: { action: string, reasoning: string }`;
-        const res = await driver.complete({ model: DEFAULT_MODEL, messages: [{ role: "user" as LlmRole, content: prompt }], maxTokens: 256 });
+        const res = await driver.complete({
+          model: DEFAULT_MODEL,
+          messages: [{ role: "user" as LlmRole, content: prompt }],
+          maxTokens: 256,
+        });
         _trackCost(DEFAULT_MODEL, res.usage);
         try {
           const parsed = parseJsonResponse(res.content);
-          actions.push({ personaId: p.id, personaName: p.name, ...(parsed as Record<string, unknown>) });
+          actions.push({
+            personaId: p.id,
+            personaName: p.name,
+            ...(parsed as Record<string, unknown>),
+          });
         } catch {
-          actions.push({ personaId: p.id, personaName: p.name, action: res.content.slice(0, 120), reasoning: "" });
+          actions.push({
+            personaId: p.id,
+            personaName: p.name,
+            action: res.content.slice(0, 120),
+            reasoning: "",
+          });
         }
       }
     } else {
-      for (const p of (personas.length ? personas : [{ id: "stub", name: "Agent" } as SimPersona])) {
-        actions.push({ personaId: p.id, personaName: p.name, action: "No LLM driver configured — add an API key to enable simulation", reasoning: "" });
+      for (const p of personas.length ? personas : [{ id: "stub", name: "Agent" } as SimPersona]) {
+        actions.push({
+          personaId: p.id,
+          personaName: p.name,
+          action: "No LLM driver configured — add an API key to enable simulation",
+          reasoning: "",
+        });
       }
     }
     const tickEntry = { tick, actions, timestamp: now() };
@@ -4036,39 +5010,69 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   app.post<{ Params: { id: string } }>("/simulate/runs/:id/reset", async (req, reply) => {
     const run = _simRuns.get(req.params.id);
     if (!run) return reply.code(404).send({ error: "not_found" });
-    run.currentTick = 0; run.status = "idle"; run.tickLog = [];
+    run.currentTick = 0;
+    run.status = "idle";
+    run.tickLog = [];
     return reply.send(run);
   });
 
   // -- MODERATION (LLM-based content safety) ---------------------------------
 
-  const _moderationConfig = { thresholds: { hate: 0.8, violence: 0.8, sexual: 0.9, selfharm: 0.7 } };
+  const _moderationConfig = {
+    thresholds: { hate: 0.8, violence: 0.8, sexual: 0.9, selfharm: 0.7 },
+  };
 
-  const _runModeration = async (text: string): Promise<{ flagged: boolean; action: string; reason: string; categories: Record<string, number> }> => {
+  const _runModeration = async (
+    text: string,
+  ): Promise<{
+    flagged: boolean;
+    action: string;
+    reason: string;
+    categories: Record<string, number>;
+  }> => {
     const driver = getDefaultDriver();
-    if (!driver) return { flagged: false, action: "allow", reason: "No LLM driver configured", categories: {} };
+    if (!driver)
+      return {
+        flagged: false,
+        action: "allow",
+        reason: "No LLM driver configured",
+        categories: {},
+      };
     const res = await driver.complete({
       model: DEFAULT_MODEL,
-      messages: [{ role: "user" as LlmRole, content: `Moderate this text for policy violations. Score each category 0-1.\nReturn JSON: { flagged: boolean, action: "block"|"warn"|"allow", reason: string, categories: { hate: number, violence: number, sexual: number, selfharm: number, spam: number } }\n\nText: ${text.slice(0, 800)}` }],
+      messages: [
+        {
+          role: "user" as LlmRole,
+          content: `Moderate this text for policy violations. Score each category 0-1.\nReturn JSON: { flagged: boolean, action: "block"|"warn"|"allow", reason: string, categories: { hate: number, violence: number, sexual: number, selfharm: number, spam: number } }\n\nText: ${text.slice(0, 800)}`,
+        },
+      ],
       maxTokens: 256,
     });
     _trackCost(DEFAULT_MODEL, res.usage);
-    try { return parseJsonResponse(res.content); }
-    catch { return { flagged: false, action: "allow", reason: "Parse error", categories: {} }; }
+    try {
+      return parseJsonResponse(res.content);
+    } catch {
+      return { flagged: false, action: "allow", reason: "Parse error", categories: {} };
+    }
   };
 
   app.post<{ Body: { text: string } }>("/moderation/check", async (request, reply) => {
     return reply.send(await _runModeration(request.body.text));
   });
 
-  app.post<{ Body: { items: Array<{ id: string; text: string }> } }>("/moderation/batch", async (request, reply) => {
-    const results = await Promise.all(
-      request.body.items.slice(0, 20).map(async (item) => ({ id: item.id, result: await _runModeration(item.text) }))
-    );
-    return reply.send({ results });
-  });
+  app.post<{ Body: { items: { id: string; text: string }[] } }>(
+    "/moderation/batch",
+    async (request, reply) => {
+      const results = await Promise.all(
+        request.body.items
+          .slice(0, 20)
+          .map(async (item) => ({ id: item.id, result: await _runModeration(item.text) })),
+      );
+      return reply.send({ results });
+    },
+  );
 
-  app.get("/moderation/config",  async (_req, reply) => reply.send(_moderationConfig));
+  app.get("/moderation/config", async (_req, reply) => reply.send(_moderationConfig));
   app.post<{ Body: typeof _moderationConfig }>("/moderation/config", async (request, reply) => {
     Object.assign(_moderationConfig, request.body);
     return reply.send(_moderationConfig);
@@ -4076,145 +5080,272 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
 
   // -- HONESTY (LLM-based sycophancy, reframe, calibration, minority report) -
 
-  app.post<{ Body: { prompt?: string; response: string } }>("/honesty/sycophancy-check", async (request, reply) => {
-    const { prompt = "", response } = request.body;
-    const driver = getDefaultDriver();
-    if (!driver) return reply.send({ sycophantic: false, score: 0, explanation: "No LLM driver configured", patterns: [] });
-    const content = [
-      "Analyse this AI response for sycophancy (excessive agreement, flattery, people-pleasing).",
-      prompt ? `\nOriginal prompt: ${prompt.slice(0, 300)}` : "",
-      `\nAI response: ${response.slice(0, 800)}`,
-      '\nReturn JSON: { sycophantic: boolean, score: number (0-1), explanation: string, patterns: string[] }',
-    ].join("");
-    const res = await driver.complete({ model: DEFAULT_MODEL, messages: [{ role: "user" as LlmRole, content }], maxTokens: 512 });
-    _trackCost(DEFAULT_MODEL, res.usage);
-    try { return reply.send(parseJsonResponse(res.content)); }
-    catch { return reply.send({ sycophantic: false, score: 0.5, explanation: res.content.slice(0, 200), patterns: [] }); }
-  });
+  app.post<{ Body: { prompt?: string; response: string } }>(
+    "/honesty/sycophancy-check",
+    async (request, reply) => {
+      const { prompt = "", response } = request.body;
+      const driver = getDefaultDriver();
+      if (!driver)
+        return reply.send({
+          sycophantic: false,
+          score: 0,
+          explanation: "No LLM driver configured",
+          patterns: [],
+        });
+      const content = [
+        "Analyse this AI response for sycophancy (excessive agreement, flattery, people-pleasing).",
+        prompt ? `\nOriginal prompt: ${prompt.slice(0, 300)}` : "",
+        `\nAI response: ${response.slice(0, 800)}`,
+        "\nReturn JSON: { sycophantic: boolean, score: number (0-1), explanation: string, patterns: string[] }",
+      ].join("");
+      const res = await driver.complete({
+        model: DEFAULT_MODEL,
+        messages: [{ role: "user" as LlmRole, content }],
+        maxTokens: 512,
+      });
+      _trackCost(DEFAULT_MODEL, res.usage);
+      try {
+        return reply.send(parseJsonResponse(res.content));
+      } catch {
+        return reply.send({
+          sycophantic: false,
+          score: 0.5,
+          explanation: res.content.slice(0, 200),
+          patterns: [],
+        });
+      }
+    },
+  );
 
   app.post<{ Body: { response: string } }>("/honesty/reframe", async (request, reply) => {
     const { response } = request.body;
     const driver = getDefaultDriver();
-    if (!driver) return reply.send({ original: response, reframed: response, changes: ["No LLM driver configured"] });
+    if (!driver)
+      return reply.send({
+        original: response,
+        reframed: response,
+        changes: ["No LLM driver configured"],
+      });
     const res = await driver.complete({
       model: DEFAULT_MODEL,
-      messages: [{ role: "user" as LlmRole, content: `Rewrite this AI response to be more direct, honest, and less sycophantic. Return JSON: { original: string, reframed: string, changes: string[] }\n\nResponse:\n${response.slice(0, 1000)}` }],
+      messages: [
+        {
+          role: "user" as LlmRole,
+          content: `Rewrite this AI response to be more direct, honest, and less sycophantic. Return JSON: { original: string, reframed: string, changes: string[] }\n\nResponse:\n${response.slice(0, 1000)}`,
+        },
+      ],
       maxTokens: 1024,
     });
     _trackCost(DEFAULT_MODEL, res.usage);
-    try { return reply.send(parseJsonResponse(res.content)); }
-    catch { return reply.send({ original: response, reframed: res.content, changes: [] }); }
+    try {
+      return reply.send(parseJsonResponse(res.content));
+    } catch {
+      return reply.send({ original: response, reframed: res.content, changes: [] });
+    }
   });
 
   app.post<{ Body: { text: string } }>("/honesty/confidence-calibrate", async (request, reply) => {
     const { text } = request.body;
     const driver = getDefaultDriver();
-    if (!driver) return reply.send({ originalConfidence: 0.8, calibratedConfidence: 0.6, overconfident: true, adjustedText: text });
+    if (!driver)
+      return reply.send({
+        originalConfidence: 0.8,
+        calibratedConfidence: 0.6,
+        overconfident: true,
+        adjustedText: text,
+      });
     const res = await driver.complete({
       model: DEFAULT_MODEL,
-      messages: [{ role: "user" as LlmRole, content: `Analyse the confidence calibration of this text. Detect overconfident claims and suggest hedged alternatives.\nReturn JSON: { originalConfidence: number (0-1), calibratedConfidence: number (0-1), overconfident: boolean, adjustedText: string }\n\nText:\n${text.slice(0, 800)}` }],
+      messages: [
+        {
+          role: "user" as LlmRole,
+          content: `Analyse the confidence calibration of this text. Detect overconfident claims and suggest hedged alternatives.\nReturn JSON: { originalConfidence: number (0-1), calibratedConfidence: number (0-1), overconfident: boolean, adjustedText: string }\n\nText:\n${text.slice(0, 800)}`,
+        },
+      ],
       maxTokens: 1024,
     });
     _trackCost(DEFAULT_MODEL, res.usage);
-    try { return reply.send(parseJsonResponse(res.content)); }
-    catch { return reply.send({ originalConfidence: 0.7, calibratedConfidence: 0.6, overconfident: false, adjustedText: text }); }
+    try {
+      return reply.send(parseJsonResponse(res.content));
+    } catch {
+      return reply.send({
+        originalConfidence: 0.7,
+        calibratedConfidence: 0.6,
+        overconfident: false,
+        adjustedText: text,
+      });
+    }
   });
 
-  app.post<{ Body: { topic: string; mainView?: string } }>("/honesty/minority-report", async (request, reply) => {
-    const { topic, mainView = "" } = request.body;
-    const driver = getDefaultDriver();
-    if (!driver) return reply.send({ mainView: mainView || topic, minorityViews: [{ view: "No LLM driver configured", prevalence: "unknown", reasoning: "" }] });
-    const res = await driver.complete({
-      model: DEFAULT_MODEL,
-      messages: [{ role: "user" as LlmRole, content: `Surface 3-4 minority, contrarian, or under-represented viewpoints on this topic.\n${mainView ? `Dominant view to challenge: ${mainView}\n` : ""}Topic: ${topic.slice(0, 400)}\n\nReturn JSON: { mainView: string, minorityViews: Array<{ view: string, prevalence: string, reasoning: string }> }` }],
-      maxTokens: 1024,
-    });
-    _trackCost(DEFAULT_MODEL, res.usage);
-    try { return reply.send(parseJsonResponse(res.content)); }
-    catch { return reply.send({ mainView: mainView || topic, minorityViews: [] }); }
-  });
+  app.post<{ Body: { topic: string; mainView?: string } }>(
+    "/honesty/minority-report",
+    async (request, reply) => {
+      const { topic, mainView = "" } = request.body;
+      const driver = getDefaultDriver();
+      if (!driver)
+        return reply.send({
+          mainView: mainView || topic,
+          minorityViews: [
+            { view: "No LLM driver configured", prevalence: "unknown", reasoning: "" },
+          ],
+        });
+      const res = await driver.complete({
+        model: DEFAULT_MODEL,
+        messages: [
+          {
+            role: "user" as LlmRole,
+            content: `Surface 3-4 minority, contrarian, or under-represented viewpoints on this topic.\n${mainView ? `Dominant view to challenge: ${mainView}\n` : ""}Topic: ${topic.slice(0, 400)}\n\nReturn JSON: { mainView: string, minorityViews: Array<{ view: string, prevalence: string, reasoning: string }> }`,
+          },
+        ],
+        maxTokens: 1024,
+      });
+      _trackCost(DEFAULT_MODEL, res.usage);
+      try {
+        return reply.send(parseJsonResponse(res.content));
+      } catch {
+        return reply.send({ mainView: mainView || topic, minorityViews: [] });
+      }
+    },
+  );
 
   // -- HALLUCINATION SCORING (LLM-based) ------------------------------------
 
   app.get("/hallucination/thresholds", async (_req, reply) => {
-    return reply.send({ low: 0.3, medium: 0.6, high: 0.8, thresholds: { low: 0.3, medium: 0.6, high: 0.8 } });
+    return reply.send({
+      low: 0.3,
+      medium: 0.6,
+      high: 0.8,
+      thresholds: { low: 0.3, medium: 0.6, high: 0.8 },
+    });
   });
 
-  const _scoreHallucination = async (response: string, context?: string): Promise<{ score: number; confidence: number; factors: string[] }> => {
+  const _scoreHallucination = async (
+    response: string,
+    context?: string,
+  ): Promise<{ score: number; confidence: number; factors: string[] }> => {
     const driver = getDefaultDriver();
     if (!driver) return { score: 0.5, confidence: 0.1, factors: ["No LLM driver configured"] };
     const prompt = context
       ? `Rate the hallucination risk of this AI response given the context (0=no hallucination, 1=definite hallucination). Return JSON: { score: number, confidence: number, factors: string[] }\n\nContext: ${context.slice(0, 500)}\n\nResponse: ${response.slice(0, 500)}`
       : `Rate the hallucination risk of this AI response (0=factual/safe, 1=likely hallucinated). Return JSON: { score: number, confidence: number, factors: string[] }\n\nResponse: ${response.slice(0, 500)}`;
-    const res = await driver.complete({ model: DEFAULT_MODEL, messages: [{ role: "user" as LlmRole, content: prompt }], maxTokens: 256 });
-    _trackCost(DEFAULT_MODEL, res.usage);
-    try { return parseJsonResponse(res.content); }
-    catch { return { score: 0.5, confidence: 0.5, factors: ["Parse error"] }; }
-  };
-
-  app.post<{ Body: { response: string; context?: string } }>("/hallucination/score", async (request, reply) => {
-    const result = await _scoreHallucination(request.body.response, request.body.context);
-    return reply.send(result);
-  });
-
-  app.post<{ Body: { answer: string; context: string } }>("/hallucination/groundedness", async (request, reply) => {
-    const { answer, context } = request.body;
-    const driver = getDefaultDriver();
-    if (!driver) return reply.send({ groundedness: 0.5, supported: [], unsupported: [] });
     const res = await driver.complete({
       model: DEFAULT_MODEL,
-      messages: [{ role: "user" as LlmRole, content: `Rate how grounded this answer is in the given context (0-1). Return JSON: { groundedness: number, supported: string[], unsupported: string[] }\n\nContext: ${context.slice(0, 500)}\n\nAnswer: ${answer.slice(0, 500)}` }],
+      messages: [{ role: "user" as LlmRole, content: prompt }],
       maxTokens: 256,
     });
     _trackCost(DEFAULT_MODEL, res.usage);
-    try { return reply.send(parseJsonResponse(res.content)); }
-    catch { return reply.send({ groundedness: 0.5, supported: [], unsupported: [] }); }
-  });
+    try {
+      return parseJsonResponse(res.content);
+    } catch {
+      return { score: 0.5, confidence: 0.5, factors: ["Parse error"] };
+    }
+  };
 
-  app.post<{ Body: { items: Array<{ id: string; response: string; context?: string }> } }>("/hallucination/batch-score", async (request, reply) => {
-    const results = await Promise.all(
-      request.body.items.slice(0, 10).map(async (item) => ({
-        id: item.id,
-        ...(await _scoreHallucination(item.response, item.context)),
-      })),
-    );
-    return reply.send({ results });
-  });
+  app.post<{ Body: { response: string; context?: string } }>(
+    "/hallucination/score",
+    async (request, reply) => {
+      const result = await _scoreHallucination(request.body.response, request.body.context);
+      return reply.send(result);
+    },
+  );
+
+  app.post<{ Body: { answer: string; context: string } }>(
+    "/hallucination/groundedness",
+    async (request, reply) => {
+      const { answer, context } = request.body;
+      const driver = getDefaultDriver();
+      if (!driver) return reply.send({ groundedness: 0.5, supported: [], unsupported: [] });
+      const res = await driver.complete({
+        model: DEFAULT_MODEL,
+        messages: [
+          {
+            role: "user" as LlmRole,
+            content: `Rate how grounded this answer is in the given context (0-1). Return JSON: { groundedness: number, supported: string[], unsupported: string[] }\n\nContext: ${context.slice(0, 500)}\n\nAnswer: ${answer.slice(0, 500)}`,
+          },
+        ],
+        maxTokens: 256,
+      });
+      _trackCost(DEFAULT_MODEL, res.usage);
+      try {
+        return reply.send(parseJsonResponse(res.content));
+      } catch {
+        return reply.send({ groundedness: 0.5, supported: [], unsupported: [] });
+      }
+    },
+  );
+
+  app.post<{ Body: { items: { id: string; response: string; context?: string }[] } }>(
+    "/hallucination/batch-score",
+    async (request, reply) => {
+      const results = await Promise.all(
+        request.body.items.slice(0, 10).map(async (item) => ({
+          id: item.id,
+          ...(await _scoreHallucination(item.response, item.context)),
+        })),
+      );
+      return reply.send({ results });
+    },
+  );
 
   // -- SPECULATIVE DECODING / CLASSIFY --------------------------------------
 
-  app.get("/speculative/config", async (_req, reply) => reply.send({
-    enabled: !!getDefaultDriver(), draftModel: DEFAULT_MODEL, targetModel: DEFAULT_MODEL, mode: "llm-simulated",
-  }));
-  app.get("/speculative/stats", async (_req, reply) => reply.send({ acceptanceRate: 0, speedup: 0, totalTokens: 0 }));
+  app.get("/speculative/config", async (_req, reply) =>
+    reply.send({
+      enabled: !!getDefaultDriver(),
+      draftModel: DEFAULT_MODEL,
+      targetModel: DEFAULT_MODEL,
+      mode: "llm-simulated",
+    }),
+  );
+  app.get("/speculative/stats", async (_req, reply) =>
+    reply.send({ acceptanceRate: 0, speedup: 0, totalTokens: 0 }),
+  );
 
-  app.post<{ Body: { prompt: string; draftModel?: string; targetModel?: string } }>("/speculative/run", async (req, reply) => {
-    const driver = getDefaultDriver();
-    if (!driver) return reply.code(503).send({ error: "no_llm_driver" });
-    const prompt = req.body.prompt ?? "";
-    const t0 = Date.now();
-    // Draft pass
-    const draftRes = await driver.complete({ model: DEFAULT_MODEL, messages: [userMsg(prompt)], maxTokens: 256 });
-    _trackCost(DEFAULT_MODEL, draftRes.usage);
-    const draftMs = Date.now() - t0;
-    // Verify pass — LLM scores and optionally improves the draft
-    const t1 = Date.now();
-    const verifyContent = await _llm([userMsg(
-      `Prompt: "${prompt.slice(0, 400)}"\n\nDraft response:\n${draftRes.content}\n\nIf the draft fully and correctly answers the prompt, respond with JSON: {"accepted":true,"output":"<same text>","reason":"correct"}. If it has errors or is incomplete, improve it: {"accepted":false,"output":"<improved>","reason":"<why rejected>"}. Return only valid JSON.`,
-    )], 512);
-    const verifyMs = Date.now() - t1;
-    let result = { accepted: true, output: draftRes.content, reason: "verify unavailable" };
-    try { result = parseJsonResponse<typeof result>(verifyContent); } catch { /* keep default */ }
-    return reply.send({
-      accepted: result.accepted,
-      output: result.output ?? draftRes.content,
-      draft: draftRes.content,
-      reason: result.reason,
-      speedup: result.accepted ? +(draftMs / (draftMs + verifyMs)).toFixed(3) : 0,
-      draftTokens: draftRes.usage?.outputTokens ?? 0,
-      draftMs, verifyMs, totalMs: Date.now() - t0,
-    });
-  });
+  app.post<{ Body: { prompt: string; draftModel?: string; targetModel?: string } }>(
+    "/speculative/run",
+    async (req, reply) => {
+      const driver = getDefaultDriver();
+      if (!driver) return reply.code(503).send({ error: "no_llm_driver" });
+      const prompt = req.body.prompt ?? "";
+      const t0 = Date.now();
+      // Draft pass
+      const draftRes = await driver.complete({
+        model: DEFAULT_MODEL,
+        messages: [userMsg(prompt)],
+        maxTokens: 256,
+      });
+      _trackCost(DEFAULT_MODEL, draftRes.usage);
+      const draftMs = Date.now() - t0;
+      // Verify pass — LLM scores and optionally improves the draft
+      const t1 = Date.now();
+      const verifyContent = await _llm(
+        [
+          userMsg(
+            `Prompt: "${prompt.slice(0, 400)}"\n\nDraft response:\n${draftRes.content}\n\nIf the draft fully and correctly answers the prompt, respond with JSON: {"accepted":true,"output":"<same text>","reason":"correct"}. If it has errors or is incomplete, improve it: {"accepted":false,"output":"<improved>","reason":"<why rejected>"}. Return only valid JSON.`,
+          ),
+        ],
+        512,
+      );
+      const verifyMs = Date.now() - t1;
+      let result = { accepted: true, output: draftRes.content, reason: "verify unavailable" };
+      try {
+        result = parseJsonResponse<typeof result>(verifyContent);
+      } catch {
+        /* keep default */
+      }
+      return reply.send({
+        accepted: result.accepted,
+        output: result.output ?? draftRes.content,
+        draft: draftRes.content,
+        reason: result.reason,
+        speedup: result.accepted ? +(draftMs / (draftMs + verifyMs)).toFixed(3) : 0,
+        draftTokens: draftRes.usage?.outputTokens ?? 0,
+        draftMs,
+        verifyMs,
+        totalMs: Date.now() - t0,
+      });
+    },
+  );
 
   app.post<{ Body: { text: string } }>("/speculative/classify", async (request, reply) => {
     const { text } = request.body;
@@ -4222,12 +5353,20 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     if (!driver) return reply.send({ type: "unknown", confidence: 0, labels: [] });
     const res = await driver.complete({
       model: DEFAULT_MODEL,
-      messages: [{ role: "user" as LlmRole, content: `Classify this text into one of: question, statement, command, code, creative, factual, opinion. Return JSON: { type: string, confidence: number, labels: string[] }\n\n${text.slice(0, 500)}` }],
+      messages: [
+        {
+          role: "user" as LlmRole,
+          content: `Classify this text into one of: question, statement, command, code, creative, factual, opinion. Return JSON: { type: string, confidence: number, labels: string[] }\n\n${text.slice(0, 500)}`,
+        },
+      ],
       maxTokens: 128,
     });
     _trackCost(DEFAULT_MODEL, res.usage);
-    try { return reply.send(parseJsonResponse(res.content)); }
-    catch { return reply.send({ type: "unknown", confidence: 0.5, labels: [] }); }
+    try {
+      return reply.send(parseJsonResponse(res.content));
+    } catch {
+      return reply.send({ type: "unknown", confidence: 0.5, labels: [] });
+    }
   });
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -4235,7 +5374,14 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   // ══════════════════════════════════════════════════════════════════════════
 
   // STM — Short-Term Memory modules backed by @nexus/drift
-  const _stmHistory: Array<{ id: string; query: string; modules: string[]; applied: string[]; params: Record<string, unknown>; ts: string }> = [];
+  const _stmHistory: {
+    id: string;
+    query: string;
+    modules: string[];
+    applied: string[];
+    params: Record<string, unknown>;
+    ts: string;
+  }[] = [];
   const _stmEmaStore = new InMemoryEmaStore();
   let _stmActiveModules: string[] = ["hedge", "dir", "ema"];
 
@@ -4245,30 +5391,66 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     async (req, reply) => {
       // Compute real drift params for this query using active modules
       const result = computeAutoTuneParams({ message: req.body.query ?? "", history: [] });
-      const entry = { id: crypto.randomUUID(), ...req.body, params: result.params as Record<string, unknown>, ts: now() };
+      const entry = {
+        id: crypto.randomUUID(),
+        ...req.body,
+        params: result.params as unknown as Record<string, unknown>,
+        ts: now(),
+      };
       _stmHistory.push(entry);
       if (_stmHistory.length > 500) _stmHistory.splice(0, _stmHistory.length - 500);
       return reply.send({ ok: true, params: result.params });
     },
   );
-  app.delete("/stm/history", async (_req, reply) => { _stmHistory.length = 0; return reply.send({ ok: true, cleared: true }); });
+  app.delete("/stm/history", async (_req, reply) => {
+    _stmHistory.length = 0;
+    return reply.send({ ok: true, cleared: true });
+  });
 
   app.get("/stm/active", async (_req, reply) => {
     // Return active module list + their current computed params for a neutral message
     const result = computeAutoTuneParams({ message: "neutral", history: [] });
-    return reply.send({ modules: _stmActiveModules, params: result.params, context: result.context });
+    return reply.send({
+      modules: _stmActiveModules,
+      params: result.params,
+      context: result.detectedContext,
+    });
   });
 
   app.post<{ Body: { modules?: string[] } }>("/stm/active", async (req, reply) => {
     if (req.body.modules) _stmActiveModules = req.body.modules;
     const result = computeAutoTuneParams({ message: "neutral", history: [] });
-    return reply.send({ modules: _stmActiveModules, params: result.params, context: result.context });
+    return reply.send({
+      modules: _stmActiveModules,
+      params: result.params,
+      context: result.detectedContext,
+    });
   });
 
   // TTS — OpenAI TTS-1 if OPENAI_API_KEY present, else graceful null
   app.post<{ Body: { text: string; voice?: string } }>("/tts", async (req, reply) => {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return reply.send({ audio: null, message: "TTS not configured — add OPENAI_API_KEY to enable." });
+    // BYOK: platform key → x-openai-key header → stored user provider key
+    const userId = (req as any).user?.id ?? "anonymous";
+    const headerKey = req.headers["x-openai-key"] as string | undefined;
+    const storedEntry = [..._providerKeys.values()].find(
+      (k) => k.userId === userId && k.provider === "openai",
+    );
+    const storedKey = storedEntry
+      ? (() => {
+          try {
+            return decryptKey(storedEntry.encryptedKey, storedEntry.iv, storedEntry.authTag);
+          } catch {
+            return undefined;
+          }
+        })()
+      : undefined;
+    const apiKey = process.env.OPENAI_API_KEY || headerKey || storedKey;
+    if (!apiKey)
+      return reply.send({
+        audio: null,
+        message:
+          "TTS not configured — set OPENAI_API_KEY, pass x-openai-key header, or store your key via POST /user/provider-keys.",
+      });
     const text = (req.body.text ?? "").slice(0, 4096);
     const voice = req.body.voice ?? "alloy";
     try {
@@ -4282,13 +5464,16 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
       const b64 = Buffer.from(buf).toString("base64");
       return reply.send({ audio: `data:audio/mpeg;base64,${b64}`, voice, chars: text.length });
     } catch (e) {
-      return reply.send({ audio: null, message: `TTS failed: ${e instanceof Error ? e.message : String(e)}` });
+      return reply.send({
+        audio: null,
+        message: `TTS failed: ${e instanceof Error ? e.message : String(e)}`,
+      });
     }
   });
 
   // Memory backend config & compact
   app.post("/memory/backend", async (_req, reply) => reply.send({ ok: true }));
-  app.put("/memory/backend",  async (_req, reply) => reply.send({ ok: true }));
+  app.put("/memory/backend", async (_req, reply) => reply.send({ ok: true }));
   app.post("/memory/compact", async (_req, reply) => reply.send({ ok: true, compacted: 0 }));
 
   // Memory delete-all
@@ -4301,7 +5486,10 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
       try {
         const store = getKGStore();
         const maxLevels = Math.min(parseInt(request.query.maxLevels ?? "2", 10) || 2, 4);
-        const maxClusterSize = Math.min(parseInt(request.query.maxClusterSize ?? "10", 10) || 10, 50);
+        const maxClusterSize = Math.min(
+          parseInt(request.query.maxClusterSize ?? "10", 10) || 10,
+          50,
+        );
 
         const clusters = await clusterGraph(store, { maxLevels, maxClusterSize });
         const communities = buildCommunities(clusters);
@@ -4310,9 +5498,10 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
           communities,
           total: communities.length,
           levels: maxLevels,
-          message: communities.length === 0
-            ? "No entities in graph yet — ingest documents first."
-            : `${communities.length} communities detected across ${maxLevels} level(s).`,
+          message:
+            communities.length === 0
+              ? "No entities in graph yet — ingest documents first."
+              : `${communities.length} communities detected across ${maxLevels} level(s).`,
         });
       } catch (err) {
         return reply.code(500).send({
@@ -4325,13 +5514,20 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
 
   // AutoTune optimize — real prompt optimization via LLM + EMA context detection
   app.post<{
-    Body: { systemPrompt: string; testInputs: Array<{ user: string; expected?: string }>; goal?: string; iterations?: number };
+    Body: {
+      systemPrompt: string;
+      testInputs: { user: string; expected?: string }[];
+      goal?: string;
+      iterations?: number;
+    };
   }>("/drift/optimize", async (request, reply) => {
     const { systemPrompt, testInputs = [], goal = "", iterations = 1 } = request.body;
     reply.hijack();
     const raw = reply.raw;
     raw.writeHead(200, SSE_HEADERS);
-    const write = (d: unknown) => { if (!raw.destroyed) raw.write(`data: ${JSON.stringify(d)}\n\n`); };
+    const write = (d: unknown) => {
+      if (!raw.destroyed) raw.write(`data: ${JSON.stringify(d)}\n\n`);
+    };
 
     const driver = getDefaultDriver();
     const inputs = testInputs.slice(0, 4); // cap at 4 to avoid excessive tokens
@@ -4362,13 +5558,21 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
       return Math.min(9, 4 + (hits / Math.max(words.length, 1)) * 6);
     };
 
-    write({ type: "step", phase: "analyse", message: `Analysing system prompt (${inputs.length} test inputs)…` });
+    write({
+      type: "step",
+      phase: "analyse",
+      message: `Analysing system prompt (${inputs.length} test inputs)…`,
+    });
 
     // Phase 1: evaluate original prompt
-    const phase1: Array<{ input: string; output: string; score: number }> = [];
+    const phase1: { input: string; output: string; score: number }[] = [];
     for (let i = 0; i < inputs.length; i++) {
       const inp = inputs[i]!;
-      write({ type: "step", phase: "eval-orig", message: `Evaluating original prompt on input ${i + 1}/${inputs.length}…` });
+      write({
+        type: "step",
+        phase: "eval-orig",
+        message: `Evaluating original prompt on input ${i + 1}/${inputs.length}…`,
+      });
       const output = await runInput(systemPrompt, inp.user);
       const score = scoreOutput(output, inp.expected);
       phase1.push({ input: inp.user, output, score });
@@ -4381,7 +5585,10 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     write({ type: "step", phase: "optimise", message: "Generating optimised system prompt…" });
     let optimizedPrompt = systemPrompt;
     if (driver) {
-      const failedInputs = phase1.filter((x) => x.score < 7).map((x) => `Input: ${x.input}\nActual output: ${x.output}`).join("\n\n");
+      const failedInputs = phase1
+        .filter((x) => x.score < 7)
+        .map((x) => `Input: ${x.input}\nActual output: ${x.output}`)
+        .join("\n\n");
       const improvePrompt = [
         `You are a prompt engineering expert. Improve the following system prompt to better achieve the stated goal.`,
         goal ? `\nGoal: ${goal}` : "",
@@ -4399,16 +5606,27 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     }
 
     // Phase 3: evaluate optimized prompt (up to iterations)
-    const phase2: Array<{ input: string; output: string; score: number }> = [];
+    const phase2: { input: string; output: string; score: number }[] = [];
     const _iters = Math.min(iterations, 1); // single optimization pass for now
     void _iters;
     for (let i = 0; i < inputs.length; i++) {
       const inp = inputs[i]!;
-      write({ type: "step", phase: "eval-opt", message: `Evaluating optimised prompt on input ${i + 1}/${inputs.length}…` });
+      write({
+        type: "step",
+        phase: "eval-opt",
+        message: `Evaluating optimised prompt on input ${i + 1}/${inputs.length}…`,
+      });
       const output = await runInput(optimizedPrompt, inp.user);
       const score = scoreOutput(output, inp.expected);
       phase2.push({ input: inp.user, output, score });
-      write({ type: "eval", inputIndex: i, phase: 2, score, originalScore: phase1[i]?.score ?? 0, output });
+      write({
+        type: "eval",
+        inputIndex: i,
+        phase: 2,
+        score,
+        originalScore: phase1[i]?.score ?? 0,
+        output,
+      });
     }
 
     const avgOpt = phase2.reduce((s, x) => s + x.score, 0) / Math.max(phase2.length, 1);
@@ -4416,7 +5634,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     // Compute diff stats
     const origLines = systemPrompt.split("\n");
     const optLines = optimizedPrompt.split("\n");
-    const linesAdded   = optLines.filter((l) => !origLines.includes(l)).length;
+    const linesAdded = optLines.filter((l) => !origLines.includes(l)).length;
     const linesRemoved = origLines.filter((l) => !optLines.includes(l)).length;
 
     write({
@@ -4440,32 +5658,41 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   // -- WHAT-IF SCENARIOS (simulate branches extension) -----------------------
 
   interface SimBranch {
-    id: string; runId: string; name: string; conditions: string;
-    currentTick: number; status: "idle" | "running" | "done";
-    tickLog: Array<{ tick: number; events: string[] }>;
+    id: string;
+    runId: string;
+    name: string;
+    conditions: string;
+    currentTick: number;
+    status: "idle" | "running" | "done";
+    tickLog: { tick: number; events: string[] }[];
     createdAt: string;
   }
   const _simBranches = new Map<string, SimBranch>();
 
   app.get<{ Params: { id: string } }>("/simulate/runs/:id/branches", async (req, reply) => {
-    const branches = Array.from(_simBranches.values()).filter(b => b.runId === req.params.id);
+    const branches = Array.from(_simBranches.values()).filter((b) => b.runId === req.params.id);
     return reply.send({ branches });
   });
 
-  app.post<{ Params: { id: string }; Body: { name?: string; conditions?: string } }>("/simulate/runs/:id/branches", async (req, reply) => {
-    const run = _simRuns.get(req.params.id);
-    if (!run) return reply.code(404).send({ error: "run_not_found" });
-    const b: SimBranch = {
-      id: crypto.randomUUID(), runId: req.params.id,
-      name: req.body.name ?? `Branch-${Date.now()}`,
-      conditions: req.body.conditions ?? "",
-      currentTick: run.currentTick, status: "idle",
-      tickLog: JSON.parse(JSON.stringify(run.tickLog ?? [])),
-      createdAt: now(),
-    };
-    _simBranches.set(b.id, b);
-    return reply.code(201).send(b);
-  });
+  app.post<{ Params: { id: string }; Body: { name?: string; conditions?: string } }>(
+    "/simulate/runs/:id/branches",
+    async (req, reply) => {
+      const run = _simRuns.get(req.params.id);
+      if (!run) return reply.code(404).send({ error: "run_not_found" });
+      const b: SimBranch = {
+        id: crypto.randomUUID(),
+        runId: req.params.id,
+        name: req.body.name ?? `Branch-${Date.now()}`,
+        conditions: req.body.conditions ?? "",
+        currentTick: run.currentTick,
+        status: "idle",
+        tickLog: JSON.parse(JSON.stringify(run.tickLog ?? [])),
+        createdAt: now(),
+      };
+      _simBranches.set(b.id, b);
+      return reply.code(201).send(b);
+    },
+  );
 
   app.post<{ Params: { id: string } }>("/simulate/branches/:id/tick", async (req, reply) => {
     const b = _simBranches.get(req.params.id);
@@ -4479,19 +5706,26 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     const driver = getDefaultDriver();
     for (const pid of personaIds) {
       const persona = _personas.get(pid);
-      if (!persona || !driver) { events.push(`${pid}: idle`); continue; }
+      if (!persona || !driver) {
+        events.push(`${pid}: idle`);
+        continue;
+      }
       try {
         const res = await driver.complete({
           model: DEFAULT_MODEL,
-          messages: [{
-            role: "user",
-            content: `You are ${persona.name}. Environment: ${env?.description ?? "unknown"}. Conditions: ${b.conditions}. Tick: ${b.currentTick}. Generate a brief action (1 sentence).`,
-          }],
+          messages: [
+            {
+              role: "user",
+              content: `You are ${persona.name}. Environment: ${env?.description ?? "unknown"}. Conditions: ${b.conditions}. Tick: ${b.currentTick}. Generate a brief action (1 sentence).`,
+            },
+          ],
           maxTokens: 80,
         });
         _trackCost(DEFAULT_MODEL, res.usage);
         events.push(`${persona.name}: ${res.content.trim()}`);
-      } catch { events.push(`${persona.name}: idle`); }
+      } catch {
+        events.push(`${persona.name}: idle`);
+      }
     }
     b.tickLog.push({ tick: b.currentTick, events });
     b.status = "idle";
@@ -4504,38 +5738,71 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   });
 
   app.get<{ Params: { id: string } }>("/simulate/runs/:id/compare", async (req, reply) => {
-    const branches = Array.from(_simBranches.values()).filter(b => b.runId === req.params.id);
-    if (branches.length < 2) return reply.send({ summary: "Need at least 2 branches to compare.", branches: [] });
+    const branches = Array.from(_simBranches.values()).filter((b) => b.runId === req.params.id);
+    if (branches.length < 2)
+      return reply.send({ summary: "Need at least 2 branches to compare.", branches: [] });
     const driver = getDefaultDriver();
     let summary = "LLM comparison unavailable.";
     if (driver) {
       try {
-        const branchSummaries = branches.map(b =>
-          `Branch "${b.name}" (conditions: ${b.conditions || "none"}): ${b.tickLog.slice(-3).map(t => t.events.join("; ")).join(" | ")}`
-        ).join("\n");
+        const branchSummaries = branches
+          .map(
+            (b) =>
+              `Branch "${b.name}" (conditions: ${b.conditions || "none"}): ${b.tickLog
+                .slice(-3)
+                .map((t) => t.events.join("; "))
+                .join(" | ")}`,
+          )
+          .join("\n");
         const res = await driver.complete({
           model: DEFAULT_MODEL,
-          messages: [{
-            role: "user",
-            content: `Compare these simulation branches and summarize key divergence points:\n${branchSummaries}\n\nProvide a concise 2-3 sentence analysis.`,
-          }],
+          messages: [
+            {
+              role: "user",
+              content: `Compare these simulation branches and summarize key divergence points:\n${branchSummaries}\n\nProvide a concise 2-3 sentence analysis.`,
+            },
+          ],
           maxTokens: 200,
         });
         _trackCost(DEFAULT_MODEL, res.usage);
         summary = res.content.trim();
-      } catch { /* use default */ }
+      } catch {
+        /* use default */
+      }
     }
-    return reply.send({ summary, branches: branches.map(b => ({ id: b.id, name: b.name, currentTick: b.currentTick, conditions: b.conditions })) });
+    return reply.send({
+      summary,
+      branches: branches.map((b) => ({
+        id: b.id,
+        name: b.name,
+        currentTick: b.currentTick,
+        conditions: b.conditions,
+      })),
+    });
   });
 
   // -- COUNCIL CHECKPOINTS ---------------------------------------------------
 
-  interface CpCheckpoint { stepIndex: number; label: string; savedAt: string; opinions: Record<string, string>; verdict: string; }
-  interface CpRun { runId: string; label: string; createdAt: string; checkpoints: CpCheckpoint[]; }
+  interface CpCheckpoint {
+    stepIndex: number;
+    label: string;
+    savedAt: string;
+    opinions: Record<string, string>;
+    verdict: string;
+  }
+  interface CpRun {
+    runId: string;
+    label: string;
+    createdAt: string;
+    checkpoints: CpCheckpoint[];
+  }
   const _cpRuns = new Map<string, CpRun>();
   const _getOrCreateCpRun = (id: string): CpRun => {
     let run = _cpRuns.get(id);
-    if (!run) { run = { runId: id, label: `Run ${id.slice(0, 8)}`, createdAt: now(), checkpoints: [] }; _cpRuns.set(id, run); }
+    if (!run) {
+      run = { runId: id, label: `Run ${id.slice(0, 8)}`, createdAt: now(), checkpoints: [] };
+      _cpRuns.set(id, run);
+    }
     return run;
   };
 
@@ -4543,7 +5810,10 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     return reply.send(_getOrCreateCpRun(req.params.id));
   });
 
-  app.post<{ Params: { id: string }; Body: { label?: string; opinions?: Record<string, string>; verdict?: string } }>("/council-checkpoints/runs/:id/save", async (req, reply) => {
+  app.post<{
+    Params: { id: string };
+    Body: { label?: string; opinions?: Record<string, string>; verdict?: string };
+  }>("/council-checkpoints/runs/:id/save", async (req, reply) => {
     const run = _getOrCreateCpRun(req.params.id);
     const cp: CpCheckpoint = {
       stepIndex: run.checkpoints.length,
@@ -4556,37 +5826,57 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     return reply.code(201).send(cp);
   });
 
-  app.get<{ Params: { id: string; step: string } }>("/council-checkpoints/runs/:id/checkpoints/:step", async (req, reply) => {
-    const run = _cpRuns.get(req.params.id);
-    if (!run) return reply.code(404).send({ error: "not_found" });
-    const idx = parseInt(req.params.step, 10);
-    const cp = run.checkpoints[idx];
-    if (!cp) return reply.code(404).send({ error: "checkpoint_not_found" });
-    return reply.send(cp);
-  });
+  app.get<{ Params: { id: string; step: string } }>(
+    "/council-checkpoints/runs/:id/checkpoints/:step",
+    async (req, reply) => {
+      const run = _cpRuns.get(req.params.id);
+      if (!run) return reply.code(404).send({ error: "not_found" });
+      const idx = parseInt(req.params.step, 10);
+      const cp = run.checkpoints[idx];
+      if (!cp) return reply.code(404).send({ error: "checkpoint_not_found" });
+      return reply.send(cp);
+    },
+  );
 
-  app.post<{ Params: { id: string }; Body: { fromStep: number } }>("/council-checkpoints/runs/:id/replay", async (req, reply) => {
-    const run = _cpRuns.get(req.params.id);
-    if (!run) return reply.code(404).send({ error: "not_found" });
-    const fromIdx = req.body.fromStep ?? 0;
-    const checkpoint = run.checkpoints[fromIdx];
-    if (!checkpoint) return reply.code(404).send({ error: "checkpoint_not_found" });
-    const driver = getDefaultDriver();
-    let replayVerdict = checkpoint.verdict;
-    if (driver && Object.keys(checkpoint.opinions).length > 0) {
-      try {
-        const opinionText = Object.entries(checkpoint.opinions).map(([k, v]) => `${k}: ${v}`).join("\n");
-        const res = await driver.complete({
-          model: DEFAULT_MODEL,
-          messages: [{ role: "user", content: `Re-synthesize a council verdict from these opinions at step ${fromIdx}:\n${opinionText}\n\nProvide a concise updated verdict.` }],
-          maxTokens: 300,
-        });
-        _trackCost(DEFAULT_MODEL, res.usage);
-        replayVerdict = res.content.trim();
-      } catch { /* use existing */ }
-    }
-    return reply.send({ fromStep: fromIdx, replayedAt: now(), verdict: replayVerdict, opinions: checkpoint.opinions });
-  });
+  app.post<{ Params: { id: string }; Body: { fromStep: number } }>(
+    "/council-checkpoints/runs/:id/replay",
+    async (req, reply) => {
+      const run = _cpRuns.get(req.params.id);
+      if (!run) return reply.code(404).send({ error: "not_found" });
+      const fromIdx = req.body.fromStep ?? 0;
+      const checkpoint = run.checkpoints[fromIdx];
+      if (!checkpoint) return reply.code(404).send({ error: "checkpoint_not_found" });
+      const driver = getDefaultDriver();
+      let replayVerdict = checkpoint.verdict;
+      if (driver && Object.keys(checkpoint.opinions).length > 0) {
+        try {
+          const opinionText = Object.entries(checkpoint.opinions)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join("\n");
+          const res = await driver.complete({
+            model: DEFAULT_MODEL,
+            messages: [
+              {
+                role: "user",
+                content: `Re-synthesize a council verdict from these opinions at step ${fromIdx}:\n${opinionText}\n\nProvide a concise updated verdict.`,
+              },
+            ],
+            maxTokens: 300,
+          });
+          _trackCost(DEFAULT_MODEL, res.usage);
+          replayVerdict = res.content.trim();
+        } catch {
+          /* use existing */
+        }
+      }
+      return reply.send({
+        fromStep: fromIdx,
+        replayedAt: now(),
+        verdict: replayVerdict,
+        opinions: checkpoint.opinions,
+      });
+    },
+  );
 
   app.delete<{ Params: { id: string } }>("/council-checkpoints/runs/:id", async (req, reply) => {
     _cpRuns.delete(req.params.id);
@@ -4595,32 +5885,45 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
 
   // -- STANDARD ANSWERS (Q&A knowledge base + LLM match) --------------------
 
-  interface StdAnswer { id: string; question: string; answer: string; tags: string[]; createdAt: string; updatedAt: string; }
+  interface StdAnswer {
+    id: string;
+    question: string;
+    answer: string;
+    tags: string[];
+    createdAt: string;
+    updatedAt: string;
+  }
 
   app.get("/standard-answers", async (_req, reply) => reply.send(Array.from(_stdAnswers.values())));
 
-  app.post<{ Body: { question: string; answer: string; tags?: string[] } }>("/standard-answers", async (req, reply) => {
-    const a: StdAnswer = {
-      id: crypto.randomUUID(),
-      question: req.body.question ?? "",
-      answer: req.body.answer ?? "",
-      tags: req.body.tags ?? [],
-      createdAt: now(),
-      updatedAt: now(),
-    };
-    _stdAnswers.set(a.id, a);
-    return reply.code(201).send(a);
-  });
+  app.post<{ Body: { question: string; answer: string; tags?: string[] } }>(
+    "/standard-answers",
+    async (req, reply) => {
+      const a: StdAnswer = {
+        id: crypto.randomUUID(),
+        question: req.body.question ?? "",
+        answer: req.body.answer ?? "",
+        tags: req.body.tags ?? [],
+        createdAt: now(),
+        updatedAt: now(),
+      };
+      _stdAnswers.set(a.id, a);
+      return reply.code(201).send(a);
+    },
+  );
 
-  app.put<{ Params: { id: string }; Body: Partial<StdAnswer> }>("/standard-answers/:id", async (req, reply) => {
-    const a = _stdAnswers.get(req.params.id);
-    if (!a) return reply.code(404).send({ error: "not_found" });
-    if (req.body.question !== undefined) a.question = req.body.question;
-    if (req.body.answer !== undefined) a.answer = req.body.answer;
-    if (req.body.tags !== undefined) a.tags = req.body.tags;
-    a.updatedAt = now();
-    return reply.send(a);
-  });
+  app.put<{ Params: { id: string }; Body: Partial<StdAnswer> }>(
+    "/standard-answers/:id",
+    async (req, reply) => {
+      const a = _stdAnswers.get(req.params.id);
+      if (!a) return reply.code(404).send({ error: "not_found" });
+      if (req.body.question !== undefined) a.question = req.body.question;
+      if (req.body.answer !== undefined) a.answer = req.body.answer;
+      if (req.body.tags !== undefined) a.tags = req.body.tags;
+      a.updatedAt = now();
+      return reply.send(a);
+    },
+  );
 
   app.delete<{ Params: { id: string } }>("/standard-answers/:id", async (req, reply) => {
     _stdAnswers.delete(req.params.id);
@@ -4630,17 +5933,29 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   app.post<{ Body: { query: string } }>("/standard-answers/match", async (req, reply) => {
     const query = req.body.query ?? "";
     const answers = Array.from(_stdAnswers.values());
-    if (!answers.length) return reply.send({ match: null, confidence: 0, message: "No standard answers in knowledge base." });
+    if (!answers.length)
+      return reply.send({
+        match: null,
+        confidence: 0,
+        message: "No standard answers in knowledge base.",
+      });
     const driver = getDefaultDriver();
-    if (!driver) return reply.send({ match: answers[0], confidence: 0.5, message: "No LLM — returning first entry." });
+    if (!driver)
+      return reply.send({
+        match: answers[0],
+        confidence: 0.5,
+        message: "No LLM — returning first entry.",
+      });
     try {
       const catalog = answers.map((a, i) => `[${i}] Q: ${a.question}`).join("\n");
       const res = await driver.complete({
         model: DEFAULT_MODEL,
-        messages: [{
-          role: "user",
-          content: `Given this user query: "${query}"\n\nWhich of these standard answers best matches? Reply with just the index number and confidence score (0-1) in JSON: {"index": N, "confidence": 0.X}\n\n${catalog}`,
-        }],
+        messages: [
+          {
+            role: "user",
+            content: `Given this user query: "${query}"\n\nWhich of these standard answers best matches? Reply with just the index number and confidence score (0-1) in JSON: {"index": N, "confidence": 0.X}\n\n${catalog}`,
+          },
+        ],
         maxTokens: 60,
       });
       _trackCost(DEFAULT_MODEL, res.usage);
@@ -4654,33 +5969,51 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
 
   // -- SEMANTIC CACHE -------------------------------------------------------
 
-  interface CacheEntry { key: string; query: string; response: string; hits: number; createdAt: string; lastHit: string; }
+  interface CacheEntry {
+    key: string;
+    query: string;
+    response: string;
+    hits: number;
+    createdAt: string;
+    lastHit: string;
+  }
   const _semCache = new Map<string, CacheEntry>();
-  const _semCacheConfig = { enabled: true, similarityThreshold: 0.85, maxEntries: 1000, ttlHours: 24 };
+  const _semCacheConfig = {
+    enabled: true,
+    similarityThreshold: 0.85,
+    maxEntries: 1000,
+    ttlHours: 24,
+  };
 
   app.get("/semantic-cache/stats", async (_req, reply) => {
     const entries = Array.from(_semCache.values());
     return reply.send({
       totalEntries: entries.length,
       totalHits: entries.reduce((s, e) => s + e.hits, 0),
-      hitRate: entries.length ? (entries.filter(e => e.hits > 0).length / entries.length) : 0,
-      avgHitsPerEntry: entries.length ? (entries.reduce((s, e) => s + e.hits, 0) / entries.length) : 0,
+      hitRate: entries.length ? entries.filter((e) => e.hits > 0).length / entries.length : 0,
+      avgHitsPerEntry: entries.length
+        ? entries.reduce((s, e) => s + e.hits, 0) / entries.length
+        : 0,
     });
   });
 
   app.get("/semantic-cache/config", async (_req, reply) => reply.send(_semCacheConfig));
 
-  app.post<{ Body: Partial<typeof _semCacheConfig> }>("/semantic-cache/config", async (req, reply) => {
-    Object.assign(_semCacheConfig, req.body);
-    return reply.send(_semCacheConfig);
-  });
+  app.post<{ Body: Partial<typeof _semCacheConfig> }>(
+    "/semantic-cache/config",
+    async (req, reply) => {
+      Object.assign(_semCacheConfig, req.body);
+      return reply.send(_semCacheConfig);
+    },
+  );
 
   app.post<{ Body: { query: string } }>("/semantic-cache/lookup", async (req, reply) => {
     const q = (req.body.query ?? "").toLowerCase().trim();
     // Naive exact/prefix match (real impl would use embeddings)
     for (const e of _semCache.values()) {
       if (e.query.toLowerCase().includes(q) || q.includes(e.query.toLowerCase())) {
-        e.hits += 1; e.lastHit = now();
+        e.hits += 1;
+        e.lastHit = now();
         return reply.send({ hit: true, entry: e, similarity: 0.91 });
       }
     }
@@ -4699,8 +6032,23 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
 
   // -- RSS FEEDS -------------------------------------------------------------
 
-  interface RssFeed { id: string; url: string; name: string; lastPolled: string | null; itemCount: number; createdAt: string; }
-  interface RssItem { id: string; feedId: string; title: string; link: string; summary: string; publishedAt: string; read: boolean; }
+  interface RssFeed {
+    id: string;
+    url: string;
+    name: string;
+    lastPolled: string | null;
+    itemCount: number;
+    createdAt: string;
+  }
+  interface RssItem {
+    id: string;
+    feedId: string;
+    title: string;
+    link: string;
+    summary: string;
+    publishedAt: string;
+    read: boolean;
+  }
 
   app.get("/rss/feeds", async (_req, reply) => reply.send(Array.from(_rssFeeds.values())));
 
@@ -4718,7 +6066,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   });
 
   app.get<{ Params: { id: string } }>("/rss/feeds/:id/items", async (req, reply) => {
-    const items = Array.from(_rssItems.values()).filter(i => i.feedId === req.params.id);
+    const items = Array.from(_rssItems.values()).filter((i) => i.feedId === req.params.id);
     return reply.send(items);
   });
 
@@ -4726,7 +6074,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     const feed = _rssFeeds.get(req.params.id);
     if (!feed) return reply.code(404).send({ error: "not_found" });
     // Attempt to fetch and parse RSS via HttpxEngine
-    let newItems: RssItem[] = [];
+    const newItems: RssItem[] = [];
     try {
       const scraper = getScraper();
       const result = await scraper.scrape(feed.url);
@@ -4738,10 +6086,11 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
         const matches = [...(result.html ?? "").matchAll(itemRegex)];
         for (const m of matches.slice(0, 20)) {
           const chunk = m[1] ?? m[2] ?? "";
-          const titleMatch = chunk.match(titleRegex);
-          const linkMatch = chunk.match(linkRegex);
+          const titleMatch = titleRegex.exec(chunk);
+          const linkMatch = linkRegex.exec(chunk);
           const item: RssItem = {
-            id: crypto.randomUUID(), feedId: feed.id,
+            id: crypto.randomUUID(),
+            feedId: feed.id,
             title: titleMatch?.[1]?.trim() ?? "(no title)",
             link: (linkMatch?.[1] ?? linkMatch?.[2] ?? "").trim(),
             summary: "",
@@ -4752,16 +6101,20 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
           newItems.push(item);
         }
       }
-    } catch { /* network errors silently ignored */ }
+    } catch {
+      /* network errors silently ignored */
+    }
     feed.lastPolled = now();
-    feed.itemCount = Array.from(_rssItems.values()).filter(i => i.feedId === feed.id).length;
+    feed.itemCount = Array.from(_rssItems.values()).filter((i) => i.feedId === feed.id).length;
     return reply.send({ feed, newItems: newItems.length, items: newItems });
   });
 
   app.delete<{ Params: { id: string } }>("/rss/feeds/:id", async (req, reply) => {
     _rssFeeds.delete(req.params.id);
     // cascade-delete items
-    Array.from(_rssItems.values()).filter(v => v.feedId === req.params.id).forEach(v => _rssItems.delete(v.id));
+    Array.from(_rssItems.values())
+      .filter((v) => v.feedId === req.params.id)
+      .forEach((v) => _rssItems.delete(v.id));
     return reply.code(204).send();
   });
 
@@ -4774,89 +6127,144 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
 
   // -- CODEGEN (LLM-backed code generation, compile, iterate, diff) ----------
 
-  app.post<{ Body: { prompt: string; language?: string; context?: string } }>("/codegen/generate", async (req, reply) => {
-    const driver = getDefaultDriver();
-    if (!driver) return reply.code(503).send({ error: "no_llm_driver" });
-    const lang = req.body.language ?? "typescript";
-    const res = await driver.complete({
-      model: DEFAULT_MODEL,
-      messages: [{
-        role: "user",
-        content: `Generate ${lang} code for the following requirement. Return ONLY the code, no explanations:\n\n${req.body.prompt}${req.body.context ? `\n\nContext:\n${req.body.context}` : ""}`,
-      }],
-      maxTokens: 2000,
-    });
-    _trackCost(DEFAULT_MODEL, res.usage);
-    const code = res.content.trim().replace(/^```[a-z]*\n?/, "").replace(/\n?```$/, "");
-    return reply.send({ code, language: lang, tokens: res.usage?.outputTokens ?? 0 });
-  });
+  app.post<{ Body: { prompt: string; language?: string; context?: string } }>(
+    "/codegen/generate",
+    async (req, reply) => {
+      const driver = getDefaultDriver();
+      if (!driver) return reply.code(503).send({ error: "no_llm_driver" });
+      const lang = req.body.language ?? "typescript";
+      const res = await driver.complete({
+        model: DEFAULT_MODEL,
+        messages: [
+          {
+            role: "user",
+            content: `Generate ${lang} code for the following requirement. Return ONLY the code, no explanations:\n\n${req.body.prompt}${req.body.context ? `\n\nContext:\n${req.body.context}` : ""}`,
+          },
+        ],
+        maxTokens: 2000,
+      });
+      _trackCost(DEFAULT_MODEL, res.usage);
+      const code = res.content
+        .trim()
+        .replace(/^```[a-z]*\n?/, "")
+        .replace(/\n?```$/, "");
+      return reply.send({ code, language: lang, tokens: res.usage?.outputTokens ?? 0 });
+    },
+  );
 
-  app.post<{ Body: { code: string; language?: string } }>("/codegen/compile", async (req, reply) => {
-    const lang = (req.body.language ?? "typescript").toLowerCase();
-    if (lang === "javascript") {
-      // Plain JS: vm syntax check is reliable
-      try {
-        new vm.Script(req.body.code);
-        return reply.send({ ok: true, errors: [], language: lang });
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return reply.send({ ok: false, errors: [{ message: msg, line: null }], language: lang });
+  app.post<{ Body: { code: string; language?: string } }>(
+    "/codegen/compile",
+    async (req, reply) => {
+      const lang = (req.body.language ?? "typescript").toLowerCase();
+      if (lang === "javascript") {
+        // Plain JS: vm syntax check is reliable
+        try {
+          new vm.Script(req.body.code);
+          return reply.send({ ok: true, errors: [], language: lang });
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          return reply.send({ ok: false, errors: [{ message: msg, line: null }], language: lang });
+        }
       }
-    }
-    if (lang === "typescript") {
-      // Ask LLM to find syntax/type errors — no fragile regex stripping
-      const feedback = await _llm([
-        systemMsg("You are a TypeScript compiler. Review the code for syntax errors and type errors only. If there are errors, respond with JSON: {ok: false, errors: [{message, line}]}. If no errors, respond with {ok: true, errors: []}. Return only valid JSON."),
-        userMsg(req.body.code.slice(0, 3000)),
-      ], 256);
-      try {
-        return reply.send({ ...(parseJsonResponse(feedback) as Record<string, unknown>), language: lang });
-      } catch {
-        return reply.send({ ok: true, errors: [], language: lang, note: "Static analysis unavailable." });
+      if (lang === "typescript") {
+        // Ask LLM to find syntax/type errors — no fragile regex stripping
+        const feedback = await _llm(
+          [
+            systemMsg(
+              "You are a TypeScript compiler. Review the code for syntax errors and type errors only. If there are errors, respond with JSON: {ok: false, errors: [{message, line}]}. If no errors, respond with {ok: true, errors: []}. Return only valid JSON.",
+            ),
+            userMsg(req.body.code.slice(0, 3000)),
+          ],
+          256,
+        );
+        try {
+          return reply.send({
+            ...(parseJsonResponse(feedback) as Record<string, unknown>),
+            language: lang,
+          });
+        } catch {
+          return reply.send({
+            ok: true,
+            errors: [],
+            language: lang,
+            note: "Static analysis unavailable.",
+          });
+        }
       }
-    }
-    return reply.send({ ok: true, errors: [], language: lang, note: "Compile check not available for this language in sandbox mode." });
-  });
+      return reply.send({
+        ok: true,
+        errors: [],
+        language: lang,
+        note: "Compile check not available for this language in sandbox mode.",
+      });
+    },
+  );
 
-  app.post<{ Body: { code: string; instruction: string; language?: string } }>("/codegen/iterate", async (req, reply) => {
-    const driver = getDefaultDriver();
-    if (!driver) return reply.code(503).send({ error: "no_llm_driver" });
-    const res = await driver.complete({
-      model: DEFAULT_MODEL,
-      messages: [{
-        role: "user",
-        content: `Here is existing code:\n\`\`\`\n${req.body.code}\n\`\`\`\n\nInstruction: ${req.body.instruction}\n\nReturn ONLY the updated code, no explanations.`,
-      }],
-      maxTokens: 2000,
-    });
-    _trackCost(DEFAULT_MODEL, res.usage);
-    const code = res.content.trim().replace(/^```[a-z]*\n?/, "").replace(/\n?```$/, "");
-    return reply.send({ code, language: req.body.language ?? "typescript" });
-  });
+  app.post<{ Body: { code: string; instruction: string; language?: string } }>(
+    "/codegen/iterate",
+    async (req, reply) => {
+      const driver = getDefaultDriver();
+      if (!driver) return reply.code(503).send({ error: "no_llm_driver" });
+      const res = await driver.complete({
+        model: DEFAULT_MODEL,
+        messages: [
+          {
+            role: "user",
+            content: `Here is existing code:\n\`\`\`\n${req.body.code}\n\`\`\`\n\nInstruction: ${req.body.instruction}\n\nReturn ONLY the updated code, no explanations.`,
+          },
+        ],
+        maxTokens: 2000,
+      });
+      _trackCost(DEFAULT_MODEL, res.usage);
+      const code = res.content
+        .trim()
+        .replace(/^```[a-z]*\n?/, "")
+        .replace(/\n?```$/, "");
+      return reply.send({ code, language: req.body.language ?? "typescript" });
+    },
+  );
 
   app.post<{ Body: { original: string; modified: string } }>("/diff/apply", async (req, reply) => {
     const orig = (req.body.original ?? "").split("\n");
-    const mod  = (req.body.modified ?? "").split("\n");
-    const hunks: Array<{ lineNo: number; type: "add" | "remove" | "change"; content: string }> = [];
+    const mod = (req.body.modified ?? "").split("\n");
+    const hunks: { lineNo: number; type: "add" | "remove" | "change"; content: string }[] = [];
     const maxLen = Math.max(orig.length, mod.length);
     for (let i = 0; i < maxLen; i++) {
       if (i >= orig.length) hunks.push({ lineNo: i + 1, type: "add", content: mod[i] ?? "" });
-      else if (i >= mod.length) hunks.push({ lineNo: i + 1, type: "remove", content: orig[i] ?? "" });
-      else if (orig[i] !== mod[i]) hunks.push({ lineNo: i + 1, type: "change", content: mod[i] ?? "" });
+      else if (i >= mod.length)
+        hunks.push({ lineNo: i + 1, type: "remove", content: orig[i] ?? "" });
+      else if (orig[i] !== mod[i])
+        hunks.push({ lineNo: i + 1, type: "change", content: mod[i] ?? "" });
     }
-    return reply.send({ applied: true, hunks, linesAdded: hunks.filter(h => h.type === "add").length, linesRemoved: hunks.filter(h => h.type === "remove").length });
+    return reply.send({
+      applied: true,
+      hunks,
+      linesAdded: hunks.filter((h) => h.type === "add").length,
+      linesRemoved: hunks.filter((h) => h.type === "remove").length,
+    });
   });
 
   // Auth stubs (Judica's own auth won't work; return informative error)
   app.post("/auth/login", async (_req, reply) =>
-    reply.code(501).send({ error: "use_nexus_auth", message: "Use the Nexus API key via Authorization: Bearer <key>" }),
+    reply.code(501).send({
+      error: "use_nexus_auth",
+      message: "Use the Nexus API key via Authorization: Bearer <key>",
+    }),
   );
   app.post("/auth/register", async (_req, reply) =>
-    reply.code(501).send({ error: "use_nexus_auth", message: "Registration is managed by the admin." }),
+    reply
+      .code(501)
+      .send({ error: "use_nexus_auth", message: "Registration is managed by the admin." }),
   );
   app.get("/auth/me", async (request, reply) => {
     const token = (request.headers.authorization as string | undefined)?.replace("Bearer ", "");
-    return reply.send({ id: "local", username: "admin", email: "admin@nexus.local", role: "admin", authenticated: !!token });
+    return reply.send({
+      id: "local",
+      username: "admin",
+      email: "admin@nexus.local",
+      role: "admin",
+      authenticated: !!token,
+    });
   });
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -4864,28 +6272,54 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   // ══════════════════════════════════════════════════════════════════════════
 
   // -- ARTIFACTS -------------------------------------------------------------
-  interface Artifact { id: string; title: string; type: string; language?: string; content: string; createdAt: string; updatedAt: string; metadata?: Record<string, unknown>; }
+  interface Artifact {
+    id: string;
+    title: string;
+    type: string;
+    language?: string;
+    content: string;
+    createdAt: string;
+    updatedAt: string;
+    metadata?: Record<string, unknown>;
+  }
   const _artifactStore = new PersistentStore<Artifact>("artifacts");
   await _artifactStore.load();
 
   app.get("/artifacts", async (_req, reply) =>
-    reply.send({ artifacts: Array.from(_artifactStore.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt)) }));
+    reply.send({
+      artifacts: Array.from(_artifactStore.values()).sort((a, b) =>
+        b.createdAt.localeCompare(a.createdAt),
+      ),
+    }),
+  );
   app.get<{ Params: { id: string } }>("/artifacts/:id", async (req, reply) => {
     const a = _artifactStore.get(req.params.id);
     return a ? reply.send(a) : reply.code(404).send({ error: "not_found" });
   });
   app.post<{ Body: Partial<Artifact> }>("/artifacts", async (req, reply) => {
-    const a: Artifact = { id: crypto.randomUUID(), title: req.body.title ?? "Untitled", type: req.body.type ?? "text", language: req.body.language, content: req.body.content ?? "", createdAt: now(), updatedAt: now(), metadata: req.body.metadata };
+    const a: Artifact = {
+      id: crypto.randomUUID(),
+      title: req.body.title ?? "Untitled",
+      type: req.body.type ?? "text",
+      language: req.body.language,
+      content: req.body.content ?? "",
+      createdAt: now(),
+      updatedAt: now(),
+      metadata: req.body.metadata,
+    };
     _artifactStore.set(a.id, a);
     return reply.code(201).send(a);
   });
-  app.put<{ Params: { id: string }; Body: Partial<Artifact> }>("/artifacts/:id", async (req, reply) => {
-    const existing = _artifactStore.get(req.params.id);
-    if (!existing) return reply.code(404).send({ error: "not_found" });
-    const updated = { ...existing, ...req.body, id: existing.id, updatedAt: now() };
-    _artifactStore.set(updated.id, updated);
-    return reply.send(updated);
-  });
+  app.put<{ Params: { id: string }; Body: Partial<Artifact> }>(
+    "/artifacts/:id",
+    async (req, reply) => {
+      const existing = _artifactStore.get(req.params.id);
+      if (!existing) return reply.code(404).send({ error: "not_found" });
+      const updated = { ...existing, ...req.body, id: existing.id, updatedAt: now() };
+      _artifactStore.set(updated.id, updated);
+      return reply.send(updated);
+    },
+  );
   app.delete<{ Params: { id: string } }>("/artifacts/:id", async (req, reply) => {
     _artifactStore.delete(req.params.id);
     return reply.code(204).send();
@@ -4893,146 +6327,293 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   app.get<{ Params: { id: string } }>("/artifacts/:id/download", async (req, reply) => {
     const a = _artifactStore.get(req.params.id);
     if (!a) return reply.code(404).send({ error: "not_found" });
-    const extMap: Record<string, string> = { code: a.language === "python" ? "py" : "ts", markdown: "md", html: "html", json: "json", csv: "csv" };
+    const extMap: Record<string, string> = {
+      code: a.language === "python" ? "py" : "ts",
+      markdown: "md",
+      html: "html",
+      json: "json",
+      csv: "csv",
+    };
     reply.header("Content-Type", "application/octet-stream");
-    reply.header("Content-Disposition", `attachment; filename="${a.title.replace(/[^a-z0-9]/gi, "_")}.${extMap[a.type] ?? "txt"}"`);
+    reply.header(
+      "Content-Disposition",
+      `attachment; filename="${a.title.replace(/[^a-z0-9]/gi, "_")}.${extMap[a.type] ?? "txt"}"`,
+    );
     return reply.send(a.content);
   });
 
   // -- AGENT CHAT (chat with simulation personas) ----------------------------
-  interface AgentChatSession { id: string; personaId: string; simulationId?: string; messages: Array<{ role: string; content: string; ts: string }>; createdAt: string; }
+  interface AgentChatSession {
+    id: string;
+    personaId: string;
+    simulationId?: string;
+    messages: { role: string; content: string; ts: string }[];
+    createdAt: string;
+  }
   const _agentChatStore = new PersistentStore<AgentChatSession>("agent_chat");
   await _agentChatStore.load();
 
-  app.post<{ Body: { personaId: string; simulationId?: string; message?: string } }>("/simulate/chat", async (req, reply) => {
-    const session: AgentChatSession = { id: crypto.randomUUID(), personaId: req.body.personaId, simulationId: req.body.simulationId, messages: [], createdAt: now() };
-    if (req.body.message) {
-      session.messages.push({ role: "user", content: req.body.message, ts: now() });
-      const persona = _personas.get(req.body.personaId);
-      const reply_content = await _llm([systemMsg(`You are ${persona?.name ?? "an AI agent"}. ${persona?.backstory ?? ""} Stay in character.`), userMsg(req.body.message)], 512);
-      session.messages.push({ role: "assistant", content: reply_content, ts: now() });
-    }
-    _agentChatStore.set(session.id, session);
-    return reply.code(201).send(session);
-  });
-  app.post<{ Params: { sessionId: string }; Body: { content: string } }>("/simulate/chat/:sessionId/messages", async (req, reply) => {
-    const session = _agentChatStore.get(req.params.sessionId);
-    if (!session) return reply.code(404).send({ error: "not_found" });
-    session.messages.push({ role: "user", content: req.body.content, ts: now() });
-    const persona = _personas.get(session.personaId);
-    const msgs = session.messages.slice(-8).map(m => ({ role: m.role as LlmRole, content: m.content }));
-    const assistantContent = await _llm([systemMsg(`You are ${persona?.name ?? "an AI agent"}. ${persona?.backstory ?? ""} Stay in character.`), ...msgs], 512);
-    const assistantMsg = { role: "assistant", content: assistantContent, ts: now() };
-    session.messages.push(assistantMsg);
-    _agentChatStore.set(session.id, session);
-    return reply.send({ message: assistantMsg, session });
-  });
+  app.post<{ Body: { personaId: string; simulationId?: string; message?: string } }>(
+    "/simulate/chat",
+    async (req, reply) => {
+      const session: AgentChatSession = {
+        id: crypto.randomUUID(),
+        personaId: req.body.personaId,
+        simulationId: req.body.simulationId,
+        messages: [],
+        createdAt: now(),
+      };
+      if (req.body.message) {
+        session.messages.push({ role: "user", content: req.body.message, ts: now() });
+        const persona = _personas.get(req.body.personaId);
+        const reply_content = await _llm(
+          [
+            systemMsg(
+              `You are ${persona?.name ?? "an AI agent"}. ${persona?.backstory ?? ""} Stay in character.`,
+            ),
+            userMsg(req.body.message),
+          ],
+          512,
+        );
+        session.messages.push({ role: "assistant", content: reply_content, ts: now() });
+      }
+      _agentChatStore.set(session.id, session);
+      return reply.code(201).send(session);
+    },
+  );
+  app.post<{ Params: { sessionId: string }; Body: { content: string } }>(
+    "/simulate/chat/:sessionId/messages",
+    async (req, reply) => {
+      const session = _agentChatStore.get(req.params.sessionId);
+      if (!session) return reply.code(404).send({ error: "not_found" });
+      session.messages.push({ role: "user", content: req.body.content, ts: now() });
+      const persona = _personas.get(session.personaId);
+      const msgs = session.messages
+        .slice(-8)
+        .map((m) => ({ role: m.role as LlmRole, content: m.content }));
+      const assistantContent = await _llm(
+        [
+          systemMsg(
+            `You are ${persona?.name ?? "an AI agent"}. ${persona?.backstory ?? ""} Stay in character.`,
+          ),
+          ...msgs,
+        ],
+        512,
+      );
+      const assistantMsg = { role: "assistant", content: assistantContent, ts: now() };
+      session.messages.push(assistantMsg);
+      _agentChatStore.set(session.id, session);
+      return reply.send({ message: assistantMsg, session });
+    },
+  );
   app.get<{ Params: { sessionId: string } }>("/simulate/chat/:sessionId", async (req, reply) => {
     const s = _agentChatStore.get(req.params.sessionId);
     return s ? reply.send(s) : reply.code(404).send({ error: "not_found" });
   });
   app.get("/simulate/chat", async (_req, reply) =>
-    reply.send({ sessions: Array.from(_agentChatStore.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt)) }));
+    reply.send({
+      sessions: Array.from(_agentChatStore.values()).sort((a, b) =>
+        b.createdAt.localeCompare(a.createdAt),
+      ),
+    }),
+  );
   app.delete<{ Params: { sessionId: string } }>("/simulate/chat/:sessionId", async (req, reply) => {
     _agentChatStore.delete(req.params.sessionId);
     return reply.code(204).send();
   });
-  app.post<{ Body: { personaIds: string[]; message: string } }>("/simulate/hot-seat", async (req, reply) => {
-    const responses = await Promise.all((req.body.personaIds ?? []).map(async (pid) => {
-      const persona = _personas.get(pid);
-      const content = await _llm([systemMsg(`You are ${persona?.name ?? "Agent " + pid}. ${persona?.backstory ?? ""} Stay in character. Be concise.`), userMsg(req.body.message)], 256);
-      return { personaId: pid, name: persona?.name ?? pid, content };
-    }));
-    return reply.send({ responses, question: req.body.message });
-  });
+  app.post<{ Body: { personaIds: string[]; message: string } }>(
+    "/simulate/hot-seat",
+    async (req, reply) => {
+      const responses = await Promise.all(
+        (req.body.personaIds ?? []).map(async (pid) => {
+          const persona = _personas.get(pid);
+          const content = await _llm(
+            [
+              systemMsg(
+                `You are ${persona?.name ?? "Agent " + pid}. ${persona?.backstory ?? ""} Stay in character. Be concise.`,
+              ),
+              userMsg(req.body.message),
+            ],
+            256,
+          );
+          return { personaId: pid, name: persona?.name ?? pid, content };
+        }),
+      );
+      return reply.send({ responses, question: req.body.message });
+    },
+  );
 
   // -- DELIBERATIONS (consensus scoring explainability) ----------------------
-  interface DeliberationScore { id: string; memberId: string; memberName: string; agreement: number; peerRanking: number; validationPenalty: number; adversarialPenalty: number; groundingPenalty: number; final: number; createdAt: string; }
-  const _deliberationScores = new PersistentStore<{ id: string; scores: DeliberationScore[]; consensus: Record<string, number>; createdAt: string }>("deliberation_scores");
+  interface DeliberationScore {
+    id: string;
+    memberId: string;
+    memberName: string;
+    agreement: number;
+    peerRanking: number;
+    validationPenalty: number;
+    adversarialPenalty: number;
+    groundingPenalty: number;
+    final: number;
+    createdAt: string;
+  }
+  const _deliberationScores = new PersistentStore<{
+    id: string;
+    scores: DeliberationScore[];
+    consensus: Record<string, number>;
+    createdAt: string;
+  }>("deliberation_scores");
   await _deliberationScores.load();
 
   app.get<{ Params: { id: string } }>("/deliberations/:id/scoring", async (req, reply) => {
     const entry = _deliberationScores.get(req.params.id);
-    return reply.send(entry ? { members: entry.scores, consensus: entry.consensus } : { members: [], consensus: {} });
+    return reply.send(
+      entry
+        ? { members: entry.scores, consensus: entry.consensus }
+        : { members: [], consensus: {} },
+    );
   });
-  app.post<{ Params: { id: string }; Body: { members: DeliberationScore[] } }>("/deliberations/:id/scoring", async (req, reply) => {
-    const { id } = req.params;
-    const members = req.body.members ?? [];
-    const consensus: Record<string, number> = members.length ? {
-      avgAgreement: members.reduce((s, m) => s + m.agreement, 0) / members.length,
-      avgFinal: members.reduce((s, m) => s + m.final, 0) / members.length,
-      spread: Math.max(...members.map(m => m.final)) - Math.min(...members.map(m => m.final)),
-    } : {};
-    const entry = { id, scores: members, consensus, createdAt: now() };
-    _deliberationScores.set(id, entry);
-    return reply.code(201).send(entry);
-  });
+  app.post<{ Params: { id: string }; Body: { members: DeliberationScore[] } }>(
+    "/deliberations/:id/scoring",
+    async (req, reply) => {
+      const { id } = req.params;
+      const members = req.body.members ?? [];
+      const consensus: Record<string, number> = members.length
+        ? {
+            avgAgreement: members.reduce((s, m) => s + m.agreement, 0) / members.length,
+            avgFinal: members.reduce((s, m) => s + m.final, 0) / members.length,
+            spread:
+              Math.max(...members.map((m) => m.final)) - Math.min(...members.map((m) => m.final)),
+          }
+        : {};
+      const entry = { id, scores: members, consensus, createdAt: now() };
+      _deliberationScores.set(id, entry);
+      return reply.code(201).send(entry);
+    },
+  );
   app.get<{ Params: { id: string } }>("/deliberations/:id/replay", async (req, reply) => {
     const entry = _deliberationScores.get(req.params.id);
     if (!entry) return reply.code(404).send({ error: "not_found" });
-    const summary = await _llm([userMsg(`Summarise this deliberation scoring in 2-3 sentences: ${JSON.stringify(entry.consensus)}`)], 256);
+    const summary = await _llm(
+      [
+        userMsg(
+          `Summarise this deliberation scoring in 2-3 sentences: ${JSON.stringify(entry.consensus)}`,
+        ),
+      ],
+      256,
+    );
     return reply.send({ ...entry, replaySummary: summary });
   });
 
   // -- BRANCHES (conversation branching) -------------------------------------
-  interface Branch { id: string; parentId?: string; name: string; messages: Array<{ role: string; content: string }>; createdAt: string; forkedAt?: string; }
+  interface Branch {
+    id: string;
+    parentId?: string;
+    name: string;
+    messages: { role: string; content: string }[];
+    createdAt: string;
+    forkedAt?: string;
+  }
   const _branchStore = new PersistentStore<Branch>("branches");
   await _branchStore.load();
 
   app.post<{ Body: Partial<Branch> }>("/branches", async (req, reply) => {
-    const b: Branch = { id: crypto.randomUUID(), parentId: req.body.parentId, name: req.body.name ?? `Branch ${now().slice(11, 19)}`, messages: req.body.messages ?? [], createdAt: now(), forkedAt: req.body.parentId ? now() : undefined };
+    const b: Branch = {
+      id: crypto.randomUUID(),
+      parentId: req.body.parentId,
+      name: req.body.name ?? `Branch ${now().slice(11, 19)}`,
+      messages: req.body.messages ?? [],
+      createdAt: now(),
+      forkedAt: req.body.parentId ? now() : undefined,
+    };
     _branchStore.set(b.id, b);
     return reply.code(201).send(b);
   });
   app.get("/branches", async (_req, reply) =>
-    reply.send({ branches: Array.from(_branchStore.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt)) }));
+    reply.send({
+      branches: Array.from(_branchStore.values()).sort((a, b) =>
+        b.createdAt.localeCompare(a.createdAt),
+      ),
+    }),
+  );
   app.get<{ Params: { id: string } }>("/branches/:id", async (req, reply) => {
     const b = _branchStore.get(req.params.id);
     return b ? reply.send(b) : reply.code(404).send({ error: "not_found" });
   });
-  app.patch<{ Params: { id: string }; Body: Partial<Branch> }>("/branches/:id", async (req, reply) => {
-    const b = _branchStore.get(req.params.id);
-    if (!b) return reply.code(404).send({ error: "not_found" });
-    const updated = { ...b, ...req.body, id: b.id };
-    _branchStore.set(b.id, updated);
-    return reply.send(updated);
-  });
+  app.patch<{ Params: { id: string }; Body: Partial<Branch> }>(
+    "/branches/:id",
+    async (req, reply) => {
+      const b = _branchStore.get(req.params.id);
+      if (!b) return reply.code(404).send({ error: "not_found" });
+      const updated = { ...b, ...req.body, id: b.id };
+      _branchStore.set(b.id, updated);
+      return reply.send(updated);
+    },
+  );
   app.delete<{ Params: { id: string } }>("/branches/:id", async (req, reply) => {
     _branchStore.delete(req.params.id);
     return reply.code(204).send();
   });
-  app.post<{ Params: { id: string }; Body: { message: string } }>("/branches/:id/continue", async (req, reply) => {
-    const b = _branchStore.get(req.params.id);
-    if (!b) return reply.code(404).send({ error: "not_found" });
-    b.messages.push({ role: "user", content: req.body.message });
-    const response = await _llm(b.messages.slice(-6).map(m => ({ role: m.role as LlmRole, content: m.content })), 512);
-    b.messages.push({ role: "assistant", content: response });
-    _branchStore.set(b.id, b);
-    return reply.send({ branch: b, response });
-  });
+  app.post<{ Params: { id: string }; Body: { message: string } }>(
+    "/branches/:id/continue",
+    async (req, reply) => {
+      const b = _branchStore.get(req.params.id);
+      if (!b) return reply.code(404).send({ error: "not_found" });
+      b.messages.push({ role: "user", content: req.body.message });
+      const response = await _llm(
+        b.messages.slice(-6).map((m) => ({ role: m.role as LlmRole, content: m.content })),
+        512,
+      );
+      b.messages.push({ role: "assistant", content: response });
+      _branchStore.set(b.id, b);
+      return reply.send({ branch: b, response });
+    },
+  );
 
   // -- SUBGRAPHS (knowledge subgraph slices) ---------------------------------
-  interface Subgraph { id: string; name: string; description?: string; nodeIds: string[]; edgeIds: string[]; query?: string; createdAt: string; updatedAt: string; }
+  interface Subgraph {
+    id: string;
+    name: string;
+    description?: string;
+    nodeIds: string[];
+    edgeIds: string[];
+    query?: string;
+    createdAt: string;
+    updatedAt: string;
+  }
   const _subgraphStore = new PersistentStore<Subgraph>("subgraphs");
   await _subgraphStore.load();
 
   app.post<{ Body: Partial<Subgraph> }>("/subgraphs", async (req, reply) => {
-    const sg: Subgraph = { id: crypto.randomUUID(), name: req.body.name ?? "Unnamed subgraph", description: req.body.description, nodeIds: req.body.nodeIds ?? [], edgeIds: req.body.edgeIds ?? [], query: req.body.query, createdAt: now(), updatedAt: now() };
+    const sg: Subgraph = {
+      id: crypto.randomUUID(),
+      name: req.body.name ?? "Unnamed subgraph",
+      description: req.body.description,
+      nodeIds: req.body.nodeIds ?? [],
+      edgeIds: req.body.edgeIds ?? [],
+      query: req.body.query,
+      createdAt: now(),
+      updatedAt: now(),
+    };
     _subgraphStore.set(sg.id, sg);
     return reply.code(201).send(sg);
   });
-  app.get("/subgraphs", async (_req, reply) => reply.send({ subgraphs: Array.from(_subgraphStore.values()) }));
+  app.get("/subgraphs", async (_req, reply) =>
+    reply.send({ subgraphs: Array.from(_subgraphStore.values()) }),
+  );
   app.get<{ Params: { id: string } }>("/subgraphs/:id", async (req, reply) => {
     const sg = _subgraphStore.get(req.params.id);
     return sg ? reply.send(sg) : reply.code(404).send({ error: "not_found" });
   });
-  app.patch<{ Params: { id: string }; Body: Partial<Subgraph> }>("/subgraphs/:id", async (req, reply) => {
-    const sg = _subgraphStore.get(req.params.id);
-    if (!sg) return reply.code(404).send({ error: "not_found" });
-    const updated = { ...sg, ...req.body, id: sg.id, updatedAt: now() };
-    _subgraphStore.set(sg.id, updated);
-    return reply.send(updated);
-  });
+  app.patch<{ Params: { id: string }; Body: Partial<Subgraph> }>(
+    "/subgraphs/:id",
+    async (req, reply) => {
+      const sg = _subgraphStore.get(req.params.id);
+      if (!sg) return reply.code(404).send({ error: "not_found" });
+      const updated = { ...sg, ...req.body, id: sg.id, updatedAt: now() };
+      _subgraphStore.set(sg.id, updated);
+      return reply.send(updated);
+    },
+  );
   app.delete<{ Params: { id: string } }>("/subgraphs/:id", async (req, reply) => {
     _subgraphStore.delete(req.params.id);
     return reply.code(204).send();
@@ -5040,121 +6621,1065 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   app.post<{ Params: { id: string } }>("/subgraphs/:id/instantiate", async (req, reply) => {
     const sg = _subgraphStore.get(req.params.id);
     if (!sg) return reply.code(404).send({ error: "not_found" });
-    const summary = await _llm([userMsg(`Describe what nodes and edges would exist in a knowledge subgraph named "${sg.name}". ${sg.description ?? ""}. Respond with JSON: { nodes: [{id, label, type}], edges: [{from, to, relation}] }`)], 512);
-    try { return reply.send({ subgraph: sg, instantiated: parseJsonResponse<{ nodes: unknown[]; edges: unknown[] }>(summary) }); }
-    catch { return reply.send({ subgraph: sg, instantiated: { nodes: [], edges: [] } }); }
+    const summary = await _llm(
+      [
+        userMsg(
+          `Describe what nodes and edges would exist in a knowledge subgraph named "${sg.name}". ${sg.description ?? ""}. Respond with JSON: { nodes: [{id, label, type}], edges: [{from, to, relation}] }`,
+        ),
+      ],
+      512,
+    );
+    try {
+      return reply.send({
+        subgraph: sg,
+        instantiated: parseJsonResponse<{ nodes: unknown[]; edges: unknown[] }>(summary),
+      });
+    } catch {
+      return reply.send({ subgraph: sg, instantiated: { nodes: [], edges: [] } });
+    }
   });
 
   // -- AUTO-DEBUG (LLM-backed code debugger) ---------------------------------
-  interface DebugTask { id: string; code: string; error: string; language: string; analysis?: string; fix?: string; status: string; createdAt: string; }
+  interface DebugTask {
+    id: string;
+    code: string;
+    error: string;
+    language: string;
+    analysis?: string;
+    fix?: string;
+    status: string;
+    createdAt: string;
+  }
   const _debugStore = new PersistentStore<DebugTask>("debug_tasks");
   await _debugStore.load();
 
-  app.post<{ Body: { code: string; error: string; language?: string } }>("/debug/analyze", async (req, reply) => {
-    const { code, error, language = "typescript" } = req.body;
-    const id = crypto.randomUUID();
-    const analysis = await _llm([systemMsg("Analyze the code and error. Respond with JSON: { cause: string, explanation: string, severity: 'low'|'medium'|'high', suggestions: string[] }"), userMsg(`Language: ${language}\n\nCode:\n${code.slice(0, 2000)}\n\nError:\n${error}`)], 512);
-    let parsed: Record<string, unknown> = {};
-    try { parsed = parseJsonResponse(analysis); } catch { parsed = { cause: "Analysis failed", explanation: analysis, severity: "medium", suggestions: [] }; }
-    _debugStore.set(id, { id, code, error, language, analysis, status: "analyzed", createdAt: now() });
-    return reply.send({ id, ...parsed });
-  });
-  app.post<{ Body: { code: string; error?: string; language?: string } }>("/debug/validate", async (req, reply) => {
-    const feedback = await _llm([systemMsg("Check this code for bugs. Respond with JSON: { valid: boolean, issues: [{line: number, message: string, severity: string}], score: number }"), userMsg(`Language: ${req.body.language ?? "typescript"}\n\nCode:\n${req.body.code.slice(0, 2000)}`)], 512);
-    try { return reply.send(parseJsonResponse(feedback)); }
-    catch { return reply.send({ valid: true, issues: [], score: 80 }); }
-  });
-  app.post<{ Body: { code: string; error: string; language?: string } }>("/debug/apply", async (req, reply) => {
-    const { code, error, language = "typescript" } = req.body;
-    const fixedCode = await _llm([systemMsg("Fix the bug. Return ONLY the corrected code, no explanations or markdown fences."), userMsg(`Language: ${language}\n\nCode:\n${code.slice(0, 2000)}\n\nError:\n${error}`)], 1500);
-    const id = crypto.randomUUID();
-    _debugStore.set(id, { id, code, error, language, fix: fixedCode, status: "fixed", createdAt: now() });
-    return reply.send({ id, fixedCode: fixedCode.replace(/^```[a-z]*\n?/, "").replace(/\n?```$/, ""), applied: true });
-  });
+  app.post<{ Body: { code: string; error: string; language?: string } }>(
+    "/debug/analyze",
+    async (req, reply) => {
+      const { code, error, language = "typescript" } = req.body;
+      const id = crypto.randomUUID();
+      const analysis = await _llm(
+        [
+          systemMsg(
+            "Analyze the code and error. Respond with JSON: { cause: string, explanation: string, severity: 'low'|'medium'|'high', suggestions: string[] }",
+          ),
+          userMsg(`Language: ${language}\n\nCode:\n${code.slice(0, 2000)}\n\nError:\n${error}`),
+        ],
+        512,
+      );
+      let parsed: Record<string, unknown> = {};
+      try {
+        parsed = parseJsonResponse(analysis);
+      } catch {
+        parsed = {
+          cause: "Analysis failed",
+          explanation: analysis,
+          severity: "medium",
+          suggestions: [],
+        };
+      }
+      _debugStore.set(id, {
+        id,
+        code,
+        error,
+        language,
+        analysis,
+        status: "analyzed",
+        createdAt: now(),
+      });
+      return reply.send({ id, ...parsed });
+    },
+  );
+  app.post<{ Body: { code: string; error?: string; language?: string } }>(
+    "/debug/validate",
+    async (req, reply) => {
+      const feedback = await _llm(
+        [
+          systemMsg(
+            "Check this code for bugs. Respond with JSON: { valid: boolean, issues: [{line: number, message: string, severity: string}], score: number }",
+          ),
+          userMsg(
+            `Language: ${req.body.language ?? "typescript"}\n\nCode:\n${req.body.code.slice(0, 2000)}`,
+          ),
+        ],
+        512,
+      );
+      try {
+        return reply.send(parseJsonResponse(feedback));
+      } catch {
+        return reply.send({ valid: true, issues: [], score: 80 });
+      }
+    },
+  );
+  app.post<{ Body: { code: string; error: string; language?: string } }>(
+    "/debug/apply",
+    async (req, reply) => {
+      const { code, error, language = "typescript" } = req.body;
+      const fixedCode = await _llm(
+        [
+          systemMsg(
+            "Fix the bug. Return ONLY the corrected code, no explanations or markdown fences.",
+          ),
+          userMsg(`Language: ${language}\n\nCode:\n${code.slice(0, 2000)}\n\nError:\n${error}`),
+        ],
+        1500,
+      );
+      const id = crypto.randomUUID();
+      _debugStore.set(id, {
+        id,
+        code,
+        error,
+        language,
+        fix: fixedCode,
+        status: "fixed",
+        createdAt: now(),
+      });
+      return reply.send({
+        id,
+        fixedCode: fixedCode.replace(/^```[a-z]*\n?/, "").replace(/\n?```$/, ""),
+        applied: true,
+      });
+    },
+  );
   app.get<{ Params: { taskId: string } }>("/debug/task/:taskId", async (req, reply) => {
     const task = _debugStore.get(req.params.taskId);
     return task ? reply.send(task) : reply.code(404).send({ error: "not_found" });
   });
 
   // -- CITATIONS (source verification + annotation) --------------------------
-  interface CitationEntry { id: string; text: string; sources: string[]; verified: boolean; score: number; createdAt: string; }
+  interface CitationEntry {
+    id: string;
+    text: string;
+    sources: string[];
+    verified: boolean;
+    score: number;
+    createdAt: string;
+  }
   const _citationStore = new PersistentStore<CitationEntry>("citations");
   await _citationStore.load();
 
-  app.post<{ Body: { text: string; sources?: string[] } }>("/citations/check", async (req, reply) => {
-    const result = await _llm([systemMsg("Evaluate if this text is factually supported. Respond with JSON: { supported: boolean, confidence: number, issues: string[], suggestions: string[] }"), userMsg(`Text: ${req.body.text}\nSources: ${(req.body.sources ?? []).join(", ") || "none"}`)], 512);
-    try { return reply.send(parseJsonResponse(result)); }
-    catch { return reply.send({ supported: false, confidence: 0, issues: ["Check failed"], suggestions: [] }); }
-  });
-  app.post<{ Body: { text: string; sources?: string[] } }>("/citations/annotate", async (req, reply) => {
-    const id = crypto.randomUUID();
-    const annotation = await _llm([systemMsg("Extract factual claims that need citations. Respond with JSON: { claims: [{text: string, type: string, citationNeeded: boolean}] }"), userMsg(req.body.text)], 512);
-    let claims: unknown[] = [];
-    try { claims = (parseJsonResponse(annotation) as { claims: unknown[] }).claims ?? []; } catch { /* ignore */ }
-    const entry: CitationEntry = { id, text: req.body.text, sources: req.body.sources ?? [], verified: false, score: 0, createdAt: now() };
-    _citationStore.set(id, entry);
-    return reply.send({ id, claims, entry });
-  });
-  app.post<{ Body: { text: string; citation: string } }>("/citations/verify", async (req, reply) => {
-    const result = await _llm([systemMsg("Verify if the citation supports the claim. Respond with JSON: { supports: boolean, relevance: number, note: string }"), userMsg(`Claim: ${req.body.text}\nCitation: ${req.body.citation}`)], 256);
-    try { return reply.send(parseJsonResponse(result)); }
-    catch { return reply.send({ supports: false, relevance: 0, note: "Verification failed" }); }
-  });
+  app.post<{ Body: { text: string; sources?: string[] } }>(
+    "/citations/check",
+    async (req, reply) => {
+      const result = await _llm(
+        [
+          systemMsg(
+            "Evaluate if this text is factually supported. Respond with JSON: { supported: boolean, confidence: number, issues: string[], suggestions: string[] }",
+          ),
+          userMsg(
+            `Text: ${req.body.text}\nSources: ${(req.body.sources ?? []).join(", ") || "none"}`,
+          ),
+        ],
+        512,
+      );
+      try {
+        return reply.send(parseJsonResponse(result));
+      } catch {
+        return reply.send({
+          supported: false,
+          confidence: 0,
+          issues: ["Check failed"],
+          suggestions: [],
+        });
+      }
+    },
+  );
+  app.post<{ Body: { text: string; sources?: string[] } }>(
+    "/citations/annotate",
+    async (req, reply) => {
+      const id = crypto.randomUUID();
+      const annotation = await _llm(
+        [
+          systemMsg(
+            "Extract factual claims that need citations. Respond with JSON: { claims: [{text: string, type: string, citationNeeded: boolean}] }",
+          ),
+          userMsg(req.body.text),
+        ],
+        512,
+      );
+      let claims: unknown[] = [];
+      try {
+        claims = (parseJsonResponse(annotation) as { claims: unknown[] }).claims ?? [];
+      } catch {
+        /* ignore */
+      }
+      const entry: CitationEntry = {
+        id,
+        text: req.body.text,
+        sources: req.body.sources ?? [],
+        verified: false,
+        score: 0,
+        createdAt: now(),
+      };
+      _citationStore.set(id, entry);
+      return reply.send({ id, claims, entry });
+    },
+  );
+  app.post<{ Body: { text: string; citation: string } }>(
+    "/citations/verify",
+    async (req, reply) => {
+      const result = await _llm(
+        [
+          systemMsg(
+            "Verify if the citation supports the claim. Respond with JSON: { supports: boolean, relevance: number, note: string }",
+          ),
+          userMsg(`Claim: ${req.body.text}\nCitation: ${req.body.citation}`),
+        ],
+        256,
+      );
+      try {
+        return reply.send(parseJsonResponse(result));
+      } catch {
+        return reply.send({ supports: false, relevance: 0, note: "Verification failed" });
+      }
+    },
+  );
   app.post<{ Body: { response: string } }>("/citations/score-response", async (req, reply) => {
-    const result = await _llm([systemMsg("Score citation quality. Respond with JSON: { citationScore: number, unsubstantiatedClaims: number, wellCitedClaims: number, overallQuality: 'poor'|'fair'|'good'|'excellent' }"), userMsg(req.body.response.slice(0, 2000))], 256);
-    try { return reply.send(parseJsonResponse(result)); }
-    catch { return reply.send({ citationScore: 50, unsubstantiatedClaims: 0, wellCitedClaims: 0, overallQuality: "fair" }); }
+    const result = await _llm(
+      [
+        systemMsg(
+          "Score citation quality. Respond with JSON: { citationScore: number, unsubstantiatedClaims: number, wellCitedClaims: number, overallQuality: 'poor'|'fair'|'good'|'excellent' }",
+        ),
+        userMsg(req.body.response.slice(0, 2000)),
+      ],
+      256,
+    );
+    try {
+      return reply.send(parseJsonResponse(result));
+    } catch {
+      return reply.send({
+        citationScore: 50,
+        unsubstantiatedClaims: 0,
+        wellCitedClaims: 0,
+        overallQuality: "fair",
+      });
+    }
   });
   app.get("/citations/history", async (_req, reply) =>
-    reply.send({ citations: Array.from(_citationStore.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt)) }));
+    reply.send({
+      citations: Array.from(_citationStore.values()).sort((a, b) =>
+        b.createdAt.localeCompare(a.createdAt),
+      ),
+    }),
+  );
 
   // -- WEBHOOKS (event delivery to external endpoints) -----------------------
-  interface Webhook { id: string; url: string; events: string[]; secret?: string; active: boolean; deliveries: number; createdAt: string; lastTriggeredAt?: string; }
+  interface Webhook {
+    id: string;
+    url: string;
+    events: string[];
+    secret?: string;
+    active: boolean;
+    deliveries: number;
+    createdAt: string;
+    lastTriggeredAt?: string;
+  }
   const _webhookStore = new PersistentStore<Webhook>("webhooks");
   await _webhookStore.load();
 
   app.post<{ Body: Partial<Webhook> }>("/webhooks", async (req, reply) => {
-    const wh: Webhook = { id: crypto.randomUUID(), url: req.body.url ?? "", events: req.body.events ?? [], secret: req.body.secret, active: true, deliveries: 0, createdAt: now() };
+    const wh: Webhook = {
+      id: crypto.randomUUID(),
+      url: req.body.url ?? "",
+      events: req.body.events ?? [],
+      secret: req.body.secret,
+      active: true,
+      deliveries: 0,
+      createdAt: now(),
+    };
     _webhookStore.set(wh.id, wh);
     return reply.code(201).send(wh);
   });
-  app.get("/webhooks", async (_req, reply) => reply.send({ webhooks: Array.from(_webhookStore.values()) }));
+  app.get("/webhooks", async (_req, reply) =>
+    reply.send({ webhooks: Array.from(_webhookStore.values()) }),
+  );
   app.get<{ Params: { id: string } }>("/webhooks/:id", async (req, reply) => {
     const wh = _webhookStore.get(req.params.id);
     return wh ? reply.send(wh) : reply.code(404).send({ error: "not_found" });
   });
-  app.patch<{ Params: { id: string }; Body: Partial<Webhook> }>("/webhooks/:id", async (req, reply) => {
-    const wh = _webhookStore.get(req.params.id);
-    if (!wh) return reply.code(404).send({ error: "not_found" });
-    _webhookStore.set(wh.id, { ...wh, ...req.body, id: wh.id });
-    return reply.send(_webhookStore.get(wh.id)!);
-  });
+  app.patch<{ Params: { id: string }; Body: Partial<Webhook> }>(
+    "/webhooks/:id",
+    async (req, reply) => {
+      const wh = _webhookStore.get(req.params.id);
+      if (!wh) return reply.code(404).send({ error: "not_found" });
+      _webhookStore.set(wh.id, { ...wh, ...req.body, id: wh.id });
+      return reply.send(_webhookStore.get(wh.id)!);
+    },
+  );
   app.delete<{ Params: { id: string } }>("/webhooks/:id", async (req, reply) => {
     _webhookStore.delete(req.params.id);
     return reply.code(204).send();
   });
-  app.post<{ Params: { id: string }; Body: { event: string; payload?: unknown } }>("/webhooks/:id/trigger", async (req, reply) => {
-    const wh = _webhookStore.get(req.params.id);
-    if (!wh?.active) return reply.code(404).send({ error: "not_found_or_inactive" });
-    let delivered = false;
-    try {
-      const r = await fetch(wh.url, { method: "POST", headers: { "Content-Type": "application/json", ...(wh.secret ? { "X-Webhook-Secret": wh.secret } : {}) }, body: JSON.stringify({ event: req.body.event, payload: req.body.payload, ts: now() }) });
-      delivered = r.ok;
-    } catch { /* delivery failed silently */ }
-    wh.deliveries += 1; wh.lastTriggeredAt = now();
-    _webhookStore.set(wh.id, wh);
-    return reply.send({ delivered, webhookId: wh.id, event: req.body.event });
+  app.post<{ Params: { id: string }; Body: { event: string; payload?: unknown } }>(
+    "/webhooks/:id/trigger",
+    async (req, reply) => {
+      const wh = _webhookStore.get(req.params.id);
+      if (!wh?.active) return reply.code(404).send({ error: "not_found_or_inactive" });
+      let delivered = false;
+      try {
+        const r = await fetch(wh.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(wh.secret ? { "X-Webhook-Secret": wh.secret } : {}),
+          },
+          body: JSON.stringify({ event: req.body.event, payload: req.body.payload, ts: now() }),
+        });
+        delivered = r.ok;
+      } catch {
+        /* delivery failed silently */
+      }
+      wh.deliveries += 1;
+      wh.lastTriggeredAt = now();
+      _webhookStore.set(wh.id, wh);
+      return reply.send({ delivered, webhookId: wh.id, event: req.body.event });
+    },
+  );
+
+  // -- SSO CONFIG STORE -------------------------------------------------------
+  // In-memory IdP config store. Wire real persistence once DB schema is ready.
+
+  interface IdpConfig {
+    id: string;
+    name: string;
+    provider: "saml" | "oidc";
+    enabled: boolean;
+    // SAML fields
+    entityId?: string;
+    ssoUrl?: string;
+    certificate?: string;
+    attributeMap?: Record<string, string>;
+    // OIDC fields
+    discoveryUrl?: string;
+    clientId?: string;
+    scopes?: string[];
+    createdAt: string;
+    updatedAt: string;
+  }
+
+  const _ssoConfigs = new Map<string, IdpConfig>();
+
+  // Seed from env vars — auto-register if SAML or OIDC is already configured
+  if (process.env.NEXUS_SAML_ENABLED === "true" && process.env.NEXUS_SAML_IDP_SSO_URL) {
+    const id = "saml-default";
+    _ssoConfigs.set(id, {
+      id,
+      name: "SAML IdP",
+      provider: "saml",
+      enabled: true,
+      entityId: process.env.NEXUS_SAML_SP_ENTITY_ID,
+      ssoUrl: process.env.NEXUS_SAML_IDP_SSO_URL,
+      certificate: process.env.NEXUS_SAML_IDP_CERT ? "[configured]" : undefined,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  }
+  if (process.env.NEXUS_OIDC_DISCOVERY_URL && process.env.NEXUS_OIDC_CLIENT_ID) {
+    const id = "oidc-default";
+    _ssoConfigs.set(id, {
+      id,
+      name: "OIDC Provider",
+      provider: "oidc",
+      enabled: true,
+      discoveryUrl: process.env.NEXUS_OIDC_DISCOVERY_URL,
+      clientId: process.env.NEXUS_OIDC_CLIENT_ID,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  // GET /sso/config — list configured IdPs
+  app.get("/sso/config", async (_req, reply) => {
+    const configs = [..._ssoConfigs.values()].map((c) => ({
+      ...c,
+      // Never expose cert or secret in list response
+      certificate: c.certificate ? "[configured]" : undefined,
+    }));
+    return reply.send({ configs, total: configs.length });
   });
 
-  // -- ENTERPRISE STUBS (SSO, SCIM, MFA, multi-tenant) ----------------------
-  const _eStub = (feat: string) => async (_: unknown, reply: { code: (n: number) => { send: (b: unknown) => unknown } }) =>
-    reply.code(402).send({ error: "enterprise_feature", message: `${feat} requires an enterprise plan.` });
-  app.get("/sso/config", _eStub("SSO")); app.post("/sso/config", _eStub("SSO")); app.get("/sso/providers", _eStub("SSO")); app.post("/sso/login", _eStub("SSO"));
-  app.get("/mfa/status", _eStub("MFA")); app.post("/mfa/enable", _eStub("MFA")); app.post("/mfa/verify", _eStub("MFA"));
-  app.get("/scim/Users", _eStub("SCIM")); app.post("/scim/Users", _eStub("SCIM")); app.get("/scim/Groups", _eStub("SCIM"));
-  app.get("/workspaces", async (_req, reply) => reply.send({ workspaces: [{ id: "default", name: "Default Workspace", plan: "community", members: 1 }] }));
-  app.post("/workspaces", _eStub("Workspace management"));
-  app.get("/tenants", _eStub("Multi-tenant isolation"));
-  app.get("/whitelabel/config", async (_req, reply) => reply.send({ branding: null, message: "Whitelabel requires enterprise plan." }));
-  app.get("/data-residency/config", _eStub("Data residency"));
+  // POST /sso/config — create or update an IdP config
+  app.post<{
+    Body: Partial<IdpConfig> & { name: string; provider: "saml" | "oidc" };
+  }>("/sso/config", async (request, reply) => {
+    const body = request.body ?? {};
+    if (!body.name || !body.provider) {
+      return reply.code(400).send({ error: "name and provider are required" });
+    }
+    if (!["saml", "oidc"].includes(body.provider)) {
+      return reply.code(400).send({ error: "provider must be 'saml' or 'oidc'" });
+    }
+    const id = body.id ?? `${body.provider}-${crypto.randomUUID().slice(0, 8)}`;
+    const now = new Date().toISOString();
+    const existing = _ssoConfigs.get(id);
+    const config: IdpConfig = {
+      ...existing,
+      ...body,
+      id,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+      enabled: body.enabled ?? existing?.enabled ?? true,
+    };
+    _ssoConfigs.set(id, config);
+    return reply.code(existing ? 200 : 201).send({
+      config: { ...config, certificate: config.certificate ? "[configured]" : undefined },
+    });
+  });
+
+  // DELETE /sso/config/:id — remove an IdP config
+  app.delete<{ Params: { id: string } }>("/sso/config/:id", async (request, reply) => {
+    if (!_ssoConfigs.has(request.params.id)) return reply.code(404).send({ error: "not_found" });
+    _ssoConfigs.delete(request.params.id);
+    return reply.send({ ok: true });
+  });
+
+  // GET /sso/providers — list available providers + their login URLs
+  app.get("/sso/providers", async (_req, reply) => {
+    const baseUrl = process.env.NEXUS_API_URL ?? "";
+    const providers = [..._ssoConfigs.values()]
+      .filter((c) => c.enabled)
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        provider: c.provider,
+        loginUrl:
+          c.provider === "saml" ? `${baseUrl}/auth/saml/login` : `${baseUrl}/auth/oidc/authorize`,
+      }));
+    // Also surface OAuth providers when configured
+    if (process.env.GOOGLE_CLIENT_ID) {
+      providers.push({
+        id: "oauth-google",
+        name: "Google",
+        provider: "oidc" as const,
+        loginUrl: `${baseUrl}/oauth/google`,
+      });
+    }
+    if (process.env.GITHUB_CLIENT_ID) {
+      providers.push({
+        id: "oauth-github",
+        name: "GitHub",
+        provider: "oidc" as const,
+        loginUrl: `${baseUrl}/oauth/github`,
+      });
+    }
+    return reply.send({ providers, total: providers.length });
+  });
+
+  // POST /sso/login — initiate SSO login for a given provider id
+  app.post<{ Body: { providerId?: string; redirectUrl?: string } }>(
+    "/sso/login",
+    async (request, reply) => {
+      const { providerId, redirectUrl } = request.body ?? {};
+      const config = providerId
+        ? _ssoConfigs.get(providerId)
+        : [..._ssoConfigs.values()].find((c) => c.enabled);
+      if (!config) {
+        return reply.code(404).send({
+          error: "no_sso_provider",
+          message: "No SSO provider configured. Add one via POST /sso/config.",
+        });
+      }
+      const baseUrl = process.env.NEXUS_API_URL ?? "";
+      const loginUrl =
+        config.provider === "saml"
+          ? `${baseUrl}/auth/saml/login${redirectUrl ? `?redirect=${encodeURIComponent(redirectUrl)}` : ""}`
+          : `${baseUrl}/auth/oidc/authorize${redirectUrl ? `?redirect=${encodeURIComponent(redirectUrl)}` : ""}`;
+      return reply.send({ loginUrl, provider: config.provider, name: config.name });
+    },
+  );
+
+  // -- MFA (already wired in auth routes — these are api-bridge aliases) ------
+  app.get("/mfa/status", async (_req, reply) =>
+    reply.send({ available: true, note: "MFA routes available at /auth/totp/*" }),
+  );
+  app.post("/mfa/enable", async (_req, reply) => reply.send({ note: "Use POST /auth/totp/setup" }));
+  app.post("/mfa/verify", async (_req, reply) =>
+    reply.send({ note: "Use POST /auth/totp/validate" }),
+  );
+
+  // -- SCIM (already wired in scim routes — these are api-bridge aliases) -----
+  app.get("/scim/Users", async (_req, reply) =>
+    reply.send({ note: "SCIM 2.0 available at /scim/v2/Users" }),
+  );
+  app.post("/scim/Users", async (_req, reply) => reply.send({ note: "Use POST /scim/v2/Users" }));
+  app.get("/scim/Groups", async (_req, reply) =>
+    reply.send({ note: "SCIM 2.0 groups at /scim/v2/Groups" }),
+  );
+
+  // -- WORKSPACES -------------------------------------------------------------
+  app.get("/workspaces", async (_req, reply) =>
+    reply.send({
+      workspaces: [{ id: "default", name: "Default Workspace", plan: "free", members: 1 }],
+    }),
+  );
+  app.post<{ Body: { name: string } }>("/workspaces", async (request, reply) =>
+    reply.code(201).send({
+      workspace: {
+        id: crypto.randomUUID(),
+        name: request.body?.name ?? "New Workspace",
+        plan: "free",
+        members: 1,
+        createdAt: new Date().toISOString(),
+      },
+    }),
+  );
+
+  // -- TENANTS ----------------------------------------------------------------
+  // Single-tenant for now — returns current workspace as tenant list
+  app.get("/tenants", async (_req, reply) => {
+    return reply.send({
+      tenants: [
+        {
+          id: "default",
+          name: "Default",
+          plan: "free",
+          region: process.env.NEXUS_REGION ?? "us-east-1",
+          createdAt: new Date().toISOString(),
+        },
+      ],
+      total: 1,
+      note: "Multi-tenant isolation is a future feature. Current deployment is single-tenant.",
+    });
+  });
+
+  // -- WHITELABEL CONFIG ------------------------------------------------------
+  interface BrandingConfig {
+    productName: string;
+    logoUrl: string | null;
+    faviconUrl: string | null;
+    primaryColor: string | null;
+    accentColor: string | null;
+    customDomain: string | null;
+    updatedAt: string;
+  }
+
+  let _branding: BrandingConfig = {
+    productName: process.env.NEXUS_PRODUCT_NAME ?? "Nexus",
+    logoUrl: process.env.NEXUS_LOGO_URL ?? null,
+    faviconUrl: null,
+    primaryColor: null,
+    accentColor: null,
+    customDomain: process.env.NEXUS_CUSTOM_DOMAIN ?? null,
+    updatedAt: new Date().toISOString(),
+  };
+
+  app.get("/whitelabel/config", async (_req, reply) => reply.send({ branding: _branding }));
+
+  app.post<{ Body: Partial<BrandingConfig> }>("/whitelabel/config", async (request, reply) => {
+    _branding = { ..._branding, ...request.body, updatedAt: new Date().toISOString() };
+    return reply.send({ ok: true, branding: _branding });
+  });
+
+  app.patch<{ Body: Partial<BrandingConfig> }>("/whitelabel/config", async (request, reply) => {
+    _branding = { ..._branding, ...request.body, updatedAt: new Date().toISOString() };
+    return reply.send({ ok: true, branding: _branding });
+  });
+
+  // -- DATA RESIDENCY ---------------------------------------------------------
+  interface DataResidencyConfig {
+    region: string;
+    retentionDays: number;
+    encryptAtRest: boolean;
+    gdprEnabled: boolean;
+    dataClassification: "public" | "internal" | "confidential";
+    backupRegion: string | null;
+    updatedAt: string;
+  }
+
+  let _dataPolicy: DataResidencyConfig = {
+    region: process.env.NEXUS_REGION ?? "us-east-1",
+    retentionDays: 90,
+    encryptAtRest: false,
+    gdprEnabled: false,
+    dataClassification: "internal",
+    backupRegion: null,
+    updatedAt: new Date().toISOString(),
+  };
+
+  app.get("/data-residency/config", async (_req, reply) => reply.send({ policy: _dataPolicy }));
+
+  app.post<{ Body: Partial<DataResidencyConfig> }>(
+    "/data-residency/config",
+    async (request, reply) => {
+      _dataPolicy = { ..._dataPolicy, ...request.body, updatedAt: new Date().toISOString() };
+      return reply.send({ ok: true, policy: _dataPolicy });
+    },
+  );
+
+  app.patch<{ Body: Partial<DataResidencyConfig> }>(
+    "/data-residency/config",
+    async (request, reply) => {
+      _dataPolicy = { ..._dataPolicy, ...request.body, updatedAt: new Date().toISOString() };
+      return reply.send({ ok: true, policy: _dataPolicy });
+    },
+  );
+
+  // ── analytics/daily + providers + models ──────────────────────────────────
+  // Used by admin-analytics charts (lazy-loaded via analytics-charts.tsx).
+  // Derives data from the in-process _costLog; returns deterministic empty
+  // shapes when the log is empty so charts render without errors.
+
+  app.get<{ Querystring: { days?: string } }>("/analytics/daily", async (request, reply) => {
+    const days = Math.min(Math.max(parseInt(request.query.days ?? "7") || 7, 1), 90);
+    const byDay: Record<string, { conversations: number; tokens: number; cost: number }> = {};
+    for (const e of _costLog) {
+      const d = e.ts.slice(0, 10);
+      if (!byDay[d]) byDay[d] = { conversations: 0, tokens: 0, cost: 0 };
+      byDay[d]!.tokens += e.inputTokens + e.outputTokens;
+      byDay[d]!.cost += e.costUsd ?? 0;
+      byDay[d].conversations += 1;
+    }
+    // Fill in the last `days` days in order
+    const result = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86_400_000).toISOString().slice(0, 10);
+      result.push({ date: d, ...(byDay[d] ?? { conversations: 0, tokens: 0, cost: 0 }) });
+    }
+    return reply.send({ data: result });
+  });
+
+  app.get("/analytics/providers", async (_req, reply) => {
+    const byProvider: Record<string, number> = {};
+    for (const e of _costLog) {
+      const p = e.model?.split("/")[0] ?? "unknown";
+      byProvider[p] = (byProvider[p] ?? 0) + 1;
+    }
+    const data = Object.entries(byProvider).map(([provider, requests]) => ({ provider, requests }));
+    return reply.send({ data });
+  });
+
+  app.get<{ Querystring: { limit?: string } }>("/analytics/models", async (request, reply) => {
+    const limit = parseInt(request.query.limit ?? "5") || 5;
+    const byModel: Record<string, { requests: number; tokens: number; cost: number }> = {};
+    for (const e of _costLog) {
+      if (!byModel[e.model]) byModel[e.model] = { requests: 0, tokens: 0, cost: 0 };
+      byModel[e.model]!.requests += 1;
+      byModel[e.model]!.tokens += e.inputTokens + e.outputTokens;
+      byModel[e.model]!.cost += e.costUsd ?? 0;
+    }
+    const data = Object.entries(byModel)
+      .sort(([, a], [, b]) => b.requests - a.requests)
+      .slice(0, limit)
+      .map(([model, stats]) => ({ model, ...stats }));
+    return reply.send({ data });
+  });
+
+  // ── system/config ──────────────────────────────────────────────────────────
+  // Admin system page: view + edit runtime config key-value pairs.
+
+  const _sysConfig: Record<string, { value: string; type: string }> = {
+    default_llm_model: { value: process.env.DEFAULT_LLM_MODEL ?? "gpt-4o", type: "string" },
+    rate_limit_max: { value: process.env.RATE_LIMIT_MAX ?? "100", type: "number" },
+    rate_limit_window_ms: { value: process.env.RATE_LIMIT_WINDOW_MS ?? "60000", type: "number" },
+    maintenance_mode: { value: process.env.MAINTENANCE_MODE ?? "false", type: "boolean" },
+  };
+
+  app.get("/system/config", async (_req, reply) => {
+    const configs = Object.entries(_sysConfig).map(([key, { value, type }]) => ({
+      key,
+      value,
+      type,
+    }));
+    return reply.send({ configs });
+  });
+
+  app.put<{ Params: { key: string }; Body: { value: string } }>(
+    "/system/config/:key",
+    async (request, reply) => {
+      const { key } = request.params;
+      const { value } = request.body ?? {};
+      if (!key || value === undefined)
+        return reply.code(400).send({ error: "key and value required" });
+      if (_sysConfig[key]) {
+        _sysConfig[key] = { ..._sysConfig[key], value };
+      } else {
+        _sysConfig[key] = { value, type: "string" };
+      }
+      return reply.send({ ok: true, key, value: _sysConfig[key].value });
+    },
+  );
+
+  // ── fallback-chains CRUD + test ────────────────────────────────────────────
+  // Complements the existing POST /fallback-chains/run (execution path).
+  // This group manages chain definitions.
+
+  interface _FallbackChain {
+    id: string;
+    name: string;
+    steps: { provider: string; model?: string; maxRetries?: number; timeoutMs?: number }[];
+    enabled: boolean;
+    createdAt: string;
+  }
+  const _fallbackChains = new Map<string, _FallbackChain>();
+
+  app.get("/fallback-chains", async (_req, reply) => {
+    return reply.send({ chains: [..._fallbackChains.values()] });
+  });
+
+  app.post<{ Body: { name: string; steps: _FallbackChain["steps"] } }>(
+    "/fallback-chains",
+    async (request, reply) => {
+      const { name, steps } = request.body ?? {};
+      if (!name || !Array.isArray(steps) || steps.length < 2) {
+        return reply.code(400).send({ error: "name and at least 2 steps required" });
+      }
+      const chain: _FallbackChain = {
+        id: `chain_${Date.now()}`,
+        name,
+        steps: steps.filter((s) => s.provider?.trim()),
+        enabled: true,
+        createdAt: new Date().toISOString(),
+      };
+      _fallbackChains.set(chain.id, chain);
+      return reply.code(201).send({ ok: true, chain });
+    },
+  );
+
+  app.post<{ Body: { chainId: string; prompt: string } }>(
+    "/fallback-chains/test",
+    async (request, reply) => {
+      const { chainId, prompt: _prompt } = request.body ?? {};
+      const chain = _fallbackChains.get(chainId ?? "");
+      if (!chain) return reply.code(404).send({ error: "chain not found" });
+      // Dry-run: report each step as attempted without actually calling providers
+      const attempts = chain.steps.map((step, i) => ({
+        step: i,
+        provider: step.provider,
+        success: i === 0, // first step "succeeds" in dry-run
+        latencyMs: 50 + i * 20,
+      }));
+      return reply.send({
+        success: true,
+        usedStep: 0,
+        usedProvider: chain.steps[0]?.provider,
+        attempts,
+        totalLatencyMs: attempts.reduce((s, a) => s + (a.latencyMs ?? 0), 0),
+      });
+    },
+  );
+
+  // ── marketplace CRUD ───────────────────────────────────────────────────────
+  // Full marketplace: list, detail, star, install, publish.
+  // Seeded with a handful of built-in items; user items stored in-memory.
+
+  interface _MpItem {
+    id: string;
+    name: string;
+    author: string;
+    description: string;
+    category: string;
+    downloads: number;
+    rating: number;
+    tags: string[];
+    price: "free" | "premium";
+    installedBy: Set<string>;
+    starredBy: Set<string>;
+  }
+  const _mpItems = new Map<string, _MpItem>([
+    [
+      "mp_1",
+      {
+        id: "mp_1",
+        name: "Advanced Code Reviewer",
+        author: "nexus-labs",
+        description: "Multi-archetype code review with security and performance analysis",
+        category: "development",
+        downloads: 1247,
+        rating: 4.8,
+        tags: ["code-review", "security", "performance"],
+        price: "free",
+        installedBy: new Set(),
+        starredBy: new Set(),
+      },
+    ],
+    [
+      "mp_2",
+      {
+        id: "mp_2",
+        name: "Legal Document Analyzer",
+        author: "legaltech-co",
+        description: "Contract analysis using ethicist and judge archetypes",
+        category: "legal",
+        downloads: 834,
+        rating: 4.6,
+        tags: ["legal", "contracts", "compliance"],
+        price: "premium",
+        installedBy: new Set(),
+        starredBy: new Set(),
+      },
+    ],
+    [
+      "mp_3",
+      {
+        id: "mp_3",
+        name: "Market Research Suite",
+        author: "bizinsights",
+        description: "Market analysis with futurist and empiricist perspectives",
+        category: "research",
+        downloads: 2103,
+        rating: 4.9,
+        tags: ["market-research", "analysis"],
+        price: "free",
+        installedBy: new Set(),
+        starredBy: new Set(),
+      },
+    ],
+    [
+      "mp_4",
+      {
+        id: "mp_4",
+        name: "Creative Writing Workshop",
+        author: "wordcraft-ai",
+        description: "Multi-perspective creative writing with iterative refinement",
+        category: "creative",
+        downloads: 567,
+        rating: 4.3,
+        tags: ["writing", "creative", "storytelling"],
+        price: "free",
+        installedBy: new Set(),
+        starredBy: new Set(),
+      },
+    ],
+    [
+      "mp_5",
+      {
+        id: "mp_5",
+        name: "Tech Architecture Planner",
+        author: "nexus-labs",
+        description: "System design with architect and strategist archetypes",
+        category: "development",
+        downloads: 1892,
+        rating: 4.7,
+        tags: ["architecture", "system-design"],
+        price: "premium",
+        installedBy: new Set(),
+        starredBy: new Set(),
+      },
+    ],
+    [
+      "mp_6",
+      {
+        id: "mp_6",
+        name: "Stakeholder Communication Kit",
+        author: "comms-pro",
+        description: "Stakeholder reports through empath and pragmatist lenses",
+        category: "business",
+        downloads: 421,
+        rating: 4.4,
+        tags: ["communication", "stakeholders"],
+        price: "free",
+        installedBy: new Set(),
+        starredBy: new Set(),
+      },
+    ],
+  ]);
+
+  function _mpView(item: _MpItem, userId?: string) {
+    return {
+      id: item.id,
+      name: item.name,
+      author: item.author,
+      description: item.description,
+      category: item.category,
+      downloads: item.downloads,
+      rating: item.rating,
+      tags: item.tags,
+      price: item.price,
+      stars: item.starredBy.size,
+      installed: userId ? item.installedBy.has(userId) : false,
+      starred: userId ? item.starredBy.has(userId) : false,
+    };
+  }
+
+  app.get<{ Querystring: { limit?: string; category?: string; q?: string } }>(
+    "/marketplace",
+    async (request, reply) => {
+      const { limit, category, q } = request.query;
+      let items = [..._mpItems.values()];
+      if (category && category !== "all") items = items.filter((i) => i.category === category);
+      if (q) {
+        const ql = q.toLowerCase();
+        items = items.filter(
+          (i) => i.name.toLowerCase().includes(ql) || i.description.toLowerCase().includes(ql),
+        );
+      }
+      items = items.slice(0, parseInt(limit ?? "50") || 50);
+      return reply.send({ items: items.map((i) => _mpView(i)) });
+    },
+  );
+
+  app.get("/marketplace/me", async (_req, reply) => {
+    // Return installed + starred items for anonymous user
+    return reply.send({ installed: [], starred: [] });
+  });
+
+  app.get<{ Params: { id: string } }>("/marketplace/:id", async (request, reply) => {
+    const item = _mpItems.get(request.params.id);
+    if (!item) return reply.code(404).send({ error: "not found" });
+    return reply.send({ item: _mpView(item) });
+  });
+
+  app.post<{ Params: { id: string } }>("/marketplace/:id/star", async (request, reply) => {
+    const item = _mpItems.get(request.params.id);
+    if (!item) return reply.code(404).send({ error: "not found" });
+    item.starredBy.add("anon");
+    return reply.send({ ok: true, stars: item.starredBy.size });
+  });
+
+  app.delete<{ Params: { id: string } }>("/marketplace/:id/star", async (request, reply) => {
+    const item = _mpItems.get(request.params.id);
+    if (!item) return reply.code(404).send({ error: "not found" });
+    item.starredBy.delete("anon");
+    return reply.send({ ok: true, stars: item.starredBy.size });
+  });
+
+  app.post<{ Params: { id: string } }>("/marketplace/:id/install", async (request, reply) => {
+    const item = _mpItems.get(request.params.id);
+    if (!item) return reply.code(404).send({ error: "not found" });
+    item.installedBy.add("anon");
+    item.downloads += 1;
+    return reply.send({ ok: true });
+  });
+
+  app.delete<{ Params: { id: string } }>("/marketplace/:id/install", async (request, reply) => {
+    const item = _mpItems.get(request.params.id);
+    if (!item) return reply.code(404).send({ error: "not found" });
+    item.installedBy.delete("anon");
+    return reply.send({ ok: true });
+  });
+
+  app.post<{
+    Body: { name: string; description: string; category: string; tags?: string[]; price?: string };
+  }>("/marketplace", async (request, reply) => {
+    const { name, description, category, tags = [], price = "free" } = request.body ?? {};
+    if (!name || !description)
+      return reply.code(400).send({ error: "name and description required" });
+    const id = `mp_${Date.now()}`;
+    const item: _MpItem = {
+      id,
+      name,
+      author: "you",
+      description,
+      category: category ?? "other",
+      downloads: 0,
+      rating: 0,
+      tags,
+      price: price as "free" | "premium",
+      installedBy: new Set(),
+      starredBy: new Set(),
+    };
+    _mpItems.set(id, item);
+    return reply.code(201).send({ ok: true, item: _mpView(item) });
+  });
+
+  // ── /v1/projects — Projects CRUD ──────────────────────────────────────────
+  // The Projects page calls /api/v1/projects (v1-prefixed). Because api-bridge
+  // is registered at prefix "/api", adding "/v1/projects" here resolves to
+  // /api/v1/projects — matching exactly what the frontend requests.
+
+  interface _Project {
+    id: string;
+    name: string;
+    description: string;
+    conversationCount: number;
+    createdAt: string;
+  }
+  const _projects = new Map<string, _Project>();
+
+  app.get("/v1/projects", async (_req, reply) => {
+    return reply.send({
+      projects: [..._projects.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    });
+  });
+
+  app.post<{ Body: { name: string; description?: string } }>(
+    "/v1/projects",
+    async (request, reply) => {
+      const { name, description = "" } = request.body ?? {};
+      if (!name?.trim()) return reply.code(400).send({ message: "name is required" });
+      const project: _Project = {
+        id: `proj_${Date.now()}`,
+        name: name.trim(),
+        description: description.trim(),
+        conversationCount: 0,
+        createdAt: new Date().toISOString(),
+      };
+      _projects.set(project.id, project);
+      return reply.code(201).send(project);
+    },
+  );
+
+  app.patch<{ Params: { id: string }; Body: { name?: string; description?: string } }>(
+    "/v1/projects/:id",
+    async (request, reply) => {
+      const project = _projects.get(request.params.id);
+      if (!project) return reply.code(404).send({ message: "project not found" });
+      if (request.body?.name) project.name = request.body.name.trim();
+      if (request.body?.description !== undefined)
+        project.description = request.body.description.trim();
+      return reply.send(project);
+    },
+  );
+
+  app.delete<{ Params: { id: string } }>("/v1/projects/:id", async (request, reply) => {
+    const existed = _projects.delete(request.params.id);
+    if (!existed) return reply.code(404).send({ message: "project not found" });
+    return reply.send({ ok: true });
+  });
+
+  // File attachments stub — accepts upload, returns file record
+  app.post<{ Params: { id: string } }>("/v1/projects/:id/files", async (request, reply) => {
+    return reply.code(201).send({
+      id: `file_${Date.now()}`,
+      projectId: request.params.id,
+      name: "upload",
+      size: 0,
+      createdAt: new Date().toISOString(),
+    });
+  });
+
+  app.delete<{ Params: { id: string; fileId: string } }>(
+    "/v1/projects/:id/files/:fileId",
+    async (request, reply) => {
+      return reply.send({ ok: true });
+    },
+  );
+
+  // ── STM project routes ─────────────────────────────────────────────────────
+  // ProjectInstructions.tsx calls /api/stm, /api/stm/project/:id, /api/stm/toggle.
+  // Extend the existing STM in-memory store to support per-project modules.
+
+  app.get("/stm", async (_req, reply) => {
+    return reply.send({ modules: _stmActiveModules, active: _stmActiveModules });
+  });
+
+  const _stmProjectOverrides = new Map<string, string[]>();
+
+  app.get<{ Params: { id: string } }>("/stm/project/:id", async (request, reply) => {
+    const overrides = _stmProjectOverrides.get(request.params.id);
+    return reply.send({ projectId: request.params.id, active: overrides ?? _stmActiveModules });
+  });
+
+  app.post<{ Params: { id: string }; Body: { active: string[] } }>(
+    "/stm/project/:id",
+    async (request, reply) => {
+      const { active = [] } = request.body ?? {};
+      _stmProjectOverrides.set(request.params.id, active);
+      return reply.send({ ok: true, projectId: request.params.id, active });
+    },
+  );
+
+  app.post<{ Body: { moduleId: string; enabled: boolean } }>(
+    "/stm/toggle",
+    async (request, reply) => {
+      const { moduleId, enabled } = request.body ?? {};
+      if (!moduleId) return reply.code(400).send({ error: "moduleId required" });
+      if (enabled) {
+        if (!_stmActiveModules.includes(moduleId)) _stmActiveModules.push(moduleId);
+      } else {
+        _stmActiveModules = _stmActiveModules.filter((m) => m !== moduleId);
+      }
+      return reply.send({ ok: true, moduleId, enabled, active: _stmActiveModules });
+    },
+  );
 }

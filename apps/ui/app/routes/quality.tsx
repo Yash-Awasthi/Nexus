@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Quality Center — hallucination scoring + speculative decoding.
  *
@@ -47,7 +48,7 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface HallucinationScore {
-  score: number;          // 0–1, higher = more hallucinated
+  score: number; // 0–1, higher = more hallucinated
   label: "factual" | "uncertain" | "hallucinated";
   claims?: { text: string; verdict: string; confidence: number }[];
   explanation?: string;
@@ -84,16 +85,35 @@ interface SpecConfig {
 function ScorePill({ score }: { score: number }) {
   const pct = Math.round(score * 100);
   const color =
-    score < 0.3 ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
-    : score < 0.6 ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400"
-    : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400";
+    score < 0.3
+      ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
+      : score < 0.6
+        ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400"
+        : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400";
   return <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${color}`}>{pct}%</span>;
 }
 
 function LabelBadge({ label }: { label: string }) {
-  if (label === "factual") return <Badge className="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"><CheckCircle className="w-3 h-3 mr-1" />Factual</Badge>;
-  if (label === "hallucinated") return <Badge className="bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"><XCircle className="w-3 h-3 mr-1" />Hallucinated</Badge>;
-  return <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400"><AlertTriangle className="w-3 h-3 mr-1" />Uncertain</Badge>;
+  if (label === "factual")
+    return (
+      <Badge className="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400">
+        <CheckCircle className="w-3 h-3 mr-1" />
+        Factual
+      </Badge>
+    );
+  if (label === "hallucinated")
+    return (
+      <Badge className="bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400">
+        <XCircle className="w-3 h-3 mr-1" />
+        Hallucinated
+      </Badge>
+    );
+  return (
+    <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400">
+      <AlertTriangle className="w-3 h-3 mr-1" />
+      Uncertain
+    </Badge>
+  );
 }
 
 // ─── Hallucination Tab ────────────────────────────────────────────────────────
@@ -118,14 +138,18 @@ function HallucinationTab() {
 
   useEffect(() => {
     fetch("/api/hallucination/thresholds")
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setThresholds(d); })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) setThresholds(d);
+      })
       .catch(() => {});
   }, []);
 
   const scoreResponse = useCallback(async () => {
     if (!response.trim()) return;
-    setLoading(true); setErr(""); setResult(null);
+    setLoading(true);
+    setErr("");
+    setResult(null);
     try {
       const r = await fetch("/api/hallucination/score", {
         method: "POST",
@@ -134,13 +158,17 @@ function HallucinationTab() {
       });
       if (r.ok) setResult(await r.json());
       else setErr("Scoring failed");
-    } catch { setErr("Could not reach server"); }
+    } catch {
+      setErr("Could not reach server");
+    }
     setLoading(false);
   }, [response, context]);
 
   const checkGroundedness = useCallback(async () => {
     if (!response.trim() || !context.trim()) return;
-    setLoading(true); setErr(""); setGroundResult(null);
+    setLoading(true);
+    setErr("");
+    setGroundResult(null);
     try {
       const r = await fetch("/api/hallucination/groundedness", {
         method: "POST",
@@ -149,48 +177,67 @@ function HallucinationTab() {
       });
       if (r.ok) setGroundResult(await r.json());
       else setErr("Groundedness check failed");
-    } catch { setErr("Could not reach server"); }
+    } catch {
+      setErr("Could not reach server");
+    }
     setLoading(false);
   }, [response, context]);
 
   const runBatch = useCallback(async () => {
-    const valid = batchItems.filter(b => b.response.trim());
+    const valid = batchItems.filter((b) => b.response.trim());
     if (!valid.length) return;
-    setLoading(true); setErr(""); setBatchResults([]);
+    setLoading(true);
+    setErr("");
+    setBatchResults([]);
     try {
       const r = await fetch("/api/hallucination/batch-score", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: valid.map(b => ({ id: b.id, response: b.response, context: b.context || undefined })) }),
+        body: JSON.stringify({
+          items: valid.map((b) => ({
+            id: b.id,
+            response: b.response,
+            context: b.context || undefined,
+          })),
+        }),
       });
       if (r.ok) {
         const d = await r.json();
         setBatchResults(d.results ?? []);
       } else setErr("Batch scoring failed");
-    } catch { setErr("Could not reach server"); }
+    } catch {
+      setErr("Could not reach server");
+    }
     setLoading(false);
   }, [batchItems]);
 
   const addBatchItem = () => {
-    setBatchItems(prev => [...prev, { id: String(Date.now()), response: "", context: "" }]);
+    setBatchItems((prev) => [...prev, { id: String(Date.now()), response: "", context: "" }]);
   };
   const removeBatchItem = (id: string) => {
-    setBatchItems(prev => prev.filter(b => b.id !== id));
+    setBatchItems((prev) => prev.filter((b) => b.id !== id));
   };
 
   return (
     <div className="space-y-4">
       {/* Mode selector */}
       <div className="flex gap-2 flex-wrap">
-        {(["single", "batch", "groundedness"] as const).map(m => (
-          <Button key={m} size="sm" variant={mode === m ? "default" : "outline"} onClick={() => setMode(m)} className="capitalize">
+        {(["single", "batch", "groundedness"] as const).map((m) => (
+          <Button
+            key={m}
+            size="sm"
+            variant={mode === m ? "default" : "outline"}
+            onClick={() => setMode(m)}
+            className="capitalize"
+          >
             {m === "groundedness" ? "Groundedness" : m === "batch" ? "Batch Score" : "Single Score"}
           </Button>
         ))}
         {thresholds && (
           <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
             <Info className="w-3 h-3" />
-            Thresholds: factual &lt;{Math.round((thresholds.factual ?? 0.3) * 100)}%, hallucinated &gt;{Math.round((thresholds.hallucinated ?? 0.6) * 100)}%
+            Thresholds: factual &lt;{Math.round((thresholds.factual ?? 0.3) * 100)}%, hallucinated
+            &gt;{Math.round((thresholds.hallucinated ?? 0.6) * 100)}%
           </div>
         )}
       </div>
@@ -205,23 +252,35 @@ function HallucinationTab() {
                 rows={4}
                 placeholder="Paste the AI response you want to check for hallucinations…"
                 value={response}
-                onChange={e => setResponse(e.target.value)}
+                onChange={(e) => setResponse(e.target.value)}
                 className="resize-none"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium">Source Context <span className="text-muted-foreground font-normal">(optional)</span></label>
+              <label className="text-sm font-medium">
+                Source Context <span className="text-muted-foreground font-normal">(optional)</span>
+              </label>
               <Textarea
                 rows={3}
                 placeholder="Optionally provide the source documents or context the response was based on…"
                 value={context}
-                onChange={e => setContext(e.target.value)}
+                onChange={(e) => setContext(e.target.value)}
                 className="resize-none"
               />
             </div>
             {err && <p className="text-red-500 text-xs">{err}</p>}
             <Button onClick={scoreResponse} disabled={loading || !response.trim()}>
-              {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Scoring…</> : <><ShieldCheck className="w-4 h-4 mr-2" />Score Response</>}
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Scoring…
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="w-4 h-4 mr-2" />
+                  Score Response
+                </>
+              )}
             </Button>
 
             {result && (
@@ -238,10 +297,16 @@ function HallucinationTab() {
                 )}
                 {result.claims && result.claims.length > 0 && (
                   <div className="space-y-2">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Claims breakdown</p>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Claims breakdown
+                    </p>
                     {result.claims.map((c, i) => (
                       <div key={i} className="flex items-start gap-2 text-sm">
-                        {c.verdict === "supported" ? <CheckCircle className="w-4 h-4 text-green-500 shrink-0 mt-0.5" /> : <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />}
+                        {c.verdict === "supported" ? (
+                          <CheckCircle className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                        )}
                         <span className="flex-1">{c.text}</span>
                         <ScorePill score={1 - c.confidence} />
                       </div>
@@ -258,14 +323,16 @@ function HallucinationTab() {
       {mode === "groundedness" && (
         <Card>
           <CardContent className="pt-4 space-y-3">
-            <p className="text-sm text-muted-foreground">Check whether an AI answer is grounded in the provided context (RAG faithfulness).</p>
+            <p className="text-sm text-muted-foreground">
+              Check whether an AI answer is grounded in the provided context (RAG faithfulness).
+            </p>
             <div className="space-y-1">
               <label className="text-sm font-medium">Source Context *</label>
               <Textarea
                 rows={4}
                 placeholder="The retrieved documents or context chunks…"
                 value={context}
-                onChange={e => setContext(e.target.value)}
+                onChange={(e) => setContext(e.target.value)}
                 className="resize-none"
               />
             </div>
@@ -275,29 +342,50 @@ function HallucinationTab() {
                 rows={3}
                 placeholder="The answer generated from the above context…"
                 value={response}
-                onChange={e => setResponse(e.target.value)}
+                onChange={(e) => setResponse(e.target.value)}
                 className="resize-none"
               />
             </div>
             {err && <p className="text-red-500 text-xs">{err}</p>}
-            <Button onClick={checkGroundedness} disabled={loading || !response.trim() || !context.trim()}>
-              {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Checking…</> : <><ShieldCheck className="w-4 h-4 mr-2" />Check Groundedness</>}
+            <Button
+              onClick={checkGroundedness}
+              disabled={loading || !response.trim() || !context.trim()}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Checking…
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="w-4 h-4 mr-2" />
+                  Check Groundedness
+                </>
+              )}
             </Button>
 
             {groundResult && (
-              <div className={`border rounded-lg p-4 space-y-2 ${groundResult.grounded ? "border-green-200 bg-green-50 dark:bg-green-950/20" : "border-red-200 bg-red-50 dark:bg-red-950/20"}`}>
+              <div
+                className={`border rounded-lg p-4 space-y-2 ${groundResult.grounded ? "border-green-200 bg-green-50 dark:bg-green-950/20" : "border-red-200 bg-red-50 dark:bg-red-950/20"}`}
+              >
                 <div className="flex items-center gap-2">
-                  {groundResult.grounded
-                    ? <CheckCircle className="w-5 h-5 text-green-600" />
-                    : <XCircle className="w-5 h-5 text-red-500" />}
-                  <span className="font-medium">{groundResult.grounded ? "Answer is grounded" : "Answer not grounded"}</span>
+                  {groundResult.grounded ? (
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-500" />
+                  )}
+                  <span className="font-medium">
+                    {groundResult.grounded ? "Answer is grounded" : "Answer not grounded"}
+                  </span>
                   <ScorePill score={1 - groundResult.score} />
                 </div>
                 {groundResult.ungroundedClaims && groundResult.ungroundedClaims.length > 0 && (
                   <div className="space-y-1">
                     <p className="text-xs font-medium text-muted-foreground">Ungrounded claims:</p>
                     {groundResult.ungroundedClaims.map((c, i) => (
-                      <p key={i} className="text-sm text-red-600 dark:text-red-400">• {c}</p>
+                      <p key={i} className="text-sm text-red-600 dark:text-red-400">
+                        • {c}
+                      </p>
                     ))}
                   </div>
                 )}
@@ -314,8 +402,15 @@ function HallucinationTab() {
             <Card key={item.id}>
               <CardContent className="pt-3 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-muted-foreground">Response #{idx + 1}</span>
-                  <Button size="icon" variant="ghost" className="h-6 w-6 text-red-400" onClick={() => removeBatchItem(item.id)}>
+                  <span className="text-sm font-medium text-muted-foreground">
+                    Response #{idx + 1}
+                  </span>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 text-red-400"
+                    onClick={() => removeBatchItem(item.id)}
+                  >
                     <Trash2 className="w-3 h-3" />
                   </Button>
                 </div>
@@ -323,33 +418,50 @@ function HallucinationTab() {
                   rows={2}
                   placeholder="AI response…"
                   value={item.response}
-                  onChange={e => setBatchItems(prev => prev.map(b => b.id === item.id ? { ...b, response: e.target.value } : b))}
+                  onChange={(e) =>
+                    setBatchItems((prev) =>
+                      prev.map((b) => (b.id === item.id ? { ...b, response: e.target.value } : b)),
+                    )
+                  }
                   className="resize-none text-sm"
                 />
                 <Input
                   placeholder="Context (optional)"
                   value={item.context}
-                  onChange={e => setBatchItems(prev => prev.map(b => b.id === item.id ? { ...b, context: e.target.value } : b))}
+                  onChange={(e) =>
+                    setBatchItems((prev) =>
+                      prev.map((b) => (b.id === item.id ? { ...b, context: e.target.value } : b)),
+                    )
+                  }
                   className="text-sm"
                 />
-                {batchResults.find(r => r.id === item.id) && (() => {
-                  const r = batchResults.find(br => br.id === item.id)!;
-                  return (
-                    <div className="flex items-center gap-2">
-                      <LabelBadge label={r.score.label} />
-                      <ScorePill score={r.score.score} />
-                    </div>
-                  );
-                })()}
+                {batchResults.find((r) => r.id === item.id) &&
+                  (() => {
+                    const r = batchResults.find((br) => br.id === item.id)!;
+                    return (
+                      <div className="flex items-center gap-2">
+                        <LabelBadge label={r.score.label} />
+                        <ScorePill score={r.score.score} />
+                      </div>
+                    );
+                  })()}
               </CardContent>
             </Card>
           ))}
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={addBatchItem}>
-              <Plus className="w-4 h-4 mr-1" />Add
+              <Plus className="w-4 h-4 mr-1" />
+              Add
             </Button>
             <Button size="sm" onClick={runBatch} disabled={loading}>
-              {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-1" />Scoring…</> : <>Score All</>}
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                  Scoring…
+                </>
+              ) : (
+                <>Score All</>
+              )}
             </Button>
           </div>
           {err && <p className="text-red-500 text-xs">{err}</p>}
@@ -365,11 +477,18 @@ function SpeculativeTab() {
   const [prompt, setPrompt] = useState("");
   const [running, setRunning] = useState(false);
   const [runResult, setRunResult] = useState<{
-    output: string; acceptanceRate: number; speedup: number; tokensGenerated: number
+    output: string;
+    acceptanceRate: number;
+    speedup: number;
+    tokensGenerated: number;
   } | null>(null);
   const [classifyText, setClassifyText] = useState("");
   const [classifying, setClassifying] = useState(false);
-  const [classResult, setClassResult] = useState<{ category: string; confidence: number; reasoning?: string } | null>(null);
+  const [classResult, setClassResult] = useState<{
+    category: string;
+    confidence: number;
+    reasoning?: string;
+  } | null>(null);
   const [stats, setStats] = useState<SpecStats | null>(null);
   const [config, setConfig] = useState<SpecConfig | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
@@ -377,17 +496,22 @@ function SpeculativeTab() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/speculative/stats").then(r => r.ok ? r.json() : null),
-      fetch("/api/speculative/config").then(r => r.ok ? r.json() : null),
-    ]).then(([s, c]) => {
-      if (s) setStats(s);
-      if (c) setConfig(c);
-    }).catch(() => {}).finally(() => setLoadingStats(false));
+      fetch("/api/speculative/stats").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/speculative/config").then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([s, c]) => {
+        if (s) setStats(s);
+        if (c) setConfig(c);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingStats(false));
   }, []);
 
   const runSpec = useCallback(async () => {
     if (!prompt.trim()) return;
-    setRunning(true); setErr(""); setRunResult(null);
+    setRunning(true);
+    setErr("");
+    setRunResult(null);
     try {
       const r = await fetch("/api/speculative/run", {
         method: "POST",
@@ -396,13 +520,17 @@ function SpeculativeTab() {
       });
       if (r.ok) setRunResult(await r.json());
       else setErr("Speculative run failed");
-    } catch { setErr("Could not reach server"); }
+    } catch {
+      setErr("Could not reach server");
+    }
     setRunning(false);
   }, [prompt]);
 
   const classify = useCallback(async () => {
     if (!classifyText.trim()) return;
-    setClassifying(true); setErr(""); setClassResult(null);
+    setClassifying(true);
+    setErr("");
+    setClassResult(null);
     try {
       const r = await fetch("/api/speculative/classify", {
         method: "POST",
@@ -411,7 +539,9 @@ function SpeculativeTab() {
       });
       if (r.ok) setClassResult(await r.json());
       else setErr("Classification failed");
-    } catch { setErr("Could not reach server"); }
+    } catch {
+      setErr("Could not reach server");
+    }
     setClassifying(false);
   }, [classifyText]);
 
@@ -420,16 +550,29 @@ function SpeculativeTab() {
       {/* Stats cards */}
       {loadingStats ? (
         <div className="flex items-center gap-2 text-muted-foreground text-sm py-4">
-          <Loader2 className="w-4 h-4 animate-spin" />Loading stats…
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Loading stats…
         </div>
       ) : stats ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
-            { label: "Acceptance Rate", value: `${Math.round((stats.acceptanceRate ?? 0) * 100)}%`, color: "text-green-600" },
-            { label: "Speedup Ratio", value: `${(stats.speedupRatio ?? 1).toFixed(2)}×`, color: "text-blue-600" },
+            {
+              label: "Acceptance Rate",
+              value: `${Math.round((stats.acceptanceRate ?? 0) * 100)}%`,
+              color: "text-green-600",
+            },
+            {
+              label: "Speedup Ratio",
+              value: `${(stats.speedupRatio ?? 1).toFixed(2)}×`,
+              color: "text-blue-600",
+            },
             { label: "Total Runs", value: (stats.totalRuns ?? 0).toLocaleString(), color: "" },
-            { label: "Avg Tokens", value: (stats.avgTokensGenerated ?? 0).toLocaleString(), color: "" },
-          ].map(s => (
+            {
+              label: "Avg Tokens",
+              value: (stats.avgTokensGenerated ?? 0).toLocaleString(),
+              color: "",
+            },
+          ].map((s) => (
             <Card key={s.label}>
               <CardContent className="pt-3">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">{s.label}</p>
@@ -446,8 +589,16 @@ function SpeculativeTab() {
           <span className="font-medium text-foreground">Config:</span>
           {config.draftModel && <Badge variant="outline">{config.draftModel} → draft</Badge>}
           {config.targetModel && <Badge variant="outline">{config.targetModel} → target</Badge>}
-          {config.numSpecTokens && <Badge variant="outline">{config.numSpecTokens} spec tokens</Badge>}
-          <Badge className={config.enabled ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400" : "bg-slate-100 text-slate-600"}>
+          {config.numSpecTokens && (
+            <Badge variant="outline">{config.numSpecTokens} spec tokens</Badge>
+          )}
+          <Badge
+            className={
+              config.enabled
+                ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
+                : "bg-slate-100 text-slate-600"
+            }
+          >
             {config.enabled ? "Enabled" : "Disabled"}
           </Badge>
         </div>
@@ -466,18 +617,30 @@ function SpeculativeTab() {
             rows={4}
             placeholder="Enter a prompt to generate with speculative decoding…"
             value={prompt}
-            onChange={e => setPrompt(e.target.value)}
+            onChange={(e) => setPrompt(e.target.value)}
             className="resize-none"
           />
           {err && <p className="text-red-500 text-xs">{err}</p>}
           <Button onClick={runSpec} disabled={running || !prompt.trim()}>
-            {running ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Running…</> : <><Zap className="w-4 h-4 mr-2" />Run</>}
+            {running ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Running…
+              </>
+            ) : (
+              <>
+                <Zap className="w-4 h-4 mr-2" />
+                Run
+              </>
+            )}
           </Button>
 
           {runResult && (
             <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
               <div className="flex items-center gap-3 flex-wrap text-sm">
-                <Badge variant="outline">Acceptance: {Math.round(runResult.acceptanceRate * 100)}%</Badge>
+                <Badge variant="outline">
+                  Acceptance: {Math.round(runResult.acceptanceRate * 100)}%
+                </Badge>
                 <Badge variant="outline">Speedup: {runResult.speedup.toFixed(2)}×</Badge>
                 <Badge variant="outline">{runResult.tokensGenerated} tokens</Badge>
               </div>
@@ -497,20 +660,35 @@ function SpeculativeTab() {
             rows={3}
             placeholder="Enter text to classify…"
             value={classifyText}
-            onChange={e => setClassifyText(e.target.value)}
+            onChange={(e) => setClassifyText(e.target.value)}
             className="resize-none"
           />
-          <Button variant="outline" onClick={classify} disabled={classifying || !classifyText.trim()}>
-            {classifying ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Classifying…</> : "Classify"}
+          <Button
+            variant="outline"
+            onClick={classify}
+            disabled={classifying || !classifyText.trim()}
+          >
+            {classifying ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Classifying…
+              </>
+            ) : (
+              "Classify"
+            )}
           </Button>
 
           {classResult && (
             <div className="border rounded-lg p-3 space-y-1 bg-muted/30">
               <div className="flex items-center gap-2">
                 <Badge>{classResult.category}</Badge>
-                <span className="text-xs text-muted-foreground">confidence: {Math.round(classResult.confidence * 100)}%</span>
+                <span className="text-xs text-muted-foreground">
+                  confidence: {Math.round(classResult.confidence * 100)}%
+                </span>
               </div>
-              {classResult.reasoning && <p className="text-sm text-muted-foreground">{classResult.reasoning}</p>}
+              {classResult.reasoning && (
+                <p className="text-sm text-muted-foreground">{classResult.reasoning}</p>
+              )}
             </div>
           )}
         </CardContent>
@@ -537,10 +715,12 @@ export default function Quality() {
       <Tabs defaultValue="hallucination">
         <TabsList>
           <TabsTrigger value="hallucination">
-            <ShieldCheck className="w-4 h-4 mr-1" />Hallucination
+            <ShieldCheck className="w-4 h-4 mr-1" />
+            Hallucination
           </TabsTrigger>
           <TabsTrigger value="speculative">
-            <Zap className="w-4 h-4 mr-1" />Speculative Decoding
+            <Zap className="w-4 h-4 mr-1" />
+            Speculative Decoding
           </TabsTrigger>
         </TabsList>
         <TabsContent value="hallucination" className="mt-4">

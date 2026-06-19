@@ -23,8 +23,8 @@ import {
 } from "@nexus/brief-engine";
 import type { FastifyInstance } from "fastify";
 
-import { requireAuth } from "../middleware/auth.js";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
+import { requireAuth } from "../middleware/auth.js";
 
 // ── Singleton engine ──────────────────────────────────────────────────────────
 

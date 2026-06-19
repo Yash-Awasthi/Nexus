@@ -17,7 +17,7 @@ export class NexusError extends Error {
     public readonly code: string,
     message: string,
     public readonly statusCode?: number,
-    public readonly details?: unknown
+    public readonly details?: unknown,
   ) {
     super(message);
     this.name = "NexusError";
@@ -51,7 +51,7 @@ export interface GatewayMessageResponse {
   type: "message";
   role: "assistant";
   model: string;
-  content: Array<{ type: "text"; text: string }>;
+  content: { type: "text"; text: string }[];
   stop_reason: string | null;
   stop_sequence: string | null;
   usage?: {
@@ -65,7 +65,11 @@ export type GatewayStreamEvent =
   | { type: "content_block_start"; index: number; content_block: { type: "text"; text: string } }
   | { type: "content_block_delta"; index: number; delta: { type: "text_delta"; text: string } }
   | { type: "content_block_stop"; index: number }
-  | { type: "message_delta"; delta: { stop_reason: string; stop_sequence: string | null }; usage?: { output_tokens: number } }
+  | {
+      type: "message_delta";
+      delta: { stop_reason: string; stop_sequence: string | null };
+      usage?: { output_tokens: number };
+    }
   | { type: "message_stop" };
 
 export interface GatewayModelInfo {
@@ -82,7 +86,7 @@ export interface GatewayModelsResponse {
 
 export interface GatewayRaceRequest {
   tier?: "fast" | "standard" | "smart" | "power" | "ultra";
-  messages: Array<{ role: string; content: string }>;
+  messages: { role: string; content: string }[];
   models?: string[];
   params?: {
     temperature?: number;
@@ -257,13 +261,22 @@ export class NexusClient {
   }
 
   /**
+   * Helper to parse a Response body as a typed JSON value.
+   * TypeScript 5 changed Response.json() to return Promise<unknown>;
+   * this wrapper restores the typed convenience of the older signature.
+   */
+  private async _json<T>(res: Response): Promise<T> {
+    return res.json() as unknown as T;
+  }
+
+  /**
    * Helper to perform HTTP requests.
    */
   private async request(
     method: "GET" | "POST" | "DELETE",
     path: string,
     body?: unknown,
-    headers?: Record<string, string>
+    headers?: Record<string, string>,
   ): Promise<Response> {
     const url = `${this.baseUrl}/api/${this.version}${path}`;
     const controller = new AbortController();
@@ -294,7 +307,7 @@ export class NexusClient {
           "HTTP_ERROR",
           `Request failed with status ${response.status}`,
           response.status,
-          errDetails
+          errDetails,
         );
       }
 
@@ -319,7 +332,7 @@ export class NexusClient {
         ...opts,
         stream: false,
       });
-      return response.json();
+      return this._json(response);
     },
 
     /**
@@ -327,7 +340,8 @@ export class NexusClient {
      * Yields parsed Server-Sent Events.
      */
     sendMessageStream: async function* (
-      opts: GatewayMessageRequest
+      this: NexusClient,
+      opts: GatewayMessageRequest,
     ): AsyncGenerator<GatewayStreamEvent, void, unknown> {
       const response = await this.request("POST", "/gateway/messages", {
         ...opts,
@@ -343,9 +357,12 @@ export class NexusClient {
 
       try {
         while (true) {
-          const { done, value } = await reader.read();
+          const { done, value } = (await reader.read()) as {
+            done: boolean;
+            value: Uint8Array | undefined;
+          };
           if (done) break;
-          buffer += decoder.decode(value, { stream: true });
+          if (value !== undefined) buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
           buffer = lines.pop() || "";
 
@@ -358,8 +375,8 @@ export class NexusClient {
                 return;
               }
               try {
-                const parsed = JSON.parse(dataStr);
-                yield parsed as GatewayStreamEvent;
+                const parsed = JSON.parse(dataStr) as GatewayStreamEvent;
+                yield parsed;
               } catch {
                 // Ignore parse errors on half-formed lines or non-JSON payloads
               }
@@ -376,7 +393,7 @@ export class NexusClient {
      */
     listModels: async (): Promise<GatewayModelsResponse> => {
       const response = await this.request("GET", "/gateway/models");
-      return response.json();
+      return this._json(response);
     },
 
     /**
@@ -384,7 +401,7 @@ export class NexusClient {
      */
     race: async (opts: GatewayRaceRequest): Promise<GatewayRaceResponse> => {
       const response = await this.request("POST", "/gateway/race", opts);
-      return response.json();
+      return this._json(response);
     },
 
     /**
@@ -392,7 +409,7 @@ export class NexusClient {
      */
     listTools: async (): Promise<GatewayToolsResponse> => {
       const response = await this.request("GET", "/gateway/tools");
-      return response.json();
+      return this._json(response);
     },
 
     /**
@@ -403,7 +420,7 @@ export class NexusClient {
         name,
         input,
       });
-      return response.json();
+      return this._json(response);
     },
 
     /**
@@ -417,11 +434,8 @@ export class NexusClient {
       if (opts?.limit) params.set("limit", String(opts.limit));
       if (opts?.cursor) params.set("cursor", opts.cursor);
 
-      const response = await this.request(
-        "GET",
-        `/gateway/cost-report?${params.toString()}`
-      );
-      return response.json();
+      const response = await this.request("GET", `/gateway/cost-report?${params.toString()}`);
+      return this._json(response);
     },
   };
 
@@ -433,7 +447,7 @@ export class NexusClient {
      */
     deliberate: async (
       proposal: ProposalInput,
-      opts?: { budgetUsd?: number; timeoutMs?: number; signalId?: string }
+      opts?: { budgetUsd?: number; timeoutMs?: number; signalId?: string },
     ): Promise<CouncilResponse> => {
       const body = {
         proposal,
@@ -442,7 +456,7 @@ export class NexusClient {
         signal_id: opts?.signalId,
       };
       const response = await this.request("POST", "/council/deliberate", body);
-      return response.json();
+      return this._json(response);
     },
 
     /**
@@ -450,7 +464,7 @@ export class NexusClient {
      */
     getVerdicts: async (): Promise<CouncilVerdict[]> => {
       const response = await this.request("GET", "/council/verdicts");
-      return response.json();
+      return this._json(response);
     },
 
     /**
@@ -458,7 +472,7 @@ export class NexusClient {
      */
     getVerdict: async (verdictId: string): Promise<CouncilVerdict> => {
       const response = await this.request("GET", `/council/verdicts/${verdictId}`);
-      return response.json();
+      return this._json(response);
     },
 
     /**
@@ -466,7 +480,7 @@ export class NexusClient {
      */
     getTranscript: async (verdictId: string): Promise<CouncilTranscript> => {
       const response = await this.request("GET", `/council/transcripts/${verdictId}`);
-      return response.json();
+      return this._json(response);
     },
 
     /**
@@ -488,7 +502,7 @@ export class NexusClient {
      */
     remember: async (
       text: string,
-      opts?: { metadata?: Record<string, unknown>; ttl?: number; userId?: string }
+      opts?: { metadata?: Record<string, unknown>; ttl?: number; userId?: string },
     ): Promise<MemoryEntry> => {
       const response = await this.request("POST", "/memory", {
         text,
@@ -496,7 +510,7 @@ export class NexusClient {
         ttl: opts?.ttl,
         userId: opts?.userId,
       });
-      return response.json();
+      return this._json(response);
     },
 
     /**
@@ -504,7 +518,7 @@ export class NexusClient {
      */
     recall: async (
       query: string,
-      opts?: { limit?: number; userId?: string }
+      opts?: { limit?: number; userId?: string },
     ): Promise<MemoryRecallResponse> => {
       const params = new URLSearchParams();
       if (query) params.set("query", query);
@@ -512,7 +526,7 @@ export class NexusClient {
       if (opts?.userId) params.set("userId", opts.userId);
 
       const response = await this.request("GET", `/memory?${params.toString()}`);
-      return response.json();
+      return this._json(response);
     },
 
     /**
@@ -530,7 +544,7 @@ export class NexusClient {
       if (opts?.userId) params.set("userId", opts.userId);
 
       const response = await this.request("GET", `/memory/list?${params.toString()}`);
-      return response.json();
+      return this._json(response);
     },
   };
 
@@ -554,7 +568,7 @@ export class NexusClient {
     readFile: async (path: string): Promise<{ content: string }> => {
       const params = new URLSearchParams({ path });
       const response = await this.request("GET", `/agents/file/read?${params.toString()}`);
-      return response.json();
+      return this._json(response);
     },
 
     /**
@@ -565,7 +579,7 @@ export class NexusClient {
         path,
         content,
       });
-      return response.json();
+      return this._json(response);
     },
 
     /**
@@ -575,7 +589,7 @@ export class NexusClient {
       const params = new URLSearchParams();
       if (opts?.limit) params.set("limit", String(opts.limit));
       const response = await this.request("GET", `/agents/file/list?${params.toString()}`);
-      return response.json();
+      return this._json(response);
     },
   };
 
@@ -587,13 +601,13 @@ export class NexusClient {
      */
     startResearch: async (
       instruction: string,
-      opts?: { limit?: number }
+      opts?: { limit?: number },
     ): Promise<{ runId: string }> => {
       const response = await this.request("POST", "/researcher/research", {
         instruction,
         limit: opts?.limit,
       });
-      return response.json();
+      return this._json(response);
     },
 
     /**
@@ -601,13 +615,13 @@ export class NexusClient {
      */
     startAcademic: async (
       instruction: string,
-      opts?: { limit?: number }
+      opts?: { limit?: number },
     ): Promise<{ runId: string }> => {
       const response = await this.request("POST", "/researcher/academic", {
         instruction,
         limit: opts?.limit,
       });
-      return response.json();
+      return this._json(response);
     },
 
     /**
@@ -615,7 +629,7 @@ export class NexusClient {
      */
     getCitations: async (runId: string): Promise<unknown[]> => {
       const response = await this.request("GET", `/researcher/${runId}/citations`);
-      return response.json();
+      return this._json(response);
     },
   };
 }

@@ -1,13 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import {
-  pgTable,
-  uuid,
-  text,
-  boolean,
-  timestamp,
-  index,
-  uniqueIndex,
-} from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, boolean, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
 
 // ── users ─────────────────────────────────────────────────────────────────────
 
@@ -181,7 +173,9 @@ export const workspaceInvitations = pgTable(
     workspaceId: uuid("workspace_id").notNull(),
     /** Email address the invitation was sent to */
     email: text("email").notNull(),
-    role: text("role", { enum: ["admin", "member", "viewer"] }).notNull().default("member"),
+    role: text("role", { enum: ["admin", "member", "viewer"] })
+      .notNull()
+      .default("member"),
     /** SHA-256 hex of the raw invitation token */
     tokenHash: text("token_hash").notNull(),
     invitedByUserId: uuid("invited_by_user_id").notNull(),

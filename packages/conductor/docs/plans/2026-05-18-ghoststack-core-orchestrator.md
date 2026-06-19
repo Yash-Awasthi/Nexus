@@ -161,7 +161,9 @@ import * as yaml from "js-yaml";
 
 describe("Runtime Configurations", () => {
   it("should contain standard YAML profiles", () => {
-    const ports = yaml.load(fs.readFileSync(path.join(__dirname, "../runtime/ports.yaml"), "utf8")) as any;
+    const ports = yaml.load(
+      fs.readFileSync(path.join(__dirname, "../runtime/ports.yaml"), "utf8"),
+    ) as any;
     expect(ports.floci).toBe(4566);
     expect(ports.fcc).toBe(8082);
     expect(ports.mcp).toBe(8000);
@@ -274,7 +276,7 @@ describe("Event Bus & Task Routing", () => {
       description: "Extract news feed",
       priority: "high",
       status: "pending",
-      dependencies: []
+      dependencies: [],
     };
 
     const resolved = await router.route(task);

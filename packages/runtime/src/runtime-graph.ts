@@ -105,7 +105,7 @@ interface IntegrityCheckpoint {
 
 // ─── Error Types ─────────────────────────────────────────────────────
 
-class GraphMutationError extends Error {
+export class GraphMutationError extends Error {
   constructor(
     message: string,
     public op: string,
@@ -116,7 +116,7 @@ class GraphMutationError extends Error {
   }
 }
 
-class GraphConsistencyError extends Error {
+export class GraphConsistencyError extends Error {
   constructor(
     message: string,
     public report: GraphIntegrityReport,

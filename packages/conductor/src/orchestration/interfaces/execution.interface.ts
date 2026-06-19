@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { ILogger } from "./logger.interface";
 
 export interface IExecutionContext {

@@ -22,26 +22,18 @@
  *   viewer  — read workspace only
  */
 
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 
 import { db } from "@nexus/db";
-import {
-  workspaces,
-  workspaceMembers,
-  workspaceInvitations,
-  users,
-} from "@nexus/db/schema";
+import { workspaces, workspaceMembers, workspaceInvitations, users } from "@nexus/db/schema";
 import { eq, and, isNull, inArray } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
-import { requireAuth } from "../middleware/auth.js";
 import { emitAuditEvent } from "../lib/audit-emitter.js";
+import { sha256hex } from "../lib/crypto-utils.js";
+import { requireAuth } from "../middleware/auth.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function sha256hex(s: string): string {
-  return createHash("sha256").update(s).digest("hex");
-}
 
 function slugify(name: string): string {
   return name
@@ -62,9 +54,12 @@ function hasMinRole(userRole: string, required: WorkspaceRole): boolean {
 
 export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
   if (!process.env.DATABASE_URL) {
-    const na = async (_: unknown, reply: { code: (n: number) => { send: (v: unknown) => unknown } }) =>
-      reply.code(503).send({ error: "DATABASE_URL not configured" });
-    for (const method of ["get", "post", "patch", "delete"] as const) app[method]("/workspaces*", na);
+    const na = async (
+      _: unknown,
+      reply: { code: (n: number) => { send: (v: unknown) => unknown } },
+    ) => reply.code(503).send({ error: "DATABASE_URL not configured" });
+    for (const method of ["get", "post", "patch", "delete"] as const)
+      app[method]("/workspaces*", na);
     return;
   }
 
@@ -98,7 +93,9 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
         .limit(1);
 
       if (existing) {
-        return reply.code(409).send({ error: "slug_taken", message: `Slug "${slug}" is already in use` });
+        return reply
+          .code(409)
+          .send({ error: "slug_taken", message: `Slug "${slug}" is already in use` });
       }
 
       const [ws] = await db
@@ -132,34 +129,30 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
   );
 
   /** GET /workspaces — list workspaces the caller belongs to */
-  app.get(
-    "/workspaces",
-    { preHandler: requireAuth },
-    async (request, reply) => {
-      const userId = request.nexusUserId;
-      if (!userId) return reply.send({ workspaces: [], total: 0 });
+  app.get("/workspaces", { preHandler: requireAuth }, async (request, reply) => {
+    const userId = request.nexusUserId;
+    if (!userId) return reply.send({ workspaces: [], total: 0 });
 
-      const memberships = await db
-        .select()
-        .from(workspaceMembers)
-        .where(eq(workspaceMembers.userId, userId));
+    const memberships = await db
+      .select()
+      .from(workspaceMembers)
+      .where(eq(workspaceMembers.userId, userId));
 
-      if (memberships.length === 0) return reply.send({ workspaces: [], total: 0 });
+    if (memberships.length === 0) return reply.send({ workspaces: [], total: 0 });
 
-      const wsIds = memberships.map((m) => m.workspaceId);
-      const wsList = await db
-        .select()
-        .from(workspaces)
-        .where(and(inArray(workspaces.id, wsIds), isNull(workspaces.deletedAt)));
+    const wsIds = memberships.map((m) => m.workspaceId);
+    const wsList = await db
+      .select()
+      .from(workspaces)
+      .where(and(inArray(workspaces.id, wsIds), isNull(workspaces.deletedAt)));
 
-      const result = wsList.map((ws) => ({
-        ...ws,
-        role: memberships.find((m) => m.workspaceId === ws.id)?.role ?? "member",
-      }));
+    const result = wsList.map((ws) => ({
+      ...ws,
+      role: memberships.find((m) => m.workspaceId === ws.id)?.role ?? "member",
+    }));
 
-      return reply.send({ workspaces: result, total: result.length });
-    },
-  );
+    return reply.send({ workspaces: result, total: result.length });
+  });
 
   /** GET /workspaces/:id — workspace details (member+) */
   app.get<{ Params: { id: string } }>(
@@ -266,14 +259,16 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(403).send({ error: "owner_required" });
       }
 
-      await db
-        .update(workspaces)
-        .set({ deletedAt: new Date() })
-        .where(eq(workspaces.id, id));
+      await db.update(workspaces).set({ deletedAt: new Date() }).where(eq(workspaces.id, id));
 
       emitAuditEvent(
-        { eventType: "workspace.deleted", actorId: userId ?? "unknown",
-          resourceType: "workspace", resourceId: id, payload: { workspaceId: id } },
+        {
+          action: "workspace.deleted",
+          actor: userId ?? "unknown",
+          entityType: "workspace",
+          entityId: id,
+          payload: { workspaceId: id },
+        },
         request.log,
       );
 
@@ -369,10 +364,7 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
           .select()
           .from(workspaceMembers)
           .where(
-            and(
-              eq(workspaceMembers.workspaceId, id),
-              eq(workspaceMembers.userId, existingUser.id),
-            ),
+            and(eq(workspaceMembers.workspaceId, id), eq(workspaceMembers.userId, existingUser.id)),
           )
           .limit(1);
         if (alreadyMember) {
@@ -446,7 +438,11 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
         .set({ acceptedAt: now })
         .where(eq(workspaceInvitations.id, invitation.id));
 
-      return reply.send({ joined: true, workspaceId: invitation.workspaceId, role: invitation.role });
+      return reply.send({
+        joined: true,
+        workspaceId: invitation.workspaceId,
+        role: invitation.role,
+      });
     },
   );
 
@@ -473,7 +469,12 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
       const [callerMembership] = await db
         .select()
         .from(workspaceMembers)
-        .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, callerId ?? "")))
+        .where(
+          and(
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.userId, callerId ?? ""),
+          ),
+        )
         .limit(1);
 
       if (!callerMembership) return reply.code(404).send({ error: "workspace_not_found" });
@@ -485,7 +486,12 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
       const [targetMembership] = await db
         .select()
         .from(workspaceMembers)
-        .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, targetUserId)))
+        .where(
+          and(
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.userId, targetUserId),
+          ),
+        )
         .limit(1);
 
       if (!targetMembership) return reply.code(404).send({ error: "member_not_found" });
@@ -501,10 +507,10 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
 
       emitAuditEvent(
         {
-          eventType: "workspace.member.role_changed",
-          actorId: callerId ?? "unknown",
-          resourceType: "workspace_member",
-          resourceId: targetMembership.id,
+          action: "workspace.member.role_changed",
+          actor: callerId ?? "unknown",
+          entityType: "workspace_member",
+          entityId: targetMembership.id,
           payload: {
             workspaceId,
             targetUserId,
@@ -530,7 +536,12 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
       const [callerMembership] = await db
         .select()
         .from(workspaceMembers)
-        .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, callerId ?? "")))
+        .where(
+          and(
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.userId, callerId ?? ""),
+          ),
+        )
         .limit(1);
 
       if (!callerMembership) return reply.code(404).send({ error: "workspace_not_found" });
@@ -545,9 +556,13 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
         const ownerCount = await db
           .select()
           .from(workspaceMembers)
-          .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.role, "owner")));
+          .where(
+            and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.role, "owner")),
+          );
         if (ownerCount.length <= 1) {
-          return reply.code(409).send({ error: "last_owner", message: "Transfer ownership before leaving" });
+          return reply
+            .code(409)
+            .send({ error: "last_owner", message: "Transfer ownership before leaving" });
         }
       }
 
@@ -562,10 +577,10 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
 
       emitAuditEvent(
         {
-          eventType: "workspace.member.removed",
-          actorId: callerId ?? "unknown",
-          resourceType: "workspace_member",
-          resourceId: `${workspaceId}:${targetUserId}`,
+          action: "workspace.member.removed",
+          actor: callerId ?? "unknown",
+          entityType: "workspace_member",
+          entityId: `${workspaceId}:${targetUserId}`,
           payload: { workspaceId, targetUserId, self: callerId === targetUserId },
         },
         request.log,

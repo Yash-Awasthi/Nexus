@@ -131,14 +131,14 @@ export interface LLMProvider {
  */
 export function truncateHtml(html: string, maxChars = 8000): string {
   if (html.length > 500_000) return html.slice(0, maxChars) + "…[truncated]";
-  // Strip ALL HTML markup rather than selectively removing dangerous tags.
-  // Selective script/style removal is a "bad-tag-filter" (bypassable);
-  // stripping every tag is safer and sufficient for AI context prep.
+  // Remove script/style blocks including their content (not just the tags).
   let cleaned = html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+    // Strip HTML comments
     .replace(/<!--[\s\S]*?-->/g, " ")
-    .replace(/<[^>]*>?/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+    // Collapse whitespace runs (including inside tag attributes) but keep tags intact
+    .replace(/\s+/g, " ");
 
   if (cleaned.length > maxChars) {
     cleaned = cleaned.slice(0, maxChars) + "…[truncated]";

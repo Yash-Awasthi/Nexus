@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @nexus/api — Conductor orchestration routes
  *
@@ -12,26 +13,38 @@
  * server starts instantly even if GhostStack deps aren't warm.
  */
 
-import type { FastifyInstance } from "fastify";
 import { createRequire } from "node:module";
+
+import type { FastifyInstance } from "fastify";
 
 // GhostStack is CJS — load via createRequire from the ESM API host
 const _require = createRequire(import.meta.url);
 
+interface GSQueueBackend {
+  getQueueLength(): Promise<number>;
+  getActiveJobs(): Promise<unknown[]>;
+  getDeadLetterQueue(): Promise<unknown[]>;
+  clearDeadLetterQueue(): Promise<void>;
+}
+
+interface GSOrchestrator {
+  start(): Promise<string[]>;
+  submitAndRun(
+    objective: string,
+    opts?: { maxIterations?: number; idleDelayMs?: number },
+  ): Promise<{ planId: string; allowed: boolean; reason?: string; processed: number }>;
+  getQueue(): GSQueueBackend;
+}
+
 interface GSModule {
-  GhostStackOrchestrator: {
+  ConductorOrchestrator: {
     create(opts: {
       runtimeManager: unknown;
       eventBus: unknown;
       taskRouter: unknown;
       agentRegistry: unknown;
-    }): {
-      start(): Promise<string[]>;
-      submitAndRun(
-        objective: string,
-        opts?: { maxIterations?: number; idleDelayMs?: number }
-      ): Promise<{ planId: string; allowed: boolean; reason?: string; processed: number }>;
-    };
+      queue?: GSQueueBackend;
+    }): GSOrchestrator;
   };
   PlanningEngine: new () => unknown;
   GovernanceEngine: new () => unknown;
@@ -39,19 +52,14 @@ interface GSModule {
   LocalAgentRegistry: new () => unknown;
   LocalEventBus: new () => unknown;
   RuntimeManager: new (opts: { services: Record<string, unknown> }) => unknown;
-  MemoryQueueBackend: new () => {
-    getQueueLength(): Promise<number>;
-    getActiveJobs(): Promise<unknown[]>;
-    getDeadLetterQueue(): Promise<unknown[]>;
-    clearDeadLetterQueue(): Promise<void>;
-  };
+  MemoryQueueBackend: new () => GSQueueBackend;
 }
 
-let _gs: ReturnType<GSModule["GhostStackOrchestrator"]["create"]> | null = null;
-let _queue: ReturnType<GSModule["MemoryQueueBackend"]["prototype"]["constructor"]> | null = null;
+let _gs: GSOrchestrator | null = null;
+let _queue: GSQueueBackend | null = null;
 let _initError: string | null = null;
 
-const _jobLog: Array<{
+const _jobLog: {
   id: string;
   objective: string;
   status: "running" | "done" | "failed" | "blocked";
@@ -59,9 +67,9 @@ const _jobLog: Array<{
   error?: string;
   startedAt: string;
   finishedAt?: string;
-}> = [];
+}[] = [];
 
-async function _getOrchestrator(): Promise<ReturnType<GSModule["GhostStackOrchestrator"]["create"]>> {
+async function _getOrchestrator(): Promise<GSOrchestrator> {
   if (_gs) return _gs;
   if (_initError) throw new Error(_initError);
   try {
@@ -70,14 +78,16 @@ async function _getOrchestrator(): Promise<ReturnType<GSModule["GhostStackOrches
     const eventBus = new gs.LocalEventBus();
     const runtimeManager = new gs.RuntimeManager({ services: {} });
     const taskRouter = new gs.TaskRouter({ agentRegistry });
+    // Share the same queue instance so status/DLQ endpoints reflect live state.
     _queue = new gs.MemoryQueueBackend();
-    _gs = gs.GhostStackOrchestrator.create({
+    _gs = gs.ConductorOrchestrator.create({
       runtimeManager,
       eventBus,
       taskRouter,
       agentRegistry,
+      queue: _queue,
     });
-    await (_gs as unknown as { start(): Promise<string[]> }).start();
+    await _gs.start();
     return _gs;
   } catch (e) {
     _initError = e instanceof Error ? e.message : String(e);
@@ -113,10 +123,14 @@ export async function conductorRoutes(app: FastifyInstance) {
         return reply.send({ jobId, ...result });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        Object.assign(entry, { status: "failed", error: msg, finishedAt: new Date().toISOString() });
+        Object.assign(entry, {
+          status: "failed",
+          error: msg,
+          finishedAt: new Date().toISOString(),
+        });
         return reply.code(500).send({ error: msg, jobId });
       }
-    }
+    },
   );
 
   // GET /gs/jobs — list recent job log
@@ -128,18 +142,23 @@ export async function conductorRoutes(app: FastifyInstance) {
   app.get("/gs/status", async (_req, reply) => {
     try {
       if (!_queue) {
-        return reply.send({ initialised: false, queueLength: 0, activeJobs: [], deadLetterCount: 0 });
+        return reply.send({
+          initialised: false,
+          queueLength: 0,
+          activeJobs: [],
+          deadLetterCount: 0,
+        });
       }
       const [queueLength, activeJobs, dlq] = await Promise.all([
-        (_queue as { getQueueLength(): Promise<number> }).getQueueLength(),
-        (_queue as { getActiveJobs(): Promise<unknown[]> }).getActiveJobs(),
-        (_queue as { getDeadLetterQueue(): Promise<unknown[]> }).getDeadLetterQueue(),
+        _queue.getQueueLength(),
+        _queue.getActiveJobs(),
+        _queue.getDeadLetterQueue(),
       ]);
       return reply.send({
         initialised: !!_gs,
         queueLength,
         activeJobs,
-        deadLetterCount: (dlq as unknown[]).length,
+        deadLetterCount: dlq.length,
         recentJobs: _jobLog.slice(-10).reverse(),
       });
     } catch (e) {
@@ -150,13 +169,13 @@ export async function conductorRoutes(app: FastifyInstance) {
   // GET /gs/dead-letter
   app.get("/gs/dead-letter", async (_req, reply) => {
     if (!_queue) return reply.send({ jobs: [] });
-    const dlq = await (_queue as { getDeadLetterQueue(): Promise<unknown[]> }).getDeadLetterQueue();
+    const dlq = await _queue.getDeadLetterQueue();
     return reply.send({ jobs: dlq, count: dlq.length });
   });
 
   // DELETE /gs/dead-letter — clear DLQ
   app.delete("/gs/dead-letter", async (_req, reply) => {
-    if (_queue) await (_queue as { clearDeadLetterQueue(): Promise<void> }).clearDeadLetterQueue();
+    if (_queue) await _queue.clearDeadLetterQueue();
     return reply.send({ ok: true, cleared: true });
   });
 
@@ -203,15 +222,15 @@ export async function getConductorMetrics(): Promise<{
   if (!_queue) return base;
   try {
     const [ql, aj, dlq] = await Promise.all([
-      (_queue as { getQueueLength(): Promise<number> }).getQueueLength(),
-      (_queue as { getActiveJobs(): Promise<unknown[]> }).getActiveJobs(),
-      (_queue as { getDeadLetterQueue(): Promise<unknown[]> }).getDeadLetterQueue(),
+      _queue.getQueueLength(),
+      _queue.getActiveJobs(),
+      _queue.getDeadLetterQueue(),
     ]);
     return {
       ...base,
       queueLength: ql,
-      activeJobs: (aj as unknown[]).length,
-      deadLetterCount: (dlq as unknown[]).length,
+      activeJobs: aj.length,
+      deadLetterCount: dlq.length,
     };
   } catch {
     return base;

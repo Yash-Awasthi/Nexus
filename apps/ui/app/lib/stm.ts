@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * STM module client library
  *
@@ -8,39 +9,39 @@
 export type STMModuleId = "hedge_reducer" | "direct_mode" | "curiosity_bias";
 
 export interface STMModule {
-  id:          STMModuleId;
-  label:       string;
+  id: STMModuleId;
+  label: string;
   description: string;
-  icon:        string;
-  injection:   string;
+  icon: string;
+  injection: string;
   conflictsWith?: STMModuleId[];
 }
 
 export const STM_MODULES: STMModule[] = [
   {
-    id:          "hedge_reducer",
-    label:       "Hedge Reducer",
+    id: "hedge_reducer",
+    label: "Hedge Reducer",
     description: "Eliminates hedging, caveats, and wishy-washy qualifications.",
-    icon:        "✂",
+    icon: "✂",
     conflictsWith: ["curiosity_bias"],
     injection:
       'MODIFIER — HEDGE REDUCER: Never use "it depends", "arguably", "I think", "in my opinion". ' +
       "State conclusions directly. One clear answer per question.",
   },
   {
-    id:          "direct_mode",
-    label:       "Direct Mode",
+    id: "direct_mode",
+    label: "Direct Mode",
     description: "Forces blunt, numbered answers. No padding, no preamble.",
-    icon:        "⚡",
+    icon: "⚡",
     injection:
       "MODIFIER — DIRECT MODE: Lead with the answer immediately. " +
       "Never restate the question. No warm opener/closer. Maximum information density.",
   },
   {
-    id:          "curiosity_bias",
-    label:       "Curiosity Bias",
+    id: "curiosity_bias",
+    label: "Curiosity Bias",
     description: "Biases toward exploratory, counter-intuitive, and unexpected angles.",
-    icon:        "🔭",
+    icon: "🔭",
     conflictsWith: ["hedge_reducer"],
     injection:
       "MODIFIER — CURIOSITY BIAS: Actively seek non-obvious angles. " +

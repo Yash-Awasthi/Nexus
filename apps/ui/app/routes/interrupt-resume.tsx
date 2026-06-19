@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Interrupt & Resume — pause, modify, and resume long-running council runs.
  *
@@ -66,7 +67,8 @@ function StatusBadge({ status }: { status: IMRRun["status"] }) {
   };
   return (
     <Badge className={`${map[status] ?? "bg-slate-100 text-slate-600"} flex items-center`}>
-      {icons[status]}{status}
+      {icons[status]}
+      {status}
     </Badge>
   );
 }
@@ -100,7 +102,9 @@ export default function InterruptResume() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { loadRuns(); }, [loadRuns]);
+  useEffect(() => {
+    loadRuns();
+  }, [loadRuns]);
 
   const loadRun = useCallback(async (id: string) => {
     setLoadingRun(true);
@@ -111,7 +115,8 @@ export default function InterruptResume() {
 
   const createRun = useCallback(async () => {
     if (!newQuery.trim()) return;
-    setCreating(true); setErr("");
+    setCreating(true);
+    setErr("");
     const r = await fetch("/api/imr/runs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -119,7 +124,7 @@ export default function InterruptResume() {
     }).catch(() => null);
     if (r?.ok) {
       const run = await r.json();
-      setRuns(prev => [run, ...prev]);
+      setRuns((prev) => [run, ...prev]);
       setSelected(run);
       setNewQuery("");
     } else setErr("Create failed");
@@ -137,7 +142,7 @@ export default function InterruptResume() {
     if (r?.ok) {
       const updated = await r.json();
       setSelected(updated);
-      setRuns(prev => prev.map(x => x.id === updated.id ? updated : x));
+      setRuns((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
     }
     setActioning(false);
   }, [selected, injectText]);
@@ -145,8 +150,14 @@ export default function InterruptResume() {
   const modify = useCallback(async () => {
     if (!selected) return;
     let params;
-    try { params = modifyParams.trim() ? JSON.parse(modifyParams) : {}; } catch { setErr("Invalid JSON params"); return; }
-    setActioning(true); setErr("");
+    try {
+      params = modifyParams.trim() ? JSON.parse(modifyParams) : {};
+    } catch {
+      setErr("Invalid JSON params");
+      return;
+    }
+    setActioning(true);
+    setErr("");
     const r = await fetch(`/api/imr/runs/${selected.id}/modify`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -162,21 +173,26 @@ export default function InterruptResume() {
   const resume = useCallback(async () => {
     if (!selected) return;
     setActioning(true);
-    const r = await fetch(`/api/imr/runs/${selected.id}/resume`, { method: "POST" }).catch(() => null);
+    const r = await fetch(`/api/imr/runs/${selected.id}/resume`, { method: "POST" }).catch(
+      () => null,
+    );
     if (r?.ok) {
       const updated = await r.json();
       setSelected(updated);
-      setRuns(prev => prev.map(x => x.id === updated.id ? updated : x));
+      setRuns((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
     }
     setActioning(false);
   }, [selected]);
 
-  const deleteRun = useCallback(async (id: string) => {
-    if (!confirm("Delete this run?")) return;
-    await fetch(`/api/imr/runs/${id}`, { method: "DELETE" }).catch(() => {});
-    setRuns(prev => prev.filter(r => r.id !== id));
-    if (selected?.id === id) setSelected(null);
-  }, [selected]);
+  const deleteRun = useCallback(
+    async (id: string) => {
+      if (!confirm("Delete this run?")) return;
+      await fetch(`/api/imr/runs/${id}`, { method: "DELETE" }).catch(() => {});
+      setRuns((prev) => prev.filter((r) => r.id !== id));
+      if (selected?.id === id) setSelected(null);
+    },
+    [selected],
+  );
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -202,12 +218,16 @@ export default function InterruptResume() {
             <Input
               placeholder="Enter a query to start a new interruptible run…"
               value={newQuery}
-              onChange={e => setNewQuery(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && createRun()}
+              onChange={(e) => setNewQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && createRun()}
               className="flex-1"
             />
             <Button onClick={createRun} disabled={creating || !newQuery.trim()}>
-              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 mr-1" />}
+              {creating ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4 mr-1" />
+              )}
               Start Run
             </Button>
           </div>
@@ -218,15 +238,18 @@ export default function InterruptResume() {
       <div className="grid md:grid-cols-3 gap-4">
         {/* Run list */}
         <div className="space-y-1.5">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Runs</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+            Runs
+          </h2>
           {loading ? (
             <div className="flex items-center gap-2 text-muted-foreground text-sm py-4">
-              <Loader2 className="w-4 h-4 animate-spin" />Loading…
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Loading…
             </div>
           ) : runs.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4">No runs yet</p>
           ) : (
-            runs.map(run => (
+            runs.map((run) => (
               <div
                 key={run.id}
                 className={`border rounded-lg p-3 cursor-pointer hover:bg-muted/40 transition-colors ${selected?.id === run.id ? "bg-muted border-primary/30" : ""}`}
@@ -238,7 +261,10 @@ export default function InterruptResume() {
                     size="icon"
                     variant="ghost"
                     className="h-5 w-5 text-red-400 shrink-0"
-                    onClick={e => { e.stopPropagation(); deleteRun(run.id); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteRun(run.id);
+                    }}
                   >
                     <Trash2 className="w-3 h-3" />
                   </Button>
@@ -247,7 +273,10 @@ export default function InterruptResume() {
                   <StatusBadge status={run.status} />
                   {run.progress !== undefined && (
                     <div className="flex-1 bg-muted rounded-full h-1">
-                      <div className="bg-primary h-1 rounded-full" style={{ width: `${run.progress}%` }} />
+                      <div
+                        className="bg-primary h-1 rounded-full"
+                        style={{ width: `${run.progress}%` }}
+                      />
                     </div>
                   )}
                 </div>
@@ -260,7 +289,8 @@ export default function InterruptResume() {
         <div className="md:col-span-2 space-y-4">
           {loadingRun ? (
             <div className="flex items-center gap-2 text-muted-foreground py-8 justify-center">
-              <Loader2 className="w-4 h-4 animate-spin" />Loading run…
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Loading run…
             </div>
           ) : selected ? (
             <>
@@ -275,24 +305,39 @@ export default function InterruptResume() {
                   {/* Output so far */}
                   {selected.output && (
                     <div>
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Output</p>
-                      <p className="text-sm whitespace-pre-wrap bg-muted/30 p-3 rounded-md max-h-40 overflow-y-auto">{selected.output}</p>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                        Output
+                      </p>
+                      <p className="text-sm whitespace-pre-wrap bg-muted/30 p-3 rounded-md max-h-40 overflow-y-auto">
+                        {selected.output}
+                      </p>
                     </div>
                   )}
 
                   {/* Interrupt */}
                   {selected.status === "running" && (
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Interrupt with context injection</label>
+                      <label className="text-sm font-medium">
+                        Interrupt with context injection
+                      </label>
                       <Textarea
                         rows={2}
                         placeholder="Additional context to inject before interrupting…"
                         value={injectText}
-                        onChange={e => setInjectText(e.target.value)}
+                        onChange={(e) => setInjectText(e.target.value)}
                         className="resize-none text-sm"
                       />
-                      <Button onClick={interrupt} disabled={actioning} variant="outline" className="border-orange-300 text-orange-600 hover:bg-orange-50">
-                        {actioning ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <PauseCircle className="w-4 h-4 mr-2" />}
+                      <Button
+                        onClick={interrupt}
+                        disabled={actioning}
+                        variant="outline"
+                        className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                      >
+                        {actioning ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        ) : (
+                          <PauseCircle className="w-4 h-4 mr-2" />
+                        )}
                         Interrupt
                       </Button>
                     </div>
@@ -302,22 +347,39 @@ export default function InterruptResume() {
                   {selected.status === "interrupted" && (
                     <div className="space-y-3">
                       <div className="space-y-1">
-                        <label className="text-sm font-medium">Modify parameters <span className="text-muted-foreground font-normal">(JSON, optional)</span></label>
+                        <label className="text-sm font-medium">
+                          Modify parameters{" "}
+                          <span className="text-muted-foreground font-normal">
+                            (JSON, optional)
+                          </span>
+                        </label>
                         <Textarea
                           rows={2}
                           placeholder='{ "temperature": 0.5, "maxTokens": 2000 }'
                           value={modifyParams}
-                          onChange={e => setModifyParams(e.target.value)}
+                          onChange={(e) => setModifyParams(e.target.value)}
                           className="resize-none font-mono text-xs"
                         />
                       </div>
                       <div className="flex gap-2">
                         <Button onClick={modify} disabled={actioning} variant="outline">
-                          {actioning ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Edit3 className="w-4 h-4 mr-2" />}
+                          {actioning ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          ) : (
+                            <Edit3 className="w-4 h-4 mr-2" />
+                          )}
                           Modify
                         </Button>
-                        <Button onClick={resume} disabled={actioning} className="bg-green-600 hover:bg-green-700">
-                          {actioning ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <PlayCircle className="w-4 h-4 mr-2" />}
+                        <Button
+                          onClick={resume}
+                          disabled={actioning}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          {actioning ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          ) : (
+                            <PlayCircle className="w-4 h-4 mr-2" />
+                          )}
                           Resume
                         </Button>
                       </div>
@@ -326,7 +388,8 @@ export default function InterruptResume() {
 
                   {selected.status === "done" && (
                     <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm">
-                      <CheckCircle className="w-4 h-4" />Run completed successfully
+                      <CheckCircle className="w-4 h-4" />
+                      Run completed successfully
                     </div>
                   )}
                 </CardContent>

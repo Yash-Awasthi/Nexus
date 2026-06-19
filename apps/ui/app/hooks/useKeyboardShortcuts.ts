@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Keyboard Shortcut System — Phase 1.25
  *
@@ -41,7 +42,7 @@ function normalizeKey(key: string): string {
 /** Check if a KeyboardEvent matches a key combo string (e.g., "mod+k", "escape") */
 function matchesCombo(event: KeyboardEvent, combo: string): boolean {
   const normalized = normalizeKey(combo);
-  const parts = normalized.split("+").map(p => p.trim().toLowerCase());
+  const parts = normalized.split("+").map((p) => p.trim().toLowerCase());
 
   const key = parts[parts.length - 1];
   const modifiers = parts.slice(0, -1);
@@ -85,43 +86,46 @@ export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[]) {
   const pendingChordRef = useRef<string | null>(null);
   const chordTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
-    for (const shortcut of shortcuts) {
-      const isChord = shortcut.keys.includes(" ");
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      for (const shortcut of shortcuts) {
+        const isChord = shortcut.keys.includes(" ");
 
-      if (isChord) {
-        const [first, second] = shortcut.keys.split(" ");
+        if (isChord) {
+          const [first, second] = shortcut.keys.split(" ");
 
-        if (pendingChordRef.current === normalizeKey(first)) {
-          if (matchesCombo(event, second)) {
+          if (pendingChordRef.current === normalizeKey(first)) {
+            if (matchesCombo(event, second)) {
+              if (!shortcut.global && isInputFocused()) continue;
+              event.preventDefault();
+              if (chordTimeoutRef.current) clearTimeout(chordTimeoutRef.current);
+              pendingChordRef.current = null;
+              shortcut.action();
+              return;
+            }
+          }
+
+          if (matchesCombo(event, first)) {
+            if (!shortcut.global && isInputFocused()) continue;
+            if (chordTimeoutRef.current) clearTimeout(chordTimeoutRef.current);
+            pendingChordRef.current = normalizeKey(first);
+            chordTimeoutRef.current = setTimeout(() => {
+              pendingChordRef.current = null;
+            }, 1500);
+            return;
+          }
+        } else {
+          if (matchesCombo(event, shortcut.keys)) {
             if (!shortcut.global && isInputFocused()) continue;
             event.preventDefault();
-            if (chordTimeoutRef.current) clearTimeout(chordTimeoutRef.current);
-            pendingChordRef.current = null;
             shortcut.action();
             return;
           }
         }
-
-        if (matchesCombo(event, first)) {
-          if (!shortcut.global && isInputFocused()) continue;
-          if (chordTimeoutRef.current) clearTimeout(chordTimeoutRef.current);
-          pendingChordRef.current = normalizeKey(first);
-          chordTimeoutRef.current = setTimeout(() => {
-            pendingChordRef.current = null;
-          }, 1500);
-          return;
-        }
-      } else {
-        if (matchesCombo(event, shortcut.keys)) {
-          if (!shortcut.global && isInputFocused()) continue;
-          event.preventDefault();
-          shortcut.action();
-          return;
-        }
       }
-    }
-  }, [shortcuts]);
+    },
+    [shortcuts],
+  );
 
   useEffect(() => {
     document.addEventListener("keydown", handleKeyDown);
@@ -147,12 +151,12 @@ export function formatShortcut(keys: string): string {
 
 /** Convenience: app-wide default shortcuts reference */
 export const APP_SHORTCUTS = {
-  FOCUS_INPUT:     "mod+k",
-  SUBMIT:          "mod+enter",
-  NEW_CHAT:        "mod+n",
-  TOGGLE_SIDEBAR:  "mod+b",
-  GO_SETTINGS:     "g s",
-  GO_CONVERSATIONS:"g c",
-  GO_MEMORY:       "g m",
-  CLOSE_MODAL:     "escape",
+  FOCUS_INPUT: "mod+k",
+  SUBMIT: "mod+enter",
+  NEW_CHAT: "mod+n",
+  TOGGLE_SIDEBAR: "mod+b",
+  GO_SETTINGS: "g s",
+  GO_CONVERSATIONS: "g c",
+  GO_MEMORY: "g m",
+  CLOSE_MODAL: "escape",
 } as const;

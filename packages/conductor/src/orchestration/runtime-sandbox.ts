@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import * as fs from "fs";
 import * as path from "path";
 import { assertPathDescendsFrom } from "./path-boundary";
@@ -15,7 +16,10 @@ export type RuntimeSandboxLayout = {
  * Canonical filesystem layout under the repo root (or configured data root).
  * All paths are validated to stay inside {@link layout.root}.
  */
-export function createRuntimeSandbox(repoRoot: string, dataDirRelative?: string): RuntimeSandboxLayout {
+export function createRuntimeSandbox(
+  repoRoot: string,
+  dataDirRelative?: string,
+): RuntimeSandboxLayout {
   const dataDirConfigured = dataDirRelative?.trim() || process.env.GHOSTSTACK_DATA_DIR?.trim();
   const dataDir = dataDirConfigured
     ? path.isAbsolute(dataDirConfigured)
@@ -31,7 +35,7 @@ export function createRuntimeSandbox(repoRoot: string, dataDirRelative?: string)
     workspacesDir: path.join(dataDir, "workspaces"),
     specsDir: path.join(repoRoot, "specs"),
     tempDir: path.join(dataDir, "tmp"),
-    backupsDir: path.join(dataDir, "backups")
+    backupsDir: path.join(dataDir, "backups"),
   };
 
   for (const dir of [layout.dataDir, layout.workspacesDir, layout.tempDir, layout.backupsDir]) {
@@ -45,8 +49,14 @@ export function createRuntimeSandbox(repoRoot: string, dataDirRelative?: string)
 }
 
 /** Resolve a user-supplied path segment into a path inside {@link sandboxDir}. */
-export function resolveSandboxPath(sandboxRoot: string, repoRoot: string, userPath: string): string {
-  const resolved = path.isAbsolute(userPath) ? path.resolve(userPath) : path.resolve(sandboxRoot, userPath);
+export function resolveSandboxPath(
+  sandboxRoot: string,
+  repoRoot: string,
+  userPath: string,
+): string {
+  const resolved = path.isAbsolute(userPath)
+    ? path.resolve(userPath)
+    : path.resolve(sandboxRoot, userPath);
   assertPathDescendsFrom(repoRoot, resolved);
   return resolved;
 }

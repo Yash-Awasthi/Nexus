@@ -1,13 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
 import type { Route } from "./+types/product.developer-platform";
 import { ProductPage } from "~/components/product-page";
-import {
-  Code,
-  Radio,
-  Webhook,
-  AppWindow,
-  MessageCircle,
-  Terminal,
-} from "lucide-react";
+import { Code, Radio, Webhook, AppWindow, MessageCircle, Terminal } from "lucide-react";
 
 export function meta({}: Route.MetaArgs) {
   return [

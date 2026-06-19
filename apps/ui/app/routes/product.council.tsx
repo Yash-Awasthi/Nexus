@@ -1,13 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
 import type { Route } from "./+types/product.council";
 import { ProductPage } from "~/components/product-page";
-import {
-  Zap,
-  AlertTriangle,
-  MessageSquare,
-  BarChart3,
-  Merge,
-  Gauge,
-} from "lucide-react";
+import { Zap, AlertTriangle, MessageSquare, BarChart3, Merge, Gauge } from "lucide-react";
 
 export function meta({}: Route.MetaArgs) {
   return [

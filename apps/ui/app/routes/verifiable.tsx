@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Verifiable Pipelines — verify AI outputs against rules, constraints, and schemas.
  *
@@ -58,8 +59,8 @@ export default function Verifiable() {
 
   useEffect(() => {
     fetch("/api/verifiable/info")
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
         if (d) {
           setInfo(d);
           if (d.defaultPipeline) setPipeline(d.defaultPipeline);
@@ -70,7 +71,9 @@ export default function Verifiable() {
 
   const verify = useCallback(async () => {
     if (!text.trim()) return;
-    setRunning(true); setErr(""); setResult(null);
+    setRunning(true);
+    setErr("");
+    setResult(null);
     const r = await fetch("/api/verifiable/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -87,12 +90,13 @@ export default function Verifiable() {
 
   const severityIcon = (severity?: string) => {
     if (severity === "error") return <XCircle className="w-4 h-4 text-red-500 shrink-0" />;
-    if (severity === "warning") return <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" />;
+    if (severity === "warning")
+      return <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" />;
     return <Info className="w-4 h-4 text-blue-500 shrink-0" />;
   };
 
   const passRate = result
-    ? Math.round((result.checks.filter(c => c.passed).length / result.checks.length) * 100)
+    ? Math.round((result.checks.filter((c) => c.passed).length / result.checks.length) * 100)
     : 0;
 
   return (
@@ -111,8 +115,13 @@ export default function Verifiable() {
       {info && (
         <div className="flex flex-wrap gap-2 text-xs text-muted-foreground items-center">
           {info.version && <Badge variant="outline">v{info.version}</Badge>}
-          {info.availablePipelines?.map(p => (
-            <Badge key={p} variant={p === pipeline ? "default" : "outline"} className="cursor-pointer" onClick={() => setPipeline(p)}>
+          {info.availablePipelines?.map((p) => (
+            <Badge
+              key={p}
+              variant={p === pipeline ? "default" : "outline"}
+              className="cursor-pointer"
+              onClick={() => setPipeline(p)}
+            >
               {p}
             </Badge>
           ))}
@@ -128,7 +137,7 @@ export default function Verifiable() {
               rows={5}
               placeholder="Paste the AI-generated text you want to verify…"
               value={text}
-              onChange={e => setText(e.target.value)}
+              onChange={(e) => setText(e.target.value)}
               className="resize-none"
             />
           </div>
@@ -138,21 +147,33 @@ export default function Verifiable() {
               <Input
                 placeholder="e.g. factual, medical, legal…"
                 value={pipeline}
-                onChange={e => setPipeline(e.target.value)}
+                onChange={(e) => setPipeline(e.target.value)}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium">Source Context <span className="text-muted-foreground font-normal">(optional)</span></label>
+              <label className="text-sm font-medium">
+                Source Context <span className="text-muted-foreground font-normal">(optional)</span>
+              </label>
               <Input
                 placeholder="Ground truth documents for factual check…"
                 value={context}
-                onChange={e => setContext(e.target.value)}
+                onChange={(e) => setContext(e.target.value)}
               />
             </div>
           </div>
           {err && <p className="text-red-500 text-xs">{err}</p>}
           <Button onClick={verify} disabled={running || !text.trim()}>
-            {running ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Verifying…</> : <><Play className="w-4 h-4 mr-2" />Verify</>}
+            {running ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Verifying…
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4 mr-2" />
+                Verify
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>
@@ -161,14 +182,24 @@ export default function Verifiable() {
       {result && (
         <div className="space-y-4">
           {/* Summary bar */}
-          <Card className={result.passed ? "border-teal-200 dark:border-teal-800" : "border-red-200 dark:border-red-800"}>
+          <Card
+            className={
+              result.passed
+                ? "border-teal-200 dark:border-teal-800"
+                : "border-red-200 dark:border-red-800"
+            }
+          >
             <CardContent className="pt-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  {result.passed
-                    ? <CheckCircle className="w-5 h-5 text-teal-600" />
-                    : <XCircle className="w-5 h-5 text-red-500" />}
-                  <span className={`font-semibold ${result.passed ? "text-teal-700 dark:text-teal-400" : "text-red-600"}`}>
+                  {result.passed ? (
+                    <CheckCircle className="w-5 h-5 text-teal-600" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-500" />
+                  )}
+                  <span
+                    className={`font-semibold ${result.passed ? "text-teal-700 dark:text-teal-400" : "text-red-600"}`}
+                  >
                     {result.passed ? "Verification Passed" : "Verification Failed"}
                   </span>
                 </div>
@@ -185,7 +216,9 @@ export default function Verifiable() {
                   style={{ width: `${passRate}%` }}
                 />
               </div>
-              {result.summary && <p className="text-sm text-muted-foreground mt-2">{result.summary}</p>}
+              {result.summary && (
+                <p className="text-sm text-muted-foreground mt-2">{result.summary}</p>
+              )}
             </CardContent>
           </Card>
 
@@ -193,26 +226,38 @@ export default function Verifiable() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">
-                Check Results ({result.checks.filter(c => c.passed).length}/{result.checks.length} passed)
+                Check Results ({result.checks.filter((c) => c.passed).length}/{result.checks.length}{" "}
+                passed)
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {result.checks.map((check, i) => (
-                <div key={i} className={`flex items-start gap-3 p-2.5 rounded-md ${check.passed ? "bg-teal-50/50 dark:bg-teal-950/10" : "bg-red-50/50 dark:bg-red-950/10"}`}>
-                  {check.passed
-                    ? <CheckCircle className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
-                    : severityIcon(check.severity)}
+                <div
+                  key={i}
+                  className={`flex items-start gap-3 p-2.5 rounded-md ${check.passed ? "bg-teal-50/50 dark:bg-teal-950/10" : "bg-red-50/50 dark:bg-red-950/10"}`}
+                >
+                  {check.passed ? (
+                    <CheckCircle className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
+                  ) : (
+                    severityIcon(check.severity)
+                  )}
                   <div className="flex-1 min-w-0">
                     <span className="text-sm font-medium">{check.name}</span>
-                    {check.message && <p className="text-xs text-muted-foreground mt-0.5">{check.message}</p>}
+                    {check.message && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{check.message}</p>
+                    )}
                   </div>
-                  <Badge className={check.passed
-                    ? "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-400"
-                    : check.severity === "warning"
-                      ? "bg-yellow-100 text-yellow-700"
-                      : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
-                  } variant="secondary">
-                    {check.passed ? "PASS" : check.severity?.toUpperCase() ?? "FAIL"}
+                  <Badge
+                    className={
+                      check.passed
+                        ? "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-400"
+                        : check.severity === "warning"
+                          ? "bg-yellow-100 text-yellow-700"
+                          : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+                    }
+                    variant="secondary"
+                  >
+                    {check.passed ? "PASS" : (check.severity?.toUpperCase() ?? "FAIL")}
                   </Badge>
                 </div>
               ))}
@@ -232,7 +277,7 @@ export default function Verifiable() {
           </CardHeader>
           <CardContent>
             <div className="grid sm:grid-cols-2 gap-2">
-              {info.checks.map(c => (
+              {info.checks.map((c) => (
                 <div key={c.name} className="text-sm">
                   <span className="font-medium">{c.name}</span>
                   <p className="text-xs text-muted-foreground">{c.description}</p>

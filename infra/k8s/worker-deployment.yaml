@@ -31,7 +31,7 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
-      terminationGracePeriodSeconds: 60   # longer — let jobs drain
+      terminationGracePeriodSeconds: 60 # longer — let jobs drain
       containers:
         - name: worker
           image: ghcr.io/yash-awasthi/nexus-worker:latest
@@ -43,7 +43,7 @@ spec:
               value: info
           envFrom:
             - secretRef:
-                name: nexus-api-secrets   # shared secrets
+                name: nexus-api-secrets # shared secrets
           resources:
             requests:
               cpu: 250m
@@ -58,7 +58,7 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 30
           securityContext:
-            readOnlyRootFilesystem: false   # worker writes temp files
+            readOnlyRootFilesystem: false # worker writes temp files
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]

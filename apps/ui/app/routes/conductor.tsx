@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * GhostStack — Multi-Agent Orchestration
  *
@@ -77,23 +78,33 @@ export default function GhostStack() {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const [sR, jR] = await Promise.all([
-        fetch("/api/v1/gs/status"),
-        fetch("/api/v1/gs/jobs"),
-      ]);
+      const [sR, jR] = await Promise.all([fetch("/api/v1/gs/status"), fetch("/api/v1/gs/jobs")]);
       if (sR.ok) setStatus(await sR.json());
-      if (jR.ok) { const d = await jR.json(); setJobs(d.jobs ?? []); }
-    } catch { /* ignore */ }
+      if (jR.ok) {
+        const d = await jR.json();
+        setJobs(d.jobs ?? []);
+      }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   const fetchDlq = useCallback(async () => {
     try {
       const r = await fetch("/api/v1/gs/dead-letter");
-      if (r.ok) { const d = await r.json(); setDlq(d.jobs ?? []); }
-    } catch { /* ignore */ }
+      if (r.ok) {
+        const d = await r.json();
+        setDlq(d.jobs ?? []);
+      }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
-  useEffect(() => { fetchStatus(); fetchDlq(); }, [fetchStatus, fetchDlq]);
+  useEffect(() => {
+    fetchStatus();
+    fetchDlq();
+  }, [fetchStatus, fetchDlq]);
 
   const handleSubmit = useCallback(async () => {
     if (!objective.trim()) return;
@@ -107,9 +118,17 @@ export default function GhostStack() {
         body: JSON.stringify({ objective, maxIterations }),
       });
       const data = await r.json();
-      if (!r.ok) { setErr(data.error ?? "Submission failed"); }
-      else {
-        setLastResult({ id: data.jobId, objective, status: data.allowed ? "done" : "blocked", result: data, startedAt: new Date().toISOString(), finishedAt: new Date().toISOString() });
+      if (!r.ok) {
+        setErr(data.error ?? "Submission failed");
+      } else {
+        setLastResult({
+          id: data.jobId,
+          objective,
+          status: data.allowed ? "done" : "blocked",
+          result: data,
+          startedAt: new Date().toISOString(),
+          finishedAt: new Date().toISOString(),
+        });
         setObjective("");
       }
     } catch (e) {
@@ -143,7 +162,8 @@ export default function GhostStack() {
             GhostStack
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Multi-agent orchestration — submit a natural-language objective and watch the runtime plan, govern, and execute
+            Multi-agent orchestration — submit a natural-language objective and watch the runtime
+            plan, govern, and execute
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={fetchStatus}>
@@ -154,13 +174,22 @@ export default function GhostStack() {
       {/* Status bar */}
       {status && (
         <div className="flex gap-3 flex-wrap">
-          <Badge variant="outline" className={status.initialised ? "border-green-500 text-green-600" : "border-yellow-500 text-yellow-600"}>
+          <Badge
+            variant="outline"
+            className={
+              status.initialised
+                ? "border-green-500 text-green-600"
+                : "border-yellow-500 text-yellow-600"
+            }
+          >
             {status.initialised ? "Runtime active" : "Runtime idle"}
           </Badge>
           <Badge variant="outline">Queue: {status.queueLength}</Badge>
           <Badge variant="outline">Active: {(status.activeJobs ?? []).length}</Badge>
           {status.deadLetterCount > 0 && (
-            <Badge variant="outline" className="border-red-500 text-red-600">DLQ: {status.deadLetterCount}</Badge>
+            <Badge variant="outline" className="border-red-500 text-red-600">
+              DLQ: {status.deadLetterCount}
+            </Badge>
           )}
           {status.error && <Badge variant="destructive">Init error</Badge>}
         </div>
@@ -175,13 +204,14 @@ export default function GhostStack() {
                 <Play className="w-4 h-4" /> Submit Objective
               </CardTitle>
               <CardDescription>
-                Natural-language task. PlanningEngine picks a blueprint, GovernanceEngine checks constraints, TaskExecutor runs it.
+                Natural-language task. PlanningEngine picks a blueprint, GovernanceEngine checks
+                constraints, TaskExecutor runs it.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Textarea
                 value={objective}
-                onChange={e => setObjective(e.target.value)}
+                onChange={(e) => setObjective(e.target.value)}
                 placeholder="Search for recent papers on LLM reasoning and summarise the key findings…"
                 rows={4}
                 className="font-mono text-sm"
@@ -191,22 +221,36 @@ export default function GhostStack() {
                 <input
                   type="number"
                   value={maxIterations}
-                  onChange={e => setMaxIterations(Number(e.target.value))}
+                  onChange={(e) => setMaxIterations(Number(e.target.value))}
                   min={1}
                   max={500}
                   className="w-20 border rounded px-2 py-1 text-sm"
                 />
               </div>
               {err && <p className="text-sm text-red-500">{err}</p>}
-              <Button onClick={handleSubmit} disabled={submitting || !objective.trim()} className="w-full">
-                {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Running…</> : <><Play className="w-4 h-4 mr-2" /> Submit</>}
+              <Button
+                onClick={handleSubmit}
+                disabled={submitting || !objective.trim()}
+                className="w-full"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Running…
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 mr-2" /> Submit
+                  </>
+                )}
               </Button>
             </CardContent>
           </Card>
 
           {/* Examples */}
           <Card>
-            <CardHeader><CardTitle className="text-sm">Quick Examples</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-sm">Quick Examples</CardTitle>
+            </CardHeader>
             <CardContent className="space-y-2">
               {EXAMPLES.map((ex, i) => (
                 <button
@@ -222,11 +266,23 @@ export default function GhostStack() {
 
           {/* Last result */}
           {lastResult && (
-            <Card className={lastResult.status === "done" ? "border-green-500/40" : lastResult.status === "blocked" ? "border-yellow-500/40" : "border-red-500/40"}>
+            <Card
+              className={
+                lastResult.status === "done"
+                  ? "border-green-500/40"
+                  : lastResult.status === "blocked"
+                    ? "border-yellow-500/40"
+                    : "border-red-500/40"
+              }
+            >
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-sm">
                   {statusIcon(lastResult.status)}
-                  {lastResult.status === "done" ? "Completed" : lastResult.status === "blocked" ? "Blocked by governance" : "Failed"}
+                  {lastResult.status === "done"
+                    ? "Completed"
+                    : lastResult.status === "blocked"
+                      ? "Blocked by governance"
+                      : "Failed"}
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-sm space-y-2">
@@ -267,8 +323,11 @@ export default function GhostStack() {
                 <p className="text-sm text-muted-foreground">No jobs yet</p>
               ) : (
                 <div className="space-y-2 max-h-80 overflow-y-auto">
-                  {jobs.map(j => (
-                    <div key={j.id} className={`rounded px-3 py-2 text-xs ${statusColor(j.status)}`}>
+                  {jobs.map((j) => (
+                    <div
+                      key={j.id}
+                      className={`rounded px-3 py-2 text-xs ${statusColor(j.status)}`}
+                    >
                       <div className="flex items-center gap-1 mb-1">
                         {statusIcon(j.status)}
                         <span className="font-medium capitalize">{j.status}</span>
@@ -307,7 +366,10 @@ export default function GhostStack() {
               ) : (
                 <div className="space-y-1 max-h-40 overflow-y-auto">
                   {dlq.map((j, i) => (
-                    <div key={i} className="text-xs bg-red-500/10 text-red-600 rounded px-2 py-1 font-mono truncate">
+                    <div
+                      key={i}
+                      className="text-xs bg-red-500/10 text-red-600 rounded px-2 py-1 font-mono truncate"
+                    >
                       {JSON.stringify(j).slice(0, 80)}
                     </div>
                   ))}

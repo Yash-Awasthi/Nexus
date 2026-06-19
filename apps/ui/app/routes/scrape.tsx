@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Web Scraping — URL scraping, website crawling, and Exa semantic search.
  *
@@ -100,8 +101,8 @@ export default function Scrape() {
 
   useEffect(() => {
     fetch("/api/web-scraping/providers")
-      .then(r => r.ok ? r.json() : null)
-      .then(d => d && setProviders(d.providers ?? []))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setProviders(d.providers ?? []))
       .catch(() => {});
   }, []);
 
@@ -117,10 +118,17 @@ export default function Scrape() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url, format: scrapeFormat }),
       });
-      if (!r.ok) { const d = await r.json().catch(() => ({})); setErr(d.error ?? "Scrape failed"); return; }
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        setErr(d.error ?? "Scrape failed");
+        return;
+      }
       setScrapeResult(await r.json());
-    } catch { setErr("Scrape failed"); }
-    finally { setScraping(false); }
+    } catch {
+      setErr("Scrape failed");
+    } finally {
+      setScraping(false);
+    }
   }, [scrapeUrl, scrapeFormat]);
 
   const handleCrawl = useCallback(async () => {
@@ -136,10 +144,17 @@ export default function Scrape() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url, maxPages: parseInt(maxPages) || 10 }),
       });
-      if (!r.ok) { const d = await r.json().catch(() => ({})); setErr(d.error ?? "Crawl failed"); return; }
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        setErr(d.error ?? "Crawl failed");
+        return;
+      }
       setCrawlResult(await r.json());
-    } catch { setErr("Crawl failed"); }
-    finally { setCrawling(false); }
+    } catch {
+      setErr("Crawl failed");
+    } finally {
+      setCrawling(false);
+    }
   }, [crawlUrl, maxPages]);
 
   const handleExaSearch = useCallback(async () => {
@@ -148,22 +163,34 @@ export default function Scrape() {
     setErr("");
     setExaResults([]);
     try {
-      const endpoint = exaType === "search"
-        ? "/api/web-scraping/exa/search"
-        : "/api/web-scraping/exa/contents";
-      const body = exaType === "search"
-        ? { query: exaQuery.trim(), numResults: 10 }
-        : { urls: exaUrls.split("\n").map(u => u.trim()).filter(Boolean) };
+      const endpoint =
+        exaType === "search" ? "/api/web-scraping/exa/search" : "/api/web-scraping/exa/contents";
+      const body =
+        exaType === "search"
+          ? { query: exaQuery.trim(), numResults: 10 }
+          : {
+              urls: exaUrls
+                .split("\n")
+                .map((u) => u.trim())
+                .filter(Boolean),
+            };
       const r = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!r.ok) { const d = await r.json().catch(() => ({})); setErr(d.error ?? "Exa request failed"); return; }
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        setErr(d.error ?? "Exa request failed");
+        return;
+      }
       const d = await r.json();
       setExaResults(d.results ?? d);
-    } catch { setErr("Exa request failed"); }
-    finally { setExaSearching(false); }
+    } catch {
+      setErr("Exa request failed");
+    } finally {
+      setExaSearching(false);
+    }
   }, [exaQuery, exaType, exaUrls]);
 
   const copyContent = useCallback((text: string) => {
@@ -189,12 +216,14 @@ export default function Scrape() {
           <p className="text-muted-foreground text-sm mt-1">
             Extract content from any URL, crawl websites, or run semantic search via Exa
             {providers.length > 0 && (
-              <span className="ml-2">· <span className="font-medium">{providers.join(", ")}</span> available</span>
+              <span className="ml-2">
+                · <span className="font-medium">{providers.join(", ")}</span> available
+              </span>
             )}
           </p>
         </div>
         <div className="flex gap-1">
-          {(["scrape", "crawl", "exa"] as const).map(t => (
+          {(["scrape", "crawl", "exa"] as const).map((t) => (
             <Button
               key={t}
               size="sm"
@@ -210,7 +239,8 @@ export default function Scrape() {
 
       {err && (
         <p className="text-red-500 text-sm flex items-center gap-2">
-          <X className="w-4 h-4 shrink-0" />{err}
+          <X className="w-4 h-4 shrink-0" />
+          {err}
         </p>
       )}
 
@@ -221,11 +251,11 @@ export default function Scrape() {
             <Input
               placeholder="https://example.com/article"
               value={scrapeUrl}
-              onChange={e => setScrapeUrl(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleScrape()}
+              onChange={(e) => setScrapeUrl(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleScrape()}
               className="flex-1"
             />
-            <Select value={scrapeFormat} onValueChange={v => setScrapeFormat(v as any)}>
+            <Select value={scrapeFormat} onValueChange={(v) => setScrapeFormat(v as any)}>
               <SelectTrigger className="w-32">
                 <SelectValue />
               </SelectTrigger>
@@ -236,7 +266,11 @@ export default function Scrape() {
               </SelectContent>
             </Select>
             <Button onClick={handleScrape} disabled={scraping || !scrapeUrl.trim()}>
-              {scraping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
+              {scraping ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Globe className="w-4 h-4" />
+              )}
             </Button>
           </div>
 
@@ -258,11 +292,23 @@ export default function Scrape() {
                     </a>
                   </div>
                   <div className="flex gap-2">
-                    <Badge variant={scrapeResult.success ? "default" : "destructive"} className="text-xs">
+                    <Badge
+                      variant={scrapeResult.success ? "default" : "destructive"}
+                      className="text-xs"
+                    >
                       {scrapeResult.success ? "OK" : "Error"}
                     </Badge>
-                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => copyContent(content)}>
-                      {copied ? <Check className="w-3 h-3 mr-1 text-green-500" /> : <Copy className="w-3 h-3 mr-1" />}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs"
+                      onClick={() => copyContent(content)}
+                    >
+                      {copied ? (
+                        <Check className="w-3 h-3 mr-1 text-green-500" />
+                      ) : (
+                        <Copy className="w-3 h-3 mr-1" />
+                      )}
                       Copy
                     </Button>
                   </div>
@@ -273,9 +319,11 @@ export default function Scrape() {
                   <p className="text-sm text-red-500">{scrapeResult.error}</p>
                 ) : (
                   <div>
-                    <pre className={`text-xs font-mono whitespace-pre-wrap overflow-auto bg-muted/50 rounded p-3 ${
-                      expandedContent ? "" : "max-h-80"
-                    }`}>
+                    <pre
+                      className={`text-xs font-mono whitespace-pre-wrap overflow-auto bg-muted/50 rounded p-3 ${
+                        expandedContent ? "" : "max-h-80"
+                      }`}
+                    >
                       {content.slice(0, expandedContent ? undefined : 3000)}
                       {!expandedContent && content.length > 3000 && "…"}
                     </pre>
@@ -286,9 +334,17 @@ export default function Scrape() {
                         className="mt-2 w-full text-xs"
                         onClick={() => setExpandedContent(!expandedContent)}
                       >
-                        {expandedContent
-                          ? <><ChevronUp className="w-3 h-3 mr-1" />Show less</>
-                          : <><ChevronDown className="w-3 h-3 mr-1" />Show all ({Math.round(content.length / 1000)}K chars)</>}
+                        {expandedContent ? (
+                          <>
+                            <ChevronUp className="w-3 h-3 mr-1" />
+                            Show less
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="w-3 h-3 mr-1" />
+                            Show all ({Math.round(content.length / 1000)}K chars)
+                          </>
+                        )}
                       </Button>
                     )}
                   </div>
@@ -306,8 +362,8 @@ export default function Scrape() {
             <Input
               placeholder="https://docs.example.com"
               value={crawlUrl}
-              onChange={e => setCrawlUrl(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleCrawl()}
+              onChange={(e) => setCrawlUrl(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCrawl()}
               className="flex-1"
             />
             <Select value={maxPages} onValueChange={setMaxPages}>
@@ -315,15 +371,25 @@ export default function Scrape() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {["5", "10", "25", "50"].map(n => (
-                  <SelectItem key={n} value={n}>{n} pages</SelectItem>
+                {["5", "10", "25", "50"].map((n) => (
+                  <SelectItem key={n} value={n}>
+                    {n} pages
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Button onClick={handleCrawl} disabled={crawling || !crawlUrl.trim()}>
-              {crawling
-                ? <><Loader2 className="w-4 h-4 animate-spin mr-1" />Crawling…</>
-                : <><Layers className="w-4 h-4 mr-1" />Crawl</>}
+              {crawling ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                  Crawling…
+                </>
+              ) : (
+                <>
+                  <Layers className="w-4 h-4 mr-1" />
+                  Crawl
+                </>
+              )}
             </Button>
           </div>
 
@@ -344,7 +410,9 @@ export default function Scrape() {
                       onClick={() => setSelectedPage(page)}
                     >
                       <FileText className="w-3 h-3 shrink-0 text-muted-foreground" />
-                      <span className="truncate">{page.title ?? page.url.replace(/https?:\/\//, "")}</span>
+                      <span className="truncate">
+                        {page.title ?? page.url.replace(/https?:\/\//, "")}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -357,13 +425,26 @@ export default function Scrape() {
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between">
                         <div>
-                          <CardTitle className="text-sm">{selectedPage.title ?? selectedPage.url}</CardTitle>
-                          <a href={selectedPage.url} target="_blank" rel="noopener noreferrer"
-                            className="text-xs text-blue-500 hover:underline">
+                          <CardTitle className="text-sm">
+                            {selectedPage.title ?? selectedPage.url}
+                          </CardTitle>
+                          <a
+                            href={selectedPage.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-500 hover:underline"
+                          >
                             {selectedPage.url}
                           </a>
                         </div>
-                        <Button size="sm" variant="ghost" className="h-7" onClick={() => copyContent(selectedPage.markdown ?? selectedPage.content ?? "")}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7"
+                          onClick={() =>
+                            copyContent(selectedPage.markdown ?? selectedPage.content ?? "")
+                          }
+                        >
                           <Copy className="w-3 h-3" />
                         </Button>
                       </div>
@@ -410,12 +491,16 @@ export default function Scrape() {
               <Input
                 placeholder="Latest AI research on reasoning models…"
                 value={exaQuery}
-                onChange={e => setExaQuery(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleExaSearch()}
+                onChange={(e) => setExaQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleExaSearch()}
                 className="flex-1"
               />
               <Button onClick={handleExaSearch} disabled={exaSearching || !exaQuery.trim()}>
-                {exaSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                {exaSearching ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Search className="w-4 h-4" />
+                )}
               </Button>
             </div>
           ) : (
@@ -423,14 +508,26 @@ export default function Scrape() {
               <Textarea
                 placeholder="https://example.com/article&#10;https://another.com/page"
                 value={exaUrls}
-                onChange={e => setExaUrls(e.target.value)}
+                onChange={(e) => setExaUrls(e.target.value)}
                 rows={4}
                 className="font-mono text-sm resize-none"
               />
-              <Button onClick={handleExaSearch} disabled={exaSearching || !exaUrls.trim()} className="w-full">
-                {exaSearching
-                  ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Extracting…</>
-                  : <><FileText className="w-4 h-4 mr-2" />Extract content</>}
+              <Button
+                onClick={handleExaSearch}
+                disabled={exaSearching || !exaUrls.trim()}
+                className="w-full"
+              >
+                {exaSearching ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Extracting…
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-4 h-4 mr-2" />
+                    Extract content
+                  </>
+                )}
               </Button>
             </div>
           )}
@@ -453,7 +550,9 @@ export default function Scrape() {
                         </a>
                         <p className="text-xs text-muted-foreground mt-0.5 truncate">{r.url}</p>
                         {r.snippet && (
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-3">{r.snippet}</p>
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-3">
+                            {r.snippet}
+                          </p>
                         )}
                         {r.content && (
                           <pre className="text-xs font-mono mt-2 bg-muted/50 rounded p-2 max-h-32 overflow-auto whitespace-pre-wrap">
@@ -463,7 +562,9 @@ export default function Scrape() {
                       </div>
                       <div className="shrink-0 flex flex-col items-end gap-1">
                         {r.score !== undefined && (
-                          <Badge variant="outline" className="text-xs">{r.score.toFixed(3)}</Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {r.score.toFixed(3)}
+                          </Badge>
                         )}
                         {r.publishedDate && (
                           <span className="text-xs text-muted-foreground">

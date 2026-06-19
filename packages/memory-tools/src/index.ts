@@ -501,9 +501,9 @@ export class MemoryToolsError extends Error {
 /** Classification of how a memory item was produced. */
 export type MemoryItemKind =
   | "observation" // Captured from agent tool usage / session events
-  | "summary"     // Compressed multi-observation summary
-  | "prompt"      // Injected via user prompt
-  | "manual";     // Manually authored / imported
+  | "summary" // Compressed multi-observation summary
+  | "prompt" // Injected via user prompt
+  | "manual"; // Manually authored / imported
 
 /** Provenance source type for a MemoryItem. */
 export type MemorySourceType =
@@ -554,7 +554,10 @@ export interface ExtendedMemoryItem {
 export type CreateExtendedMemoryItem = Omit<
   ExtendedMemoryItem,
   "id" | "createdAtEpoch" | "updatedAtEpoch"
-> & Partial<Pick<ExtendedMemoryItem, "serverSessionId" | "title" | "subtitle" | "text" | "narrative">>;
+> &
+  Partial<
+    Pick<ExtendedMemoryItem, "serverSessionId" | "title" | "subtitle" | "text" | "narrative">
+  >;
 
 /**
  * Provenance record linking a MemoryItem to its originating source.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Knowledge Graph — Phase 4.8
  *
@@ -85,7 +86,7 @@ function layoutNodes(nodes: GraphNode[], edges: GraphEdge[]) {
 
   // Simple spring iterations
   for (let iter = 0; iter < 30; iter++) {
-    edges.forEach(e => {
+    edges.forEach((e) => {
       const a = positions[e.source];
       const b = positions[e.target];
       if (!a || !b) return;
@@ -96,12 +97,14 @@ function layoutNodes(nodes: GraphNode[], edges: GraphEdge[]) {
       const f = (dist - ideal) * 0.04;
       const mx = (dx / dist) * f;
       const my = (dy / dist) * f;
-      a.x += mx; a.y += my;
-      b.x -= mx; b.y -= my;
+      a.x += mx;
+      a.y += my;
+      b.x -= mx;
+      b.y -= my;
     });
     // Repulsion
     nodes.forEach((a, i) => {
-      nodes.slice(i + 1).forEach(b => {
+      nodes.slice(i + 1).forEach((b) => {
         const pa = positions[a.id];
         const pb = positions[b.id];
         if (!pa || !pb) return;
@@ -112,13 +115,15 @@ function layoutNodes(nodes: GraphNode[], edges: GraphEdge[]) {
           const f = (80 - dist) * 0.15;
           const mx = (dx / dist) * f;
           const my = (dy / dist) * f;
-          pa.x -= mx; pa.y -= my;
-          pb.x += mx; pb.y += my;
+          pa.x -= mx;
+          pa.y -= my;
+          pb.x += mx;
+          pb.y += my;
         }
       });
     });
     // Clamp
-    Object.values(positions).forEach(p => {
+    Object.values(positions).forEach((p) => {
       p.x = Math.max(NODE_R + 5, Math.min(W - NODE_R - 5, p.x));
       p.y = Math.max(NODE_R + 5, Math.min(H - NODE_R - 5, p.y));
     });
@@ -129,8 +134,14 @@ function layoutNodes(nodes: GraphNode[], edges: GraphEdge[]) {
 // ─── Community colour palette ─────────────────────────────────────────────────
 
 const COMMUNITY_COLORS = [
-  "#6366f1", "#f59e0b", "#10b981", "#ef4444",
-  "#3b82f6", "#ec4899", "#14b8a6", "#f97316",
+  "#6366f1",
+  "#f59e0b",
+  "#10b981",
+  "#ef4444",
+  "#3b82f6",
+  "#ec4899",
+  "#14b8a6",
+  "#f97316",
 ];
 
 function nodeColor(n: GraphNode) {
@@ -152,17 +163,25 @@ export default function KnowledgeGraph() {
   // Extract
   const [extractText, setExtractText] = useState("");
   const [extracting, setExtracting] = useState(false);
-  const [extractResult, setExtractResult] = useState<{ added: number; skipped: number } | null>(null);
+  const [extractResult, setExtractResult] = useState<{ added: number; skipped: number } | null>(
+    null,
+  );
 
   // Search
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
-  const [searchResult, setSearchResult] = useState<{ nodes: GraphNode[]; edges: GraphEdge[] } | null>(null);
+  const [searchResult, setSearchResult] = useState<{
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+  } | null>(null);
 
   // Traverse
   const [traverseFrom, setTraverseFrom] = useState("");
   const [traversing, setTraversing] = useState(false);
-  const [traverseResult, setTraverseResult] = useState<{ nodes: GraphNode[]; edges: GraphEdge[] } | null>(null);
+  const [traverseResult, setTraverseResult] = useState<{
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+  } | null>(null);
 
   const [tab, setTab] = useState<"graph" | "extract" | "search" | "communities">("graph");
   const [err, setErr] = useState("");
@@ -187,7 +206,10 @@ export default function KnowledgeGraph() {
     } catch {}
   }, []);
 
-  useEffect(() => { loadGraph(); loadCommunities(); }, [loadGraph, loadCommunities]);
+  useEffect(() => {
+    loadGraph();
+    loadCommunities();
+  }, [loadGraph, loadCommunities]);
 
   const handleExtract = useCallback(async () => {
     if (!extractText.trim()) return;
@@ -207,8 +229,11 @@ export default function KnowledgeGraph() {
         loadGraph();
         loadCommunities();
       } else setErr("Extraction failed");
-    } catch { setErr("Extraction error"); }
-    finally { setExtracting(false); }
+    } catch {
+      setErr("Extraction error");
+    } finally {
+      setExtracting(false);
+    }
   }, [extractText, loadGraph, loadCommunities]);
 
   const handleSearch = useCallback(async () => {
@@ -222,31 +247,39 @@ export default function KnowledgeGraph() {
         body: JSON.stringify({ query: searchQuery.trim(), hops: 2 }),
       });
       if (r.ok) setSearchResult(await r.json());
-    } catch {}
-    finally { setSearching(false); }
+    } catch {
+    } finally {
+      setSearching(false);
+    }
   }, [searchQuery]);
 
-  const handleTraverse = useCallback(async (entity: string) => {
-    const e = entity || traverseFrom;
-    if (!e.trim()) return;
-    setTraversing(true);
-    setTraverseResult(null);
-    try {
-      const r = await fetch("/api/kg/traverse", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ startEntity: e.trim(), hops: 2 }),
-      });
-      if (r.ok) setTraverseResult(await r.json());
-    } catch {}
-    finally { setTraversing(false); }
-  }, [traverseFrom]);
+  const handleTraverse = useCallback(
+    async (entity: string) => {
+      const e = entity || traverseFrom;
+      if (!e.trim()) return;
+      setTraversing(true);
+      setTraverseResult(null);
+      try {
+        const r = await fetch("/api/kg/traverse", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ startEntity: e.trim(), hops: 2 }),
+        });
+        if (r.ok) setTraverseResult(await r.json());
+      } catch {
+      } finally {
+        setTraversing(false);
+      }
+    },
+    [traverseFrom],
+  );
 
   // Display graph — full or search/traverse overlay
   const displayGraph = searchResult ?? traverseResult ?? graph;
-  const displayPositions = (searchResult || traverseResult)
-    ? layoutNodes(displayGraph.nodes ?? [], displayGraph.edges ?? [])
-    : positions;
+  const displayPositions =
+    searchResult || traverseResult
+      ? layoutNodes(displayGraph.nodes ?? [], displayGraph.edges ?? [])
+      : positions;
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -262,12 +295,16 @@ export default function KnowledgeGraph() {
           </p>
         </div>
         <div className="flex gap-2">
-          {(["graph", "extract", "search", "communities"] as const).map(t => (
+          {(["graph", "extract", "search", "communities"] as const).map((t) => (
             <Button
               key={t}
               size="sm"
               variant={tab === t ? "default" : "outline"}
-              onClick={() => { setTab(t); setSearchResult(null); setTraverseResult(null); }}
+              onClick={() => {
+                setTab(t);
+                setSearchResult(null);
+                setTraverseResult(null);
+              }}
               className="capitalize"
             >
               {t}
@@ -303,9 +340,21 @@ export default function KnowledgeGraph() {
               <div className="lg:col-span-2">
                 <Card>
                   <CardContent className="p-0 overflow-hidden rounded-lg">
-                    <svg width={W} height={H} className="w-full" style={{ background: "var(--background)" }}>
+                    <svg
+                      width={W}
+                      height={H}
+                      className="w-full"
+                      style={{ background: "var(--background)" }}
+                    >
                       <defs>
-                        <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                        <marker
+                          id="arrow"
+                          markerWidth="6"
+                          markerHeight="6"
+                          refX="5"
+                          refY="3"
+                          orient="auto"
+                        >
                           <path d="M0,0 L0,6 L6,3 z" fill="#94a3b8" />
                         </marker>
                       </defs>
@@ -324,7 +373,10 @@ export default function KnowledgeGraph() {
                         return (
                           <g key={i}>
                             <line
-                              x1={a.x} y1={a.y} x2={ex} y2={ey}
+                              x1={a.x}
+                              y1={a.y}
+                              x2={ex}
+                              y2={ey}
                               stroke="#94a3b8"
                               strokeWidth={1 + e.confidence}
                               strokeOpacity={0.5}
@@ -337,7 +389,7 @@ export default function KnowledgeGraph() {
                         );
                       })}
                       {/* Nodes */}
-                      {(displayGraph.nodes ?? []).map(n => {
+                      {(displayGraph.nodes ?? []).map((n) => {
                         const p = displayPositions[n.id];
                         if (!p) return null;
                         const isSelected = selectedNode?.id === n.id;
@@ -349,14 +401,17 @@ export default function KnowledgeGraph() {
                             onClick={() => setSelectedNode(isSelected ? null : n)}
                           >
                             <circle
-                              cx={p.x} cy={p.y} r={NODE_R + (isSelected ? 4 : 0)}
+                              cx={p.x}
+                              cy={p.y}
+                              r={NODE_R + (isSelected ? 4 : 0)}
                               fill={color}
                               fillOpacity={isSelected ? 1 : 0.8}
                               stroke={isSelected ? "#fff" : "transparent"}
                               strokeWidth={2}
                             />
                             <text
-                              x={p.x} y={p.y + 1}
+                              x={p.x}
+                              y={p.y + 1}
                               fontSize={9}
                               fill="white"
                               textAnchor="middle"
@@ -380,35 +435,54 @@ export default function KnowledgeGraph() {
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-sm">{selectedNode.label}</CardTitle>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSelectedNode(null)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => setSelectedNode(null)}
+                        >
                           <X className="w-3 h-3" />
                         </Button>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       <div className="flex gap-2">
-                        <Badge variant="outline" className="text-xs capitalize">{selectedNode.type}</Badge>
+                        <Badge variant="outline" className="text-xs capitalize">
+                          {selectedNode.type}
+                        </Badge>
                         {selectedNode.community !== undefined && (
                           <Badge
                             className="text-xs text-white"
-                            style={{ background: COMMUNITY_COLORS[selectedNode.community % COMMUNITY_COLORS.length] }}
+                            style={{
+                              background:
+                                COMMUNITY_COLORS[selectedNode.community % COMMUNITY_COLORS.length],
+                            }}
                           >
                             community {selectedNode.community}
                           </Badge>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground">Degree: {selectedNode.degree} connections</p>
+                      <p className="text-xs text-muted-foreground">
+                        Degree: {selectedNode.degree} connections
+                      </p>
 
                       {/* Connected edges */}
                       <div className="space-y-1">
                         <p className="text-xs font-medium">Relationships:</p>
                         {graph.edges
-                          .filter(e => e.source === selectedNode.id || e.target === selectedNode.id)
+                          .filter(
+                            (e) => e.source === selectedNode.id || e.target === selectedNode.id,
+                          )
                           .slice(0, 8)
                           .map((e, i) => (
-                            <div key={i} className="text-xs text-muted-foreground flex items-center gap-1">
+                            <div
+                              key={i}
+                              className="text-xs text-muted-foreground flex items-center gap-1"
+                            >
                               <ChevronRight className="w-3 h-3 shrink-0" />
-                              <span className="font-medium">{e.source === selectedNode.id ? e.target : e.source}</span>
+                              <span className="font-medium">
+                                {e.source === selectedNode.id ? e.target : e.source}
+                              </span>
                               <span className="opacity-60">— {e.predicate}</span>
                             </div>
                           ))}
@@ -418,7 +492,10 @@ export default function KnowledgeGraph() {
                         size="sm"
                         variant="outline"
                         className="w-full"
-                        onClick={() => { handleTraverse(selectedNode.label); setTab("search"); }}
+                        onClick={() => {
+                          handleTraverse(selectedNode.label);
+                          setTab("search");
+                        }}
                       >
                         <GitBranch className="w-3 h-3 mr-1" />
                         Traverse from here
@@ -474,7 +551,7 @@ export default function KnowledgeGraph() {
             <Textarea
               placeholder="Paste any text — a conversation, article, notes… The LLM will extract entities and relationships into your graph."
               value={extractText}
-              onChange={e => setExtractText(e.target.value)}
+              onChange={(e) => setExtractText(e.target.value)}
               rows={8}
               className="resize-none font-mono text-sm"
             />
@@ -484,10 +561,22 @@ export default function KnowledgeGraph() {
                 ✓ Added {extractResult.added} triples, skipped {extractResult.skipped} duplicates
               </div>
             )}
-            <Button onClick={handleExtract} disabled={extracting || !extractText.trim()} className="w-full">
-              {extracting
-                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Extracting…</>
-                : <><Plus className="w-4 h-4 mr-2" />Extract to graph</>}
+            <Button
+              onClick={handleExtract}
+              disabled={extracting || !extractText.trim()}
+              className="w-full"
+            >
+              {extracting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Extracting…
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Extract to graph
+                </>
+              )}
             </Button>
           </CardContent>
         </Card>
@@ -504,11 +593,15 @@ export default function KnowledgeGraph() {
                   <Input
                     placeholder="e.g. What do I know about machine learning?"
                     value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && handleSearch()}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                   />
                   <Button onClick={handleSearch} disabled={searching || !searchQuery.trim()}>
-                    {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    {searching ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Search className="w-4 h-4" />
+                    )}
                   </Button>
                 </div>
               </div>
@@ -519,11 +612,19 @@ export default function KnowledgeGraph() {
                   <Input
                     placeholder="Entity name, e.g. 'TypeScript'"
                     value={traverseFrom}
-                    onChange={e => setTraverseFrom(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && handleTraverse("")}
+                    onChange={(e) => setTraverseFrom(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleTraverse("")}
                   />
-                  <Button onClick={() => handleTraverse("")} disabled={traversing || !traverseFrom.trim()} variant="outline">
-                    {traversing ? <Loader2 className="w-4 h-4 animate-spin" /> : <GitBranch className="w-4 h-4" />}
+                  <Button
+                    onClick={() => handleTraverse("")}
+                    disabled={traversing || !traverseFrom.trim()}
+                    variant="outline"
+                  >
+                    {traversing ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <GitBranch className="w-4 h-4" />
+                    )}
                   </Button>
                 </div>
               </div>
@@ -535,27 +636,54 @@ export default function KnowledgeGraph() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm">
-                  Search result — {searchResult.nodes?.length ?? 0} nodes, {searchResult.edges?.length ?? 0} edges
+                  Search result — {searchResult.nodes?.length ?? 0} nodes,{" "}
+                  {searchResult.edges?.length ?? 0} edges
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <svg width={W} height={H} className="w-full" style={{ background: "var(--background)" }}>
+                <svg
+                  width={W}
+                  height={H}
+                  className="w-full"
+                  style={{ background: "var(--background)" }}
+                >
                   {(searchResult.edges ?? []).map((e, i) => {
                     const a = displayPositions[e.source];
                     const b = displayPositions[e.target];
                     if (!a || !b) return null;
                     return (
-                      <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                        stroke="#94a3b8" strokeWidth={1} strokeOpacity={0.5} />
+                      <line
+                        key={i}
+                        x1={a.x}
+                        y1={a.y}
+                        x2={b.x}
+                        y2={b.y}
+                        stroke="#94a3b8"
+                        strokeWidth={1}
+                        strokeOpacity={0.5}
+                      />
                     );
                   })}
-                  {(searchResult.nodes ?? []).map(n => {
+                  {(searchResult.nodes ?? []).map((n) => {
                     const p = displayPositions[n.id];
                     if (!p) return null;
                     return (
                       <g key={n.id}>
-                        <circle cx={p.x} cy={p.y} r={NODE_R} fill={nodeColor(n)} fillOpacity={0.85} />
-                        <text x={p.x} y={p.y + 1} fontSize={9} fill="white" textAnchor="middle" dominantBaseline="middle">
+                        <circle
+                          cx={p.x}
+                          cy={p.y}
+                          r={NODE_R}
+                          fill={nodeColor(n)}
+                          fillOpacity={0.85}
+                        />
+                        <text
+                          x={p.x}
+                          y={p.y + 1}
+                          fontSize={9}
+                          fill="white"
+                          textAnchor="middle"
+                          dominantBaseline="middle"
+                        >
                           {n.label.length > 10 ? n.label.slice(0, 9) + "…" : n.label}
                         </text>
                       </g>
@@ -572,7 +700,9 @@ export default function KnowledgeGraph() {
       {tab === "communities" && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">{communities.length} communities detected</p>
+            <p className="text-sm text-muted-foreground">
+              {communities.length} communities detected
+            </p>
             <Button variant="ghost" size="sm" onClick={loadCommunities}>
               <RefreshCw className="w-3 h-3 mr-1" />
               Refresh
@@ -582,11 +712,13 @@ export default function KnowledgeGraph() {
             <Card>
               <CardContent className="pt-8 pb-8 text-center">
                 <Layers className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-40" />
-                <p className="text-muted-foreground">No communities yet — extract more entities first</p>
+                <p className="text-muted-foreground">
+                  No communities yet — extract more entities first
+                </p>
               </CardContent>
             </Card>
           )}
-          {communities.map(c => (
+          {communities.map((c) => (
             <Card key={c.id}>
               <CardContent className="pt-4">
                 <div className="flex items-center gap-2 mb-2">
@@ -595,12 +727,16 @@ export default function KnowledgeGraph() {
                     style={{ background: COMMUNITY_COLORS[c.id % COMMUNITY_COLORS.length] }}
                   />
                   <span className="text-sm font-medium">Community {c.id}</span>
-                  <Badge variant="outline" className="text-xs">{c.entities?.length ?? 0} entities</Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {c.entities?.length ?? 0} entities
+                  </Badge>
                 </div>
                 {c.summary && <p className="text-xs text-muted-foreground mb-2">{c.summary}</p>}
                 <div className="flex flex-wrap gap-1">
-                  {(c.entities ?? []).map(e => (
-                    <Badge key={e} variant="secondary" className="text-xs font-normal">{e}</Badge>
+                  {(c.entities ?? []).map((e) => (
+                    <Badge key={e} variant="secondary" className="text-xs font-normal">
+                      {e}
+                    </Badge>
                   ))}
                 </div>
               </CardContent>

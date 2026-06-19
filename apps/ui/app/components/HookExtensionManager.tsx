@@ -1,6 +1,7 @@
-"use client"
+// SPDX-License-Identifier: Apache-2.0
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
   PlusIcon,
   Trash2Icon,
@@ -17,19 +18,19 @@ import {
   ShieldIcon,
   SearchIcon,
   FilterIcon,
-} from "lucide-react"
+} from "lucide-react";
 
-import { Button } from "~/components/ui/button"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "~/components/ui/card"
-import { Input } from "~/components/ui/input"
-import { Badge } from "~/components/ui/badge"
+import { Button } from "~/components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "~/components/ui/card";
+import { Input } from "~/components/ui/input";
+import { Badge } from "~/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select"
+} from "~/components/ui/select";
 import {
   Dialog,
   DialogTrigger,
@@ -39,7 +40,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
-} from "~/components/ui/dialog"
+} from "~/components/ui/dialog";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -51,90 +52,128 @@ type HookPoint =
   | "pre_response"
   | "post_response"
   | "pre_council"
-  | "post_council"
+  | "post_council";
 
-type HookLanguage = "javascript" | "typescript"
+type HookLanguage = "javascript" | "typescript";
 
 interface HookExtension {
-  id: number
-  userId: number
-  name: string
-  description: string | null
-  hookPoint: HookPoint
-  executionOrder: number
-  code: string
-  language: HookLanguage
-  isActive: boolean
-  config: Record<string, unknown> | null
-  timeout: number
-  createdAt: string
-  updatedAt: string
+  id: number;
+  userId: number;
+  name: string;
+  description: string | null;
+  hookPoint: HookPoint;
+  executionOrder: number;
+  code: string;
+  language: HookLanguage;
+  isActive: boolean;
+  config: Record<string, unknown> | null;
+  timeout: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface BuiltInTemplate {
-  type: string
-  name: string
-  description: string
-  hookPoint: HookPoint
-  language: HookLanguage
-  code: string
-  defaultConfig: Record<string, unknown>
-  timeout: number
+  type: string;
+  name: string;
+  description: string;
+  hookPoint: HookPoint;
+  language: HookLanguage;
+  code: string;
+  defaultConfig: Record<string, unknown>;
+  timeout: number;
 }
 
 interface HookExecutionLog {
-  id: number
-  hookId: number
-  conversationId: string | null
-  executionTimeMs: number
-  status: "success" | "error" | "timeout" | "skipped"
-  inputSize: number
-  outputSize: number
-  errorMessage: string | null
-  createdAt: string
+  id: number;
+  hookId: number;
+  conversationId: string | null;
+  executionTimeMs: number;
+  status: "success" | "error" | "timeout" | "skipped";
+  inputSize: number;
+  outputSize: number;
+  errorMessage: string | null;
+  createdAt: string;
 }
 
 interface ValidationResult {
-  valid: boolean
-  errors: string[]
+  valid: boolean;
+  errors: string[];
 }
 
 interface TestResult {
-  ok: boolean
-  result?: { content: string; metadata: Record<string, unknown> }
-  error?: string
-  durationMs: number
+  ok: boolean;
+  result?: { content: string; metadata: Record<string, unknown> };
+  error?: string;
+  durationMs: number;
 }
 
 interface HookExtensionManagerProps {
-  apiBase?: string
-  className?: string
+  apiBase?: string;
+  className?: string;
 }
 
 // ─── Hook Point metadata ────────────────────────────────────────────────────
 
 const HOOK_POINT_META: Record<HookPoint, { label: string; description: string; color: string }> = {
-  pre_indexing: { label: "Pre-Indexing", description: "Before content is indexed", color: "bg-blue-100 text-blue-800" },
-  post_indexing: { label: "Post-Indexing", description: "After content is indexed", color: "bg-blue-100 text-blue-800" },
-  pre_query: { label: "Pre-Query", description: "Before query is processed", color: "bg-green-100 text-green-800" },
-  post_query: { label: "Post-Query", description: "After query results", color: "bg-green-100 text-green-800" },
-  pre_response: { label: "Pre-Response", description: "Before response is delivered", color: "bg-amber-100 text-amber-800" },
-  post_response: { label: "Post-Response", description: "After response is delivered", color: "bg-amber-100 text-amber-800" },
-  pre_council: { label: "Pre-Council", description: "Before the council sees it", color: "bg-purple-100 text-purple-800" },
-  post_council: { label: "Post-Council", description: "After the council deliberates", color: "bg-purple-100 text-purple-800" },
-}
+  pre_indexing: {
+    label: "Pre-Indexing",
+    description: "Before content is indexed",
+    color: "bg-blue-100 text-blue-800",
+  },
+  post_indexing: {
+    label: "Post-Indexing",
+    description: "After content is indexed",
+    color: "bg-blue-100 text-blue-800",
+  },
+  pre_query: {
+    label: "Pre-Query",
+    description: "Before query is processed",
+    color: "bg-green-100 text-green-800",
+  },
+  post_query: {
+    label: "Post-Query",
+    description: "After query results",
+    color: "bg-green-100 text-green-800",
+  },
+  pre_response: {
+    label: "Pre-Response",
+    description: "Before response is delivered",
+    color: "bg-amber-100 text-amber-800",
+  },
+  post_response: {
+    label: "Post-Response",
+    description: "After response is delivered",
+    color: "bg-amber-100 text-amber-800",
+  },
+  pre_council: {
+    label: "Pre-Council",
+    description: "Before the council sees it",
+    color: "bg-purple-100 text-purple-800",
+  },
+  post_council: {
+    label: "Post-Council",
+    description: "After the council deliberates",
+    color: "bg-purple-100 text-purple-800",
+  },
+};
 
 const HOOK_POINTS: HookPoint[] = [
-  "pre_indexing", "post_indexing", "pre_query", "post_query",
-  "pre_response", "post_response", "pre_council", "post_council",
-]
+  "pre_indexing",
+  "post_indexing",
+  "pre_query",
+  "post_query",
+  "pre_response",
+  "post_response",
+  "pre_council",
+  "post_council",
+];
 
 const STATUS_COLORS: Record<string, string> = {
   success: "bg-green-100 text-green-800",
   error: "bg-red-100 text-red-800",
   timeout: "bg-amber-100 text-amber-800",
   skipped: "bg-gray-100 text-gray-800",
-}
+};
 
 // ─── API helpers ────────────────────────────────────────────────────────────
 
@@ -145,12 +184,12 @@ async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
       "Content-Type": "application/json",
       ...init?.headers,
     },
-  })
+  });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body.error ?? `Request failed: ${res.status}`)
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `Request failed: ${res.status}`);
   }
-  return res.json() as Promise<T>
+  return res.json() as Promise<T>;
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
@@ -159,157 +198,164 @@ export default function HookExtensionManager({
   apiBase = "",
   className = "",
 }: HookExtensionManagerProps) {
-  const [hooks, setHooks] = React.useState<HookExtension[]>([])
-  const [templates, setTemplates] = React.useState<BuiltInTemplate[]>([])
-  const [error, setError] = React.useState<string | null>(null)
-  const [tab, setTab] = React.useState<"hooks" | "templates" | "logs">("hooks")
-  const [filterPoint, setFilterPoint] = React.useState<string>("all")
+  const [hooks, setHooks] = React.useState<HookExtension[]>([]);
+  const [templates, setTemplates] = React.useState<BuiltInTemplate[]>([]);
+  const [error, setError] = React.useState<string | null>(null);
+  const [tab, setTab] = React.useState<"hooks" | "templates" | "logs">("hooks");
+  const [filterPoint, setFilterPoint] = React.useState<string>("all");
 
   // Editor state
-  const [editingHook, setEditingHook] = React.useState<Partial<HookExtension> | null>(null)
-  const [isCreating, setIsCreating] = React.useState(false)
-  const [validationErrors, setValidationErrors] = React.useState<string[]>([])
+  const [editingHook, setEditingHook] = React.useState<Partial<HookExtension> | null>(null);
+  const [isCreating, setIsCreating] = React.useState(false);
+  const [validationErrors, setValidationErrors] = React.useState<string[]>([]);
 
   // Test panel state
-  const [testHookId, setTestHookId] = React.useState<number | null>(null)
-  const [testInput, setTestInput] = React.useState("")
-  const [testResult, setTestResult] = React.useState<TestResult | null>(null)
-  const [isTesting, setIsTesting] = React.useState(false)
+  const [testHookId, setTestHookId] = React.useState<number | null>(null);
+  const [testInput, setTestInput] = React.useState("");
+  const [testResult, setTestResult] = React.useState<TestResult | null>(null);
+  const [isTesting, setIsTesting] = React.useState(false);
 
   // Logs state
-  const [selectedHookId, setSelectedHookId] = React.useState<number | null>(null)
-  const [logs, setLogs] = React.useState<HookExecutionLog[]>([])
+  const [selectedHookId, setSelectedHookId] = React.useState<number | null>(null);
+  const [logs, setLogs] = React.useState<HookExecutionLog[]>([]);
 
   // ─── Fetch data ─────────────────────────────────────────────────────────
 
   const loadHooks = React.useCallback(async () => {
     try {
-      const params = filterPoint !== "all" ? `?hookPoint=${filterPoint}` : ""
-      const res = await apiFetch<{ hooks: HookExtension[] }>(`${apiBase}/api/hook-extensions${params}`)
-      setHooks(res.hooks)
-      setError(null)
+      const params = filterPoint !== "all" ? `?hookPoint=${filterPoint}` : "";
+      const res = await apiFetch<{ hooks: HookExtension[] }>(
+        `${apiBase}/api/hook-extensions${params}`,
+      );
+      setHooks(res.hooks);
+      setError(null);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to load hooks")
+      setError(e instanceof Error ? e.message : "Failed to load hooks");
     }
-  }, [apiBase, filterPoint])
+  }, [apiBase, filterPoint]);
 
   const loadTemplates = React.useCallback(async () => {
     try {
-      const res = await apiFetch<{ templates: BuiltInTemplate[] }>(`${apiBase}/api/hook-extensions/built-in`)
-      setTemplates(res.templates)
+      const res = await apiFetch<{ templates: BuiltInTemplate[] }>(
+        `${apiBase}/api/hook-extensions/built-in`,
+      );
+      setTemplates(res.templates);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to load templates")
+      setError(e instanceof Error ? e.message : "Failed to load templates");
     }
-  }, [apiBase])
+  }, [apiBase]);
 
-  const loadLogs = React.useCallback(async (hookId: number) => {
-    try {
-      const res = await apiFetch<{ logs: HookExecutionLog[]; total: number }>(
-        `${apiBase}/api/hook-extensions/${hookId}/logs?limit=50`
-      )
-      setLogs(res.logs)
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to load logs")
-    }
-  }, [apiBase])
+  const loadLogs = React.useCallback(
+    async (hookId: number) => {
+      try {
+        const res = await apiFetch<{ logs: HookExecutionLog[]; total: number }>(
+          `${apiBase}/api/hook-extensions/${hookId}/logs?limit=50`,
+        );
+        setLogs(res.logs);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Failed to load logs");
+      }
+    },
+    [apiBase],
+  );
 
   React.useEffect(() => {
-    loadHooks()
-    loadTemplates()
-  }, [loadHooks, loadTemplates])
+    loadHooks();
+    loadTemplates();
+  }, [loadHooks, loadTemplates]);
 
   React.useEffect(() => {
     if (selectedHookId) {
-      loadLogs(selectedHookId)
+      loadLogs(selectedHookId);
     }
-  }, [selectedHookId, loadLogs])
+  }, [selectedHookId, loadLogs]);
 
   // ─── CRUD handlers ──────────────────────────────────────────────────────
 
   const handleCreate = async () => {
-    if (!editingHook) return
+    if (!editingHook) return;
     try {
       await apiFetch<HookExtension>(`${apiBase}/api/hook-extensions`, {
         method: "POST",
         body: JSON.stringify(editingHook),
-      })
-      setEditingHook(null)
-      setIsCreating(false)
-      setValidationErrors([])
-      loadHooks()
+      });
+      setEditingHook(null);
+      setIsCreating(false);
+      setValidationErrors([]);
+      loadHooks();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to create hook")
+      setError(e instanceof Error ? e.message : "Failed to create hook");
     }
-  }
+  };
 
   const handleUpdate = async () => {
-    if (!editingHook?.id) return
+    if (!editingHook?.id) return;
     try {
       await apiFetch<HookExtension>(`${apiBase}/api/hook-extensions/${editingHook.id}`, {
         method: "PUT",
         body: JSON.stringify(editingHook),
-      })
-      setEditingHook(null)
-      setValidationErrors([])
-      loadHooks()
+      });
+      setEditingHook(null);
+      setValidationErrors([]);
+      loadHooks();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to update hook")
+      setError(e instanceof Error ? e.message : "Failed to update hook");
     }
-  }
+  };
 
   const handleDelete = async (id: number) => {
     try {
-      await fetch(`${apiBase}/api/hook-extensions/${id}`, { method: "DELETE" })
-      loadHooks()
+      await fetch(`${apiBase}/api/hook-extensions/${id}`, { method: "DELETE" });
+      loadHooks();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to delete hook")
+      setError(e instanceof Error ? e.message : "Failed to delete hook");
     }
-  }
+  };
 
   const handleToggle = async (id: number, isActive: boolean) => {
     try {
       await apiFetch<HookExtension>(`${apiBase}/api/hook-extensions/${id}/toggle`, {
         method: "PATCH",
         body: JSON.stringify({ isActive }),
-      })
-      loadHooks()
+      });
+      loadHooks();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to toggle hook")
+      setError(e instanceof Error ? e.message : "Failed to toggle hook");
     }
-  }
+  };
 
   const handleValidate = async (code: string) => {
     try {
       const res = await apiFetch<ValidationResult>(`${apiBase}/api/hook-extensions/validate`, {
         method: "POST",
         body: JSON.stringify({ code, language: editingHook?.language ?? "javascript" }),
-      })
-      setValidationErrors(res.errors)
-      return res.valid
+      });
+      setValidationErrors(res.errors);
+      return res.valid;
     } catch {
-      return false
+      return false;
     }
-  }
+  };
 
   const handleTest = async () => {
-    if (!testHookId || !testInput) return
-    setIsTesting(true)
+    if (!testHookId || !testInput) return;
+    setIsTesting(true);
     try {
       const res = await apiFetch<TestResult>(`${apiBase}/api/hook-extensions/${testHookId}/test`, {
         method: "POST",
         body: JSON.stringify({ content: testInput }),
-      })
-      setTestResult(res)
+      });
+      setTestResult(res);
     } catch (e: unknown) {
       setTestResult({
         ok: false,
         error: e instanceof Error ? e.message : "Test failed",
         durationMs: 0,
-      })
+      });
     } finally {
-      setIsTesting(false)
+      setIsTesting(false);
     }
-  }
+  };
 
   const handleInstallTemplate = (template: BuiltInTemplate) => {
     setEditingHook({
@@ -321,16 +367,15 @@ export default function HookExtensionManager({
       config: template.defaultConfig,
       timeout: template.timeout,
       isActive: true,
-    })
-    setIsCreating(true)
-    setTab("hooks")
-  }
+    });
+    setIsCreating(true);
+    setTab("hooks");
+  };
 
   // ─── Filtered hooks ─────────────────────────────────────────────────────
 
-  const filteredHooks = filterPoint === "all"
-    ? hooks
-    : hooks.filter((h) => h.hookPoint === filterPoint)
+  const filteredHooks =
+    filterPoint === "all" ? hooks : hooks.filter((h) => h.hookPoint === filterPoint);
 
   // ─── Render ─────────────────────────────────────────────────────────────
 
@@ -350,12 +395,12 @@ export default function HookExtensionManager({
             setEditingHook({
               name: "",
               hookPoint: "pre_indexing",
-              code: 'function handler(context) {\n  const { content, config } = context;\n  return { content, metadata: {} };\n}',
+              code: "function handler(context) {\n  const { content, config } = context;\n  return { content, metadata: {} };\n}",
               language: "javascript",
               timeout: 5000,
               isActive: true,
-            })
-            setIsCreating(true)
+            });
+            setIsCreating(true);
           }}
         >
           <PlusIcon className="mr-2 h-4 w-4" /> New Hook
@@ -375,13 +420,25 @@ export default function HookExtensionManager({
 
       {/* Tab navigation */}
       <div className="flex gap-2 border-b pb-2">
-        <Button variant={tab === "hooks" ? "default" : "ghost"} size="sm" onClick={() => setTab("hooks")}>
+        <Button
+          variant={tab === "hooks" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setTab("hooks")}
+        >
           <CodeIcon className="mr-1 h-4 w-4" /> Hooks ({hooks.length})
         </Button>
-        <Button variant={tab === "templates" ? "default" : "ghost"} size="sm" onClick={() => setTab("templates")}>
+        <Button
+          variant={tab === "templates" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setTab("templates")}
+        >
           <ShieldIcon className="mr-1 h-4 w-4" /> Built-in Templates
         </Button>
-        <Button variant={tab === "logs" ? "default" : "ghost"} size="sm" onClick={() => setTab("logs")}>
+        <Button
+          variant={tab === "logs" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setTab("logs")}
+        >
           <FileTextIcon className="mr-1 h-4 w-4" /> Execution Logs
         </Button>
       </div>
@@ -453,15 +510,19 @@ export default function HookExtensionManager({
                         onClick={() => handleToggle(hook.id, !hook.isActive)}
                         title={hook.isActive ? "Disable" : "Enable"}
                       >
-                        {hook.isActive ? <PauseIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}
+                        {hook.isActive ? (
+                          <PauseIcon className="h-4 w-4" />
+                        ) : (
+                          <PlayIcon className="h-4 w-4" />
+                        )}
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          setTestHookId(hook.id)
-                          setTestResult(null)
-                          setTestInput("")
+                          setTestHookId(hook.id);
+                          setTestResult(null);
+                          setTestInput("");
                         }}
                         title="Test"
                       >
@@ -471,8 +532,8 @@ export default function HookExtensionManager({
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          setEditingHook(hook)
-                          setIsCreating(false)
+                          setEditingHook(hook);
+                          setIsCreating(false);
                         }}
                         title="Edit"
                       >
@@ -482,8 +543,8 @@ export default function HookExtensionManager({
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          setSelectedHookId(hook.id)
-                          setTab("logs")
+                          setSelectedHookId(hook.id);
+                          setTab("logs");
                         }}
                         title="View Logs"
                       >
@@ -625,14 +686,16 @@ export default function HookExtensionManager({
           open={!!editingHook}
           onOpenChange={(open) => {
             if (!open) {
-              setEditingHook(null)
-              setValidationErrors([])
+              setEditingHook(null);
+              setValidationErrors([]);
             }
           }}
         >
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{isCreating ? "Create Hook Extension" : "Edit Hook Extension"}</DialogTitle>
+              <DialogTitle>
+                {isCreating ? "Create Hook Extension" : "Edit Hook Extension"}
+              </DialogTitle>
               <DialogDescription>
                 {isCreating
                   ? "Define a new hook that runs at a specific pipeline point."
@@ -654,7 +717,9 @@ export default function HookExtensionManager({
                   <label className="text-sm font-medium">Hook Point</label>
                   <Select
                     value={editingHook.hookPoint ?? "pre_indexing"}
-                    onValueChange={(v) => setEditingHook({ ...editingHook, hookPoint: v as HookPoint })}
+                    onValueChange={(v) =>
+                      setEditingHook({ ...editingHook, hookPoint: v as HookPoint })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -757,7 +822,7 @@ export default function HookExtensionManager({
                   value={editingHook.config ? JSON.stringify(editingHook.config, null, 2) : "{}"}
                   onChange={(e) => {
                     try {
-                      setEditingHook({ ...editingHook, config: JSON.parse(e.target.value) })
+                      setEditingHook({ ...editingHook, config: JSON.parse(e.target.value) });
                     } catch {
                       // Allow invalid JSON while typing
                     }
@@ -785,8 +850,8 @@ export default function HookExtensionManager({
           open={testHookId !== null}
           onOpenChange={(open) => {
             if (!open) {
-              setTestHookId(null)
-              setTestResult(null)
+              setTestHookId(null);
+              setTestResult(null);
             }
           }}
         >
@@ -851,9 +916,7 @@ export default function HookExtensionManager({
                       </div>
                     </div>
                   )}
-                  {testResult.error && (
-                    <p className="text-sm text-red-700">{testResult.error}</p>
-                  )}
+                  {testResult.error && <p className="text-sm text-red-700">{testResult.error}</p>}
                 </div>
               )}
             </div>
@@ -867,5 +930,5 @@ export default function HookExtensionManager({
         </Dialog>
       )}
     </div>
-  )
+  );
 }

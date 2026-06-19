@@ -541,9 +541,9 @@ Your summary should include the following sections:
 Please provide your summary based on the research session below, following this structure and ensuring precision and thoroughness — especially for numerical data.`;
 
 const _NO_TOOLS_TRAILER =
-  '\n\nREMINDER: Do NOT call any tools. Respond with plain text only — ' +
-  'an <analysis> block followed by a <summary> block. ' +
-  'Tool calls will be rejected and you will fail the task.';
+  "\n\nREMINDER: Do NOT call any tools. Respond with plain text only — " +
+  "an <analysis> block followed by a <summary> block. " +
+  "Tool calls will be rejected and you will fail the task.";
 
 /**
  * Build the prompt sent to the fast LLM for compaction.
@@ -565,16 +565,13 @@ ${toolResults}${_NO_TOOLS_TRAILER}`;
  */
 export function formatCompactSummary(rawSummary: string): string {
   let formatted = rawSummary;
-  formatted = formatted.replace(/<analysis>[\s\S]*?<\/analysis>/, '');
-  const summaryMatch = formatted.match(/<summary>([\s\S]*?)<\/summary>/);
+  formatted = formatted.replace(/<analysis>[\s\S]*?<\/analysis>/, "");
+  const summaryMatch = /<summary>([\s\S]*?)<\/summary>/.exec(formatted);
   if (summaryMatch) {
-    const content = summaryMatch[1] ?? '';
-    formatted = formatted.replace(
-      /<summary>[\s\S]*?<\/summary>/,
-      `Summary:\n${content.trim()}`,
-    );
+    const content = summaryMatch[1] ?? "";
+    formatted = formatted.replace(/<summary>[\s\S]*?<\/summary>/, `Summary:\n${content.trim()}`);
   }
-  formatted = formatted.replace(/\n\n+/g, '\n\n');
+  formatted = formatted.replace(/\n\n+/g, "\n\n");
   return formatted.trim();
 }
 
@@ -600,10 +597,7 @@ export interface ILlmCaller {
    * @param prompt Full prompt string (no tools bound).
    * @param opts   Optional model override and abort signal.
    */
-  call(
-    prompt: string,
-    opts?: { model?: string; signal?: AbortSignal },
-  ): Promise<string>;
+  call(prompt: string, opts?: { model?: string; signal?: AbortSignal }): Promise<string>;
 }
 
 export interface LlmCompactParams {
@@ -680,7 +674,7 @@ export class LlmCompactor {
         ok: false,
         error: new PrunerError(
           `LlmCompactor blocked after ${MAX_CONSECUTIVE_COMPACTION_FAILURES} consecutive failures`,
-          'COMPACTOR_BLOCKED',
+          "COMPACTOR_BLOCKED",
         ),
       };
     }
@@ -693,7 +687,7 @@ export class LlmCompactor {
       });
 
       if (!rawSummary.trim()) {
-        throw new PrunerError('Compaction returned empty response', 'EMPTY_RESPONSE');
+        throw new PrunerError("Compaction returned empty response", "EMPTY_RESPONSE");
       }
 
       this._consecutiveFailures = 0;
@@ -726,7 +720,7 @@ export class LlmCompactor {
 //        run LlmCompactor at major thresholds for lossless deep compaction.
 
 /** Marker text replacing cleared tool-result content. */
-export const MC_CLEARED_MESSAGE = '[Old tool result content cleared]';
+export const MC_CLEARED_MESSAGE = "[Old tool result content cleared]";
 
 /** Fire when compactable tool messages exceed this count. */
 export const COUNT_TRIGGER_THRESHOLD = 8;
@@ -739,7 +733,7 @@ export const TOKEN_TRIGGER_THRESHOLD = 80_000;
 
 /** Extended Message type with optional tool name for MicroCompactor routing. */
 export interface ToolMessage extends Message {
-  role: 'tool';
+  role: "tool";
   /** Name of the tool that produced this result — used for compactability check. */
   toolName: string;
 }
@@ -751,7 +745,7 @@ export interface MicroCompactResult {
   /** Estimated tokens saved. */
   estimatedTokensSaved: number;
   /** Which trigger fired, or null if nothing was cleared. */
-  trigger: 'count' | 'token' | null;
+  trigger: "count" | "token" | null;
 }
 
 /**
@@ -772,10 +766,10 @@ export function microCompact(
   // Collect indices of clearable tool messages with non-cleared content
   const compactableIndices: number[] = [];
   for (let i = 0; i < messages.length; i++) {
-    const msg = messages[i];
+    const msg = messages[i]!;
     if (
-      msg.role === 'tool' &&
-      compactableTools.has((msg as ToolMessage).toolName ?? '') &&
+      msg.role === "tool" &&
+      compactableTools.has((msg as ToolMessage).toolName ?? "") &&
       msg.content !== MC_CLEARED_MESSAGE
     ) {
       compactableIndices.push(i);
@@ -789,7 +783,7 @@ export function microCompact(
   let totalTokens = 0;
   if (!countTriggered) {
     for (const idx of compactableIndices) {
-      totalTokens += Math.ceil(messages[idx].content.length / 3.5);
+      totalTokens += Math.ceil(messages[idx]!.content.length / 3.5);
     }
   }
   const tokenTriggered = !countTriggered && totalTokens > TOKEN_TRIGGER_THRESHOLD;
@@ -800,7 +794,7 @@ export function microCompact(
 
   // Keep most recent COUNT_KEEP_RECENT, clear the rest
   const keepSet = new Set(compactableIndices.slice(-COUNT_KEEP_RECENT));
-  const clearIndices = compactableIndices.filter(i => !keepSet.has(i));
+  const clearIndices = compactableIndices.filter((i) => !keepSet.has(i));
 
   if (clearIndices.length === 0) {
     return { messages, cleared: 0, estimatedTokensSaved: 0, trigger: null };
@@ -821,7 +815,7 @@ export function microCompact(
     messages: newMessages,
     cleared: clearIndices.length,
     estimatedTokensSaved: tokensSaved,
-    trigger: countTriggered ? 'count' : 'token',
+    trigger: countTriggered ? "count" : "token",
   };
 }
 
@@ -840,7 +834,7 @@ export function microCompact(
 export const DEFAULT_TOKEN_BUDGET = 200_000;
 
 /** Trigger background compaction at this fraction of the token budget. */
-export const COMPACTION_THRESHOLD = 0.80;
+export const COMPACTION_THRESHOLD = 0.8;
 
 /**
  * If context exceeds this fraction when compaction starts, perform a
@@ -849,7 +843,7 @@ export const COMPACTION_THRESHOLD = 0.80;
 export const CRITICAL_THRESHOLD = 0.95;
 
 /** Minimum context usage fraction required for manual compaction. */
-export const MANUAL_COMPACT_MIN_THRESHOLD = 0.10;
+export const MANUAL_COMPACT_MIN_THRESHOLD = 0.1;
 
 /** Keep this many recent turns verbatim (not summarised). */
 export const RECENT_TURNS_TO_KEEP = 10;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * First-run onboarding wizard — 4 steps
  *
@@ -46,42 +47,46 @@ import { useAuth } from "~/context/AuthContext";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STEPS = [
-  { id: 1, label: "Welcome",  icon: Sparkles  },
-  { id: 2, label: "Council",  icon: Users     },
-  { id: 3, label: "Prefs",    icon: Settings2 },
-  { id: 4, label: "Launch",   icon: Zap       },
+  { id: 1, label: "Welcome", icon: Sparkles },
+  { id: 2, label: "Council", icon: Users },
+  { id: 3, label: "Prefs", icon: Settings2 },
+  { id: 4, label: "Launch", icon: Zap },
 ] as const;
 
 const SYNTHESIS_MODELS = [
-  { id: "rotate",    label: "Rotate (default)",  detail: "Each round a different member synthesizes" },
-  { id: "fastest",   label: "Fastest responder", detail: "Whoever finishes first writes the verdict" },
-  { id: "openai",    label: "Always OpenAI",     detail: ""                                          },
-  { id: "anthropic", label: "Always Anthropic",  detail: ""                                          },
-  { id: "gemini",    label: "Always Gemini",     detail: ""                                          },
+  { id: "rotate", label: "Rotate (default)", detail: "Each round a different member synthesizes" },
+  {
+    id: "fastest",
+    label: "Fastest responder",
+    detail: "Whoever finishes first writes the verdict",
+  },
+  { id: "openai", label: "Always OpenAI", detail: "" },
+  { id: "anthropic", label: "Always Anthropic", detail: "" },
+  { id: "gemini", label: "Always Gemini", detail: "" },
 ];
 
 const DELIBERATION_MODES = [
-  { id: "consensus",  label: "Consensus",     desc: "Find common ground across all members"    },
-  { id: "debate",     label: "Debate",        desc: "Argue opposing positions before verdict"  },
-  { id: "expert",     label: "Expert Panel",  desc: "Each member uses a specialist persona"    },
-  { id: "blind",      label: "Blind Council", desc: "Members cannot see each other's answers"  },
+  { id: "consensus", label: "Consensus", desc: "Find common ground across all members" },
+  { id: "debate", label: "Debate", desc: "Argue opposing positions before verdict" },
+  { id: "expert", label: "Expert Panel", desc: "Each member uses a specialist persona" },
+  { id: "blind", label: "Blind Council", desc: "Members cannot see each other's answers" },
 ];
 
 const BROWSER_ACCOUNTS = [
-  { id: "chatgpt", name: "ChatGPT",  hint: "Uses your ChatGPT Plus / Team account"          },
-  { id: "gemini",  name: "Gemini",   hint: "Uses your Google account (Gemini Advanced opt.)" },
-  { id: "claude",  name: "Claude",   hint: "Uses your Anthropic / Claude Pro subscription"   },
+  { id: "chatgpt", name: "ChatGPT", hint: "Uses your ChatGPT Plus / Team account" },
+  { id: "gemini", name: "Gemini", hint: "Uses your Google account (Gemini Advanced opt.)" },
+  { id: "claude", name: "Claude", hint: "Uses your Anthropic / Claude Pro subscription" },
 ];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface WizardPrefs {
-  synthesisModel:      string;
-  deliberationMode:    string;
+  synthesisModel: string;
+  deliberationMode: string;
   roundsBeforeCompact: number;
-  browserAccounts:     Record<string, boolean>;
-  apiMembers:          CouncilMember[];
-  username:            string;
+  browserAccounts: Record<string, boolean>;
+  apiMembers: CouncilMember[];
+  username: string;
 }
 
 // ─── Step 1: Welcome ─────────────────────────────────────────────────────────
@@ -95,7 +100,8 @@ function StepWelcome() {
             <div
               className="size-20 rounded-2xl flex items-center justify-center text-4xl"
               style={{
-                background: "linear-gradient(135deg, hsl(var(--primary)/0.12), hsl(var(--primary)/0.04))",
+                background:
+                  "linear-gradient(135deg, hsl(var(--primary)/0.12), hsl(var(--primary)/0.04))",
                 border: "1px solid hsl(var(--primary)/0.3)",
               }}
             >
@@ -109,18 +115,32 @@ function StepWelcome() {
         </div>
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Welcome to Nexus</h2>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Multi-model AI deliberation platform
-          </p>
+          <p className="text-muted-foreground mt-1 text-sm">Multi-model AI deliberation platform</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-2.5">
         {[
-          { icon: Users,  title: "Council",        desc: "3–51 AI models deliberate simultaneously on your question"      },
-          { icon: Brain,  title: "Synthesis",       desc: "A rotating synthesizer distills a single verdict from all opinions" },
-          { icon: Cpu,    title: "RAG + Memory",    desc: "Your docs, connectors, and conversation history inform every answer" },
-          { icon: Zap,    title: "Agentic tools",   desc: "Code execution, web search, and 50+ connectors available to the council" },
+          {
+            icon: Users,
+            title: "Council",
+            desc: "3–51 AI models deliberate simultaneously on your question",
+          },
+          {
+            icon: Brain,
+            title: "Synthesis",
+            desc: "A rotating synthesizer distills a single verdict from all opinions",
+          },
+          {
+            icon: Cpu,
+            title: "RAG + Memory",
+            desc: "Your docs, connectors, and conversation history inform every answer",
+          },
+          {
+            icon: Zap,
+            title: "Agentic tools",
+            desc: "Code execution, web search, and 50+ connectors available to the council",
+          },
         ].map(({ icon: Icon, title, desc }) => (
           <div
             key={title}
@@ -156,25 +176,28 @@ function StepCouncil({
   setPrefs: React.Dispatch<React.SetStateAction<WizardPrefs>>;
 }) {
   const [showAdd, setShowAdd] = useState(false);
-  const [newProvider, setNewProvider]   = useState("openai");
-  const [newKey, setNewKey]             = useState("");
-  const [newModel, setNewModel]         = useState("");
+  const [newProvider, setNewProvider] = useState("openai");
+  const [newKey, setNewKey] = useState("");
+  const [newModel, setNewModel] = useState("");
 
   const toggleBrowser = (id: string) =>
-    setPrefs((p) => ({ ...p, browserAccounts: { ...p.browserAccounts, [id]: !p.browserAccounts[id] } }));
+    setPrefs((p) => ({
+      ...p,
+      browserAccounts: { ...p.browserAccounts, [id]: !p.browserAccounts[id] },
+    }));
 
   const addApi = () => {
     const prov = API_PROVIDERS.find((p) => p.id === newProvider)!;
     const model = newModel.trim() || prov.defaultModel;
     const member: CouncilMember = {
-      id:       `api_${Date.now()}`,
-      label:    `${prov.label} — ${model}`,
-      enabled:  true,
-      mode:     "api",
+      id: `api_${Date.now()}`,
+      label: `${prov.label} — ${model}`,
+      enabled: true,
+      mode: "api",
       provider: prov.id,
       model,
-      apiKey:   newKey.trim(),
-      baseUrl:  prov.defaultBaseUrl,
+      apiKey: newKey.trim(),
+      baseUrl: prov.defaultBaseUrl,
     };
     setPrefs((p) => ({ ...p, apiMembers: [...p.apiMembers, member] }));
     setShowAdd(false);
@@ -195,7 +218,9 @@ function StepCouncil({
       <div>
         <div className="flex items-center gap-2 mb-1">
           <h3 className="font-semibold text-sm">Browser accounts</h3>
-          <Badge variant="outline" className="text-xs h-4">{enabledCount}</Badge>
+          <Badge variant="outline" className="text-xs h-4">
+            {enabledCount}
+          </Badge>
         </div>
         <p className="text-xs text-muted-foreground mb-3">
           Use your existing subscriptions — no API key needed.
@@ -205,7 +230,10 @@ function StepCouncil({
             <div
               key={id}
               className="flex items-center justify-between p-3 rounded-lg"
-              style={{ background: "hsl(var(--muted)/0.4)", border: "1px solid hsl(var(--border)/0.5)" }}
+              style={{
+                background: "hsl(var(--muted)/0.4)",
+                border: "1px solid hsl(var(--border)/0.5)",
+              }}
             >
               <div>
                 <p className="text-sm font-medium">{name}</p>
@@ -225,7 +253,9 @@ function StepCouncil({
         <div className="flex items-center gap-2 mb-1">
           <Key className="size-3.5 text-muted-foreground" />
           <h3 className="font-semibold text-sm">API members</h3>
-          <Badge variant="outline" className="text-xs h-4">{prefs.apiMembers.length}</Badge>
+          <Badge variant="outline" className="text-xs h-4">
+            {prefs.apiMembers.length}
+          </Badge>
         </div>
         <p className="text-xs text-muted-foreground mb-3">
           Add models via API key — OpenAI, Groq, OpenRouter, Ollama, and more.
@@ -237,7 +267,10 @@ function StepCouncil({
               <div
                 key={m.id}
                 className="flex items-center justify-between p-2.5 rounded-md text-xs"
-                style={{ background: "hsl(var(--muted)/0.3)", border: "1px solid hsl(var(--border)/0.4)" }}
+                style={{
+                  background: "hsl(var(--muted)/0.3)",
+                  border: "1px solid hsl(var(--border)/0.4)",
+                }}
               >
                 <span className="font-medium font-mono">{m.label}</span>
                 <button
@@ -254,7 +287,10 @@ function StepCouncil({
         {showAdd ? (
           <div
             className="p-3 rounded-lg space-y-3"
-            style={{ background: "hsl(var(--muted)/0.4)", border: "1px solid hsl(var(--border)/0.5)" }}
+            style={{
+              background: "hsl(var(--muted)/0.4)",
+              border: "1px solid hsl(var(--border)/0.5)",
+            }}
           >
             <div className="space-y-1.5">
               <Label className="text-xs">Provider</Label>
@@ -264,7 +300,9 @@ function StepCouncil({
                 </SelectTrigger>
                 <SelectContent>
                   {API_PROVIDERS.map((p) => (
-                    <SelectItem key={p.id} value={p.id} className="text-xs">{p.label}</SelectItem>
+                    <SelectItem key={p.id} value={p.id} className="text-xs">
+                      {p.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -298,7 +336,12 @@ function StepCouncil({
               <Button size="sm" className="h-7 text-xs flex-1" onClick={addApi}>
                 Add member
               </Button>
-              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setShowAdd(false)}>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                onClick={() => setShowAdd(false)}
+              >
                 Cancel
               </Button>
             </div>
@@ -322,7 +365,8 @@ function StepCouncil({
       )}
       {total > 0 && (
         <p className="text-xs text-center text-muted-foreground">
-          Council: <span className="text-foreground font-semibold">{total}</span> member{total !== 1 ? "s" : ""}
+          Council: <span className="text-foreground font-semibold">{total}</span> member
+          {total !== 1 ? "s" : ""}
         </p>
       )}
     </div>
@@ -352,16 +396,21 @@ function StepPrefs({
               onClick={() => setPrefs((p) => ({ ...p, deliberationMode: id }))}
               className="w-full flex items-start gap-3 p-3 rounded-lg text-left transition-colors"
               style={{
-                background: prefs.deliberationMode === id
-                  ? "hsl(var(--primary)/0.1)"
-                  : "hsl(var(--muted)/0.4)",
+                background:
+                  prefs.deliberationMode === id
+                    ? "hsl(var(--primary)/0.1)"
+                    : "hsl(var(--muted)/0.4)",
                 border: `1px solid ${prefs.deliberationMode === id ? "hsl(var(--primary)/0.4)" : "hsl(var(--border)/0.5)"}`,
               }}
             >
-              {prefs.deliberationMode === id
-                ? <CheckCircle2 className="size-4 text-primary mt-0.5 shrink-0" />
-                : <div className="size-4 rounded-full mt-0.5 shrink-0" style={{ border: "1px solid hsl(var(--border))" }} />
-              }
+              {prefs.deliberationMode === id ? (
+                <CheckCircle2 className="size-4 text-primary mt-0.5 shrink-0" />
+              ) : (
+                <div
+                  className="size-4 rounded-full mt-0.5 shrink-0"
+                  style={{ border: "1px solid hsl(var(--border))" }}
+                />
+              )}
               <div>
                 <p className="text-sm font-medium">{label}</p>
                 <p className="text-xs text-muted-foreground">{desc}</p>
@@ -386,7 +435,8 @@ function StepPrefs({
           <SelectContent>
             {SYNTHESIS_MODELS.map(({ id, label, detail }) => (
               <SelectItem key={id} value={id} className="text-xs">
-                {label}{detail && <span className="text-muted-foreground"> — {detail}</span>}
+                {label}
+                {detail && <span className="text-muted-foreground"> — {detail}</span>}
               </SelectItem>
             ))}
           </SelectContent>
@@ -405,12 +455,12 @@ function StepPrefs({
               onClick={() => setPrefs((p) => ({ ...p, roundsBeforeCompact: n }))}
               className="flex-1 py-1.5 rounded-md text-xs font-medium transition-colors"
               style={{
-                background: prefs.roundsBeforeCompact === n
-                  ? "hsl(var(--primary))"
-                  : "hsl(var(--muted)/0.5)",
-                color: prefs.roundsBeforeCompact === n
-                  ? "hsl(var(--primary-foreground))"
-                  : "hsl(var(--muted-foreground))",
+                background:
+                  prefs.roundsBeforeCompact === n ? "hsl(var(--primary))" : "hsl(var(--muted)/0.5)",
+                color:
+                  prefs.roundsBeforeCompact === n
+                    ? "hsl(var(--primary-foreground))"
+                    : "hsl(var(--muted-foreground))",
                 border: "1px solid hsl(var(--border)/0.5)",
               }}
             >
@@ -454,9 +504,7 @@ function StepLaunch({
           autoFocus
           className="text-sm"
         />
-        <p className="text-xs text-muted-foreground">
-          Stored locally — never sent anywhere.
-        </p>
+        <p className="text-xs text-muted-foreground">Stored locally — never sent anywhere.</p>
       </div>
 
       {/* Summary */}
@@ -467,10 +515,10 @@ function StepLaunch({
         <p className="font-semibold text-foreground mb-1">Your setup</p>
         {[
           ["Browser accounts", enabledBrowser.length > 0 ? enabledBrowser.join(", ") : "None"],
-          ["API members",      String(prefs.apiMembers.length)],
-          ["Mode",             prefs.deliberationMode],
-          ["Synthesis",        SYNTHESIS_MODELS.find((m) => m.id === prefs.synthesisModel)?.label ?? ""],
-          ["Compact after",    `${prefs.roundsBeforeCompact} rounds`],
+          ["API members", String(prefs.apiMembers.length)],
+          ["Mode", prefs.deliberationMode],
+          ["Synthesis", SYNTHESIS_MODELS.find((m) => m.id === prefs.synthesisModel)?.label ?? ""],
+          ["Compact after", `${prefs.roundsBeforeCompact} rounds`],
         ].map(([key, val]) => (
           <div key={key} className="flex justify-between">
             <span className="text-muted-foreground">{key}</span>
@@ -490,17 +538,16 @@ export default function SetupPage() {
 
   const [step, setStep] = useState(1);
   const [prefs, setPrefs] = useState<WizardPrefs>({
-    synthesisModel:      "rotate",
-    deliberationMode:    "consensus",
+    synthesisModel: "rotate",
+    deliberationMode: "consensus",
     roundsBeforeCompact: 5,
-    browserAccounts:     { chatgpt: true, gemini: true, claude: true },
-    apiMembers:          [],
-    username:            "",
+    browserAccounts: { chatgpt: true, gemini: true, claude: true },
+    apiMembers: [],
+    username: "",
   });
 
   const totalMembers =
-    Object.values(prefs.browserAccounts).filter(Boolean).length +
-    prefs.apiMembers.length;
+    Object.values(prefs.browserAccounts).filter(Boolean).length + prefs.apiMembers.length;
 
   const canAdvance = () => {
     if (step === 2) return totalMembers > 0;
@@ -509,26 +556,33 @@ export default function SetupPage() {
   };
 
   const advance = () => {
-    if (step < 4) { setStep((s) => s + 1); return; }
+    if (step < 4) {
+      setStep((s) => s + 1);
+      return;
+    }
     finish();
   };
 
   const finish = () => {
     // Build council member list from wizard selections
     const members: CouncilMember[] = [
-      ...BROWSER_ACCOUNTS
-        .filter((b) => prefs.browserAccounts[b.id])
-        .map((b) => ({ ...(DEFAULT_MEMBERS.find((m) => m.id === b.id) ?? DEFAULT_MEMBERS[0]), enabled: true })),
+      ...BROWSER_ACCOUNTS.filter((b) => prefs.browserAccounts[b.id]).map((b) => ({
+        ...(DEFAULT_MEMBERS.find((m) => m.id === b.id) ?? DEFAULT_MEMBERS[0]),
+        enabled: true,
+      })),
       ...prefs.apiMembers,
     ];
     saveCouncilMembers(members);
 
     // Persist deliberation prefs
-    localStorage.setItem("nexus_prefs", JSON.stringify({
-      synthesisModel:      prefs.synthesisModel,
-      deliberationMode:    prefs.deliberationMode,
-      roundsBeforeCompact: prefs.roundsBeforeCompact,
-    }));
+    localStorage.setItem(
+      "nexus_prefs",
+      JSON.stringify({
+        synthesisModel: prefs.synthesisModel,
+        deliberationMode: prefs.deliberationMode,
+        roundsBeforeCompact: prefs.roundsBeforeCompact,
+      }),
+    );
 
     // Mark first-run complete
     localStorage.setItem("nexus_setup_done", "1");
@@ -544,7 +598,6 @@ export default function SetupPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-5">
-
         {/* Progress bar */}
         <div className="flex items-center justify-center gap-1">
           {STEPS.map((s, i) => (
@@ -554,27 +607,30 @@ export default function SetupPage() {
                 className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors"
                 style={{
                   background:
-                    s.id === step ? "hsl(var(--primary)/0.15)"
-                    : s.id < step ? "hsl(var(--muted)/0.3)"
-                    : "transparent",
+                    s.id === step
+                      ? "hsl(var(--primary)/0.15)"
+                      : s.id < step
+                        ? "hsl(var(--muted)/0.3)"
+                        : "transparent",
                   color:
-                    s.id === step ? "hsl(var(--primary))"
-                    : s.id < step ? "hsl(var(--foreground))"
-                    : "hsl(var(--muted-foreground))",
+                    s.id === step
+                      ? "hsl(var(--primary))"
+                      : s.id < step
+                        ? "hsl(var(--foreground))"
+                        : "hsl(var(--muted-foreground))",
                   border: `1px solid ${s.id === step ? "hsl(var(--primary)/0.3)" : "transparent"}`,
                   cursor: s.id < step ? "pointer" : "default",
                 }}
               >
-                {s.id < step
-                  ? <CheckCircle2 className="size-3" />
-                  : <s.icon className="size-3" />
-                }
+                {s.id < step ? <CheckCircle2 className="size-3" /> : <s.icon className="size-3" />}
                 <span className="hidden sm:inline">{s.label}</span>
               </button>
               {i < STEPS.length - 1 && (
                 <div
                   className="w-4 h-px"
-                  style={{ background: s.id < step ? "hsl(var(--primary)/0.4)" : "hsl(var(--border))" }}
+                  style={{
+                    background: s.id < step ? "hsl(var(--primary)/0.4)" : "hsl(var(--border))",
+                  }}
                 />
               )}
             </div>
@@ -590,15 +646,17 @@ export default function SetupPage() {
             <div className="flex items-center gap-2 mb-1">
               <currentStep.icon className="size-4 text-primary" />
               <h2 className="font-semibold text-base">{currentStep.label}</h2>
-              <span className="ml-auto text-xs text-muted-foreground">{step} / {STEPS.length}</span>
+              <span className="ml-auto text-xs text-muted-foreground">
+                {step} / {STEPS.length}
+              </span>
             </div>
             <div className="h-px w-full" style={{ background: "hsl(var(--border)/0.6)" }} />
           </div>
 
           {step === 1 && <StepWelcome />}
           {step === 2 && <StepCouncil prefs={prefs} setPrefs={setPrefs} />}
-          {step === 3 && <StepPrefs   prefs={prefs} setPrefs={setPrefs} />}
-          {step === 4 && <StepLaunch  prefs={prefs} setPrefs={setPrefs} />}
+          {step === 3 && <StepPrefs prefs={prefs} setPrefs={setPrefs} />}
+          {step === 4 && <StepLaunch prefs={prefs} setPrefs={setPrefs} />}
 
           {/* Navigation */}
           <div className="flex gap-2 mt-6">
@@ -611,15 +669,16 @@ export default function SetupPage() {
                 <ChevronLeft className="size-3.5" /> Back
               </Button>
             )}
-            <Button
-              className="flex-1 gap-1.5 text-sm"
-              onClick={advance}
-              disabled={!canAdvance()}
-            >
-              {step === 4
-                ? <><ArrowRight className="size-3.5" /> Enter Nexus</>
-                : <>Continue <ChevronRight className="size-3.5" /></>
-              }
+            <Button className="flex-1 gap-1.5 text-sm" onClick={advance} disabled={!canAdvance()}>
+              {step === 4 ? (
+                <>
+                  <ArrowRight className="size-3.5" /> Enter Nexus
+                </>
+              ) : (
+                <>
+                  Continue <ChevronRight className="size-3.5" />
+                </>
+              )}
             </Button>
           </div>
         </div>

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Verbosity — control and preview output verbosity levels.
  *
@@ -42,8 +43,8 @@ export default function Verbosity() {
 
   useEffect(() => {
     fetch("/api/verbosity/levels")
-      .then(r => r.ok ? r.json() : { levels: [] })
-      .then(d => {
+      .then((r) => (r.ok ? r.json() : { levels: [] }))
+      .then((d) => {
         const lvls = d.levels ?? d;
         setLevels(lvls);
         if (lvls.length) setSelectedLevel(lvls[0].id);
@@ -54,7 +55,9 @@ export default function Verbosity() {
 
   const runPreview = useCallback(async () => {
     if (!prompt.trim() || !selectedLevel) return;
-    setPreviewing(true); setErr(""); setPreview(null);
+    setPreviewing(true);
+    setErr("");
+    setPreview(null);
     const r = await fetch("/api/verbosity/preview", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -66,8 +69,10 @@ export default function Verbosity() {
   }, [prompt, selectedLevel]);
 
   const levelColor = (id: string) => {
-    if (id === "minimal" || id === "concise") return "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400";
-    if (id === "standard" || id === "normal") return "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400";
+    if (id === "minimal" || id === "concise")
+      return "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400";
+    if (id === "standard" || id === "normal")
+      return "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400";
     if (id === "verbose" || id === "detailed") return "bg-yellow-100 text-yellow-700";
     if (id === "exhaustive") return "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400";
     return "bg-slate-100 text-slate-600";
@@ -87,35 +92,48 @@ export default function Verbosity() {
 
       <Tabs defaultValue="levels">
         <TabsList>
-          <TabsTrigger value="levels"><Volume2 className="w-4 h-4 mr-1" />Levels</TabsTrigger>
-          <TabsTrigger value="preview"><Eye className="w-4 h-4 mr-1" />Preview</TabsTrigger>
+          <TabsTrigger value="levels">
+            <Volume2 className="w-4 h-4 mr-1" />
+            Levels
+          </TabsTrigger>
+          <TabsTrigger value="preview">
+            <Eye className="w-4 h-4 mr-1" />
+            Preview
+          </TabsTrigger>
         </TabsList>
 
         {/* Levels */}
         <TabsContent value="levels" className="mt-4">
           {loadingLevels ? (
             <div className="flex items-center gap-2 text-muted-foreground py-8 justify-center">
-              <Loader2 className="w-4 h-4 animate-spin" />Loading levels…
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Loading levels…
             </div>
           ) : (
             <div className="grid sm:grid-cols-2 gap-3">
-              {levels.map(l => (
+              {levels.map((l) => (
                 <Card key={l.id}>
                   <CardContent className="pt-4 space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-sm">{l.label}</span>
                       <Badge className={levelColor(l.id)}>{l.id}</Badge>
                     </div>
-                    {l.description && <p className="text-xs text-muted-foreground">{l.description}</p>}
+                    {l.description && (
+                      <p className="text-xs text-muted-foreground">{l.description}</p>
+                    )}
                     {l.tokenMultiplier !== undefined && (
-                      <p className="text-xs text-muted-foreground">Token multiplier: ×{l.tokenMultiplier}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Token multiplier: ×{l.tokenMultiplier}
+                      </p>
                     )}
                   </CardContent>
                 </Card>
               ))}
               {levels.length === 0 && (
                 <Card className="col-span-2">
-                  <CardContent className="pt-8 pb-8 text-center text-muted-foreground">No levels configured</CardContent>
+                  <CardContent className="pt-8 pb-8 text-center text-muted-foreground">
+                    No levels configured
+                  </CardContent>
                 </Card>
               )}
             </div>
@@ -130,12 +148,12 @@ export default function Verbosity() {
                 rows={4}
                 placeholder="Enter a prompt to preview at different verbosity levels…"
                 value={prompt}
-                onChange={e => setPrompt(e.target.value)}
+                onChange={(e) => setPrompt(e.target.value)}
                 className="resize-none"
               />
               {levels.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                  {levels.map(l => (
+                  {levels.map((l) => (
                     <button
                       key={l.id}
                       onClick={() => setSelectedLevel(l.id)}
@@ -151,8 +169,21 @@ export default function Verbosity() {
                 </div>
               )}
               {err && <p className="text-red-500 text-xs">{err}</p>}
-              <Button onClick={runPreview} disabled={previewing || !prompt.trim() || !selectedLevel}>
-                {previewing ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Previewing…</> : <><Eye className="w-4 h-4 mr-2" />Preview</>}
+              <Button
+                onClick={runPreview}
+                disabled={previewing || !prompt.trim() || !selectedLevel}
+              >
+                {previewing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Previewing…
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-4 h-4 mr-2" />
+                    Preview
+                  </>
+                )}
               </Button>
             </CardContent>
           </Card>
@@ -161,8 +192,14 @@ export default function Verbosity() {
             <Card className="border-teal-200 dark:border-teal-800">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center justify-between">
-                  <span>Preview — <Badge className={levelColor(preview.level)}>{preview.level}</Badge></span>
-                  {preview.tokens !== undefined && <span className="text-xs text-muted-foreground font-normal">{preview.tokens} tokens</span>}
+                  <span>
+                    Preview — <Badge className={levelColor(preview.level)}>{preview.level}</Badge>
+                  </span>
+                  {preview.tokens !== undefined && (
+                    <span className="text-xs text-muted-foreground font-normal">
+                      {preview.tokens} tokens
+                    </span>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>

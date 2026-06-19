@@ -2,12 +2,14 @@
   "name": "@nexus/image-transformations",
   "version": "0.1.0",
   "type": "module",
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./dist/index.js"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests",
+    "build": "tsc --project tsconfig.json",
+    "typecheck": "tsc --noEmit"
   },
   "optionalDependencies": {
     "sharp": "^0.33.0"

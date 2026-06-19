@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import * as fs from "fs";
 import * as path from "path";
 import * as net from "net";
@@ -143,21 +144,21 @@ export class FederationSupervisor {
           name: "floci",
           status: floci.reachable ? "healthy" : "offline",
           latencyMs: floci.latencyMs,
-          port: 4566
+          port: 4566,
         },
         {
           name: "orchestrator",
           status: apiRunning ? "healthy" : "offline",
           pid: state.apiPid,
-          port: state.apiPort
+          port: state.apiPort,
         },
         {
           name: "mcp-server",
           status: mcpRunning ? "healthy" : "offline",
           pid: state.mcpPid,
-          port: state.mcpPort
-        }
-      ]
+          port: state.mcpPort,
+        },
+      ],
     };
   }
 
@@ -171,7 +172,7 @@ export class FederationSupervisor {
       apiPort: this.config.apiPort,
       mcpPort: this.config.mcpPort,
       apiPid,
-      mcpPid
+      mcpPid,
     };
     fs.writeFileSync(p, JSON.stringify(state, null, 2), "utf8");
   }
@@ -185,14 +186,14 @@ export class FederationSupervisor {
     name: string,
     type: "mcp_server" | "workflow",
     status: "active" | "failed" | "degraded",
-    metadata: Record<string, unknown>
+    metadata: Record<string, unknown>,
   ): Promise<void> {
     if (!this.runtimeGraph) return;
     try {
       await this.runtimeGraph.addNode(`fed:${name}`, type, name, {
         status,
         metadata,
-        dependencies: ["conductor-runtime"]
+        dependencies: ["conductor-runtime"],
       });
     } catch {
       await this.runtimeGraph.updateNodeStatus(`fed:${name}`, status, metadata);
@@ -210,12 +211,21 @@ export class FederationSupervisor {
     while (Date.now() - started < timeoutMs) {
       const probe = await probeFlociHealth(resolveFlociEndpoint(), 5000);
       if (probe.reachable) {
-        return { name: "floci", status: "healthy", latencyMs: probe.latencyMs, detail: probe.healthPath };
+        return {
+          name: "floci",
+          status: "healthy",
+          latencyMs: probe.latencyMs,
+          detail: probe.healthPath,
+        };
       }
       retries++;
       await new Promise((r) => setTimeout(r, 2000));
     }
-    return { name: "floci", status: "offline", detail: `timeout waiting for Floci health after ${retries} retries` };
+    return {
+      name: "floci",
+      status: "offline",
+      detail: `timeout waiting for Floci health after ${retries} retries`,
+    };
   }
 
   async startFlociDocker(): Promise<void> {
@@ -249,7 +259,9 @@ export class FederationSupervisor {
       try {
         const state = JSON.parse(fs.readFileSync(statePath, "utf8")) as PersistedState;
         if (state.apiPid && isProcessRunning(state.apiPid)) {
-          throw new Error(`Conductor is already running (API PID: ${state.apiPid}). Stop it first with 'gs stop'`);
+          throw new Error(
+            `Conductor is already running (API PID: ${state.apiPid}). Stop it first with 'gs stop'`,
+          );
         }
       } catch (err: any) {
         if (err.message.includes("Conductor is already running")) throw err;
@@ -300,7 +312,7 @@ export class FederationSupervisor {
         status: probe.reachable ? "healthy" : "degraded",
         detail: probe.reachable ? undefined : "autostart disabled or unreachable",
         latencyMs: probe.latencyMs,
-        port: 4566
+        port: 4566,
       });
     }
 
@@ -311,20 +323,21 @@ export class FederationSupervisor {
       status: "healthy",
       detail: `http://127.0.0.1:${this.gsServer.port}`,
       pid: process.pid,
-      port: this.gsServer.port
+      port: this.gsServer.port,
     });
     console.log(`[federation] Orchestrator API http://127.0.0.1:${this.gsServer.port}`);
 
     // 3. MCP composite server last
     this.registerServiceNode("orchestrator-api", "mcp_server", "active", {
       port: this.config.apiPort,
-      url: `http://127.0.0.1:${this.config.apiPort}`
+      url: `http://127.0.0.1:${this.config.apiPort}`,
     });
     // Register Floci with its actual service status from the services array
-    const flociNodeStatus = services.find((s) => s.name === "floci")?.status === "healthy" ? "active" : "degraded";
-    this.registerServiceNode("floci-emulator", "mcp_server", flociNodeStatus,
-      { endpoint: resolveFlociEndpoint() }
-    );
+    const flociNodeStatus =
+      services.find((s) => s.name === "floci")?.status === "healthy" ? "active" : "degraded";
+    this.registerServiceNode("floci-emulator", "mcp_server", flociNodeStatus, {
+      endpoint: resolveFlociEndpoint(),
+    });
 
     if (this.config.features.mcpExternal && !options?.skipMcp) {
       this.mcpHost = new McpServerHost({ repoRoot: this.repoRoot });
@@ -336,7 +349,7 @@ export class FederationSupervisor {
           status: "healthy",
           detail: this.mcpHost.getMcpUrl(),
           pid: mcpPid,
-          port: this.config.mcpPort
+          port: this.config.mcpPort,
         });
         console.log(`[federation] MCP ${this.mcpHost.getMcpUrl()} (PID: ${mcpPid})`);
       } catch (err) {
@@ -366,7 +379,7 @@ export class FederationSupervisor {
     process.on("SIGTERM", sigtermHandler);
     this.signalHandlers.push(
       { signal: "SIGINT", handler: sigintHandler },
-      { signal: "SIGTERM", handler: sigtermHandler }
+      { signal: "SIGTERM", handler: sigtermHandler },
     );
 
     return {
@@ -378,7 +391,7 @@ export class FederationSupervisor {
       mcpUrl: this.mcpHost?.getMcpUrl(),
       flociUrl: resolveFlociEndpoint(),
       weStartedFlociDocker: this.weStartedFlociDocker,
-      services
+      services,
     };
   }
 
@@ -429,7 +442,7 @@ export class FederationSupervisor {
         if (queueLength > 0) {
           console.log(`[federation] Queue has ${queueLength} pending jobs. Draining...`);
           let attempts = 0;
-          while (await ctx.queue.getQueueLength() > 0 && attempts < 10) {
+          while ((await ctx.queue.getQueueLength()) > 0 && attempts < 10) {
             await new Promise((r) => setTimeout(r, 200));
             attempts++;
           }
@@ -441,7 +454,9 @@ export class FederationSupervisor {
       await this.gsServer.stop();
       this.gsServer = null;
     } else if (apiPid && apiPid !== process.pid && isProcessRunning(apiPid)) {
-      console.log(`[federation] Sending SIGTERM to running orchestrator process (PID: ${apiPid})...`);
+      console.log(
+        `[federation] Sending SIGTERM to running orchestrator process (PID: ${apiPid})...`,
+      );
       try {
         process.kill(apiPid, "SIGTERM");
         // Give it up to 2 seconds to gracefully exit
@@ -483,8 +498,8 @@ export class FederationSupervisor {
         status: floci.reachable ? "healthy" : "offline",
         latencyMs: floci.latencyMs,
         detail: floci.error,
-        port: 4566
-      }
+        port: 4566,
+      },
     ];
 
     const statePath = FederationSupervisor.statePath(this.repoRoot);
@@ -509,18 +524,18 @@ export class FederationSupervisor {
       name: "orchestrator",
       status: "offline",
       port: this.config.apiPort,
-      pid: apiPid
+      pid: apiPid,
     };
     try {
       const res = await fetch(`http://127.0.0.1:${this.config.apiPort}/health`, {
-        signal: AbortSignal.timeout(3000)
+        signal: AbortSignal.timeout(3000),
       });
       apiStatus = {
         name: "orchestrator",
         status: res.ok ? "healthy" : "degraded",
         detail: `http://127.0.0.1:${this.config.apiPort}`,
         pid: apiPid,
-        port: this.config.apiPort
+        port: this.config.apiPort,
       };
     } catch {
       apiStatus.detail = "API not reachable";
@@ -532,7 +547,7 @@ export class FederationSupervisor {
       name: "mcp-server",
       status: "offline",
       port: mcpPort,
-      pid: mcpPid
+      pid: mcpPid,
     };
     try {
       await fetch(`http://127.0.0.1:${mcpPort}/mcp`, { signal: AbortSignal.timeout(2000) });
@@ -541,10 +556,16 @@ export class FederationSupervisor {
         status: "healthy",
         detail: `http://127.0.0.1:${mcpPort}/mcp`,
         pid: mcpPid,
-        port: mcpPort
+        port: mcpPort,
       };
     } catch {
-      mcpStatus = { name: "mcp-server", status: "skipped", detail: "not running", pid: mcpPid, port: mcpPort };
+      mcpStatus = {
+        name: "mcp-server",
+        status: "skipped",
+        detail: "not running",
+        pid: mcpPid,
+        port: mcpPort,
+      };
     }
     services.push(mcpStatus);
 
@@ -569,7 +590,7 @@ export class FederationSupervisor {
       mcpUrl: `http://127.0.0.1:${mcpPort}/mcp`,
       flociUrl: resolveFlociEndpoint(),
       weStartedFlociDocker,
-      services
+      services,
     };
   }
 

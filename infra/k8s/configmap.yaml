@@ -11,19 +11,19 @@ metadata:
     app.kubernetes.io/name: nexus
     app.kubernetes.io/component: api
 data:
-  NODE_ENV:               "production"
-  LOG_LEVEL:              "info"
-  PORT:                   "3000"
-  HOST:                   "0.0.0.0"
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+  PORT: "3000"
+  HOST: "0.0.0.0"
 
   # Tracing (set to "true" when Sentry DSN is provisioned)
-  NEXUS_TRACING:          "false"
+  NEXUS_TRACING: "false"
 
   # CORS — comma-separated origins; wildcard not recommended in prod
-  ALLOWED_ORIGINS:        "https://nexus.yashawasthi.dev,https://api.nexus.yashawasthi.dev"
+  ALLOWED_ORIGINS: "https://nexus.yashawasthi.dev,https://api.nexus.yashawasthi.dev"
 
   # Prompt cache TTL (seconds; default 3600 = 1h)
-  PROMPT_CACHE_TTL_MS:    "3600000"
+  PROMPT_CACHE_TTL_MS: "3600000"
 
   # Gateway context budget (tokens; guards against runaway context)
   GATEWAY_CONTEXT_BUDGET: "30000"
@@ -32,9 +32,9 @@ data:
   OAUTH_REDIRECT_BASE_URL: "https://api.nexus.yashawasthi.dev"
 
   # CSP report-only mode in staging, enforcement in prod
-  NEXUS_CSP_REPORT_ONLY:  "false"
+  NEXUS_CSP_REPORT_ONLY: "false"
 
   # Observability endpoints (Grafana Cloud OTEL, adjust to match your stack)
   OTEL_EXPORTER_OTLP_ENDPOINT: "https://otlp-gateway-prod-eu-west-0.grafana.net/otlp"
-  OTEL_SERVICE_NAME:            "nexus-api"
-  OTEL_RESOURCE_ATTRIBUTES:     "deployment.environment=production"
+  OTEL_SERVICE_NAME: "nexus-api"
+  OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=production"

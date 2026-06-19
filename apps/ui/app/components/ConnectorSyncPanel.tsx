@@ -1,6 +1,7 @@
-"use client"
+// SPDX-License-Identifier: Apache-2.0
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
   PlayIcon,
   RefreshCwIcon,
@@ -13,19 +14,19 @@ import {
   AlertCircleIcon,
   LoaderIcon,
   ClockIcon,
-} from "lucide-react"
+} from "lucide-react";
 
-import { Button } from "~/components/ui/button"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "~/components/ui/card"
-import { Input } from "~/components/ui/input"
-import { Badge } from "~/components/ui/badge"
+import { Button } from "~/components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "~/components/ui/card";
+import { Input } from "~/components/ui/input";
+import { Badge } from "~/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select"
+} from "~/components/ui/select";
 import {
   Dialog,
   DialogTrigger,
@@ -35,41 +36,41 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
-} from "~/components/ui/dialog"
+} from "~/components/ui/dialog";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type SyncMode = "load" | "poll" | "slim"
-type JobStatus = "pending" | "running" | "completed" | "failed"
+type SyncMode = "load" | "poll" | "slim";
+type JobStatus = "pending" | "running" | "completed" | "failed";
 
 interface SyncJob {
-  id: string
-  connectorId: string
-  syncMode: SyncMode
-  status: JobStatus
-  startedAt: string | null
-  completedAt: string | null
-  documentsProcessed: number
-  documentsDeleted: number
-  errorMessage: string | null
-  createdAt: string
+  id: string;
+  connectorId: string;
+  syncMode: SyncMode;
+  status: JobStatus;
+  startedAt: string | null;
+  completedAt: string | null;
+  documentsProcessed: number;
+  documentsDeleted: number;
+  errorMessage: string | null;
+  createdAt: string;
 }
 
 interface SyncSchedule {
-  id: string
-  connectorId: string
-  syncMode: SyncMode
-  cronExpression: string
-  enabled: boolean
-  lastRunAt: string | null
-  nextRunAt: string | null
-  createdAt: string
+  id: string;
+  connectorId: string;
+  syncMode: SyncMode;
+  cronExpression: string;
+  enabled: boolean;
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+  createdAt: string;
 }
 
 interface ConnectorSyncPanelProps {
-  connectorId: string
-  apiBase?: string
-  className?: string
+  connectorId: string;
+  apiBase?: string;
+  className?: string;
 }
 
 // ─── API helpers ────────────────────────────────────────────────────────────
@@ -81,47 +82,65 @@ async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
       "Content-Type": "application/json",
       ...init?.headers,
     },
-  })
+  });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body.message ?? `Request failed: ${res.status}`)
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message ?? `Request failed: ${res.status}`);
   }
-  return res.json() as Promise<T>
+  return res.json() as Promise<T>;
 }
 
 // ─── Status Helpers ─────────────────────────────────────────────────────────
 
-const STATUS_CONFIG: Record<JobStatus, { icon: React.ElementType; variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
+const STATUS_CONFIG: Record<
+  JobStatus,
+  {
+    icon: React.ElementType;
+    variant: "default" | "secondary" | "destructive" | "outline";
+    label: string;
+  }
+> = {
   pending: { icon: ClockIcon, variant: "outline", label: "Pending" },
   running: { icon: LoaderIcon, variant: "secondary", label: "Running" },
   completed: { icon: CheckCircleIcon, variant: "default", label: "Completed" },
   failed: { icon: AlertCircleIcon, variant: "destructive", label: "Failed" },
-}
+};
 
-const SYNC_MODE_CONFIG: Record<SyncMode, { icon: React.ElementType; label: string; description: string }> = {
-  load: { icon: PlayIcon, label: "Load", description: "Full bulk index -- re-ingest all documents" },
+const SYNC_MODE_CONFIG: Record<
+  SyncMode,
+  { icon: React.ElementType; label: string; description: string }
+> = {
+  load: {
+    icon: PlayIcon,
+    label: "Load",
+    description: "Full bulk index -- re-ingest all documents",
+  },
   poll: { icon: RefreshCwIcon, label: "Poll", description: "Incremental update since last sync" },
-  slim: { icon: ScissorsIcon, label: "Slim", description: "Lightweight prune -- remove deleted docs" },
-}
+  slim: {
+    icon: ScissorsIcon,
+    label: "Slim",
+    description: "Lightweight prune -- remove deleted docs",
+  },
+};
 
 function StatusBadge({ status }: { status: JobStatus }) {
-  const config = STATUS_CONFIG[status]
-  const Icon = config.icon
+  const config = STATUS_CONFIG[status];
+  const Icon = config.icon;
   return (
     <Badge variant={config.variant} className="gap-1">
       <Icon className={`h-3 w-3 ${status === "running" ? "animate-spin" : ""}`} />
       {config.label}
     </Badge>
-  )
+  );
 }
 
 function SyncModeBadge({ mode }: { mode: SyncMode }) {
-  const config = SYNC_MODE_CONFIG[mode]
+  const config = SYNC_MODE_CONFIG[mode];
   return (
     <Badge variant="outline" className="gap-1">
       {config.label}
     </Badge>
-  )
+  );
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
@@ -131,57 +150,57 @@ export function ConnectorSyncPanel({
   apiBase = "/api/connectors",
   className,
 }: ConnectorSyncPanelProps) {
-  const [jobs, setJobs] = React.useState<SyncJob[]>([])
-  const [schedules, setSchedules] = React.useState<SyncSchedule[]>([])
-  const [loading, setLoading] = React.useState(true)
-  const [syncing, setSyncing] = React.useState<SyncMode | null>(null)
-  const [error, setError] = React.useState<string | null>(null)
+  const [jobs, setJobs] = React.useState<SyncJob[]>([]);
+  const [schedules, setSchedules] = React.useState<SyncSchedule[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [syncing, setSyncing] = React.useState<SyncMode | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
 
   // Schedule dialog state
-  const [showScheduleDialog, setShowScheduleDialog] = React.useState(false)
-  const [newScheduleMode, setNewScheduleMode] = React.useState<SyncMode>("poll")
-  const [newScheduleCron, setNewScheduleCron] = React.useState("0 */6 * * *")
+  const [showScheduleDialog, setShowScheduleDialog] = React.useState(false);
+  const [newScheduleMode, setNewScheduleMode] = React.useState<SyncMode>("poll");
+  const [newScheduleCron, setNewScheduleCron] = React.useState("0 */6 * * *");
 
-  const baseUrl = `${apiBase}/${connectorId}/sync`
+  const baseUrl = `${apiBase}/${connectorId}/sync`;
 
   // ─── Data Fetching ──────────────────────────────────────────────────────
 
   const fetchData = React.useCallback(async () => {
     try {
-      setLoading(true)
+      setLoading(true);
       const [jobsRes, schedulesRes] = await Promise.all([
         apiFetch<{ jobs: SyncJob[] }>(`${baseUrl}/jobs?limit=20`),
         apiFetch<{ schedules: SyncSchedule[] }>(`${baseUrl}/schedules`),
-      ])
-      setJobs(jobsRes.jobs)
-      setSchedules(schedulesRes.schedules)
-      setError(null)
+      ]);
+      setJobs(jobsRes.jobs);
+      setSchedules(schedulesRes.schedules);
+      setError(null);
     } catch (err) {
-      setError((err as Error).message)
+      setError((err as Error).message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [baseUrl])
+  }, [baseUrl]);
 
   React.useEffect(() => {
-    fetchData()
-  }, [fetchData])
+    fetchData();
+  }, [fetchData]);
 
   // ─── Trigger Sync ───────────────────────────────────────────────────────
 
   async function triggerSync(mode: SyncMode) {
     try {
-      setSyncing(mode)
-      setError(null)
+      setSyncing(mode);
+      setError(null);
       await apiFetch(`${baseUrl}`, {
         method: "POST",
         body: JSON.stringify({ mode }),
-      })
-      await fetchData()
+      });
+      await fetchData();
     } catch (err) {
-      setError((err as Error).message)
+      setError((err as Error).message);
     } finally {
-      setSyncing(null)
+      setSyncing(null);
     }
   }
 
@@ -189,11 +208,11 @@ export function ConnectorSyncPanel({
 
   async function cancelJob(jobId: string) {
     try {
-      setError(null)
-      await apiFetch(`${baseUrl}/jobs/${jobId}`, { method: "DELETE" })
-      await fetchData()
+      setError(null);
+      await apiFetch(`${baseUrl}/jobs/${jobId}`, { method: "DELETE" });
+      await fetchData();
     } catch (err) {
-      setError((err as Error).message)
+      setError((err as Error).message);
     }
   }
 
@@ -201,19 +220,19 @@ export function ConnectorSyncPanel({
 
   async function handleCreateSchedule() {
     try {
-      setError(null)
+      setError(null);
       await apiFetch(`${baseUrl}/schedules`, {
         method: "POST",
         body: JSON.stringify({
           syncMode: newScheduleMode,
           cronExpression: newScheduleCron,
         }),
-      })
-      setShowScheduleDialog(false)
-      setNewScheduleCron("0 */6 * * *")
-      await fetchData()
+      });
+      setShowScheduleDialog(false);
+      setNewScheduleCron("0 */6 * * *");
+      await fetchData();
     } catch (err) {
-      setError((err as Error).message)
+      setError((err as Error).message);
     }
   }
 
@@ -221,14 +240,14 @@ export function ConnectorSyncPanel({
 
   async function toggleSchedule(scheduleId: string, enabled: boolean) {
     try {
-      setError(null)
+      setError(null);
       await apiFetch(`${baseUrl}/schedules/${scheduleId}`, {
         method: "PUT",
         body: JSON.stringify({ enabled }),
-      })
-      await fetchData()
+      });
+      await fetchData();
     } catch (err) {
-      setError((err as Error).message)
+      setError((err as Error).message);
     }
   }
 
@@ -236,11 +255,11 @@ export function ConnectorSyncPanel({
 
   async function deleteSchedule(scheduleId: string) {
     try {
-      setError(null)
-      await apiFetch(`${baseUrl}/schedules/${scheduleId}`, { method: "DELETE" })
-      await fetchData()
+      setError(null);
+      await apiFetch(`${baseUrl}/schedules/${scheduleId}`, { method: "DELETE" });
+      await fetchData();
     } catch (err) {
-      setError((err as Error).message)
+      setError((err as Error).message);
     }
   }
 
@@ -262,16 +281,14 @@ export function ConnectorSyncPanel({
       <Card className="mb-4">
         <CardHeader>
           <CardTitle className="text-lg">Sync Modes</CardTitle>
-          <CardDescription>
-            Trigger a sync to keep your knowledge base current.
-          </CardDescription>
+          <CardDescription>Trigger a sync to keep your knowledge base current.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3">
             {(Object.keys(SYNC_MODE_CONFIG) as SyncMode[]).map((mode) => {
-              const config = SYNC_MODE_CONFIG[mode]
-              const Icon = config.icon
-              const isSyncing = syncing === mode
+              const config = SYNC_MODE_CONFIG[mode];
+              const Icon = config.icon;
+              const isSyncing = syncing === mode;
               return (
                 <Button
                   key={mode}
@@ -283,7 +300,7 @@ export function ConnectorSyncPanel({
                   <Icon className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
                   {isSyncing ? `Running ${config.label}...` : config.label}
                 </Button>
-              )
+              );
             })}
           </div>
           <div className="mt-3 space-y-1">
@@ -314,14 +331,15 @@ export function ConnectorSyncPanel({
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create Sync Schedule</DialogTitle>
-                <DialogDescription>
-                  Set up an automated sync on a cron schedule.
-                </DialogDescription>
+                <DialogDescription>Set up an automated sync on a cron schedule.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div>
                   <label className="text-sm font-medium">Sync Mode</label>
-                  <Select value={newScheduleMode} onValueChange={(v) => setNewScheduleMode(v as SyncMode)}>
+                  <Select
+                    value={newScheduleMode}
+                    onValueChange={(v) => setNewScheduleMode(v as SyncMode)}
+                  >
                     <SelectTrigger className="mt-1">
                       <SelectValue />
                     </SelectTrigger>
@@ -476,5 +494,5 @@ export function ConnectorSyncPanel({
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

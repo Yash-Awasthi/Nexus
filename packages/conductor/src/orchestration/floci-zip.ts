@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /** Minimal single-file ZIP builder for Lambda deployment packages (stored, no compression). */
 
 function makeCrcTable(): Uint32Array {

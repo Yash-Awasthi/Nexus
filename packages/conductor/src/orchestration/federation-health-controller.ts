@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Federation Health Controller
  *
@@ -17,7 +18,10 @@ import * as fs from "fs";
 import * as net from "net";
 import * as path from "path";
 import { resolveFlociEndpoint, probeFlociHealth } from "./floci-client";
-import type { FederationSupervisor, FederationServiceStatus } from "../runtime/federation-supervisor";
+import type {
+  FederationSupervisor,
+  FederationServiceStatus,
+} from "../runtime/federation-supervisor";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -93,7 +97,7 @@ export class FederationHealthController {
   constructor(
     supervisor: FederationSupervisor,
     repoRoot: string,
-    options?: FederationHealthControllerOptions
+    options?: FederationHealthControllerOptions,
   ) {
     this.supervisor = supervisor;
     this.repoRoot = repoRoot;
@@ -138,7 +142,10 @@ export class FederationHealthController {
    * Check a service health and escalate if needed.
    * Returns the current escalation level for the service.
    */
-  async checkAndEscalate(serviceName: string, actualHealth: FederationServiceStatus): Promise<EscalationLevel> {
+  async checkAndEscalate(
+    serviceName: string,
+    actualHealth: FederationServiceStatus,
+  ): Promise<EscalationLevel> {
     let record = this.escalationRecords.get(serviceName);
     if (!record) {
       record = {
@@ -171,7 +178,8 @@ export class FederationHealthController {
         newLevel = sinceLastTransition >= this.options.degradedAfterMs ? "restarting" : "degraded";
         break;
       case "restarting":
-        newLevel = sinceLastTransition >= this.options.restartingToOfflineMs ? "offline" : "restarting";
+        newLevel =
+          sinceLastTransition >= this.options.restartingToOfflineMs ? "offline" : "restarting";
         break;
       case "offline":
         // Already offline, stays offline until manual intervention
@@ -179,7 +187,11 @@ export class FederationHealthController {
     }
 
     if (newLevel !== record.currentLevel) {
-      this.transition(record, newLevel, `Escalation after ${Math.floor(sinceLastTransition / 1000)}s of '${actualHealth.status}'`);
+      this.transition(
+        record,
+        newLevel,
+        `Escalation after ${Math.floor(sinceLastTransition / 1000)}s of '${actualHealth.status}'`,
+      );
     }
 
     return record.currentLevel;
@@ -200,7 +212,11 @@ export class FederationHealthController {
     this.escalationRecords.delete(serviceName);
   }
 
-  private transition(record: FederationEscalationRecord, to: EscalationLevel, reason: string): void {
+  private transition(
+    record: FederationEscalationRecord,
+    to: EscalationLevel,
+    reason: string,
+  ): void {
     const from = record.currentLevel;
     record.currentLevel = to;
     record.lastTransition = new Date().toISOString();
@@ -233,10 +249,13 @@ export class FederationHealthController {
               type: "docker_missing",
               detail: `Floci Docker container expected (started by supervisor) but health probe failed: ${flociHealth.error}`,
               severity: "critical",
-              suggestedAction: "docker compose -f docker/docker-compose.federation.yaml up -d floci",
+              suggestedAction:
+                "docker compose -f docker/docker-compose.federation.yaml up -d floci",
             });
           }
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
     }
 
@@ -300,7 +319,9 @@ export class FederationHealthController {
                 if (pid && this.isProcessRunning(pid)) {
                   continue; // Process still alive, skip
                 }
-              } catch { /* corrupt file, cleanup */ }
+              } catch {
+                /* corrupt file, cleanup */
+              }
             }
 
             const size = stat.size;
@@ -308,7 +329,9 @@ export class FederationHealthController {
             report.staleStateFilesRemoved.push(fp);
             report.totalBytesFreed += size;
           }
-        } catch { /* skip unreadable files */ }
+        } catch {
+          /* skip unreadable files */
+        }
       }
     }
 
@@ -318,7 +341,9 @@ export class FederationHealthController {
       try {
         const raw = fs.readFileSync(sf, "utf8");
         const parsed = JSON.parse(raw);
-        const pids = [parsed.apiPid, parsed.mcpPid].filter((p: unknown): p is number => typeof p === "number");
+        const pids = [parsed.apiPid, parsed.mcpPid].filter(
+          (p: unknown): p is number => typeof p === "number",
+        );
         for (const pid of pids) {
           if (this.isProcessRunning(pid)) {
             try {
@@ -328,11 +353,15 @@ export class FederationHealthController {
               try {
                 process.kill(pid, "SIGKILL");
                 report.zombiePidsKilled.push(pid);
-              } catch { /* process may have exited */ }
+              } catch {
+                /* process may have exited */
+              }
             }
           }
         }
-      } catch { /* skip corrupt */ }
+      } catch {
+        /* skip corrupt */
+      }
     }
 
     return report;

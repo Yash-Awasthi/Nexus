@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Conductor operator CLI (`gs` / `conductor`)
  */
@@ -101,8 +102,8 @@ async function cmdInit(): Promise<void> {
         flociStrict: false,
         offlineMode: true,
         mcpBridge: true,
-        mcpExternal: true
-      }
+        mcpExternal: true,
+      },
     };
     fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2), "utf8");
     console.log(`[scaffold] Created default config file: ${configPath}`);
@@ -138,8 +139,9 @@ GHOSTSTACK_MCP_EXTERNAL=true
       spec_version: "v1.1",
       metadata: {
         name: "Demo ETL Pipeline",
-        description: "Scrapes news articles, transforms key headers, and stores in local Floci S3 buckets.",
-        author: "Conductor Operator"
+        description:
+          "Scrapes news articles, transforms key headers, and stores in local Floci S3 buckets.",
+        author: "Conductor Operator",
       },
       template_id: "governed-etl-template",
       tasks: [
@@ -153,9 +155,9 @@ GHOSTSTACK_MCP_EXTERNAL=true
           arguments: {
             url: "https://news.ycombinator.com",
             maxLengthBytes: 40000,
-            selectors: ["a.storylink"]
+            selectors: ["a.storylink"],
           },
-          dependencies: []
+          dependencies: [],
         },
         {
           id: "transform-news",
@@ -166,9 +168,9 @@ GHOSTSTACK_MCP_EXTERNAL=true
           priority: "medium",
           arguments: {
             pattern: "(?:AI|Rust|TypeScript|Cognitive)",
-            sourceTaskId: "extract-news"
+            sourceTaskId: "extract-news",
           },
-          dependencies: ["extract-news"]
+          dependencies: ["extract-news"],
         },
         {
           id: "load-archive",
@@ -179,11 +181,11 @@ GHOSTSTACK_MCP_EXTERNAL=true
           priority: "medium",
           arguments: {
             bucketName: "conductor-tech-archive",
-            sourceTaskId: "transform-news"
+            sourceTaskId: "transform-news",
           },
-          dependencies: ["transform-news"]
-        }
-      ]
+          dependencies: ["transform-news"],
+        },
+      ],
     };
     fs.writeFileSync(specPath, JSON.stringify(demoSpec, null, 2), "utf8");
     console.log(`[scaffold] Scaffolding example spec: ${specPath}`);
@@ -215,7 +217,7 @@ async function cmdPs(): Promise<void> {
     const stat = s.status.toUpperCase().padEnd(12);
     const port = (s.port ? String(s.port) : "-").padEnd(8);
     const pid = (s.pid ? String(s.pid) : "-").padEnd(9);
-    const detail = s.latencyMs ? `${s.latencyMs}ms` : (s.detail || "-");
+    const detail = s.latencyMs ? `${s.latencyMs}ms` : s.detail || "-";
     console.log(`  ${name}${stat}${port}${pid}${detail}`);
   }
   console.log("=======================================================================\n");
@@ -248,7 +250,7 @@ async function cmdE2e(viaHttp: boolean): Promise<void> {
     const res = await fetch(`${api}/runtime/e2e/federation`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ strict: true, cleanup: true })
+      body: JSON.stringify({ strict: true, cleanup: true }),
     });
     const body = await res.json();
     console.log(JSON.stringify(body, null, 2));
@@ -344,7 +346,11 @@ async function cmdWorkflowsExecutions(): Promise<void> {
         const status = e.status.padEnd(12);
         const id = e.id.padEnd(28);
         const started = e.startedAt ? new Date(e.startedAt).toLocaleTimeString() : "-";
-        const note = e.error ? ` ERR: ${e.error}` : e.approved === false ? " (pending approval)" : "";
+        const note = e.error
+          ? ` ERR: ${e.error}`
+          : e.approved === false
+            ? " (pending approval)"
+            : "";
         console.log(`  ${status}${id}${started}${note}`);
       }
     }
@@ -574,9 +580,13 @@ async function cmdGraphRepair(): Promise<void> {
   try {
     console.log("\n=== RuntimeGraph Repair ===");
     const before = await ctx.runtimeGraph.validate();
-    console.log(`  Before: valid=${before.valid}, dangling=${before.danglingEdgeCount}, missingDeps=${before.missingDependencyCount}, cycles=${before.cycleCount}`);
+    console.log(
+      `  Before: valid=${before.valid}, dangling=${before.danglingEdgeCount}, missingDeps=${before.missingDependencyCount}, cycles=${before.cycleCount}`,
+    );
     const after = await ctx.runtimeGraph.repair();
-    console.log(`  After:  valid=${after.valid}, dangling=${after.danglingEdgeCount}, missingDeps=${after.missingDependencyCount}, cycles=${after.cycleCount}`);
+    console.log(
+      `  After:  valid=${after.valid}, dangling=${after.danglingEdgeCount}, missingDeps=${after.missingDependencyCount}, cycles=${after.cycleCount}`,
+    );
     console.log(`  Repaired: ${after.repaired ? "✅" : "already clean"}`);
     if (after.warnings.length > 0) {
       console.log("\n  Warnings:");
@@ -664,7 +674,9 @@ async function cmdGraphPrune(): Promise<void> {
     // Repair the graph to clean up dangling dependency references in remaining nodes
     if (removed > 0) {
       const repairReport = await ctx.runtimeGraph.repair();
-      console.log(`  Repair: removed ${repairReport.danglingEdgeCount} dangling edge(s), ${repairReport.missingDependencyCount} missing dep(s)`);
+      console.log(
+        `  Repair: removed ${repairReport.danglingEdgeCount} dangling edge(s), ${repairReport.missingDependencyCount} missing dep(s)`,
+      );
     }
     console.log(`\n  Done: ${removed} node(s) pruned.`);
     if (removed === 0) {
@@ -730,7 +742,7 @@ async function cmdPlan(objective: string | undefined): Promise<void> {
   const plan = await engine.generatePlan(objective);
   const total = plan.synthesisResults.reduce(
     (sum, t) => sum + (t.governanceMetadata?.costEstimate ?? 0),
-    0
+    0,
   );
 
   console.log(`\n======================== Generated Plan ============================`);
@@ -747,7 +759,9 @@ async function cmdPlan(objective: string | undefined): Promise<void> {
     const deps = t.dependencies.length > 0 ? `deps: ${t.dependencies.join(", ")}` : "deps: none";
     const dangerous = t.governanceMetadata?.dangerous ? " ⚠ DANGEROUS" : "";
     console.log(`\n  #${i + 1}  ${t.action}  ${priority}  ${deps}${dangerous}`);
-    console.log(`       cost: $${(t.governanceMetadata?.costEstimate ?? 0).toFixed(4)}  scope: ${t.governanceMetadata?.resourceScope}`);
+    console.log(
+      `       cost: $${(t.governanceMetadata?.costEstimate ?? 0).toFixed(4)}  scope: ${t.governanceMetadata?.resourceScope}`,
+    );
     if (Object.keys(t.arguments).length > 0) {
       console.log(`       args: ${JSON.stringify(t.arguments)}`);
     }
@@ -765,8 +779,8 @@ async function cmdQueue(): Promise<void> {
   const ctx = await createRuntimeContext(repoRoot);
   await startRuntime(ctx);
   try {
-    const active = await ctx.queue?.getActiveJobs?.() ?? [];
-    const dlq = await ctx.queue?.getDeadLetterQueue?.() ?? [];
+    const active = (await ctx.queue?.getActiveJobs?.()) ?? [];
+    const dlq = (await ctx.queue?.getDeadLetterQueue?.()) ?? [];
 
     console.log(`\n======================== Queue Status ==============================`);
     console.log(`  Pending:     ${active.length}`);
@@ -815,7 +829,9 @@ async function cmdDlq(subcommand: string | undefined, jobId?: string): Promise<v
       if (dlq.length === 0) {
         console.log("  (empty)");
       } else {
-        console.log(`\n  ${"JOB ID".padEnd(32)} ${"PRIORITY".padEnd(10)} ${"RETRIES".padEnd(10)} TYPE`);
+        console.log(
+          `\n  ${"JOB ID".padEnd(32)} ${"PRIORITY".padEnd(10)} ${"RETRIES".padEnd(10)} TYPE`,
+        );
         console.log(`  ${"─".repeat(65)}`);
         for (const job of dlq) {
           const id = job.id.padEnd(32);
@@ -978,7 +994,8 @@ async function main(): Promise<void> {
     case "e2e:http":
       loadConductorConfig(repoRoot);
       await cmdE2e(true);
-      break;      case "workflows":
+      break;
+    case "workflows":
       await cmdWorkflowsList();
       break;
     case "workflows:executions":

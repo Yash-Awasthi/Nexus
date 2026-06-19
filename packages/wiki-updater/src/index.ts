@@ -274,7 +274,7 @@ export class PgWikiStore {
   async count(): Promise<number> {
     await this.ensureReady();
     const rows = await this.sql`SELECT COUNT(*)::int AS n FROM wiki_articles`;
-    return (((rows as Record<string, unknown>[])[0])?.["n"] as number) ?? 0;
+    return ((rows as Record<string, unknown>[])[0]?.["n"] as number) ?? 0;
   }
 
   private rowToArticle(row: Record<string, unknown>): WikiArticle {

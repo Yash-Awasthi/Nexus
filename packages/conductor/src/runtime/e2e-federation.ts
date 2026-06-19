@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { ConductorRuntimeContext } from "./runtime-context";
 import { IWorkflowDefinition } from "../orchestration/interfaces/workflow.interface";
 import { Task } from "../orchestration/task-router";
@@ -24,7 +25,7 @@ export type FederationE2eOptions = {
  */
 export async function runFederationE2e(
   ctx: ConductorRuntimeContext,
-  options: FederationE2eOptions = {}
+  options: FederationE2eOptions = {},
 ): Promise<FederationE2eResult> {
   const strict = options.strict ?? true;
   const cleanup = options.cleanup ?? true;
@@ -50,7 +51,7 @@ export async function runFederationE2e(
       dependencies: [],
       type: "floci",
       action: "create_s3_bucket",
-      arguments: { bucketName }
+      arguments: { bucketName },
     },
     {
       id: "e2e-lambda-create",
@@ -63,8 +64,8 @@ export async function runFederationE2e(
       action: "create_lambda",
       arguments: {
         functionName,
-        handlerBody: "JSON.stringify({ ok: true, source: 'conductor-e2e', event })"
-      }
+        handlerBody: "JSON.stringify({ ok: true, source: 'conductor-e2e', event })",
+      },
     },
     {
       id: "e2e-lambda-invoke",
@@ -77,16 +78,16 @@ export async function runFederationE2e(
       action: "invoke_lambda",
       arguments: {
         functionName,
-        payload: { test: "conductor-e2e" }
-      }
-    }
+        payload: { test: "conductor-e2e" },
+      },
+    },
   ];
 
   const definition: IWorkflowDefinition = {
     id: workflowId,
     name: "Federation E2E Pipeline",
     description: "S3 → Lambda deploy → Lambda invoke",
-    tasks
+    tasks,
   };
 
   ctx.registry.registerWorkflow(definition);
@@ -99,7 +100,7 @@ export async function runFederationE2e(
     workflowId,
     executionId,
     error: exec.error,
-    taskResults: exec.taskResults
+    taskResults: exec.taskResults,
   };
 
   if (cleanup && strict) {

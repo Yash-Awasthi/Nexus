@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Agents Hub — Phase 4.13 / 4.15
  *
@@ -114,14 +115,7 @@ const EVENT_TYPES = [
   "connector.sync.completed",
 ];
 
-const HANDLER_TYPES = [
-  "notify",
-  "send_email",
-  "webhook",
-  "run_workflow",
-  "summarize",
-  "tag",
-];
+const HANDLER_TYPES = ["notify", "send_email", "webhook", "run_workflow", "summarize", "tag"];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -212,15 +206,22 @@ export default function Agents() {
           startUrl: newTask.url.trim() || undefined,
         }),
       });
-      if (!r.ok) { const d = await r.json(); setErr(d.error ?? "Create failed"); return; }
+      if (!r.ok) {
+        const d = await r.json();
+        setErr(d.error ?? "Create failed");
+        return;
+      }
       const data = await r.json();
       const session: BrowserTask = data.session ?? data;
-      setBrowserSessions(prev => [session, ...prev]);
+      setBrowserSessions((prev) => [session, ...prev]);
       setSelectedSession(session);
       setShowBrowserForm(false);
       setNewTask({ task: "", url: "" });
-    } catch { setErr("Create failed"); }
-    finally { setCreatingTask(false); }
+    } catch {
+      setErr("Create failed");
+    } finally {
+      setCreatingTask(false);
+    }
   }, [newTask]);
 
   const loadSession = useCallback(async (id: string) => {
@@ -229,7 +230,7 @@ export default function Agents() {
       if (r.ok) {
         const data = await r.json();
         setSelectedSession(data);
-        setBrowserSessions(prev => prev.map(s => s.sessionId === id ? data : s));
+        setBrowserSessions((prev) => prev.map((s) => (s.sessionId === id ? data : s)));
       }
     } catch {}
   }, []);
@@ -241,7 +242,9 @@ export default function Agents() {
     setErr("");
     try {
       let config = {};
-      try { config = JSON.parse(newReaction.handlerConfig); } catch {}
+      try {
+        config = JSON.parse(newReaction.handlerConfig);
+      } catch {}
       const r = await fetch("/api/reactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -251,12 +254,23 @@ export default function Agents() {
           handlerConfig: config,
         }),
       });
-      if (!r.ok) { const d = await r.json(); setErr(d.error ?? "Create failed"); return; }
+      if (!r.ok) {
+        const d = await r.json();
+        setErr(d.error ?? "Create failed");
+        return;
+      }
       setShowReactionForm(false);
-      setNewReaction({ eventPattern: "message.created", handlerType: "notify", handlerConfig: "{}" });
+      setNewReaction({
+        eventPattern: "message.created",
+        handlerType: "notify",
+        handlerConfig: "{}",
+      });
       loadReactions();
-    } catch { setErr("Create failed"); }
-    finally { setCreatingReaction(false); }
+    } catch {
+      setErr("Create failed");
+    } finally {
+      setCreatingReaction(false);
+    }
   }, [newReaction, loadReactions]);
 
   const toggleReaction = useCallback(async (rule: ReactionRule) => {
@@ -266,14 +280,16 @@ export default function Agents() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled: !rule.enabled }),
       });
-      setReactions(prev => prev.map(r => r.id === rule.id ? { ...r, enabled: !rule.enabled } : r));
+      setReactions((prev) =>
+        prev.map((r) => (r.id === rule.id ? { ...r, enabled: !rule.enabled } : r)),
+      );
     } catch {}
   }, []);
 
   const deleteReaction = useCallback(async (id: string) => {
     try {
       await fetch(`/api/reactions/${id}`, { method: "DELETE" });
-      setReactions(prev => prev.filter(r => r.id !== id));
+      setReactions((prev) => prev.filter((r) => r.id !== id));
     } catch {}
   }, []);
 
@@ -283,10 +299,18 @@ export default function Agents() {
       await fetch("/api/reactions/emit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventType: testEvent, payload: { test: true, timestamp: Date.now() } }),
+        body: JSON.stringify({
+          eventType: testEvent,
+          payload: { test: true, timestamp: Date.now() },
+        }),
       });
-      setTimeout(() => { loadReactionEvents(); loadReactions(); }, 1000);
-    } finally { setEmitting(false); }
+      setTimeout(() => {
+        loadReactionEvents();
+        loadReactions();
+      }, 1000);
+    } finally {
+      setEmitting(false);
+    }
   }, [testEvent, loadReactionEvents, loadReactions]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -305,11 +329,19 @@ export default function Agents() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant={tab === "browser" ? "default" : "outline"} onClick={() => setTab("browser")}>
+          <Button
+            size="sm"
+            variant={tab === "browser" ? "default" : "outline"}
+            onClick={() => setTab("browser")}
+          >
             <Globe className="w-3 h-3 mr-1" />
             Browser Agent
           </Button>
-          <Button size="sm" variant={tab === "reactive" ? "default" : "outline"} onClick={() => setTab("reactive")}>
+          <Button
+            size="sm"
+            variant={tab === "reactive" ? "default" : "outline"}
+            onClick={() => setTab("reactive")}
+          >
             <Zap className="w-3 h-3 mr-1" />
             Reactive Rules
           </Button>
@@ -341,17 +373,22 @@ export default function Agents() {
                 <CardContent className="pt-6 pb-6 text-center space-y-3">
                   <Globe className="w-10 h-10 mx-auto opacity-40 text-muted-foreground" />
                   <p className="text-sm text-muted-foreground">No tasks yet</p>
-                  <Button size="sm" onClick={() => setShowBrowserForm(true)}>Create task</Button>
+                  <Button size="sm" onClick={() => setShowBrowserForm(true)}>
+                    Create task
+                  </Button>
                 </CardContent>
               </Card>
             ) : (
-              browserSessions.map(s => (
+              browserSessions.map((s) => (
                 <Card
                   key={s.sessionId}
                   className={`cursor-pointer hover:bg-accent/50 transition-colors ${
                     selectedSession?.sessionId === s.sessionId ? "border-primary" : ""
                   }`}
-                  onClick={() => { setSelectedSession(s); loadSession(s.sessionId); }}
+                  onClick={() => {
+                    setSelectedSession(s);
+                    loadSession(s.sessionId);
+                  }}
                 >
                   <CardContent className="pt-3 pb-3">
                     <div className="flex items-center gap-2">
@@ -384,19 +421,30 @@ export default function Agents() {
                       <div>
                         <CardTitle className="text-sm">{selectedSession.task}</CardTitle>
                         {selectedSession.url && (
-                          <p className="text-xs text-muted-foreground mt-1">{selectedSession.url}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {selectedSession.url}
+                          </p>
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge className={
-                          selectedSession.status === "completed" ? "bg-green-100 text-green-700" :
-                          selectedSession.status === "error" ? "bg-red-100 text-red-700" :
-                          selectedSession.status === "running" ? "bg-blue-100 text-blue-700" :
-                          "bg-slate-100 text-slate-600"
-                        }>
+                        <Badge
+                          className={
+                            selectedSession.status === "completed"
+                              ? "bg-green-100 text-green-700"
+                              : selectedSession.status === "error"
+                                ? "bg-red-100 text-red-700"
+                                : selectedSession.status === "running"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-slate-100 text-slate-600"
+                          }
+                        >
                           {selectedSession.status}
                         </Badge>
-                        <Button variant="ghost" size="sm" onClick={() => loadSession(selectedSession.sessionId)}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => loadSession(selectedSession.sessionId)}
+                        >
                           <RefreshCw className="w-3 h-3" />
                         </Button>
                       </div>
@@ -409,9 +457,11 @@ export default function Agents() {
                       <div className="space-y-1 max-h-48 overflow-y-auto">
                         {selectedSession.steps.map((step, i) => (
                           <div key={i} className="flex items-center gap-2 text-xs">
-                            {step.success
-                              ? <CheckCircle className="w-3 h-3 text-green-500 shrink-0" />
-                              : <XCircle className="w-3 h-3 text-red-500 shrink-0" />}
+                            {step.success ? (
+                              <CheckCircle className="w-3 h-3 text-green-500 shrink-0" />
+                            ) : (
+                              <XCircle className="w-3 h-3 text-red-500 shrink-0" />
+                            )}
                             <span className="text-muted-foreground">{step.description}</span>
                           </div>
                         ))}
@@ -429,7 +479,9 @@ export default function Agents() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedSession.result}</p>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                        {selectedSession.result}
+                      </p>
                     </CardContent>
                   </Card>
                 )}
@@ -473,17 +525,21 @@ export default function Agents() {
                   <p className="text-xs text-muted-foreground">
                     Reactive rules fire agent actions automatically when system events occur
                   </p>
-                  <Button size="sm" onClick={() => setShowReactionForm(true)}>Create first rule</Button>
+                  <Button size="sm" onClick={() => setShowReactionForm(true)}>
+                    Create first rule
+                  </Button>
                 </CardContent>
               </Card>
             ) : (
-              reactions.map(rule => (
+              reactions.map((rule) => (
                 <Card key={rule.id} className={!rule.enabled ? "opacity-60" : ""}>
                   <CardContent className="pt-3 pb-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="outline" className="text-xs font-mono">{rule.eventPattern}</Badge>
+                          <Badge variant="outline" className="text-xs font-mono">
+                            {rule.eventPattern}
+                          </Badge>
                           <ArrowRight className="w-3 h-3 text-muted-foreground" />
                           <Badge className="text-xs capitalize">{rule.handlerType}</Badge>
                         </div>
@@ -532,13 +588,19 @@ export default function Agents() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {EVENT_TYPES.map(e => (
-                      <SelectItem key={e} value={e} className="text-xs font-mono">{e}</SelectItem>
+                    {EVENT_TYPES.map((e) => (
+                      <SelectItem key={e} value={e} className="text-xs font-mono">
+                        {e}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <Button size="sm" className="w-full" onClick={emitTestEvent} disabled={emitting}>
-                  {emitting ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Play className="w-3 h-3 mr-1" />}
+                  {emitting ? (
+                    <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                  ) : (
+                    <Play className="w-3 h-3 mr-1" />
+                  )}
                   Emit event
                 </Button>
               </CardContent>
@@ -546,7 +608,9 @@ export default function Agents() {
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Event log</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Event log
+                </p>
                 <Button variant="ghost" size="sm" className="h-6" onClick={loadReactionEvents}>
                   <RefreshCw className="w-3 h-3" />
                 </Button>
@@ -555,7 +619,7 @@ export default function Agents() {
                 {reactionEvents.length === 0 ? (
                   <p className="text-xs text-muted-foreground text-center py-3">No events yet</p>
                 ) : (
-                  reactionEvents.slice(0, 20).map(ev => (
+                  reactionEvents.slice(0, 20).map((ev) => (
                     <div key={ev.id} className="text-xs border rounded-md p-2">
                       <div className="flex items-center justify-between">
                         <span className="font-mono">{ev.eventType}</span>
@@ -563,7 +627,8 @@ export default function Agents() {
                       </div>
                       {ev.matchedRules.length > 0 && (
                         <p className="text-muted-foreground mt-0.5">
-                          Matched {ev.matchedRules.length} rule{ev.matchedRules.length > 1 ? "s" : ""}
+                          Matched {ev.matchedRules.length} rule
+                          {ev.matchedRules.length > 1 ? "s" : ""}
                         </p>
                       )}
                     </div>
@@ -588,14 +653,14 @@ export default function Agents() {
             <Textarea
               placeholder="Describe the task, e.g. Go to news.ycombinator.com and extract the top 5 story titles"
               value={newTask.task}
-              onChange={e => setNewTask(t => ({ ...t, task: e.target.value }))}
+              onChange={(e) => setNewTask((t) => ({ ...t, task: e.target.value }))}
               rows={3}
               className="resize-none"
             />
             <Input
               placeholder="Starting URL (optional)"
               value={newTask.url}
-              onChange={e => setNewTask(t => ({ ...t, url: e.target.value }))}
+              onChange={(e) => setNewTask((t) => ({ ...t, url: e.target.value }))}
             />
             <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-2 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2">
               <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
@@ -603,9 +668,15 @@ export default function Agents() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowBrowserForm(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowBrowserForm(false)}>
+              Cancel
+            </Button>
             <Button onClick={createBrowserTask} disabled={creatingTask || !newTask.task.trim()}>
-              {creatingTask ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Play className="w-4 h-4 mr-2" />}
+              {creatingTask ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Play className="w-4 h-4 mr-2" />
+              )}
               Start task
             </Button>
           </DialogFooter>
@@ -626,14 +697,16 @@ export default function Agents() {
               <label className="text-xs text-muted-foreground">When this event fires…</label>
               <Select
                 value={newReaction.eventPattern}
-                onValueChange={v => setNewReaction(r => ({ ...r, eventPattern: v }))}
+                onValueChange={(v) => setNewReaction((r) => ({ ...r, eventPattern: v }))}
               >
                 <SelectTrigger className="font-mono text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {EVENT_TYPES.map(e => (
-                    <SelectItem key={e} value={e} className="font-mono text-xs">{e}</SelectItem>
+                  {EVENT_TYPES.map((e) => (
+                    <SelectItem key={e} value={e} className="font-mono text-xs">
+                      {e}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -642,14 +715,16 @@ export default function Agents() {
               <label className="text-xs text-muted-foreground">Run this handler…</label>
               <Select
                 value={newReaction.handlerType}
-                onValueChange={v => setNewReaction(r => ({ ...r, handlerType: v }))}
+                onValueChange={(v) => setNewReaction((r) => ({ ...r, handlerType: v }))}
               >
                 <SelectTrigger className="capitalize">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {HANDLER_TYPES.map(h => (
-                    <SelectItem key={h} value={h} className="capitalize">{h}</SelectItem>
+                  {HANDLER_TYPES.map((h) => (
+                    <SelectItem key={h} value={h} className="capitalize">
+                      {h}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -658,7 +733,7 @@ export default function Agents() {
               <label className="text-xs text-muted-foreground">Handler config (JSON)</label>
               <Textarea
                 value={newReaction.handlerConfig}
-                onChange={e => setNewReaction(r => ({ ...r, handlerConfig: e.target.value }))}
+                onChange={(e) => setNewReaction((r) => ({ ...r, handlerConfig: e.target.value }))}
                 rows={3}
                 className="font-mono text-xs resize-none"
                 placeholder='{"message": "New event triggered!"}'
@@ -666,7 +741,9 @@ export default function Agents() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowReactionForm(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowReactionForm(false)}>
+              Cancel
+            </Button>
             <Button onClick={createReaction} disabled={creatingReaction}>
               {creatingReaction ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Create rule

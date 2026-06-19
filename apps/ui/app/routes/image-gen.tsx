@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Image Generation — prompt-to-image via DALL-E / Stable Diffusion / FLUX
  *
@@ -17,28 +18,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import {
-  ImageIcon, Send, Loader2, X, Download, Trash2, RefreshCw,
-} from "lucide-react";
+import { ImageIcon, Send, Loader2, X, Download, Trash2, RefreshCw } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface GeneratedImage {
-  id:             string;
-  prompt:         string;
+  id: string;
+  prompt: string;
   revisedPrompt?: string;
-  provider:       string;
-  model:          string;
-  url?:           string;
-  base64?:        string;
-  width:          number;
-  height:         number;
-  createdAt:      string;
+  provider: string;
+  model: string;
+  url?: string;
+  base64?: string;
+  width: number;
+  height: number;
+  createdAt: string;
 }
 
 interface Provider {
-  id:    string;
-  name:  string;
+  id: string;
+  name: string;
   models: string[];
 }
 
@@ -48,27 +47,22 @@ const SIZES = [
   { value: "1024x1024", label: "1024 × 1024 (Square)" },
   { value: "1024x1792", label: "1024 × 1792 (Portrait)" },
   { value: "1792x1024", label: "1792 × 1024 (Landscape)" },
-  { value: "512x512",   label: "512 × 512 (Small)" },
+  { value: "512x512", label: "512 × 512 (Small)" },
 ];
 
 const QUALITIES = [
   { value: "standard", label: "Standard" },
-  { value: "hd",       label: "HD" },
+  { value: "hd", label: "HD" },
 ];
 
 const STYLES = [
-  { value: "vivid",   label: "Vivid" },
+  { value: "vivid", label: "Vivid" },
   { value: "natural", label: "Natural" },
 ];
 
 // ── Image card ────────────────────────────────────────────────────────────────
 
-function ImageCard({
-  img, onDelete,
-}: {
-  img: GeneratedImage;
-  onDelete: (id: string) => void;
-}) {
+function ImageCard({ img, onDelete }: { img: GeneratedImage; onDelete: (id: string) => void }) {
   const src = img.url ?? (img.base64 ? `data:image/png;base64,${img.base64}` : null);
 
   const handleDownload = () => {
@@ -140,21 +134,21 @@ function ImageCard({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function ImageGenPage() {
-  const [prompt,   setPrompt]   = useState("");
-  const [size,     setSize]     = useState("1024x1024");
-  const [quality,  setQuality]  = useState("standard");
-  const [style,    setStyle]    = useState("vivid");
+  const [prompt, setPrompt] = useState("");
+  const [size, setSize] = useState("1024x1024");
+  const [quality, setQuality] = useState("standard");
+  const [style, setStyle] = useState("vivid");
   const [provider, setProvider] = useState("");
   const [providers, setProviders] = useState<Provider[]>([]);
-  const [images,   setImages]   = useState<GeneratedImage[]>([]);
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState<string | null>(null);
+  const [images, setImages] = useState<GeneratedImage[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
   // Load providers
   useEffect(() => {
     fetch("/api/images/providers")
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.providers?.length) {
           setProviders(data.providers);
@@ -173,11 +167,15 @@ export default function ImageGenPage() {
         const data = await res.json();
         setImages(data.images ?? []);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setLoadingHistory(false);
   }, []);
 
-  useEffect(() => { loadHistory(); }, [loadHistory]);
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
 
   const generate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -187,10 +185,10 @@ export default function ImageGenPage() {
 
     try {
       const res = await fetch("/api/images/generate", {
-        method:  "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({
-          prompt:   prompt.trim(),
+        body: JSON.stringify({
+          prompt: prompt.trim(),
           size,
           quality,
           style,
@@ -215,12 +213,13 @@ export default function ImageGenPage() {
     try {
       await fetch(`/api/images/${id}`, { method: "DELETE" });
       setImages((prev) => prev.filter((img) => img.id !== id));
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   };
 
   return (
     <div className="flex h-screen overflow-hidden">
-
       {/* Left panel — controls */}
       <aside
         className="w-72 shrink-0 flex flex-col border-r border-border"
@@ -259,7 +258,9 @@ export default function ImageGenPage() {
               </SelectTrigger>
               <SelectContent>
                 {SIZES.map((s) => (
-                  <SelectItem key={s.value} value={s.value} className="text-xs">{s.label}</SelectItem>
+                  <SelectItem key={s.value} value={s.value} className="text-xs">
+                    {s.label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -275,7 +276,9 @@ export default function ImageGenPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {QUALITIES.map((q) => (
-                    <SelectItem key={q.value} value={q.value} className="text-xs">{q.label}</SelectItem>
+                    <SelectItem key={q.value} value={q.value} className="text-xs">
+                      {q.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -288,7 +291,9 @@ export default function ImageGenPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {STYLES.map((s) => (
-                    <SelectItem key={s.value} value={s.value} className="text-xs">{s.label}</SelectItem>
+                    <SelectItem key={s.value} value={s.value} className="text-xs">
+                      {s.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -305,7 +310,9 @@ export default function ImageGenPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {providers.map((p) => (
-                    <SelectItem key={p.id} value={p.id} className="text-xs">{p.name}</SelectItem>
+                    <SelectItem key={p.id} value={p.id} className="text-xs">
+                      {p.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -324,11 +331,7 @@ export default function ImageGenPage() {
           )}
 
           {/* Generate button */}
-          <Button
-            type="submit"
-            disabled={loading || !prompt.trim()}
-            className="gap-2 mt-auto"
-          >
+          <Button type="submit" disabled={loading || !prompt.trim()} className="gap-2 mt-auto">
             {loading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
             {loading ? "Generating…" : "Generate"}
           </Button>
@@ -339,7 +342,9 @@ export default function ImageGenPage() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="border-b border-border px-6 py-3 shrink-0 flex items-center gap-3">
           <h1 className="text-sm font-semibold">Gallery</h1>
-          <Badge variant="outline" className="text-xs">{images.length} images</Badge>
+          <Badge variant="outline" className="text-xs">
+            {images.length} images
+          </Badge>
           <Button
             variant="ghost"
             size="icon"

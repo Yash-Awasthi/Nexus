@@ -21,8 +21,6 @@ COPY packages/contracts/package.json ./packages/contracts/
 COPY packages/db/package.json ./packages/db/
 COPY packages/governance/package.json ./packages/governance/
 COPY packages/memory/package.json ./packages/memory/
-COPY packages/autotune/package.json ./packages/autotune/
-COPY packages/parseltongue/package.json ./packages/parseltongue/
 COPY packages/sft-tagger/package.json ./packages/sft-tagger/
 COPY packages/runtime/package.json ./packages/runtime/
 COPY packages/council/package.json ./packages/council/
@@ -32,8 +30,41 @@ COPY packages/researcher/package.json ./packages/researcher/
 COPY packages/image-gen/package.json ./packages/image-gen/
 COPY packages/knowledge-graph/package.json ./packages/knowledge-graph/
 COPY packages/llm-drivers/package.json ./packages/llm-drivers/
-COPY packages/ultraplinian/package.json ./packages/ultraplinian/
-COPY packages/ghoststack/package.json ./packages/ghoststack/
+COPY packages/drift/package.json ./packages/drift/
+COPY packages/redteam/package.json ./packages/redteam/
+COPY packages/gauntlet/package.json ./packages/gauntlet/
+COPY packages/conductor/package.json ./packages/conductor/
+COPY packages/kv/package.json ./packages/kv/
+COPY packages/tier-gate/package.json ./packages/tier-gate/
+COPY packages/admin-gateway/package.json ./packages/admin-gateway/
+COPY packages/agents/package.json ./packages/agents/
+COPY packages/hooks/package.json ./packages/hooks/
+COPY packages/alerts/package.json ./packages/alerts/
+COPY packages/gateway/package.json ./packages/gateway/
+COPY packages/plugin-sdk/package.json ./packages/plugin-sdk/
+COPY packages/token-budget/package.json ./packages/token-budget/
+COPY packages/billing/package.json ./packages/billing/
+COPY packages/bots/package.json ./packages/bots/
+COPY packages/connectors/package.json ./packages/connectors/
+COPY packages/context-pack/package.json ./packages/context-pack/
+COPY packages/context-pruner/package.json ./packages/context-pruner/
+COPY packages/doc-pipeline/package.json ./packages/doc-pipeline/
+COPY packages/evals/package.json ./packages/evals/
+COPY packages/feature-flags/package.json ./packages/feature-flags/
+COPY packages/gateway-log/package.json ./packages/gateway-log/
+COPY packages/lens/package.json ./packages/lens/
+COPY packages/llm-router/package.json ./packages/llm-router/
+COPY packages/mail-ingest/package.json ./packages/mail-ingest/
+COPY packages/nlp-utils/package.json ./packages/nlp-utils/
+COPY packages/reranker/package.json ./packages/reranker/
+COPY packages/retrieval/package.json ./packages/retrieval/
+COPY packages/run-cost/package.json ./packages/run-cost/
+COPY packages/sse/package.json ./packages/sse/
+COPY packages/voice/package.json ./packages/voice/
+COPY packages/domain-feeds/package.json ./packages/domain-feeds/
+COPY packages/obs-providers/package.json ./packages/obs-providers/
+COPY packages/wiki-updater/package.json ./packages/wiki-updater/
+COPY packages/image-transformations/package.json ./packages/image-transformations/
 COPY apps/api/package.json ./apps/api/
 
 RUN pnpm install --frozen-lockfile --filter @nexus/api --filter @nexus/auth \
@@ -43,8 +74,19 @@ RUN pnpm install --frozen-lockfile --filter @nexus/api --filter @nexus/auth \
     --filter @nexus/runtime --filter @nexus/council --filter @nexus/telemetry \
     --filter @nexus/adaptive-scraper --filter @nexus/researcher \
     --filter @nexus/image-gen --filter @nexus/knowledge-graph \
-    --filter @nexus/llm-drivers --filter @nexus/gauntlet \
-    --filter @nexus/conductor
+    --filter @nexus/llm-drivers --filter @nexus/gauntlet --filter @nexus/conductor \
+    --filter @nexus/kv --filter @nexus/tier-gate --filter @nexus/admin-gateway \
+    --filter @nexus/agents --filter @nexus/hooks --filter @nexus/alerts \
+    --filter @nexus/gateway --filter @nexus/plugin-sdk --filter @nexus/token-budget \
+    --filter @nexus/billing --filter @nexus/bots --filter @nexus/connectors \
+    --filter @nexus/context-pack --filter @nexus/context-pruner \
+    --filter @nexus/doc-pipeline --filter @nexus/evals \
+    --filter @nexus/feature-flags --filter @nexus/gateway-log \
+    --filter @nexus/lens --filter @nexus/llm-router --filter @nexus/mail-ingest \
+    --filter @nexus/nlp-utils --filter @nexus/reranker --filter @nexus/retrieval \
+    --filter @nexus/run-cost --filter @nexus/sse --filter @nexus/voice \
+    --filter @nexus/domain-feeds --filter @nexus/obs-providers --filter @nexus/wiki-updater \
+    --filter @nexus/image-transformations
 
 # ─── Stage 2: development — hot-reload via tsx (no compiled dist needed) ─────
 FROM deps AS development
@@ -59,8 +101,19 @@ RUN pnpm install --frozen-lockfile \
     --filter @nexus/runtime --filter @nexus/council --filter @nexus/telemetry \
     --filter @nexus/adaptive-scraper --filter @nexus/researcher \
     --filter @nexus/image-gen --filter @nexus/knowledge-graph \
-    --filter @nexus/llm-drivers --filter @nexus/gauntlet \
-    --filter @nexus/conductor
+    --filter @nexus/llm-drivers --filter @nexus/gauntlet --filter @nexus/conductor \
+    --filter @nexus/kv --filter @nexus/tier-gate --filter @nexus/admin-gateway \
+    --filter @nexus/agents --filter @nexus/hooks --filter @nexus/alerts \
+    --filter @nexus/gateway --filter @nexus/plugin-sdk --filter @nexus/token-budget \
+    --filter @nexus/billing --filter @nexus/bots --filter @nexus/connectors \
+    --filter @nexus/context-pack --filter @nexus/context-pruner \
+    --filter @nexus/doc-pipeline --filter @nexus/evals \
+    --filter @nexus/feature-flags --filter @nexus/gateway-log \
+    --filter @nexus/lens --filter @nexus/llm-router --filter @nexus/mail-ingest \
+    --filter @nexus/nlp-utils --filter @nexus/reranker --filter @nexus/retrieval \
+    --filter @nexus/run-cost --filter @nexus/sse --filter @nexus/voice \
+    --filter @nexus/domain-feeds --filter @nexus/obs-providers --filter @nexus/wiki-updater \
+    --filter @nexus/image-transformations
 
 # Source is bind-mounted at runtime — no COPY here
 ENV NODE_ENV=development
@@ -96,6 +149,37 @@ RUN pnpm --filter @nexus/shared build && \
     pnpm --filter @nexus/llm-drivers build && \
     pnpm --filter @nexus/gauntlet build && \
     pnpm --filter @nexus/conductor build && \
+    pnpm --filter @nexus/kv build && \
+    pnpm --filter @nexus/tier-gate build && \
+    pnpm --filter @nexus/admin-gateway build && \
+    pnpm --filter @nexus/agents build && \
+    pnpm --filter @nexus/hooks build && \
+    pnpm --filter @nexus/alerts build && \
+    pnpm --filter @nexus/gateway build && \
+    pnpm --filter @nexus/plugin-sdk build && \
+    pnpm --filter @nexus/token-budget build && \
+    pnpm --filter @nexus/billing build && \
+    pnpm --filter @nexus/bots build && \
+    pnpm --filter @nexus/connectors build && \
+    pnpm --filter @nexus/context-pack build && \
+    pnpm --filter @nexus/context-pruner build && \
+    pnpm --filter @nexus/doc-pipeline build && \
+    pnpm --filter @nexus/evals build && \
+    pnpm --filter @nexus/feature-flags build && \
+    pnpm --filter @nexus/gateway-log build && \
+    pnpm --filter @nexus/lens build && \
+    pnpm --filter @nexus/llm-router build && \
+    pnpm --filter @nexus/mail-ingest build && \
+    pnpm --filter @nexus/nlp-utils build && \
+    pnpm --filter @nexus/reranker build && \
+    pnpm --filter @nexus/retrieval build && \
+    pnpm --filter @nexus/run-cost build && \
+    pnpm --filter @nexus/sse build && \
+    pnpm --filter @nexus/voice build && \
+    pnpm --filter @nexus/domain-feeds build && \
+    pnpm --filter @nexus/obs-providers build && \
+    pnpm --filter @nexus/wiki-updater build && \
+    pnpm --filter @nexus/image-transformations build && \
     pnpm --filter @nexus/api build
 
 # ─── Stage 3: pruner — production-only node_modules (eliminates devDep CVEs) ──
@@ -109,8 +193,19 @@ RUN pnpm install --frozen-lockfile --prod \
     --filter @nexus/telemetry --filter @nexus/adaptive-scraper \
     --filter @nexus/researcher --filter @nexus/image-gen \
     --filter @nexus/knowledge-graph --filter @nexus/llm-drivers \
-    --filter @nexus/gauntlet \
-    --filter @nexus/conductor
+    --filter @nexus/gauntlet --filter @nexus/conductor \
+    --filter @nexus/kv --filter @nexus/tier-gate --filter @nexus/admin-gateway \
+    --filter @nexus/agents --filter @nexus/hooks --filter @nexus/alerts \
+    --filter @nexus/gateway --filter @nexus/plugin-sdk --filter @nexus/token-budget \
+    --filter @nexus/billing --filter @nexus/bots --filter @nexus/connectors \
+    --filter @nexus/context-pack --filter @nexus/context-pruner \
+    --filter @nexus/doc-pipeline --filter @nexus/evals \
+    --filter @nexus/feature-flags --filter @nexus/gateway-log \
+    --filter @nexus/lens --filter @nexus/llm-router --filter @nexus/mail-ingest \
+    --filter @nexus/nlp-utils --filter @nexus/reranker --filter @nexus/retrieval \
+    --filter @nexus/run-cost --filter @nexus/sse --filter @nexus/voice \
+    --filter @nexus/domain-feeds --filter @nexus/obs-providers --filter @nexus/wiki-updater \
+    --filter @nexus/image-transformations
 
 # ─── Stage 4: runner ─────────────────────────────────────────────────────────
 FROM node:26-alpine AS runner
@@ -127,8 +222,6 @@ COPY --from=builder --chown=nexus:nexus /app/packages/contracts/dist ./packages/
 COPY --from=builder --chown=nexus:nexus /app/packages/db/dist ./packages/db/dist
 COPY --from=builder --chown=nexus:nexus /app/packages/governance/dist ./packages/governance/dist
 COPY --from=builder --chown=nexus:nexus /app/packages/memory/dist ./packages/memory/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/autotune/dist ./packages/autotune/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/parseltongue/dist ./packages/parseltongue/dist
 COPY --from=builder --chown=nexus:nexus /app/packages/sft-tagger/dist ./packages/sft-tagger/dist
 COPY --from=builder --chown=nexus:nexus /app/packages/runtime/dist ./packages/runtime/dist
 COPY --from=builder --chown=nexus:nexus /app/packages/council/dist ./packages/council/dist
@@ -138,8 +231,37 @@ COPY --from=builder --chown=nexus:nexus /app/packages/researcher/dist ./packages
 COPY --from=builder --chown=nexus:nexus /app/packages/image-gen/dist ./packages/image-gen/dist
 COPY --from=builder --chown=nexus:nexus /app/packages/knowledge-graph/dist ./packages/knowledge-graph/dist
 COPY --from=builder --chown=nexus:nexus /app/packages/llm-drivers/dist ./packages/llm-drivers/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/ultraplinian/dist ./packages/ultraplinian/dist
-COPY --from=builder --chown=nexus:nexus /app/packages/ghoststack/dist ./packages/ghoststack/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/kv/dist ./packages/kv/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/tier-gate/dist ./packages/tier-gate/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/admin-gateway/dist ./packages/admin-gateway/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/agents/dist ./packages/agents/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/hooks/dist ./packages/hooks/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/alerts/dist ./packages/alerts/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/gateway/dist ./packages/gateway/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/plugin-sdk/dist ./packages/plugin-sdk/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/token-budget/dist ./packages/token-budget/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/billing/dist ./packages/billing/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/bots/dist ./packages/bots/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/connectors/dist ./packages/connectors/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/context-pack/dist ./packages/context-pack/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/context-pruner/dist ./packages/context-pruner/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/doc-pipeline/dist ./packages/doc-pipeline/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/evals/dist ./packages/evals/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/feature-flags/dist ./packages/feature-flags/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/gateway-log/dist ./packages/gateway-log/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/lens/dist ./packages/lens/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/llm-router/dist ./packages/llm-router/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/mail-ingest/dist ./packages/mail-ingest/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/nlp-utils/dist ./packages/nlp-utils/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/reranker/dist ./packages/reranker/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/retrieval/dist ./packages/retrieval/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/run-cost/dist ./packages/run-cost/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/sse/dist ./packages/sse/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/voice/dist ./packages/voice/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/domain-feeds/dist ./packages/domain-feeds/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/obs-providers/dist ./packages/obs-providers/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/wiki-updater/dist ./packages/wiki-updater/dist
+COPY --from=builder --chown=nexus:nexus /app/packages/image-transformations/dist ./packages/image-transformations/dist
 COPY --from=builder --chown=nexus:nexus /app/apps/api/dist ./apps/api/dist
 COPY --from=builder --chown=nexus:nexus /app/apps/api/package.json ./apps/api/
 

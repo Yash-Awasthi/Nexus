@@ -276,13 +276,13 @@ export interface SocialAuthTokenDetails {
   username: string;
   error?: string;
   /** Extra settings the platform requires (e.g. page selector checkboxes). */
-  additionalSettings?: Array<{
+  additionalSettings?: {
     title: string;
     description: string;
     type: "checkbox" | "text" | "textarea";
     value: unknown;
     regex?: string;
-  }>;
+  }[];
 }
 
 /** Response payload from `generateAuthUrl`. */
@@ -297,7 +297,7 @@ export interface SocialAuthUrlResponse {
 /** A single analytics series returned by a platform. */
 export interface SocialAnalyticsData {
   label: string;
-  data: Array<{ total: string; date: string }>;
+  data: { total: string; date: string }[];
   percentageChange: number;
 }
 
@@ -410,12 +410,12 @@ export interface ISocialProvider {
     token: string,
     data: { query: string },
     id: string,
-  ): Promise<Array<{ id: string; label: string; image: string; doNotCache?: boolean }> | { none: true }>;
+  ): Promise<{ id: string; label: string; image: string; doNotCache?: boolean }[] | { none: true }>;
   mentionFormat?(idOrHandle: string, name: string): string;
 
   /** Validate media attached to a post before publishing. Returns true or an error message. */
   checkValidity(
-    posts: Array<Array<{ path: string; thumbnail?: string }>>,
+    posts: { path: string; thumbnail?: string }[][],
     settings: unknown,
     additionalSettings: unknown[],
   ): Promise<string | true>;

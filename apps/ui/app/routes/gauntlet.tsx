@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * ULTRAPLINIAN — Ultra-parallel multi-model query with composite scoring
  *
@@ -127,10 +128,10 @@ function ResponseCard({
         isWinner
           ? "border-yellow-500/60 bg-yellow-500/5 ring-1 ring-yellow-500/20"
           : resp.status === "error"
-          ? "border-destructive/40 bg-destructive/5"
-          : resp.status === "pending"
-          ? "border-border/50 bg-muted/10 animate-pulse"
-          : "border-border/50 bg-muted/5 hover:border-border"
+            ? "border-destructive/40 bg-destructive/5"
+            : resp.status === "pending"
+              ? "border-border/50 bg-muted/10 animate-pulse"
+              : "border-border/50 bg-muted/5 hover:border-border"
       }`}
     >
       {/* Header */}
@@ -139,15 +140,15 @@ function ResponseCard({
           #{rank}
         </span>
         {isWinner && <Trophy className="size-3 text-yellow-400 shrink-0" />}
-        <span className={`text-xs font-semibold truncate flex-1 ${isWinner ? "text-yellow-300" : ""}`}>
+        <span
+          className={`text-xs font-semibold truncate flex-1 ${isWinner ? "text-yellow-300" : ""}`}
+        >
           {resp.label}
         </span>
         {resp.status === "pending" && (
           <Loader2 className="size-3 animate-spin text-muted-foreground shrink-0" />
         )}
-        {resp.status === "error" && (
-          <AlertTriangle className="size-3 text-destructive shrink-0" />
-        )}
+        {resp.status === "error" && <AlertTriangle className="size-3 text-destructive shrink-0" />}
         {resp.status === "done" && (
           <Badge
             variant="outline"
@@ -210,7 +211,9 @@ function ResponseCard({
               onClick={() => setExpanded((v) => !v)}
               className="text-[9px] text-muted-foreground hover:text-foreground mt-1 flex items-center gap-0.5"
             >
-              <ChevronDown className={`size-2.5 transition-transform ${expanded ? "rotate-180" : ""}`} />
+              <ChevronDown
+                className={`size-2.5 transition-transform ${expanded ? "rotate-180" : ""}`}
+              />
               {expanded ? "collapse" : "expand"}
             </button>
           )}
@@ -300,7 +303,7 @@ export default function UltraplinianPage() {
                     qualityScore: 0,
                     tokenScore: 0,
                     status: "pending",
-                  }))
+                  })),
                 );
               } else if (type === "response") {
                 setResponses((prev) => {
@@ -324,9 +327,7 @@ export default function UltraplinianPage() {
                       .map((r) => (r.id === ev.id ? updated : r))
                       .sort((a, b) => b.compositeScore - a.compositeScore);
                   }
-                  return [...prev, updated].sort(
-                    (a, b) => b.compositeScore - a.compositeScore
-                  );
+                  return [...prev, updated].sort((a, b) => b.compositeScore - a.compositeScore);
                 });
               } else if (type === "done") {
                 setDone(ev as DoneEvent);
@@ -348,26 +349,25 @@ export default function UltraplinianPage() {
         setIsRunning(false);
       }
     },
-    [question, tier, isRunning]
+    [question, tier, isRunning],
   );
 
-  const sortedResponses = [...responses].sort(
-    (a, b) => b.compositeScore - a.compositeScore
-  );
+  const sortedResponses = [...responses].sort((a, b) => b.compositeScore - a.compositeScore);
   const winnerId = done?.winnerId ?? sortedResponses[0]?.id;
 
   // Responsive grid columns based on tier
   const cols = tier <= 10 ? 2 : tier <= 24 ? 3 : tier <= 36 ? 4 : 5;
 
   return (
-    <main className="flex flex-col h-screen overflow-hidden bg-background" aria-label="ULTRAPLINIAN">
+    <main
+      className="flex flex-col h-screen overflow-hidden bg-background"
+      aria-label="ULTRAPLINIAN"
+    >
       {/* Header */}
       <header className="border-b border-border px-6 py-3.5 flex items-center gap-3 shrink-0">
         <Zap className="size-5 text-yellow-400 shrink-0" />
         <div className="flex-1 min-w-0">
-          <h1 className="text-base font-bold tracking-tight">
-            ULTRAPLINIAN
-          </h1>
+          <h1 className="text-base font-bold tracking-tight">ULTRAPLINIAN</h1>
           <p className="text-[11px] text-muted-foreground">
             Fire every model in parallel. Score by quality + latency + tokens. Crown the winner.
           </p>
@@ -389,12 +389,17 @@ export default function UltraplinianPage() {
               {TIERS.map((t) => (
                 <button
                   key={t}
-                  onClick={() => { setTier(t); setShowTierPicker(false); }}
+                  onClick={() => {
+                    setTier(t);
+                    setShowTierPicker(false);
+                  }}
                   className={`w-full text-left px-3 py-2 text-xs font-semibold hover:bg-muted transition-colors flex items-center gap-2 ${
                     t === tier ? "text-foreground" : "text-muted-foreground"
                   }`}
                 >
-                  <span className={`size-2 rounded-full ${t === tier ? "bg-yellow-400" : "bg-muted-foreground/30"}`} />
+                  <span
+                    className={`size-2 rounded-full ${t === tier ? "bg-yellow-400" : "bg-muted-foreground/30"}`}
+                  />
                   {TIER_LABELS[t]}
                 </button>
               ))}
@@ -424,7 +429,13 @@ export default function UltraplinianPage() {
           autoFocus
         />
         {isRunning ? (
-          <Button type="button" variant="destructive" size="sm" onClick={handleStop} className="gap-1.5 shrink-0">
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            onClick={handleStop}
+            className="gap-1.5 shrink-0"
+          >
             <span className="size-2 rounded-full bg-white animate-pulse" />
             Stop
           </Button>
@@ -446,7 +457,7 @@ export default function UltraplinianPage() {
         <div className="h-0.5 bg-muted shrink-0">
           <div
             className="h-full bg-yellow-400 transition-all duration-300"
-            style={{ width: `${Math.round((doneCount + errorCount) / totalSlots * 100)}%` }}
+            style={{ width: `${Math.round(((doneCount + errorCount) / totalSlots) * 100)}%` }}
           />
         </div>
       )}
@@ -460,7 +471,8 @@ export default function UltraplinianPage() {
             wins with score {Math.round(done.winnerScore * 100)}/100
           </span>
           <span className="text-muted-foreground ml-auto">
-            {done.successCount}/{done.responseCount} succeeded · {(done.totalMs / 1000).toFixed(1)}s total
+            {done.successCount}/{done.responseCount} succeeded · {(done.totalMs / 1000).toFixed(1)}s
+            total
           </span>
         </div>
       )}
@@ -496,7 +508,8 @@ export default function UltraplinianPage() {
               Select a tier, ask a question, watch the models race.
             </p>
             <p className="text-xs text-muted-foreground/60 mt-1">
-              Currently set to <span className="text-yellow-400 font-semibold">{TIER_LABELS[tier]}</span>
+              Currently set to{" "}
+              <span className="text-yellow-400 font-semibold">{TIER_LABELS[tier]}</span>
             </p>
           </div>
         )}

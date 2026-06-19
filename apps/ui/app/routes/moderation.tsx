@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Moderation — content moderation check and configuration.
  *
@@ -48,12 +49,22 @@ interface ModerationConfig {
 
 // ─── Category badge ───────────────────────────────────────────────────────────
 
-function CategoryScore({ name, score, flagged }: { name: string; score: number; flagged: boolean }) {
+function CategoryScore({
+  name,
+  score,
+  flagged,
+}: {
+  name: string;
+  score: number;
+  flagged: boolean;
+}) {
   return (
     <div className="flex items-center gap-2">
-      {flagged
-        ? <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
-        : <CheckCircle className="w-3.5 h-3.5 text-green-500 shrink-0" />}
+      {flagged ? (
+        <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+      ) : (
+        <CheckCircle className="w-3.5 h-3.5 text-green-500 shrink-0" />
+      )}
       <span className="text-sm flex-1 capitalize">{name.replace(/_/g, " ")}</span>
       <div className="w-24 bg-muted rounded-full h-1.5 overflow-hidden">
         <div
@@ -61,7 +72,9 @@ function CategoryScore({ name, score, flagged }: { name: string; score: number; 
           style={{ width: `${score * 100}%` }}
         />
       </div>
-      <span className="text-xs text-muted-foreground w-8 text-right">{Math.round(score * 100)}%</span>
+      <span className="text-xs text-muted-foreground w-8 text-right">
+        {Math.round(score * 100)}%
+      </span>
     </div>
   );
 }
@@ -76,7 +89,9 @@ function CheckTab() {
 
   const check = useCallback(async () => {
     if (!text.trim()) return;
-    setLoading(true); setErr(""); setResult(null);
+    setLoading(true);
+    setErr("");
+    setResult(null);
     try {
       const r = await fetch("/api/moderation/check", {
         method: "POST",
@@ -85,7 +100,9 @@ function CheckTab() {
       });
       if (r.ok) setResult(await r.json());
       else setErr("Moderation check failed");
-    } catch { setErr("Could not reach server"); }
+    } catch {
+      setErr("Could not reach server");
+    }
     setLoading(false);
   }, [text]);
 
@@ -97,34 +114,58 @@ function CheckTab() {
             rows={5}
             placeholder="Enter text to check for policy violations…"
             value={text}
-            onChange={e => setText(e.target.value)}
+            onChange={(e) => setText(e.target.value)}
             className="resize-none"
           />
           {err && <p className="text-red-500 text-xs">{err}</p>}
           <Button onClick={check} disabled={loading || !text.trim()}>
-            {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Checking…</> : <><ShieldAlert className="w-4 h-4 mr-2" />Check Content</>}
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Checking…
+              </>
+            ) : (
+              <>
+                <ShieldAlert className="w-4 h-4 mr-2" />
+                Check Content
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>
 
       {result && (
-        <Card className={result.flagged ? "border-red-200 dark:border-red-800" : "border-green-200 dark:border-green-800"}>
+        <Card
+          className={
+            result.flagged
+              ? "border-red-200 dark:border-red-800"
+              : "border-green-200 dark:border-green-800"
+          }
+        >
           <CardContent className="pt-4 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                {result.flagged
-                  ? <XCircle className="w-5 h-5 text-red-500" />
-                  : <CheckCircle className="w-5 h-5 text-green-600" />}
-                <span className={`font-semibold ${result.flagged ? "text-red-600" : "text-green-700 dark:text-green-400"}`}>
+                {result.flagged ? (
+                  <XCircle className="w-5 h-5 text-red-500" />
+                ) : (
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                )}
+                <span
+                  className={`font-semibold ${result.flagged ? "text-red-600" : "text-green-700 dark:text-green-400"}`}
+                >
                   {result.flagged ? "Content Flagged" : "Content Clear"}
                 </span>
               </div>
               {result.action && (
-                <Badge className={
-                  result.action === "block" ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
-                  : result.action === "warn" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400"
-                  : "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
-                }>
+                <Badge
+                  className={
+                    result.action === "block"
+                      ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+                      : result.action === "warn"
+                        ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400"
+                        : "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
+                  }
+                >
                   {result.action.toUpperCase()}
                 </Badge>
               )}
@@ -133,7 +174,9 @@ function CheckTab() {
 
             {result.scores && Object.keys(result.scores).length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Category Scores</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Category Scores
+                </p>
                 {Object.entries(result.scores).map(([cat, score]) => (
                   <CategoryScore
                     key={cat}
@@ -163,39 +206,55 @@ function BatchTab() {
   const [err, setErr] = useState("");
 
   const run = useCallback(async () => {
-    const valid = items.filter(i => i.text.trim());
+    const valid = items.filter((i) => i.text.trim());
     if (!valid.length) return;
-    setLoading(true); setErr(""); setResults([]);
+    setLoading(true);
+    setErr("");
+    setResults([]);
     try {
       const r = await fetch("/api/moderation/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: valid.map(i => ({ id: i.id, text: i.text })) }),
+        body: JSON.stringify({ items: valid.map((i) => ({ id: i.id, text: i.text })) }),
       });
       if (r.ok) {
         const d = await r.json();
         setResults(d.results ?? []);
       } else setErr("Batch check failed");
-    } catch { setErr("Could not reach server"); }
+    } catch {
+      setErr("Could not reach server");
+    }
     setLoading(false);
   }, [items]);
 
   return (
     <div className="space-y-3">
       {items.map((item, idx) => {
-        const res = results.find(r => r.id === item.id);
+        const res = results.find((r) => r.id === item.id);
         return (
           <Card key={item.id}>
             <CardContent className="pt-3 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-muted-foreground">Text #{idx + 1}</span>
                 <div className="flex items-center gap-2">
-                  {res && (
-                    res.result.flagged
-                      ? <Badge className="bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"><XCircle className="w-3 h-3 mr-1" />Flagged</Badge>
-                      : <Badge className="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"><CheckCircle className="w-3 h-3 mr-1" />Clear</Badge>
-                  )}
-                  <Button size="icon" variant="ghost" className="h-6 w-6 text-red-400" onClick={() => setItems(prev => prev.filter(i => i.id !== item.id))}>
+                  {res &&
+                    (res.result.flagged ? (
+                      <Badge className="bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400">
+                        <XCircle className="w-3 h-3 mr-1" />
+                        Flagged
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Clear
+                      </Badge>
+                    ))}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 text-red-400"
+                    onClick={() => setItems((prev) => prev.filter((i) => i.id !== item.id))}
+                  >
                     <Trash2 className="w-3 h-3" />
                   </Button>
                 </div>
@@ -204,7 +263,11 @@ function BatchTab() {
                 rows={2}
                 placeholder="Enter text…"
                 value={item.text}
-                onChange={e => setItems(prev => prev.map(i => i.id === item.id ? { ...i, text: e.target.value } : i))}
+                onChange={(e) =>
+                  setItems((prev) =>
+                    prev.map((i) => (i.id === item.id ? { ...i, text: e.target.value } : i)),
+                  )
+                }
                 className="resize-none text-sm"
               />
             </CardContent>
@@ -212,18 +275,30 @@ function BatchTab() {
         );
       })}
       <div className="flex gap-2">
-        <Button variant="outline" size="sm" onClick={() => setItems(prev => [...prev, { id: String(Date.now()), text: "" }])}>
-          <Plus className="w-4 h-4 mr-1" />Add
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setItems((prev) => [...prev, { id: String(Date.now()), text: "" }])}
+        >
+          <Plus className="w-4 h-4 mr-1" />
+          Add
         </Button>
         <Button size="sm" onClick={run} disabled={loading}>
-          {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-1" />Checking…</> : "Check All"}
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin mr-1" />
+              Checking…
+            </>
+          ) : (
+            "Check All"
+          )}
         </Button>
       </div>
       {err && <p className="text-red-500 text-xs">{err}</p>}
       {results.length > 0 && (
         <div className="flex items-center gap-3 text-sm text-muted-foreground pt-1">
-          <span>{results.filter(r => r.result.flagged).length} flagged</span>
-          <span>{results.filter(r => !r.result.flagged).length} clear</span>
+          <span>{results.filter((r) => r.result.flagged).length} flagged</span>
+          <span>{results.filter((r) => !r.result.flagged).length} clear</span>
           <span>of {results.length} checked</span>
         </div>
       )}
@@ -239,14 +314,29 @@ function ConfigTab() {
 
   useEffect(() => {
     fetch("/api/moderation/config")
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setConfig(d); })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) setConfig(d);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="flex items-center gap-2 text-muted-foreground py-8 justify-center"><Loader2 className="w-4 h-4 animate-spin" />Loading…</div>;
-  if (!config) return <Card><CardContent className="pt-8 pb-8 text-center text-muted-foreground">No config available</CardContent></Card>;
+  if (loading)
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground py-8 justify-center">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        Loading…
+      </div>
+    );
+  if (!config)
+    return (
+      <Card>
+        <CardContent className="pt-8 pb-8 text-center text-muted-foreground">
+          No config available
+        </CardContent>
+      </Card>
+    );
 
   return (
     <Card>
@@ -258,19 +348,31 @@ function ConfigTab() {
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {config.categories.map(cat => (
+          {config.categories.map((cat) => (
             <div key={cat.name} className="flex items-center gap-3">
-              <div className={`w-2 h-2 rounded-full shrink-0 ${cat.enabled ? "bg-green-500" : "bg-slate-300"}`} />
+              <div
+                className={`w-2 h-2 rounded-full shrink-0 ${cat.enabled ? "bg-green-500" : "bg-slate-300"}`}
+              />
               <span className="text-sm w-40 capitalize">{cat.name.replace(/_/g, " ")}</span>
               <div className="flex-1 bg-muted rounded-full h-1.5 overflow-hidden">
-                <div className="bg-primary h-1.5 rounded-full" style={{ width: `${cat.threshold * 100}%` }} />
+                <div
+                  className="bg-primary h-1.5 rounded-full"
+                  style={{ width: `${cat.threshold * 100}%` }}
+                />
               </div>
-              <span className="text-xs text-muted-foreground w-12 text-right">{Math.round(cat.threshold * 100)}%</span>
-              <Badge variant="outline" className={`text-xs shrink-0 ${
-                cat.action === "block" ? "border-red-300 text-red-600"
-                : cat.action === "warn" ? "border-yellow-300 text-yellow-600"
-                : "border-green-300 text-green-600"
-              }`}>
+              <span className="text-xs text-muted-foreground w-12 text-right">
+                {Math.round(cat.threshold * 100)}%
+              </span>
+              <Badge
+                variant="outline"
+                className={`text-xs shrink-0 ${
+                  cat.action === "block"
+                    ? "border-red-300 text-red-600"
+                    : cat.action === "warn"
+                      ? "border-yellow-300 text-yellow-600"
+                      : "border-green-300 text-green-600"
+                }`}
+              >
                 {cat.action}
               </Badge>
             </div>
@@ -298,13 +400,28 @@ export default function Moderation() {
 
       <Tabs defaultValue="check">
         <TabsList>
-          <TabsTrigger value="check"><ShieldAlert className="w-4 h-4 mr-1" />Check</TabsTrigger>
-          <TabsTrigger value="batch"><AlertTriangle className="w-4 h-4 mr-1" />Batch</TabsTrigger>
-          <TabsTrigger value="config"><Settings className="w-4 h-4 mr-1" />Config</TabsTrigger>
+          <TabsTrigger value="check">
+            <ShieldAlert className="w-4 h-4 mr-1" />
+            Check
+          </TabsTrigger>
+          <TabsTrigger value="batch">
+            <AlertTriangle className="w-4 h-4 mr-1" />
+            Batch
+          </TabsTrigger>
+          <TabsTrigger value="config">
+            <Settings className="w-4 h-4 mr-1" />
+            Config
+          </TabsTrigger>
         </TabsList>
-        <TabsContent value="check" className="mt-4"><CheckTab /></TabsContent>
-        <TabsContent value="batch" className="mt-4"><BatchTab /></TabsContent>
-        <TabsContent value="config" className="mt-4"><ConfigTab /></TabsContent>
+        <TabsContent value="check" className="mt-4">
+          <CheckTab />
+        </TabsContent>
+        <TabsContent value="batch" className="mt-4">
+          <BatchTab />
+        </TabsContent>
+        <TabsContent value="config" className="mt-4">
+          <ConfigTab />
+        </TabsContent>
       </Tabs>
     </div>
   );

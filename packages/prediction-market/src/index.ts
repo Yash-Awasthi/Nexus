@@ -476,15 +476,15 @@ export interface SwarmPredictor {
 
 export interface SwarmPrediction {
   predictorId: string;
-  value: number;    // normalised 0–1 probability
+  value: number; // normalised 0–1 probability
   confidence: number;
   reasoning?: string;
 }
 
 export interface SwarmConsensusResult {
-  consensus: number;         // weighted median probability
-  mean: number;              // simple mean
-  spread: number;            // max − min
+  consensus: number; // weighted median probability
+  mean: number; // simple mean
+  spread: number; // max − min
   predictions: SwarmPrediction[];
   totalWeight: number;
   timestamp: string;
@@ -505,7 +505,14 @@ export class SwarmConsensus {
    */
   aggregate(predictions: SwarmPrediction[]): SwarmConsensusResult {
     if (!predictions.length) {
-      return { consensus: 0.5, mean: 0.5, spread: 0, predictions: [], totalWeight: 0, timestamp: new Date().toISOString() };
+      return {
+        consensus: 0.5,
+        mean: 0.5,
+        spread: 0,
+        predictions: [],
+        totalWeight: 0,
+        timestamp: new Date().toISOString(),
+      };
     }
 
     // Attach predictor weights; default weight 1 for unregistered predictors
@@ -522,14 +529,24 @@ export class SwarmConsensus {
     let median = sorted[0]!.value;
     for (const p of sorted) {
       cumW += p.w;
-      if (cumW >= totalWeight / 2) { median = p.value; break; }
+      if (cumW >= totalWeight / 2) {
+        median = p.value;
+        break;
+      }
     }
 
     const mean = weighted.reduce((s, p) => s + p.value * p.w, 0) / totalWeight;
     const values = predictions.map((p) => p.value);
     const spread = Math.max(...values) - Math.min(...values);
 
-    return { consensus: Math.round(median * 10000) / 10000, mean: Math.round(mean * 10000) / 10000, spread, predictions, totalWeight, timestamp: new Date().toISOString() };
+    return {
+      consensus: Math.round(median * 10000) / 10000,
+      mean: Math.round(mean * 10000) / 10000,
+      spread,
+      predictions,
+      totalWeight,
+      timestamp: new Date().toISOString(),
+    };
   }
 }
 
@@ -543,7 +560,7 @@ export class SwarmConsensus {
 
 export interface TradeContext {
   symbol: string;
-  question?: string;         // for prediction markets
+  question?: string; // for prediction markets
   data: Record<string, unknown>;
   analyses: Record<string, string>;
   proposal?: { action: "buy" | "sell" | "hold"; confidence: number; reasoning: string };
@@ -559,7 +576,7 @@ export interface TradeAgentFn {
 export interface TradingAnalysisResult {
   symbol: string;
   action: "buy" | "sell" | "hold";
-  confidence: number;       // 0–1
+  confidence: number; // 0–1
   reasoning: string;
   riskApproved: boolean;
   analyses: Record<string, string>;
@@ -584,28 +601,37 @@ export class TradingAnalysisOrchestrator {
         const output = await this.agentFn(ctx, role);
 
         if (role === "trader") {
-          const action = /\b(buy|long)\b/i.test(output) ? "buy"
-            : /\b(sell|short)\b/i.test(output) ? "sell"
-            : "hold";
+          const action = /\b(buy|long)\b/i.test(output)
+            ? "buy"
+            : /\b(sell|short)\b/i.test(output)
+              ? "sell"
+              : "hold";
           const confMatch = output.match(/confidence[:\s]+(\d+(?:\.\d+)?)\s*%?/i);
           ctx.proposal = {
-            action, confidence: confMatch ? parseFloat(confMatch[1]!) / 100 : 0.5,
+            action,
+            confidence: confMatch ? parseFloat(confMatch[1]!) / 100 : 0.5,
             reasoning: output.slice(0, 500),
           };
         } else if (role === "risk_manager") {
           const approved = !/\b(reject|deny|do not|don.t)\b/i.test(output);
           const adjMatch = output.match(/adjust(?:ed)? confidence[:\s]+(\d+(?:\.\d+)?)\s*%?/i);
           ctx.riskAssessment = {
-            approved, notes: output.slice(0, 300),
-            adjustedConfidence: adjMatch ? parseFloat(adjMatch[1]!) / 100 : (ctx.proposal?.confidence ?? 0.5),
+            approved,
+            notes: output.slice(0, 300),
+            adjustedConfidence: adjMatch
+              ? parseFloat(adjMatch[1]!) / 100
+              : (ctx.proposal?.confidence ?? 0.5),
           };
         } else {
           ctx.analyses[role] = output.slice(0, 600);
         }
-      } catch { /* non-fatal — skip failing agent */ }
+      } catch {
+        /* non-fatal — skip failing agent */
+      }
     }
 
-    const finalAction = ctx.riskAssessment?.approved === false ? "hold" : (ctx.proposal?.action ?? "hold");
+    const finalAction =
+      ctx.riskAssessment?.approved === false ? "hold" : (ctx.proposal?.action ?? "hold");
     const finalConf = ctx.riskAssessment?.adjustedConfidence ?? ctx.proposal?.confidence ?? 0.5;
 
     return {
@@ -689,14 +715,21 @@ export class FinancialResearchAgent {
       if (!pending.length) break;
 
       for (const task of pending) {
-        if (task.attempts >= this.maxTaskAttempts) { task.status = "failed"; continue; }
+        if (task.attempts >= this.maxTaskAttempts) {
+          task.status = "failed";
+          continue;
+        }
         task.status = "running";
         task.attempts++;
 
         try {
           const toolName = this._selectTool(task.description);
           const tool = this.tools[toolName] ?? this.tools["default"];
-          if (!tool) { task.result = "No tool available"; task.status = "failed"; continue; }
+          if (!tool) {
+            task.result = "No tool available";
+            task.status = "failed";
+            continue;
+          }
 
           task.result = await tool(task, context);
           context += `\nTask "${task.description}" result:\n${task.result.slice(0, 400)}\n`;
@@ -714,7 +747,9 @@ export class FinancialResearchAgent {
           `${context}\n\nDo we have sufficient data to answer "${question}"? Reply YES or describe what is still missing.`,
         );
         if (/^yes\b/i.test(validation.trim())) break;
-      } catch { break; }
+      } catch {
+        break;
+      }
     }
 
     // Step 4: Synthesize
@@ -722,7 +757,14 @@ export class FinancialResearchAgent {
     const answer = await this._synthesize(question, context, doneTasks.length, plan.tasks.length);
     const confidence = doneTasks.length / Math.max(plan.tasks.length, 1);
 
-    return { question, answer, confidence: Math.round(confidence * 100) / 100, tasks: plan.tasks, iterations, timestamp: new Date().toISOString() };
+    return {
+      question,
+      answer,
+      confidence: Math.round(confidence * 100) / 100,
+      tasks: plan.tasks,
+      iterations,
+      timestamp: new Date().toISOString(),
+    };
   }
 
   private async _plan(question: string): Promise<ResearchPlan> {
@@ -746,7 +788,13 @@ export class FinancialResearchAgent {
         attempts: 0,
       }));
 
-    if (!tasks.length) tasks.push({ id: "task-1", description: "Analyse the question", status: "pending", attempts: 0 });
+    if (!tasks.length)
+      tasks.push({
+        id: "task-1",
+        description: "Analyse the question",
+        status: "pending",
+        attempts: 0,
+      });
     return { question, tasks, createdAt: new Date().toISOString() };
   }
 
@@ -754,12 +802,19 @@ export class FinancialResearchAgent {
     const d = description.toLowerCase();
     if (d.includes("sentiment") || d.includes("news")) return "sentiment";
     if (d.includes("technical") || d.includes("chart") || d.includes("price")) return "technical";
-    if (d.includes("fundamental") || d.includes("balance") || d.includes("income")) return "fundamental";
-    if (d.includes("market") || d.includes("polymarket") || d.includes("predict")) return "prediction_market";
+    if (d.includes("fundamental") || d.includes("balance") || d.includes("income"))
+      return "fundamental";
+    if (d.includes("market") || d.includes("polymarket") || d.includes("predict"))
+      return "prediction_market";
     return "default";
   }
 
-  private async _synthesize(question: string, context: string, doneTasks: number, totalTasks: number): Promise<string> {
+  private async _synthesize(
+    question: string,
+    context: string,
+    doneTasks: number,
+    totalTasks: number,
+  ): Promise<string> {
     try {
       return await this.llm(
         `${context}\n\nSynthesize a concise answer to: "${question}"\nBase your answer only on the research above. Include key data points. Be direct.`,
@@ -801,7 +856,7 @@ interface KalshiMarketsResponse {
 }
 
 function kalshiToMarket(r: KalshiRawMarket): Market {
-  const yesBid = (r.yes_bid ?? 0) / 100;   // Kalshi prices are cents (0-100)
+  const yesBid = (r.yes_bid ?? 0) / 100; // Kalshi prices are cents (0-100)
   const yesAsk = (r.yes_ask ?? 0) / 100;
   const lastPrice = (r.last_price ?? 0) / 100;
   const mid = yesBid && yesAsk ? (yesBid + yesAsk) / 2 : lastPrice;
@@ -831,13 +886,20 @@ export class KalshiHttpBackend implements MarketBackend {
   private apiKey?: string;
 
   constructor(opts: { baseUrl?: string; apiKey?: string } = {}) {
-    this.baseUrl = (opts.baseUrl ?? process.env["KALSHI_BASE_URL"] ?? "https://external-api.kalshi.com/trade-api/v2").replace(/\/$/, "");
+    this.baseUrl = (
+      opts.baseUrl ??
+      process.env["KALSHI_BASE_URL"] ??
+      "https://external-api.kalshi.com/trade-api/v2"
+    ).replace(/\/$/, "");
     this.apiKey = opts.apiKey ?? process.env["KALSHI_API_KEY"];
   }
 
   async fetchMarket(id: string): Promise<Market> {
     const headers = this._headers();
-    const res = await this._fetch(`${this.baseUrl}/markets/${encodeURIComponent(id)}`, headers) as { market?: KalshiRawMarket };
+    const res = (await this._fetch(
+      `${this.baseUrl}/markets/${encodeURIComponent(id)}`,
+      headers,
+    )) as { market?: KalshiRawMarket };
     if (!res.market) throw new Error(`Kalshi market not found: ${id}`);
     return kalshiToMarket(res.market);
   }
@@ -847,9 +909,14 @@ export class KalshiHttpBackend implements MarketBackend {
     if (query.category) params.set("category", query.category);
 
     const headers = this._headers();
-    const res = await this._fetch(`${this.baseUrl}/markets?${params}`, headers) as KalshiMarketsResponse;
+    const res = (await this._fetch(
+      `${this.baseUrl}/markets?${params}`,
+      headers,
+    )) as KalshiMarketsResponse;
     const raw = res.markets ?? [];
-    const markets = (query.ids ? raw.filter((m) => query.ids!.includes(m.ticker)) : raw).map(kalshiToMarket);
+    const markets = (query.ids ? raw.filter((m) => query.ids!.includes(m.ticker)) : raw).map(
+      kalshiToMarket,
+    );
 
     return { markets, total: markets.length, fetchedAt: new Date().toISOString() };
   }
@@ -868,7 +935,10 @@ export class KalshiHttpBackend implements MarketBackend {
       clearTimeout(timer);
       if (!res.ok) throw new Error(`Kalshi API ${res.status}: ${url}`);
       return res.json();
-    } catch (e) { clearTimeout(timer); throw e; }
+    } catch (e) {
+      clearTimeout(timer);
+      throw e;
+    }
   }
 }
 
@@ -924,15 +994,20 @@ export class MetaculusHttpBackend implements MarketBackend {
 
   async fetchMarket(id: string): Promise<Market> {
     const numId = id.replace(/^metaculus-/, "");
-    const raw = await this._fetch(`${this.baseUrl}/questions/${numId}/`) as MetaculusRawQuestion;
+    const raw = (await this._fetch(`${this.baseUrl}/questions/${numId}/`)) as MetaculusRawQuestion;
     return metaculusToMarket(raw);
   }
 
   async fetchMarkets(query: MarketQuery): Promise<MarketListResponse> {
-    const params = new URLSearchParams({ limit: String(query.limit ?? 50), has_community_prediction: "true" });
+    const params = new URLSearchParams({
+      limit: String(query.limit ?? 50),
+      has_community_prediction: "true",
+    });
     if (query.category) params.set("categories", query.category);
 
-    const res = await this._fetch(`${this.baseUrl}/questions/?${params}`) as MetaculusListResponse;
+    const res = (await this._fetch(
+      `${this.baseUrl}/questions/?${params}`,
+    )) as MetaculusListResponse;
     const markets = (res.results ?? []).map(metaculusToMarket);
     return { markets, total: res.count ?? markets.length, fetchedAt: new Date().toISOString() };
   }
@@ -941,11 +1016,17 @@ export class MetaculusHttpBackend implements MarketBackend {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15_000);
     try {
-      const res = await fetch(url, { headers: { Accept: "application/json" }, signal: controller.signal });
+      const res = await fetch(url, {
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      });
       clearTimeout(timer);
       if (!res.ok) throw new Error(`Metaculus API ${res.status}: ${url}`);
       return res.json();
-    } catch (e) { clearTimeout(timer); throw e; }
+    } catch (e) {
+      clearTimeout(timer);
+      throw e;
+    }
   }
 }
 
@@ -1018,7 +1099,7 @@ export interface OrderBookSnapshot {
 /** Apply a single delta to a mutable snapshot in place. Returns the snapshot. */
 export function applyOrderBookDelta(
   book: OrderBookSnapshot,
-  delta: OrderBookDelta
+  delta: OrderBookDelta,
 ): OrderBookSnapshot {
   const levels = delta.side === "BUY" ? book.bids : book.asks;
 
@@ -1089,7 +1170,7 @@ export function bookSpread(book: OrderBookSnapshot): number | undefined {
 export function avgPriceForQuantity(
   book: OrderBookSnapshot,
   side: OrderSide,
-  quantity: number
+  quantity: number,
 ): { avgPrice: number; filled: number; unfilled: number } {
   const levels = side === "BUY" ? book.asks : book.bids; // BUY walks asks, SELL walks bids
   let remaining = quantity;
@@ -1111,9 +1192,16 @@ export function avgPriceForQuantity(
 /** Create an empty order book snapshot for an instrument. */
 export function createOrderBook(
   instrumentId: string,
-  bookType: BookType = "L2_MBP"
+  bookType: BookType = "L2_MBP",
 ): OrderBookSnapshot {
-  return { instrumentId, bookType, bids: [], asks: [], sequence: 0, timestamp: new Date().toISOString() };
+  return {
+    instrumentId,
+    bookType,
+    bids: [],
+    asks: [],
+    sequence: 0,
+    timestamp: new Date().toISOString(),
+  };
 }
 
 // ── Polymarket CLOB Domain Models ─────────────────────────────────────────────

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Token Conservation — compress prompts and monitor token usage efficiency.
  *
@@ -52,11 +53,15 @@ export default function TokenConservation() {
     setLoadingStatus(false);
   }, []);
 
-  useEffect(() => { loadStatus(); }, [loadStatus]);
+  useEffect(() => {
+    loadStatus();
+  }, [loadStatus]);
 
   const compress = useCallback(async () => {
     if (!prompt.trim()) return;
-    setCompressing(true); setCompressErr(""); setResult(null);
+    setCompressing(true);
+    setCompressErr("");
+    setResult(null);
     const r = await fetch("/api/token-conservation/compress", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -88,8 +93,14 @@ export default function TokenConservation() {
 
       <Tabs defaultValue="compress">
         <TabsList>
-          <TabsTrigger value="compress"><Minimize2 className="w-4 h-4 mr-1" />Compress</TabsTrigger>
-          <TabsTrigger value="status"><BarChart2 className="w-4 h-4 mr-1" />Status</TabsTrigger>
+          <TabsTrigger value="compress">
+            <Minimize2 className="w-4 h-4 mr-1" />
+            Compress
+          </TabsTrigger>
+          <TabsTrigger value="status">
+            <BarChart2 className="w-4 h-4 mr-1" />
+            Status
+          </TabsTrigger>
         </TabsList>
 
         {/* Compress */}
@@ -100,25 +111,43 @@ export default function TokenConservation() {
                 rows={5}
                 placeholder="Enter a prompt to compress…"
                 value={prompt}
-                onChange={e => setPrompt(e.target.value)}
+                onChange={(e) => setPrompt(e.target.value)}
                 className="resize-none"
               />
               <div className="space-y-1">
                 <label className="text-sm font-medium flex justify-between">
                   Aggressiveness
-                  <span className="font-normal text-muted-foreground">{Math.round(aggressiveness * 100)}%</span>
+                  <span className="font-normal text-muted-foreground">
+                    {Math.round(aggressiveness * 100)}%
+                  </span>
                 </label>
                 <input
-                  type="range" min={0} max={1} step={0.05}
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
                   value={aggressiveness}
-                  onChange={e => setAggressiveness(parseFloat(e.target.value))}
+                  onChange={(e) => setAggressiveness(parseFloat(e.target.value))}
                   className="w-full accent-primary"
                 />
-                <div className="flex justify-between text-xs text-muted-foreground"><span>Conservative</span><span>Aggressive</span></div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Conservative</span>
+                  <span>Aggressive</span>
+                </div>
               </div>
               {compressErr && <p className="text-red-500 text-xs">{compressErr}</p>}
               <Button onClick={compress} disabled={compressing || !prompt.trim()}>
-                {compressing ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Compressing…</> : <><Minimize2 className="w-4 h-4 mr-2" />Compress</>}
+                {compressing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Compressing…
+                  </>
+                ) : (
+                  <>
+                    <Minimize2 className="w-4 h-4 mr-2" />
+                    Compress
+                  </>
+                )}
               </Button>
             </CardContent>
           </Card>
@@ -136,7 +165,10 @@ export default function TokenConservation() {
                 </Card>
                 <Card className="border-emerald-200 dark:border-emerald-800">
                   <CardContent className="pt-3 pb-3">
-                    <p className="text-xs text-muted-foreground flex items-center gap-1"><Zap className="w-3 h-3" />Compressed</p>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Zap className="w-3 h-3" />
+                      Compressed
+                    </p>
                     <p className="text-xl font-bold text-emerald-600">{result.compressedTokens}</p>
                     <p className="text-xs text-muted-foreground">tokens</p>
                   </CardContent>
@@ -157,19 +189,32 @@ export default function TokenConservation() {
                     <span>{100 - savingsPct}% of original</span>
                   </div>
                   <div className="w-full bg-muted rounded-full h-2">
-                    <div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${100 - savingsPct}%` }} />
+                    <div
+                      className="bg-emerald-500 h-2 rounded-full"
+                      style={{ width: `${100 - savingsPct}%` }}
+                    />
                   </div>
                 </CardContent>
               </Card>
               {/* Side-by-side */}
               <div className="grid md:grid-cols-2 gap-3">
                 <Card>
-                  <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Original</CardTitle></CardHeader>
-                  <CardContent><p className="text-sm text-muted-foreground whitespace-pre-wrap">{result.original}</p></CardContent>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-muted-foreground">Original</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                      {result.original}
+                    </p>
+                  </CardContent>
                 </Card>
                 <Card className="border-primary/20">
-                  <CardHeader className="pb-2"><CardTitle className="text-xs">Compressed</CardTitle></CardHeader>
-                  <CardContent><p className="text-sm whitespace-pre-wrap">{result.compressed}</p></CardContent>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs">Compressed</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm whitespace-pre-wrap">{result.compressed}</p>
+                  </CardContent>
                 </Card>
               </div>
             </div>
@@ -180,30 +225,42 @@ export default function TokenConservation() {
         <TabsContent value="status" className="mt-4">
           {loadingStatus ? (
             <div className="flex items-center gap-2 text-muted-foreground py-8 justify-center">
-              <Loader2 className="w-4 h-4 animate-spin" />Loading status…
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Loading status…
             </div>
           ) : !status ? (
-            <Card><CardContent className="pt-8 pb-8 text-center text-muted-foreground">No conservation data yet</CardContent></Card>
+            <Card>
+              <CardContent className="pt-8 pb-8 text-center text-muted-foreground">
+                No conservation data yet
+              </CardContent>
+            </Card>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               <Card>
                 <CardContent className="pt-4">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Compressions Run</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                    Compressions Run
+                  </p>
                   <p className="text-2xl font-bold">{status.totalCompressed.toLocaleString()}</p>
                 </CardContent>
               </Card>
               <Card className="border-emerald-200 dark:border-emerald-800">
                 <CardContent className="pt-4">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                    <Zap className="w-3 h-3" />Tokens Saved
+                    <Zap className="w-3 h-3" />
+                    Tokens Saved
                   </p>
-                  <p className="text-2xl font-bold text-emerald-600">{status.totalTokensSaved.toLocaleString()}</p>
+                  <p className="text-2xl font-bold text-emerald-600">
+                    {status.totalTokensSaved.toLocaleString()}
+                  </p>
                 </CardContent>
               </Card>
               {status.avgRatio !== undefined && (
                 <Card>
                   <CardContent className="pt-4">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Avg Ratio</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                      Avg Ratio
+                    </p>
                     <p className="text-2xl font-bold">{(status.avgRatio * 100).toFixed(1)}%</p>
                   </CardContent>
                 </Card>
@@ -211,9 +268,12 @@ export default function TokenConservation() {
               {status.estimatedCostSaved !== undefined && (
                 <Card className="col-span-2 md:col-span-1">
                   <CardContent className="pt-4">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Est. Cost Saved</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                      Est. Cost Saved
+                    </p>
                     <p className="text-2xl font-bold">
-                      {status.currency ?? "$"}{status.estimatedCostSaved.toFixed(2)}
+                      {status.currency ?? "$"}
+                      {status.estimatedCostSaved.toFixed(2)}
                     </p>
                   </CardContent>
                 </Card>

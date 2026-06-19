@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { Outlet, useLocation } from "react-router";
 import { Navbar } from "~/components/navbar";
 import { Footer } from "~/components/footer";
@@ -6,8 +7,12 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const pageVariants = {
   initial: { opacity: 0, y: 12 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.23, 1, 0.32, 1] } },
-  exit: { opacity: 0, y: -8, transition: { duration: 0.2, ease: "easeIn" } },
+  animate: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.35, ease: [0.23, 1, 0.32, 1] as [number, number, number, number] },
+  },
+  exit: { opacity: 0, y: -8, transition: { duration: 0.2, ease: "easeIn" as const } },
 };
 
 export default function MarketingLayout() {
@@ -18,7 +23,13 @@ export default function MarketingLayout() {
       <Navbar />
       <main className="flex-1">
         <AnimatePresence mode="wait">
-          <motion.div key={location.pathname} variants={pageVariants} initial="initial" animate="animate" exit="exit">
+          <motion.div
+            key={location.pathname}
+            variants={pageVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+          >
             <Outlet />
           </motion.div>
         </AnimatePresence>

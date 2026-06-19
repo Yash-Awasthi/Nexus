@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * useEasterEggs — registers all Easter egg listeners and returns triggered eggs.
  */

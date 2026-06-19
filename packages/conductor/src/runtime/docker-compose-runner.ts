@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { spawn } from "child_process";
 import * as path from "path";
 
@@ -6,9 +7,9 @@ export type ComposeRunResult = { code: number; stdout: string; stderr: string };
 export function runDockerCompose(
   repoRoot: string,
   composeFiles: string[],
-  args: string[]
+  args: string[],
 ): Promise<ComposeRunResult> {
-  const files = composeFiles.map((f) => path.isAbsolute(f) ? f : path.join(repoRoot, f));
+  const files = composeFiles.map((f) => (path.isAbsolute(f) ? f : path.join(repoRoot, f)));
   const fileArgs = files.flatMap((f) => ["-f", f]);
   const cmd = process.platform === "win32" ? "docker" : "docker";
   const fullArgs = ["compose", ...fileArgs, ...args];
@@ -17,7 +18,7 @@ export function runDockerCompose(
     const proc = spawn(cmd, fullArgs, {
       cwd: repoRoot,
       shell: process.platform === "win32",
-      env: process.env
+      env: process.env,
     });
     let stdout = "";
     let stderr = "";

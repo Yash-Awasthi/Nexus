@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Image Transformations — img2img and img2video.
  *
@@ -17,16 +18,7 @@ import { Badge } from "~/components/ui/badge";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import {
-  ImageIcon,
-  Film,
-  Upload,
-  Loader2,
-  Download,
-  Wand2,
-  RefreshCw,
-  X,
-} from "lucide-react";
+import { ImageIcon, Film, Upload, Loader2, Download, Wand2, RefreshCw, X } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -60,7 +52,7 @@ function useImageUpload() {
 
   const handleFile = (file: File) => {
     const reader = new FileReader();
-    reader.onload = e => setDataUrl(e.target?.result as string);
+    reader.onload = (e) => setDataUrl(e.target?.result as string);
     reader.readAsDataURL(file);
   };
 
@@ -74,7 +66,7 @@ function useImageUpload() {
 
   const DropZone = () => (
     <div
-      onDragOver={e => e.preventDefault()}
+      onDragOver={(e) => e.preventDefault()}
       onDrop={handleDrop}
       onClick={() => ref.current?.click()}
       className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors hover:border-primary/50 ${dataUrl ? "border-primary/30" : "border-muted-foreground/25"}`}
@@ -84,13 +76,16 @@ function useImageUpload() {
         type="file"
         accept="image/*"
         className="hidden"
-        onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
+        onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
       />
       {dataUrl ? (
         <div className="relative inline-block">
           <img src={dataUrl} alt="source" className="max-h-48 rounded-md mx-auto" />
           <button
-            onClick={e => { e.stopPropagation(); clear(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              clear();
+            }}
             className="absolute -top-2 -right-2 bg-background border rounded-full p-0.5 text-muted-foreground hover:text-foreground"
           >
             <X className="w-3 h-3" />
@@ -123,7 +118,9 @@ function Img2ImgTab({ providers }: { providers: Provider[] }) {
 
   const run = useCallback(async () => {
     if (!dataUrl || !prompt.trim()) return;
-    setRunning(true); setErr(""); setResult(null);
+    setRunning(true);
+    setErr("");
+    setResult(null);
     try {
       const r = await fetch("/api/image-transformations/img2img", {
         method: "POST",
@@ -137,8 +134,13 @@ function Img2ImgTab({ providers }: { providers: Provider[] }) {
         }),
       });
       if (r.ok) setResult(await r.json());
-      else { const d = await r.json().catch(() => ({})); setErr(d.error ?? "Transform failed"); }
-    } catch { setErr("Could not reach server"); }
+      else {
+        const d = await r.json().catch(() => ({}));
+        setErr(d.error ?? "Transform failed");
+      }
+    } catch {
+      setErr("Could not reach server");
+    }
     setRunning(false);
   }, [dataUrl, prompt, negativePrompt, strength, providerId]);
 
@@ -158,7 +160,7 @@ function Img2ImgTab({ providers }: { providers: Provider[] }) {
               rows={3}
               placeholder="A painting in the style of Van Gogh, oil on canvas…"
               value={prompt}
-              onChange={e => setPrompt(e.target.value)}
+              onChange={(e) => setPrompt(e.target.value)}
               className="resize-none"
             />
           </div>
@@ -167,7 +169,7 @@ function Img2ImgTab({ providers }: { providers: Provider[] }) {
             <Input
               placeholder="blurry, low quality…"
               value={negativePrompt}
-              onChange={e => setNegativePrompt(e.target.value)}
+              onChange={(e) => setNegativePrompt(e.target.value)}
             />
           </div>
           <div className="space-y-1">
@@ -181,11 +183,12 @@ function Img2ImgTab({ providers }: { providers: Provider[] }) {
               max={1.0}
               step={0.05}
               value={strength}
-              onChange={e => setStrength(parseFloat(e.target.value))}
+              onChange={(e) => setStrength(parseFloat(e.target.value))}
               className="w-full accent-primary"
             />
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Subtle</span><span>Full transform</span>
+              <span>Subtle</span>
+              <span>Full transform</span>
             </div>
           </div>
           {providers.length > 0 && (
@@ -194,20 +197,32 @@ function Img2ImgTab({ providers }: { providers: Provider[] }) {
               <select
                 className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
                 value={providerId}
-                onChange={e => setProviderId(e.target.value)}
+                onChange={(e) => setProviderId(e.target.value)}
               >
                 <option value="">Auto-select</option>
-                {providers.filter(p => p.supportsImg2Img !== false).map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
+                {providers
+                  .filter((p) => p.supportsImg2Img !== false)
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
               </select>
             </div>
           )}
           {err && <p className="text-red-500 text-xs">{err}</p>}
           <Button onClick={run} disabled={running || !dataUrl || !prompt.trim()} className="w-full">
-            {running
-              ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Transforming…</>
-              : <><Wand2 className="w-4 h-4 mr-2" />Transform Image</>}
+            {running ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Transforming…
+              </>
+            ) : (
+              <>
+                <Wand2 className="w-4 h-4 mr-2" />
+                Transform Image
+              </>
+            )}
           </Button>
         </div>
 
@@ -223,7 +238,9 @@ function Img2ImgTab({ providers }: { providers: Provider[] }) {
               <div className="w-full p-2 space-y-2">
                 <img src={imgSrc} alt="transformed" className="w-full rounded-md" />
                 <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-                  <span>{result?.width && result?.height ? `${result.width}×${result.height}` : ""}</span>
+                  <span>
+                    {result?.width && result?.height ? `${result.width}×${result.height}` : ""}
+                  </span>
                   <div className="flex items-center gap-2">
                     {result?.provider && <Badge variant="outline">{result.provider}</Badge>}
                     {result?.durationMs && <span>{(result.durationMs / 1000).toFixed(1)}s</span>}
@@ -232,7 +249,8 @@ function Img2ImgTab({ providers }: { providers: Provider[] }) {
                 {imgSrc && (
                   <a href={imgSrc} download="transformed.png">
                     <Button variant="outline" size="sm" className="w-full">
-                      <Download className="w-4 h-4 mr-2" />Download
+                      <Download className="w-4 h-4 mr-2" />
+                      Download
                     </Button>
                   </a>
                 )}
@@ -264,7 +282,9 @@ function Img2VideoTab({ providers }: { providers: Provider[] }) {
 
   const run = useCallback(async () => {
     if (!dataUrl) return;
-    setRunning(true); setErr(""); setResult(null);
+    setRunning(true);
+    setErr("");
+    setResult(null);
     try {
       const r = await fetch("/api/image-transformations/img2video", {
         method: "POST",
@@ -278,8 +298,13 @@ function Img2VideoTab({ providers }: { providers: Provider[] }) {
         }),
       });
       if (r.ok) setResult(await r.json());
-      else { const d = await r.json().catch(() => ({})); setErr(d.error ?? "Video generation failed"); }
-    } catch { setErr("Could not reach server"); }
+      else {
+        const d = await r.json().catch(() => ({}));
+        setErr(d.error ?? "Video generation failed");
+      }
+    } catch {
+      setErr("Could not reach server");
+    }
     setRunning(false);
   }, [dataUrl, motionPrompt, durationSec, fps, providerId]);
 
@@ -292,12 +317,14 @@ function Img2VideoTab({ providers }: { providers: Provider[] }) {
             <DropZone />
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium">Motion Prompt <span className="text-muted-foreground font-normal">(optional)</span></label>
+            <label className="text-sm font-medium">
+              Motion Prompt <span className="text-muted-foreground font-normal">(optional)</span>
+            </label>
             <Textarea
               rows={2}
               placeholder="Camera slowly zooms in, leaves rustle in the breeze…"
               value={motionPrompt}
-              onChange={e => setMotionPrompt(e.target.value)}
+              onChange={(e) => setMotionPrompt(e.target.value)}
               className="resize-none"
             />
           </div>
@@ -309,7 +336,7 @@ function Img2VideoTab({ providers }: { providers: Provider[] }) {
                 min={1}
                 max={15}
                 value={durationSec}
-                onChange={e => setDurationSec(parseInt(e.target.value) || 3)}
+                onChange={(e) => setDurationSec(parseInt(e.target.value) || 3)}
               />
             </div>
             <div className="space-y-1">
@@ -319,7 +346,7 @@ function Img2VideoTab({ providers }: { providers: Provider[] }) {
                 min={8}
                 max={60}
                 value={fps}
-                onChange={e => setFps(parseInt(e.target.value) || 24)}
+                onChange={(e) => setFps(parseInt(e.target.value) || 24)}
               />
             </div>
           </div>
@@ -329,22 +356,36 @@ function Img2VideoTab({ providers }: { providers: Provider[] }) {
               <select
                 className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
                 value={providerId}
-                onChange={e => setProviderId(e.target.value)}
+                onChange={(e) => setProviderId(e.target.value)}
               >
                 <option value="">Auto-select</option>
-                {providers.filter(p => p.supportsImg2Video !== false).map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
+                {providers
+                  .filter((p) => p.supportsImg2Video !== false)
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
               </select>
             </div>
           )}
           {err && <p className="text-red-500 text-xs">{err}</p>}
           <Button onClick={run} disabled={running || !dataUrl} className="w-full">
-            {running
-              ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Generating video…</>
-              : <><Film className="w-4 h-4 mr-2" />Animate Image</>}
+            {running ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Generating video…
+              </>
+            ) : (
+              <>
+                <Film className="w-4 h-4 mr-2" />
+                Animate Image
+              </>
+            )}
           </Button>
-          <p className="text-xs text-muted-foreground">Video generation typically takes 15–120 seconds depending on provider and duration.</p>
+          <p className="text-xs text-muted-foreground">
+            Video generation typically takes 15–120 seconds depending on provider and duration.
+          </p>
         </div>
 
         <div className="space-y-3">
@@ -359,20 +400,15 @@ function Img2VideoTab({ providers }: { providers: Provider[] }) {
               </div>
             ) : result?.url ? (
               <div className="w-full p-2 space-y-2">
-                <video
-                  src={result.url}
-                  controls
-                  autoPlay
-                  loop
-                  className="w-full rounded-md"
-                />
+                <video src={result.url} controls autoPlay loop className="w-full rounded-md" />
                 <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
                   {result.durationSec && <span>{result.durationSec}s</span>}
                   {result.provider && <Badge variant="outline">{result.provider}</Badge>}
                 </div>
                 <a href={result.url} download="animated.mp4" target="_blank" rel="noreferrer">
                   <Button variant="outline" size="sm" className="w-full">
-                    <Download className="w-4 h-4 mr-2" />Download
+                    <Download className="w-4 h-4 mr-2" />
+                    Download
                   </Button>
                 </a>
               </div>
@@ -397,8 +433,8 @@ export default function ImageTransform() {
 
   useState(() => {
     fetch("/api/image-transformations/providers")
-      .then(r => r.ok ? r.json() : { providers: [] })
-      .then(d => setProviders(d.providers ?? d))
+      .then((r) => (r.ok ? r.json() : { providers: [] }))
+      .then((d) => setProviders(d.providers ?? d))
       .catch(() => {})
       .finally(() => setLoadingProviders(false));
   });
@@ -417,18 +453,29 @@ export default function ImageTransform() {
 
       {loadingProviders ? (
         <div className="flex items-center gap-2 text-muted-foreground text-sm">
-          <Loader2 className="w-4 h-4 animate-spin" />Loading providers…
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Loading providers…
         </div>
       ) : providers.length > 0 ? (
         <div className="flex flex-wrap gap-1">
-          {providers.map(p => <Badge key={p.id} variant="outline">{p.name}</Badge>)}
+          {providers.map((p) => (
+            <Badge key={p.id} variant="outline">
+              {p.name}
+            </Badge>
+          ))}
         </div>
       ) : null}
 
       <Tabs defaultValue="img2img">
         <TabsList>
-          <TabsTrigger value="img2img"><ImageIcon className="w-4 h-4 mr-1" />Image to Image</TabsTrigger>
-          <TabsTrigger value="img2video"><Film className="w-4 h-4 mr-1" />Image to Video</TabsTrigger>
+          <TabsTrigger value="img2img">
+            <ImageIcon className="w-4 h-4 mr-1" />
+            Image to Image
+          </TabsTrigger>
+          <TabsTrigger value="img2video">
+            <Film className="w-4 h-4 mr-1" />
+            Image to Video
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="img2img" className="mt-4">
           <Img2ImgTab providers={providers} />

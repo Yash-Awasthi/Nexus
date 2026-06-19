@@ -26,8 +26,8 @@ import { users } from "@nexus/db/schema";
 import { eq, isNull, and } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
-import { requireAuth } from "../middleware/auth.js";
 import { emitAuditEvent } from "../lib/audit-emitter.js";
+import { requireAuth } from "../middleware/auth.js";
 
 // ── Base32 encoding/decoding (RFC 4648 — used by TOTP apps) ──────────────────
 
@@ -37,8 +37,8 @@ function base32Encode(buf: Buffer): string {
   let bits = 0;
   let value = 0;
   let output = "";
-  for (let i = 0; i < buf.length; i++) {
-    value = (value << 8) | (buf[i] as number);
+  for (const byte of buf) {
+    value = (value << 8) | byte;
     bits += 8;
     while (bits >= 5) {
       output += BASE32_CHARS[(value >>> (bits - 5)) & 31];
@@ -77,12 +77,12 @@ function hotp(secretBase32: string, counter: bigint): string {
   const msg = Buffer.alloc(8);
   msg.writeBigUInt64BE(counter);
   const hmac = createHmac("sha1", key).update(msg).digest();
-  const offset = (hmac[19] as number) & 0x0f;
+  const offset = hmac[19]! & 0x0f;
   const code =
-    (((hmac[offset] as number) & 0x7f) << 24) |
-    (((hmac[offset + 1] as number) & 0xff) << 16) |
-    (((hmac[offset + 2] as number) & 0xff) << 8) |
-    ((hmac[offset + 3] as number) & 0xff);
+    ((hmac[offset]! & 0x7f) << 24) |
+    ((hmac[offset + 1]! & 0xff) << 16) |
+    ((hmac[offset + 2]! & 0xff) << 8) |
+    (hmac[offset + 3]! & 0xff);
   return String(code % 1_000_000).padStart(6, "0");
 }
 
@@ -147,8 +147,10 @@ function getEncKey(): Buffer | null {
 
 export async function mfaRoutes(app: FastifyInstance): Promise<void> {
   if (!process.env.DATABASE_URL) {
-    const na = async (_: unknown, reply: { code: (n: number) => { send: (v: unknown) => unknown } }) =>
-      reply.code(503).send({ error: "DATABASE_URL not configured" });
+    const na = async (
+      _: unknown,
+      reply: { code: (n: number) => { send: (v: unknown) => unknown } },
+    ) => reply.code(503).send({ error: "DATABASE_URL not configured" });
     app.get("/mfa/status", na);
     app.post("/mfa/setup", na);
     app.post("/mfa/verify", na);
@@ -158,22 +160,18 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
   }
 
   /** GET /mfa/status — is MFA enabled for the current user? */
-  app.get(
-    "/mfa/status",
-    { preHandler: requireAuth },
-    async (request, reply) => {
-      const userId = request.nexusUserId;
-      if (!userId) return reply.code(403).send({ error: "jwt_required" });
+  app.get("/mfa/status", { preHandler: requireAuth }, async (request, reply) => {
+    const userId = request.nexusUserId;
+    if (!userId) return reply.code(403).send({ error: "jwt_required" });
 
-      const [user] = await db
-        .select({ mfaEnabled: users.mfaEnabled })
-        .from(users)
-        .where(eq(users.id, userId))
-        .limit(1);
+    const [user] = await db
+      .select({ mfaEnabled: users.mfaEnabled })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
 
-      return reply.send({ mfaEnabled: user?.mfaEnabled ?? false });
-    },
-  );
+    return reply.send({ mfaEnabled: user?.mfaEnabled ?? false });
+  });
 
   /**
    * POST /mfa/setup
@@ -185,42 +183,41 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
    *   secret     — base32 TOTP secret (show to user once; they enter into authenticator app)
    *   otpauthUrl — otpauth:// URI for QR code generation
    */
-  app.post(
-    "/mfa/setup",
-    { preHandler: requireAuth },
-    async (request, reply) => {
-      const userId = request.nexusUserId;
-      if (!userId) return reply.code(403).send({ error: "jwt_required" });
+  app.post("/mfa/setup", { preHandler: requireAuth }, async (request, reply) => {
+    const userId = request.nexusUserId;
+    if (!userId) return reply.code(403).send({ error: "jwt_required" });
 
-      const [user] = await db
-        .select({ email: users.email, mfaEnabled: users.mfaEnabled })
-        .from(users)
-        .where(and(eq(users.id, userId), isNull(users.deletedAt)))
-        .limit(1);
+    const [user] = await db
+      .select({ email: users.email, mfaEnabled: users.mfaEnabled })
+      .from(users)
+      .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+      .limit(1);
 
-      if (!user) return reply.code(404).send({ error: "user_not_found" });
-      if (user.mfaEnabled) {
-        return reply.code(409).send({ error: "mfa_already_enabled", message: "Disable existing MFA first" });
-      }
+    if (!user) return reply.code(404).send({ error: "user_not_found" });
+    if (user.mfaEnabled) {
+      return reply
+        .code(409)
+        .send({ error: "mfa_already_enabled", message: "Disable existing MFA first" });
+    }
 
-      const secret = generateTotpSecret();
-      const encryptedSecret = encryptSecret(secret);
+    const secret = generateTotpSecret();
+    const encryptedSecret = encryptSecret(secret);
 
-      await db
-        .update(users)
-        .set({ totpSecret: encryptedSecret, mfaEnabled: false })
-        .where(eq(users.id, userId));
+    await db
+      .update(users)
+      .set({ totpSecret: encryptedSecret, mfaEnabled: false })
+      .where(eq(users.id, userId));
 
-      const issuer = process.env.NEXUS_MFA_ISSUER ?? "Nexus";
-      const otpauthUrl = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(user.email)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
+    const issuer = process.env.NEXUS_MFA_ISSUER ?? "Nexus";
+    const otpauthUrl = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(user.email)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
 
-      return reply.send({
-        secret,
-        otpauthUrl,
-        message: "Scan the QR code in your authenticator app, then call POST /mfa/verify with a valid code to activate.",
-      });
-    },
-  );
+    return reply.send({
+      secret,
+      otpauthUrl,
+      message:
+        "Scan the QR code in your authenticator app, then call POST /mfa/verify with a valid code to activate.",
+    });
+  });
 
   /**
    * POST /mfa/verify
@@ -260,7 +257,9 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
       const secret = decryptSecret(user.totpSecret);
       const valid = verifyTotp(secret, request.body.code);
       if (!valid) {
-        return reply.code(400).send({ error: "invalid_code", message: "Invalid or expired TOTP code" });
+        return reply
+          .code(400)
+          .send({ error: "invalid_code", message: "Invalid or expired TOTP code" });
       }
 
       await db.update(users).set({ mfaEnabled: true }).where(eq(users.id, userId));

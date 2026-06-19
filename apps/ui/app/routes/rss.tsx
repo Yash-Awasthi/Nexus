@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * RSS Feeds — subscribe to and read RSS/Atom feeds.
  *
@@ -82,7 +83,9 @@ export default function RssFeeds() {
     setLoadingFeeds(false);
   }, []);
 
-  useEffect(() => { loadFeeds(); }, [loadFeeds]);
+  useEffect(() => {
+    loadFeeds();
+  }, [loadFeeds]);
 
   const loadItems = useCallback(async (feed: Feed) => {
     setSelectedFeed(feed);
@@ -98,45 +101,64 @@ export default function RssFeeds() {
 
   const addFeed = useCallback(async () => {
     if (!newUrl.trim()) return;
-    setAdding(true); setErr("");
+    setAdding(true);
+    setErr("");
     const r = await fetch("/api/rss/feeds", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url: newUrl.trim() }),
     }).catch(() => null);
-    if (r?.ok) { setNewUrl(""); loadFeeds(); }
-    else setErr("Failed to add feed");
+    if (r?.ok) {
+      setNewUrl("");
+      loadFeeds();
+    } else setErr("Failed to add feed");
     setAdding(false);
   }, [newUrl, loadFeeds]);
 
-  const pollFeed = useCallback(async (feedId: string) => {
-    setPolling(feedId);
-    const r = await fetch(`/api/rss/feeds/${feedId}/poll`, { method: "POST" }).catch(() => null);
-    if (r?.ok) {
-      loadFeeds();
-      if (selectedFeed?.id === feedId) loadItems(selectedFeed);
-    }
-    setPolling(null);
-  }, [selectedFeed, loadFeeds, loadItems]);
+  const pollFeed = useCallback(
+    async (feedId: string) => {
+      setPolling(feedId);
+      const r = await fetch(`/api/rss/feeds/${feedId}/poll`, { method: "POST" }).catch(() => null);
+      if (r?.ok) {
+        loadFeeds();
+        if (selectedFeed?.id === feedId) loadItems(selectedFeed);
+      }
+      setPolling(null);
+    },
+    [selectedFeed, loadFeeds, loadItems],
+  );
 
-  const deleteFeed = useCallback(async (id: string) => {
-    if (!confirm("Remove this feed?")) return;
-    setDeleting(id);
-    await fetch(`/api/rss/feeds/${id}`, { method: "DELETE" }).catch(() => {});
-    setFeeds(prev => prev.filter(f => f.id !== id));
-    if (selectedFeed?.id === id) { setSelectedFeed(null); setItems([]); }
-    setDeleting(null);
-  }, [selectedFeed]);
+  const deleteFeed = useCallback(
+    async (id: string) => {
+      if (!confirm("Remove this feed?")) return;
+      setDeleting(id);
+      await fetch(`/api/rss/feeds/${id}`, { method: "DELETE" }).catch(() => {});
+      setFeeds((prev) => prev.filter((f) => f.id !== id));
+      if (selectedFeed?.id === id) {
+        setSelectedFeed(null);
+        setItems([]);
+      }
+      setDeleting(null);
+    },
+    [selectedFeed],
+  );
 
-  const markRead = useCallback(async (itemId: string) => {
-    await fetch(`/api/rss/items/${itemId}/read`, { method: "PATCH" }).catch(() => {});
-    setItems(prev => prev.map(i => i.id === itemId ? { ...i, read: true } : i));
-    if (selectedFeed) {
-      setFeeds(prev => prev.map(f => f.id === selectedFeed.id
-        ? { ...f, unreadCount: Math.max(0, (f.unreadCount ?? 0) - 1) }
-        : f));
-    }
-  }, [selectedFeed]);
+  const markRead = useCallback(
+    async (itemId: string) => {
+      await fetch(`/api/rss/items/${itemId}/read`, { method: "PATCH" }).catch(() => {});
+      setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, read: true } : i)));
+      if (selectedFeed) {
+        setFeeds((prev) =>
+          prev.map((f) =>
+            f.id === selectedFeed.id
+              ? { ...f, unreadCount: Math.max(0, (f.unreadCount ?? 0) - 1) }
+              : f,
+          ),
+        );
+      }
+    },
+    [selectedFeed],
+  );
 
   const totalUnread = feeds.reduce((sum, f) => sum + (f.unreadCount ?? 0), 0);
 
@@ -148,9 +170,15 @@ export default function RssFeeds() {
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Rss className="w-6 h-6 text-orange-500" />
             RSS Feeds
-            {totalUnread > 0 && <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400">{totalUnread} unread</Badge>}
+            {totalUnread > 0 && (
+              <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400">
+                {totalUnread} unread
+              </Badge>
+            )}
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">Subscribe to RSS/Atom feeds and read items inline</p>
+          <p className="text-muted-foreground text-sm mt-1">
+            Subscribe to RSS/Atom feeds and read items inline
+          </p>
         </div>
         <Button variant="ghost" size="sm" onClick={loadFeeds}>
           <RefreshCw className={`w-4 h-4 ${loadingFeeds ? "animate-spin" : ""}`} />
@@ -162,12 +190,16 @@ export default function RssFeeds() {
         <Input
           placeholder="https://example.com/feed.xml"
           value={newUrl}
-          onChange={e => setNewUrl(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && addFeed()}
+          onChange={(e) => setNewUrl(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && addFeed()}
           className="flex-1"
         />
         <Button onClick={addFeed} disabled={adding || !newUrl.trim()}>
-          {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 mr-1" />}
+          {adding ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Plus className="w-4 h-4 mr-1" />
+          )}
           {adding ? "" : "Subscribe"}
         </Button>
       </div>
@@ -181,12 +213,13 @@ export default function RssFeeds() {
           </h2>
           {loadingFeeds ? (
             <div className="flex items-center gap-2 text-muted-foreground text-sm py-4">
-              <Loader2 className="w-4 h-4 animate-spin" />Loading…
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Loading…
             </div>
           ) : feeds.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4">No feeds yet. Add one above.</p>
           ) : (
-            feeds.map(feed => (
+            feeds.map((feed) => (
               <div
                 key={feed.id}
                 className={`border rounded-lg p-3 cursor-pointer transition-colors hover:bg-muted/50 ${selectedFeed?.id === feed.id ? "bg-muted border-primary/30" : ""}`}
@@ -199,7 +232,9 @@ export default function RssFeeds() {
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     {(feed.unreadCount ?? 0) > 0 && (
-                      <Badge className="text-xs bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400">{feed.unreadCount}</Badge>
+                      <Badge className="text-xs bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400">
+                        {feed.unreadCount}
+                      </Badge>
                     )}
                   </div>
                 </div>
@@ -208,7 +243,10 @@ export default function RssFeeds() {
                     size="icon"
                     variant="ghost"
                     className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                    onClick={e => { e.stopPropagation(); pollFeed(feed.id); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      pollFeed(feed.id);
+                    }}
                     disabled={polling === feed.id}
                   >
                     <RefreshCw className={`w-3 h-3 ${polling === feed.id ? "animate-spin" : ""}`} />
@@ -217,10 +255,17 @@ export default function RssFeeds() {
                     size="icon"
                     variant="ghost"
                     className="h-6 w-6 text-red-400 hover:bg-red-50"
-                    onClick={e => { e.stopPropagation(); deleteFeed(feed.id); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteFeed(feed.id);
+                    }}
                     disabled={deleting === feed.id}
                   >
-                    {deleting === feed.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                    {deleting === feed.id ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3 h-3" />
+                    )}
                   </Button>
                 </div>
               </div>
@@ -241,43 +286,53 @@ export default function RssFeeds() {
             <>
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold">{selectedFeed.title ?? selectedFeed.url}</h2>
-                {items.some(i => !i.read) && (
+                {items.some((i) => !i.read) && (
                   <Button
                     size="sm"
                     variant="ghost"
                     className="text-xs h-7"
-                    onClick={() => items.filter(i => !i.read).forEach(i => markRead(i.id))}
+                    onClick={() => items.filter((i) => !i.read).forEach((i) => markRead(i.id))}
                   >
-                    <CheckCheck className="w-3 h-3 mr-1" />Mark all read
+                    <CheckCheck className="w-3 h-3 mr-1" />
+                    Mark all read
                   </Button>
                 )}
               </div>
               {loadingItems ? (
                 <div className="flex items-center gap-2 text-muted-foreground text-sm py-8 justify-center">
-                  <Loader2 className="w-4 h-4 animate-spin" />Loading items…
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading items…
                 </div>
               ) : items.length === 0 ? (
-                <Card><CardContent className="pt-8 pb-8 text-center text-muted-foreground">No items in this feed</CardContent></Card>
+                <Card>
+                  <CardContent className="pt-8 pb-8 text-center text-muted-foreground">
+                    No items in this feed
+                  </CardContent>
+                </Card>
               ) : (
                 <div className="space-y-1.5 max-h-[600px] overflow-y-auto pr-1">
-                  {items.map(item => (
+                  {items.map((item) => (
                     <div
                       key={item.id}
                       className={`border rounded-lg p-3 cursor-pointer transition-colors hover:bg-muted/50 ${item.read ? "opacity-60" : ""}`}
                       onClick={() => !item.read && markRead(item.id)}
                     >
                       <div className="flex items-start gap-2">
-                        {!item.read && <Circle className="w-2 h-2 text-orange-500 shrink-0 mt-1.5 fill-current" />}
+                        {!item.read && (
+                          <Circle className="w-2 h-2 text-orange-500 shrink-0 mt-1.5 fill-current" />
+                        )}
                         {item.read && <div className="w-2 h-2 shrink-0 mt-1.5" />}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
-                            <p className={`text-sm ${!item.read ? "font-medium" : ""} flex-1`}>{item.title}</p>
+                            <p className={`text-sm ${!item.read ? "font-medium" : ""} flex-1`}>
+                              {item.title}
+                            </p>
                             {item.link && (
                               <a
                                 href={item.link}
                                 target="_blank"
                                 rel="noreferrer"
-                                onClick={e => e.stopPropagation()}
+                                onClick={(e) => e.stopPropagation()}
                                 className="text-muted-foreground hover:text-foreground shrink-0"
                               >
                                 <ExternalLink className="w-3.5 h-3.5" />
@@ -285,11 +340,15 @@ export default function RssFeeds() {
                             )}
                           </div>
                           {item.summary && (
-                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.summary}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                              {item.summary}
+                            </p>
                           )}
                           <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                             {item.author && <span>{item.author}</span>}
-                            {item.publishedAt && <span>{new Date(item.publishedAt).toLocaleDateString()}</span>}
+                            {item.publishedAt && (
+                              <span>{new Date(item.publishedAt).toLocaleDateString()}</span>
+                            )}
                           </div>
                         </div>
                       </div>

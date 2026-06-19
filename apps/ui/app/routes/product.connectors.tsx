@@ -1,14 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
 import type { Route } from "./+types/product.connectors";
 import { ProductPage } from "~/components/product-page";
-import {
-  Brain,
-  Cloud,
-  Gem,
-  Server,
-  Cpu,
-  Database,
-  FolderOpen,
-} from "lucide-react";
+import { Brain, Cloud, Gem, Server, Cpu, Database, FolderOpen } from "lucide-react";
 
 export function meta({}: Route.MetaArgs) {
   return [

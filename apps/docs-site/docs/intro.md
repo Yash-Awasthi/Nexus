@@ -24,36 +24,36 @@ Most AI agent frameworks bolt on governance and observability as afterthoughts. 
 
 ### Applications
 
-| App               | Description                                                       |
-| ----------------- | ----------------------------------------------------------------- |
-| `apps/api`        | Fastify REST/SSE gateway — 47 routes                              |
-| `apps/worker`     | BullMQ high/medium/low queues + signal workers + repeatable jobs  |
-| `apps/web`        | React dashboard — 17 pages, real API integration                  |
+| App               | Description                                                           |
+| ----------------- | --------------------------------------------------------------------- |
+| `apps/api`        | Fastify REST/SSE gateway — 47 routes                                  |
+| `apps/worker`     | BullMQ high/medium/low queues + signal workers + repeatable jobs      |
+| `apps/web`        | React dashboard — 17 pages, real API integration                      |
 | `apps/spectre`    | SPECTRE hacker chat UI — 4 modes, 4 themes (see [SPECTRE](./spectre)) |
-| `apps/cli`        | Developer CLI (commander.js)                                      |
-| `services/ingest` | Python FastAPI ingestion service (asyncpg, Redis pub, OTel)       |
+| `apps/cli`        | Developer CLI (commander.js)                                          |
+| `services/ingest` | Python FastAPI ingestion service (asyncpg, Redis pub, OTel)           |
 
 ### Key packages
 
-| Package                  | Description                                                        |
-| ------------------------ | ------------------------------------------------------------------ |
-| `@nexus/client`          | Typed isomorphic SDK — chat, council, memory, agents, research     |
-| `@nexus/agent-runtime`   | Multi-step LLM tool loop, spawn_agents, swarm layer                |
-| `@nexus/council`         | Multi-model deliberation: allSettled fanout, voting, synthesis     |
-| `@nexus/llm-drivers`     | 15 provider drivers with native SSE/NDJSON streaming               |
-| `@nexus/gauntlet`    | Race N models in parallel waves; composite scorer; 5 tiers         |
-| `@nexus/memory`          | pgvector store, MemoryGraph BFS, TTL, multi-tenant ACL             |
-| `@nexus/retrieval`         | RAG: chunk → embed → hybrid retrieve → rerank                      |
-| `@nexus/redteam`    | Input perturbation engine (6 techniques × 3 intensities)           |
-| `@nexus/drift`        | EMA adaptive sampling parameter tuning                             |
-| `@nexus/stm`             | Semantic transformation: hedge reducer, directness optimizer       |
-| `@nexus/supervisor`      | Multi-agent DAG scheduler (OmaTask, dependency-first, BFS)         |
-| `@nexus/gateway`         | IProvider failover, model alias routing, Singleflight coalescer    |
-| `@nexus/adapters`        | Barrel re-exporting all 25 `@nexus/adapter-*` sub-packages         |
-| `@nexus/plugin-sdk`      | defineAdapter(), capability types, test harness                    |
-| `@nexus/db`              | Drizzle ORM — 11 schemas (verdicts, memory, signals, billing…)     |
-| `@nexus/telemetry`       | OTel bootstrap, SLO tracker, HMAC-chained audit log, Prometheus    |
-| `@nexus/runtime`         | Circuit breaker, crash recovery, queue backends, OTel tracing      |
+| Package                | Description                                                     |
+| ---------------------- | --------------------------------------------------------------- |
+| `@nexus/client`        | Typed isomorphic SDK — chat, council, memory, agents, research  |
+| `@nexus/agent-runtime` | Multi-step LLM tool loop, spawn_agents, swarm layer             |
+| `@nexus/council`       | Multi-model deliberation: allSettled fanout, voting, synthesis  |
+| `@nexus/llm-drivers`   | 15 provider drivers with native SSE/NDJSON streaming            |
+| `@nexus/gauntlet`      | Race N models in parallel waves; composite scorer; 5 tiers      |
+| `@nexus/memory`        | pgvector store, MemoryGraph BFS, TTL, multi-tenant ACL          |
+| `@nexus/retrieval`     | RAG: chunk → embed → hybrid retrieve → rerank                   |
+| `@nexus/redteam`       | Input perturbation engine (6 techniques × 3 intensities)        |
+| `@nexus/drift`         | EMA adaptive sampling parameter tuning                          |
+| `@nexus/stm`           | Semantic transformation: hedge reducer, directness optimizer    |
+| `@nexus/supervisor`    | Multi-agent DAG scheduler (OmaTask, dependency-first, BFS)      |
+| `@nexus/gateway`       | IProvider failover, model alias routing, Singleflight coalescer |
+| `@nexus/adapters`      | Barrel re-exporting all 25 `@nexus/adapter-*` sub-packages      |
+| `@nexus/plugin-sdk`    | defineAdapter(), capability types, test harness                 |
+| `@nexus/db`            | Drizzle ORM — 11 schemas (verdicts, memory, signals, billing…)  |
+| `@nexus/telemetry`     | OTel bootstrap, SLO tracker, HMAC-chained audit log, Prometheus |
+| `@nexus/runtime`       | Circuit breaker, crash recovery, queue backends, OTel tracing   |
 
 > 150 `@nexus/*` packages total. See [README](https://github.com/Yash-Awasthi/Nexus#core-packages) for the full table.
 

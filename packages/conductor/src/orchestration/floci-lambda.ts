@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { flociFetch, normalizeFlociEndpoint } from "./floci-client";
 import { FlociClientError } from "./floci-client";
 import { buildNodeLambdaHandlerZip } from "./floci-zip";
@@ -27,13 +28,13 @@ export function mapFlociHttpError(
   action: string,
   service: string,
   status: number,
-  bodyText: string
+  bodyText: string,
 ): FlociClientError {
   return new FlociClientError(
     `Floci ${action} failed: HTTP ${status} ${bodyText.slice(0, 500)}`,
     status >= 500 ? "HTTP_ERROR" : "HTTP_ERROR",
     status,
-    bodyText
+    bodyText,
   );
 }
 
@@ -50,7 +51,7 @@ export function normalizeLambdaInvokeBody(bodyText: string): unknown {
 export async function flociCreateLambdaFunction(
   endpoint: string,
   functionName: string,
-  options?: { handlerBody?: string; runtime?: string; timeout?: number }
+  options?: { handlerBody?: string; runtime?: string; timeout?: number },
 ): Promise<NormalizedFlociResult> {
   const base = normalizeFlociEndpoint(endpoint);
   const zip = buildNodeLambdaHandlerZip(options?.handlerBody ?? "JSON.stringify(event)");
@@ -60,7 +61,7 @@ export async function flociCreateLambdaFunction(
     Role: LAMBDA_ROLE,
     Handler: "index.handler",
     Timeout: options?.timeout ?? 30,
-    Code: { ZipFile: zip.toString("base64") }
+    Code: { ZipFile: zip.toString("base64") },
   };
 
   const res = await flociFetch(base, {
@@ -68,7 +69,7 @@ export async function flociCreateLambdaFunction(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-    timeoutMs: 60000
+    timeoutMs: 60000,
   });
 
   if (res.ok || res.status === 201) {
@@ -85,7 +86,7 @@ export async function flociCreateLambdaFunction(
       mocked: false,
       httpStatus: res.status,
       flociRequestMs: res.latencyMs,
-      data
+      data,
     };
   }
 
@@ -94,7 +95,7 @@ export async function flociCreateLambdaFunction(
 
 export async function flociInvokeLambda(
   endpoint: string,
-  input: LambdaInvokePayload
+  input: LambdaInvokePayload,
 ): Promise<NormalizedFlociResult> {
   const base = normalizeFlociEndpoint(endpoint);
   const fn = input.functionName;
@@ -116,10 +117,10 @@ export async function flociInvokeLambda(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Amz-Invocation-Type": invocationType
+      "X-Amz-Invocation-Type": invocationType,
     },
     body: payloadStr,
-    timeoutMs: 120000
+    timeoutMs: 120000,
   });
 
   const parsed = normalizeLambdaInvokeBody(res.bodyText);
@@ -132,7 +133,7 @@ export async function flociInvokeLambda(
       mocked: false,
       httpStatus: res.status,
       flociRequestMs: res.latencyMs,
-      data: parsed
+      data: parsed,
     };
   }
 
@@ -141,13 +142,13 @@ export async function flociInvokeLambda(
 
 export async function flociDeleteLambdaFunction(
   endpoint: string,
-  functionName: string
+  functionName: string,
 ): Promise<NormalizedFlociResult> {
   const base = normalizeFlociEndpoint(endpoint);
   const res = await flociFetch(base, {
     requestUrl: `${base}/2015-03-31/functions/${functionName}`,
     method: "DELETE",
-    timeoutMs: 30000
+    timeoutMs: 30000,
   });
 
   if (res.ok || res.status === 204) {
@@ -158,7 +159,7 @@ export async function flociDeleteLambdaFunction(
       mocked: false,
       httpStatus: res.status,
       flociRequestMs: res.latencyMs,
-      data: { functionName, deleted: true }
+      data: { functionName, deleted: true },
     };
   }
 

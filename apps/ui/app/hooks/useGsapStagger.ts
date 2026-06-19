@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { useEffect, useRef } from "react";
 
 /**
@@ -25,11 +26,13 @@ export function useGsapStagger<T extends HTMLElement>(deps: unknown[] = []) {
           duration: 0.4,
           stagger: 0.06,
           ease: "power2.out",
-        }
+        },
       );
     });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, deps);
 
   return ref;

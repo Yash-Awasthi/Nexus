@@ -1,15 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
 "use client";
 
 import { useState, useMemo } from "react";
 import type { Route } from "./+types/llm-leaderboard";
 import { Badge } from "~/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Trophy, Search } from "lucide-react";
 import { FadeIn, DottedGrid } from "~/components/animations";
 
@@ -41,26 +36,235 @@ interface Model {
 // Sources: Chatbot Arena, GPQA Diamond leaderboard, SWE-bench Verified
 const models: Model[] = [
   // Top proprietary
-  { model: "Gemini 2.5 Pro", provider: "Google", parameters: "-", context: "1M", gpqa: 84.0, sweBench: 63.8, arenaElo: 1381, speed: "Medium", pricing: "$1.25", open: false },
-  { model: "Claude Opus 4.6", provider: "Anthropic", parameters: "-", context: "200K", gpqa: 82.1, sweBench: 72.5, arenaElo: 1368, speed: "Medium", pricing: "$15.00", open: false },
-  { model: "GPT-4.1", provider: "OpenAI", parameters: "-", context: "1M", gpqa: 78.3, sweBench: 54.6, arenaElo: 1352, speed: "Fast", pricing: "$2.00", open: false },
-  { model: "Claude Sonnet 4.6", provider: "Anthropic", parameters: "-", context: "200K", gpqa: 77.4, sweBench: 72.7, arenaElo: 1348, speed: "Fast", pricing: "$3.00", open: false },
-  { model: "Grok 3", provider: "xAI", parameters: "-", context: "131K", gpqa: 75.0, sweBench: 51.6, arenaElo: 1344, speed: "Fast", pricing: "$3.00", open: false },
-  { model: "GPT-4o", provider: "OpenAI", parameters: "-", context: "128K", gpqa: 53.6, sweBench: 48.9, arenaElo: 1338, speed: "Fast", pricing: "$2.50", open: false },
-  { model: "Gemini 2.5 Flash", provider: "Google", parameters: "-", context: "1M", gpqa: 70.7, sweBench: 53.4, arenaElo: 1329, speed: "Very Fast", pricing: "$0.15", open: false },
-  { model: "Mistral Large 2", provider: "Mistral", parameters: "-", context: "128K", gpqa: 59.2, sweBench: 45.1, arenaElo: 1289, speed: "Fast", pricing: "$2.00", open: false },
-  { model: "Claude Haiku 4.5", provider: "Anthropic", parameters: "-", context: "200K", gpqa: 52.3, sweBench: 40.6, arenaElo: 1258, speed: "Very Fast", pricing: "$0.80", open: false },
-  { model: "GPT-4.1 mini", provider: "OpenAI", parameters: "-", context: "1M", gpqa: 47.5, sweBench: 34.2, arenaElo: 1245, speed: "Very Fast", pricing: "$0.40", open: false },
+  {
+    model: "Gemini 2.5 Pro",
+    provider: "Google",
+    parameters: "-",
+    context: "1M",
+    gpqa: 84.0,
+    sweBench: 63.8,
+    arenaElo: 1381,
+    speed: "Medium",
+    pricing: "$1.25",
+    open: false,
+  },
+  {
+    model: "Claude Opus 4.6",
+    provider: "Anthropic",
+    parameters: "-",
+    context: "200K",
+    gpqa: 82.1,
+    sweBench: 72.5,
+    arenaElo: 1368,
+    speed: "Medium",
+    pricing: "$15.00",
+    open: false,
+  },
+  {
+    model: "GPT-4.1",
+    provider: "OpenAI",
+    parameters: "-",
+    context: "1M",
+    gpqa: 78.3,
+    sweBench: 54.6,
+    arenaElo: 1352,
+    speed: "Fast",
+    pricing: "$2.00",
+    open: false,
+  },
+  {
+    model: "Claude Sonnet 4.6",
+    provider: "Anthropic",
+    parameters: "-",
+    context: "200K",
+    gpqa: 77.4,
+    sweBench: 72.7,
+    arenaElo: 1348,
+    speed: "Fast",
+    pricing: "$3.00",
+    open: false,
+  },
+  {
+    model: "Grok 3",
+    provider: "xAI",
+    parameters: "-",
+    context: "131K",
+    gpqa: 75.0,
+    sweBench: 51.6,
+    arenaElo: 1344,
+    speed: "Fast",
+    pricing: "$3.00",
+    open: false,
+  },
+  {
+    model: "GPT-4o",
+    provider: "OpenAI",
+    parameters: "-",
+    context: "128K",
+    gpqa: 53.6,
+    sweBench: 48.9,
+    arenaElo: 1338,
+    speed: "Fast",
+    pricing: "$2.50",
+    open: false,
+  },
+  {
+    model: "Gemini 2.5 Flash",
+    provider: "Google",
+    parameters: "-",
+    context: "1M",
+    gpqa: 70.7,
+    sweBench: 53.4,
+    arenaElo: 1329,
+    speed: "Very Fast",
+    pricing: "$0.15",
+    open: false,
+  },
+  {
+    model: "Mistral Large 2",
+    provider: "Mistral",
+    parameters: "-",
+    context: "128K",
+    gpqa: 59.2,
+    sweBench: 45.1,
+    arenaElo: 1289,
+    speed: "Fast",
+    pricing: "$2.00",
+    open: false,
+  },
+  {
+    model: "Claude Haiku 4.5",
+    provider: "Anthropic",
+    parameters: "-",
+    context: "200K",
+    gpqa: 52.3,
+    sweBench: 40.6,
+    arenaElo: 1258,
+    speed: "Very Fast",
+    pricing: "$0.80",
+    open: false,
+  },
+  {
+    model: "GPT-4.1 mini",
+    provider: "OpenAI",
+    parameters: "-",
+    context: "1M",
+    gpqa: 47.5,
+    sweBench: 34.2,
+    arenaElo: 1245,
+    speed: "Very Fast",
+    pricing: "$0.40",
+    open: false,
+  },
   // Open-weight
-  { model: "DeepSeek V3", provider: "DeepSeek", parameters: "671B MoE", context: "128K", gpqa: 68.4, sweBench: 49.2, arenaElo: 1340, speed: "Fast", pricing: "Open", open: true },
-  { model: "Llama 4 Maverick", provider: "Meta", parameters: "400B MoE", context: "1M", gpqa: 69.8, sweBench: 47.2, arenaElo: 1322, speed: "Fast", pricing: "Open", open: true },
-  { model: "Qwen 3 72B", provider: "Alibaba", parameters: "72B", context: "128K", gpqa: 65.4, sweBench: 43.8, arenaElo: 1305, speed: "Medium", pricing: "Open", open: true },
-  { model: "Llama 4 Scout", provider: "Meta", parameters: "109B MoE", context: "10M", gpqa: 62.1, sweBench: 44.4, arenaElo: 1293, speed: "Fast", pricing: "Open", open: true },
-  { model: "Gemma 4 31B", provider: "Google", parameters: "31B", context: "128K", gpqa: 60.2, sweBench: 38.6, arenaElo: 1278, speed: "Fast", pricing: "Open", open: true },
-  { model: "Qwen 3 32B", provider: "Alibaba", parameters: "32B", context: "128K", gpqa: 55.7, sweBench: 36.2, arenaElo: 1265, speed: "Fast", pricing: "Open", open: true },
-  { model: "Phi-4 14B", provider: "Microsoft", parameters: "14B", context: "128K", gpqa: 56.1, sweBench: 38.1, arenaElo: 1254, speed: "Very Fast", pricing: "Open", open: true },
-  { model: "Gemma 4 12B", provider: "Google", parameters: "12B", context: "128K", gpqa: 48.3, sweBench: 29.7, arenaElo: 1230, speed: "Very Fast", pricing: "Open", open: true },
-  { model: "Llama 4 Nano", provider: "Meta", parameters: "8B", context: "128K", gpqa: 40.2, sweBench: 22.4, arenaElo: 1198, speed: "Very Fast", pricing: "Open", open: true },
+  {
+    model: "DeepSeek V3",
+    provider: "DeepSeek",
+    parameters: "671B MoE",
+    context: "128K",
+    gpqa: 68.4,
+    sweBench: 49.2,
+    arenaElo: 1340,
+    speed: "Fast",
+    pricing: "Open",
+    open: true,
+  },
+  {
+    model: "Llama 4 Maverick",
+    provider: "Meta",
+    parameters: "400B MoE",
+    context: "1M",
+    gpqa: 69.8,
+    sweBench: 47.2,
+    arenaElo: 1322,
+    speed: "Fast",
+    pricing: "Open",
+    open: true,
+  },
+  {
+    model: "Qwen 3 72B",
+    provider: "Alibaba",
+    parameters: "72B",
+    context: "128K",
+    gpqa: 65.4,
+    sweBench: 43.8,
+    arenaElo: 1305,
+    speed: "Medium",
+    pricing: "Open",
+    open: true,
+  },
+  {
+    model: "Llama 4 Scout",
+    provider: "Meta",
+    parameters: "109B MoE",
+    context: "10M",
+    gpqa: 62.1,
+    sweBench: 44.4,
+    arenaElo: 1293,
+    speed: "Fast",
+    pricing: "Open",
+    open: true,
+  },
+  {
+    model: "Gemma 4 31B",
+    provider: "Google",
+    parameters: "31B",
+    context: "128K",
+    gpqa: 60.2,
+    sweBench: 38.6,
+    arenaElo: 1278,
+    speed: "Fast",
+    pricing: "Open",
+    open: true,
+  },
+  {
+    model: "Qwen 3 32B",
+    provider: "Alibaba",
+    parameters: "32B",
+    context: "128K",
+    gpqa: 55.7,
+    sweBench: 36.2,
+    arenaElo: 1265,
+    speed: "Fast",
+    pricing: "Open",
+    open: true,
+  },
+  {
+    model: "Phi-4 14B",
+    provider: "Microsoft",
+    parameters: "14B",
+    context: "128K",
+    gpqa: 56.1,
+    sweBench: 38.1,
+    arenaElo: 1254,
+    speed: "Very Fast",
+    pricing: "Open",
+    open: true,
+  },
+  {
+    model: "Gemma 4 12B",
+    provider: "Google",
+    parameters: "12B",
+    context: "128K",
+    gpqa: 48.3,
+    sweBench: 29.7,
+    arenaElo: 1230,
+    speed: "Very Fast",
+    pricing: "Open",
+    open: true,
+  },
+  {
+    model: "Llama 4 Nano",
+    provider: "Meta",
+    parameters: "8B",
+    context: "128K",
+    gpqa: 40.2,
+    sweBench: 22.4,
+    arenaElo: 1198,
+    speed: "Very Fast",
+    pricing: "Open",
+    open: true,
+  },
 ];
 
 type FilterTab = "All" | "Proprietary" | "Open Source";
@@ -96,7 +300,9 @@ function pricingBadge(pricing: string) {
   else if (value <= 5) colorClass = "border-yellow-500/30 bg-yellow-500/10 text-yellow-400";
   else colorClass = "border-orange-500/30 bg-orange-500/10 text-orange-400";
   return (
-    <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${colorClass}`}>
+    <span
+      className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${colorClass}`}
+    >
       {pricing}
     </span>
   );
@@ -205,7 +411,9 @@ export default function LLMLeaderboard() {
                       <th className="pb-3 pr-3 font-medium text-muted-foreground">Provider</th>
                       <th className="pb-3 pr-3 font-medium text-muted-foreground">Params</th>
                       <th className="pb-3 pr-3 font-medium text-muted-foreground">Context</th>
-                      <th className="pb-3 pr-3 font-medium text-muted-foreground">GPQA Diamond (%)</th>
+                      <th className="pb-3 pr-3 font-medium text-muted-foreground">
+                        GPQA Diamond (%)
+                      </th>
                       <th className="pb-3 pr-3 font-medium text-muted-foreground">SWE-bench (%)</th>
                       <th className="pb-3 pr-3 font-medium text-muted-foreground">Arena Elo</th>
                       <th className="pb-3 pr-3 font-medium text-muted-foreground">Speed</th>

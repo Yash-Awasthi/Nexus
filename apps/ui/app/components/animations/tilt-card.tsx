@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 "use client";
 
 import { useRef, useState, type ReactNode, type MouseEvent } from "react";
@@ -8,11 +9,7 @@ interface TiltCardProps {
   tiltAmount?: number;
 }
 
-export function TiltCard({
-  children,
-  className,
-  tiltAmount = 10,
-}: TiltCardProps) {
+export function TiltCard({ children, className, tiltAmount = 10 }: TiltCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [transform, setTransform] = useState("perspective(800px) rotateX(0deg) rotateY(0deg)");
   const [glarePos, setGlarePos] = useState({ x: 50, y: 50 });
@@ -48,9 +45,7 @@ export function TiltCard({
       } ${className ?? ""}`}
       style={{
         transform,
-        transition: isHovered
-          ? "transform 0.1s ease-out"
-          : "transform 0.4s ease-out",
+        transition: isHovered ? "transform 0.1s ease-out" : "transform 0.4s ease-out",
       }}
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}

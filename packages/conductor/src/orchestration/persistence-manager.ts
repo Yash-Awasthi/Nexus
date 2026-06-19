@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { IEventStore, IRuntimePersistence } from "./interfaces/persistence.interface";
 import { ILogger } from "./interfaces/logger.interface";
 import * as fs from "fs";
@@ -37,7 +38,7 @@ export class FileEventStore implements IEventStore {
     const record = {
       event,
       payload,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
     const line = JSON.stringify(record) + "\n";
 
@@ -70,7 +71,11 @@ export class FileEventStore implements IEventStore {
       const quarantinePath = `${this.filePath}.corrupt.${Date.now()}.jsonl`;
       fs.appendFileSync(quarantinePath, corruptLines.join("\n") + "\n", "utf8");
       const msg = `[Conductor] event log replay skipped ${this.lastReplayCorruptLines} corrupt JSONL line(s); quarantined to ${quarantinePath}`;
-      if (this.logger) { this.logger.warn(msg); } else { console.warn(msg); }
+      if (this.logger) {
+        this.logger.warn(msg);
+      } else {
+        console.warn(msg);
+      }
     }
 
     if (since) {
@@ -132,7 +137,11 @@ export class FileRuntimePersistence implements IRuntimePersistence {
         fs.copyFileSync(this.filePath, corruptPath);
       }
       const corruptMsg = `[Conductor] state file corrupt; reset to {} (backup: ${corruptPath})`;
-      if (this.logger) { this.logger.warn(corruptMsg); } else { console.warn(corruptMsg); }
+      if (this.logger) {
+        this.logger.warn(corruptMsg);
+      } else {
+        console.warn(corruptMsg);
+      }
       return {};
     }
   }
@@ -159,12 +168,16 @@ export class FileRuntimePersistence implements IRuntimePersistence {
           if (written !== expected) {
             // Write verification failed — attempt a second write
             const verifyMsg = `[ConductorPersistence] Write-verify mismatch for key: ${key}. Rewriting...`;
-            if (this.logger) { this.logger.warn(verifyMsg); } else { console.warn(verifyMsg); }
+            if (this.logger) {
+              this.logger.warn(verifyMsg);
+            } else {
+              console.warn(verifyMsg);
+            }
             this.writeState(current);
             const verify2 = this.readState();
             if (JSON.stringify(verify2[key]) !== expected) {
               throw new Error(
-                `Persistence write-verify FAILED for key: ${key}. Data may be corrupt.`
+                `Persistence write-verify FAILED for key: ${key}. Data may be corrupt.`,
               );
             }
           }
@@ -214,10 +227,10 @@ export class FileRuntimePersistence implements IRuntimePersistence {
 export function backupRuntimePersistence(
   eventStore: FileEventStore,
   persistence: FileRuntimePersistence,
-  backupsDir: string
+  backupsDir: string,
 ): { eventsBackup: string; stateBackup: string } {
   return {
     eventsBackup: eventStore.backupTo(backupsDir),
-    stateBackup: persistence.backupTo(backupsDir)
+    stateBackup: persistence.backupTo(backupsDir),
   };
 }

@@ -24,7 +24,7 @@ import {
   type ScrapingBackend,
 } from "@nexus/scraping-mcp";
 import { createStealthBackend, isPatchrightAvailable } from "@nexus/stealth-browser";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
 
@@ -131,7 +131,7 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
       const result = await server.call("open_session", {});
       if (result.isError) {
         const msg = result.content[0]?.type === "text" ? result.content[0].text : "Unknown error";
-        return reply.code(500).send({ error: msg });
+        return (reply as FastifyReply).code(500).send({ error: msg });
       }
       const first = result.content[0];
       const data = first?.type === "text" ? parseTextContent(first.text) : {};
@@ -155,7 +155,7 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
       const result = await server.call("close_session", { sessionId: request.params.id });
       if (result.isError) {
         const msg = result.content[0]?.type === "text" ? result.content[0].text : "Not found";
-        return reply.code(404).send({ error: msg });
+        return (reply as FastifyReply).code(404).send({ error: msg });
       }
       const first = result.content[0];
       const data = first?.type === "text" ? parseTextContent(first.text) : {};
@@ -173,7 +173,7 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: requireAuth },
     async (request, reply) => {
       const { tool, input = {} } = request.body;
-      if (!tool) return reply.code(400).send({ error: "tool is required" });
+      if (!tool) return (reply as FastifyReply).code(400).send({ error: "tool is required" });
 
       const result = await server.call(tool, input);
       return reply.code(result.isError ? 422 : 200).send({
@@ -203,7 +203,7 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
       const result = await server.call("get", request.body);
       if (result.isError) {
         const msg = result.content[0]?.type === "text" ? result.content[0].text : "Fetch failed";
-        return reply.code(422).send({ error: msg });
+        return (reply as FastifyReply).code(422).send({ error: msg });
       }
       const first = result.content[0];
       const data = first?.type === "text" ? parseTextContent(first.text) : {};
@@ -232,7 +232,7 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
       if (result.isError) {
         const msg =
           result.content[0]?.type === "text" ? result.content[0].text : "Stealth fetch failed";
-        return reply.code(422).send({ error: msg });
+        return (reply as FastifyReply).code(422).send({ error: msg });
       }
       const first = result.content[0];
       const data = first?.type === "text" ? parseTextContent(first.text) : {};
@@ -261,7 +261,7 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
       if (result.isError) {
         const msg =
           result.content[0]?.type === "text" ? result.content[0].text : "Screenshot failed";
-        return reply.code(422).send({ error: msg });
+        return (reply as FastifyReply).code(422).send({ error: msg });
       }
       const img = result.content.find((c) => c.type === "image");
       return reply.send({
@@ -293,7 +293,7 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
       if (result.isError) {
         const msg =
           result.content[0]?.type === "text" ? result.content[0].text : "Bulk fetch failed";
-        return reply.code(422).send({ error: msg });
+        return (reply as FastifyReply).code(422).send({ error: msg });
       }
       const first = result.content[0];
       const data = first?.type === "text" ? parseTextContent(first.text) : {};

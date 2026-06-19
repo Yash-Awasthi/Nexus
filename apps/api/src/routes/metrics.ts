@@ -29,8 +29,8 @@ import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
 
+import { getConductorMetrics } from "./conductor-route.js";
 import { gatewayLog, _costStore } from "./gateway.js";
-import { getConductorMetrics } from './conductor-route.js';
 
 // ── SLO tracker singleton (records HTTP 2xx vs 5xx) ──────────────────────────
 // Available for other routes to call sloTracker.record() on each response.
@@ -120,13 +120,27 @@ export async function metricsRoutes(app: FastifyInstance): Promise<void> {
         lines.push("# TYPE nexus_conductor_jobs_total counter");
         lines.push(formatMetricLine("nexus_conductor_jobs_total", gs.jobsTotal, { status: "all" }));
         lines.push(formatMetricLine("nexus_conductor_jobs_total", gs.jobsDone, { status: "done" }));
-        lines.push(formatMetricLine("nexus_conductor_jobs_total", gs.jobsFailed, { status: "failed" }));
-        lines.push(formatMetricLine("nexus_conductor_jobs_total", gs.jobsBlocked, { status: "blocked" }));
-        lines.push(formatMetricLine("nexus_conductor_jobs_total", gs.jobsRunning, { status: "running" }));
+        lines.push(
+          formatMetricLine("nexus_conductor_jobs_total", gs.jobsFailed, { status: "failed" }),
+        );
+        lines.push(
+          formatMetricLine("nexus_conductor_jobs_total", gs.jobsBlocked, { status: "blocked" }),
+        );
+        lines.push(
+          formatMetricLine("nexus_conductor_jobs_total", gs.jobsRunning, { status: "running" }),
+        );
         lines.push("# TYPE nexus_conductor_queue_depth gauge");
-        lines.push(formatMetricLine("nexus_conductor_queue_depth", gs.queueLength, { queue: "main" }));
-        lines.push(formatMetricLine("nexus_conductor_queue_depth", gs.activeJobs, { queue: "active" }));
-        lines.push(formatMetricLine("nexus_conductor_queue_depth", gs.deadLetterCount, { queue: "dead_letter" }));
+        lines.push(
+          formatMetricLine("nexus_conductor_queue_depth", gs.queueLength, { queue: "main" }),
+        );
+        lines.push(
+          formatMetricLine("nexus_conductor_queue_depth", gs.activeJobs, { queue: "active" }),
+        );
+        lines.push(
+          formatMetricLine("nexus_conductor_queue_depth", gs.deadLetterCount, {
+            queue: "dead_letter",
+          }),
+        );
         lines.push("# TYPE nexus_conductor_initialised gauge");
         lines.push(formatMetricLine("nexus_conductor_initialised", gs.initialised ? 1 : 0));
       } catch {

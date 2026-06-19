@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 "use client";
 
 import type { Route } from "./+types/landing";
@@ -22,12 +23,7 @@ class SplineErrorBoundary extends Component<
 }
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import {
   Users,
   Search,
@@ -45,7 +41,7 @@ import {
 
 const GithubIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
   </svg>
 );
 import { SplineScene } from "~/components/ui/splite";
@@ -89,8 +85,7 @@ export function meta({}: Route.MetaArgs) {
     },
     {
       name: "twitter:description",
-      content:
-        "Don't trust one AI. Make them debate. Open-source multi-agent deliberation.",
+      content: "Don't trust one AI. Make them debate. Open-source multi-agent deliberation.",
     },
   ];
 }
@@ -147,8 +142,7 @@ const featureGrid = [
   {
     icon: MessageSquare,
     title: "5 Deliberation Modes",
-    description:
-      "Standard, Socratic, Red/Blue, Hypothesis, Confidence-weighted.",
+    description: "Standard, Socratic, Red/Blue, Hypothesis, Confidence-weighted.",
     animation: "pulse" as const,
   },
   {
@@ -168,8 +162,7 @@ const featureGrid = [
   {
     icon: Shield,
     title: "Enterprise Ready",
-    description:
-      "SSO, SCIM, RBAC, audit logs, Stripe billing, org isolation.",
+    description: "SSO, SCIM, RBAC, audit logs, Stripe billing, org isolation.",
     animation: "bounce" as const,
   },
 ];
@@ -268,23 +261,39 @@ function OrbitingAgents() {
       {/* Connection lines (decorative) */}
       <svg className="absolute inset-0 h-full w-full" viewBox="0 0 280 280">
         <line
-          x1="140" y1="140" x2="70" y2="70"
-          stroke="url(#connGrad)" strokeWidth="0.5"
+          x1="140"
+          y1="140"
+          x2="70"
+          y2="70"
+          stroke="url(#connGrad)"
+          strokeWidth="0.5"
           style={{ animation: "connectionPulse 4s ease-in-out infinite" }}
         />
         <line
-          x1="140" y1="140" x2="210" y2="90"
-          stroke="url(#connGrad)" strokeWidth="0.5"
+          x1="140"
+          y1="140"
+          x2="210"
+          y2="90"
+          stroke="url(#connGrad)"
+          strokeWidth="0.5"
           style={{ animation: "connectionPulse 4s ease-in-out infinite 1s" }}
         />
         <line
-          x1="140" y1="140" x2="80" y2="200"
-          stroke="url(#connGrad)" strokeWidth="0.5"
+          x1="140"
+          y1="140"
+          x2="80"
+          y2="200"
+          stroke="url(#connGrad)"
+          strokeWidth="0.5"
           style={{ animation: "connectionPulse 4s ease-in-out infinite 2s" }}
         />
         <line
-          x1="140" y1="140" x2="220" y2="190"
-          stroke="url(#connGrad)" strokeWidth="0.5"
+          x1="140"
+          y1="140"
+          x2="220"
+          y2="190"
+          stroke="url(#connGrad)"
+          strokeWidth="0.5"
           style={{ animation: "connectionPulse 4s ease-in-out infinite 0.5s" }}
         />
         <defs>
@@ -315,14 +324,21 @@ export default function Home() {
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
       const over =
-        e.clientX >= rect.left && e.clientX <= rect.right &&
-        e.clientY >= rect.top && e.clientY <= rect.bottom;
+        e.clientX >= rect.left &&
+        e.clientX <= rect.right &&
+        e.clientY >= rect.top &&
+        e.clientY <= rect.bottom;
       if (over) return;
-      canvas.dispatchEvent(new PointerEvent("pointermove", {
-        bubbles: false, cancelable: true,
-        clientX: e.clientX, clientY: e.clientY,
-        pointerId: 1, pointerType: "mouse",
-      }));
+      canvas.dispatchEvent(
+        new PointerEvent("pointermove", {
+          bubbles: false,
+          cancelable: true,
+          clientX: e.clientX,
+          clientY: e.clientY,
+          pointerId: 1,
+          pointerType: "mouse",
+        }),
+      );
     }
     window.addEventListener("pointermove", forwardToCanvas);
     return () => window.removeEventListener("pointermove", forwardToCanvas);
@@ -377,9 +393,9 @@ export default function Home() {
 
               <FadeIn delay={0.28}>
                 <p className="mt-4 text-sm text-neutral-400 sm:text-base leading-relaxed">
-                  Instead of trusting one model's best guess, JUDICA runs a council of
-                  AI agents that argue, critique each other, and produce a scored
-                  consensus you can actually verify.
+                  Instead of trusting one model's best guess, JUDICA runs a council of AI agents
+                  that argue, critique each other, and produce a scored consensus you can actually
+                  verify.
                 </p>
               </FadeIn>
 
@@ -412,7 +428,12 @@ export default function Home() {
                     </Button>
                   </MagneticButton>
                   <MagneticButton>
-                    <Button variant="outline" size="sm" asChild className="h-9 px-4 border-white/20 text-white hover:bg-white/10">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild
+                      className="h-9 px-4 border-white/20 text-white hover:bg-white/10"
+                    >
                       <Link to="/register">
                         Try for Free
                         <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
@@ -420,8 +441,17 @@ export default function Home() {
                     </Button>
                   </MagneticButton>
                   <MagneticButton>
-                    <Button variant="ghost" size="sm" asChild className="h-9 px-4 text-neutral-400 hover:text-white">
-                      <a href="https://github.com/Yash-Awasthi/Nexus" target="_blank" rel="noopener noreferrer">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      asChild
+                      className="h-9 px-4 text-neutral-400 hover:text-white"
+                    >
+                      <a
+                        href="https://github.com/Yash-Awasthi/Nexus"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
                         <GithubIcon className="mr-1.5 h-3.5 w-3.5" />
                         GitHub
                       </a>
@@ -470,14 +500,10 @@ export default function Home() {
                     <StaggerItem key={row.label}>
                       <div
                         className={`grid grid-cols-3 ${
-                          i < comparisonRows.length - 1
-                            ? "border-b border-border/40"
-                            : ""
+                          i < comparisonRows.length - 1 ? "border-b border-border/40" : ""
                         }`}
                       >
-                        <div className="px-4 py-3 text-sm font-medium">
-                          {row.label}
-                        </div>
+                        <div className="px-4 py-3 text-sm font-medium">{row.label}</div>
                         <div className="px-4 py-3 text-sm text-muted-foreground text-center flex items-center justify-center gap-1.5">
                           <X className="h-3.5 w-3.5 text-red-400 shrink-0" />
                           {row.single}
@@ -512,10 +538,7 @@ export default function Home() {
             </div>
           </FadeIn>
 
-          <StaggerChildren
-            className="grid grid-cols-1 md:grid-cols-3 gap-6"
-            staggerDelay={0.12}
-          >
+          <StaggerChildren className="grid grid-cols-1 md:grid-cols-3 gap-6" staggerDelay={0.12}>
             {platformFeatures.map((feature) => (
               <StaggerItem key={feature.title}>
                 <TiltCard className="h-full rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:border-blue-500/20 hover:bg-card/70">
@@ -529,9 +552,7 @@ export default function Home() {
                           className="text-primary"
                         />
                       </div>
-                      <CardTitle className="text-base font-semibold">
-                        {feature.title}
-                      </CardTitle>
+                      <CardTitle className="text-base font-semibold">{feature.title}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <p className="text-sm text-muted-foreground leading-relaxed">
@@ -576,9 +597,7 @@ export default function Home() {
                           className="text-foreground"
                         />
                       </div>
-                      <CardTitle className="text-sm font-semibold">
-                        {feature.title}
-                      </CardTitle>
+                      <CardTitle className="text-sm font-semibold">{feature.title}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <p className="text-xs text-muted-foreground leading-relaxed">
@@ -606,17 +625,11 @@ export default function Home() {
               <StaggerItem key={stat.label}>
                 <div>
                   <div className="font-display text-4xl font-bold tracking-tight sm:text-5xl bg-gradient-to-r from-blue-500 to-violet-500 bg-clip-text text-transparent">
-                    <AnimatedCounter
-                      target={stat.value}
-                      suffix={stat.suffix}
-                      duration={2.5}
-                    />
+                    <AnimatedCounter target={stat.value} suffix={stat.suffix} duration={2.5} />
                   </div>
                   {/* Gradient underline */}
                   <div className="mx-auto mt-2 h-px w-12 bg-gradient-to-r from-blue-500/60 to-violet-500/60 rounded-full" />
-                  <div className="mt-3 text-sm text-muted-foreground">
-                    {stat.label}
-                  </div>
+                  <div className="mt-3 text-sm text-muted-foreground">{stat.label}</div>
                 </div>
               </StaggerItem>
             ))}
@@ -637,8 +650,7 @@ export default function Home() {
               Ready to rethink how you use AI?
             </h2>
             <p className="mt-4 text-muted-foreground text-base sm:text-lg max-w-xl mx-auto">
-              Deploy JUDICA in minutes. Self-hosted, open source,
-              enterprise-ready.
+              Deploy JUDICA in minutes. Self-hosted, open source, enterprise-ready.
             </p>
           </FadeIn>
 
