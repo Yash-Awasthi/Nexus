@@ -182,30 +182,10 @@ RUN pnpm --filter @nexus/shared build && \
     pnpm --filter @nexus/image-transformations build && \
     pnpm --filter @nexus/api build
 
-# ─── Stage 3: pruner — production-only node_modules (eliminates devDep CVEs) ──
+# ─── Stage 3: pruner — self-contained prod deploy via pnpm deploy ─────────────
 FROM deps AS pruner
 WORKDIR /app
-RUN pnpm install --frozen-lockfile --prod \
-    --filter @nexus/api --filter @nexus/auth --filter @nexus/shared \
-    --filter @nexus/contracts --filter @nexus/db --filter @nexus/governance \
-    --filter @nexus/memory --filter @nexus/drift --filter @nexus/redteam \
-    --filter @nexus/sft-tagger --filter @nexus/runtime --filter @nexus/council \
-    --filter @nexus/telemetry --filter @nexus/adaptive-scraper \
-    --filter @nexus/researcher --filter @nexus/image-gen \
-    --filter @nexus/knowledge-graph --filter @nexus/llm-drivers \
-    --filter @nexus/gauntlet --filter @nexus/conductor \
-    --filter @nexus/kv --filter @nexus/tier-gate --filter @nexus/admin-gateway \
-    --filter @nexus/agents --filter @nexus/hooks --filter @nexus/alerts \
-    --filter @nexus/gateway --filter @nexus/plugin-sdk --filter @nexus/token-budget \
-    --filter @nexus/billing --filter @nexus/bots --filter @nexus/connectors \
-    --filter @nexus/context-pack --filter @nexus/context-pruner \
-    --filter @nexus/doc-pipeline --filter @nexus/evals \
-    --filter @nexus/feature-flags --filter @nexus/gateway-log \
-    --filter @nexus/lens --filter @nexus/llm-router --filter @nexus/mail-ingest \
-    --filter @nexus/nlp-utils --filter @nexus/reranker --filter @nexus/retrieval \
-    --filter @nexus/run-cost --filter @nexus/sse --filter @nexus/voice \
-    --filter @nexus/domain-feeds --filter @nexus/obs-providers --filter @nexus/wiki-updater \
-    --filter @nexus/image-transformations
+RUN pnpm --filter @nexus/api deploy --prod /deploy
 
 # ─── Stage 4: runner ─────────────────────────────────────────────────────────
 FROM node:26-alpine AS runner
@@ -215,7 +195,7 @@ WORKDIR /app
 RUN addgroup -g 1001 nexus && adduser -u 1001 -G nexus -s /bin/sh -D nexus
 
 # Use prod-only node_modules from pruner (no esbuild, vitest, vite, etc.)
-COPY --from=pruner --chown=nexus:nexus /app/node_modules ./node_modules
+COPY --from=pruner --chown=nexus:nexus /deploy/node_modules ./node_modules
 COPY --from=builder --chown=nexus:nexus /app/packages/auth/dist ./packages/auth/dist
 COPY --from=builder --chown=nexus:nexus /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder --chown=nexus:nexus /app/packages/contracts/dist ./packages/contracts/dist
