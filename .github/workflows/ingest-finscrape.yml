@@ -12,12 +12,12 @@ name: Ingest fin-scrape signals
 
 on:
   schedule:
-    - cron: "*/30 * * * *"   # every 30 minutes
-  workflow_dispatch:           # also triggerable manually
+    - cron: "*/30 * * * *" # every 30 minutes
+  workflow_dispatch: # also triggerable manually
 
 concurrency:
   group: ingest-finscrape
-  cancel-in-progress: true    # cancel stale run if a new one starts
+  cancel-in-progress: true # cancel stale run if a new one starts
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"

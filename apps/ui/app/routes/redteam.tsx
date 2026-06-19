@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * PARSELTONGUE — Code-aware deliberation
  *
@@ -15,32 +16,46 @@ import { ScrollArea } from "~/components/ui/scroll-area";
 import { Textarea } from "~/components/ui/textarea";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import {
-  Code2, Send, Loader2, X, AlertTriangle,
-  Clock, CheckCircle2,
-} from "lucide-react";
+import { Code2, Send, Loader2, X, AlertTriangle, Clock, CheckCircle2 } from "lucide-react";
 
-interface Mention { type: MentionType; label: string; value: string }
+interface Mention {
+  type: MentionType;
+  label: string;
+  value: string;
+}
 
 // ── Code block extractor ───────────────────────────────────────────────────────
 
-interface CodeBlock { lang: string; code: string; before: string; after: string }
-
-function extractFirstCodeBlock(text: string): CodeBlock | null {
-  const match = text.match(/^([\s\S]*?)```(\w*)\n([\s\S]*?)```([\s\S]*)$/)
-  if (!match) return null
-  return { before: match[1], lang: match[2] || 'text', code: match[3], after: match[4] }
+interface CodeBlock {
+  lang: string;
+  code: string;
+  before: string;
+  after: string;
 }
 
-function SpecialistOutput({ text, original, roleId }: { text: string; original: string; roleId: string }) {
-  const block = extractFirstCodeBlock(text)
+function extractFirstCodeBlock(text: string): CodeBlock | null {
+  const match = text.match(/^([\s\S]*?)```(\w*)\n([\s\S]*?)```([\s\S]*)$/);
+  if (!match) return null;
+  return { before: match[1], lang: match[2] || "text", code: match[3], after: match[4] };
+}
+
+function SpecialistOutput({
+  text,
+  original,
+  roleId,
+}: {
+  text: string;
+  original: string;
+  roleId: string;
+}) {
+  const block = extractFirstCodeBlock(text);
 
   if (!block || !original.trim() || block.code.trim() === original.trim()) {
     return (
       <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 font-mono text-xs">
         {text}
       </div>
-    )
+    );
   }
 
   return (
@@ -50,15 +65,20 @@ function SpecialistOutput({ text, original, roleId }: { text: string; original: 
           {block.before.trim()}
         </div>
       )}
-      <div style={{ border: '1px solid #2a2a2a', borderRadius: 6, overflow: 'hidden' }}>
-        <div style={{ padding: '4px 10px', background: '#0a0a0a', borderBottom: '1px solid #1e1e1e', fontSize: 10, color: '#555', letterSpacing: '0.1em' }}>
+      <div style={{ border: "1px solid #2a2a2a", borderRadius: 6, overflow: "hidden" }}>
+        <div
+          style={{
+            padding: "4px 10px",
+            background: "#0a0a0a",
+            borderBottom: "1px solid #1e1e1e",
+            fontSize: 10,
+            color: "#555",
+            letterSpacing: "0.1em",
+          }}
+        >
           SUGGESTED DIFF · {roleId.toUpperCase()} · {block.lang}
         </div>
-        <DiffViewer
-          filename={`input.${block.lang}`}
-          original={original}
-          modified={block.code}
-        />
+        <DiffViewer filename={`input.${block.lang}`} original={original} modified={block.code} />
       </div>
       {block.after.trim() && (
         <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 font-mono text-xs">
@@ -66,48 +86,52 @@ function SpecialistOutput({ text, original, roleId }: { text: string; original: 
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface RoleInfo { id: string; label: string; icon: string }
+interface RoleInfo {
+  id: string;
+  label: string;
+  icon: string;
+}
 
 interface RoleResponse {
-  roleId:    string;
+  roleId: string;
   roleLabel: string;
-  roleIcon:  string;
-  text:      string;
+  roleIcon: string;
+  text: string;
   latencyMs: number;
-  tokens:    number;
-  status:    "pending" | "done" | "error";
-  error?:    string;
+  tokens: number;
+  status: "pending" | "done" | "error";
+  error?: string;
 }
 
 interface InitEvent {
-  language:    string;
+  language: string;
   linesOfCode: number;
-  complexity:  number;
-  roles:       RoleInfo[];
+  complexity: number;
+  roles: RoleInfo[];
 }
 
 interface DoneEvent {
-  totalMs:         number;
-  language:        string;
-  linesOfCode:     number;
-  complexity:      number;
-  issueCount:      number;
+  totalMs: number;
+  language: string;
+  linesOfCode: number;
+  complexity: number;
+  issueCount: number;
   suggestionCount: number;
 }
 
 // ── Role colors ───────────────────────────────────────────────────────────────
 
 const ROLE_STYLES: Record<string, { border: string; bg: string; label: string }> = {
-  reviewer:    { border: "border-blue-500/40",   bg: "bg-blue-500/5",   label: "text-blue-400"   },
-  security:    { border: "border-red-500/40",    bg: "bg-red-500/5",    label: "text-red-400"    },
+  reviewer: { border: "border-blue-500/40", bg: "bg-blue-500/5", label: "text-blue-400" },
+  security: { border: "border-red-500/40", bg: "bg-red-500/5", label: "text-red-400" },
   performance: { border: "border-yellow-500/40", bg: "bg-yellow-500/5", label: "text-yellow-400" },
-  correctness: { border: "border-green-500/40",  bg: "bg-green-500/5",  label: "text-green-400"  },
-  architect:   { border: "border-purple-500/40", bg: "bg-purple-500/5", label: "text-purple-400" },
+  correctness: { border: "border-green-500/40", bg: "bg-green-500/5", label: "text-green-400" },
+  architect: { border: "border-purple-500/40", bg: "bg-purple-500/5", label: "text-purple-400" },
 };
 
 const DEFAULT_STYLE = { border: "border-border", bg: "bg-muted/20", label: "text-foreground" };
@@ -115,14 +139,14 @@ const DEFAULT_STYLE = { border: "border-border", bg: "bg-muted/20", label: "text
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ParseltonguesPage() {
-  const [code, setCode]         = useState("");
+  const [code, setCode] = useState("");
   const [mentions, setMentions] = useState<Mention[]>([]);
-  const codeRef                 = useRef<HTMLTextAreaElement | null>(null);
-  const mention                 = useContextMention(codeRef);
+  const codeRef = useRef<HTMLTextAreaElement | null>(null);
+  const mention = useContextMention(codeRef);
   const [question, setQuestion] = useState("");
   const [responses, setResponses] = useState<RoleResponse[]>([]);
-  const [init, setInit]         = useState<InitEvent | null>(null);
-  const [done, setDone]         = useState<DoneEvent | null>(null);
+  const [init, setInit] = useState<InitEvent | null>(null);
+  const [done, setDone] = useState<DoneEvent | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -146,15 +170,15 @@ export default function ParseltonguesPage() {
 
     try {
       const res = await fetch("/api/redteam/analyze", {
-        method:  "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ code: code.trim(), question: question.trim() || undefined }),
-        signal:  ctrl.signal,
+        body: JSON.stringify({ code: code.trim(), question: question.trim() || undefined }),
+        signal: ctrl.signal,
       });
 
       if (!res.ok || !res.body) throw new Error(`Server error ${res.status}`);
 
-      const reader  = res.body.getReader();
+      const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = "";
 
@@ -172,51 +196,48 @@ export default function ParseltonguesPage() {
 
             if (ev.type === "init") {
               const info: InitEvent = {
-                language:    ev.language,
+                language: ev.language,
                 linesOfCode: ev.linesOfCode,
-                complexity:  ev.complexity,
-                roles:       ev.roles,
+                complexity: ev.complexity,
+                roles: ev.roles,
               };
               setInit(info);
               setResponses(
                 ev.roles.map((r: RoleInfo) => ({
-                  roleId:    r.id,
+                  roleId: r.id,
                   roleLabel: r.label,
-                  roleIcon:  r.icon,
-                  text:      "",
+                  roleIcon: r.icon,
+                  text: "",
                   latencyMs: 0,
-                  tokens:    0,
-                  status:    "pending" as const,
-                }))
+                  tokens: 0,
+                  status: "pending" as const,
+                })),
               );
-
             } else if (ev.type === "response") {
               setResponses((prev) =>
                 prev.map((r) =>
                   r.roleId === ev.roleId
                     ? {
                         ...r,
-                        text:      ev.text ?? "",
+                        text: ev.text ?? "",
                         latencyMs: ev.latencyMs ?? 0,
-                        tokens:    ev.tokens ?? 0,
-                        status:    ev.status as "done" | "error",
-                        error:     ev.error,
+                        tokens: ev.tokens ?? 0,
+                        status: ev.status as "done" | "error",
+                        error: ev.error,
                       }
-                    : r
-                )
+                    : r,
+                ),
               );
-
             } else if (ev.type === "done") {
               setDone({
-                totalMs:         ev.totalMs,
-                language:        ev.language,
-                linesOfCode:     ev.linesOfCode,
-                complexity:      ev.complexity,
-                issueCount:      ev.issueCount,
+                totalMs: ev.totalMs,
+                language: ev.language,
+                linesOfCode: ev.linesOfCode,
+                complexity: ev.complexity,
+                issueCount: ev.issueCount,
                 suggestionCount: ev.suggestionCount,
               });
               setIsLoading(false);
-
             } else if (ev.type === "error") {
               throw new Error(ev.message ?? "Analysis failed");
             }
@@ -229,7 +250,7 @@ export default function ParseltonguesPage() {
       if ((err as Error).name !== "AbortError") {
         const msg = err instanceof Error ? err.message : "Request failed";
         setResponses((prev) =>
-          prev.map((r) => r.status === "pending" ? { ...r, status: "error", error: msg } : r)
+          prev.map((r) => (r.status === "pending" ? { ...r, status: "error", error: msg } : r)),
         );
       }
     } finally {
@@ -238,7 +259,6 @@ export default function ParseltonguesPage() {
   }
 
   const doneCount = responses.filter((r) => r.status === "done").length;
-
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -258,25 +278,59 @@ export default function ParseltonguesPage() {
             {mentions.length > 0 && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginBottom: 4 }}>
                 {mentions.map((m, i) => (
-                  <ContextPill key={i} type={m.type} label={m.label} value={m.value}
-                    onRemove={() => setMentions(prev => prev.filter((_, j) => j !== i))} />
+                  <ContextPill
+                    key={i}
+                    type={m.type}
+                    label={m.label}
+                    value={m.value}
+                    onRemove={() => setMentions((prev) => prev.filter((_, j) => j !== i))}
+                  />
                 ))}
               </div>
             )}
             <Textarea
               ref={codeRef}
               value={code}
-              onChange={(e) => { mention.onTextareaChange(e); setCode(e.target.value); }}
-              onKeyDown={(e) => { mention.onKeyDown(e as any); }}
+              onChange={(e) => {
+                mention.onTextareaChange(e);
+                setCode(e.target.value);
+              }}
+              onKeyDown={(e) => {
+                mention.onKeyDown(e as any);
+              }}
               placeholder={"// paste code here...\nfunction example() {\n  ...\n}"}
               className="flex-1 font-mono text-xs resize-none min-h-[300px]"
               disabled={isLoading}
               style={{ fontFamily: "monospace" }}
             />
             {mention.isOpen && (
-              <div style={{ position: "fixed", top: mention.anchorPos.top, left: mention.anchorPos.left, zIndex: 9000, background: "#111", border: "1px solid #333", borderRadius: 8, width: 280, maxHeight: 220, overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.7)" }}>
-                <div style={{ padding: "5px 10px", borderBottom: "1px solid #222", fontSize: 11, color: "#888" }}>
-                  {mention.mentionType ? mention.mentionType.toUpperCase() : "CONTEXT"} · {mention.query || "type @file: @symbol: @web:"}
+              <div
+                style={{
+                  position: "fixed",
+                  top: mention.anchorPos.top,
+                  left: mention.anchorPos.left,
+                  zIndex: 9000,
+                  background: "#111",
+                  border: "1px solid #333",
+                  borderRadius: 8,
+                  width: 280,
+                  maxHeight: 220,
+                  overflow: "hidden",
+                  display: "flex",
+                  flexDirection: "column",
+                  boxShadow: "0 8px 32px rgba(0,0,0,0.7)",
+                }}
+              >
+                <div
+                  style={{
+                    padding: "5px 10px",
+                    borderBottom: "1px solid #222",
+                    fontSize: 11,
+                    color: "#888",
+                  }}
+                >
+                  {mention.mentionType ? mention.mentionType.toUpperCase() : "CONTEXT"} ·{" "}
+                  {mention.query || "type @file: @symbol: @web:"}
                 </div>
                 <div style={{ padding: "8px 10px", color: "#555", fontSize: 11 }}>
                   Press Esc to close
@@ -302,11 +356,14 @@ export default function ParseltonguesPage() {
           {init && (
             <div
               className="rounded-lg px-3 py-2 text-xs space-y-1"
-              style={{ background: "hsl(var(--muted)/0.4)", border: "1px solid hsl(var(--border)/0.5)" }}
+              style={{
+                background: "hsl(var(--muted)/0.4)",
+                border: "1px solid hsl(var(--border)/0.5)",
+              }}
             >
               {[
-                ["Language",   init.language],
-                ["Lines",      String(init.linesOfCode)],
+                ["Language", init.language],
+                ["Lines", String(init.linesOfCode)],
                 ["Complexity", `${init.complexity}/10`],
               ].map(([k, v]) => (
                 <div key={k} className="flex justify-between">
@@ -323,13 +380,25 @@ export default function ParseltonguesPage() {
               disabled={isLoading || !code.trim()}
               className="flex-1 gap-2 text-sm"
             >
-              {isLoading
-                ? <><Loader2 className="size-3.5 animate-spin" /> Analyzing ({doneCount}/{responses.length})</>
-                : <><Send className="size-3.5" /> Analyze</>
-              }
+              {isLoading ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" /> Analyzing ({doneCount}/
+                  {responses.length})
+                </>
+              ) : (
+                <>
+                  <Send className="size-3.5" /> Analyze
+                </>
+              )}
             </Button>
             {isLoading && (
-              <Button type="button" variant="outline" size="icon" onClick={stop} className="shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={stop}
+                className="shrink-0"
+              >
                 <X className="size-4" />
               </Button>
             )}
@@ -345,7 +414,8 @@ export default function ParseltonguesPage() {
             <>
               <CheckCircle2 className="size-3.5 text-green-400" />
               <span className="font-medium">
-                {done.language.toUpperCase()} · {done.linesOfCode} lines · complexity {done.complexity}/10
+                {done.language.toUpperCase()} · {done.linesOfCode} lines · complexity{" "}
+                {done.complexity}/10
               </span>
               <span className="text-muted-foreground ml-auto flex items-center gap-1">
                 <Clock className="size-3" />
@@ -378,14 +448,20 @@ export default function ParseltonguesPage() {
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <span className="text-base">{r.roleIcon}</span>
-                        <span className={`text-sm font-semibold ${style.label}`}>{r.roleLabel}</span>
+                        <span className={`text-sm font-semibold ${style.label}`}>
+                          {r.roleLabel}
+                        </span>
                       </div>
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         {r.status === "pending" && <Loader2 className="size-3 animate-spin" />}
                         {r.status === "done" && (
-                          <span className="font-mono">{r.latencyMs}ms · {r.tokens}t</span>
+                          <span className="font-mono">
+                            {r.latencyMs}ms · {r.tokens}t
+                          </span>
                         )}
-                        {r.status === "error" && <AlertTriangle className="size-3.5 text-destructive" />}
+                        {r.status === "error" && (
+                          <AlertTriangle className="size-3.5 text-destructive" />
+                        )}
                       </div>
                     </div>
 
@@ -417,14 +493,21 @@ export default function ParseltonguesPage() {
               <div>
                 <p className="text-sm font-medium">PARSELTONGUE</p>
                 <p className="text-xs text-muted-foreground mt-1 max-w-xs">
-                  Paste code on the left. Five specialists fire in parallel:
-                  code review, security audit, performance analysis,
-                  correctness check, and architecture review.
+                  Paste code on the left. Five specialists fire in parallel: code review, security
+                  audit, performance analysis, correctness check, and architecture review.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 justify-center">
-                {["🔍 Reviewer", "🛡 Security", "⚡ Performance", "✓ Correctness", "🏗 Architect"].map((r) => (
-                  <Badge key={r} variant="outline" className="text-xs">{r}</Badge>
+                {[
+                  "🔍 Reviewer",
+                  "🛡 Security",
+                  "⚡ Performance",
+                  "✓ Correctness",
+                  "🏗 Architect",
+                ].map((r) => (
+                  <Badge key={r} variant="outline" className="text-xs">
+                    {r}
+                  </Badge>
                 ))}
               </div>
             </div>

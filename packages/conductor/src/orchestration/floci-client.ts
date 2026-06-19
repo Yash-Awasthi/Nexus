@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * HTTP client for the Floci AWS emulator (default :4566).
  * Tries Quarkus health paths documented in runtime/healthchecks.yaml.
@@ -26,7 +27,7 @@ export class FlociClientError extends Error {
     message: string,
     public readonly code: "UNREACHABLE" | "HTTP_ERROR" | "TIMEOUT" | "UNKNOWN_ACTION",
     public readonly status?: number,
-    public readonly body?: string
+    public readonly body?: string,
   ) {
     super(message);
     this.name = "FlociClientError";
@@ -45,7 +46,7 @@ export function resolveFlociEndpoint(): string {
 
 export async function probeFlociHealth(
   endpoint: string,
-  timeoutMs = 4000
+  timeoutMs = 4000,
 ): Promise<FlociHealthStatus> {
   const base = normalizeFlociEndpoint(endpoint);
   const started = Date.now();
@@ -53,7 +54,8 @@ export async function probeFlociHealth(
   // In offline mode, skip HTTP entirely — AbortSignal.timeout() can fail to
   // abort socket-level connects on some platforms (Windows), causing the probe
   // to block for the OS TCP timeout (~120s) instead of the intended timeoutMs.
-  const offline = process.env.GHOSTSTACK_OFFLINE_MODE === "1" ||
+  const offline =
+    process.env.GHOSTSTACK_OFFLINE_MODE === "1" ||
     (process.env.GHOSTSTACK_OFFLINE_MODE ?? "").toLowerCase() === "true";
   if (offline) {
     return {
@@ -61,7 +63,7 @@ export async function probeFlociHealth(
       endpoint: base,
       latencyMs: Date.now() - started,
       error: "offline mode — probe skipped",
-      checkedAt: new Date().toISOString()
+      checkedAt: new Date().toISOString(),
     };
   }
 
@@ -71,7 +73,7 @@ export async function probeFlociHealth(
     try {
       const res = await fetch(`${base}${healthPath}`, {
         method: "GET",
-        signal: AbortSignal.timeout(timeoutMs)
+        signal: AbortSignal.timeout(timeoutMs),
       });
       const latencyMs = Date.now() - started;
       if (res.ok) {
@@ -81,7 +83,7 @@ export async function probeFlociHealth(
           healthPath,
           latencyMs,
           httpStatus: res.status,
-          checkedAt: new Date().toISOString()
+          checkedAt: new Date().toISOString(),
         };
       }
       lastError = `HTTP ${res.status} at ${healthPath}`;
@@ -95,7 +97,7 @@ export async function probeFlociHealth(
     endpoint: base,
     latencyMs: Date.now() - started,
     error: lastError ?? "unknown",
-    checkedAt: new Date().toISOString()
+    checkedAt: new Date().toISOString(),
   };
 }
 
@@ -106,7 +108,7 @@ export type FlociFetchOptions = Omit<RequestInit, "signal"> & {
 
 export async function flociFetch(
   endpoint: string,
-  init: FlociFetchOptions
+  init: FlociFetchOptions,
 ): Promise<FlociRequestResult> {
   const base = normalizeFlociEndpoint(endpoint);
   const requestUrl = init.requestUrl ?? base;
@@ -117,21 +119,21 @@ export async function flociFetch(
     const { timeoutMs: _t, requestUrl: _u, ...rest } = init;
     const res = await fetch(requestUrl.startsWith("http") ? requestUrl : `${base}${requestUrl}`, {
       ...rest,
-      signal: AbortSignal.timeout(timeoutMs)
+      signal: AbortSignal.timeout(timeoutMs),
     });
     const bodyText = await res.text();
     return {
       ok: res.ok,
       status: res.status,
       bodyText,
-      latencyMs: Date.now() - started
+      latencyMs: Date.now() - started,
     };
   } catch (err) {
     throw new FlociClientError(
       `Floci request failed: ${(err as Error).message}`,
       "UNREACHABLE",
       undefined,
-      undefined
+      undefined,
     );
   }
 }

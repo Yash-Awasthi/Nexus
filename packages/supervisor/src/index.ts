@@ -359,7 +359,10 @@ export interface AgentPolicyContext {
   metadata?: Record<string, unknown>;
 }
 
-export interface PolicyResult { allowed: boolean; violations: string[] }
+export interface PolicyResult {
+  allowed: boolean;
+  violations: string[];
+}
 
 /** Agent policy */
 export class AgentPolicy {
@@ -381,22 +384,41 @@ export class AgentPolicy {
 
   /** Pre-built: cap iterations */
   static maxIterations(max: number): AgentPolicyRule {
-    return { name: "max-iterations", check: (ctx) => ctx.iteration > max ? `Exceeded max ${max} iterations` : null };
+    return {
+      name: "max-iterations",
+      check: (ctx) => (ctx.iteration > max ? `Exceeded max ${max} iterations` : null),
+    };
   }
 
   /** Pre-built: allowlist of tools */
   static allowedTools(tools: string[]): AgentPolicyRule {
-    return { name: "allowed-tools", check: (ctx) => ctx.toolName && !tools.includes(ctx.toolName) ? `Tool "${ctx.toolName}" not in allowlist` : null };
+    return {
+      name: "allowed-tools",
+      check: (ctx) =>
+        ctx.toolName && !tools.includes(ctx.toolName)
+          ? `Tool "${ctx.toolName}" not in allowlist`
+          : null,
+    };
   }
 
   /** Pre-built: blocklist of tools */
   static blockedTools(tools: string[]): AgentPolicyRule {
-    return { name: "blocked-tools", check: (ctx) => ctx.toolName && tools.includes(ctx.toolName) ? `Tool "${ctx.toolName}" is blocked` : null };
+    return {
+      name: "blocked-tools",
+      check: (ctx) =>
+        ctx.toolName && tools.includes(ctx.toolName) ? `Tool "${ctx.toolName}" is blocked` : null,
+    };
   }
 
   /** Pre-built: require sandbox harness */
   static requireSandbox(sandboxHarnesses: string[]): AgentPolicyRule {
-    return { name: "require-sandbox", check: (ctx) => !sandboxHarnesses.includes(ctx.harness) ? `Harness "${ctx.harness}" not in sandbox list` : null };
+    return {
+      name: "require-sandbox",
+      check: (ctx) =>
+        !sandboxHarnesses.includes(ctx.harness)
+          ? `Harness "${ctx.harness}" not in sandbox list`
+          : null,
+    };
   }
 }
 
@@ -441,10 +463,19 @@ export class AgentHarness {
 
     while (iteration < maxIter) {
       iteration++;
-      const ctx: AgentPolicyContext = { agentId: this.opts.id, harness: this.opts.harness, action: "run", iteration, metadata: this.opts.metadata };
+      const ctx: AgentPolicyContext = {
+        agentId: this.opts.id,
+        harness: this.opts.harness,
+        action: "run",
+        iteration,
+        metadata: this.opts.metadata,
+      };
       if (this.opts.policy) {
         const result = this.opts.policy.evaluate(ctx);
-        if (!result.allowed) { violations.push(...result.violations); break; }
+        if (!result.allowed) {
+          violations.push(...result.violations);
+          break;
+        }
       }
       try {
         output = await this.runFn(this.opts.id, prompt, iteration);
@@ -455,7 +486,14 @@ export class AgentHarness {
       }
     }
 
-    return { agentId: this.opts.id, harness: this.opts.harness, output, iterations: iteration, policyViolations: violations, timestamp: new Date().toISOString() };
+    return {
+      agentId: this.opts.id,
+      harness: this.opts.harness,
+      output,
+      iterations: iteration,
+      policyViolations: violations,
+      timestamp: new Date().toISOString(),
+    };
   }
 }
 
@@ -494,7 +532,12 @@ export class SandboxProvisioner {
     const fn = this.providers.get(spec.provider);
     if (!fn) {
       // Default local no-op instance
-      const inst: SandboxInstance = { id: `local-${Date.now()}`, provider: "local", status: "ready", createdAt: new Date().toISOString() };
+      const inst: SandboxInstance = {
+        id: `local-${Date.now()}`,
+        provider: "local",
+        status: "ready",
+        createdAt: new Date().toISOString(),
+      };
       this.instances.set(inst.id, inst);
       return inst;
     }
@@ -505,11 +548,17 @@ export class SandboxProvisioner {
 
   async terminate(id: string): Promise<void> {
     const inst = this.instances.get(id);
-    if (inst) { inst.status = "stopped"; }
+    if (inst) {
+      inst.status = "stopped";
+    }
   }
 
-  list(): SandboxInstance[] { return [...this.instances.values()]; }
-  get(id: string): SandboxInstance | undefined { return this.instances.get(id); }
+  list(): SandboxInstance[] {
+    return [...this.instances.values()];
+  }
+  get(id: string): SandboxInstance | undefined {
+    return this.instances.get(id);
+  }
 }
 
 // ── open-multi-agent Task DAG + Scheduling Patterns ──────────────────────────
@@ -523,7 +572,7 @@ export type OmaTaskStatus =
   | "in_progress"
   | "completed"
   | "failed"
-  | "blocked"    // waiting on unresolved dependsOn tasks
+  | "blocked" // waiting on unresolved dependsOn tasks
   | "skipped";
 
 /** A node in the task DAG. dependsOn forms directed edges. */
@@ -667,7 +716,10 @@ export function assignTasks(
 
   const ranked = [...pendingTasks];
   if (strategy === "dependency-first") {
-    ranked.sort((a, b) => countBlockedDependents(b.id, pendingTasks) - countBlockedDependents(a.id, pendingTasks));
+    ranked.sort(
+      (a, b) =>
+        countBlockedDependents(b.id, pendingTasks) - countBlockedDependents(a.id, pendingTasks),
+    );
   }
 
   ranked.forEach((task, i) => {

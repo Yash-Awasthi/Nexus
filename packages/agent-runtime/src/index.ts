@@ -834,13 +834,27 @@ export type SessionStatus =
   | { kind: "error"; message: string };
 
 export const SessionStatus = {
-  active(): SessionStatus { return { kind: "active" }; },
-  closed(): SessionStatus { return { kind: "closed" }; },
-  crashed(message?: string): SessionStatus { return { kind: "crashed", message }; },
-  reloaded(): SessionStatus { return { kind: "reloaded" }; },
-  compacted(): SessionStatus { return { kind: "compacted" }; },
-  rateLimited(): SessionStatus { return { kind: "rate_limited" }; },
-  error(message: string): SessionStatus { return { kind: "error", message }; },
+  active(): SessionStatus {
+    return { kind: "active" };
+  },
+  closed(): SessionStatus {
+    return { kind: "closed" };
+  },
+  crashed(message?: string): SessionStatus {
+    return { kind: "crashed", message };
+  },
+  reloaded(): SessionStatus {
+    return { kind: "reloaded" };
+  },
+  compacted(): SessionStatus {
+    return { kind: "compacted" };
+  },
+  rateLimited(): SessionStatus {
+    return { kind: "rate_limited" };
+  },
+  error(message: string): SessionStatus {
+    return { kind: "error", message };
+  },
 } as const;
 
 // ── ResumeTarget ──────────────────────────────────────────────────────────────
@@ -858,11 +872,16 @@ export type ResumeTarget =
 
 export function resumeTargetId(target: ResumeTarget): string {
   switch (target.kind) {
-    case "jcode": return target.sessionId;
-    case "claude_code": return target.sessionId;
-    case "codex": return target.sessionId;
-    case "pi": return target.sessionPath;
-    case "open_code": return target.sessionId;
+    case "jcode":
+      return target.sessionId;
+    case "claude_code":
+      return target.sessionId;
+    case "codex":
+      return target.sessionId;
+    case "pi":
+      return target.sessionPath;
+    case "open_code":
+      return target.sessionId;
   }
 }
 
@@ -942,7 +961,12 @@ export class VersionedPlan {
       version: this.version,
       participants: [...this.participants].sort(),
       items: this.items.map(({ id, content, priority, subsystem, fileScope, blockedBy }) => ({
-        id, content, priority, subsystem, fileScope, blockedBy,
+        id,
+        content,
+        priority,
+        subsystem,
+        fileScope,
+        blockedBy,
       })),
     };
   }
@@ -1028,28 +1052,40 @@ export class ToolOutput {
  */
 export function resolveToolName(name: string): string {
   switch (name) {
-    case "communicate": return "swarm";
+    case "communicate":
+      return "swarm";
     case "task":
-    case "task_runner": return "subagent";
-    case "launch": return "open";
+    case "task_runner":
+      return "subagent";
+    case "launch":
+      return "open";
     case "shell":
-    case "shell_exec": return "bash";
+    case "shell_exec":
+      return "bash";
     case "read_file":
-    case "file_read": return "read";
+    case "file_read":
+      return "read";
     case "write_file":
-    case "file_write": return "write";
+    case "file_write":
+      return "write";
     case "edit_file":
-    case "file_edit": return "edit";
-    case "file_glob": return "glob";
-    case "file_grep": return "grep";
+    case "file_edit":
+      return "edit";
+    case "file_glob":
+      return "glob";
+    case "file_grep":
+      return "grep";
     case "skill":
-    case "Skill": return "skill_manage";
+    case "Skill":
+      return "skill_manage";
     case "todoread":
     case "todowrite":
     case "todo_read":
     case "todo_write":
-    case "todos": return "todo";
-    default: return name;
+    case "todos":
+      return "todo";
+    default:
+      return name;
   }
 }
 
@@ -1059,15 +1095,23 @@ export function resolveToolName(name: string): string {
 // content blocks, cache control, ToolDefinition token estimation helpers, and
 // a TokenUsageTotals struct with full cache telemetry breakdown.
 
-/** Cache control metadata for prompt caching (ephemeral / persistent). */
-export interface CacheControl {
+/** Cache control metadata for prompt caching (ephemeral / persistent).
+ *  Named PromptCacheControl to avoid colliding with the CacheControl class
+ *  (HTTP cache policy helper) exported from this same module.
+ */
+export interface PromptCacheControl {
   type: "ephemeral" | "persistent";
   ttl?: string;
 }
 
-export const CacheControl = {
-  ephemeral(ttl?: string): CacheControl { return { type: "ephemeral", ttl }; },
-  persistent(): CacheControl { return { type: "persistent" }; },
+/** Factory helpers for PromptCacheControl — kept for backward compat. */
+export const PromptCacheControlFactory = {
+  ephemeral(ttl?: string): PromptCacheControl {
+    return { type: "ephemeral", ttl };
+  },
+  persistent(): PromptCacheControl {
+    return { type: "persistent" };
+  },
 } as const;
 
 /**
@@ -1079,12 +1123,24 @@ export const CacheControl = {
  *   OpenAIReasoning     — includes encrypted_content for OpenAI `store=false` stateless mode.
  */
 export type ContentBlock =
-  | { type: "text"; text: string; cache_control?: CacheControl }
+  | { type: "text"; text: string; cache_control?: PromptCacheControl }
   | { type: "reasoning"; text: string }
-  | { type: "reasoning_trace"; text: string }           // captured for debugging, never replayed
+  | { type: "reasoning_trace"; text: string } // captured for debugging, never replayed
   | { type: "anthropic_thinking"; thinking: string; signature: string }
-  | { type: "open_ai_reasoning"; id: string; summary: string[]; encrypted_content?: string; status?: string }
-  | { type: "tool_use"; id: string; name: string; input: unknown; cache_control?: CacheControl }
+  | {
+      type: "open_ai_reasoning";
+      id: string;
+      summary: string[];
+      encrypted_content?: string;
+      status?: string;
+    }
+  | {
+      type: "tool_use";
+      id: string;
+      name: string;
+      input: unknown;
+      cache_control?: PromptCacheControl;
+    }
   | { type: "tool_result"; tool_use_id: string; content: string; is_error?: boolean }
   | { type: "image"; source: { type: "base64"; media_type: string; data: string } };
 
@@ -1109,14 +1165,22 @@ export class ToolDefinition {
 
   /** Serialised byte length of the full tool payload sent to providers. */
   promptChars(): number {
-    return JSON.stringify({ name: this.name, description: this.description, input_schema: this.inputSchema }).length;
+    return JSON.stringify({
+      name: this.name,
+      description: this.description,
+      input_schema: this.inputSchema,
+    }).length;
   }
 
   /** Approximate token cost of the description only (chars / 4). */
-  descriptionTokenEstimate(): number { return Math.ceil(this.description.length / 4); }
+  descriptionTokenEstimate(): number {
+    return Math.ceil(this.description.length / 4);
+  }
 
   /** Approximate token cost of the full tool payload (chars / 4). */
-  promptTokenEstimate(): number { return Math.ceil(this.promptChars() / 4); }
+  promptTokenEstimate(): number {
+    return Math.ceil(this.promptChars() / 4);
+  }
 
   static aggregatePromptChars(defs: ToolDefinition[]): number {
     return defs.reduce((s, d) => s + d.promptChars(), 0);
@@ -1259,7 +1323,11 @@ export type SkillsMap = Record<string, SkillDefinition>;
 /** Reasoning token options (OpenRouter pattern). */
 export type AgentReasoningOptions =
   | { enabled?: boolean; exclude?: boolean; max_tokens: number }
-  | { enabled?: boolean; exclude?: boolean; effort: "high" | "medium" | "low" | "minimal" | "none" };
+  | {
+      enabled?: boolean;
+      exclude?: boolean;
+      effort: "high" | "medium" | "low" | "minimal" | "none";
+    };
 
 /** Provider routing options for OpenRouter-compatible LLM backends. */
 export interface AgentProviderOptions {

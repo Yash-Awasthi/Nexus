@@ -271,7 +271,10 @@ describe("SearchOrchestrator", () => {
 
 describe("createDefaultOrchestrator", () => {
   it("creates orchestrator with default strategies", async () => {
-    const orchestrator = createDefaultOrchestrator();
+    // Pass an explicit mock so the test is not affected by DATABASE_URL /
+    // CHROMA_URL env vars that may be set in CI but have no live service.
+    const mock = new MockSearchStrategy("chroma");
+    const orchestrator = createDefaultOrchestrator([mock]);
     const response = await orchestrator.search({ query: "hello" });
     expect(response.results.length).toBeGreaterThan(0);
   });

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { IFilesystemSandbox, ISandboxConstraint } from "./interfaces/environment.interface";
 import { isSafeSandboxPath } from "./security-utils";
 import * as fs from "fs";
@@ -6,7 +7,7 @@ import * as path from "path";
 export class SandboxConstraint implements ISandboxConstraint {
   constructor(
     public maxWriteBytes: number,
-    public allowedPathPrefix: string
+    public allowedPathPrefix: string,
   ) {}
 
   validateWrite(filePath: string, contentSize: number, currentTotal: number): boolean {
@@ -26,7 +27,7 @@ export class FilesystemSandbox implements IFilesystemSandbox {
 
   constructor(
     private sandboxDir: string,
-    private constraint: ISandboxConstraint
+    private constraint: ISandboxConstraint,
   ) {
     if (!fs.existsSync(this.sandboxDir)) {
       fs.mkdirSync(this.sandboxDir, { recursive: true });
@@ -36,7 +37,9 @@ export class FilesystemSandbox implements IFilesystemSandbox {
   async createDirectory(pathSegment: string): Promise<string> {
     const targetDir = path.resolve(path.join(this.sandboxDir, pathSegment));
     if (!isSafeSandboxPath(this.constraint.allowedPathPrefix, targetDir)) {
-      throw new Error(`Sandbox Path violation: Cannot create directory outside bounds: ${targetDir}`);
+      throw new Error(
+        `Sandbox Path violation: Cannot create directory outside bounds: ${targetDir}`,
+      );
     }
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(targetDir, { recursive: true });
@@ -49,7 +52,9 @@ export class FilesystemSandbox implements IFilesystemSandbox {
     const contentSize = Buffer.byteLength(content, "utf8");
 
     if (!this.constraint.validateWrite(targetFile, contentSize, this.totalBytesWritten)) {
-      throw new Error(`Sandbox Write violation: Path isolation constraint or capacity ceiling overrun: ${targetFile}`);
+      throw new Error(
+        `Sandbox Write violation: Path isolation constraint or capacity ceiling overrun: ${targetFile}`,
+      );
     }
 
     const parentDir = path.dirname(targetFile);
@@ -61,7 +66,7 @@ export class FilesystemSandbox implements IFilesystemSandbox {
     this.writeLog.push({
       timestamp: new Date(),
       file: targetFile,
-      bytes: contentSize
+      bytes: contentSize,
     });
     this.totalBytesWritten += contentSize;
   }

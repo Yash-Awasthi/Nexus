@@ -43,21 +43,35 @@ export function llmJudgeScorer(
     try {
       const judgment = await judgeLlm(
         `You are an evaluator. Rate the following output for this criterion: "${criteria}"\n\n` +
-        `Output:\n${text.slice(0, 2000)}\n\n` +
-        `Respond with a score from 0 to 10 (10 = perfect) on the FIRST line, then explain.`,
+          `Output:\n${text.slice(0, 2000)}\n\n` +
+          `Respond with a score from 0 to 10 (10 = perfect) on the FIRST line, then explain.`,
       );
 
       const match = judgment.match(/^(\d+(?:\.\d+)?)/);
       const raw = match ? parseFloat(match[1]!) : null;
       if (raw !== null) {
         const score = Math.min(1, Math.max(0, raw / 10));
-        return { pass: score >= threshold, score, reason: judgment.split("\n").slice(1).join(" ").slice(0, 200) };
+        return {
+          pass: score >= threshold,
+          score,
+          reason: judgment.split("\n").slice(1).join(" ").slice(0, 200),
+        };
       }
 
       // Keyword fallback
       const lower = judgment.toLowerCase();
-      const positive = ["excellent", "good", "correct", "accurate", "meets", "satisfies", "pass"].some((w) => lower.includes(w));
-      const negative = ["poor", "incorrect", "fails", "wrong", "missing", "incomplete"].some((w) => lower.includes(w));
+      const positive = [
+        "excellent",
+        "good",
+        "correct",
+        "accurate",
+        "meets",
+        "satisfies",
+        "pass",
+      ].some((w) => lower.includes(w));
+      const negative = ["poor", "incorrect", "fails", "wrong", "missing", "incomplete"].some((w) =>
+        lower.includes(w),
+      );
       const score = positive && !negative ? 0.85 : negative ? 0.2 : 0.5;
       return { pass: score >= threshold, score };
     } catch {
@@ -86,23 +100,41 @@ export function semanticSimilarity(
     const intersection = [...refTokens].filter((t) => outTokens.has(t)).length;
     const union = new Set([...refTokens, ...outTokens]).size;
     const score = union > 0 ? intersection / union : 0;
-    return { pass: score >= minScore, score: Math.round(score * 1000) / 1000, reason: score < minScore ? `Jaccard similarity ${score.toFixed(2)} < threshold ${minScore}` : undefined };
+    return {
+      pass: score >= minScore,
+      score: Math.round(score * 1000) / 1000,
+      reason:
+        score < minScore
+          ? `Jaccard similarity ${score.toFixed(2)} < threshold ${minScore}`
+          : undefined,
+    };
   };
 }
 
 function tokenize(text: string): string[] {
-  return text.toLowerCase().replace(/[^\w\s]/g, " ").split(/\s+/).filter((t) => t.length > 2);
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .split(/\s+/)
+    .filter((t) => t.length > 2);
 }
 
 // ── notContains ───────────────────────────────────────────────────────────────
 
-export function notContains(needle: string, opts: { ignoreCase?: boolean } = {}): (output: unknown) => EvalScore {
+export function notContains(
+  needle: string,
+  opts: { ignoreCase?: boolean } = {},
+): (output: unknown) => EvalScore {
   return (output) => {
     const haystack = JSON.stringify(output) ?? "";
     const h = opts.ignoreCase ? haystack.toLowerCase() : haystack;
     const n = opts.ignoreCase ? needle.toLowerCase() : needle;
     const pass = !h.includes(n);
-    return { pass, score: pass ? 1 : 0, reason: pass ? undefined : `Output must not contain "${needle}"` };
+    return {
+      pass,
+      score: pass ? 1 : 0,
+      reason: pass ? undefined : `Output must not contain "${needle}"`,
+    };
   };
 }
 
@@ -112,8 +144,10 @@ export function wordCount(min: number, max: number): (output: unknown) => EvalSc
   return (output) => {
     const text = typeof output === "string" ? output : JSON.stringify(output);
     const words = text.trim().split(/\s+/).length;
-    if (words < min) return { pass: false, score: words / min, reason: `Too short: ${words} words (min ${min})` };
-    if (words > max) return { pass: false, score: max / words, reason: `Too long: ${words} words (max ${max})` };
+    if (words < min)
+      return { pass: false, score: words / min, reason: `Too short: ${words} words (min ${min})` };
+    if (words > max)
+      return { pass: false, score: max / words, reason: `Too long: ${words} words (max ${max})` };
     return { pass: true, score: 1 };
   };
 }
@@ -128,15 +162,15 @@ export interface AcceptanceCriterion {
 export interface ScenarioSpec {
   name: string;
   goal: string;
-  inputs: Record<string, unknown>[];  // multiple test inputs per scenario
+  inputs: Record<string, unknown>[]; // multiple test inputs per scenario
   criteria: AcceptanceCriterion[];
-  passThreshold?: number;              // fraction of criteria that must pass (default: 1.0)
+  passThreshold?: number; // fraction of criteria that must pass (default: 1.0)
 }
 
 export interface ScenarioResult {
   scenarioName: string;
   input: Record<string, unknown>;
-  criteriaResults: Array<{ criterion: string; pass: boolean; score: number; reason?: string }>;
+  criteriaResults: { criterion: string; pass: boolean; score: number; reason?: string }[];
   overallPass: boolean;
   overallScore: number;
 }
@@ -158,14 +192,22 @@ export class ScenarioRunner {
 
     for (const input of spec.inputs) {
       let output: unknown;
-      try { output = await subject(input); }
-      catch (e) { output = `Error: ${String(e)}`; }
+      try {
+        output = await subject(input);
+      } catch (e) {
+        output = `Error: ${String(e)}`;
+      }
 
       const criteriaResults = await Promise.all(
         spec.criteria.map(async (c) => {
           try {
             const score = await c.scorer(output);
-            return { criterion: c.description, pass: score.pass, score: score.score, reason: score.reason };
+            return {
+              criterion: c.description,
+              pass: score.pass,
+              score: score.score,
+              reason: score.reason,
+            };
           } catch (e) {
             return { criterion: c.description, pass: false, score: 0, reason: String(e) };
           }
@@ -174,13 +216,25 @@ export class ScenarioRunner {
 
       const passedCount = criteriaResults.filter((r) => r.pass).length;
       const passRate = criteriaResults.length > 0 ? passedCount / criteriaResults.length : 1;
-      const overallScore = criteriaResults.reduce((s, r) => s + r.score, 0) / Math.max(criteriaResults.length, 1);
+      const overallScore =
+        criteriaResults.reduce((s, r) => s + r.score, 0) / Math.max(criteriaResults.length, 1);
 
-      results.push({ input, criteriaResults, overallPass: passRate >= threshold, overallScore: Math.round(overallScore * 1000) / 1000, scenarioName: spec.name });
+      results.push({
+        input,
+        criteriaResults,
+        overallPass: passRate >= threshold,
+        overallScore: Math.round(overallScore * 1000) / 1000,
+        scenarioName: spec.name,
+      });
     }
 
     const passed = results.filter((r) => r.overallPass).length;
-    return { scenario: spec.name, results, passRate: results.length > 0 ? passed / results.length : 1, timestamp: new Date().toISOString() };
+    return {
+      scenario: spec.name,
+      results,
+      passRate: results.length > 0 ? passed / results.length : 1,
+      timestamp: new Date().toISOString(),
+    };
   }
 }
 
@@ -191,7 +245,7 @@ export interface BenchmarkRun {
   suiteName: string;
   passRate: number;
   timestamp: string;
-  results: Array<{ name: string; pass: boolean; score: number }>;
+  results: { name: string; pass: boolean; score: number }[];
 }
 
 export interface RegressionAlert {
@@ -208,7 +262,9 @@ export class BenchmarkTracker {
   private runs: BenchmarkRun[] = [];
   private maxHistory: number;
 
-  constructor(maxHistory = 50) { this.maxHistory = maxHistory; }
+  constructor(maxHistory = 50) {
+    this.maxHistory = maxHistory;
+  }
 
   record(run: BenchmarkRun): void {
     this.runs.unshift(run);
@@ -229,9 +285,23 @@ export class BenchmarkTracker {
       if (!prev) continue;
       const scoreDelta = curr.score - prev.score;
       if (prev.pass && !curr.pass) {
-        alerts.push({ suiteName, caseName: curr.name, previousPass: true, currentPass: false, scoreDelta, severity: "regression" });
+        alerts.push({
+          suiteName,
+          caseName: curr.name,
+          previousPass: true,
+          currentPass: false,
+          scoreDelta,
+          severity: "regression",
+        });
       } else if (!prev.pass && curr.pass) {
-        alerts.push({ suiteName, caseName: curr.name, previousPass: false, currentPass: true, scoreDelta, severity: "improvement" });
+        alerts.push({
+          suiteName,
+          caseName: curr.name,
+          previousPass: false,
+          currentPass: true,
+          scoreDelta,
+          severity: "improvement",
+        });
       }
     }
     return alerts;
@@ -253,14 +323,14 @@ export class BenchmarkTracker {
 // and expected outputs using a planning LLM, then run them.
 
 export interface MLEvalSpec {
-  task: string;          // "Summarise financial reports in < 100 words"
-  domain: string;        // "financial", "medical", "legal", etc.
-  nCases?: number;       // number of test cases to generate (default: 5)
+  task: string; // "Summarise financial reports in < 100 words"
+  domain: string; // "financial", "medical", "legal", etc.
+  nCases?: number; // number of test cases to generate (default: 5)
 }
 
 export interface GeneratedEvalCase {
   input: string;
-  expectedPattern: string;   // describes what a good output looks like
+  expectedPattern: string; // describes what a good output looks like
   scorerDescription: string; // human-readable scoring criterion
 }
 
@@ -278,7 +348,11 @@ export class MLResearchEval {
    * Generate eval cases from a spec, then run them against a subject function.
    * Returns a ScenarioRunResult compatible format.
    */
-  async evaluate(spec: MLEvalSpec, subject: ScenarioSubjectFn, judgeLlm?: JudgeLlmFn): Promise<ScenarioRunResult> {
+  async evaluate(
+    spec: MLEvalSpec,
+    subject: ScenarioSubjectFn,
+    judgeLlm?: JudgeLlmFn,
+  ): Promise<ScenarioRunResult> {
     const cases = await this.generatorFn(spec);
     const runner = new ScenarioRunner();
 

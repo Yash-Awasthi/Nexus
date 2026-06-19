@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Honesty Tools — anti-sycophancy, confidence calibration, minority reports.
  *
@@ -69,7 +70,9 @@ function SycophancyTab() {
 
   const check = useCallback(async () => {
     if (!response.trim()) return;
-    setLoading(true); setErr(""); setResult(null);
+    setLoading(true);
+    setErr("");
+    setResult(null);
     const r = await fetch("/api/honesty/sycophancy-check", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -85,40 +88,84 @@ function SycophancyTab() {
       <Card>
         <CardContent className="pt-4 space-y-3">
           <div className="space-y-1">
-            <label className="text-sm font-medium">Original Prompt <span className="text-muted-foreground font-normal">(optional)</span></label>
-            <Textarea rows={2} placeholder="What prompt produced this response?" value={prompt} onChange={e => setPrompt(e.target.value)} className="resize-none text-sm" />
+            <label className="text-sm font-medium">
+              Original Prompt <span className="text-muted-foreground font-normal">(optional)</span>
+            </label>
+            <Textarea
+              rows={2}
+              placeholder="What prompt produced this response?"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              className="resize-none text-sm"
+            />
           </div>
           <div className="space-y-1">
             <label className="text-sm font-medium">AI Response *</label>
-            <Textarea rows={5} placeholder="Paste the AI response to check for sycophancy…" value={response} onChange={e => setResponse(e.target.value)} className="resize-none" />
+            <Textarea
+              rows={5}
+              placeholder="Paste the AI response to check for sycophancy…"
+              value={response}
+              onChange={(e) => setResponse(e.target.value)}
+              className="resize-none"
+            />
           </div>
           {err && <p className="text-red-500 text-xs">{err}</p>}
           <Button onClick={check} disabled={loading || !response.trim()}>
-            {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Checking…</> : <><Scale className="w-4 h-4 mr-2" />Check Sycophancy</>}
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Checking…
+              </>
+            ) : (
+              <>
+                <Scale className="w-4 h-4 mr-2" />
+                Check Sycophancy
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>
 
       {result && (
-        <Card className={result.sycophantic ? "border-orange-200 dark:border-orange-800" : "border-green-200 dark:border-green-800"}>
+        <Card
+          className={
+            result.sycophantic
+              ? "border-orange-200 dark:border-orange-800"
+              : "border-green-200 dark:border-green-800"
+          }
+        >
           <CardContent className="pt-4 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                {result.sycophantic
-                  ? <AlertTriangle className="w-5 h-5 text-orange-500" />
-                  : <CheckCircle className="w-5 h-5 text-green-500" />}
-                <span className={`font-semibold ${result.sycophantic ? "text-orange-600" : "text-green-600 dark:text-green-400"}`}>
+                {result.sycophantic ? (
+                  <AlertTriangle className="w-5 h-5 text-orange-500" />
+                ) : (
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                )}
+                <span
+                  className={`font-semibold ${result.sycophantic ? "text-orange-600" : "text-green-600 dark:text-green-400"}`}
+                >
                   {result.sycophantic ? "Sycophantic Response" : "Response Appears Honest"}
                 </span>
               </div>
-              <Badge className={result.score > 0.6 ? "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400" : "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"}>
+              <Badge
+                className={
+                  result.score > 0.6
+                    ? "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400"
+                    : "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
+                }
+              >
                 {Math.round(result.score * 100)}% sycophancy score
               </Badge>
             </div>
-            {result.explanation && <p className="text-sm text-muted-foreground">{result.explanation}</p>}
+            {result.explanation && (
+              <p className="text-sm text-muted-foreground">{result.explanation}</p>
+            )}
             {result.patterns && result.patterns.length > 0 && (
               <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Detected patterns</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Detected patterns
+                </p>
                 {result.patterns.map((p, i) => (
                   <div key={i} className="flex items-center gap-2 text-sm">
                     <AlertTriangle className="w-3 h-3 text-orange-400 shrink-0" />
@@ -144,7 +191,9 @@ function ReframeTab() {
 
   const reframe = useCallback(async () => {
     if (!response.trim()) return;
-    setLoading(true); setErr(""); setResult(null);
+    setLoading(true);
+    setErr("");
+    setResult(null);
     const r = await fetch("/api/honesty/reframe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -160,10 +209,26 @@ function ReframeTab() {
       <Card>
         <CardContent className="pt-4 space-y-3">
           <label className="text-sm font-medium">Response to Reframe</label>
-          <Textarea rows={5} placeholder="Paste a sycophantic or vague AI response to reframe as more direct…" value={response} onChange={e => setResponse(e.target.value)} className="resize-none" />
+          <Textarea
+            rows={5}
+            placeholder="Paste a sycophantic or vague AI response to reframe as more direct…"
+            value={response}
+            onChange={(e) => setResponse(e.target.value)}
+            className="resize-none"
+          />
           {err && <p className="text-red-500 text-xs">{err}</p>}
           <Button onClick={reframe} disabled={loading || !response.trim()}>
-            {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Reframing…</> : <><MessageSquareDiff className="w-4 h-4 mr-2" />Reframe</>}
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Reframing…
+              </>
+            ) : (
+              <>
+                <MessageSquareDiff className="w-4 h-4 mr-2" />
+                Reframe
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>
@@ -171,17 +236,29 @@ function ReframeTab() {
       {result && (
         <div className="grid md:grid-cols-2 gap-3">
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Original</CardTitle></CardHeader>
-            <CardContent><p className="text-sm text-muted-foreground">{result.original}</p></CardContent>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground">Original</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">{result.original}</p>
+            </CardContent>
           </Card>
           <Card className="border-primary/20">
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Reframed (Honest)</CardTitle></CardHeader>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Reframed (Honest)</CardTitle>
+            </CardHeader>
             <CardContent>
               <p className="text-sm">{result.reframed}</p>
               {result.changes && result.changes.length > 0 && (
                 <div className="mt-3 space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Changes made</p>
-                  {result.changes.map((c, i) => <p key={i} className="text-xs text-muted-foreground">• {c}</p>)}
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Changes made
+                  </p>
+                  {result.changes.map((c, i) => (
+                    <p key={i} className="text-xs text-muted-foreground">
+                      • {c}
+                    </p>
+                  ))}
                 </div>
               )}
             </CardContent>
@@ -202,7 +279,9 @@ function ConfidenceTab() {
 
   const calibrate = useCallback(async () => {
     if (!text.trim()) return;
-    setLoading(true); setErr(""); setResult(null);
+    setLoading(true);
+    setErr("");
+    setResult(null);
     const r = await fetch("/api/honesty/confidence-calibrate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -218,10 +297,26 @@ function ConfidenceTab() {
       <Card>
         <CardContent className="pt-4 space-y-3">
           <label className="text-sm font-medium">Text to Calibrate</label>
-          <Textarea rows={5} placeholder="Paste a text with confidence claims to calibrate…" value={text} onChange={e => setText(e.target.value)} className="resize-none" />
+          <Textarea
+            rows={5}
+            placeholder="Paste a text with confidence claims to calibrate…"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            className="resize-none"
+          />
           {err && <p className="text-red-500 text-xs">{err}</p>}
           <Button onClick={calibrate} disabled={loading || !text.trim()}>
-            {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Calibrating…</> : <><BarChart2 className="w-4 h-4 mr-2" />Calibrate Confidence</>}
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Calibrating…
+              </>
+            ) : (
+              <>
+                <BarChart2 className="w-4 h-4 mr-2" />
+                Calibrate Confidence
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>
@@ -229,26 +324,37 @@ function ConfidenceTab() {
       {result && (
         <Card>
           <CardContent className="pt-4 space-y-3">
-            {result.originalConfidence !== undefined && result.calibratedConfidence !== undefined && (
-              <div className="flex items-center gap-4 text-sm">
-                <div>
-                  <p className="text-xs text-muted-foreground">Original</p>
-                  <p className="text-xl font-bold">{Math.round(result.originalConfidence * 100)}%</p>
+            {result.originalConfidence !== undefined &&
+              result.calibratedConfidence !== undefined && (
+                <div className="flex items-center gap-4 text-sm">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Original</p>
+                    <p className="text-xl font-bold">
+                      {Math.round(result.originalConfidence * 100)}%
+                    </p>
+                  </div>
+                  <span className="text-muted-foreground">→</span>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Calibrated</p>
+                    <p className="text-xl font-bold text-primary">
+                      {Math.round(result.calibratedConfidence * 100)}%
+                    </p>
+                  </div>
+                  {result.overconfident && (
+                    <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400 ml-auto">
+                      Overconfident
+                    </Badge>
+                  )}
                 </div>
-                <span className="text-muted-foreground">→</span>
-                <div>
-                  <p className="text-xs text-muted-foreground">Calibrated</p>
-                  <p className="text-xl font-bold text-primary">{Math.round(result.calibratedConfidence * 100)}%</p>
-                </div>
-                {result.overconfident && (
-                  <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400 ml-auto">Overconfident</Badge>
-                )}
-              </div>
-            )}
+              )}
             {result.adjustedText && (
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Adjusted Text</p>
-                <p className="text-sm whitespace-pre-wrap bg-muted/30 p-3 rounded-md">{result.adjustedText}</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                  Adjusted Text
+                </p>
+                <p className="text-sm whitespace-pre-wrap bg-muted/30 p-3 rounded-md">
+                  {result.adjustedText}
+                </p>
               </div>
             )}
           </CardContent>
@@ -269,7 +375,9 @@ function MinorityTab() {
 
   const generate = useCallback(async () => {
     if (!topic.trim()) return;
-    setLoading(true); setErr(""); setResult(null);
+    setLoading(true);
+    setErr("");
+    setResult(null);
     const r = await fetch("/api/honesty/minority-report", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -284,18 +392,44 @@ function MinorityTab() {
     <div className="space-y-4">
       <Card>
         <CardContent className="pt-4 space-y-3">
-          <p className="text-sm text-muted-foreground">Surface contrarian, minority, or under-represented viewpoints on any topic.</p>
+          <p className="text-sm text-muted-foreground">
+            Surface contrarian, minority, or under-represented viewpoints on any topic.
+          </p>
           <div className="space-y-1">
             <label className="text-sm font-medium">Topic *</label>
-            <Textarea rows={2} placeholder="e.g. remote work is always better than in-office…" value={topic} onChange={e => setTopic(e.target.value)} className="resize-none text-sm" />
+            <Textarea
+              rows={2}
+              placeholder="e.g. remote work is always better than in-office…"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              className="resize-none text-sm"
+            />
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium">Dominant View <span className="text-muted-foreground font-normal">(optional)</span></label>
-            <Textarea rows={2} placeholder="Describe the mainstream position to challenge…" value={mainView} onChange={e => setMainView(e.target.value)} className="resize-none text-sm" />
+            <label className="text-sm font-medium">
+              Dominant View <span className="text-muted-foreground font-normal">(optional)</span>
+            </label>
+            <Textarea
+              rows={2}
+              placeholder="Describe the mainstream position to challenge…"
+              value={mainView}
+              onChange={(e) => setMainView(e.target.value)}
+              className="resize-none text-sm"
+            />
           </div>
           {err && <p className="text-red-500 text-xs">{err}</p>}
           <Button onClick={generate} disabled={loading || !topic.trim()}>
-            {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Generating…</> : <><Users className="w-4 h-4 mr-2" />Generate Minority Report</>}
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Generating…
+              </>
+            ) : (
+              <>
+                <Users className="w-4 h-4 mr-2" />
+                Generate Minority Report
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>
@@ -305,7 +439,9 @@ function MinorityTab() {
           {result.mainView && (
             <Card className="opacity-70">
               <CardContent className="pt-3 pb-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Dominant view</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                  Dominant view
+                </p>
                 <p className="text-sm">{result.mainView}</p>
               </CardContent>
             </Card>
@@ -315,16 +451,24 @@ function MinorityTab() {
               <CardContent className="pt-3 pb-3">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm flex-1">{mv.view}</p>
-                  {mv.prevalence && <Badge variant="outline" className="text-xs shrink-0">{mv.prevalence}</Badge>}
+                  {mv.prevalence && (
+                    <Badge variant="outline" className="text-xs shrink-0">
+                      {mv.prevalence}
+                    </Badge>
+                  )}
                 </div>
-                {mv.reasoning && <p className="text-xs text-muted-foreground mt-1">{mv.reasoning}</p>}
+                {mv.reasoning && (
+                  <p className="text-xs text-muted-foreground mt-1">{mv.reasoning}</p>
+                )}
               </CardContent>
             </Card>
           ))}
           {result.synthesis && (
             <Card>
               <CardContent className="pt-3 pb-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Synthesis</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                  Synthesis
+                </p>
                 <p className="text-sm">{result.synthesis}</p>
               </CardContent>
             </Card>
@@ -352,15 +496,35 @@ export default function Honesty() {
 
       <Tabs defaultValue="sycophancy">
         <TabsList>
-          <TabsTrigger value="sycophancy"><Scale className="w-4 h-4 mr-1" />Sycophancy</TabsTrigger>
-          <TabsTrigger value="reframe"><MessageSquareDiff className="w-4 h-4 mr-1" />Reframe</TabsTrigger>
-          <TabsTrigger value="confidence"><BarChart2 className="w-4 h-4 mr-1" />Confidence</TabsTrigger>
-          <TabsTrigger value="minority"><Users className="w-4 h-4 mr-1" />Minority Report</TabsTrigger>
+          <TabsTrigger value="sycophancy">
+            <Scale className="w-4 h-4 mr-1" />
+            Sycophancy
+          </TabsTrigger>
+          <TabsTrigger value="reframe">
+            <MessageSquareDiff className="w-4 h-4 mr-1" />
+            Reframe
+          </TabsTrigger>
+          <TabsTrigger value="confidence">
+            <BarChart2 className="w-4 h-4 mr-1" />
+            Confidence
+          </TabsTrigger>
+          <TabsTrigger value="minority">
+            <Users className="w-4 h-4 mr-1" />
+            Minority Report
+          </TabsTrigger>
         </TabsList>
-        <TabsContent value="sycophancy" className="mt-4"><SycophancyTab /></TabsContent>
-        <TabsContent value="reframe" className="mt-4"><ReframeTab /></TabsContent>
-        <TabsContent value="confidence" className="mt-4"><ConfidenceTab /></TabsContent>
-        <TabsContent value="minority" className="mt-4"><MinorityTab /></TabsContent>
+        <TabsContent value="sycophancy" className="mt-4">
+          <SycophancyTab />
+        </TabsContent>
+        <TabsContent value="reframe" className="mt-4">
+          <ReframeTab />
+        </TabsContent>
+        <TabsContent value="confidence" className="mt-4">
+          <ConfidenceTab />
+        </TabsContent>
+        <TabsContent value="minority" className="mt-4">
+          <MinorityTab />
+        </TabsContent>
       </Tabs>
     </div>
   );

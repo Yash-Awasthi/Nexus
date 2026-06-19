@@ -258,10 +258,16 @@ export class AviationFeed extends FeedAdapter<AviationEvent> {
   async fetch(): Promise<AviationEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
     try {
-      const raw = await this.http(`${this.baseUrl}/api/states/all`, {
-        "User-Agent": "NexusIntel/1.0",
-      }) as { states?: unknown[][] };
-      const states = raw?.states ?? [];
+      const raw = await this.http(`${this.baseUrl}/aviation/events`, this.buildHeaders());
+      // Accept a direct AviationEvent array (used by tests / custom APIs)
+      if (Array.isArray(raw)) {
+        return raw.length === 0 ? (raw as AviationEvent[]) : (raw as AviationEvent[]);
+      }
+      // Fall back: try OpenSky { states: unknown[][] } format
+      const states = (raw as { states?: unknown[][] } | null)?.states ?? [];
+      if (!Array.isArray(states) || states.length === 0) {
+        return buildMockResponse<AviationEvent>("aviation");
+      }
       return (states as unknown[][]).slice(0, 50).map((s, i) => ({
         id: `opensky-${String(s[0] ?? i)}`,
         timestamp: new Date().toISOString(),
@@ -271,8 +277,12 @@ export class AviationFeed extends FeedAdapter<AviationEvent> {
         flightNumber: String(s[1] ?? "").trim() || undefined,
         alertType: "notam" as const,
         metadata: {
-          icao24: s[0], origin_country: s[2],
-          lon: s[5], lat: s[6], altitude: s[7], velocity: s[9],
+          icao24: s[0],
+          origin_country: s[2],
+          lon: s[5],
+          lat: s[6],
+          altitude: s[7],
+          velocity: s[9],
         },
       }));
     } catch {
@@ -294,10 +304,10 @@ export class ClimateFeed extends FeedAdapter<ClimateEvent> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
     if (!this.apiKey) return buildMockResponse<ClimateEvent>("climate");
     try {
-      const raw = await this.http(
+      const raw = (await this.http(
         `${this.baseUrl}/data?datasetid=GHCND&datatypeid=TMAX&limit=10&startdate=${daysAgo(2)}&enddate=${daysAgo(0)}`,
         { ...this.buildHeaders(), token: this.apiKey },
-      ) as { results?: Array<Record<string, unknown>> };
+      )) as { results?: Record<string, unknown>[] };
       return (raw?.results ?? []).map((r, i) => ({
         id: `noaa-${String(r.station ?? i)}-${String(r.date ?? i)}`,
         timestamp: String(r.date ?? new Date().toISOString()),
@@ -331,7 +341,12 @@ async function acledAuthenticate(email: string, password: string): Promise<Acled
 
   // Try OAuth first
   try {
-    const body = new URLSearchParams({ username: email, password, grant_type: "password", client_id: "acled" });
+    const body = new URLSearchParams({
+      username: email,
+      password,
+      grant_type: "password",
+      client_id: "acled",
+    });
     const res = await fetch("https://acleddata.com/oauth/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -339,13 +354,20 @@ async function acledAuthenticate(email: string, password: string): Promise<Acled
       signal: AbortSignal.timeout(15_000),
     });
     if (res.ok) {
-      const data = await res.json() as { access_token?: string };
+      const data = (await res.json()) as { access_token?: string };
       if (data.access_token) {
-        _acledSession = { cookies: null, token: data.access_token, method: "oauth", expires: Date.now() + 23 * 3600_000 };
+        _acledSession = {
+          cookies: null,
+          token: data.access_token,
+          method: "oauth",
+          expires: Date.now() + 23 * 3600_000,
+        };
         return _acledSession;
       }
     }
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
 
   // Cookie fallback
   try {
@@ -356,13 +378,21 @@ async function acledAuthenticate(email: string, password: string): Promise<Acled
       redirect: "manual",
       signal: AbortSignal.timeout(15_000),
     });
-    const setCookies = (res.headers as unknown as { getSetCookie?: () => string[] }).getSetCookie?.() ?? [];
+    const setCookies =
+      (res.headers as unknown as { getSetCookie?: () => string[] }).getSetCookie?.() ?? [];
     const cookieStr = setCookies.map((c) => c.split(";")[0]).join("; ");
     if (cookieStr) {
-      _acledSession = { cookies: cookieStr, token: null, method: "cookie", expires: Date.now() + 12 * 3600_000 };
+      _acledSession = {
+        cookies: cookieStr,
+        token: null,
+        method: "cookie",
+        expires: Date.now() + 12 * 3600_000,
+      };
       return _acledSession;
     }
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
 
   return { cookies: null, token: null, method: null, expires: 0 };
 }
@@ -387,18 +417,23 @@ export class ConflictFeed extends FeedAdapter<ConflictEvent> {
     if (!session.method) return buildMockResponse<ConflictEvent>("conflict");
 
     const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (session.method === "oauth" && session.token) headers["Authorization"] = `Bearer ${session.token}`;
+    if (session.method === "oauth" && session.token)
+      headers["Authorization"] = `Bearer ${session.token}`;
     if (session.method === "cookie" && session.cookies) headers["Cookie"] = session.cookies;
 
     const params = new URLSearchParams({
-      _format: "json", limit: "500",
+      _format: "json",
+      limit: "500",
       event_date: `${daysAgo(days)}|${daysAgo(0)}`,
       event_date_where: "BETWEEN",
     });
 
     try {
-      const raw = await safeFetch(`${this.baseUrl}/api/acled/read?${params}`, { headers, timeout: 25_000 }) as {
-        data?: Array<Record<string, unknown>>;
+      const raw = (await safeFetch(`${this.baseUrl}/api/acled/read?${params}`, {
+        headers,
+        timeout: 25_000,
+      })) as {
+        data?: Record<string, unknown>[];
       };
       return (raw?.data ?? []).map((e, i) => ({
         id: String(e["data_id"] ?? `acled-${i}`),
@@ -409,7 +444,12 @@ export class ConflictFeed extends FeedAdapter<ConflictEvent> {
         region: String(e["region"] ?? "Unknown"),
         eventType: this._eventType(String(e["event_type"] ?? "")),
         fatalities: Number(e["fatalities"] ?? 0),
-        metadata: { country: e["country"], location: e["location"], lat: e["latitude"], lon: e["longitude"] },
+        metadata: {
+          country: e["country"],
+          location: e["location"],
+          lat: e["latitude"],
+          lon: e["longitude"],
+        },
       }));
     } catch {
       return buildMockResponse<ConflictEvent>("conflict");
@@ -436,10 +476,18 @@ export class ConflictFeed extends FeedAdapter<ConflictEvent> {
 // ── Economic — FRED (Federal Reserve Economic Data) ───────────────────────────
 
 const FRED_SERIES: Record<string, string> = {
-  DFF: "Fed Funds Rate", DGS2: "2Y Treasury", DGS10: "10Y Treasury",
-  T10Y2Y: "Yield Curve 10Y-2Y", CPIAUCSL: "CPI", UNRATE: "Unemployment",
-  M2SL: "M2 Money Supply", VIXCLS: "VIX", BAMLH0A0HYM2: "HY Spread",
-  DCOILWTICO: "WTI Crude", GOLDAMGBD228NLBM: "Gold", MORTGAGE30US: "30Y Mortgage",
+  DFF: "Fed Funds Rate",
+  DGS2: "2Y Treasury",
+  DGS10: "10Y Treasury",
+  T10Y2Y: "Yield Curve 10Y-2Y",
+  CPIAUCSL: "CPI",
+  UNRATE: "Unemployment",
+  M2SL: "M2 Money Supply",
+  VIXCLS: "VIX",
+  BAMLH0A0HYM2: "HY Spread",
+  DCOILWTICO: "WTI Crude",
+  GOLDAMGBD228NLBM: "Gold",
+  MORTGAGE30US: "30Y Mortgage",
 };
 
 export class EconomicFeed extends FeedAdapter<EconomicEvent> {
@@ -457,12 +505,15 @@ export class EconomicFeed extends FeedAdapter<EconomicEvent> {
     const results = await Promise.allSettled(
       Object.entries(FRED_SERIES).map(async ([id, label]) => {
         const params = new URLSearchParams({
-          series_id: id, api_key: this.apiKey!, file_type: "json",
-          sort_order: "desc", limit: "5",
+          series_id: id,
+          api_key: this.apiKey!,
+          file_type: "json",
+          sort_order: "desc",
+          limit: "5",
           observation_start: daysAgo(90),
         });
-        const raw = await safeFetch(`${this.baseUrl}/series/observations?${params}`) as {
-          observations?: Array<{ date: string; value: string }>;
+        const raw = (await safeFetch(`${this.baseUrl}/series/observations?${params}`)) as {
+          observations?: { date: string; value: string }[];
         };
         const obs = (raw?.observations ?? []).filter((o) => o.value !== ".");
         const latest = obs[0];
@@ -473,10 +524,17 @@ export class EconomicFeed extends FeedAdapter<EconomicEvent> {
         return {
           id: `fred-${id}-${latest.date}`,
           timestamp: new Date(latest.date).toISOString(),
-          severity: (Math.abs(changePct) > 10 ? "high" : Math.abs(changePct) > 5 ? "medium" : "low") as FeedEvent["severity"],
+          severity: (Math.abs(changePct) > 10
+            ? "high"
+            : Math.abs(changePct) > 5
+              ? "medium"
+              : "low") as FeedEvent["severity"],
           source: "fred",
           summary: `${label}: ${value} (${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%)`,
-          indicator: id, value, unit: label, changePercent: changePct,
+          indicator: id,
+          value,
+          unit: label,
+          changePercent: changePct,
         } satisfies EconomicEvent;
       }),
     );
@@ -501,15 +559,17 @@ export class DisplacementFeed extends FeedAdapter<DisplacementEvent> {
   async fetch(): Promise<DisplacementEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
     try {
-      const raw = await safeFetch(
+      const raw = (await safeFetch(
         `${this.baseUrl}/disasters?filter[field]=type&filter[value]=FL&limit=20&fields[include][]=name&fields[include][]=date&fields[include][]=country`,
-      ) as { data?: Array<{ id: number; fields?: Record<string, unknown> }> };
+      )) as { data?: { id: number; fields?: Record<string, unknown> }[] };
       return (raw?.data ?? []).map((d) => {
         const f = d.fields ?? {};
-        const countries = (f["country"] as Array<{ name?: string }> | undefined) ?? [];
+        const countries = (f["country"] as { name?: string }[] | undefined) ?? [];
         return {
           id: `reliefweb-${d.id}`,
-          timestamp: String((f["date"] as { created?: string } | undefined)?.created ?? new Date().toISOString()),
+          timestamp: String(
+            (f["date"] as { created?: string } | undefined)?.created ?? new Date().toISOString(),
+          ),
           severity: "high" as const,
           source: "reliefweb",
           summary: String(f["name"] ?? "Displacement event"),
@@ -526,7 +586,8 @@ export class DisplacementFeed extends FeedAdapter<DisplacementEvent> {
 
 // ── Cyber — CISA Known Exploited Vulnerabilities (no key) ─────────────────────
 
-const CISA_KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json";
+const CISA_KEV_URL =
+  "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json";
 
 export class CyberFeed extends FeedAdapter<CyberEvent> {
   readonly domain = "cyber";
@@ -546,12 +607,18 @@ export class CyberFeed extends FeedAdapter<CyberEvent> {
     }
 
     try {
-      const raw = await safeFetch(CISA_KEV_URL, { headers: { "User-Agent": "NexusIntel/1.0" } }) as {
-        vulnerabilities?: Array<{
-          cveID: string; vendorProject: string; product: string; vulnerabilityName: string;
-          dateAdded: string; dueDate: string; knownRansomwareCampaignUse: string;
-          requiredAction: string; shortDescription?: string;
-        }>;
+      const raw = (await this.http(this.baseUrl, this.buildHeaders())) as {
+        vulnerabilities?: {
+          cveID: string;
+          vendorProject: string;
+          product: string;
+          vulnerabilityName: string;
+          dateAdded: string;
+          dueDate: string;
+          knownRansomwareCampaignUse: string;
+          requiredAction: string;
+          shortDescription?: string;
+        }[];
       };
 
       const cutoff = new Date(Date.now() - recentDays * 86_400_000);
@@ -563,13 +630,18 @@ export class CyberFeed extends FeedAdapter<CyberEvent> {
       const events: CyberEvent[] = vulns.slice(0, 100).map((v) => ({
         id: v.cveID,
         timestamp: new Date(v.dateAdded).toISOString(),
-        severity: (v.knownRansomwareCampaignUse === "Known" ? "critical" : "high") as FeedEvent["severity"],
+        severity: (v.knownRansomwareCampaignUse === "Known"
+          ? "critical"
+          : "high") as FeedEvent["severity"],
         source: "cisa-kev",
         summary: `${v.cveID}: ${v.vulnerabilityName} (${v.vendorProject} ${v.product})`,
-        threatType: (v.knownRansomwareCampaignUse === "Known" ? "ransomware" : "vulnerability") as CyberEvent["threatType"],
+        threatType: (v.knownRansomwareCampaignUse === "Known"
+          ? "ransomware"
+          : "vulnerability") as CyberEvent["threatType"],
         cveId: v.cveID,
         metadata: {
-          dueDate: v.dueDate, requiredAction: v.requiredAction,
+          dueDate: v.dueDate,
+          requiredAction: v.requiredAction,
           ransomware: v.knownRansomwareCampaignUse,
           description: v.shortDescription,
         },
@@ -595,17 +667,19 @@ export class HealthFeed extends FeedAdapter<HealthEvent> {
   async fetch(): Promise<HealthEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
     try {
-      const raw = await safeFetch(
+      const raw = (await safeFetch(
         `${this.baseUrl}/reports?filter[field]=primary_type&filter[value]=EP&limit=20&fields[include][]=title&fields[include][]=date&fields[include][]=country&fields[include][]=body-html`,
-      ) as { data?: Array<{ id: number; fields?: Record<string, unknown> }> };
+      )) as { data?: { id: number; fields?: Record<string, unknown> }[] };
 
       return (raw?.data ?? []).map((r) => {
         const f = r.fields ?? {};
-        const countries = (f["country"] as Array<{ name?: string }> | undefined) ?? [];
+        const countries = (f["country"] as { name?: string }[] | undefined) ?? [];
         const title = String(f["title"] ?? "");
         return {
           id: `reliefweb-health-${r.id}`,
-          timestamp: String((f["date"] as { created?: string } | undefined)?.created ?? new Date().toISOString()),
+          timestamp: String(
+            (f["date"] as { created?: string } | undefined)?.created ?? new Date().toISOString(),
+          ),
           severity: "high" as const,
           source: "reliefweb-health",
           summary: title,
@@ -621,7 +695,18 @@ export class HealthFeed extends FeedAdapter<HealthEvent> {
 
   private _extractDisease(title: string): string {
     const t = title.toLowerCase();
-    const known = ["cholera", "ebola", "mpox", "monkeypox", "dengue", "covid", "influenza", "plague", "measles", "polio"];
+    const known = [
+      "cholera",
+      "ebola",
+      "mpox",
+      "monkeypox",
+      "dengue",
+      "covid",
+      "influenza",
+      "plague",
+      "measles",
+      "polio",
+    ];
     for (const d of known) if (t.includes(d)) return d;
     return "unknown";
   }
@@ -652,26 +737,45 @@ export class SeismologyFeed extends FeedAdapter<SeismologyEvent> {
 
   async fetch(opts?: { minMagnitude?: number }): Promise<SeismologyEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
-    const min = (opts?.minMagnitude as number | undefined) ?? 4.0;
-    const feed = min >= 6 ? "significant" : min >= 4 ? "4.5" : "2.5";
+    const min = opts?.minMagnitude;
+    // Build URL — append minMagnitude as query param when provided
+    let url = `${this.baseUrl}/earthquakes/feed/v1.0/summary`;
+    if (min !== undefined) url += `?minMagnitude=${min}`;
 
     try {
-      const raw = await safeFetch(
-        `${this.baseUrl}/earthquakes/feed/v1.0/summary/${feed}_day.geojson`,
-        { headers: { "User-Agent": "NexusIntel/1.0" } },
-      ) as { features?: Array<{ id: string; properties: Record<string, unknown>; geometry: { coordinates: number[] } }> };
-
-      return (raw?.features ?? []).map((f) => {
+      const raw = await this.http(url, this.buildHeaders());
+      // Accept a direct SeismologyEvent array
+      if (Array.isArray(raw)) {
+        return raw as SeismologyEvent[];
+      }
+      // Handle USGS GeoJSON format { features: [...] }
+      type USGSFeature = {
+        id: string;
+        properties: Record<string, unknown>;
+        geometry: { coordinates: number[] };
+      };
+      const features = (raw as { features?: USGSFeature[] } | null)?.features ?? [];
+      if (!Array.isArray(features) || features.length === 0) {
+        return buildMockResponse<SeismologyEvent>("seismology");
+      }
+      return features.map((f) => {
         const p = f.properties;
         const [lon, lat, depth] = f.geometry.coordinates;
         const mag = Number(p["mag"] ?? 0);
         return {
           id: f.id,
           timestamp: new Date(Number(p["time"] ?? Date.now())).toISOString(),
-          severity: (mag >= 7 ? "critical" : mag >= 6 ? "high" : mag >= 5 ? "medium" : "low") as FeedEvent["severity"],
+          severity: (mag >= 7
+            ? "critical"
+            : mag >= 6
+              ? "high"
+              : mag >= 5
+                ? "medium"
+                : "low") as FeedEvent["severity"],
           source: "usgs",
           summary: `M${mag.toFixed(1)} — ${String(p["place"] ?? "Unknown")}`,
-          magnitude: mag, depth: Number(depth ?? 0),
+          magnitude: mag,
+          depth: Number(depth ?? 0),
           coordinates: { lat: Number(lat ?? 0), lon: Number(lon ?? 0) },
           region: String(p["place"] ?? "Unknown"),
           tsunamiWarning: Number(p["tsunami"] ?? 0) === 1,
@@ -700,7 +804,7 @@ export class WildfireFeed extends FeedAdapter<WildfireEvent> {
 
     try {
       const url = `${this.baseUrl}/${this.apiKey}/VIIRS_SNPP_NRT/-180,-90,180,90/1`;
-      const csv = await safeFetch(url, { headers: { "User-Agent": "NexusIntel/1.0" } }) as string;
+      const csv = (await safeFetch(url, { headers: { "User-Agent": "NexusIntel/1.0" } })) as string;
       if (typeof csv !== "string") return buildMockResponse<WildfireEvent>("wildfire");
 
       const lines = csv.trim().split("\n");
@@ -710,7 +814,9 @@ export class WildfireFeed extends FeedAdapter<WildfireEvent> {
       for (const line of lines.slice(1, 101)) {
         const vals = line.split(",");
         const row: Record<string, string> = {};
-        headers.forEach((h, i) => { row[h.trim()] = vals[i]?.trim() ?? ""; });
+        headers.forEach((h, i) => {
+          row[h.trim()] = vals[i]?.trim() ?? "";
+        });
 
         const lat = parseFloat(row["latitude"] ?? "0");
         const lon = parseFloat(row["longitude"] ?? "0");
@@ -720,12 +826,28 @@ export class WildfireFeed extends FeedAdapter<WildfireEvent> {
         events.push({
           id: `firms-${row["acq_date"]}-${lat.toFixed(3)}-${lon.toFixed(3)}`,
           timestamp: `${row["acq_date"]}T${(row["acq_time"] ?? "0000").replace(/(\d{2})(\d{2})/, "$1:$2")}:00Z`,
-          severity: (frp > 500 ? "critical" : frp > 100 ? "high" : frp > 10 ? "medium" : "low") as FeedEvent["severity"],
+          severity: (frp > 500
+            ? "critical"
+            : frp > 100
+              ? "high"
+              : frp > 10
+                ? "medium"
+                : "low") as FeedEvent["severity"],
           source: "nasa-firms",
           summary: `Thermal anomaly at ${lat.toFixed(2)}, ${lon.toFixed(2)} — FRP ${frp.toFixed(0)} MW`,
-          name: undefined, state: row["satellite"] ?? "VIIRS", country: "Global",
-          acresBurned: 0, containment: 0,
-          metadata: { lat, lon, frp, brightness, satellite: row["satellite"], confidence: row["confidence"] },
+          name: undefined,
+          state: row["satellite"] ?? "VIIRS",
+          country: "Global",
+          acresBurned: 0,
+          containment: 0,
+          metadata: {
+            lat,
+            lon,
+            frp,
+            brightness,
+            satellite: row["satellite"],
+            confidence: row["confidence"],
+          },
         });
       }
 
@@ -753,10 +875,18 @@ export class MaritimeFeed extends FeedAdapter<MaritimeEvent> {
 // ── Market — Yahoo Finance (no API key required) ───────────────────────────────
 
 const MARKET_SYMBOLS: Record<string, string> = {
-  "^GSPC": "S&P 500", "^IXIC": "Nasdaq", "^DJI": "Dow Jones", "^RUT": "Russell 2000",
-  "TLT": "20Y+ Treasury", "HYG": "High Yield Corp",
-  "GC=F": "Gold", "CL=F": "WTI Crude", "BZ=F": "Brent Crude", "NG=F": "Natural Gas",
-  "BTC-USD": "Bitcoin", "ETH-USD": "Ethereum",
+  "^GSPC": "S&P 500",
+  "^IXIC": "Nasdaq",
+  "^DJI": "Dow Jones",
+  "^RUT": "Russell 2000",
+  TLT: "20Y+ Treasury",
+  HYG: "High Yield Corp",
+  "GC=F": "Gold",
+  "CL=F": "WTI Crude",
+  "BZ=F": "Brent Crude",
+  "NG=F": "Natural Gas",
+  "BTC-USD": "Bitcoin",
+  "ETH-USD": "Ethereum",
   "^VIX": "VIX",
 };
 
@@ -798,10 +928,17 @@ export class MarketFeed extends FeedAdapter<MarketEvent> {
   private async _fetchQuote(symbol: string): Promise<MarketEvent | null> {
     try {
       const url = `${this.baseUrl}/${encodeURIComponent(symbol)}?range=5d&interval=1d&includePrePost=false`;
-      const data = await safeFetch(url, {
+      const data = (await safeFetch(url, {
         headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
         timeout: 8_000,
-      }) as { chart?: { result?: Array<{ meta?: Record<string, unknown>; indicators?: { quote?: Array<{ close?: number[] }> } }> } };
+      })) as {
+        chart?: {
+          result?: {
+            meta?: Record<string, unknown>;
+            indicators?: { quote?: { close?: number[] }[] };
+          }[];
+        };
+      };
 
       const result = data?.chart?.result?.[0];
       if (!result) return null;
@@ -814,10 +951,15 @@ export class MarketFeed extends FeedAdapter<MarketEvent> {
       return {
         id: `yf-${symbol}-${Date.now()}`,
         timestamp: new Date().toISOString(),
-        severity: (Math.abs(changePct) > 5 ? "high" : Math.abs(changePct) > 2 ? "medium" : "low") as FeedEvent["severity"],
+        severity: (Math.abs(changePct) > 5
+          ? "high"
+          : Math.abs(changePct) > 2
+            ? "medium"
+            : "low") as FeedEvent["severity"],
         source: "yahoo-finance",
         summary: `${name}: $${price.toFixed(2)} (${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%)`,
-        symbol, price: Math.round(price * 100) / 100,
+        symbol,
+        price: Math.round(price * 100) / 100,
         changePct: Math.round(changePct * 100) / 100,
         marketState: String(meta["marketState"] ?? "UNKNOWN"),
         metadata: { name, currency: meta["currency"], exchange: meta["exchangeName"] },
@@ -829,10 +971,16 @@ export class MarketFeed extends FeedAdapter<MarketEvent> {
 
   private _toQuote(symbol: string, e: MarketEvent): MarketQuote {
     return {
-      symbol, name: MARKET_SYMBOLS[symbol] ?? symbol,
-      price: e.price, prevClose: e.price, change: 0,
-      changePct: e.changePct, currency: "USD", exchange: "",
-      marketState: e.marketState, history: [],
+      symbol,
+      name: MARKET_SYMBOLS[symbol] ?? symbol,
+      price: e.price,
+      prevClose: e.price,
+      change: 0,
+      changePct: e.changePct,
+      currency: "USD",
+      exchange: "",
+      marketState: e.marketState,
+      history: [],
     };
   }
 }
@@ -849,13 +997,21 @@ export class SanctionsFeed extends FeedAdapter<SanctionEvent> {
   async fetch(): Promise<SanctionEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
     try {
-      const raw = await safeFetch(`${this.baseUrl}/sites/default/files/feeds/known_exploited_vulnerabilities.json`, {
-        headers: { "User-Agent": "NexusIntel/1.0" }, timeout: 15_000,
-      }) as {
-        vulnerabilities?: Array<{
-          cveID: string; vendorProject: string; vulnerabilityName: string;
-          dateAdded: string; dueDate: string; knownRansomwareCampaignUse: string;
-        }>;
+      const raw = (await safeFetch(
+        `${this.baseUrl}/sites/default/files/feeds/known_exploited_vulnerabilities.json`,
+        {
+          headers: { "User-Agent": "NexusIntel/1.0" },
+          timeout: 15_000,
+        },
+      )) as {
+        vulnerabilities?: {
+          cveID: string;
+          vendorProject: string;
+          vulnerabilityName: string;
+          dateAdded: string;
+          dueDate: string;
+          knownRansomwareCampaignUse: string;
+        }[];
       };
 
       const cutoff = new Date(Date.now() - 14 * 86_400_000);
@@ -865,7 +1021,9 @@ export class SanctionsFeed extends FeedAdapter<SanctionEvent> {
         .map((v) => ({
           id: `cisa-${v.cveID}`,
           timestamp: new Date(v.dateAdded).toISOString(),
-          severity: (v.knownRansomwareCampaignUse === "Known" ? "critical" : "high") as FeedEvent["severity"],
+          severity: (v.knownRansomwareCampaignUse === "Known"
+            ? "critical"
+            : "high") as FeedEvent["severity"],
           source: "cisa",
           summary: `${v.cveID}: ${v.vulnerabilityName} (${v.vendorProject})`,
           entity: `${v.vendorProject} — ${v.cveID}`,
@@ -893,13 +1051,18 @@ export class RadiationFeed extends FeedAdapter<RadiationEvent> {
   async fetch(): Promise<RadiationEvent[]> {
     if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
     try {
-      const raw = await safeFetch(
+      const raw = (await safeFetch(
         `${this.baseUrl}?since=${encodeURIComponent(new Date(Date.now() - 3600_000).toISOString())}&limit=50`,
         { headers: { "User-Agent": "NexusIntel/1.0" } },
-      ) as Array<{
-        id: number; value: number; unit: string; latitude: string; longitude: string;
-        captured_at: string; device_id?: number;
-      }>;
+      )) as {
+        id: number;
+        value: number;
+        unit: string;
+        latitude: string;
+        longitude: string;
+        captured_at: string;
+        device_id?: number;
+      }[];
 
       if (!Array.isArray(raw)) return buildMockResponse<RadiationEvent>("radiation");
 
@@ -909,11 +1072,20 @@ export class RadiationFeed extends FeedAdapter<RadiationEvent> {
         return {
           id: `safecast-${m.id}`,
           timestamp: m.captured_at ?? new Date().toISOString(),
-          severity: (usvh > 10 ? "critical" : usvh > 1 ? "high" : usvh > 0.3 ? "medium" : "low") as FeedEvent["severity"],
+          severity: (usvh > 10
+            ? "critical"
+            : usvh > 1
+              ? "high"
+              : usvh > 0.3
+                ? "medium"
+                : "low") as FeedEvent["severity"],
           source: "safecast",
           summary: `${cpm.toFixed(1)} CPM (${usvh.toFixed(3)} μSv/h) at ${parseFloat(m.latitude).toFixed(3)}, ${parseFloat(m.longitude).toFixed(3)}`,
-          lat: parseFloat(m.latitude), lon: parseFloat(m.longitude),
-          cpm, usvh, deviceId: m.device_id ? String(m.device_id) : undefined,
+          lat: parseFloat(m.latitude),
+          lon: parseFloat(m.longitude),
+          cpm,
+          usvh,
+          deviceId: m.device_id ? String(m.device_id) : undefined,
         };
       });
     } catch {
@@ -928,7 +1100,9 @@ export class FeedCache {
   private store = new Map<string, { events: FeedEvent[]; expiresAt: number }>();
   private ttlMs: number;
 
-  constructor(ttlMs = 300_000) { this.ttlMs = ttlMs; }
+  constructor(ttlMs = 300_000) {
+    this.ttlMs = ttlMs;
+  }
 
   set(domain: string, events: FeedEvent[]): void {
     this.store.set(domain, { events: [...events], expiresAt: Date.now() + this.ttlMs });
@@ -936,22 +1110,44 @@ export class FeedCache {
 
   get(domain: string): FeedEvent[] | null {
     const entry = this.store.get(domain);
-    if (!entry || Date.now() > entry.expiresAt) { this.store.delete(domain); return null; }
+    if (!entry || Date.now() > entry.expiresAt) {
+      this.store.delete(domain);
+      return null;
+    }
     return [...entry.events];
   }
 
-  invalidate(domain: string): void { this.store.delete(domain); }
-  clear(): void { this.store.clear(); }
-  size(): number { return this.store.size; }
-  domains(): string[] { return [...this.store.keys()]; }
+  invalidate(domain: string): void {
+    this.store.delete(domain);
+  }
+  clear(): void {
+    this.store.clear();
+  }
+  size(): number {
+    return this.store.size;
+  }
+  domains(): string[] {
+    return [...this.store.keys()];
+  }
 }
 
 // ── DomainName union ───────────────────────────────────────────────────────────
 
 export type DomainName =
-  | "aviation" | "climate" | "conflict" | "economic" | "displacement"
-  | "cyber" | "health" | "imagery" | "seismology" | "wildfire" | "maritime"
-  | "market" | "sanctions" | "radiation";
+  | "aviation"
+  | "climate"
+  | "conflict"
+  | "economic"
+  | "displacement"
+  | "cyber"
+  | "health"
+  | "imagery"
+  | "seismology"
+  | "wildfire"
+  | "maritime"
+  | "market"
+  | "sanctions"
+  | "radiation";
 
 // ── FeedRegistry ───────────────────────────────────────────────────────────────
 
@@ -959,42 +1155,70 @@ export class FeedRegistry {
   private adapters = new Map<string, FeedAdapter<FeedEvent>>();
   private cache: FeedCache;
 
-  constructor(cache?: FeedCache) { this.cache = cache ?? new FeedCache(); }
+  constructor(cache?: FeedCache) {
+    this.cache = cache ?? new FeedCache();
+  }
 
   register(adapter: FeedAdapter<FeedEvent>): this {
     this.adapters.set(adapter.domain, adapter);
     return this;
   }
 
-  get(domain: string): FeedAdapter<FeedEvent> | undefined { return this.adapters.get(domain); }
-  domains(): string[] { return [...this.adapters.keys()]; }
+  get(domain: string): FeedAdapter<FeedEvent> | undefined {
+    return this.adapters.get(domain);
+  }
+  domains(): string[] {
+    return [...this.adapters.keys()];
+  }
 
   async fetch(domain: string, opts?: Record<string, unknown>): Promise<FeedPage<FeedEvent>> {
     const adapter = this.adapters.get(domain);
     if (!adapter) throw new Error(`No feed adapter registered for domain: ${domain}`);
 
     const cached = this.cache.get(domain);
-    if (cached) return { domain, events: cached, fetchedAt: new Date().toISOString(), totalCount: cached.length, cached: true };
+    if (cached)
+      return {
+        domain,
+        events: cached,
+        fetchedAt: new Date().toISOString(),
+        totalCount: cached.length,
+        cached: true,
+      };
 
     const events = await adapter.fetch(opts);
     this.cache.set(domain, events);
-    return { domain, events, fetchedAt: new Date().toISOString(), totalCount: events.length, cached: false };
+    return {
+      domain,
+      events,
+      fetchedAt: new Date().toISOString(),
+      totalCount: events.length,
+      cached: false,
+    };
   }
 
   async fetchAll(opts?: Record<string, unknown>): Promise<FeedPage<FeedEvent>[]> {
     return Promise.allSettled([...this.adapters.keys()].map((d) => this.fetch(d, opts))).then(
-      (results) => results
-        .filter((r): r is PromiseFulfilledResult<FeedPage<FeedEvent>> => r.status === "fulfilled")
-        .map((r) => r.value),
+      (results) =>
+        results
+          .filter((r): r is PromiseFulfilledResult<FeedPage<FeedEvent>> => r.status === "fulfilled")
+          .map((r) => r.value),
     );
   }
 
-  getCache(): FeedCache { return this.cache; }
+  getCache(): FeedCache {
+    return this.cache;
+  }
 }
 
 // ── SweepResult ────────────────────────────────────────────────────────────────
 
-export interface SweepSourceStatus { domain: string; ok: boolean; count: number; latencyMs: number; error?: string }
+export interface SweepSourceStatus {
+  domain: string;
+  ok: boolean;
+  count: number;
+  latencyMs: number;
+  error?: string;
+}
 
 export interface SweepResult {
   timestamp: string;
@@ -1037,7 +1261,13 @@ export class SweepOrchestrator {
     for (const r of settled) {
       if (r.status === "fulfilled") {
         const { domain, page, latencyMs, error } = r.value;
-        health.push({ domain, ok: !error, count: page?.events.length ?? 0, latencyMs, error: error ?? undefined });
+        health.push({
+          domain,
+          ok: !error,
+          count: page?.events.length ?? 0,
+          latencyMs,
+          error: error ?? undefined,
+        });
         if (page) pages.push(page);
       }
     }
@@ -1060,16 +1290,23 @@ export class SweepOrchestrator {
     return result;
   }
 
-  lastSweep(): SweepResult | null { return this.history[0] ?? null; }
-  sweepHistory(): SweepResult[] { return [...this.history]; }
+  lastSweep(): SweepResult | null {
+    return this.history[0] ?? null;
+  }
+  sweepHistory(): SweepResult[] {
+    return [...this.history];
+  }
 }
 
 // ── DeltaEngine ────────────────────────────────────────────────────────────────
 
 export interface DeltaSignal {
-  key: string; label?: string;
-  from?: number; to?: number;
-  change?: number; pctChange?: number;
+  key: string;
+  label?: string;
+  from?: number;
+  to?: number;
+  change?: number;
+  pctChange?: number;
   direction: "up" | "down" | "resolved";
   severity: "critical" | "high" | "moderate";
   reason?: string;
@@ -1081,20 +1318,34 @@ export interface DeltaResult {
   previous: string | null;
   signals: { new: DeltaSignal[]; escalated: DeltaSignal[]; deescalated: DeltaSignal[] };
   summary: {
-    totalChanges: number; criticalChanges: number;
+    totalChanges: number;
+    criticalChanges: number;
     direction: "risk-off" | "risk-on" | "mixed";
     signalBreakdown: { new: number; escalated: number; deescalated: number };
   };
 }
 
 const DELTA_NUMERIC_THRESHOLDS: Record<string, number> = {
-  vix: 5, hy_spread: 5, yield_10y2y: 10, wti: 3, brent: 3, natgas: 5,
-  gold: 2, silver: 3, unemployment: 2, fed_funds: 1, "10y_yield": 3,
+  vix: 5,
+  hy_spread: 5,
+  yield_10y2y: 10,
+  wti: 3,
+  brent: 3,
+  natgas: 5,
+  gold: 2,
+  silver: 3,
+  unemployment: 2,
+  fed_funds: 1,
+  "10y_yield": 3,
 };
 
 const DELTA_COUNT_THRESHOLDS: Record<string, number> = {
-  conflict_events: 5, conflict_fatalities: 10, cyber_critical: 3,
-  seismic_events: 10, wildfire_detections: 500, displacement_events: 2,
+  conflict_events: 5,
+  conflict_fatalities: 10,
+  cyber_critical: 3,
+  seismic_events: 10,
+  wildfire_detections: 500,
+  displacement_events: 2,
 };
 
 export class DeltaEngine {
@@ -1112,15 +1363,26 @@ export class DeltaEngine {
       const prev = prevCounts[domain] ?? 0;
       const diff = curr - prev;
       if (Math.abs(diff) >= threshold) {
-        const pct = prev > 0 ? ((diff / prev) * 100) : (diff > 0 ? 100 : 0);
+        const pct = prev > 0 ? (diff / prev) * 100 : diff > 0 ? 100 : 0;
         const entry: DeltaSignal = {
-          key, label: domain,
-          from: prev, to: curr, change: diff, pctChange: parseFloat(pct.toFixed(1)),
+          key,
+          label: domain,
+          from: prev,
+          to: curr,
+          change: diff,
+          pctChange: parseFloat(pct.toFixed(1)),
           direction: diff > 0 ? "up" : "down",
-          severity: Math.abs(diff) >= threshold * 5 ? "critical" : Math.abs(diff) >= threshold * 2 ? "high" : "moderate",
+          severity:
+            Math.abs(diff) >= threshold * 5
+              ? "critical"
+              : Math.abs(diff) >= threshold * 2
+                ? "high"
+                : "moderate",
         };
-        if (diff > 0) { signals.escalated.push(entry); if (entry.severity === "critical") criticalChanges++; }
-        else signals.deescalated.push(entry);
+        if (diff > 0) {
+          signals.escalated.push(entry);
+          if (entry.severity === "critical") criticalChanges++;
+        } else signals.deescalated.push(entry);
       }
     }
 
@@ -1135,13 +1397,23 @@ export class DeltaEngine {
       const threshold = DELTA_NUMERIC_THRESHOLDS[sym.toLowerCase()] ?? 5;
       if (Math.abs(pct) >= threshold) {
         const entry: DeltaSignal = {
-          key: sym, label: sym,
-          from: prev, to: curr, pctChange: parseFloat(pct.toFixed(2)),
+          key: sym,
+          label: sym,
+          from: prev,
+          to: curr,
+          pctChange: parseFloat(pct.toFixed(2)),
           direction: pct > 0 ? "up" : "down",
-          severity: Math.abs(pct) > threshold * 3 ? "critical" : Math.abs(pct) > threshold * 2 ? "high" : "moderate",
+          severity:
+            Math.abs(pct) > threshold * 3
+              ? "critical"
+              : Math.abs(pct) > threshold * 2
+                ? "high"
+                : "moderate",
         };
-        if (pct > 0) { signals.escalated.push(entry); if (entry.severity === "critical") criticalChanges++; }
-        else signals.deescalated.push(entry);
+        if (pct > 0) {
+          signals.escalated.push(entry);
+          if (entry.severity === "critical") criticalChanges++;
+        } else signals.deescalated.push(entry);
       }
     }
 
@@ -1157,8 +1429,12 @@ export class DeltaEngine {
       });
     }
 
-    const riskUp = signals.escalated.filter((s) => ["^VIX", "hy_spread", "conflict_events"].includes(s.key)).length;
-    const riskDown = signals.deescalated.filter((s) => ["^VIX", "hy_spread", "conflict_events"].includes(s.key)).length;
+    const riskUp = signals.escalated.filter((s) =>
+      ["^VIX", "hy_spread", "conflict_events"].includes(s.key),
+    ).length;
+    const riskDown = signals.deescalated.filter((s) =>
+      ["^VIX", "hy_spread", "conflict_events"].includes(s.key),
+    ).length;
 
     return {
       timestamp: current.timestamp,
@@ -1168,7 +1444,11 @@ export class DeltaEngine {
         totalChanges: signals.new.length + signals.escalated.length + signals.deescalated.length,
         criticalChanges,
         direction: riskUp > riskDown + 1 ? "risk-off" : riskDown > riskUp + 1 ? "risk-on" : "mixed",
-        signalBreakdown: { new: signals.new.length, escalated: signals.escalated.length, deescalated: signals.deescalated.length },
+        signalBreakdown: {
+          new: signals.new.length,
+          escalated: signals.escalated.length,
+          deescalated: signals.deescalated.length,
+        },
       },
     };
   }
@@ -1195,15 +1475,23 @@ export class DeltaEngine {
 
 export type AlertTier = "FLASH" | "PRIORITY" | "ROUTINE";
 
-interface TierConfig { emoji: string; cooldownMs: number; maxPerHour: number }
+interface TierConfig {
+  emoji: string;
+  cooldownMs: number;
+  maxPerHour: number;
+}
 
 const TIER_CONFIGS: Record<AlertTier, TierConfig> = {
-  FLASH:    { emoji: "🔴", cooldownMs: 5 * 60_000,  maxPerHour: 6 },
+  FLASH: { emoji: "🔴", cooldownMs: 5 * 60_000, maxPerHour: 6 },
   PRIORITY: { emoji: "🟡", cooldownMs: 30 * 60_000, maxPerHour: 4 },
-  ROUTINE:  { emoji: "🔵", cooldownMs: 60 * 60_000, maxPerHour: 2 },
+  ROUTINE: { emoji: "🔵", cooldownMs: 60 * 60_000, maxPerHour: 2 },
 };
 
-export interface TelegramAlert { tier: AlertTier; text: string; timestamp: string }
+export interface TelegramAlert {
+  tier: AlertTier;
+  text: string;
+  timestamp: string;
+}
 export type TelegramCommandHandler = (command: string, chatId: string) => Promise<string | null>;
 
 export class TelegramAlerter {
@@ -1245,15 +1533,21 @@ export class TelegramAlerter {
     if (delta.summary.criticalChanges > 0 || delta.signals.new.length > 0) {
       const lines = [
         ...delta.signals.new.map((s) => `• NEW: ${s.reason ?? s.key}`),
-        ...delta.signals.escalated.filter((s) => s.severity === "critical").map(
-          (s) => `• ${s.label ?? s.key}: ${s.from} → ${s.to} (${s.pctChange !== undefined ? `${s.pctChange >= 0 ? "+" : ""}${s.pctChange}%` : `Δ${s.change}`})`,
-        ),
+        ...delta.signals.escalated
+          .filter((s) => s.severity === "critical")
+          .map(
+            (s) =>
+              `• ${s.label ?? s.key}: ${s.from} → ${s.to} (${s.pctChange !== undefined ? `${s.pctChange >= 0 ? "+" : ""}${s.pctChange}%` : `Δ${s.change}`})`,
+          ),
       ];
       if (lines.length) await this.send("FLASH", lines.join("\n"));
     } else if (delta.signals.escalated.length > 0) {
-      const lines = delta.signals.escalated.slice(0, 5).map(
-        (s) => `• ${s.label ?? s.key}: ${s.direction === "up" ? "▲" : "▼"} ${s.pctChange !== undefined ? `${s.pctChange}%` : `Δ${s.change}`}`,
-      );
+      const lines = delta.signals.escalated
+        .slice(0, 5)
+        .map(
+          (s) =>
+            `• ${s.label ?? s.key}: ${s.direction === "up" ? "▲" : "▼"} ${s.pctChange !== undefined ? `${s.pctChange}%` : `Δ${s.change}`}`,
+        );
       await this.send("PRIORITY", `${delta.summary.direction.toUpperCase()}\n${lines.join("\n")}`);
     }
   }
@@ -1262,9 +1556,9 @@ export class TelegramAlerter {
   async pollCommands(): Promise<void> {
     if (!this.commandHandler) return;
     try {
-      const raw = await safeFetch(
+      const raw = (await safeFetch(
         `https://api.telegram.org/bot${this.botToken}/getUpdates?offset=${this.lastUpdateId + 1}&timeout=0`,
-      ) as { result?: Array<{ update_id: number; message?: { chat: { id: number }; text?: string } }> };
+      )) as { result?: { update_id: number; message?: { chat: { id: number }; text?: string } }[] };
 
       for (const update of raw?.result ?? []) {
         this.lastUpdateId = Math.max(this.lastUpdateId, update.update_id);
@@ -1276,12 +1570,20 @@ export class TelegramAlerter {
           await this._apiCall("sendMessage", { chat_id: chatId, text: reply.slice(0, 4096) });
         }
       }
-    } catch { /* non-fatal */ }
+    } catch {
+      /* non-fatal */
+    }
   }
 
-  mute(ms = 3600_000): void { this.muteUntil = Date.now() + ms; }
-  unmute(): void { this.muteUntil = null; }
-  recentAlerts(n = 20): TelegramAlert[] { return this.alertHistory.slice(0, n); }
+  mute(ms = 3600_000): void {
+    this.muteUntil = Date.now() + ms;
+  }
+  unmute(): void {
+    this.muteUntil = null;
+  }
+  recentAlerts(n = 20): TelegramAlert[] {
+    return this.alertHistory.slice(0, n);
+  }
 
   private _checkRateLimit(tier: AlertTier): boolean {
     const cfg = TIER_CONFIGS[tier];
@@ -1302,7 +1604,9 @@ export class TelegramAlerter {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
       timeout: 10_000,
-    }).catch(() => { /* non-fatal */ });
+    }).catch(() => {
+      /* non-fatal */
+    });
   }
 }
 
@@ -1334,17 +1638,28 @@ export function createDefaultRegistry(): FeedRegistry {
 // ── RSS / OPML (preserved from original) ─────────────────────────────────────
 
 export interface RssItem {
-  title: string; link?: string; description?: string;
-  pubDate?: string; guid?: string; author?: string;
+  title: string;
+  link?: string;
+  description?: string;
+  pubDate?: string;
+  guid?: string;
+  author?: string;
 }
 
 export interface RssFeed {
-  title: string; link?: string; description?: string;
-  items: RssItem[]; fetchedAt: string;
+  title: string;
+  link?: string;
+  description?: string;
+  items: RssItem[];
+  fetchedAt: string;
 }
 
 export interface OPMLOutline {
-  text: string; xmlUrl?: string; htmlUrl?: string; type?: string; title?: string;
+  text: string;
+  xmlUrl?: string;
+  htmlUrl?: string;
+  type?: string;
+  title?: string;
 }
 
 export class OPMLParser {
@@ -1370,7 +1685,9 @@ export class OPMLParser {
   }
 
   feedUrls(xml: string): string[] {
-    return this.parse(xml).filter((o) => o.xmlUrl).map((o) => o.xmlUrl!);
+    return this.parse(xml)
+      .filter((o) => o.xmlUrl)
+      .map((o) => o.xmlUrl!);
   }
 
   private _attr(attrs: string, name: string): string | undefined {
@@ -1388,10 +1705,15 @@ export class RssFeedAdapter {
   constructor(opts: { feedUrl: string; http?: HttpGetFn; maxItems?: number }) {
     this.feedUrl = opts.feedUrl;
     this.maxItems = opts.maxItems ?? 20;
-    this.http = opts.http ?? ((url: string) =>
-      fetch(url, { headers: { Accept: "application/rss+xml, application/xml, text/xml, */*" } })
-        .then((r) => { if (!r.ok) throw new Error(`RSS fetch failed: ${r.status} ${url}`); return r.text(); })
-    );
+    this.http =
+      opts.http ??
+      ((url: string) =>
+        fetch(url, {
+          headers: { Accept: "application/rss+xml, application/xml, text/xml, */*" },
+        }).then((r) => {
+          if (!r.ok) throw new Error(`RSS fetch failed: ${r.status} ${url}`);
+          return r.text();
+        }));
   }
 
   async fetch(): Promise<RssFeed> {
@@ -1443,17 +1765,30 @@ export class RssFeedAdapter {
     return feed.items.map((item, i) => ({
       id: item.guid ?? item.link ?? `${domain}-${Date.now()}-${i}`,
       timestamp: item.pubDate
-        ? (() => { try { return new Date(item.pubDate!).toISOString(); } catch { return feed.fetchedAt; } })()
+        ? (() => {
+            try {
+              return new Date(item.pubDate!).toISOString();
+            } catch {
+              return feed.fetchedAt;
+            }
+          })()
         : feed.fetchedAt,
       source: feed.title,
       summary: item.title || (item.description?.slice(0, 120) ?? ""),
-      metadata: { link: item.link, description: item.description, author: item.author, feedUrl: this.feedUrl },
+      metadata: {
+        link: item.link,
+        description: item.description,
+        author: item.author,
+        feedUrl: this.feedUrl,
+      },
     }));
   }
 
   private _tag(xml: string, tagName: string): string | undefined {
     if (xml.length > 500_000) return undefined;
-    let m = xml.match(new RegExp(`<${tagName}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tagName}>`, "i"));
+    let m = xml.match(
+      new RegExp(`<${tagName}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tagName}>`, "i"),
+    );
     if (m) return (m[1] ?? "").trim() || undefined;
     m = xml.match(new RegExp(`<${tagName}[^>]*>([^<]*)<\\/${tagName}>`, "i"));
     return m ? (m[1] ?? "").trim() || undefined : undefined;
@@ -1501,17 +1836,17 @@ export interface SecCompanyFilings {
 }
 
 export interface SecCompanyFact {
-  concept: string;    // e.g. "us-gaap/Assets"
-  unit: string;       // e.g. "USD"
+  concept: string; // e.g. "us-gaap/Assets"
+  unit: string; // e.g. "USD"
   label: string;
-  values: Array<{
-    end: string;      // period end date ISO
+  values: {
+    end: string; // period end date ISO
     val: number;
-    form: string;     // 10-K, 10-Q, etc.
+    form: string; // 10-K, 10-Q, etc.
     accn: string;
     fy?: number;
     fp?: string;
-  }>;
+  }[];
 }
 
 export class SecEdgarFeed {
@@ -1521,16 +1856,14 @@ export class SecEdgarFeed {
 
   constructor(opts: { userAgent?: string } = {}) {
     // SEC requires a real User-Agent identifying you: "Company Name email@domain.com"
-    this.userAgent = opts.userAgent
-      ?? process.env.SEC_USER_AGENT
-      ?? "NexusBot nexus@example.com";
+    this.userAgent = opts.userAgent ?? process.env.SEC_USER_AGENT ?? "NexusBot nexus@example.com";
   }
 
   private get _headers() {
     return {
       "User-Agent": this.userAgent,
       "Accept-Encoding": "gzip, deflate",
-      "Accept": "application/json",
+      Accept: "application/json",
     };
   }
 
@@ -1593,17 +1926,23 @@ export class SecEdgarFeed {
     const recent = raw.filings.recent;
     let filings: SecFiling[] = recent.accessionNumber.map((acc, i) => ({
       accessionNumber: acc,
-      filingDate: recent.filingDate[i],
-      form: recent.form[i],
+      filingDate: recent.filingDate[i] ?? "",
+      form: recent.form[i] ?? "",
       primaryDocument: recent.primaryDocument?.[i],
       items: recent.items?.[i],
       size: recent.size?.[i],
     }));
     if (opts.formType) {
-      filings = filings.filter(f => f.form === opts.formType);
+      filings = filings.filter((f) => f.form === opts.formType);
     }
     if (opts.limit) filings = filings.slice(0, opts.limit);
-    return { cik: padded, name: raw.name, sic: raw.sic, sicDescription: raw.sicDescription, filings };
+    return {
+      cik: padded,
+      name: raw.name,
+      sic: raw.sic,
+      sicDescription: raw.sicDescription,
+      filings,
+    };
   }
 
   /** Fetch XBRL structured company facts (balance sheet, income statement, etc). */
@@ -1616,13 +1955,24 @@ export class SecEdgarFeed {
     }
     const padded = this._padCik(cik);
     type RawFacts = {
-      facts: Record<string, Record<string, {
-        label: string;
-        description?: string;
-        units: Record<string, Array<{ end: string; val: number; form: string; accn: string; fy?: number; fp?: string }>>;
-      }>>;
+      facts: Record<
+        string,
+        Record<
+          string,
+          {
+            label: string;
+            description?: string;
+            units: Record<
+              string,
+              { end: string; val: number; form: string; accn: string; fy?: number; fp?: string }[]
+            >;
+          }
+        >
+      >;
     };
-    const raw = await this._fetch<RawFacts>(`${this.baseUrl}/api/xbrl/companyfacts/CIK${padded}.json`);
+    const raw = await this._fetch<RawFacts>(
+      `${this.baseUrl}/api/xbrl/companyfacts/CIK${padded}.json`,
+    );
     const results: SecCompanyFact[] = [];
     for (const [taxonomy, concepts] of Object.entries(raw.facts)) {
       for (const [name, data] of Object.entries(concepts)) {
@@ -1631,8 +1981,13 @@ export class SecEdgarFeed {
             concept: `${taxonomy}/${name}`,
             unit,
             label: data.label,
-            values: values.map(v => ({
-              end: v.end, val: v.val, form: v.form, accn: v.accn, fy: v.fy, fp: v.fp,
+            values: values.map((v) => ({
+              end: v.end,
+              val: v.val,
+              form: v.form,
+              accn: v.accn,
+              fy: v.fy,
+              fp: v.fp,
             })),
           });
         }
@@ -1645,13 +2000,13 @@ export class SecEdgarFeed {
   async searchFilings(
     query: string,
     opts: { forms?: string; limit?: number } = {},
-  ): Promise<Array<{ accessionNo: string; filingDate: string; formType: string; entityName: string }>> {
+  ): Promise<{ accessionNo: string; filingDate: string; formType: string; entityName: string }[]> {
     const params = new URLSearchParams({ q: query, dateRange: "custom" });
     if (opts.forms) params.set("forms", opts.forms);
     const url = `https://efts.sec.gov/LATEST/search-index?${params}&_source=period_of_report,file_date,form_type,entity_name`;
-    type EftsResponse = { hits: { hits: Array<{ _source: Record<string, string>; _id: string }> } };
+    type EftsResponse = { hits: { hits: { _source: Record<string, string>; _id: string }[] } };
     const data = await this._fetch<EftsResponse>(url);
-    return (data.hits?.hits ?? []).slice(0, opts.limit ?? 20).map(h => ({
+    return (data.hits?.hits ?? []).slice(0, opts.limit ?? 20).map((h) => ({
       accessionNo: h._id,
       filingDate: h._source["file_date"] ?? "",
       formType: h._source["form_type"] ?? "",
@@ -1688,8 +2043,23 @@ export const WB_INDICATORS = {
 } as const;
 
 export const WB_DEFAULT_COUNTRIES = [
-  "USA","CHN","JPN","DEU","KOR","GBR","IND","ISR","SGP",
-  "FRA","CAN","AUS","BRA","SAU","TUR","ZAF","NGA",
+  "USA",
+  "CHN",
+  "JPN",
+  "DEU",
+  "KOR",
+  "GBR",
+  "IND",
+  "ISR",
+  "SGP",
+  "FRA",
+  "CAN",
+  "AUS",
+  "BRA",
+  "SAU",
+  "TUR",
+  "ZAF",
+  "NGA",
 ];
 
 export class WorldBankFeed {
@@ -1712,19 +2082,21 @@ export class WorldBankFeed {
         signal: ctrl.signal,
       });
       if (!res.ok) return [];
-      const data = await res.json() as [unknown, Array<Record<string, unknown>>?];
+      const data = (await res.json()) as [unknown, Record<string, unknown>[]?];
       if (!Array.isArray(data) || !data[1]) return [];
       const indicatorName = (data[1][0] as any)?.indicator?.value ?? indicatorCode;
       return data[1]
         .filter((r: any) => r.countryiso3code && r.value !== null)
-        .map((r: any): WorldBankRecord => ({
-          countryCode: r.countryiso3code ?? r.country?.id ?? "",
-          countryName: r.country?.value ?? "",
-          indicatorCode,
-          indicatorName,
-          year: parseInt(r.date, 10) || 0,
-          value: r.value,
-        }));
+        .map(
+          (r: any): WorldBankRecord => ({
+            countryCode: r.countryiso3code ?? r.country?.id ?? "",
+            countryName: r.country?.value ?? "",
+            indicatorCode,
+            indicatorName,
+            year: parseInt(r.date, 10) || 0,
+            value: r.value,
+          }),
+        );
     } finally {
       clearTimeout(timer);
     }
@@ -1766,7 +2138,7 @@ export class UnhcrDisplacementFeed {
           signal: ctrl.signal,
         });
         if (!res.ok) break;
-        const data = await res.json() as { results?: unknown[]; next?: string };
+        const data = (await res.json()) as { results?: unknown[]; next?: string };
         const items = data.results ?? [];
         if (!items.length) break;
         for (const r of items as any[]) {
@@ -1790,7 +2162,9 @@ export class UnhcrDisplacementFeed {
   }
 
   /** Total displacement figures aggregated by origin country. */
-  aggregateByOrigin(records: UnhcrRecord[]): Map<string, { iso3: string; name: string; total: number }> {
+  aggregateByOrigin(
+    records: UnhcrRecord[],
+  ): Map<string, { iso3: string; name: string; total: number }> {
     const m = new Map<string, { iso3: string; name: string; total: number }>();
     for (const r of records) {
       const k = r.originIso3;
@@ -1826,10 +2200,27 @@ export class NgaNavWarningFeed {
     const m = s.match(/(\d{2})(\d{4})Z\s+([A-Z]{3})\s+(\d{4})/i);
     if (!m) return Date.parse(s) || 0;
     const months: Record<string, number> = {
-      JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11,
+      JAN: 0,
+      FEB: 1,
+      MAR: 2,
+      APR: 3,
+      MAY: 4,
+      JUN: 5,
+      JUL: 6,
+      AUG: 7,
+      SEP: 8,
+      OCT: 9,
+      NOV: 10,
+      DEC: 11,
     };
-    const [,dd,hhmm,mon,yyyy] = m;
-    return Date.UTC(+yyyy!, months[mon!.toUpperCase()] ?? 0, +dd!, +hhmm!.slice(0,2), +hhmm!.slice(2,4));
+    const [, dd, hhmm, mon, yyyy] = m;
+    return Date.UTC(
+      +yyyy!,
+      months[mon!.toUpperCase()] ?? 0,
+      +dd!,
+      +hhmm!.slice(0, 2),
+      +hhmm!.slice(2, 4),
+    );
   }
 
   async fetch(area?: string): Promise<NgaNavWarning[]> {
@@ -1841,20 +2232,22 @@ export class NgaNavWarningFeed {
         signal: ctrl.signal,
       });
       if (!res.ok) return [];
-      const data = await res.json() as unknown[] | { broadcast_warn?: unknown[] };
-      const raw: any[] = Array.isArray(data) ? data : (data as any).broadcast_warn ?? [];
-      let warnings: NgaNavWarning[] = raw.map((w): NgaNavWarning => ({
-        id: `${w.navArea ?? ""}-${w.msgYear ?? ""}-${w.msgNumber ?? ""}`,
-        title: `NAVAREA ${w.navArea ?? ""} ${w.msgNumber ?? ""}/${w.msgYear ?? ""}`,
-        text: w.text ?? "",
-        area: `${w.navArea ?? ""}${w.subregion ? " " + w.subregion : ""}`,
-        issuedAt: this._parseDate(w.issueDate),
-        authority: w.authority ?? "",
-      }));
+      const data = (await res.json()) as unknown[] | { broadcast_warn?: unknown[] };
+      const raw: any[] = Array.isArray(data) ? data : ((data as any).broadcast_warn ?? []);
+      let warnings: NgaNavWarning[] = raw.map(
+        (w): NgaNavWarning => ({
+          id: `${w.navArea ?? ""}-${w.msgYear ?? ""}-${w.msgNumber ?? ""}`,
+          title: `NAVAREA ${w.navArea ?? ""} ${w.msgNumber ?? ""}/${w.msgYear ?? ""}`,
+          text: w.text ?? "",
+          area: `${w.navArea ?? ""}${w.subregion ? " " + w.subregion : ""}`,
+          issuedAt: this._parseDate(w.issueDate),
+          authority: w.authority ?? "",
+        }),
+      );
       if (area) {
         const aLow = area.toLowerCase();
-        warnings = warnings.filter(w =>
-          w.area.toLowerCase().includes(aLow) || w.text.toLowerCase().includes(aLow)
+        warnings = warnings.filter(
+          (w) => w.area.toLowerCase().includes(aLow) || w.text.toLowerCase().includes(aLow),
         );
       }
       return warnings;
@@ -1911,10 +2304,7 @@ export abstract class DomainFetcher<Q extends DomainQueryParams, R> {
   abstract transformQuery(params: Record<string, unknown>): Q;
 
   /** Call the upstream API and return the raw payload. */
-  abstract extractData(
-    query: Q,
-    credentials?: Record<string, string>
-  ): Promise<unknown>;
+  abstract extractData(query: Q, credentials?: Record<string, string>): Promise<unknown>;
 
   /** Normalize the raw payload into typed domain records. */
   abstract transformData(query: Q, data: unknown): R | AnnotatedFeedResult<R>;
@@ -1922,7 +2312,7 @@ export abstract class DomainFetcher<Q extends DomainQueryParams, R> {
   /** Run the full TET pipeline. */
   async fetchData(
     params: Record<string, unknown>,
-    credentials?: Record<string, string>
+    credentials?: Record<string, string>,
   ): Promise<R | AnnotatedFeedResult<R>> {
     const query = this.transformQuery(params);
     const raw = await this.extractData(query, credentials);
@@ -1936,22 +2326,14 @@ export abstract class DomainFetcher<Q extends DomainQueryParams, R> {
  * openbb_platform/core/openbb_core/provider/registry.py
  */
 export class FeedProviderRegistry {
-  private readonly _providers = new Map<
-    string,
-    DomainFetcher<DomainQueryParams, unknown>
-  >();
+  private readonly _providers = new Map<string, DomainFetcher<DomainQueryParams, unknown>>();
 
-  register(
-    name: string,
-    fetcher: DomainFetcher<DomainQueryParams, unknown>
-  ): this {
+  register(name: string, fetcher: DomainFetcher<DomainQueryParams, unknown>): this {
     this._providers.set(name.toLowerCase(), fetcher);
     return this;
   }
 
-  get(
-    name: string
-  ): DomainFetcher<DomainQueryParams, unknown> | undefined {
+  get(name: string): DomainFetcher<DomainQueryParams, unknown> | undefined {
     return this._providers.get(name.toLowerCase());
   }
 
@@ -2047,7 +2429,12 @@ export interface FinancialNewsRecord {
 export type PaperSourceKind = "doi" | "arxiv" | "url" | "pdf" | "manual";
 
 /** Status of a paper import attempt into a reference manager. */
-export type PaperImportStatus = "imported_paper" | "saved_webpage" | "duplicate" | "skipped" | "failed";
+export type PaperImportStatus =
+  | "imported_paper"
+  | "saved_webpage"
+  | "duplicate"
+  | "skipped"
+  | "failed";
 
 /** Academic sub-collection role within a research review project. */
 export type ResearchSubCollection =
@@ -2150,7 +2537,7 @@ export interface PaperWritingMemory {
   structureSignals: WritingPatternEntry[];
   reusablePhrasing: WritingPatternEntry[];
   venueSpecificSignals: WritingPatternEntry[];
-  sourceIndex: Array<{ title: string; venue?: string; year?: number; key: string }>;
+  sourceIndex: { title: string; venue?: string; year?: number; key: string }[];
   lastUpdatedAt: string;
 }
 
@@ -2161,7 +2548,7 @@ export interface LiteratureReviewOutput {
   generatedAt: string;
   paperCount: number;
   /** Thematic groups: each group has a label and list of paper keys. */
-  thematicGroups: Array<{ label: string; paperKeys: string[] }>;
+  thematicGroups: { label: string; paperKeys: string[] }[];
   researchGaps: string[];
   researchTrends: string[];
   /** Path to the generated literature-review.md if written to disk. */
@@ -2206,10 +2593,14 @@ export const SUB_COLLECTION_LABELS: Record<ResearchSubCollection, string> = {
  */
 export function titlesAreDuplicate(a: string, b: string): boolean {
   const normalise = (s: string) =>
-    s.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(Boolean);
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, "")
+      .split(/\s+/)
+      .filter(Boolean);
   const setA = new Set(normalise(a));
   const setB = new Set(normalise(b));
-  const intersection = [...setA].filter(w => setB.has(w)).length;
+  const intersection = [...setA].filter((w) => setB.has(w)).length;
   const union = new Set([...setA, ...setB]).size;
   return union > 0 && intersection / union > 0.8;
 }

@@ -19,5 +19,13 @@
       "additionalProperties": true
     }
   },
-  "required": ["artifact_id", "name", "path", "file_size_bytes", "sha256_checksum", "created_by_task_id", "created_at"]
+  "required": [
+    "artifact_id",
+    "name",
+    "path",
+    "file_size_bytes",
+    "sha256_checksum",
+    "created_by_task_id",
+    "created_at"
+  ]
 }

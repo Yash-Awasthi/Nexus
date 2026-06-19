@@ -17,56 +17,60 @@
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export type ImageFormat = "jpeg" | "png" | "webp" | "avif" | "gif" | "tiff";
-export type FitMode    = "cover" | "contain" | "fill" | "inside" | "outside";
+export type FitMode = "cover" | "contain" | "fill" | "inside" | "outside";
 
 export interface ResizeOptions {
-  width?:   number;
-  height?:  number;
-  fit?:     FitMode;
+  width?: number;
+  height?: number;
+  fit?: FitMode;
   /** Background colour for `contain` / `fill` — CSS hex or rgba string. Default: "#ffffff" */
   background?: string;
 }
 
 export interface CropOptions {
-  left:   number;
-  top:    number;
-  width:  number;
+  left: number;
+  top: number;
+  width: number;
   height: number;
 }
 
 export interface ConvertOptions {
-  format:  ImageFormat;
+  format: ImageFormat;
   quality?: number; // 1–100; default 85
 }
 
 export interface WatermarkOptions {
-  text:         string;
+  text: string;
   /** CSS colour string. Default: "rgba(255,255,255,0.5)" */
-  colour?:      string;
+  colour?: string;
   /** Font size in px. Default: 36 */
-  fontSize?:    number;
+  fontSize?: number;
   /** Gravity: "northwest" | "north" | "northeast" | "southeast" | etc. Default: "southeast" */
-  gravity?:     string;
+  gravity?: string;
 }
 
 export interface TransformResult {
-  buffer:    Buffer;
-  format:    ImageFormat;
-  width:     number | null;
-  height:    number | null;
-  byteSize:  number;
+  buffer: Buffer;
+  format: ImageFormat;
+  width: number | null;
+  height: number | null;
+  byteSize: number;
   /** True when sharp was unavailable and input was returned unchanged */
   passthrough: boolean;
 }
 
 // ── Sharp availability check ───────────────────────────────────────────────────
 
-let _sharpModule: typeof import("sharp") | null | undefined = undefined; // undefined = not yet checked
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _sharpModule: any = undefined; // undefined = not yet checked; null = not available
 
-async function getSharp(): Promise<typeof import("sharp") | null> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getSharp(): Promise<any> {
   if (_sharpModule !== undefined) return _sharpModule;
   try {
-    _sharpModule = (await import("sharp")).default as unknown as typeof import("sharp");
+    // Dynamic import so tsc doesn't require @types/sharp to be installed.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    _sharpModule = ((await import("sharp")) as any).default;
     return _sharpModule;
   } catch {
     _sharpModule = null;
@@ -75,7 +79,14 @@ async function getSharp(): Promise<typeof import("sharp") | null> {
 }
 
 function passthrough(input: Buffer, format: ImageFormat = "jpeg"): TransformResult {
-  return { buffer: input, format, width: null, height: null, byteSize: input.byteLength, passthrough: true };
+  return {
+    buffer: input,
+    format,
+    width: null,
+    height: null,
+    byteSize: input.byteLength,
+    passthrough: true,
+  };
 }
 
 // ── ImageTransformer ──────────────────────────────────────────────────────────
@@ -90,20 +101,20 @@ export class ImageTransformer {
     if (!sharp) return passthrough(input, format ?? "jpeg");
 
     let pipeline = sharp(input).resize({
-      width:      opts.width,
-      height:     opts.height,
-      fit:        opts.fit ?? "cover",
+      width: opts.width,
+      height: opts.height,
+      fit: opts.fit ?? "cover",
       background: opts.background ?? "#ffffff",
     });
     if (format) pipeline = applyFormat(pipeline, format);
 
     const { data, info } = await pipeline.toBuffer({ resolveWithObject: true });
     return {
-      buffer:    data,
-      format:    info.format as ImageFormat ?? format ?? "jpeg",
-      width:     info.width,
-      height:    info.height,
-      byteSize:  info.size,
+      buffer: data,
+      format: (info.format as ImageFormat) ?? format ?? "jpeg",
+      width: info.width,
+      height: info.height,
+      byteSize: info.size,
       passthrough: false,
     };
   }
@@ -114,9 +125,9 @@ export class ImageTransformer {
     if (!sharp) return passthrough(input, format);
 
     let pipeline = sharp(input).extract({
-      left:   opts.left,
-      top:    opts.top,
-      width:  opts.width,
+      left: opts.left,
+      top: opts.top,
+      width: opts.width,
       height: opts.height,
     });
     if (format) pipeline = applyFormat(pipeline, format);
@@ -124,8 +135,8 @@ export class ImageTransformer {
     const { data, info } = await pipeline.toBuffer({ resolveWithObject: true });
     return {
       buffer: data,
-      format: info.format as ImageFormat ?? format ?? "jpeg",
-      width:  info.width,
+      format: (info.format as ImageFormat) ?? format ?? "jpeg",
+      width: info.width,
       height: info.height,
       byteSize: info.size,
       passthrough: false,
@@ -138,49 +149,55 @@ export class ImageTransformer {
     if (!sharp) return passthrough(input, opts.format);
 
     const quality = opts.quality ?? 85;
-    let pipeline  = sharp(input);
+    let pipeline = sharp(input);
     pipeline = applyFormat(pipeline, opts.format, quality);
 
     const { data, info } = await pipeline.toBuffer({ resolveWithObject: true });
     return {
-      buffer:    data,
-      format:    opts.format,
-      width:     info.width,
-      height:    info.height,
-      byteSize:  info.size,
+      buffer: data,
+      format: opts.format,
+      width: info.width,
+      height: info.height,
+      byteSize: info.size,
       passthrough: false,
     };
   }
 
   /** Add a text watermark (SVG overlay). */
-  async watermark(input: Buffer, opts: WatermarkOptions, format?: ImageFormat): Promise<TransformResult> {
+  async watermark(
+    input: Buffer,
+    opts: WatermarkOptions,
+    format?: ImageFormat,
+  ): Promise<TransformResult> {
     const sharp = await getSharp();
     if (!sharp) return passthrough(input, format);
 
     const fontSize = opts.fontSize ?? 36;
-    const colour   = opts.colour   ?? "rgba(255,255,255,0.5)";
-    const textLen  = opts.text.length;
+    const colour = opts.colour ?? "rgba(255,255,255,0.5)";
+    const textLen = opts.text.length;
     const svgWidth = fontSize * textLen * 0.6;
 
     const svgBuf = Buffer.from(
       `<svg width="${svgWidth}" height="${fontSize * 1.5}">` +
-      `<text x="0" y="${fontSize}" font-size="${fontSize}" fill="${colour}" ` +
-      `font-family="sans-serif">${opts.text}</text></svg>`,
+        `<text x="0" y="${fontSize}" font-size="${fontSize}" fill="${colour}" ` +
+        `font-family="sans-serif">${opts.text}</text></svg>`,
     );
 
-    let pipeline = sharp(input).composite([{
-      input: svgBuf,
-      gravity: (opts.gravity ?? "southeast") as "southeast",
-    }]);
+    let pipeline = sharp(input).composite([
+      {
+        input: svgBuf,
+        gravity: (opts.gravity ?? "southeast") as "southeast",
+      },
+    ]);
     if (format) pipeline = applyFormat(pipeline, format);
 
     const { data, info } = await pipeline.toBuffer({ resolveWithObject: true });
     return {
-      buffer:    data,
-      format:    info.format as ImageFormat ?? format ?? "jpeg",
-      width:     info.width,
-      height:    info.height,
-      byteSize:  info.size,
+      buffer: data,
+      format: (info.format as ImageFormat) ?? format ?? "jpeg",
+      width: info.width,
+      height: info.height,
+      byteSize: info.size,
       passthrough: false,
     };
   }
@@ -196,16 +213,22 @@ export class ImageTransformer {
   }> {
     const sharp = await getSharp();
     if (!sharp) {
-      return { format: undefined, width: undefined, height: undefined,
-               channels: undefined, size: input.byteLength, hasAlpha: undefined };
+      return {
+        format: undefined,
+        width: undefined,
+        height: undefined,
+        channels: undefined,
+        size: input.byteLength,
+        hasAlpha: undefined,
+      };
     }
     const meta = await sharp(input).metadata();
     return {
-      format:   meta.format,
-      width:    meta.width,
-      height:   meta.height,
+      format: meta.format,
+      width: meta.width,
+      height: meta.height,
       channels: meta.channels,
-      size:     meta.size ?? input.byteLength,
+      size: meta.size ?? input.byteLength,
       hasAlpha: meta.hasAlpha,
     };
   }
@@ -216,13 +239,20 @@ export class ImageTransformer {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function applyFormat(pipeline: any, format: ImageFormat, quality = 85): any {
   switch (format) {
-    case "jpeg": return pipeline.jpeg({ quality });
-    case "png":  return pipeline.png({ compressionLevel: Math.round((100 - quality) / 11) });
-    case "webp": return pipeline.webp({ quality });
-    case "avif": return pipeline.avif({ quality });
-    case "gif":  return pipeline.gif();
-    case "tiff": return pipeline.tiff({ quality });
-    default:     return pipeline;
+    case "jpeg":
+      return pipeline.jpeg({ quality });
+    case "png":
+      return pipeline.png({ compressionLevel: Math.round((100 - quality) / 11) });
+    case "webp":
+      return pipeline.webp({ quality });
+    case "avif":
+      return pipeline.avif({ quality });
+    case "gif":
+      return pipeline.gif();
+    case "tiff":
+      return pipeline.tiff({ quality });
+    default:
+      return pipeline;
   }
 }
 
@@ -234,7 +264,10 @@ export async function isSharpAvailable(): Promise<boolean> {
 // ── TransformError ────────────────────────────────────────────────────────────
 
 export class TransformError extends Error {
-  constructor(message: string, public readonly code: string) {
+  constructor(
+    message: string,
+    public readonly code: string,
+  ) {
     super(message);
     this.name = "TransformError";
   }

@@ -15,19 +15,17 @@
     "PATH": "$PWD/node_modules/.bin:$PATH"
   },
   "shell": {
-    "init_hook": [
-      "echo 'Nexus dev shell ready. Run: devbox run install && devbox run build'"
-    ],
+    "init_hook": ["echo 'Nexus dev shell ready. Run: devbox run install && devbox run build'"],
     "scripts": {
-      "install":   "pnpm install",
-      "build":     "pnpm build",
-      "dev":       "pnpm dev",
-      "test":      "pnpm test",
-      "lint":      "pnpm lint",
+      "install": "pnpm install",
+      "build": "pnpm build",
+      "dev": "pnpm dev",
+      "test": "pnpm test",
+      "lint": "pnpm lint",
       "typecheck": "pnpm typecheck",
-      "format":    "pnpm format",
-      "db:up":     "docker compose up -d postgres redis",
-      "stack:up":  "docker compose up -d",
+      "format": "pnpm format",
+      "db:up": "docker compose up -d postgres redis",
+      "stack:up": "docker compose up -d",
       "stack:down": "docker compose down"
     }
   }

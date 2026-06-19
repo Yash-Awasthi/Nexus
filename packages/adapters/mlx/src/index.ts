@@ -67,7 +67,7 @@ export class NullMLXBridge implements IMLXBridge {
   private _config: MLXModelConfig | undefined;
 
   readonly loadCalls: MLXModelConfig[] = [];
-  readonly generateCalls: Array<{ prompt: string; opts?: MLXGenerateOpts }> = [];
+  readonly generateCalls: { prompt: string; opts?: MLXGenerateOpts }[] = [];
   readonly unloadCalls: number[] = [];
 
   /** Override the response returned by generate(). */

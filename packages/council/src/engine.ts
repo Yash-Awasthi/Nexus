@@ -294,12 +294,7 @@ export class DeliberationEngine {
 // These types are the council output layer for financial decision deliberation.
 
 /** 5-tier portfolio rating (Research Manager + Portfolio Manager). */
-export type PortfolioRating =
-  | "Buy"
-  | "Overweight"
-  | "Hold"
-  | "Underweight"
-  | "Sell";
+export type PortfolioRating = "Buy" | "Overweight" | "Hold" | "Underweight" | "Sell";
 
 /** 3-tier transaction direction (Trader agent). */
 export type TraderAction = "Buy" | "Hold" | "Sell";

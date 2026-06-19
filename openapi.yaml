@@ -51,14 +51,14 @@ components:
       type: object
       required: [error]
       properties:
-        error:   { type: string }
+        error: { type: string }
         message: { type: string }
 
     ChatMessage:
       type: object
       required: [role, content]
       properties:
-        role:    { type: string, enum: [system, user, assistant] }
+        role: { type: string, enum: [system, user, assistant] }
         content: { type: string }
 
     ContentBlock:
@@ -72,45 +72,45 @@ components:
       type: object
       required: [type, role, content, usage]
       properties:
-        type:        { type: string, enum: [message] }
-        id:          { type: string }
-        role:        { type: string, enum: [assistant] }
-        model:       { type: string }
+        type: { type: string, enum: [message] }
+        id: { type: string }
+        role: { type: string, enum: [assistant] }
+        model: { type: string }
         content:
           type: array
           items: { $ref: "#/components/schemas/ContentBlock" }
         usage:
           type: object
           properties:
-            input_tokens:  { type: integer }
+            input_tokens: { type: integer }
             output_tokens: { type: integer }
-        stop_reason:  { type: string }
+        stop_reason: { type: string }
 
     ModelAlias:
       type: object
       required: [id, provider, backend_model, available]
       properties:
-        id:           { type: string }
-        provider:     { type: string }
+        id: { type: string }
+        provider: { type: string }
         backend_model:{ type: string }
-        available:    { type: boolean }
+        available: { type: boolean }
 
     AdminRoute:
       type: object
       required: [alias, model, provider]
       properties:
-        alias:     { type: string }
-        model:     { type: string }
-        provider:  { type: string }
+        alias: { type: string }
+        model: { type: string }
+        provider: { type: string }
         overridden:{ type: boolean }
 
     AdminSettings:
       type: object
       properties:
-        tracing:      { type: boolean }
-        logLevel:     { type: string }
+        tracing: { type: boolean }
+        logLevel: { type: string }
         rateLimitRpm: { type: integer }
-        maxTokens:    { type: integer }
+        maxTokens: { type: integer }
         defaultModel: { type: string }
         corsOrigins:
           type: array
@@ -119,14 +119,14 @@ components:
     TraceEntry:
       type: object
       properties:
-        provider:     { type: string }
-        model:        { type: string }
-        status:       { type: string, enum: [success, error, cached] }
-        latencyMs:    { type: number }
-        inputTokens:  { type: integer }
+        provider: { type: string }
+        model: { type: string }
+        status: { type: string, enum: [success, error, cached] }
+        latencyMs: { type: number }
+        inputTokens: { type: integer }
         outputTokens: { type: integer }
-        identity:     { type: string }
-        ts:           { type: integer }
+        identity: { type: string }
+        ts: { type: integer }
 
 security:
   - BearerAuth: []
@@ -147,7 +147,7 @@ paths:
               schema:
                 type: object
                 properties:
-                  status:    { type: string, example: ok }
+                  status: { type: string, example: ok }
                   timestamp: { type: string, format: date-time }
 
   /health/ready:
@@ -196,11 +196,11 @@ paths:
                 messages:
                   type: array
                   items: { $ref: "#/components/schemas/ChatMessage" }
-                system:       { type: string }
-                max_tokens:   { type: integer, default: 2048 }
-                temperature:  { type: number, minimum: 0, maximum: 1 }
-                stream:       { type: boolean, default: false }
-                max_spend_usd:{ type: number, minimum: 0 }
+                system: { type: string }
+                max_tokens: { type: integer, default: 2048 }
+                temperature: { type: number, minimum: 0, maximum: 1 }
+                stream: { type: boolean, default: false }
+                max_spend_usd: { type: number, minimum: 0 }
       responses:
         "200":
           description: Message response
@@ -223,8 +223,8 @@ paths:
               schema:
                 type: object
                 properties:
-                  tools:  { type: array, items: { type: object } }
-                  total:  { type: integer }
+                  tools: { type: array, items: { type: object } }
+                  total: { type: integer }
 
   /gateway/tools/invoke:
     post:
@@ -238,7 +238,7 @@ paths:
               type: object
               required: [name]
               properties:
-                name:  { type: string }
+                name: { type: string }
                 input: { type: object }
       responses:
         "200": { description: Tool result }
@@ -262,9 +262,9 @@ paths:
                 type: object
                 properties:
                   totalRuns: { type: integer }
-                  totalUsd:  { type: number }
-                  limit:     { type: integer }
-                  runs:      { type: array, items: { type: object } }
+                  totalUsd: { type: number }
+                  limit: { type: integer }
+                  runs: { type: array, items: { type: object } }
 
   # ── Council ───────────────────────────────────────────────────────────────────
 
@@ -280,8 +280,8 @@ paths:
               type: object
               required: [proposal]
               properties:
-                proposal:  { type: string }
-                context:   { type: string }
+                proposal: { type: string }
+                context: { type: string }
                 budget_usd:{ type: number }
                 timeout_ms:{ type: integer }
       responses:
@@ -316,9 +316,9 @@ paths:
               type: object
               required: [content]
               properties:
-                content:    { type: string }
-                category:   { type: string }
-                tags:       { type: array, items: { type: string } }
+                content: { type: string }
+                category: { type: string }
+                tags: { type: array, items: { type: string } }
                 confidence: { type: number, minimum: 0, maximum: 1 }
       responses:
         "201": { description: Memory created }
@@ -365,11 +365,11 @@ paths:
               schema:
                 type: object
                 properties:
-                  jobId:   { type: string }
-                  status:  { type: string, enum: [queued, running, done, error] }
-                  report:  { type: string }
+                  jobId: { type: string }
+                  status: { type: string, enum: [queued, running, done, error] }
+                  report: { type: string }
                   sources: { type: array, items: { type: object } }
-                  error:   { type: string }
+                  error: { type: string }
 
   # ── Admin ─────────────────────────────────────────────────────────────────────
 
@@ -400,8 +400,8 @@ paths:
               type: object
               required: [alias, model, provider]
               properties:
-                alias:    { type: string }
-                model:    { type: string }
+                alias: { type: string }
+                model: { type: string }
                 provider: { type: string }
       responses:
         "201": { description: Route created }
@@ -543,9 +543,9 @@ paths:
               type: object
               required: [plan]
               properties:
-                plan:       { type: string, enum: [pro, enterprise] }
+                plan: { type: string, enum: [pro, enterprise] }
                 successUrl: { type: string, format: uri }
-                cancelUrl:  { type: string, format: uri }
+                cancelUrl: { type: string, format: uri }
       responses:
         "200":
           description: Checkout session
@@ -555,7 +555,7 @@ paths:
                 type: object
                 properties:
                   sessionId: { type: string }
-                  url:       { type: string, format: uri }
+                  url: { type: string, format: uri }
         "503": { description: Stripe not configured }
 
   /billing/portal:

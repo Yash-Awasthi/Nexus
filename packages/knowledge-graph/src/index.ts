@@ -961,7 +961,7 @@ export interface KGCommunitySummary {
   title: string;
   summary: string;
   /** Key findings extracted by the LLM from entity+edge context in the cluster */
-  findings: Array<{ explanation: string; summary: string }>;
+  findings: { explanation: string; summary: string }[];
   /** Token count of the full prompt used to generate this summary */
   promptTokens: number;
   createdAt: number;
@@ -1117,7 +1117,9 @@ export async function clusterGraph(
     }
 
     // For next level: collapse each cluster to a super-node
-    currentNodes = finalClusters.map((_, idx) => `super_${globalClusterCounter - finalClusters.length + idx}`);
+    currentNodes = finalClusters.map(
+      (_, idx) => `super_${globalClusterCounter - finalClusters.length + idx}`,
+    );
     if (currentNodes.length <= 1) break;
   }
 
@@ -1235,7 +1237,7 @@ export async function multiHopTraverse(
         ? await store.findEdges({ objectId: current.nodeId })
         : [];
 
-    const candidateEdges: Array<{ edge: KGEdge; neighborId: string }> = [
+    const candidateEdges: { edge: KGEdge; neighborId: string }[] = [
       ...outEdges.map((e) => ({ edge: e, neighborId: e.objectId })),
       ...inEdges.map((e) => ({ edge: e, neighborId: e.subjectId })),
     ];
@@ -1356,7 +1358,7 @@ export async function extractGraphFromChunks(
     const batch = chunks.slice(i, i + concurrency);
 
     const settled = await Promise.allSettled(
-      batch.map((chunk) => kg.ingest(chunk.text, chunk.id)),
+      batch.map((chunk) => kg.ingest(chunk.text, { source: chunk.id })),
     );
 
     for (let j = 0; j < settled.length; j++) {
@@ -1456,9 +1458,7 @@ export const permissiveValidator: OntologyValidator = {
  * Strict entity-type validator — discards entities whose type is not in
  * the allowed set.
  */
-export function strictTypeValidator(
-  allowedTypes: EntityType[],
-): OntologyValidator {
+export function strictTypeValidator(allowedTypes: EntityType[]): OntologyValidator {
   const allowed = new Set<EntityType>(allowedTypes);
   return {
     validate: (e) => (allowed.has(e.type) ? e : null),
@@ -1478,12 +1478,12 @@ export function strictTypeValidator(
 // Typed discriminated union for the query path to use against the knowledge graph.
 
 export type KGSearchType =
-  | "ENTITIES"         // Direct entity lookup by name/type
-  | "TRIPLETS"         // Triplet (subject, predicate, object) matching
-  | "LOCAL_GRAPH"      // 1–3 hop neighbourhood around matched entities
-  | "COMMUNITY"        // Community-level context (community summaries)
+  | "ENTITIES" // Direct entity lookup by name/type
+  | "TRIPLETS" // Triplet (subject, predicate, object) matching
+  | "LOCAL_GRAPH" // 1–3 hop neighbourhood around matched entities
+  | "COMMUNITY" // Community-level context (community summaries)
   | "GRAPH_COMPLETION" // Full graph-RAG: embed query → nearest entities → expand → synthesise
-  | "LEXICAL";         // Keyword/BM25 fallback (when no entity match found)
+  | "LEXICAL"; // Keyword/BM25 fallback (when no entity match found)
 
 /** A single graph search result item */
 export interface KGSearchResult {
@@ -1534,7 +1534,9 @@ export function buildGraphContext(
     for (const edge of edges) {
       const src = nodes.find((n) => n.id === edge.subjectId)?.name ?? edge.subjectId;
       const tgt = nodes.find((n) => n.id === edge.objectId)?.name ?? edge.objectId;
-      lines.push(`- ${src} --[${edge.predicate}]--> ${tgt}  [confidence: ${edge.confidence.toFixed(2)}]`);
+      lines.push(
+        `- ${src} --[${edge.predicate}]--> ${tgt}  [confidence: ${edge.confidence.toFixed(2)}]`,
+      );
     }
   }
 
@@ -1611,9 +1613,9 @@ export async function graphSearch(
         nodeIds.add(e.subjectId);
         nodeIds.add(e.objectId);
       }
-      nodes = (
-        await Promise.all(Array.from(nodeIds).map((id) => store.getNode(id)))
-      ).filter((n): n is KGNode => n !== undefined);
+      nodes = (await Promise.all(Array.from(nodeIds).map((id) => store.getNode(id)))).filter(
+        (n): n is KGNode => n !== undefined,
+      );
       break;
     }
 

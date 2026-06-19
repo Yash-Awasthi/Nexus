@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Admin — Traces Viewer
  *
@@ -21,25 +22,33 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import {
-  Activity, ChevronLeft, ChevronRight, RefreshCw, X,
-  Clock, Cpu, DollarSign, Search, Loader2,
+  Activity,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
+  X,
+  Clock,
+  Cpu,
+  DollarSign,
+  Search,
+  Loader2,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface TraceRow {
-  id:             string;
+  id: string;
   conversationId?: string;
-  workflowRunId?:  string;
-  type:            string;
+  workflowRunId?: string;
+  type: string;
   totalLatencyMs?: number;
-  totalTokens?:    number;
-  totalCostUsd?:   number;
-  createdAt:       string;
+  totalTokens?: number;
+  totalCostUsd?: number;
+  createdAt: string;
 }
 
 interface TraceDetail extends TraceRow {
-  steps?:     unknown[];
+  steps?: unknown[];
   inputText?: string;
 }
 
@@ -62,26 +71,21 @@ function fmtCost(c?: number) {
 
 function latencyColor(ms?: number) {
   if (!ms) return "text-muted-foreground";
-  if (ms < 1000)  return "text-green-400";
-  if (ms < 5000)  return "text-amber-400";
+  if (ms < 1000) return "text-green-400";
+  if (ms < 5000) return "text-amber-400";
   return "text-red-400";
 }
 
 // ── Trace detail panel ────────────────────────────────────────────────────────
 
-function TraceDetailPanel({
-  traceId, onClose,
-}: {
-  traceId: string;
-  onClose: () => void;
-}) {
+function TraceDetailPanel({ traceId, onClose }: { traceId: string; onClose: () => void }) {
   const [trace, setTrace] = useState<TraceDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
     fetch(`/api/traces/${traceId}`)
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => setTrace(data?.trace ?? data))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -110,7 +114,9 @@ function TraceDetailPanel({
             <div className="grid grid-cols-2 gap-2">
               <div className="p-2 rounded-lg" style={{ background: "hsl(var(--muted)/0.4)" }}>
                 <p className="text-muted-foreground mb-1">Latency</p>
-                <p className={`font-mono font-medium ${latencyColor(trace.totalLatencyMs)}`}>{fmtMs(trace.totalLatencyMs)}</p>
+                <p className={`font-mono font-medium ${latencyColor(trace.totalLatencyMs)}`}>
+                  {fmtMs(trace.totalLatencyMs)}
+                </p>
               </div>
               <div className="p-2 rounded-lg" style={{ background: "hsl(var(--muted)/0.4)" }}>
                 <p className="text-muted-foreground mb-1">Tokens</p>
@@ -118,7 +124,9 @@ function TraceDetailPanel({
               </div>
               <div className="p-2 rounded-lg" style={{ background: "hsl(var(--muted)/0.4)" }}>
                 <p className="text-muted-foreground mb-1">Cost</p>
-                <p className="font-mono font-medium text-green-400">{fmtCost(trace.totalCostUsd)}</p>
+                <p className="font-mono font-medium text-green-400">
+                  {fmtCost(trace.totalCostUsd)}
+                </p>
               </div>
               <div className="p-2 rounded-lg" style={{ background: "hsl(var(--muted)/0.4)" }}>
                 <p className="text-muted-foreground mb-1">Type</p>
@@ -146,10 +154,15 @@ function TraceDetailPanel({
                     <div
                       key={i}
                       className="p-2 rounded-lg text-[10px]"
-                      style={{ background: "hsl(var(--muted)/0.3)", border: "1px solid hsl(var(--border)/0.4)" }}
+                      style={{
+                        background: "hsl(var(--muted)/0.3)",
+                        border: "1px solid hsl(var(--border)/0.4)",
+                      }}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium">{step.model ?? step.type ?? `Step ${i + 1}`}</span>
+                        <span className="font-medium">
+                          {step.model ?? step.type ?? `Step ${i + 1}`}
+                        </span>
                         <span className="text-muted-foreground">{fmtMs(step.latencyMs)}</span>
                       </div>
                       {step.tokens && <p className="text-muted-foreground">{step.tokens} tokens</p>}
@@ -168,59 +181,68 @@ function TraceDetailPanel({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 const TYPE_OPTIONS = [
-  { value: "all",        label: "All types" },
+  { value: "all", label: "All types" },
   { value: "deliberate", label: "Deliberate" },
   { value: "gauntlet", label: "Gauntlet" },
-  { value: "research",   label: "Research" },
-  { value: "chat",       label: "Chat" },
-  { value: "embedding",  label: "Embedding" },
+  { value: "research", label: "Research" },
+  { value: "chat", label: "Chat" },
+  { value: "embedding", label: "Embedding" },
 ];
 
 export default function AdminTracesPage() {
-  const [traces, setTraces]   = useState<TraceRow[]>([]);
-  const [total, setTotal]     = useState(0);
-  const [page, setPage]       = useState(1);
-  const [pages, setPages]     = useState(1);
+  const [traces, setTraces] = useState<TraceRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch]   = useState("");
+  const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [selected, setSelected] = useState<string | null>(null);
 
-  const fetchTraces = useCallback(async (pg = page, type = typeFilter) => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({ page: String(pg), limit: "25" });
-      if (type && type !== "all") params.set("type", type);
-      const res = await fetch(`/api/traces?${params}`);
-      if (res.ok) {
-        const data = await res.json();
-        setTraces(data.traces ?? []);
-        setTotal(data.total ?? 0);
-        setPages(data.pages ?? 1);
-        setPage(pg);
+  const fetchTraces = useCallback(
+    async (pg = page, type = typeFilter) => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({ page: String(pg), limit: "25" });
+        if (type && type !== "all") params.set("type", type);
+        const res = await fetch(`/api/traces?${params}`);
+        if (res.ok) {
+          const data = await res.json();
+          setTraces(data.traces ?? []);
+          setTotal(data.total ?? 0);
+          setPages(data.pages ?? 1);
+          setPage(pg);
+        }
+      } catch {
+        /* ignore */
       }
-    } catch { /* ignore */ }
-    setLoading(false);
-  }, [page, typeFilter]);
+      setLoading(false);
+    },
+    [page, typeFilter],
+  );
 
-  useEffect(() => { fetchTraces(1, typeFilter); }, [typeFilter]);
+  useEffect(() => {
+    fetchTraces(1, typeFilter);
+  }, [typeFilter]);
 
-  const filtered = traces.filter((t) =>
-    !search ||
-    t.id.toLowerCase().includes(search.toLowerCase()) ||
-    t.type.toLowerCase().includes(search.toLowerCase()) ||
-    (t.conversationId ?? "").toLowerCase().includes(search.toLowerCase())
+  const filtered = traces.filter(
+    (t) =>
+      !search ||
+      t.id.toLowerCase().includes(search.toLowerCase()) ||
+      t.type.toLowerCase().includes(search.toLowerCase()) ||
+      (t.conversationId ?? "").toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
     <div className="flex h-screen overflow-hidden">
       <div className="flex-1 flex flex-col overflow-hidden">
-
         {/* Header */}
         <div className="border-b border-border px-6 py-4 shrink-0 flex items-center gap-3">
           <Activity className="size-4 text-primary" />
           <h1 className="text-sm font-semibold">AI Traces</h1>
-          <Badge variant="outline" className="text-xs">{total} total</Badge>
+          <Badge variant="outline" className="text-xs">
+            {total} total
+          </Badge>
           <div className="ml-auto flex items-center gap-2">
             <Select value={typeFilter} onValueChange={setTypeFilter}>
               <SelectTrigger className="h-7 text-xs w-36">
@@ -228,7 +250,9 @@ export default function AdminTracesPage() {
               </SelectTrigger>
               <SelectContent>
                 {TYPE_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>
+                  <SelectItem key={o.value} value={o.value} className="text-xs">
+                    {o.label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -263,9 +287,18 @@ export default function AdminTracesPage() {
             >
               <span>ID / Conversation</span>
               <span>Type</span>
-              <span><Clock className="size-3 inline mr-1" />Latency</span>
-              <span><Cpu className="size-3 inline mr-1" />Tokens</span>
-              <span><DollarSign className="size-3 inline mr-1" />Cost</span>
+              <span>
+                <Clock className="size-3 inline mr-1" />
+                Latency
+              </span>
+              <span>
+                <Cpu className="size-3 inline mr-1" />
+                Tokens
+              </span>
+              <span>
+                <DollarSign className="size-3 inline mr-1" />
+                Cost
+              </span>
               <span>Created</span>
             </div>
 
@@ -293,16 +326,24 @@ export default function AdminTracesPage() {
                       <div className="min-w-0">
                         <p className="font-mono text-[10px] truncate">{t.id}</p>
                         {t.conversationId && (
-                          <p className="text-muted-foreground text-[10px] truncate">{t.conversationId}</p>
+                          <p className="text-muted-foreground text-[10px] truncate">
+                            {t.conversationId}
+                          </p>
                         )}
                       </div>
                       <div>
-                        <Badge variant="outline" className="text-[10px] capitalize">{t.type}</Badge>
+                        <Badge variant="outline" className="text-[10px] capitalize">
+                          {t.type}
+                        </Badge>
                       </div>
-                      <p className={`font-mono ${latencyColor(t.totalLatencyMs)}`}>{fmtMs(t.totalLatencyMs)}</p>
+                      <p className={`font-mono ${latencyColor(t.totalLatencyMs)}`}>
+                        {fmtMs(t.totalLatencyMs)}
+                      </p>
                       <p className="font-mono text-muted-foreground">{fmtTokens(t.totalTokens)}</p>
                       <p className="font-mono text-green-400">{fmtCost(t.totalCostUsd)}</p>
-                      <p className="text-muted-foreground">{new Date(t.createdAt).toLocaleString()}</p>
+                      <p className="text-muted-foreground">
+                        {new Date(t.createdAt).toLocaleString()}
+                      </p>
                     </button>
                   ))}
                 </div>
@@ -312,7 +353,9 @@ export default function AdminTracesPage() {
             {/* Pagination */}
             {pages > 1 && (
               <div className="border-t border-border px-4 py-2.5 flex items-center justify-between shrink-0 text-xs text-muted-foreground">
-                <span>Page {page} of {pages} · {total} traces</span>
+                <span>
+                  Page {page} of {pages} · {total} traces
+                </span>
                 <div className="flex gap-1">
                   <Button
                     variant="ghost"
@@ -338,9 +381,7 @@ export default function AdminTracesPage() {
           </div>
 
           {/* Detail panel */}
-          {selected && (
-            <TraceDetailPanel traceId={selected} onClose={() => setSelected(null)} />
-          )}
+          {selected && <TraceDetailPanel traceId={selected} onClose={() => setSelected(null)} />}
         </div>
       </div>
     </div>

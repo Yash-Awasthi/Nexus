@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 "use client";
 
 import type { Route } from "./+types/pricing";
@@ -82,8 +83,7 @@ export default function Pricing() {
             Simple, <TextShimmer>transparent pricing</TextShimmer>
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-            Start with a free trial. No credit card required. Scale when you're
-            ready.
+            Start with a free trial. No credit card required. Scale when you're ready.
           </p>
 
           {/* Billing toggle */}
@@ -117,9 +117,7 @@ export default function Pricing() {
               <Card className="relative flex flex-col backdrop-blur-md bg-card/80 border-white/10">
                 <CardHeader>
                   <div className="flex items-center gap-2">
-                    <CardTitle className="font-display text-2xl">
-                      Business
-                    </CardTitle>
+                    <CardTitle className="font-display text-2xl">Business</CardTitle>
                     <style>
                       {`
                         @keyframes pulseGlow {
@@ -128,15 +126,12 @@ export default function Pricing() {
                         }
                       `}
                     </style>
-                    <Badge
-                      style={{ animation: "pulseGlow 2s ease-in-out infinite" }}
-                    >
+                    <Badge style={{ animation: "pulseGlow 2s ease-in-out infinite" }}>
                       Popular
                     </Badge>
                   </div>
                   <CardDescription>
-                    For teams that need multi-agent AI with full deliberation
-                    capabilities.
+                    For teams that need multi-agent AI with full deliberation capabilities.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex-1">
@@ -147,15 +142,11 @@ export default function Pricing() {
                     >
                       ${price}
                     </span>
-                    <span className="text-muted-foreground">
-                      /user/month
-                    </span>
+                    <span className="text-muted-foreground">/user/month</span>
                     <div
                       className={`transition-all duration-300 overflow-hidden ${annual ? "max-h-8 opacity-100 mt-1" : "max-h-0 opacity-0"}`}
                     >
-                      <p className="text-sm text-muted-foreground">
-                        Billed annually
-                      </p>
+                      <p className="text-sm text-muted-foreground">Billed annually</p>
                     </div>
                   </div>
                   <StaggerChildren staggerDelay={0.05}>
@@ -188,20 +179,16 @@ export default function Pricing() {
               <Card className="relative flex flex-col border-primary/30 backdrop-blur-md bg-card/80">
                 <CardHeader>
                   <div className="flex items-center gap-2">
-                    <CardTitle className="font-display text-2xl">
-                      Enterprise
-                    </CardTitle>
+                    <CardTitle className="font-display text-2xl">Enterprise</CardTitle>
                   </div>
                   <CardDescription>
-                    For organizations that need advanced security, compliance, and
-                    dedicated support.
+                    For organizations that need advanced security, compliance, and dedicated
+                    support.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex-1">
                   <div className="mb-6">
-                    <span className="font-display text-4xl font-bold">
-                      Contact us
-                    </span>
+                    <span className="font-display text-4xl font-bold">Contact us</span>
                     <p className="mt-1 text-sm text-muted-foreground">
                       Custom pricing for your organization
                     </p>
@@ -235,12 +222,10 @@ export default function Pricing() {
       {/* FAQ-style bottom section */}
       <section className="border-t border-border/40 bg-muted/10 px-6 py-16 text-center">
         <FadeIn>
-          <h2 className="font-display text-2xl font-bold">
-            Need help choosing?
-          </h2>
+          <h2 className="font-display text-2xl font-bold">Need help choosing?</h2>
           <p className="mx-auto mt-2 max-w-xl text-muted-foreground">
-            Every plan includes a 14-day free trial. No credit card required. Talk
-            to our team if you need a custom plan.
+            Every plan includes a 14-day free trial. No credit card required. Talk to our team if
+            you need a custom plan.
           </p>
           <MagneticButton className="mt-6">
             <Button variant="outline" asChild>

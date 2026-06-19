@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "~/components/ui/button";
@@ -18,7 +19,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { FolderOpen, Plus, MessageSquare, MoreVertical, Pencil, Trash2, ChevronLeft, Paperclip, Brain, BookOpen } from "lucide-react";
+import {
+  FolderOpen,
+  Plus,
+  MessageSquare,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  ChevronLeft,
+  Paperclip,
+  Brain,
+  BookOpen,
+} from "lucide-react";
 import { ProjectMemoryPanel } from "~/components/ProjectMemoryPanel";
 import { ProjectFileAttachments } from "~/components/ProjectFileAttachments";
 import { ProjectInstructions } from "~/components/ProjectInstructions";
@@ -58,14 +70,26 @@ export default function ProjectsPage() {
   // ── Load projects ──────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
-    apiFetch<{ projects: Project[] }>('/api/v1/projects')
-      .then(({ projects: list }) => { if (!cancelled) setProjects(list); })
-      .catch((e) => { if (!cancelled) setError(e.message); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+    apiFetch<{ projects: Project[] }>("/api/v1/projects")
+      .then(({ projects: list }) => {
+        if (!cancelled) setProjects(list);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const openNew = () => { setName(""); setDescription(""); setNewProjectOpen(true); };
+  const openNew = () => {
+    setName("");
+    setDescription("");
+    setNewProjectOpen(true);
+  };
 
   const openEdit = (project: Project) => {
     setName(project.name);
@@ -77,14 +101,14 @@ export default function ProjectsPage() {
     if (!name.trim()) return;
     setSaving(true);
     try {
-      const created = await apiFetch<Project>('/api/v1/projects', {
-        method: 'POST',
+      const created = await apiFetch<Project>("/api/v1/projects", {
+        method: "POST",
         body: JSON.stringify({ name: name.trim(), description: description.trim() }),
       });
       setProjects((prev) => [created, ...prev]);
       setNewProjectOpen(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to create project');
+      setError(e instanceof Error ? e.message : "Failed to create project");
     } finally {
       setSaving(false);
     }
@@ -95,25 +119,25 @@ export default function ProjectsPage() {
     setSaving(true);
     try {
       const updated = await apiFetch<Project>(`/api/v1/projects/${editProject.id}`, {
-        method: 'PATCH',
+        method: "PATCH",
         body: JSON.stringify({ name: name.trim(), description: description.trim() }),
       });
-      setProjects((prev) => prev.map((p) => p.id === editProject.id ? updated : p));
+      setProjects((prev) => prev.map((p) => (p.id === editProject.id ? updated : p)));
       setEditProject(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to update project');
+      setError(e instanceof Error ? e.message : "Failed to update project");
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this project?')) return;
+    if (!confirm("Delete this project?")) return;
     try {
-      await apiFetch(`/api/v1/projects/${id}`, { method: 'DELETE' });
+      await apiFetch(`/api/v1/projects/${id}`, { method: "DELETE" });
       setProjects((prev) => prev.filter((p) => p.id !== id));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to delete project');
+      setError(e instanceof Error ? e.message : "Failed to delete project");
     }
   };
 
@@ -128,25 +152,37 @@ export default function ProjectsPage() {
   // ── Project detail panel ───────────────────────────────────────────────────
   if (selectedProject) {
     const tabs: Array<{ id: typeof activeTab; icon: React.ElementType; label: string }> = [
-      { id: "memory",       icon: Brain,      label: "Memory"       },
-      { id: "files",        icon: Paperclip,  label: "Files"        },
-      { id: "instructions", icon: BookOpen,   label: "Instructions" },
+      { id: "memory", icon: Brain, label: "Memory" },
+      { id: "files", icon: Paperclip, label: "Files" },
+      { id: "instructions", icon: BookOpen, label: "Instructions" },
     ];
     return (
       <div className="flex-1 flex flex-col overflow-hidden h-screen">
         {/* Detail header */}
         <div className="border-b border-border px-5 py-3 flex items-center gap-3 shrink-0">
-          <Button variant="ghost" size="sm" className="gap-1.5 text-xs" onClick={() => setSelectedProject(null)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-xs"
+            onClick={() => setSelectedProject(null)}
+          >
             <ChevronLeft className="size-3.5" /> All Projects
           </Button>
           <div className="h-4 w-px bg-border" />
           <FolderOpen className="size-4 text-muted-foreground" />
           <span className="font-medium text-sm">{selectedProject.name}</span>
           {selectedProject.description && (
-            <span className="text-xs text-muted-foreground hidden sm:block truncate max-w-xs">{selectedProject.description}</span>
+            <span className="text-xs text-muted-foreground hidden sm:block truncate max-w-xs">
+              {selectedProject.description}
+            </span>
           )}
           <div className="ml-auto flex gap-1.5">
-            <Button variant="outline" size="sm" className="gap-1.5 text-xs h-7" onClick={() => openEdit(selectedProject)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-xs h-7"
+              onClick={() => openEdit(selectedProject)}
+            >
               <Pencil className="size-3" /> Edit
             </Button>
           </div>
@@ -172,9 +208,9 @@ export default function ProjectsPage() {
 
         {/* Tab content */}
         <div className="flex-1 overflow-y-auto p-5">
-          {activeTab === "memory"       && <ProjectMemoryPanel    projectId={selectedProject.id} />}
-          {activeTab === "files"        && <ProjectFileAttachments projectId={selectedProject.id} />}
-          {activeTab === "instructions" && <ProjectInstructions   projectId={selectedProject.id} />}
+          {activeTab === "memory" && <ProjectMemoryPanel projectId={selectedProject.id} />}
+          {activeTab === "files" && <ProjectFileAttachments projectId={selectedProject.id} />}
+          {activeTab === "instructions" && <ProjectInstructions projectId={selectedProject.id} />}
         </div>
       </div>
     );
@@ -185,7 +221,9 @@ export default function ProjectsPage() {
       {error && (
         <div className="fixed top-4 right-4 z-50 bg-destructive text-destructive-foreground text-xs px-3 py-2 rounded-md shadow-lg flex items-center gap-2">
           {error}
-          <button onClick={() => setError(null)} className="font-bold">✕</button>
+          <button onClick={() => setError(null)} className="font-bold">
+            ✕
+          </button>
         </div>
       )}
       <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -212,7 +250,10 @@ export default function ProjectsPage() {
             <Card
               key={project.id}
               className="cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all"
-              onClick={() => { setSelectedProject(project); setActiveTab("memory"); }}
+              onClick={() => {
+                setSelectedProject(project);
+                setActiveTab("memory");
+              }}
             >
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-2">
@@ -234,12 +275,21 @@ export default function ProjectsPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEdit(project); }} className="gap-2 text-xs">
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEdit(project);
+                        }}
+                        className="gap-2 text-xs"
+                      >
                         <Pencil className="size-3" />
                         Edit
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={(e) => { e.stopPropagation(); handleDelete(project.id); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(project.id);
+                        }}
                         className="gap-2 text-xs text-red-400 focus:text-red-400"
                       >
                         <Trash2 className="size-3" />
@@ -253,7 +303,8 @@ export default function ProjectsPage() {
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <MessageSquare className="size-3" />
-                    {project.conversationCount} conversation{project.conversationCount !== 1 ? "s" : ""}
+                    {project.conversationCount} conversation
+                    {project.conversationCount !== 1 ? "s" : ""}
                   </span>
                   <span>{project.createdAt}</span>
                 </div>

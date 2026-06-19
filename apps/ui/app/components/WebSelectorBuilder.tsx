@@ -1,6 +1,7 @@
-"use client"
+// SPDX-License-Identifier: Apache-2.0
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
   PlusIcon,
   Trash2Icon,
@@ -17,19 +18,19 @@ import {
   HistoryIcon,
   WrenchIcon,
   LayersIcon,
-} from "lucide-react"
+} from "lucide-react";
 
-import { Button } from "~/components/ui/button"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "~/components/ui/card"
-import { Input } from "~/components/ui/input"
-import { Badge } from "~/components/ui/badge"
+import { Button } from "~/components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "~/components/ui/card";
+import { Input } from "~/components/ui/input";
+import { Badge } from "~/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select"
+} from "~/components/ui/select";
 import {
   Dialog,
   DialogTrigger,
@@ -39,129 +40,129 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
-} from "~/components/ui/dialog"
+} from "~/components/ui/dialog";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 interface WebSelector {
-  id: number
-  name: string
-  description: string
-  url: string | null
-  resolvedSelector: string | null
-  selectorType: "css" | "xpath" | "aria"
-  confidence: number
-  lastResolvedAt: string | null
-  failCount: number
-  createdAt: string
-  updatedAt: string
+  id: number;
+  name: string;
+  description: string;
+  url: string | null;
+  resolvedSelector: string | null;
+  selectorType: "css" | "xpath" | "aria";
+  confidence: number;
+  lastResolvedAt: string | null;
+  failCount: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface ExecutionResult {
-  success: boolean
-  selector: string
-  selectorType: "css" | "xpath" | "aria"
-  content: string | null
-  confidence: number
-  executionTimeMs: number
-  error?: string
+  success: boolean;
+  selector: string;
+  selectorType: "css" | "xpath" | "aria";
+  content: string | null;
+  confidence: number;
+  executionTimeMs: number;
+  error?: string;
 }
 
 interface ExecutionHistory {
-  id: number
-  selectorId: number
-  url: string
-  success: boolean
-  resolvedSelector: string
-  extractedContent: string | null
-  executionTimeMs: number
-  errorMessage: string | null
-  createdAt: string
+  id: number;
+  selectorId: number;
+  url: string;
+  success: boolean;
+  resolvedSelector: string;
+  extractedContent: string | null;
+  executionTimeMs: number;
+  errorMessage: string | null;
+  createdAt: string;
 }
 
 interface ResolveResult {
   candidates: {
-    selector: string
-    type: "css" | "xpath" | "aria"
-    confidence: number
-    reasoning: string
-  }[]
-  bestSelector: string | null
-  bestType: "css" | "xpath" | "aria"
-  confidence: number
+    selector: string;
+    type: "css" | "xpath" | "aria";
+    confidence: number;
+    reasoning: string;
+  }[];
+  bestSelector: string | null;
+  bestType: "css" | "xpath" | "aria";
+  confidence: number;
 }
 
 // ─── API Helpers ────────────────────────────────────────────────────────────
 
-const API_BASE = "/api/web-selectors"
+const API_BASE = "/api/web-selectors";
 
 async function apiCall<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     headers: { "Content-Type": "application/json" },
     ...options,
-  })
+  });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(err.error || "Request failed")
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || "Request failed");
   }
-  return res.json()
+  return res.json();
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export default function WebSelectorBuilder() {
-  const [selectors, setSelectors] = React.useState<WebSelector[]>([])
-  const [loading, setLoading] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
+  const [selectors, setSelectors] = React.useState<WebSelector[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
   // Create form state
-  const [newName, setNewName] = React.useState("")
-  const [newDescription, setNewDescription] = React.useState("")
-  const [newUrl, setNewUrl] = React.useState("")
-  const [newType, setNewType] = React.useState<"css" | "xpath" | "aria">("css")
-  const [createOpen, setCreateOpen] = React.useState(false)
+  const [newName, setNewName] = React.useState("");
+  const [newDescription, setNewDescription] = React.useState("");
+  const [newUrl, setNewUrl] = React.useState("");
+  const [newType, setNewType] = React.useState<"css" | "xpath" | "aria">("css");
+  const [createOpen, setCreateOpen] = React.useState(false);
 
   // Execute state
-  const [executeUrl, setExecuteUrl] = React.useState("")
-  const [executeResult, setExecuteResult] = React.useState<ExecutionResult | null>(null)
-  const [executing, setExecuting] = React.useState(false)
-  const [executeDialogId, setExecuteDialogId] = React.useState<number | null>(null)
+  const [executeUrl, setExecuteUrl] = React.useState("");
+  const [executeResult, setExecuteResult] = React.useState<ExecutionResult | null>(null);
+  const [executing, setExecuting] = React.useState(false);
+  const [executeDialogId, setExecuteDialogId] = React.useState<number | null>(null);
 
   // Resolve state
-  const [resolveDescription, setResolveDescription] = React.useState("")
-  const [resolveUrl, setResolveUrl] = React.useState("")
-  const [resolveResult, setResolveResult] = React.useState<ResolveResult | null>(null)
-  const [resolving, setResolving] = React.useState(false)
+  const [resolveDescription, setResolveDescription] = React.useState("");
+  const [resolveUrl, setResolveUrl] = React.useState("");
+  const [resolveResult, setResolveResult] = React.useState<ResolveResult | null>(null);
+  const [resolving, setResolving] = React.useState(false);
 
   // History state
-  const [historyId, setHistoryId] = React.useState<number | null>(null)
-  const [history, setHistory] = React.useState<ExecutionHistory[]>([])
-  const [historyLoading, setHistoryLoading] = React.useState(false)
+  const [historyId, setHistoryId] = React.useState<number | null>(null);
+  const [history, setHistory] = React.useState<ExecutionHistory[]>([]);
+  const [historyLoading, setHistoryLoading] = React.useState(false);
 
   // ── Fetch selectors ───────────────────────────────────────────────
 
   const fetchSelectors = React.useCallback(async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
-      const data = await apiCall<{ selectors: WebSelector[] }>(API_BASE)
-      setSelectors(data.selectors)
+      const data = await apiCall<{ selectors: WebSelector[] }>(API_BASE);
+      setSelectors(data.selectors);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load selectors")
+      setError(err instanceof Error ? err.message : "Failed to load selectors");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [])
+  }, []);
 
   React.useEffect(() => {
-    fetchSelectors()
-  }, [fetchSelectors])
+    fetchSelectors();
+  }, [fetchSelectors]);
 
   // ── Create ────────────────────────────────────────────────────────
 
   async function handleCreate() {
-    if (!newName.trim() || !newDescription.trim()) return
-    setLoading(true)
+    if (!newName.trim() || !newDescription.trim()) return;
+    setLoading(true);
     try {
       await apiCall(`${API_BASE}`, {
         method: "POST",
@@ -171,17 +172,17 @@ export default function WebSelectorBuilder() {
           url: newUrl.trim() || undefined,
           selectorType: newType,
         }),
-      })
-      setNewName("")
-      setNewDescription("")
-      setNewUrl("")
-      setNewType("css")
-      setCreateOpen(false)
-      await fetchSelectors()
+      });
+      setNewName("");
+      setNewDescription("");
+      setNewUrl("");
+      setNewType("css");
+      setCreateOpen(false);
+      await fetchSelectors();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create selector")
+      setError(err instanceof Error ? err.message : "Failed to create selector");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -189,25 +190,25 @@ export default function WebSelectorBuilder() {
 
   async function handleDelete(id: number) {
     try {
-      await apiCall(`${API_BASE}/${id}`, { method: "DELETE" })
-      await fetchSelectors()
+      await apiCall(`${API_BASE}/${id}`, { method: "DELETE" });
+      await fetchSelectors();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete selector")
+      setError(err instanceof Error ? err.message : "Failed to delete selector");
     }
   }
 
   // ── Execute ───────────────────────────────────────────────────────
 
   async function handleExecute(id: number) {
-    if (!executeUrl.trim()) return
-    setExecuting(true)
-    setExecuteResult(null)
+    if (!executeUrl.trim()) return;
+    setExecuting(true);
+    setExecuteResult(null);
     try {
       const data = await apiCall<{ execution: ExecutionResult }>(`${API_BASE}/${id}/execute`, {
         method: "POST",
         body: JSON.stringify({ url: executeUrl.trim() }),
-      })
-      setExecuteResult(data.execution)
+      });
+      setExecuteResult(data.execution);
     } catch (err) {
       setExecuteResult({
         success: false,
@@ -217,36 +218,36 @@ export default function WebSelectorBuilder() {
         confidence: 0,
         executionTimeMs: 0,
         error: err instanceof Error ? err.message : "Execution failed",
-      })
+      });
     } finally {
-      setExecuting(false)
+      setExecuting(false);
     }
   }
 
   // ── Self-Heal ─────────────────────────────────────────────────────
 
   async function handleHeal(id: number, url: string) {
-    setExecuting(true)
+    setExecuting(true);
     try {
       const data = await apiCall<{ execution: ExecutionResult }>(`${API_BASE}/${id}/heal`, {
         method: "POST",
         body: JSON.stringify({ url }),
-      })
-      setExecuteResult(data.execution)
-      await fetchSelectors()
+      });
+      setExecuteResult(data.execution);
+      await fetchSelectors();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Self-heal failed")
+      setError(err instanceof Error ? err.message : "Self-heal failed");
     } finally {
-      setExecuting(false)
+      setExecuting(false);
     }
   }
 
   // ── Resolve (Stateless) ───────────────────────────────────────────
 
   async function handleResolve() {
-    if (!resolveDescription.trim()) return
-    setResolving(true)
-    setResolveResult(null)
+    if (!resolveDescription.trim()) return;
+    setResolving(true);
+    setResolveResult(null);
     try {
       const data = await apiCall<ResolveResult & { success: boolean }>(`${API_BASE}/resolve`, {
         method: "POST",
@@ -254,27 +255,27 @@ export default function WebSelectorBuilder() {
           description: resolveDescription.trim(),
           url: resolveUrl.trim() || undefined,
         }),
-      })
-      setResolveResult(data)
+      });
+      setResolveResult(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Resolution failed")
+      setError(err instanceof Error ? err.message : "Resolution failed");
     } finally {
-      setResolving(false)
+      setResolving(false);
     }
   }
 
   // ── History ───────────────────────────────────────────────────────
 
   async function fetchHistory(id: number) {
-    setHistoryLoading(true)
-    setHistoryId(id)
+    setHistoryLoading(true);
+    setHistoryId(id);
     try {
-      const data = await apiCall<{ executions: ExecutionHistory[] }>(`${API_BASE}/${id}/history`)
-      setHistory(data.executions)
+      const data = await apiCall<{ executions: ExecutionHistory[] }>(`${API_BASE}/${id}/history`);
+      setHistory(data.executions);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load history")
+      setError(err instanceof Error ? err.message : "Failed to load history");
     } finally {
-      setHistoryLoading(false)
+      setHistoryLoading(false);
     }
   }
 
@@ -326,7 +327,10 @@ export default function WebSelectorBuilder() {
                   value={newUrl}
                   onChange={(e) => setNewUrl(e.target.value)}
                 />
-                <Select value={newType} onValueChange={(v) => setNewType(v as "css" | "xpath" | "aria")}>
+                <Select
+                  value={newType}
+                  onValueChange={(v) => setNewType(v as "css" | "xpath" | "aria")}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Selector type" />
                   </SelectTrigger>
@@ -399,14 +403,18 @@ export default function WebSelectorBuilder() {
                     <Badge variant="outline" className="font-mono">
                       {resolveResult.bestType.toUpperCase()}
                     </Badge>
-                    <code className="rounded bg-muted px-2 py-1 text-sm">{resolveResult.bestSelector}</code>
+                    <code className="rounded bg-muted px-2 py-1 text-sm">
+                      {resolveResult.bestSelector}
+                    </code>
                     <Badge variant={resolveResult.confidence > 0.7 ? "default" : "secondary"}>
                       {(resolveResult.confidence * 100).toFixed(0)}% confidence
                     </Badge>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => navigator.clipboard.writeText(resolveResult.bestSelector || "")}
+                      onClick={() =>
+                        navigator.clipboard.writeText(resolveResult.bestSelector || "")
+                      }
                     >
                       <CopyIcon className="h-3 w-3" />
                     </Button>
@@ -418,8 +426,13 @@ export default function WebSelectorBuilder() {
                       </summary>
                       <div className="mt-2 space-y-1">
                         {resolveResult.candidates.map((c, i) => (
-                          <div key={i} className="flex items-center gap-2 rounded bg-muted/50 px-2 py-1">
-                            <Badge variant="outline" className="text-xs font-mono">{c.type}</Badge>
+                          <div
+                            key={i}
+                            className="flex items-center gap-2 rounded bg-muted/50 px-2 py-1"
+                          >
+                            <Badge variant="outline" className="text-xs font-mono">
+                              {c.type}
+                            </Badge>
                             <code className="text-xs">{c.selector}</code>
                             <span className="text-xs text-muted-foreground">
                               {(c.confidence * 100).toFixed(0)}% — {c.reasoning}
@@ -508,12 +521,12 @@ export default function WebSelectorBuilder() {
                     <Dialog
                       open={executeDialogId === sel.id}
                       onOpenChange={(open) => {
-                        setExecuteDialogId(open ? sel.id : null)
+                        setExecuteDialogId(open ? sel.id : null);
                         if (!open) {
-                          setExecuteResult(null)
-                          setExecuteUrl(sel.url || "")
+                          setExecuteResult(null);
+                          setExecuteUrl(sel.url || "");
                         } else {
-                          setExecuteUrl(sel.url || "")
+                          setExecuteUrl(sel.url || "");
                         }
                       }}
                     >
@@ -601,10 +614,10 @@ export default function WebSelectorBuilder() {
                       open={historyId === sel.id}
                       onOpenChange={(open) => {
                         if (open) {
-                          fetchHistory(sel.id)
+                          fetchHistory(sel.id);
                         } else {
-                          setHistoryId(null)
-                          setHistory([])
+                          setHistoryId(null);
+                          setHistory([]);
                         }
                       }}
                     >
@@ -622,7 +635,9 @@ export default function WebSelectorBuilder() {
                             <RefreshCwIcon className="h-5 w-5 animate-spin text-muted-foreground" />
                           </div>
                         ) : history.length === 0 ? (
-                          <p className="py-8 text-center text-muted-foreground">No executions yet</p>
+                          <p className="py-8 text-center text-muted-foreground">
+                            No executions yet
+                          </p>
                         ) : (
                           <div className="max-h-96 space-y-2 overflow-auto">
                             {history.map((exec) => (
@@ -649,7 +664,9 @@ export default function WebSelectorBuilder() {
                                     <p className="mt-1 truncate text-xs">{exec.extractedContent}</p>
                                   )}
                                   {exec.errorMessage && (
-                                    <p className="mt-1 text-xs text-destructive">{exec.errorMessage}</p>
+                                    <p className="mt-1 text-xs text-destructive">
+                                      {exec.errorMessage}
+                                    </p>
                                   )}
                                   <p className="mt-1 text-xs text-muted-foreground">
                                     {new Date(exec.createdAt).toLocaleString()}
@@ -679,5 +696,5 @@ export default function WebSelectorBuilder() {
         </div>
       )}
     </div>
-  )
+  );
 }

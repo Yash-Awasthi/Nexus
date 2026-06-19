@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { Task } from "./task-router";
 
 export type QueueJobPayload = {
@@ -19,8 +20,8 @@ export function buildQueuePayloadFromTask(task: Task): QueueJobPayload {
       type: task.type,
       payload: {
         action: task.action,
-        ...(task.arguments ?? {})
-      }
+        ...(task.arguments ?? {}),
+      },
     };
   }
 
@@ -28,7 +29,7 @@ export function buildQueuePayloadFromTask(task: Task): QueueJobPayload {
   if (task.type) {
     return {
       type: task.type,
-      payload: { ...(task.arguments ?? {}) }
+      payload: { ...(task.arguments ?? {}) },
     };
   }
 
@@ -41,14 +42,14 @@ export function buildQueuePayloadFromTask(task: Task): QueueJobPayload {
     payloadPayload = {
       url: task.description.includes("illegal") ? "file:///etc/passwd" : "https://github.com",
       actions: [{ type: "navigate", value: "https://news.ycombinator.com" }],
-      timeoutMs: 5000
+      timeoutMs: 5000,
     };
   } else if (task.description.includes("scraping")) {
     payloadType = "scraping";
     payloadPayload = {
       url: "https://github.com",
       selectors: [".repo-title"],
-      maxRequests: 3
+      maxRequests: 3,
     };
   } else if (task.description.includes("search")) {
     payloadType = "search";

@@ -1,13 +1,28 @@
-"use client"
+// SPDX-License-Identifier: Apache-2.0
+"use client";
 
-import * as React from "react"
-import { PlusIcon, Trash2Icon, PencilIcon, FileTextIcon, XIcon, FolderOpenIcon } from "lucide-react"
+import * as React from "react";
+import {
+  PlusIcon,
+  Trash2Icon,
+  PencilIcon,
+  FileTextIcon,
+  XIcon,
+  FolderOpenIcon,
+} from "lucide-react";
 
-import { Button } from "~/components/ui/button"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "~/components/ui/card"
-import { Input } from "~/components/ui/input"
-import { Textarea } from "~/components/ui/textarea"
-import { Badge } from "~/components/ui/badge"
+import { Button } from "~/components/ui/button";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "~/components/ui/card";
+import { Input } from "~/components/ui/input";
+import { Textarea } from "~/components/ui/textarea";
+import { Badge } from "~/components/ui/badge";
 import {
   Dialog,
   DialogTrigger,
@@ -17,36 +32,36 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
-} from "~/components/ui/dialog"
+} from "~/components/ui/dialog";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 interface DocumentSet {
-  id: string
-  name: string
-  description: string | null
-  isPublic: boolean
-  memberCount?: number
-  createdAt: string
-  updatedAt: string
+  id: string;
+  name: string;
+  description: string | null;
+  isPublic: boolean;
+  memberCount?: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface DocumentSetMember {
-  id: string
-  documentSetId: string
-  documentId: string
-  documentTitle: string
-  documentSource: string | null
-  addedAt: string
+  id: string;
+  documentSetId: string;
+  documentId: string;
+  documentTitle: string;
+  documentSource: string | null;
+  addedAt: string;
 }
 
 interface DocumentSetManagerProps {
   /** Base API URL, defaults to "/api/document-sets" */
-  apiBase?: string
+  apiBase?: string;
   /** Called when a set is selected for scoping a conversation */
-  onSelectSet?: (set: DocumentSet) => void
+  onSelectSet?: (set: DocumentSet) => void;
   /** Optional class name */
-  className?: string
+  className?: string;
 }
 
 // ─── API helpers ────────────────────────────────────────────────────────────
@@ -58,12 +73,12 @@ async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
       "Content-Type": "application/json",
       ...init?.headers,
     },
-  })
+  });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body.message ?? `Request failed: ${res.status}`)
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message ?? `Request failed: ${res.status}`);
   }
-  return res.json() as Promise<T>
+  return res.json() as Promise<T>;
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
@@ -73,97 +88,97 @@ export function DocumentSetManager({
   onSelectSet,
   className,
 }: DocumentSetManagerProps) {
-  const [sets, setSets] = React.useState<DocumentSet[]>([])
-  const [loading, setLoading] = React.useState(true)
-  const [error, setError] = React.useState<string | null>(null)
+  const [sets, setSets] = React.useState<DocumentSet[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
   // Create dialog state
-  const [createOpen, setCreateOpen] = React.useState(false)
-  const [createName, setCreateName] = React.useState("")
-  const [createDescription, setCreateDescription] = React.useState("")
-  const [creating, setCreating] = React.useState(false)
+  const [createOpen, setCreateOpen] = React.useState(false);
+  const [createName, setCreateName] = React.useState("");
+  const [createDescription, setCreateDescription] = React.useState("");
+  const [creating, setCreating] = React.useState(false);
 
   // Edit dialog state
-  const [editSet, setEditSet] = React.useState<DocumentSet | null>(null)
-  const [editName, setEditName] = React.useState("")
-  const [editDescription, setEditDescription] = React.useState("")
-  const [editing, setEditing] = React.useState(false)
+  const [editSet, setEditSet] = React.useState<DocumentSet | null>(null);
+  const [editName, setEditName] = React.useState("");
+  const [editDescription, setEditDescription] = React.useState("");
+  const [editing, setEditing] = React.useState(false);
 
   // Members panel state
-  const [activeSetId, setActiveSetId] = React.useState<string | null>(null)
-  const [members, setMembers] = React.useState<DocumentSetMember[]>([])
-  const [membersLoading, setMembersLoading] = React.useState(false)
-  const [addDocId, setAddDocId] = React.useState("")
-  const [adding, setAdding] = React.useState(false)
+  const [activeSetId, setActiveSetId] = React.useState<string | null>(null);
+  const [members, setMembers] = React.useState<DocumentSetMember[]>([]);
+  const [membersLoading, setMembersLoading] = React.useState(false);
+  const [addDocId, setAddDocId] = React.useState("");
+  const [adding, setAdding] = React.useState(false);
 
   // ─── Load sets ────────────────────────────────────────────────────────────
 
   const loadSets = React.useCallback(async () => {
     try {
-      setLoading(true)
-      setError(null)
-      const data = await apiFetch<DocumentSet[]>(apiBase)
-      setSets(data)
+      setLoading(true);
+      setError(null);
+      const data = await apiFetch<DocumentSet[]>(apiBase);
+      setSets(data);
     } catch (err: any) {
-      setError(err.message ?? "Failed to load document sets")
+      setError(err.message ?? "Failed to load document sets");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [apiBase])
+  }, [apiBase]);
 
   React.useEffect(() => {
-    loadSets()
-  }, [loadSets])
+    loadSets();
+  }, [loadSets]);
 
   // ─── Create ───────────────────────────────────────────────────────────────
 
   async function handleCreate() {
-    if (!createName.trim()) return
+    if (!createName.trim()) return;
     try {
-      setCreating(true)
+      setCreating(true);
       await apiFetch<{ success: boolean; id: string }>(apiBase, {
         method: "POST",
         body: JSON.stringify({
           name: createName.trim(),
           description: createDescription.trim() || undefined,
         }),
-      })
-      setCreateName("")
-      setCreateDescription("")
-      setCreateOpen(false)
-      await loadSets()
+      });
+      setCreateName("");
+      setCreateDescription("");
+      setCreateOpen(false);
+      await loadSets();
     } catch (err: any) {
-      setError(err.message)
+      setError(err.message);
     } finally {
-      setCreating(false)
+      setCreating(false);
     }
   }
 
   // ─── Edit ─────────────────────────────────────────────────────────────────
 
   function openEdit(set: DocumentSet) {
-    setEditSet(set)
-    setEditName(set.name)
-    setEditDescription(set.description ?? "")
+    setEditSet(set);
+    setEditName(set.name);
+    setEditDescription(set.description ?? "");
   }
 
   async function handleEdit() {
-    if (!editSet || !editName.trim()) return
+    if (!editSet || !editName.trim()) return;
     try {
-      setEditing(true)
+      setEditing(true);
       await apiFetch<{ success: boolean }>(`${apiBase}/${editSet.id}`, {
         method: "PUT",
         body: JSON.stringify({
           name: editName.trim(),
           description: editDescription.trim() || undefined,
         }),
-      })
-      setEditSet(null)
-      await loadSets()
+      });
+      setEditSet(null);
+      await loadSets();
     } catch (err: any) {
-      setError(err.message)
+      setError(err.message);
     } finally {
-      setEditing(false)
+      setEditing(false);
     }
   }
 
@@ -173,14 +188,14 @@ export function DocumentSetManager({
     try {
       await apiFetch<{ success: boolean }>(`${apiBase}/${id}`, {
         method: "DELETE",
-      })
+      });
       if (activeSetId === id) {
-        setActiveSetId(null)
-        setMembers([])
+        setActiveSetId(null);
+        setMembers([]);
       }
-      await loadSets()
+      await loadSets();
     } catch (err: any) {
-      setError(err.message)
+      setError(err.message);
     }
   }
 
@@ -188,50 +203,49 @@ export function DocumentSetManager({
 
   async function loadMembers(setId: string) {
     try {
-      setMembersLoading(true)
-      const data = await apiFetch<DocumentSetMember[]>(`${apiBase}/${setId}/members`)
-      setMembers(data)
-      setActiveSetId(setId)
+      setMembersLoading(true);
+      const data = await apiFetch<DocumentSetMember[]>(`${apiBase}/${setId}/members`);
+      setMembers(data);
+      setActiveSetId(setId);
     } catch (err: any) {
-      setError(err.message)
+      setError(err.message);
     } finally {
-      setMembersLoading(false)
+      setMembersLoading(false);
     }
   }
 
   async function handleAddDocument() {
-    if (!activeSetId || !addDocId.trim()) return
+    if (!activeSetId || !addDocId.trim()) return;
     try {
-      setAdding(true)
+      setAdding(true);
       await apiFetch<{ success: boolean }>(`${apiBase}/${activeSetId}/members`, {
         method: "POST",
         body: JSON.stringify({ documentIds: [addDocId.trim()] }),
-      })
-      setAddDocId("")
-      await loadMembers(activeSetId)
+      });
+      setAddDocId("");
+      await loadMembers(activeSetId);
     } catch (err: any) {
-      setError(err.message)
+      setError(err.message);
     } finally {
-      setAdding(false)
+      setAdding(false);
     }
   }
 
   async function handleRemoveDocument(documentId: string) {
-    if (!activeSetId) return
+    if (!activeSetId) return;
     try {
-      await apiFetch<{ success: boolean }>(
-        `${apiBase}/${activeSetId}/members/${documentId}`,
-        { method: "DELETE" },
-      )
-      await loadMembers(activeSetId)
+      await apiFetch<{ success: boolean }>(`${apiBase}/${activeSetId}/members/${documentId}`, {
+        method: "DELETE",
+      });
+      await loadMembers(activeSetId);
     } catch (err: any) {
-      setError(err.message)
+      setError(err.message);
     }
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
-  const activeSet = sets.find((s) => s.id === activeSetId)
+  const activeSet = sets.find((s) => s.id === activeSetId);
 
   return (
     <div className={className}>
@@ -336,11 +350,7 @@ export function DocumentSetManager({
               </div>
             </CardContent>
             <CardFooter className="flex items-center gap-1 border-t pt-3">
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => loadMembers(set.id)}
-              >
+              <Button variant="ghost" size="xs" onClick={() => loadMembers(set.id)}>
                 <FileTextIcon data-icon="inline-start" />
                 Docs
               </Button>
@@ -348,11 +358,7 @@ export function DocumentSetManager({
                 <PencilIcon data-icon="inline-start" />
                 Edit
               </Button>
-              <Button
-                variant="destructive"
-                size="xs"
-                onClick={() => handleDelete(set.id)}
-              >
+              <Button variant="destructive" size="xs" onClick={() => handleDelete(set.id)}>
                 <Trash2Icon data-icon="inline-start" />
                 Delete
               </Button>
@@ -375,9 +381,7 @@ export function DocumentSetManager({
       {activeSet && (
         <div className="mt-4 rounded-lg border bg-card p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-xs font-semibold">
-              Documents in "{activeSet.name}"
-            </h3>
+            <h3 className="text-xs font-semibold">Documents in "{activeSet.name}"</h3>
             <Button variant="ghost" size="icon-xs" onClick={() => setActiveSetId(null)}>
               <XIcon />
             </Button>
@@ -392,11 +396,7 @@ export function DocumentSetManager({
               onKeyDown={(e) => e.key === "Enter" && handleAddDocument()}
               className="flex-1"
             />
-            <Button
-              size="sm"
-              onClick={handleAddDocument}
-              disabled={adding || !addDocId.trim()}
-            >
+            <Button size="sm" onClick={handleAddDocument} disabled={adding || !addDocId.trim()}>
               {adding ? "Adding..." : "Add"}
             </Button>
           </div>
@@ -468,5 +468,5 @@ export function DocumentSetManager({
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

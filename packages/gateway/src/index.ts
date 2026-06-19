@@ -359,7 +359,7 @@ export { DEFAULT_BASE_URLS, GROQ_SMART, GROQ_FAST };
 export interface IProvider {
   /** Send messages and return a streaming async iterable of text chunks. */
   complete(
-    messages: Array<{ role: string; content: string }>,
+    messages: { role: string; content: string }[],
     tools: unknown[],
     system: string,
     resumeSessionId?: string,
@@ -371,7 +371,7 @@ export interface IProvider {
    * Falls back to `complete(messages, tools, systemStatic)` by default.
    */
   completeSplit?(
-    messages: Array<{ role: string; content: string }>,
+    messages: { role: string; content: string }[],
     tools: unknown[],
     systemStatic: string,
     systemDynamic: string,
@@ -414,8 +414,7 @@ export const FailoverDecision = {
   RetryAndMarkUnavailable: "retry-and-mark-unavailable",
 } as const;
 
-export type FailoverDecision =
-  (typeof FailoverDecision)[keyof typeof FailoverDecision];
+export type FailoverDecision = (typeof FailoverDecision)[keyof typeof FailoverDecision];
 
 export function failoverShouldSwitch(d: FailoverDecision): boolean {
   return d !== FailoverDecision.None;
@@ -455,13 +454,9 @@ export function failoverPromptToMessage(prompt: ProviderFailoverPrompt): string 
 }
 
 /** Parse a failover prompt from an error message string. Returns null if not present. */
-export function parseFailoverPromptMessage(
-  message: string,
-): ProviderFailoverPrompt | null {
+export function parseFailoverPromptMessage(message: string): ProviderFailoverPrompt | null {
   const line = message.split("\n")[0]?.trim() ?? "";
-  const json = line.startsWith(_FAILOVER_PREFIX)
-    ? line.slice(_FAILOVER_PREFIX.length)
-    : null;
+  const json = line.startsWith(_FAILOVER_PREFIX) ? line.slice(_FAILOVER_PREFIX.length) : null;
   if (!json) return null;
   try {
     return JSON.parse(json) as ProviderFailoverPrompt;
@@ -506,31 +501,60 @@ export function classifyFailoverError(message: string): FailoverDecision {
     return before && after;
   }
 
-  const isContextSize = [
-    "context length", "context_length", "context window", "maximum context",
-    "prompt is too long", "input is too long", "too many tokens",
-    "max tokens", "token limit", "token_limit",
-    "413 payload too large", "413 request entity too large",
-  ].some((p) => lower.includes(p)) || hasCode("413");
+  const isContextSize =
+    [
+      "context length",
+      "context_length",
+      "context window",
+      "maximum context",
+      "prompt is too long",
+      "input is too long",
+      "too many tokens",
+      "max tokens",
+      "token limit",
+      "token_limit",
+      "413 payload too large",
+      "413 request entity too large",
+    ].some((p) => lower.includes(p)) || hasCode("413");
 
   if (isContextSize) return FailoverDecision.RetryNextProvider;
 
-  const isRateOrQuota = [
-    "rate limit", "rate-limited", "too many requests", "quota",
-    "credit balance", "credits have run out", "insufficient credit",
-    "billing", "payment required", "usage tier",
-  ].some((p) => lower.includes(p)) || hasCode("429") || hasCode("402");
+  const isRateOrQuota =
+    [
+      "rate limit",
+      "rate-limited",
+      "too many requests",
+      "quota",
+      "credit balance",
+      "credits have run out",
+      "insufficient credit",
+      "billing",
+      "payment required",
+      "usage tier",
+    ].some((p) => lower.includes(p)) ||
+    hasCode("429") ||
+    hasCode("402");
 
   if (isRateOrQuota) return FailoverDecision.RetryAndMarkUnavailable;
 
-  const isAuthAccess = [
-    "access denied", "not accessible by integration",
-    "provider unavailable", "provider not available",
-    "provider is unavailable", "provider currently unavailable",
-    "provider not configured", "credentials are not configured",
-    "no credentials", "token exchange failed",
-    "authentication failed", "unauthorized", "forbidden",
-  ].some((p) => lower.includes(p)) || hasCode("401") || hasCode("403");
+  const isAuthAccess =
+    [
+      "access denied",
+      "not accessible by integration",
+      "provider unavailable",
+      "provider not available",
+      "provider is unavailable",
+      "provider currently unavailable",
+      "provider not configured",
+      "credentials are not configured",
+      "no credentials",
+      "token exchange failed",
+      "authentication failed",
+      "unauthorized",
+      "forbidden",
+    ].some((p) => lower.includes(p)) ||
+    hasCode("401") ||
+    hasCode("403");
 
   if (isAuthAccess) return FailoverDecision.RetryAndMarkUnavailable;
 
@@ -544,11 +568,7 @@ export function classifyFailoverError(message: string): FailoverDecision {
 // paths, timing windows (wake, handoff, grace), and resource snapshots.
 // Useful for any long-running async job that needs durable state.
 
-export type OvernightRunStatus =
-  | "running"
-  | "cancel_requested"
-  | "completed"
-  | "failed";
+export type OvernightRunStatus = "running" | "cancel_requested" | "completed" | "failed";
 
 /**
  * Durable manifest for a background / overnight run.
@@ -638,17 +658,13 @@ export interface FallbackChainResult<T> {
   /** 1-based index of the successful attempt. */
   attemptCount: number;
   /** Per-attempt failures for all models tried before success. */
-  errors: Array<{ model: FallbackModel; error: unknown }>;
+  errors: { model: FallbackModel; error: unknown }[];
 }
 
 /** Options for {@link runFallbackChain}. */
 export interface FallbackChainOptions {
   /** Called immediately before switching to the next model in the chain. */
-  onFallback?: (
-    from: FallbackModel,
-    to: FallbackModel,
-    error: unknown
-  ) => void;
+  onFallback?: (from: FallbackModel, to: FallbackModel, error: unknown) => void;
 }
 
 /**
@@ -669,14 +685,14 @@ export interface FallbackChainOptions {
 export async function runFallbackChain<T>(
   chain: FallbackModel[],
   fn: FallbackCallFn<T>,
-  opts?: FallbackChainOptions
+  opts?: FallbackChainOptions,
 ): Promise<FallbackChainResult<T>> {
   if (chain.length === 0) {
     throw new Error("runFallbackChain: chain must not be empty");
   }
-  const errors: Array<{ model: FallbackModel; error: unknown }> = [];
+  const errors: { model: FallbackModel; error: unknown }[] = [];
   for (let i = 0; i < chain.length; i++) {
-    const target = chain[i];
+    const target = chain[i]!;
     try {
       const result = await fn(target);
       return { result, usedModel: target, attemptCount: i + 1, errors };
@@ -688,10 +704,9 @@ export async function runFallbackChain<T>(
       }
     }
   }
-  throw Object.assign(
-    new Error(`runFallbackChain: all ${chain.length} model(s) failed`),
-    { errors }
-  );
+  throw Object.assign(new Error(`runFallbackChain: all ${chain.length} model(s) failed`), {
+    errors,
+  });
 }
 
 // ── Cost callback registry ─────────────────────────────────────────────────────
@@ -721,9 +736,7 @@ export interface GatewayCostEvent {
 }
 
 /** Observer function registered with {@link CostCallbackRegistry}. */
-export type CostCallbackFn = (
-  event: GatewayCostEvent
-) => void | Promise<void>;
+export type CostCallbackFn = (event: GatewayCostEvent) => void | Promise<void>;
 
 /**
  * Registry of cost-tracking callbacks. Fire all observers after each
@@ -785,7 +798,7 @@ export const SINGLEFLIGHT_MAX_KEYS = 1024;
  * ```
  */
 export class Singleflight<T> {
-  private readonly _pending: Map<string, Promise<T>> = new Map();
+  private readonly _pending = new Map<string, Promise<T>>();
   private readonly _maxKeys: number;
 
   constructor(maxKeys = SINGLEFLIGHT_MAX_KEYS) {

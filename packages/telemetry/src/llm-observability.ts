@@ -39,16 +39,16 @@
 
 /** Type of LLM observation span (what kind of operation is being traced) */
 export type LlmObservationType =
-  | "GENERATION"   // LLM completion call (input prompt → output tokens)
-  | "AGENT"        // An autonomous agent turn (may contain child spans)
-  | "TOOL"         // A tool call invocation (MCP tool, function call, etc.)
-  | "RETRIEVER"    // A retrieval operation (vector search, BM25, graph query)
-  | "EMBEDDING"    // An embedding generation call
-  | "CHAIN"        // A sequence of operations forming a pipeline
-  | "EVALUATOR"    // A quality evaluation step
-  | "GUARDRAIL"    // A safety / guardrail check
-  | "SPAN"         // Generic span (default for unknown types)
-  | "EVENT";       // Point-in-time event (no duration)
+  | "GENERATION" // LLM completion call (input prompt → output tokens)
+  | "AGENT" // An autonomous agent turn (may contain child spans)
+  | "TOOL" // A tool call invocation (MCP tool, function call, etc.)
+  | "RETRIEVER" // A retrieval operation (vector search, BM25, graph query)
+  | "EMBEDDING" // An embedding generation call
+  | "CHAIN" // A sequence of operations forming a pipeline
+  | "EVALUATOR" // A quality evaluation step
+  | "GUARDRAIL" // A safety / guardrail check
+  | "SPAN" // Generic span (default for unknown types)
+  | "EVENT"; // Point-in-time event (no duration)
 
 /** Severity level for an LLM observation */
 export type LlmObservationLevel = "DEBUG" | "DEFAULT" | "WARNING" | "ERROR";
@@ -122,28 +122,74 @@ export interface ModelPriceEntry {
  */
 export const MODEL_PRICE_TABLE: Record<string, ModelPriceEntry> = {
   // Anthropic
-  "claude-opus-4-5":            { input: 0.000015,  output: 0.000075,  inputCachedRead: 0.0000015,  inputCachedCreation: 0.00001875, provider: "anthropic" },
-  "claude-sonnet-4-5":          { input: 0.000003,  output: 0.000015,  inputCachedRead: 0.0000003,  inputCachedCreation: 0.00000375, provider: "anthropic" },
-  "claude-haiku-3-5":           { input: 0.0000008, output: 0.000004,  inputCachedRead: 0.00000008, inputCachedCreation: 0.000001,   provider: "anthropic" },
-  "claude-3-5-sonnet":          { input: 0.000003,  output: 0.000015,  inputCachedRead: 0.0000003,  inputCachedCreation: 0.00000375, provider: "anthropic" },
-  "claude-3-5-haiku":           { input: 0.0000008, output: 0.000004,  inputCachedRead: 0.00000008, inputCachedCreation: 0.000001,   provider: "anthropic" },
-  "claude-3-opus":              { input: 0.000015,  output: 0.000075,  inputCachedRead: 0.0000015,  inputCachedCreation: 0.00001875, provider: "anthropic" },
+  "claude-opus-4-5": {
+    input: 0.000015,
+    output: 0.000075,
+    inputCachedRead: 0.0000015,
+    inputCachedCreation: 0.00001875,
+    provider: "anthropic",
+  },
+  "claude-sonnet-4-5": {
+    input: 0.000003,
+    output: 0.000015,
+    inputCachedRead: 0.0000003,
+    inputCachedCreation: 0.00000375,
+    provider: "anthropic",
+  },
+  "claude-haiku-3-5": {
+    input: 0.0000008,
+    output: 0.000004,
+    inputCachedRead: 0.00000008,
+    inputCachedCreation: 0.000001,
+    provider: "anthropic",
+  },
+  "claude-3-5-sonnet": {
+    input: 0.000003,
+    output: 0.000015,
+    inputCachedRead: 0.0000003,
+    inputCachedCreation: 0.00000375,
+    provider: "anthropic",
+  },
+  "claude-3-5-haiku": {
+    input: 0.0000008,
+    output: 0.000004,
+    inputCachedRead: 0.00000008,
+    inputCachedCreation: 0.000001,
+    provider: "anthropic",
+  },
+  "claude-3-opus": {
+    input: 0.000015,
+    output: 0.000075,
+    inputCachedRead: 0.0000015,
+    inputCachedCreation: 0.00001875,
+    provider: "anthropic",
+  },
   // OpenAI
-  "gpt-4o":                     { input: 0.0000025, output: 0.00001,   inputCachedRead: 0.00000125,                                  provider: "openai" },
-  "gpt-4o-mini":                { input: 0.00000015,output: 0.0000006, inputCachedRead: 0.000000075,                                 provider: "openai" },
-  "o3":                         { input: 0.00001,   output: 0.00004,   inputCachedRead: 0.0000025,                                   provider: "openai" },
-  "o3-mini":                    { input: 0.0000011, output: 0.0000044, inputCachedRead: 0.00000055,                                  provider: "openai" },
-  "gpt-4-turbo":                { input: 0.00001,   output: 0.00003,                                                                 provider: "openai" },
-  "gpt-3.5-turbo":              { input: 0.0000005, output: 0.0000015,                                                               provider: "openai" },
+  "gpt-4o": { input: 0.0000025, output: 0.00001, inputCachedRead: 0.00000125, provider: "openai" },
+  "gpt-4o-mini": {
+    input: 0.00000015,
+    output: 0.0000006,
+    inputCachedRead: 0.000000075,
+    provider: "openai",
+  },
+  o3: { input: 0.00001, output: 0.00004, inputCachedRead: 0.0000025, provider: "openai" },
+  "o3-mini": {
+    input: 0.0000011,
+    output: 0.0000044,
+    inputCachedRead: 0.00000055,
+    provider: "openai",
+  },
+  "gpt-4-turbo": { input: 0.00001, output: 0.00003, provider: "openai" },
+  "gpt-3.5-turbo": { input: 0.0000005, output: 0.0000015, provider: "openai" },
   // Groq (very cheap — approximately)
-  "llama-3.3-70b-versatile":    { input: 0.00000059,output: 0.00000079,                                                              provider: "groq" },
-  "llama-3.1-8b-instant":       { input: 0.00000005,output: 0.00000008,                                                              provider: "groq" },
-  "gemma2-9b-it":               { input: 0.0000002, output: 0.0000002,                                                               provider: "groq" },
-  "mixtral-8x7b-32768":         { input: 0.00000024,output: 0.00000024,                                                              provider: "groq" },
+  "llama-3.3-70b-versatile": { input: 0.00000059, output: 0.00000079, provider: "groq" },
+  "llama-3.1-8b-instant": { input: 0.00000005, output: 0.00000008, provider: "groq" },
+  "gemma2-9b-it": { input: 0.0000002, output: 0.0000002, provider: "groq" },
+  "mixtral-8x7b-32768": { input: 0.00000024, output: 0.00000024, provider: "groq" },
   // Google Gemini
-  "gemini-2.0-flash":           { input: 0.0000001, output: 0.0000004,                                                               provider: "google" },
-  "gemini-1.5-pro":             { input: 0.00000125,output: 0.000005,                                                                provider: "google" },
-  "gemini-1.5-flash":           { input: 0.000000075,output: 0.0000003,                                                              provider: "google" },
+  "gemini-2.0-flash": { input: 0.0000001, output: 0.0000004, provider: "google" },
+  "gemini-1.5-pro": { input: 0.00000125, output: 0.000005, provider: "google" },
+  "gemini-1.5-flash": { input: 0.000000075, output: 0.0000003, provider: "google" },
 };
 
 /**
@@ -177,10 +223,7 @@ export function resolveModelPrice(modelName: string): ModelPriceEntry | undefine
  *
  * Ref: langfuse pricing-tiers/matcher.ts evaluateCondition + price calculation
  */
-export function computeTokenCost(
-  modelName: string,
-  usage: LlmUsageDetails,
-): LlmCostDetails {
+export function computeTokenCost(modelName: string, usage: LlmUsageDetails): LlmCostDetails {
   const price = resolveModelPrice(modelName);
 
   if (!price) {
@@ -189,18 +232,16 @@ export function computeTokenCost(
 
   const inputCost = (usage.input ?? 0) * price.input;
   const outputCost = (usage.output ?? 0) * price.output;
-  const cachedReadCost = usage.cached_read !== undefined
-    ? usage.cached_read * (price.inputCachedRead ?? price.input * 0.5)
-    : undefined;
-  const cachedCreationCost = usage.cached_creation !== undefined
-    ? usage.cached_creation * (price.inputCachedCreation ?? price.input * 1.25)
-    : undefined;
+  const cachedReadCost =
+    usage.cached_read !== undefined
+      ? usage.cached_read * (price.inputCachedRead ?? price.input * 0.5)
+      : undefined;
+  const cachedCreationCost =
+    usage.cached_creation !== undefined
+      ? usage.cached_creation * (price.inputCachedCreation ?? price.input * 1.25)
+      : undefined;
 
-  const total =
-    inputCost +
-    outputCost +
-    (cachedReadCost ?? 0) +
-    (cachedCreationCost ?? 0);
+  const total = inputCost + outputCost + (cachedReadCost ?? 0) + (cachedCreationCost ?? 0);
 
   return {
     input: inputCost,
@@ -221,30 +262,30 @@ export function computeTokenCost(
 /** OTel span attribute key constants for LLM observations */
 export const LLM_SPAN_ATTR = {
   // Observation identity
-  OBSERVATION_TYPE:         "langfuse.observation.type",
-  OBSERVATION_LEVEL:        "langfuse.observation.level",
-  OBSERVATION_STATUS_MSG:   "langfuse.observation.status_message",
+  OBSERVATION_TYPE: "langfuse.observation.type",
+  OBSERVATION_LEVEL: "langfuse.observation.level",
+  OBSERVATION_STATUS_MSG: "langfuse.observation.status_message",
   // I/O
-  OBSERVATION_INPUT:        "langfuse.observation.input",
-  OBSERVATION_OUTPUT:       "langfuse.observation.output",
-  OBSERVATION_METADATA:     "langfuse.observation.metadata",
+  OBSERVATION_INPUT: "langfuse.observation.input",
+  OBSERVATION_OUTPUT: "langfuse.observation.output",
+  OBSERVATION_METADATA: "langfuse.observation.metadata",
   // Model + usage
-  OBSERVATION_MODEL:        "langfuse.observation.model.name",
+  OBSERVATION_MODEL: "langfuse.observation.model.name",
   OBSERVATION_MODEL_PARAMS: "langfuse.observation.model.parameters",
-  OBSERVATION_USAGE:        "langfuse.observation.usage_details",
-  OBSERVATION_COST:         "langfuse.observation.cost_details",
-  OBSERVATION_TTFT:         "langfuse.observation.time_to_first_token_ms",
+  OBSERVATION_USAGE: "langfuse.observation.usage_details",
+  OBSERVATION_COST: "langfuse.observation.cost_details",
+  OBSERVATION_TTFT: "langfuse.observation.time_to_first_token_ms",
   // Prompt versioning
-  PROMPT_NAME:              "langfuse.observation.prompt.name",
-  PROMPT_VERSION:           "langfuse.observation.prompt.version",
-  PROMPT_ID:                "langfuse.observation.prompt.id",
+  PROMPT_NAME: "langfuse.observation.prompt.name",
+  PROMPT_VERSION: "langfuse.observation.prompt.version",
+  PROMPT_ID: "langfuse.observation.prompt.id",
   // Session / trace grouping
-  TRACE_SESSION_ID:         "session.id",
-  TRACE_USER_ID:            "user.id",
-  TRACE_NAME:               "langfuse.trace.name",
+  TRACE_SESSION_ID: "session.id",
+  TRACE_USER_ID: "user.id",
+  TRACE_NAME: "langfuse.trace.name",
   // Environment
-  ENVIRONMENT:              "langfuse.environment",
-  RELEASE:                  "langfuse.release",
+  ENVIRONMENT: "langfuse.environment",
+  RELEASE: "langfuse.release",
 } as const;
 
 // ── LLM span attributes payload ───────────────────────────────────────────────
@@ -314,40 +355,53 @@ export type LlmSpanAttributeMap = Record<string, string | number | boolean | und
  */
 export function createLlmSpanAttributes(input: LlmSpanInput): LlmSpanAttributeMap {
   const {
-    model, provider, usage, type = "GENERATION", level = "DEFAULT",
-    timeToFirstTokenMs, latencyMs, modelParameters, promptName,
-    promptVersion, promptId, sessionId, userId, traceName, statusMessage,
+    model,
+    provider,
+    usage,
+    type = "GENERATION",
+    level = "DEFAULT",
+    timeToFirstTokenMs,
+    latencyMs,
+    modelParameters,
+    promptName,
+    promptVersion,
+    promptId,
+    sessionId,
+    userId,
+    traceName,
+    statusMessage,
   } = input;
 
   // Compute cost if not provided
-  const cost: LlmCostDetails | undefined = input.cost ??
-    (usage ? computeTokenCost(model, usage) : undefined);
+  const cost: LlmCostDetails | undefined =
+    input.cost ?? (usage ? computeTokenCost(model, usage) : undefined);
 
   const attrs: LlmSpanAttributeMap = {
-    [LLM_SPAN_ATTR.OBSERVATION_TYPE]:   type,
-    [LLM_SPAN_ATTR.OBSERVATION_LEVEL]:  level,
-    [LLM_SPAN_ATTR.OBSERVATION_MODEL]:  model,
+    [LLM_SPAN_ATTR.OBSERVATION_TYPE]: type,
+    [LLM_SPAN_ATTR.OBSERVATION_LEVEL]: level,
+    [LLM_SPAN_ATTR.OBSERVATION_MODEL]: model,
   };
 
-  if (provider)           attrs["llm.provider"] = provider;
-  if (statusMessage)      attrs[LLM_SPAN_ATTR.OBSERVATION_STATUS_MSG] = statusMessage;
+  if (provider) attrs["llm.provider"] = provider;
+  if (statusMessage) attrs[LLM_SPAN_ATTR.OBSERVATION_STATUS_MSG] = statusMessage;
   if (timeToFirstTokenMs !== undefined) attrs[LLM_SPAN_ATTR.OBSERVATION_TTFT] = timeToFirstTokenMs;
-  if (latencyMs !== undefined)          attrs["llm.latency_ms"] = latencyMs;
-  if (promptName)         attrs[LLM_SPAN_ATTR.PROMPT_NAME] = promptName;
+  if (latencyMs !== undefined) attrs["llm.latency_ms"] = latencyMs;
+  if (promptName) attrs[LLM_SPAN_ATTR.PROMPT_NAME] = promptName;
   if (promptVersion !== undefined) attrs[LLM_SPAN_ATTR.PROMPT_VERSION] = promptVersion;
-  if (promptId)           attrs[LLM_SPAN_ATTR.PROMPT_ID] = promptId;
-  if (sessionId)          attrs[LLM_SPAN_ATTR.TRACE_SESSION_ID] = sessionId;
-  if (userId)             attrs[LLM_SPAN_ATTR.TRACE_USER_ID] = userId;
-  if (traceName)          attrs[LLM_SPAN_ATTR.TRACE_NAME] = traceName;
+  if (promptId) attrs[LLM_SPAN_ATTR.PROMPT_ID] = promptId;
+  if (sessionId) attrs[LLM_SPAN_ATTR.TRACE_SESSION_ID] = sessionId;
+  if (userId) attrs[LLM_SPAN_ATTR.TRACE_USER_ID] = userId;
+  if (traceName) attrs[LLM_SPAN_ATTR.TRACE_NAME] = traceName;
 
   // Flatten usage details to individual attributes
   if (usage) {
-    if (usage.input !== undefined)           attrs["llm.usage.input_tokens"] = usage.input;
-    if (usage.output !== undefined)          attrs["llm.usage.output_tokens"] = usage.output;
-    if (usage.total !== undefined)           attrs["llm.usage.total_tokens"] = usage.total;
-    if (usage.cached_read !== undefined)     attrs["llm.usage.cached_read_tokens"] = usage.cached_read;
-    if (usage.cached_creation !== undefined) attrs["llm.usage.cached_creation_tokens"] = usage.cached_creation;
-    if (usage.reasoning !== undefined)       attrs["llm.usage.reasoning_tokens"] = usage.reasoning;
+    if (usage.input !== undefined) attrs["llm.usage.input_tokens"] = usage.input;
+    if (usage.output !== undefined) attrs["llm.usage.output_tokens"] = usage.output;
+    if (usage.total !== undefined) attrs["llm.usage.total_tokens"] = usage.total;
+    if (usage.cached_read !== undefined) attrs["llm.usage.cached_read_tokens"] = usage.cached_read;
+    if (usage.cached_creation !== undefined)
+      attrs["llm.usage.cached_creation_tokens"] = usage.cached_creation;
+    if (usage.reasoning !== undefined) attrs["llm.usage.reasoning_tokens"] = usage.reasoning;
     // Serialise full map for Langfuse-compatible collectors
     attrs[LLM_SPAN_ATTR.OBSERVATION_USAGE] = JSON.stringify(usage);
   }
@@ -417,7 +471,8 @@ export function buildGenerationRecord(
   timing: { startTime: Date; endTime: Date; timeToFirstTokenMs?: number },
 ): LlmGenerationRecord {
   const usage = input.usage ?? {};
-  const cost = input.cost ?? (input.usage ? computeTokenCost(input.model, input.usage) : { currency: "USD" });
+  const cost =
+    input.cost ?? (input.usage ? computeTokenCost(input.model, input.usage) : { currency: "USD" });
   const latencyMs = timing.endTime.getTime() - timing.startTime.getTime();
 
   return {
@@ -480,9 +535,7 @@ export interface SessionCostSummary {
  * console.log(`Run cost: $${summaries[0]?.totalCostUsd.toFixed(6)}`);
  * ```
  */
-export function aggregateSessionCost(
-  records: LlmGenerationRecord[],
-): SessionCostSummary[] {
+export function aggregateSessionCost(records: LlmGenerationRecord[]): SessionCostSummary[] {
   const bySession = new Map<string, LlmGenerationRecord[]>();
 
   for (const r of records) {
@@ -524,7 +577,12 @@ export function aggregateSessionCost(
       totalCachedReadTokens,
       totalCachedCreationTokens,
       totalReasoningTokens,
-      totalTokens: totalInputTokens + totalOutputTokens + totalCachedReadTokens + totalCachedCreationTokens + totalReasoningTokens,
+      totalTokens:
+        totalInputTokens +
+        totalOutputTokens +
+        totalCachedReadTokens +
+        totalCachedCreationTokens +
+        totalReasoningTokens,
       totalCostUsd,
       generationCount: sessionRecords.length,
       avgLatencyMs: sessionRecords.length > 0 ? totalLatencyMs / sessionRecords.length : 0,

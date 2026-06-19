@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // @splinetool/react-spline removed — stubbed out
 interface SplineSceneProps {
   scene: string;

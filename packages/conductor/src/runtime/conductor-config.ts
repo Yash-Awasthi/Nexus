@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import * as fs from "fs";
 import * as path from "path";
 import { loadEnvFile } from "./env-loader";
@@ -26,10 +27,9 @@ const DEFAULTS: ConductorConfig = {
     flociStrict: false,
     offlineMode: true,
     mcpBridge: true,
-    mcpExternal: true
-  }
+    mcpExternal: true,
+  },
 };
-
 
 function envBool(key: string, fallback: boolean): boolean {
   const v = process.env[key];
@@ -60,11 +60,15 @@ function validateConfig(config: ConductorConfig): void {
   const errors: string[] = [];
 
   if (isNaN(config.apiPort) || config.apiPort < 1 || config.apiPort > 65535) {
-    errors.push(`- apiPort: "${config.apiPort}" is invalid. Must be an integer between 1 and 65535.`);
+    errors.push(
+      `- apiPort: "${config.apiPort}" is invalid. Must be an integer between 1 and 65535.`,
+    );
   }
 
   if (isNaN(config.mcpPort) || config.mcpPort < 1 || config.mcpPort > 65535) {
-    errors.push(`- mcpPort: "${config.mcpPort}" is invalid. Must be an integer between 1 and 65535.`);
+    errors.push(
+      `- mcpPort: "${config.mcpPort}" is invalid. Must be an integer between 1 and 65535.`,
+    );
   }
 
   if (!config.flociUrl.startsWith("http://") && !config.flociUrl.startsWith("https://")) {
@@ -106,8 +110,8 @@ export function loadConductorConfig(repoRoot: string): ConductorConfig {
     dataDir: fileConfig.dataDir ?? DEFAULTS.dataDir,
     features: {
       ...DEFAULTS.features,
-      ...(fileConfig.features ?? {})
-    }
+      ...(fileConfig.features ?? {}),
+    },
   };
 
   if (process.env.GHOSTSTACK_API_PORT) merged.apiPort = Number(process.env.GHOSTSTACK_API_PORT);
@@ -115,7 +119,10 @@ export function loadConductorConfig(repoRoot: string): ConductorConfig {
   if (process.env.GHOSTSTACK_MCP_PORT) merged.mcpPort = Number(process.env.GHOSTSTACK_MCP_PORT);
   if (process.env.GHOSTSTACK_DATA_DIR) merged.dataDir = process.env.GHOSTSTACK_DATA_DIR;
 
-  merged.features.flociAutostart = envBool("GHOSTSTACK_FLOCI_AUTOSTART", merged.features.flociAutostart);
+  merged.features.flociAutostart = envBool(
+    "GHOSTSTACK_FLOCI_AUTOSTART",
+    merged.features.flociAutostart,
+  );
   merged.features.flociStrict = envBool("GHOSTSTACK_FLOCI_STRICT", merged.features.flociStrict);
   merged.features.offlineMode = envBool("GHOSTSTACK_OFFLINE_MODE", merged.features.offlineMode);
   merged.features.mcpBridge = envBool("GHOSTSTACK_MCP_BRIDGE", merged.features.mcpBridge);

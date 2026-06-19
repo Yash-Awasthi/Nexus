@@ -1,15 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
 "use client";
 
 import type { Route } from "./+types/infra-calculator";
 import { useState, useMemo } from "react";
 import { Badge } from "~/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -43,33 +38,210 @@ interface ModelInfo {
 
 const modelList: ModelInfo[] = [
   // Small dense
-  { name: "Gemma 2 2B", totalParams: 2, isMoE: false, label: "Dense 2B", layers: 18, hiddenDim: 2304 },
-  { name: "Phi-3.5 Mini 3.8B", totalParams: 4, isMoE: false, label: "Dense 3.8B", layers: 32, hiddenDim: 3072 },
-  { name: "Llama 3.2 3B", totalParams: 3, isMoE: false, label: "Dense 3B", layers: 28, hiddenDim: 3072 },
+  {
+    name: "Gemma 2 2B",
+    totalParams: 2,
+    isMoE: false,
+    label: "Dense 2B",
+    layers: 18,
+    hiddenDim: 2304,
+  },
+  {
+    name: "Phi-3.5 Mini 3.8B",
+    totalParams: 4,
+    isMoE: false,
+    label: "Dense 3.8B",
+    layers: 32,
+    hiddenDim: 3072,
+  },
+  {
+    name: "Llama 3.2 3B",
+    totalParams: 3,
+    isMoE: false,
+    label: "Dense 3B",
+    layers: 28,
+    hiddenDim: 3072,
+  },
   // Medium dense
-  { name: "Llama 4 Nano 8B", totalParams: 8, isMoE: false, label: "Dense 8B", layers: 32, hiddenDim: 4096 },
-  { name: "Gemma 4 12B", totalParams: 12, isMoE: false, label: "Dense 12B", layers: 36, hiddenDim: 4608 },
-  { name: "Phi-4 14B", totalParams: 14, isMoE: false, label: "Dense 14B", layers: 40, hiddenDim: 5120 },
-  { name: "Mistral Small 22B", totalParams: 22, isMoE: false, label: "Dense 22B", layers: 40, hiddenDim: 6144 },
-  { name: "Gemma 2 27B", totalParams: 27, isMoE: false, label: "Dense 27B", layers: 46, hiddenDim: 4608 },
-  { name: "Gemma 4 31B", totalParams: 31, isMoE: false, label: "Dense 31B", layers: 48, hiddenDim: 6144 },
-  { name: "Qwen 3 32B", totalParams: 32, isMoE: false, label: "Dense 32B", layers: 64, hiddenDim: 5120 },
-  { name: "Qwen 3.5 27B", totalParams: 27, isMoE: false, label: "Dense 27B", layers: 36, hiddenDim: 5120 },
+  {
+    name: "Llama 4 Nano 8B",
+    totalParams: 8,
+    isMoE: false,
+    label: "Dense 8B",
+    layers: 32,
+    hiddenDim: 4096,
+  },
+  {
+    name: "Gemma 4 12B",
+    totalParams: 12,
+    isMoE: false,
+    label: "Dense 12B",
+    layers: 36,
+    hiddenDim: 4608,
+  },
+  {
+    name: "Phi-4 14B",
+    totalParams: 14,
+    isMoE: false,
+    label: "Dense 14B",
+    layers: 40,
+    hiddenDim: 5120,
+  },
+  {
+    name: "Mistral Small 22B",
+    totalParams: 22,
+    isMoE: false,
+    label: "Dense 22B",
+    layers: 40,
+    hiddenDim: 6144,
+  },
+  {
+    name: "Gemma 2 27B",
+    totalParams: 27,
+    isMoE: false,
+    label: "Dense 27B",
+    layers: 46,
+    hiddenDim: 4608,
+  },
+  {
+    name: "Gemma 4 31B",
+    totalParams: 31,
+    isMoE: false,
+    label: "Dense 31B",
+    layers: 48,
+    hiddenDim: 6144,
+  },
+  {
+    name: "Qwen 3 32B",
+    totalParams: 32,
+    isMoE: false,
+    label: "Dense 32B",
+    layers: 64,
+    hiddenDim: 5120,
+  },
+  {
+    name: "Qwen 3.5 27B",
+    totalParams: 27,
+    isMoE: false,
+    label: "Dense 27B",
+    layers: 36,
+    hiddenDim: 5120,
+  },
   // Large dense
-  { name: "Llama 3.1 70B", totalParams: 70, isMoE: false, label: "Dense 70B", layers: 80, hiddenDim: 8192 },
-  { name: "Qwen 3 72B", totalParams: 72, isMoE: false, label: "Dense 72B", layers: 80, hiddenDim: 8192 },
-  { name: "Command R+ 104B", totalParams: 104, isMoE: false, label: "Dense 104B", layers: 96, hiddenDim: 8192 },
-  { name: "Llama 3.1 405B", totalParams: 405, isMoE: false, label: "Dense 405B", layers: 126, hiddenDim: 16384 },
+  {
+    name: "Llama 3.1 70B",
+    totalParams: 70,
+    isMoE: false,
+    label: "Dense 70B",
+    layers: 80,
+    hiddenDim: 8192,
+  },
+  {
+    name: "Qwen 3 72B",
+    totalParams: 72,
+    isMoE: false,
+    label: "Dense 72B",
+    layers: 80,
+    hiddenDim: 8192,
+  },
+  {
+    name: "Command R+ 104B",
+    totalParams: 104,
+    isMoE: false,
+    label: "Dense 104B",
+    layers: 96,
+    hiddenDim: 8192,
+  },
+  {
+    name: "Llama 3.1 405B",
+    totalParams: 405,
+    isMoE: false,
+    label: "Dense 405B",
+    layers: 126,
+    hiddenDim: 16384,
+  },
   // MoE models
-  { name: "Mixtral 8x7B", totalParams: 47, activeParams: 13, isMoE: true, label: "MoE 47B (13B active)", layers: 32, hiddenDim: 4096 },
-  { name: "Mixtral 8x22B", totalParams: 176, activeParams: 39, isMoE: true, label: "MoE 176B (39B active)", layers: 56, hiddenDim: 6144 },
-  { name: "Qwen 3.5 35B MoE", totalParams: 35, activeParams: 7, isMoE: true, label: "MoE 35B (7B active)", layers: 36, hiddenDim: 4096 },
-  { name: "Qwen 3.5 122B MoE", totalParams: 122, activeParams: 22, isMoE: true, label: "MoE 122B (22B active)", layers: 48, hiddenDim: 7168 },
-  { name: "DeepSeek V3", totalParams: 671, activeParams: 37, isMoE: true, label: "MoE 671B (37B active)", layers: 61, hiddenDim: 7168 },
-  { name: "Llama 4 Scout", totalParams: 109, activeParams: 17, isMoE: true, label: "MoE 109B (17B active)", layers: 48, hiddenDim: 5120 },
-  { name: "Llama 4 Maverick", totalParams: 400, activeParams: 17, isMoE: true, label: "MoE 400B (17B active)", layers: 96, hiddenDim: 8192 },
-  { name: "Qwen 3 235B MoE", totalParams: 235, activeParams: 22, isMoE: true, label: "MoE 235B (22B active)", layers: 94, hiddenDim: 7168 },
-  { name: "DeepSeek V3.2", totalParams: 800, activeParams: 37, isMoE: true, label: "MoE ~800B (37B active)", layers: 61, hiddenDim: 7168 },
+  {
+    name: "Mixtral 8x7B",
+    totalParams: 47,
+    activeParams: 13,
+    isMoE: true,
+    label: "MoE 47B (13B active)",
+    layers: 32,
+    hiddenDim: 4096,
+  },
+  {
+    name: "Mixtral 8x22B",
+    totalParams: 176,
+    activeParams: 39,
+    isMoE: true,
+    label: "MoE 176B (39B active)",
+    layers: 56,
+    hiddenDim: 6144,
+  },
+  {
+    name: "Qwen 3.5 35B MoE",
+    totalParams: 35,
+    activeParams: 7,
+    isMoE: true,
+    label: "MoE 35B (7B active)",
+    layers: 36,
+    hiddenDim: 4096,
+  },
+  {
+    name: "Qwen 3.5 122B MoE",
+    totalParams: 122,
+    activeParams: 22,
+    isMoE: true,
+    label: "MoE 122B (22B active)",
+    layers: 48,
+    hiddenDim: 7168,
+  },
+  {
+    name: "DeepSeek V3",
+    totalParams: 671,
+    activeParams: 37,
+    isMoE: true,
+    label: "MoE 671B (37B active)",
+    layers: 61,
+    hiddenDim: 7168,
+  },
+  {
+    name: "Llama 4 Scout",
+    totalParams: 109,
+    activeParams: 17,
+    isMoE: true,
+    label: "MoE 109B (17B active)",
+    layers: 48,
+    hiddenDim: 5120,
+  },
+  {
+    name: "Llama 4 Maverick",
+    totalParams: 400,
+    activeParams: 17,
+    isMoE: true,
+    label: "MoE 400B (17B active)",
+    layers: 96,
+    hiddenDim: 8192,
+  },
+  {
+    name: "Qwen 3 235B MoE",
+    totalParams: 235,
+    activeParams: 22,
+    isMoE: true,
+    label: "MoE 235B (22B active)",
+    layers: 94,
+    hiddenDim: 7168,
+  },
+  {
+    name: "DeepSeek V3.2",
+    totalParams: 800,
+    activeParams: 37,
+    isMoE: true,
+    label: "MoE ~800B (37B active)",
+    layers: 61,
+    hiddenDim: 7168,
+  },
 ];
 
 const quantOptions: { name: string; bytesPerParam: number }[] = [
@@ -198,7 +370,16 @@ function calculate(
     recommendation = `Requires ${gpusNeeded}× ${gpu.name}. This is impractical. Use INT4/GGUF quantization or datacenter GPUs.`;
   }
 
-  return { modelVram, kvCacheVram, totalVram, vramPerGpu, gpusNeeded, fits, recommendation, estimatedTps };
+  return {
+    modelVram,
+    kvCacheVram,
+    totalVram,
+    vramPerGpu,
+    gpusNeeded,
+    fits,
+    recommendation,
+    estimatedTps,
+  };
 }
 
 function statusGlowColor(fits: boolean, gpusNeeded: number) {
@@ -224,11 +405,21 @@ export default function InfraCalculator() {
   );
 
   const laptopGpus = gpuList.map((g, i) => ({ g, i })).filter(({ g }) => g.category === "Laptop");
-  const consumerGpus = gpuList.map((g, i) => ({ g, i })).filter(({ g }) => g.category === "Consumer");
-  const datacenterGpus = gpuList.map((g, i) => ({ g, i })).filter(({ g }) => g.category === "Datacenter");
-  const smallModels = modelList.map((m, i) => ({ m, i })).filter(({ m }) => !m.isMoE && m.totalParams <= 15);
-  const mediumModels = modelList.map((m, i) => ({ m, i })).filter(({ m }) => !m.isMoE && m.totalParams > 15 && m.totalParams < 100);
-  const largeModels = modelList.map((m, i) => ({ m, i })).filter(({ m }) => !m.isMoE && m.totalParams >= 100);
+  const consumerGpus = gpuList
+    .map((g, i) => ({ g, i }))
+    .filter(({ g }) => g.category === "Consumer");
+  const datacenterGpus = gpuList
+    .map((g, i) => ({ g, i }))
+    .filter(({ g }) => g.category === "Datacenter");
+  const smallModels = modelList
+    .map((m, i) => ({ m, i }))
+    .filter(({ m }) => !m.isMoE && m.totalParams <= 15);
+  const mediumModels = modelList
+    .map((m, i) => ({ m, i }))
+    .filter(({ m }) => !m.isMoE && m.totalParams > 15 && m.totalParams < 100);
+  const largeModels = modelList
+    .map((m, i) => ({ m, i }))
+    .filter(({ m }) => !m.isMoE && m.totalParams >= 100);
   const moeModels = modelList.map((m, i) => ({ m, i })).filter(({ m }) => m.isMoE);
 
   return (
@@ -283,21 +474,37 @@ export default function InfraCalculator() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">Small (≤15B)</div>
+                        <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">
+                          Small (≤15B)
+                        </div>
                         {smallModels.map(({ m, i }) => (
-                          <SelectItem key={i} value={String(i)}>{m.name}</SelectItem>
+                          <SelectItem key={i} value={String(i)}>
+                            {m.name}
+                          </SelectItem>
                         ))}
-                        <div className="mt-1 px-2 py-1 text-xs font-semibold text-muted-foreground">Medium (15B–100B)</div>
+                        <div className="mt-1 px-2 py-1 text-xs font-semibold text-muted-foreground">
+                          Medium (15B–100B)
+                        </div>
                         {mediumModels.map(({ m, i }) => (
-                          <SelectItem key={i} value={String(i)}>{m.name}</SelectItem>
+                          <SelectItem key={i} value={String(i)}>
+                            {m.name}
+                          </SelectItem>
                         ))}
-                        <div className="mt-1 px-2 py-1 text-xs font-semibold text-muted-foreground">Large (100B+)</div>
+                        <div className="mt-1 px-2 py-1 text-xs font-semibold text-muted-foreground">
+                          Large (100B+)
+                        </div>
                         {largeModels.map(({ m, i }) => (
-                          <SelectItem key={i} value={String(i)}>{m.name}</SelectItem>
+                          <SelectItem key={i} value={String(i)}>
+                            {m.name}
+                          </SelectItem>
                         ))}
-                        <div className="mt-1 px-2 py-1 text-xs font-semibold text-muted-foreground">MoE Models</div>
+                        <div className="mt-1 px-2 py-1 text-xs font-semibold text-muted-foreground">
+                          MoE Models
+                        </div>
                         {moeModels.map(({ m, i }) => (
-                          <SelectItem key={i} value={String(i)}>{m.name}</SelectItem>
+                          <SelectItem key={i} value={String(i)}>
+                            {m.name}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -367,7 +574,8 @@ export default function InfraCalculator() {
                     </Select>
                     {gpuInfo.category === "Laptop" && (
                       <p className="text-xs text-yellow-400/80">
-                        ⚠ Laptop GPUs may thermal-throttle during extended inference. Speeds are estimated conservatively.
+                        ⚠ Laptop GPUs may thermal-throttle during extended inference. Speeds are
+                        estimated conservatively.
                       </p>
                     )}
                   </div>
@@ -418,7 +626,8 @@ export default function InfraCalculator() {
                         {result.totalVram.toFixed(1)} GB
                       </p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        Model: {result.modelVram.toFixed(1)} GB + KV: {result.kvCacheVram.toFixed(1)} GB
+                        Model: {result.modelVram.toFixed(1)} GB + KV:{" "}
+                        {result.kvCacheVram.toFixed(1)} GB
                       </p>
                     </div>
                     <div className="rounded-lg border border-border/50 bg-muted/10 p-4">
@@ -438,8 +647,12 @@ export default function InfraCalculator() {
                         <Zap className="h-4 w-4" />
                         Est. Speed
                       </div>
-                      <p className="font-display mt-1 text-2xl font-bold">~{result.estimatedTps} tok/s</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">Single user, rough estimate</p>
+                      <p className="font-display mt-1 text-2xl font-bold">
+                        ~{result.estimatedTps} tok/s
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Single user, rough estimate
+                      </p>
                     </div>
                     {result.gpusNeeded > 1 && (
                       <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-4">
@@ -482,7 +695,9 @@ export default function InfraCalculator() {
                     )}
                     <div>
                       <p className="text-sm font-medium">
-                        {result.fits ? "Fits on a single GPU" : `Requires ${result.gpusNeeded} GPUs`}
+                        {result.fits
+                          ? "Fits on a single GPU"
+                          : `Requires ${result.gpusNeeded} GPUs`}
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">{result.recommendation}</p>
                     </div>
@@ -491,20 +706,21 @@ export default function InfraCalculator() {
                   {modelInfo.isMoE && (
                     <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4">
                       <p className="text-xs text-blue-300">
-                        <span className="font-semibold">MoE Note:</span> All {modelInfo.totalParams}B
-                        parameters must be loaded into VRAM, but only {modelInfo.activeParams}B are
-                        active per token. Inference speed scales with active parameters, not total.
+                        <span className="font-semibold">MoE Note:</span> All {modelInfo.totalParams}
+                        B parameters must be loaded into VRAM, but only {modelInfo.activeParams}B
+                        are active per token. Inference speed scales with active parameters, not
+                        total.
                       </p>
                     </div>
                   )}
 
                   <div className="rounded-lg border border-border/50 bg-muted/10 p-4">
                     <p className="text-xs text-muted-foreground">
-                      Estimates include KV cache for the selected context length. Actual requirements
-                      vary based on batch size, framework overhead, and attention implementation (GQA,
-                      MQA). For production deployments, add 10-20% additional headroom. Speed
-                      estimates are approximate and depend on hardware configuration and serving
-                      framework.
+                      Estimates include KV cache for the selected context length. Actual
+                      requirements vary based on batch size, framework overhead, and attention
+                      implementation (GQA, MQA). For production deployments, add 10-20% additional
+                      headroom. Speed estimates are approximate and depend on hardware configuration
+                      and serving framework.
                     </p>
                   </div>
                 </CardContent>

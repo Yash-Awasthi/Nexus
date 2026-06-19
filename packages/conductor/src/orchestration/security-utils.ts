@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { URL } from "url";
 import * as path from "path";
 
@@ -25,7 +26,7 @@ export function isSafeUrl(urlStr: string): boolean {
       "169.254.169.254",
       "metadata.google.internal",
       "metadata",
-      "instance-data"
+      "instance-data",
     ]);
 
     if (forbiddenHosts.has(host)) {

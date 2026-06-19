@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Minimal .env file loader — no external dependencies.
  *
@@ -38,9 +39,7 @@ function parseLine(line: string): { key: string; value: string } | null {
   if (!trimmed || trimmed.startsWith("#")) return null;
 
   // Strip optional `export ` prefix
-  const withoutExport = trimmed.startsWith("export ")
-    ? trimmed.slice(7).trim()
-    : trimmed;
+  const withoutExport = trimmed.startsWith("export ") ? trimmed.slice(7).trim() : trimmed;
 
   // Must contain `=` to be a valid assignment
   const eqIdx = withoutExport.indexOf("=");
@@ -79,16 +78,13 @@ function parseLine(line: string): { key: string; value: string } | null {
  * @param envFilePath  Absolute path to the `.env` file. Defaults to `<cwd>/.env`.
  * @param override     When true, existing env vars are overwritten (default: false).
  */
-export function loadEnvFile(
-  envFilePath?: string,
-  override = false
-): EnvLoaderResult {
+export function loadEnvFile(envFilePath?: string, override = false): EnvLoaderResult {
   const resolvedPath = envFilePath ?? path.resolve(process.cwd(), ".env");
 
   const result: EnvLoaderResult = {
     filePath: null,
     loaded: [],
-    skipped: []
+    skipped: [],
   };
 
   if (!fs.existsSync(resolvedPath)) {

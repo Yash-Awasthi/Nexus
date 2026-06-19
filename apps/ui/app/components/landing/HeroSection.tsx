@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { useRef, useEffect, useState, lazy, Suspense } from "react";
 import { Link } from "react-router";
 
@@ -9,27 +10,39 @@ export function HeroSection() {
   const subtitleRef = useRef<HTMLParagraphElement>(null);
   const ctaRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { setIsClient(true); }, []);
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     import("gsap").then(({ default: gsap }) => {
       if (cancelled) return;
       if (titleRef.current) {
-        gsap.fromTo(titleRef.current, { opacity: 0, scale: 0.9, y: 30 }, { opacity: 1, scale: 1, y: 0, duration: 1.2, ease: "power3.out" });
+        gsap.fromTo(
+          titleRef.current,
+          { opacity: 0, scale: 0.9, y: 30 },
+          { opacity: 1, scale: 1, y: 0, duration: 1.2, ease: "power3.out" },
+        );
       }
       if (subtitleRef.current) {
-        gsap.fromTo(subtitleRef.current, { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 1, delay: 0.3, ease: "power2.out" });
+        gsap.fromTo(
+          subtitleRef.current,
+          { opacity: 0, y: 30 },
+          { opacity: 1, y: 0, duration: 1, delay: 0.3, ease: "power2.out" },
+        );
       }
       if (ctaRef.current) {
         gsap.fromTo(
           Array.from(ctaRef.current.children),
           { opacity: 0, y: 20 },
-          { opacity: 1, y: 0, duration: 0.8, delay: 0.6, stagger: 0.15, ease: "power2.out" }
+          { opacity: 1, y: 0, duration: 0.8, delay: 0.6, stagger: 0.15, ease: "power2.out" },
         );
       }
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
@@ -63,11 +76,15 @@ export function HeroSection() {
           ref={subtitleRef}
           className="mt-6 text-base sm:text-lg md:text-xl text-white/50 max-w-2xl mx-auto leading-relaxed opacity-0"
         >
-          JUDICA orchestrates multi-model AI deliberations — pitting diverse AI perspectives
-          against each other to surface deeper insights, challenge assumptions, and reach better conclusions.
+          JUDICA orchestrates multi-model AI deliberations — pitting diverse AI perspectives against
+          each other to surface deeper insights, challenge assumptions, and reach better
+          conclusions.
         </p>
 
-        <div ref={ctaRef} className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+        <div
+          ref={ctaRef}
+          className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
+        >
           <Link
             to="/register"
             className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-[#4d7cff] hover:bg-[#3d6cef] rounded-lg transition-all hover:shadow-[0_0_30px_rgba(77,124,255,0.3)] opacity-0"
@@ -85,7 +102,13 @@ export function HeroSection() {
 
       {/* Scroll indicator */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 animate-bounce">
-        <svg className="w-5 h-5 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg
+          className="w-5 h-5 text-white/30"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
         </svg>
       </div>

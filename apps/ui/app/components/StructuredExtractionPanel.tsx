@@ -1,6 +1,7 @@
-"use client"
+// SPDX-License-Identifier: Apache-2.0
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
   PlusIcon,
   Trash2Icon,
@@ -23,19 +24,19 @@ import {
   CopyIcon,
   Loader2Icon,
   RefreshCwIcon,
-} from "lucide-react"
+} from "lucide-react";
 
-import { Button } from "~/components/ui/button"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "~/components/ui/card"
-import { Input } from "~/components/ui/input"
-import { Badge } from "~/components/ui/badge"
+import { Button } from "~/components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "~/components/ui/card";
+import { Input } from "~/components/ui/input";
+import { Badge } from "~/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select"
+} from "~/components/ui/select";
 import {
   Dialog,
   DialogTrigger,
@@ -45,77 +46,89 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
-} from "~/components/ui/dialog"
+} from "~/components/ui/dialog";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 interface SchemaField {
-  name: string
-  type: "string" | "number" | "boolean" | "date" | "url" | "email" | "array" | "object"
-  required?: boolean
-  description?: string
-  children?: SchemaField[]
+  name: string;
+  type: "string" | "number" | "boolean" | "date" | "url" | "email" | "array" | "object";
+  required?: boolean;
+  description?: string;
+  children?: SchemaField[];
 }
 
 interface ExtractionSchema {
-  id: number
-  name: string
-  description: string | null
-  schema: { fields: SchemaField[] }
-  outputFormat: "json" | "csv" | "table"
-  isPublic: boolean
-  version: number
-  createdAt: string
-  updatedAt: string
+  id: number;
+  name: string;
+  description: string | null;
+  schema: { fields: SchemaField[] };
+  outputFormat: "json" | "csv" | "table";
+  isPublic: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface ExtractionJob {
-  id: number
-  schemaId: number
-  url: string
-  status: "pending" | "running" | "completed" | "failed"
-  result: { rows: Record<string, unknown>[]; totalRows: number; confidence: number; warnings: string[] } | null
-  extractedRows: number
-  pagesProcessed: number
-  executionTimeMs: number | null
-  errorMessage: string | null
-  createdAt: string
+  id: number;
+  schemaId: number;
+  url: string;
+  status: "pending" | "running" | "completed" | "failed";
+  result: {
+    rows: Record<string, unknown>[];
+    totalRows: number;
+    confidence: number;
+    warnings: string[];
+  } | null;
+  extractedRows: number;
+  pagesProcessed: number;
+  executionTimeMs: number | null;
+  errorMessage: string | null;
+  createdAt: string;
 }
 
 interface ExtractionTemplate {
-  id?: number
-  name: string
-  description: string
-  category: string
-  schema: { fields: SchemaField[] }
-  sampleUrls?: string[]
+  id?: number;
+  name: string;
+  description: string;
+  category: string;
+  schema: { fields: SchemaField[] };
+  sampleUrls?: string[];
 }
 
 const FIELD_TYPES = [
-  "string", "number", "boolean", "date", "url", "email", "array", "object",
-] as const
+  "string",
+  "number",
+  "boolean",
+  "date",
+  "url",
+  "email",
+  "array",
+  "object",
+] as const;
 
 const STATUS_STYLES: Record<string, { color: string; icon: React.ComponentType<any> }> = {
-  pending:   { color: "bg-yellow-100 text-yellow-800", icon: ClockIcon },
-  running:   { color: "bg-blue-100 text-blue-800", icon: Loader2Icon },
+  pending: { color: "bg-yellow-100 text-yellow-800", icon: ClockIcon },
+  running: { color: "bg-blue-100 text-blue-800", icon: Loader2Icon },
   completed: { color: "bg-green-100 text-green-800", icon: CheckCircleIcon },
-  failed:    { color: "bg-red-100 text-red-800", icon: XCircleIcon },
-}
+  failed: { color: "bg-red-100 text-red-800", icon: XCircleIcon },
+};
 
 // ─── API Helpers ────────────────────────────────────────────────────────────
 
-const API_BASE = "/api/extraction"
+const API_BASE = "/api/extraction";
 
 async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const resp = await fetch(`${API_BASE}${path}`, {
     headers: { "Content-Type": "application/json", ...opts.headers },
     ...opts,
-  })
+  });
   if (!resp.ok) {
-    const err = await resp.json().catch(() => ({ error: resp.statusText }))
-    throw new Error(err.error ?? resp.statusText)
+    const err = await resp.json().catch(() => ({ error: resp.statusText }));
+    throw new Error(err.error ?? resp.statusText);
   }
-  return resp.json()
+  return resp.json();
 }
 
 // ─── Schema Builder Sub-Component ───────────────────────────────────────────
@@ -126,28 +139,31 @@ function SchemaFieldEditor({
   onRemove,
   depth = 0,
 }: {
-  field: SchemaField
-  onChange: (updated: SchemaField) => void
-  onRemove: () => void
-  depth?: number
+  field: SchemaField;
+  onChange: (updated: SchemaField) => void;
+  onRemove: () => void;
+  depth?: number;
 }) {
-  const [expanded, setExpanded] = React.useState(true)
-  const hasChildren = field.type === "object" || field.type === "array"
+  const [expanded, setExpanded] = React.useState(true);
+  const hasChildren = field.type === "object" || field.type === "array";
 
   function addChild() {
-    const children = [...(field.children ?? []), { name: "", type: "string" as const, required: false }]
-    onChange({ ...field, children })
+    const children = [
+      ...(field.children ?? []),
+      { name: "", type: "string" as const, required: false },
+    ];
+    onChange({ ...field, children });
   }
 
   function updateChild(index: number, updated: SchemaField) {
-    const children = [...(field.children ?? [])]
-    children[index] = updated
-    onChange({ ...field, children })
+    const children = [...(field.children ?? [])];
+    children[index] = updated;
+    onChange({ ...field, children });
   }
 
   function removeChild(index: number) {
-    const children = (field.children ?? []).filter((_, i) => i !== index)
-    onChange({ ...field, children })
+    const children = (field.children ?? []).filter((_, i) => i !== index);
+    onChange({ ...field, children });
   }
 
   return (
@@ -155,7 +171,11 @@ function SchemaFieldEditor({
       <div className="flex items-center gap-2">
         {hasChildren && (
           <button onClick={() => setExpanded(!expanded)} className="p-0.5">
-            {expanded ? <ChevronDownIcon className="h-4 w-4" /> : <ChevronRightIcon className="h-4 w-4" />}
+            {expanded ? (
+              <ChevronDownIcon className="h-4 w-4" />
+            ) : (
+              <ChevronRightIcon className="h-4 w-4" />
+            )}
           </button>
         )}
         <Input
@@ -173,7 +193,9 @@ function SchemaFieldEditor({
           </SelectTrigger>
           <SelectContent>
             {FIELD_TYPES.map((t) => (
-              <SelectItem key={t} value={t}>{t}</SelectItem>
+              <SelectItem key={t} value={t}>
+                {t}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -213,20 +235,20 @@ function SchemaFieldEditor({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ─── Result Viewer Sub-Component ────────────────────────────────────────────
 
 function ResultViewer({ job }: { job: ExtractionJob }) {
-  const [viewFormat, setViewFormat] = React.useState<"json" | "table">("table")
+  const [viewFormat, setViewFormat] = React.useState<"json" | "table">("table");
 
   if (!job.result || !job.result.rows.length) {
-    return <p className="text-sm text-muted-foreground">No data extracted.</p>
+    return <p className="text-sm text-muted-foreground">No data extracted.</p>;
   }
 
-  const { rows, confidence, warnings } = job.result
-  const columns = Object.keys(rows[0] ?? {})
+  const { rows, confidence, warnings } = job.result;
+  const columns = Object.keys(rows[0] ?? {});
 
   return (
     <div className="space-y-3">
@@ -259,7 +281,9 @@ function ResultViewer({ job }: { job: ExtractionJob }) {
 
       {warnings.length > 0 && (
         <div className="text-xs text-yellow-700 bg-yellow-50 p-2 rounded">
-          {warnings.map((w, i) => <div key={i}>{w}</div>)}
+          {warnings.map((w, i) => (
+            <div key={i}>{w}</div>
+          ))}
         </div>
       )}
 
@@ -269,7 +293,9 @@ function ResultViewer({ job }: { job: ExtractionJob }) {
             <thead className="bg-muted">
               <tr>
                 {columns.map((col) => (
-                  <th key={col} className="px-3 py-2 text-left font-medium">{col}</th>
+                  <th key={col} className="px-3 py-2 text-left font-medium">
+                    {col}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -295,97 +321,97 @@ function ResultViewer({ job }: { job: ExtractionJob }) {
         </pre>
       )}
     </div>
-  )
+  );
 }
 
 function formatCell(value: unknown): string {
-  if (value === null || value === undefined) return "-"
-  if (typeof value === "boolean") return value ? "Yes" : "No"
-  if (Array.isArray(value)) return `[${value.length} items]`
-  if (typeof value === "object") return JSON.stringify(value)
-  return String(value)
+  if (value === null || value === undefined) return "-";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (Array.isArray(value)) return `[${value.length} items]`;
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
 }
 
 // ─── Main Panel ─────────────────────────────────────────────────────────────
 
-type Tab = "schemas" | "jobs" | "templates"
+type Tab = "schemas" | "jobs" | "templates";
 
 export default function StructuredExtractionPanel() {
-  const [tab, setTab] = React.useState<Tab>("schemas")
-  const [schemas, setSchemas] = React.useState<ExtractionSchema[]>([])
-  const [jobs, setJobs] = React.useState<ExtractionJob[]>([])
-  const [templates, setTemplates] = React.useState<ExtractionTemplate[]>([])
-  const [loading, setLoading] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
+  const [tab, setTab] = React.useState<Tab>("schemas");
+  const [schemas, setSchemas] = React.useState<ExtractionSchema[]>([]);
+  const [jobs, setJobs] = React.useState<ExtractionJob[]>([]);
+  const [templates, setTemplates] = React.useState<ExtractionTemplate[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
   // Schema creation state
-  const [showCreate, setShowCreate] = React.useState(false)
-  const [newName, setNewName] = React.useState("")
-  const [newDescription, setNewDescription] = React.useState("")
+  const [showCreate, setShowCreate] = React.useState(false);
+  const [newName, setNewName] = React.useState("");
+  const [newDescription, setNewDescription] = React.useState("");
   const [newFields, setNewFields] = React.useState<SchemaField[]>([
     { name: "", type: "string", required: true },
-  ])
-  const [newFormat, setNewFormat] = React.useState<"json" | "csv" | "table">("json")
+  ]);
+  const [newFormat, setNewFormat] = React.useState<"json" | "csv" | "table">("json");
 
   // Job runner state
-  const [runSchemaId, setRunSchemaId] = React.useState<number | null>(null)
-  const [runUrl, setRunUrl] = React.useState("")
-  const [showRunner, setShowRunner] = React.useState(false)
+  const [runSchemaId, setRunSchemaId] = React.useState<number | null>(null);
+  const [runUrl, setRunUrl] = React.useState("");
+  const [showRunner, setShowRunner] = React.useState(false);
 
   // Job detail state
-  const [selectedJob, setSelectedJob] = React.useState<ExtractionJob | null>(null)
+  const [selectedJob, setSelectedJob] = React.useState<ExtractionJob | null>(null);
 
   // Infer schema state
-  const [inferUrl, setInferUrl] = React.useState("")
-  const [inferring, setInferring] = React.useState(false)
+  const [inferUrl, setInferUrl] = React.useState("");
+  const [inferring, setInferring] = React.useState(false);
 
   // ── Data fetching ─────────────────────────────────────────────────
   const loadSchemas = React.useCallback(async () => {
     try {
-      setLoading(true)
-      const data = await api<{ schemas: ExtractionSchema[] }>("/schemas")
-      setSchemas(data.schemas)
+      setLoading(true);
+      const data = await api<{ schemas: ExtractionSchema[] }>("/schemas");
+      setSchemas(data.schemas);
     } catch (e) {
-      setError((e as Error).message)
+      setError((e as Error).message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [])
+  }, []);
 
   const loadJobs = React.useCallback(async () => {
     try {
-      setLoading(true)
-      const data = await api<{ jobs: ExtractionJob[] }>("/jobs")
-      setJobs(data.jobs)
+      setLoading(true);
+      const data = await api<{ jobs: ExtractionJob[] }>("/jobs");
+      setJobs(data.jobs);
     } catch (e) {
-      setError((e as Error).message)
+      setError((e as Error).message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [])
+  }, []);
 
   const loadTemplates = React.useCallback(async () => {
     try {
-      setLoading(true)
-      const data = await api<{ templates: ExtractionTemplate[] }>("/templates")
-      setTemplates(data.templates)
+      setLoading(true);
+      const data = await api<{ templates: ExtractionTemplate[] }>("/templates");
+      setTemplates(data.templates);
     } catch (e) {
-      setError((e as Error).message)
+      setError((e as Error).message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [])
+  }, []);
 
   React.useEffect(() => {
-    if (tab === "schemas") loadSchemas()
-    else if (tab === "jobs") loadJobs()
-    else if (tab === "templates") loadTemplates()
-  }, [tab, loadSchemas, loadJobs, loadTemplates])
+    if (tab === "schemas") loadSchemas();
+    else if (tab === "jobs") loadJobs();
+    else if (tab === "templates") loadTemplates();
+  }, [tab, loadSchemas, loadJobs, loadTemplates]);
 
   // ── Schema CRUD ───────────────────────────────────────────────────
   async function handleCreateSchema() {
     try {
-      setError(null)
+      setError(null);
       await api("/schemas", {
         method: "POST",
         body: JSON.stringify({
@@ -394,89 +420,96 @@ export default function StructuredExtractionPanel() {
           schema: { fields: newFields },
           outputFormat: newFormat,
         }),
-      })
-      setShowCreate(false)
-      setNewName("")
-      setNewDescription("")
-      setNewFields([{ name: "", type: "string", required: true }])
-      loadSchemas()
+      });
+      setShowCreate(false);
+      setNewName("");
+      setNewDescription("");
+      setNewFields([{ name: "", type: "string", required: true }]);
+      loadSchemas();
     } catch (e) {
-      setError((e as Error).message)
+      setError((e as Error).message);
     }
   }
 
   async function handleDeleteSchema(id: number) {
     try {
-      await api(`/schemas/${id}`, { method: "DELETE" })
-      loadSchemas()
+      await api(`/schemas/${id}`, { method: "DELETE" });
+      loadSchemas();
     } catch (e) {
-      setError((e as Error).message)
+      setError((e as Error).message);
     }
   }
 
   // ── Run extraction ────────────────────────────────────────────────
   async function handleRunExtraction() {
-    if (!runSchemaId || !runUrl) return
+    if (!runSchemaId || !runUrl) return;
     try {
-      setError(null)
+      setError(null);
       await api("/run", {
         method: "POST",
         body: JSON.stringify({ schemaId: runSchemaId, url: runUrl }),
-      })
-      setShowRunner(false)
-      setRunUrl("")
-      setTab("jobs")
-      loadJobs()
+      });
+      setShowRunner(false);
+      setRunUrl("");
+      setTab("jobs");
+      loadJobs();
     } catch (e) {
-      setError((e as Error).message)
+      setError((e as Error).message);
     }
   }
 
   // ── Infer schema ──────────────────────────────────────────────────
   async function handleInferSchema() {
-    if (!inferUrl) return
+    if (!inferUrl) return;
     try {
-      setInferring(true)
-      setError(null)
-      const data = await api<{ inferred: { suggestedName: string; fields: SchemaField[] } }>("/infer-schema", {
-        method: "POST",
-        body: JSON.stringify({ url: inferUrl }),
-      })
-      setNewName(data.inferred.suggestedName)
-      setNewFields(data.inferred.fields.length > 0 ? data.inferred.fields : [{ name: "", type: "string", required: true }])
-      setInferUrl("")
-      setShowCreate(true)
+      setInferring(true);
+      setError(null);
+      const data = await api<{ inferred: { suggestedName: string; fields: SchemaField[] } }>(
+        "/infer-schema",
+        {
+          method: "POST",
+          body: JSON.stringify({ url: inferUrl }),
+        },
+      );
+      setNewName(data.inferred.suggestedName);
+      setNewFields(
+        data.inferred.fields.length > 0
+          ? data.inferred.fields
+          : [{ name: "", type: "string", required: true }],
+      );
+      setInferUrl("");
+      setShowCreate(true);
     } catch (e) {
-      setError((e as Error).message)
+      setError((e as Error).message);
     } finally {
-      setInferring(false)
+      setInferring(false);
     }
   }
 
   // ── Export ────────────────────────────────────────────────────────
   async function handleExport(jobId: number, format: "json" | "csv") {
     try {
-      const resp = await fetch(`${API_BASE}/jobs/${jobId}/export?format=${format}`)
-      if (!resp.ok) throw new Error("Export failed")
-      const blob = await resp.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `extraction-${jobId}.${format}`
-      a.click()
-      URL.revokeObjectURL(url)
+      const resp = await fetch(`${API_BASE}/jobs/${jobId}/export?format=${format}`);
+      if (!resp.ok) throw new Error("Export failed");
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `extraction-${jobId}.${format}`;
+      a.click();
+      URL.revokeObjectURL(url);
     } catch (e) {
-      setError((e as Error).message)
+      setError((e as Error).message);
     }
   }
 
   // ── Use template ──────────────────────────────────────────────────
   function handleUseTemplate(template: ExtractionTemplate) {
-    setNewName(template.name)
-    setNewDescription(template.description)
-    setNewFields(template.schema.fields)
-    setShowCreate(true)
-    setTab("schemas")
+    setNewName(template.name);
+    setNewDescription(template.description);
+    setNewFields(template.schema.fields);
+    setShowCreate(true);
+    setTab("schemas");
   }
 
   // ── Render ────────────────────────────────────────────────────────
@@ -489,13 +522,12 @@ export default function StructuredExtractionPanel() {
             Structured Web Data Extraction
           </CardTitle>
           <CardDescription>
-            Define schemas, extract structured data from any URL. Works on dynamic pages, authenticated content, and paginated results.
+            Define schemas, extract structured data from any URL. Works on dynamic pages,
+            authenticated content, and paginated results.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {error && (
-            <div className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</div>
-          )}
+          {error && <div className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</div>}
 
           {/* Tab navigation */}
           <div className="flex gap-2 border-b pb-2">
@@ -534,7 +566,11 @@ export default function StructuredExtractionPanel() {
                     onClick={handleInferSchema}
                     disabled={inferring || !inferUrl}
                   >
-                    {inferring ? <Loader2Icon className="h-3 w-3 mr-1 animate-spin" /> : <WandIcon className="h-3 w-3 mr-1" />}
+                    {inferring ? (
+                      <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
+                    ) : (
+                      <WandIcon className="h-3 w-3 mr-1" />
+                    )}
                     Infer Schema
                   </Button>
                 </div>
@@ -551,13 +587,24 @@ export default function StructuredExtractionPanel() {
               ) : (
                 <div className="space-y-2">
                   {schemas.map((schema) => (
-                    <div key={schema.id} className="border rounded-md p-3 flex items-center justify-between">
+                    <div
+                      key={schema.id}
+                      className="border rounded-md p-3 flex items-center justify-between"
+                    >
                       <div>
                         <div className="font-medium flex items-center gap-2">
                           {schema.name}
-                          <Badge variant="outline" className="text-xs">v{schema.version}</Badge>
-                          <Badge variant="outline" className="text-xs">{schema.outputFormat}</Badge>
-                          {schema.isPublic && <Badge variant="secondary" className="text-xs">Public</Badge>}
+                          <Badge variant="outline" className="text-xs">
+                            v{schema.version}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {schema.outputFormat}
+                          </Badge>
+                          {schema.isPublic && (
+                            <Badge variant="secondary" className="text-xs">
+                              Public
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-sm text-muted-foreground">
                           {schema.schema.fields.length} fields
@@ -568,7 +615,10 @@ export default function StructuredExtractionPanel() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => { setRunSchemaId(schema.id); setShowRunner(true) }}
+                          onClick={() => {
+                            setRunSchemaId(schema.id);
+                            setShowRunner(true);
+                          }}
                         >
                           <PlayIcon className="h-3 w-3 mr-1" /> Run
                         </Button>
@@ -608,9 +658,9 @@ export default function StructuredExtractionPanel() {
               ) : (
                 <div className="space-y-2">
                   {jobs.map((job) => {
-                    const statusStyle = STATUS_STYLES[job.status] ?? STATUS_STYLES.pending
-                    const StatusIcon = statusStyle.icon
-                    const isSelected = selectedJob?.id === job.id
+                    const statusStyle = STATUS_STYLES[job.status] ?? STATUS_STYLES.pending;
+                    const StatusIcon = statusStyle.icon;
+                    const isSelected = selectedJob?.id === job.id;
                     return (
                       <div key={job.id}>
                         <div
@@ -619,17 +669,35 @@ export default function StructuredExtractionPanel() {
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <StatusIcon className={`h-4 w-4 ${job.status === "running" ? "animate-spin" : ""}`} />
+                              <StatusIcon
+                                className={`h-4 w-4 ${job.status === "running" ? "animate-spin" : ""}`}
+                              />
                               <Badge className={statusStyle.color}>{job.status}</Badge>
-                              <span className="text-sm font-mono truncate max-w-[300px]">{job.url}</span>
+                              <span className="text-sm font-mono truncate max-w-[300px]">
+                                {job.url}
+                              </span>
                             </div>
                             <div className="flex items-center gap-2">
                               {job.status === "completed" && (
                                 <>
-                                  <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleExport(job.id, "json") }}>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleExport(job.id, "json");
+                                    }}
+                                  >
                                     <FileJsonIcon className="h-3 w-3" />
                                   </Button>
-                                  <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleExport(job.id, "csv") }}>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleExport(job.id, "csv");
+                                    }}
+                                  >
                                     <FileTextIcon className="h-3 w-3" />
                                   </Button>
                                 </>
@@ -646,7 +714,7 @@ export default function StructuredExtractionPanel() {
                           </div>
                         )}
                       </div>
-                    )
+                    );
                   })}
                 </div>
               )}
@@ -663,13 +731,19 @@ export default function StructuredExtractionPanel() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {templates.map((tpl, i) => (
-                    <Card key={tpl.id ?? i} className="cursor-pointer hover:ring-2 ring-primary/50" onClick={() => handleUseTemplate(tpl)}>
+                    <Card
+                      key={tpl.id ?? i}
+                      className="cursor-pointer hover:ring-2 ring-primary/50"
+                      onClick={() => handleUseTemplate(tpl)}
+                    >
                       <CardHeader className="pb-2">
                         <CardTitle className="text-base flex items-center gap-2">
                           <LayoutTemplateIcon className="h-4 w-4" />
                           {tpl.name}
                         </CardTitle>
-                        <Badge variant="outline" className="w-fit text-xs">{tpl.category}</Badge>
+                        <Badge variant="outline" className="w-fit text-xs">
+                          {tpl.category}
+                        </Badge>
                       </CardHeader>
                       <CardContent>
                         <p className="text-sm text-muted-foreground">{tpl.description}</p>
@@ -730,9 +804,9 @@ export default function StructuredExtractionPanel() {
                     key={i}
                     field={field}
                     onChange={(updated) => {
-                      const copy = [...newFields]
-                      copy[i] = updated
-                      setNewFields(copy)
+                      const copy = [...newFields];
+                      copy[i] = updated;
+                      setNewFields(copy);
                     }}
                     onRemove={() => setNewFields(newFields.filter((_, j) => j !== i))}
                   />
@@ -740,7 +814,9 @@ export default function StructuredExtractionPanel() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setNewFields([...newFields, { name: "", type: "string", required: false }])}
+                  onClick={() =>
+                    setNewFields([...newFields, { name: "", type: "string", required: false }])
+                  }
                 >
                   <PlusIcon className="h-3 w-3 mr-1" /> Add Field
                 </Button>
@@ -788,5 +864,5 @@ export default function StructuredExtractionPanel() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

@@ -27,12 +27,16 @@
  *  - No state is stored server-side after the JWT is issued (stateless).
  */
 
-import { createHash, createHmac, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 
+import { signJwt } from "@nexus/auth";
+import { db } from "@nexus/db";
+import { users, refreshTokens } from "@nexus/db/schema";
+import { eq, and, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
+import { sha256hex as _sha256hex } from "../lib/crypto-utils.js";
 import { getSharedKV } from "../lib/shared-kv.js";
-
 
 // ── OAuth provider constants ───────────────────────────────────────────────────
 
@@ -67,15 +71,10 @@ async function _consumeState(state: string): Promise<boolean> {
 
 // ── Route plugin ──────────────────────────────────────────────────────────────
 
-
 // ── OAuth user upsert + token issuance ────────────────────────────────────────
 
 const _OAUTH_ACCESS_TTL_SEC = 15 * 60;
 const _OAUTH_REFRESH_TTL_MS = 30 * 24 * 3600 * 1000;
-
-function _sha256hex(s: string): string {
-  return createHash("sha256").update(s).digest("hex");
-}
 
 async function upsertOAuthUser(
   email: string,
@@ -122,7 +121,12 @@ async function upsertOAuthUser(
   }
 
   const accessToken = signJwt(
-    { sub: userId, role: role as "admin" | "agent" | "read-only", tier, exp: Math.floor(Date.now() / 1000) + _OAUTH_ACCESS_TTL_SEC },
+    {
+      sub: userId,
+      role: role as "admin" | "agent" | "read-only",
+      tier,
+      exp: Math.floor(Date.now() / 1000) + _OAUTH_ACCESS_TTL_SEC,
+    } as Parameters<typeof signJwt>[0],
     secret,
   );
 
@@ -210,7 +214,10 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
         const user = (await userRes.json()) as { sub?: string; email?: string; name?: string };
         const email = user.email ?? user.sub ?? "unknown@google.com";
         const { accessToken, refreshToken, userId } = await upsertOAuthUser(
-          email, user.name, "google", request.headers["user-agent"],
+          email,
+          user.name,
+          "google",
+          request.headers["user-agent"],
         );
         return reply.send({ accessToken, refreshToken, userId, email, provider: "google" });
       } catch (err) {
@@ -297,7 +304,10 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
         };
         const email = user.email ?? `${user.login ?? "unknown"}@users.noreply.github.com`;
         const { accessToken, refreshToken, userId } = await upsertOAuthUser(
-          email, user.name ?? user.login, "github", request.headers["user-agent"],
+          email,
+          user.name ?? user.login,
+          "github",
+          request.headers["user-agent"],
         );
         return reply.send({ accessToken, refreshToken, userId, email, provider: "github" });
       } catch (err) {

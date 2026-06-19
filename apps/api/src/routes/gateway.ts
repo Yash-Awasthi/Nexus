@@ -22,7 +22,14 @@ import {
   NaiveTokenizer,
   type Message as PrunerMessage,
 } from "@nexus/context-pruner";
+import { computeAutoTuneParams, detectContext, InMemoryEmaStore } from "@nexus/drift";
 import { KVGatewayLog } from "@nexus/gateway-log";
+import {
+  UltraplinianRunner,
+  type SpeedTier,
+  type UltraplinianMessage,
+  type SamplingParams as UltraplinianSamplingParams,
+} from "@nexus/gauntlet";
 import { globalHooks } from "@nexus/hooks";
 import {
   DriverRegistry,
@@ -44,11 +51,6 @@ import {
   type LlmRole,
 } from "@nexus/llm-drivers";
 import {
-  computeAutoTuneParams,
-  detectContext,
-  InMemoryEmaStore,
-} from "@nexus/drift";
-import {
   FixedEmbedder,
   GroqEmbedder,
   InMemoryStore,
@@ -57,20 +59,14 @@ import {
 } from "@nexus/memory";
 import { applyParseltongue, getDefaultConfig as redteamDefaultConfig } from "@nexus/redteam";
 import { RunCostTracker, InMemoryRunCostStore } from "@nexus/run-cost";
-import { StreamRecoveryOrchestrator } from "@nexus/stream-recovery";
 import { createDefaultPipeline } from "@nexus/stm";
+import { StreamRecoveryOrchestrator } from "@nexus/stream-recovery";
 import { ThinkTagParser } from "@nexus/think-parser";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { globalTierGate, makeTierGatePreHandler } from "@nexus/tier-gate";
 import { KVTokenBudget, BudgetExceededError } from "@nexus/token-budget";
 import { createDefaultRegistry } from "@nexus/tool-registry";
 import type { ToolRegistry } from "@nexus/tool-registry";
-import {
-  UltraplinianRunner,
-  type SpeedTier,
-  type UltraplinianMessage,
-  type SamplingParams as UltraplinianSamplingParams,
-} from "@nexus/gauntlet";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 
 import { getPromptCache, PromptCache, type CacheableRequest } from "../lib/prompt-cache.js";
@@ -438,14 +434,13 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
       if (!request.body.temperature) {
         try {
           const allText = opts.messages.map((m) => m.content).join(" ");
-          const detection = detectContext(allText);
+          const _detection = detectContext(allText);
           const tuned = computeAutoTuneParams({
-            context: detection.type,
+            message: allText,
             history: opts.messages.slice(-4).map((m) => ({
               role: m.role,
               content: m.content,
             })),
-            emaStore: _emaStore,
           });
           opts = { ...opts, temperature: tuned.params.temperature, topP: tuned.params.top_p };
         } catch {
@@ -715,8 +710,7 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
           const lastUserMsg = opts.messages.filter((m) => m.role === "user").at(-1)?.content ?? "";
           _gatewayMemory
             .remember(`Q: ${lastUserMsg.slice(0, 200)}\nA: ${finalContent.slice(0, 1000)}`, {
-              category: "gateway",
-              tags: [resolvedModel, providerName],
+              metadata: { category: "gateway", tags: [resolvedModel, providerName] },
             })
             .catch(() => {});
         }

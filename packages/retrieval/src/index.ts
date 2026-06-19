@@ -344,13 +344,13 @@ export class RagtimeRetriever {
  * Determines chunk boundary detection strategy.
  */
 export type ChunkingStrategy =
-  | "token"        // Fixed token count windows (default 512 tokens)
-  | "delimiter"    // Split on sentence/paragraph delimiters
-  | "paragraph"    // Paragraph boundaries (double newlines)
-  | "title"        // Document section headings (H1/H2/H3 boundaries)
-  | "one"          // Entire document as a single chunk (for short docs)
-  | "code"         // Code block boundaries (function/class level)
-  | "qa";          // Q&A pair extraction (question → answer chunks)
+  | "token" // Fixed token count windows (default 512 tokens)
+  | "delimiter" // Split on sentence/paragraph delimiters
+  | "paragraph" // Paragraph boundaries (double newlines)
+  | "title" // Document section headings (H1/H2/H3 boundaries)
+  | "one" // Entire document as a single chunk (for short docs)
+  | "code" // Code block boundaries (function/class level)
+  | "qa"; // Q&A pair extraction (question → answer chunks)
 
 /** Configuration for a chunking pass */
 export interface ChunkingConfig {
@@ -414,7 +414,7 @@ export interface RetrievalResult {
   /** Total chunks available before top-K truncation */
   total: number;
   /** Retrieved and reranked chunks, sorted by score descending */
-  chunks: Array<RagChunk & { score: number }>;
+  chunks: (RagChunk & { score: number })[];
   /** Per-document chunk aggregates for citation context */
   docAggs: DocAggregate[];
 }
@@ -425,9 +425,7 @@ export interface RetrievalResult {
  *
  * Ref: ragflow/rag/nlp/search.py ranks["doc_aggs"] assembly
  */
-export function buildDocAggregates(
-  chunks: Array<RagChunk & { score: number }>,
-): DocAggregate[] {
+export function buildDocAggregates(chunks: (RagChunk & { score: number })[]): DocAggregate[] {
   const byDoc = new Map<string, DocAggregate>();
 
   for (const chunk of chunks) {
@@ -484,14 +482,16 @@ export function hybridSimilarity(
   const tokenSim = union.size > 0 ? intersection.size / union.size : 0;
 
   // Vector cosine
-  let dot = 0, magQ = 0, magC = 0;
+  let dot = 0,
+    magQ = 0,
+    magC = 0;
   const len = Math.min(queryVec.length, chunkVec.length);
   for (let i = 0; i < len; i++) {
     dot += queryVec[i]! * chunkVec[i]!;
     magQ += queryVec[i]! * queryVec[i]!;
     magC += chunkVec[i]! * chunkVec[i]!;
   }
-  const vecSim = (magQ > 0 && magC > 0) ? dot / (Math.sqrt(magQ) * Math.sqrt(magC)) : 0;
+  const vecSim = magQ > 0 && magC > 0 ? dot / (Math.sqrt(magQ) * Math.sqrt(magC)) : 0;
 
   return tokenWeight * tokenSim + vectorWeight * vecSim;
 }
@@ -583,8 +583,14 @@ export async function insertCitations(
   }
 
   // Precompute chunk token sets
-  const chunkTokenSets = chunks.map((c) =>
-    new Set(c.text.toLowerCase().split(/\s+/).filter((t) => t.length > 1)),
+  const chunkTokenSets = chunks.map(
+    (c) =>
+      new Set(
+        c.text
+          .toLowerCase()
+          .split(/\s+/)
+          .filter((t) => t.length > 1),
+      ),
   );
 
   // Find citations with threshold decay
@@ -596,15 +602,24 @@ export async function insertCitations(
       const sentVec = sentenceEmbeddings[si];
       if (!sentVec) continue;
 
-      const sentTokens = sentences[si]!.toLowerCase().split(/\s+/).filter((t) => t.length > 1);
-      const matchingChunks: Array<{ chunkId: string; score: number }> = [];
+      const sentTokens = sentences[si]!.toLowerCase()
+        .split(/\s+/)
+        .filter((t) => t.length > 1);
+      const matchingChunks: { chunkId: string; score: number }[] = [];
 
       for (let ci = 0; ci < chunks.length; ci++) {
         const chunkVec = chunkEmbeddings[ci];
         const chunkTokens = Array.from(chunkTokenSets[ci] ?? []);
         if (!chunkVec) continue;
 
-        const score = hybridSimilarity(sentTokens, chunkTokens, sentVec, chunkVec, tokenWeight, vectorWeight);
+        const score = hybridSimilarity(
+          sentTokens,
+          chunkTokens,
+          sentVec,
+          chunkVec,
+          tokenWeight,
+          vectorWeight,
+        );
 
         if (score >= threshold * 0.99) {
           matchingChunks.push({ chunkId: chunks[ci]!.id, score });
@@ -613,7 +628,10 @@ export async function insertCitations(
 
       if (matchingChunks.length > 0) {
         matchingChunks.sort((a, b) => b.score - a.score);
-        citationMap.set(si, matchingChunks.slice(0, maxCitesPerSentence).map((m) => m.chunkId));
+        citationMap.set(
+          si,
+          matchingChunks.slice(0, maxCitesPerSentence).map((m) => m.chunkId),
+        );
       }
     }
     threshold *= thresholdDecay;
@@ -661,10 +679,7 @@ export interface ScoredChunk extends RagChunk {
 }
 
 /** Multi-source retriever function type — injectable, one per source */
-export type SourceRetrieverFn = (
-  query: string,
-  limit: number,
-) => Promise<ScoredChunk[]>;
+export type SourceRetrieverFn = (query: string, limit: number) => Promise<ScoredChunk[]>;
 
 /**
  * Retrieve from multiple sources concurrently and merge results.
@@ -718,10 +733,7 @@ export async function multiSourceRetrieve(
 export type QueryDecomposer = (query: string) => Promise<string[]>;
 
 /** Injectable sufficiency checker: given retrieved chunks → is the answer sufficient? */
-export type SufficiencyChecker = (
-  query: string,
-  chunks: ScoredChunk[],
-) => Promise<boolean>;
+export type SufficiencyChecker = (query: string, chunks: ScoredChunk[]) => Promise<boolean>;
 
 /** No-op decomposer — returns the query unchanged (single-hop) */
 export const nullQueryDecomposer: QueryDecomposer = async (q) => [q];
@@ -960,9 +972,7 @@ export function accumulateSection(
   }
 
   // Doesn't fit: flush current buffer and start fresh with this section
-  const flushed: ChunkPayload[] = acc.text
-    ? [{ text: acc.text, links: acc.linkOffsets }]
-    : [];
+  const flushed: ChunkPayload[] = acc.text ? [{ text: acc.text, links: acc.linkOffsets }] : [];
 
   return {
     accumulator: { text: sectionText, linkOffsets: { 0: sectionLink } },
@@ -984,9 +994,9 @@ export function flushAccumulator(acc: AccumulatorState): ChunkPayload | null {
  * When duplicates exist, keeps the entry with the highest score.
  * Mirrors Onyx's combine_retrieval_results() in search_runner.py.
  */
-export function combineRetrievalResults<T extends { documentId: string; chunkId: number; score?: number }>(
-  chunkSets: T[][],
-): T[] {
+export function combineRetrievalResults<
+  T extends { documentId: string; chunkId: number; score?: number },
+>(chunkSets: T[][]): T[] {
   const unique = new Map<string, T>();
   for (const set of chunkSets) {
     for (const chunk of set) {

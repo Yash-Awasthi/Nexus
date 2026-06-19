@@ -32,12 +32,15 @@ import {
   NeonConnector,
   SlackConnector,
   LinearConnector,
+  NotionConnector,
+  BitbucketConnector,
+  JiraConnector,
   NullConnector,
 } from "@nexus/connectors";
 import type { FastifyInstance } from "fastify";
 
-import { requireAuth } from "../middleware/auth.js";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
+import { requireAuth } from "../middleware/auth.js";
 
 // ── Registry bootstrap ────────────────────────────────────────────────────────
 
@@ -78,7 +81,6 @@ if (process.env.SLACK_BOT_TOKEN) {
   registry.register(
     new SlackConnector({
       token: process.env.SLACK_BOT_TOKEN,
-      signingSecret: process.env.SLACK_SIGNING_SECRET,
     }),
   );
 } else if (!registry.get("slack")) {
@@ -91,12 +93,39 @@ if (process.env.LINEAR_API_KEY) {
   registry.register(new NullConnector("linear", "Linear"));
 }
 
+if (process.env.NOTION_API_KEY) {
+  registry.register(new NotionConnector({ apiKey: process.env.NOTION_API_KEY }));
+} else if (!registry.get("notion")) {
+  registry.register(new NullConnector("notion", "Notion"));
+}
+
+if (process.env.BITBUCKET_TOKEN) {
+  registry.register(new BitbucketConnector({ token: process.env.BITBUCKET_TOKEN }));
+} else if (process.env.BITBUCKET_USERNAME && process.env.BITBUCKET_APP_PASSWORD) {
+  registry.register(
+    new BitbucketConnector({
+      username: process.env.BITBUCKET_USERNAME,
+      appPassword: process.env.BITBUCKET_APP_PASSWORD,
+    }),
+  );
+} else if (!registry.get("bitbucket")) {
+  registry.register(new NullConnector("bitbucket", "Bitbucket"));
+}
+
+if (process.env.JIRA_HOST && process.env.JIRA_EMAIL && process.env.JIRA_API_TOKEN) {
+  registry.register(
+    new JiraConnector({
+      host: process.env.JIRA_HOST,
+      email: process.env.JIRA_EMAIL,
+      apiToken: process.env.JIRA_API_TOKEN,
+    }),
+  );
+} else if (!registry.get("jira")) {
+  registry.register(new NullConnector("jira", "Jira"));
+}
+
 // Static placeholder connectors for integrations without dedicated connector classes yet
-const PLACEHOLDER_CONNECTORS = [
-  { id: "notion",    name: "Notion",    type: "docs" },
-  { id: "bitbucket", name: "Bitbucket", type: "git" },
-  { id: "jira",      name: "Jira",      type: "issues" },
-];
+const PLACEHOLDER_CONNECTORS: { id: string; name: string }[] = [];
 for (const p of PLACEHOLDER_CONNECTORS) {
   if (!registry.get(p.id)) {
     registry.register(new NullConnector(p.id, p.name));

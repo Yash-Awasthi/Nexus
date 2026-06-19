@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Build Tab — Phase 4.4
  *
@@ -9,13 +10,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "~/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import {
@@ -65,21 +60,21 @@ interface BuildTask {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
-  { id: "planned",     label: "Planned",     color: "bg-slate-100 dark:bg-slate-800" },
-  { id: "claimed",     label: "Claimed",     color: "bg-blue-50 dark:bg-blue-950" },
+  { id: "planned", label: "Planned", color: "bg-slate-100 dark:bg-slate-800" },
+  { id: "claimed", label: "Claimed", color: "bg-blue-50 dark:bg-blue-950" },
   { id: "in_progress", label: "In Progress", color: "bg-yellow-50 dark:bg-yellow-950" },
-  { id: "review",      label: "Review",      color: "bg-purple-50 dark:bg-purple-950" },
-  { id: "done",        label: "Done",        color: "bg-green-50 dark:bg-green-950" },
-  { id: "blocked",     label: "Blocked",     color: "bg-red-50 dark:bg-red-950" },
+  { id: "review", label: "Review", color: "bg-purple-50 dark:bg-purple-950" },
+  { id: "done", label: "Done", color: "bg-green-50 dark:bg-green-950" },
+  { id: "blocked", label: "Blocked", color: "bg-red-50 dark:bg-red-950" },
 ];
 
 const STATUS_ICONS: Record<TaskStatus, React.ReactNode> = {
-  planned:     <Clock className="w-3 h-3" />,
-  claimed:     <Lock className="w-3 h-3" />,
+  planned: <Clock className="w-3 h-3" />,
+  claimed: <Lock className="w-3 h-3" />,
   in_progress: <PlayCircle className="w-3 h-3" />,
-  review:      <Eye className="w-3 h-3" />,
-  done:        <CheckCircle className="w-3 h-3" />,
-  blocked:     <AlertCircle className="w-3 h-3" />,
+  review: <Eye className="w-3 h-3" />,
+  done: <CheckCircle className="w-3 h-3" />,
+  blocked: <AlertCircle className="w-3 h-3" />,
 };
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -119,20 +114,20 @@ async function apiDelete(path: string) {
 // Map raw API task to our interface
 function mapTask(raw: any): BuildTask {
   return {
-    id:          raw.id,
-    userId:      raw.userId ?? raw.user_id ?? 1,
-    parentId:    raw.parentId ?? raw.parent_id ?? null,
-    title:       raw.title ?? "",
+    id: raw.id,
+    userId: raw.userId ?? raw.user_id ?? 1,
+    parentId: raw.parentId ?? raw.parent_id ?? null,
+    title: raw.title ?? "",
     description: raw.description ?? null,
-    status:      raw.status ?? "planned",
-    claimedBy:   raw.claimedBy ?? raw.claimed_by ?? null,
-    claimedAt:   raw.claimedAt ?? raw.claimed_at ?? null,
-    output:      raw.output ?? null,
+    status: raw.status ?? "planned",
+    claimedBy: raw.claimedBy ?? raw.claimed_by ?? null,
+    claimedAt: raw.claimedAt ?? raw.claimed_at ?? null,
+    output: raw.output ?? null,
     submittedAt: raw.submittedAt ?? raw.submitted_at ?? null,
-    isLocked:    raw.isLocked ?? raw.is_locked ?? false,
-    meta:        raw.meta ?? {},
-    createdAt:   raw.createdAt ?? raw.created_at ?? new Date().toISOString(),
-    updatedAt:   raw.updatedAt ?? raw.updated_at ?? new Date().toISOString(),
+    isLocked: raw.isLocked ?? raw.is_locked ?? false,
+    meta: raw.meta ?? {},
+    createdAt: raw.createdAt ?? raw.created_at ?? new Date().toISOString(),
+    updatedAt: raw.updatedAt ?? raw.updated_at ?? new Date().toISOString(),
   };
 }
 
@@ -158,8 +153,11 @@ function TaskCard({
     try {
       await apiPost(`/api/build/tasks/${task.id}/claim`);
       onRefresh();
-    } catch { /* ignore — UI optimism not needed, refresh covers it */ }
-    finally { setLoading(false); }
+    } catch {
+      /* ignore — UI optimism not needed, refresh covers it */
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRelease = async () => {
@@ -167,8 +165,10 @@ function TaskCard({
     try {
       await apiPost(`/api/build/tasks/${task.id}/release`);
       onRefresh();
-    } catch { }
-    finally { setLoading(false); }
+    } catch {
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -177,8 +177,10 @@ function TaskCard({
     try {
       await apiDelete(`/api/build/tasks/${task.id}`);
       onRefresh();
-    } catch { }
-    finally { setLoading(false); }
+    } catch {
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -215,19 +217,29 @@ function TaskCard({
             sub
           </Badge>
         )}
-        {task.isLocked && (
-          <Lock className="w-3 h-3 text-orange-500" />
-        )}
+        {task.isLocked && <Lock className="w-3 h-3 text-orange-500" />}
       </div>
 
       <div className="flex gap-1 mt-2">
         {task.status === "planned" && (
-          <Button size="sm" variant="outline" className="text-xs h-6 px-2" onClick={handleClaim} disabled={loading}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-xs h-6 px-2"
+            onClick={handleClaim}
+            disabled={loading}
+          >
             Claim
           </Button>
         )}
         {(task.status === "claimed" || task.status === "in_progress") && (
-          <Button size="sm" variant="outline" className="text-xs h-6 px-2" onClick={handleRelease} disabled={loading}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-xs h-6 px-2"
+            onClick={handleRelease}
+            disabled={loading}
+          >
             Release
           </Button>
         )}
@@ -246,7 +258,7 @@ function KanbanColumn({
   onDragStart,
   onDrop,
 }: {
-  column: typeof COLUMNS[0];
+  column: (typeof COLUMNS)[0];
   tasks: BuildTask[];
   onRefresh: () => void;
   onSelect: (t: BuildTask) => void;
@@ -258,16 +270,24 @@ function KanbanColumn({
   return (
     <div
       className={`flex-1 min-w-[180px] max-w-[260px] rounded-xl ${column.color} p-3 flex flex-col gap-2 transition-colors ${dragOver ? "ring-2 ring-blue-400" : ""}`}
-      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragOver(true);
+      }}
       onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => { setDragOver(false); onDrop(e, column.id); }}
+      onDrop={(e) => {
+        setDragOver(false);
+        onDrop(e, column.id);
+      }}
     >
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-1.5 text-sm font-semibold">
           {STATUS_ICONS[column.id]}
           {column.label}
         </div>
-        <Badge variant="secondary" className="text-xs">{tasks.length}</Badge>
+        <Badge variant="secondary" className="text-xs">
+          {tasks.length}
+        </Badge>
       </div>
 
       <div className="flex flex-col gap-2 overflow-y-auto max-h-[600px]">
@@ -314,8 +334,10 @@ function TaskDetailPanel({
       await apiPost(`/api/build/tasks/${task.id}/submit`, { output });
       onRefresh();
       onClose();
-    } catch { }
-    finally { setLoading(false); }
+    } catch {
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddSubtask = async () => {
@@ -329,8 +351,10 @@ function TaskDetailPanel({
       });
       setSubtaskTitle("");
       onRefresh();
-    } catch { }
-    finally { setLoading(false); }
+    } catch {
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleReview = async (verdict: "approved" | "rejected") => {
@@ -342,8 +366,10 @@ function TaskDetailPanel({
       });
       onRefresh();
       onClose();
-    } catch { }
-    finally { setLoading(false); }
+    } catch {
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleMerge = async () => {
@@ -352,23 +378,36 @@ function TaskDetailPanel({
       await apiPatch(`/api/build/tasks/${task.id}/status`, { status: "done" });
       onRefresh();
       onClose();
-    } catch { }
-    finally { setLoading(false); }
+    } catch {
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="w-80 border-l bg-white dark:bg-gray-950 flex flex-col h-full overflow-y-auto p-4 gap-4 shrink-0">
       <div className="flex items-start justify-between">
         <h3 className="font-semibold text-sm leading-tight">{task.title}</h3>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-lg leading-none">
+        <button
+          onClick={onClose}
+          className="text-gray-400 hover:text-gray-700 text-lg leading-none"
+        >
           ×
         </button>
       </div>
 
       <div className="flex gap-2 flex-wrap">
         <Badge variant="outline">{task.status}</Badge>
-        {task.isLocked && <Badge variant="destructive" className="text-xs">Locked</Badge>}
-        {task.parentId && <Badge variant="secondary" className="text-xs">subtask of #{task.parentId}</Badge>}
+        {task.isLocked && (
+          <Badge variant="destructive" className="text-xs">
+            Locked
+          </Badge>
+        )}
+        {task.parentId && (
+          <Badge variant="secondary" className="text-xs">
+            subtask of #{task.parentId}
+          </Badge>
+        )}
       </div>
 
       {task.description && (
@@ -410,10 +449,21 @@ function TaskDetailPanel({
             className="text-xs"
           />
           <div className="flex gap-2">
-            <Button size="sm" onClick={() => handleReview("approved")} disabled={loading} className="flex-1">
+            <Button
+              size="sm"
+              onClick={() => handleReview("approved")}
+              disabled={loading}
+              className="flex-1"
+            >
               Approve
             </Button>
-            <Button size="sm" variant="destructive" onClick={() => handleReview("rejected")} disabled={loading} className="flex-1">
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => handleReview("rejected")}
+              disabled={loading}
+              className="flex-1"
+            >
               Reject
             </Button>
           </div>
@@ -438,7 +488,12 @@ function TaskDetailPanel({
             className="text-xs h-7"
             onKeyDown={(e) => e.key === "Enter" && handleAddSubtask()}
           />
-          <Button size="sm" className="h-7 px-2" onClick={handleAddSubtask} disabled={loading || !subtaskTitle.trim()}>
+          <Button
+            size="sm"
+            className="h-7 px-2"
+            onClick={handleAddSubtask}
+            disabled={loading || !subtaskTitle.trim()}
+          >
             <Plus className="w-3 h-3" />
           </Button>
         </div>
@@ -451,9 +506,7 @@ function TaskDetailPanel({
         </p>
       )}
       {task.createdAt && (
-        <p className="text-xs text-gray-400">
-          Created {new Date(task.createdAt).toLocaleString()}
-        </p>
+        <p className="text-xs text-gray-400">Created {new Date(task.createdAt).toLocaleString()}</p>
       )}
     </div>
   );
@@ -462,15 +515,15 @@ function TaskDetailPanel({
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function BuildPage() {
-  const [tasks, setTasks]               = useState<BuildTask[]>([]);
-  const [loading, setLoading]           = useState(false);
-  const [error, setError]               = useState<string | null>(null);
+  const [tasks, setTasks] = useState<BuildTask[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<BuildTask | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [newTitle, setNewTitle]         = useState("");
-  const [newDesc, setNewDesc]           = useState("");
+  const [newTitle, setNewTitle] = useState("");
+  const [newDesc, setNewDesc] = useState("");
   const [stealAgentId, setStealAgentId] = useState("agent-1");
-  const [stealMsg, setStealMsg]         = useState<string | null>(null);
+  const [stealMsg, setStealMsg] = useState<string | null>(null);
   const dragTask = useRef<BuildTask | null>(null);
 
   const loadTasks = useCallback(async () => {
@@ -487,7 +540,9 @@ export default function BuildPage() {
     }
   }, []);
 
-  useEffect(() => { loadTasks(); }, [loadTasks]);
+  useEffect(() => {
+    loadTasks();
+  }, [loadTasks]);
 
   const tasksByStatus = useCallback(
     (status: TaskStatus) => tasks.filter((t) => t.status === status && t.parentId === null),
@@ -498,16 +553,18 @@ export default function BuildPage() {
     if (!newTitle.trim()) return;
     try {
       await apiPost("/api/build/tasks", {
-        title:       newTitle,
+        title: newTitle,
         description: newDesc || null,
-        status:      "planned",
-        parentId:    null,
+        status: "planned",
+        parentId: null,
       });
       setNewTitle("");
       setNewDesc("");
       setShowCreateDialog(false);
       loadTasks();
-    } catch { /* ignore — board will stay consistent */ }
+    } catch {
+      /* ignore — board will stay consistent */
+    }
   };
 
   const handleDragStart = (e: React.DragEvent, task: BuildTask) => {
@@ -522,7 +579,7 @@ export default function BuildPage() {
     dragTask.current = null;
 
     // Optimistic update
-    setTasks((prev) => prev.map((task) => task.id === t.id ? { ...task, status } : task));
+    setTasks((prev) => prev.map((task) => (task.id === t.id ? { ...task, status } : task)));
 
     try {
       await apiPatch(`/api/build/tasks/${t.id}/status`, { status });
@@ -581,7 +638,12 @@ export default function BuildPage() {
               className="h-6 w-24 text-xs border-0 p-0"
               placeholder="agent id"
             />
-            <Button size="sm" variant="outline" className="h-6 text-xs px-2 gap-1" onClick={handleSteal}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 text-xs px-2 gap-1"
+              onClick={handleSteal}
+            >
               <Shuffle className="w-3 h-3" />
               Steal
             </Button>
@@ -598,11 +660,7 @@ export default function BuildPage() {
             Refresh
           </Button>
 
-          <Button
-            size="sm"
-            className="gap-1"
-            onClick={() => setShowCreateDialog(true)}
-          >
+          <Button size="sm" className="gap-1" onClick={() => setShowCreateDialog(true)}>
             <Plus className="w-3 h-3" />
             New Task
           </Button>
@@ -611,7 +669,9 @@ export default function BuildPage() {
 
       {/* Status bar */}
       {(error || stealMsg) && (
-        <div className={`px-6 py-2 text-xs shrink-0 ${error ? "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400" : "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"}`}>
+        <div
+          className={`px-6 py-2 text-xs shrink-0 ${error ? "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400" : "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"}`}
+        >
           {error ?? stealMsg}
         </div>
       )}
@@ -645,7 +705,10 @@ export default function BuildPage() {
             key={selectedTask.id}
             task={selectedTask}
             onClose={() => setSelectedTask(null)}
-            onRefresh={() => { loadTasks(); setSelectedTask(null); }}
+            onRefresh={() => {
+              loadTasks();
+              setSelectedTask(null);
+            }}
           />
         )}
       </div>
@@ -671,8 +734,12 @@ export default function BuildPage() {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
-            <Button onClick={handleCreateTask} disabled={!newTitle.trim()}>Create</Button>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateTask} disabled={!newTitle.trim()}>
+              Create
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

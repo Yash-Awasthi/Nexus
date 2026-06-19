@@ -21,7 +21,7 @@
  *   Claims validated: iss, aud, exp, iat.
  */
 
-import { createHash, createPublicKey, randomBytes, createVerify } from "node:crypto";
+import { createPublicKey, randomBytes, createVerify } from "node:crypto";
 
 import { signJwt } from "@nexus/auth";
 import { db } from "@nexus/db";
@@ -30,6 +30,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
 import { emitAuditEvent } from "../lib/audit-emitter.js";
+import { sha256hex as _sha256hex } from "../lib/crypto-utils.js";
 import { getSharedKV } from "../lib/shared-kv.js";
 
 // ── Config helpers ─────────────────────────────────────────────────────────────
@@ -90,7 +91,11 @@ const DISCOVERY_TTL_MS = 5 * 60_000;
 
 async function fetchDiscovery(issuer: string): Promise<OidcDiscovery> {
   const now = Date.now();
-  if (_discoveryCache && _discoveryCache.issuer === issuer && now - _discoveryCache.cachedAt < DISCOVERY_TTL_MS) {
+  if (
+    _discoveryCache &&
+    _discoveryCache.issuer === issuer &&
+    now - _discoveryCache.cachedAt < DISCOVERY_TTL_MS
+  ) {
     return _discoveryCache.doc;
   }
   const url = `${issuer.replace(/\/$/, "")}/.well-known/openid-configuration`;
@@ -132,7 +137,12 @@ const JWKS_TTL_MS = 5 * 60_000;
 
 async function fetchJwks(uri: string, forceRefresh = false): Promise<JwkSet> {
   const now = Date.now();
-  if (!forceRefresh && _jwksCache && _jwksCache.uri === uri && now - _jwksCache.cachedAt < JWKS_TTL_MS) {
+  if (
+    !forceRefresh &&
+    _jwksCache &&
+    _jwksCache.uri === uri &&
+    now - _jwksCache.cachedAt < JWKS_TTL_MS
+  ) {
     return _jwksCache.set;
   }
   const res = await fetch(uri);
@@ -190,9 +200,7 @@ async function verifyIdToken(
     kid?: string;
   };
 
-  const claims = JSON.parse(
-    Buffer.from(payloadB64, "base64url").toString(),
-  ) as IdTokenClaims;
+  const claims = JSON.parse(Buffer.from(payloadB64, "base64url").toString()) as IdTokenClaims;
 
   // ── Claim validation first (before crypto — fail fast) ──────────────────────
 
@@ -204,7 +212,9 @@ async function verifyIdToken(
 
   const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
   if (!aud.includes(expectedAudience)) {
-    throw new Error(`ID token aud mismatch: "${claims.aud}" does not include "${expectedAudience}"`);
+    throw new Error(
+      `ID token aud mismatch: "${claims.aud}" does not include "${expectedAudience}"`,
+    );
   }
 
   if (claims.exp <= now) {
@@ -223,7 +233,9 @@ async function verifyIdToken(
   const signature = Buffer.from(signatureB64, "base64url");
 
   const jwk = await findJwk(jwksUri, header.kid);
-  const publicKey = createPublicKey({ key: jwk as unknown as Parameters<typeof createPublicKey>[0], format: "jwk" });
+  const publicKey = createPublicKey({ key: jwk, format: "jwk" } as unknown as Parameters<
+    typeof createPublicKey
+  >[0]);
 
   let valid = false;
   if (alg === "RS256" || alg === "RS384" || alg === "RS512") {
@@ -250,10 +262,6 @@ async function verifyIdToken(
 const _OIDC_ACCESS_TTL_SEC = 15 * 60;
 const _OIDC_REFRESH_TTL_MS = 30 * 24 * 3600 * 1000;
 
-function _sha256hex(s: string): string {
-  return createHash("sha256").update(s).digest("hex");
-}
-
 async function upsertOidcUser(
   claims: IdTokenClaims,
   provider: string,
@@ -266,9 +274,9 @@ async function upsertOidcUser(
   if (!rawEmail) throw new Error("ID token missing email claim");
 
   const displayName =
-    claims.name ??
+    claims.name ||
     [claims.given_name, claims.family_name].filter(Boolean).join(" ") ||
-    claims.preferred_username ??
+    claims.preferred_username ||
     undefined;
 
   let userId: string;
@@ -314,7 +322,7 @@ async function upsertOidcUser(
       role: role as "admin" | "agent" | "read-only",
       tier,
       exp: Math.floor(Date.now() / 1000) + _OIDC_ACCESS_TTL_SEC,
-    },
+    } as Parameters<typeof signJwt>[0],
     secret,
   );
 
@@ -336,10 +344,14 @@ async function upsertOidcUser(
 export async function oidcRoutes(app: FastifyInstance): Promise<void> {
   if (!isOidcConfigured()) {
     // Graceful degradation — routes return 501 until OIDC env vars are set
-    const notConfigured = async (_req: unknown, reply: { code: (n: number) => { send: (v: unknown) => unknown } }) =>
+    const notConfigured = async (
+      _req: unknown,
+      reply: { code: (n: number) => { send: (v: unknown) => unknown } },
+    ) =>
       reply.code(501).send({
         error: "oidc_not_configured",
-        message: "Set NEXUS_OIDC_ISSUER, NEXUS_OIDC_CLIENT_ID, NEXUS_OIDC_CLIENT_SECRET, NEXUS_OIDC_REDIRECT_URI to enable OIDC SSO",
+        message:
+          "Set NEXUS_OIDC_ISSUER, NEXUS_OIDC_CLIENT_ID, NEXUS_OIDC_CLIENT_SECRET, NEXUS_OIDC_REDIRECT_URI to enable OIDC SSO",
       });
     app.get("/auth/oidc/authorize", notConfigured);
     app.get("/auth/oidc/callback", notConfigured);
@@ -379,7 +391,7 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
         state,
       });
 
-      return reply.redirect(302, `${discovery.authorization_endpoint}?${params.toString()}`);
+      return reply.redirect(`${discovery.authorization_endpoint}?${params.toString()}`, 302);
     },
   );
 
@@ -398,120 +410,127 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{
     Querystring: { code?: string; state?: string; error?: string; error_description?: string };
-  }>(
-    "/auth/oidc/callback",
-    async (request, reply) => {
-      const { code, state, error, error_description } = request.query;
+  }>("/auth/oidc/callback", async (request, reply) => {
+    const { code, state, error, error_description } = request.query;
 
-      // Provider-side error (user denied consent, etc.)
-      if (error) {
-        return reply.code(400).send({
-          error: "oidc_provider_error",
-          provider_error: error,
-          message: error_description ?? "Provider returned an error",
-        });
-      }
+    // Provider-side error (user denied consent, etc.)
+    if (error) {
+      return reply.code(400).send({
+        error: "oidc_provider_error",
+        provider_error: error,
+        message: error_description ?? "Provider returned an error",
+      });
+    }
 
-      if (!code || !state) {
-        return reply.code(400).send({ error: "missing_params", message: "code and state are required" });
-      }
+    if (!code || !state) {
+      return reply
+        .code(400)
+        .send({ error: "missing_params", message: "code and state are required" });
+    }
 
-      // CSRF validation
-      const stateValid = await _consumeState(state);
-      if (!stateValid) {
-        return reply.code(400).send({ error: "invalid_state", message: "State mismatch — possible CSRF" });
-      }
+    // CSRF validation
+    const stateValid = await _consumeState(state);
+    if (!stateValid) {
+      return reply
+        .code(400)
+        .send({ error: "invalid_state", message: "State mismatch — possible CSRF" });
+    }
 
-      const cfg = oidcConfig();
+    const cfg = oidcConfig();
 
-      let discovery: OidcDiscovery;
-      try {
-        discovery = await fetchDiscovery(cfg.issuer!);
-      } catch (err) {
-        return reply.code(502).send({ error: "oidc_discovery_failed", message: String(err) });
-      }
+    let discovery: OidcDiscovery;
+    try {
+      discovery = await fetchDiscovery(cfg.issuer!);
+    } catch (err) {
+      return reply.code(502).send({ error: "oidc_discovery_failed", message: String(err) });
+    }
 
-      // ── Code → token exchange ─────────────────────────────────────────────
+    // ── Code → token exchange ─────────────────────────────────────────────
 
-      let tokenRes: { id_token?: string; access_token?: string; error?: string };
-      try {
-        const body = new URLSearchParams({
-          grant_type: "authorization_code",
-          code,
-          redirect_uri: cfg.redirectUri!,
-          client_id: cfg.clientId!,
-          client_secret: cfg.clientSecret!,
-        });
-        const res = await fetch(discovery.token_endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-          body: body.toString(),
-        });
-        tokenRes = (await res.json()) as typeof tokenRes;
-      } catch (err) {
-        return reply.code(502).send({ error: "token_exchange_failed", message: String(err) });
-      }
-
-      if (tokenRes.error || !tokenRes.id_token) {
-        return reply.code(400).send({
-          error: "token_exchange_error",
-          message: (tokenRes as Record<string, string>).error_description ?? tokenRes.error ?? "No id_token returned",
-        });
-      }
-
-      // ── ID token verification ──────────────────────────────────────────────
-
-      let claims: IdTokenClaims;
-      try {
-        claims = await verifyIdToken(
-          tokenRes.id_token,
-          discovery.jwks_uri,
-          cfg.issuer!,
-          cfg.clientId!,
-        );
-      } catch (err) {
-        app.log.warn({ err }, "oidc: id_token verification failed");
-        return reply.code(401).send({ error: "id_token_invalid", message: String(err) });
-      }
-
-      // ── User upsert + token issuance ──────────────────────────────────────
-
-      let tokens: { accessToken: string; refreshToken: string; userId: string };
-      try {
-        tokens = await upsertOidcUser(
-          claims,
-          `oidc:${new URL(cfg.issuer!).hostname}`,
-          request.headers["user-agent"],
-        );
-      } catch (err) {
-        app.log.error({ err }, "oidc: user upsert failed");
-        return reply.code(500).send({ error: "upsert_failed", message: String(err) });
-      }
-
-      emitAuditEvent(
-        {
-          entityType: "user",
-          entityId: tokens.userId,
-          action: "auth.oidc_login",
-          actor: tokens.userId,
-          payload: {
-            issuer: cfg.issuer,
-            sub: claims.sub,
-            email: claims.email,
-            emailVerified: claims.email_verified,
-          },
+    let tokenRes: { id_token?: string; access_token?: string; error?: string };
+    try {
+      const body = new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: cfg.redirectUri!,
+        client_id: cfg.clientId!,
+        client_secret: cfg.clientSecret!,
+      });
+      const res = await fetch(discovery.token_endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
         },
-        app.log,
+        body: body.toString(),
+      });
+      tokenRes = (await res.json()) as typeof tokenRes;
+    } catch (err) {
+      return reply.code(502).send({ error: "token_exchange_failed", message: String(err) });
+    }
+
+    if (tokenRes.error || !tokenRes.id_token) {
+      return reply.code(400).send({
+        error: "token_exchange_error",
+        message:
+          (tokenRes as Record<string, string>).error_description ??
+          tokenRes.error ??
+          "No id_token returned",
+      });
+    }
+
+    // ── ID token verification ──────────────────────────────────────────────
+
+    let claims: IdTokenClaims;
+    try {
+      claims = await verifyIdToken(
+        tokenRes.id_token,
+        discovery.jwks_uri,
+        cfg.issuer!,
+        cfg.clientId!,
       );
+    } catch (err) {
+      app.log.warn({ err }, "oidc: id_token verification failed");
+      return reply.code(401).send({ error: "id_token_invalid", message: String(err) });
+    }
 
-      // ── Browser redirect ──────────────────────────────────────────────────
+    // ── User upsert + token issuance ──────────────────────────────────────
 
-      const dest = new URL("/auth/callback", _redirectBase());
-      dest.searchParams.set("accessToken", tokens.accessToken);
-      dest.searchParams.set("refreshToken", tokens.refreshToken);
-      dest.searchParams.set("provider", "oidc");
+    let tokens: { accessToken: string; refreshToken: string; userId: string };
+    try {
+      tokens = await upsertOidcUser(
+        claims,
+        `oidc:${new URL(cfg.issuer!).hostname}`,
+        request.headers["user-agent"],
+      );
+    } catch (err) {
+      app.log.error({ err }, "oidc: user upsert failed");
+      return reply.code(500).send({ error: "upsert_failed", message: String(err) });
+    }
 
-      return reply.redirect(302, dest.toString());
-    },
-  );
+    emitAuditEvent(
+      {
+        entityType: "user",
+        entityId: tokens.userId,
+        action: "auth.oidc_login",
+        actor: tokens.userId,
+        payload: {
+          issuer: cfg.issuer,
+          sub: claims.sub,
+          email: claims.email,
+          emailVerified: claims.email_verified,
+        },
+      },
+      app.log,
+    );
+
+    // ── Browser redirect ──────────────────────────────────────────────────
+
+    const dest = new URL("/auth/callback", _redirectBase());
+    dest.searchParams.set("accessToken", tokens.accessToken);
+    dest.searchParams.set("refreshToken", tokens.refreshToken);
+    dest.searchParams.set("provider", "oidc");
+
+    return reply.redirect(dest.toString(), 302);
+  });
 }

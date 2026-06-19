@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Reasoning — multi-mode reasoning and symbolic logic tools.
  *
@@ -74,8 +75,8 @@ function ReasoningTab() {
 
   useEffect(() => {
     fetch("/api/reasoning/modes")
-      .then(r => r.ok ? r.json() : { modes: [] })
-      .then(d => {
+      .then((r) => (r.ok ? r.json() : { modes: [] }))
+      .then((d) => {
         const modeList = d.modes ?? d;
         setModes(modeList);
         if (modeList.length) setSelectedMode(modeList[0].id);
@@ -85,7 +86,10 @@ function ReasoningTab() {
 
   const run = useCallback(async () => {
     if (!prompt.trim()) return;
-    setRunning(true); setErr(""); setResult(null); setExpandedSteps(new Set());
+    setRunning(true);
+    setErr("");
+    setResult(null);
+    setExpandedSteps(new Set());
     const r = await fetch("/api/reasoning/run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -97,7 +101,7 @@ function ReasoningTab() {
   }, [prompt, selectedMode]);
 
   const toggleStep = (n: number) => {
-    setExpandedSteps(prev => {
+    setExpandedSteps((prev) => {
       const next = new Set(prev);
       next.has(n) ? next.delete(n) : next.add(n);
       return next;
@@ -109,7 +113,7 @@ function ReasoningTab() {
       {/* Mode selector */}
       {modes.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {modes.map(m => (
+          {modes.map((m) => (
             <button
               key={m.id}
               onClick={() => setSelectedMode(m.id)}
@@ -128,12 +132,22 @@ function ReasoningTab() {
             rows={4}
             placeholder="Enter a problem or question that requires deep reasoning…"
             value={prompt}
-            onChange={e => setPrompt(e.target.value)}
+            onChange={(e) => setPrompt(e.target.value)}
             className="resize-none"
           />
           {err && <p className="text-red-500 text-xs">{err}</p>}
           <Button onClick={run} disabled={running || !prompt.trim()}>
-            {running ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Reasoning…</> : <><Brain className="w-4 h-4 mr-2" />Run</>}
+            {running ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Reasoning…
+              </>
+            ) : (
+              <>
+                <Brain className="w-4 h-4 mr-2" />
+                Run
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>
@@ -143,10 +157,20 @@ function ReasoningTab() {
           {/* Metadata */}
           <div className="flex flex-wrap gap-2 items-center text-sm">
             <Badge variant="outline">mode: {result.mode}</Badge>
-            {result.tokensUsed && <Badge variant="outline">{result.tokensUsed.toLocaleString()} tokens</Badge>}
-            {result.durationMs && <Badge variant="outline">{(result.durationMs / 1000).toFixed(1)}s</Badge>}
+            {result.tokensUsed && (
+              <Badge variant="outline">{result.tokensUsed.toLocaleString()} tokens</Badge>
+            )}
+            {result.durationMs && (
+              <Badge variant="outline">{(result.durationMs / 1000).toFixed(1)}s</Badge>
+            )}
             {result.confidence !== undefined && (
-              <Badge className={result.confidence > 0.7 ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400" : "bg-yellow-100 text-yellow-700"}>
+              <Badge
+                className={
+                  result.confidence > 0.7
+                    ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
+                    : "bg-yellow-100 text-yellow-700"
+                }
+              >
                 {Math.round(result.confidence * 100)}% confidence
               </Badge>
             )}
@@ -161,7 +185,7 @@ function ReasoningTab() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {result.steps.map(step => (
+                {result.steps.map((step) => (
                   <div key={step.stepNumber} className="border rounded-md overflow-hidden">
                     <button
                       onClick={() => toggleStep(step.stepNumber)}
@@ -171,7 +195,9 @@ function ReasoningTab() {
                         {step.stepNumber}
                       </span>
                       <span className="text-sm flex-1 truncate">{step.thought}</span>
-                      <ChevronRight className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform ${expandedSteps.has(step.stepNumber) ? "rotate-90" : ""}`} />
+                      <ChevronRight
+                        className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform ${expandedSteps.has(step.stepNumber) ? "rotate-90" : ""}`}
+                      />
                     </button>
                     {expandedSteps.has(step.stepNumber) && (
                       <div className="px-3 pb-3 pt-1 text-sm text-muted-foreground border-t bg-muted/20">
@@ -191,7 +217,8 @@ function ReasoningTab() {
           <Card className="border-primary/20">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Lightbulb className="w-4 h-4 text-yellow-500" />Final Answer
+                <Lightbulb className="w-4 h-4 text-yellow-500" />
+                Final Answer
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -216,17 +243,22 @@ function SymbolicTab() {
   const [chainResult, setChainResult] = useState<ForwardChainResult | null>(null);
 
   // Consistency check
-  const [consistFacts, setConsistFacts] = useState<string[]>(["all cats are mammals", "some mammals can't breathe underwater"]);
+  const [consistFacts, setConsistFacts] = useState<string[]>([
+    "all cats are mammals",
+    "some mammals can't breathe underwater",
+  ]);
   const [checking, setChecking] = useState(false);
   const [consistResult, setConsistResult] = useState<ConsistencyResult | null>(null);
 
   const [err, setErr] = useState("");
 
   const runChain = useCallback(async () => {
-    const validFacts = facts.filter(f => f.trim());
-    const validRules = rules.filter(r => r.trim());
+    const validFacts = facts.filter((f) => f.trim());
+    const validRules = rules.filter((r) => r.trim());
     if (!validFacts.length) return;
-    setChaining(true); setErr(""); setChainResult(null);
+    setChaining(true);
+    setErr("");
+    setChainResult(null);
     const r = await fetch("/api/symbolic/forward-chain", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -238,9 +270,11 @@ function SymbolicTab() {
   }, [facts, rules]);
 
   const checkConsistency = useCallback(async () => {
-    const valid = consistFacts.filter(f => f.trim());
+    const valid = consistFacts.filter((f) => f.trim());
     if (valid.length < 2) return;
-    setChecking(true); setErr(""); setConsistResult(null);
+    setChecking(true);
+    setErr("");
+    setConsistResult(null);
     const r = await fetch("/api/symbolic/check-consistency", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -254,10 +288,18 @@ function SymbolicTab() {
   return (
     <div className="space-y-4">
       <div className="flex gap-2">
-        <Button size="sm" variant={mode === "chain" ? "default" : "outline"} onClick={() => setMode("chain")}>
+        <Button
+          size="sm"
+          variant={mode === "chain" ? "default" : "outline"}
+          onClick={() => setMode("chain")}
+        >
           Forward Chain
         </Button>
-        <Button size="sm" variant={mode === "consistency" ? "default" : "outline"} onClick={() => setMode("consistency")}>
+        <Button
+          size="sm"
+          variant={mode === "consistency" ? "default" : "outline"}
+          onClick={() => setMode("consistency")}
+        >
           Consistency Check
         </Button>
       </div>
@@ -265,56 +307,88 @@ function SymbolicTab() {
       {mode === "chain" && (
         <div className="grid md:grid-cols-2 gap-4">
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Facts</CardTitle></CardHeader>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Facts</CardTitle>
+            </CardHeader>
             <CardContent className="space-y-2">
               {facts.map((f, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <Input
                     value={f}
-                    onChange={e => setFacts(prev => prev.map((x, j) => j === i ? e.target.value : x))}
+                    onChange={(e) =>
+                      setFacts((prev) => prev.map((x, j) => (j === i ? e.target.value : x)))
+                    }
                     className="text-sm"
                     placeholder="Enter a fact…"
                   />
-                  <Button size="icon" variant="ghost" className="h-8 w-8 text-red-400 shrink-0" onClick={() => setFacts(prev => prev.filter((_, j) => j !== i))}>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-red-400 shrink-0"
+                    onClick={() => setFacts((prev) => prev.filter((_, j) => j !== i))}
+                  >
                     <Trash2 className="w-3 h-3" />
                   </Button>
                 </div>
               ))}
-              <Button variant="outline" size="sm" onClick={() => setFacts(prev => [...prev, ""])}>
-                <Plus className="w-4 h-4 mr-1" />Add fact
+              <Button variant="outline" size="sm" onClick={() => setFacts((prev) => [...prev, ""])}>
+                <Plus className="w-4 h-4 mr-1" />
+                Add fact
               </Button>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Rules</CardTitle></CardHeader>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Rules</CardTitle>
+            </CardHeader>
             <CardContent className="space-y-2">
               {rules.map((r, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <Input
                     value={r}
-                    onChange={e => setRules(prev => prev.map((x, j) => j === i ? e.target.value : x))}
+                    onChange={(e) =>
+                      setRules((prev) => prev.map((x, j) => (j === i ? e.target.value : x)))
+                    }
                     className="text-sm font-mono"
                     placeholder="IF ... THEN ..."
                   />
-                  <Button size="icon" variant="ghost" className="h-8 w-8 text-red-400 shrink-0" onClick={() => setRules(prev => prev.filter((_, j) => j !== i))}>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-red-400 shrink-0"
+                    onClick={() => setRules((prev) => prev.filter((_, j) => j !== i))}
+                  >
                     <Trash2 className="w-3 h-3" />
                   </Button>
                 </div>
               ))}
-              <Button variant="outline" size="sm" onClick={() => setRules(prev => [...prev, ""])}>
-                <Plus className="w-4 h-4 mr-1" />Add rule
+              <Button variant="outline" size="sm" onClick={() => setRules((prev) => [...prev, ""])}>
+                <Plus className="w-4 h-4 mr-1" />
+                Add rule
               </Button>
             </CardContent>
           </Card>
           <div className="md:col-span-2 space-y-3">
             {err && <p className="text-red-500 text-xs">{err}</p>}
             <Button onClick={runChain} disabled={chaining}>
-              {chaining ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Chaining…</> : <><Play className="w-4 h-4 mr-2" />Run Forward Chain</>}
+              {chaining ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Chaining…
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4 mr-2" />
+                  Run Forward Chain
+                </>
+              )}
             </Button>
             {chainResult && (
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Derived Facts ({chainResult.derivedFacts.length})</CardTitle>
+                  <CardTitle className="text-sm">
+                    Derived Facts ({chainResult.derivedFacts.length})
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-1">
                   {chainResult.derivedFacts.map((f, i) => (
@@ -324,7 +398,9 @@ function SymbolicTab() {
                     </div>
                   ))}
                   {chainResult.iterations && (
-                    <p className="text-xs text-muted-foreground pt-1">{chainResult.iterations} iterations</p>
+                    <p className="text-xs text-muted-foreground pt-1">
+                      {chainResult.iterations} iterations
+                    </p>
                   )}
                 </CardContent>
               </Card>
@@ -336,47 +412,85 @@ function SymbolicTab() {
       {mode === "consistency" && (
         <div className="space-y-4">
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Facts to Check</CardTitle></CardHeader>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Facts to Check</CardTitle>
+            </CardHeader>
             <CardContent className="space-y-2">
               {consistFacts.map((f, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <Input
                     value={f}
-                    onChange={e => setConsistFacts(prev => prev.map((x, j) => j === i ? e.target.value : x))}
+                    onChange={(e) =>
+                      setConsistFacts((prev) => prev.map((x, j) => (j === i ? e.target.value : x)))
+                    }
                     className="text-sm"
                     placeholder="Enter a fact…"
                   />
-                  <Button size="icon" variant="ghost" className="h-8 w-8 text-red-400 shrink-0" onClick={() => setConsistFacts(prev => prev.filter((_, j) => j !== i))}>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-red-400 shrink-0"
+                    onClick={() => setConsistFacts((prev) => prev.filter((_, j) => j !== i))}
+                  >
                     <Trash2 className="w-3 h-3" />
                   </Button>
                 </div>
               ))}
-              <Button variant="outline" size="sm" onClick={() => setConsistFacts(prev => [...prev, ""])}>
-                <Plus className="w-4 h-4 mr-1" />Add fact
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setConsistFacts((prev) => [...prev, ""])}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add fact
               </Button>
             </CardContent>
           </Card>
           {err && <p className="text-red-500 text-xs">{err}</p>}
           <Button onClick={checkConsistency} disabled={checking}>
-            {checking ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Checking…</> : "Check Consistency"}
+            {checking ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Checking…
+              </>
+            ) : (
+              "Check Consistency"
+            )}
           </Button>
           {consistResult && (
-            <Card className={consistResult.consistent ? "border-green-200 dark:border-green-800" : "border-red-200 dark:border-red-800"}>
+            <Card
+              className={
+                consistResult.consistent
+                  ? "border-green-200 dark:border-green-800"
+                  : "border-red-200 dark:border-red-800"
+              }
+            >
               <CardContent className="pt-4 space-y-3">
                 <div className="flex items-center gap-2">
-                  {consistResult.consistent
-                    ? <CheckCircle className="w-5 h-5 text-green-500" />
-                    : <XCircle className="w-5 h-5 text-red-500" />}
-                  <span className={`font-semibold ${consistResult.consistent ? "text-green-600 dark:text-green-400" : "text-red-600"}`}>
+                  {consistResult.consistent ? (
+                    <CheckCircle className="w-5 h-5 text-green-500" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-500" />
+                  )}
+                  <span
+                    className={`font-semibold ${consistResult.consistent ? "text-green-600 dark:text-green-400" : "text-red-600"}`}
+                  >
                     {consistResult.consistent ? "Facts are consistent" : "Inconsistencies detected"}
                   </span>
                 </div>
                 {consistResult.conflicts && consistResult.conflicts.length > 0 && (
                   <div className="space-y-2">
                     {consistResult.conflicts.map((c, i) => (
-                      <div key={i} className="text-sm bg-red-50 dark:bg-red-950/20 p-2.5 rounded-md">
-                        <p className="text-red-600 dark:text-red-400 text-xs font-medium mb-1">Conflict {i + 1}</p>
-                        <p>"{c.fact1}" ↔ "{c.fact2}"</p>
+                      <div
+                        key={i}
+                        className="text-sm bg-red-50 dark:bg-red-950/20 p-2.5 rounded-md"
+                      >
+                        <p className="text-red-600 dark:text-red-400 text-xs font-medium mb-1">
+                          Conflict {i + 1}
+                        </p>
+                        <p>
+                          "{c.fact1}" ↔ "{c.fact2}"
+                        </p>
                         <p className="text-muted-foreground text-xs mt-1">{c.explanation}</p>
                       </div>
                     ))}
@@ -408,11 +522,18 @@ export default function Reasoning() {
 
       <Tabs defaultValue="depth">
         <TabsList>
-          <TabsTrigger value="depth"><Brain className="w-4 h-4 mr-1" />Reasoning Depth</TabsTrigger>
+          <TabsTrigger value="depth">
+            <Brain className="w-4 h-4 mr-1" />
+            Reasoning Depth
+          </TabsTrigger>
           <TabsTrigger value="symbolic">Symbolic Logic</TabsTrigger>
         </TabsList>
-        <TabsContent value="depth" className="mt-4"><ReasoningTab /></TabsContent>
-        <TabsContent value="symbolic" className="mt-4"><SymbolicTab /></TabsContent>
+        <TabsContent value="depth" className="mt-4">
+          <ReasoningTab />
+        </TabsContent>
+        <TabsContent value="symbolic" className="mt-4">
+          <SymbolicTab />
+        </TabsContent>
       </Tabs>
     </div>
   );

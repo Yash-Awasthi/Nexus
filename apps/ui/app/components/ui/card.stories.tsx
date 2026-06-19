@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import type { Meta, StoryObj } from "@storybook/react";
 import {
   Card,
@@ -54,7 +55,9 @@ export const WithFooter: Story = {
         <p>Card content goes here.</p>
       </CardContent>
       <CardFooter style={{ gap: "8px" }}>
-        <Button variant="outline" size="sm">Cancel</Button>
+        <Button variant="outline" size="sm">
+          Cancel
+        </Button>
         <Button size="sm">Confirm</Button>
       </CardFooter>
     </Card>
@@ -108,7 +111,9 @@ export const AgentCard: Story = {
         </p>
       </CardContent>
       <CardFooter style={{ gap: "8px" }}>
-        <Button variant="ghost" size="sm">Configure</Button>
+        <Button variant="ghost" size="sm">
+          Configure
+        </Button>
         <Button size="sm">Run</Button>
       </CardFooter>
     </Card>

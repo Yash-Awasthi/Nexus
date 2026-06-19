@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
@@ -40,7 +41,7 @@ export function ParticleField({ count = 150, radius = 7, color = "#6d9eff" }: Pa
       dummy.position.set(
         p.x * cos - p.z * sin,
         p.y + Math.sin(t * p.speed + p.offset) * 0.3,
-        p.x * sin + p.z * cos
+        p.x * sin + p.z * cos,
       );
       const s = p.scale * (0.8 + 0.2 * Math.sin(t * 0.5 + p.offset));
       dummy.scale.setScalar(s);

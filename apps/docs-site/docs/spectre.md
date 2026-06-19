@@ -26,35 +26,41 @@ docker compose --profile spectre up spectre
 ## Modes
 
 ### CHAT
+
 Standard multi-model chat with session history stored in `localStorage`. Features:
+
 - Session sidebar with auto-titling (first 42 chars of first message)
 - 6 model presets: nexus/smart, nexus/fast, Claude 3.5, GPT-4o, Gemini Flash, Grok 3
 - Sessions persist across browser reloads — no account required
 
 ### PHANTOM
+
 5 original model+prompt combos race in parallel via `Promise.allSettled`. Each combo fires simultaneously; cards resolve live as responses arrive. Winner is crowned by signal density (response length as proxy).
 
-| Combo | Model |
-|---|---|
-| 👻 PHANTOM-1 | anthropic/claude-3.5-sonnet |
-| ⚡ PHANTOM-2 | x-ai/grok-3 |
-| 🔮 PHANTOM-3 | google/gemini-2.5-flash |
-| 🌑 PHANTOM-4 | openai/gpt-4o |
+| Combo           | Model                            |
+| --------------- | -------------------------------- |
+| 👻 PHANTOM-1    | anthropic/claude-3.5-sonnet      |
+| ⚡ PHANTOM-2    | x-ai/grok-3                      |
+| 🔮 PHANTOM-3    | google/gemini-2.5-flash          |
+| 🌑 PHANTOM-4    | openai/gpt-4o                    |
 | 💀 PHANTOM-FAST | meta-llama/llama-3.1-8b-instruct |
 
 ### ULTRAPLINIAN
+
 Powered by `@nexus/gauntlet`. Select a tier, send a query — all models in that tier race in parallel waves (12 models/wave, 150ms stagger). Results are scored 0–100 on substance, directness, and relevance. Winner displayed prominently; full ranked table collapsible below.
 
-| Tier | Approx models |
-|---|---|
-| ⚡ FAST | ~12 |
-| 🎯 STANDARD | ~24 |
-| 🧠 SMART | ~35 |
-| ⚔️ POWER | ~45 |
-| 🔱 ULTRA | ~51 |
+| Tier        | Approx models |
+| ----------- | ------------- |
+| ⚡ FAST     | ~12           |
+| 🎯 STANDARD | ~24           |
+| 🧠 SMART    | ~35           |
+| ⚔️ POWER    | ~45           |
+| 🔱 ULTRA    | ~51           |
 
 ### PARSELTONGUE
+
 Powered by `@nexus/redteam`. Input perturbation for red-teaming research:
+
 - Live preview of perturbed output as you type
 - 6 techniques: LEET, UNICODE, ZWJ, MIXCASE, PHONETIC, RANDOM
 - 3 intensities: LIGHT / MEDIUM / HEAVY
@@ -65,12 +71,12 @@ Powered by `@nexus/redteam`. Input perturbation for red-teaming research:
 
 Themes are applied via CSS variables and persisted to `localStorage` (key: `spectre_theme`):
 
-| Theme | Aesthetic |
-|---|---|
-| VOID | Deep green terminal — `#080808` bg, `#00ff88` fg |
-| EMBER | Red/orange hacker — `#0a0605` bg, `#ff6600` fg |
-| NEON | Purple glyph — `#07000f` bg, `#bf80ff` fg |
-| GHOST | Minimal light — `#f5f5f5` bg, `#1a1a2e` fg |
+| Theme | Aesthetic                                        |
+| ----- | ------------------------------------------------ |
+| VOID  | Deep green terminal — `#080808` bg, `#00ff88` fg |
+| EMBER | Red/orange hacker — `#0a0605` bg, `#ff6600` fg   |
+| NEON  | Purple glyph — `#07000f` bg, `#bf80ff` fg        |
+| GHOST | Minimal light — `#f5f5f5` bg, `#1a1a2e` fg       |
 
 ## Easter egg
 

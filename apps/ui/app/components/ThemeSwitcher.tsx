@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * ThemeSwitcher — compact theme picker
  * Used in Settings and the header menu.
@@ -31,9 +32,9 @@ export function ThemeSwitcher({ compact = false }: { compact?: boolean }) {
               title={t.label}
               className="size-4 rounded-full border-2 transition-transform hover:scale-110"
               style={{
-                background:   t.preview,
-                borderColor:  current === t.id ? "hsl(var(--primary))" : "hsl(var(--border))",
-                transform:    current === t.id ? "scale(1.2)" : undefined,
+                background: t.preview,
+                borderColor: current === t.id ? "hsl(var(--primary))" : "hsl(var(--border))",
+                transform: current === t.id ? "scale(1.2)" : undefined,
               }}
             />
           ))}
@@ -56,7 +57,7 @@ export function ThemeSwitcher({ compact = false }: { compact?: boolean }) {
             className="flex items-start gap-3 p-3 rounded-lg text-left transition-all"
             style={{
               background: current === t.id ? "hsl(var(--primary)/0.1)" : "hsl(var(--muted)/0.3)",
-              border:     `1px solid ${current === t.id ? "hsl(var(--primary)/0.4)" : "hsl(var(--border)/0.5)"}`,
+              border: `1px solid ${current === t.id ? "hsl(var(--primary)/0.4)" : "hsl(var(--border)/0.5)"}`,
             }}
           >
             <div

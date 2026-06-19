@@ -17,7 +17,7 @@ import { createHash, createHmac } from "node:crypto";
 
 import { db } from "@nexus/db";
 import { auditLog, GENESIS_SENTINEL } from "@nexus/db/schema";
-import { desc, sql } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
@@ -31,7 +31,9 @@ function payloadHash(payload: unknown): string {
 }
 
 function chainHash(key: string, prevHash: string, pHash: string): string {
-  return createHmac("sha256", key).update(prevHash + pHash).digest("hex");
+  return createHmac("sha256", key)
+    .update(prevHash + pHash)
+    .digest("hex");
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────

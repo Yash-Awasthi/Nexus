@@ -804,7 +804,10 @@ export class VoxCPMSynthesizeProvider implements SynthesizeProvider {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 60_000);
       res = await fetch(`${this.baseUrl}/v1/audio/speech`, {
-        method: "POST", headers, body, signal: controller.signal,
+        method: "POST",
+        headers,
+        body,
+        signal: controller.signal,
       });
       clearTimeout(timer);
     } catch (cause) {
@@ -816,7 +819,9 @@ export class VoxCPMSynthesizeProvider implements SynthesizeProvider {
     }
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      throw new VoiceError("SYNTHESIZE_FAILED", `VoxCPM API returned ${res.status}`, { body: body.slice(0, 200) });
+      throw new VoiceError("SYNTHESIZE_FAILED", `VoxCPM API returned ${res.status}`, {
+        body: body.slice(0, 200),
+      });
     }
 
     const bytes = new Uint8Array(await res.arrayBuffer());
@@ -845,7 +850,11 @@ export class OpenAICompatibleSynthesizeProvider implements SynthesizeProvider {
   private defaultVoice: string;
 
   constructor(config: OpenAITTSConfig = {}) {
-    this.baseUrl = (config.baseUrl ?? process.env["OPENAI_BASE_URL"] ?? "https://api.openai.com").replace(/\/$/, "");
+    this.baseUrl = (
+      config.baseUrl ??
+      process.env["OPENAI_BASE_URL"] ??
+      "https://api.openai.com"
+    ).replace(/\/$/, "");
     this.apiKey = config.apiKey ?? process.env["OPENAI_API_KEY"] ?? "";
     this.model = config.model ?? "tts-1";
     this.defaultVoice = config.defaultVoice ?? "alloy";
@@ -867,14 +876,18 @@ export class OpenAICompatibleSynthesizeProvider implements SynthesizeProvider {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 60_000);
       res = await fetch(`${this.baseUrl}/v1/audio/speech`, {
-        method: "POST", headers, body, signal: controller.signal,
+        method: "POST",
+        headers,
+        body,
+        signal: controller.signal,
       });
       clearTimeout(timer);
     } catch (cause) {
       throw new VoiceError("SYNTHESIZE_FAILED", `OpenAI TTS network error: ${String(cause)}`);
     }
 
-    if (res.status === 401 || res.status === 403) throw new VoiceError("PROVIDER_AUTH_FAILED", "OpenAI API key invalid");
+    if (res.status === 401 || res.status === 403)
+      throw new VoiceError("PROVIDER_AUTH_FAILED", "OpenAI API key invalid");
     if (!res.ok) throw new VoiceError("SYNTHESIZE_FAILED", `OpenAI TTS API returned ${res.status}`);
 
     const bytes = new Uint8Array(await res.arrayBuffer());

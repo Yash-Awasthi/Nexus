@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Multi-Quote Comment Composer — Phase 1.9
  *
@@ -24,9 +25,9 @@ import { Button } from "~/components/ui/button";
 export interface QuoteEntry {
   id: string;
   quotedText: string;
-  speaker: string;      // council member name or "You"
-  comment: string;      // per-quote annotation
-  selectedAt: string;   // ISO timestamp
+  speaker: string; // council member name or "You"
+  comment: string; // per-quote annotation
+  selectedAt: string; // ISO timestamp
 }
 
 export interface MultiQuotePayload {
@@ -54,15 +55,15 @@ export function MultiQuoteComposer({ onSend }: Props) {
       comment: "",
       selectedAt: new Date().toISOString(),
     };
-    setQuotes(prev => [...prev, entry]);
+    setQuotes((prev) => [...prev, entry]);
   }, []);
 
   const updateComment = (id: string, comment: string) => {
-    setQuotes(prev => prev.map(q => q.id === id ? { ...q, comment } : q));
+    setQuotes((prev) => prev.map((q) => (q.id === id ? { ...q, comment } : q)));
   };
 
   const removeQuote = (id: string) => {
-    setQuotes(prev => prev.filter(q => q.id !== id));
+    setQuotes((prev) => prev.filter((q) => q.id !== id));
   };
 
   const handleSend = () => {
@@ -83,7 +84,7 @@ export function MultiQuoteComposer({ onSend }: Props) {
 
       {/* Quote stack */}
       <div className="space-y-2 max-h-64 overflow-y-auto">
-        {quotes.map(q => (
+        {quotes.map((q) => (
           <div key={q.id} className="bg-background border border-border rounded-md p-2 space-y-1">
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
@@ -104,7 +105,7 @@ export function MultiQuoteComposer({ onSend }: Props) {
               type="text"
               placeholder="Add your comment on this quote..."
               value={q.comment}
-              onChange={e => updateComment(q.id, e.target.value)}
+              onChange={(e) => updateComment(q.id, e.target.value)}
               className="w-full text-xs bg-muted/50 border border-border rounded px-2 py-1 outline-none focus:ring-1 focus:ring-ring"
             />
           </div>
@@ -116,7 +117,7 @@ export function MultiQuoteComposer({ onSend }: Props) {
         type="text"
         placeholder="Optional: master instruction (e.g. 'address these sequentially')"
         value={instruction}
-        onChange={e => setInstruction(e.target.value)}
+        onChange={(e) => setInstruction(e.target.value)}
         className="w-full text-xs bg-background border border-border rounded px-2 py-1 outline-none focus:ring-1 focus:ring-ring"
       />
 

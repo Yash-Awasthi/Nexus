@@ -307,7 +307,7 @@ gateway
         totalRuns: number;
         totalUsd: number;
         limit: number;
-        runs: Array<{ taskId: string; totalCostUsd: number; model?: string }>;
+        runs: { taskId: string; totalCostUsd: number; model?: string }[];
       }>(`/gateway/cost-report?limit=${opts.limit}`);
       console.log(
         chalk.bold(`\nCost Report — ${data.totalRuns} runs, $${data.totalUsd.toFixed(4)} total\n`),
@@ -337,13 +337,13 @@ memory
       const qs = new URLSearchParams({ limit: opts.limit });
       if (opts.category) qs.set("category", opts.category);
       const data = await api.get<{
-        memories: Array<{
+        memories: {
           id: string;
           content: string;
           category?: string;
           confidence?: number;
           createdAt: string;
-        }>;
+        }[];
         total: number;
       }>(`/memory?${qs}`);
       console.log(chalk.bold(`\n${data.total} memories\n`));
@@ -412,7 +412,7 @@ research
           console.log(res.report ?? "(empty)");
           if (res.sources?.length) {
             console.log(chalk.bold(`\nSources (${res.sources.length}):`));
-            (res.sources as Array<{ url: string; title: string }>).forEach((s, i) => {
+            (res.sources as { url: string; title: string }[]).forEach((s, i) => {
               console.log(` [${i + 1}] ${chalk.cyan(s.title ?? s.url)}`);
               console.log(`     ${chalk.gray(s.url)}`);
             });
@@ -435,7 +435,7 @@ research
   .action(async (opts: { limit: string }) => {
     try {
       const data = await api.get<{
-        jobs: Array<{ jobId: string; status: string; query: string; createdAt: string }>;
+        jobs: { jobId: string; status: string; query: string; createdAt: string }[];
       }>(`/researcher/jobs?limit=${opts.limit}`);
       const jobs = data.jobs ?? [];
       console.log(chalk.bold(`\n${jobs.length} research jobs\n`));
@@ -466,7 +466,7 @@ admin
   .action(async () => {
     try {
       const data = await api.get<{
-        routes: Array<{ alias: string; model: string; provider: string; overridden: boolean }>;
+        routes: { alias: string; model: string; provider: string; overridden: boolean }[];
         total: number;
       }>("/admin/routes");
       console.log(chalk.bold(`\n${data.total} routes\n`));
@@ -486,13 +486,13 @@ admin
   .action(async () => {
     try {
       const data = await api.get<{
-        stats: Array<{
+        stats: {
           alias: string;
           requests: number;
           totalTokens: number;
           errors: number;
           avgLatencyMs: number;
-        }>;
+        }[];
       }>("/admin/stats");
       console.log(chalk.bold("\nGateway stats\n"));
       console.log(
@@ -526,7 +526,7 @@ admin
       if (opts.model) qs.set("model", opts.model);
       if (opts.status) qs.set("status", opts.status);
       const data = await api.get<{
-        entries: Array<{
+        entries: {
           provider: string;
           model: string;
           status: string;
@@ -534,7 +534,7 @@ admin
           inputTokens?: number;
           outputTokens?: number;
           ts: number;
-        }>;
+        }[];
         total: number;
       }>(`/admin/traces?${qs}`);
       console.log(chalk.bold(`\n${data.total} trace entries\n`));

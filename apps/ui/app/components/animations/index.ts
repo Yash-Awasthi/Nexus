@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 export { DottedGrid } from "./dotted-grid";
 export { GlowOrbs } from "./glow-orbs";
 export { CursorGlow } from "./cursor-glow";

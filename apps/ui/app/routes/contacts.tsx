@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Contacts — placeholder page
 // Real contacts data comes from apps/api once an integration is wired
 export default function ContactsPage() {

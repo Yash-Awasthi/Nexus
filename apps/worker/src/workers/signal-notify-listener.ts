@@ -105,7 +105,9 @@ export class SignalNotifyListener {
 
     try {
       const pg = await import("pg");
-      const Client = (pg.default?.Client ?? pg.Client) as unknown as new (opts: Record<string, unknown>) => {
+      const Client = (pg.default?.Client ?? pg.Client) as unknown as new (
+        opts: Record<string, unknown>,
+      ) => {
         connect(): Promise<void>;
         end(): Promise<void>;
         query(sql: string): Promise<unknown>;

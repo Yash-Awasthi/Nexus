@@ -344,9 +344,7 @@ export class ResearchApiRouter {
       return { data: null, status: 403, error: err instanceof Error ? err.message : String(err) };
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const name = (req.body as unknown)?.name ?? `batch-${Date.now()}`;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+    const name = String((req.body as Record<string, unknown>)?.["name"] ?? `batch-${Date.now()}`);
     const batch = this.store.flush(name, req.userTier);
     const result = await this.publisher.push(batch, this.defaultRepoId);
 

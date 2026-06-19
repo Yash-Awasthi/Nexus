@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { Link } from "react-router";
 
 const columns = [
@@ -33,13 +34,9 @@ export function LandingFooter() {
           {/* Logo */}
           <div className="flex-shrink-0">
             <Link to="/" className="inline-flex items-center gap-2">
-              <span className="text-lg font-bold tracking-tight text-white">
-                Nexus
-              </span>
+              <span className="text-lg font-bold tracking-tight text-white">Nexus</span>
             </Link>
-            <p className="mt-2 text-xs text-white/30">
-              Multi-perspective AI deliberation platform
-            </p>
+            <p className="mt-2 text-xs text-white/30">Multi-perspective AI deliberation platform</p>
           </div>
 
           {/* Link columns */}

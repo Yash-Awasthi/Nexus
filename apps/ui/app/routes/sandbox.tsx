@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Code Sandbox — Phase 4.12 / 4.16
  *
@@ -131,8 +132,8 @@ export default function Sandbox() {
   useEffect(() => {
     // Load sandbox status
     fetch("/api/sandbox/status")
-      .then(r => r.ok ? r.json() : null)
-      .then(d => d && setSandboxStatus(d))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setSandboxStatus(d))
       .catch(() => {});
     // Load recent agent sessions
     loadAgentSessions();
@@ -167,8 +168,11 @@ export default function Sandbox() {
         return;
       }
       setResult(await r.json());
-    } catch { setErr("Execution failed"); }
-    finally { setRunning(false); }
+    } catch {
+      setErr("Execution failed");
+    } finally {
+      setRunning(false);
+    }
   }, [code, language]);
 
   const runAgent = useCallback(async () => {
@@ -190,9 +194,15 @@ export default function Sandbox() {
       const data = await r.json();
       const session: AgentSession = data.session ?? data;
       setAgentResult(session);
-      setAgentSessions(prev => [session, ...prev.filter(s => s.sessionId !== session.sessionId)]);
-    } catch { setErr("Agent run failed"); }
-    finally { setAgentRunning(false); }
+      setAgentSessions((prev) => [
+        session,
+        ...prev.filter((s) => s.sessionId !== session.sessionId),
+      ]);
+    } catch {
+      setErr("Agent run failed");
+    } finally {
+      setAgentRunning(false);
+    }
   }, [agentTask, agentLang]);
 
   const copyResult = useCallback(() => {
@@ -221,19 +231,29 @@ export default function Sandbox() {
         <div className="flex items-center gap-3">
           {sandboxStatus && (
             <Badge
-              className={sandboxStatus.available
-                ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
-                : "bg-red-100 text-red-700"}
+              className={
+                sandboxStatus.available
+                  ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
+                  : "bg-red-100 text-red-700"
+              }
             >
               {sandboxStatus.available ? "● Sandbox ready" : "● Sandbox unavailable"}
             </Badge>
           )}
           <div className="flex gap-1">
-            <Button size="sm" variant={tab === "execute" ? "default" : "outline"} onClick={() => setTab("execute")}>
+            <Button
+              size="sm"
+              variant={tab === "execute" ? "default" : "outline"}
+              onClick={() => setTab("execute")}
+            >
               <Code2 className="w-3 h-3 mr-1" />
               Execute
             </Button>
-            <Button size="sm" variant={tab === "agent" ? "default" : "outline"} onClick={() => setTab("agent")}>
+            <Button
+              size="sm"
+              variant={tab === "agent" ? "default" : "outline"}
+              onClick={() => setTab("agent")}
+            >
               <Bot className="w-3 h-3 mr-1" />
               Code Agent
             </Button>
@@ -243,7 +263,8 @@ export default function Sandbox() {
 
       {err && (
         <p className="text-red-500 text-sm flex items-center gap-2">
-          <XCircle className="w-4 h-4" />{err}
+          <XCircle className="w-4 h-4" />
+          {err}
         </p>
       )}
 
@@ -258,24 +279,30 @@ export default function Sandbox() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {["javascript", "typescript", "python", "bash"].map(l => (
-                    <SelectItem key={l} value={l} className="capitalize">{l}</SelectItem>
+                  {["javascript", "typescript", "python", "bash"].map((l) => (
+                    <SelectItem key={l} value={l} className="capitalize">
+                      {l}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Button
-                onClick={runCode}
-                disabled={running || !code.trim()}
-                className="flex-1"
-              >
-                {running
-                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Running…</>
-                  : <><Play className="w-4 h-4 mr-2" />Run</>}
+              <Button onClick={runCode} disabled={running || !code.trim()} className="flex-1">
+                {running ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Running…
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 mr-2" />
+                    Run
+                  </>
+                )}
               </Button>
             </div>
             <Textarea
               value={code}
-              onChange={e => setCode(e.target.value)}
+              onChange={(e) => setCode(e.target.value)}
               rows={22}
               className="font-mono text-sm resize-none"
               placeholder="// Write your code here…"
@@ -286,14 +313,21 @@ export default function Sandbox() {
           {/* Right: output */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Output</p>
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                Output
+              </p>
               {result && (
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Clock className="w-3 h-3" />{result.durationMs}ms
+                    <Clock className="w-3 h-3" />
+                    {result.durationMs}ms
                   </span>
                   <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={copyResult}>
-                    {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                    {copied ? (
+                      <Check className="w-3 h-3 text-green-500" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
                   </Button>
                 </div>
               )}
@@ -316,9 +350,11 @@ export default function Sandbox() {
             ) : result ? (
               <div className="rounded-lg border h-[460px] overflow-auto bg-slate-950 dark:bg-slate-900">
                 <div className="p-3 border-b border-slate-800 flex items-center gap-2">
-                  {result.exitCode === 0
-                    ? <CheckCircle className="w-4 h-4 text-green-400" />
-                    : <XCircle className="w-4 h-4 text-red-400" />}
+                  {result.exitCode === 0 ? (
+                    <CheckCircle className="w-4 h-4 text-green-400" />
+                  ) : (
+                    <XCircle className="w-4 h-4 text-red-400" />
+                  )}
                   <span className="text-xs text-slate-400">
                     Exit {result.exitCode} · {result.durationMs}ms · {result.language}
                   </span>
@@ -358,7 +394,7 @@ export default function Sandbox() {
                 <Textarea
                   placeholder="e.g. Write a function that calculates the nth prime number and print the first 20 primes"
                   value={agentTask}
-                  onChange={e => setAgentTask(e.target.value)}
+                  onChange={(e) => setAgentTask(e.target.value)}
                   rows={4}
                   className="resize-none"
                 />
@@ -368,8 +404,10 @@ export default function Sandbox() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {["python", "javascript", "typescript"].map(l => (
-                        <SelectItem key={l} value={l} className="capitalize">{l}</SelectItem>
+                      {["python", "javascript", "typescript"].map((l) => (
+                        <SelectItem key={l} value={l} className="capitalize">
+                          {l}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -378,13 +416,22 @@ export default function Sandbox() {
                     onClick={runAgent}
                     disabled={agentRunning || !agentTask.trim()}
                   >
-                    {agentRunning
-                      ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Agent working…</>
-                      : <><Bot className="w-4 h-4 mr-2" />Run agent</>}
+                    {agentRunning ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Agent working…
+                      </>
+                    ) : (
+                      <>
+                        <Bot className="w-4 h-4 mr-2" />
+                        Run agent
+                      </>
+                    )}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  The LLM writes code, runs it, reads the output, and iteratively fixes errors until it works.
+                  The LLM writes code, runs it, reads the output, and iteratively fixes errors until
+                  it works.
                 </p>
               </CardContent>
             </Card>
@@ -400,13 +447,15 @@ export default function Sandbox() {
                           agentResult.status === "success"
                             ? "bg-green-100 text-green-700"
                             : agentResult.status === "error"
-                            ? "bg-red-100 text-red-700"
-                            : "bg-blue-100 text-blue-700"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-blue-100 text-blue-700"
                         }
                       >
                         {agentResult.status}
                       </Badge>
-                      <span className="text-xs text-muted-foreground">{agentResult.iterations} iteration{agentResult.iterations !== 1 ? "s" : ""}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {agentResult.iterations} iteration{agentResult.iterations !== 1 ? "s" : ""}
+                      </span>
                     </div>
                   </div>
                 </CardHeader>
@@ -414,7 +463,9 @@ export default function Sandbox() {
                   {/* Generated code */}
                   {agentResult.code && (
                     <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-1">Generated code:</p>
+                      <p className="text-xs font-medium text-muted-foreground mb-1">
+                        Generated code:
+                      </p>
                       <pre className="rounded-lg bg-slate-950 p-3 text-xs text-green-300 font-mono overflow-auto max-h-48 whitespace-pre-wrap">
                         {agentResult.code}
                       </pre>
@@ -445,7 +496,9 @@ export default function Sandbox() {
           {/* Right: past sessions */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Past runs</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Past runs
+              </p>
               <Button variant="ghost" size="sm" onClick={loadAgentSessions}>
                 <RefreshCw className="w-3 h-3" />
               </Button>
@@ -453,7 +506,7 @@ export default function Sandbox() {
             {agentSessions.length === 0 ? (
               <p className="text-xs text-muted-foreground text-center py-4">No sessions yet</p>
             ) : (
-              agentSessions.slice(0, 10).map(s => (
+              agentSessions.slice(0, 10).map((s) => (
                 <Card
                   key={s.sessionId}
                   className="cursor-pointer hover:bg-accent/50 transition-colors"
@@ -461,14 +514,21 @@ export default function Sandbox() {
                 >
                   <CardContent className="pt-2 pb-2">
                     <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full shrink-0 ${
-                        s.status === "success" ? "bg-green-500" :
-                        s.status === "error" ? "bg-red-500" : "bg-blue-500"
-                      }`} />
+                      <div
+                        className={`w-2 h-2 rounded-full shrink-0 ${
+                          s.status === "success"
+                            ? "bg-green-500"
+                            : s.status === "error"
+                              ? "bg-red-500"
+                              : "bg-blue-500"
+                        }`}
+                      />
                       <p className="text-xs flex-1 truncate">{s.task}</p>
                       <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
                     </div>
-                    <p className="text-xs text-muted-foreground ml-4">{s.language} · {s.iterations} iter</p>
+                    <p className="text-xs text-muted-foreground ml-4">
+                      {s.language} · {s.iterations} iter
+                    </p>
                   </CardContent>
                 </Card>
               ))

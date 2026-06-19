@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -9,16 +10,11 @@ interface TypewriterProps {
   className?: string;
 }
 
-export function Typewriter({
-  texts,
-  speed = 50,
-  delay = 2000,
-  className,
-}: TypewriterProps) {
+export function Typewriter({ texts, speed = 50, delay = 2000, className }: TypewriterProps) {
   const [displayed, setDisplayed] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const indexRef = useRef(0);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const tick = useCallback(() => {
     const currentText = texts[indexRef.current];

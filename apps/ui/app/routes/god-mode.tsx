@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * GODMODE CLASSIC
  *
@@ -17,43 +18,43 @@ import { loadCouncilMembers } from "~/lib/council";
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface MemberResponse {
-  id:        string;
-  label:     string;
-  model:     string;
-  text:      string;
+  id: string;
+  label: string;
+  model: string;
+  text: string;
   latencyMs: number;
-  tokens:    number;
-  status:    "pending" | "done" | "error";
-  error?:    string;
+  tokens: number;
+  status: "pending" | "done" | "error";
+  error?: string;
 }
 
 interface DoneEvent {
-  totalMs:       number;
+  totalMs: number;
   responseCount: number;
-  successCount:  number;
-  fastestId:     string;
-  fastestLabel:  string;
+  successCount: number;
+  fastestId: string;
+  fastestLabel: string;
 }
 
 // ── Color palette ─────────────────────────────────────────────────────────────
 
 const COLORS = [
-  { border: "border-blue-500/40",   bg: "bg-blue-500/5",   text: "text-blue-400"   },
+  { border: "border-blue-500/40", bg: "bg-blue-500/5", text: "text-blue-400" },
   { border: "border-purple-500/40", bg: "bg-purple-500/5", text: "text-purple-400" },
-  { border: "border-green-500/40",  bg: "bg-green-500/5",  text: "text-green-400"  },
+  { border: "border-green-500/40", bg: "bg-green-500/5", text: "text-green-400" },
   { border: "border-orange-500/40", bg: "bg-orange-500/5", text: "text-orange-400" },
-  { border: "border-pink-500/40",   bg: "bg-pink-500/5",   text: "text-pink-400"   },
-  { border: "border-cyan-500/40",   bg: "bg-cyan-500/5",   text: "text-cyan-400"   },
+  { border: "border-pink-500/40", bg: "bg-pink-500/5", text: "text-pink-400" },
+  { border: "border-cyan-500/40", bg: "bg-cyan-500/5", text: "text-cyan-400" },
   { border: "border-yellow-500/40", bg: "bg-yellow-500/5", text: "text-yellow-400" },
-  { border: "border-red-500/40",    bg: "bg-red-500/5",    text: "text-red-400"    },
+  { border: "border-red-500/40", bg: "bg-red-500/5", text: "text-red-400" },
 ];
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function GodModePage() {
-  const [question, setQuestion]   = useState("");
+  const [question, setQuestion] = useState("");
   const [responses, setResponses] = useState<MemberResponse[]>([]);
-  const [done, setDone]           = useState<DoneEvent | null>(null);
+  const [done, setDone] = useState<DoneEvent | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -78,27 +79,27 @@ export default function GodModePage() {
 
     // Build member payload from council config
     const members = council.map((m) => ({
-      id:       m.id,
-      label:    m.label,
+      id: m.id,
+      label: m.label,
       provider: m.provider,
-      model:    m.model,
-      apiKey:   m.apiKey || undefined,
-      baseUrl:  m.baseUrl || undefined,
+      model: m.model,
+      apiKey: m.apiKey || undefined,
+      baseUrl: m.baseUrl || undefined,
     }));
 
     try {
       const res = await fetch("/api/godmode/stream", {
-        method:  "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ question: question.trim(), members }),
-        signal:  ctrl.signal,
+        body: JSON.stringify({ question: question.trim(), members }),
+        signal: ctrl.signal,
       });
 
       if (!res.ok || !res.body) {
         throw new Error(`Server error ${res.status}`);
       }
 
-      const reader  = res.body.getReader();
+      const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = "";
 
@@ -117,43 +118,42 @@ export default function GodModePage() {
 
             if (ev.type === "init") {
               // Pre-populate pending slots in order
-              const slots: MemberResponse[] = ev.members.map((m: { id: string; label: string; model: string }) => ({
-                id:        m.id,
-                label:     m.label,
-                model:     m.model,
-                text:      "",
-                latencyMs: 0,
-                tokens:    0,
-                status:    "pending" as const,
-              }));
+              const slots: MemberResponse[] = ev.members.map(
+                (m: { id: string; label: string; model: string }) => ({
+                  id: m.id,
+                  label: m.label,
+                  model: m.model,
+                  text: "",
+                  latencyMs: 0,
+                  tokens: 0,
+                  status: "pending" as const,
+                }),
+              );
               setResponses(slots);
-
             } else if (ev.type === "response") {
               setResponses((prev) =>
                 prev.map((r) =>
                   r.id === ev.id
                     ? {
                         ...r,
-                        text:      ev.text ?? "",
+                        text: ev.text ?? "",
                         latencyMs: ev.latencyMs ?? 0,
-                        tokens:    ev.tokens ?? 0,
-                        status:    ev.status as "done" | "error",
-                        error:     ev.error,
+                        tokens: ev.tokens ?? 0,
+                        status: ev.status as "done" | "error",
+                        error: ev.error,
                       }
-                    : r
-                )
+                    : r,
+                ),
               );
-
             } else if (ev.type === "done") {
               setDone({
-                totalMs:       ev.totalMs,
+                totalMs: ev.totalMs,
                 responseCount: ev.responseCount,
-                successCount:  ev.successCount,
-                fastestId:     ev.fastestId,
-                fastestLabel:  ev.fastestLabel,
+                successCount: ev.successCount,
+                fastestId: ev.fastestId,
+                fastestLabel: ev.fastestLabel,
               });
               setIsLoading(false);
-
             } else if (ev.type === "error") {
               throw new Error(ev.message ?? "Stream error");
             }
@@ -166,7 +166,7 @@ export default function GodModePage() {
       if ((err as Error).name !== "AbortError") {
         const msg = err instanceof Error ? err.message : "Request failed";
         setResponses((prev) =>
-          prev.map((r) => r.status === "pending" ? { ...r, status: "error", error: msg } : r)
+          prev.map((r) => (r.status === "pending" ? { ...r, status: "error", error: msg } : r)),
         );
       }
     } finally {
@@ -179,7 +179,6 @@ export default function GodModePage() {
 
   return (
     <main className="flex flex-col h-screen overflow-hidden">
-
       {/* Header */}
       <header className="border-b border-border px-6 py-4 flex items-center gap-3 shrink-0">
         <Zap className="size-5 text-yellow-500" />
@@ -188,7 +187,8 @@ export default function GodModePage() {
             GODMODE <span className="text-muted-foreground font-normal text-sm">CLASSIC</span>
           </h1>
           <p className="text-xs text-muted-foreground">
-            Raw parallel compare — {council.length} member{council.length !== 1 ? "s" : ""}, no scoring, no synthesis
+            Raw parallel compare — {council.length} member{council.length !== 1 ? "s" : ""}, no
+            scoring, no synthesis
           </p>
         </div>
 
@@ -227,10 +227,7 @@ export default function GodModePage() {
           aria-label="Question"
         />
         <Button type="submit" disabled={isLoading || !question.trim()}>
-          {isLoading
-            ? <Loader2 className="size-4 animate-spin" />
-            : <Send className="size-4" />
-          }
+          {isLoading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
         </Button>
       </form>
 
@@ -287,9 +284,7 @@ export default function GodModePage() {
                     </p>
                   )}
                   {r.status === "error" && (
-                    <p className="text-xs text-destructive flex-1">
-                      {r.error ?? "Failed"}
-                    </p>
+                    <p className="text-xs text-destructive flex-1">{r.error ?? "Failed"}</p>
                   )}
                 </article>
               );
@@ -302,7 +297,8 @@ export default function GodModePage() {
               <p className="text-sm font-medium">GODMODE CLASSIC</p>
               <p className="text-xs text-muted-foreground mt-1">
                 Submit a question to fire all council members simultaneously.
-                <br />No scoring. No synthesis. Fastest response wins.
+                <br />
+                No scoring. No synthesis. Fastest response wins.
               </p>
             </div>
           </div>

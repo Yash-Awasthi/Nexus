@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Easter eggs
  *
@@ -16,7 +17,7 @@ export type EggId =
   | "gauntlet_reverse";
 
 export interface EggEvent {
-  id:      EggId;
+  id: EggId;
   message: string;
   action?: () => void;
 }
@@ -24,9 +25,16 @@ export interface EggEvent {
 // ── Konami sequence ────────────────────────────────────────────────────────────
 
 const KONAMI = [
-  "ArrowUp","ArrowUp","ArrowDown","ArrowDown",
-  "ArrowLeft","ArrowRight","ArrowLeft","ArrowRight",
-  "b","a",
+  "ArrowUp",
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowLeft",
+  "ArrowRight",
+  "b",
+  "a",
 ];
 
 // ── Council quotes (shown on logo triple-click) ───────────────────────────────
@@ -59,9 +67,9 @@ export function initEasterEggs(onEgg: (egg: EggEvent) => void) {
       if (konamiIndex === KONAMI.length) {
         konamiIndex = 0;
         onEgg({
-          id:      "konami",
+          id: "konami",
           message: "↑↑↓↓←→←→BA — YOU'VE ACTIVATED THE MATRIX",
-          action:  () => {
+          action: () => {
             import("./theme").then(({ applyTheme }) => applyTheme("matrix"));
           },
         });
@@ -74,15 +82,17 @@ export function initEasterEggs(onEgg: (egg: EggEvent) => void) {
     const ULTRA_REVERSED = "nainiilparlu";
     if (key.length === 1) {
       ultraBuffer += key.toLowerCase();
-      ultraBuffer  = ultraBuffer.slice(-ULTRA_REVERSED.length);
+      ultraBuffer = ultraBuffer.slice(-ULTRA_REVERSED.length);
 
       if (ultraTimer) clearTimeout(ultraTimer);
-      ultraTimer = setTimeout(() => { ultraBuffer = ""; }, 5_000);
+      ultraTimer = setTimeout(() => {
+        ultraBuffer = "";
+      }, 5_000);
 
       if (ultraBuffer === ULTRA_REVERSED) {
         ultraBuffer = "";
         onEgg({
-          id:      "gauntlet_reverse",
+          id: "gauntlet_reverse",
           message: "NAINIILPARLU — Tier 51 unlocked. The elder himself would be proud.",
         });
       }
@@ -92,7 +102,7 @@ export function initEasterEggs(onEgg: (egg: EggEvent) => void) {
   // ── Secret hash ────────────────────────────────────────────────────────────
   if (typeof window !== "undefined" && window.location.hash === "#elder") {
     onEgg({
-      id:      "elder_hash",
+      id: "elder_hash",
       message: "In memory of elder plinius. The original G0DM0D3.",
     });
   }

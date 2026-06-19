@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Feedback Analytics — admin dashboard for response quality signals.
  *
@@ -51,17 +52,24 @@ export default function AdminFeedback() {
       const r = await fetch("/api/feedback/stats");
       if (r.ok) setStats(await r.json());
       else setErr("Failed to load stats");
-    } catch { setErr("Could not reach server"); }
+    } catch {
+      setErr("Could not reach server");
+    }
     setLoading(false);
   }, []);
 
-  useEffect(() => { loadStats(); }, [loadStats]);
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
 
   const exportCSV = useCallback(async () => {
     setExporting(true);
     try {
       const r = await fetch("/api/feedback/export");
-      if (!r.ok) { setErr("Export failed"); return; }
+      if (!r.ok) {
+        setErr("Export failed");
+        return;
+      }
       const blob = await r.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -69,11 +77,12 @@ export default function AdminFeedback() {
       a.download = "nexus-feedback.csv";
       a.click();
       URL.revokeObjectURL(url);
-    } finally { setExporting(false); }
+    } finally {
+      setExporting(false);
+    }
   }, []);
 
-  const pct = (n: number, total: number) =>
-    total > 0 ? `${Math.round((n / total) * 100)}%` : "—";
+  const pct = (n: number, total: number) => (total > 0 ? `${Math.round((n / total) * 100)}%` : "—");
 
   if (loading) {
     return (
@@ -102,9 +111,17 @@ export default function AdminFeedback() {
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
           <Button variant="outline" size="sm" onClick={exportCSV} disabled={exporting}>
-            {exporting
-              ? <><Loader2 className="w-4 h-4 animate-spin mr-1" />Exporting…</>
-              : <><Download className="w-4 h-4 mr-1" />Export CSV</>}
+            {exporting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                Exporting…
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4 mr-1" />
+                Export CSV
+              </>
+            )}
           </Button>
         </div>
       </div>
@@ -135,9 +152,12 @@ export default function AdminFeedback() {
             <Card className="border-green-200 dark:border-green-800">
               <CardContent className="pt-4">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                  <ThumbsUp className="w-3 h-3" />Positive
+                  <ThumbsUp className="w-3 h-3" />
+                  Positive
                 </p>
-                <p className="text-3xl font-bold text-green-600">{stats.positiveCount.toLocaleString()}</p>
+                <p className="text-3xl font-bold text-green-600">
+                  {stats.positiveCount.toLocaleString()}
+                </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {pct(stats.positiveCount, stats.totalFeedback)} of total
                 </p>
@@ -146,9 +166,12 @@ export default function AdminFeedback() {
             <Card className="border-red-200 dark:border-red-800">
               <CardContent className="pt-4">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                  <ThumbsDown className="w-3 h-3" />Negative
+                  <ThumbsDown className="w-3 h-3" />
+                  Negative
                 </p>
-                <p className="text-3xl font-bold text-red-500">{stats.negativeCount.toLocaleString()}</p>
+                <p className="text-3xl font-bold text-red-500">
+                  {stats.negativeCount.toLocaleString()}
+                </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {pct(stats.negativeCount, stats.totalFeedback)} of total
                 </p>
@@ -157,13 +180,18 @@ export default function AdminFeedback() {
             <Card>
               <CardContent className="pt-4">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                  <TrendingUp className="w-3 h-3" />Positive Rate
+                  <TrendingUp className="w-3 h-3" />
+                  Positive Rate
                 </p>
-                <p className={`text-3xl font-bold ${stats.positiveRate >= 0.7 ? "text-green-600" : stats.positiveRate >= 0.5 ? "text-yellow-500" : "text-red-500"}`}>
+                <p
+                  className={`text-3xl font-bold ${stats.positiveRate >= 0.7 ? "text-green-600" : stats.positiveRate >= 0.5 ? "text-yellow-500" : "text-red-500"}`}
+                >
                   {Math.round((stats.positiveRate ?? 0) * 100)}%
                 </p>
                 {stats.avgScore !== undefined && (
-                  <p className="text-xs text-muted-foreground mt-1">avg score {stats.avgScore.toFixed(2)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    avg score {stats.avgScore.toFixed(2)}
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -209,14 +237,18 @@ export default function AdminFeedback() {
                       const maxCount = Math.max(...Object.values(stats.qualityIssues));
                       return (
                         <div key={issue} className="flex items-center gap-3">
-                          <span className="text-sm w-48 truncate capitalize">{issue.replace(/_/g, " ")}</span>
+                          <span className="text-sm w-48 truncate capitalize">
+                            {issue.replace(/_/g, " ")}
+                          </span>
                           <div className="flex-1 bg-muted rounded-full h-2">
                             <div
                               className="bg-orange-400 h-2 rounded-full"
                               style={{ width: `${(count / maxCount) * 100}%` }}
                             />
                           </div>
-                          <span className="text-xs text-muted-foreground w-10 text-right">{count}</span>
+                          <span className="text-xs text-muted-foreground w-10 text-right">
+                            {count}
+                          </span>
                         </div>
                       );
                     })}
@@ -235,7 +267,9 @@ export default function AdminFeedback() {
                 <div className="flex items-end gap-1 h-20">
                   {stats.recentTrend.slice(-7).map((day, i) => {
                     const total = day.positive + day.negative;
-                    const maxTotal = Math.max(...stats.recentTrend!.map(d => d.positive + d.negative));
+                    const maxTotal = Math.max(
+                      ...stats.recentTrend!.map((d) => d.positive + d.negative),
+                    );
                     const height = maxTotal > 0 ? Math.max(4, (total / maxTotal) * 80) : 4;
                     const positivePct = total > 0 ? (day.positive / total) * 100 : 0;
                     return (
@@ -245,17 +279,13 @@ export default function AdminFeedback() {
                           style={{ height: `${height}px` }}
                           title={`${day.date}: +${day.positive} / -${day.negative}`}
                         >
-                          <div
-                            className="bg-green-500"
-                            style={{ height: `${positivePct}%` }}
-                          />
-                          <div
-                            className="bg-red-400"
-                            style={{ height: `${100 - positivePct}%` }}
-                          />
+                          <div className="bg-green-500" style={{ height: `${positivePct}%` }} />
+                          <div className="bg-red-400" style={{ height: `${100 - positivePct}%` }} />
                         </div>
                         <span className="text-xs text-muted-foreground">
-                          {new Date(day.date).toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2)}
+                          {new Date(day.date)
+                            .toLocaleDateString(undefined, { weekday: "short" })
+                            .slice(0, 2)}
                         </span>
                       </div>
                     );

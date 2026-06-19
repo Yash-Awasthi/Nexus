@@ -133,14 +133,13 @@ export async function corpusBuilderRoutes(app: FastifyInstance): Promise<void> {
     try {
       const tagger = new RuleTagger();
       const scorer = new QualityScorer();
-      const tagResult = tagger.tag({ role: "assistant", content: request.body.completion });
-      if (tagResult.label === "preferred" || tagResult.label === "rejected") {
-        autoTag = tagResult.label as SampleTag;
-      }
-      qualityScore = scorer.score({
-        prompt: request.body.prompt,
-        completion: request.body.completion,
-      });
+      const turn = { id: "t0", role: "assistant" as const, content: request.body.completion };
+      const tagResult = tagger.tag(turn);
+      // Map tagger labels to sample tags where meaningful
+      if (tagResult.label === "task-completion") autoTag = "preferred" as SampleTag;
+      else if (tagResult.label === "refusal" || tagResult.label === "error")
+        autoTag = "rejected" as SampleTag;
+      qualityScore = scorer.score([turn], [tagResult]);
     } catch {
       // non-fatal — proceed with fallback tag
     }

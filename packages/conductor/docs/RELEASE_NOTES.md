@@ -5,6 +5,7 @@
 ## v1.2.0 — 2026-06-10
 
 ### New Features
+
 - **WebSearchAdapter** — `IExecutionAdapter` for `search` / `answer` / `web_search` task types; wired into `TaskExecutor` adapter chain.
 - **CodeAgentPool** — five-agent pool (`FilePickerAgent`, `CodeEditorAgent`, `CodeReviewerAgent`, `ResearcherAgent`, `ThinkerAgent`) dispatching on `code` / `code_edit` / `code_review` / `research` / `reason` types.
 - **LocalInferenceAdapter** — routes `inference` / `local_llm` / `generate` tasks to the local model bridge.
@@ -15,6 +16,7 @@
 - **`CONTRIBUTING.md`** — contribution guide covering setup, commit conventions, adapter/CLI extension, and governance rules.
 
 ### Bug Fixes
+
 - `GHOSTSTACK_OFFLINE_MODE === undefined` silently forced offline mode everywhere — removed; default is now online.
 - Planner-generated tasks had no `type` field so all routed to `floci` regardless of blueprint — `submitCognitiveObjective` now threads `type`/`action`/`arguments` from `ITaskSynthesisResult`.
 - `task-payload.ts` fallback added `search` / `code` / `inference` branches and a type-only fast path.
@@ -24,6 +26,7 @@
 - `RuntimeManager.getActiveServices()` silently polluted the services registry with phantom `"unknown"` entries for config-declared services — removed auto-registration side-effect.
 
 ### Changed
+
 - All third-party library names stripped from bridges, adapters, comments, and error strings.
 - Bridge files renamed: `stealth_browser_bridge.py`, `web_scraping_bridge.py`, `local_inference_bridge.py`, `mcp_server_bridge.py`.
 - `FastMcpHost` → `McpServerHost`; `"fastmcp"` → `"mcp-server"` throughout.
@@ -35,6 +38,7 @@
 - Bootstrap banner updated to v1.2.0.
 
 ### Stats
+
 - 499 tests · 65 suites · 0 ESLint errors · 0 TypeScript errors
 
 ---
@@ -42,6 +46,7 @@
 ## v1.1.2 — 2026-06-10
 
 ### Bug Fixes
+
 - **B1** Fixed broken `$schema` key (`""` → `"$schema"`) in `task.schema.json`, `orchestration.schema.json`, and `agent-message.schema.json`; all JSON Schema validators now parse correctly.
 - **B1** `task.schema.json` expanded with `type`, `action`, `arguments`, and a properly constrained `priority` enum (`low | medium | high`).
 - **B1** Priority enum in `spec.schema.json` aligned to `low | medium | high` — removed orphaned `normal` and `critical` values that did not match the queue backend.
@@ -50,6 +55,7 @@
 - **B4** `runtime/runtime-context.ts` now instantiates `FileQueueBackend` (persistent JSONL queue) instead of `MemoryQueueBackend`. Queue state survives process restarts. `GhostStackRuntimeContext.queue` is typed as `IQueueBackend` for interface correctness.
 
 ### Improvements
+
 - Queue backend type in the runtime context narrowed to the `IQueueBackend` interface — downstream code no longer depends on the concrete class.
 
 ---
@@ -57,6 +63,7 @@
 ## v1.1.1 — 2026-06-09
 
 ### New Features
+
 - **EnvLoader** (`runtime/env-loader.ts`): zero-dependency `.env` parser. Handles quoted values, inline comments, `export` prefix, blank lines, and no-override-by-default semantics. Wired into `createRuntimeContext` before any other subsystem reads `process.env`.
 - **FileQueueBackend** (`orchestration/file-queue-backend.ts`): persistent JSONL-backed job queue. Atomic tmp→rename writes, crash recovery via `init()`, separate DLQ file, `clear()` and `reload()` operators.
 - **RuntimeManager** rewritten from a 23-line stub to a full lifecycle manager: `registerService`, `markRunning/Stopped/Degraded/Error`, `startService/stopService/restartService`, `getHealthSummary()`.
@@ -65,13 +72,16 @@
 - **Orchestrator helpers**: `run(maxIterations, idleDelayMs)` and `submitAndRun(objective, options)` added to `GhostStackOrchestrator`.
 
 ### Bug Fixes
+
 - `TaskExecutor.runLoop()` exponential backoff moved out of `executeNext()` into the loop body — `executeNext()` stays non-blocking; existing tests that call it directly are unaffected.
 - ESLint: `no-var-requires` → `@typescript-eslint/no-require-imports` in server health reader; `let nodeVersion` → `const`.
 
 ### Governance
+
 - `GovernanceEngine` gained three new constraints: `TimeoutConstraint` (max execution ceiling), `HighCostPlanGuardrail` (total plan cost gate), `DuplicateActionGuardrail` (repeated action detection).
 
 ### Tooling
+
 - `package.json` v1.1.1: all dev tools moved to `devDependencies`; only `js-yaml` remains as a runtime dep.
 - `jest.config.js`: coverage directory, `collectCoverageFrom`, reporters, 60 % threshold configured.
 - `tsconfig.json`: `resolveJsonModule`, `declaration`, `declarationMap`, `sourceMap`, `exclude` array added.
@@ -100,12 +110,12 @@ GhostStack transitioned from experimental architecture phases to a fully hardene
 
 ### Benchmark Metrics (v1.1.0 baseline)
 
-| Metric | Value |
-|---|---|
-| Task execution loop latency | ~22.8 ms |
-| Local system throughput | ~44 tasks/sec |
-| Concurrent contention (100 ops) | ~2034 ms |
-| Storage read overhead | ~13.4 ms |
+| Metric                          | Value         |
+| ------------------------------- | ------------- |
+| Task execution loop latency     | ~22.8 ms      |
+| Local system throughput         | ~44 tasks/sec |
+| Concurrent contention (100 ops) | ~2034 ms      |
+| Storage read overhead           | ~13.4 ms      |
 
 ### Known Limitations
 

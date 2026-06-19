@@ -24,46 +24,59 @@ import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest }
 
 import { makeRateLimitPreHandler } from "./lib/rate-limiter.js";
 import { sentryReporter } from "./lib/sentry-reporter.js";
+import { adminUsersRoutes } from "./routes/admin-users.js";
 import { adminRoutes } from "./routes/admin.js";
 import { agentsRoutes } from "./routes/agents.js";
 import { alertsRoutes } from "./routes/alerts.js";
+import { apiBridgeRoutes } from "./routes/api-bridge.js";
 import { auditRoutes } from "./routes/audit.js";
-import { driftRoutes } from "./routes/drift.js";
+import { authUsersRoutes } from "./routes/auth-users.js";
 import { billingRoutes } from "./routes/billing.js";
 import { botsRoutes } from "./routes/bots.js";
 import { briefRoutes } from "./routes/brief.js";
 import { chatAnalystRoutes } from "./routes/chat-analyst.js";
 import { chatSuggestionsRoutes } from "./routes/chat-suggestions.js";
 import { codeReplRoutes } from "./routes/code-repl.js";
+import { conductorRoutes } from "./routes/conductor-route.js";
 import { connectorsRoutes } from "./routes/connectors.js";
 import { contextRoutes } from "./routes/context.js";
+import { conversationAnalysisRoutes } from "./routes/conversation-analysis.js";
 import { corpusBuilderRoutes } from "./routes/corpus-builder.js";
 import { councilRoutes } from "./routes/council.js";
 import { docPipelineRoutes } from "./routes/doc-pipeline.js";
 import { domainFeedsRoutes } from "./routes/domain-feeds.js";
+import { driftRoutes } from "./routes/drift.js";
 import { evalsRoutes } from "./routes/evals.js";
 import { featureFlagsRoutes } from "./routes/feature-flags.js";
 import { forecastRoutes } from "./routes/forecast.js";
 import { gatewayRoutes } from "./routes/gateway.js";
+import { geoipRoutes } from "./routes/geoip.js";
 import { governanceRoutes } from "./routes/governance.js";
 import { healthRoutes } from "./routes/health.js";
 import { hooksRoutes } from "./routes/hooks.js";
+import { i18nRoutes } from "./routes/i18n.js";
 import { imageGenRoutes } from "./routes/image-gen.js";
 import { ingestRoutes } from "./routes/ingest.js";
 import { knowledgeGraphRoutes } from "./routes/knowledge-graph.js";
 import { libertasRoutes } from "./routes/libertas.js";
 import { llmRoutes } from "./routes/llm.js";
+import { mailIngestRoutes } from "./routes/mail-ingest.js";
 import { mcpRoutes } from "./routes/mcp.js";
 import { memoryRoutes } from "./routes/memory.js";
 import { metricsRoutes } from "./routes/metrics.js";
+import { mfaRoutes } from "./routes/mfa.js";
+import { nlpRoutes } from "./routes/nlp.js";
 import { oauthRoutes } from "./routes/oauth.js";
 import { obsProvidersRoutes } from "./routes/obs-providers.js";
-import { redteamRoutes } from "./routes/redteam.js";
+import { oidcRoutes } from "./routes/oidc.js";
 import { predictionMarketRoutes } from "./routes/prediction-market.js";
+import { redteamRoutes } from "./routes/redteam.js";
 import { researcherRoutes } from "./routes/researcher.js";
 import { rlhfRoutes } from "./routes/rlhf.js";
 import { runtimeRoutes } from "./routes/runtime.js";
+import { samlRoutes } from "./routes/saml.js";
 import { scenarioPlannerRoutes } from "./routes/scenario-planner.js";
+import { scimRoutes } from "./routes/scim.js";
 import { scrapingMcpRoutes } from "./routes/scraping-mcp.js";
 import { sessionSyncRoutes } from "./routes/session-sync.js";
 import { sftRoutes } from "./routes/sft.js";
@@ -71,15 +84,7 @@ import { sseRoutes } from "./routes/sse.js";
 import { stmRoutes } from "./routes/stm.js";
 import { voiceRoutes } from "./routes/voice.js";
 import { wikiRoutes } from "./routes/wiki.js";
-import { authUsersRoutes } from "./routes/auth-users.js";
 import { workspacesRoutes } from "./routes/workspaces.js";
-import { mfaRoutes } from "./routes/mfa.js";
-import { adminUsersRoutes } from "./routes/admin-users.js";
-import { apiBridgeRoutes } from "./routes/api-bridge.js";
-import { conductorRoutes } from "./routes/conductor-route.js";
-import { oidcRoutes } from "./routes/oidc.js";
-import { scimRoutes } from "./routes/scim.js";
-import { samlRoutes } from "./routes/saml.js";
 
 // Augment FastifyRequest to carry optional trace span
 declare module "fastify" {
@@ -262,6 +267,11 @@ export async function buildServer(): Promise<FastifyInstance> {
 
       // Full-feature pages
       await api.register(knowledgeGraphRoutes);
+      await api.register(conversationAnalysisRoutes);
+      await api.register(nlpRoutes);
+      await api.register(geoipRoutes);
+      await api.register(i18nRoutes);
+      await api.register(mailIngestRoutes);
       await api.register(imageGenRoutes);
       await api.register(voiceRoutes);
       await api.register(billingRoutes);
@@ -338,7 +348,9 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   // ── Conductor orchestration routes (/api/v1/gs/*) ────────────────────────
   await app.register(
-    async (gsApi) => { await gsApi.register(conductorRoutes); },
+    async (gsApi) => {
+      await gsApi.register(conductorRoutes);
+    },
     { prefix: "/api/v1" },
   );
 

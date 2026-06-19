@@ -593,7 +593,7 @@ export async function searchSearxNG(
   try {
     const res = await fetch(url.toString(), { signal: controller.signal });
     if (!res.ok) throw new Error(`SearxNG ${res.status}: ${res.statusText}`);
-    const data = await res.json() as { results?: SearxNGResult[]; suggestions?: string[] };
+    const data = (await res.json()) as { results?: SearxNGResult[]; suggestions?: string[] };
     return { results: data.results ?? [], suggestions: data.suggestions ?? [] };
   } finally {
     clearTimeout(timer);
@@ -605,7 +605,9 @@ export class SearxNGSearchStrategy implements SearchStrategy {
   readonly name = "mock" as SearchSource; // reuse "mock" slot; override if needed
   private opts: SearxNGOptions;
 
-  constructor(opts: SearxNGOptions = {}) { this.opts = opts; }
+  constructor(opts: SearxNGOptions = {}) {
+    this.opts = opts;
+  }
 
   async search(req: SearchRequest): Promise<SearchResponse> {
     const start = Date.now();
@@ -619,6 +621,11 @@ export class SearxNGSearchStrategy implements SearchStrategy {
       timestamp: new Date().toISOString(),
       metadata: { url: r.url, title: r.title, author: r.author },
     }));
-    return { results: mapped, source: "mock", durationMs: Date.now() - start, totalFound: results.length };
+    return {
+      results: mapped,
+      source: "mock",
+      durationMs: Date.now() - start,
+      totalFound: results.length,
+    };
   }
 }

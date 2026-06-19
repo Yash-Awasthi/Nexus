@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import type { Preview, Decorator } from "@storybook/react";
 import React from "react";
 import { ThemeProvider } from "../app/context/ThemeContext";
@@ -23,8 +24,8 @@ const withThemeProvider: Decorator = (Story, context) => {
           color: theme === "dark" ? "#f8fafc" : "#0f172a",
         },
       },
-      React.createElement(Story)
-    )
+      React.createElement(Story),
+    ),
   );
 };
 

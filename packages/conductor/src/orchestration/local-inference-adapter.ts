@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * LocalInferenceAdapter — runs large language models locally via layer-by-layer
  * sharded inference (70B+ on 4GB VRAM, no quantization required).
@@ -15,7 +16,7 @@ import {
   TextChunk,
   GenerateTextParams,
   StreamTextParams,
-  GenerateObjectParams
+  GenerateObjectParams,
 } from "./interfaces/language-model.interface";
 import { IExecutionContext } from "./interfaces/execution.interface";
 import { getBridgeManager, BridgeManager } from "../runtime/bridge-manager";
@@ -61,7 +62,7 @@ export class LocalInferenceAdapter {
       const body: Record<string, unknown> = {
         model,
         max_new_tokens: payload.maxNewTokens ?? this.opts.maxNewTokens ?? 200,
-        compression: payload.compression ?? this.opts.compression ?? null
+        compression: payload.compression ?? this.opts.compression ?? null,
       };
       if (messages.length > 0) {
         body.messages = messages;
@@ -87,7 +88,7 @@ export class LocalInferenceAdapter {
         success: true,
         text: result.text,
         model: result.model,
-        tokensGenerated: result.tokens_generated
+        tokensGenerated: result.tokens_generated,
       };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -127,7 +128,7 @@ export class LocalLanguageModel implements ILanguageModel {
     const messages = params.messages.map((m) => ({ role: m.role, content: m.content }));
     return this.callBridge("/chat", {
       messages,
-      max_new_tokens: params.maxTokens ?? 512
+      max_new_tokens: params.maxTokens ?? 512,
     });
   }
 
@@ -139,12 +140,12 @@ export class LocalLanguageModel implements ILanguageModel {
 
   async generateObject<T>(params: GenerateObjectParams<T>): Promise<T> {
     const schemaPrompt = `Respond ONLY with valid JSON matching this schema:\n${JSON.stringify(params.schema)}\nNo markdown, no explanation.`;
-    const messages = [
-      { role: "system" as const, content: schemaPrompt },
-      ...params.messages
-    ];
+    const messages = [{ role: "system" as const, content: schemaPrompt }, ...params.messages];
     const raw = await this.generateText({ ...params, messages });
-    const cleaned = raw.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim();
+    const cleaned = raw
+      .replace(/^```(?:json)?\n?/m, "")
+      .replace(/\n?```$/m, "")
+      .trim();
     return JSON.parse(cleaned) as T;
   }
 }

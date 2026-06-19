@@ -1,18 +1,19 @@
+// SPDX-License-Identifier: Apache-2.0
 import { type RouteConfig, index, layout, route } from "@react-router/dev/routes";
 
 export default [
   // Auth — login / register UI + API handlers
-  route("login",    "routes/login.tsx"),
+  route("login", "routes/login.tsx"),
   route("register", "routes/register.tsx"),
-  route("api/auth/google",          "routes/api.auth.google.tsx"),
+  route("api/auth/google", "routes/api.auth.google.tsx"),
   route("api/auth/google/callback", "routes/api.auth.google.callback.tsx"),
-  route("api/auth/login",           "routes/api.auth.login.tsx"),
-  route("api/auth/logout",          "routes/api.auth.logout.tsx"),
-  route("api/auth/me",              "routes/api.auth.me.tsx"),
-  route("api/auth/register",        "routes/api.auth.register.tsx"),
+  route("api/auth/login", "routes/api.auth.login.tsx"),
+  route("api/auth/logout", "routes/api.auth.logout.tsx"),
+  route("api/auth/me", "routes/api.auth.me.tsx"),
+  route("api/auth/register", "routes/api.auth.register.tsx"),
   // Internal API proxy routes (deliberation + evaluation)
   route("api/deliberate", "routes/api.deliberate.tsx"),
-  route("api/evaluate",   "routes/api.evaluate.tsx"),
+  route("api/evaluate", "routes/api.evaluate.tsx"),
   // Setup (first launch)
   route("setup", "routes/setup.tsx"),
   // Marketing pages — wrapped with Navbar + Footer

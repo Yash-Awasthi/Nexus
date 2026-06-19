@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Member Evolution — track how council member personas adapt over time.
  *
@@ -36,8 +37,12 @@ function ProfileTab() {
 
   const load = useCallback(async () => {
     if (!model.trim()) return;
-    setLoading(true); setErr(""); setProfile(null);
-    const r = await fetch(`/api/member-evolution/${encodeURIComponent(model.trim())}`).catch(() => null);
+    setLoading(true);
+    setErr("");
+    setProfile(null);
+    const r = await fetch(`/api/member-evolution/${encodeURIComponent(model.trim())}`).catch(
+      () => null,
+    );
     if (r?.ok) setProfile(await r.json());
     else setErr("Failed to load evolution profile");
     setLoading(false);
@@ -47,17 +52,23 @@ function ProfileTab() {
     <div className="space-y-4">
       <Card>
         <CardContent className="pt-4 space-y-3">
-          <p className="text-sm text-muted-foreground">Enter a model identifier to view its evolution profile.</p>
+          <p className="text-sm text-muted-foreground">
+            Enter a model identifier to view its evolution profile.
+          </p>
           <div className="flex gap-2">
             <Input
               placeholder="e.g. gpt-4o, claude-opus-4, gemini-2.0…"
               value={model}
-              onChange={e => setModel(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && load()}
+              onChange={(e) => setModel(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && load()}
               className="flex-1"
             />
             <Button onClick={load} disabled={loading || !model.trim()}>
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <TrendingUp className="w-4 h-4" />}
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <TrendingUp className="w-4 h-4" />
+              )}
             </Button>
           </div>
           {err && <p className="text-red-500 text-xs">{err}</p>}
@@ -76,26 +87,34 @@ function ProfileTab() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {profile.traits.map(t => (
+            {profile.traits.map((t) => (
               <div key={t.name} className="space-y-1">
                 <div className="flex justify-between text-sm">
                   <span className="capitalize">{t.name.replace(/_/g, " ")}</span>
                   <span className="font-mono text-xs">
                     {(t.value * 100).toFixed(1)}%
                     {t.delta !== undefined && (
-                      <span className={`ml-1 text-xs ${t.delta >= 0 ? "text-green-500" : "text-red-500"}`}>
-                        {t.delta >= 0 ? "+" : ""}{(t.delta * 100).toFixed(1)}
+                      <span
+                        className={`ml-1 text-xs ${t.delta >= 0 ? "text-green-500" : "text-red-500"}`}
+                      >
+                        {t.delta >= 0 ? "+" : ""}
+                        {(t.delta * 100).toFixed(1)}
                       </span>
                     )}
                   </span>
                 </div>
                 <div className="w-full bg-muted rounded-full h-2">
-                  <div className="bg-violet-500 h-2 rounded-full" style={{ width: `${t.value * 100}%` }} />
+                  <div
+                    className="bg-violet-500 h-2 rounded-full"
+                    style={{ width: `${t.value * 100}%` }}
+                  />
                 </div>
               </div>
             ))}
             {profile.lastUpdated && (
-              <p className="text-xs text-muted-foreground">Last updated: {new Date(profile.lastUpdated).toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground">
+                Last updated: {new Date(profile.lastUpdated).toLocaleString()}
+              </p>
             )}
           </CardContent>
         </Card>
@@ -113,7 +132,9 @@ function RecomputeTab() {
   const [err, setErr] = useState("");
 
   const recompute = useCallback(async () => {
-    setLoading(true); setErr(""); setResult(null);
+    setLoading(true);
+    setErr("");
+    setResult(null);
     const body: Record<string, string> = {};
     if (model.trim()) body.model = model.trim();
     const r = await fetch("/api/member-evolution/recompute", {
@@ -136,11 +157,21 @@ function RecomputeTab() {
           <Input
             placeholder="Model (optional, blank = all)"
             value={model}
-            onChange={e => setModel(e.target.value)}
+            onChange={(e) => setModel(e.target.value)}
           />
           {err && <p className="text-red-500 text-xs">{err}</p>}
           <Button onClick={recompute} disabled={loading}>
-            {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Recomputing…</> : <><RefreshCw className="w-4 h-4 mr-2" />Recompute</>}
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Recomputing…
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Recompute
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>
@@ -170,7 +201,9 @@ function ApplyTab() {
   const [err, setErr] = useState("");
 
   const apply = useCallback(async () => {
-    setLoading(true); setErr(""); setResult(null);
+    setLoading(true);
+    setErr("");
+    setResult(null);
     const body: Record<string, string> = {};
     if (sessionId.trim()) body.sessionId = sessionId.trim();
     const r = await fetch("/api/member-evolution/apply", {
@@ -188,16 +221,27 @@ function ApplyTab() {
       <Card>
         <CardContent className="pt-4 space-y-3">
           <p className="text-sm text-muted-foreground">
-            Apply the latest evolution weights to active sessions. Leave session ID blank to apply to all sessions.
+            Apply the latest evolution weights to active sessions. Leave session ID blank to apply
+            to all sessions.
           </p>
           <Input
             placeholder="Session ID (optional)"
             value={sessionId}
-            onChange={e => setSessionId(e.target.value)}
+            onChange={(e) => setSessionId(e.target.value)}
           />
           {err && <p className="text-red-500 text-xs">{err}</p>}
           <Button onClick={apply} disabled={loading}>
-            {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Applying…</> : <><Play className="w-4 h-4 mr-2" />Apply Evolution</>}
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Applying…
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4 mr-2" />
+                Apply Evolution
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>
@@ -235,12 +279,24 @@ export default function MemberEvolution() {
       <Tabs defaultValue="profile">
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="recompute"><RefreshCw className="w-4 h-4 mr-1" />Recompute</TabsTrigger>
-          <TabsTrigger value="apply"><Play className="w-4 h-4 mr-1" />Apply</TabsTrigger>
+          <TabsTrigger value="recompute">
+            <RefreshCw className="w-4 h-4 mr-1" />
+            Recompute
+          </TabsTrigger>
+          <TabsTrigger value="apply">
+            <Play className="w-4 h-4 mr-1" />
+            Apply
+          </TabsTrigger>
         </TabsList>
-        <TabsContent value="profile" className="mt-4"><ProfileTab /></TabsContent>
-        <TabsContent value="recompute" className="mt-4"><RecomputeTab /></TabsContent>
-        <TabsContent value="apply" className="mt-4"><ApplyTab /></TabsContent>
+        <TabsContent value="profile" className="mt-4">
+          <ProfileTab />
+        </TabsContent>
+        <TabsContent value="recompute" className="mt-4">
+          <RecomputeTab />
+        </TabsContent>
+        <TabsContent value="apply" className="mt-4">
+          <ApplyTab />
+        </TabsContent>
       </Tabs>
     </div>
   );

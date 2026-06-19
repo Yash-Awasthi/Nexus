@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * MarkdownRenderer - REQUIRED for rendering AI responses
  *
@@ -41,11 +42,7 @@ function CodeBlockPre({ children }: { children?: React.ReactNode }) {
   let codeString = "";
   let language = "";
 
-  if (
-    children &&
-    typeof children === "object" &&
-    "props" in (children as React.ReactElement)
-  ) {
+  if (children && typeof children === "object" && "props" in (children as React.ReactElement)) {
     const codeElement = children as React.ReactElement<{
       children?: React.ReactNode;
       className?: string;
@@ -74,12 +71,27 @@ function CodeBlockPre({ children }: { children?: React.ReactNode }) {
         aria-label="Copy code"
       >
         {copied ? (
-          <svg className="size-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg
+            className="size-4 text-green-500"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         ) : (
-          <svg className="size-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          <svg
+            className="size-4 text-gray-500"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+            />
           </svg>
         )}
       </button>
@@ -93,20 +105,12 @@ function CodeBlockPre({ children }: { children?: React.ReactNode }) {
 // Custom components for react-markdown
 const components: Components = {
   // Paragraphs
-  p: ({ children }) => (
-    <p className="mb-4 last:mb-0 leading-relaxed">{children}</p>
-  ),
+  p: ({ children }) => <p className="mb-4 last:mb-0 leading-relaxed">{children}</p>,
 
   // Headings
-  h1: ({ children }) => (
-    <h1 className="text-2xl font-bold mt-6 mb-4 first:mt-0">{children}</h1>
-  ),
-  h2: ({ children }) => (
-    <h2 className="text-xl font-bold mt-6 mb-3 first:mt-0">{children}</h2>
-  ),
-  h3: ({ children }) => (
-    <h3 className="text-lg font-semibold mt-5 mb-2 first:mt-0">{children}</h3>
-  ),
+  h1: ({ children }) => <h1 className="text-2xl font-bold mt-6 mb-4 first:mt-0">{children}</h1>,
+  h2: ({ children }) => <h2 className="text-xl font-bold mt-6 mb-3 first:mt-0">{children}</h2>,
+  h3: ({ children }) => <h3 className="text-lg font-semibold mt-5 mb-2 first:mt-0">{children}</h3>,
   h4: ({ children }) => (
     <h4 className="text-base font-semibold mt-4 mb-2 first:mt-0">{children}</h4>
   ),
@@ -130,13 +134,9 @@ const components: Components = {
   ),
 
   // Lists
-  ul: ({ children }) => (
-    <ul className="list-disc list-outside ml-6 mb-4 space-y-1">{children}</ul>
-  ),
+  ul: ({ children }) => <ul className="list-disc list-outside ml-6 mb-4 space-y-1">{children}</ul>,
   ol: ({ children }) => (
-    <ol className="list-decimal list-outside ml-6 mb-4 space-y-1">
-      {children}
-    </ol>
+    <ol className="list-decimal list-outside ml-6 mb-4 space-y-1">{children}</ol>
   ),
   li: ({ children }) => <li className="leading-relaxed">{children}</li>,
 
@@ -150,34 +150,26 @@ const components: Components = {
   // Tables
   table: ({ children }) => (
     <div className="overflow-x-auto my-4">
-      <table className="min-w-full border-collapse border border-gray-200">
-        {children}
-      </table>
+      <table className="min-w-full border-collapse border border-gray-200">{children}</table>
     </div>
   ),
   thead: ({ children }) => <thead className="bg-gray-50">{children}</thead>,
   tbody: ({ children }) => <tbody>{children}</tbody>,
-  tr: ({ children }) => (
-    <tr className="border-b border-gray-200">{children}</tr>
-  ),
+  tr: ({ children }) => <tr className="border-b border-gray-200">{children}</tr>,
   th: ({ children }) => (
     <th className="px-4 py-2 text-left font-semibold border-r border-gray-200 last:border-r-0">
       {children}
     </th>
   ),
   td: ({ children }) => (
-    <td className="px-4 py-2 border-r border-gray-200 last:border-r-0">
-      {children}
-    </td>
+    <td className="px-4 py-2 border-r border-gray-200 last:border-r-0">{children}</td>
   ),
 
   // Horizontal rule
   hr: () => <hr className="my-6 border-gray-200" />,
 
   // Strong and emphasis
-  strong: ({ children }) => (
-    <strong className="font-semibold">{children}</strong>
-  ),
+  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
   em: ({ children }) => <em className="italic">{children}</em>,
 
   // Strikethrough
@@ -185,19 +177,11 @@ const components: Components = {
 
   // Images
   img: ({ src, alt }) => (
-    <img
-      src={src}
-      alt={alt || ""}
-      className="max-w-full h-auto rounded-lg my-4"
-    />
+    <img src={src} alt={alt || ""} className="max-w-full h-auto rounded-lg my-4" />
   ),
 };
 
-function MarkdownRendererBase({
-  content,
-  className,
-  isStreaming = false,
-}: MarkdownRendererProps) {
+function MarkdownRendererBase({ content, className, isStreaming = false }: MarkdownRendererProps) {
   // Process content for streaming - auto-close unclosed code fences
   const processedContent = useMemo(() => {
     if (!isStreaming) return content;
@@ -226,7 +210,7 @@ export const MarkdownRenderer = memo(
   (prev, next) =>
     prev.content === next.content &&
     prev.className === next.className &&
-    prev.isStreaming === next.isStreaming
+    prev.isStreaming === next.isStreaming,
 );
 
 MarkdownRenderer.displayName = "MarkdownRenderer";

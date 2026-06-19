@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { useState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
@@ -5,7 +6,13 @@ import { Badge } from "~/components/ui/badge";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -395,7 +402,8 @@ export class RateLimiter {
   {
     id: "sk_8",
     name: "CSV Processor",
-    description: "Parse, filter, transform, and export CSV data with streaming support for large files",
+    description:
+      "Parse, filter, transform, and export CSV data with streaming support for large files",
     language: "Python",
     tags: ["data", "csv", "etl"],
     code: `import csv
@@ -516,9 +524,7 @@ function CodeViewer({ code }: { code: string }) {
   return (
     <div className="rounded-md bg-zinc-950 border border-zinc-800 overflow-hidden">
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-zinc-800 bg-zinc-900/60">
-        <span className="text-[10px] text-zinc-500 font-mono">
-          {lines.length} lines
-        </span>
+        <span className="text-[10px] text-zinc-500 font-mono">{lines.length} lines</span>
         <Button
           size="sm"
           variant="ghost"
@@ -546,9 +552,7 @@ function CodeViewer({ code }: { code: string }) {
                 <td className="select-none text-right pr-3 pl-3 py-0 text-zinc-600 w-8 min-w-[2.5rem]">
                   {i + 1}
                 </td>
-                <td className="pr-4 py-0 text-zinc-100 whitespace-pre">
-                  {line || "\u00a0"}
-                </td>
+                <td className="pr-4 py-0 text-zinc-100 whitespace-pre">{line || "\u00a0"}</td>
               </tr>
             ))}
           </tbody>
@@ -596,10 +600,7 @@ function ImportDialog({
           };
           onImport(newSkill);
           onOpenChange(false);
-        } else if (
-          file.name.endsWith(".yaml") ||
-          file.name.endsWith(".yml")
-        ) {
+        } else if (file.name.endsWith(".yaml") || file.name.endsWith(".yml")) {
           // Simple YAML key-value parsing
           const lines = content.split("\n");
           const parsed: Record<string, string> = {};
@@ -649,11 +650,12 @@ function ImportDialog({
             id: `sk_import_${Date.now()}`,
             name: file.name.replace(/\.\w+$/, ""),
             description: "Imported from file",
-            language: file.name.endsWith(".ts") || file.name.endsWith(".tsx")
-              ? "TypeScript"
-              : file.name.endsWith(".js") || file.name.endsWith(".jsx")
-                ? "JavaScript"
-                : "Python",
+            language:
+              file.name.endsWith(".ts") || file.name.endsWith(".tsx")
+                ? "TypeScript"
+                : file.name.endsWith(".js") || file.name.endsWith(".jsx")
+                  ? "JavaScript"
+                  : "Python",
             tags: ["imported"],
             code: content,
           };
@@ -661,9 +663,7 @@ function ImportDialog({
           onOpenChange(false);
         }
       } catch (err) {
-        setError(
-          `Failed to parse file: ${err instanceof Error ? err.message : "Unknown error"}`
-        );
+        setError(`Failed to parse file: ${err instanceof Error ? err.message : "Unknown error"}`);
       }
       setImporting(false);
       setFileName(null);
@@ -736,16 +736,12 @@ function ImportDialog({
             {importing ? (
               <div className="flex flex-col items-center gap-2">
                 <Loader2 className="size-8 text-primary animate-spin" />
-                <p className="text-sm text-muted-foreground">
-                  Importing {fileName}...
-                </p>
+                <p className="text-sm text-muted-foreground">Importing {fileName}...</p>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2">
                 <Upload className="size-8 text-muted-foreground" />
-                <p className="text-sm font-medium">
-                  Drop a file here or click to browse
-                </p>
+                <p className="text-sm font-medium">Drop a file here or click to browse</p>
                 <p className="text-xs text-muted-foreground">
                   Supports .json, .yaml, .py, .ts, .js files
                 </p>
@@ -787,7 +783,7 @@ export default function SkillsPage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    apiFetch<{ skills: BackendSkill[] }>('/api/skills')
+    apiFetch<{ skills: BackendSkill[] }>("/api/skills")
       .then(({ skills: list }) => {
         if (!cancelled) {
           setSkills(list.length > 0 ? list.map(toSkill) : EXAMPLE_SKILLS);
@@ -797,55 +793,59 @@ export default function SkillsPage() {
         // Fall back to examples on auth/network error
         if (!cancelled) setSkills(EXAMPLE_SKILLS);
       })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filtered = skills.filter(
     (s) =>
       s.name.toLowerCase().includes(search.toLowerCase()) ||
       s.description.toLowerCase().includes(search.toLowerCase()) ||
-      s.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()))
+      s.tags.some((t) => t.toLowerCase().includes(search.toLowerCase())),
   );
 
   const handleAddSkill = async () => {
     if (!addForm.name || !addForm.language) return;
     setAddLoading(true);
     try {
-      const created = await apiFetch<BackendSkill>('/api/skills', {
-        method: 'POST',
+      const created = await apiFetch<BackendSkill>("/api/skills", {
+        method: "POST",
         body: JSON.stringify({
           name: addForm.name,
-          description: addForm.description || 'No description',
+          description: addForm.description || "No description",
           language: addForm.language.toLowerCase(),
-          code: addForm.code || '# No code provided',
+          code: addForm.code || "# No code provided",
         }),
       });
       setSkills((prev) => [toSkill(created), ...prev]);
       setAddOpen(false);
       setAddForm({ name: "", description: "", language: "", tags: "", code: "" });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to create skill');
+      setError(e instanceof Error ? e.message : "Failed to create skill");
     } finally {
       setAddLoading(false);
     }
   };
 
   const handleDeleteSkill = async (id: string) => {
-    if (!confirm('Delete this skill?')) return;
+    if (!confirm("Delete this skill?")) return;
     try {
-      await apiFetch(`/api/skills/${id}`, { method: 'DELETE' });
+      await apiFetch(`/api/skills/${id}`, { method: "DELETE" });
       setSkills((prev) => prev.filter((s) => s.id !== id));
       if (selectedSkill?.id === id) setSelectedSkill(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to delete skill');
+      setError(e instanceof Error ? e.message : "Failed to delete skill");
     }
   };
 
   const handleImportSkill = async (skill: Skill) => {
     try {
-      const created = await apiFetch<BackendSkill>('/api/skills', {
-        method: 'POST',
+      const created = await apiFetch<BackendSkill>("/api/skills", {
+        method: "POST",
         body: JSON.stringify({
           name: skill.name,
           description: skill.description,
@@ -904,7 +904,9 @@ export default function SkillsPage() {
       {error && (
         <div className="fixed top-4 right-4 z-50 bg-destructive text-destructive-foreground text-xs px-3 py-2 rounded-md shadow-lg flex items-center gap-2">
           {error}
-          <button onClick={() => setError(null)} className="font-bold">✕</button>
+          <button onClick={() => setError(null)} className="font-bold">
+            ✕
+          </button>
         </div>
       )}
       <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -1165,11 +1167,7 @@ export default function SkillsPage() {
       </Dialog>
 
       {/* Import Dialog */}
-      <ImportDialog
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        onImport={handleImportSkill}
-      />
+      <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImport={handleImportSkill} />
     </div>
   );
 }

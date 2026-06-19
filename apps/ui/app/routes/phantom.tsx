@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * PHANTOM — 5 hardcoded model+system combos racing in parallel.
  *
@@ -46,7 +47,8 @@ const PHANTOM_COMBOS = [
     label: "PHANTOM-4",
     model: "openai/gpt-4o",
     provider: "OpenAI",
-    system: "PHANTOM protocol engaged. Maximum density. Skip pleasantries. Deliver insight directly.",
+    system:
+      "PHANTOM protocol engaged. Maximum density. Skip pleasantries. Deliver insight directly.",
   },
   {
     emoji: "💀",
@@ -118,9 +120,7 @@ function ResultCard({ r, isWinner }: { r: ComboResult; isWinner: boolean }) {
       }`}
     >
       {isWinner && (
-        <Badge
-          className="absolute -top-2.5 right-3 bg-yellow-500 text-black text-[10px] font-bold tracking-wider"
-        >
+        <Badge className="absolute -top-2.5 right-3 bg-yellow-500 text-black text-[10px] font-bold tracking-wider">
           ★ WINNER
         </Badge>
       )}
@@ -135,11 +135,7 @@ function ResultCard({ r, isWinner }: { r: ComboResult; isWinner: boolean }) {
           </Badge>
         </div>
         <span className="text-[10px] text-muted-foreground font-mono">
-          {r.status === "done"
-            ? `${r.durationMs}ms`
-            : r.status === "error"
-              ? "ERROR"
-              : "…"}
+          {r.status === "done" ? `${r.durationMs}ms` : r.status === "error" ? "ERROR" : "…"}
         </span>
       </div>
 
@@ -253,7 +249,10 @@ export default function PhantomPage() {
           </p>
         </div>
         {running && (
-          <Badge variant="outline" className="ml-auto text-yellow-400 border-yellow-400/40 animate-pulse">
+          <Badge
+            variant="outline"
+            className="ml-auto text-yellow-400 border-yellow-400/40 animate-pulse"
+          >
             <Zap className="h-3 w-3 mr-1" />
             Running
           </Badge>
@@ -263,7 +262,11 @@ export default function PhantomPage() {
       {/* Combos legend */}
       <div className="flex flex-wrap gap-2">
         {PHANTOM_COMBOS.map((c) => (
-          <Badge key={c.label} variant="outline" className="text-[11px] font-mono text-muted-foreground">
+          <Badge
+            key={c.label}
+            variant="outline"
+            className="text-[11px] font-mono text-muted-foreground"
+          >
             {c.emoji} {c.label} · {c.provider}
           </Badge>
         ))}
@@ -287,9 +290,15 @@ export default function PhantomPage() {
             className="bg-purple-600 hover:bg-purple-700 text-white"
           >
             {running ? (
-              <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Running…</>
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Running…
+              </>
             ) : (
-              <><Send className="h-4 w-4 mr-2" />Unleash Phantoms</>
+              <>
+                <Send className="h-4 w-4 mr-2" />
+                Unleash Phantoms
+              </>
             )}
           </Button>
           {running && (
@@ -307,7 +316,9 @@ export default function PhantomPage() {
             <div className="flex items-center gap-2 p-3 rounded-lg border border-yellow-500/30 bg-yellow-500/5 text-sm">
               <Trophy className="h-4 w-4 text-yellow-400 flex-shrink-0" />
               <span className="font-mono text-yellow-400 font-bold">{winner.label}</span>
-              <span className="text-muted-foreground">won with {winner.content.length} chars in {winner.durationMs}ms</span>
+              <span className="text-muted-foreground">
+                won with {winner.content.length} chars in {winner.durationMs}ms
+              </span>
             </div>
           )}
           <ScrollArea className="h-[600px]">

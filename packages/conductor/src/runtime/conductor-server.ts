@@ -1,6 +1,12 @@
+// SPDX-License-Identifier: Apache-2.0
 import * as http from "http";
 import * as path from "path";
-import { createRuntimeContext, startRuntime, stopRuntime, ConductorRuntimeContext } from "./runtime-context";
+import {
+  createRuntimeContext,
+  startRuntime,
+  stopRuntime,
+  ConductorRuntimeContext,
+} from "./runtime-context";
 import { RuntimeDiagnosticAPI } from "../orchestration/diagnostic-api";
 import { metricsToPrometheus } from "../orchestration/prometheus-format";
 import { ADAPTER_MANIFEST } from "./adapters/manifest";
@@ -10,7 +16,10 @@ import { runFederationE2e } from "./e2e-federation";
 
 // ─── Structured health response ──────────────────────────────────────────────
 
-async function buildHealthResponse(ctx: ConductorRuntimeContext, bootMs: number): Promise<{
+async function buildHealthResponse(
+  ctx: ConductorRuntimeContext,
+  bootMs: number,
+): Promise<{
   status: "healthy" | "degraded" | "unhealthy";
   version: string;
   uptime_ms: number;
@@ -22,7 +31,7 @@ async function buildHealthResponse(ctx: ConductorRuntimeContext, bootMs: number)
 
   // Queue
   try {
-    const queueLen = await ctx.queue?.getQueueLength?.() ?? 0;
+    const queueLen = (await ctx.queue?.getQueueLength?.()) ?? 0;
     components.queue = { status: "healthy", detail: `${queueLen} job(s) pending` };
   } catch (e: any) {
     components.queue = { status: "error", detail: e?.message };
@@ -32,7 +41,10 @@ async function buildHealthResponse(ctx: ConductorRuntimeContext, bootMs: number)
   try {
     const flociHealth = ctx.flociAdapter?.getLastHealth?.();
     if (flociHealth?.reachable === false) {
-      components.floci = { status: "offline", detail: `latency: ${flociHealth.latencyMs ?? "-"}ms` };
+      components.floci = {
+        status: "offline",
+        detail: `latency: ${flociHealth.latencyMs ?? "-"}ms`,
+      };
     } else if (flociHealth?.reachable === true) {
       components.floci = { status: "healthy", detail: `latency: ${flociHealth.latencyMs}ms` };
     } else {
@@ -47,7 +59,7 @@ async function buildHealthResponse(ctx: ConductorRuntimeContext, bootMs: number)
     const history = ctx.eventBus?.getHistory?.();
     components.event_bus = {
       status: "healthy",
-      detail: `${Array.isArray(history) ? history.length : "?"} event(s) in history`
+      detail: `${Array.isArray(history) ? history.length : "?"} event(s) in history`,
     };
   } catch (e: any) {
     components.event_bus = { status: "error", detail: e?.message };
@@ -58,14 +70,18 @@ async function buildHealthResponse(ctx: ConductorRuntimeContext, bootMs: number)
     const wfStats = ctx.inspector?.getWorkflowTelemetryStats?.();
     components.workflow_engine = {
       status: "healthy",
-      detail: `${wfStats?.totalExecutions ?? 0} total execution(s)`
+      detail: `${wfStats?.totalExecutions ?? 0} total execution(s)`,
     };
   } catch (e: any) {
     components.workflow_engine = { status: "error", detail: e?.message };
   }
 
-  const hasError = Object.values(components).some((c) => c.status === "error" || c.status === "unhealthy");
-  const hasDegraded = Object.values(components).some((c) => c.status === "degraded" || c.status === "offline");
+  const hasError = Object.values(components).some(
+    (c) => c.status === "error" || c.status === "unhealthy",
+  );
+  const hasDegraded = Object.values(components).some(
+    (c) => c.status === "degraded" || c.status === "offline",
+  );
   const overall = hasError ? "unhealthy" : hasDegraded ? "degraded" : "healthy";
 
   // Read version from package.json — resolved relative to the dist or source root
@@ -83,7 +99,7 @@ async function buildHealthResponse(ctx: ConductorRuntimeContext, bootMs: number)
     uptime_ms: Date.now() - bootMs,
     boot_ms: bootMs,
     timestamp: new Date().toISOString(),
-    components
+    components,
   };
 }
 
@@ -113,7 +129,7 @@ export async function createConductorServer(repoRoot: string): Promise<Conductor
     const servers = await mcpBridge.registry.listServers();
     ctx.logger.info("Conductor in-process MCP bridge registered", {
       server: servers[0]?.name,
-      tools: servers[0]?.tools
+      tools: servers[0]?.tools,
     });
   }
 
@@ -132,7 +148,8 @@ export async function createConductorServer(repoRoot: string): Promise<Conductor
       // ── Health check — always public, no auth required ────────────────────
       if (method === "GET" && (pathname === "/health" || pathname === "/healthz")) {
         const health = await buildHealthResponse(ctx, bootMs);
-        res.statusCode = health.status === "healthy" ? 200 : health.status === "degraded" ? 200 : 503;
+        res.statusCode =
+          health.status === "healthy" ? 200 : health.status === "degraded" ? 200 : 503;
         res.setHeader("Content-Type", "application/json");
         res.end(JSON.stringify(health, null, 2));
         return;
@@ -149,7 +166,11 @@ export async function createConductorServer(repoRoot: string): Promise<Conductor
         res.statusCode = 200;
         res.setHeader("Content-Type", "application/json");
         res.end(
-          JSON.stringify({ manifest: ADAPTER_MANIFEST, floci: ctx.flociAdapter.getLastHealth() }, null, 2)
+          JSON.stringify(
+            { manifest: ADAPTER_MANIFEST, floci: ctx.flociAdapter.getLastHealth() },
+            null,
+            2,
+          ),
         );
         return;
       }
@@ -183,15 +204,21 @@ export async function createConductorServer(repoRoot: string): Promise<Conductor
       if (method === "GET" && pathname === "/runtime/queue") {
         const [activeJobs, dlqJobs] = await Promise.all([
           ctx.queue.getActiveJobs(),
-          ctx.queue.getDeadLetterQueue()
+          ctx.queue.getDeadLetterQueue(),
         ]);
         res.statusCode = 200;
-        res.end(JSON.stringify({
-          activeCount: activeJobs.length,
-          dlqCount: dlqJobs.length,
-          activeJobs,
-          dlqJobs
-        }, null, 2));
+        res.end(
+          JSON.stringify(
+            {
+              activeCount: activeJobs.length,
+              dlqCount: dlqJobs.length,
+              activeJobs,
+              dlqJobs,
+            },
+            null,
+            2,
+          ),
+        );
         return;
       }
 
@@ -214,7 +241,7 @@ export async function createConductorServer(repoRoot: string): Promise<Conductor
         }
         const payload: Record<string, unknown> = {
           ...((body.payload as Record<string, unknown>) ?? {}),
-          ...body
+          ...body,
         };
         delete payload.action;
         delete payload.payload;
@@ -223,7 +250,7 @@ export async function createConductorServer(repoRoot: string): Promise<Conductor
           startTime: new Date(),
           attempt: 1,
           environment: {},
-          logger: ctx.logger
+          logger: ctx.logger,
         };
         const result = await ctx.flociAdapter.executeAction(action, payload, flociCtx);
         res.statusCode = 200;
@@ -236,7 +263,7 @@ export async function createConductorServer(repoRoot: string): Promise<Conductor
         const body = bodyRaw ? JSON.parse(bodyRaw) : {};
         const result = await runFederationE2e(ctx, {
           strict: body.strict === true,
-          cleanup: body.cleanup !== false
+          cleanup: body.cleanup !== false,
         });
         res.statusCode = result.status === "succeeded" ? 200 : 500;
         res.end(JSON.stringify(result, null, 2));
@@ -259,7 +286,11 @@ export async function createConductorServer(repoRoot: string): Promise<Conductor
         return;
       }
 
-      if (method === "POST" && pathname.startsWith("/runtime/approvals/") && pathname.endsWith("/approve")) {
+      if (
+        method === "POST" &&
+        pathname.startsWith("/runtime/approvals/") &&
+        pathname.endsWith("/approve")
+      ) {
         const parts = pathname.split("/");
         const approvalId = parts[parts.length - 2];
         const result = await ctx.workflowEngine.approveAndTriggerWorkflow(approvalId);
@@ -330,7 +361,7 @@ export async function startHttpServer(): Promise<http.Server> {
   loadConductorConfig(repoRoot);
   const gs = await createConductorServer(repoRoot);
   console.log(
-    `[Conductor] API http://127.0.0.1:${gs.port} | /health | POST /runtime/e2e/federation | POST /runtime/workflows/execute`
+    `[Conductor] API http://127.0.0.1:${gs.port} | /health | POST /runtime/e2e/federation | POST /runtime/workflows/execute`,
   );
   const shutdown = async () => {
     await gs.stop();

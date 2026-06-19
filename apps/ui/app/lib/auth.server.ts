@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Server-only auth utilities.
  * Uses Web Crypto API (available in Cloudflare Workers + Node.js 18+).
@@ -15,7 +16,7 @@ export interface AuthUser {
 const COOKIE_NAME = "access_token";
 const TOKEN_TTL_SECS = 60 * 60 * 24 * 7; // 7 days
 
-function b64uEncode(buf: ArrayBuffer): string {
+function b64uEncode(buf: ArrayBuffer | Uint8Array): string {
   return btoa(String.fromCharCode(...new Uint8Array(buf)))
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
@@ -36,13 +37,17 @@ async function getKey(secret: string): Promise<CryptoKey> {
     new TextEncoder().encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
-    ["sign", "verify"]
+    ["sign", "verify"],
   );
 }
 
 export async function signToken(payload: AuthUser, secret: string): Promise<string> {
   const header = b64uEncode(new TextEncoder().encode(JSON.stringify({ alg: "HS256", typ: "JWT" })));
-  const claims = { ...payload, iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECS };
+  const claims = {
+    ...payload,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECS,
+  };
   const body = b64uEncode(new TextEncoder().encode(JSON.stringify(claims)));
   const data = `${header}.${body}`;
   const key = await getKey(secret);
@@ -57,7 +62,12 @@ export async function verifyToken(token: string, secret: string): Promise<AuthUs
     const [header, body, sig] = parts;
     const data = `${header}.${body}`;
     const key = await getKey(secret);
-    const valid = await crypto.subtle.verify("HMAC", key, b64uDecode(sig), new TextEncoder().encode(data));
+    const valid = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      b64uDecode(sig),
+      new TextEncoder().encode(data),
+    );
     if (!valid) return null;
     const claims = JSON.parse(new TextDecoder().decode(b64uDecode(body)));
     if (claims.exp && claims.exp < Math.floor(Date.now() / 1000)) return null;

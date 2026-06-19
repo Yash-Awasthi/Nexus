@@ -1,14 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
 "use client";
 
 import type { ReactNode } from "react";
 
-export function TextShimmer({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+export function TextShimmer({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <>
       <style>

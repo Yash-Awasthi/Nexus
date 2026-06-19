@@ -346,8 +346,7 @@ export class RollingWindow {
     const v = this.values();
     if (v.length < 2) return 0;
     const m = this.mean();
-    const variance =
-      v.reduce((a, b) => a + (b - m) ** 2, 0) / (v.length - 1);
+    const variance = v.reduce((a, b) => a + (b - m) ** 2, 0) / (v.length - 1);
     return Math.sqrt(variance);
   }
 
@@ -470,12 +469,11 @@ export const STMMetrics = {
    */
   hedgeDensity: (text: string) => {
     const words = text.trim().split(/\s+/).length || 1;
-    const hedges =
-      (
-        text.match(
-          /\b(?:perhaps|maybe|apparently|seemingly|it seems|it appears|i think|i believe|one could argue|generally speaking|in many cases)\b/gi
-        ) ?? []
-      ).length;
+    const hedges = (
+      text.match(
+        /\b(?:perhaps|maybe|apparently|seemingly|it seems|it appears|i think|i believe|one could argue|generally speaking|in many cases)\b/gi,
+      ) ?? []
+    ).length;
     return (hedges / words) * 100;
   },
 
@@ -539,13 +537,14 @@ export function fixedRiskSize(
   priceIncrement = 0.01,
   commissionRate = 0,
   hardLimit?: number,
-  unitBatchSize = 1
+  unitBatchSize = 1,
 ): PositionSizeResult {
   if (equity <= 0) return { quantity: 0, dollarRisk: 0, effectiveRiskFraction: 0, riskTicks: 0 };
   if (priceIncrement <= 0) throw new RangeError("fixedRiskSize: priceIncrement must be > 0");
 
   const riskTicks = Math.abs(entry - stopLoss) / priceIncrement;
-  if (riskTicks === 0) return { quantity: 0, dollarRisk: 0, effectiveRiskFraction: 0, riskTicks: 0 };
+  if (riskTicks === 0)
+    return { quantity: 0, dollarRisk: 0, effectiveRiskFraction: 0, riskTicks: 0 };
 
   const riskMoney = equity * riskFraction;
   const commission = riskMoney * commissionRate * 2; // round-trip

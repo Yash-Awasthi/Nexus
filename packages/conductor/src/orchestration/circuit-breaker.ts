@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Circuit Breaker for Floci and external service resilience.
  *
@@ -51,7 +52,7 @@ export class CircuitBreakerOpenError extends Error {
   constructor(
     message: string,
     public readonly breakerName: string,
-    public readonly retryAfterMs: number
+    public readonly retryAfterMs: number,
   ) {
     super(message);
     this.name = "CircuitBreakerOpenError";
@@ -76,7 +77,7 @@ export class CircuitBreaker {
     private config: CircuitBreakerConfig,
     private eventBus?: IEventBus,
     private logger?: ILogger,
-    private metrics?: IMetricsCollector
+    private metrics?: IMetricsCollector,
   ) {}
 
   getState(): CircuitState {
@@ -93,7 +94,7 @@ export class CircuitBreaker {
       lastSuccessTime: this.lastSuccessTime,
       openedAt: this.openedAt,
       halfOpenAllowed: this.halfOpenRequests,
-      halfOpenSuccesses: this.halfOpenSuccesses
+      halfOpenSuccesses: this.halfOpenSuccesses,
     };
   }
 
@@ -129,7 +130,7 @@ export class CircuitBreaker {
         throw new CircuitBreakerOpenError(
           `Circuit breaker "${this.config.name}" is open. Retry after ${retryAfter}ms.`,
           this.config.name,
-          retryAfter
+          retryAfter,
         );
       }
     }
@@ -139,7 +140,7 @@ export class CircuitBreaker {
         throw new CircuitBreakerOpenError(
           `Circuit breaker "${this.config.name}" half-open max requests (${this.config.halfOpenMaxRequests}) reached`,
           this.config.name,
-          0
+          0,
         );
       }
       this.halfOpenRequests++;
@@ -192,13 +193,13 @@ export class CircuitBreaker {
     const recentCount = this._recentFailureCount();
     this.logger?.warn(`Circuit breaker "${this.config.name}" OPENED`, {
       failureCount: recentCount,
-      openedAt: new Date(this.openedAt).toISOString()
+      openedAt: new Date(this.openedAt).toISOString(),
     });
     this.metrics?.recordGauge(`circuit_breaker.${this.config.name}.state`, 1, { state: "open" });
     this.eventBus?.publish("circuit_breaker_opened", {
       name: this.config.name,
       failureCount: recentCount,
-      openedAt: new Date().toISOString()
+      openedAt: new Date().toISOString(),
     });
   }
 
@@ -207,10 +208,12 @@ export class CircuitBreaker {
     this.halfOpenRequests = 0;
     this.halfOpenSuccesses = 0;
     this.logger?.info(`Circuit breaker "${this.config.name}" HALF-OPEN (testing recovery)`);
-    this.metrics?.recordGauge(`circuit_breaker.${this.config.name}.state`, 1, { state: "half-open" });
+    this.metrics?.recordGauge(`circuit_breaker.${this.config.name}.state`, 1, {
+      state: "half-open",
+    });
     this.eventBus?.publish("circuit_breaker_half_opened", {
       name: this.config.name,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 
@@ -224,7 +227,7 @@ export class CircuitBreaker {
     this.metrics?.recordGauge(`circuit_breaker.${this.config.name}.state`, 0, { state: "closed" });
     this.eventBus?.publish("circuit_breaker_closed", {
       name: this.config.name,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 
@@ -247,14 +250,14 @@ export class CircuitBreaker {
 export class CircuitBreakerAdapterWrapper {
   constructor(
     private breaker: CircuitBreaker,
-    private logger?: ILogger
+    private logger?: ILogger,
   ) {}
 
   /**
    * Wrap an execute method through the circuit breaker.
    */
   wrap<TArgs extends unknown[], TResult>(
-    fn: (...args: TArgs) => Promise<TResult>
+    fn: (...args: TArgs) => Promise<TResult>,
   ): (...args: TArgs) => Promise<TResult> {
     return async (...args: TArgs): Promise<TResult> => {
       return this.breaker.execute(() => fn(...args));
@@ -264,9 +267,7 @@ export class CircuitBreakerAdapterWrapper {
   /**
    * Wrap an adapter's execute method through the circuit breaker.
    */
-  wrapAdapter<T extends { execute(task: any, context: any): Promise<any> }>(
-    adapter: T
-  ): T {
+  wrapAdapter<T extends { execute(task: any, context: any): Promise<any> }>(adapter: T): T {
     const wrapped = Object.create(adapter);
     const originalExecute = adapter.execute.bind(adapter);
     wrapped.execute = async (task: any, context: any) => {
@@ -275,7 +276,11 @@ export class CircuitBreakerAdapterWrapper {
     // If adapter has executeAction, wrap that too
     if ((adapter as any).executeAction) {
       const originalExecuteAction = (adapter as any).executeAction.bind(adapter);
-      (wrapped as any).executeAction = async (action: string, payload: Record<string, unknown>, context: any) => {
+      (wrapped as any).executeAction = async (
+        action: string,
+        payload: Record<string, unknown>,
+        context: any,
+      ) => {
         return this.breaker.execute(() => originalExecuteAction(action, payload, context));
       };
     }
@@ -296,7 +301,7 @@ export class HealthAwareCircuitBreaker extends CircuitBreaker {
     private healthCheckIntervalMs: number,
     eventBus?: IEventBus,
     logger?: ILogger,
-    metrics?: IMetricsCollector
+    metrics?: IMetricsCollector,
   ) {
     super(config, eventBus, logger, metrics);
     this.startHealthProbes();
@@ -338,4 +343,3 @@ export class HealthAwareCircuitBreaker extends CircuitBreaker {
     this.reset();
   }
 }
-

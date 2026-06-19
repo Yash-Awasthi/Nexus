@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Blind Council — run a council deliberation where model identities are hidden.
  *
@@ -28,9 +29,9 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface BlindResponse {
-  alias: string;        // "Model A", "Model B", etc.
+  alias: string; // "Model A", "Model B", etc.
   content: string;
-  model?: string;       // revealed after unmasking
+  model?: string; // revealed after unmasking
   score?: number;
   rank?: number;
 }
@@ -45,11 +46,11 @@ interface BlindCouncilResult {
 // ─── Color map ────────────────────────────────────────────────────────────────
 
 const ALIAS_COLORS: Record<string, string> = {
-  "A": "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400",
-  "B": "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400",
-  "C": "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400",
-  "D": "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400",
-  "E": "bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-400",
+  A: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400",
+  B: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400",
+  C: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400",
+  D: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400",
+  E: "bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-400",
 };
 
 function getAliasColor(alias: string) {
@@ -71,8 +72,12 @@ export default function BlindCouncil() {
 
   const run = useCallback(async () => {
     if (!query.trim()) return;
-    setRunning(true); setErr(""); setResult(null); setRevealed(false); setVotes({});
-    const r = await fetch("/api/blind-council/run", {
+    setRunning(true);
+    setErr("");
+    setResult(null);
+    setRevealed(false);
+    setVotes({});
+    const r = await fetch("/api/blind-council/deliberate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query: query.trim(), modelCount: parseInt(models) || 3 }),
@@ -85,7 +90,7 @@ export default function BlindCouncil() {
   }, [query, models]);
 
   const toggleExpand = (alias: string) => {
-    setExpanded(prev => {
+    setExpanded((prev) => {
       const next = new Set(prev);
       next.has(alias) ? next.delete(alias) : next.add(alias);
       return next;
@@ -93,11 +98,14 @@ export default function BlindCouncil() {
   };
 
   const vote = (alias: string) => {
-    setVotes(prev => ({ ...prev, [alias]: (prev[alias] ?? 0) + 1 }));
+    setVotes((prev) => ({ ...prev, [alias]: (prev[alias] ?? 0) + 1 }));
   };
 
   const topVoted = result
-    ? result.responses.reduce((a, b) => (votes[a.alias] ?? 0) > (votes[b.alias] ?? 0) ? a : b, result.responses[0])
+    ? result.responses.reduce(
+        (a, b) => ((votes[a.alias] ?? 0) > (votes[b.alias] ?? 0) ? a : b),
+        result.responses[0],
+      )
     : null;
 
   return (
@@ -108,7 +116,8 @@ export default function BlindCouncil() {
           Blind Council
         </h1>
         <p className="text-muted-foreground text-sm mt-1">
-          AI responses are anonymized (Model A, B, C…) to eliminate identity bias. Rate responses, then reveal who said what.
+          AI responses are anonymized (Model A, B, C…) to eliminate identity bias. Rate responses,
+          then reveal who said what.
         </p>
       </div>
 
@@ -119,7 +128,7 @@ export default function BlindCouncil() {
             rows={3}
             placeholder="Enter your question or task for the blind council…"
             value={query}
-            onChange={e => setQuery(e.target.value)}
+            onChange={(e) => setQuery(e.target.value)}
             className="resize-none"
           />
           <div className="flex items-center gap-4">
@@ -128,14 +137,28 @@ export default function BlindCouncil() {
               <select
                 className="h-8 rounded-md border border-input bg-background px-2 text-sm"
                 value={models}
-                onChange={e => setModels(e.target.value)}
+                onChange={(e) => setModels(e.target.value)}
               >
-                {["2", "3", "4", "5"].map(n => <option key={n} value={n}>{n}</option>)}
+                {["2", "3", "4", "5"].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
               </select>
             </div>
             {err && <p className="text-red-500 text-xs flex-1">{err}</p>}
             <Button onClick={run} disabled={running || !query.trim()} className="ml-auto">
-              {running ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Running…</> : <><EyeOff className="w-4 h-4 mr-2" />Run Blind Council</>}
+              {running ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Running…
+                </>
+              ) : (
+                <>
+                  <EyeOff className="w-4 h-4 mr-2" />
+                  Run Blind Council
+                </>
+              )}
             </Button>
           </div>
         </CardContent>
@@ -148,27 +171,47 @@ export default function BlindCouncil() {
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-muted-foreground">
               {result.responses.length} anonymous responses
-              {Object.keys(votes).length > 0 && ` · ${Object.values(votes).reduce((a, b) => a + b, 0)} votes cast`}
+              {Object.keys(votes).length > 0 &&
+                ` · ${Object.values(votes).reduce((a, b) => a + b, 0)} votes cast`}
             </p>
             <Button
               variant={revealed ? "default" : "outline"}
               size="sm"
               onClick={() => setRevealed(!revealed)}
             >
-              {revealed ? <><EyeOff className="w-4 h-4 mr-2" />Hide Identities</> : <><Eye className="w-4 h-4 mr-2" />Reveal Identities</>}
+              {revealed ? (
+                <>
+                  <EyeOff className="w-4 h-4 mr-2" />
+                  Hide Identities
+                </>
+              ) : (
+                <>
+                  <Eye className="w-4 h-4 mr-2" />
+                  Reveal Identities
+                </>
+              )}
             </Button>
           </div>
 
           {/* Response cards */}
           <div className="grid md:grid-cols-2 gap-3">
-            {result.responses.map(resp => (
-              <Card key={resp.alias} className={topVoted?.alias === resp.alias && Object.keys(votes).length > 0 ? "ring-2 ring-yellow-400" : ""}>
+            {result.responses.map((resp) => (
+              <Card
+                key={resp.alias}
+                className={
+                  topVoted?.alias === resp.alias && Object.keys(votes).length > 0
+                    ? "ring-2 ring-yellow-400"
+                    : ""
+                }
+              >
                 <CardContent className="pt-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Badge className={getAliasColor(resp.alias)}>{resp.alias}</Badge>
                       {revealed && resp.model && (
-                        <span className="text-xs text-muted-foreground font-mono">({resp.model})</span>
+                        <span className="text-xs text-muted-foreground font-mono">
+                          ({resp.model})
+                        </span>
                       )}
                       {topVoted?.alias === resp.alias && Object.keys(votes).length > 0 && (
                         <Trophy className="w-4 h-4 text-yellow-500" />
@@ -176,17 +219,22 @@ export default function BlindCouncil() {
                     </div>
                     <div className="flex items-center gap-2">
                       {resp.score !== undefined && (
-                        <span className="text-xs text-muted-foreground">score: {resp.score.toFixed(2)}</span>
+                        <span className="text-xs text-muted-foreground">
+                          score: {resp.score.toFixed(2)}
+                        </span>
                       )}
                       {votes[resp.alias] > 0 && (
                         <Badge variant="secondary" className="text-xs">
-                          <Star className="w-2.5 h-2.5 mr-0.5" />{votes[resp.alias]}
+                          <Star className="w-2.5 h-2.5 mr-0.5" />
+                          {votes[resp.alias]}
                         </Badge>
                       )}
                     </div>
                   </div>
 
-                  <div className={`text-sm text-muted-foreground overflow-hidden transition-all ${expanded.has(resp.alias) ? "" : "line-clamp-5"}`}>
+                  <div
+                    className={`text-sm text-muted-foreground overflow-hidden transition-all ${expanded.has(resp.alias) ? "" : "line-clamp-5"}`}
+                  >
                     {resp.content}
                   </div>
 
@@ -195,9 +243,17 @@ export default function BlindCouncil() {
                       className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5"
                       onClick={() => toggleExpand(resp.alias)}
                     >
-                      {expanded.has(resp.alias)
-                        ? <><ChevronUp className="w-3 h-3" />Show less</>
-                        : <><ChevronDown className="w-3 h-3" />Show more</>}
+                      {expanded.has(resp.alias) ? (
+                        <>
+                          <ChevronUp className="w-3 h-3" />
+                          Show less
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="w-3 h-3" />
+                          Show more
+                        </>
+                      )}
                     </button>
                     <Button
                       size="sm"
@@ -205,7 +261,8 @@ export default function BlindCouncil() {
                       className="ml-auto h-6 text-xs"
                       onClick={() => vote(resp.alias)}
                     >
-                      <Star className="w-3 h-3 mr-1" />Vote best
+                      <Star className="w-3 h-3 mr-1" />
+                      Vote best
                     </Button>
                   </div>
                 </CardContent>

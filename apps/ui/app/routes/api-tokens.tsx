@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * API Tokens — Personal Access Token management.
  *
@@ -75,14 +76,14 @@ const AVAILABLE_SCOPES = [
 ];
 
 const TIER_DESCRIPTIONS: Record<string, string> = {
-  admin:   "Full admin access",
-  basic:   "Standard user operations",
+  admin: "Full admin access",
+  basic: "Standard user operations",
   limited: "Read-only restricted access",
 };
 
 const TIER_COLORS: Record<string, string> = {
-  admin:   "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400",
-  basic:   "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400",
+  admin: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400",
+  basic: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400",
   limited: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
 };
 
@@ -91,7 +92,9 @@ const TIER_COLORS: Record<string, string> = {
 function fmtDate(d?: string) {
   if (!d) return "Never";
   return new Date(d).toLocaleDateString(undefined, {
-    year: "numeric", month: "short", day: "numeric",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
   });
 }
 
@@ -130,19 +133,24 @@ export default function APITokens() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { loadTokens(); }, [loadTokens]);
+  useEffect(() => {
+    loadTokens();
+  }, [loadTokens]);
 
   const toggleScope = useCallback((scope: string) => {
-    setNewToken(prev => ({
+    setNewToken((prev) => ({
       ...prev,
       scopes: prev.scopes.includes(scope)
-        ? prev.scopes.filter(s => s !== scope)
+        ? prev.scopes.filter((s) => s !== scope)
         : [...prev.scopes, scope],
     }));
   }, []);
 
   const createToken = useCallback(async () => {
-    if (!newToken.label.trim()) { setErr("Label is required"); return; }
+    if (!newToken.label.trim()) {
+      setErr("Label is required");
+      return;
+    }
     setCreating(true);
     setErr("");
     try {
@@ -166,8 +174,11 @@ export default function APITokens() {
       setShowCreate(false);
       setNewToken({ label: "", tier: "basic", scopes: [], expiresInDays: "" });
       loadTokens();
-    } catch { setErr("Creation failed"); }
-    finally { setCreating(false); }
+    } catch {
+      setErr("Creation failed");
+    } finally {
+      setCreating(false);
+    }
   }, [newToken, loadTokens]);
 
   const revokeToken = useCallback(async (id: string) => {
@@ -175,7 +186,7 @@ export default function APITokens() {
     setRevoking(id);
     try {
       await fetch(`/api/tokens/${id}`, { method: "DELETE" });
-      setTokens(prev => prev.map(t => t.id === id ? { ...t, revoked: true } : t));
+      setTokens((prev) => prev.map((t) => (t.id === id ? { ...t, revoked: true } : t)));
     } catch {}
     setRevoking(null);
   }, []);
@@ -229,9 +240,17 @@ export default function APITokens() {
                     {createdSecret}
                   </code>
                   <Button size="sm" variant="outline" onClick={copySecret}>
-                    {copied
-                      ? <><Check className="w-3 h-3 mr-1 text-green-500" />Copied</>
-                      : <><Copy className="w-3 h-3 mr-1" />Copy</>}
+                    {copied ? (
+                      <>
+                        <Check className="w-3 h-3 mr-1 text-green-500" />
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3 mr-1" />
+                        Copy
+                      </>
+                    )}
                   </Button>
                 </div>
                 <Button
@@ -272,7 +291,7 @@ export default function APITokens() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {tokens.map(token => {
+          {tokens.map((token) => {
             const expired = isExpired(token.expiresAt);
             return (
               <Card
@@ -289,10 +308,15 @@ export default function APITokens() {
                           {token.tier}
                         </Badge>
                         {token.revoked && (
-                          <Badge variant="destructive" className="text-xs">Revoked</Badge>
+                          <Badge variant="destructive" className="text-xs">
+                            Revoked
+                          </Badge>
                         )}
                         {expired && !token.revoked && (
-                          <Badge variant="outline" className="text-orange-600 border-orange-400 text-xs">
+                          <Badge
+                            variant="outline"
+                            className="text-orange-600 border-orange-400 text-xs"
+                          >
                             Expired
                           </Badge>
                         )}
@@ -305,8 +329,10 @@ export default function APITokens() {
                       </div>
 
                       <div className="flex flex-wrap gap-1 mb-2">
-                        {token.scopes.slice(0, 6).map(s => (
-                          <Badge key={s} variant="secondary" className="text-xs font-normal">{s}</Badge>
+                        {token.scopes.slice(0, 6).map((s) => (
+                          <Badge key={s} variant="secondary" className="text-xs font-normal">
+                            {s}
+                          </Badge>
                         ))}
                         {token.scopes.length > 6 && (
                           <Badge variant="secondary" className="text-xs font-normal">
@@ -325,9 +351,7 @@ export default function APITokens() {
                             Expires {fmtDate(token.expiresAt)}
                           </span>
                         )}
-                        {token.lastUsedAt && (
-                          <span>Last used {fmtDate(token.lastUsedAt)}</span>
-                        )}
+                        {token.lastUsedAt && <span>Last used {fmtDate(token.lastUsedAt)}</span>}
                       </div>
                     </div>
 
@@ -339,9 +363,11 @@ export default function APITokens() {
                         onClick={() => revokeToken(token.id)}
                         disabled={revoking === token.id}
                       >
-                        {revoking === token.id
-                          ? <Loader2 className="w-4 h-4 animate-spin" />
-                          : <Trash2 className="w-4 h-4" />}
+                        {revoking === token.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
                       </Button>
                     )}
                   </div>
@@ -357,7 +383,7 @@ export default function APITokens() {
         <CardContent className="pt-4 pb-4">
           <p className="text-xs font-medium mb-2">Usage</p>
           <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap">
-{`curl https://your-nexus.app/api/chat \\
+            {`curl https://your-nexus.app/api/chat \\
   -H "Authorization: Bearer nexus_<your_token>" \\
   -H "Content-Type: application/json" \\
   -d '{"message": "Hello"}'`}
@@ -377,7 +403,7 @@ export default function APITokens() {
               <Input
                 placeholder="e.g. CI pipeline, VS Code extension"
                 value={newToken.label}
-                onChange={e => setNewToken(t => ({ ...t, label: e.target.value }))}
+                onChange={(e) => setNewToken((t) => ({ ...t, label: e.target.value }))}
               />
             </div>
 
@@ -385,7 +411,7 @@ export default function APITokens() {
               <label className="text-sm font-medium">Tier</label>
               <Select
                 value={newToken.tier}
-                onValueChange={v => setNewToken(t => ({ ...t, tier: v as any }))}
+                onValueChange={(v) => setNewToken((t) => ({ ...t, tier: v as any }))}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -404,7 +430,7 @@ export default function APITokens() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Scopes</label>
               <div className="grid grid-cols-2 gap-1 max-h-40 overflow-y-auto">
-                {AVAILABLE_SCOPES.map(scope => (
+                {AVAILABLE_SCOPES.map((scope) => (
                   <label key={scope} className="flex items-center gap-2 cursor-pointer text-xs">
                     <input
                       type="checkbox"
@@ -425,7 +451,7 @@ export default function APITokens() {
                 type="number"
                 placeholder="Leave blank = no expiry"
                 value={newToken.expiresInDays}
-                onChange={e => setNewToken(t => ({ ...t, expiresInDays: e.target.value }))}
+                onChange={(e) => setNewToken((t) => ({ ...t, expiresInDays: e.target.value }))}
                 min={1}
                 max={3650}
               />
@@ -434,9 +460,15 @@ export default function APITokens() {
             {err && <p className="text-red-500 text-xs">{err}</p>}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowCreate(false)}>
+              Cancel
+            </Button>
             <Button onClick={createToken} disabled={creating || !newToken.label.trim()}>
-              {creating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Key className="w-4 h-4 mr-2" />}
+              {creating ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Key className="w-4 h-4 mr-2" />
+              )}
               Create token
             </Button>
           </DialogFooter>

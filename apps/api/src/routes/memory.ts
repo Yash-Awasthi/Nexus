@@ -221,7 +221,6 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
       total: entries.length,
     });
   });
-}
 
   /**
    * DELETE /memory/entries
@@ -242,7 +241,10 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
         response: {
           200: {
             type: "object",
-            properties: { deleted: { type: "number" }, errors: { type: "array", items: { type: "string" } } },
+            properties: {
+              deleted: { type: "number" },
+              errors: { type: "array", items: { type: "string" } },
+            },
           },
         },
       },
@@ -310,9 +312,15 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
       let compacted = 0;
       await Promise.all(
         toDelete.map(async (entry) => {
-          try { await manager.forget(entry.id); compacted++; } catch { /* non-fatal */ }
+          try {
+            await manager.forget(entry.id);
+            compacted++;
+          } catch {
+            /* non-fatal */
+          }
         }),
       );
       return reply.send({ compacted, kept: all.length - compacted });
     },
   );
+}

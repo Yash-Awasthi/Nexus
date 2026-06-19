@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { IEnvironmentTelemetry } from "./interfaces/environment.interface";
 
 export class EnvironmentTelemetry implements IEnvironmentTelemetry {

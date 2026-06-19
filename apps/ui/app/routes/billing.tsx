@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Billing & Plans — Phase 8.x
  *
@@ -65,17 +66,17 @@ interface UsageSummary {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<string, string> = {
-  active:   "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400",
+  active: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400",
   trialing: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400",
   canceled: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
   past_due: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400",
-  unpaid:   "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400",
+  unpaid: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400",
 };
 
 const PLAN_ICONS: Record<string, React.ReactNode> = {
-  free:       <Star className="w-5 h-5 text-slate-500" />,
-  starter:    <Zap className="w-5 h-5 text-blue-500" />,
-  pro:        <CheckCircle className="w-5 h-5 text-indigo-500" />,
+  free: <Star className="w-5 h-5 text-slate-500" />,
+  starter: <Zap className="w-5 h-5 text-blue-500" />,
+  pro: <CheckCircle className="w-5 h-5 text-indigo-500" />,
   enterprise: <Building2 className="w-5 h-5 text-purple-500" />,
 };
 
@@ -87,7 +88,11 @@ function fmt(n: number) {
 
 function fmtDate(d?: string) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return new Date(d).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -106,8 +111,10 @@ export default function Billing() {
   // Get current user/tenant
   useEffect(() => {
     fetch("/api/auth/me")
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.tenantId || d?.id) setTenantId(d.tenantId ?? String(d.id)); });
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.tenantId || d?.id) setTenantId(d.tenantId ?? String(d.id));
+      });
   }, []);
 
   const loadPlans = useCallback(async () => {
@@ -145,27 +152,42 @@ export default function Billing() {
     }
   }, [tenantId, loadSubscription, loadUsage]);
 
-  const handleCheckout = useCallback(async (planId: string) => {
-    if (!tenantId) { setErr("Not logged in"); return; }
-    setCheckingOut(planId);
-    setErr("");
-    try {
-      const r = await fetch("/api/billing/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tenantId, planId, interval }),
-      });
-      const d = await r.json();
-      if (!r.ok) { setErr(d.error ?? "Checkout failed"); return; }
-      if (d.url) window.location.href = d.url;
-      else if (d.sessionUrl) window.location.href = d.sessionUrl;
-    } catch { setErr("Checkout failed"); }
-    finally { setCheckingOut(null); }
-  }, [tenantId, interval]);
+  const handleCheckout = useCallback(
+    async (planId: string) => {
+      if (!tenantId) {
+        setErr("Not logged in");
+        return;
+      }
+      setCheckingOut(planId);
+      setErr("");
+      try {
+        const r = await fetch("/api/billing/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tenantId, planId, interval }),
+        });
+        const d = await r.json();
+        if (!r.ok) {
+          setErr(d.error ?? "Checkout failed");
+          return;
+        }
+        if (d.url) window.location.href = d.url;
+        else if (d.sessionUrl) window.location.href = d.sessionUrl;
+      } catch {
+        setErr("Checkout failed");
+      } finally {
+        setCheckingOut(null);
+      }
+    },
+    [tenantId, interval],
+  );
 
   const handleCancel = useCallback(async () => {
     if (!tenantId || !subscription) return;
-    if (!confirm("Cancel your subscription? You'll keep access until the end of the billing period.")) return;
+    if (
+      !confirm("Cancel your subscription? You'll keep access until the end of the billing period.")
+    )
+      return;
     setCanceling(true);
     try {
       const r = await fetch(`/api/billing/cancel/${tenantId}`, { method: "POST" });
@@ -174,11 +196,14 @@ export default function Billing() {
       } else {
         setErr("Cancellation failed");
       }
-    } catch { setErr("Cancellation failed"); }
-    finally { setCanceling(false); }
+    } catch {
+      setErr("Cancellation failed");
+    } finally {
+      setCanceling(false);
+    }
   }, [tenantId, subscription, loadSubscription]);
 
-  const currentPlan = subscription ? plans.find(p => p.id === subscription.planId) : null;
+  const currentPlan = subscription ? plans.find((p) => p.id === subscription.planId) : null;
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -195,7 +220,17 @@ export default function Billing() {
             Manage your subscription and view usage
           </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => { if (tenantId) { loadSubscription(tenantId); loadUsage(tenantId); } loadPlans(); }}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            if (tenantId) {
+              loadSubscription(tenantId);
+              loadUsage(tenantId);
+            }
+            loadPlans();
+          }}
+        >
           <RefreshCw className="w-4 h-4" />
         </Button>
       </div>
@@ -214,8 +249,12 @@ export default function Billing() {
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <p className="font-semibold text-lg">{currentPlan?.name ?? subscription.planId}</p>
-                  <Badge className={STATUS_STYLES[subscription.status] ?? ""}>{subscription.status}</Badge>
+                  <p className="font-semibold text-lg">
+                    {currentPlan?.name ?? subscription.planId}
+                  </p>
+                  <Badge className={STATUS_STYLES[subscription.status] ?? ""}>
+                    {subscription.status}
+                  </Badge>
                   {subscription.cancelAtPeriodEnd && (
                     <Badge variant="outline" className="text-orange-600 border-orange-400 text-xs">
                       Cancels {fmtDate(subscription.currentPeriodEnd)}
@@ -223,8 +262,8 @@ export default function Billing() {
                   )}
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {subscription.interval === "annual" ? "Annual" : "Monthly"} billing ·
-                  Renews {fmtDate(subscription.currentPeriodEnd)}
+                  {subscription.interval === "annual" ? "Annual" : "Monthly"} billing · Renews{" "}
+                  {fmtDate(subscription.currentPeriodEnd)}
                 </p>
               </div>
               {subscription.status === "active" && !subscription.cancelAtPeriodEnd && (
@@ -235,7 +274,11 @@ export default function Billing() {
                   disabled={canceling}
                   className="text-red-600 border-red-300 hover:bg-red-50"
                 >
-                  {canceling ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <XCircle className="w-3 h-3 mr-1" />}
+                  {canceling ? (
+                    <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                  ) : (
+                    <XCircle className="w-3 h-3 mr-1" />
+                  )}
                   Cancel plan
                 </Button>
               )}
@@ -326,13 +369,16 @@ export default function Billing() {
         ) : plans.length === 0 ? (
           <Card>
             <CardContent className="pt-8 pb-8 text-center">
-              <p className="text-muted-foreground text-sm">No plans configured — add STRIPE_SECRET_KEY to .env</p>
+              <p className="text-muted-foreground text-sm">
+                No plans configured — add STRIPE_SECRET_KEY to .env
+              </p>
             </CardContent>
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {plans.map(plan => {
-              const isCurrent = subscription?.planId === plan.id && subscription.status !== "canceled";
+            {plans.map((plan) => {
+              const isCurrent =
+                subscription?.planId === plan.id && subscription.status !== "canceled";
               const price = interval === "annual" ? plan.priceAnnual : plan.priceMonthly;
               const iconKey = plan.id.toLowerCase();
               return (
@@ -354,7 +400,9 @@ export default function Billing() {
                   )}
                   <CardHeader className="pb-3">
                     <div className="flex items-center gap-2">
-                      {PLAN_ICONS[iconKey] ?? <CreditCard className="w-5 h-5 text-muted-foreground" />}
+                      {PLAN_ICONS[iconKey] ?? (
+                        <CreditCard className="w-5 h-5 text-muted-foreground" />
+                      )}
                       <CardTitle className="text-base">{plan.name}</CardTitle>
                     </div>
                     {plan.description && (
@@ -376,7 +424,7 @@ export default function Billing() {
                   <CardContent className="flex-1 space-y-3">
                     {plan.features && plan.features.length > 0 && (
                       <ul className="space-y-1.5">
-                        {plan.features.map(f => (
+                        {plan.features.map((f) => (
                           <li key={f} className="flex items-start gap-2 text-sm">
                             <CheckCircle className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" />
                             {f}
@@ -387,9 +435,14 @@ export default function Billing() {
                     {plan.limits && Object.keys(plan.limits).length > 0 && (
                       <div className="border-t pt-2 space-y-1">
                         {Object.entries(plan.limits).map(([k, v]) => (
-                          <div key={k} className="flex justify-between text-xs text-muted-foreground">
+                          <div
+                            key={k}
+                            className="flex justify-between text-xs text-muted-foreground"
+                          >
                             <span className="capitalize">{k.replace(/_/g, " ")}</span>
-                            <span className="font-medium">{typeof v === "number" ? fmt(v) : v}</span>
+                            <span className="font-medium">
+                              {typeof v === "number" ? fmt(v) : v}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -409,10 +462,14 @@ export default function Billing() {
                         disabled={checkingOut === plan.id}
                       >
                         {checkingOut === plan.id ? (
-                          <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Redirecting…</>
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Redirecting…
+                          </>
                         ) : (
-                          <><ExternalLink className="w-4 h-4 mr-2" />
-                          {price ? "Upgrade" : "Get started"}
+                          <>
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            {price ? "Upgrade" : "Get started"}
                           </>
                         )}
                       </Button>

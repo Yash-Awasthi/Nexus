@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 export interface IMCPTask {
   id: string;
   serverName: string;

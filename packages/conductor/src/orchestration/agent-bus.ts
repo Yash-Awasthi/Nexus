@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Agent Communication Bus
  *
@@ -50,7 +51,11 @@ export interface DelegationResult {
 
 export interface IAgentBus {
   send(message: Omit<AgentMessage, "id" | "timestamp">): Promise<string>;
-  registerCapability(agentId: string, actions: string[], metadata?: Record<string, unknown>): Promise<void>;
+  registerCapability(
+    agentId: string,
+    actions: string[],
+    metadata?: Record<string, unknown>,
+  ): Promise<void>;
   unregisterCapability(agentId: string): Promise<void>;
   findAgents(action: string): Promise<AgentCapability[]>;
   delegate(request: DelegationRequest): Promise<DelegationResult>;
@@ -82,7 +87,7 @@ export class AgentBus implements IAgentBus {
     private eventStore?: IEventStore,
     private memoryStore?: MemoryStore,
     logger?: ILogger,
-    options?: AgentBusOptions
+    options?: AgentBusOptions,
   ) {
     this.logger = logger;
     this.maxMessages = options?.maxMessages ?? 1_000;
@@ -93,7 +98,7 @@ export class AgentBus implements IAgentBus {
     const full: AgentMessage = {
       ...message,
       id,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
     this.messages.push(full);
     // Evict expired TTL messages, then enforce the ring-buffer cap
@@ -112,7 +117,7 @@ export class AgentBus implements IAgentBus {
         value: full.body,
         tags: ["agent-bus", `from:${full.from}`, `type:${full.type}`],
         agentId: full.from,
-        ttlMs: 24 * 60 * 60 * 1000
+        ttlMs: 24 * 60 * 60 * 1000,
       });
     }
 
@@ -134,14 +139,14 @@ export class AgentBus implements IAgentBus {
   async registerCapability(
     agentId: string,
     actions: string[],
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
   ): Promise<void> {
     this.capabilities.set(agentId, {
       agentId,
       name: agentId,
       actions,
       status: "idle",
-      metadata
+      metadata,
     });
     await this.eventBus.publish("agent_registered", { agentId, actions });
   }
@@ -153,7 +158,7 @@ export class AgentBus implements IAgentBus {
 
   async findAgents(action: string): Promise<AgentCapability[]> {
     return Array.from(this.capabilities.values()).filter(
-      (c) => c.status !== "offline" && c.actions.includes(action)
+      (c) => c.status !== "offline" && c.actions.includes(action),
     );
   }
 
@@ -165,7 +170,7 @@ export class AgentBus implements IAgentBus {
         requestId: request.id,
         success: false,
         error: `No available agents with capability: ${request.targetCapability}`,
-        durationMs: Date.now() - started
+        durationMs: Date.now() - started,
       };
     }
 
@@ -182,13 +187,17 @@ export class AgentBus implements IAgentBus {
       const timeout = setTimeout(() => {
         // Ensure subscription is cleaned up on timeout to prevent leaks
         if (sub) {
-          try { sub.unsubscribe(); } catch { /* ignore */ }
+          try {
+            sub.unsubscribe();
+          } catch {
+            /* ignore */
+          }
         }
         resolve({
           requestId: request.id,
           success: false,
           error: `Delegation timeout after ${request.timeoutMs}ms`,
-          durationMs: Date.now() - started
+          durationMs: Date.now() - started,
         });
       }, request.timeoutMs);
 
@@ -197,14 +206,18 @@ export class AgentBus implements IAgentBus {
         if (msg.correlationId === request.id && msg.from === target.agentId) {
           clearTimeout(timeout);
           if (sub) {
-            try { sub.unsubscribe(); } catch { /* ignore */ }
+            try {
+              sub.unsubscribe();
+            } catch {
+              /* ignore */
+            }
           }
           resolve({
             requestId: request.id,
             success: msg.type !== "error",
             output: msg.type === "result" ? msg.body : undefined,
             error: msg.type === "error" ? String(msg.body) : undefined,
-            durationMs: Date.now() - started
+            durationMs: Date.now() - started,
           });
         }
       });
@@ -216,7 +229,7 @@ export class AgentBus implements IAgentBus {
         type: "delegation",
         subject: request.targetCapability,
         body: request.task,
-        correlationId: request.id
+        correlationId: request.id,
       }).catch(() => {}); // fire-and-forget, errors handled via timeout
     });
 
@@ -232,7 +245,7 @@ export class AgentBus implements IAgentBus {
         value: { request, result },
         tags: ["agent-bus", "delegation", `capability:${request.targetCapability}`],
         agentId: target.agentId,
-        ttlMs: 7 * 24 * 60 * 60 * 1000
+        ttlMs: 7 * 24 * 60 * 60 * 1000,
       });
     }
 
@@ -250,9 +263,7 @@ export class AgentBus implements IAgentBus {
   /** Remove messages whose ttlMs has expired from the ring buffer. */
   private _evictExpired(): void {
     const now = Date.now();
-    this.messages = this.messages.filter(
-      (m) => !m.ttlMs || now - m.timestamp.getTime() <= m.ttlMs
-    );
+    this.messages = this.messages.filter((m) => !m.ttlMs || now - m.timestamp.getTime() <= m.ttlMs);
   }
 
   async getMessages(options?: { since?: Date; limit?: number }): Promise<AgentMessage[]> {
@@ -296,7 +307,7 @@ export class TaskDelegationAgent {
         type: "result",
         subject: `delegated:${targetAction}`,
         body: { delegated: true, target: agents[0].agentId, payload },
-        correlationId: msg.correlationId
+        correlationId: msg.correlationId,
       });
     } else {
       await this.bus.send({
@@ -305,7 +316,7 @@ export class TaskDelegationAgent {
         type: "error",
         subject: `delegation_failed:${targetAction}`,
         body: `No agent found for action: ${targetAction}`,
-        correlationId: msg.correlationId
+        correlationId: msg.correlationId,
       });
     }
   }

@@ -100,7 +100,7 @@ export class LocalInferenceAdapter {
 
 // ─── ILanguageModel implementation ───────────────────────────────────────────
 
-class LocalLanguageModel implements ILanguageModel {
+export class LocalLanguageModel implements ILanguageModel {
   readonly modelId: string;
   private model: string;
   private compression: "4bit" | "8bit" | null;

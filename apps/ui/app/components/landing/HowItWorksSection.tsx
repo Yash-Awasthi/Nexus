@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { useRef, useEffect } from "react";
 
 const steps = [
@@ -40,13 +41,15 @@ export function HowItWorksSection() {
                 duration: 0.7,
                 ease: "power2.out",
                 scrollTrigger: { trigger: item, start: "top 80%" },
-              }
+              },
             );
           });
         }
-      }
+      },
     );
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
@@ -54,8 +57,7 @@ export function HowItWorksSection() {
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
-            Three Steps to{" "}
-            <span className="text-[#4dff8a]">Better Decisions</span>
+            Three Steps to <span className="text-[#4dff8a]">Better Decisions</span>
           </h2>
         </div>
 
@@ -64,11 +66,7 @@ export function HowItWorksSection() {
           <div className="absolute left-6 top-0 bottom-0 w-px bg-gradient-to-b from-[#4d7cff]/30 via-[#4de8ff]/20 to-transparent hidden sm:block" />
 
           {steps.map((step) => (
-            <div
-              key={step.num}
-              data-step
-              className="relative flex gap-6 items-start opacity-0"
-            >
+            <div key={step.num} data-step className="relative flex gap-6 items-start opacity-0">
               <div className="relative z-10 flex-shrink-0 w-12 h-12 rounded-xl bg-[#4d7cff]/10 border border-[#4d7cff]/20 flex items-center justify-center">
                 <span className="text-sm font-bold text-[#4d7cff]">{step.num}</span>
               </div>

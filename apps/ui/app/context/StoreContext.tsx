@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -56,13 +57,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   function lsGet<T>(key: string, fallback: T): T {
     if (typeof window === "undefined") return fallback;
-    try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : fallback; }
-    catch { return fallback; }
+    try {
+      const s = localStorage.getItem(key);
+      return s ? JSON.parse(s) : fallback;
+    } catch {
+      return fallback;
+    }
   }
 
   function lsSet(key: string, value: unknown) {
     if (typeof window === "undefined") return;
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch {}
   }
 
   // ── Load archetypes: API first, localStorage fallback ─────────────────────
@@ -105,10 +112,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return id;
   }, []);
 
-  const allModels = [
-    ...BUILTIN_MODELS,
-    ...customModels.map((m) => ({ id: m.id, label: m.label })),
-  ];
+  const allModels = [...BUILTIN_MODELS, ...customModels.map((m) => ({ id: m.id, label: m.label }))];
 
   // ── Archetype helpers — sync to API + localStorage ────────────────────────
 
@@ -130,7 +134,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       .then((created) => {
         if (created?.id && created.id !== optimisticId) {
           setCustomArchetypes((prev) => {
-            const next = prev.map((a) => a.id === optimisticId ? { ...a, id: created.id } : a);
+            const next = prev.map((a) => (a.id === optimisticId ? { ...a, id: created.id } : a));
             lsSet("Nexus_custom_archetypes", next);
             return next;
           });

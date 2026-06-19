@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * ILanguageModel — unified abstraction over any text generation backend.
  *

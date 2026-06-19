@@ -46,16 +46,18 @@ describe("NexusClient HTTP request logic", () => {
           Authorization: "Bearer key",
           "Content-Type": "application/json",
         }),
-      })
+      }),
     );
   });
 
   it("throws NexusError on HTTP failure", async () => {
-    mockFetch.mockResolvedValueOnce({
+    const errorResponse = {
       ok: false,
       status: 401,
       json: async () => ({ error: "Unauthorized access" }),
-    });
+    };
+    // Mock for both assertions — each rejects.toThrow() triggers one fetch call
+    mockFetch.mockResolvedValueOnce(errorResponse).mockResolvedValueOnce(errorResponse);
 
     await expect(client.gateway.listModels()).rejects.toThrow(NexusError);
     await expect(client.gateway.listModels()).rejects.toThrow("Request failed with status 401");
@@ -92,7 +94,7 @@ describe("Gateway namespace", () => {
           messages: [{ role: "user", content: "hello" }],
           stream: false,
         }),
-      })
+      }),
     );
     expect(res).toEqual(mockResponse);
   });
@@ -162,7 +164,7 @@ describe("Council namespace", () => {
 
     const res = await client.council.deliberate(
       { title: "Test Proposal", description: "Desc" },
-      { timeoutMs: 5000 }
+      { timeoutMs: 5000 },
     );
 
     expect(mockFetch).toHaveBeenCalledWith(
@@ -173,7 +175,7 @@ describe("Council namespace", () => {
           proposal: { title: "Test Proposal", description: "Desc" },
           timeoutMs: 5000,
         }),
-      })
+      }),
     );
     expect(res.ok).toBe(true);
   });
@@ -204,7 +206,7 @@ describe("Memory namespace", () => {
           text: "fact",
           userId: "user-1",
         }),
-      })
+      }),
     );
     expect(res.id).toBe("mem-123");
   });
@@ -221,7 +223,7 @@ describe("Memory namespace", () => {
       "https://api.nexus.dev/api/v1/memory?query=search+query&limit=5",
       expect.objectContaining({
         method: "GET",
-      })
+      }),
     );
   });
 });

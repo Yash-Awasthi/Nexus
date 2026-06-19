@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Collaborative Rooms — shared AI sessions where multiple users
  * see responses in real-time.
@@ -79,7 +80,9 @@ export default function Rooms() {
     // Rooms list isn't explicitly provided by the backend, so we load from localStorage cache
     const cached = localStorage.getItem("nexus_rooms");
     if (cached) {
-      try { setRooms(JSON.parse(cached)); } catch {}
+      try {
+        setRooms(JSON.parse(cached));
+      } catch {}
     }
   }, []);
 
@@ -97,15 +100,22 @@ export default function Rooms() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newRoomName.trim() || undefined }),
       });
-      if (!r.ok) { const d = await r.json(); setErr(d.error ?? "Create failed"); return; }
+      if (!r.ok) {
+        const d = await r.json();
+        setErr(d.error ?? "Create failed");
+        return;
+      }
       const data = await r.json();
       const room: Room = data.room ?? data;
       saveRooms([room, ...rooms]);
       setCurrentRoom(room);
       setShowCreate(false);
       setNewRoomName("");
-    } catch { setErr("Create failed"); }
-    finally { setCreating(false); }
+    } catch {
+      setErr("Create failed");
+    } finally {
+      setCreating(false);
+    }
   }, [newRoomName, rooms, saveRooms]);
 
   const joinRoom = useCallback(async () => {
@@ -115,26 +125,36 @@ export default function Rooms() {
     setErr("");
     try {
       const r = await fetch(`/api/rooms/join/${code}`, { method: "POST" });
-      if (!r.ok) { const d = await r.json(); setErr(d.error ?? "Join failed"); return; }
+      if (!r.ok) {
+        const d = await r.json();
+        setErr(d.error ?? "Join failed");
+        return;
+      }
       const data = await r.json();
       const room: Room = data.room ?? data;
-      saveRooms([room, ...rooms.filter(rm => rm.id !== room.id)]);
+      saveRooms([room, ...rooms.filter((rm) => rm.id !== room.id)]);
       setCurrentRoom(room);
       setShowJoin(false);
       setInviteCode("");
-    } catch { setErr("Join failed"); }
-    finally { setJoining(false); }
+    } catch {
+      setErr("Join failed");
+    } finally {
+      setJoining(false);
+    }
   }, [inviteCode, rooms, saveRooms]);
 
-  const deleteRoom = useCallback(async (room: Room) => {
-    if (!confirm("Delete this room? All participants will lose access.")) return;
-    try {
-      await fetch(`/api/rooms/${room.id}`, { method: "DELETE" });
-      const updated = rooms.filter(r => r.id !== room.id);
-      saveRooms(updated);
-      if (currentRoom?.id === room.id) setCurrentRoom(null);
-    } catch {}
-  }, [rooms, currentRoom, saveRooms]);
+  const deleteRoom = useCallback(
+    async (room: Room) => {
+      if (!confirm("Delete this room? All participants will lose access.")) return;
+      try {
+        await fetch(`/api/rooms/${room.id}`, { method: "DELETE" });
+        const updated = rooms.filter((r) => r.id !== room.id);
+        saveRooms(updated);
+        if (currentRoom?.id === room.id) setCurrentRoom(null);
+      } catch {}
+    },
+    [rooms, currentRoom, saveRooms],
+  );
 
   const copyInviteLink = useCallback((room: Room) => {
     const link = `${window.location.origin}/rooms?join=${room.inviteCode}`;
@@ -207,7 +227,12 @@ export default function Rooms() {
                   Created {timeAgo(currentRoom.createdAt)}
                 </CardDescription>
               </div>
-              <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setCurrentRoom(null)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={() => setCurrentRoom(null)}
+              >
                 ×
               </Button>
             </div>
@@ -216,15 +241,41 @@ export default function Rooms() {
             {/* Invite code */}
             <div className="flex items-center gap-2 bg-background rounded-lg p-2.5 border">
               <code className="text-sm font-mono flex-1 select-all">{currentRoom.inviteCode}</code>
-              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => copyCode(currentRoom.inviteCode)}>
-                {copiedId === currentRoom.inviteCode
-                  ? <><Check className="w-3 h-3 mr-1 text-green-500" />Copied</>
-                  : <><Copy className="w-3 h-3 mr-1" />Copy code</>}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs"
+                onClick={() => copyCode(currentRoom.inviteCode)}
+              >
+                {copiedId === currentRoom.inviteCode ? (
+                  <>
+                    <Check className="w-3 h-3 mr-1 text-green-500" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3 h-3 mr-1" />
+                    Copy code
+                  </>
+                )}
               </Button>
-              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => copyInviteLink(currentRoom)}>
-                {copiedId === currentRoom.id
-                  ? <><Check className="w-3 h-3 mr-1 text-green-500" />Link copied</>
-                  : <><Link2 className="w-3 h-3 mr-1" />Copy link</>}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs"
+                onClick={() => copyInviteLink(currentRoom)}
+              >
+                {copiedId === currentRoom.id ? (
+                  <>
+                    <Check className="w-3 h-3 mr-1 text-green-500" />
+                    Link copied
+                  </>
+                ) : (
+                  <>
+                    <Link2 className="w-3 h-3 mr-1" />
+                    Copy link
+                  </>
+                )}
               </Button>
             </div>
 
@@ -243,7 +294,8 @@ export default function Rooms() {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Share the invite code or link with teammates. Anyone who joins will see AI responses live.
+              Share the invite code or link with teammates. Anyone who joins will see AI responses
+              live.
             </p>
           </CardContent>
         </Card>
@@ -274,8 +326,10 @@ export default function Rooms() {
         </Card>
       ) : (
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">{rooms.length} room{rooms.length > 1 ? "s" : ""}</p>
-          {rooms.map(room => (
+          <p className="text-sm text-muted-foreground">
+            {rooms.length} room{rooms.length > 1 ? "s" : ""}
+          </p>
+          {rooms.map((room) => (
             <Card
               key={room.id}
               className={`hover:bg-accent/30 transition-colors cursor-pointer ${
@@ -309,17 +363,25 @@ export default function Rooms() {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7"
-                      onClick={e => { e.stopPropagation(); copyInviteLink(room); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        copyInviteLink(room);
+                      }}
                     >
-                      {copiedId === room.id
-                        ? <Check className="w-3 h-3 text-green-500" />
-                        : <Link2 className="w-3 h-3" />}
+                      {copiedId === room.id ? (
+                        <Check className="w-3 h-3 text-green-500" />
+                      ) : (
+                        <Link2 className="w-3 h-3" />
+                      )}
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50"
-                      onClick={e => { e.stopPropagation(); deleteRoom(room); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteRoom(room);
+                      }}
                     >
                       <Trash2 className="w-3 h-3" />
                     </Button>
@@ -354,15 +416,21 @@ export default function Rooms() {
             <Input
               placeholder="Room name (optional)"
               value={newRoomName}
-              onChange={e => setNewRoomName(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && createRoom()}
+              onChange={(e) => setNewRoomName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && createRoom()}
             />
             {err && <p className="text-red-500 text-xs">{err}</p>}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowCreate(false)}>
+              Cancel
+            </Button>
             <Button onClick={createRoom} disabled={creating}>
-              {creating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+              {creating ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Plus className="w-4 h-4 mr-2" />
+              )}
               Create
             </Button>
           </DialogFooter>
@@ -379,16 +447,22 @@ export default function Rooms() {
             <Input
               placeholder="Invite code"
               value={inviteCode}
-              onChange={e => setInviteCode(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && joinRoom()}
+              onChange={(e) => setInviteCode(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && joinRoom()}
               className="font-mono"
             />
             {err && <p className="text-red-500 text-xs">{err}</p>}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowJoin(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowJoin(false)}>
+              Cancel
+            </Button>
             <Button onClick={joinRoom} disabled={joining || !inviteCode.trim()}>
-              {joining ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <LogIn className="w-4 h-4 mr-2" />}
+              {joining ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <LogIn className="w-4 h-4 mr-2" />
+              )}
               Join
             </Button>
           </DialogFooter>

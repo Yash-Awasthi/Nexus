@@ -767,8 +767,8 @@ export interface TurboQuantConfig {
 interface QuantEntry {
   id: string;
   quantized: Int8Array;
-  scales: Float32Array;   // per-dim scale factor (max - min)
-  offsets: Float32Array;  // per-dim offset (min)
+  scales: Float32Array; // per-dim scale factor (max - min)
+  offsets: Float32Array; // per-dim offset (min)
   entry: MemoryEntry;
 }
 
@@ -786,12 +786,14 @@ export class TurboQuantStore implements IMemoryStore {
     this.dim = config.dim ?? 1536;
   }
 
-  async save(entry: MemoryEntry): Promise<void> {
+  async save(entry: MemoryEntry): Promise<MemoryEntry> {
     const vec = entry.embedding ?? [];
     if (vec.length !== this.dim && vec.length > 0) {
       // Pad or truncate to configured dim
     }
-    const { quantized, scales, offsets } = this._quantize(vec.length > 0 ? vec : new Array(this.dim).fill(0) as number[]);
+    const { quantized, scales, offsets } = this._quantize(
+      vec.length > 0 ? vec : (new Array(this.dim).fill(0) as number[]),
+    );
     const qe: QuantEntry = { id: entry.id, quantized, scales, offsets, entry };
 
     const existing = this.idMap.get(entry.id);
@@ -801,29 +803,32 @@ export class TurboQuantStore implements IMemoryStore {
       this.idMap.set(entry.id, this.entries.length);
       this.entries.push(qe);
     }
+    return entry;
   }
 
-  async search(query: number[], opts: { limit?: number; minScore?: number; filter?: MemoryFilter }): Promise<MemorySearchResult[]> {
-    const limit = opts.limit ?? 10;
-    const minScore = opts.minScore ?? 0;
+  async search(
+    queryEmbedding: number[],
+    limit: number,
+    filter?: MemoryFilter,
+  ): Promise<MemorySearchResult[]> {
+    const now = Math.floor(Date.now() / 1000);
+    const excludeExpired = filter?.excludeExpired ?? true;
 
-    const scored: Array<{ entry: MemoryEntry; score: number }> = [];
-    const qNorm = this._l2norm(query);
+    const scored: { entry: MemoryEntry; score: number }[] = [];
+    const qNorm = this._l2norm(queryEmbedding);
 
     for (const qe of this.entries) {
-      if (opts.filter) {
-        const { category, tags } = opts.filter;
-        if (category && qe.entry.category !== category) continue;
-        if (tags?.length) {
-          const entryTags = qe.entry.tags ?? [];
-          if (!tags.some((t) => entryTags.includes(t))) continue;
-        }
+      if (excludeExpired && qe.entry.expiresAt !== undefined && qe.entry.expiresAt <= now) continue;
+      if (filter?.userId !== undefined && qe.entry.userId !== filter.userId) continue;
+      if (filter?.metadata) {
+        const match = Object.entries(filter.metadata).every(([k, v]) => qe.entry.metadata[k] === v);
+        if (!match) continue;
       }
 
       // Dequantize and compute cosine similarity
       const dequant = this._dequantize(qe.quantized, qe.scales, qe.offsets);
-      const score = this._cosine(query, dequant, qNorm);
-      if (score >= minScore) scored.push({ entry: qe.entry, score });
+      const score = this._cosine(queryEmbedding, dequant, qNorm);
+      scored.push({ entry: qe.entry, score });
     }
 
     return scored
@@ -837,42 +842,72 @@ export class TurboQuantStore implements IMemoryStore {
     return idx !== undefined ? (this.entries[idx]?.entry ?? null) : null;
   }
 
-  async delete(id: string): Promise<boolean> {
+  async delete(id: string): Promise<void> {
     const idx = this.idMap.get(id);
-    if (idx === undefined) return false;
-    // Mark as tombstone — rebuild on next compaction
+    if (idx === undefined) return;
     this.idMap.delete(id);
     this.entries.splice(idx, 1);
     // Rebuild idMap after splice
     for (let i = idx; i < this.entries.length; i++) {
       this.idMap.set(this.entries[i]!.id, i);
     }
-    return true;
   }
 
-  async list(opts?: { limit?: number; offset?: number; filter?: MemoryFilter }): Promise<MemoryEntry[]> {
+  async list(filter?: MemoryFilter): Promise<MemoryEntry[]> {
+    const now = Math.floor(Date.now() / 1000);
+    const excludeExpired = filter?.excludeExpired ?? true;
     let entries = this.entries.map((e) => e.entry);
-    if (opts?.filter?.category) entries = entries.filter((e) => e.category === opts.filter!.category);
-    const offset = opts?.offset ?? 0;
-    const limit = opts?.limit ?? 100;
-    return entries.slice(offset, offset + limit);
+    if (excludeExpired)
+      entries = entries.filter((e) => e.expiresAt === undefined || e.expiresAt > now);
+    if (filter?.userId !== undefined) entries = entries.filter((e) => e.userId === filter.userId);
+    if (filter?.metadata) {
+      entries = entries.filter((e) =>
+        Object.entries(filter.metadata!).every(([k, v]) => e.metadata[k] === v),
+      );
+    }
+    return entries;
   }
 
-  async count(): Promise<number> { return this.entries.length; }
-  async clear(): Promise<void> { this.entries = []; this.idMap.clear(); }
+  async purge(filter?: MemoryFilter): Promise<number> {
+    const matching = await this.list(filter);
+    for (const entry of matching) {
+      await this.delete(entry.id);
+    }
+    return matching.length;
+  }
+
+  async count(): Promise<number> {
+    return this.entries.length;
+  }
+  async clear(): Promise<void> {
+    this.entries = [];
+    this.idMap.clear();
+  }
 
   /** Memory usage estimate in bytes vs equivalent float32 store. */
-  memoryStats(): { quantizedBytes: number; float32EquivalentBytes: number; compressionRatio: number } {
+  memoryStats(): {
+    quantizedBytes: number;
+    float32EquivalentBytes: number;
+    compressionRatio: number;
+  } {
     const n = this.entries.length;
     // int8 vectors + float32 scales + float32 offsets
     const quantizedBytes = n * (this.dim + this.dim * 4 * 2);
     const float32EquivalentBytes = n * this.dim * 4;
-    return { quantizedBytes, float32EquivalentBytes, compressionRatio: float32EquivalentBytes / Math.max(quantizedBytes, 1) };
+    return {
+      quantizedBytes,
+      float32EquivalentBytes,
+      compressionRatio: float32EquivalentBytes / Math.max(quantizedBytes, 1),
+    };
   }
 
   // ── Quantization helpers ────────────────────────────────────────────────────
 
-  private _quantize(vec: number[]): { quantized: Int8Array; scales: Float32Array; offsets: Float32Array } {
+  private _quantize(vec: number[]): {
+    quantized: Int8Array;
+    scales: Float32Array;
+    offsets: Float32Array;
+  } {
     const dim = vec.length;
     const quantized = new Int8Array(dim);
     const scales = new Float32Array(dim);
@@ -893,7 +928,7 @@ export class TurboQuantStore implements IMemoryStore {
   }
 
   private _dequantize(quantized: Int8Array, scales: Float32Array, offsets: Float32Array): number[] {
-    const out: number[] = new Array(quantized.length);
+    const out: number[] = Array.from({ length: quantized.length }) as number[];
     for (let i = 0; i < quantized.length; i++) {
       out[i] = (quantized[i]! + 127) * scales[i]! + offsets[i]!;
     }
@@ -908,7 +943,10 @@ export class TurboQuantStore implements IMemoryStore {
     let dot = 0;
     let bNorm = 0;
     const len = Math.min(a.length, b.length);
-    for (let i = 0; i < len; i++) { dot += a[i]! * b[i]!; bNorm += b[i]! * b[i]!; }
+    for (let i = 0; i < len; i++) {
+      dot += a[i]! * b[i]!;
+      bNorm += b[i]! * b[i]!;
+    }
     return dot / (aNorm * (Math.sqrt(bNorm) || 1));
   }
 }
@@ -1121,19 +1159,40 @@ export interface IStream<TData> {
 // Scoped key-value store (scope+key) — complements IStream (stream_name+group_id+item_id).
 // Simpler addressing for per-session or per-user namespaced state.
 
-export interface StateGetInput { scope: string; key: string; }
-export interface StateSetInput { scope: string; key: string; value: unknown; }
-export interface StateDeleteInput { scope: string; key: string; }
-export interface StateListInput { scope: string; }
-export interface StateUpdateInput { scope: string; key: string; ops: UpdateOp[]; }
+export interface StateGetInput {
+  scope: string;
+  key: string;
+}
+export interface StateSetInput {
+  scope: string;
+  key: string;
+  value: unknown;
+}
+export interface StateDeleteInput {
+  scope: string;
+  key: string;
+}
+export interface StateListInput {
+  scope: string;
+}
+export interface StateUpdateInput {
+  scope: string;
+  key: string;
+  ops: UpdateOp[];
+}
 
-export interface StateSetResult<TData> { old_value?: TData; new_value: TData; }
+export interface StateSetResult<TData> {
+  old_value?: TData;
+  new_value: TData;
+}
 export interface StateUpdateResult<TData> {
   old_value?: TData;
   new_value: TData;
   errors?: UpdateOpError[];
 }
-export interface StateDeleteResult { old_value?: unknown; }
+export interface StateDeleteResult {
+  old_value?: unknown;
+}
 
 export enum StateEventType {
   Created = "state:created",
@@ -1190,16 +1249,25 @@ export type EdgeKind =
 /** Traversal weight for BFS scoring — higher = stronger propagation. */
 export function edgeTraversalWeight(e: EdgeKind): number {
   switch (e.kind) {
-    case "has_tag":      return 0.8;
-    case "in_cluster":   return 0.6;
-    case "relates_to":   return e.weight;
-    case "supersedes":   return 0.9;
-    case "contradicts":  return 0.3;
-    case "derived_from": return 0.7;
+    case "has_tag":
+      return 0.8;
+    case "in_cluster":
+      return 0.6;
+    case "relates_to":
+      return e.weight;
+    case "supersedes":
+      return 0.9;
+    case "contradicts":
+      return 0.3;
+    case "derived_from":
+      return 0.7;
   }
 }
 
-export interface GraphEdge { target: string; kind: EdgeKind; }
+export interface GraphEdge {
+  target: string;
+  kind: EdgeKind;
+}
 
 export interface TagEntry {
   id: string; // "tag:{name}"
@@ -1243,10 +1311,10 @@ export interface IMemoryEntry {
  * tagged memories. Returns top-k by accumulated score.
  */
 export class MemoryGraph {
-  private _memories: Map<string, IMemoryEntry> = new Map();
-  private _edges: Map<string, GraphEdge[]> = new Map();
-  private _incoming: Map<string, Set<string>> = new Map();
-  private _tags: Map<string, TagEntry> = new Map();
+  private _memories = new Map<string, IMemoryEntry>();
+  private _edges = new Map<string, GraphEdge[]>();
+  private _incoming = new Map<string, Set<string>>();
+  private _tags = new Map<string, TagEntry>();
   readonly metadata: GraphMetadata = {
     version: GRAPH_VERSION,
     createdAt: new Date().toISOString(),
@@ -1254,9 +1322,15 @@ export class MemoryGraph {
     retrievalCount: 0,
   };
 
-  memoryCount(): number { return this._memories.size; }
-  nodeCount(): number { return this._memories.size + this._tags.size; }
-  edgeCount(): number { return [...this._edges.values()].reduce((s, e) => s + e.length, 0); }
+  memoryCount(): number {
+    return this._memories.size;
+  }
+  nodeCount(): number {
+    return this._memories.size + this._tags.size;
+  }
+  edgeCount(): number {
+    return [...this._edges.values()].reduce((s, e) => s + e.length, 0);
+  }
 
   addMemory(entry: IMemoryEntry): string {
     this._memories.set(entry.id, entry);
@@ -1264,7 +1338,9 @@ export class MemoryGraph {
     return entry.id;
   }
 
-  getMemory(id: string): IMemoryEntry | undefined { return this._memories.get(id); }
+  getMemory(id: string): IMemoryEntry | undefined {
+    return this._memories.get(id);
+  }
 
   removeMemory(id: string): IMemoryEntry | undefined {
     const m = this._memories.get(id);
@@ -1272,7 +1348,7 @@ export class MemoryGraph {
       this._memories.delete(id);
       this._edges.delete(id);
       for (const [src, edges] of this._edges) {
-        const filtered = edges.filter(e => e.target !== id);
+        const filtered = edges.filter((e) => e.target !== id);
         if (filtered.length !== edges.length) this._edges.set(src, filtered);
       }
       this._incoming.delete(id);
@@ -1281,7 +1357,9 @@ export class MemoryGraph {
     return m;
   }
 
-  allMemories(): IMemoryEntry[] { return [...this._memories.values()]; }
+  allMemories(): IMemoryEntry[] {
+    return [...this._memories.values()];
+  }
 
   ensureTag(name: string): TagEntry {
     const id = `tag:${name}`;
@@ -1294,7 +1372,7 @@ export class MemoryGraph {
   tagMemory(memoryId: string, tagName: string): void {
     const tag = this.ensureTag(tagName);
     const existing = this._edges.get(memoryId) ?? [];
-    if (!existing.some(e => e.target === tag.id && e.kind.kind === "has_tag")) {
+    if (!existing.some((e) => e.target === tag.id && e.kind.kind === "has_tag")) {
       existing.push({ target: tag.id, kind: { kind: "has_tag" } });
       this._edges.set(memoryId, existing);
       const inc = this._incoming.get(tag.id) ?? new Set();
@@ -1307,10 +1385,12 @@ export class MemoryGraph {
   getMemoriesByTag(tagName: string): IMemoryEntry[] {
     const tagId = `tag:${tagName}`;
     const ids = this._incoming.get(tagId) ?? new Set<string>();
-    return [...ids].map(id => this._memories.get(id)).filter(Boolean) as IMemoryEntry[];
+    return [...ids].map((id) => this._memories.get(id)).filter(Boolean) as IMemoryEntry[];
   }
 
-  allTags(): TagEntry[] { return [...this._tags.values()]; }
+  allTags(): TagEntry[] {
+    return [...this._tags.values()];
+  }
 
   addEdge(from: string, to: string, kind: EdgeKind): void {
     const list = this._edges.get(from) ?? [];
@@ -1321,8 +1401,12 @@ export class MemoryGraph {
     this._incoming.set(to, inc);
   }
 
-  getEdges(nodeId: string): GraphEdge[] { return this._edges.get(nodeId) ?? []; }
-  getIncoming(nodeId: string): string[] { return [...(this._incoming.get(nodeId) ?? [])]; }
+  getEdges(nodeId: string): GraphEdge[] {
+    return this._edges.get(nodeId) ?? [];
+  }
+  getIncoming(nodeId: string): string[] {
+    return [...(this._incoming.get(nodeId) ?? [])];
+  }
 
   /** Link two memories bidirectionally with a semantic weight [0, 1]. */
   linkMemories(from: string, to: string, weight: number): void {
@@ -1358,11 +1442,11 @@ export class MemoryGraph {
     seedScores: number[],
     maxDepth = 2,
     maxResults = 20,
-  ): Array<{ id: string; score: number }> {
+  ): { id: string; score: number }[] {
     this.metadata.retrievalCount++;
     const visited = new Set<string>();
     const results = new Map<string, number>();
-    const queue: Array<[string, number, number]> = [];
+    const queue: [string, number, number][] = [];
 
     for (let i = 0; i < seedIds.length; i++) {
       const id = seedIds[i]!;
@@ -1415,25 +1499,32 @@ export class MemoryGraph {
 // ── Memory pipeline / activity tracking (from jcode-memory-types) ─────────────
 
 export type PipelineStepStatus = "pending" | "running" | "done" | "error" | "skipped";
-export interface PipelineStepResult { summary: string; latencyMs: number; }
+export interface PipelineStepResult {
+  summary: string;
+  latencyMs: number;
+}
 
 /** Tracks the 4-step per-turn memory pipeline: search → verify → inject → maintain. */
 export interface PipelineState {
-  search: PipelineStepStatus;    searchResult?: PipelineStepResult;
-  verify: PipelineStepStatus;    verifyResult?: PipelineStepResult;
+  search: PipelineStepStatus;
+  searchResult?: PipelineStepResult;
+  verify: PipelineStepStatus;
+  verifyResult?: PipelineStepResult;
   verifyProgress?: [number, number];
-  inject: PipelineStepStatus;    injectResult?: PipelineStepResult;
-  maintain: PipelineStepStatus;  maintainResult?: PipelineStepResult;
+  inject: PipelineStepStatus;
+  injectResult?: PipelineStepResult;
+  maintain: PipelineStepStatus;
+  maintainResult?: PipelineStepResult;
   startedAt: string;
 }
 
 export function pipelineIsComplete(p: PipelineState): boolean {
   const t: PipelineStepStatus[] = ["done", "error", "skipped"];
-  return [p.search, p.verify, p.inject, p.maintain].every(s => t.includes(s));
+  return [p.search, p.verify, p.inject, p.maintain].every((s) => t.includes(s));
 }
 
 export function pipelineHasRunningStep(p: PipelineState): boolean {
-  return [p.search, p.verify, p.inject, p.maintain].some(s => s === "running");
+  return [p.search, p.verify, p.inject, p.maintain].some((s) => s === "running");
 }
 
 /** Memory sidecar state machine. */
@@ -1463,7 +1554,11 @@ export type MemoryEventKind =
   | { kind: "maintenance_gap"; candidates: number }
   | { kind: "maintenance_complete"; latencyMs: number };
 
-export interface MemoryEvent { kind: MemoryEventKind; timestamp: string; detail?: string; }
+export interface MemoryEvent {
+  kind: MemoryEventKind;
+  timestamp: string;
+  detail?: string;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BM25 LEXICAL INDEX + RRF HYBRID SEARCH
@@ -1486,19 +1581,38 @@ export interface MemoryEvent { kind: MemoryEventKind; timestamp: string; detail?
 // ── Minimal Porter stemmer (no external deps) ─────────────────────────────────
 // Ref: agentmemory/src/state/stemmer.ts
 
-const STEP2_RULES: Array<[string, string]> = [
-  ["ational", "ate"], ["tional", "tion"], ["enci", "ence"],
-  ["anci", "ance"], ["izer", "ize"],  ["bli", "ble"],
-  ["alli", "al"],   ["entli", "ent"], ["eli", "e"],
-  ["ousli", "ous"], ["ization", "ize"], ["ation", "ate"],
-  ["ator", "ate"],  ["alism", "al"],  ["iveness", "ive"],
-  ["fulness", "ful"], ["ousness", "ous"], ["aliti", "al"],
-  ["iviti", "ive"], ["biliti", "ble"], ["logi", "log"],
+const STEP2_RULES: [string, string][] = [
+  ["ational", "ate"],
+  ["tional", "tion"],
+  ["enci", "ence"],
+  ["anci", "ance"],
+  ["izer", "ize"],
+  ["bli", "ble"],
+  ["alli", "al"],
+  ["entli", "ent"],
+  ["eli", "e"],
+  ["ousli", "ous"],
+  ["ization", "ize"],
+  ["ation", "ate"],
+  ["ator", "ate"],
+  ["alism", "al"],
+  ["iveness", "ive"],
+  ["fulness", "ful"],
+  ["ousness", "ous"],
+  ["aliti", "al"],
+  ["iviti", "ive"],
+  ["biliti", "ble"],
+  ["logi", "log"],
 ];
 
-const STEP3_RULES: Array<[string, string]> = [
-  ["icate", "ic"], ["ative", ""], ["alize", "al"],
-  ["iciti", "ic"], ["ical", "ic"], ["ful", ""], ["ness", ""],
+const STEP3_RULES: [string, string][] = [
+  ["icate", "ic"],
+  ["ative", ""],
+  ["alize", "al"],
+  ["iciti", "ic"],
+  ["ical", "ic"],
+  ["ful", ""],
+  ["ness", ""],
 ];
 
 function hasCVCPattern(word: string): boolean {
@@ -1507,8 +1621,12 @@ function hasCVCPattern(word: string): boolean {
   let inVowel = false;
   for (const c of word) {
     const isVowel = "aeiou".includes(c);
-    if (isVowel && !inVowel) { inVowel = true; }
-    else if (!isVowel && inVowel) { inVowel = false; m++; }
+    if (isVowel && !inVowel) {
+      inVowel = true;
+    } else if (!isVowel && inVowel) {
+      inVowel = false;
+      m++;
+    }
   }
   return m > 0;
 }
@@ -1521,8 +1639,9 @@ export function porterStem(word: string): string {
   // Step 1a
   if (w.endsWith("sses")) w = w.slice(0, -2);
   else if (w.endsWith("ies")) w = w.slice(0, -2);
-  else if (w.endsWith("ss")) { /* keep */ }
-  else if (w.endsWith("s")) w = w.slice(0, -1);
+  else if (w.endsWith("ss")) {
+    /* keep */
+  } else if (w.endsWith("s")) w = w.slice(0, -1);
 
   // Step 1b
   if (w.endsWith("eed")) {
@@ -1530,11 +1649,21 @@ export function porterStem(word: string): string {
   } else if (w.endsWith("ed") && /[aeiou]/.test(w.slice(0, -2))) {
     w = w.slice(0, -2);
     if (w.endsWith("at") || w.endsWith("bl") || w.endsWith("iz")) w += "e";
-    else if (w.length > 1 && w[w.length - 1] === w[w.length - 2] && !"lsz".includes(w[w.length - 1]!)) w = w.slice(0, -1);
+    else if (
+      w.length > 1 &&
+      w[w.length - 1] === w[w.length - 2] &&
+      !"lsz".includes(w[w.length - 1]!)
+    )
+      w = w.slice(0, -1);
   } else if (w.endsWith("ing") && /[aeiou]/.test(w.slice(0, -3))) {
     w = w.slice(0, -3);
     if (w.endsWith("at") || w.endsWith("bl") || w.endsWith("iz")) w += "e";
-    else if (w.length > 1 && w[w.length - 1] === w[w.length - 2] && !"lsz".includes(w[w.length - 1]!)) w = w.slice(0, -1);
+    else if (
+      w.length > 1 &&
+      w[w.length - 1] === w[w.length - 2] &&
+      !"lsz".includes(w[w.length - 1]!)
+    )
+      w = w.slice(0, -1);
   }
 
   // Step 1c
@@ -1557,12 +1686,35 @@ export function porterStem(word: string): string {
   }
 
   // Step 4 — remove derivational suffixes
-  const step4 = ["ement","ment","ance","ence","ism","ible","able","ant","ent","ion","ou","ism","ate","iti","ous","ive","ize","al","er","ic"];
+  const step4 = [
+    "ement",
+    "ment",
+    "ance",
+    "ence",
+    "ism",
+    "ible",
+    "able",
+    "ant",
+    "ent",
+    "ion",
+    "ou",
+    "ism",
+    "ate",
+    "iti",
+    "ous",
+    "ive",
+    "ize",
+    "al",
+    "er",
+    "ic",
+  ];
   for (const suf of step4) {
     if (w.endsWith(suf) && hasCVCPattern(w.slice(0, -suf.length))) {
       if (suf === "ion") {
         const stem = w.slice(0, -3);
-        if (stem.endsWith("s") || stem.endsWith("t")) { w = stem; }
+        if (stem.endsWith("s") || stem.endsWith("t")) {
+          w = stem;
+        }
       } else {
         w = w.slice(0, -suf.length);
       }
@@ -1693,12 +1845,18 @@ export class BM25Lexicon {
     if (rawTerms.length === 0) return [];
 
     // Expand with synonyms
-    const queryTerms: Array<{ term: string; weight: number }> = [];
+    const queryTerms: { term: string; weight: number }[] = [];
     const seen = new Set<string>();
     for (const t of rawTerms) {
-      if (!seen.has(t)) { seen.add(t); queryTerms.push({ term: t, weight: 1.0 }); }
-      for (const syn of (this.synonyms[t] ?? [])) {
-        if (!seen.has(syn)) { seen.add(syn); queryTerms.push({ term: syn, weight: 0.7 }); }
+      if (!seen.has(t)) {
+        seen.add(t);
+        queryTerms.push({ term: t, weight: 1.0 });
+      }
+      for (const syn of this.synonyms[t] ?? []) {
+        if (!seen.has(syn)) {
+          seen.add(syn);
+          queryTerms.push({ term: syn, weight: 0.7 });
+        }
       }
     }
 
@@ -1712,7 +1870,10 @@ export class BM25Lexicon {
         const df = exactDocs.size;
         const idf = Math.log((N - df + 0.5) / (df + 0.5) + 1);
         for (const docId of exactDocs) {
-          scores.set(docId, (scores.get(docId) ?? 0) + this.bm25Score(docId, term, idf, avgDocLen, weight));
+          scores.set(
+            docId,
+            (scores.get(docId) ?? 0) + this.bm25Score(docId, term, idf, avgDocLen, weight),
+          );
         }
       }
 
@@ -1727,7 +1888,11 @@ export class BM25Lexicon {
         const df = prefixDocs.size;
         const idf = Math.log((N - df + 0.5) / (df + 0.5) + 1) * 0.5;
         for (const docId of prefixDocs) {
-          scores.set(docId, (scores.get(docId) ?? 0) + this.bm25Score(docId, indexTerm, idf, avgDocLen, weight * 0.5));
+          scores.set(
+            docId,
+            (scores.get(docId) ?? 0) +
+              this.bm25Score(docId, indexTerm, idf, avgDocLen, weight * 0.5),
+          );
         }
       }
     }
@@ -1738,8 +1903,12 @@ export class BM25Lexicon {
       .slice(0, limit);
   }
 
-  get size(): number { return this.entries.size; }
-  has(id: string): boolean { return this.entries.has(id); }
+  get size(): number {
+    return this.entries.size;
+  }
+  has(id: string): boolean {
+    return this.entries.has(id);
+  }
 
   clear(): void {
     this.entries.clear();
@@ -1760,7 +1929,8 @@ export class BM25Lexicon {
         ([t, ids]) => [t, Array.from(ids)] as [string, string[]],
       ),
       docTermCounts: Array.from(this.docTermCounts.entries()).map(
-        ([id, counts]) => [id, Array.from(counts.entries())] as [id: string, counts: [string, number][]],
+        ([id, counts]) =>
+          [id, Array.from(counts.entries())] as [id: string, counts: [string, number][]],
       ),
       totalDocLength: this.totalDocLength,
     });
@@ -1778,15 +1948,24 @@ export class BM25Lexicon {
       };
       for (const [k, v] of data.entries ?? []) idx.entries.set(k, v);
       for (const [t, ids] of data.inverted ?? []) idx.invertedIndex.set(t, new Set(ids));
-      for (const [id, counts] of data.docTermCounts ?? []) idx.docTermCounts.set(id, new Map(counts));
-      idx.totalDocLength = Number(data.totalDocLength ?? 0);
-    } catch { /* return empty index on bad JSON */ }
+      for (const [id, counts] of data.docTermCounts ?? [])
+        idx.docTermCounts.set(id, new Map(counts));
+      idx.totalDocLength = (data.totalDocLength as number | undefined) ?? 0;
+    } catch {
+      /* return empty index on bad JSON */
+    }
     return idx;
   }
 
   // ── Private helpers ─────────────────────────────────────────────────────────
 
-  private bm25Score(docId: string, term: string, idf: number, avgDocLen: number, weight: number): number {
+  private bm25Score(
+    docId: string,
+    term: string,
+    idf: number,
+    avgDocLen: number,
+    weight: number,
+  ): number {
     const entry = this.entries.get(docId);
     if (!entry) return 0;
     const tf = this.docTermCounts.get(docId)?.get(term) ?? 0;
@@ -1814,7 +1993,8 @@ export class BM25Lexicon {
   }
 
   private lowerBound(arr: string[], target: string): number {
-    let lo = 0, hi = arr.length;
+    let lo = 0,
+      hi = arr.length;
     while (lo < hi) {
       const mid = (lo + hi) >>> 1;
       if (arr[mid]! < target) lo = mid + 1;
@@ -1901,7 +2081,7 @@ export interface RRFSearchOptions {
  */
 export function rrfHybridSearch(
   bm25Results: BM25Hit[],
-  vectorResults: Array<{ id: string; score: number; groupId?: string }>,
+  vectorResults: { id: string; score: number; groupId?: string }[],
   opts: RRFSearchOptions = {},
 ): HybridMemoryResult[] {
   const limit = opts.limit ?? 20;
@@ -1910,22 +2090,35 @@ export function rrfHybridSearch(
   let vectorW = opts.vectorWeight ?? 0.6;
 
   // Renormalise weights if one stream is absent
-  if (!hasVector) { bm25W = 1.0; vectorW = 0.0; }
+  if (!hasVector) {
+    bm25W = 1.0;
+    vectorW = 0.0;
+  }
   const totalW = bm25W + vectorW;
-  if (totalW > 0) { bm25W /= totalW; vectorW /= totalW; }
+  if (totalW > 0) {
+    bm25W /= totalW;
+    vectorW /= totalW;
+  }
 
   // Accumulate per-document scores
-  const scores = new Map<string, {
-    groupId?: string;
-    bm25Rank: number; vectorRank: number;
-    bm25Score: number; vectorScore: number;
-  }>();
+  const scores = new Map<
+    string,
+    {
+      groupId?: string;
+      bm25Rank: number;
+      vectorRank: number;
+      bm25Score: number;
+      vectorScore: number;
+    }
+  >();
 
   bm25Results.forEach((r, i) => {
     scores.set(r.id, {
       groupId: r.groupId,
-      bm25Rank: i + 1, vectorRank: Infinity,
-      bm25Score: r.score, vectorScore: 0,
+      bm25Rank: i + 1,
+      vectorRank: Infinity,
+      bm25Score: r.score,
+      vectorScore: 0,
     });
   });
 
@@ -1938,8 +2131,10 @@ export function rrfHybridSearch(
     } else {
       scores.set(r.id, {
         groupId: r.groupId,
-        bm25Rank: Infinity, vectorRank: i + 1,
-        bm25Score: 0, vectorScore: r.score,
+        bm25Rank: Infinity,
+        vectorRank: i + 1,
+        bm25Score: 0,
+        vectorScore: r.score,
       });
     }
   });
@@ -1952,9 +2147,7 @@ export function rrfHybridSearch(
     vectorRank: s.vectorRank,
     bm25Score: s.bm25Score,
     vectorScore: s.vectorScore,
-    combinedScore:
-      bm25W * (1 / (RRF_K + s.bm25Rank)) +
-      vectorW * (1 / (RRF_K + s.vectorRank)),
+    combinedScore: bm25W * (1 / (RRF_K + s.bm25Rank)) + vectorW * (1 / (RRF_K + s.vectorRank)),
   }));
 
   combined.sort((a, b) => b.combinedScore - a.combinedScore);
@@ -2043,7 +2236,10 @@ export const nullQueryExpander: QueryExpander = async (query: string): Promise<Q
  */
 export async function hybridSearchWithExpansion(
   bm25: BM25Lexicon,
-  vectorFn: (query: string, limit: number) => Promise<Array<{ id: string; score: number; groupId?: string }>>,
+  vectorFn: (
+    query: string,
+    limit: number,
+  ) => Promise<{ id: string; score: number; groupId?: string }[]>,
   query: string,
   expansion: QueryExpansion,
   opts: RRFSearchOptions = {},
