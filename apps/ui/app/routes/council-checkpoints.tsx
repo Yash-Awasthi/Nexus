@@ -77,7 +77,6 @@ export default function CouncilCheckpoints() {
   const [selectedStep, setSelectedStep] = useState<number | null>(null);
   const [stepDetail, setStepDetail] = useState<StepDetail | null>(null);
   const [loadingStep, setLoadingStep] = useState(false);
-  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
 
   // Replay
   const [replayStep, setReplayStep] = useState<number | null>(null);

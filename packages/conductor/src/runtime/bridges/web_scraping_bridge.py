@@ -32,7 +32,7 @@ except ImportError:
     _SCRAPLING_AVAILABLE = False
 
 try:
-    from scrapling.fetchers import PlayWrightFetcher as _JsFetcher  # availability check only
+    import scrapling.fetchers  # noqa: F401 — check module availability only
     _JS_FETCHER_AVAILABLE = True
 except ImportError:
     _JS_FETCHER_AVAILABLE = False

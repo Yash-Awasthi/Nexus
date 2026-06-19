@@ -31,15 +31,16 @@ import type { FastifyInstance } from "fastify";
 
 import { emitAuditEvent } from "../lib/audit-emitter.js";
 
+import { sha256hex as _sha256hex } from "../lib/crypto-utils.js";
+import { getSharedKV } from "../lib/shared-kv.js";
+import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
+
 // 20 OIDC callback attempts per 15 minutes per IP — prevents code replay attacks
 const oidcRateLimit = makeRateLimitPreHandler({
   limit: 20,
   windowMs: 15 * 60 * 1000,
   keyPrefix: "auth:oidc",
 });
-import { sha256hex as _sha256hex } from "../lib/crypto-utils.js";
-import { getSharedKV } from "../lib/shared-kv.js";
-import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
 
 // ── Config helpers ─────────────────────────────────────────────────────────────
 

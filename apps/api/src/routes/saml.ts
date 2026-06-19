@@ -33,6 +33,21 @@ import { db } from "@nexus/db";
 import { users, refreshTokens } from "@nexus/db/schema";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
+
+// 30 SAML initiations per 15 min per IP — prevents SSO redirect spam
+const samlLoginRateLimit = makeRateLimitPreHandler({
+  limit: 30,
+  windowMs: 15 * 60 * 1000,
+  keyPrefix: "auth:saml:login",
+});
+
+// 20 ACS callbacks per 15 min per IP — prevents SAML response replay attacks
+const samlCallbackRateLimit = makeRateLimitPreHandler({
+  limit: 20,
+  windowMs: 15 * 60 * 1000,
+  keyPrefix: "auth:saml:callback",
+});
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
