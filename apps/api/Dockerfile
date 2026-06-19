@@ -65,6 +65,29 @@ COPY packages/domain-feeds/package.json ./packages/domain-feeds/
 COPY packages/obs-providers/package.json ./packages/obs-providers/
 COPY packages/wiki-updater/package.json ./packages/wiki-updater/
 COPY packages/image-transformations/package.json ./packages/image-transformations/
+COPY packages/agent-runtime/package.json ./packages/agent-runtime/
+COPY packages/brief-engine/package.json ./packages/brief-engine/
+COPY packages/chat-analyst/package.json ./packages/chat-analyst/
+COPY packages/code-repl/package.json ./packages/code-repl/
+COPY packages/domain-forecast/package.json ./packages/domain-forecast/
+COPY packages/geoip/package.json ./packages/geoip/
+COPY packages/hf-research/package.json ./packages/hf-research/
+COPY packages/i18n/package.json ./packages/i18n/
+COPY packages/llm-tracer/package.json ./packages/llm-tracer/
+COPY packages/posthog-analytics/package.json ./packages/posthog-analytics/
+COPY packages/prediction-market/package.json ./packages/prediction-market/
+COPY packages/rlhf-pipeline/package.json ./packages/rlhf-pipeline/
+COPY packages/scenario-planner/package.json ./packages/scenario-planner/
+COPY packages/scraping-mcp/package.json ./packages/scraping-mcp/
+COPY packages/session-sync/package.json ./packages/session-sync/
+COPY packages/stealth-browser/package.json ./packages/stealth-browser/
+COPY packages/stm/package.json ./packages/stm/
+COPY packages/stream-recovery/package.json ./packages/stream-recovery/
+COPY packages/supervisor/package.json ./packages/supervisor/
+COPY packages/think-parser/package.json ./packages/think-parser/
+COPY packages/tool-registry/package.json ./packages/tool-registry/
+COPY packages/video-search/package.json ./packages/video-search/
+COPY packages/wiki/package.json ./packages/wiki/
 COPY apps/api/package.json ./apps/api/
 
 RUN pnpm install --frozen-lockfile --filter @nexus/api --filter @nexus/auth \
