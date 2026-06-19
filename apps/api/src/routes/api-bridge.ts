@@ -6864,6 +6864,39 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   );
 
   // -- WEBHOOKS (event delivery to external endpoints) -----------------------
+
+  /**
+   * Validate webhook URL to prevent SSRF attacks.
+   * Blocks private IP ranges, loopback, link-local, and non-http(s) schemes.
+   */
+  function validateWebhookUrl(rawUrl: string): { ok: true } | { ok: false; reason: string } {
+    let parsed: URL;
+    try {
+      parsed = new URL(rawUrl);
+    } catch {
+      return { ok: false, reason: "Invalid URL format" };
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return { ok: false, reason: "Only http and https URLs are allowed" };
+    }
+    const host = parsed.hostname.toLowerCase();
+    // Block loopback, link-local, and RFC 1918 private ranges
+    const blocked = [
+      /^localhost$/,
+      /^127\.\d+\.\d+\.\d+$/,
+      /^10\.\d+\.\d+\.\d+$/,
+      /^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/,
+      /^192\.168\.\d+\.\d+$/,
+      /^169\.254\.\d+\.\d+$/, // link-local (AWS metadata, etc.)
+      /^::1$/,
+      /^fd[0-9a-f]{2}:/i, // IPv6 ULA
+    ];
+    if (blocked.some((re) => re.test(host))) {
+      return { ok: false, reason: "URL targets a private or reserved address" };
+    }
+    return { ok: true };
+  }
+
   interface Webhook {
     id: string;
     url: string;
@@ -6878,6 +6911,10 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   await _webhookStore.load();
 
   app.post<{ Body: Partial<Webhook> }>("/webhooks", async (req, reply) => {
+    const urlCheck = validateWebhookUrl(req.body.url ?? "");
+    if (!urlCheck.ok) {
+      return reply.code(400).send({ error: "invalid_webhook_url", reason: urlCheck.reason });
+    }
     const wh: Webhook = {
       id: crypto.randomUUID(),
       url: req.body.url ?? "",
@@ -6902,6 +6939,12 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     async (req, reply) => {
       const wh = _webhookStore.get(req.params.id);
       if (!wh) return reply.code(404).send({ error: "not_found" });
+      if (req.body.url !== undefined) {
+        const urlCheck = validateWebhookUrl(req.body.url);
+        if (!urlCheck.ok) {
+          return reply.code(400).send({ error: "invalid_webhook_url", reason: urlCheck.reason });
+        }
+      }
       _webhookStore.set(wh.id, { ...wh, ...req.body, id: wh.id });
       return reply.send(_webhookStore.get(wh.id)!);
     },
