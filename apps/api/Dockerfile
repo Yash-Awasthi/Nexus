@@ -109,7 +109,15 @@ RUN pnpm install --frozen-lockfile --filter @nexus/api --filter @nexus/auth \
     --filter @nexus/nlp-utils --filter @nexus/reranker --filter @nexus/retrieval \
     --filter @nexus/run-cost --filter @nexus/sse --filter @nexus/voice \
     --filter @nexus/domain-feeds --filter @nexus/obs-providers --filter @nexus/wiki-updater \
-    --filter @nexus/image-transformations
+    --filter @nexus/image-transformations \
+    --filter @nexus/llm-tracer --filter @nexus/posthog-analytics --filter @nexus/stm \
+    --filter @nexus/agent-runtime --filter @nexus/brief-engine --filter @nexus/chat-analyst \
+    --filter @nexus/code-repl --filter @nexus/domain-forecast --filter @nexus/geoip \
+    --filter @nexus/hf-research --filter @nexus/i18n --filter @nexus/prediction-market \
+    --filter @nexus/rlhf-pipeline --filter @nexus/scenario-planner --filter @nexus/scraping-mcp \
+    --filter @nexus/session-sync --filter @nexus/stealth-browser --filter @nexus/stream-recovery \
+    --filter @nexus/supervisor --filter @nexus/think-parser --filter @nexus/tool-registry \
+    --filter @nexus/video-search --filter @nexus/wiki
 
 # ─── Stage 2: development — hot-reload via tsx (no compiled dist needed) ─────
 FROM deps AS development
@@ -136,7 +144,15 @@ RUN pnpm install --frozen-lockfile \
     --filter @nexus/nlp-utils --filter @nexus/reranker --filter @nexus/retrieval \
     --filter @nexus/run-cost --filter @nexus/sse --filter @nexus/voice \
     --filter @nexus/domain-feeds --filter @nexus/obs-providers --filter @nexus/wiki-updater \
-    --filter @nexus/image-transformations
+    --filter @nexus/image-transformations \
+    --filter @nexus/llm-tracer --filter @nexus/posthog-analytics --filter @nexus/stm \
+    --filter @nexus/agent-runtime --filter @nexus/brief-engine --filter @nexus/chat-analyst \
+    --filter @nexus/code-repl --filter @nexus/domain-forecast --filter @nexus/geoip \
+    --filter @nexus/hf-research --filter @nexus/i18n --filter @nexus/prediction-market \
+    --filter @nexus/rlhf-pipeline --filter @nexus/scenario-planner --filter @nexus/scraping-mcp \
+    --filter @nexus/session-sync --filter @nexus/stealth-browser --filter @nexus/stream-recovery \
+    --filter @nexus/supervisor --filter @nexus/think-parser --filter @nexus/tool-registry \
+    --filter @nexus/video-search --filter @nexus/wiki
 
 # Source is bind-mounted at runtime — no COPY here
 ENV NODE_ENV=development
