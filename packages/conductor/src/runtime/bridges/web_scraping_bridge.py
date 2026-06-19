@@ -31,11 +31,8 @@ try:
 except ImportError:
     _SCRAPLING_AVAILABLE = False
 
-try:
-    import scrapling.fetchers  # noqa: F401 — check module availability only
-    _JS_FETCHER_AVAILABLE = True
-except ImportError:
-    _JS_FETCHER_AVAILABLE = False
+import importlib.util as _importlib_util
+_JS_FETCHER_AVAILABLE = _importlib_util.find_spec("scrapling.fetchers") is not None
 
 app = FastAPI(title="scraping-bridge", version="1.0.0")
 
