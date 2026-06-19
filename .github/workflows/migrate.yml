@@ -97,9 +97,34 @@ jobs:
         if: ${{ github.event.inputs.dry_run != 'true' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        # drizzle-kit migrate with strict:true prompts for confirmation interactively.
-        # Pipe `yes` to auto-confirm in CI.
-        run: yes | pnpm --filter @nexus/db db:migrate || pnpm --filter @nexus/db db:migrate
+        # Run migrations programmatically via Drizzle's Node.js migrator API.
+        # This bypasses drizzle-kit's interactive prompt (strict:true) and
+        # surfaces the real PostgreSQL error instead of pnpm's wrapper message.
+        run: |
+          node --input-type=module <<'EOF'
+          import { drizzle } from "drizzle-orm/node-postgres";
+          import { migrate } from "drizzle-orm/node-postgres/migrator";
+          import pg from "pg";
+          import { fileURLToPath } from "url";
+          import { dirname, join } from "path";
+
+          const __dirname = dirname(fileURLToPath(import.meta.url));
+          const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+          const db = drizzle(pool);
+
+          try {
+            await migrate(db, {
+              migrationsFolder: join(__dirname, "packages/db/migrations"),
+              migrationsTable: "nexus_drizzle_migrations",
+            });
+            console.log("✅ Migrations applied successfully");
+          } catch (err) {
+            console.error("❌ Migration failed:", err.message);
+            process.exit(1);
+          } finally {
+            await pool.end();
+          }
+          EOF
 
       - name: Verify schema health
         env:
