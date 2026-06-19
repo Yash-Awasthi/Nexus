@@ -88,6 +88,10 @@ COPY packages/think-parser/package.json ./packages/think-parser/
 COPY packages/tool-registry/package.json ./packages/tool-registry/
 COPY packages/video-search/package.json ./packages/video-search/
 COPY packages/wiki/package.json ./packages/wiki/
+COPY packages/autotune/package.json ./packages/autotune/
+COPY packages/parseltongue/package.json ./packages/parseltongue/
+COPY packages/ragtime/package.json ./packages/ragtime/
+COPY packages/ultraplinian/package.json ./packages/ultraplinian/
 COPY apps/api/package.json ./apps/api/
 
 RUN pnpm install --frozen-lockfile --filter @nexus/api --filter @nexus/auth \
@@ -117,7 +121,9 @@ RUN pnpm install --frozen-lockfile --filter @nexus/api --filter @nexus/auth \
     --filter @nexus/rlhf-pipeline --filter @nexus/scenario-planner --filter @nexus/scraping-mcp \
     --filter @nexus/session-sync --filter @nexus/stealth-browser --filter @nexus/stream-recovery \
     --filter @nexus/supervisor --filter @nexus/think-parser --filter @nexus/tool-registry \
-    --filter @nexus/video-search --filter @nexus/wiki
+    --filter @nexus/video-search --filter @nexus/wiki \
+    --filter @nexus/autotune --filter @nexus/parseltongue --filter @nexus/ragtime \
+    --filter @nexus/ultraplinian
 
 # ─── Stage 2: development — hot-reload via tsx (no compiled dist needed) ─────
 FROM deps AS development
@@ -152,7 +158,9 @@ RUN pnpm install --frozen-lockfile \
     --filter @nexus/rlhf-pipeline --filter @nexus/scenario-planner --filter @nexus/scraping-mcp \
     --filter @nexus/session-sync --filter @nexus/stealth-browser --filter @nexus/stream-recovery \
     --filter @nexus/supervisor --filter @nexus/think-parser --filter @nexus/tool-registry \
-    --filter @nexus/video-search --filter @nexus/wiki
+    --filter @nexus/video-search --filter @nexus/wiki \
+    --filter @nexus/autotune --filter @nexus/parseltongue --filter @nexus/ragtime \
+    --filter @nexus/ultraplinian
 
 # Source is bind-mounted at runtime — no COPY here
 ENV NODE_ENV=development
@@ -242,6 +250,10 @@ RUN pnpm --filter @nexus/shared build && \
     pnpm --filter @nexus/tool-registry build && \
     pnpm --filter @nexus/video-search build && \
     pnpm --filter @nexus/wiki build && \
+    pnpm --filter @nexus/autotune build && \
+    pnpm --filter @nexus/parseltongue build && \
+    pnpm --filter @nexus/ragtime build && \
+    pnpm --filter @nexus/ultraplinian build && \
     pnpm --filter @nexus/api build
 
 # ─── Stage 3: pruner — pnpm deploy FROM builder so workspace dist/ files exist ─
