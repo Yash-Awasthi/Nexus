@@ -172,7 +172,10 @@ export default function Simulation() {
     setLoadingPersonas(true);
     try {
       const r = await fetch("/api/simulate/personas");
-      if (r.ok) setPersonas(await r.json());
+      if (r.ok) {
+        const data = await r.json();
+        setPersonas(Array.isArray(data) ? data : (data?.personas ?? data?.items ?? []));
+      }
     } catch {}
     setLoadingPersonas(false);
   }, []);
@@ -181,7 +184,10 @@ export default function Simulation() {
     setLoadingEnvs(true);
     try {
       const r = await fetch("/api/simulate/environments");
-      if (r.ok) setEnvironments(await r.json());
+      if (r.ok) {
+        const data = await r.json();
+        setEnvironments(Array.isArray(data) ? data : (data?.environments ?? data?.items ?? []));
+      }
     } catch {}
     setLoadingEnvs(false);
   }, []);
@@ -190,7 +196,10 @@ export default function Simulation() {
     setLoadingRuns(true);
     try {
       const r = await fetch("/api/simulate/runs");
-      if (r.ok) setRuns(await r.json());
+      if (r.ok) {
+        const data = await r.json();
+        setRuns(Array.isArray(data) ? data : (data?.runs ?? data?.items ?? []));
+      }
     } catch {}
     setLoadingRuns(false);
   }, []);
@@ -571,13 +580,13 @@ export default function Simulation() {
                     <CardTitle className="text-sm">Tick Log</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {selectedRun.tickLog.length === 0 ? (
+                    {(selectedRun.tickLog ?? []).length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">
                         No ticks yet — press "Next tick" or "Run all" to start
                       </p>
                     ) : (
                       <div className="space-y-3 max-h-96 overflow-y-auto">
-                        {[...selectedRun.tickLog].reverse().map((tick) => (
+                        {[...(selectedRun.tickLog ?? [])].reverse().map((tick) => (
                           <div key={tick.tick} className="border-l-2 border-emerald-400 pl-3">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">

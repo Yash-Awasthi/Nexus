@@ -471,7 +471,7 @@ export default function MarketplacePage() {
                           </span>
                           <span className="flex items-center gap-1">
                             <Download className="size-3" />
-                            {item.installs.toLocaleString()}
+                            {(item.installs ?? 0).toLocaleString()}
                           </span>
                         </div>
                       </div>
