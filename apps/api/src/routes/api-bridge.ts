@@ -7722,4 +7722,442 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
       return reply.send({ ok: true, moduleId, enabled, active: _stmActiveModules });
     },
   );
+
+  // ── Build Tasks (in-memory Kanban) ─────────────────────────────────────────
+  // Frontend: apps/ui/app/routes/build.tsx
+  // Endpoints: GET/POST /api/build/tasks, PATCH /:id/status,
+  //            POST /:id/claim|release|submit, DELETE /:id, POST /steal
+
+  interface _BuildTask {
+    id: number;
+    userId: number;
+    parentId: number | null;
+    title: string;
+    description: string | null;
+    status: string;
+    claimedBy: string | null;
+    claimedAt: string | null;
+    output: string | null;
+    submittedAt: string | null;
+    isLocked: boolean;
+    meta: Record<string, unknown>;
+    createdAt: string;
+    updatedAt: string;
+  }
+
+  let _btId = 1;
+  const _buildTaskStore = new Map<number, _BuildTask>();
+  const _btNow = () => new Date().toISOString();
+
+  app.get("/build/tasks", async (_req, reply) => {
+    return reply.send({ tasks: [..._buildTaskStore.values()] });
+  });
+
+  // IMPORTANT: register /steal before /:id routes so static path wins
+  app.post<{ Body: { agentId?: string } }>("/build/tasks/steal", async (request, reply) => {
+    const agentId = request.body?.agentId ?? "agent";
+    const available = [..._buildTaskStore.values()].find(
+      (t) => t.status === "planned" && !t.claimedBy,
+    );
+    if (!available) return reply.send({ task: null, message: "No available tasks" });
+    available.status = "claimed";
+    available.claimedBy = agentId;
+    available.claimedAt = _btNow();
+    available.updatedAt = _btNow();
+    _buildTaskStore.set(available.id, available);
+    return reply.send({ task: available });
+  });
+
+  app.post<{
+    Body: { title: string; description?: string; status?: string; parentId?: number | null };
+  }>("/build/tasks", async (request, reply) => {
+    const { title, description = null, status = "planned", parentId = null } = request.body ?? {};
+    if (!title?.trim()) return reply.code(400).send({ error: "title required" });
+    const task: _BuildTask = {
+      id: _btId++,
+      userId: 1,
+      parentId: parentId ?? null,
+      title: title.trim(),
+      description: description ?? null,
+      status,
+      claimedBy: null,
+      claimedAt: null,
+      output: null,
+      submittedAt: null,
+      isLocked: false,
+      meta: {},
+      createdAt: _btNow(),
+      updatedAt: _btNow(),
+    };
+    _buildTaskStore.set(task.id, task);
+    return reply.code(201).send(task);
+  });
+
+  app.patch<{ Params: { id: string }; Body: { status?: string; feedback?: string } }>(
+    "/build/tasks/:id/status",
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10);
+      const task = _buildTaskStore.get(id);
+      if (!task) return reply.code(404).send({ error: "not found" });
+      if (request.body?.status) task.status = request.body.status;
+      task.updatedAt = _btNow();
+      _buildTaskStore.set(id, task);
+      return reply.send(task);
+    },
+  );
+
+  app.post<{ Params: { id: string } }>("/build/tasks/:id/claim", async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const task = _buildTaskStore.get(id);
+    if (!task) return reply.code(404).send({ error: "not found" });
+    task.status = "claimed";
+    task.claimedBy = "user";
+    task.claimedAt = _btNow();
+    task.updatedAt = _btNow();
+    _buildTaskStore.set(id, task);
+    return reply.send(task);
+  });
+
+  app.post<{ Params: { id: string } }>("/build/tasks/:id/release", async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const task = _buildTaskStore.get(id);
+    if (!task) return reply.code(404).send({ error: "not found" });
+    task.status = "planned";
+    task.claimedBy = null;
+    task.claimedAt = null;
+    task.updatedAt = _btNow();
+    _buildTaskStore.set(id, task);
+    return reply.send(task);
+  });
+
+  app.post<{ Params: { id: string }; Body: { output: string } }>(
+    "/build/tasks/:id/submit",
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10);
+      const task = _buildTaskStore.get(id);
+      if (!task) return reply.code(404).send({ error: "not found" });
+      task.status = "review";
+      task.output = request.body?.output ?? "";
+      task.submittedAt = _btNow();
+      task.updatedAt = _btNow();
+      _buildTaskStore.set(id, task);
+      return reply.send(task);
+    },
+  );
+
+  app.delete<{ Params: { id: string } }>("/build/tasks/:id", async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    _buildTaskStore.delete(id);
+    return reply.send({ ok: true });
+  });
+
+  // ── Prompts (in-memory, versioned) ─────────────────────────────────────────
+  // Frontend: apps/ui/app/routes/prompts.tsx
+  // Endpoints: GET/POST /api/prompts, GET/DELETE /api/prompts/:id,
+  //            POST /api/prompts/:id/versions
+
+  interface _PromptVersion {
+    id: string;
+    versionNum: number;
+    content: string;
+    model: string | null;
+    temperature: number | null;
+    createdAt: string;
+  }
+  interface _Prompt {
+    id: string;
+    name: string;
+    description: string | null;
+    createdAt: string;
+    versions: _PromptVersion[];
+  }
+  const _promptStore = new Map<string, _Prompt>();
+  const _puid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+  app.get("/prompts", async (_req, reply) => {
+    return reply.send({ prompts: [..._promptStore.values()] });
+  });
+
+  app.post<{ Body: { name: string; description?: string; content?: string } }>(
+    "/prompts",
+    async (request, reply) => {
+      const { name, description, content } = request.body ?? {};
+      if (!name?.trim()) return reply.code(400).send({ error: "name required" });
+      const now = _btNow();
+      const version: _PromptVersion = {
+        id: _puid(),
+        versionNum: 1,
+        content: content ?? "# {{role}}\n\nYou are a helpful assistant.\n\n## Instructions\n\n{{instructions}}\n\n## Input\n\n{{input}}",
+        model: null,
+        temperature: null,
+        createdAt: now,
+      };
+      const prompt: _Prompt = {
+        id: _puid(),
+        name: name.trim(),
+        description: description ?? null,
+        createdAt: now,
+        versions: [version],
+      };
+      _promptStore.set(prompt.id, prompt);
+      return reply.code(201).send(prompt);
+    },
+  );
+
+  app.get<{ Params: { id: string } }>("/prompts/:id", async (request, reply) => {
+    const p = _promptStore.get(request.params.id);
+    if (!p) return reply.code(404).send({ error: "not found" });
+    return reply.send(p);
+  });
+
+  app.post<{
+    Params: { id: string };
+    Body: { content: string; model?: string; temperature?: number };
+  }>("/prompts/:id/versions", async (request, reply) => {
+    const p = _promptStore.get(request.params.id);
+    if (!p) return reply.code(404).send({ error: "not found" });
+    const { content = "", model = null, temperature = null } = request.body ?? {};
+    const nextNum = (p.versions[0]?.versionNum ?? 0) + 1;
+    const version: _PromptVersion = {
+      id: _puid(),
+      versionNum: nextNum,
+      content,
+      model,
+      temperature,
+      createdAt: _btNow(),
+    };
+    p.versions = [version];
+    _promptStore.set(p.id, p);
+    return reply.send(version);
+  });
+
+  app.delete<{ Params: { id: string } }>("/prompts/:id", async (request, reply) => {
+    _promptStore.delete(request.params.id);
+    return reply.send({ ok: true });
+  });
+
+  // ── Web Scraping ────────────────────────────────────────────────────────────
+  // Frontend: apps/ui/app/routes/scrape.tsx
+  // Endpoints: GET /api/web-scraping/providers, POST /api/web-scraping/scrape,
+  //            POST /api/web-scraping/crawl, POST /api/web-scraping/exa/search,
+  //            POST /api/web-scraping/exa/contents
+
+  app.get("/web-scraping/providers", async (_req, reply) => {
+    const providers: string[] = [];
+    if (process.env.FIRECRAWL_API_KEY) providers.push("firecrawl");
+    if (process.env.EXA_API_KEY) providers.push("exa");
+    if (process.env.TAVILY_API_KEY) providers.push("tavily");
+    providers.push("basic"); // always available
+    return reply.send({ providers });
+  });
+
+  const _scrapeHeaders = { "User-Agent": "Mozilla/5.0 NexusScraper/1.0" };
+  const _extractText = (html: string) =>
+    html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 12000);
+  const _extractTitle = (html: string) =>
+    html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ?? "";
+
+  app.post<{ Body: { url: string; format?: string } }>(
+    "/web-scraping/scrape",
+    async (request, reply) => {
+      const { url } = request.body ?? {};
+      if (!url) return reply.code(400).send({ error: "url required" });
+
+      // Firecrawl if configured
+      if (process.env.FIRECRAWL_API_KEY) {
+        try {
+          const r = await fetch("https://api.firecrawl.dev/v1/scrape", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`,
+            },
+            body: JSON.stringify({ url, formats: ["markdown", "html"] }),
+            signal: AbortSignal.timeout(15000),
+          });
+          if (r.ok) {
+            const d = (await r.json()) as { data?: { markdown?: string; metadata?: { title?: string } } };
+            return reply.send({
+              url,
+              success: true,
+              title: d.data?.metadata?.title ?? "",
+              content: d.data?.markdown ?? "",
+              markdown: d.data?.markdown ?? "",
+            });
+          }
+        } catch { /* fall through to basic */ }
+      }
+
+      // Basic fetch scraper
+      try {
+        const r = await fetch(url, {
+          headers: _scrapeHeaders,
+          signal: AbortSignal.timeout(12000),
+        });
+        const html = await r.text();
+        return reply.send({
+          url,
+          success: true,
+          title: _extractTitle(html),
+          content: _extractText(html),
+          html: html.slice(0, 50000),
+          metadata: { statusCode: r.status },
+        });
+      } catch (e) {
+        return reply.send({ url, success: false, content: "", error: String(e) });
+      }
+    },
+  );
+
+  app.post<{ Body: { url: string; limit?: number; maxDepth?: number } }>(
+    "/web-scraping/crawl",
+    async (request, reply) => {
+      const { url, limit = 5 } = request.body ?? {};
+      if (!url) return reply.code(400).send({ error: "url required" });
+
+      if (process.env.FIRECRAWL_API_KEY) {
+        try {
+          const r = await fetch("https://api.firecrawl.dev/v1/crawl", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`,
+            },
+            body: JSON.stringify({ url, limit }),
+            signal: AbortSignal.timeout(30000),
+          });
+          if (r.ok) {
+            const d = (await r.json()) as { data?: unknown[] };
+            const pages = d.data ?? [];
+            return reply.send({ url, success: true, pages, totalPages: pages.length });
+          }
+        } catch { /* fall through */ }
+      }
+
+      // Basic: scrape root page + extract same-origin links
+      try {
+        const r = await fetch(url, { headers: _scrapeHeaders, signal: AbortSignal.timeout(12000) });
+        const html = await r.text();
+        const rootPage = { url, title: _extractTitle(html), content: _extractText(html), success: true };
+
+        // Extract up to (limit - 1) same-origin links
+        const origin = new URL(url).origin;
+        const linkRe = /href=["']([^"'#?]+)["']/gi;
+        const seenLinks = new Set<string>([url]);
+        const toFetch: string[] = [];
+        let m: RegExpExecArray | null;
+        while ((m = linkRe.exec(html)) && toFetch.length < limit - 1) {
+          try {
+            const abs = new URL(m[1]!, url).href;
+            if (abs.startsWith(origin) && !seenLinks.has(abs)) {
+              seenLinks.add(abs);
+              toFetch.push(abs);
+            }
+          } catch { /* invalid URL */ }
+        }
+
+        const subPages = await Promise.allSettled(
+          toFetch.map(async (link) => {
+            const sr = await fetch(link, { headers: _scrapeHeaders, signal: AbortSignal.timeout(8000) });
+            const sh = await sr.text();
+            return { url: link, title: _extractTitle(sh), content: _extractText(sh), success: true };
+          }),
+        );
+
+        const pages = [rootPage, ...subPages.filter((p) => p.status === "fulfilled").map((p) => (p as PromiseFulfilledResult<typeof rootPage>).value)];
+        return reply.send({ url, success: true, pages, totalPages: pages.length });
+      } catch (e) {
+        return reply.send({ url, success: false, pages: [], totalPages: 0, error: String(e) });
+      }
+    },
+  );
+
+  app.post<{ Body: { query: string; numResults?: number; useAutoprompt?: boolean } }>(
+    "/web-scraping/exa/search",
+    async (request, reply) => {
+      const { query, numResults = 5 } = request.body ?? {};
+      if (!query) return reply.code(400).send({ error: "query required" });
+
+      if (process.env.EXA_API_KEY) {
+        try {
+          const r = await fetch("https://api.exa.ai/search", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-api-key": process.env.EXA_API_KEY },
+            body: JSON.stringify({ query, numResults, type: "neural", useAutoprompt: true }),
+            signal: AbortSignal.timeout(15000),
+          });
+          if (r.ok) {
+            const d = (await r.json()) as { results?: unknown[] };
+            return reply.send({ results: d.results ?? [] });
+          }
+        } catch { /* fall through */ }
+      }
+
+      // Tavily fallback
+      if (process.env.TAVILY_API_KEY) {
+        try {
+          const r = await fetch("https://api.tavily.com/search", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ api_key: process.env.TAVILY_API_KEY, query, max_results: numResults, search_depth: "basic" }),
+            signal: AbortSignal.timeout(15000),
+          });
+          if (r.ok) {
+            const d = (await r.json()) as { results?: { url: string; title: string; content: string; score: number }[] };
+            const results = (d.results ?? []).map((item) => ({
+              url: item.url,
+              title: item.title,
+              text: item.content,
+              score: item.score,
+            }));
+            return reply.send({ results });
+          }
+        } catch { /* ignore */ }
+      }
+
+      return reply.send({ results: [], message: "No search providers configured. Set EXA_API_KEY or TAVILY_API_KEY." });
+    },
+  );
+
+  app.post<{ Body: { urls?: string[]; ids?: string[]; text?: boolean } }>(
+    "/web-scraping/exa/contents",
+    async (request, reply) => {
+      const urls = request.body?.urls ?? request.body?.ids ?? [];
+
+      if (process.env.EXA_API_KEY && urls.length > 0) {
+        try {
+          const r = await fetch("https://api.exa.ai/contents", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-api-key": process.env.EXA_API_KEY },
+            body: JSON.stringify({ ids: urls, text: true }),
+            signal: AbortSignal.timeout(15000),
+          });
+          if (r.ok) {
+            const d = (await r.json()) as { results?: unknown[] };
+            return reply.send({ results: d.results ?? [] });
+          }
+        } catch { /* fall through */ }
+      }
+
+      // Basic: fetch each URL
+      const results = await Promise.allSettled(
+        urls.slice(0, 5).map(async (url) => {
+          const r = await fetch(url, { headers: _scrapeHeaders, signal: AbortSignal.timeout(8000) });
+          const html = await r.text();
+          return { url, title: _extractTitle(html), text: _extractText(html), success: true };
+        }),
+      );
+      return reply.send({
+        results: results
+          .filter((r) => r.status === "fulfilled")
+          .map((r) => (r as PromiseFulfilledResult<{ url: string; title: string; text: string; success: boolean }>).value),
+      });
+    },
+  );
 }
