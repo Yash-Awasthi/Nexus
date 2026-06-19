@@ -102,7 +102,15 @@ export default function Scrape() {
   useEffect(() => {
     fetch("/api/web-scraping/providers")
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => d && setProviders(d.providers ?? []))
+      .then((d) => {
+        if (!d) return;
+        const raw: unknown[] = Array.isArray(d.providers) ? d.providers : [];
+        setProviders(
+          raw.map((p) =>
+            typeof p === "string" ? p : ((p as Record<string, unknown>).name ?? (p as Record<string, unknown>).id ?? "") as string,
+          ).filter(Boolean),
+        );
+      })
       .catch(() => {});
   }, []);
 
@@ -123,7 +131,18 @@ export default function Scrape() {
         setErr(d.error ?? "Scrape failed");
         return;
       }
-      setScrapeResult(await r.json());
+      const raw = await r.json();
+      // Normalize backend shape {text, status, html, ...} → frontend ScrapeResult
+      setScrapeResult({
+        url: raw.url ?? url,
+        title: raw.title ?? raw.metadata?.title ?? "",
+        content: raw.content ?? raw.text ?? raw.markdown ?? "",
+        markdown: raw.markdown ?? raw.text ?? "",
+        html: raw.html ?? "",
+        metadata: raw.metadata ?? { statusCode: raw.statusCode, engine: raw.engine },
+        success: raw.success ?? (raw.status !== "error" && raw.status !== "failed"),
+        error: raw.error,
+      });
     } catch {
       setErr("Scrape failed");
     } finally {
@@ -149,7 +168,20 @@ export default function Scrape() {
         setErr(d.error ?? "Crawl failed");
         return;
       }
-      setCrawlResult(await r.json());
+      const raw = await r.json();
+      // Normalize: backend returns {pages, total} but interface expects {pages, totalPages}
+      setCrawlResult({
+        url: raw.url ?? url,
+        pages: (raw.pages ?? []).map((p: Record<string, unknown>) => ({
+          url: p.url ?? "",
+          title: String(p.title ?? ""),
+          content: String(p.content ?? p.text ?? ""),
+          markdown: String(p.markdown ?? p.text ?? ""),
+          success: p.success ?? p.status !== "error",
+        })),
+        totalPages: raw.totalPages ?? raw.total ?? (raw.pages ?? []).length,
+        success: raw.success ?? true,
+      });
     } catch {
       setErr("Crawl failed");
     } finally {
