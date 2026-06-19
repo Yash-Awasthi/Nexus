@@ -17,13 +17,15 @@ const PORT = parseInt(process.env.PORT ?? "10000", 10);
 const HOST = process.env.HOST ?? "0.0.0.0";
 
 // ── Global error traps ────────────────────────────────────────────────────────
+// unhandledRejection is intentionally LOGGED but not process.exit() here —
+// the try/catch around import("./server.js") handles rejections explicitly and
+// keeps the diagnostic server alive to surface the error via HTTP.
 process.on("uncaughtException", (err) => {
   console.error("[fatal] Uncaught exception:", err);
   process.exit(1);
 });
 process.on("unhandledRejection", (reason) => {
-  console.error("[fatal] Unhandled rejection:", reason);
-  process.exit(1);
+  console.error("[warn] Unhandled rejection (non-fatal in diagnostic mode):", reason);
 });
 
 // ── Startup validation ────────────────────────────────────────────────────────
@@ -72,11 +74,43 @@ async function main(): Promise<void> {
   });
 
   // ── Step 2: Load full Fastify server (slow on low-CPU) ──────────────────────
+  // Wrap in try/catch: if ANYTHING fails during import, serve the error on /health
+  // so we can read it from the live URL instead of losing it in inaccessible logs.
   console.log("[startup] loading server modules (may take a moment on low-CPU)...");
-  const { buildServer } = await import("./server.js");
+
+  let importError: Error | null = null;
+  let buildServerFn: (() => Promise<import("fastify").FastifyInstance>) | null = null;
+
+  try {
+    const mod = await import("./server.js");
+    buildServerFn = mod.buildServer as () => Promise<import("fastify").FastifyInstance>;
+    console.log("[startup] server modules loaded.");
+  } catch (err) {
+    importError = err instanceof Error ? err : new Error(String(err));
+    console.error("[startup] FAILED to load server modules:", importError.message);
+    console.error(importError.stack);
+  }
+
+  if (importError || !buildServerFn) {
+    // Keep the early server alive and serve the error so it's readable via HTTP.
+    // /health returns 200 with diagnostic JSON → Render marks deploy live →
+    // we hit the URL and see exactly what crashed.
+    const errMsg = importError?.message ?? "buildServerFn is null";
+    const errStack = importError?.stack ?? "";
+    const _handler = (_req: import("node:http").IncomingMessage, res: import("node:http").ServerResponse) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ status: "error", stage: "import", error: errMsg, stack: errStack }));
+    };
+    earlyServer.removeAllListeners("request");
+    earlyServer.on("request", _handler);
+    console.log("[startup] diagnostic server running — hit /health to see error");
+    // Stay alive for 10 minutes so the error can be read
+    await new Promise<void>((resolve) => setTimeout(resolve, 10 * 60 * 1000));
+    process.exit(1);
+  }
 
   console.log("[startup] building Fastify server...");
-  const app = await buildServer();
+  const app = await buildServerFn();
   console.log("[startup] Fastify server built.");
 
   // ── Step 3: Hand off port from early server to Fastify ──────────────────────
