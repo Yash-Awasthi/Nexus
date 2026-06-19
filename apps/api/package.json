@@ -98,7 +98,12 @@
     "@nexus/bots": "workspace:*",
     "@nexus/wiki": "workspace:*",
     "@nexus/supervisor": "workspace:*",
+    "@nexus/autotune": "workspace:*",
+    "@nexus/parseltongue": "workspace:*",
+    "@nexus/ragtime": "workspace:*",
+    "@nexus/ultraplinian": "workspace:*",
     "drizzle-orm": "^0.45.2",
-    "fastify": "^5.8.5"
+    "fastify": "^5.8.5",
+    "pg": "^8.13.3"
   }
 }

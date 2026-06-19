@@ -2426,10 +2426,7 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // -- KNOWLEDGE BASES -------------------------------------------------------
-
-  app.get("/kb", async (_req, reply) => {
-    return reply.send({ knowledgeBases: Array.from(_kbStore.values()), total: _kbStore.size });
-  });
+  // GET /kb is declared above in the KG section (real implementation via @nexus/knowledge-graph).
 
   app.post<{ Body: { name: string } }>("/kb", async (request, reply) => {
     const id = crypto.randomUUID();

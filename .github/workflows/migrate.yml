@@ -41,8 +41,30 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
+  check:
+    name: Check DATABASE_URL is configured
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - id: check
+        name: Skip if DATABASE_URL not set
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URL not configured for this environment — skipping migration."
+            echo "Add DATABASE_URL to the 'production' environment secrets to enable auto-migration."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
   migrate:
     name: Run Drizzle migrations
+    needs: check
+    if: needs.check.outputs.configured == 'true'
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment || 'production' }}
     permissions:
@@ -75,7 +97,34 @@ jobs:
         if: ${{ github.event.inputs.dry_run != 'true' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: pnpm --filter @nexus/db db:migrate
+        # Run migrations programmatically via Drizzle's Node.js migrator API.
+        # This bypasses drizzle-kit's interactive prompt (strict:true) and
+        # surfaces the real PostgreSQL error instead of pnpm's wrapper message.
+        run: |
+          node --input-type=module <<'EOF'
+          import { drizzle } from "drizzle-orm/node-postgres";
+          import { migrate } from "drizzle-orm/node-postgres/migrator";
+          import pg from "pg";
+          import { fileURLToPath } from "url";
+          import { dirname, join } from "path";
+
+          const __dirname = dirname(fileURLToPath(import.meta.url));
+          const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+          const db = drizzle(pool);
+
+          try {
+            await migrate(db, {
+              migrationsFolder: join(__dirname, "packages/db/migrations"),
+              migrationsTable: "nexus_drizzle_migrations",
+            });
+            console.log("✅ Migrations applied successfully");
+          } catch (err) {
+            console.error("❌ Migration failed:", err.message);
+            process.exit(1);
+          } finally {
+            await pool.end();
+          }
+          EOF
 
       - name: Verify schema health
         env:

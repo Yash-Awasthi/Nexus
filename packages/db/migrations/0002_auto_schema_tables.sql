@@ -7,6 +7,9 @@
 -- Safe to run multiple times (all statements are idempotent).
 -- Depends on: pgvector extension (for memory_entries.embedding column).
 
+-- Enable pgvector (Neon has it available; must be explicitly created)
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- ─── memory_entries ──────────────────────────────────────────────────────────
 -- Managed by: @nexus/memory PgVectorStore.init()
 

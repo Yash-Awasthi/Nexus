@@ -66,8 +66,13 @@ export default function WebSearch() {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d) {
-          setProviders(d.providers ?? []);
-          setPreferred(d.preferred ?? "");
+          const raw: unknown[] = Array.isArray(d.providers) ? d.providers : [];
+          setProviders(
+            raw.map((p) =>
+              typeof p === "string" ? p : ((p as Record<string, unknown>)?.name ?? (p as Record<string, unknown>)?.id ?? "") as string,
+            ).filter(Boolean),
+          );
+          setPreferred(typeof d.preferred === "string" ? d.preferred : "");
         }
       })
       .catch(() => {});

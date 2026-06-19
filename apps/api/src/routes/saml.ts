@@ -33,6 +33,7 @@ import { db } from "@nexus/db";
 import { users, refreshTokens } from "@nexus/db/schema";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
 
 // 30 SAML initiations per 15 min per IP — prevents SSO redirect spam

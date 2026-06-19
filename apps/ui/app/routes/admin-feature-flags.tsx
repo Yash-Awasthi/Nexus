@@ -73,7 +73,7 @@ export default function AdminFeatureFlags() {
       const r = await fetch("/api/feature-flags/admin/flags");
       if (r.ok) {
         const d = await r.json();
-        setFlags(d.flags ?? d);
+        setFlags(Array.isArray(d.flags) ? d.flags : Array.isArray(d) ? d : []);
       }
     } catch {}
     setLoading(false);

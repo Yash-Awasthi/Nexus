@@ -30,10 +30,9 @@ import { eq, and, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
 import { emitAuditEvent } from "../lib/audit-emitter.js";
-
 import { sha256hex as _sha256hex } from "../lib/crypto-utils.js";
-import { getSharedKV } from "../lib/shared-kv.js";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
+import { getSharedKV } from "../lib/shared-kv.js";
 
 // 20 OIDC callback attempts per 15 minutes per IP — prevents code replay attacks
 const oidcRateLimit = makeRateLimitPreHandler({

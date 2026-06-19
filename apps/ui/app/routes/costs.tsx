@@ -173,7 +173,7 @@ export default function Costs() {
                   Month-to-Date
                 </p>
                 <p className="text-2xl font-bold text-emerald-600">
-                  {dashboard ? fmt(dashboard.mtd, dashboard.currency) : "—"}
+                  {dashboard ? fmt(dashboard.mtd ?? 0, dashboard.currency) : "—"}
                 </p>
                 {dashboard?.trend && (
                   <p
@@ -197,7 +197,7 @@ export default function Costs() {
                   Week-to-Date
                 </p>
                 <p className="text-2xl font-bold">
-                  {dashboard ? fmt(dashboard.wtd, dashboard.currency) : "—"}
+                  {dashboard ? fmt(dashboard.wtd ?? 0, dashboard.currency) : "—"}
                 </p>
               </CardContent>
             </Card>
@@ -207,7 +207,7 @@ export default function Costs() {
                   Year-to-Date
                 </p>
                 <p className="text-2xl font-bold">
-                  {dashboard ? fmt(dashboard.ytd, dashboard.currency) : "—"}
+                  {dashboard ? fmt(dashboard.ytd ?? 0, dashboard.currency) : "—"}
                 </p>
               </CardContent>
             </Card>

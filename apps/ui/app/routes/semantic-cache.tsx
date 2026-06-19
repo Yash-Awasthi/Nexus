@@ -151,7 +151,7 @@ export default function SemanticCache() {
     setSavingConfig(false);
   }, [editConfig]);
 
-  const hitRatePct = stats ? Math.round(stats.hitRate * 100) : 0;
+  const hitRatePct = stats ? Math.round((stats.hitRate ?? 0) * 100) : 0;
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -182,7 +182,7 @@ export default function SemanticCache() {
           <Card>
             <CardContent className="pt-4">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Entries</p>
-              <p className="text-2xl font-bold">{stats.totalEntries.toLocaleString()}</p>
+              <p className="text-2xl font-bold">{(stats.totalEntries ?? 0).toLocaleString()}</p>
               {stats.sizeBytes && (
                 <p className="text-xs text-muted-foreground mt-1">
                   {(stats.sizeBytes / 1024).toFixed(1)} KB
@@ -198,16 +198,16 @@ export default function SemanticCache() {
               </p>
               <p className="text-2xl font-bold text-green-600">{hitRatePct}%</p>
               <p className="text-xs text-muted-foreground mt-1">
-                {stats.totalHits.toLocaleString()} hits
+                {(stats.totalHits ?? 0).toLocaleString()} hits
               </p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Misses</p>
-              <p className="text-2xl font-bold">{Math.round(stats.missRate * 100)}%</p>
+              <p className="text-2xl font-bold">{Math.round((stats.missRate ?? 0) * 100)}%</p>
               <p className="text-xs text-muted-foreground mt-1">
-                {stats.totalMisses.toLocaleString()} misses
+                {(stats.totalMisses ?? 0).toLocaleString()} misses
               </p>
             </CardContent>
           </Card>

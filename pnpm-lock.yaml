@@ -101,6 +101,9 @@ importers:
       '@nexus/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@nexus/autotune':
+        specifier: workspace:*
+        version: link:../../packages/autotune
       '@nexus/billing':
         specifier: workspace:*
         version: link:../../packages/billing
@@ -215,6 +218,9 @@ importers:
       '@nexus/obs-providers':
         specifier: workspace:*
         version: link:../../packages/obs-providers
+      '@nexus/parseltongue':
+        specifier: workspace:*
+        version: link:../../packages/parseltongue
       '@nexus/plugin-sdk':
         specifier: workspace:*
         version: link:../../packages/plugin-sdk
@@ -224,6 +230,9 @@ importers:
       '@nexus/prediction-market':
         specifier: workspace:*
         version: link:../../packages/prediction-market
+      '@nexus/ragtime':
+        specifier: workspace:*
+        version: link:../../packages/ragtime
       '@nexus/redteam':
         specifier: workspace:*
         version: link:../../packages/redteam
@@ -290,6 +299,9 @@ importers:
       '@nexus/tool-registry':
         specifier: workspace:*
         version: link:../../packages/tool-registry
+      '@nexus/ultraplinian':
+        specifier: workspace:*
+        version: link:../../packages/ultraplinian
       '@nexus/video-search':
         specifier: workspace:*
         version: link:../../packages/video-search
@@ -308,6 +320,9 @@ importers:
       fastify:
         specifier: ^5.8.5
         version: 5.8.5
+      pg:
+        specifier: ^8.13.3
+        version: 8.21.0
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -1037,6 +1052,12 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@25.9.3)(lightningcss@1.32.0)(terser@5.48.0)
 
+  packages/autotune:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+
   packages/best-of-n:
     devDependencies:
       '@vitest/coverage-v8':
@@ -1725,6 +1746,12 @@ importers:
         specifier: '*'
         version: 2.1.9(@types/node@25.9.3)(lightningcss@1.32.0)(terser@5.48.0)
 
+  packages/parseltongue:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+
   packages/pipeline-signal:
     devDependencies:
       typescript:
@@ -1802,6 +1829,12 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@25.9.3)(lightningcss@1.32.0)(terser@5.48.0)
+
+  packages/ragtime:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
 
   packages/redteam:
     devDependencies:
@@ -2132,6 +2165,12 @@ importers:
       vitest:
         specifier: '*'
         version: 2.1.9(@types/node@25.9.3)(lightningcss@1.32.0)(terser@5.48.0)
+
+  packages/ultraplinian:
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
 
   packages/video-search:
     devDependencies:

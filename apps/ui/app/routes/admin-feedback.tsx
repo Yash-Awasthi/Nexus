@@ -145,7 +145,7 @@ export default function AdminFeedback() {
             <Card>
               <CardContent className="pt-4">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">Total</p>
-                <p className="text-3xl font-bold">{stats.totalFeedback.toLocaleString()}</p>
+                <p className="text-3xl font-bold">{(stats.totalFeedback ?? 0).toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground mt-1">responses rated</p>
               </CardContent>
             </Card>
@@ -156,7 +156,7 @@ export default function AdminFeedback() {
                   Positive
                 </p>
                 <p className="text-3xl font-bold text-green-600">
-                  {stats.positiveCount.toLocaleString()}
+                  {(stats.positiveCount ?? 0).toLocaleString()}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {pct(stats.positiveCount, stats.totalFeedback)} of total
@@ -170,7 +170,7 @@ export default function AdminFeedback() {
                   Negative
                 </p>
                 <p className="text-3xl font-bold text-red-500">
-                  {stats.negativeCount.toLocaleString()}
+                  {(stats.negativeCount ?? 0).toLocaleString()}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {pct(stats.negativeCount, stats.totalFeedback)} of total

@@ -42,7 +42,8 @@ function useSessionHistory() {
       const res = await fetch("/api/stm/history");
       if (res.ok) {
         const data = await res.json();
-        setHistory(data.entries ?? []);
+        const entries = data?.entries;
+        setHistory(Array.isArray(entries) ? entries : []);
       }
     } catch {
       /* offline */
@@ -73,14 +74,18 @@ export default function STMPage() {
   const { history, refresh, clear } = useSessionHistory();
 
   useEffect(() => {
-    setActive(loadActiveSTM());
+    const loaded = loadActiveSTM();
+    setActive(Array.isArray(loaded) ? loaded : []);
   }, []);
 
+  const safeActive: STMModuleId[] = Array.isArray(active) ? active : [];
+  const safeHistory: SessionEntry[] = Array.isArray(history) ? history : [];
+
   const toggle = async (id: STMModuleId) => {
-    const next = active.includes(id) ? active.filter((m) => m !== id) : [...active, id];
+    const next = safeActive.includes(id) ? safeActive.filter((m) => m !== id) : [...safeActive, id];
 
     const module = STM_MODULES.find((m) => m.id === id);
-    const conflicts = module?.conflictsWith ?? [];
+    const conflicts: STMModuleId[] = module?.conflictsWith ?? [];
     const clean = next.filter((m) => !conflicts.includes(m as STMModuleId) || m === id);
 
     setActive(clean);
@@ -93,7 +98,7 @@ export default function STMPage() {
     }).catch(() => {});
   };
 
-  const conflicts = getConflicts(active);
+  const conflicts = getConflicts(safeActive);
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -108,9 +113,9 @@ export default function STMPage() {
             <h2 className="text-sm font-semibold">STM Modules</h2>
             <p className="text-xs text-muted-foreground">Prompt modifiers per round</p>
           </div>
-          {active.length > 0 && (
+          {safeActive.length > 0 && (
             <Badge variant="outline" className="ml-auto text-xs">
-              {active.length} active
+              {safeActive.length} active
             </Badge>
           )}
         </div>
@@ -118,7 +123,7 @@ export default function STMPage() {
         <ScrollArea className="flex-1">
           <div className="p-4 space-y-2.5">
             {STM_MODULES.map((m) => {
-              const isActive = active.includes(m.id);
+              const isActive = safeActive.includes(m.id);
               const hasConflict = conflicts.some((c) => c.includes(m.label));
 
               return (
@@ -201,7 +206,7 @@ export default function STMPage() {
             <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5" onClick={refresh}>
               <RefreshCcw className="size-3" /> Refresh
             </Button>
-            {history.length > 0 && (
+            {safeHistory.length > 0 && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -215,7 +220,7 @@ export default function STMPage() {
         </header>
 
         <ScrollArea className="flex-1">
-          {history.length === 0 ? (
+          {safeHistory.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-10">
               <MemoryStick className="size-12 text-primary/20" />
               <div>
@@ -228,7 +233,7 @@ export default function STMPage() {
             </div>
           ) : (
             <div className="p-5 space-y-2">
-              {history.map((entry) => {
+              {safeHistory.map((entry) => {
                 const isExpanded = expanded === entry.id;
                 return (
                   <div

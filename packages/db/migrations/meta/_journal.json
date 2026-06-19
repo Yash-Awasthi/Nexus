@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1718000000000,
+      "tag": "0000_bootstrap",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1718000000001,
+      "tag": "0001_signal_notify",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1718000000002,
+      "tag": "0002_auto_schema_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1718000000003,
+      "tag": "0003_enterprise_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1718000000004,
+      "tag": "0004_password_reset",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1718000000005,
+      "tag": "0005_email_verification",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1718000000006,
+      "tag": "0006_billing",
+      "breakpoints": true
+    }
+  ]
+}
