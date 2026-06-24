@@ -49,11 +49,11 @@ async function fetchYouTubeTranscript(videoId: string): Promise<TranscriptResult
 
 function extractYouTubeId(url: string): string | null {
   // youtu.be/<id>
-  const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  const shortMatch = /youtu\.be\/([a-zA-Z0-9_-]{11})/.exec(url);
   if (shortMatch) return shortMatch[1] ?? null;
 
   // youtube.com/watch?v=<id>
-  const longMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  const longMatch = /[?&]v=([a-zA-Z0-9_-]{11})/.exec(url);
   if (longMatch) return longMatch[1] ?? null;
 
   return null;
@@ -95,10 +95,7 @@ async function fetchUrlTranscript(): Promise<TranscriptResult> {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-export async function fetchTranscript(
-  source: string,
-  url: string,
-): Promise<TranscriptResult> {
+export async function fetchTranscript(source: string, url: string): Promise<TranscriptResult> {
   switch (source) {
     case "youtube": {
       const videoId = extractYouTubeId(url);
@@ -112,9 +109,7 @@ export async function fetchTranscript(
     case "url":
       return fetchUrlTranscript();
     default:
-      throw new Error(
-        `Unknown source type: "${source}". Must be one of: youtube, file, url`,
-      );
+      throw new Error(`Unknown source type: "${source}". Must be one of: youtube, file, url`);
   }
 }
 

@@ -902,7 +902,9 @@ describe("TelegramBotAdapter.handleUpdate", () => {
   });
 
   it("reports sendFailed when the Telegram API rejects", async () => {
-    const fetchFn = makeFetch([{ ok: false, status: 403, body: { ok: false, description: "blocked" } }]);
+    const fetchFn = makeFetch([
+      { ok: false, status: 403, body: { ok: false, description: "blocked" } },
+    ]);
     const bot = makeTelegram(echoHandler, fetchFn);
     const res = await bot.handleUpdate(tgUpdate());
     expect(res.handled).toBe(true);
@@ -913,8 +915,14 @@ describe("TelegramBotAdapter.handleUpdate", () => {
     const hooks = makeHooks();
     const bot = makeTelegram(echoHandler, makeFetch(), { hooks });
     await bot.handleUpdate(tgUpdate());
-    expect(hooks.emit).toHaveBeenCalledWith("task.before", expect.objectContaining({ platform: "telegram" }));
-    expect(hooks.emit).toHaveBeenCalledWith("task.after", expect.objectContaining({ platform: "telegram" }));
+    expect(hooks.emit).toHaveBeenCalledWith(
+      "task.before",
+      expect.objectContaining({ platform: "telegram" }),
+    );
+    expect(hooks.emit).toHaveBeenCalledWith(
+      "task.after",
+      expect.objectContaining({ platform: "telegram" }),
+    );
   });
 });
 
@@ -923,7 +931,19 @@ describe("TelegramBotAdapter.pollOnce", () => {
     const handler = vi.fn<BotHandler>().mockResolvedValue({ text: "ok" });
     // First fetch = getUpdates batch; subsequent = sendMessage calls
     const fetchFn = makeFetch([
-      { ok: true, body: { ok: true, result: [tgUpdate({}), { update_id: 101, message: { message_id: 6, from: { id: 7 }, chat: { id: 8 }, text: "yo", date: 1 } }] } },
+      {
+        ok: true,
+        body: {
+          ok: true,
+          result: [
+            tgUpdate({}),
+            {
+              update_id: 101,
+              message: { message_id: 6, from: { id: 7 }, chat: { id: 8 }, text: "yo", date: 1 },
+            },
+          ],
+        },
+      },
       { ok: true, body: { ok: true } },
       { ok: true, body: { ok: true } },
     ]);

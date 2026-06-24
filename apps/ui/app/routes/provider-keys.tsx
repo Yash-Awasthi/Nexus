@@ -98,7 +98,8 @@ export default function ProviderKeysPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ provider, apiKey, label: label || undefined }),
       });
-      if (res.status === 503) throw new Error("Server encryption is not configured. Contact admin.");
+      if (res.status === 503)
+        throw new Error("Server encryption is not configured. Contact admin.");
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error ?? `Failed to save key (${res.status})`);

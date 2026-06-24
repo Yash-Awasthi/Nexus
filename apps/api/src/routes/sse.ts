@@ -34,7 +34,7 @@ import { globalBus, formatSseEvent, formatPing, type SseEvent } from "@nexus/sse
 import type { FastifyInstance } from "fastify";
 
 import { startAgentEventsBridge, stopAgentEventsBridge } from "../lib/agent-events-bridge.js";
-import { requireAuth, requireAuthWithTier } from "../middleware/auth.js";
+import { requireAuthWithTier } from "../middleware/auth.js";
 
 const PING_INTERVAL_MS = 20_000;
 
@@ -107,7 +107,7 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
   ): Promise<boolean> {
     if (!userId) return false; // no user context → deny
     const dbUrl = process.env.DATABASE_URL;
-    if (!dbUrl) return true;  // no DB → allow (single-tenant dev mode)
+    if (!dbUrl) return true; // no DB → allow (single-tenant dev mode)
     try {
       const { default: pg } = await import("pg");
       const pool = new pg.Pool({ connectionString: dbUrl, max: 1 });

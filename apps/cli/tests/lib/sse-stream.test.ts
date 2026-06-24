@@ -5,7 +5,9 @@ import { parseSseBuffer } from "../../src/lib/sse-stream.js";
 
 describe("parseSseBuffer", () => {
   it("parses a complete event/data/id frame", () => {
-    const { frames, rest } = parseSseBuffer("event: agent.step\nid: a-1\ndata: {\"stepIndex\":0}\n\n");
+    const { frames, rest } = parseSseBuffer(
+      'event: agent.step\nid: a-1\ndata: {"stepIndex":0}\n\n',
+    );
     expect(rest).toBe("");
     expect(frames).toHaveLength(1);
     expect(frames[0]).toEqual({ event: "agent.step", id: "a-1", data: '{"stepIndex":0}' });
@@ -18,7 +20,7 @@ describe("parseSseBuffer", () => {
   });
 
   it("stitches a frame split across two buffers", () => {
-    const a = parseSseBuffer("event: agent.status\ndata: {\"sta");
+    const a = parseSseBuffer('event: agent.status\ndata: {"sta');
     const b = parseSseBuffer(a.rest + 'tus":"completed"}\n\n');
     expect(b.frames).toHaveLength(1);
     expect(b.frames[0]?.event).toBe("agent.status");

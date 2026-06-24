@@ -45,7 +45,10 @@ const CREATIVE_PATTERNS = /story|poem|write|imagine|fiction|narrative|character/
 const ANALYTICAL_PATTERNS = /analyze|compare|explain|why|how does|what is|evaluate/i;
 const CHAOTIC_PATTERNS = /wtf|!!!|random|chaos|wild|crazy|insane/i;
 
-export function detectContext(message: string, _history: Array<{ role: string; content: string }>): DetectionResult {
+export function detectContext(
+  message: string,
+  _history: Array<{ role: string; content: string }>,
+): DetectionResult {
   const scores: Record<ContextType, number> = {
     code: CODE_PATTERNS.test(message) ? 0.8 : 0.1,
     creative: CREATIVE_PATTERNS.test(message) ? 0.7 : 0.1,
@@ -58,12 +61,45 @@ export function detectContext(message: string, _history: Array<{ role: string; c
   return { type, confidence, scores };
 }
 
-const BASE_PARAMS: Record<ContextType, { temperature: number; top_p: number; frequency_penalty: number; presence_penalty: number; top_k: number }> = {
-  code:           { temperature: 0.2, top_p: 0.9, frequency_penalty: 0.0, presence_penalty: 0.0, top_k: 40 },
-  creative:       { temperature: 0.9, top_p: 0.95, frequency_penalty: 0.3, presence_penalty: 0.2, top_k: 80 },
-  analytical:     { temperature: 0.4, top_p: 0.9, frequency_penalty: 0.1, presence_penalty: 0.1, top_k: 50 },
-  conversational: { temperature: 0.7, top_p: 0.9, frequency_penalty: 0.2, presence_penalty: 0.1, top_k: 60 },
-  chaotic:        { temperature: 1.2, top_p: 1.0, frequency_penalty: 0.5, presence_penalty: 0.4, top_k: 100 },
+const BASE_PARAMS: Record<
+  ContextType,
+  {
+    temperature: number;
+    top_p: number;
+    frequency_penalty: number;
+    presence_penalty: number;
+    top_k: number;
+  }
+> = {
+  code: { temperature: 0.2, top_p: 0.9, frequency_penalty: 0.0, presence_penalty: 0.0, top_k: 40 },
+  creative: {
+    temperature: 0.9,
+    top_p: 0.95,
+    frequency_penalty: 0.3,
+    presence_penalty: 0.2,
+    top_k: 80,
+  },
+  analytical: {
+    temperature: 0.4,
+    top_p: 0.9,
+    frequency_penalty: 0.1,
+    presence_penalty: 0.1,
+    top_k: 50,
+  },
+  conversational: {
+    temperature: 0.7,
+    top_p: 0.9,
+    frequency_penalty: 0.2,
+    presence_penalty: 0.1,
+    top_k: 60,
+  },
+  chaotic: {
+    temperature: 1.2,
+    top_p: 1.0,
+    frequency_penalty: 0.5,
+    presence_penalty: 0.4,
+    top_k: 100,
+  },
 };
 
 export function computeAutoTuneParams(opts: {
@@ -85,8 +121,14 @@ export function computeAutoTuneParams(opts: {
   if (learnedDelta && learnedDelta.samples >= 3) {
     base.temperature = Math.max(0, Math.min(2, base.temperature + learnedDelta.temperature));
     base.top_p = Math.max(0, Math.min(1, base.top_p + learnedDelta.top_p));
-    base.frequency_penalty = Math.max(-2, Math.min(2, base.frequency_penalty + learnedDelta.frequency_penalty));
-    base.presence_penalty = Math.max(-2, Math.min(2, base.presence_penalty + learnedDelta.presence_penalty));
+    base.frequency_penalty = Math.max(
+      -2,
+      Math.min(2, base.frequency_penalty + learnedDelta.frequency_penalty),
+    );
+    base.presence_penalty = Math.max(
+      -2,
+      Math.min(2, base.presence_penalty + learnedDelta.presence_penalty),
+    );
   }
 
   const params = { ...base, ...(overrides ?? {}) };
@@ -102,8 +144,18 @@ export function computeAutoTuneParams(opts: {
 const EMA_ALPHA = 0.3;
 const RATING_DELTAS: Record<number, number> = { 1: -0.15, 2: -0.07, 3: 0, 4: 0.07, 5: 0.15 };
 
-export async function updateEma(context: ContextType, rating: number, store: EmaStore): Promise<EmaDelta> {
-  const existing = await store.get(context) ?? { temperature: 0, top_p: 0, frequency_penalty: 0, presence_penalty: 0, samples: 0 };
+export async function updateEma(
+  context: ContextType,
+  rating: number,
+  store: EmaStore,
+): Promise<EmaDelta> {
+  const existing = (await store.get(context)) ?? {
+    temperature: 0,
+    top_p: 0,
+    frequency_penalty: 0,
+    presence_penalty: 0,
+    samples: 0,
+  };
   const delta = RATING_DELTAS[rating] ?? 0;
   const updated: EmaDelta = {
     temperature: existing.temperature * (1 - EMA_ALPHA) + delta * EMA_ALPHA,

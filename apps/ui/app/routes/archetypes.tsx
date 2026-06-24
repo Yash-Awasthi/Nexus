@@ -386,15 +386,22 @@ export default function ArchetypesPage() {
             for (const a of data.archetypes) {
               if (!store.customArchetypes.find((x) => x.id === a.id)) {
                 store.addCustomArchetype({
-                  name: a.name, icon: a.icon, color: a.color ?? "bg-primary/20 border-primary/30",
-                  thinkingStyle: a.thinkingStyle, description: a.description,
-                  systemPrompt: a.systemPrompt, model: a.model, temperature: a.temperature,
+                  name: a.name,
+                  icon: a.icon,
+                  color: a.color ?? "bg-primary/20 border-primary/30",
+                  thinkingStyle: a.thinkingStyle,
+                  description: a.description,
+                  systemPrompt: a.systemPrompt,
+                  model: a.model,
+                  temperature: a.temperature,
                 });
               }
             }
           }
         }
-      } catch { /* offline — use local store */ }
+      } catch {
+        /* offline — use local store */
+      }
       setApiLoaded(true);
     }
     load();
@@ -406,15 +413,43 @@ export default function ArchetypesPage() {
       const res = await fetch("/api/archetypes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: data.name, icon: data.icon, thinkingStyle: data.thinkingStyle, description: data.description, systemPrompt: data.systemPrompt, model: data.model, temperature: data.temperature }),
+        body: JSON.stringify({
+          name: data.name,
+          icon: data.icon,
+          thinkingStyle: data.thinkingStyle,
+          description: data.description,
+          systemPrompt: data.systemPrompt,
+          model: data.model,
+          temperature: data.temperature,
+        }),
       });
       if (res.ok) {
         const created = await res.json();
-        store.addCustomArchetype({ name: created.name, icon: created.icon, color: "bg-primary/20 border-primary/30", thinkingStyle: created.thinkingStyle, description: created.description, systemPrompt: created.systemPrompt, model: created.model, temperature: created.temperature });
+        store.addCustomArchetype({
+          name: created.name,
+          icon: created.icon,
+          color: "bg-primary/20 border-primary/30",
+          thinkingStyle: created.thinkingStyle,
+          description: created.description,
+          systemPrompt: created.systemPrompt,
+          model: created.model,
+          temperature: created.temperature,
+        });
         return;
       }
-    } catch { /* offline — local only */ }
-    store.addCustomArchetype({ name: data.name, icon: data.icon || "🤖", color: "bg-primary/20 border-primary/30", thinkingStyle: data.thinkingStyle, description: data.description, systemPrompt: data.systemPrompt, model: data.model, temperature: data.temperature });
+    } catch {
+      /* offline — local only */
+    }
+    store.addCustomArchetype({
+      name: data.name,
+      icon: data.icon || "🤖",
+      color: "bg-primary/20 border-primary/30",
+      thinkingStyle: data.thinkingStyle,
+      description: data.description,
+      systemPrompt: data.systemPrompt,
+      model: data.model,
+      temperature: data.temperature,
+    });
   }
 
   // Merge builtins with store custom archetypes
@@ -453,7 +488,15 @@ export default function ArchetypesPage() {
       fetch(`/api/archetypes/${editTarget.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: data.name, icon: data.icon, thinkingStyle: data.thinkingStyle, description: data.description, systemPrompt: data.systemPrompt, model: data.model, temperature: data.temperature }),
+        body: JSON.stringify({
+          name: data.name,
+          icon: data.icon,
+          thinkingStyle: data.thinkingStyle,
+          description: data.description,
+          systemPrompt: data.systemPrompt,
+          model: data.model,
+          temperature: data.temperature,
+        }),
       }).catch(() => {});
     }
     setEditTarget(null);

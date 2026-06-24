@@ -33,6 +33,7 @@
     "@nexus/llm-drivers": "workspace:*",
     "@nexus/mcp-client": "workspace:*",
     "@nexus/memory": "workspace:*",
+    "@nexus/sandbox": "workspace:*",
     "@nexus/obs-providers": "workspace:*",
     "@nexus/pipeline-signal": "workspace:*",
     "@nexus/search-orchestrator": "workspace:*",

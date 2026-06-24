@@ -29,25 +29,27 @@ Packages are workspace deps referenced as `@nexus/<name>` with `workspace:*`.
 
 ## Common commands (run from repo root)
 
-| Task | Command |
-|---|---|
-| Install | `pnpm install` |
-| Build all | `pnpm build` (`turbo run build`) |
-| Dev (all, watch) | `pnpm dev` |
-| Test all | `pnpm test` |
-| Unit tests | `pnpm test:unit` |
-| Typecheck | `pnpm typecheck` |
-| Lint | `pnpm lint` / `pnpm lint:fix` |
-| Format | `pnpm format` |
-| DB migrate | `pnpm db:migrate` |
-| Infra up | `docker compose up -d postgres redis` |
+| Task             | Command                               |
+| ---------------- | ------------------------------------- |
+| Install          | `pnpm install`                        |
+| Build all        | `pnpm build` (`turbo run build`)      |
+| Dev (all, watch) | `pnpm dev`                            |
+| Test all         | `pnpm test`                           |
+| Unit tests       | `pnpm test:unit`                      |
+| Typecheck        | `pnpm typecheck`                      |
+| Lint             | `pnpm lint` / `pnpm lint:fix`         |
+| Format           | `pnpm format`                         |
+| DB migrate       | `pnpm db:migrate`                     |
+| Infra up         | `docker compose up -d postgres redis` |
 
 **Scope to one package** (much faster — do this when working on a single package):
+
 ```
 pnpm --filter @nexus/council test
 pnpm --filter @nexus/council typecheck
 turbo run build --filter=@nexus/council
 ```
+
 Per-package scripts: `build` (tsc), `dev` (tsx watch), `typecheck` (tsc --noEmit),
 `lint` (eslint src/), `test` (vitest run).
 

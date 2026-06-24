@@ -1624,8 +1624,7 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       // BYOK: platform key → x-openai-key header → stored user provider key
       const headerKey = req.headers["x-openai-key"] as string | undefined;
-      const storedKey =
-        (await resolveUserProviderKey(req.nexusUserId, "openai")) ?? undefined;
+      const storedKey = (await resolveUserProviderKey(req.nexusUserId, "openai")) ?? undefined;
       const apiKey = process.env.OPENAI_API_KEY || headerKey || storedKey;
       if (!apiKey)
         return reply.code(503).send({
@@ -1723,13 +1722,13 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   // Piston public API — supports Python, Bash, TypeScript, and 70+ others
   const PISTON_URL = process.env.PISTON_URL ?? "https://emkc.org/api/v2/piston";
   const PISTON_LANG_MAP: Record<string, { language: string; version: string; filename: string }> = {
-    python:     { language: "python",     version: "3.10.0", filename: "main.py"  },
-    bash:       { language: "bash",       version: "5.2.0",  filename: "main.sh"  },
-    typescript: { language: "typescript", version: "5.0.3",  filename: "main.ts"  },
-    r:          { language: "r",          version: "4.1.1",  filename: "main.r"   },
-    ruby:       { language: "ruby",       version: "3.0.1",  filename: "main.rb"  },
-    go:         { language: "go",         version: "1.21.0", filename: "main.go"  },
-    rust:       { language: "rust",       version: "1.68.2", filename: "main.rs"  },
+    python: { language: "python", version: "3.10.0", filename: "main.py" },
+    bash: { language: "bash", version: "5.2.0", filename: "main.sh" },
+    typescript: { language: "typescript", version: "5.0.3", filename: "main.ts" },
+    r: { language: "r", version: "4.1.1", filename: "main.r" },
+    ruby: { language: "ruby", version: "3.0.1", filename: "main.rb" },
+    go: { language: "go", version: "1.21.0", filename: "main.go" },
+    rust: { language: "rust", version: "1.68.2", filename: "main.rs" },
   };
 
   async function _runViaPiston(
@@ -2091,7 +2090,13 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   // A key is optional for local/self-hosted providers (e.g. ollama, custom) as
   // long as a baseUrl is given; baseUrl + models are non-secret connection metadata.
   app.post<{
-    Body: { provider: string; apiKey?: string; label?: string; baseUrl?: string; models?: string[] };
+    Body: {
+      provider: string;
+      apiKey?: string;
+      label?: string;
+      baseUrl?: string;
+      models?: string[];
+    };
   }>("/user/provider-keys", { preHandler: requireAuthWithTier }, async (request, reply) => {
     const { provider, apiKey, label, baseUrl, models } = request.body ?? {};
     if (!provider) return reply.code(400).send({ error: "provider is required" });
@@ -3053,7 +3058,7 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     const llmUrl = isGroq
       ? "https://api.groq.com/openai/v1/chat/completions"
       : "https://api.openai.com/v1/chat/completions";
-    const llmModel = isGroq ? model : (model || "gpt-4o-mini");
+    const llmModel = isGroq ? model : model || "gpt-4o-mini";
 
     const systemPrompt = `You are a code generation assistant. Write clean, runnable ${language} code to complete the task.
 Output ONLY the code — no markdown fences, no explanation, no comments unless required by the code.`;
@@ -3106,7 +3111,12 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
             log: (...a: unknown[]) => logs.push(a.map(String).join(" ")),
             error: (...a: unknown[]) => logs.push("[err] " + a.map(String).join(" ")),
           },
-          Math, JSON, parseInt, parseFloat, isNaN, isFinite,
+          Math,
+          JSON,
+          parseInt,
+          parseFloat,
+          isNaN,
+          isFinite,
         });
         try {
           const ret = vm.runInContext(generatedCode, ctx, { timeout: 5000 });
@@ -3339,15 +3349,24 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
     pageTitle: string,
     pageText: string,
     history: BrowserAgentStep[],
-  ): Promise<{ action: string; target?: string; value?: string; description: string; done?: boolean; result?: string }> {
+  ): Promise<{
+    action: string;
+    target?: string;
+    value?: string;
+    description: string;
+    done?: boolean;
+    result?: string;
+  }> {
     const sys = systemMsg(
       "You are a web-automation agent. Given a goal, the current page, and action history, " +
         "decide the SINGLE next action. Respond ONLY with JSON: " +
         '{"action":"navigate|click|type|extract|done","target":"<css selector or url>","value":"<text to type>","description":"<why>","done":<bool>,"result":"<final answer when done>"}. ' +
         "Use 'done' when the goal is achieved. Keep selectors simple and robust.",
     );
-    const hist = history.map((s) => `- ${s.action} ${s.target ?? ""} (${s.success ? "ok" : "fail"})`).join("\n");
-    const safeText = String(pageText ?? "");
+    const hist = history
+      .map((s) => `- ${s.action} ${s.target ?? ""} (${s.success ? "ok" : "fail"})`)
+      .join("\n");
+    const safeText = pageText ?? "";
     const usr = userMsg(
       `GOAL: ${task}\n\nCURRENT URL: ${pageUrl}\nTITLE: ${pageTitle}\n\nVISIBLE TEXT (truncated):\n${safeText.slice(0, 2000)}\n\nHISTORY:\n${hist || "(none)"}\n\nNext action as JSON:`,
     );
@@ -3362,7 +3381,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
           messages: [sys, usr],
           maxTokens: 400,
         });
-        raw = String(r.content ?? "").trim();
+        raw = (r.content ?? "").trim();
       } catch {
         raw = "";
       }
@@ -3370,7 +3389,12 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
     try {
       return parseJsonResponse(raw);
     } catch {
-      return { action: "done", description: "Could not parse next action", done: true, result: raw.slice(0, 500) };
+      return {
+        action: "done",
+        description: "Could not parse next action",
+        done: true,
+        result: raw.slice(0, 500),
+      };
     }
   }
 
@@ -3381,7 +3405,12 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
     await browser.withPage(async (page) => {
       if (session.url) {
         await page.goto(session.url);
-        session.steps.push({ action: "navigate", target: session.url, description: "open start URL", success: true });
+        session.steps.push({
+          action: "navigate",
+          target: session.url,
+          description: "open start URL",
+          success: true,
+        });
       }
       for (let i = 0; i < MAX_AGENT_STEPS; i++) {
         const pageUrl = page.url;
@@ -3389,7 +3418,13 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
         const text = await page
           .evaluate<string>("() => document.body?.innerText ?? ''")
           .catch(() => "");
-        const decision = await _nextBrowserAction(session.task, pageUrl, title, text, session.steps);
+        const decision = await _nextBrowserAction(
+          session.task,
+          pageUrl,
+          title,
+          text,
+          session.steps,
+        );
 
         if (decision.done || decision.action === "done") {
           session.result = decision.result ?? text.slice(0, 1000);
@@ -3510,7 +3545,13 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
         ok = false;
         session.error = e instanceof Error ? e.message : String(e);
       }
-      const step: BrowserAgentStep = { action, target, value, description: "manual action", success: ok };
+      const step: BrowserAgentStep = {
+        action,
+        target,
+        value,
+        description: "manual action",
+        success: ok,
+      };
       session.steps.push(step);
       if (screenshot) session.screenshot = screenshot;
       return reply.send(session);
@@ -3605,44 +3646,35 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
   );
 
   /** POST /prompt-filter/check — check text for flagged patterns */
-  app.post<{ Body: { text: string } }>(
-    "/prompt-filter/check",
-    async (request, reply) => {
-      const { text } = request.body ?? {};
-      if (!text) return reply.code(400).send({ error: "text is required" });
-      const triggers = detectTriggers(text, []);
-      return reply.send({
-        flagged: triggers.length > 0,
-        patterns: triggers.map((t) => ({ name: String(t), risk: "low" as const })),
-      });
-    },
-  );
+  app.post<{ Body: { text: string } }>("/prompt-filter/check", async (request, reply) => {
+    const { text } = request.body ?? {};
+    if (!text) return reply.code(400).send({ error: "text is required" });
+    const triggers = detectTriggers(text, []);
+    return reply.send({
+      flagged: triggers.length > 0,
+      patterns: triggers.map((t) => ({ name: t, risk: "low" as const })),
+    });
+  });
 
   /** POST /prompt-filter/sanitize — sanitize text by stripping known patterns */
-  app.post<{ Body: { text: string } }>(
-    "/prompt-filter/sanitize",
-    async (request, reply) => {
-      const { text } = request.body ?? {};
-      if (!text) return reply.code(400).send({ error: "text is required" });
-      return reply.send({
-        sanitized: text.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "[removed]"),
-      });
-    },
-  );
+  app.post<{ Body: { text: string } }>("/prompt-filter/sanitize", async (request, reply) => {
+    const { text } = request.body ?? {};
+    if (!text) return reply.code(400).send({ error: "text is required" });
+    return reply.send({
+      sanitized: text.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "[removed]"),
+    });
+  });
 
   /** POST /prompt-filter/batch — run check on multiple items */
-  app.post<{ Body: { items: string[] } }>(
-    "/prompt-filter/batch",
-    async (request, reply) => {
-      const { items = [] } = request.body ?? {};
-      return reply.send({
-        results: items.map((text) => {
-          const triggers = detectTriggers(text, []);
-          return { text, flagged: triggers.length > 0, triggers: triggers.length };
-        }),
-      });
-    },
-  );
+  app.post<{ Body: { items: string[] } }>("/prompt-filter/batch", async (request, reply) => {
+    const { items = [] } = request.body ?? {};
+    return reply.send({
+      results: items.map((text) => {
+        const triggers = detectTriggers(text, []);
+        return { text, flagged: triggers.length > 0, triggers: triggers.length };
+      }),
+    });
+  });
 
   /** GET /prompt-filter/patterns — list known injection patterns */
   app.get("/prompt-filter/patterns", async (_req, reply) => {
@@ -3812,17 +3844,14 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
   );
 
   /** POST /task-routing/classify — classify a prompt into a task category */
-  app.post<{ Body: { prompt: string } }>(
-    "/task-routing/classify",
-    async (request, reply) => {
-      const { prompt } = request.body ?? {};
-      if (!prompt) return reply.code(400).send({ error: "prompt is required" });
-      return reply.send({
-        category: "general",
-        confidence: 0.75,
-      });
-    },
-  );
+  app.post<{ Body: { prompt: string } }>("/task-routing/classify", async (request, reply) => {
+    const { prompt } = request.body ?? {};
+    if (!prompt) return reply.code(400).send({ error: "prompt is required" });
+    return reply.send({
+      category: "general",
+      confidence: 0.75,
+    });
+  });
 
   /** GET /task-routing/stats — routing statistics */
   app.get("/task-routing/stats", async (_req, reply) => {
@@ -3899,7 +3928,8 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
     "/verifiable/verify",
     async (request, reply) => {
       const { text, pipeline } = request.body ?? {};
-      if (!text || !pipeline) return reply.code(400).send({ error: "text and pipeline are required" });
+      if (!text || !pipeline)
+        return reply.code(400).send({ error: "text and pipeline are required" });
       return reply.send({
         passed: true,
         checks: [
@@ -4171,7 +4201,10 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
       if (!prompt) return reply.code(400).send({ error: "prompt is required" });
       const ids = Object.keys(ARCHETYPES).slice(0, count);
       return reply.send({
-        archetypes: ids.map((id) => ({ id, name: (ARCHETYPES as Record<string, {name: string}>)[id]?.name ?? id })),
+        archetypes: ids.map((id) => ({
+          id,
+          name: (ARCHETYPES as Record<string, { name: string }>)[id]?.name ?? id,
+        })),
       });
     },
   );
@@ -4181,7 +4214,8 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
     "/skill-selection/preview",
     async (request, reply) => {
       const { prompt, archetypeId } = request.body ?? {};
-      if (!prompt || !archetypeId) return reply.code(400).send({ error: "prompt and archetypeId are required" });
+      if (!prompt || !archetypeId)
+        return reply.code(400).send({ error: "prompt and archetypeId are required" });
       const archetype = (ARCHETYPES as Record<string, Archetype>)[archetypeId];
       const prefix = archetype ? `[${archetype.thinkingStyle}] ` : "";
       return reply.send({
@@ -4444,23 +4478,20 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   );
 
   /** POST /cross-memory/retrieve — retrieve memories matching a query */
-  app.post<{ Body: { query: string } }>(
-    "/cross-memory/retrieve",
-    async (request, reply) => {
-      const { query } = request.body ?? {};
-      if (!query) return reply.code(400).send({ error: "query is required" });
-      const manager = getMemory();
-      const results = await manager.recall(query, 5);
-      return reply.send({
-        memories: results.map((r) => ({
-          id: r.entry.id,
-          content: r.entry.text,
-          score: r.score,
-          createdAt: r.entry.createdAt,
-        })),
-      });
-    },
-  );
+  app.post<{ Body: { query: string } }>("/cross-memory/retrieve", async (request, reply) => {
+    const { query } = request.body ?? {};
+    if (!query) return reply.code(400).send({ error: "query is required" });
+    const manager = getMemory();
+    const results = await manager.recall(query, 5);
+    return reply.send({
+      memories: results.map((r) => ({
+        id: r.entry.id,
+        content: r.entry.text,
+        score: r.score,
+        createdAt: r.entry.createdAt,
+      })),
+    });
+  });
 
   /** POST /cross-memory/context — fuse memories into a single context string */
   app.post<{ Body: { memories: { content: string }[] } }>(
@@ -4889,24 +4920,22 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   });
 
   /** POST /specialisation/detect — detect domain from text */
-  app.post<{ Body: { text: string } }>(
-    "/specialisation/detect",
-    async (request, reply) => {
-      const { text } = request.body ?? {};
-      if (!text) return reply.code(400).send({ error: "text is required" });
-      return reply.send({
-        domain: "code-review",
-        confidence: 0.85,
-      });
-    },
-  );
+  app.post<{ Body: { text: string } }>("/specialisation/detect", async (request, reply) => {
+    const { text } = request.body ?? {};
+    if (!text) return reply.code(400).send({ error: "text is required" });
+    return reply.send({
+      domain: "code-review",
+      confidence: 0.85,
+    });
+  });
 
   /** POST /specialisation/apply — apply a specialisation to a session */
   app.post<{ Body: { domain: string; sessionId: string } }>(
     "/specialisation/apply",
     async (request, reply) => {
       const { domain, sessionId } = request.body ?? {};
-      if (!domain || !sessionId) return reply.code(400).send({ error: "domain and sessionId are required" });
+      if (!domain || !sessionId)
+        return reply.code(400).send({ error: "domain and sessionId are required" });
       return reply.send({
         applied: true,
         domain,
@@ -4981,29 +5010,27 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   });
 
   /** POST /member-evolution/recompute — recompute evolution profile for a model */
-  app.post<{ Body: { model: string } }>(
-    "/member-evolution/recompute",
-    async (request, reply) => {
-      const { model } = request.body ?? {};
-      if (!model) return reply.code(400).send({ error: "model is required" });
-      return reply.send({
-        profile: {
-          model,
-          sessions: 0,
-          avgScore: 0.5,
-          lastSeen: now(),
-          traits: { default: 0.5 },
-        },
-      });
-    },
-  );
+  app.post<{ Body: { model: string } }>("/member-evolution/recompute", async (request, reply) => {
+    const { model } = request.body ?? {};
+    if (!model) return reply.code(400).send({ error: "model is required" });
+    return reply.send({
+      profile: {
+        model,
+        sessions: 0,
+        avgScore: 0.5,
+        lastSeen: now(),
+        traits: { default: 0.5 },
+      },
+    });
+  });
 
   /** POST /member-evolution/apply — apply evolution profile to a session */
   app.post<{ Body: { model: string; sessionId: string } }>(
     "/member-evolution/apply",
     async (request, reply) => {
       const { model, sessionId } = request.body ?? {};
-      if (!model || !sessionId) return reply.code(400).send({ error: "model and sessionId are required" });
+      if (!model || !sessionId)
+        return reply.code(400).send({ error: "model and sessionId are required" });
       return reply.send({
         applied: true,
         model,
@@ -5489,7 +5516,10 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
       const { text, aggressiveness = 0.5 } = request.body ?? {};
       if (!text) return reply.code(400).send({ error: "text is required" });
       const before = text.length;
-      const compressed = text.length > 100 ? text.slice(0, Math.floor(text.length * (1 - aggressiveness * 0.5))) + "…" : text;
+      const compressed =
+        text.length > 100
+          ? text.slice(0, Math.floor(text.length * (1 - aggressiveness * 0.5))) + "…"
+          : text;
       const after = compressed.length;
       return reply.send({
         compressed,
@@ -5533,7 +5563,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
               ? Math.round((1 - result.transformed.length / result.original.length) * 100)
               : 0,
           truncated: result.truncated,
-          modules: result.modules.map((m) => ({ id: (m as any).moduleId ?? m, applied: true })),
+          modules: result.modules.map((m) => ({ id: m.moduleId, applied: true })),
         });
       } catch (err) {
         return reply.code(500).send({ error: err instanceof Error ? err.message : String(err) });
@@ -6225,11 +6255,31 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   app.get("/honesty/modes", async (_req, reply) => {
     return reply.send({
       modes: [
-        { id: "sycophancy-check", name: "Sycophancy Detection", description: "Detect excessive agreement / people-pleasing." },
-        { id: "reframe", name: "Honest Reframe", description: "Reword a response to be more direct and honest." },
-        { id: "confidence-calibrate", name: "Confidence Calibration", description: "Assign a confidence score (0–1) to each claim." },
-        { id: "minority-report", name: "Minority Report", description: "Surface underrepresented viewpoints on a topic." },
-        { id: "score", name: "Honesty Score", description: "Composite honesty score from multiple signals." },
+        {
+          id: "sycophancy-check",
+          name: "Sycophancy Detection",
+          description: "Detect excessive agreement / people-pleasing.",
+        },
+        {
+          id: "reframe",
+          name: "Honest Reframe",
+          description: "Reword a response to be more direct and honest.",
+        },
+        {
+          id: "confidence-calibrate",
+          name: "Confidence Calibration",
+          description: "Assign a confidence score (0–1) to each claim.",
+        },
+        {
+          id: "minority-report",
+          name: "Minority Report",
+          description: "Surface underrepresented viewpoints on a topic.",
+        },
+        {
+          id: "score",
+          name: "Honesty Score",
+          description: "Composite honesty score from multiple signals.",
+        },
       ],
     });
   });
@@ -8977,14 +9027,14 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
         "INSERT INTO prompts (name, description) VALUES ($1, $2) RETURNING *",
         [name.trim(), description ?? null],
       );
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const p = pRows.rows[0] as any;
+
+      const p = pRows.rows[0] as Record<string, unknown>;
       const vRows = await pool.query(
         "INSERT INTO prompt_versions (prompt_id, version_num, content) VALUES ($1, 1, $2) RETURNING *",
         [p.id, defaultContent],
       );
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const v = vRows.rows[0] as any;
+
+      const v = vRows.rows[0] as Record<string, unknown>;
       return reply.code(201).send(_promptRow(p, [v]));
     },
   );
@@ -8993,8 +9043,8 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     const pool = _getPool();
     if (!pool) return reply.code(503).send({ error: "DB unavailable" });
     const pResult = await pool.query("SELECT * FROM prompts WHERE id=$1", [request.params.id]);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const p = pResult.rows[0] as any;
+
+    const p = pResult.rows[0] as Record<string, unknown>;
     if (!p) return reply.code(404).send({ error: "not found" });
     const { rows: versions } = await pool.query(
       "SELECT * FROM prompt_versions WHERE prompt_id=$1 ORDER BY version_num DESC",
@@ -9010,35 +9060,34 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     const pool = _getPool();
     if (!pool) return reply.code(503).send({ error: "DB unavailable" });
     const pResult = await pool.query("SELECT * FROM prompts WHERE id=$1", [request.params.id]);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const p = pResult.rows[0] as any;
+
+    const p = pResult.rows[0] as Record<string, unknown>;
     if (!p) return reply.code(404).send({ error: "not found" });
     const { content = "", model = null, temperature = null } = request.body ?? {};
     const maxResult = await pool.query(
       "SELECT COALESCE(MAX(version_num), 0) AS max FROM prompt_versions WHERE prompt_id=$1",
       [p.id],
     );
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-    const nextNum = (Number((maxResult.rows[0] as any)?.max) || 0) + 1;
+
+    const nextNum = (Number((maxResult.rows[0] as Record<string, unknown>)?.max) || 0) + 1;
     const vResult = await pool.query(
       "INSERT INTO prompt_versions (prompt_id, version_num, content, model, temperature) VALUES ($1, $2, $3, $4, $5) RETURNING *",
       [p.id, nextNum, content, model, temperature],
     );
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const v = vResult.rows[0] as any;
+
+    const v = vResult.rows[0] as Record<string, unknown>;
     await pool.query("UPDATE prompts SET updated_at=NOW() WHERE id=$1", [p.id]);
     return reply.send({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       id: v.id,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
       versionNum: v.version_num,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
       content: v.content,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
       model: v.model ?? null,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
       temperature: v.temperature != null ? Number(v.temperature) : null,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
       createdAt: new Date(v.created_at as string).toISOString(),
     });
   });
@@ -9052,7 +9101,14 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
 
   // ── Contacts CRUD ────────────────────────────────────────────────────────────
 
-  const _contacts: Array<{ id: string; name: string; email: string; company?: string; notes?: string; createdAt: string }> = [];
+  const _contacts: {
+    id: string;
+    name: string;
+    email: string;
+    company?: string;
+    notes?: string;
+    createdAt: string;
+  }[] = [];
   app.get("/contacts", async (_request, reply) => {
     return reply.send({ contacts: _contacts });
   });
@@ -9060,7 +9116,8 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     "/contacts",
     async (request, reply) => {
       const { name, email, company, notes } = request.body ?? {};
-      if (!name?.trim() || !email?.trim()) return reply.code(400).send({ error: "name and email required" });
+      if (!name?.trim() || !email?.trim())
+        return reply.code(400).send({ error: "name and email required" });
       const contact = {
         id: crypto.randomUUID(),
         name: name.trim(),
@@ -9077,9 +9134,15 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   // ── Archetypes CRUD ──────────────────────────────────────────────────────────
 
   interface ArchetypeEntry {
-    id: string; name: string; icon: string; color: string;
-    thinkingStyle: string; description: string;
-    systemPrompt?: string; model?: string; temperature?: number;
+    id: string;
+    name: string;
+    icon: string;
+    color: string;
+    thinkingStyle: string;
+    description: string;
+    systemPrompt?: string;
+    model?: string;
+    temperature?: number;
   }
   const _archetypes: ArchetypeEntry[] = [];
   app.get("/archetypes", async (_request, reply) => {
@@ -9090,12 +9153,15 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     _archetypes.push(entry);
     return reply.code(201).send(entry);
   });
-  app.put<{ Params: { id: string }; Body: Partial<Omit<ArchetypeEntry, "id">> }>("/archetypes/:id", async (request, reply) => {
-    const idx = _archetypes.findIndex((a) => a.id === request.params.id);
-    if (idx === -1) return reply.code(404).send({ error: "not_found" });
-    _archetypes[idx] = { ..._archetypes[idx], ...request.body } as ArchetypeEntry;
-    return reply.send(_archetypes[idx]);
-  });
+  app.put<{ Params: { id: string }; Body: Partial<Omit<ArchetypeEntry, "id">> }>(
+    "/archetypes/:id",
+    async (request, reply) => {
+      const idx = _archetypes.findIndex((a) => a.id === request.params.id);
+      if (idx === -1) return reply.code(404).send({ error: "not_found" });
+      _archetypes[idx] = { ..._archetypes[idx], ...request.body } as ArchetypeEntry;
+      return reply.send(_archetypes[idx]);
+    },
+  );
   app.delete<{ Params: { id: string } }>("/archetypes/:id", async (request, reply) => {
     const idx = _archetypes.findIndex((a) => a.id === request.params.id);
     if (idx === -1) return reply.code(404).send({ error: "not_found" });
@@ -9108,14 +9174,86 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   app.get("/leaderboard", async (_request, reply) => {
     // Static leaderboard with live pricing when API keys are configured
     const models = [
-      { model: "Claude Opus 4.8", provider: "Anthropic", parameters: "—", context: "1M", gpqa: 87.2, sweBench: 74.1, arenaElo: 1320, speed: "Fast" },
-      { model: "Claude Sonnet 4.6", provider: "Anthropic", parameters: "—", context: "200K", gpqa: 84.3, sweBench: 71.5, arenaElo: 1298, speed: "Fastest" },
-      { model: "Claude Fable 5", provider: "Anthropic", parameters: "—", context: "200K", gpqa: 86.1, sweBench: 72.8, arenaElo: 1312, speed: "Fast" },
-      { model: "GPT-5", provider: "OpenAI", parameters: "—", context: "256K", gpqa: 86.5, sweBench: 73.2, arenaElo: 1315, speed: "Medium" },
-      { model: "Gemini 2.5 Pro", provider: "Google", parameters: "—", context: "2M", gpqa: 85.0, sweBench: 69.8, arenaElo: 1305, speed: "Fast" },
-      { model: "Llama 4", provider: "Meta", parameters: "400B", context: "128K", gpqa: 78.2, sweBench: 62.1, arenaElo: 1250, speed: "Medium" },
-      { model: "Mistral Large 2", provider: "Mistral", parameters: "—", context: "256K", gpqa: 80.5, sweBench: 67.3, arenaElo: 1270, speed: "Fast" },
-      { model: "Grok 3", provider: "xAI", parameters: "—", context: "1M", gpqa: 82.1, sweBench: 68.5, arenaElo: 1280, speed: "Fast" },
+      {
+        model: "Claude Opus 4.8",
+        provider: "Anthropic",
+        parameters: "—",
+        context: "1M",
+        gpqa: 87.2,
+        sweBench: 74.1,
+        arenaElo: 1320,
+        speed: "Fast",
+      },
+      {
+        model: "Claude Sonnet 4.6",
+        provider: "Anthropic",
+        parameters: "—",
+        context: "200K",
+        gpqa: 84.3,
+        sweBench: 71.5,
+        arenaElo: 1298,
+        speed: "Fastest",
+      },
+      {
+        model: "Claude Fable 5",
+        provider: "Anthropic",
+        parameters: "—",
+        context: "200K",
+        gpqa: 86.1,
+        sweBench: 72.8,
+        arenaElo: 1312,
+        speed: "Fast",
+      },
+      {
+        model: "GPT-5",
+        provider: "OpenAI",
+        parameters: "—",
+        context: "256K",
+        gpqa: 86.5,
+        sweBench: 73.2,
+        arenaElo: 1315,
+        speed: "Medium",
+      },
+      {
+        model: "Gemini 2.5 Pro",
+        provider: "Google",
+        parameters: "—",
+        context: "2M",
+        gpqa: 85.0,
+        sweBench: 69.8,
+        arenaElo: 1305,
+        speed: "Fast",
+      },
+      {
+        model: "Llama 4",
+        provider: "Meta",
+        parameters: "400B",
+        context: "128K",
+        gpqa: 78.2,
+        sweBench: 62.1,
+        arenaElo: 1250,
+        speed: "Medium",
+      },
+      {
+        model: "Mistral Large 2",
+        provider: "Mistral",
+        parameters: "—",
+        context: "256K",
+        gpqa: 80.5,
+        sweBench: 67.3,
+        arenaElo: 1270,
+        speed: "Fast",
+      },
+      {
+        model: "Grok 3",
+        provider: "xAI",
+        parameters: "—",
+        context: "1M",
+        gpqa: 82.1,
+        sweBench: 68.5,
+        arenaElo: 1280,
+        speed: "Fast",
+      },
     ];
     return reply.send({ models, updated: new Date().toISOString().slice(0, 10), source: "static" });
   });
@@ -9123,7 +9261,15 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   // ── Admin traces (legacy /api/traces alias) ────────────────────────────────
   // Frontend admin-traces.tsx calls /api/traces. Returns in-memory store.
 
-  const _tracesStore: Array<{ id: string; method: string; path: string; status: number; durationMs: number; userId?: string; createdAt: string }> = [];
+  const _tracesStore: {
+    id: string;
+    method: string;
+    path: string;
+    status: number;
+    durationMs: number;
+    userId?: string;
+    createdAt: string;
+  }[] = [];
 
   app.get<{ Querystring: { page?: string; limit?: string; type?: string } }>(
     "/traces",

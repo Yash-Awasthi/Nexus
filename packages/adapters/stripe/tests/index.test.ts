@@ -63,7 +63,8 @@ describe("stripeAdapter", () => {
     ]) {
       it(`handles ${t}`, () => expect(stripeAdapter.canExecute(t)).toBe(true));
     }
-    it("rejects unknown types", () => expect(stripeAdapter.canExecute("github.get-repo")).toBe(false));
+    it("rejects unknown types", () =>
+      expect(stripeAdapter.canExecute("github.get-repo")).toBe(false));
   });
 
   describe("auth", () => {

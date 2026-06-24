@@ -140,24 +140,32 @@ export function scoreResponse(content: string, question: string): number {
 
   // Refusal detection
   const refusalPhrases = [
-    "i cannot", "i can't", "i'm unable", "i am unable", "i won't",
-    "i will not", "as an ai", "i don't have the ability",
+    "i cannot",
+    "i can't",
+    "i'm unable",
+    "i am unable",
+    "i won't",
+    "i will not",
+    "as an ai",
+    "i don't have the ability",
   ];
   const lower = content.toLowerCase();
-  if (refusalPhrases.some(p => lower.includes(p))) return 0.05;
+  if (refusalPhrases.some((p) => lower.includes(p))) return 0.05;
 
   // Length score: penalise very short or extremely long responses
   const words = content.trim().split(/\s+/).length;
   const lengthScore = words < 10 ? words / 10 : words > 2000 ? 0.7 : 1.0;
 
   // Coverage: fraction of significant question words present in response
-  const qWords = question.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-  const coverage = qWords.length > 0
-    ? qWords.filter(w => lower.includes(w)).length / qWords.length
-    : 0.5;
+  const qWords = question
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length > 3);
+  const coverage =
+    qWords.length > 0 ? qWords.filter((w) => lower.includes(w)).length / qWords.length : 0.5;
 
   // Structure bonus: headers, lists, code blocks suggest organized answer
-  const structureBonus = (/^#+\s|\n[-*]\s|```/.test(content)) ? 0.1 : 0;
+  const structureBonus = /^#+\s|\n[-*]\s|```/.test(content) ? 0.1 : 0;
 
   const raw = lengthScore * 0.4 + coverage * 0.5 + structureBonus;
   return Math.max(0, Math.min(1, raw));

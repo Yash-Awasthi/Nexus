@@ -68,9 +68,15 @@ export default function WebSearch() {
         if (d) {
           const raw: unknown[] = Array.isArray(d.providers) ? d.providers : [];
           setProviders(
-            raw.map((p) =>
-              typeof p === "string" ? p : ((p as Record<string, unknown>)?.name ?? (p as Record<string, unknown>)?.id ?? "") as string,
-            ).filter(Boolean),
+            raw
+              .map((p) =>
+                typeof p === "string"
+                  ? p
+                  : (((p as Record<string, unknown>)?.name ??
+                      (p as Record<string, unknown>)?.id ??
+                      "") as string),
+              )
+              .filter(Boolean),
           );
           setPreferred(typeof d.preferred === "string" ? d.preferred : "");
         }

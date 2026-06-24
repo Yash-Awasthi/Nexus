@@ -1032,7 +1032,14 @@ export class ToolAgentRuntime {
 
     for (let i = 0; i < this.maxSteps; i++) {
       if (signal?.aborted) {
-        return { messages, steps, finalContent, totalUsage, aborted: true, totalDurationMs: Date.now() - t0 };
+        return {
+          messages,
+          steps,
+          finalContent,
+          totalUsage,
+          aborted: true,
+          totalDurationMs: Date.now() - t0,
+        };
       }
 
       // Compact the history before the model call once it exceeds the budget.
@@ -1129,7 +1136,14 @@ export class ToolAgentRuntime {
       if (turn.toolCalls.length === 0) break;
     }
 
-    return { messages, steps, finalContent, totalUsage, aborted: false, totalDurationMs: Date.now() - t0 };
+    return {
+      messages,
+      steps,
+      finalContent,
+      totalUsage,
+      aborted: false,
+      totalDurationMs: Date.now() - t0,
+    };
   }
 }
 

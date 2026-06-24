@@ -108,17 +108,19 @@ describe("Conductor routes /api/v1/gs/* (regression oracle)", () => {
     expect(typeof body.processed).toBe("number");
 
     // The job must be discoverable via /gs/jobs ...
-    const jobs = (
-      await app.inject({ method: "GET", url: `${P}/jobs` })
-    ).json() as { jobs: { id: string; objective: string }[]; total: number };
+    const jobs = (await app.inject({ method: "GET", url: `${P}/jobs` })).json() as {
+      jobs: { id: string; objective: string }[];
+      total: number;
+    };
     expect(jobs.total).toBeGreaterThanOrEqual(1);
     expect(jobs.jobs.some((j) => j.id === body.jobId)).toBe(true);
     expect(jobs.jobs.some((j) => j.objective === "regression oracle objective")).toBe(true);
 
     // ... and /gs/status must now report the orchestrator as initialised.
-    const status = (
-      await app.inject({ method: "GET", url: `${P}/status` })
-    ).json() as { initialised: boolean; queueLength: number };
+    const status = (await app.inject({ method: "GET", url: `${P}/status` })).json() as {
+      initialised: boolean;
+      queueLength: number;
+    };
     expect(status.initialised).toBe(true);
     expect(typeof status.queueLength).toBe("number");
 

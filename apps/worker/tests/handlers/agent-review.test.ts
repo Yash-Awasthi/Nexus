@@ -2,7 +2,11 @@
 import type { LlmToolFn, RuntimeMessage } from "@nexus/agent-runtime";
 import { describe, expect, it, vi } from "vitest";
 
-import { buildReviewInput, parseLearnings, reviewSession } from "../../src/handlers/agent-review.js";
+import {
+  buildReviewInput,
+  parseLearnings,
+  reviewSession,
+} from "../../src/handlers/agent-review.js";
 
 describe("parseLearnings", () => {
   it("parses a JSON array of learnings, embedded in prose", () => {

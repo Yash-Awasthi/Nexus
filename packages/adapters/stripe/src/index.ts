@@ -125,7 +125,12 @@ async function execute(task: StripeTask, ctx: IExecutionContext): Promise<unknow
         "/v1/customers",
         apiKey,
         "POST",
-        { email: task.email, name: task.name, description: task.description, metadata: task.metadata },
+        {
+          email: task.email,
+          name: task.name,
+          description: task.description,
+          metadata: task.metadata,
+        },
         baseUrl,
       );
       return assertOk(res);
@@ -171,7 +176,10 @@ async function execute(task: StripeTask, ctx: IExecutionContext): Promise<unknow
     }
 
     case "stripe.refund": {
-      ctx.logger.info("stripe.refund", { charge: task.charge, payment_intent: task.payment_intent });
+      ctx.logger.info("stripe.refund", {
+        charge: task.charge,
+        payment_intent: task.payment_intent,
+      });
       const res = await stripeFetch(
         "/v1/refunds",
         apiKey,

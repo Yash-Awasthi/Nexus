@@ -15,18 +15,18 @@
 
 ## What needs external infra (can't do from code)
 
-| Task | Blocker | Priority |
-|------|---------|----------|
-| Firecracker microVM spike | Need KVM host (bare metal or nested virt cloud VM) | HIGH |
-| gVisor fallback testing | Need Linux host with runsc installed | MEDIUM |
-| Docker sandbox e2e test | Docker daemon needed on worker host | MEDIUM |
-| Seccomp profile for agent containers | Need to author + test profile on Linux | LOW |
-| Redis cluster for rate limiting | Upstash or Redis instance | MEDIUM |
-| PgBouncer connection pooling | DB admin to set up | LOW |
-| K8s HPA deployment | Need K8s cluster (already have infra/k8s/) | MEDIUM |
-| Grafana dashboards deploy | Need Grafana instance (configs in infra/grafana/) | LOW |
-| Stripe webhook endpoint verify | Stripe dashboard to set webhook URL | MEDIUM |
-| OAuth app registration | GitHub/Google dev consoles for client IDs | LOW |
+| Task                                 | Blocker                                            | Priority |
+| ------------------------------------ | -------------------------------------------------- | -------- |
+| Firecracker microVM spike            | Need KVM host (bare metal or nested virt cloud VM) | HIGH     |
+| gVisor fallback testing              | Need Linux host with runsc installed               | MEDIUM   |
+| Docker sandbox e2e test              | Docker daemon needed on worker host                | MEDIUM   |
+| Seccomp profile for agent containers | Need to author + test profile on Linux             | LOW      |
+| Redis cluster for rate limiting      | Upstash or Redis instance                          | MEDIUM   |
+| PgBouncer connection pooling         | DB admin to set up                                 | LOW      |
+| K8s HPA deployment                   | Need K8s cluster (already have infra/k8s/)         | MEDIUM   |
+| Grafana dashboards deploy            | Need Grafana instance (configs in infra/grafana/)  | LOW      |
+| Stripe webhook endpoint verify       | Stripe dashboard to set webhook URL                | MEDIUM   |
+| OAuth app registration               | GitHub/Google dev consoles for client IDs          | LOW      |
 
 ## Code-only tasks remaining
 

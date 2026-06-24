@@ -23,10 +23,10 @@ import {
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest } from "fastify";
 
 import { makeRateLimitPreHandler, makeUserRateLimitPreHandler } from "./lib/rate-limiter.js";
-import { requireAuth } from "./middleware/auth.js";
 import { sentryReporter } from "./lib/sentry-reporter.js";
-import { adminUsersRoutes } from "./routes/admin-users.js";
+import { requireAuth } from "./middleware/auth.js";
 import { adminTracesRoutes } from "./routes/admin-traces.js";
+import { adminUsersRoutes } from "./routes/admin-users.js";
 import { adminRoutes } from "./routes/admin.js";
 import { agentsRoutes } from "./routes/agents.js";
 import { alertsRoutes } from "./routes/alerts.js";
@@ -47,8 +47,8 @@ import { corpusBuilderRoutes } from "./routes/corpus-builder.js";
 import { councilRoutes } from "./routes/council.js";
 import { docPipelineRoutes } from "./routes/doc-pipeline.js";
 import { domainFeedsRoutes } from "./routes/domain-feeds.js";
-import { driveRoutes } from "./routes/drive.js";
 import { driftRoutes } from "./routes/drift.js";
+import { driveRoutes } from "./routes/drive.js";
 import { evalsRoutes } from "./routes/evals.js";
 import { featureFlagsRoutes } from "./routes/feature-flags.js";
 import { forecastRoutes } from "./routes/forecast.js";
@@ -64,8 +64,8 @@ import { knowledgeGraphRoutes } from "./routes/knowledge-graph.js";
 import { libertasRoutes } from "./routes/libertas.js";
 import { llmRoutes } from "./routes/llm.js";
 import { mailIngestRoutes } from "./routes/mail-ingest.js";
-import { mcpRoutes } from "./routes/mcp.js";
 import { mcpServersRoutes } from "./routes/mcp-servers.js";
+import { mcpRoutes } from "./routes/mcp.js";
 import { memoryRoutes } from "./routes/memory.js";
 import { metricsRoutes } from "./routes/metrics.js";
 import { mfaRoutes } from "./routes/mfa.js";
@@ -239,8 +239,16 @@ export async function buildServer(): Promise<FastifyInstance> {
   const _councilRL = makeRateLimitPreHandler({ limit: 30, windowMs: 60_000, keyPrefix: "council" });
 
   // Per-user limits layered on top of IP limits
-  const _adminUserRL = makeUserRateLimitPreHandler({ limit: 50, windowMs: 60_000, keyPrefix: "admin" });
-  const _billingUserRL = makeUserRateLimitPreHandler({ limit: 100, windowMs: 60_000, keyPrefix: "billing" });
+  const _adminUserRL = makeUserRateLimitPreHandler({
+    limit: 50,
+    windowMs: 60_000,
+    keyPrefix: "admin",
+  });
+  const _billingUserRL = makeUserRateLimitPreHandler({
+    limit: 100,
+    windowMs: 60_000,
+    keyPrefix: "billing",
+  });
 
   app.addHook("onRequest", async (request: FastifyRequest, reply) => {
     const url = request.url;

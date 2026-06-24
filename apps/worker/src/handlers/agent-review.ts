@@ -60,14 +60,19 @@ export function parseLearnings(text: string): Learning[] {
     if (!item || typeof item !== "object") continue;
     const rec = item as Record<string, unknown>;
     if (typeof rec.content !== "string" || !rec.content.trim()) continue;
-    const type = (typeof rec.type === "string" && LEARNING_TYPES.has(rec.type) ? rec.type : "memory") as LearningType;
+    const type = (
+      typeof rec.type === "string" && LEARNING_TYPES.has(rec.type) ? rec.type : "memory"
+    ) as LearningType;
     out.push({ type, content: rec.content.trim() });
   }
   return out;
 }
 
 /** Run the review: one tool-less model turn over the transcript → learnings. */
-export async function reviewSession(messages: RuntimeMessage[], llm: LlmToolFn): Promise<Learning[]> {
+export async function reviewSession(
+  messages: RuntimeMessage[],
+  llm: LlmToolFn,
+): Promise<Learning[]> {
   if (!messages.length) return [];
   const turn = await llm([{ role: "user", content: buildReviewInput(messages) }], {
     systemPrompt: REVIEW_SYSTEM_PROMPT,

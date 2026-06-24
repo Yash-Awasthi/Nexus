@@ -18,8 +18,16 @@ vi.mock("drizzle-orm", () => ({ eq: vi.fn() }));
 vi.mock("@nexus/llm-drivers", () => {
   class FakeDriver {
     readonly model = "fake-model";
-    async stream(): Promise<{ content: string; toolCalls: never[]; usage: Record<string, number> }> {
-      return { content: "done", toolCalls: [], usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 } };
+    async stream(): Promise<{
+      content: string;
+      toolCalls: never[];
+      usage: Record<string, number>;
+    }> {
+      return {
+        content: "done",
+        toolCalls: [],
+        usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+      };
     }
   }
   return { AnthropicDriver: FakeDriver, GroqDriver: FakeDriver, OpenRouterDriver: FakeDriver };

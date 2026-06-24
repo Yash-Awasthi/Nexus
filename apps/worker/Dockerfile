@@ -27,12 +27,21 @@ CMD ["node", "--inspect=0.0.0.0:9229", \
      "--import", "tsx/esm", \
      "--watch", "apps/worker/src/index.ts"]
 
-# ─── Stage 3: pruner — pnpm deploy copies worker + all workspace deps' dist ──
+# ─── Stage 3: builder — compile worker + all its workspace deps (topo order) ─
+FROM deps AS builder
+WORKDIR /app
+
+COPY tsconfig.base.json ./
+COPY apps/worker/ ./apps/worker/
+
+RUN pnpm --filter "@nexus/worker..." build
+
+# ─── Stage 4: pruner — pnpm deploy copies worker + all workspace deps' dist ──
 FROM builder AS pruner
 WORKDIR /app
 RUN pnpm --filter @nexus/worker deploy --prod /deploy
 
-# ─── Stage 4: runner ─────────────────────────────────────────────────────────
+# ─── Stage 5: runner ─────────────────────────────────────────────────────────
 FROM node:26-alpine AS runner
 WORKDIR /app
 

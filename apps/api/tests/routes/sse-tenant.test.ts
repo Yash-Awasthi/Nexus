@@ -165,7 +165,11 @@ beforeEach(async () => {
 afterEach(async () => {
   vi.restoreAllMocks();
   if (app) {
-    try { await app.close(); } catch { /* already closed */ }
+    try {
+      await app.close();
+    } catch {
+      /* already closed */
+    }
   }
 });
 
@@ -209,40 +213,32 @@ describe("GET /api/v1/sse/agent/:stream (tenant isolation)", () => {
     },
   );
 
-  it(
-    "proceeds (hijacks) when user matches session owner",
-    { timeout: 10_000 },
-    async () => {
-      setPgRows([{ user_id: USER_A }]);
-      app = await buildWithAuth();
+  it("proceeds (hijacks) when user matches session owner", { timeout: 10_000 }, async () => {
+    setPgRows([{ user_id: USER_A }]);
+    app = await buildWithAuth();
 
-      const res = await injectSse(app, {
-        method: "GET",
-        url: `/api/v1/sse/agent/${TASK_OWNED_BY_A}`,
-        headers: { authorization: `Bearer ${tokenFor(USER_A)}` },
-      });
+    const res = await injectSse(app, {
+      method: "GET",
+      url: `/api/v1/sse/agent/${TASK_OWNED_BY_A}`,
+      headers: { authorization: `Bearer ${tokenFor(USER_A)}` },
+    });
 
-      expect(res.hijacked).toBe(true);
-    },
-  );
+    expect(res.hijacked).toBe(true);
+  });
 
-  it(
-    "fails open (no 403) when DB is unreachable",
-    { timeout: 10_000 },
-    async () => {
-      setPgError(new Error("ECONNREFUSED"));
-      app = await buildWithAuth();
+  it("fails open (no 403) when DB is unreachable", { timeout: 10_000 }, async () => {
+    setPgError(new Error("ECONNREFUSED"));
+    app = await buildWithAuth();
 
-      const res = await injectSse(app, {
-        method: "GET",
-        url: `/api/v1/sse/agent/${TASK_OWNED_BY_A}`,
-        headers: { authorization: `Bearer ${tokenFor(USER_A)}` },
-      });
+    const res = await injectSse(app, {
+      method: "GET",
+      url: `/api/v1/sse/agent/${TASK_OWNED_BY_A}`,
+      headers: { authorization: `Bearer ${tokenFor(USER_A)}` },
+    });
 
-      // Fail-open → hijacked (no 403)
-      expect(res.hijacked).toBe(true);
-    },
-  );
+    // Fail-open → hijacked (no 403)
+    expect(res.hijacked).toBe(true);
+  });
 });
 
 // ── Firehose routes: enterprise tier only ──────────────────────────────────────
@@ -273,23 +269,19 @@ describe("SSE firehose routes require enterprise tier", () => {
       expect(body.error).toMatch(/firehose requires enterprise tier/i);
     });
 
-    it(
-      `allows enterprise tier on ${ep.label}`,
-      { timeout: 10_000 },
-      async () => {
-        setPgRows([]);
-        app = await buildWithAuth();
+    it(`allows enterprise tier on ${ep.label}`, { timeout: 10_000 }, async () => {
+      setPgRows([]);
+      app = await buildWithAuth();
 
-        const res = await injectSse(app, {
-          method: ep.method as "GET",
-          url: ep.url,
-          headers: { authorization: `Bearer ${tokenFor(USER_A, "enterprise")}` },
-        });
+      const res = await injectSse(app, {
+        method: ep.method as "GET",
+        url: ep.url,
+        headers: { authorization: `Bearer ${tokenFor(USER_A, "enterprise")}` },
+      });
 
-        // Hijacked SSE → auth + tier checks passed
-        expect(res.hijacked).toBe(true);
-      },
-    );
+      // Hijacked SSE → auth + tier checks passed
+      expect(res.hijacked).toBe(true);
+    });
   }
 });
 
@@ -311,22 +303,18 @@ describe("GET /api/v1/sse/tasks/:taskId (ownership)", () => {
     expect(res.body().error).toBe("Not your task");
   });
 
-  it(
-    "allows when user owns the task",
-    { timeout: 10_000 },
-    async () => {
-      setPgRows([{ user_id: USER_A }]);
-      app = await buildWithAuth();
+  it("allows when user owns the task", { timeout: 10_000 }, async () => {
+    setPgRows([{ user_id: USER_A }]);
+    app = await buildWithAuth();
 
-      const res = await injectSse(app, {
-        method: "GET",
-        url: `/api/v1/sse/tasks/${TASK_OWNED_BY_A}`,
-        headers: { authorization: `Bearer ${tokenFor(USER_A)}` },
-      });
+    const res = await injectSse(app, {
+      method: "GET",
+      url: `/api/v1/sse/tasks/${TASK_OWNED_BY_A}`,
+      headers: { authorization: `Bearer ${tokenFor(USER_A)}` },
+    });
 
-      expect(res.hijacked).toBe(true);
-    },
-  );
+    expect(res.hijacked).toBe(true);
+  });
 });
 
 // ── Single-verdict subscription: ownership check ───────────────────────────────
@@ -347,22 +335,18 @@ describe("GET /api/v1/sse/verdicts/:taskId (ownership)", () => {
     expect(res.body().error).toBe("Not your task");
   });
 
-  it(
-    "allows when user owns the verdict task",
-    { timeout: 10_000 },
-    async () => {
-      setPgRows([{ user_id: USER_A }]);
-      app = await buildWithAuth();
+  it("allows when user owns the verdict task", { timeout: 10_000 }, async () => {
+    setPgRows([{ user_id: USER_A }]);
+    app = await buildWithAuth();
 
-      const res = await injectSse(app, {
-        method: "GET",
-        url: `/api/v1/sse/verdicts/${TASK_OWNED_BY_A}`,
-        headers: { authorization: `Bearer ${tokenFor(USER_A)}` },
-      });
+    const res = await injectSse(app, {
+      method: "GET",
+      url: `/api/v1/sse/verdicts/${TASK_OWNED_BY_A}`,
+      headers: { authorization: `Bearer ${tokenFor(USER_A)}` },
+    });
 
-      expect(res.hijacked).toBe(true);
-    },
-  );
+    expect(res.hijacked).toBe(true);
+  });
 });
 
 // ── Auth requirement: no token → 401 ───────────────────────────────────────────

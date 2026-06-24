@@ -627,7 +627,9 @@ export default function PromptsPage() {
               {viewingVersion?.temperature != null && (
                 <span className="ml-2">temp {viewingVersion.temperature}</span>
               )}
-              {viewingVersion && <span className="ml-2">{relativeTime(viewingVersion.createdAt)}</span>}
+              {viewingVersion && (
+                <span className="ml-2">{relativeTime(viewingVersion.createdAt)}</span>
+              )}
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[55vh] rounded-md border border-border bg-muted/30">

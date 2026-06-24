@@ -10,9 +10,17 @@ import {
 
 function toolSet(): RuntimeToolSet {
   const ts = new RuntimeToolSet();
-  ts.add({ name: "read_file", description: "read", handler: async (a) => `contents-of-${String(a.path)}` });
+  ts.add({
+    name: "read_file",
+    description: "read",
+    handler: async (a) => `contents-of-${String(a.path)}`,
+  });
   ts.add({ name: "write_file", description: "write", handler: async () => "wrote" });
-  ts.add({ name: "hang", description: "never resolves", handler: () => new Promise<string>(() => {}) });
+  ts.add({
+    name: "hang",
+    description: "never resolves",
+    handler: () => new Promise<string>(() => {}),
+  });
   return ts;
 }
 
@@ -42,14 +50,20 @@ describe("createProgrammaticToolTool", () => {
 
   it("honors the permission gate for inner calls (no bypass)", async () => {
     const ptc = createProgrammaticToolTool({ toolSet: toolSet(), permissionGate: deny });
-    const out = (await ptc.handler({ code: `await call("write_file", { path: "x", content: "y" });` }, {})) as string;
+    const out = (await ptc.handler(
+      { code: `await call("write_file", { path: "x", content: "y" });` },
+      {},
+    )) as string;
     expect(out).toContain("[error]");
     expect(out).toContain("permission_denied");
   });
 
   it("allows gated calls when the gate approves", async () => {
     const ptc = createProgrammaticToolTool({ toolSet: toolSet(), permissionGate: allow });
-    const out = (await ptc.handler({ code: `print(await call("write_file", { path: "x" }));` }, {})) as string;
+    const out = (await ptc.handler(
+      { code: `print(await call("write_file", { path: "x" }));` },
+      {},
+    )) as string;
     expect(out).toContain("wrote");
   });
 
@@ -62,12 +76,19 @@ describe("createProgrammaticToolTool", () => {
 
   it("refuses to call itself", async () => {
     const ptc = createProgrammaticToolTool({ toolSet: toolSet() });
-    const out = (await ptc.handler({ code: `await call("run_tool_script", { code: "1" });` }, {})) as string;
+    const out = (await ptc.handler(
+      { code: `await call("run_tool_script", { code: "1" });` },
+      {},
+    )) as string;
     expect(out).toContain("not callable");
   });
 
   it("times out a hanging script", async () => {
-    const ptc = createProgrammaticToolTool({ toolSet: toolSet(), permissionGate: allow, timeoutMs: 50 });
+    const ptc = createProgrammaticToolTool({
+      toolSet: toolSet(),
+      permissionGate: allow,
+      timeoutMs: 50,
+    });
     const out = (await ptc.handler({ code: `await call("hang", {});` }, {})) as string;
     expect(out).toContain("timed out");
   });
@@ -81,16 +102,26 @@ describe("createProgrammaticToolTool", () => {
 
 describe("gatedInvoke", () => {
   it("rejects a denied mutating tool", async () => {
-    await expect(gatedInvoke(toolSet(), deny, "write_file", {})).rejects.toThrow(/permission_denied/);
+    await expect(gatedInvoke(toolSet(), deny, "write_file", {})).rejects.toThrow(
+      /permission_denied/,
+    );
   });
 
   it("runs an auto-allowed tool without consulting the gate", async () => {
-    await expect(gatedInvoke(toolSet(), deny, "read_file", { path: "z" })).resolves.toBe("contents-of-z");
+    await expect(gatedInvoke(toolSet(), deny, "read_file", { path: "z" })).resolves.toBe(
+      "contents-of-z",
+    );
   });
 
   it("propagates a tool error", async () => {
     const ts = new RuntimeToolSet();
-    ts.add({ name: "boom", description: "throws", handler: async () => { throw new Error("kaboom"); } });
+    ts.add({
+      name: "boom",
+      description: "throws",
+      handler: async () => {
+        throw new Error("kaboom");
+      },
+    });
     await expect(gatedInvoke(ts, allow, "boom", {})).rejects.toThrow(/kaboom/);
   });
 });

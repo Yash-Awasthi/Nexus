@@ -168,8 +168,7 @@ export async function botsRoutes(app: FastifyInstance): Promise<void> {
   }>("/bots/telegram/webhook", async (request, reply) => {
     try {
       const result = await _telegramAdapter.handleUpdate(request.body, {
-        "x-telegram-bot-api-secret-token":
-          request.headers["x-telegram-bot-api-secret-token"] ?? "",
+        "x-telegram-bot-api-secret-token": request.headers["x-telegram-bot-api-secret-token"] ?? "",
       });
       if (result.error) {
         return reply.code(200).send({ ok: true, handled: false, note: result.error });

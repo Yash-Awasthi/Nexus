@@ -20,6 +20,7 @@ import {
   buildSafeEnv,
   createDockerRunner,
   type DockerSandboxConfig,
+  type RunnerResult,
 } from "@nexus/sandbox";
 
 export interface CodingToolsOptions {
@@ -70,12 +71,14 @@ function clip(s: string, max: number): string {
 
 /** Structured audit log for every shell command executed by an agent. */
 function auditLog(event: string, detail: Record<string, unknown>): void {
-  console.error(JSON.stringify({
-    level: "info",
-    event: `agent.command.${event}`,
-    ts: new Date().toISOString(),
-    ...detail,
-  }));
+  console.error(
+    JSON.stringify({
+      level: "info",
+      event: `agent.command.${event}`,
+      ts: new Date().toISOString(),
+      ...detail,
+    }),
+  );
 }
 
 /**
@@ -93,7 +96,11 @@ function runCommand(
   env?: Record<string, string>,
   dockerConfig?: DockerSandboxConfig,
 ): Promise<string> {
-  auditLog("started", { command: command.slice(0, 200), cwd, sandbox: dockerConfig ? "docker" : "subprocess" });
+  auditLog("started", {
+    command: command.slice(0, 200),
+    cwd,
+    sandbox: dockerConfig ? "docker" : "subprocess",
+  });
   const safeEnv = buildSafeEnv(env);
 
   // ── Docker path ──────────────────────────────────────────────────
@@ -104,10 +111,15 @@ function runCommand(
         timeoutMs,
         env: safeEnv,
       })
-        .then((result) => {
-          auditLog("finished", { exitCode: result.exitCode, timedOut: result.timedOut, sandbox: "docker" });
+        .then((result: RunnerResult) => {
+          auditLog("finished", {
+            exitCode: result.exitCode,
+            timedOut: result.timedOut,
+            sandbox: "docker",
+          });
           const out = (result.stdout + (result.stderr ? `\n${result.stderr}` : "")).trim();
           resolve(clip(out || `[exit ${result.exitCode}]`, maxOut));
+          return;
         })
         .catch((err: Error) => {
           auditLog("error", { error: err.message, sandbox: "docker" });
@@ -134,7 +146,9 @@ function runCommand(
     child.on("close", (code) => {
       clearTimeout(timer);
       auditLog("finished", { exitCode: code, timedOut: killed, sandbox: "subprocess" });
-      resolve(clip(out, maxOut) + (killed ? `\n…[killed after ${timeoutMs}ms]` : `\n[exit ${code}]`));
+      resolve(
+        clip(out, maxOut) + (killed ? `\n…[killed after ${timeoutMs}ms]` : `\n[exit ${code}]`),
+      );
     });
     child.on("error", (err) => {
       clearTimeout(timer);
@@ -153,18 +167,21 @@ export function createCodingToolSet(opts: CodingToolsOptions): RuntimeToolSet {
 
   set.add({
     name: "read_file",
-    description: "Read a UTF-8 text file within the workspace. Returns its contents (truncated if large).",
+    description:
+      "Read a UTF-8 text file within the workspace. Returns its contents (truncated if large).",
     parameters: {
       type: "object",
       properties: { path: { type: "string", description: "Workspace-relative file path" } },
       required: ["path"],
     },
-    handler: async (args) => clip(await fs.readFile(await safeResolve(root, String(args.path ?? "")), "utf8"), maxOut),
+    handler: async (args) =>
+      clip(await fs.readFile(await safeResolve(root, String(args.path ?? "")), "utf8"), maxOut),
   });
 
   set.add({
     name: "write_file",
-    description: "Create or overwrite a UTF-8 text file within the workspace (creates parent dirs).",
+    description:
+      "Create or overwrite a UTF-8 text file within the workspace (creates parent dirs).",
     parameters: {
       type: "object",
       properties: { path: { type: "string" }, content: { type: "string" } },
@@ -202,10 +219,13 @@ export function createCodingToolSet(opts: CodingToolsOptions): RuntimeToolSet {
 
   set.add({
     name: "list_files",
-    description: "List files and directories directly under a workspace-relative path (non-recursive).",
+    description:
+      "List files and directories directly under a workspace-relative path (non-recursive).",
     parameters: {
       type: "object",
-      properties: { path: { type: "string", description: "Workspace-relative directory (default '.')" } },
+      properties: {
+        path: { type: "string", description: "Workspace-relative directory (default '.')" },
+      },
     },
     handler: async (args) => {
       const entries = await fs.readdir(await safeResolve(root, String(args.path ?? ".")), {
@@ -229,7 +249,14 @@ export function createCodingToolSet(opts: CodingToolsOptions): RuntimeToolSet {
         required: ["command"],
       },
       handler: (args) =>
-        runCommand(String(args.command ?? ""), root, maxOut, cmdTimeout, opts.env, opts.dockerConfig),
+        runCommand(
+          String(args.command ?? ""),
+          root,
+          maxOut,
+          cmdTimeout,
+          opts.env,
+          opts.dockerConfig,
+        ),
     });
   }
 

@@ -71,8 +71,14 @@ export async function mcpServersRoutes(app: FastifyInstance): Promise<void> {
     };
   }>("/mcp/servers", { preHandler: requireAuthWithTier }, async (request, reply) => {
     const userId = request.nexusUserId!;
-    const { name, description, transportType = "http", endpoint, apiKey, config } =
-      request.body ?? {};
+    const {
+      name,
+      description,
+      transportType = "http",
+      endpoint,
+      apiKey,
+      config,
+    } = request.body ?? {};
 
     if (!name?.trim()) return reply.code(400).send({ error: "name is required" });
     if (!endpoint?.trim()) return reply.code(400).send({ error: "endpoint is required" });
