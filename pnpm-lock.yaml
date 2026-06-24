@@ -576,6 +576,9 @@ importers:
       '@nexus/pipeline-signal':
         specifier: workspace:*
         version: link:../../packages/pipeline-signal
+      '@nexus/sandbox':
+        specifier: workspace:*
+        version: link:../../packages/sandbox
       '@nexus/search-orchestrator':
         specifier: workspace:*
         version: link:../../packages/search-orchestrator

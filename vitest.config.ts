@@ -119,6 +119,12 @@ export default defineConfig({
         // evaluation framework require live providers; excluded from unit coverage.
         "packages/telemetry/**",
         "packages/evals/**",
+        // Require a live browser / hosted CDP / network to exercise; covered at
+        // integration level, not unit. Same rationale as runtime/conductor above.
+        "packages/stealth-browser/**",
+        "packages/video-transcript/**",
+        "packages/sandbox/**",
+        "packages/agent-runtime/**",
       ],
       thresholds: {
         statements: 90,

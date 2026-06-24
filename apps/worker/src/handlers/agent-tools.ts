@@ -20,6 +20,7 @@ import {
   buildSafeEnv,
   createDockerRunner,
   type DockerSandboxConfig,
+  type RunnerResult,
 } from "@nexus/sandbox";
 
 export interface CodingToolsOptions {
@@ -104,7 +105,7 @@ function runCommand(
         timeoutMs,
         env: safeEnv,
       })
-        .then((result) => {
+        .then((result: RunnerResult) => {
           auditLog("finished", { exitCode: result.exitCode, timedOut: result.timedOut, sandbox: "docker" });
           const out = (result.stdout + (result.stderr ? `\n${result.stderr}` : "")).trim();
           resolve(clip(out || `[exit ${result.exitCode}]`, maxOut));
