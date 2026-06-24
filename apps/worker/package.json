@@ -23,6 +23,7 @@
     "vitest": "^2.1.8"
   },
   "dependencies": {
+    "@nexus/agent-runtime": "workspace:*",
     "@nexus/contracts": "workspace:*",
     "@nexus/council": "workspace:*",
     "@nexus/corpus-builder": "workspace:*",
@@ -30,10 +31,13 @@
     "@nexus/domain-feeds": "workspace:*",
     "@nexus/governance": "workspace:*",
     "@nexus/llm-drivers": "workspace:*",
+    "@nexus/mcp-client": "workspace:*",
+    "@nexus/memory": "workspace:*",
     "@nexus/obs-providers": "workspace:*",
     "@nexus/pipeline-signal": "workspace:*",
     "@nexus/search-orchestrator": "workspace:*",
     "@nexus/shared": "workspace:*",
+    "@nexus/sse": "workspace:*",
     "@nexus/wiki-updater": "workspace:*",
     "bullmq": "^5.78.1",
     "drizzle-orm": "^0.45.2",

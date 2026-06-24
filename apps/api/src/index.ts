@@ -27,10 +27,49 @@ process.on("unhandledRejection", (reason) => {
 });
 
 // ── Startup validation ────────────────────────────────────────────────────────
-function validateApiKey(): void {
-  if (!process.env.NEXUS_API_KEY) {
+
+/** Known dev/sample placeholder values that must never reach production. */
+const INSECURE_DEFAULTS = new Set([
+  "dev",
+  "change-me",
+  "changeme",
+  "your-nexus-api-key",
+  "your-api-key",
+  "secret",
+  "test",
+  "nexus-dev-key",
+]);
+
+/**
+ * Validate required secrets at startup. NEXUS_API_KEY is always required. In
+ * production we additionally reject insecure placeholder / too-short keys and
+ * warn when recommended secrets (JWT_SECRET, AUDIT_LOG_KEY) are missing, so a
+ * misconfigured deploy fails fast instead of silently running insecurely.
+ */
+function validateSecrets(): void {
+  const apiKey = process.env.NEXUS_API_KEY;
+  if (!apiKey) {
     console.error("[startup] FATAL: NEXUS_API_KEY is not set.");
     process.exit(1);
+  }
+
+  const isProd = process.env.NODE_ENV === "production";
+  if (isProd) {
+    if (INSECURE_DEFAULTS.has(apiKey.toLowerCase()) || apiKey.length < 16) {
+      console.error(
+        "[startup] FATAL: NEXUS_API_KEY is a placeholder or too short (<16 chars) for production.",
+      );
+      process.exit(1);
+    }
+    for (const name of ["JWT_SECRET", "AUDIT_LOG_KEY"]) {
+      const val = process.env[name];
+      if (!val) {
+        console.warn(`[startup] ⚠ ${name} is not set — strongly recommended in production.`);
+      } else if (INSECURE_DEFAULTS.has(val.toLowerCase()) || val.length < 16) {
+        console.error(`[startup] FATAL: ${name} is a placeholder or too short for production.`);
+        process.exit(1);
+      }
+    }
   }
 }
 
@@ -42,8 +81,8 @@ async function main(): Promise<void> {
   console.log("[startup] nexus-api starting...");
   console.log(`[startup] NODE_ENV=${process.env.NODE_ENV} PORT=${PORT} HOST=${HOST}`);
 
-  validateApiKey();
-  console.log("[startup] NEXUS_API_KEY ✓");
+  validateSecrets();
+  console.log("[startup] secrets validated ✓");
 
   // ── Step 1: Early health server ─────────────────────────────────────────────
   // Bind the port immediately so Render's health check gets 200 right away,

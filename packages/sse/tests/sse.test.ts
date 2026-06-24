@@ -8,6 +8,7 @@ import {
   publishTaskUpdate,
   publishSignal,
   publishVerdict,
+  dispatchAgentEvent,
   globalBus,
   type SseEvent,
   type TaskUpdatePayload,
@@ -383,5 +384,32 @@ describe("publishVerdict", () => {
 
     const event = listener.mock.calls[0]?.[0] as SseEvent;
     expect(event.id).toBe("verdict-vrd-7");
+  });
+});
+
+// ── dispatchAgentEvent ──────────────────────────────────────────────────────────
+
+describe("dispatchAgentEvent", () => {
+  it("fans an agent event to both agent:<stream> and the firehose", () => {
+    const scoped = vi.fn();
+    const firehose = vi.fn();
+    globalBus.subscribe("agent:s1", scoped);
+    globalBus.subscribe("agent", firehose);
+
+    dispatchAgentEvent({ stream: "s1", type: "step", data: { stepIndex: 0 }, ts: 123 });
+
+    expect(scoped).toHaveBeenCalledTimes(1);
+    expect(firehose).toHaveBeenCalledTimes(1);
+    const event = scoped.mock.calls[0]?.[0] as SseEvent<{ stream: string; stepIndex: number }>;
+    expect(event.event).toBe("agent.step");
+    expect(event.id).toBe("agent-s1-123");
+    expect(event.data).toEqual({ stream: "s1", stepIndex: 0 });
+  });
+
+  it("does not deliver to a different stream", () => {
+    const other = vi.fn();
+    globalBus.subscribe("agent:other", other);
+    dispatchAgentEvent({ stream: "s2", type: "status", data: { status: "completed" }, ts: 1 });
+    expect(other).not.toHaveBeenCalled();
   });
 });

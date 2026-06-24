@@ -33,7 +33,8 @@ import type { Socket } from "net";
 import { globalBus, formatSseEvent, formatPing, type SseEvent } from "@nexus/sse";
 import type { FastifyInstance } from "fastify";
 
-import { requireAuth } from "../middleware/auth.js";
+import { startAgentEventsBridge, stopAgentEventsBridge } from "../lib/agent-events-bridge.js";
+import { requireAuth, requireAuthWithTier } from "../middleware/auth.js";
 
 const PING_INTERVAL_MS = 20_000;
 
@@ -91,98 +92,180 @@ function openSseConnection(raw: ServerResponse, socket: Socket, channels: string
 // ── Route plugin ──────────────────────────────────────────────────────────────
 
 export async function sseRoutes(app: FastifyInstance): Promise<void> {
+  // Start the worker→API Redis bridge so agent-run events published by the
+  // worker process reach SSE clients here (no-op without REDIS_URL).
+  await startAgentEventsBridge();
+  app.addHook("onClose", async () => {
+    await stopAgentEventsBridge();
+  });
+
+  // ── Tenant-isolation helper ──────────────────────────────────────────────
+  // Verifies the authenticated user owns the given agent-session (by taskId).
+  async function verifySessionOwnership(
+    userId: string | undefined,
+    streamId: string,
+  ): Promise<boolean> {
+    if (!userId) return false; // no user context → deny
+    const dbUrl = process.env.DATABASE_URL;
+    if (!dbUrl) return true;  // no DB → allow (single-tenant dev mode)
+    try {
+      const { default: pg } = await import("pg");
+      const pool = new pg.Pool({ connectionString: dbUrl, max: 1 });
+      const { rows } = await pool.query<{ user_id: string }>(
+        `SELECT user_id FROM agent_sessions WHERE task_id = $1 AND user_id IS NOT NULL LIMIT 1`,
+        [streamId],
+      );
+      await pool.end();
+      if (rows.length === 0) return true; // session not yet persisted → allow
+      return rows[0]!.user_id === userId;
+    } catch {
+      return true; // DB unreachable → fail open (don't break SSE for transient issues)
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Firehose routes — enterprise/admin tier only
+  // ══════════════════════════════════════════════════════════════════════════
+
   // ── All task updates ─────────────────────────────────────────────────────
 
   app.get(
     "/sse/tasks",
-    {
-      schema: {
-        response: {
-          200: { type: "object", additionalProperties: true },
-          201: { type: "object", additionalProperties: true },
-        },
-      },
-      preHandler: requireAuth,
-    },
+    { preHandler: requireAuthWithTier },
     async (request, reply): Promise<void> => {
+      if (request.nexusTier !== "enterprise") {
+        reply.code(403);
+        return reply.send({ error: "Firehose requires enterprise tier" });
+      }
       reply.hijack();
       openSseConnection(reply.raw, request.socket, ["tasks"]);
     },
   );
 
-  // ── Single task updates ──────────────────────────────────────────────────
+  // ── Single task updates (tenant-isolated) ────────────────────────────────
 
   app.get<{ Params: { taskId: string } }>(
     "/sse/tasks/:taskId",
     {
       schema: {
         response: {
-          200: { type: "object", additionalProperties: true },
-          201: { type: "object", additionalProperties: true },
+          200: {},
+          403: {},
         },
       },
-      preHandler: requireAuth,
+      preHandler: requireAuthWithTier,
     },
     async (request, reply): Promise<void> => {
+      if (!(await verifySessionOwnership(request.nexusUserId, request.params.taskId))) {
+        reply.code(403);
+        return reply.send({ error: "Not your task" });
+      }
       reply.hijack();
       openSseConnection(reply.raw, request.socket, [`tasks:${request.params.taskId}`]);
     },
   );
 
-  // ── All signals ──────────────────────────────────────────────────────────
+  // ── All signals (enterprise only) ────────────────────────────────────────
 
   app.get(
     "/sse/signals",
     {
       schema: {
         response: {
-          200: { type: "object", additionalProperties: true },
-          201: { type: "object", additionalProperties: true },
+          200: {},
+          403: {},
         },
       },
-      preHandler: requireAuth,
+      preHandler: requireAuthWithTier,
     },
     async (request, reply): Promise<void> => {
+      if (request.nexusTier !== "enterprise") {
+        reply.code(403);
+        return reply.send({ error: "Firehose requires enterprise tier" });
+      }
       reply.hijack();
       openSseConnection(reply.raw, request.socket, ["signals"]);
     },
   );
 
-  // ── All verdicts ─────────────────────────────────────────────────────────
+  // ── All verdicts (enterprise only) ───────────────────────────────────────
 
   app.get(
     "/sse/verdicts",
     {
       schema: {
         response: {
-          200: { type: "object", additionalProperties: true },
-          201: { type: "object", additionalProperties: true },
+          200: {},
+          403: {},
         },
       },
-      preHandler: requireAuth,
+      preHandler: requireAuthWithTier,
     },
     async (request, reply): Promise<void> => {
+      if (request.nexusTier !== "enterprise") {
+        reply.code(403);
+        return reply.send({ error: "Firehose requires enterprise tier" });
+      }
       reply.hijack();
       openSseConnection(reply.raw, request.socket, ["verdicts"]);
     },
   );
 
-  // ── Verdict for a specific task ──────────────────────────────────────────
+  // ── Verdict for a specific task ─────────────────────────────────────────
 
   app.get<{ Params: { taskId: string } }>(
     "/sse/verdicts/:taskId",
     {
       schema: {
         response: {
-          200: { type: "object", additionalProperties: true },
-          201: { type: "object", additionalProperties: true },
+          200: {},
+          403: {},
         },
       },
-      preHandler: requireAuth,
+      preHandler: requireAuthWithTier,
     },
     async (request, reply): Promise<void> => {
+      if (!(await verifySessionOwnership(request.nexusUserId, request.params.taskId))) {
+        reply.code(403);
+        return reply.send({ error: "Not your task" });
+      }
       reply.hijack();
       openSseConnection(reply.raw, request.socket, [`verdicts:${request.params.taskId}`]);
+    },
+  );
+
+  // ── Live agent-run stream (step / compaction / status) ───────────────────
+  // `:stream` is the run's sessionId or taskId. "all" = firehose (enterprise only).
+
+  app.get<{ Params: { stream: string } }>(
+    "/sse/agent/:stream",
+    {
+      schema: {
+        response: {
+          200: {},
+          403: {},
+        },
+      },
+      preHandler: requireAuthWithTier,
+    },
+    async (request, reply): Promise<void> => {
+      const { stream } = request.params;
+      // Firehose → enterprise only
+      if (stream === "all") {
+        if (request.nexusTier !== "enterprise") {
+          reply.code(403);
+          return reply.send({ error: "Agent firehose requires enterprise tier" });
+        }
+      } else {
+        // Specific session → verify ownership
+        if (!(await verifySessionOwnership(request.nexusUserId, stream))) {
+          reply.code(403);
+          return reply.send({ error: "Not your agent session" });
+        }
+      }
+      const channel = stream === "all" ? "agent" : `agent:${stream}`;
+      reply.hijack();
+      openSseConnection(reply.raw, request.socket, [channel]);
     },
   );
 }

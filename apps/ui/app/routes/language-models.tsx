@@ -1,4 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0
+import {
+  Brain,
+  Settings,
+  Trash2,
+  Plus,
+  Eye,
+  EyeOff,
+  CheckCircle2,
+  Loader2,
+  Cpu,
+  Sparkles,
+  Zap,
+  Globe,
+  Server,
+  Router,
+  Wind,
+  CircuitBoard,
+  MessageSquare,
+  Wrench,
+  Check,
+} from "lucide-react";
 import { useState, useEffect } from "react";
 // ── Provider catalogue (static config, not live data) ─────────────────────────
 
@@ -154,13 +175,19 @@ const AVAILABLE_PROVIDERS: Provider[] = [
     models: [],
   },
 ];
-import { cn } from "~/lib/utils";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { Badge } from "~/components/ui/badge";
-import { Separator } from "~/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -170,36 +197,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "~/components/ui/dialog";
+import { Separator } from "~/components/ui/separator";
 import { useStore } from "~/context/StoreContext";
-import {
-  Brain,
-  Settings,
-  Trash2,
-  Plus,
-  Eye,
-  EyeOff,
-  CheckCircle2,
-  Loader2,
-  Cpu,
-  Sparkles,
-  Zap,
-  Globe,
-  Server,
-  Router,
-  Wind,
-  CircuitBoard,
-  MessageSquare,
-  Wrench,
-  Check,
-} from "lucide-react";
+import { authFetch } from "~/lib/api";
+import { cn } from "~/lib/utils";
+
+/**
+ * The encrypted /provider-keys store uses canonical provider slugs. This page's
+ * catalogue calls Google's provider "google"; the store/driver slug is "gemini".
+ */
+function toStoreProvider(id: string): string {
+  return id === "google" ? "gemini" : id;
+}
+function fromStoreProvider(slug: string): string {
+  return slug === "gemini" ? "google" : slug;
+}
 
 const PROVIDER_ICONS: Record<string, React.ReactNode> = {
   openai: <Sparkles className="size-5" />,
@@ -222,23 +234,36 @@ export default function LanguageModelsPage() {
   const store = useStore();
   const [connectedProviders, setConnectedProviders] = useState<ConnectedProvider[]>([]);
   const [defaultModel, setDefaultModel] = useState("gpt-4o");
-  const [providersLoading, setProvidersLoading] = useState(true);
+  const [_providersLoading, setProvidersLoading] = useState(true);
 
-  // Load user's connected providers from the API
+  // Load the user's encrypted provider connections (keys never returned — only a
+  // masked prefix + non-secret metadata) from the BYOK store.
   useEffect(() => {
     setProvidersLoading(true);
-    fetch("/api/providers")
-      .then((r) => (r.ok ? r.json() : null))
+    authFetch("/api/user/provider-keys")
+      .then((r) =>
+        r.ok
+          ? (r.json() as Promise<{
+              keys?: {
+                id: string;
+                provider: string;
+                label?: string | null;
+                keyPrefix?: string | null;
+                baseUrl?: string | null;
+                models?: string[] | null;
+              }[];
+            }>)
+          : null,
+      )
       .then((data) => {
-        if (!data?.providers) return;
-        // Map API response to ConnectedProvider shape
-        const mapped: ConnectedProvider[] = data.providers.map((p: any) => ({
-          id: String(p.id),
-          providerId: p.provider ?? p.type ?? "custom",
-          displayName: p.name,
-          apiKey: p.apiKey ?? "••••",
-          baseUrl: p.baseUrl,
-          enabledModels: p.model ? [p.model] : [],
+        if (!data?.keys) return;
+        const mapped: ConnectedProvider[] = data.keys.map((k) => ({
+          id: k.id,
+          providerId: fromStoreProvider(k.provider),
+          displayName: k.label ?? k.provider,
+          apiKey: k.keyPrefix ? `${k.keyPrefix}••••` : "",
+          baseUrl: k.baseUrl ?? "",
+          enabledModels: k.models ?? [],
           isDefault: false,
         }));
         setConnectedProviders(mapped);
@@ -293,7 +318,9 @@ export default function LanguageModelsPage() {
     setEditingProvider(provider);
     setEditingConnection(connection);
     setFormDisplayName(connection.displayName);
-    setFormApiKey(connection.apiKey);
+    // Keys are write-only: never preload the masked stored value into the form.
+    // An empty field means "keep existing key"; a new value rotates it.
+    setFormApiKey("");
     setFormBaseUrl(connection.baseUrl ?? "");
     setFormEnabledModels([...connection.enabledModels]);
     setShowApiKey(false);
@@ -315,41 +342,35 @@ export default function LanguageModelsPage() {
     if (!editingProvider) return;
     setIsSaving(true);
     try {
-      if (editingConnection) {
-        // Update existing — use DELETE + re-add (no PATCH endpoint)
-        await fetch(`/api/providers/${editingConnection.id}`, { method: "DELETE" }).catch(() => {});
-      }
-      // Create new / re-create
-      const res = await fetch("/api/providers", {
+      // The store is keyed by (user, provider) and rotates on POST (soft-delete
+      // old + insert), so this handles both create and edit. Keys are write-only.
+      const res = await authFetch("/api/user/provider-keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: formDisplayName || editingProvider.name,
-          type: editingProvider.id,
-          provider: editingProvider.id,
-          apiKey: formApiKey,
-          model: formEnabledModels[0] ?? editingProvider.models?.[0]?.id ?? "",
+          provider: toStoreProvider(editingProvider.id),
+          apiKey: formApiKey || undefined,
+          label: formDisplayName || editingProvider.name,
           baseUrl: formBaseUrl || undefined,
+          models: formEnabledModels,
         }),
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as { id?: string; keyPrefix?: string | null };
         const newConn: ConnectedProvider = {
-          id: String(data.provider?.id ?? `conn-${Date.now()}`),
+          id: data.id ?? `conn-${Date.now()}`,
           providerId: editingProvider.id,
           displayName: formDisplayName || editingProvider.name,
-          apiKey: formApiKey ? "••••" + formApiKey.slice(-4) : "••••",
+          apiKey: data.keyPrefix ? `${data.keyPrefix}••••` : formApiKey ? "••••" : "",
           baseUrl: formBaseUrl || undefined,
           enabledModels: formEnabledModels,
           isDefault: connectedProviders.length === 0,
         };
-        if (editingConnection) {
-          setConnectedProviders((prev) =>
-            prev.map((cp) => (cp.id === editingConnection.id ? newConn : cp)),
-          );
-        } else {
-          setConnectedProviders((prev) => [...prev, newConn]);
-        }
+        // Replace any existing connection for this provider.
+        setConnectedProviders((prev) => [
+          ...prev.filter((cp) => cp.providerId !== editingProvider.id),
+          newConn,
+        ]);
       }
     } catch {
       /* ignore — optimistically updated */
@@ -360,17 +381,47 @@ export default function LanguageModelsPage() {
 
   async function handleDelete(connectionId: string) {
     try {
-      await fetch(`/api/providers/${connectionId}`, { method: "DELETE" });
+      await authFetch(`/api/user/provider-keys/${connectionId}`, { method: "DELETE" });
     } catch {
       /* ignore */
     }
     setConnectedProviders((prev) => prev.filter((cp) => cp.id !== connectionId));
   }
 
-  function handleInlineKeySave(connectionId: string) {
-    setConnectedProviders((prev) =>
-      prev.map((cp) => (cp.id === connectionId ? { ...cp, apiKey: inlineKeyValue } : cp)),
-    );
+  async function handleInlineKeySave(connectionId: string) {
+    const cp = connectedProviders.find((c) => c.id === connectionId);
+    if (cp && inlineKeyValue) {
+      try {
+        // Rotate the stored key, preserving the connection's metadata.
+        const res = await authFetch("/api/user/provider-keys", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            provider: toStoreProvider(cp.providerId),
+            apiKey: inlineKeyValue,
+            label: cp.displayName,
+            baseUrl: cp.baseUrl || undefined,
+            models: cp.enabledModels,
+          }),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { id?: string; keyPrefix?: string | null };
+          setConnectedProviders((prev) =>
+            prev.map((c) =>
+              c.id === connectionId
+                ? {
+                    ...c,
+                    id: data.id ?? c.id,
+                    apiKey: data.keyPrefix ? `${data.keyPrefix}••••` : "••••",
+                  }
+                : c,
+            ),
+          );
+        }
+      } catch {
+        /* ignore */
+      }
+    }
     setInlineKeyEditing(null);
     setInlineKeyValue("");
     setInlineKeyVisible(false);
@@ -577,8 +628,9 @@ export default function LanguageModelsPage() {
                                 variant="ghost"
                                 className="h-6 px-2 text-[11px]"
                                 onClick={() => {
+                                  // Keys are write-only — never preload the masked value.
                                   setInlineKeyEditing(cp.id);
-                                  setInlineKeyValue(cp.apiKey.includes("...") ? "" : cp.apiKey);
+                                  setInlineKeyValue("");
                                   setInlineKeyVisible(false);
                                 }}
                               >

@@ -8,20 +8,6 @@
  * Step 4: Identity + launch
  */
 
-import { useState } from "react";
-import { useNavigate } from "react-router";
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
-import { Badge } from "~/components/ui/badge";
-import { Switch } from "~/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
 import {
   Zap,
   Users,
@@ -36,13 +22,28 @@ import {
   Sparkles,
   ArrowRight,
 } from "lucide-react";
+import { useState } from "react";
+import { useNavigate } from "react-router";
+
+import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import { Switch } from "~/components/ui/switch";
+import { useAuth } from "~/context/AuthContext";
 import {
   type CouncilMember,
   API_PROVIDERS,
   DEFAULT_MEMBERS,
   saveCouncilMembers,
 } from "~/lib/council";
-import { useAuth } from "~/context/AuthContext";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -177,7 +178,6 @@ function StepCouncil({
 }) {
   const [showAdd, setShowAdd] = useState(false);
   const [newProvider, setNewProvider] = useState("openai");
-  const [newKey, setNewKey] = useState("");
   const [newModel, setNewModel] = useState("");
 
   const toggleBrowser = (id: string) =>
@@ -196,12 +196,10 @@ function StepCouncil({
       mode: "api",
       provider: prov.id,
       model,
-      apiKey: newKey.trim(),
       baseUrl: prov.defaultBaseUrl,
     };
     setPrefs((p) => ({ ...p, apiMembers: [...p.apiMembers, member] }));
     setShowAdd(false);
-    setNewKey("");
     setNewModel("");
     setNewProvider("openai");
   };
@@ -240,7 +238,7 @@ function StepCouncil({
                 <p className="text-xs text-muted-foreground">{hint}</p>
               </div>
               <Switch
-                checked={!!prefs.browserAccounts[id]}
+                checked={prefs.browserAccounts[id] ?? false}
                 onCheckedChange={() => toggleBrowser(id)}
               />
             </div>
@@ -321,16 +319,10 @@ function StepCouncil({
               />
             </div>
             {API_PROVIDERS.find((p) => p.id === newProvider)?.needsKey && (
-              <div className="space-y-1.5">
-                <Label className="text-xs">API Key</Label>
-                <Input
-                  className="h-8 text-xs font-mono"
-                  type="password"
-                  placeholder="sk-…"
-                  value={newKey}
-                  onChange={(e) => setNewKey(e.target.value)}
-                />
-              </div>
+              <p className="text-xs text-muted-foreground">
+                Add this provider&apos;s key (encrypted server-side) on the Provider Keys page after
+                setup.
+              </p>
             )}
             <div className="flex gap-2">
               <Button size="sm" className="h-7 text-xs flex-1" onClick={addApi}>

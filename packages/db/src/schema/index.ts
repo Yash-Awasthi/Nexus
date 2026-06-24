@@ -11,3 +11,6 @@ export * from "./billing.js";
 export * from "./forecast-runs.js";
 export * from "./research-runs.js";
 export * from "./users.js";
+export * from "./user-provider-credentials.js";
+export * from "./mcp-servers.js";
+export * from "./agent-sessions.js";

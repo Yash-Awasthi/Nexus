@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -373,6 +373,49 @@ export default function ArchetypesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Archetype | null>(null);
   const [viewTarget, setViewTarget] = useState<Archetype | null>(null);
+  const [apiLoaded, setApiLoaded] = useState(false);
+
+  // Load custom archetypes from API on mount (fallback to local store)
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch("/api/archetypes");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.archetypes?.length > 0) {
+            for (const a of data.archetypes) {
+              if (!store.customArchetypes.find((x) => x.id === a.id)) {
+                store.addCustomArchetype({
+                  name: a.name, icon: a.icon, color: a.color ?? "bg-primary/20 border-primary/30",
+                  thinkingStyle: a.thinkingStyle, description: a.description,
+                  systemPrompt: a.systemPrompt, model: a.model, temperature: a.temperature,
+                });
+              }
+            }
+          }
+        }
+      } catch { /* offline — use local store */ }
+      setApiLoaded(true);
+    }
+    load();
+  }, []);
+
+  // Sync create to API
+  async function syncCreate(data: FormState) {
+    try {
+      const res = await fetch("/api/archetypes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: data.name, icon: data.icon, thinkingStyle: data.thinkingStyle, description: data.description, systemPrompt: data.systemPrompt, model: data.model, temperature: data.temperature }),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        store.addCustomArchetype({ name: created.name, icon: created.icon, color: "bg-primary/20 border-primary/30", thinkingStyle: created.thinkingStyle, description: created.description, systemPrompt: created.systemPrompt, model: created.model, temperature: created.temperature });
+        return;
+      }
+    } catch { /* offline — local only */ }
+    store.addCustomArchetype({ name: data.name, icon: data.icon || "🤖", color: "bg-primary/20 border-primary/30", thinkingStyle: data.thinkingStyle, description: data.description, systemPrompt: data.systemPrompt, model: data.model, temperature: data.temperature });
+  }
 
   // Merge builtins with store custom archetypes
   const customArchetypes: Archetype[] = store.customArchetypes.map((a) => ({
@@ -391,16 +434,7 @@ export default function ArchetypesPage() {
   const archetypes = [...builtinArchetypes, ...customArchetypes];
 
   const handleCreate = (data: FormState) => {
-    store.addCustomArchetype({
-      name: data.name,
-      icon: data.icon || "🤖",
-      color: "bg-primary/20 border-primary/30",
-      thinkingStyle: data.thinkingStyle,
-      description: data.description,
-      systemPrompt: data.systemPrompt,
-      model: data.model,
-      temperature: data.temperature,
-    });
+    syncCreate(data);
   };
 
   const handleEdit = (data: FormState) => {
@@ -415,12 +449,19 @@ export default function ArchetypesPage() {
         model: data.model,
         temperature: data.temperature,
       });
+      // Sync to API (fire-and-forget)
+      fetch(`/api/archetypes/${editTarget.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: data.name, icon: data.icon, thinkingStyle: data.thinkingStyle, description: data.description, systemPrompt: data.systemPrompt, model: data.model, temperature: data.temperature }),
+      }).catch(() => {});
     }
     setEditTarget(null);
   };
 
   const handleDelete = (id: string) => {
     store.removeArchetype(id);
+    fetch(`/api/archetypes/${id}`, { method: "DELETE" }).catch(() => {});
   };
 
   return (

@@ -62,7 +62,7 @@ async function getManager(): Promise<KernelManager> {
   return _manager;
 }
 
-const SUPPORTED_LANGS: ReplLanguage[] = ["python", "r", "julia"];
+const SUPPORTED_LANGS: ReplLanguage[] = ["python", "r", "julia", "shell"];
 
 // ── Route plugin ──────────────────────────────────────────────────────────────
 

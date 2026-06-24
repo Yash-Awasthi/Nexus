@@ -13,13 +13,7 @@
  * No external TOTP library — pure Node.js crypto.
  */
 
-import {
-  createCipheriv,
-  createDecipheriv,
-  createHmac,
-  randomBytes,
-  timingSafeEqual,
-} from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 import { db } from "@nexus/db";
 import { users } from "@nexus/db/schema";
@@ -28,6 +22,7 @@ import type { FastifyInstance } from "fastify";
 
 import { emitAuditEvent } from "../lib/audit-emitter.js";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
+import { encryptWithKey, decryptWithKey } from "../lib/secret-crypto.js";
 import { requireAuth } from "../middleware/auth.js";
 
 // 5 MFA attempts per 15 minutes per IP — prevents brute-force TOTP attacks
@@ -121,11 +116,7 @@ function generateTotpSecret(): string {
 function encryptSecret(plaintext: string): string {
   const key = getEncKey();
   if (!key) return plaintext; // Unencrypted fallback when NEXUS_MFA_KEY unset
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
-  const enc = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return Buffer.concat([iv, tag, enc]).toString("base64");
+  return encryptWithKey(key, plaintext);
 }
 
 /** AES-256-GCM decrypt a stored TOTP secret. */
@@ -133,13 +124,7 @@ function decryptSecret(stored: string): string {
   const key = getEncKey();
   if (!key) return stored;
   try {
-    const buf = Buffer.from(stored, "base64");
-    const iv = buf.subarray(0, 12);
-    const tag = buf.subarray(12, 28);
-    const enc = buf.subarray(28);
-    const decipher = createDecipheriv("aes-256-gcm", key, iv);
-    decipher.setAuthTag(tag);
-    return decipher.update(enc).toString("utf8") + decipher.final("utf8");
+    return decryptWithKey(key, stored);
   } catch {
     return stored; // Plaintext fallback
   }

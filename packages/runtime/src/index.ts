@@ -92,6 +92,14 @@ export { registerConductorMcpBridge, GHOSTSTACK_MCP_TOOLS } from "./conductor-mc
 // ── Planning engine ───────────────────────────────────────────────────────────
 export { PlanningEngine } from "./planning-engine.js";
 
+// ── GhostStack orchestrator compatibility factory (for @nexus/api gs route) ─────
+export { createGhostStackOrchestrator } from "./conductor-compat.js";
+export type { GhostStackOrchestrator } from "./conductor-compat.js";
+
+// ── Native agent-runtime adapter (tool-calling coding-agent loop) ────────────────
+export { AgentRuntimeAdapter } from "./agent-runtime-adapter.js";
+export type { AgentRuntimeAdapterOptions, AgentRuntimeTask } from "./agent-runtime-adapter.js";
+
 // ── Spec loader ───────────────────────────────────────────────────────────────
 export {
   parseWorkflowSpec,

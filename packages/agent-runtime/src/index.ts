@@ -211,11 +211,84 @@ export class StrReplaceProcessor {
 
 // ── RuntimeToolSet ────────────────────────────────────────────────────────────
 
+/**
+ * Per-invocation context passed to a tool handler (modeled on jcode's ToolContext).
+ * All fields optional so existing handlers ignoring it keep working.
+ */
+export interface ToolContext {
+  sessionId?: string;
+  toolCallId?: string;
+  /** Cooperative cancellation for long-running tools. */
+  signal?: AbortSignal;
+  /** Workspace root, if the run is workspace-scoped. */
+  workingDir?: string;
+}
+
 export interface RuntimeTool {
   name: string;
   description: string;
-  handler: (args: Record<string, unknown>) => Promise<unknown>;
+  handler: (args: Record<string, unknown>, ctx?: ToolContext) => Promise<unknown>;
+  /** JSON Schema for the tool's arguments — advertised to native tool-calling. */
+  parameters?: Record<string, unknown>;
+  /**
+   * Override the default permission tier. When unset, the tier is derived from
+   * the tool name via `classifyTool` (read-only names auto-allow; others gate).
+   */
+  tier?: ActionTier;
 }
+
+// ── Permission model (two-tier; modeled on jcode safety.rs) ─────────────────────
+
+export type ActionTier = "auto_allowed" | "requires_permission";
+
+/**
+ * Read-only tool names that never require approval. Mirrors jcode's AUTO_ALLOWED.
+ * Anything not listed defaults to `requires_permission` (mutating / side-effecting).
+ */
+export const AUTO_ALLOWED_TOOLS: ReadonlySet<string> = new Set([
+  "read",
+  "read_file",
+  "glob",
+  "grep",
+  "ls",
+  "list",
+  "list_files",
+  "memory",
+  "todo",
+  "todoread",
+  "todowrite",
+  "conversation_search",
+  "session_search",
+  "codesearch",
+]);
+
+/** Classify a tool by name into a permission tier (case-insensitive). */
+export function classifyTool(name: string): ActionTier {
+  return AUTO_ALLOWED_TOOLS.has(name.toLowerCase()) ? "auto_allowed" : "requires_permission";
+}
+
+/** A request to run a tool that requires approval. */
+export interface PermissionRequest {
+  toolName: string;
+  args: Record<string, unknown>;
+  tier: ActionTier;
+  sessionId?: string;
+  toolCallId?: string;
+}
+
+/** Approve/deny verdict for a PermissionRequest. */
+export interface PermissionDecision {
+  allowed: boolean;
+  reason?: string;
+}
+
+/**
+ * Decides whether a `requires_permission` tool may run. Injected into
+ * ToolAgentRuntime; when absent, all tools run (back-compatible default).
+ */
+export type PermissionGate = (
+  req: PermissionRequest,
+) => PermissionDecision | Promise<PermissionDecision>;
 
 /** Runtime tool set. */
 export class RuntimeToolSet {
@@ -239,13 +312,17 @@ export class RuntimeToolSet {
     return [...this.tools.values()];
   }
 
-  async invoke(name: string, args: Record<string, unknown>): Promise<ToolResult> {
+  async invoke(
+    name: string,
+    args: Record<string, unknown>,
+    ctx?: ToolContext,
+  ): Promise<ToolResult> {
     const tool = this.tools.get(name);
     if (!tool) {
       return { name, output: null, error: `Tool not found: ${name}` };
     }
     try {
-      const output = await tool.handler(args);
+      const output = await tool.handler(args, ctx);
       return { name, output };
     } catch (err) {
       return { name, output: null, error: err instanceof Error ? err.message : String(err) };
@@ -574,6 +651,488 @@ export class AgentRuntime {
   }
 }
 
+// ── Native tool-calling runtime (ToolAgentRuntime) ──────────────────────────────
+//
+// The canonical harness loop. Unlike AgentRuntime above (which parses a custom
+// [TOOL:...] bracket protocol from streamed TEXT and rebuilds a synthetic prompt
+// each step), this loop uses the provider's NATIVE tool-calling and keeps a real
+// growing message history, so multi-step coding sessions retain full context.
+//
+// It is decoupled from @nexus/llm-drivers via the structural LlmToolDriver
+// interface + llmDriverToToolFn bridge (no cross-package import).
+
+/** Token usage accumulated across a run. */
+export interface RuntimeUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+}
+
+/** Provider-agnostic conversation message held in the loop's history. */
+export interface RuntimeMessage {
+  role: "user" | "assistant" | "system" | "tool";
+  content: string;
+  /** On assistant messages that requested tool calls. */
+  toolCalls?: ToolCallRaw[];
+  /** On `role: "tool"` messages — links the result back to its call. */
+  toolCallId?: string;
+}
+
+/** A tool advertised to the model (name + description + JSON-Schema params). */
+export interface ToolSpec {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+}
+
+/** One model turn: assistant text + any tool calls + usage. */
+export interface LlmTurnResult {
+  content: string;
+  toolCalls: ToolCallRaw[];
+  usage?: RuntimeUsage;
+}
+
+/** Tool-aware LLM function consumed by ToolAgentRuntime. */
+export type LlmToolFn = (
+  messages: RuntimeMessage[],
+  opts: {
+    systemPrompt?: string;
+    tools?: ToolSpec[];
+    signal?: AbortSignal;
+    /** Streamed text deltas (for SSE pass-through). */
+    onText?: (delta: string) => void;
+  },
+) => Promise<LlmTurnResult>;
+
+/**
+ * Structural interface matching @nexus/llm-drivers' LlmDriver (native tool-calling
+ * variant). Defined here to avoid a workspace import cycle; any real driver whose
+ * stream() sends `tools` and returns `toolCalls` satisfies it structurally.
+ */
+export interface LlmToolDriver {
+  readonly model: string;
+  stream(
+    opts: {
+      model: string;
+      messages: {
+        role: "user" | "assistant" | "system" | "tool";
+        content: string;
+        toolCalls?: { id: string; name: string; arguments: Record<string, unknown> }[];
+        toolCallId?: string;
+      }[];
+      systemPrompt?: string;
+      maxTokens?: number;
+      temperature?: number;
+      tools?: { name: string; description: string; parameters: Record<string, unknown> }[];
+    },
+    handler: (delta: { delta: string; done: boolean }) => void | Promise<void>,
+  ): Promise<{
+    content: string;
+    toolCalls?: { id: string; name: string; arguments: Record<string, unknown> }[];
+    usage?: RuntimeUsage;
+  }>;
+}
+
+/** Bridge a native-tool-calling LlmDriver to the LlmToolFn the loop expects. */
+export function llmDriverToToolFn(driver: LlmToolDriver, modelOverride?: string): LlmToolFn {
+  return async (messages, opts): Promise<LlmTurnResult> => {
+    const resp = await driver.stream(
+      {
+        model: modelOverride ?? driver.model,
+        messages: messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+          ...(m.toolCalls?.length
+            ? {
+                toolCalls: m.toolCalls.map((tc) => ({
+                  id: tc.callId ?? "",
+                  name: tc.name,
+                  arguments: tc.arguments,
+                })),
+              }
+            : {}),
+          ...(m.toolCallId ? { toolCallId: m.toolCallId } : {}),
+        })),
+        systemPrompt: opts.systemPrompt,
+        ...(opts.tools?.length ? { tools: opts.tools } : {}),
+      },
+      (delta) => {
+        if (!delta.done && delta.delta) opts.onText?.(delta.delta);
+      },
+    );
+    return {
+      content: resp.content,
+      toolCalls: (resp.toolCalls ?? []).map((tc) => ({
+        name: tc.name,
+        arguments: tc.arguments,
+        callId: tc.id,
+      })),
+      usage: resp.usage,
+    };
+  };
+}
+
+// ── Context compaction (constants + estimator + compactor; from jcode) ──────────
+//
+// Long agent sessions grow message history until the provider 4xx-es on context
+// length. Compaction summarizes older turns into a single system message while
+// keeping the most recent turns verbatim. Constants mirror jcode-compaction-core.
+
+/** Default context budget in tokens (matches Claude's ~200k window). */
+export const DEFAULT_TOKEN_BUDGET = 200_000;
+/** Compact when the estimate reaches this fraction of the budget. */
+export const COMPACTION_THRESHOLD = 0.8;
+/** Keep this many most-recent turns verbatim (never summarized). */
+export const RECENT_TURNS_TO_KEEP = 10;
+/** Approximate chars per token for estimation. */
+export const CHARS_PER_TOKEN = 4;
+/**
+ * Flat token cost charged per inline image. Counting raw base64 length as text
+ * massively overestimates real cost and triggers spurious compaction loops, so
+ * images are charged a flat estimate instead (jcode lesson).
+ */
+export const IMAGE_TOKEN_COST = 1_600;
+/** Fixed overhead for system prompt + tool definitions (≈8k sys + ≈10k tools). */
+export const SYSTEM_OVERHEAD_TOKENS = 18_000;
+
+/** Summary prompt — produces a compact, resumable natural-language digest. */
+export const COMPACTION_SUMMARY_PROMPT = `Summarize the conversation so far so the work can continue later.
+
+Write natural language with these sections:
+- Context: what we're working on and why (1-2 sentences)
+- What we did: key actions taken, files changed, problems solved
+- Current state: what works, what's broken, what's next
+- User preferences: specific requirements or decisions made
+
+Be concise but preserve important details (file paths, identifiers, decisions).`;
+
+/** Heuristic per-message token estimate (text length + flat image cost). */
+export function estimateMessageTokens(m: RuntimeMessage): number {
+  let tokens = Math.ceil((m.content?.length ?? 0) / CHARS_PER_TOKEN);
+  if (m.toolCalls?.length) {
+    for (const tc of m.toolCalls) {
+      tokens += Math.ceil(JSON.stringify(tc.arguments).length / CHARS_PER_TOKEN) + 4;
+    }
+  }
+  // Inline base64 image markers are charged a flat cost, not their raw length.
+  const images = m.content ? m.content.match(/data:image\/[a-zA-Z]+;base64,/g) : null;
+  if (images) tokens += images.length * IMAGE_TOKEN_COST;
+  return tokens;
+}
+
+/** Estimate total context tokens for a message list, incl. fixed overhead. */
+export function estimateContextTokens(
+  messages: RuntimeMessage[],
+  systemOverhead = SYSTEM_OVERHEAD_TOKENS,
+): number {
+  return messages.reduce((sum, m) => sum + estimateMessageTokens(m), systemOverhead);
+}
+
+export interface CompactionOptions {
+  /** Token budget; compaction triggers at threshold × budget. */
+  tokenBudget?: number;
+  threshold?: number;
+  recentTurnsToKeep?: number;
+  systemOverhead?: number;
+  /**
+   * Summarizer LLM. Receives the messages to summarize; returns the digest text.
+   * Typically the same LlmToolFn the loop uses, with no tools.
+   */
+  summarize: (messages: RuntimeMessage[]) => Promise<string>;
+}
+
+export interface CompactionResult {
+  messages: RuntimeMessage[];
+  compacted: boolean;
+  preTokens: number;
+  postTokens: number;
+  summarizedCount: number;
+}
+
+/**
+ * Compact a message history if it exceeds threshold × budget: summarize all but
+ * the last `recentTurnsToKeep` messages into one system message, preserving the
+ * recent tail verbatim. A leading system message (index 0) is always preserved.
+ * Returns the original list unchanged when under threshold.
+ */
+export async function compactMessages(
+  messages: RuntimeMessage[],
+  opts: CompactionOptions,
+): Promise<CompactionResult> {
+  const budget = opts.tokenBudget ?? DEFAULT_TOKEN_BUDGET;
+  const threshold = opts.threshold ?? COMPACTION_THRESHOLD;
+  const keep = opts.recentTurnsToKeep ?? RECENT_TURNS_TO_KEEP;
+  const overhead = opts.systemOverhead ?? SYSTEM_OVERHEAD_TOKENS;
+
+  const preTokens = estimateContextTokens(messages, overhead);
+  if (preTokens < budget * threshold) {
+    return { messages, compacted: false, preTokens, postTokens: preTokens, summarizedCount: 0 };
+  }
+
+  // Preserve a leading system message; summarize the middle; keep recent tail.
+  const hasLeadingSystem = messages[0]?.role === "system";
+  const head = hasLeadingSystem ? messages.slice(0, 1) : [];
+  const body = hasLeadingSystem ? messages.slice(1) : messages;
+
+  if (body.length <= keep) {
+    // Nothing old enough to summarize — leave as-is (avoids a no-op summary call).
+    return { messages, compacted: false, preTokens, postTokens: preTokens, summarizedCount: 0 };
+  }
+
+  const toSummarize = body.slice(0, body.length - keep);
+  const recent = body.slice(body.length - keep);
+  const summary = await opts.summarize(toSummarize);
+
+  const compactedMessages: RuntimeMessage[] = [
+    ...head,
+    { role: "system", content: `[Earlier conversation summary]\n${summary}` },
+    ...recent,
+  ];
+  const postTokens = estimateContextTokens(compactedMessages, overhead);
+  return {
+    messages: compactedMessages,
+    compacted: true,
+    preTokens,
+    postTokens,
+    summarizedCount: toSummarize.length,
+  };
+}
+
+/** Default step budget for a coding session (bounded to limit runaway cost). */
+export const TOOL_RUNTIME_MAX_STEPS_DEFAULT = 50;
+
+/** One executed step in a ToolAgentRuntime run. */
+export interface ToolStepRecord {
+  stepIndex: number;
+  content: string;
+  toolCalls: ToolCallRaw[];
+  toolResults: ToolResult[];
+  usage?: RuntimeUsage;
+  durationMs: number;
+}
+
+/** Result of a ToolAgentRuntime run. */
+export interface ToolRuntimeResult {
+  /** Full conversation history (user → assistant/tool_calls → tool results → …). */
+  messages: RuntimeMessage[];
+  steps: ToolStepRecord[];
+  finalContent: string;
+  totalUsage: RuntimeUsage;
+  aborted: boolean;
+  totalDurationMs: number;
+}
+
+export interface ToolRuntimeOptions {
+  llm: LlmToolFn;
+  toolSet?: RuntimeToolSet;
+  systemPrompt?: string;
+  maxSteps?: number;
+  /** Tools advertised to the model; derived from toolSet when omitted. */
+  tools?: ToolSpec[];
+  /** Streamed text deltas (SSE). */
+  onText?: (delta: string) => void;
+  /** Per-step lifecycle callback (SSE progress). */
+  onStep?: (step: ToolStepRecord) => void;
+  /**
+   * Permission gate consulted before each `requires_permission` tool runs. When
+   * omitted, all tools run (back-compatible). A denial is fed back to the model
+   * as a tool error so it can adapt rather than crashing the run.
+   */
+  permissionGate?: PermissionGate;
+  /** Workspace root passed to tools via ToolContext. */
+  workingDir?: string;
+  /** Session id passed to tools + permission requests. */
+  sessionId?: string;
+  /**
+   * Context compaction. When set, the loop compacts the message history before
+   * each model call once it exceeds threshold × budget. Off by default.
+   */
+  compaction?: CompactionOptions;
+  /** Called when a compaction pass runs (SSE/telemetry). */
+  onCompaction?: (info: CompactionResult) => void;
+  /**
+   * Prior conversation to resume from. When provided, the new instruction is
+   * appended after these messages instead of starting a fresh history.
+   */
+  initialMessages?: RuntimeMessage[];
+}
+
+function deriveToolSpecs(toolSet: RuntimeToolSet): ToolSpec[] {
+  return toolSet.list().map((t) => ({
+    name: t.name,
+    description: t.description,
+    parameters: t.parameters ?? { type: "object", properties: {}, additionalProperties: true },
+  }));
+}
+
+function stringifyToolOutput(r: ToolResult): string {
+  if (r.error) return `Error: ${r.error}`;
+  if (typeof r.output === "string") return r.output;
+  try {
+    return JSON.stringify(r.output);
+  } catch {
+    return String(r.output);
+  }
+}
+
+/**
+ * Multi-step agent loop over native tool-calling with a growing message history.
+ *
+ * Each step: call the model with the full history + advertised tools → append the
+ * assistant message (incl. tool calls) → execute each tool → append a tool-result
+ * message → repeat until the model emits no tool calls (done) or maxSteps / abort.
+ */
+export class ToolAgentRuntime {
+  private llm: LlmToolFn;
+  private toolSet: RuntimeToolSet;
+  private systemPrompt: string;
+  private maxSteps: number;
+  private tools?: ToolSpec[];
+  private onText?: (delta: string) => void;
+  private onStep?: (step: ToolStepRecord) => void;
+  private permissionGate?: PermissionGate;
+  private workingDir?: string;
+  private sessionId?: string;
+  private compaction?: CompactionOptions;
+  private onCompaction?: (info: CompactionResult) => void;
+  private initialMessages?: RuntimeMessage[];
+
+  constructor(opts: ToolRuntimeOptions) {
+    this.llm = opts.llm;
+    this.toolSet = opts.toolSet ?? new RuntimeToolSet();
+    this.systemPrompt =
+      opts.systemPrompt ?? "You are a coding agent. Use the provided tools to complete the task.";
+    this.maxSteps = opts.maxSteps ?? TOOL_RUNTIME_MAX_STEPS_DEFAULT;
+    this.tools = opts.tools;
+    this.onText = opts.onText;
+    this.onStep = opts.onStep;
+    this.permissionGate = opts.permissionGate;
+    this.workingDir = opts.workingDir;
+    this.sessionId = opts.sessionId;
+    this.compaction = opts.compaction;
+    this.onCompaction = opts.onCompaction;
+    this.initialMessages = opts.initialMessages;
+  }
+
+  /** Resolve a tool's effective permission tier (explicit override, else by name). */
+  private tierFor(toolName: string): ActionTier {
+    return this.toolSet.get(toolName)?.tier ?? classifyTool(toolName);
+  }
+
+  async run(instruction: string, signal?: AbortSignal): Promise<ToolRuntimeResult> {
+    const t0 = Date.now();
+    let messages: RuntimeMessage[] = [
+      ...(this.initialMessages ?? []),
+      { role: "user", content: instruction },
+    ];
+    const steps: ToolStepRecord[] = [];
+    const totalUsage: RuntimeUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+    const tools = this.tools ?? deriveToolSpecs(this.toolSet);
+    let finalContent = "";
+
+    for (let i = 0; i < this.maxSteps; i++) {
+      if (signal?.aborted) {
+        return { messages, steps, finalContent, totalUsage, aborted: true, totalDurationMs: Date.now() - t0 };
+      }
+
+      // Compact the history before the model call once it exceeds the budget.
+      if (this.compaction) {
+        const result = await compactMessages(messages, this.compaction);
+        if (result.compacted) {
+          messages = result.messages;
+          this.onCompaction?.(result);
+        }
+      }
+
+      const s0 = Date.now();
+      const turn = await this.llm(messages, {
+        systemPrompt: this.systemPrompt,
+        tools,
+        signal,
+        onText: this.onText,
+      });
+
+      if (turn.usage) {
+        totalUsage.inputTokens += turn.usage.inputTokens;
+        totalUsage.outputTokens += turn.usage.outputTokens;
+        totalUsage.totalTokens += turn.usage.totalTokens;
+      }
+      if (turn.content) finalContent = turn.content;
+
+      // Record the assistant turn in history (with any tool calls).
+      messages.push({
+        role: "assistant",
+        content: turn.content,
+        ...(turn.toolCalls.length ? { toolCalls: turn.toolCalls } : {}),
+      });
+
+      // Execute each tool call and append its result to history.
+      const toolResults: ToolResult[] = [];
+      for (const call of turn.toolCalls) {
+        const tier = this.tierFor(call.name);
+        let result: ToolResult;
+
+        // Gate mutating tools through the permission gate (when one is set).
+        if (tier === "requires_permission" && this.permissionGate) {
+          const decision = await this.permissionGate({
+            toolName: call.name,
+            args: call.arguments,
+            tier,
+            sessionId: this.sessionId,
+            toolCallId: call.callId,
+          });
+          if (!decision.allowed) {
+            result = {
+              name: call.name,
+              output: null,
+              error: `permission_denied: ${decision.reason ?? "tool call was not approved"}`,
+            };
+          } else {
+            result = await this.toolSet.invoke(call.name, call.arguments, {
+              sessionId: this.sessionId,
+              toolCallId: call.callId,
+              signal,
+              workingDir: this.workingDir,
+            });
+          }
+        } else {
+          result = await this.toolSet.invoke(call.name, call.arguments, {
+            sessionId: this.sessionId,
+            toolCallId: call.callId,
+            signal,
+            workingDir: this.workingDir,
+          });
+        }
+
+        result.callId = call.callId;
+        result.name = call.name;
+        toolResults.push(result);
+        messages.push({
+          role: "tool",
+          content: stringifyToolOutput(result),
+          toolCallId: call.callId,
+        });
+      }
+
+      const step: ToolStepRecord = {
+        stepIndex: i,
+        content: turn.content,
+        toolCalls: turn.toolCalls,
+        toolResults,
+        usage: turn.usage,
+        durationMs: Date.now() - s0,
+      };
+      steps.push(step);
+      this.onStep?.(step);
+
+      // No tool calls → the model is done.
+      if (turn.toolCalls.length === 0) break;
+    }
+
+    return { messages, steps, finalContent, totalUsage, aborted: false, totalDurationMs: Date.now() - t0 };
+  }
+}
+
 // ── spawn_agents tool ─────────────────────────────────────────────────────────
 //
 // Registers a "spawn_agents" tool on any RuntimeToolSet, enabling an agent to
@@ -772,8 +1331,8 @@ export interface SwarmMemberRecord {
  * in either direction without a full table scan.
  */
 export class ChannelIndex {
-  readonly bySwarmChannel: Map<string, Map<string, Set<string>>> = new Map();
-  readonly bySession: Map<string, Map<string, Set<string>>> = new Map();
+  readonly bySwarmChannel = new Map<string, Map<string, Set<string>>>();
+  readonly bySession = new Map<string, Map<string, Set<string>>>();
 
   subscribe(sessionId: string, swarmId: string, channel: string): void {
     // by_swarm_channel
@@ -952,8 +1511,8 @@ export interface SwarmExecutionState {
 export class VersionedPlan {
   items: PlanItem[] = [];
   version = 0;
-  participants: Set<string> = new Set();
-  taskProgress: Map<string, SwarmTaskProgress> = new Map();
+  participants = new Set<string>();
+  taskProgress = new Map<string, SwarmTaskProgress>();
 
   /** Serialisable definition snapshot (no runtime state). */
   planDefinition(): SwarmPlanDefinition {
@@ -1337,7 +1896,7 @@ export interface AgentProviderOptions {
   data_collection?: "allow" | "deny";
   only?: string[];
   ignore?: string[];
-  quantizations?: Array<"int4" | "int8" | "fp4" | "fp6" | "fp8" | "fp16" | "bf16" | "fp32">;
+  quantizations?: ("int4" | "int8" | "fp4" | "fp6" | "fp8" | "fp16" | "bf16" | "fp32")[];
   sort?: "price" | "throughput" | "latency";
   max_price?: { prompt?: number | string; completion?: number | string; request?: number | string };
 }
@@ -1399,4 +1958,186 @@ export interface AgentPersona {
   displayName: string;
   purpose: string;
   hidden?: boolean;
+}
+
+// ── Programmatic Tool Calling (PTC) ─────────────────────────────────────────────
+//
+// Round-trip tool calling pushes every intermediate tool result back into the
+// model's context — expensive when a task needs many calls (read 30 files, grep
+// them, return the 3 that matched). PTC gives the model ONE tool that runs a
+// script it authors; the script calls other tools locally via `call()` and only
+// its printed/returned output re-enters context. Intermediate results never cost
+// context tokens. (Clean-room from hermes-agent's PTC idea.)
+//
+// SECURITY: the script runs in-process via the AsyncFunction constructor with the
+// worker's privileges — the same trust model as the shell tool. Every `call()`
+// is routed through the permission gate (no bypass), and execution is bounded by
+// max calls, output size, and a cooperative async timeout. A synchronous infinite
+// loop cannot be force-killed in-process (worker_thread isolation is a future
+// hardening, mirroring run_command's sandbox follow-up).
+
+// The AsyncFunction constructor isn't a global; derive it from an async fn's
+// `.constructor` (typed `Function`, so no unsafe-any from getPrototypeOf).
+const AsyncFunctionCtor = (async () => {
+  /* probe */
+}).constructor as new (...args: string[]) => (...callArgs: unknown[]) => Promise<unknown>;
+
+function ptcSafeJson(v: unknown): string {
+  try {
+    return JSON.stringify(v) ?? String(v);
+  } catch {
+    return String(v);
+  }
+}
+
+function ptcClip(s: string, max: number): string {
+  return s.length > max ? `${s.slice(0, max)}\n…[truncated ${s.length - max} chars]` : s;
+}
+
+function ptcWithTimeout<T>(p: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+    (timer as { unref?: () => void }).unref?.();
+  });
+  return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
+}
+
+/**
+ * Invoke a tool through the same two-tier permission check the runtime applies,
+ * so callers (e.g. PTC scripts) cannot bypass the gate. Throws on denial or tool
+ * error; otherwise returns the tool's raw output.
+ */
+export async function gatedInvoke(
+  toolSet: RuntimeToolSet,
+  permissionGate: PermissionGate | undefined,
+  name: string,
+  args: Record<string, unknown>,
+  ctx?: ToolContext,
+): Promise<unknown> {
+  const tier = toolSet.get(name)?.tier ?? classifyTool(name);
+  if (tier === "requires_permission" && permissionGate) {
+    const decision = await permissionGate({
+      toolName: name,
+      args,
+      tier,
+      ...(ctx?.sessionId ? { sessionId: ctx.sessionId } : {}),
+      ...(ctx?.toolCallId ? { toolCallId: ctx.toolCallId } : {}),
+    });
+    if (!decision.allowed) {
+      throw new Error(`permission_denied: ${decision.reason ?? "tool call was not approved"}`);
+    }
+  }
+  const result = await toolSet.invoke(name, args, ctx);
+  if (result.error) throw new Error(result.error);
+  return result.output;
+}
+
+export interface ProgrammaticToolOptions {
+  /** The tool set the script may call into. */
+  toolSet: RuntimeToolSet;
+  /** Permission gate applied to every `call()` (same one the runtime uses). */
+  permissionGate?: PermissionGate;
+  /** Tool name (default "run_tool_script"). */
+  name?: string;
+  /** Max tool calls a single script may make (default 100). */
+  maxCalls?: number;
+  /** Cooperative timeout for the script in ms (default 60s). */
+  timeoutMs?: number;
+  /** Max chars of captured output returned to the model (default 16000). */
+  maxOutputChars?: number;
+  /** Tool names the script may not call (the PTC tool always excludes itself). */
+  exclude?: readonly string[];
+}
+
+const PTC_DEFAULT_NAME = "run_tool_script";
+
+/**
+ * Build the PTC meta-tool. The model passes a JavaScript body that may
+ * `await call(name, args)` other tools and `print(...)` results; only printed
+ * output (plus any returned value) is handed back to the model.
+ */
+export function createProgrammaticToolTool(opts: ProgrammaticToolOptions): RuntimeTool {
+  const name = opts.name ?? PTC_DEFAULT_NAME;
+  const maxCalls = opts.maxCalls ?? 100;
+  const timeoutMs = opts.timeoutMs ?? 60_000;
+  const maxOutput = opts.maxOutputChars ?? 16_000;
+  const excluded = new Set<string>([name, ...(opts.exclude ?? [])]);
+
+  const callableTools = (): { name: string; description: string }[] =>
+    opts.toolSet
+      .list()
+      .filter((t) => !excluded.has(t.name))
+      .map((t) => ({ name: t.name, description: t.description }));
+
+  return {
+    name,
+    description:
+      "Run a JavaScript snippet that orchestrates other tools WITHOUT returning each " +
+      "intermediate result to the conversation — saving context tokens. Inside the script: " +
+      "`await call(toolName, argsObject)` runs a tool and returns its output; `print(...values)` " +
+      "appends to the output you get back; the script may also `return` a value. Best for " +
+      "batching many calls (read/grep/filter many files, then surface only what matters). " +
+      "Callable tools: " +
+      callableTools()
+        .map((t) => t.name)
+        .join(", "),
+    tier: "requires_permission",
+    parameters: {
+      type: "object",
+      properties: {
+        code: {
+          type: "string",
+          description:
+            "Async JavaScript body. In scope: `call(name, args)`, `print(...)`, and `tools` " +
+            "(array of {name, description}). Example: `const out = await call('list_files', " +
+            "{path:'src'}); for (const f of out.split('\\n')) if (f.endsWith('.ts')) print(f);`",
+        },
+      },
+      required: ["code"],
+    },
+    handler: async (args, ctx) => {
+      const code = String(args.code ?? "");
+      if (!code.trim()) return "Error: empty script";
+
+      const outputs: string[] = [];
+      let calls = 0;
+      const print = (...vals: unknown[]): void => {
+        outputs.push(vals.map((v) => (typeof v === "string" ? v : ptcSafeJson(v))).join(" "));
+      };
+      const call = async (toolName: unknown, toolArgs?: unknown): Promise<unknown> => {
+        if (ctx?.signal?.aborted) throw new Error("aborted");
+        const tn = String(toolName);
+        if (excluded.has(tn)) throw new Error(`tool '${tn}' is not callable from a script`);
+        if (++calls > maxCalls) throw new Error(`script exceeded ${maxCalls} tool calls`);
+        return gatedInvoke(
+          opts.toolSet,
+          opts.permissionGate,
+          tn,
+          (toolArgs ?? {}) as Record<string, unknown>,
+          ctx,
+        );
+      };
+
+      const fn = new AsyncFunctionCtor("call", "print", "tools", code);
+      let returnLine = "";
+      try {
+        const ret = await ptcWithTimeout(
+          fn(call, print, callableTools()),
+          timeoutMs,
+          `script timed out after ${timeoutMs}ms`,
+        );
+        if (ret !== undefined) {
+          returnLine = `\n[return] ${typeof ret === "string" ? ret : ptcSafeJson(ret)}`;
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        const partial = outputs.join("\n");
+        return ptcClip(`${partial}${partial ? "\n" : ""}[error] ${msg}`, maxOutput);
+      }
+
+      const combined = (outputs.join("\n") + returnLine).trim();
+      return `${ptcClip(combined || "(script produced no output)", maxOutput)}\n[${calls} tool call(s)]`;
+    },
+  };
 }

@@ -7,12 +7,13 @@
  * Pure speed. Fastest first.
  */
 
+import { Zap, Send, Loader2, AlertTriangle, Trophy, Clock, X } from "lucide-react";
 import { useState, useRef, useCallback } from "react";
+
+import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { Badge } from "~/components/ui/badge";
 import { ScrollArea } from "~/components/ui/scroll-area";
-import { Zap, Send, Loader2, AlertTriangle, Trophy, Clock, X } from "lucide-react";
 import { loadCouncilMembers } from "~/lib/council";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -35,6 +36,21 @@ interface DoneEvent {
   fastestId: string;
   fastestLabel: string;
 }
+
+/** SSE event shapes emitted by POST /api/godmode/stream. */
+type GodModeEvent =
+  | { type: "init"; members: { id: string; label: string; model: string }[] }
+  | {
+      type: "response";
+      id: string;
+      text?: string;
+      latencyMs?: number;
+      tokens?: number;
+      status: "done" | "error";
+      error?: string;
+    }
+  | ({ type: "done" } & DoneEvent)
+  | { type: "error"; message?: string };
 
 // ── Color palette ─────────────────────────────────────────────────────────────
 
@@ -65,7 +81,7 @@ export default function GodModePage() {
     setIsLoading(false);
   }, []);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault();
     if (!question.trim() || isLoading) return;
 
@@ -83,7 +99,6 @@ export default function GodModePage() {
       label: m.label,
       provider: m.provider,
       model: m.model,
-      apiKey: m.apiKey || undefined,
       baseUrl: m.baseUrl || undefined,
     }));
 
@@ -114,21 +129,19 @@ export default function GodModePage() {
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
           try {
-            const ev = JSON.parse(line.slice(6));
+            const ev = JSON.parse(line.slice(6)) as GodModeEvent;
 
             if (ev.type === "init") {
               // Pre-populate pending slots in order
-              const slots: MemberResponse[] = ev.members.map(
-                (m: { id: string; label: string; model: string }) => ({
-                  id: m.id,
-                  label: m.label,
-                  model: m.model,
-                  text: "",
-                  latencyMs: 0,
-                  tokens: 0,
-                  status: "pending" as const,
-                }),
-              );
+              const slots: MemberResponse[] = ev.members.map((m) => ({
+                id: m.id,
+                label: m.label,
+                model: m.model,
+                text: "",
+                latencyMs: 0,
+                tokens: 0,
+                status: "pending" as const,
+              }));
               setResponses(slots);
             } else if (ev.type === "response") {
               setResponses((prev) =>
@@ -139,7 +152,7 @@ export default function GodModePage() {
                         text: ev.text ?? "",
                         latencyMs: ev.latencyMs ?? 0,
                         tokens: ev.tokens ?? 0,
-                        status: ev.status as "done" | "error",
+                        status: ev.status,
                         error: ev.error,
                       }
                     : r,

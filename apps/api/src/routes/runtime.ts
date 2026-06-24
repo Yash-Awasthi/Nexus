@@ -13,6 +13,7 @@ import type { SQL } from "drizzle-orm";
 import { eq, desc, and } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
+import { launchAgentRun, type LaunchAgentInput } from "../lib/agent-queue.js";
 import { requireAuth } from "../middleware/auth.js";
 
 export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
@@ -76,6 +77,25 @@ export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
     }
     return reply.code(201).send(row);
   });
+
+  // POST /agent/run — launch a coding-agent run; stream it on /sse/agent/:sessionId
+  app.post<{ Body: LaunchAgentInput }>(
+    "/agent/run",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const instruction = (request.body?.instruction ?? "").trim();
+      if (!instruction) return reply.code(400).send({ error: "instruction is required" });
+
+      const launched = await launchAgentRun({ ...request.body, instruction });
+      if (!launched) {
+        return reply.code(503).send({ error: "agent queue unavailable (REDIS_URL not configured)" });
+      }
+      return reply.code(202).send({
+        ...launched,
+        stream: `/api/v1/sse/agent/${launched.sessionId}`,
+      });
+    },
+  );
 
   // GET /runtime/tasks/:taskId
   app.get<{ Params: { taskId: string } }>(

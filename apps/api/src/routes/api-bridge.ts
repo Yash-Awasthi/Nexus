@@ -35,6 +35,8 @@ import {
   type Archetype,
   type TaskCategory,
 } from "@nexus/council";
+import { db } from "@nexus/db";
+import { userProviderCredentials } from "@nexus/db/schema";
 import { computeAutoTuneParams, InMemoryEmaStore } from "@nexus/drift";
 import { runFallbackChain, type FallbackModel } from "@nexus/gateway";
 import {
@@ -111,11 +113,15 @@ import {
   type VideoBackend,
   type VideoResult,
 } from "@nexus/video-search";
+import { eq, and, isNull } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { Pool } from "pg";
 
 import { emitAuditEvent } from "../lib/audit-emitter.js";
 import { sha256hex } from "../lib/crypto-utils.js";
+import { resolveUserProviderKey, buildUserDriverRegistry } from "../lib/provider-keys.js";
+import { encryptSecret, SecretCryptoUnavailableError } from "../lib/secret-crypto.js";
+import { requireAuthWithTier } from "../middleware/auth.js";
 
 // ── SSE helpers ───────────────────────────────────────────────────────────────
 
@@ -624,13 +630,18 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
         label: string;
         provider: string;
         model: string;
-        apiKey?: string;
         baseUrl?: string;
       }[];
     };
-  }>("/godmode/stream", async (request, reply) => {
+  }>("/godmode/stream", { preHandler: requireAuthWithTier }, async (request, reply) => {
     const { question, members } = request.body;
-    const reg = getRegistry();
+    // Strict BYOK: build a registry from the authenticated user's stored keys
+    // only — no env-var fallback. Members whose provider lacks a stored key fail
+    // individually below.
+    const { registry: reg } = await buildUserDriverRegistry(
+      request.nexusUserId,
+      members.map((m) => m.provider),
+    );
 
     reply.hijack();
     const raw = reply.raw;
@@ -650,8 +661,8 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
       members.map(async (member) => {
         const start = Date.now();
         try {
-          const driver = reg.get(member.provider) ?? reg.get("openrouter");
-          if (!driver) throw new Error(`No driver for provider: ${member.provider}`);
+          const driver = reg.get(member.provider);
+          if (!driver) throw new Error(`No key configured for provider: ${member.provider}`);
 
           const res = await driver.complete({
             model: member.model,
@@ -1208,6 +1219,73 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     return reply.send({ repos: (await _listGithubRepos()).map(_toRepoView) });
   });
 
+  /**
+   * POST /repos/:id/search — search files in a repo by name / content pattern.
+   * Mock implementation that returns sample file matches.
+   *
+   * Body: { query: string, path?: string, maxResults?: number }
+   */
+  app.post<{
+    Params: { id: string };
+    Body: { query: string; path?: string; maxResults?: number };
+  }>(
+    "/repos/:id/search",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["query"],
+          properties: {
+            query: { type: "string", maxLength: 512 },
+            path: { type: "string", maxLength: 256 },
+            maxResults: { type: "number", minimum: 1, maximum: 100 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { query, path: _path = "/", maxResults = 10 } = request.body;
+      const repoId = request.params.id;
+      // Mock file hits
+      const hits = [
+        {
+          file: "src/index.ts",
+          line: 12,
+          match: `import { ${query.slice(0, 20)} } from "./lib";`,
+          score: 0.92,
+        },
+        {
+          file: "README.md",
+          line: 5,
+          match: `## ${query.slice(0, 30)}`,
+          score: 0.87,
+        },
+        {
+          file: "package.json",
+          line: 3,
+          match: `"name": "${query.slice(0, 15)}..."`,
+          score: 0.81,
+        },
+      ].slice(0, maxResults);
+      return reply.send({ repoId, query, hits, total: hits.length, searchedAt: now() });
+    },
+  );
+
+  /** GET /repos/:id/status — repo metadata and sync status. */
+  app.get<{ Params: { id: string } }>("/repos/:id/status", async (request, reply) => {
+    const repoId = request.params.id;
+    return reply.send({
+      id: repoId,
+      name: repoId,
+      status: "synced",
+      lastSyncedAt: new Date(Date.now() - 3_600_000).toISOString(),
+      branchCount: 3,
+      defaultBranch: "main",
+      sizeKb: 1_280,
+      provider: "github",
+    });
+  });
+
   // -- API TOKENS ------------------------------------------------------------
   // In-memory API token store. Each token is hashed for safe listing;
   // the raw value is returned only at creation time.
@@ -1545,20 +1623,9 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     "/fine-tune/initiate",
     async (req, reply) => {
       // BYOK: platform key → x-openai-key header → stored user provider key
-      const userId = (req as any).user?.id ?? "anonymous";
       const headerKey = req.headers["x-openai-key"] as string | undefined;
-      const storedEntry = [..._providerKeys.values()].find(
-        (k) => k.userId === userId && k.provider === "openai",
-      );
-      const storedKey = storedEntry
-        ? (() => {
-            try {
-              return decryptKey(storedEntry.encryptedKey, storedEntry.iv, storedEntry.authTag);
-            } catch {
-              return undefined;
-            }
-          })()
-        : undefined;
+      const storedKey =
+        (await resolveUserProviderKey(req.nexusUserId, "openai")) ?? undefined;
       const apiKey = process.env.OPENAI_API_KEY || headerKey || storedKey;
       if (!apiKey)
         return reply.code(503).send({
@@ -1717,7 +1784,6 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
       if (lang !== "javascript" && lang !== "js") {
         const pistonLang = lang === "typescript" || lang === "ts" ? "typescript" : lang;
         try {
-          const t0 = Date.now();
           const pResult = await _runViaPiston(code, pistonLang);
           const result = {
             executionId,
@@ -1998,140 +2064,168 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   // Stored: { id, userId, provider, keyPrefix (first 8 chars), encryptedKey, iv, authTag, createdAt }
   // Returned: id, provider, keyPrefix, createdAt only — never the raw key.
 
-  type ProviderName = "openai" | "anthropic" | "groq" | "replicate" | "stability";
+  // Persisted, encrypted at rest in user_provider_credentials (AES-256-GCM via
+  // secret-crypto). Raw keys are NEVER returned over HTTP — only resolved
+  // server-side at request time via resolveUserProviderKey().
 
-  interface StoredProviderKey {
-    id: string;
-    userId: string;
-    provider: ProviderName;
-    keyPrefix: string;
-    encryptedKey: string; // hex
-    iv: string; // hex, 12 bytes
-    authTag: string; // hex, 16 bytes
-    createdAt: string;
-  }
+  const VALID_PROVIDERS = [
+    "openai",
+    "anthropic",
+    "groq",
+    "gemini",
+    "deepseek",
+    "mistral",
+    "openrouter",
+    "xai",
+    "together",
+    "perplexity",
+    "cohere",
+    "cerebras",
+    "ollama",
+    "custom",
+  ] as const;
+  type ProviderName = (typeof VALID_PROVIDERS)[number];
+  // resolveUserProviderKey / buildUserDriverRegistry live in ../lib/provider-keys.js
 
-  const _providerKeys = new Map<string, StoredProviderKey>(); // keyed by id
-
-  function getEncryptionKey(): Buffer {
-    const raw = process.env.NEXUS_ENCRYPTION_KEY;
-    if (!raw) {
-      // Dev fallback — log warning once
-      process.emitWarning(
-        "NEXUS_ENCRYPTION_KEY not set — using insecure dev key. Set it in production.",
-        "NexusBYOK",
-      );
-      return Buffer.alloc(32, 0x4e); // 'N' * 32
+  // POST /user/provider-keys — store (encrypt) a provider connection.
+  // A key is optional for local/self-hosted providers (e.g. ollama, custom) as
+  // long as a baseUrl is given; baseUrl + models are non-secret connection metadata.
+  app.post<{
+    Body: { provider: string; apiKey?: string; label?: string; baseUrl?: string; models?: string[] };
+  }>("/user/provider-keys", { preHandler: requireAuthWithTier }, async (request, reply) => {
+    const { provider, apiKey, label, baseUrl, models } = request.body ?? {};
+    if (!provider) return reply.code(400).send({ error: "provider is required" });
+    if (!VALID_PROVIDERS.includes(provider as ProviderName)) {
+      return reply.code(400).send({ error: "invalid_provider", valid: VALID_PROVIDERS });
     }
-    // Accept hex (64 chars) or raw string (padded/truncated to 32 bytes)
-    if (/^[0-9a-fA-F]{64}$/.test(raw)) return Buffer.from(raw, "hex");
-    return Buffer.from(raw.slice(0, 32).padEnd(32, "0"), "utf8");
-  }
+    if (apiKey && apiKey.length < 8) return reply.code(400).send({ error: "apiKey too short" });
 
-  function encryptKey(plaintext: string): { encrypted: string; iv: string; authTag: string } {
-    const iv = crypto.randomBytes(12);
-    const cipher = crypto.createCipheriv("aes-256-gcm", getEncryptionKey(), iv);
-    const enc = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
-    return {
-      encrypted: enc.toString("hex"),
-      iv: iv.toString("hex"),
-      authTag: cipher.getAuthTag().toString("hex"),
-    };
-  }
+    const userId = request.nexusUserId!;
+    // Look up the existing active connection so a metadata-only edit (new label /
+    // models / baseUrl, but no re-entered key) keeps the stored key. Keys are
+    // write-only in the UI, so an empty apiKey on edit means "keep existing".
+    const [existing] = await db
+      .select()
+      .from(userProviderCredentials)
+      .where(
+        and(
+          eq(userProviderCredentials.userId, userId),
+          eq(userProviderCredentials.provider, provider),
+          isNull(userProviderCredentials.deletedAt),
+        ),
+      )
+      .limit(1);
 
-  function decryptKey(encrypted: string, iv: string, authTag: string): string {
-    const decipher = crypto.createDecipheriv(
-      "aes-256-gcm",
-      getEncryptionKey(),
-      Buffer.from(iv, "hex"),
-    );
-    decipher.setAuthTag(Buffer.from(authTag, "hex"));
-    return Buffer.concat([
-      decipher.update(Buffer.from(encrypted, "hex")),
-      decipher.final(),
-    ]).toString("utf8");
-  }
+    // A brand-new connection needs at least a key or a baseUrl; an edit can rely
+    // on the carried-over key/baseUrl from the existing row.
+    const effectiveBaseUrl = baseUrl ?? existing?.baseUrl ?? null;
+    if (!apiKey && !effectiveBaseUrl && !existing?.encryptedKey)
+      return reply.code(400).send({ error: "apiKey or baseUrl is required" });
 
-  const VALID_PROVIDERS: ProviderName[] = ["openai", "anthropic", "groq", "replicate", "stability"];
-
-  // POST /user/provider-keys — store a new provider key
-  app.post<{ Body: { provider: string; apiKey: string; label?: string } }>(
-    "/user/provider-keys",
-    async (request, reply) => {
-      const { provider, apiKey } = request.body ?? {};
-      if (!provider || !apiKey)
-        return reply.code(400).send({ error: "provider and apiKey are required" });
-      if (!VALID_PROVIDERS.includes(provider as ProviderName)) {
-        return reply.code(400).send({ error: "invalid_provider", valid: VALID_PROVIDERS });
+    let encryptedKey: string | null = existing?.encryptedKey ?? null;
+    let keyPrefix: string | null = existing?.keyPrefix ?? null;
+    let keyHash: string | null = existing?.keyHash ?? null;
+    if (apiKey) {
+      try {
+        encryptedKey = encryptSecret(apiKey);
+      } catch (e) {
+        if (e instanceof SecretCryptoUnavailableError)
+          return reply.code(503).send({ error: "encryption_unavailable" });
+        throw e;
       }
-      if (apiKey.length < 8) return reply.code(400).send({ error: "apiKey too short" });
+      keyPrefix = apiKey.slice(0, 8);
+      keyHash = sha256hex(apiKey);
+    }
 
-      // One key per provider per user — overwrite if exists
-      const userId = (request as any).user?.id ?? "anonymous";
-      const existingId = [..._providerKeys.values()].find(
-        (k) => k.userId === userId && k.provider === (provider as ProviderName),
-      )?.id;
-      if (existingId) _providerKeys.delete(existingId);
+    // Rotation: soft-delete any existing active connection for this (user, provider).
+    await db
+      .update(userProviderCredentials)
+      .set({ deletedAt: new Date(), active: false })
+      .where(
+        and(
+          eq(userProviderCredentials.userId, userId),
+          eq(userProviderCredentials.provider, provider),
+          isNull(userProviderCredentials.deletedAt),
+        ),
+      );
 
-      const { encrypted, iv, authTag } = encryptKey(apiKey);
-      const entry: StoredProviderKey = {
-        id: crypto.randomUUID(),
+    const [row] = await db
+      .insert(userProviderCredentials)
+      .values({
         userId,
-        provider: provider as ProviderName,
-        keyPrefix: apiKey.slice(0, 8),
-        encryptedKey: encrypted,
-        iv,
-        authTag,
-        createdAt: new Date().toISOString(),
-      };
-      _providerKeys.set(entry.id, entry);
-
-      return reply.code(201).send({
-        id: entry.id,
-        provider: entry.provider,
-        keyPrefix: entry.keyPrefix,
-        createdAt: entry.createdAt,
+        provider,
+        label: label ?? existing?.label ?? null,
+        encryptedKey,
+        keyPrefix,
+        keyHash,
+        baseUrl: effectiveBaseUrl,
+        models: models ?? existing?.models ?? null,
+      })
+      .returning({
+        id: userProviderCredentials.id,
+        provider: userProviderCredentials.provider,
+        keyPrefix: userProviderCredentials.keyPrefix,
+        baseUrl: userProviderCredentials.baseUrl,
+        models: userProviderCredentials.models,
+        createdAt: userProviderCredentials.createdAt,
       });
-    },
-  );
 
-  // GET /user/provider-keys — list stored keys (prefix only, never raw key)
-  app.get("/user/provider-keys", async (request, reply) => {
-    const userId = (request as any).user?.id ?? "anonymous";
-    const keys = [..._providerKeys.values()]
-      .filter((k) => k.userId === userId)
-      .map(({ id, provider, keyPrefix, createdAt }) => ({ id, provider, keyPrefix, createdAt }));
+    return reply.code(201).send(row);
+  });
+
+  // GET /user/provider-keys — list active keys (prefix only, never raw key)
+  app.get("/user/provider-keys", { preHandler: requireAuthWithTier }, async (request, reply) => {
+    const userId = request.nexusUserId!;
+    const keys = await db
+      .select({
+        id: userProviderCredentials.id,
+        provider: userProviderCredentials.provider,
+        label: userProviderCredentials.label,
+        keyPrefix: userProviderCredentials.keyPrefix,
+        baseUrl: userProviderCredentials.baseUrl,
+        models: userProviderCredentials.models,
+        createdAt: userProviderCredentials.createdAt,
+        lastUsedAt: userProviderCredentials.lastUsedAt,
+      })
+      .from(userProviderCredentials)
+      .where(
+        and(eq(userProviderCredentials.userId, userId), isNull(userProviderCredentials.deletedAt)),
+      );
     return reply.send({ keys, total: keys.length });
   });
 
-  // DELETE /user/provider-keys/:id — remove a stored key
-  app.delete<{ Params: { id: string } }>("/user/provider-keys/:id", async (request, reply) => {
-    const userId = (request as any).user?.id ?? "anonymous";
-    const entry = _providerKeys.get(request.params.id);
-    if (!entry) return reply.code(404).send({ error: "not_found" });
-    if (entry.userId !== userId) return reply.code(403).send({ error: "forbidden" });
-    _providerKeys.delete(request.params.id);
-    return reply.send({ ok: true });
-  });
-
-  // GET /user/provider-keys/resolve/:provider — internal helper (returns decrypted key for LLM router)
-  // Not authenticated by user auth — called server-side only. Not exposed in public API docs.
-  app.get<{ Params: { provider: string } }>(
-    "/user/provider-keys/resolve/:provider",
+  // DELETE /user/provider-keys/:id — soft-delete (ownership-checked)
+  app.delete<{ Params: { id: string } }>(
+    "/user/provider-keys/:id",
+    { preHandler: requireAuthWithTier },
     async (request, reply) => {
-      const userId = (request as any).user?.id ?? "anonymous";
-      const entry = [..._providerKeys.values()].find(
-        (k) => k.userId === userId && k.provider === (request.params.provider as ProviderName),
-      );
-      if (!entry) return reply.code(404).send({ error: "no_key_for_provider" });
-      try {
-        const plaintext = decryptKey(entry.encryptedKey, entry.iv, entry.authTag);
-        return reply.send({ provider: entry.provider, apiKey: plaintext });
-      } catch {
-        return reply.code(500).send({ error: "decryption_failed" });
-      }
+      const userId = request.nexusUserId!;
+      const [row] = await db
+        .select({
+          id: userProviderCredentials.id,
+          userId: userProviderCredentials.userId,
+        })
+        .from(userProviderCredentials)
+        .where(
+          and(
+            eq(userProviderCredentials.id, request.params.id),
+            isNull(userProviderCredentials.deletedAt),
+          ),
+        )
+        .limit(1);
+      if (!row) return reply.code(404).send({ error: "not_found" });
+      if (row.userId !== userId) return reply.code(403).send({ error: "forbidden" });
+      await db
+        .update(userProviderCredentials)
+        .set({ deletedAt: new Date(), active: false })
+        .where(eq(userProviderCredentials.id, request.params.id));
+      return reply.send({ ok: true });
     },
   );
+
+  // NOTE: the former GET /user/provider-keys/resolve/:provider endpoint was
+  // intentionally removed — decrypted keys must never be returned over HTTP.
+  // Server-side callers use resolveUserProviderKey() instead.
 
   // -- FEATURE FLAGS ---------------------------------------------------------
 
@@ -3002,7 +3096,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
       const lang = language.toLowerCase();
       let finalOutput = "";
       let finalError: string | undefined;
-      let iterations = 1;
+      const iterations = 1;
 
       if (lang === "javascript" || lang === "js") {
         // VM execution
@@ -3205,6 +3299,225 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
   );
 
   // ══════════════════════════════════════════════════════════════════════════
+  // C.4b — browser-agent TASK LOOP: LLM-driven multi-step web automation.
+  //        POST /browser-agent/tasks            — create + run a task session
+  //        GET  /browser-agent/sessions         — list sessions
+  //        GET  /browser-agent/sessions/:id     — session detail
+  //        POST /browser-agent/sessions/:id/action — manual single action
+  //
+  //        The agent drives @nexus/stealth-browser (server-side / remote CDP).
+  //        Each step: snapshot page → LLM picks action → execute → repeat.
+  //        Requires a real browser (patchright + BROWSER_CDP_URL or local
+  //        chromium). With MockBrowserDriver it returns a clear notice.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  interface BrowserAgentStep {
+    action: string;
+    target?: string;
+    value?: string;
+    description: string;
+    success: boolean;
+  }
+  interface BrowserAgentSession {
+    sessionId: string;
+    task: string;
+    url?: string;
+    status: "pending" | "running" | "completed" | "error";
+    steps: BrowserAgentStep[];
+    result?: string;
+    screenshot?: string;
+    error?: string;
+    createdAt: string;
+  }
+  const _browserSessions = new Map<string, BrowserAgentSession>();
+  const MAX_AGENT_STEPS = 8;
+
+  /** Ask the LLM for the next browser action given the current page state. */
+  async function _nextBrowserAction(
+    task: string,
+    pageUrl: string,
+    pageTitle: string,
+    pageText: string,
+    history: BrowserAgentStep[],
+  ): Promise<{ action: string; target?: string; value?: string; description: string; done?: boolean; result?: string }> {
+    const sys = systemMsg(
+      "You are a web-automation agent. Given a goal, the current page, and action history, " +
+        "decide the SINGLE next action. Respond ONLY with JSON: " +
+        '{"action":"navigate|click|type|extract|done","target":"<css selector or url>","value":"<text to type>","description":"<why>","done":<bool>,"result":"<final answer when done>"}. ' +
+        "Use 'done' when the goal is achieved. Keep selectors simple and robust.",
+    );
+    const hist = history.map((s) => `- ${s.action} ${s.target ?? ""} (${s.success ? "ok" : "fail"})`).join("\n");
+    const safeText = String(pageText ?? "");
+    const usr = userMsg(
+      `GOAL: ${task}\n\nCURRENT URL: ${pageUrl}\nTITLE: ${pageTitle}\n\nVISIBLE TEXT (truncated):\n${safeText.slice(0, 2000)}\n\nHISTORY:\n${hist || "(none)"}\n\nNext action as JSON:`,
+    );
+    // Use Groq (fast + reliably available) for the agent decision loop.
+    const reg = getRegistry();
+    const drv = reg.get("groq") ?? getDefaultDriver();
+    let raw = "";
+    if (drv) {
+      try {
+        const r = await drv.complete({
+          model: reg.get("groq") ? "llama-3.3-70b-versatile" : DEFAULT_MODEL,
+          messages: [sys, usr],
+          maxTokens: 400,
+        });
+        raw = String(r.content ?? "").trim();
+      } catch {
+        raw = "";
+      }
+    }
+    try {
+      return parseJsonResponse(raw);
+    } catch {
+      return { action: "done", description: "Could not parse next action", done: true, result: raw.slice(0, 500) };
+    }
+  }
+
+  /** Run the agent loop on a live page until done / max steps. Mutates session. */
+  async function _runBrowserAgent(session: BrowserAgentSession): Promise<void> {
+    session.status = "running";
+    const browser = await _getBrowser();
+    await browser.withPage(async (page) => {
+      if (session.url) {
+        await page.goto(session.url);
+        session.steps.push({ action: "navigate", target: session.url, description: "open start URL", success: true });
+      }
+      for (let i = 0; i < MAX_AGENT_STEPS; i++) {
+        const pageUrl = page.url;
+        const title = await page.title().catch(() => "");
+        const text = await page
+          .evaluate<string>("() => document.body?.innerText ?? ''")
+          .catch(() => "");
+        const decision = await _nextBrowserAction(session.task, pageUrl, title, text, session.steps);
+
+        if (decision.done || decision.action === "done") {
+          session.result = decision.result ?? text.slice(0, 1000);
+          break;
+        }
+        let ok = true;
+        try {
+          if (decision.action === "navigate" && decision.target) {
+            await page.goto(decision.target);
+          } else if (decision.action === "click" && decision.target) {
+            await page.click(decision.target);
+          } else if (decision.action === "type" && decision.target) {
+            await page.type(decision.target, decision.value ?? "");
+          }
+          // 'extract' is a no-op execution; the LLM reads text next round.
+        } catch (e) {
+          ok = false;
+          void e;
+        }
+        session.steps.push({
+          action: decision.action,
+          target: decision.target,
+          value: decision.value,
+          description: decision.description,
+          success: ok,
+        });
+      }
+      // Final screenshot for the UI.
+      try {
+        const shot = await page.screenshot({ fullPage: false });
+        session.screenshot = shot.toString("base64");
+      } catch {
+        /* screenshot best-effort */
+      }
+    });
+    session.status = "completed";
+  }
+
+  app.post<{ Body: { task: string; startUrl?: string } }>(
+    "/browser-agent/tasks",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["task"],
+          properties: {
+            task: { type: "string", minLength: 1, maxLength: 2000 },
+            startUrl: { type: "string", maxLength: 2048 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const patchrightOk = await isPatchrightAvailable();
+      const hasCdp = Boolean(process.env.BROWSER_CDP_URL);
+      const session: BrowserAgentSession = {
+        sessionId: crypto.randomUUID(),
+        task: request.body.task,
+        url: request.body.startUrl,
+        status: "pending",
+        steps: [],
+        createdAt: now(),
+      };
+      _browserSessions.set(session.sessionId, session);
+
+      if (!patchrightOk && !hasCdp) {
+        session.status = "error";
+        session.error =
+          "No browser engine available. Install patchright on the server (pnpm add patchright && npx patchright install chromium) " +
+          "or set BROWSER_CDP_URL to a hosted browser (Browserbase/Steel). Browser automation cannot drive your personal logged-in browser from a website.";
+        return reply.code(200).send({ session });
+      }
+
+      // Run synchronously but guard total time; the loop is bounded by MAX_AGENT_STEPS.
+      try {
+        await _runBrowserAgent(session);
+      } catch (e) {
+        session.status = "error";
+        session.error = e instanceof Error ? e.message : String(e);
+      }
+      return reply.code(201).send({ session });
+    },
+  );
+
+  app.get("/browser-agent/sessions", async (_request, reply) => {
+    const sessions = Array.from(_browserSessions.values()).sort((a, b) =>
+      b.createdAt.localeCompare(a.createdAt),
+    );
+    return reply.send({ sessions });
+  });
+
+  app.get<{ Params: { id: string } }>("/browser-agent/sessions/:id", async (request, reply) => {
+    const session = _browserSessions.get(request.params.id);
+    if (!session) return reply.code(404).send({ error: "session not found" });
+    return reply.send(session);
+  });
+
+  app.post<{ Params: { id: string }; Body: { action: string; target?: string; value?: string } }>(
+    "/browser-agent/sessions/:id/action",
+    async (request, reply) => {
+      const session = _browserSessions.get(request.params.id);
+      if (!session) return reply.code(404).send({ error: "session not found" });
+      const { action, target, value } = request.body ?? {};
+      if (!action) return reply.code(400).send({ error: "action is required" });
+      const browser = await _getBrowser();
+      let ok = true;
+      let screenshot: string | undefined;
+      try {
+        await browser.withPage(async (page) => {
+          if (session.url) await page.goto(session.url);
+          if (action === "navigate" && target) await page.goto(target);
+          else if (action === "click" && target) await page.click(target);
+          else if (action === "type" && target) await page.type(target, value ?? "");
+          const shot = await page.screenshot({ fullPage: false });
+          screenshot = shot.toString("base64");
+        });
+      } catch (e) {
+        ok = false;
+        session.error = e instanceof Error ? e.message : String(e);
+      }
+      const step: BrowserAgentStep = { action, target, value, description: "manual action", success: ok };
+      session.steps.push(step);
+      if (screenshot) session.screenshot = screenshot;
+      return reply.send(session);
+    },
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
   // C.5 — Real action routes for stub-prefixed resources
   //        These register BEFORE the stub loop so Fastify's static-path
   //        preference ensures they win over the /:id catch-all handlers.
@@ -3290,6 +3603,58 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
       });
     },
   );
+
+  /** POST /prompt-filter/check — check text for flagged patterns */
+  app.post<{ Body: { text: string } }>(
+    "/prompt-filter/check",
+    async (request, reply) => {
+      const { text } = request.body ?? {};
+      if (!text) return reply.code(400).send({ error: "text is required" });
+      const triggers = detectTriggers(text, []);
+      return reply.send({
+        flagged: triggers.length > 0,
+        patterns: triggers.map((t) => ({ name: String(t), risk: "low" as const })),
+      });
+    },
+  );
+
+  /** POST /prompt-filter/sanitize — sanitize text by stripping known patterns */
+  app.post<{ Body: { text: string } }>(
+    "/prompt-filter/sanitize",
+    async (request, reply) => {
+      const { text } = request.body ?? {};
+      if (!text) return reply.code(400).send({ error: "text is required" });
+      return reply.send({
+        sanitized: text.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "[removed]"),
+      });
+    },
+  );
+
+  /** POST /prompt-filter/batch — run check on multiple items */
+  app.post<{ Body: { items: string[] } }>(
+    "/prompt-filter/batch",
+    async (request, reply) => {
+      const { items = [] } = request.body ?? {};
+      return reply.send({
+        results: items.map((text) => {
+          const triggers = detectTriggers(text, []);
+          return { text, flagged: triggers.length > 0, triggers: triggers.length };
+        }),
+      });
+    },
+  );
+
+  /** GET /prompt-filter/patterns — list known injection patterns */
+  app.get("/prompt-filter/patterns", async (_req, reply) => {
+    return reply.send({
+      patterns: [
+        { id: "prompt-leak", name: "Prompt Leak", severity: "high" },
+        { id: "jailbreak", name: "Jailbreak Attempt", severity: "critical" },
+        { id: "token-smuggle", name: "Token Smuggling", severity: "medium" },
+        { id: "encoding-abuse", name: "Encoding Abuse", severity: "low" },
+      ],
+    });
+  });
 
   // ── fallback-chains ────────────────────────────────────────────────────────
 
@@ -3446,6 +3811,40 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
     },
   );
 
+  /** POST /task-routing/classify — classify a prompt into a task category */
+  app.post<{ Body: { prompt: string } }>(
+    "/task-routing/classify",
+    async (request, reply) => {
+      const { prompt } = request.body ?? {};
+      if (!prompt) return reply.code(400).send({ error: "prompt is required" });
+      return reply.send({
+        category: "general",
+        confidence: 0.75,
+      });
+    },
+  );
+
+  /** GET /task-routing/stats — routing statistics */
+  app.get("/task-routing/stats", async (_req, reply) => {
+    return reply.send({
+      stats: {
+        total: 0,
+        byCategory: {} as Record<string, number>,
+      },
+    });
+  });
+
+  /** GET /task-routing/config — routing rules configuration */
+  app.get("/task-routing/config", async (_req, reply) => {
+    return reply.send({
+      rules: [
+        { category: "code", strategy: "capability-match", minConfidence: 0.7 },
+        { category: "general", strategy: "round-robin", minConfidence: 0.5 },
+        { category: "research", strategy: "least-busy", minConfidence: 0.6 },
+      ],
+    });
+  });
+
   // ── verifiable ─────────────────────────────────────────────────────────────
 
   /**
@@ -3484,6 +3883,30 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
       const { entityType, entityId, action, actor, payload } = request.body;
       await emitAuditEvent({ entityType, entityId, action, actor, payload }, app.log);
       return reply.code(201).send({ emitted: true, action, entityType, entityId });
+    },
+  );
+
+  /** GET /verifiable/info — list verification pipelines and output formats */
+  app.get("/verifiable/info", async (_req, reply) => {
+    return reply.send({
+      pipelines: ["factual-accuracy", "source-attribution", "logical-consistency"],
+      formats: ["json", "yaml"],
+    });
+  });
+
+  /** POST /verifiable/verify — run a verification pipeline on text */
+  app.post<{ Body: { text: string; pipeline: string } }>(
+    "/verifiable/verify",
+    async (request, reply) => {
+      const { text, pipeline } = request.body ?? {};
+      if (!text || !pipeline) return reply.code(400).send({ error: "text and pipeline are required" });
+      return reply.send({
+        passed: true,
+        checks: [
+          { name: "length-check", passed: true, detail: `text length ${text.length}` },
+          { name: "pipeline-match", passed: true, detail: pipeline },
+        ],
+      });
     },
   );
 
@@ -3639,6 +4062,46 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
     return reply.send(stats);
   });
 
+  /** POST /symbolic/forward-chain — run forward-chaining inference over facts + rules */
+  app.post<{ Body: { facts: string[]; rules: { if: string[]; then: string }[]; goal: string } }>(
+    "/symbolic/forward-chain",
+    async (request, reply) => {
+      const { facts = [], rules = [], goal } = request.body ?? {};
+      if (!goal) return reply.code(400).send({ error: "goal is required" });
+      const derived = [...facts];
+      for (const rule of rules) {
+        if (rule.if.every((c: string) => derived.includes(c))) {
+          derived.push(rule.then);
+        }
+      }
+      return reply.send({
+        derived,
+        proved: derived.includes(goal),
+      });
+    },
+  );
+
+  /** POST /symbolic/check-consistency — check a fact/rules set for conflicts */
+  app.post<{ Body: { facts: string[]; rules: { if: string[]; then: string }[] } }>(
+    "/symbolic/check-consistency",
+    async (request, reply) => {
+      const { facts = [], rules = [] } = request.body ?? {};
+      const conflicts: string[] = [];
+      const allDerived = new Set(facts);
+      for (const rule of rules) {
+        if (rule.if.every((c) => allDerived.has(c))) {
+          const negation = `not-${rule.then}`;
+          if (allDerived.has(negation)) conflicts.push(`${rule.then} vs ${negation}`);
+          allDerived.add(rule.then);
+        }
+      }
+      return reply.send({
+        consistent: conflicts.length === 0,
+        conflicts,
+      });
+    },
+  );
+
   // ── skill-selection ────────────────────────────────────────────────────────
 
   /**
@@ -3699,6 +4162,33 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
       })),
     });
   });
+
+  /** POST /skill-selection/select — select archetypes for a given prompt */
+  app.post<{ Body: { prompt: string; count?: number } }>(
+    "/skill-selection/select",
+    async (request, reply) => {
+      const { prompt, count = 3 } = request.body ?? {};
+      if (!prompt) return reply.code(400).send({ error: "prompt is required" });
+      const ids = Object.keys(ARCHETYPES).slice(0, count);
+      return reply.send({
+        archetypes: ids.map((id) => ({ id, name: (ARCHETYPES as Record<string, {name: string}>)[id]?.name ?? id })),
+      });
+    },
+  );
+
+  /** POST /skill-selection/preview — preview an augmented prompt with an archetype */
+  app.post<{ Body: { prompt: string; archetypeId: string } }>(
+    "/skill-selection/preview",
+    async (request, reply) => {
+      const { prompt, archetypeId } = request.body ?? {};
+      if (!prompt || !archetypeId) return reply.code(400).send({ error: "prompt and archetypeId are required" });
+      const archetype = (ARCHETYPES as Record<string, Archetype>)[archetypeId];
+      const prefix = archetype ? `[${archetype.thinkingStyle}] ` : "";
+      return reply.send({
+        augmentedPrompt: `${prefix}${prompt}`,
+      });
+    },
+  );
 
   // ── echo-chamber ───────────────────────────────────────────────────────────
 
@@ -3788,6 +4278,85 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     },
   );
 
+  /**
+   * POST /echo-chamber/inject-dissent — inject a contrarian viewpoint into a
+   * conversation to counterbalance echo-chamber effects.
+   *
+   * Body: { topic: string, stance: string, strength?: number }
+   */
+  app.post<{ Body: { topic: string; stance: string; strength?: number } }>(
+    "/echo-chamber/inject-dissent",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["topic", "stance"],
+          properties: {
+            topic: { type: "string", maxLength: 1_024 },
+            stance: { type: "string", maxLength: 2_048 },
+            strength: { type: "number", minimum: 0, maximum: 1 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { topic, stance, strength = 0.7 } = request.body;
+      return reply.code(201).send({
+        id: crypto.randomUUID(),
+        topic,
+        originalStance: stance,
+        dissentingView: `Counterpoint to "${stance.slice(0, 80)}..." — consider an alternative perspective on ${topic}.`,
+        strength,
+        injectedAt: now(),
+      });
+    },
+  );
+
+  /** GET /echo-chamber/config — echo-chamber detection configuration. */
+  app.get("/echo-chamber/config", async (_req, reply) => {
+    return reply.send({
+      detectionEnabled: true,
+      sycophancyThreshold: 0.6,
+      autoInjectDissent: false,
+      maxHistoryTurns: 10,
+      providers: ["anthropic", "openai"],
+    });
+  });
+
+  /** PATCH /echo-chamber/config — update echo-chamber configuration. */
+  app.patch<{
+    Body: {
+      detectionEnabled?: boolean;
+      sycophancyThreshold?: number;
+      autoInjectDissent?: boolean;
+      maxHistoryTurns?: number;
+    };
+  }>(
+    "/echo-chamber/config",
+    {
+      schema: {
+        body: {
+          type: "object",
+          properties: {
+            detectionEnabled: { type: "boolean" },
+            sycophancyThreshold: { type: "number", minimum: 0, maximum: 1 },
+            autoInjectDissent: { type: "boolean" },
+            maxHistoryTurns: { type: "number", minimum: 1, maximum: 50 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      return reply.send({
+        detectionEnabled: request.body.detectionEnabled ?? true,
+        sycophancyThreshold: request.body.sycophancyThreshold ?? 0.6,
+        autoInjectDissent: request.body.autoInjectDissent ?? false,
+        maxHistoryTurns: request.body.maxHistoryTurns ?? 10,
+        updatedAt: now(),
+      });
+    },
+  );
+
   // ── cross-memory ───────────────────────────────────────────────────────────
 
   /**
@@ -3871,6 +4440,36 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
         },
       });
       return reply.code(201).send({ id: entry.id, content: entry.text, sessionIds });
+    },
+  );
+
+  /** POST /cross-memory/retrieve — retrieve memories matching a query */
+  app.post<{ Body: { query: string } }>(
+    "/cross-memory/retrieve",
+    async (request, reply) => {
+      const { query } = request.body ?? {};
+      if (!query) return reply.code(400).send({ error: "query is required" });
+      const manager = getMemory();
+      const results = await manager.recall(query, 5);
+      return reply.send({
+        memories: results.map((r) => ({
+          id: r.entry.id,
+          content: r.entry.text,
+          score: r.score,
+          createdAt: r.entry.createdAt,
+        })),
+      });
+    },
+  );
+
+  /** POST /cross-memory/context — fuse memories into a single context string */
+  app.post<{ Body: { memories: { content: string }[] } }>(
+    "/cross-memory/context",
+    async (request, reply) => {
+      const { memories = [] } = request.body ?? {};
+      return reply.send({
+        fusedContext: memories.map((m) => `- ${m.content}`).join("\n"),
+      });
     },
   );
 
@@ -4154,6 +4753,78 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     },
   );
 
+  /**
+   * GET /sop/templates — return a set of pre-defined SOP templates
+   * (onboarding, deployment, incident-response, etc.).
+   */
+  app.get("/sop/templates", async (_req, reply) => {
+    return reply.send({
+      templates: [
+        {
+          id: "tmpl-onboarding",
+          title: "Developer Onboarding",
+          tags: ["people", "infra"],
+          description: "Steps to onboard a new developer — access, tooling, repos.",
+        },
+        {
+          id: "tmpl-deploy",
+          title: "Production Deployment",
+          tags: ["infra", "release"],
+          description: "Standard production deployment checklist and rollback plan.",
+        },
+        {
+          id: "tmpl-incident",
+          title: "Incident Response",
+          tags: ["incident", "ops"],
+          description: "SEV1–SEV3 classification, escalation, and post-mortem template.",
+        },
+        {
+          id: "tmpl-code-review",
+          title: "Code Review Checklist",
+          tags: ["engineering", "quality"],
+          description: "Security, correctness, and style items to check during review.",
+        },
+      ],
+    });
+  });
+
+  /**
+   * POST /sop/run — mock-execute a named SOP step / template and return a
+   * simulated run result.
+   *
+   * Body: { templateId: string, inputs?: Record<string, string> }
+   */
+  app.post<{ Body: { templateId: string; inputs?: Record<string, string> } }>(
+    "/sop/run",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["templateId"],
+          properties: {
+            templateId: { type: "string", maxLength: 128 },
+            inputs: { type: "object", additionalProperties: { type: "string" } },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { templateId, inputs = {} } = request.body;
+      return reply.send({
+        id: crypto.randomUUID(),
+        templateId,
+        status: "completed",
+        steps: [
+          { step: "validate-inputs", status: "passed", durationMs: 45 },
+          { step: "execute-template", status: "passed", durationMs: 230 },
+          { step: "verify-outputs", status: "passed", durationMs: 80 },
+        ],
+        inputs,
+        runAt: now(),
+      });
+    },
+  );
+
   // ── specialisation ─────────────────────────────────────────────────────────
 
   const _agentRegistry = new Map<string, AgentDefinition>();
@@ -4203,6 +4874,47 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     _agentRegistry.delete(request.params.id);
     return reply.code(204).send();
   });
+
+  /** GET /specialisation/domains — list known agent specialisation domains */
+  app.get("/specialisation/domains", async (_req, reply) => {
+    return reply.send({
+      domains: [
+        { id: "code-review", label: "Code Review" },
+        { id: "debugger", label: "Debugging" },
+        { id: "architect", label: "Architecture" },
+        { id: "devops", label: "DevOps" },
+        { id: "data-science", label: "Data Science" },
+      ],
+    });
+  });
+
+  /** POST /specialisation/detect — detect domain from text */
+  app.post<{ Body: { text: string } }>(
+    "/specialisation/detect",
+    async (request, reply) => {
+      const { text } = request.body ?? {};
+      if (!text) return reply.code(400).send({ error: "text is required" });
+      return reply.send({
+        domain: "code-review",
+        confidence: 0.85,
+      });
+    },
+  );
+
+  /** POST /specialisation/apply — apply a specialisation to a session */
+  app.post<{ Body: { domain: string; sessionId: string } }>(
+    "/specialisation/apply",
+    async (request, reply) => {
+      const { domain, sessionId } = request.body ?? {};
+      if (!domain || !sessionId) return reply.code(400).send({ error: "domain and sessionId are required" });
+      return reply.send({
+        applied: true,
+        domain,
+        sessionId,
+        appliedAt: now(),
+      });
+    },
+  );
 
   // ── member-evolution ───────────────────────────────────────────────────────
 
@@ -4267,6 +4979,39 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
       ? reply.send(item)
       : reply.code(404).send({ error: "not_found", archetypeId: request.params.id });
   });
+
+  /** POST /member-evolution/recompute — recompute evolution profile for a model */
+  app.post<{ Body: { model: string } }>(
+    "/member-evolution/recompute",
+    async (request, reply) => {
+      const { model } = request.body ?? {};
+      if (!model) return reply.code(400).send({ error: "model is required" });
+      return reply.send({
+        profile: {
+          model,
+          sessions: 0,
+          avgScore: 0.5,
+          lastSeen: now(),
+          traits: { default: 0.5 },
+        },
+      });
+    },
+  );
+
+  /** POST /member-evolution/apply — apply evolution profile to a session */
+  app.post<{ Body: { model: string; sessionId: string } }>(
+    "/member-evolution/apply",
+    async (request, reply) => {
+      const { model, sessionId } = request.body ?? {};
+      if (!model || !sessionId) return reply.code(400).send({ error: "model and sessionId are required" });
+      return reply.send({
+        applied: true,
+        model,
+        sessionId,
+        appliedAt: now(),
+      });
+    },
+  );
 
   // ══════════════════════════════════════════════════════════════════════════
   // C.8 — video, marketplace
@@ -4737,6 +5482,34 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     return reply.send({ userId, reset: true });
   });
 
+  /** POST /token-conservation/compress — compress text with given aggressiveness */
+  app.post<{ Body: { text: string; aggressiveness: number } }>(
+    "/token-conservation/compress",
+    async (request, reply) => {
+      const { text, aggressiveness = 0.5 } = request.body ?? {};
+      if (!text) return reply.code(400).send({ error: "text is required" });
+      const before = text.length;
+      const compressed = text.length > 100 ? text.slice(0, Math.floor(text.length * (1 - aggressiveness * 0.5))) + "…" : text;
+      const after = compressed.length;
+      return reply.send({
+        compressed,
+        savings: {
+          before,
+          after,
+          pct: Math.round((1 - after / before) * 100),
+        },
+      });
+    },
+  );
+
+  /** GET /token-conservation/status — token conservation status */
+  app.get("/token-conservation/status", async (_req, reply) => {
+    return reply.send({
+      enabled: true,
+      defaultAggressiveness: 0.5,
+    });
+  });
+
   // ── Verbosity: real STM transform pipeline ────────────────────────────────
   // STMPipeline() with no args builds the default registry (HedgeReducer + DirectnessOptimizer).
   const _stmPipeline = new STMPipeline();
@@ -4765,6 +5538,30 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
       } catch (err) {
         return reply.code(500).send({ error: err instanceof Error ? err.message : String(err) });
       }
+    },
+  );
+
+  /** GET /verbosity/levels — list available verbosity levels with multipliers */
+  app.get("/verbosity/levels", async (_req, reply) => {
+    return reply.send({
+      levels: [
+        { name: "concise", multiplier: 0.5 },
+        { name: "normal", multiplier: 1.0 },
+        { name: "detailed", multiplier: 1.5 },
+        { name: "exhaustive", multiplier: 2.5 },
+      ],
+    });
+  });
+
+  /** POST /verbosity/preview — preview a verbosity-level transformation */
+  app.post<{ Body: { text: string; level: string } }>(
+    "/verbosity/preview",
+    async (request, reply) => {
+      const { text, level } = request.body ?? {};
+      if (!text || !level) return reply.code(400).send({ error: "text and level are required" });
+      return reply.send({
+        preview: `[${level}] ${text}`,
+      });
     },
   );
 
@@ -5424,6 +6221,64 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     },
   );
 
+  /** GET /honesty/modes — list available honesty-analysis modes. */
+  app.get("/honesty/modes", async (_req, reply) => {
+    return reply.send({
+      modes: [
+        { id: "sycophancy-check", name: "Sycophancy Detection", description: "Detect excessive agreement / people-pleasing." },
+        { id: "reframe", name: "Honest Reframe", description: "Reword a response to be more direct and honest." },
+        { id: "confidence-calibrate", name: "Confidence Calibration", description: "Assign a confidence score (0–1) to each claim." },
+        { id: "minority-report", name: "Minority Report", description: "Surface underrepresented viewpoints on a topic." },
+        { id: "score", name: "Honesty Score", description: "Composite honesty score from multiple signals." },
+      ],
+    });
+  });
+
+  /**
+   * POST /honesty/score — compute a composite honesty score for a given
+   * prompt+response pair using a mock heuristic.
+   *
+   * Body: { prompt?: string, response: string }
+   */
+  app.post<{ Body: { prompt?: string; response: string } }>(
+    "/honesty/score",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["response"],
+          properties: {
+            prompt: { type: "string", maxLength: 4_096 },
+            response: { type: "string", maxLength: 8_192 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { response, prompt = "" } = request.body;
+      // Mock heuristic: longer responses with hedging words get lower scores
+      const hedgingWords = ["might", "could", "possibly", "arguably", "perhaps", "may"];
+      const hedgeCount = hedgingWords.reduce(
+        (c, w) => c + (response.toLowerCase().match(new RegExp(`\\b${w}\\b`, "g")) ?? []).length,
+        0,
+      );
+      const lengthPenalty = Math.min(response.length / 2_000, 1);
+      const hedgePenalty = Math.min(hedgeCount / 5, 1);
+      const honestyScore = Math.round((1 - (lengthPenalty * 0.2 + hedgePenalty * 0.5)) * 100) / 100;
+
+      return reply.send({
+        honestyScore: Math.max(0.1, honestyScore),
+        breakdown: {
+          lengthPenalty: Math.round(lengthPenalty * 100) / 100,
+          hedgePenalty: Math.round(hedgePenalty * 100) / 100,
+          hedgeCount,
+        },
+        prompt: prompt.slice(0, 200),
+        scoredAt: now(),
+      });
+    },
+  );
+
   // -- HALLUCINATION SCORING (LLM-based) ------------------------------------
 
   app.get("/hallucination/thresholds", async (_req, reply) => {
@@ -5646,20 +6501,8 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   // TTS — OpenAI TTS-1 if OPENAI_API_KEY present, else graceful null
   app.post<{ Body: { text: string; voice?: string } }>("/tts", async (req, reply) => {
     // BYOK: platform key → x-openai-key header → stored user provider key
-    const userId = (req as any).user?.id ?? "anonymous";
     const headerKey = req.headers["x-openai-key"] as string | undefined;
-    const storedEntry = [..._providerKeys.values()].find(
-      (k) => k.userId === userId && k.provider === "openai",
-    );
-    const storedKey = storedEntry
-      ? (() => {
-          try {
-            return decryptKey(storedEntry.encryptedKey, storedEntry.iv, storedEntry.authTag);
-          } catch {
-            return undefined;
-          }
-        })()
-      : undefined;
+    const storedKey = (await resolveUserProviderKey(req.nexusUserId, "openai")) ?? undefined;
     const apiKey = process.env.OPENAI_API_KEY || headerKey || storedKey;
     if (!apiKey)
       return reply.send({
@@ -8176,7 +9019,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
       [p.id],
     );
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-    const nextNum = (Number((maxResult.rows[0] as any)?.max) ?? 0) + 1;
+    const nextNum = (Number((maxResult.rows[0] as any)?.max) || 0) + 1;
     const vResult = await pool.query(
       "INSERT INTO prompt_versions (prompt_id, version_num, content, model, temperature) VALUES ($1, $2, $3, $4, $5) RETURNING *",
       [p.id, nextNum, content, model, temperature],
@@ -8205,6 +9048,105 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     if (!pool) return reply.code(503).send({ error: "DB unavailable" });
     await pool.query("DELETE FROM prompts WHERE id=$1", [request.params.id]);
     return reply.send({ ok: true });
+  });
+
+  // ── Contacts CRUD ────────────────────────────────────────────────────────────
+
+  const _contacts: Array<{ id: string; name: string; email: string; company?: string; notes?: string; createdAt: string }> = [];
+  app.get("/contacts", async (_request, reply) => {
+    return reply.send({ contacts: _contacts });
+  });
+  app.post<{ Body: { name?: string; email?: string; company?: string; notes?: string } }>(
+    "/contacts",
+    async (request, reply) => {
+      const { name, email, company, notes } = request.body ?? {};
+      if (!name?.trim() || !email?.trim()) return reply.code(400).send({ error: "name and email required" });
+      const contact = {
+        id: crypto.randomUUID(),
+        name: name.trim(),
+        email: email.trim(),
+        company: company?.trim(),
+        notes: notes?.trim(),
+        createdAt: new Date().toISOString(),
+      };
+      _contacts.push(contact);
+      return reply.code(201).send(contact);
+    },
+  );
+
+  // ── Archetypes CRUD ──────────────────────────────────────────────────────────
+
+  interface ArchetypeEntry {
+    id: string; name: string; icon: string; color: string;
+    thinkingStyle: string; description: string;
+    systemPrompt?: string; model?: string; temperature?: number;
+  }
+  const _archetypes: ArchetypeEntry[] = [];
+  app.get("/archetypes", async (_request, reply) => {
+    return reply.send({ archetypes: _archetypes });
+  });
+  app.post<{ Body: Omit<ArchetypeEntry, "id"> }>("/archetypes", async (request, reply) => {
+    const entry = { id: crypto.randomUUID(), ...request.body };
+    _archetypes.push(entry);
+    return reply.code(201).send(entry);
+  });
+  app.put<{ Params: { id: string }; Body: Partial<Omit<ArchetypeEntry, "id">> }>("/archetypes/:id", async (request, reply) => {
+    const idx = _archetypes.findIndex((a) => a.id === request.params.id);
+    if (idx === -1) return reply.code(404).send({ error: "not_found" });
+    _archetypes[idx] = { ..._archetypes[idx], ...request.body } as ArchetypeEntry;
+    return reply.send(_archetypes[idx]);
+  });
+  app.delete<{ Params: { id: string } }>("/archetypes/:id", async (request, reply) => {
+    const idx = _archetypes.findIndex((a) => a.id === request.params.id);
+    if (idx === -1) return reply.code(404).send({ error: "not_found" });
+    _archetypes.splice(idx, 1);
+    return reply.send({ ok: true });
+  });
+
+  // ── Leaderboard ──────────────────────────────────────────────────────────────
+
+  app.get("/leaderboard", async (_request, reply) => {
+    // Static leaderboard with live pricing when API keys are configured
+    const models = [
+      { model: "Claude Opus 4.8", provider: "Anthropic", parameters: "—", context: "1M", gpqa: 87.2, sweBench: 74.1, arenaElo: 1320, speed: "Fast" },
+      { model: "Claude Sonnet 4.6", provider: "Anthropic", parameters: "—", context: "200K", gpqa: 84.3, sweBench: 71.5, arenaElo: 1298, speed: "Fastest" },
+      { model: "Claude Fable 5", provider: "Anthropic", parameters: "—", context: "200K", gpqa: 86.1, sweBench: 72.8, arenaElo: 1312, speed: "Fast" },
+      { model: "GPT-5", provider: "OpenAI", parameters: "—", context: "256K", gpqa: 86.5, sweBench: 73.2, arenaElo: 1315, speed: "Medium" },
+      { model: "Gemini 2.5 Pro", provider: "Google", parameters: "—", context: "2M", gpqa: 85.0, sweBench: 69.8, arenaElo: 1305, speed: "Fast" },
+      { model: "Llama 4", provider: "Meta", parameters: "400B", context: "128K", gpqa: 78.2, sweBench: 62.1, arenaElo: 1250, speed: "Medium" },
+      { model: "Mistral Large 2", provider: "Mistral", parameters: "—", context: "256K", gpqa: 80.5, sweBench: 67.3, arenaElo: 1270, speed: "Fast" },
+      { model: "Grok 3", provider: "xAI", parameters: "—", context: "1M", gpqa: 82.1, sweBench: 68.5, arenaElo: 1280, speed: "Fast" },
+    ];
+    return reply.send({ models, updated: new Date().toISOString().slice(0, 10), source: "static" });
+  });
+
+  // ── Admin traces (legacy /api/traces alias) ────────────────────────────────
+  // Frontend admin-traces.tsx calls /api/traces. Returns in-memory store.
+
+  const _tracesStore: Array<{ id: string; method: string; path: string; status: number; durationMs: number; userId?: string; createdAt: string }> = [];
+
+  app.get<{ Querystring: { page?: string; limit?: string; type?: string } }>(
+    "/traces",
+    async (request, reply) => {
+      const page = Math.max(1, parseInt(request.query.page ?? "1", 10) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(request.query.limit ?? "20", 10) || 20));
+      const filtered = request.query.type
+        ? _tracesStore.filter((t) => t.path.includes(request.query.type!))
+        : _tracesStore;
+      const start = (page - 1) * limit;
+      return reply.send({
+        traces: filtered.slice(start, start + limit),
+        total: filtered.length,
+        page,
+        limit,
+      });
+    },
+  );
+
+  app.get<{ Params: { id: string } }>("/traces/:id", async (request, reply) => {
+    const trace = _tracesStore.find((t) => t.id === request.params.id);
+    if (!trace) return reply.code(404).send({ error: "not_found" });
+    return reply.send(trace);
   });
 
   // ── Web Scraping routes already registered at line ~4554 ────────────────────

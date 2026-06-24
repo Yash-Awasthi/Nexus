@@ -23,7 +23,6 @@
     "clean": "rm -rf dist coverage"
   },
   "devDependencies": {
-    "@fast-check/vitest": "^0.4.1",
     "fast-check": "^3.23.2",
     "typescript": "^5.6.3",
     "vitest": "^2.1.8"

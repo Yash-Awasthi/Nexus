@@ -505,6 +505,105 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // ── Subscription / Usage / Cancel ──────────────────────────────────────────
+
+  app.get<{ Params: { tenantId: string } }>(
+    "/billing/subscription/:tenantId",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const { tenantId } = request.params;
+      if (!DB_AVAILABLE) {
+        return reply.send({ id: null, tenantId, planId: "free", status: "active" });
+      }
+      try {
+        const { db: billingDb } = await import("@nexus/db");
+        const { subscriptions } = await import("@nexus/db/schema");
+        const { eq } = await import("drizzle-orm");
+        const [sub] = await billingDb
+          .select()
+          .from(subscriptions)
+          .where(eq(subscriptions.ownerId, tenantId))
+          .limit(1);
+        if (!sub) return reply.send({ id: null, tenantId, planId: "free", status: "active" });
+        return reply.send({
+          id: sub.id,
+          tenantId: sub.ownerId,
+          planId: sub.plan,
+          status: sub.status,
+          currentPeriodEnd: sub.currentPeriodEnd
+            ? new Date(sub.currentPeriodEnd as unknown as number * 1000).toISOString()
+            : undefined,
+          cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+          stripeCustomerId: sub.stripeCustomerId,
+        });
+      } catch (err: unknown) {
+        return reply.code(500).send({ error: (err as Error).message });
+      }
+    },
+  );
+
+  app.get<{ Params: { tenantId: string } }>(
+    "/billing/usage/:tenantId",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const now = new Date();
+      const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString();
+      if (!DB_AVAILABLE) {
+        return reply.send({ requests: 0, tokensIn: 0, tokensOut: 0, cost: 0, periodStart, periodEnd });
+      }
+      try {
+        const { db: billingDb } = await import("@nexus/db");
+        const { usageEvents } = await import("@nexus/db/schema");
+        const { sql } = await import("drizzle-orm");
+        const [row] = await billingDb
+          .select({
+            requests: sql<number>`count(*)`,
+            cost: sql<number>`coalesce(sum(${usageEvents.costUnits}), 0)`,
+          })
+          .from(usageEvents)
+          .where(sql`${usageEvents.createdAt} >= ${periodStart}`);
+        return reply.send({
+          requests: row?.requests ?? 0,
+          tokensIn: 0,
+          tokensOut: 0,
+          cost: (row?.cost ?? 0) / 1_000_000,
+          periodStart,
+          periodEnd,
+        });
+      } catch (err: unknown) {
+        return reply.code(500).send({ error: (err as Error).message });
+      }
+    },
+  );
+
+  app.post<{ Params: { tenantId: string } }>(
+    "/billing/cancel/:tenantId",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const { tenantId } = request.params;
+      if (!DB_AVAILABLE) return reply.code(503).send({ error: "Database not configured" });
+      try {
+        const { db: billingDb } = await import("@nexus/db");
+        const { subscriptions } = await import("@nexus/db/schema");
+        const { eq } = await import("drizzle-orm");
+        const [sub] = await billingDb
+          .select()
+          .from(subscriptions)
+          .where(eq(subscriptions.ownerId, tenantId))
+          .limit(1);
+        if (!sub) return reply.code(404).send({ error: "No subscription found" });
+        await billingDb
+          .update(subscriptions)
+          .set({ cancelAtPeriodEnd: true })
+          .where(eq(subscriptions.id, sub.id));
+        return reply.send({ ok: true, cancelAtPeriodEnd: true });
+      } catch (err: unknown) {
+        return reply.code(500).send({ error: (err as Error).message });
+      }
+    },
+  );
+
   /** POST /billing/webhook/stripe */
   app.post(
     "/billing/webhook/stripe",

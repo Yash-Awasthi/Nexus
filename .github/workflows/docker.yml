@@ -39,6 +39,9 @@ jobs:
           - service: ingest
             dockerfile: services/ingest/Dockerfile
             image_suffix: ingest
+          - service: ui
+            dockerfile: apps/ui/Dockerfile
+            image_suffix: ui
 
     steps:
       - uses: actions/checkout@v6

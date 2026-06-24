@@ -23,6 +23,7 @@ import chalk from "chalk";
 import { Command } from "commander";
 
 import { api } from "./lib/client.js";
+import { streamSse } from "./lib/sse-stream.js";
 
 const program = new Command();
 
@@ -37,6 +38,112 @@ program
     try {
       const res = await api.health();
       console.log(chalk.green("✓"), "API is", chalk.bold(res.status));
+    } catch (err) {
+      console.error(chalk.red("✗"), String(err));
+      process.exit(1);
+    }
+  });
+
+// ── code (coding agent) ─────────────────────────────────────────────────────────
+
+/**
+ * Render one streamed agent frame; returns true when the stream should close.
+ * With `awaitLearnings`, the forked review's `agent.learnings` (which arrives
+ * after status) is the terminal event instead of `agent.status`.
+ */
+function renderAgentFrame(
+  event: string | undefined,
+  data: Record<string, unknown>,
+  awaitLearnings: boolean,
+): boolean {
+  switch (event) {
+    case "agent.run_started":
+      console.log(chalk.gray(`  ▸ ${String(data.instruction ?? "").slice(0, 100)}`));
+      return false;
+    case "agent.step": {
+      const tools = Array.isArray(data.toolCalls) ? (data.toolCalls as string[]) : [];
+      const label = tools.length ? tools.join(", ") : chalk.gray("(thinking)");
+      console.log(`  ${chalk.cyan(`step ${String(data.stepIndex)}`)}  ${label}`);
+      return false;
+    }
+    case "agent.compaction":
+      console.log(chalk.gray(`  ~ compacted ${String(data.summarized)} turns`));
+      return false;
+    case "agent.learnings": {
+      const learnings = Array.isArray(data.learnings)
+        ? (data.learnings as { type: string; content: string }[])
+        : [];
+      if (learnings.length) {
+        console.log(chalk.magenta("\n✎ learnings:"));
+        for (const l of learnings) console.log(`  ${chalk.gray(`[${l.type}]`)} ${l.content}`);
+      }
+      return true; // learnings is the terminal event when a review was requested
+    }
+    case "agent.status": {
+      const status = String(data.status);
+      const color = status === "completed" ? chalk.green : status === "error" ? chalk.red : chalk.yellow;
+      console.log(color(`\n● ${status.toUpperCase()}`), data.steps !== undefined ? chalk.gray(`(${String(data.steps)} steps)`) : "");
+      if (data.error) console.error(chalk.red(String(data.error)));
+      // When a review was requested, keep the stream open for agent.learnings.
+      return !awaitLearnings;
+    }
+    default:
+      return false;
+  }
+}
+
+program
+  .command("code <task>")
+  .description("Launch a coding-agent run and stream its progress")
+  .option("--provider <p>", "LLM provider (anthropic|groq|openrouter)")
+  .option("--model <m>", "Model id")
+  .option("--repo <path>", "Run inside a git-worktree workspace cut from this repo")
+  .option("--base <branch>", "Base branch for the worktree", "main")
+  .option("--start-run", "Start the .nexus run server during the agent run")
+  .option("--max-steps <n>", "Max agent steps")
+  .option("--review", "Run a forked post-run learning review")
+  .option("--no-wait", "Return after launch without streaming")
+  .action(async (task: string, opts) => {
+    try {
+      const body: Record<string, unknown> = { instruction: task };
+      if (opts.provider) body.provider = opts.provider;
+      if (opts.model) body.model = opts.model;
+      if (opts.maxSteps) body.maxSteps = Number(opts.maxSteps);
+      if (opts.review) body.review = true;
+      if (opts.repo) {
+        body.worktree = {
+          repoPath: opts.repo,
+          baseBranch: opts.base,
+          ...(opts.startRun ? { startRun: true } : {}),
+        };
+      }
+
+      const launched = await api.post<{ sessionId: string; stream: string }>("/agent/run", body);
+      console.log(chalk.green("✓"), "Launched:", chalk.bold(launched.sessionId));
+      if (!opts.wait) return;
+
+      console.log(chalk.gray("  streaming… (Ctrl-C to detach)\n"));
+      const controller = new AbortController();
+      try {
+        for await (const frame of streamSse(
+          api.sseUrl(`/sse/agent/${launched.sessionId}`),
+          api.authHeaders(),
+          controller.signal,
+        )) {
+          let data: Record<string, unknown> = {};
+          try {
+            data = JSON.parse(frame.data) as Record<string, unknown>;
+          } catch {
+            /* keepalive or non-JSON frame */
+          }
+          if (renderAgentFrame(frame.event, data, Boolean(opts.review))) {
+            controller.abort();
+            break;
+          }
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) throw err;
+      }
     } catch (err) {
       console.error(chalk.red("✗"), String(err));
       process.exit(1);

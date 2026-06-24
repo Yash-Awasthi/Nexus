@@ -51,6 +51,9 @@ const SCRYPT_R = 8;
 const SCRYPT_P = 1;
 const SCRYPT_KEY_LEN = 64;
 const SALT_LEN = 32;
+// OpenSSL default maxmem (32 MB) is below scrypt's 128*N*r usage (~32MB+) and
+// throws ERR_CRYPTO_INVALID_SCRYPT_PARAMS. Raise the cap to 128 MB.
+const SCRYPT_MAXMEM = 128 * 1024 * 1024;
 
 async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(SALT_LEN);
@@ -58,6 +61,7 @@ async function hashPassword(password: string): Promise<string> {
     N: SCRYPT_N,
     r: SCRYPT_R,
     p: SCRYPT_P,
+    maxmem: SCRYPT_MAXMEM,
   })) as Buffer;
   // Format: scrypt$salt_hex$hash_hex
   return `scrypt$${salt.toString("hex")}$${hash.toString("hex")}`;
@@ -76,6 +80,7 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
       N: SCRYPT_N,
       r: SCRYPT_R,
       p: SCRYPT_P,
+      maxmem: SCRYPT_MAXMEM,
     })) as Buffer;
   } catch {
     return false;
@@ -93,11 +98,28 @@ function generateRefreshToken(): string {
 const ACCESS_TOKEN_TTL_SEC = 15 * 60; // 15 minutes
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 3600 * 1000; // 30 days
 
+/**
+ * Map a platform role (users.role: owner|admin|member|viewer) to a NexusRole
+ * (admin|agent|read-only) understood by @nexus/auth's role hierarchy. Without
+ * this, tokens carry a role outside ROLE_RANK and fail authenticate().
+ */
+function toNexusRole(role: string): "admin" | "agent" | "read-only" {
+  switch (role) {
+    case "owner":
+    case "admin":
+      return "admin";
+    case "member":
+      return "agent";
+    default:
+      return "read-only"; // viewer / unknown
+  }
+}
+
 function issueAccessToken(userId: string, role: string, tier: string, secret: string): string {
   return signJwt(
     {
       sub: userId,
-      role: role as "admin" | "agent" | "read-only",
+      role: toNexusRole(role),
       tier,
       exp: Math.floor(Date.now() / 1000) + ACCESS_TOKEN_TTL_SEC,
     } as Parameters<typeof signJwt>[0],

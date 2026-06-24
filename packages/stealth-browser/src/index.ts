@@ -231,11 +231,19 @@ export class MockBrowserDriver implements BrowserDriver {
  * Used at startup to decide whether to activate real browser execution.
  */
 export async function isPatchrightAvailable(): Promise<boolean> {
+  // A remote CDP endpoint means we can drive a hosted browser regardless of
+  // which local client lib is present.
+  if (process.env.BROWSER_CDP_URL) return true;
   try {
     await import("patchright");
     return true;
   } catch {
-    return false;
+    try {
+      await import("playwright-core");
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 
@@ -354,10 +362,15 @@ export class PatchrightDriver implements BrowserDriver {
   private _open = false;
   private readonly headless: boolean;
   private readonly channel: string;
+  private readonly cdpUrl: string | undefined;
 
-  constructor(config?: { headless?: boolean; channel?: string }) {
+  constructor(config?: { headless?: boolean; channel?: string; cdpUrl?: string }) {
     this.headless = config?.headless ?? true;
     this.channel = config?.channel ?? "chromium";
+    // Remote CDP endpoint (Browserbase / Steel / self-hosted). When set, connect
+    // over CDP instead of launching a local chromium — lets the API run on hosts
+    // that can't run a browser (e.g. Render free tier).
+    this.cdpUrl = config?.cdpUrl ?? process.env.BROWSER_CDP_URL;
   }
 
   get isOpen(): boolean {
@@ -367,26 +380,39 @@ export class PatchrightDriver implements BrowserDriver {
   private async ensureOpen(): Promise<PatchrightBrowserType> {
     if (this._browser) return this._browser;
 
+    // Resolve a browser client lib: patchright (preferred) → playwright-core.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let patchright: any;
+    let lib: any;
     try {
-      patchright = await import("patchright");
+      lib = await import("patchright");
     } catch {
-      throw new Error(
-        "PatchrightDriver: `patchright` package not found. " +
-          "Install it with: pnpm add patchright && npx patchright install chromium",
-      );
+      try {
+        lib = await import("playwright-core");
+      } catch {
+        throw new Error(
+          "stealth-browser: no browser client found. Install `patchright` or `playwright-core`.",
+        );
+      }
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const chromium = (patchright.chromium ?? patchright.default?.chromium) as
+    const chromium = (lib.chromium ?? lib.default?.chromium) as
       | {
           launch(opts: Record<string, unknown>): Promise<PatchrightBrowserType>;
+          connectOverCDP(url: string): Promise<PatchrightBrowserType>;
         }
       | undefined;
 
     if (!chromium) {
-      throw new Error("PatchrightDriver: could not locate chromium in patchright exports");
+      throw new Error("stealth-browser: could not locate chromium in browser client exports");
+    }
+
+    // Remote CDP path — connect to a hosted browser (no local chromium needed).
+    if (this.cdpUrl) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      this._browser = await chromium.connectOverCDP(this.cdpUrl);
+      this._open = true;
+      return this._browser;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment

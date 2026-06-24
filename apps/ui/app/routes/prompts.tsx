@@ -1,9 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-import { lazy, Suspense, useState, useCallback, useEffect } from "react";
-import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { ScrollArea } from "~/components/ui/scroll-area";
 import {
   FileText,
   Plus,
@@ -13,7 +8,30 @@ import {
   GitCommit,
   ChevronDown,
   Loader2,
+  History,
+  Eye,
+  RotateCcw,
 } from "lucide-react";
+import { lazy, Suspense, useState, useCallback, useEffect } from "react";
+
+import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
+import { ScrollArea } from "~/components/ui/scroll-area";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "~/components/ui/sheet";
 
 const MonacoEditor = lazy(() => import("@monaco-editor/react"));
 
@@ -39,10 +57,10 @@ interface Prompt {
 async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: { "Content-Type": "application/json", ...(init?.headers as Record<string, string>) },
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
+    const body: unknown = await res.json().catch(() => ({}));
     throw new Error((body as { message?: string }).message ?? `Request failed: ${res.status}`);
   }
   return res.json() as Promise<T>;
@@ -54,6 +72,20 @@ function extractVariables(content: string): string[] {
   const matches = content.match(/\{\{([^}]+)\}\}/g);
   if (!matches) return [];
   return [...new Set(matches.map((m) => m.replace(/\{\{|\}\}/g, "").trim()))];
+}
+
+function relativeTime(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const diff = Date.now() - then;
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day}d ago`;
+  return new Date(iso).toLocaleDateString();
 }
 
 export default function PromptsPage() {
@@ -68,6 +100,9 @@ export default function PromptsPage() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [viewingVersion, setViewingVersion] = useState<PromptVersion | null>(null);
+  const [restoringNum, setRestoringNum] = useState<number | null>(null);
 
   // ── Load prompt list ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -79,8 +114,8 @@ export default function PromptsPage() {
         setPrompts(list);
         if (list.length > 0) setSelectedId(list[0].id);
       })
-      .catch((e) => {
-        if (!cancelled) setError(e.message);
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -99,8 +134,8 @@ export default function PromptsPage() {
       .then((detail) => {
         if (!cancelled) setSelectedPrompt(detail);
       })
-      .catch((e) => {
-        if (!cancelled) setError(e.message);
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       })
       .finally(() => {
         if (!cancelled) setLoadingDetail(false);
@@ -158,10 +193,14 @@ export default function PromptsPage() {
         method: "POST",
         body: JSON.stringify({ content, model }),
       });
-      // Update local state with new version
-      setSelectedPrompt((prev) => (prev ? { ...prev, versions: [newVersion] } : prev));
+      // Prepend the new version so the full history stays available to the drawer.
+      setSelectedPrompt((prev) =>
+        prev ? { ...prev, versions: [newVersion, ...prev.versions] } : prev,
+      );
       setPrompts((prev) =>
-        prev.map((p) => (p.id === selectedId ? { ...p, versions: [newVersion] } : p)),
+        prev.map((p) =>
+          p.id === selectedId ? { ...p, versions: [newVersion, ...p.versions] } : p,
+        ),
       );
       setEditedContent((prev) => {
         const n = { ...prev };
@@ -179,6 +218,51 @@ export default function PromptsPage() {
       setSaving(false);
     }
   }, [selectedId, selectedPrompt, editedContent, editedModel, latestVersion]);
+
+  // Restore is non-destructive: it creates a NEW version from an old one's content
+  // (matching the "save = new version" semantics), it never rewrites history.
+  const handleRestore = useCallback(
+    async (version: PromptVersion) => {
+      if (!selectedId) return;
+      setRestoringNum(version.versionNum);
+      try {
+        const newVersion = await apiFetch<PromptVersion>(`/api/prompts/${selectedId}/versions`, {
+          method: "POST",
+          body: JSON.stringify({
+            content: version.content,
+            model: version.model,
+            temperature: version.temperature,
+          }),
+        });
+        setSelectedPrompt((prev) =>
+          prev ? { ...prev, versions: [newVersion, ...prev.versions] } : prev,
+        );
+        setPrompts((prev) =>
+          prev.map((p) =>
+            p.id === selectedId ? { ...p, versions: [newVersion, ...p.versions] } : p,
+          ),
+        );
+        // Drop any unsaved edits so the editor reflects the restored content.
+        setEditedContent((prev) => {
+          const n = { ...prev };
+          delete n[selectedId];
+          return n;
+        });
+        setEditedModel((prev) => {
+          const n = { ...prev };
+          delete n[selectedId];
+          return n;
+        });
+        setViewingVersion(null);
+        setHistoryOpen(false);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to restore version");
+      } finally {
+        setRestoringNum(null);
+      }
+    },
+    [selectedId],
+  );
 
   const handleDelete = useCallback(async () => {
     if (!selectedId) return;
@@ -353,6 +437,19 @@ export default function PromptsPage() {
               <Button
                 variant="ghost"
                 size="sm"
+                className="h-7 gap-1.5 text-xs"
+                onClick={() => setHistoryOpen(true)}
+                title="Version history"
+              >
+                <History className="size-3.5" />
+                History
+                <Badge variant="secondary" className="text-[9px] h-4 px-1">
+                  {selectedPrompt.versions.length}
+                </Badge>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive"
                 onClick={handleDelete}
               >
@@ -438,6 +535,121 @@ export default function PromptsPage() {
       {showModelDropdown && (
         <div className="fixed inset-0 z-40" onClick={() => setShowModelDropdown(false)} />
       )}
+
+      {/* Version history drawer */}
+      <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
+        <SheetContent className="w-full sm:max-w-md flex flex-col gap-0 p-0">
+          <SheetHeader className="p-4 border-b border-border">
+            <SheetTitle className="flex items-center gap-2 text-sm">
+              <History className="size-4" />
+              Version History
+            </SheetTitle>
+            <SheetDescription className="text-xs">
+              {selectedPrompt?.name ?? "Prompt"} — {selectedPrompt?.versions.length ?? 0} version
+              {(selectedPrompt?.versions.length ?? 0) === 1 ? "" : "s"}. Restoring creates a new
+              version; older versions are never overwritten.
+            </SheetDescription>
+          </SheetHeader>
+          <ScrollArea className="flex-1">
+            <div className="p-3 space-y-2">
+              {(selectedPrompt?.versions ?? []).map((v, idx) => (
+                <div
+                  key={v.id}
+                  className="rounded-md border border-border p-3 space-y-2 bg-background"
+                >
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-[10px] gap-0.5">
+                      <GitCommit className="size-2.5" />v{v.versionNum}
+                    </Badge>
+                    {idx === 0 && (
+                      <Badge variant="secondary" className="text-[9px] h-4 px-1.5">
+                        latest
+                      </Badge>
+                    )}
+                    <span className="text-[10px] text-muted-foreground ml-auto">
+                      {relativeTime(v.createdAt)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                    {v.model && <span className="font-mono">{v.model}</span>}
+                    {v.temperature != null && <span>temp {v.temperature}</span>}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground font-mono line-clamp-2 break-all">
+                    {v.content.slice(0, 160)}
+                    {v.content.length > 160 ? "…" : ""}
+                  </p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 gap-1 text-[10px] px-2"
+                      onClick={() => setViewingVersion(v)}
+                    >
+                      <Eye className="size-3" />
+                      View
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 gap-1 text-[10px] px-2"
+                      onClick={() => handleRestore(v)}
+                      disabled={restoringNum != null || idx === 0}
+                      title={idx === 0 ? "Already the latest version" : "Restore as a new version"}
+                    >
+                      {restoringNum === v.versionNum ? (
+                        <Loader2 className="size-3 animate-spin" />
+                      ) : (
+                        <RotateCcw className="size-3" />
+                      )}
+                      Restore
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {(selectedPrompt?.versions.length ?? 0) === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-6">No versions yet</p>
+              )}
+            </div>
+          </ScrollArea>
+        </SheetContent>
+      </Sheet>
+
+      {/* Read-only version preview */}
+      <Dialog open={viewingVersion != null} onOpenChange={(o) => !o && setViewingVersion(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm">
+              <GitCommit className="size-4" />
+              Version {viewingVersion?.versionNum}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {viewingVersion?.model && <span className="font-mono">{viewingVersion.model}</span>}
+              {viewingVersion?.temperature != null && (
+                <span className="ml-2">temp {viewingVersion.temperature}</span>
+              )}
+              {viewingVersion && <span className="ml-2">{relativeTime(viewingVersion.createdAt)}</span>}
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[55vh] rounded-md border border-border bg-muted/30">
+            <pre className="text-xs font-mono p-3 whitespace-pre-wrap break-words">
+              {viewingVersion?.content}
+            </pre>
+          </ScrollArea>
+          <div className="flex justify-end gap-2">
+            <Button
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              onClick={() => viewingVersion && handleRestore(viewingVersion)}
+              disabled={
+                restoringNum != null || viewingVersion?.versionNum === latestVersion?.versionNum
+              }
+            >
+              <RotateCcw className="size-3.5" />
+              Restore this version
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

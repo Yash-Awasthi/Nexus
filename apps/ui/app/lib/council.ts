@@ -11,17 +11,18 @@ export interface CouncilMember {
   // API mode fields
   provider: string; // "openai" | "anthropic" | "deepseek" | "groq" | "ollama" | "openrouter" | "gemini" | "mistral" | "custom"
   model: string;
-  apiKey: string;
   baseUrl: string; // for ollama/custom
+  // NOTE: provider API keys are NOT stored here. They live encrypted server-side
+  // (see /provider-keys). The backend resolves each member's key by provider.
 }
 
-export const API_PROVIDERS: Array<{
+export const API_PROVIDERS: {
   id: string;
   label: string;
   defaultModel: string;
   defaultBaseUrl: string;
   needsKey: boolean;
-}> = [
+}[] = [
   {
     id: "openai",
     label: "OpenAI",
@@ -72,6 +73,34 @@ export const API_PROVIDERS: Array<{
     needsKey: true,
   },
   {
+    id: "xai",
+    label: "xAI (Grok)",
+    defaultModel: "grok-2-latest",
+    defaultBaseUrl: "https://api.x.ai/v1",
+    needsKey: true,
+  },
+  {
+    id: "together",
+    label: "Together AI",
+    defaultModel: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    defaultBaseUrl: "https://api.together.xyz/v1",
+    needsKey: true,
+  },
+  {
+    id: "perplexity",
+    label: "Perplexity",
+    defaultModel: "sonar",
+    defaultBaseUrl: "https://api.perplexity.ai",
+    needsKey: true,
+  },
+  {
+    id: "cohere",
+    label: "Cohere",
+    defaultModel: "command-r-plus",
+    defaultBaseUrl: "https://api.cohere.ai/compatibility/v1",
+    needsKey: true,
+  },
+  {
     id: "ollama",
     label: "Ollama (local)",
     defaultModel: "llama3.2",
@@ -89,7 +118,6 @@ export const DEFAULT_MEMBERS: CouncilMember[] = [
     mode: "browser",
     provider: "openai",
     model: "gpt-4o",
-    apiKey: "",
     baseUrl: "https://api.openai.com/v1",
   },
   {
@@ -99,7 +127,6 @@ export const DEFAULT_MEMBERS: CouncilMember[] = [
     mode: "browser",
     provider: "gemini",
     model: "gemini-2.0-flash",
-    apiKey: "",
     baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
   },
   {
@@ -109,7 +136,6 @@ export const DEFAULT_MEMBERS: CouncilMember[] = [
     mode: "browser",
     provider: "anthropic",
     model: "claude-3-5-sonnet-20241022",
-    apiKey: "",
     baseUrl: "https://api.anthropic.com",
   },
 ];
@@ -120,9 +146,22 @@ export function loadCouncilMembers(): CouncilMember[] {
   try {
     const raw = localStorage.getItem(COUNCIL_KEY);
     if (!raw) return DEFAULT_MEMBERS;
-    const parsed = JSON.parse(raw);
-    // Merge to always have the 3 defaults
-    return Array.isArray(parsed) ? parsed : DEFAULT_MEMBERS;
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return DEFAULT_MEMBERS;
+    // Purge any legacy plaintext `apiKey` left over from before keys moved
+    // server-side; if we strip any, persist the cleaned config back to disk.
+    let hadKeys = false;
+    const cleaned = (parsed as (CouncilMember & { apiKey?: string })[]).map((m) => {
+      if (m && typeof m === "object" && "apiKey" in m) {
+        hadKeys = true;
+        const { apiKey: _drop, ...rest } = m;
+        void _drop;
+        return rest as CouncilMember;
+      }
+      return m as CouncilMember;
+    });
+    if (hadKeys) saveCouncilMembers(cleaned);
+    return cleaned;
   } catch {
     return DEFAULT_MEMBERS;
   }
@@ -140,7 +179,6 @@ export function newMember(): CouncilMember {
     mode: "api",
     provider: "deepseek",
     model: "deepseek-chat",
-    apiKey: "",
     baseUrl: "https://api.deepseek.com/v1",
   };
 }

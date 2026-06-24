@@ -15,6 +15,10 @@ import {
   CerebrasDriver,
   KimiDriver,
   CodestralDriver,
+  XaiDriver,
+  TogetherDriver,
+  PerplexityDriver,
+  CohereDriver,
   MockTransport,
   DriverRegistry,
   LlmError,
@@ -182,13 +186,22 @@ describe.each([
     provider: "codestral",
     url: "codestral.mistral.ai",
   },
+  { name: "XaiDriver", Factory: XaiDriver, provider: "xai", url: "api.x.ai" },
+  { name: "TogetherDriver", Factory: TogetherDriver, provider: "together", url: "api.together.xyz" },
+  {
+    name: "PerplexityDriver",
+    Factory: PerplexityDriver,
+    provider: "perplexity",
+    url: "api.perplexity.ai",
+  },
+  { name: "CohereDriver", Factory: CohereDriver, provider: "cohere", url: "api.cohere.ai" },
 ] as const)("$name", ({ Factory, provider, url }) => {
   let t: MockTransport;
   let d: InstanceType<typeof Factory>;
 
   beforeEach(() => {
     t = new MockTransport().setResponse(OAI_RESPONSE);
-    // @ts-ignore — all constructors accept { apiKey }
+    // @ts-expect-error — all constructors accept { apiKey }
     d = new Factory({ apiKey: "key" }, t);
   });
 
@@ -317,7 +330,7 @@ describe("GeminiDriver", () => {
 
   it("maps role: assistant → model in body", async () => {
     await d.complete(makeOpts({ messages: [{ role: "assistant", content: "hey" }] }));
-    const body = t.calls[0]!.body as { contents: Array<{ role: string }> };
+    const body = t.calls[0]!.body as { contents: { role: string }[] };
     expect(body.contents[0]!.role).toBe("model");
   });
 });

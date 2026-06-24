@@ -1,18 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
-import { Switch } from "~/components/ui/switch";
-import { Label } from "~/components/ui/label";
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "~/components/ui/collapsible";
 import {
   Settings,
   Shield,
@@ -32,7 +18,22 @@ import {
   Link2,
   MemoryStick,
 } from "lucide-react";
+import { useState, useEffect } from "react";
+
 import { STMPanel } from "~/components/STMPanel";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "~/components/ui/collapsible";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import { Switch } from "~/components/ui/switch";
 import {
   type CouncilMember,
   type MemberMode,
@@ -386,18 +387,16 @@ function MemberRow({
             />
           </div>
 
-          {/* API Key — hidden for Ollama */}
+          {/* API keys are managed centrally and encrypted server-side — see the
+              Provider Keys page (/provider-keys). Not entered per-member here. */}
           {selectedProvider?.needsKey !== false && (
-            <div className="space-y-1 col-span-2">
-              <Label className="text-xs text-muted-foreground">API Key</Label>
-              <Input
-                className="h-7 text-xs font-mono"
-                type="password"
-                placeholder="sk-..."
-                value={member.apiKey}
-                onChange={(e) => onChange({ ...member, apiKey: e.target.value })}
-              />
-            </div>
+            <p className="col-span-2 text-xs text-muted-foreground">
+              Add this provider&apos;s key on the{" "}
+              <a href="/provider-keys" className="underline">
+                Provider Keys
+              </a>{" "}
+              page.
+            </p>
           )}
 
           {/* Base URL — shown for ollama and custom */}
@@ -439,8 +438,11 @@ export default function SettingsPage() {
   const saveCouncil = () => {
     saveCouncilMembers(members);
     // Sync to electron main if running in desktop
-    if (typeof window !== "undefined" && (window as any).molecule) {
-      (window as any).molecule.setCouncilMembers(members);
+    if (typeof window !== "undefined") {
+      const molecule = (
+        window as { molecule?: { setCouncilMembers: (m: CouncilMember[]) => void } }
+      ).molecule;
+      if (molecule) molecule.setCouncilMembers(members);
     }
     setCouncilSaved(true);
     setTimeout(() => setCouncilSaved(false), 2000);
@@ -475,7 +477,22 @@ export default function SettingsPage() {
   // ── Load preferences from backend ──────────────────────────────────────────
   useEffect(() => {
     fetch("/api/settings/preferences")
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((r) =>
+        r.ok
+          ? (r.json() as Promise<{
+              autoCouncil?: boolean;
+              debateRound?: boolean;
+              coldValidator?: boolean;
+              piiDetection?: boolean;
+              autoAnonymize?: boolean;
+              blockProfanity?: boolean;
+              blockAdultContent?: boolean;
+              verbosityLevel?: string;
+              deliberationMode?: string;
+              enableStreaming?: boolean;
+            }>)
+          : Promise.reject(new Error("failed")),
+      )
       .then((data) => {
         if (data.autoCouncil !== undefined) setAutoCouncil(data.autoCouncil);
         if (data.debateRound !== undefined) setDebateRound(data.debateRound);
@@ -492,7 +509,17 @@ export default function SettingsPage() {
 
     // Load quotas from analytics overview
     fetch("/api/analytics/overview")
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((r) =>
+        r.ok
+          ? (r.json() as Promise<{
+              requestsToday?: number;
+              conversationsToday?: number;
+              requestsLimit?: number;
+              totalTokensUsed?: number;
+              tokensLimit?: number;
+            }>)
+          : Promise.reject(new Error("failed")),
+      )
       .then((data) => {
         setQuotas({
           requests: data.requestsToday ?? data.conversationsToday ?? 0,

@@ -23,6 +23,7 @@
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
+    "@nexus/agent-runtime": "workspace:*",
     "@nexus/governance": "workspace:*",
     "@nexus/memory": "workspace:*",
     "@nexus/telemetry": "workspace:*",
@@ -30,7 +31,6 @@
     "js-yaml": "^4.1.0"
   },
   "devDependencies": {
-    "@fast-check/vitest": "^0.4.1",
     "@types/js-yaml": "^4.0.9",
     "fast-check": "^3.23.2",
     "typescript": "^5.6.3",

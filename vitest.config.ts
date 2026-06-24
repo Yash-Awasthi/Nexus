@@ -90,14 +90,6 @@ export default defineConfig({
       // API server integration tests — require a running Fastify server + DB
       "apps/api/tests/routes/**",
       "apps/api/tests/server.test.ts",
-      // Property-based tests using @fast-check/vitest@^0.4.x which requires
-      // vitest ^4.x — excluded until root vitest is upgraded from 2.x
-      "packages/db/tests/schema.test.ts",
-      "packages/governance/tests/audit-log.test.ts",
-      "packages/runtime/tests/council-bridge.test.ts",
-      "packages/runtime/tests/crash-recovery.test.ts",
-      "packages/telemetry/tests/health-aggregator.test.ts",
-      "packages/telemetry/tests/slo-tracker.test.ts",
     ],
     coverage: {
       provider: "v8",

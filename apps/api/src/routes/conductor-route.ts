@@ -10,15 +10,11 @@
  *   GET  /api/gs/health          — runtime health
  *
  * The orchestrator is initialised lazily on first request so the API
- * server starts instantly even if GhostStack deps aren't warm.
+ * server starts instantly even if the runtime deps aren't warm.
  */
 
-import { createRequire } from "node:module";
-
+import { createGhostStackOrchestrator, type GhostStackOrchestrator } from "@nexus/runtime";
 import type { FastifyInstance } from "fastify";
-
-// GhostStack is CJS — load via createRequire from the ESM API host
-const _require = createRequire(import.meta.url);
 
 interface GSQueueBackend {
   getQueueLength(): Promise<number>;
@@ -27,35 +23,7 @@ interface GSQueueBackend {
   clearDeadLetterQueue(): Promise<void>;
 }
 
-interface GSOrchestrator {
-  start(): Promise<string[]>;
-  submitAndRun(
-    objective: string,
-    opts?: { maxIterations?: number; idleDelayMs?: number },
-  ): Promise<{ planId: string; allowed: boolean; reason?: string; processed: number }>;
-  getQueue(): GSQueueBackend;
-}
-
-interface GSModule {
-  ConductorOrchestrator: {
-    create(opts: {
-      runtimeManager: unknown;
-      eventBus: unknown;
-      taskRouter: unknown;
-      agentRegistry: unknown;
-      queue?: GSQueueBackend;
-    }): GSOrchestrator;
-  };
-  PlanningEngine: new () => unknown;
-  GovernanceEngine: new () => unknown;
-  TaskRouter: new (opts: { agentRegistry: unknown }) => unknown;
-  LocalAgentRegistry: new () => unknown;
-  LocalEventBus: new () => unknown;
-  RuntimeManager: new (opts: { services: Record<string, unknown> }) => unknown;
-  MemoryQueueBackend: new () => GSQueueBackend;
-}
-
-let _gs: GSOrchestrator | null = null;
+let _gs: GhostStackOrchestrator | null = null;
 let _queue: GSQueueBackend | null = null;
 let _initError: string | null = null;
 
@@ -69,24 +37,15 @@ const _jobLog: {
   finishedAt?: string;
 }[] = [];
 
-async function _getOrchestrator(): Promise<GSOrchestrator> {
+async function _getOrchestrator(): Promise<GhostStackOrchestrator> {
   if (_gs) return _gs;
   if (_initError) throw new Error(_initError);
   try {
-    const gs = _require("@nexus/conductor") as GSModule;
-    const agentRegistry = new gs.LocalAgentRegistry();
-    const eventBus = new gs.LocalEventBus();
-    const runtimeManager = new gs.RuntimeManager({ services: {} });
-    const taskRouter = new gs.TaskRouter({ agentRegistry });
-    // Share the same queue instance so status/DLQ endpoints reflect live state.
-    _queue = new gs.MemoryQueueBackend();
-    _gs = gs.ConductorOrchestrator.create({
-      runtimeManager,
-      eventBus,
-      taskRouter,
-      agentRegistry,
-      queue: _queue,
-    });
+    // Build the orchestrator from @nexus/runtime. The shared queue instance is
+    // surfaced so status/DLQ endpoints reflect live state.
+    const { orchestrator, queue } = createGhostStackOrchestrator();
+    _gs = orchestrator;
+    _queue = queue;
     await _gs.start();
     return _gs;
   } catch (e) {

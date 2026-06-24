@@ -1,7 +1,0 @@
-# GhostStack Ports Configuration
-# Defines default ports for all managed services.
-
-floci: 4566
-fcc: 8082
-mcp: 8000
-ollama: 11434

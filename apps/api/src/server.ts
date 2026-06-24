@@ -22,9 +22,11 @@ import {
 } from "@nexus/posthog-analytics";
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest } from "fastify";
 
-import { makeRateLimitPreHandler } from "./lib/rate-limiter.js";
+import { makeRateLimitPreHandler, makeUserRateLimitPreHandler } from "./lib/rate-limiter.js";
+import { requireAuth } from "./middleware/auth.js";
 import { sentryReporter } from "./lib/sentry-reporter.js";
 import { adminUsersRoutes } from "./routes/admin-users.js";
+import { adminTracesRoutes } from "./routes/admin-traces.js";
 import { adminRoutes } from "./routes/admin.js";
 import { agentsRoutes } from "./routes/agents.js";
 import { alertsRoutes } from "./routes/alerts.js";
@@ -45,6 +47,7 @@ import { corpusBuilderRoutes } from "./routes/corpus-builder.js";
 import { councilRoutes } from "./routes/council.js";
 import { docPipelineRoutes } from "./routes/doc-pipeline.js";
 import { domainFeedsRoutes } from "./routes/domain-feeds.js";
+import { driveRoutes } from "./routes/drive.js";
 import { driftRoutes } from "./routes/drift.js";
 import { evalsRoutes } from "./routes/evals.js";
 import { featureFlagsRoutes } from "./routes/feature-flags.js";
@@ -62,6 +65,7 @@ import { libertasRoutes } from "./routes/libertas.js";
 import { llmRoutes } from "./routes/llm.js";
 import { mailIngestRoutes } from "./routes/mail-ingest.js";
 import { mcpRoutes } from "./routes/mcp.js";
+import { mcpServersRoutes } from "./routes/mcp-servers.js";
 import { memoryRoutes } from "./routes/memory.js";
 import { metricsRoutes } from "./routes/metrics.js";
 import { mfaRoutes } from "./routes/mfa.js";
@@ -82,6 +86,7 @@ import { sessionSyncRoutes } from "./routes/session-sync.js";
 import { sftRoutes } from "./routes/sft.js";
 import { sseRoutes } from "./routes/sse.js";
 import { stmRoutes } from "./routes/stm.js";
+import { videoTranscriptRoutes } from "./routes/video-transcript.js";
 import { voiceRoutes } from "./routes/voice.js";
 import { wikiRoutes } from "./routes/wiki.js";
 import { workspacesRoutes } from "./routes/workspaces.js";
@@ -121,6 +126,8 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   // ── Plugins ───────────────────────────────────────────────────────────────
   // CSP: strict policy for the web app; report-only in dev (NEXUS_CSP_REPORT_ONLY=true)
+  // Security note: connectSrc includes ALLOWED_ORIGINS for SSE/CORS compatibility.
+  // In production, set ALLOWED_ORIGINS to the specific frontend origin (not wildcard).
   const cspDirectives = {
     defaultSrc: ["'self'"],
     scriptSrc: ["'self'", "'strict-dynamic'"],
@@ -130,6 +137,7 @@ export async function buildServer(): Promise<FastifyInstance> {
     fontSrc: ["'self'"],
     objectSrc: ["'none'"],
     baseUri: ["'self'"],
+    formAction: ["'self'"],
     frameAncestors: ["'none'"],
     ...(process.env.NODE_ENV === "production" ? { upgradeInsecureRequests: [] as string[] } : {}),
   };
@@ -220,9 +228,7 @@ export async function buildServer(): Promise<FastifyInstance> {
     }
   });
 
-  // ── IP-based rate limiting on high-value route groups ────────────────────────
-  // Limits are intentionally generous to avoid blocking legitimate use.
-  // Tighten per tier once tier-aware key extraction is plumbed through.
+  // ── Defense in depth: IP + per-user rate limiting on high-value route groups ──
   const _adminRL = makeRateLimitPreHandler({ limit: 30, windowMs: 60_000, keyPrefix: "admin" });
   const _billingRL = makeRateLimitPreHandler({ limit: 20, windowMs: 60_000, keyPrefix: "billing" });
   const _codeReplRL = makeRateLimitPreHandler({
@@ -232,11 +238,19 @@ export async function buildServer(): Promise<FastifyInstance> {
   });
   const _councilRL = makeRateLimitPreHandler({ limit: 30, windowMs: 60_000, keyPrefix: "council" });
 
+  // Per-user limits layered on top of IP limits
+  const _adminUserRL = makeUserRateLimitPreHandler({ limit: 50, windowMs: 60_000, keyPrefix: "admin" });
+  const _billingUserRL = makeUserRateLimitPreHandler({ limit: 100, windowMs: 60_000, keyPrefix: "billing" });
+
   app.addHook("onRequest", async (request: FastifyRequest, reply) => {
     const url = request.url;
-    if (url.startsWith("/api/v1/admin")) await _adminRL(request, reply);
-    else if (url.startsWith("/api/v1/billing")) await _billingRL(request, reply);
-    else if (url.startsWith("/api/v1/code-repl")) await _codeReplRL(request, reply);
+    if (url.startsWith("/api/v1/admin")) {
+      await _adminRL(request, reply);
+      if (!reply.sent) await _adminUserRL(request, reply);
+    } else if (url.startsWith("/api/v1/billing")) {
+      await _billingRL(request, reply);
+      if (!reply.sent) await _billingUserRL(request, reply);
+    } else if (url.startsWith("/api/v1/code-repl")) await _codeReplRL(request, reply);
     else if (url.startsWith("/api/v1/council")) await _councilRL(request, reply);
   });
 
@@ -291,6 +305,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       await api.register(scrapingMcpRoutes);
       await api.register(docPipelineRoutes);
       await api.register(mcpRoutes);
+      await api.register(mcpServersRoutes);
 
       // O — drift: adaptive sampling params + EMA feedback
       await api.register(driftRoutes);
@@ -321,6 +336,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       // Enterprise — user auth, workspaces, MFA
       await api.register(authUsersRoutes);
       await api.register(workspacesRoutes);
+      await api.register(driveRoutes);
       await api.register(mfaRoutes);
 
       // AF — Libertas: public free-tier endpoint (no auth required)
@@ -329,6 +345,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       // Enterprise — SCIM 2.0 provisioning + admin user management
       await api.register(scimRoutes);
       await api.register(adminUsersRoutes);
+      await api.register(adminTracesRoutes);
 
       // Enterprise — generic OIDC SSO (Okta, Azure AD, Keycloak, etc.)
       await api.register(oidcRoutes);
@@ -341,10 +358,16 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   // ── API-bridge routes (/api/* — no version prefix) ─────────────────────
   // Bridges legacy frontend call surface to the Nexus backend.
-  // Provides: gauntlet stream, godmode stream, A/B comparison, memory,
-  // knowledge-graph, settings, rooms, workflows, redteam, providers,
-  // and stubs for features not yet backed by packages.
-  await app.register(apiBridgeRoutes, { prefix: "/api" });
+  // Auth-gated: every /api/* route now requires a valid Bearer token.
+  // (Individual route-level auth in api-bridge.ts is retained for double-check.)
+  await app.register(
+    async (scoped) => {
+      scoped.addHook("preHandler", requireAuth);
+      await scoped.register(apiBridgeRoutes);
+      await scoped.register(videoTranscriptRoutes);
+    },
+    { prefix: "/api" },
+  );
 
   // ── Conductor orchestration routes (/api/v1/gs/*) ────────────────────────
   await app.register(

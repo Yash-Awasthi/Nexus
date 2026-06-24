@@ -7,23 +7,10 @@
  * task creation, claim/release, work stealing, and review submission.
  * All state is persisted via /api/build/tasks backend.
  */
-import { useState, useCallback, useEffect, useRef } from "react";
-import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Textarea } from "~/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "~/components/ui/dialog";
 import {
   Plus,
   RefreshCw,
   Lock,
-  Unlock,
   CheckCircle,
   Clock,
   AlertCircle,
@@ -31,15 +18,30 @@ import {
   Eye,
   Shuffle,
   Trash2,
-  ChevronRight,
   Loader2,
+  LayoutGrid,
+  Network,
 } from "lucide-react";
+import { useState, useCallback, useEffect, useRef } from "react";
+
+import { BuildGraph } from "~/components/build-graph";
+import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
+import { Textarea } from "~/components/ui/textarea";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type TaskStatus = "planned" | "claimed" | "in_progress" | "review" | "done" | "blocked";
+export type TaskStatus = "planned" | "claimed" | "in_progress" | "review" | "done" | "blocked";
 
-interface BuildTask {
+export interface BuildTask {
   id: number;
   userId: number;
   parentId: number | null;
@@ -78,40 +80,66 @@ const STATUS_ICONS: Record<TaskStatus, React.ReactNode> = {
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
-async function apiGet(path: string) {
+async function apiGet<T = unknown>(path: string): Promise<T> {
   const res = await fetch(path);
   if (!res.ok) throw new Error(`GET ${path} → ${res.status}`);
-  return res.json();
+  return res.json() as Promise<T>;
 }
 
-async function apiPost(path: string, body?: unknown) {
+async function apiPost<T = unknown>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) throw new Error(`POST ${path} → ${res.status}`);
-  return res.json();
+  return res.json() as Promise<T>;
 }
 
-async function apiPatch(path: string, body: unknown) {
+async function apiPatch<T = unknown>(path: string, body: unknown): Promise<T> {
   const res = await fetch(path, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`PATCH ${path} → ${res.status}`);
-  return res.json();
+  return res.json() as Promise<T>;
 }
 
-async function apiDelete(path: string) {
+async function apiDelete(path: string): Promise<boolean> {
   const res = await fetch(path, { method: "DELETE" });
   if (!res.ok) throw new Error(`DELETE ${path} → ${res.status}`);
   return res.ok;
 }
 
+// Loose shape of a task row as it arrives from the API (camelCase or snake_case).
+interface RawTask {
+  id: number;
+  userId?: number;
+  user_id?: number;
+  parentId?: number | null;
+  parent_id?: number | null;
+  title?: string;
+  description?: string | null;
+  status?: TaskStatus;
+  claimedBy?: string | null;
+  claimed_by?: string | null;
+  claimedAt?: string | null;
+  claimed_at?: string | null;
+  output?: string | null;
+  submittedAt?: string | null;
+  submitted_at?: string | null;
+  isLocked?: boolean;
+  is_locked?: boolean;
+  meta?: Record<string, unknown>;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
+}
+
 // Map raw API task to our interface
-function mapTask(raw: any): BuildTask {
+function mapTask(raw: RawTask): BuildTask {
   return {
     id: raw.id,
     userId: raw.userId ?? raw.user_id ?? 1,
@@ -165,6 +193,7 @@ function TaskCard({
       await apiPost(`/api/build/tasks/${task.id}/release`);
       onRefresh();
     } catch {
+      /* ignore — refresh keeps the board consistent */
     } finally {
       setLoading(false);
     }
@@ -177,6 +206,7 @@ function TaskCard({
       await apiDelete(`/api/build/tasks/${task.id}`);
       onRefresh();
     } catch {
+      /* ignore — refresh keeps the board consistent */
     } finally {
       setLoading(false);
     }
@@ -334,6 +364,7 @@ function TaskDetailPanel({
       onRefresh();
       onClose();
     } catch {
+      /* ignore — refresh keeps the board consistent */
     } finally {
       setLoading(false);
     }
@@ -351,6 +382,7 @@ function TaskDetailPanel({
       setSubtaskTitle("");
       onRefresh();
     } catch {
+      /* ignore — refresh keeps the board consistent */
     } finally {
       setLoading(false);
     }
@@ -366,6 +398,7 @@ function TaskDetailPanel({
       onRefresh();
       onClose();
     } catch {
+      /* ignore — refresh keeps the board consistent */
     } finally {
       setLoading(false);
     }
@@ -378,6 +411,7 @@ function TaskDetailPanel({
       onRefresh();
       onClose();
     } catch {
+      /* ignore — refresh keeps the board consistent */
     } finally {
       setLoading(false);
     }
@@ -523,14 +557,15 @@ export default function BuildPage() {
   const [newDesc, setNewDesc] = useState("");
   const [stealAgentId, setStealAgentId] = useState("agent-1");
   const [stealMsg, setStealMsg] = useState<string | null>(null);
+  const [view, setView] = useState<"board" | "graph">("board");
   const dragTask = useRef<BuildTask | null>(null);
 
   const loadTasks = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiGet("/api/build/tasks");
-      const list: BuildTask[] = (data.tasks ?? data.data ?? data ?? []).map(mapTask);
+      const data = await apiGet<{ tasks?: RawTask[]; data?: RawTask[] }>("/api/build/tasks");
+      const list: BuildTask[] = (data.tasks ?? data.data ?? []).map(mapTask);
       setTasks(list);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load tasks");
@@ -598,7 +633,7 @@ export default function BuildPage() {
         body: JSON.stringify({ agentId: stealAgentId }),
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as { task?: RawTask };
         const stolen = data.task ? mapTask(data.task) : null;
         if (stolen) {
           setStealMsg(`Stolen: "${stolen.title}" → claimed by ${stealAgentId}`);
@@ -648,6 +683,28 @@ export default function BuildPage() {
             </Button>
           </div>
 
+          {/* Board ↔ Graph toggle */}
+          <div className="flex items-center rounded-md border p-0.5">
+            <Button
+              size="sm"
+              variant={view === "board" ? "secondary" : "ghost"}
+              className="h-6 gap-1 text-xs px-2"
+              onClick={() => setView("board")}
+            >
+              <LayoutGrid className="w-3 h-3" />
+              Board
+            </Button>
+            <Button
+              size="sm"
+              variant={view === "graph" ? "secondary" : "ghost"}
+              className="h-6 gap-1 text-xs px-2"
+              onClick={() => setView("graph")}
+            >
+              <Network className="w-3 h-3" />
+              Graph
+            </Button>
+          </div>
+
           <Button
             size="sm"
             variant="outline"
@@ -677,11 +734,13 @@ export default function BuildPage() {
 
       {/* Board + Detail */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Kanban */}
+        {/* Board / Graph */}
         {loading && tasks.length === 0 ? (
           <div className="flex-1 flex items-center justify-center">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
+        ) : view === "graph" ? (
+          <BuildGraph tasks={tasks} onSelect={(t) => setSelectedTask(t)} />
         ) : (
           <div className="flex gap-3 p-4 overflow-x-auto flex-1">
             {COLUMNS.map((col) => (

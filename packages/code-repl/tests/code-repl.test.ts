@@ -6,6 +6,8 @@ import {
   KernelSession,
   SessionReaper,
   KernelManager,
+  DockerReplExecutor,
+  buildDockerRunArgs,
   type ReplLanguage,
 } from "../src/index.js";
 
@@ -284,11 +286,81 @@ describe("KernelManager", () => {
     expect(() => manager.create("python")).not.toThrow();
   });
 
-  it("create supports all 3 languages", () => {
-    const langs: ReplLanguage[] = ["python", "r", "julia"];
+  it("create supports all 4 languages", () => {
+    const big = new KernelManager({ executor: new MockReplExecutor(), maxSessions: 10 });
+    const langs: ReplLanguage[] = ["python", "r", "julia", "shell"];
     for (const lang of langs) {
-      const session = manager.create(lang);
+      const session = big.create(lang);
       expect(session.language).toBe(lang);
     }
+  });
+});
+
+// ── Shell sandbox (Track B) ─────────────────────────────────────────────────────
+
+describe("JupyterMode.wrap — shell", () => {
+  it("runs shell commands verbatim (no last-expression echo)", () => {
+    const code = "uname -a && ls /";
+    expect(JupyterMode.wrap(code, "shell")).toBe(code);
+  });
+});
+
+describe("buildDockerRunArgs — isolation policy", () => {
+  const baseLimits = {
+    memoryLimit: "512m",
+    cpuLimit: "0.5",
+    networkMode: "none",
+    pidsLimit: 128,
+    readonlyRootfs: false,
+    tmpfsSizeMb: 0,
+    user: "",
+  };
+
+  it("enforces a hard 512MB memory cap (memory + memory-swap) and no network", () => {
+    const args = buildDockerRunArgs("python", baseLimits);
+    expect(args).toContain("--memory=512m");
+    expect(args).toContain("--memory-swap=512m"); // swap disabled → hard cap
+    expect(args).toContain("--network=none");
+    expect(args).toContain("--cap-drop=ALL");
+    expect(args).toContain("--no-new-privileges");
+    expect(args).toContain("--pids-limit=128");
+  });
+
+  it("fully locks down the shell language (non-root, read-only rootfs, tmpfs /tmp)", () => {
+    const shellLimits = {
+      ...baseLimits,
+      readonlyRootfs: true,
+      tmpfsSizeMb: 64,
+      user: "65534:65534",
+    };
+    const args = buildDockerRunArgs("shell", shellLimits);
+    expect(args).toContain("--user=65534:65534");
+    expect(args).toContain("--read-only");
+    expect(args).toContain("--tmpfs=/tmp:rw,nosuid,nodev,size=64m");
+    // shell image + stdin script delivery
+    const imageIdx = args.findIndex((a) => a.startsWith("alpine"));
+    expect(imageIdx).toBeGreaterThan(0);
+    expect(args.slice(imageIdx + 1)).toEqual(["/bin/sh", "-s"]);
+  });
+
+  it("does not apply read-only/user lockdown to the interpreter languages", () => {
+    const args = buildDockerRunArgs("python", baseLimits);
+    expect(args).not.toContain("--read-only");
+    expect(args.some((a) => a.startsWith("--user="))).toBe(false);
+  });
+});
+
+describe("DockerReplExecutor.resolveLimits", () => {
+  it("hardens shell but not python", () => {
+    const exec = new DockerReplExecutor();
+    expect(exec.resolveLimits("shell").readonlyRootfs).toBe(true);
+    expect(exec.resolveLimits("shell").user).toBe("65534:65534");
+    expect(exec.resolveLimits("python").readonlyRootfs).toBe(false);
+    expect(exec.resolveLimits("python").user).toBe("");
+  });
+
+  it("honours a custom memory limit", () => {
+    const exec = new DockerReplExecutor({ memoryLimit: "256m" });
+    expect(exec.resolveLimits("shell").memoryLimit).toBe("256m");
   });
 });

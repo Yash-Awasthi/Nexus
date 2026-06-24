@@ -20,7 +20,9 @@ services:
   # ── Infrastructure ──────────────────────────────────────────────────────────
 
   postgres:
-    image: postgres:16-alpine
+    # pgvector/pgvector ships Postgres 16 + the `vector` extension (migration 0002
+    # runs CREATE EXTENSION vector). Stock postgres:16-alpine lacks it.
+    image: pgvector/pgvector:pg16
     container_name: nexus-postgres
     restart: unless-stopped
     environment:

@@ -13,5 +13,8 @@
   "devDependencies": {
     "vitest": "*",
     "typescript": "*"
+  },
+  "dependencies": {
+    "playwright-core": "^1.49.0"
   }
 }
