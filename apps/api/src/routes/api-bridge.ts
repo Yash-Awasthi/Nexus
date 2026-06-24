@@ -3347,7 +3347,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
         "Use 'done' when the goal is achieved. Keep selectors simple and robust.",
     );
     const hist = history.map((s) => `- ${s.action} ${s.target ?? ""} (${s.success ? "ok" : "fail"})`).join("\n");
-    const safeText = String(pageText ?? "");
+    const safeText = pageText ?? "";
     const usr = userMsg(
       `GOAL: ${task}\n\nCURRENT URL: ${pageUrl}\nTITLE: ${pageTitle}\n\nVISIBLE TEXT (truncated):\n${safeText.slice(0, 2000)}\n\nHISTORY:\n${hist || "(none)"}\n\nNext action as JSON:`,
     );
@@ -3362,7 +3362,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
           messages: [sys, usr],
           maxTokens: 400,
         });
-        raw = String(r.content ?? "").trim();
+        raw = (r.content ?? "").trim();
       } catch {
         raw = "";
       }
@@ -3613,7 +3613,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
       const triggers = detectTriggers(text, []);
       return reply.send({
         flagged: triggers.length > 0,
-        patterns: triggers.map((t) => ({ name: String(t), risk: "low" as const })),
+        patterns: triggers.map((t) => ({ name: t, risk: "low" as const })),
       });
     },
   );
@@ -5533,7 +5533,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
               ? Math.round((1 - result.transformed.length / result.original.length) * 100)
               : 0,
           truncated: result.truncated,
-          modules: result.modules.map((m) => ({ id: (m as any).moduleId ?? m, applied: true })),
+          modules: result.modules.map((m) => ({ id: m.moduleId, applied: true })),
         });
       } catch (err) {
         return reply.code(500).send({ error: err instanceof Error ? err.message : String(err) });
@@ -8977,14 +8977,14 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
         "INSERT INTO prompts (name, description) VALUES ($1, $2) RETURNING *",
         [name.trim(), description ?? null],
       );
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const p = pRows.rows[0] as any;
+       
+      const p = pRows.rows[0] as Record<string, unknown>;
       const vRows = await pool.query(
         "INSERT INTO prompt_versions (prompt_id, version_num, content) VALUES ($1, 1, $2) RETURNING *",
         [p.id, defaultContent],
       );
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const v = vRows.rows[0] as any;
+       
+      const v = vRows.rows[0] as Record<string, unknown>;
       return reply.code(201).send(_promptRow(p, [v]));
     },
   );
@@ -8993,8 +8993,8 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     const pool = _getPool();
     if (!pool) return reply.code(503).send({ error: "DB unavailable" });
     const pResult = await pool.query("SELECT * FROM prompts WHERE id=$1", [request.params.id]);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const p = pResult.rows[0] as any;
+     
+    const p = pResult.rows[0] as Record<string, unknown>;
     if (!p) return reply.code(404).send({ error: "not found" });
     const { rows: versions } = await pool.query(
       "SELECT * FROM prompt_versions WHERE prompt_id=$1 ORDER BY version_num DESC",
@@ -9010,35 +9010,35 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     const pool = _getPool();
     if (!pool) return reply.code(503).send({ error: "DB unavailable" });
     const pResult = await pool.query("SELECT * FROM prompts WHERE id=$1", [request.params.id]);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const p = pResult.rows[0] as any;
+     
+    const p = pResult.rows[0] as Record<string, unknown>;
     if (!p) return reply.code(404).send({ error: "not found" });
     const { content = "", model = null, temperature = null } = request.body ?? {};
     const maxResult = await pool.query(
       "SELECT COALESCE(MAX(version_num), 0) AS max FROM prompt_versions WHERE prompt_id=$1",
       [p.id],
     );
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-    const nextNum = (Number((maxResult.rows[0] as any)?.max) || 0) + 1;
+     
+    const nextNum = (Number((maxResult.rows[0] as Record<string, unknown>)?.max) || 0) + 1;
     const vResult = await pool.query(
       "INSERT INTO prompt_versions (prompt_id, version_num, content, model, temperature) VALUES ($1, $2, $3, $4, $5) RETURNING *",
       [p.id, nextNum, content, model, temperature],
     );
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const v = vResult.rows[0] as any;
+     
+    const v = vResult.rows[0] as Record<string, unknown>;
     await pool.query("UPDATE prompts SET updated_at=NOW() WHERE id=$1", [p.id]);
     return reply.send({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+       
       id: v.id,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+       
       versionNum: v.version_num,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+       
       content: v.content,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+       
       model: v.model ?? null,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+       
       temperature: v.temperature != null ? Number(v.temperature) : null,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+       
       createdAt: new Date(v.created_at as string).toISOString(),
     });
   });
@@ -9052,7 +9052,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
 
   // ── Contacts CRUD ────────────────────────────────────────────────────────────
 
-  const _contacts: Array<{ id: string; name: string; email: string; company?: string; notes?: string; createdAt: string }> = [];
+  const _contacts: { id: string; name: string; email: string; company?: string; notes?: string; createdAt: string }[] = [];
   app.get("/contacts", async (_request, reply) => {
     return reply.send({ contacts: _contacts });
   });
@@ -9123,7 +9123,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   // ── Admin traces (legacy /api/traces alias) ────────────────────────────────
   // Frontend admin-traces.tsx calls /api/traces. Returns in-memory store.
 
-  const _tracesStore: Array<{ id: string; method: string; path: string; status: number; durationMs: number; userId?: string; createdAt: string }> = [];
+  const _tracesStore: { id: string; method: string; path: string; status: number; durationMs: number; userId?: string; createdAt: string }[] = [];
 
   app.get<{ Querystring: { page?: string; limit?: string; type?: string } }>(
     "/traces",

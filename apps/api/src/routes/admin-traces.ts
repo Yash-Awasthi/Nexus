@@ -10,6 +10,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+
 import type { FastifyInstance } from "fastify";
 
 import { requireAuthWithTier } from "../middleware/auth.js";

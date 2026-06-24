@@ -109,6 +109,7 @@ function runCommand(
           auditLog("finished", { exitCode: result.exitCode, timedOut: result.timedOut, sandbox: "docker" });
           const out = (result.stdout + (result.stderr ? `\n${result.stderr}` : "")).trim();
           resolve(clip(out || `[exit ${result.exitCode}]`, maxOut));
+          return;
         })
         .catch((err: Error) => {
           auditLog("error", { error: err.message, sandbox: "docker" });

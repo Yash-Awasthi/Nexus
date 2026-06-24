@@ -30,13 +30,13 @@ import {
 } from "@nexus/agent-runtime";
 import { db } from "@nexus/db";
 import { agentSessions } from "@nexus/db/schema";
-import { GroqEmbedder, MemoryManager, PgVectorStore } from "@nexus/memory";
 import {
   AnthropicDriver,
   GroqDriver,
   OpenRouterDriver,
   type LlmDriver,
 } from "@nexus/llm-drivers";
+import { GroqEmbedder, MemoryManager, PgVectorStore } from "@nexus/memory";
 import { eq } from "drizzle-orm";
 
 import { publishAgentEvent } from "./agent-events.js";

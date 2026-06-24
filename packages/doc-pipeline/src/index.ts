@@ -383,7 +383,7 @@ export interface DocIngestTask {
 }
 
 async function execute(task: DocIngestTask, ctx: IExecutionContext): Promise<PipelineResult> {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+   
   ctx.logger.info("doc.ingest", {
     format: task.format,
     contentLength: task.content.length,
@@ -402,7 +402,7 @@ async function execute(task: DocIngestTask, ctx: IExecutionContext): Promise<Pip
 }
 
 /** Doc pipeline adapter. */
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+ 
 export const docPipelineAdapter = defineAdapter<DocIngestTask, PipelineResult>({
   name: "nexus-adapter-doc-pipeline",
   version: "0.1.0",

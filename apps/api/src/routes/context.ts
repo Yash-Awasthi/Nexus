@@ -34,8 +34,6 @@ import {
 } from "@nexus/context-pack";
 import { db } from "@nexus/db";
 import { runtimeTasks, signals } from "@nexus/db/schema";
-import { desc, or, eq } from "drizzle-orm";
-import type { FastifyInstance } from "fastify";
 import {
   FixedEmbedder,
   GroqEmbedder,
@@ -43,6 +41,8 @@ import {
   MemoryManager,
   PgVectorStore,
 } from "@nexus/memory";
+import { desc, or, eq } from "drizzle-orm";
+import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
 

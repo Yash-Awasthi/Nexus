@@ -34,7 +34,7 @@ import { globalBus, formatSseEvent, formatPing, type SseEvent } from "@nexus/sse
 import type { FastifyInstance } from "fastify";
 
 import { startAgentEventsBridge, stopAgentEventsBridge } from "../lib/agent-events-bridge.js";
-import { requireAuth, requireAuthWithTier } from "../middleware/auth.js";
+import { requireAuthWithTier } from "../middleware/auth.js";
 
 const PING_INTERVAL_MS = 20_000;
 

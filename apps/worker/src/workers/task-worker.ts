@@ -30,7 +30,6 @@ import { type ConnectionOptions, Worker, type Job } from "bullmq";
 import { eq } from "drizzle-orm";
 
 import { handleAgentRunJob, type AgentRunPayload } from "../handlers/agent-handler.js";
-import { handleDriveExecJob, type DriveExecPayload } from "../handlers/drive-handler.js";
 import {
   handleWikiReconcileJob,
   handleCorpusBuildJob,
@@ -46,6 +45,7 @@ import {
   type SearchReindexPayload,
 } from "../handlers/async-handlers.js";
 import { handleCouncilJob, type CouncilJobPayload } from "../handlers/council-handler.js";
+import { handleDriveExecJob, type DriveExecPayload } from "../handlers/drive-handler.js";
 import { handleIngestJob, type IngestJobPayload } from "../handlers/ingest-handler.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
