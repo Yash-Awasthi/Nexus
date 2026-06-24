@@ -16,10 +16,6 @@
       "Bash(git branch:*)",
       "Bash(docker compose:*)"
     ],
-    "deny": [
-      "Bash(git push:*)",
-      "Read(.env)",
-      "Read(.env.*)"
-    ]
+    "deny": ["Bash(git push:*)", "Read(.env)", "Read(.env.*)"]
   }
 }

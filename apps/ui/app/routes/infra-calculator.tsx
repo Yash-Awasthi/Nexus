@@ -439,7 +439,10 @@ export default function InfraCalculator() {
         <GlowOrbs />
         <FadeIn>
           <div className="mb-4">
-            <Badge variant="outline" className="border-amber-500/30 text-amber-600 dark:text-amber-400">
+            <Badge
+              variant="outline"
+              className="border-amber-500/30 text-amber-600 dark:text-amber-400"
+            >
               <AlertTriangle className="w-3 h-3 mr-1" /> Client-side estimates — reference only
             </Badge>
           </div>

@@ -23,7 +23,7 @@ empty / error locally.
 
 **Decision:** add formal SQL migrations for all three tables so local dev and any
 fresh deploy work. Tables are addressed by raw SQL, so a drizzle schema object is
-*not* required, but we add migrations matching the columns the route code already
+_not_ required, but we add migrations matching the columns the route code already
 expects (inferred from the `INSERT`/`SELECT`/`_btRow`/`_promptRow` code).
 
 Current highest migration: `0008_provider_credentials_metadata`. New numbers below.
@@ -33,6 +33,7 @@ Current highest migration: `0008_provider_credentials_metadata`. New numbers bel
 ## Feature 1 — Prompt Versioning UI
 
 **Backend: already complete.** Route prefix `/api` (no auth), in `api-bridge.ts`:
+
 - `GET /api/prompts` → `{ prompts: Prompt[] }` (each includes `versions[]`, newest-first)
 - `POST /api/prompts` → create prompt (`{ name, description?, content? }`)
 - `GET /api/prompts/:id` → single `Prompt` with full `versions[]`
@@ -48,14 +49,15 @@ Shapes (from `_promptRow`, api-bridge.ts:8101):
 view, or restore** past versions.
 
 ### Tasks
+
 1. **Migration `0009_prompts_and_build_tasks.sql`** (+ `_journal.json` idx 9):
    `CREATE TABLE IF NOT EXISTS prompts(...)`, `prompt_versions(...)` (FK →
    `prompts(id) ON DELETE CASCADE`, `version_num int`, `content text`, `model text`,
    `temperature numeric`, timestamps) **and** `build_tasks(...)` (see Feature 2 — one
    migration covers both raw-pool tables). Columns exactly match the SQL in
    api-bridge.ts (`build_tasks`: `id serial pk, user_id, parent_id, title, description,
-   status, claimed_by, claimed_at, output, submitted_at, is_locked, meta jsonb,
-   created_at, updated_at`).
+status, claimed_by, claimed_at, output, submitted_at, is_locked, meta jsonb,
+created_at, updated_at`).
 2. **`prompts.tsx` — Version History drawer.** Add a "History" button (lucide
    `History`) opening a `Sheet` (`~/components/ui/sheet`) on the right:
    - Scrollable list of `selectedPrompt.versions` — `Badge` for `v{versionNum}`,
@@ -63,7 +65,7 @@ view, or restore** past versions.
    - **View**: opens read-only content (reuse a `Dialog` or load into editor as
      read-only preview).
    - **Restore**: `POST /api/prompts/:id/versions` with the old version's
-     `{ content, model, temperature }` → creates a *new* version (non-destructive),
+     `{ content, model, temperature }` → creates a _new_ version (non-destructive),
      then refetch detail. (Matches existing "save = new version" semantics.)
 3. (Defer) Monaco diff view between two versions — nice-to-have, not in v1.
 
@@ -87,6 +89,7 @@ child structure is invisible except a "sub" badge inside the detail panel.
 dependency.
 
 ### Tasks
+
 1. **View toggle** on build.tsx header: "Board" (existing Kanban) ↔ "Graph".
 2. **Graph view** with `@xyflow/react`:
    - One node per task; **edge parent→child** via `parentId`.
@@ -116,6 +119,7 @@ invocation against the hardcoded scraping server. **No MCP UI exists.**
 (`initialize()`, `listTools()`, `callTool()`), reusable for the "test connection" path.
 
 ### Tasks
+
 1. **DB schema** `packages/db/src/schema/mcp-servers.ts` (drizzle, mirror
    `user-provider-credentials.ts` style). Table `mcp_servers`: `id uuid pk`,
    `userId uuid notNull`, `name text notNull`, `description text`,
@@ -174,6 +178,7 @@ commit if Docker isn't available in this environment — it currently isn't, so
 migrations are authored but applied later).
 
 ## Risks / notes
+
 - **Raw-pool tables vs drizzle:** migrations 0009/0010 are hand-written SQL (repo
   convention); the build/prompts code keeps using the raw `pg.Pool`. Don't try to route
   those through drizzle — out of scope.

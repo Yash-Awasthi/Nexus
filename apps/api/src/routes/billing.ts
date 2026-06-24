@@ -531,7 +531,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
           planId: sub.plan,
           status: sub.status,
           currentPeriodEnd: sub.currentPeriodEnd
-            ? new Date(sub.currentPeriodEnd as unknown as number * 1000).toISOString()
+            ? new Date((sub.currentPeriodEnd as unknown as number) * 1000).toISOString()
             : undefined,
           cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
           stripeCustomerId: sub.stripeCustomerId,
@@ -550,7 +550,14 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
       const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString();
       if (!DB_AVAILABLE) {
-        return reply.send({ requests: 0, tokensIn: 0, tokensOut: 0, cost: 0, periodStart, periodEnd });
+        return reply.send({
+          requests: 0,
+          tokensIn: 0,
+          tokensOut: 0,
+          cost: 0,
+          periodStart,
+          periodEnd,
+        });
       }
       try {
         const { db: billingDb } = await import("@nexus/db");

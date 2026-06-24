@@ -17,11 +17,7 @@ export interface IMemoryEntry {
 }
 
 export interface IMemoryStore {
-  search(
-    embedding: number[],
-    k: number,
-    filter?: Record<string, unknown>,
-  ): Promise<IMemoryEntry[]>;
+  search(embedding: number[], k: number, filter?: Record<string, unknown>): Promise<IMemoryEntry[]>;
 }
 
 export interface RagtimeConfig {
@@ -41,7 +37,9 @@ export interface RagtimeConfig {
 
 function cosineSim(a: number[], b: number[]): number {
   if (a.length === 0 || b.length === 0) return 0;
-  let dot = 0, na = 0, nb = 0;
+  let dot = 0,
+    na = 0,
+    nb = 0;
   for (let i = 0; i < Math.min(a.length, b.length); i++) {
     dot += a[i]! * b[i]!;
     na += a[i]! * a[i]!;
@@ -54,7 +52,12 @@ function cosineSim(a: number[], b: number[]): number {
 function recencyDecay(entry: IMemoryEntry, halfLifeMs: number): number {
   const ts = entry.createdAt;
   if (!ts) return 0.5;
-  const t = ts instanceof Date ? ts.getTime() : typeof ts === "string" ? new Date(ts).getTime() : Number(ts);
+  const t =
+    ts instanceof Date
+      ? ts.getTime()
+      : typeof ts === "string"
+        ? new Date(ts).getTime()
+        : Number(ts);
   const ageMs = Date.now() - t;
   return Math.pow(0.5, ageMs / halfLifeMs);
 }
@@ -92,7 +95,7 @@ export class RagtimeRetriever {
     const { alpha, beta, gamma, halfLifeMs, finalK } = this.cfg;
     const k = Math.min(limit, finalK);
 
-    const scored = pool.map(entry => {
+    const scored = pool.map((entry) => {
       const relevance = entry.embedding
         ? (cosineSim(queryEmbedding, entry.embedding) + 1) / 2
         : 0.5;
@@ -103,6 +106,6 @@ export class RagtimeRetriever {
     });
 
     scored.sort((a, b) => b.score - a.score);
-    return scored.slice(0, k).map(s => s.entry);
+    return scored.slice(0, k).map((s) => s.entry);
   }
 }

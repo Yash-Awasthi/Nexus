@@ -101,7 +101,9 @@ class LlmDriversTransport implements ILLMTransport {
 // ── Per-user council service (strict BYOK) ──────────────────────────────────────
 
 /** Distinct providers any council model alias can route to. */
-const COUNCIL_PROVIDERS = [...new Set(Object.values(COUNCIL_DRIVER_ALIASES).map((a) => a.provider))];
+const COUNCIL_PROVIDERS = [
+  ...new Set(Object.values(COUNCIL_DRIVER_ALIASES).map((a) => a.provider)),
+];
 
 /** Raised when the authenticated user has no key for the active council provider. */
 class NoCouncilKeyError extends Error {}

@@ -187,7 +187,12 @@ describe.each([
     url: "codestral.mistral.ai",
   },
   { name: "XaiDriver", Factory: XaiDriver, provider: "xai", url: "api.x.ai" },
-  { name: "TogetherDriver", Factory: TogetherDriver, provider: "together", url: "api.together.xyz" },
+  {
+    name: "TogetherDriver",
+    Factory: TogetherDriver,
+    provider: "together",
+    url: "api.together.xyz",
+  },
   {
     name: "PerplexityDriver",
     Factory: PerplexityDriver,

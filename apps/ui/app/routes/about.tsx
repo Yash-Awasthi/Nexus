@@ -166,9 +166,9 @@ export default function About() {
             NEXUS
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-xl leading-relaxed text-muted-foreground">
-            Multi-agent AI orchestration platform. From a single prompt to a self-coordinating
-            swarm — with 15 LLM providers, multi-model council deliberation, sandboxed code
-            execution, and long-term vector memory.
+            Multi-agent AI orchestration platform. From a single prompt to a self-coordinating swarm
+            — with 15 LLM providers, multi-model council deliberation, sandboxed code execution, and
+            long-term vector memory.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Button size="lg" asChild>
@@ -220,11 +220,10 @@ export default function About() {
               <code className="rounded bg-muted px-1.5 py-0.5 text-sm font-mono text-foreground">
                 Promise.allSettled
               </code>
-              , manages long-term memory in pgvector with graph-based retrieval, executes
-              sandboxed code across 8 languages, ingests data from 16 global domain feeds, and
-              processes documents through a full extract → classify → OCR → index pipeline. The
-              Fastify API has 61 route modules. The React UI has 100+ routes all wired to real
-              backends.
+              , manages long-term memory in pgvector with graph-based retrieval, executes sandboxed
+              code across 8 languages, ingests data from 16 global domain feeds, and processes
+              documents through a full extract → classify → OCR → index pipeline. The Fastify API
+              has 61 route modules. The React UI has 100+ routes all wired to real backends.
             </p>
           </div>
         </FadeIn>

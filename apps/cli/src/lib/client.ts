@@ -45,5 +45,6 @@ export const api = {
   /** Absolute URL for a versioned path — used for SSE streaming (raw fetch). */
   sseUrl: (path: string) => `${BASE_URL}/api/v1${path}`,
   /** Auth headers to attach to a raw fetch (e.g. SSE), if a key is configured. */
-  authHeaders: (): Record<string, string> => (API_KEY ? { Authorization: `Bearer ${API_KEY}` } : {}),
+  authHeaders: (): Record<string, string> =>
+    API_KEY ? { Authorization: `Bearer ${API_KEY}` } : {},
 };

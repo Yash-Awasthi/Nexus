@@ -273,7 +273,11 @@ function toAnthropicMessages(messages: LlmMessage[]): {
 /** Tool definitions → Anthropic `tools` array. */
 function toAnthropicTools(tools?: LlmToolDefinition[]): Record<string, unknown>[] | undefined {
   if (!tools?.length) return undefined;
-  return tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters }));
+  return tools.map((t) => ({
+    name: t.name,
+    description: t.description,
+    input_schema: t.parameters,
+  }));
 }
 
 // ── Base driver ────────────────────────────────────────────────────────────────

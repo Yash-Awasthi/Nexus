@@ -33,26 +33,26 @@ native provider tool-calling.
 
 ## Reuse map — what exists vs. what's a gap
 
-| Harness capability | Nexus today | Action |
-|---|---|---|
-| Agent loop | `@nexus/agent-runtime` (real, **unwired**) | Wire it; fix maxSteps, add message history, native tool-calling |
-| Tool dispatch | `@nexus/tool-registry` (typed JSON-schema, live in `gateway.ts`) | Bridge into the loop |
-| File-edit primitives | `packages/runtime/src/code-agent-pool.ts` CodeEditor (real disk writes + **path-traversal guard**) | Convert single-shot agents → loop *tools* |
-| MCP | `@nexus/mcp-client` + per-user encrypted registry (`routes/mcp-servers.ts`) + inbound server (`routes/mcp.ts`) | Wrap `McpClient.callTool()` as loop tools |
-| Shell / exec | `@nexus/sandbox` (Docker `--network=none --cap-drop=ALL`), `@nexus/code-repl` | Wrap `executeCode` as a `run_command` tool |
-| Multi-model quality | council / gauntlet / consortium / best-of-n / multi-reviewer (mature) | Use as gates, not default-on (token cost) |
-| Job substrate | `apps/worker` BullMQ priority queues + `IExecutionAdapter` seam (`task-executor.ts`) | Run agent sessions as `agent.run` jobs |
-| Governance | `GovernanceEngine` (allow/deny + approval gates) | Gate dangerous tool calls |
-| Parallel / worktree isolation | — | **Gap** → Conductor model + Nexus Drive |
-| Learning loop (skills/memory) | file memory exists | **Gap** → hermes-style forked background review |
-| CLI front-end | `apps/cli` (no `nexus code`) | **Gap** → add `nexus code <task>` |
-| True sandbox | Docker only; self-documents gVisor/Firecracker "not yet implemented" | Nexus Drive Firecracker spike (separate initiative) |
+| Harness capability            | Nexus today                                                                                                    | Action                                                          |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Agent loop                    | `@nexus/agent-runtime` (real, **unwired**)                                                                     | Wire it; fix maxSteps, add message history, native tool-calling |
+| Tool dispatch                 | `@nexus/tool-registry` (typed JSON-schema, live in `gateway.ts`)                                               | Bridge into the loop                                            |
+| File-edit primitives          | `packages/runtime/src/code-agent-pool.ts` CodeEditor (real disk writes + **path-traversal guard**)             | Convert single-shot agents → loop _tools_                       |
+| MCP                           | `@nexus/mcp-client` + per-user encrypted registry (`routes/mcp-servers.ts`) + inbound server (`routes/mcp.ts`) | Wrap `McpClient.callTool()` as loop tools                       |
+| Shell / exec                  | `@nexus/sandbox` (Docker `--network=none --cap-drop=ALL`), `@nexus/code-repl`                                  | Wrap `executeCode` as a `run_command` tool                      |
+| Multi-model quality           | council / gauntlet / consortium / best-of-n / multi-reviewer (mature)                                          | Use as gates, not default-on (token cost)                       |
+| Job substrate                 | `apps/worker` BullMQ priority queues + `IExecutionAdapter` seam (`task-executor.ts`)                           | Run agent sessions as `agent.run` jobs                          |
+| Governance                    | `GovernanceEngine` (allow/deny + approval gates)                                                               | Gate dangerous tool calls                                       |
+| Parallel / worktree isolation | —                                                                                                              | **Gap** → Conductor model + Nexus Drive                         |
+| Learning loop (skills/memory) | file memory exists                                                                                             | **Gap** → hermes-style forked background review                 |
+| CLI front-end                 | `apps/cli` (no `nexus code`)                                                                                   | **Gap** → add `nexus code <task>`                               |
+| True sandbox                  | Docker only; self-documents gVisor/Firecracker "not yet implemented"                                           | Nexus Drive Firecracker spike (separate initiative)             |
 
 ---
 
 ## Borrowed architecture (ideas only; map to Nexus)
 
-- **hermes-agent → Programmatic Tool Calling (PTC).** The model writes *one* script that calls
+- **hermes-agent → Programmatic Tool Calling (PTC).** The model writes _one_ script that calls
   tools over RPC; **only stdout returns to context** — a 20-step pipeline collapses into one
   turn at near-zero context cost. Highest-leverage token saver. Also: forked background
   memory/skill review (reuses warm prompt cache), summary-only subagent delegation with a hard
@@ -60,15 +60,15 @@ native provider tool-calling.
   `ProviderProfile` pattern for BYOK. (MIT — adaptable with attribution.)
 - **conductor.build → "workspace = git worktree = unit of delegation; branch/PR = unit of
   integration."** Each parallel agent gets its own worktree + branch + **PORT range** + context;
-  no central scheduler — *decomposition is the orchestration*. Lifecycle hooks
+  no central scheduler — _decomposition is the orchestration_. Lifecycle hooks
   (`setup`/`run`/`archive`) as committed config; merge-gating on aggregated checks. Maps onto
   **Nexus Drive**. (Closed-source; ideas only.)
 - **g0dm0d3 → race-with-early-exit + synthesize-reducer + EMA AutoTune.** Already maps onto
-  Nexus gauntlet/consortium/drift; adopt the *patterns* (wave-staggered launch, `minResults` +
+  Nexus gauntlet/consortium/drift; adopt the _patterns_ (wave-staggered launch, `minResults` +
   grace + AbortController early-exit, `ParamDelta` transparency, a scorer-calibration test
   harness). **AGPL-3.0 — never copy code; clean-room from description only.** Its jailbreak
   layer (godmode prompt, Parseltongue) is **out of scope**.
-- **jcode** (Rust harness) — swarm primitives are *already partially in* `agent-runtime`. Full
+- **jcode** (Rust harness) — swarm primitives are _already partially in_ `agent-runtime`. Full
   inspection still pending (the inspector hit a rate-limit cap during research).
 
 ---
@@ -76,7 +76,9 @@ native provider tool-calling.
 ## Phased build plan
 
 ### Phase 0 — Wire the loop (highest value, lowest risk)
+
 Promote `AgentRuntime` to a first-class executor.
+
 - Implement an `IExecutionAdapter` (`canExecute`/`execute`, see `task-executor.ts`) that runs
   `AgentRuntime.run()` for `code*` task types — replacing single-shot `CodeAgentPool` dispatch.
 - Add a BullMQ `agent.run` job in `apps/worker` and stream progress over the existing SSE bus.
@@ -97,7 +99,9 @@ Promote `AgentRuntime` to a first-class executor.
 > for live step streaming.
 
 ### Phase 1 — Tools
+
 Give the loop real capabilities.
+
 - Bridge `@nexus/tool-registry` tools into `RuntimeToolSet`.
 - `edit_file` (reuse CodeEditor's apply + path-traversal guard), `find_files`, `read_file`.
 - `run_command` wrapping `@nexus/sandbox` (Docker runner).
@@ -105,8 +109,10 @@ Give the loop real capabilities.
 - **DoD:** the agent can locate, read, edit, run, and call external MCP tools.
 
 ### Phase 2 — Sessions, permissions & compaction
+
 Concrete design from jcode (`crates/jcode-base/src/safety.rs`, `jcode-compaction-core`,
 `jcode-session-types`); see `~/.cache/harness-research/_jcode_conductor_findings.md`.
+
 - **Permission gate (two-tier).** `ActionTier::{AutoAllowed, RequiresPermission}`. Auto-allow the
   read-only allowlist (`read, glob, grep, ls, list_files, memory, todo*, *_search`); everything
   that mutates (`write_file, edit_file, run_command`, MCP calls) requires approval. Back it with
@@ -123,7 +129,9 @@ Concrete design from jcode (`crates/jcode-base/src/safety.rs`, `jcode-compaction
 - **DoD:** sessions resume; mutating ops require approval; long sessions compact instead of 4xx-ing.
 
 ### Phase 3 — Parallel orchestration (Conductor model)
+
 Concrete config contract from Conductor docs (verbatim in the findings doc).
+
 - Worktree-backed workspaces: per-agent git worktree off `origin/<base>` **after a fetch**,
   one-branch-one-worktree; converges with **Nexus Drive**.
 - **`.nexus/settings.toml`** mirroring `.conductor/settings.toml`: `[scripts] setup/run/archive` +
@@ -138,11 +146,13 @@ Concrete config contract from Conductor docs (verbatim in the findings doc).
 - **DoD:** N agents run in parallel on isolated worktrees; results return via branch/PR.
 
 ### Phase 4 — Learning loop + PTC
+
 - Forked background pass proposing `MEMORY.md`/skill updates (reuse warm cache or a digest).
 - PTC: expose the tool layer to a sandboxed child over local RPC; only stdout returns.
 - **DoD:** the harness captures skills/memory autonomously and collapses pipelines via PTC.
 
 ### Front-end (parallelizable with Phase 1+)
+
 - Add `nexus code <task>` to `apps/cli` (currently HTTP-client only, no agent command).
 
 ---
@@ -164,6 +174,7 @@ Concrete config contract from Conductor docs (verbatim in the findings doc).
 ---
 
 ## References
+
 - Reference clones: `~/.cache/harness-research/{jcode,hermes-agent,g0dm0d3,ponytail,caveman}`
 - **Phase 2/3 source-level findings: `~/.cache/harness-research/_jcode_conductor_findings.md`** (jcode permission/compaction/session internals + Conductor settings.toml/env/run_mode, verbatim)
 - Conductor docs: https://www.conductor.build/docs/

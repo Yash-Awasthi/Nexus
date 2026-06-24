@@ -20,11 +20,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import {
-  buildSafeEnv,
-  createDockerRunner,
-  type DockerSandboxConfig,
-} from "@nexus/sandbox";
+import { buildSafeEnv, createDockerRunner, type DockerSandboxConfig } from "@nexus/sandbox";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuthWithTier } from "../middleware/auth.js";
@@ -33,8 +29,7 @@ import { requireAuthWithTier } from "../middleware/auth.js";
 // Constants
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const DRIVE_ROOT =
-  process.env.NEXUS_DRIVE_ROOT ?? path.join(os.tmpdir(), "nexus-drives");
+const DRIVE_ROOT = process.env.NEXUS_DRIVE_ROOT ?? path.join(os.tmpdir(), "nexus-drives");
 const QUOTA_BYTES = 512 * 1024 * 1024; // 512 MB
 const QUOTA_WARN_PCT = 0.9; // warn at 90%
 const MAX_OUTPUT_BYTES = 64 * 1024;
@@ -112,26 +107,24 @@ function clip(s: string, max: number): string {
 export async function driveRoutes(app: FastifyInstance): Promise<void> {
   // ── Status + quota ──────────────────────────────────────────────────────────
 
-  app.get(
-    "/drive/status",
-    { preHandler: requireAuthWithTier },
-    async (request, reply) => {
-      const userId = request.nexusUserId;
-      if (!userId) return reply.code(401).send({ error: "auth_required" });
+  app.get("/drive/status", { preHandler: requireAuthWithTier }, async (request, reply) => {
+    const userId = request.nexusUserId;
+    if (!userId) return reply.code(401).send({ error: "auth_required" });
 
-      const driveDir = await ensureDriveDir(userId);
-      const usage = await getDriveUsage(driveDir);
-      const pct = usage / QUOTA_BYTES;
-      const warning = pct >= QUOTA_WARN_PCT;
+    const driveDir = await ensureDriveDir(userId);
+    const usage = await getDriveUsage(driveDir);
+    const pct = usage / QUOTA_BYTES;
+    const warning = pct >= QUOTA_WARN_PCT;
 
-      return reply.send({
-        root: driveDir,
-        quota: { used: usage, limit: QUOTA_BYTES, pct: Math.round(pct * 100) },
-        warning: warning ? `Drive at ${Math.round(pct * 100)}% — nearing ${QUOTA_BYTES / 1024 / 1024}MB limit` : null,
-        dockerAvailable: Boolean(process.env.SANDBOX_SHELL_IMAGE) || true,
-      });
-    },
-  );
+    return reply.send({
+      root: driveDir,
+      quota: { used: usage, limit: QUOTA_BYTES, pct: Math.round(pct * 100) },
+      warning: warning
+        ? `Drive at ${Math.round(pct * 100)}% — nearing ${QUOTA_BYTES / 1024 / 1024}MB limit`
+        : null,
+      dockerAvailable: Boolean(process.env.SANDBOX_SHELL_IMAGE) || true,
+    });
+  });
 
   // ── Execute command ─────────────────────────────────────────────────────────
 
@@ -225,9 +218,7 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
       if (!userId) return reply.code(401).send({ error: "auth_required" });
 
       const driveDir = await ensureDriveDir(userId);
-      const listDir = request.query.dir
-        ? await safeResolve(driveDir, request.query.dir)
-        : driveDir;
+      const listDir = request.query.dir ? await safeResolve(driveDir, request.query.dir) : driveDir;
 
       try {
         const entries = await fs.readdir(listDir, { withFileTypes: true });
@@ -331,20 +322,16 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
 
   // ── Destroy workspace ───────────────────────────────────────────────────────
 
-  app.delete(
-    "/drive/destroy",
-    { preHandler: requireAuthWithTier },
-    async (request, reply) => {
-      const userId = request.nexusUserId;
-      if (!userId) return reply.code(401).send({ error: "auth_required" });
+  app.delete("/drive/destroy", { preHandler: requireAuthWithTier }, async (request, reply) => {
+    const userId = request.nexusUserId;
+    if (!userId) return reply.code(401).send({ error: "auth_required" });
 
-      const driveDir = userDrivePath(userId);
-      try {
-        await fs.rm(driveDir, { recursive: true, force: true });
-        return reply.send({ message: "workspace destroyed" });
-      } catch {
-        return reply.send({ message: "workspace already clean" });
-      }
-    },
-  );
+    const driveDir = userDrivePath(userId);
+    try {
+      await fs.rm(driveDir, { recursive: true, force: true });
+      return reply.send({ message: "workspace destroyed" });
+    } catch {
+      return reply.send({ message: "workspace already clean" });
+    }
+  });
 }

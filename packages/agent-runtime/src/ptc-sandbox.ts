@@ -288,9 +288,7 @@ export async function runToolScript(
   const maxOutput = opts.maxOutputChars ?? DEFAULT_MAX_OUTPUT;
 
   // Build context with callable tools list (same as in-process PTC)
-  const toolNames = opts.toolSet
-    .list()
-    .map((t) => ({ name: t.name, description: t.description }));
+  const toolNames = opts.toolSet.list().map((t) => ({ name: t.name, description: t.description }));
 
   const context: Record<string, unknown> = {
     tools: toolNames,
@@ -385,10 +383,7 @@ async function runToolScriptFallback(
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(
-      () => reject(new Error(`script timed out after ${timeoutMs}ms`)),
-      timeoutMs,
-    );
+    timer = setTimeout(() => reject(new Error(`script timed out after ${timeoutMs}ms`)), timeoutMs);
     if (timer && typeof (timer as NodeJS.Timeout).unref === "function") {
       (timer as NodeJS.Timeout).unref();
     }

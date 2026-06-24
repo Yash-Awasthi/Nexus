@@ -661,10 +661,14 @@ describe("SemanticCachingLLMProvider", () => {
     const { p, calls } = countingProvider(makeResponse({ content: "Use the reset link." }));
     const sem = new SemanticCachingLLMProvider(p, embed, { threshold: 0.95 });
 
-    const r1 = await sem.complete(makeRequest({ messages: [{ role: "user", content: "How do I reset my password" }] }));
+    const r1 = await sem.complete(
+      makeRequest({ messages: [{ role: "user", content: "How do I reset my password" }] }),
+    );
     expect(r1.cached).toBeFalsy();
 
-    const r2 = await sem.complete(makeRequest({ messages: [{ role: "user", content: "How can I reset the password" }] }));
+    const r2 = await sem.complete(
+      makeRequest({ messages: [{ role: "user", content: "How can I reset the password" }] }),
+    );
     expect(r2.cached).toBe(true);
     expect(r2.content).toBe("Use the reset link.");
     expect(calls()).toBe(1); // inner provider only called once
@@ -673,8 +677,12 @@ describe("SemanticCachingLLMProvider", () => {
   it("misses for a semantically different request", async () => {
     const { p, calls } = countingProvider(makeResponse());
     const sem = new SemanticCachingLLMProvider(p, embed, { threshold: 0.95 });
-    await sem.complete(makeRequest({ messages: [{ role: "user", content: "How do I reset my password" }] }));
-    await sem.complete(makeRequest({ messages: [{ role: "user", content: "What is the capital of France" }] }));
+    await sem.complete(
+      makeRequest({ messages: [{ role: "user", content: "How do I reset my password" }] }),
+    );
+    await sem.complete(
+      makeRequest({ messages: [{ role: "user", content: "What is the capital of France" }] }),
+    );
     expect(calls()).toBe(2);
     expect(sem.stats()).toMatchObject({ hits: 0, misses: 2 });
   });
@@ -682,15 +690,27 @@ describe("SemanticCachingLLMProvider", () => {
   it("does not match across different models", async () => {
     const { p, calls } = countingProvider(makeResponse());
     const sem = new SemanticCachingLLMProvider(p, embed, { threshold: 0.95 });
-    await sem.complete(makeRequest({ model: "gpt-4o", messages: [{ role: "user", content: "How do I reset my password" }] }));
-    await sem.complete(makeRequest({ model: "claude", messages: [{ role: "user", content: "How can I reset the password" }] }));
+    await sem.complete(
+      makeRequest({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: "How do I reset my password" }],
+      }),
+    );
+    await sem.complete(
+      makeRequest({
+        model: "claude",
+        messages: [{ role: "user", content: "How can I reset the password" }],
+      }),
+    );
     expect(calls()).toBe(2); // different model → no semantic hit
   });
 
   it("respects noCache metadata", async () => {
     const { p, calls } = countingProvider(makeResponse());
     const sem = new SemanticCachingLLMProvider(p, embed);
-    const req = makeRequest({ messages: [{ role: "user", content: "How do I reset my password" }] });
+    const req = makeRequest({
+      messages: [{ role: "user", content: "How do I reset my password" }],
+    });
     await sem.complete(req);
     await sem.complete({ ...req, metadata: { noCache: true } });
     expect(calls()).toBe(2);

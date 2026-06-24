@@ -34,7 +34,11 @@ function parseFrame(raw: string): SseFrame | null {
     }
   }
   if (!seen) return null;
-  return { ...(event !== undefined ? { event } : {}), ...(id !== undefined ? { id } : {}), data: dataLines.join("\n") };
+  return {
+    ...(event !== undefined ? { event } : {}),
+    ...(id !== undefined ? { id } : {}),
+    data: dataLines.join("\n"),
+  };
 }
 
 /**

@@ -95,10 +95,7 @@ async function fetchUrlTranscript(): Promise<TranscriptResult> {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-export async function fetchTranscript(
-  source: string,
-  url: string,
-): Promise<TranscriptResult> {
+export async function fetchTranscript(source: string, url: string): Promise<TranscriptResult> {
   switch (source) {
     case "youtube": {
       const videoId = extractYouTubeId(url);
@@ -112,9 +109,7 @@ export async function fetchTranscript(
     case "url":
       return fetchUrlTranscript();
     default:
-      throw new Error(
-        `Unknown source type: "${source}". Must be one of: youtube, file, url`,
-      );
+      throw new Error(`Unknown source type: "${source}". Must be one of: youtube, file, url`);
   }
 }
 

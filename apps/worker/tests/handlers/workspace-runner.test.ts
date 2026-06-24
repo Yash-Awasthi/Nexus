@@ -20,7 +20,10 @@ const ws = (name: string, port: number): Workspace => ({
   archived: false,
 });
 
-const settings = (run?: string, runMode: "concurrent" | "nonconcurrent" = "concurrent"): NexusSettings => ({
+const settings = (
+  run?: string,
+  runMode: "concurrent" | "nonconcurrent" = "concurrent",
+): NexusSettings => ({
   scripts: run ? { run } : {},
   runMode,
 });

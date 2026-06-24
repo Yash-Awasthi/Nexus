@@ -244,7 +244,10 @@ export async function runScriptBounded(opts: {
       clearTimeout(timer);
       resolve();
     };
-    const timer = setTimeout(() => void stopProcess(child).then(done), opts.timeoutMs ?? SCRIPT_TIMEOUT_MS);
+    const timer = setTimeout(
+      () => void stopProcess(child).then(done),
+      opts.timeoutMs ?? SCRIPT_TIMEOUT_MS,
+    );
     timer.unref();
     child.once("exit", (code) => {
       opts.onExit?.(code);
@@ -290,7 +293,10 @@ export class WorkspaceManager {
   /** Read the workspace index ({} if none yet). */
   private async readIndex(): Promise<Record<string, WorkspaceRecord>> {
     try {
-      return JSON.parse(await fs.readFile(this.indexPath, "utf8")) as Record<string, WorkspaceRecord>;
+      return JSON.parse(await fs.readFile(this.indexPath, "utf8")) as Record<
+        string,
+        WorkspaceRecord
+      >;
     } catch {
       return {};
     }
@@ -337,11 +343,7 @@ export class WorkspaceManager {
    * exists), then cuts a fresh branch+worktree from it. One branch ⇄ one
    * worktree; the name must be unique among active workspaces.
    */
-  async create(opts: {
-    name: string;
-    baseBranch: string;
-    branch?: string;
-  }): Promise<Workspace> {
+  async create(opts: { name: string; baseBranch: string; branch?: string }): Promise<Workspace> {
     const { name, baseBranch } = opts;
     if (!/^[A-Za-z0-9._-]+$/.test(name)) {
       throw new Error(`invalid workspace name: ${name}`);
@@ -366,7 +368,14 @@ export class WorkspaceManager {
       await git(root, ["worktree", "add", "-b", branch, wsPath, startPoint]);
 
       const ports = await reservePortRange(this.portBase, this.usedPorts(index));
-      const rec: WorkspaceRecord = { name, path: wsPath, branch, baseBranch, ports, archived: false };
+      const rec: WorkspaceRecord = {
+        name,
+        path: wsPath,
+        branch,
+        baseBranch,
+        ports,
+        archived: false,
+      };
       index[name] = rec;
       await this.writeIndex(index);
       return this.toWorkspace(rec);
@@ -480,7 +489,10 @@ export class WorkspaceRunner {
       existing.refs++;
       return existing.handle;
     }
-    const child = spawn("/bin/sh", ["-c", cmd], { cwd: ws.path, env: { ...process.env, ...ws.env } });
+    const child = spawn("/bin/sh", ["-c", cmd], {
+      cwd: ws.path,
+      env: { ...process.env, ...ws.env },
+    });
     const port = ws.ports[0] ?? 0;
     const handle: RunHandle = { key, name: ws.name, child, port, url: `http://127.0.0.1:${port}` };
     const entry: RunEntry = { handle, refs: 1 };

@@ -19,12 +19,12 @@ Verify with `/model` (should report Opus 4.x).
 
 ## 2. Two flavors of "agents"
 
-| | Subagents (Agent tool) | Background tasks |
-|---|---|---|
-| What | Spawned sub-Claudes with their own context | Long shell commands that run detached |
-| Use for | Parallel coding/review/research across packages | `pnpm build`, `pnpm test`, dev servers |
-| How | "Use N subagents to ..." or the Agent tool | `pnpm test &`-style, run in background |
-| Concurrency | Many at once, results return to the lead | Re-invokes Claude when each finishes |
+|             | Subagents (Agent tool)                          | Background tasks                       |
+| ----------- | ----------------------------------------------- | -------------------------------------- |
+| What        | Spawned sub-Claudes with their own context      | Long shell commands that run detached  |
+| Use for     | Parallel coding/review/research across packages | `pnpm build`, `pnpm test`, dev servers |
+| How         | "Use N subagents to ..." or the Agent tool      | `pnpm test &`-style, run in background |
+| Concurrency | Many at once, results return to the lead        | Re-invokes Claude when each finishes   |
 
 ## 3. Parallel subagents — the core workflow
 
@@ -33,9 +33,10 @@ Claude something like:
 
 > "Spin up parallel subagents, one per package, to <task>. Each subagent should
 > `cd` into its package, run `pnpm --filter @nexus/<pkg> typecheck && pnpm --filter
-> @nexus/<pkg> test`, and report back."
+@nexus/<pkg> test`, and report back."
 
 Good fan-out tasks here:
+
 - **Typecheck/test sweep**: one subagent per package, collect failures.
 - **Dependency/version bumps**: one per package, edit + verify in isolation.
 - **Code review by dimension**: subagents for correctness / security / perf over a diff.
@@ -43,18 +44,21 @@ Good fan-out tasks here:
 - **Migration**: discover call sites, then one subagent per site to transform + verify.
 
 ### Avoid write conflicts
+
 When subagents **edit files in parallel**, isolate them so they don't clobber each
 other. Either scope each strictly to its own package, or run each in its own git
 worktree (`isolation: "worktree"` on the Agent tool). Read-only fan-out (review,
 typecheck, search) needs no isolation.
 
 ### Don't double-run
+
 If you delegate a search/build to a subagent, wait for its result instead of also
 running it yourself.
 
 ## 4. Background tasks — builds & long runs
 
 Run slow, independent commands in the background so the lead keeps working:
+
 - `pnpm build` / `pnpm test` (whole-repo) — minutes; background it.
 - `docker compose up -d postgres redis` — infra for runtime work.
 - `pnpm dev` — persistent dev servers.

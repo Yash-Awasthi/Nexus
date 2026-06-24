@@ -88,7 +88,9 @@ export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
 
       const launched = await launchAgentRun({ ...request.body, instruction });
       if (!launched) {
-        return reply.code(503).send({ error: "agent queue unavailable (REDIS_URL not configured)" });
+        return reply
+          .code(503)
+          .send({ error: "agent queue unavailable (REDIS_URL not configured)" });
       }
       return reply.code(202).send({
         ...launched,

@@ -79,10 +79,7 @@ function mockUpstashPipeline(incrResult: number, expireResult: number = 1): void
     "fetch",
     vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => [
-        { result: incrResult },
-        { result: expireResult },
-      ],
+      json: async () => [{ result: incrResult }, { result: expireResult }],
     }),
   );
 }
@@ -240,10 +237,7 @@ describe("Fail-open when KV is unavailable", () => {
 
   it("passes through (no 429) when Upstash fetch throws", async () => {
     setUpstashEnv();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockRejectedValue(new Error("ECONNREFUSED")),
-    );
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("ECONNREFUSED")));
 
     const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
     const handler = makeRateLimitPreHandler({ limit: 1, windowMs: 60_000, keyPrefix: "fo1" });

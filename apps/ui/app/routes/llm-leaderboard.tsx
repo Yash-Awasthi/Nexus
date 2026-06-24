@@ -328,8 +328,10 @@ export default function LLMLeaderboard() {
 
   useEffect(() => {
     fetch("/api/leaderboard")
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => { if (d?.models) setLiveModels(d.models as Model[]); })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.models) setLiveModels(d.models as Model[]);
+      })
       .catch(() => {});
   }, []);
 

@@ -114,7 +114,9 @@ describe("WorkspaceManager", () => {
 
   it("rejects a duplicate active name and invalid names", async () => {
     const mgr = makeManager();
-    await expect(mgr.create({ name: "alpha", baseBranch: "main" })).rejects.toThrow(/already active/);
+    await expect(mgr.create({ name: "alpha", baseBranch: "main" })).rejects.toThrow(
+      /already active/,
+    );
     await expect(mgr.create({ name: "bad name", baseBranch: "main" })).rejects.toThrow(/invalid/);
   });
 
@@ -155,7 +157,9 @@ describe("WorkspaceManager", () => {
     const names = ["c1", "c2", "c3", "c4"];
     // Separate manager instances → exercises the cross-process file lock, not
     // an in-process mutex. The shared index must not be clobbered.
-    const created = await Promise.all(names.map((n) => mk().create({ name: n, baseBranch: "main" })));
+    const created = await Promise.all(
+      names.map((n) => mk().create({ name: n, baseBranch: "main" })),
+    );
 
     const all = await mk().list();
     expect(all.map((w) => w.name).sort()).toEqual(names);

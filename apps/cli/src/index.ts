@@ -81,8 +81,12 @@ function renderAgentFrame(
     }
     case "agent.status": {
       const status = String(data.status);
-      const color = status === "completed" ? chalk.green : status === "error" ? chalk.red : chalk.yellow;
-      console.log(color(`\n● ${status.toUpperCase()}`), data.steps !== undefined ? chalk.gray(`(${String(data.steps)} steps)`) : "");
+      const color =
+        status === "completed" ? chalk.green : status === "error" ? chalk.red : chalk.yellow;
+      console.log(
+        color(`\n● ${status.toUpperCase()}`),
+        data.steps !== undefined ? chalk.gray(`(${String(data.steps)} steps)`) : "",
+      );
       if (data.error) console.error(chalk.red(String(data.error)));
       // When a review was requested, keep the stream open for agent.learnings.
       return !awaitLearnings;

@@ -46,10 +46,7 @@ function _ipKey(req: FastifyRequest, prefix: string): string {
 // Uses the Upstash REST pipeline to atomically increment and set TTL.
 // This eliminates the read-check-set race condition present in the old code.
 
-async function _atomicIncrWithTTL(
-  key: string,
-  windowSec: number,
-): Promise<number | null> {
+async function _atomicIncrWithTTL(key: string, windowSec: number): Promise<number | null> {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) return null; // not using Upstash
@@ -97,7 +94,7 @@ export function makeRateLimitPreHandler(opts: RateLimitOptions) {
     try {
       // Try atomic Redis INCR first (no race condition)
       const atomicCount = await _atomicIncrWithTTL(key, windowSec);
-      const current = atomicCount ?? await _getCurrentCount(key);
+      const current = atomicCount ?? (await _getCurrentCount(key));
 
       if (current > limit) {
         const retryAfter = windowSec;
@@ -155,7 +152,7 @@ export function makeUserRateLimitPreHandler(opts: RateLimitOptions) {
 
     try {
       const atomicCount = await _atomicIncrWithTTL(key, windowSec);
-      const current = atomicCount ?? await _getCurrentCount(key);
+      const current = atomicCount ?? (await _getCurrentCount(key));
 
       if (current > limit) {
         const retryAfter = windowSec;

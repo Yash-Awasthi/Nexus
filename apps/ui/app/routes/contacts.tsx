@@ -52,10 +52,18 @@ export default function ContactsPage() {
       const res = await fetch("/api/v1/contacts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), email: email.trim(), company: company.trim() || undefined, notes: notes.trim() || undefined }),
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          company: company.trim() || undefined,
+          notes: notes.trim() || undefined,
+        }),
       });
       if (res.ok) {
-        setName(""); setEmail(""); setCompany(""); setNotes("");
+        setName("");
+        setEmail("");
+        setCompany("");
+        setNotes("");
         setStatus({ type: "success", message: "Contact saved." });
         await loadContacts();
       } else {
@@ -71,7 +79,8 @@ export default function ContactsPage() {
       <div>
         <h1 className="text-2xl font-bold mb-1">Contacts</h1>
         <p className="text-muted-foreground text-sm">
-          Manage your contacts. Backend persists contacts when a connector (e.g. Google Contacts, HubSpot) is configured.
+          Manage your contacts. Backend persists contacts when a connector (e.g. Google Contacts,
+          HubSpot) is configured.
         </p>
       </div>
 
@@ -87,24 +96,54 @@ export default function ContactsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label htmlFor="name">Name *</Label>
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Smith" required />
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Jane Smith"
+                  required
+                />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="email">Email *</Label>
-                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jane@example.com" required />
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="jane@example.com"
+                  required
+                />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="company">Company</Label>
-                <Input id="company" value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Acme Corp" />
+                <Input
+                  id="company"
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                  placeholder="Acme Corp"
+                />
               </div>
             </div>
             <div className="space-y-1">
               <Label htmlFor="notes">Notes</Label>
-              <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes..." rows={2} />
+              <Textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Optional notes..."
+                rows={2}
+              />
             </div>
             {status && (
-              <div className={`flex items-center gap-2 text-sm ${status.type === "success" ? "text-green-600" : "text-red-600"}`}>
-                {status.type === "success" ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+              <div
+                className={`flex items-center gap-2 text-sm ${status.type === "success" ? "text-green-600" : "text-red-600"}`}
+              >
+                {status.type === "success" ? (
+                  <CheckCircle className="w-4 h-4" />
+                ) : (
+                  <AlertCircle className="w-4 h-4" />
+                )}
                 {status.message}
               </div>
             )}
@@ -135,7 +174,10 @@ export default function ContactsPage() {
           ) : (
             <div className="space-y-3">
               {contacts.map((c) => (
-                <div key={c.id} className="flex items-start justify-between border-b pb-3 last:border-0">
+                <div
+                  key={c.id}
+                  className="flex items-start justify-between border-b pb-3 last:border-0"
+                >
                   <div>
                     <p className="font-medium">{c.name}</p>
                     <p className="text-sm text-muted-foreground">{c.email}</p>
@@ -145,7 +187,9 @@ export default function ContactsPage() {
                       </Badge>
                     )}
                   </div>
-                  <span className="text-xs text-muted-foreground">{new Date(c.createdAt).toLocaleDateString()}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(c.createdAt).toLocaleDateString()}
+                  </span>
                 </div>
               ))}
             </div>

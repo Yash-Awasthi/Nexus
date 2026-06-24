@@ -107,7 +107,7 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
   ): Promise<boolean> {
     if (!userId) return false; // no user context → deny
     const dbUrl = process.env.DATABASE_URL;
-    if (!dbUrl) return true;  // no DB → allow (single-tenant dev mode)
+    if (!dbUrl) return true; // no DB → allow (single-tenant dev mode)
     try {
       const { default: pg } = await import("pg");
       const pool = new pg.Pool({ connectionString: dbUrl, max: 1 });

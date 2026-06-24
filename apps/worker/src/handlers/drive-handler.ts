@@ -8,11 +8,7 @@
  * timeout, 64 KiB output truncation, and structured JSON audit logging.
  */
 
-import {
-  buildSafeEnv,
-  createDockerRunner,
-  type DockerSandboxConfig,
-} from "@nexus/sandbox";
+import { buildSafeEnv, createDockerRunner, type DockerSandboxConfig } from "@nexus/sandbox";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -53,11 +49,7 @@ function clip(s: string, max: number): string {
 }
 
 /** Structured audit log matching the agent-tools.ts pattern. */
-function auditLog(
-  userId: string,
-  event: string,
-  detail: Record<string, unknown>,
-): void {
+function auditLog(userId: string, event: string, detail: Record<string, unknown>): void {
   console.error(
     JSON.stringify({
       level: "info",
@@ -71,9 +63,7 @@ function auditLog(
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
-export async function handleDriveExecJob(
-  payload: DriveExecPayload,
-): Promise<DriveExecResult> {
+export async function handleDriveExecJob(payload: DriveExecPayload): Promise<DriveExecResult> {
   const { userId, command, cwd, env, timeoutMs } = payload;
   const start = Date.now();
   const timeout = Math.min(timeoutMs ?? DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS);

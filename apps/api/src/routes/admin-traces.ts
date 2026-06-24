@@ -72,16 +72,12 @@ export async function adminTracesRoutes(app: FastifyInstance): Promise<void> {
   /** GET / — list traces (supports ?limit and ?offset query params) */
   app.get<{
     Querystring: { limit?: string; offset?: string };
-  }>(
-    "/",
-    { preHandler: requireAuthWithTier },
-    async (request, reply) => {
-      const limit = Math.min(parseInt(request.query.limit ?? "50", 10), 500);
-      const offset = parseInt(request.query.offset ?? "0", 10);
-      const page = traces.slice(offset, offset + limit);
-      return reply.send({ traces: page, total: traces.length, limit, offset });
-    },
-  );
+  }>("/", { preHandler: requireAuthWithTier }, async (request, reply) => {
+    const limit = Math.min(parseInt(request.query.limit ?? "50", 10), 500);
+    const offset = parseInt(request.query.offset ?? "0", 10);
+    const page = traces.slice(offset, offset + limit);
+    return reply.send({ traces: page, total: traces.length, limit, offset });
+  });
 
   /** GET /:id — get a single trace by ID */
   app.get<{ Params: { id: string } }>(

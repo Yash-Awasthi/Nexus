@@ -17,7 +17,12 @@ type QueueLike = {
 };
 
 /** Parse a redis:// URL into BullMQ ConnectionOptions (mirrors the worker). */
-function parseRedisUrl(url: string): { host: string; port: number; password?: string; db?: number } {
+function parseRedisUrl(url: string): {
+  host: string;
+  port: number;
+  password?: string;
+  db?: number;
+} {
   const u = new URL(url);
   return {
     host: u.hostname,
@@ -63,7 +68,10 @@ export interface LaunchAgentInput {
  * sessionId and taskId so the SSE stream, session persistence, and worktree
  * name all key off one value. Pure — exported for tests.
  */
-export function buildAgentRunJob(input: LaunchAgentInput, sessionId: string): Record<string, unknown> {
+export function buildAgentRunJob(
+  input: LaunchAgentInput,
+  sessionId: string,
+): Record<string, unknown> {
   return { ...input, sessionId, taskId: sessionId };
 }
 

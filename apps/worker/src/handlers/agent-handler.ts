@@ -30,12 +30,7 @@ import {
 } from "@nexus/agent-runtime";
 import { db } from "@nexus/db";
 import { agentSessions } from "@nexus/db/schema";
-import {
-  AnthropicDriver,
-  GroqDriver,
-  OpenRouterDriver,
-  type LlmDriver,
-} from "@nexus/llm-drivers";
+import { AnthropicDriver, GroqDriver, OpenRouterDriver, type LlmDriver } from "@nexus/llm-drivers";
 import { GroqEmbedder, MemoryManager, PgVectorStore } from "@nexus/memory";
 import { eq } from "drizzle-orm";
 
@@ -235,12 +230,21 @@ async function provisionWorkspace(
   let ws: Workspace;
   if (existing && !existing.archived) ws = existing;
   else if (existing) ws = await mgr.restore(name);
-  else ws = await mgr.create({ name, baseBranch: wt.baseBranch, ...(wt.branch ? { branch: wt.branch } : {}) });
+  else
+    ws = await mgr.create({
+      name,
+      baseBranch: wt.baseBranch,
+      ...(wt.branch ? { branch: wt.branch } : {}),
+    });
   return { ws, mgr };
 }
 
 /** Run the workspace's `.nexus` setup script to completion (bounded by a timeout). */
-async function runSetupScript(ws: Workspace, settings: NexusSettings, taskId?: string): Promise<void> {
+async function runSetupScript(
+  ws: Workspace,
+  settings: NexusSettings,
+  taskId?: string,
+): Promise<void> {
   const cmd = settings.scripts.setup;
   if (!cmd) return;
   await runScriptBounded({
@@ -250,7 +254,13 @@ async function runSetupScript(ws: Workspace, settings: NexusSettings, taskId?: s
     timeoutMs: SETUP_TIMEOUT_MS,
     onExit: (code) =>
       console.log(
-        JSON.stringify({ level: "info", event: "agent.workspace_setup", taskId, ws: ws.name, exit: code }),
+        JSON.stringify({
+          level: "info",
+          event: "agent.workspace_setup",
+          taskId,
+          ws: ws.name,
+          exit: code,
+        }),
       ),
   });
 }
@@ -278,7 +288,9 @@ function makeDriver(payload: AgentRunPayload): LlmDriver {
   }
 }
 
-export async function handleAgentRunJob(payload: AgentRunPayload): Promise<Record<string, unknown>> {
+export async function handleAgentRunJob(
+  payload: AgentRunPayload,
+): Promise<Record<string, unknown>> {
   const instruction = (payload.instruction ?? payload.prompt ?? payload.goal ?? "").trim();
   if (!instruction) return { ok: false, error: "no_instruction" };
 
@@ -369,7 +381,11 @@ export async function handleAgentRunJob(payload: AgentRunPayload): Promise<Recor
     workingDir,
     ...(initialMessages.length ? { initialMessages } : {}),
     ...(compaction ? { compaction } : {}),
-    ...(payload.sessionId ? { sessionId: payload.sessionId } : payload.taskId ? { sessionId: payload.taskId } : {}),
+    ...(payload.sessionId
+      ? { sessionId: payload.sessionId }
+      : payload.taskId
+        ? { sessionId: payload.taskId }
+        : {}),
     ...(payload.systemPrompt ? { systemPrompt: payload.systemPrompt } : {}),
     ...(payload.maxSteps ? { maxSteps: payload.maxSteps } : {}),
     onCompaction: (info: CompactionResult): void => {
@@ -378,7 +394,14 @@ export async function handleAgentRunJob(payload: AgentRunPayload): Promise<Recor
         preTokens: info.preTokens,
         postTokens: info.postTokens,
       };
-      console.log(JSON.stringify({ level: "info", event: "agent.compaction", taskId: payload.taskId, ...data }));
+      console.log(
+        JSON.stringify({
+          level: "info",
+          event: "agent.compaction",
+          taskId: payload.taskId,
+          ...data,
+        }),
+      );
       emit("compaction", data);
     },
     onStep: (step: ToolStepRecord): void => {
@@ -387,7 +410,9 @@ export async function handleAgentRunJob(payload: AgentRunPayload): Promise<Recor
         toolCalls: step.toolCalls.map((c) => c.name),
         usage: step.usage,
       };
-      console.log(JSON.stringify({ level: "info", event: "agent.step", taskId: payload.taskId, ...data }));
+      console.log(
+        JSON.stringify({ level: "info", event: "agent.step", taskId: payload.taskId, ...data }),
+      );
       emit("step", data);
     },
   });
@@ -462,8 +487,7 @@ export async function handleAgentRunJob(payload: AgentRunPayload): Promise<Recor
                     event: "agent.learning_persist_failed",
                     taskId: payload.taskId,
                     learningType: learning.type,
-                    error:
-                      persistErr instanceof Error ? persistErr.message : String(persistErr),
+                    error: persistErr instanceof Error ? persistErr.message : String(persistErr),
                   }),
                 );
               }

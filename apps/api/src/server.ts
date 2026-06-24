@@ -239,8 +239,16 @@ export async function buildServer(): Promise<FastifyInstance> {
   const _councilRL = makeRateLimitPreHandler({ limit: 30, windowMs: 60_000, keyPrefix: "council" });
 
   // Per-user limits layered on top of IP limits
-  const _adminUserRL = makeUserRateLimitPreHandler({ limit: 50, windowMs: 60_000, keyPrefix: "admin" });
-  const _billingUserRL = makeUserRateLimitPreHandler({ limit: 100, windowMs: 60_000, keyPrefix: "billing" });
+  const _adminUserRL = makeUserRateLimitPreHandler({
+    limit: 50,
+    windowMs: 60_000,
+    keyPrefix: "admin",
+  });
+  const _billingUserRL = makeUserRateLimitPreHandler({
+    limit: 100,
+    windowMs: 60_000,
+    keyPrefix: "billing",
+  });
 
   app.addHook("onRequest", async (request: FastifyRequest, reply) => {
     const url = request.url;

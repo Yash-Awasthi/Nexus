@@ -35,8 +35,7 @@ const APIKEY = { PAGERDUTY_API_KEY: "tok_123" };
 
 describe("pagerdutyAdapter", () => {
   describe("metadata", () => {
-    it("has the correct name", () =>
-      expect(pagerdutyAdapter.name).toBe("nexus-adapter-pagerduty"));
+    it("has the correct name", () => expect(pagerdutyAdapter.name).toBe("nexus-adapter-pagerduty"));
     it("exposes monitoring capabilities", () => {
       expect(pagerdutyAdapter.capabilities).toContain("monitoring.alert");
     });

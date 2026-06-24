@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
-import { makeUserRateLimitPreHandler, makeRateLimitPreHandler } from "../../src/lib/rate-limiter.js";
+import {
+  makeUserRateLimitPreHandler,
+  makeRateLimitPreHandler,
+} from "../../src/lib/rate-limiter.js";
 
 describe("Nexus Drive", () => {
   it("drive status returns quota info", () => expect(true).toBe(true));

@@ -383,7 +383,6 @@ export interface DocIngestTask {
 }
 
 async function execute(task: DocIngestTask, ctx: IExecutionContext): Promise<PipelineResult> {
-   
   ctx.logger.info("doc.ingest", {
     format: task.format,
     contentLength: task.content.length,
@@ -402,7 +401,7 @@ async function execute(task: DocIngestTask, ctx: IExecutionContext): Promise<Pip
 }
 
 /** Doc pipeline adapter. */
- 
+
 export const docPipelineAdapter = defineAdapter<DocIngestTask, PipelineResult>({
   name: "nexus-adapter-doc-pipeline",
   version: "0.1.0",
