@@ -1,10 +1,30 @@
 // SPDX-License-Identifier: Apache-2.0
+import {
+  Plus,
+  Settings2,
+  Trash2,
+  X,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  VolumeX,
+  Volume2,
+  Copy,
+  Check,
+} from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { loadActiveSTM, STM_MODULES, type STMModuleId } from "~/lib/stm";
-import type { Route } from "./+types/chat";
-import { useContextMention } from "~/hooks/useContextMention";
-import { ContextPill, type MentionType } from "~/components/ContextPill";
 
+import type { Route } from "./+types/chat";
+
+import { ContextPill, type MentionType } from "~/components/ContextPill";
+import { useContextMention } from "~/hooks/useContextMention";
+import {
+  loadCouncilMembers,
+  saveCouncilMembers,
+  newMember,
+  API_PROVIDERS,
+  type CouncilMember,
+} from "~/lib/council";
 import {
   deliberate,
   onOpinion,
@@ -19,26 +39,7 @@ import {
   type MoleculeVerdict,
   saveGroups,
 } from "~/lib/deliberate";
-import {
-  loadCouncilMembers,
-  saveCouncilMembers,
-  newMember,
-  API_PROVIDERS,
-  type CouncilMember,
-} from "~/lib/council";
-import {
-  Plus,
-  Settings2,
-  Trash2,
-  X,
-  ChevronDown,
-  ChevronRight,
-  Download,
-  VolumeX,
-  Volume2,
-  Copy,
-  Check,
-} from "lucide-react";
+import { loadActiveSTM, STM_MODULES, type STMModuleId } from "~/lib/stm";
 
 interface Mention {
   type: MentionType;
@@ -172,7 +173,10 @@ export default function Chat() {
     // deliberation:started — electron fires this when deliberation begins
     let offStarted = () => {};
     if (isMolecule()) {
-      offStarted = (window as any).molecule.on("deliberation:started", () => setStreaming(true));
+      const molecule = (
+        window as { molecule?: { on: (event: string, cb: () => void) => () => void } }
+      ).molecule;
+      if (molecule) offStarted = molecule.on("deliberation:started", () => setStreaming(true));
     }
 
     const offOpinion = onOpinion((data: MoleculeOpinion) => {
@@ -264,13 +268,13 @@ export default function Chat() {
 
   const hydrateThread = useCallback(async (id: string) => {
     const idToLabel = Object.fromEntries(councilRef.current.map((c) => [c.id, c.label]));
-    const msgs = (await getMessages(id)) as Array<{
+    const msgs = (await getMessages(id)) as {
       id: string;
       role: string;
       member: string | null;
       content: string;
       round: number;
-    }>;
+    }[];
     const byRound: Record<number, MsgGroup> = {};
     for (const m of msgs) {
       if (!byRound[m.round])
@@ -1192,7 +1196,7 @@ export default function Chat() {
           onSelect={(label, value) => {
             setMentions((prev) => [
               ...prev,
-              { type: (mention.mentionType ?? "file") as any, label, value },
+              { type: (mention.mentionType ?? "file") as MentionType, label, value },
             ]);
             mention.closePicker();
           }}
@@ -1475,15 +1479,6 @@ function SettingsPanel({
                         style={iStyle}
                       />
                     </SRow>
-                    <SRow label="API KEY">
-                      <input
-                        type="password"
-                        value={m.apiKey}
-                        onChange={(e) => update(m.id, { apiKey: e.target.value })}
-                        style={iStyle}
-                        placeholder="sk-…"
-                      />
-                    </SRow>
                     {(m.provider === "ollama" || m.provider === "custom") && (
                       <SRow label="BASE URL">
                         <input
@@ -1581,7 +1576,7 @@ function ContextPickerOverlay({
   mono,
   onSelect,
 }: {
-  mention: ReturnType<typeof import("~/hooks/useContextMention").useContextMention>;
+  mention: ReturnType<typeof useContextMention>;
   borderColor: string;
   greenDim: string;
   textDim: string;
@@ -1614,14 +1609,28 @@ function ContextPickerOverlay({
         }
 
         const res = await fetch(url);
-        if (!res.ok) throw new Error();
-        const data = await res.json();
+        if (!res.ok) throw new Error("context lookup failed");
+        interface PickerRow {
+          name?: string;
+          title?: string;
+          path?: string;
+          url?: string;
+          kind?: string;
+          file?: string;
+          domain?: string;
+        }
+        const data = (await res.json()) as { results?: PickerRow[] } | PickerRow[];
+        const rows: (PickerRow | string)[] = Array.isArray(data) ? data : (data.results ?? []);
         // normalize: files → {path,name}, symbols → {name,kind,file}, web → {title,url}
-        const items: PickerResult[] = (data.results ?? data ?? []).slice(0, 8).map((r: any) => ({
-          label: r.name ?? r.title ?? r.path ?? String(r),
-          value: r.path ?? r.url ?? r.name ?? String(r),
-          meta: r.kind ?? r.file ?? r.domain ?? undefined,
-        }));
+        const items: PickerResult[] = rows.slice(0, 8).map((r) =>
+          typeof r === "string"
+            ? { label: r, value: r, meta: undefined }
+            : {
+                label: r.name ?? r.title ?? r.path ?? "",
+                value: r.path ?? r.url ?? r.name ?? "",
+                meta: r.kind ?? r.file ?? r.domain ?? undefined,
+              },
+        );
         setResults(items);
       } catch {
         setResults([]);

@@ -14,13 +14,14 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   setUser: (user: AuthUser | null) => void;
-  login: (username: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 const STORAGE_KEY = "nexus_user";
+const TOKEN_KEY = "nexus_token";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<AuthUser | null>(null);
@@ -30,8 +31,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        setUserState(JSON.parse(raw));
-      } else if (typeof window !== "undefined" && (window as any).molecule) {
+        setUserState(JSON.parse(raw) as AuthUser);
+      } else if (typeof window !== "undefined" && (window as { molecule?: unknown }).molecule) {
         // Electron desktop — no backend auth needed, auto-login as local user
         const localUser: AuthUser = { id: "local", username: "You" };
         setUserState(localUser);
@@ -52,16 +53,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => setUser(null);
+  const logout = () => {
+    localStorage.removeItem(TOKEN_KEY);
+    setUser(null);
+  };
 
-  const login = async (username: string, password: string) => {
+  const login = async (email: string, password: string) => {
     const res = await fetch("/api/v1/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ email, password }),
     });
     if (!res.ok) throw new Error(await res.text().catch(() => "Login failed"));
-    const data = (await res.json()) as { user: AuthUser };
+    const data = (await res.json()) as { accessToken?: string; user: AuthUser };
+    // Persist the JWT so authFetch() can attach it to API calls (see ~/lib/api).
+    if (data.accessToken) localStorage.setItem(TOKEN_KEY, data.accessToken);
     setUser(data.user);
   };
 

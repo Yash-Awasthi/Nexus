@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import type { Route } from "./+types/llm-leaderboard";
 import { Badge } from "~/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -324,9 +324,19 @@ function BenchmarkBar({ score, max }: { score: number; max: number }) {
 export default function LLMLeaderboard() {
   const [activeTab, setActiveTab] = useState<FilterTab>("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [liveModels, setLiveModels] = useState<Model[] | null>(null);
+
+  useEffect(() => {
+    fetch("/api/leaderboard")
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d?.models) setLiveModels(d.models as Model[]); })
+      .catch(() => {});
+  }, []);
+
+  const allModels = liveModels ?? models;
 
   const filteredModels = useMemo(() => {
-    return models.filter((m) => {
+    return allModels.filter((m) => {
       if (activeTab === "Proprietary" && m.open) return false;
       if (activeTab === "Open Source" && !m.open) return false;
       if (

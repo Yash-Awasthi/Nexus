@@ -1,158 +1,220 @@
 # Future of NEXUS — Roadmap & Contribution Areas
 
-This document captures what NEXUS could grow into, where contributions are most needed, and how to scale the platform for real-world deployment.
+This document captures what NEXUS could grow into, where contributions are most
+needed, and how to scale the platform for real-world deployment. It is the single
+forward-looking roadmap; completed work is summarised under **Recently shipped** for
+context and then dropped.
+
+_Last refreshed: 2026-06-22 (branch `claudecode`)._
 
 ---
 
-## Hosting & Infrastructure Upgrades
+## Recently shipped
 
-### Current (free tier)
-- API: Render (free instance — sleeps after 15 min idle, cold start ~30s)
-- UI: Vercel (free)
-- DB: Neon PostgreSQL (free tier — 512 MB storage, connection limits)
-- KV: in-memory fallback (no Redis persistence)
+These were open roadmap items now landed — kept here only as a changelog anchor:
 
-### Recommended upgrades
-
-| Layer | Free → Paid | What you unlock |
-|---|---|---|
-| **API** | Render Starter ($7/mo) | Always-on, no cold starts, persistent disk |
-| **API** | Render Standard ($25/mo) | 2 GB RAM, 1 CPU — handles concurrent agent workloads |
-| **DB** | Neon Pro ($19/mo) | More compute units, larger storage, branching for dev/staging |
-| **DB** | Supabase Pro ($25/mo) | Managed pgvector, edge functions, built-in auth |
-| **KV/Queue** | Upstash Redis ($10/mo) | Persistent BullMQ queues — survive restarts, multi-worker support |
-| **UI** | Vercel Pro ($20/mo) | Analytics, higher bandwidth, team features |
-| **Docker sandbox** | Any VPS with Docker ($6–15/mo) | Replace Piston with full DockerReplExecutor for local sandboxing |
-
-### Cloud deployment options
-- **Railway** — one-click deploy via the button in the README; includes managed Postgres and Redis. Good starting point.
-- **Fly.io** — good fit for the Fastify API; global edge deploys, persistent volumes, ~$5/mo for a small instance.
-- **AWS ECS / GCP Cloud Run** — containerized, auto-scaling. Use the `infra/terraform/` modules for GKE/EKS.
-- **Kubernetes** — full `infra/helm/nexus/` chart available. Use with GKE, EKS, or bare-metal for high throughput.
+- ✅ **User accounts / auth wiring** — email+password login wired end-to-end; the
+  UI captures the JWT and attaches it to API calls (`authFetch`). A latent bug where
+  user JWTs could never authenticate (middleware never received `jwtSecret`) is fixed.
+- ✅ **Per-user BYOK key management** — provider keys are AES-256-GCM encrypted at
+  rest in Postgres (`user_provider_credentials`), resolved **server-side only** with a
+  strict policy (no env fallback on user LLM paths). New `/provider-keys` page to
+  add/rotate/delete; all client-side plaintext keys removed from `localStorage`.
+- ✅ **Conductor → runtime consolidation** — the duplicate `@nexus/conductor` package
+  was deleted and its single consumer migrated to `@nexus/runtime`.
+- ✅ **`pnpm dev:api` / `pnpm dev:ui`** — single-service dev scripts.
+- ✅ **Crypto dedup** — AES-256-GCM primitives shared via `secret-crypto.ts`
+  (`encryptWithKey`/`decryptWithKey`) instead of being copied across mfa/connectors.
+- ✅ **Four LLM providers** — xAI/Grok, Together, Perplexity, Cohere drivers + full
+  BYOK wiring (111 driver tests).
+- ✅ **Scaffolds + devcontainer** — `pnpm scaffold:adapter` / `scaffold:driver`
+  generators and a `.devcontainer/` for zero-setup Codespaces.
 
 ---
 
-## Scaling Architecture
+## Next up — flagship: Nexus Drive (per-user 512 MB sandboxed CLI)
 
-### What needs work at scale
+A persistent, per-user 512 MB quota-capped workspace that runs our CLI (or an
+allowlisted user-chosen CLI) in an isolated microVM, with shell + git scoped to
+`/workspace`. **Design is locked** (`.claude/NEXUS_DRIVE_SANDBOX.md`); the build is
+the next major effort. It is deliberately the one item that cannot be finished in a
+quick pass — it needs a host with KVM and an isolation spike — so it is scoped here in
+phases rather than rushed.
 
-**Connection pooling**
-The API currently uses direct Neon connections. At >10 concurrent requests, add PgBouncer or use the Neon pooler URL (`-pooler` suffix) in `DATABASE_URL`.
+**Locked decisions (recap):** Firecracker microVM isolation (gVisor / Docker as
+fallbacks); filesystem-level 512 MB quota (loopback ext4 / XFS project quota) with a
+~90% soft-warn + brief grace then hard block; 30-day idle reclaim; user supplies their
+own LLM key via a `.env` inside `/workspace` (NOT Nexus BYOK injection); persistent
+volume + ephemeral compute.
 
-**Worker scaling**
-BullMQ workers run in a single `apps/worker` process. For production:
-- Run multiple worker instances with separate concurrency limits per queue (high/med/low)
-- Use `WORKER_CONCURRENCY` env var to tune per-worker thread count
-- Consider splitting domain-feed workers from task workers to isolate noisy feed jobs
+**Phased build:**
 
-**Memory/pgvector at scale**
-- Add IVFFlat `probes` tuning: `SET ivfflat.probes = 20` for better recall at cost of latency
-- Migrate to HNSW index once Neon supports it (better ANN recall, no training step)
-- Add per-tenant table partitioning when memory rows exceed ~1M
-
-**LLM cost control**
-- Enable `llm-cache` package — caches identical prompts so repeated queries don't burn tokens
-- Add `token-budget` package limits per user session
-- Wire Prometheus cost tracking to alerting (alert when daily spend crosses threshold)
-
-**Ingest service**
-The Python `services/ingest/` FastAPI+Celery service is optional today. At scale:
-- Run it as a separate container with its own Celery worker pool
-- Point domain feed adapters at the ingest service instead of BullMQ directly
-- Add dead-letter queues for failed feed jobs
+- [ ] **Phase 0 — Isolation spike (throwaway).** Validate Firecracker + a 512 MB FS
+      quota end-to-end on the target host; confirm KVM availability. Fall back to
+      gVisor or Docker-with-limits if Firecracker is impractical. Decision gate before
+      any production code.
+- [ ] **Phase 1 — Storage + schema.** `drive_workspaces` table (userId, volumePath,
+      quotaBytes, `lastActiveAt`, state). Per-user 512 MB volume provisioning +
+      teardown; FS-level quota enforcement (tamper-proof, not app-level).
+- [ ] **Phase 2 — Sandbox runtime package.** New `packages/sandbox` (or extend
+      `@nexus/code-repl`): spin up an ephemeral microVM bound to the user's volume with
+      CPU/RAM/PID/wall-clock caps and policy-gated egress.
+- [ ] **Phase 3 — API + worker.** `/api/v1/drive/*` (create / exec / upload / ls /
+      quota) behind `requireAuthWithTier`; a BullMQ job type in `apps/worker` for
+      lifecycle (provision, idle-reclaim, quota sweep).
+- [ ] **Phase 4 — UI.** Terminal + drive-management panel; `.env.example` seeded into
+      fresh workspaces; quota meter with the soft-warn UX.
+- [ ] **Phase 5 — Hardening.** Egress allowlist, secret-hygiene (never log `.env`),
+      30-day idle warning + reclaim, abuse/runaway limits.
 
 ---
 
-## Feature Roadmap
+## Feature roadmap
 
 ### Near-term (good first contributions)
 
-- [ ] **User accounts** — the auth package exists but there's no sign-up/login flow in the UI. Wire `POST /api/v1/auth/register` and `POST /api/v1/auth/login` to a login page.
-- [ ] **Per-user API key management** — store BYOK keys encrypted in the DB instead of localStorage; add a key rotation UI.
-- [ ] **Streaming Council responses** — the council currently waits for all models to finish. Add SSE streaming so the UI shows each model's answer as it arrives.
-- [ ] **Prompt versioning UI** — the backend has `prompt_versions` table and routes; the UI Prompts page needs a version history drawer.
-- [ ] **Build task dependencies** — the `parent_id` column exists in `build_tasks`; add DAG rendering in the Build page.
-- [ ] **MCP server registry** — UI page to add/remove MCP servers; currently hardcoded in config.
+- [x] **Streaming Council responses** — `POST /council/deliberate/stream` (SSE) emits each
+      model's vote as it lands then a final `done` event; engine/service take an optional
+      `onVote` callback. UI client helper `streamCouncilDeliberation()` in `lib/api.ts`.
+      (Backend verified with mocked transport — 3 new engine tests; UI page rewire to use
+      it is a follow-up, since the current flow is electron-bridged.)
+- [x] **Reconcile `language-models` page with BYOK** — the Language Models page
+      (`apps/ui/app/routes/language-models.tsx`) now reads and writes the encrypted
+      `/api/user/provider-keys` store via `authFetch`, so it shares one source of truth
+      for keys with the `/provider-keys` page. Keys are write-only in the UI (the form
+      never preloads the masked value; an empty key on edit keeps the stored one).
+      Schema extended (migration `0008_provider_credentials_metadata`) with nullable
+      `encrypted_key` + `base_url` + `models` columns so local/self-hosted connections
+      (ollama, custom base URLs) and per-connection metadata persist. Backend POST does a
+      metadata-only edit when no new key is supplied (carries over the existing
+      key/prefix/hash).
+- [ ] **Prompt versioning UI** — backend has `prompt_versions` table + routes; add a
+      version-history drawer to the Prompts page.
+- [ ] **Build task dependencies** — `parent_id` exists in `build_tasks`; add DAG
+      rendering on the Build page.
+- [ ] **MCP server registry** — UI to add/remove MCP servers (currently config-hardcoded).
 
 ### Medium-term
 
-- [ ] **Voice interface** — `packages/voice/` has the TTS/STT pipeline. Wire it to the UI with a push-to-talk button and streaming transcription.
-- [ ] **Image generation** — `packages/image-gen/` adapters exist. Add an image tab to the Sandbox page.
-- [ ] **Knowledge graph UI** — `packages/knowledge-graph/` has Leiden clustering and multi-hop BFS. Add a graph visualisation page (D3.js or React Flow).
-- [ ] **Prediction markets dashboard** — `packages/prediction-market/` has Polymarket/Kalshi/Metaculus CLOB backends. Build a markets page.
-- [ ] **Gauntlet UI** — the race-47-models feature exists in `packages/gauntlet/` but has no UI. Add a competitive model benchmark page.
-- [ ] **RLHF feedback loop** — the `rlhf-pipeline` package exists; add thumbs up/down on council responses that feed back into the pipeline.
-- [ ] **Eval runner UI** — `packages/evals/` has scorers and test runner; build a UI to run eval suites and view results.
+- [ ] **Voice interface** — wire `packages/voice/` TTS/STT to a push-to-talk UI with
+      streaming transcription.
+- [ ] **Image generation** — surface `packages/image-gen/` adapters as a Sandbox tab.
+- [ ] **Knowledge graph UI** — visualise `packages/knowledge-graph/` (Leiden clustering,
+      multi-hop BFS) with React Flow or D3.
+- [ ] **Prediction markets dashboard** — build a markets page over the
+      Polymarket/Kalshi/Metaculus backends in `packages/prediction-market/`.
+- [ ] **Gauntlet UI** — a competitive model-benchmark page over `packages/gauntlet/`.
+- [ ] **RLHF feedback loop** — thumbs up/down on council responses feeding
+      `packages/rlhf-pipeline/`.
+- [ ] **Eval runner UI** — run `packages/evals/` suites and view results.
 
 ### Long-term / ambitious
 
-- [ ] **Multi-tenant SaaS** — add org-level isolation, per-org usage quotas, billing via Stripe
-- [ ] **Plugin marketplace** — let users publish custom adapters using `packages/plugin-sdk/`; host them in a registry
-- [ ] **Fine-tuning pipeline** — end-to-end SFT from NEXUS conversation history using `packages/sft-tagger/` and `packages/corpus-builder/`
-- [ ] **Agentic browser** — `packages/stealth-browser/` has PatchrightDriver; build a full browser-use agent accessible from the UI
-- [ ] **Mobile app** — React Native wrapper with push notifications for agent task completion
-- [ ] **Custom LLM driver** — framework for adding new providers; currently requires adding a file in `packages/llm-drivers/`; document and simplify the interface
+- [ ] **Multi-tenant SaaS** — org-level isolation, per-org quotas, Stripe billing.
+- [ ] **Plugin marketplace** — publish custom adapters via `packages/plugin-sdk/` to a
+      hosted registry.
+- [ ] **Fine-tuning pipeline** — end-to-end SFT from conversation history using
+      `packages/sft-tagger/` + `packages/corpus-builder/`.
+- [ ] **Agentic browser** — a full browser-use agent over `packages/stealth-browser/`.
+- [ ] **Mobile app** — React Native wrapper with push notifications on task completion.
+- [ ] **Custom LLM driver framework** — document + simplify the `IProvider` interface so
+      adding a provider doesn't require touching `packages/llm-drivers/` internals.
 
 ---
 
-## New LLM Providers to Add
+## New LLM providers to add
 
-The `packages/llm-drivers/` pattern is straightforward — each driver implements `IProvider`. Good contributions:
+Each driver extends `OpenAICompatibleDriver` in `packages/llm-drivers/` (~12 lines for
+OpenAI-compatible providers; use `pnpm scaffold:driver <name>` to start):
 
-- `xai` (Grok) — large context, strong reasoning
-- `together` (Together AI) — cheap open-model inference
-- `perplexity` — built-in search augmentation
-- `cohere` — strong reranking + embeddings
-- `aws-bedrock` — enterprise Anthropic/Meta access
-- `azure-openai` — required for enterprise customers
+- [x] `xai` (Grok) — shipped
+- [x] `together` (Together AI) — shipped
+- [x] `perplexity` — shipped
+- [x] `cohere` (via OpenAI-compat endpoint) — shipped
+- [ ] `aws-bedrock` — enterprise Anthropic/Meta access (needs AWS SigV4 — custom driver)
+- [ ] `azure-openai` — required for many enterprise customers (custom base URL + api-version)
 
 ---
 
-## Domain Feed Sources to Add
+## Domain feed sources to add
 
-`packages/domain-feeds/` currently has 16 domains. Additional sources:
+`packages/domain-feeds/` has 16 domains today. Additional sources:
 
 - **Legislative tracking** — congressional bills, EU directives
 - **Scientific preprints** — arXiv, bioRxiv
-- **Earnings & SEC filings** — EDGAR, 8-K filings
+- **Earnings & SEC filings** — EDGAR, 8-K
 - **Social signals** — Reddit, HN (rate-limited, respectful)
-- **Dark web monitoring** — Tor-accessible sources (requires careful legal review)
+- **Dark web monitoring** — Tor-accessible sources (careful legal review required)
 - **Supply chain** — shipping AIS data, port congestion
 
 ---
 
-## Developer Experience
+## Developer experience & code health
 
-- [ ] Add `pnpm dev:api` and `pnpm dev:ui` scripts that start only the relevant service (instead of all)
-- [ ] Add `pnpm scaffold:driver <name>` CLI command to scaffold a new LLM driver
-- [ ] Add `pnpm scaffold:adapter <name>` to scaffold a new adapter package
-- [ ] Add `pnpm scaffold:feed <name>` to scaffold a new domain feed
-- [ ] Pre-built Docker images on GitHub Container Registry so users don't need to build locally
-- [ ] GitHub Codespaces devcontainer config for zero-setup development
-- [ ] Improve test coverage — currently 4542 tests, aim for 80%+ coverage across core packages
+- [x] **Pay down UI lint debt** — the large route files (`chat.tsx`, `god-mode.tsx`,
+      `settings.tsx`, `setup.tsx`, `root.tsx`, `language-models.tsx`) had ~155 `no-unsafe-*`
+      / unused-import errors from untyped `fetch`/`JSON.parse` results. Typed the responses + dropped dead imports; all six now lint clean and commit through lint-staged normally.
+- [x] `pnpm scaffold:driver <name>` — scaffold a new LLM driver
+- [x] `pnpm scaffold:adapter <name>` — scaffold a new adapter package
+- [x] `pnpm scaffold:feed <name>` — scaffold a new domain feed (appends a
+      `FeedAdapter` subclass to domain-feeds; prints the registry-wiring reminder)
+- [x] Pre-built Docker images on GHCR — `docker.yml` publishes api/worker/ingest/**ui**
+      to GHCR on push to main + tags (built-in `GITHUB_TOKEN`, SBOM + provenance)
+- [x] GitHub Codespaces devcontainer for zero-setup development (`.devcontainer/`)
+- [ ] Improve test coverage toward 80%+ across core packages
 
 ---
 
-## Portfolio Website
+## Hosting & infrastructure (reference)
 
-A public portfolio website for NEXUS could include:
+### Current (free tier)
 
-- Live Gauntlet race visualization
-- Real-time council deliberation demo (public API key, rate-limited)
-- Interactive architecture diagram
-- Package browser with API docs
-- Eval leaderboard comparing providers
+- API: Render (free — sleeps after 15 min idle, cold start ~30s)
+- UI: Vercel (free)
+- DB: Neon PostgreSQL (free — 512 MB storage, connection limits)
+- KV: in-memory fallback (no Redis persistence)
 
-Tech suggestion: React + Vercel, pulling from the NEXUS API for live data.
+### Recommended upgrades
+
+| Layer        | Free → Paid                | What you unlock                                     |
+| ------------ | -------------------------- | --------------------------------------------------- |
+| **API**      | Render Starter ($7/mo)     | Always-on, no cold starts, persistent disk          |
+| **API**      | Render Standard ($25/mo)   | 2 GB RAM, 1 CPU — concurrent agent workloads        |
+| **DB**       | Neon Pro ($19/mo)          | More compute, larger storage, dev/staging branching |
+| **DB**       | Supabase Pro ($25/mo)      | Managed pgvector, edge functions, built-in auth     |
+| **KV/Queue** | Upstash Redis ($10/mo)     | Persistent BullMQ queues, multi-worker              |
+| **UI**       | Vercel Pro ($20/mo)        | Analytics, higher bandwidth, team features          |
+| **Sandbox**  | VPS with Docker ($6–15/mo) | Full DockerReplExecutor (and Nexus Drive host)      |
+
+### Cloud deployment options
+
+- **Railway** — one-click deploy; managed Postgres + Redis. Good starting point.
+- **Fly.io** — fits the Fastify API; global edge, persistent volumes (~$5/mo small).
+- **AWS ECS / GCP Cloud Run** — containerized, auto-scaling; see `infra/terraform/`.
+- **Kubernetes** — full `infra/helm/nexus/` chart for GKE/EKS/bare-metal.
+
+### Scaling notes
+
+- **Connection pooling** — at >10 concurrent requests use PgBouncer or the Neon
+  `-pooler` URL in `DATABASE_URL`.
+- **Worker scaling** — run multiple `apps/worker` instances; tune `WORKER_CONCURRENCY`;
+  split noisy domain-feed workers from task workers.
+- **pgvector at scale** — tune `ivfflat.probes`; migrate to HNSW when available;
+  partition memory tables past ~1M rows.
+- **LLM cost control** — enable the `llm-cache` package; per-session token budgets;
+  wire Prometheus cost metrics to alerting.
+- **Ingest service** — run `services/ingest/` as its own container with a Celery pool
+  and dead-letter queues for failed feed jobs.
 
 ---
 
 ## Contributing
 
-See `CONTRIBUTING.md` for code standards, branch strategy, and PR template.
+See `CONTRIBUTING.md` for code standards, branch strategy, and the PR template.
+Highest-leverage areas right now:
 
-The highest-leverage areas right now:
-1. New LLM driver adapters (each one is ~150 lines, well-tested pattern)
-2. UI pages for existing backend features (Gauntlet, Knowledge Graph, Evals)
-3. Documentation — ADRs, package READMEs, and runbooks
-4. Test coverage for `packages/council/`, `packages/memory/`, and `packages/conductor/`
+1. **Nexus Drive Phase 0 spike** — the flagship; unblocks the biggest feature.
+2. New LLM driver adapters (each ~150 lines, well-tested pattern).
+3. UI pages for existing backend features (Gauntlet, Knowledge Graph, Evals).
+4. Paying down UI lint debt and raising test coverage for `packages/council/`,
+   `packages/memory/`, and `packages/runtime/`.

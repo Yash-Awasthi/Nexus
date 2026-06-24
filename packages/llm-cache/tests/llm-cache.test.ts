@@ -4,6 +4,9 @@ import {
   MemoryPromptCache,
   KVPromptCache,
   CachingLLMProvider,
+  TieredPromptCache,
+  SemanticCachingLLMProvider,
+  cosineSimilarity,
   CacheError,
   buildCacheKey,
   type PromptCache,
@@ -11,6 +14,7 @@ import {
   type LLMResponse,
   type LLMProvider,
   type KVStoreLike,
+  type EmbedFn,
 } from "../src/index.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -552,5 +556,143 @@ describe("CacheError", () => {
     expect(err.code).toBe("MISS");
     expect(err.context?.key).toBe("x");
     expect(err instanceof Error).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TieredPromptCache (Track C — multi-layer)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("TieredPromptCache", () => {
+  let l1: MemoryPromptCache;
+  let l2: KVPromptCache;
+  let tier: TieredPromptCache;
+
+  beforeEach(() => {
+    l1 = new MemoryPromptCache();
+    l2 = new KVPromptCache(makeKVStore());
+    tier = new TieredPromptCache(l1, l2);
+  });
+
+  it("write-through stores in both layers", async () => {
+    await tier.set("k", makeResponse());
+    expect(await l1.get("k")).toBeDefined();
+    expect(await l2.get("k")).toBeDefined();
+  });
+
+  it("serves from L1 without touching L2", async () => {
+    await l1.set("k", makeResponse({ content: "from-l1" }));
+    const r = await tier.get("k");
+    expect(r?.content).toBe("from-l1");
+  });
+
+  it("on L1 miss falls back to L2 and promotes into L1", async () => {
+    await l2.set("k", makeResponse({ content: "from-l2" }));
+    expect(await l1.get("k")).toBeUndefined(); // not in L1 yet
+
+    const r = await tier.get("k");
+    expect(r?.content).toBe("from-l2");
+    // promoted: now present in L1
+    expect((await l1.get("k"))?.content).toBe("from-l2");
+  });
+
+  it("counts hits and misses; size reflects L1", async () => {
+    await tier.set("k", makeResponse());
+    await tier.get("k"); // hit
+    await tier.get("missing"); // miss
+    const s = await tier.stats();
+    expect(s.hits).toBe(1);
+    expect(s.misses).toBe(1);
+    expect(s.size).toBe(1);
+  });
+
+  it("delete and clear remove from both layers", async () => {
+    await tier.set("k", makeResponse());
+    await tier.delete("k");
+    expect(await l1.get("k")).toBeUndefined();
+    expect(await l2.get("k")).toBeUndefined();
+
+    await tier.set("k2", makeResponse());
+    await tier.clear();
+    expect(await l1.get("k2")).toBeUndefined();
+    expect(await l2.get("k2")).toBeUndefined();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SemanticCachingLLMProvider (Track C — semantic/approximate cache)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("cosineSimilarity", () => {
+  it("is 1 for identical vectors and 0 for orthogonal", () => {
+    expect(cosineSimilarity([1, 0], [1, 0])).toBeCloseTo(1);
+    expect(cosineSimilarity([1, 0], [0, 1])).toBeCloseTo(0);
+  });
+  it("guards degenerate input", () => {
+    expect(cosineSimilarity([], [])).toBe(0);
+    expect(cosineSimilarity([0, 0], [0, 0])).toBe(0);
+    expect(cosineSimilarity([1], [1, 2])).toBe(0);
+  });
+});
+
+describe("SemanticCachingLLMProvider", () => {
+  // Deterministic embedder: maps known phrases to vectors so we control similarity.
+  const vectors: Record<string, number[]> = {
+    "how do I reset my password": [1, 0, 0],
+    "how can I reset the password": [0.99, 0.01, 0], // near-duplicate
+    "what is the capital of france": [0, 1, 0], // unrelated
+  };
+  const embed: EmbedFn = async (text) => vectors[text.toLowerCase()] ?? [0, 0, 1];
+
+  function countingProvider(resp: LLMResponse) {
+    let calls = 0;
+    const p: LLMProvider = {
+      name: "inner",
+      models: ["gpt-4o"],
+      async complete() {
+        calls++;
+        return { ...resp };
+      },
+    };
+    return { p, calls: () => calls };
+  }
+
+  it("returns a cached response for a paraphrase above threshold", async () => {
+    const { p, calls } = countingProvider(makeResponse({ content: "Use the reset link." }));
+    const sem = new SemanticCachingLLMProvider(p, embed, { threshold: 0.95 });
+
+    const r1 = await sem.complete(makeRequest({ messages: [{ role: "user", content: "How do I reset my password" }] }));
+    expect(r1.cached).toBeFalsy();
+
+    const r2 = await sem.complete(makeRequest({ messages: [{ role: "user", content: "How can I reset the password" }] }));
+    expect(r2.cached).toBe(true);
+    expect(r2.content).toBe("Use the reset link.");
+    expect(calls()).toBe(1); // inner provider only called once
+  });
+
+  it("misses for a semantically different request", async () => {
+    const { p, calls } = countingProvider(makeResponse());
+    const sem = new SemanticCachingLLMProvider(p, embed, { threshold: 0.95 });
+    await sem.complete(makeRequest({ messages: [{ role: "user", content: "How do I reset my password" }] }));
+    await sem.complete(makeRequest({ messages: [{ role: "user", content: "What is the capital of France" }] }));
+    expect(calls()).toBe(2);
+    expect(sem.stats()).toMatchObject({ hits: 0, misses: 2 });
+  });
+
+  it("does not match across different models", async () => {
+    const { p, calls } = countingProvider(makeResponse());
+    const sem = new SemanticCachingLLMProvider(p, embed, { threshold: 0.95 });
+    await sem.complete(makeRequest({ model: "gpt-4o", messages: [{ role: "user", content: "How do I reset my password" }] }));
+    await sem.complete(makeRequest({ model: "claude", messages: [{ role: "user", content: "How can I reset the password" }] }));
+    expect(calls()).toBe(2); // different model → no semantic hit
+  });
+
+  it("respects noCache metadata", async () => {
+    const { p, calls } = countingProvider(makeResponse());
+    const sem = new SemanticCachingLLMProvider(p, embed);
+    const req = makeRequest({ messages: [{ role: "user", content: "How do I reset my password" }] });
+    await sem.complete(req);
+    await sem.complete({ ...req, metadata: { noCache: true } });
+    expect(calls()).toBe(2);
   });
 });

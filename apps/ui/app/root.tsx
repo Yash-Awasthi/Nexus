@@ -1,18 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-import { useEffect, useState, useCallback, useRef } from "react";
-import { useEasterEggs } from "~/hooks/useEasterEggs";
-import { EasterEggToast } from "~/components/EasterEggToast";
-import {
-  isRouteErrorResponse,
-  Links,
-  Meta,
-  NavLink,
-  Outlet,
-  Scripts,
-  ScrollRestoration,
-  useLocation,
-  useNavigate,
-} from "react-router";
 import {
   MessageSquare,
   LayoutDashboard,
@@ -41,7 +27,6 @@ import {
   Zap,
   Code2,
   SlidersHorizontal,
-  FlaskConical,
   Search,
   Plug,
   RefreshCcw,
@@ -60,34 +45,31 @@ import {
   Terminal,
   Bot,
   Key,
+  KeyRound,
   Flag,
   BookOpenCheck,
   Bug,
   ShieldCheck,
-  Wand2,
   DollarSign,
   ShieldAlert,
-  Braces,
-  Waves,
-  History,
-  Rss,
-  PenTool,
-  Video,
-  Route as RouteIcon,
-  PauseCircle,
   EyeOff,
-  GitMerge,
-  Scale,
-  ClipboardList,
-  Filter,
-  TrendingUp,
-  AlertTriangle,
-  Volume2,
-  Minimize2,
-  Microscope,
 } from "lucide-react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import {
+  isRouteErrorResponse,
+  Links,
+  Meta,
+  NavLink,
+  Outlet,
+  Scripts,
+  ScrollRestoration,
+  useLocation,
+  useNavigate,
+} from "react-router";
 
-import { TooltipProvider } from "~/components/ui/tooltip";
+import type { Route } from "./+types/root";
+
+import { EasterEggToast } from "~/components/EasterEggToast";
 import {
   SidebarProvider,
   Sidebar,
@@ -102,11 +84,11 @@ import {
   SidebarHeader,
   SidebarTrigger,
 } from "~/components/ui/sidebar";
-import { ThemeProvider, useTheme } from "~/context/ThemeContext";
-import { StoreProvider } from "~/context/StoreContext";
+import { TooltipProvider } from "~/components/ui/tooltip";
 import { AuthProvider, useAuth } from "~/context/AuthContext";
-
-import type { Route } from "./+types/root";
+import { StoreProvider } from "~/context/StoreContext";
+import { ThemeProvider, useTheme } from "~/context/ThemeContext";
+import { useEasterEggs } from "~/hooks/useEasterEggs";
 import "./app.css";
 
 const PUBLIC_PATHS = new Set(["/", "/login", "/register", "/setup"]);
@@ -214,6 +196,7 @@ const navGroups = [
       { to: "/billing", icon: CreditCard, label: "Billing" },
       { to: "/costs", icon: DollarSign, label: "Cost Analytics" },
       { to: "/api-tokens", icon: Key, label: "API Tokens" },
+      { to: "/provider-keys", icon: KeyRound, label: "Provider Keys" },
       { to: "/standard-answers", icon: BookOpenCheck, label: "Standard Answers" },
       { to: "/web-search", icon: Globe, label: "Web Search" },
       { to: "/scrape", icon: Bug, label: "Scraping" },
@@ -344,7 +327,7 @@ function NotificationBell() {
     try {
       const res = await fetch("/api/notifications/count");
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as { unreadCount?: number };
         setUnread(data.unreadCount ?? 0);
       }
     } catch {
@@ -358,7 +341,7 @@ function NotificationBell() {
     try {
       const res = await fetch("/api/notifications?limit=8");
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as { notifications?: Notif[]; unreadCount?: number };
         setNotifs(data.notifications ?? []);
         setUnread(data.unreadCount ?? 0);
       }
@@ -606,7 +589,11 @@ export default function App() {
 
   // In Electron, skip landing page and go straight to /chat
   useEffect(() => {
-    if (location.pathname === "/" && typeof window !== "undefined" && (window as any).molecule) {
+    if (
+      location.pathname === "/" &&
+      typeof window !== "undefined" &&
+      (window as { molecule?: unknown }).molecule
+    ) {
       navigate("/chat", { replace: true });
       return;
     }

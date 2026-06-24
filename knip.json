@@ -37,7 +37,7 @@
     "packages/adapters/vercel": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
     "apps/api": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
     "apps/worker": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
-    "apps/web": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
+    "apps/ui": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
     "apps/cli": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] },
     "apps/docs-site": { "entry": ["src/index.ts"], "project": ["src/**/*.ts"] }
   },

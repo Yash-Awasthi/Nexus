@@ -2,24 +2,34 @@
 /**
  * Bot webhook routes — Slack and Teams event adapters.
  *
- * POST /bots/slack/events     — Slack Events API webhook (URL verification + message events)
- * POST /bots/teams/activity   — Bot Framework / Teams activity webhook
+ * POST /bots/slack/events       — Slack Events API webhook (URL verification + message events)
+ * POST /bots/teams/activity     — Bot Framework / Teams activity webhook
+ * POST /bots/telegram/webhook   — Telegram Bot API webhook (secret-token verified)
  *
- * Both adapters forward BotMessage → the gateway route (POST /api/v1/gateway/messages)
+ * All adapters forward BotMessage → the gateway route (POST /api/v1/gateway/messages)
  * and stream the reply back to the platform via the adapter's reply mechanism.
  *
  * Configuration via env vars:
- *   SLACK_BOT_TOKEN       — xoxb-… token for sending Slack messages
- *   SLACK_SIGNING_SECRET  — for request signature verification
- *   SLACK_BOT_APP_ID      — Slack App ID (optional, for filtering)
- *   TEAMS_BOT_APP_ID      — Bot Framework app ID
- *   TEAMS_BOT_APP_PASSWORD — Bot Framework app password
+ *   SLACK_BOT_TOKEN          — xoxb-… token for sending Slack messages
+ *   SLACK_SIGNING_SECRET     — for request signature verification
+ *   SLACK_BOT_APP_ID         — Slack App ID (optional, for filtering)
+ *   TEAMS_BOT_APP_ID         — Bot Framework app ID
+ *   TEAMS_BOT_APP_PASSWORD   — Bot Framework app password
+ *   TELEGRAM_BOT_TOKEN       — Bot API token from @BotFather
+ *   TELEGRAM_WEBHOOK_SECRET  — secret_token set with setWebhook (recommended)
+ *   TELEGRAM_BOT_USERNAME    — bot @username (optional, for mention triggers)
  *
  * When SLACK_BOT_TOKEN is absent, the Slack adapter runs in echo mode (no
  * outbound API calls). Teams likewise.
  */
 
-import { SlackBotAdapter, TeamsBotAdapter, type BotMessage, type BotReply } from "@nexus/bots";
+import {
+  SlackBotAdapter,
+  TeamsBotAdapter,
+  TelegramBotAdapter,
+  type BotMessage,
+  type BotReply,
+} from "@nexus/bots";
 import type { FastifyInstance } from "fastify";
 
 // ── Singleton adapters ────────────────────────────────────────────────────────
@@ -72,6 +82,15 @@ const _slackAdapter = new SlackBotAdapter({
 const _teamsAdapter = new TeamsBotAdapter({
   appId: process.env.TEAMS_BOT_APP_ID ?? "",
   appPassword: process.env.TEAMS_BOT_APP_PASSWORD ?? "",
+  handler: _gatewayHandler,
+});
+
+const _telegramAdapter = new TelegramBotAdapter({
+  token: process.env.TELEGRAM_BOT_TOKEN ?? "",
+  // When set (recommended), webhook requests are verified against the
+  // X-Telegram-Bot-Api-Secret-Token header configured with setWebhook.
+  secretToken: process.env.TELEGRAM_WEBHOOK_SECRET || undefined,
+  botUsername: process.env.TELEGRAM_BOT_USERNAME || undefined,
   handler: _gatewayHandler,
 });
 
@@ -132,5 +151,34 @@ export async function botsRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return reply.send({ ok: true, handled: result.handled });
+  });
+
+  /**
+   * POST /bots/telegram/webhook
+   *
+   * Telegram Bot API webhook. Register it with the Telegram setWebhook method
+   * and a secret_token; the adapter verifies the X-Telegram-Bot-Api-Secret-Token
+   * header when TELEGRAM_WEBHOOK_SECRET is configured. Each update is normalized
+   * to a BotMessage, forwarded to the gateway, and the reply is sent via the
+   * Telegram sendMessage API. Telegram expects a fast 2xx, so we ack immediately.
+   */
+  app.post<{
+    Body: Record<string, unknown>;
+    Headers: { "x-telegram-bot-api-secret-token"?: string };
+  }>("/bots/telegram/webhook", async (request, reply) => {
+    try {
+      const result = await _telegramAdapter.handleUpdate(request.body, {
+        "x-telegram-bot-api-secret-token":
+          request.headers["x-telegram-bot-api-secret-token"] ?? "",
+      });
+      if (result.error) {
+        return reply.code(200).send({ ok: true, handled: false, note: result.error });
+      }
+      return reply.code(200).send({ ok: true, handled: result.handled });
+    } catch (err) {
+      // Secret mismatch / malformed payload — reject without leaking detail.
+      const code = err instanceof Error && err.message.includes("secret") ? 401 : 400;
+      return reply.code(code).send({ ok: false });
+    }
   });
 }

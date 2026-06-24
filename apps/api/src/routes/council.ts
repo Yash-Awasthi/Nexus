@@ -22,20 +22,13 @@ import type {
 } from "@nexus/council";
 import { db } from "@nexus/db";
 import { verdicts, councilTranscripts, signals } from "@nexus/db/schema";
-import {
-  DriverRegistry,
-  GroqDriver,
-  AnthropicDriver,
-  GeminiDriver,
-  DeepSeekDriver,
-  MistralDriver,
-  type LlmRole,
-} from "@nexus/llm-drivers";
+import type { DriverRegistry, LlmRole } from "@nexus/llm-drivers";
 import { makeTierGatePreHandler } from "@nexus/tier-gate";
 import { eq, desc } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
-import { requireAuth, getTierFromRequest } from "../middleware/auth.js";
+import { buildUserDriverRegistry } from "../lib/provider-keys.js";
+import { requireAuth, requireAuthWithTier, getTierFromRequest } from "../middleware/auth.js";
 
 // ── Council config ─────────────────────────────────────────────────────────────
 
@@ -105,31 +98,30 @@ class LlmDriversTransport implements ILLMTransport {
   }
 }
 
-function buildCouncilRegistry(): DriverRegistry {
-  const reg = new DriverRegistry();
-  if (process.env.GROQ_API_KEY) reg.register(new GroqDriver({ apiKey: process.env.GROQ_API_KEY }));
-  if (process.env.ANTHROPIC_API_KEY)
-    reg.register(new AnthropicDriver({ apiKey: process.env.ANTHROPIC_API_KEY }));
-  if (process.env.GEMINI_API_KEY)
-    reg.register(new GeminiDriver({ apiKey: process.env.GEMINI_API_KEY }));
-  if (process.env.DEEPSEEK_API_KEY)
-    reg.register(new DeepSeekDriver({ apiKey: process.env.DEEPSEEK_API_KEY }));
-  if (process.env.MISTRAL_API_KEY)
-    reg.register(new MistralDriver({ apiKey: process.env.MISTRAL_API_KEY }));
-  return reg;
-}
+// ── Per-user council service (strict BYOK) ──────────────────────────────────────
 
-// ── Service singleton ──────────────────────────────────────────────────────────
+/** Distinct providers any council model alias can route to. */
+const COUNCIL_PROVIDERS = [...new Set(Object.values(COUNCIL_DRIVER_ALIASES).map((a) => a.provider))];
 
-let _councilService: CouncilService | null = null;
+/** Raised when the authenticated user has no key for the active council provider. */
+class NoCouncilKeyError extends Error {}
 
-function getCouncilService(): CouncilService {
-  if (!_councilService) {
-    const registry = buildCouncilRegistry();
-    const transport = new LlmDriversTransport(registry, COUNCIL_MODEL);
-    _councilService = new CouncilService({ llm: transport, onResult: persistCouncilResult });
+/**
+ * Build a CouncilService backed by the authenticated user's own provider keys.
+ * Strict: if the user has no key for the active council model's provider, throws
+ * NoCouncilKeyError (surfaced as 400) rather than falling back to an env key.
+ */
+async function buildCouncilServiceForUser(userId: string | undefined): Promise<CouncilService> {
+  const { registry, missing } = await buildUserDriverRegistry(userId, COUNCIL_PROVIDERS);
+  const councilProvider = (COUNCIL_DRIVER_ALIASES[COUNCIL_MODEL] ?? { provider: "groq" }).provider;
+  if (missing.includes(councilProvider)) {
+    throw new NoCouncilKeyError(
+      `No API key configured for the council provider "${councilProvider}". ` +
+        `Add one under Settings → Provider Keys.`,
+    );
   }
-  return _councilService;
+  const transport = new LlmDriversTransport(registry, COUNCIL_MODEL);
+  return new CouncilService({ llm: transport, onResult: persistCouncilResult });
 }
 
 // ── Persistence ────────────────────────────────────────────────────────────────
@@ -182,7 +174,7 @@ export async function councilRoutes(app: FastifyInstance): Promise<void> {
     "/council/deliberate",
     {
       preHandler: [
-        requireAuth,
+        requireAuthWithTier,
         makeTierGatePreHandler({
           feature: "council",
           getTier: (req) => getTierFromRequest(req as Parameters<typeof getTierFromRequest>[0]),
@@ -212,7 +204,14 @@ export async function councilRoutes(app: FastifyInstance): Promise<void> {
       const { signal_id, ...councilRequest } = request.body as CouncilRequest & {
         signal_id?: string;
       };
-      const svc = getCouncilService();
+      let svc: CouncilService;
+      try {
+        svc = await buildCouncilServiceForUser(request.nexusUserId);
+      } catch (err) {
+        if (err instanceof NoCouncilKeyError)
+          return reply.code(400).send({ ok: false, error: err.message });
+        throw err;
+      }
       try {
         const response = await svc.deliberate(councilRequest, { signalId: signal_id });
         return reply.code(response.ok ? 200 : 500).send(response);
@@ -223,6 +222,61 @@ export async function councilRoutes(app: FastifyInstance): Promise<void> {
           error: err instanceof Error ? err.message : "Deliberation failed",
         });
       }
+    },
+  );
+
+  // POST /council/deliberate/stream — SSE: emit each model's vote as it lands,
+  // then a final "done" event with the full deliberation response.
+  app.post<{
+    Body: CouncilRequest & { signal_id?: string };
+  }>(
+    "/council/deliberate/stream",
+    {
+      preHandler: [
+        requireAuthWithTier,
+        makeTierGatePreHandler({
+          feature: "council",
+          getTier: (req) => getTierFromRequest(req as Parameters<typeof getTierFromRequest>[0]),
+        }),
+      ],
+    },
+    async (request, reply) => {
+      const { signal_id, ...councilRequest } = request.body as CouncilRequest & {
+        signal_id?: string;
+      };
+
+      let svc: CouncilService;
+      try {
+        svc = await buildCouncilServiceForUser(request.nexusUserId);
+      } catch (err) {
+        if (err instanceof NoCouncilKeyError)
+          return reply.code(400).send({ ok: false, error: err.message });
+        throw err;
+      }
+
+      reply.raw.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+      });
+      const send = (event: string, data: unknown): void => {
+        reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      };
+
+      try {
+        const response = await svc.deliberate(councilRequest, {
+          signalId: signal_id,
+          onVote: (vote: ModelVote) => send("vote", vote),
+        });
+        send("done", response);
+      } catch (err) {
+        request.log.error(err, "council/deliberate/stream failed");
+        send("error", { error: err instanceof Error ? err.message : "Deliberation failed" });
+      } finally {
+        reply.raw.end();
+      }
+      return reply;
     },
   );
 
@@ -293,7 +347,7 @@ export async function councilRoutes(app: FastifyInstance): Promise<void> {
   }>(
     "/council/trigger",
     {
-      preHandler: requireAuth,
+      preHandler: requireAuthWithTier,
       schema: {
         body: {
           type: "object",
@@ -328,7 +382,14 @@ export async function councilRoutes(app: FastifyInstance): Promise<void> {
         timeoutMs: timeoutMs ?? 60_000,
       };
 
-      const svc = getCouncilService();
+      let svc: CouncilService;
+      try {
+        svc = await buildCouncilServiceForUser(request.nexusUserId);
+      } catch (err) {
+        if (err instanceof NoCouncilKeyError)
+          return reply.code(400).send({ ok: false, error: err.message });
+        throw err;
+      }
       try {
         const response = await svc.deliberate(councilRequest, { signalId });
         return reply.code(response.ok ? 200 : 500).send(response);

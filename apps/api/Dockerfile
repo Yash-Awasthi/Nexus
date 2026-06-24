@@ -33,7 +33,6 @@ COPY packages/llm-drivers/package.json ./packages/llm-drivers/
 COPY packages/drift/package.json ./packages/drift/
 COPY packages/redteam/package.json ./packages/redteam/
 COPY packages/gauntlet/package.json ./packages/gauntlet/
-COPY packages/conductor/package.json ./packages/conductor/
 COPY packages/kv/package.json ./packages/kv/
 COPY packages/tier-gate/package.json ./packages/tier-gate/
 COPY packages/admin-gateway/package.json ./packages/admin-gateway/
@@ -87,6 +86,8 @@ COPY packages/supervisor/package.json ./packages/supervisor/
 COPY packages/think-parser/package.json ./packages/think-parser/
 COPY packages/tool-registry/package.json ./packages/tool-registry/
 COPY packages/video-search/package.json ./packages/video-search/
+COPY packages/sandbox/package.json ./packages/sandbox/
+COPY packages/mcp-client/package.json ./packages/mcp-client/
 COPY packages/wiki/package.json ./packages/wiki/
 COPY packages/autotune/package.json ./packages/autotune/
 COPY packages/parseltongue/package.json ./packages/parseltongue/
@@ -101,7 +102,7 @@ RUN pnpm install --frozen-lockfile --filter @nexus/api --filter @nexus/auth \
     --filter @nexus/runtime --filter @nexus/council --filter @nexus/telemetry \
     --filter @nexus/adaptive-scraper --filter @nexus/researcher \
     --filter @nexus/image-gen --filter @nexus/knowledge-graph \
-    --filter @nexus/llm-drivers --filter @nexus/gauntlet --filter @nexus/conductor \
+    --filter @nexus/llm-drivers --filter @nexus/gauntlet \
     --filter @nexus/kv --filter @nexus/tier-gate --filter @nexus/admin-gateway \
     --filter @nexus/agents --filter @nexus/hooks --filter @nexus/alerts \
     --filter @nexus/gateway --filter @nexus/plugin-sdk --filter @nexus/token-budget \
@@ -122,6 +123,7 @@ RUN pnpm install --frozen-lockfile --filter @nexus/api --filter @nexus/auth \
     --filter @nexus/session-sync --filter @nexus/stealth-browser --filter @nexus/stream-recovery \
     --filter @nexus/supervisor --filter @nexus/think-parser --filter @nexus/tool-registry \
     --filter @nexus/video-search --filter @nexus/wiki \
+    --filter @nexus/sandbox --filter @nexus/mcp-client \
     --filter @nexus/autotune --filter @nexus/parseltongue --filter @nexus/ragtime \
     --filter @nexus/ultraplinian
 
@@ -138,7 +140,7 @@ RUN pnpm install --frozen-lockfile \
     --filter @nexus/runtime --filter @nexus/council --filter @nexus/telemetry \
     --filter @nexus/adaptive-scraper --filter @nexus/researcher \
     --filter @nexus/image-gen --filter @nexus/knowledge-graph \
-    --filter @nexus/llm-drivers --filter @nexus/gauntlet --filter @nexus/conductor \
+    --filter @nexus/llm-drivers --filter @nexus/gauntlet \
     --filter @nexus/kv --filter @nexus/tier-gate --filter @nexus/admin-gateway \
     --filter @nexus/agents --filter @nexus/hooks --filter @nexus/alerts \
     --filter @nexus/gateway --filter @nexus/plugin-sdk --filter @nexus/token-budget \
@@ -159,6 +161,7 @@ RUN pnpm install --frozen-lockfile \
     --filter @nexus/session-sync --filter @nexus/stealth-browser --filter @nexus/stream-recovery \
     --filter @nexus/supervisor --filter @nexus/think-parser --filter @nexus/tool-registry \
     --filter @nexus/video-search --filter @nexus/wiki \
+    --filter @nexus/sandbox --filter @nexus/mcp-client \
     --filter @nexus/autotune --filter @nexus/parseltongue --filter @nexus/ragtime \
     --filter @nexus/ultraplinian
 
@@ -177,84 +180,7 @@ COPY packages/ ./packages/
 COPY apps/api/ ./apps/api/
 COPY tsconfig.base.json ./
 
-RUN pnpm --filter @nexus/shared build && \
-    pnpm --filter @nexus/contracts build && \
-    pnpm --filter @nexus/db build && \
-    pnpm --filter @nexus/telemetry build && \
-    pnpm --filter @nexus/governance build && \
-    pnpm --filter @nexus/memory build && \
-    pnpm --filter @nexus/drift build && \
-    pnpm --filter @nexus/redteam build && \
-    pnpm --filter @nexus/sft-tagger build && \
-    pnpm --filter @nexus/runtime build && \
-    pnpm --filter @nexus/council build && \
-    pnpm --filter @nexus/auth build && \
-    pnpm --filter @nexus/adaptive-scraper build && \
-    pnpm --filter @nexus/researcher build && \
-    pnpm --filter @nexus/image-gen build && \
-    pnpm --filter @nexus/knowledge-graph build && \
-    pnpm --filter @nexus/llm-drivers build && \
-    pnpm --filter @nexus/gauntlet build && \
-    pnpm --filter @nexus/conductor build && \
-    pnpm --filter @nexus/kv build && \
-    pnpm --filter @nexus/tier-gate build && \
-    pnpm --filter @nexus/admin-gateway build && \
-    pnpm --filter @nexus/agents build && \
-    pnpm --filter @nexus/hooks build && \
-    pnpm --filter @nexus/alerts build && \
-    pnpm --filter @nexus/gateway build && \
-    pnpm --filter @nexus/plugin-sdk build && \
-    pnpm --filter @nexus/token-budget build && \
-    pnpm --filter @nexus/billing build && \
-    pnpm --filter @nexus/bots build && \
-    pnpm --filter @nexus/connectors build && \
-    pnpm --filter @nexus/context-pack build && \
-    pnpm --filter @nexus/context-pruner build && \
-    pnpm --filter @nexus/doc-pipeline build && \
-    pnpm --filter @nexus/evals build && \
-    pnpm --filter @nexus/feature-flags build && \
-    pnpm --filter @nexus/gateway-log build && \
-    pnpm --filter @nexus/lens build && \
-    pnpm --filter @nexus/llm-router build && \
-    pnpm --filter @nexus/mail-ingest build && \
-    pnpm --filter @nexus/nlp-utils build && \
-    pnpm --filter @nexus/reranker build && \
-    pnpm --filter @nexus/retrieval build && \
-    pnpm --filter @nexus/run-cost build && \
-    pnpm --filter @nexus/sse build && \
-    pnpm --filter @nexus/voice build && \
-    pnpm --filter @nexus/domain-feeds build && \
-    pnpm --filter @nexus/obs-providers build && \
-    pnpm --filter @nexus/wiki-updater build && \
-    pnpm --filter @nexus/image-transformations build && \
-    pnpm --filter @nexus/llm-tracer build && \
-    pnpm --filter @nexus/posthog-analytics build && \
-    pnpm --filter @nexus/stm build && \
-    pnpm --filter @nexus/agent-runtime build && \
-    pnpm --filter @nexus/brief-engine build && \
-    pnpm --filter @nexus/chat-analyst build && \
-    pnpm --filter @nexus/code-repl build && \
-    pnpm --filter @nexus/domain-forecast build && \
-    pnpm --filter @nexus/geoip build && \
-    pnpm --filter @nexus/hf-research build && \
-    pnpm --filter @nexus/i18n build && \
-    pnpm --filter @nexus/prediction-market build && \
-    pnpm --filter @nexus/rlhf-pipeline build && \
-    pnpm --filter @nexus/scenario-planner build && \
-    pnpm --filter @nexus/scraping-mcp build && \
-    pnpm --filter @nexus/session-sync build && \
-    pnpm --filter @nexus/stealth-browser build && \
-    pnpm --filter @nexus/stream-recovery build && \
-    pnpm --filter @nexus/supervisor build && \
-    pnpm --filter @nexus/think-parser build && \
-    pnpm --filter @nexus/tool-registry build && \
-    pnpm --filter @nexus/video-search build && \
-    pnpm --filter @nexus/wiki build && \
-    pnpm --filter @nexus/autotune build && \
-    pnpm --filter @nexus/parseltongue build && \
-    pnpm --filter @nexus/ragtime build && \
-    pnpm --filter @nexus/ultraplinian build && \
-    pnpm --filter @nexus/api build
+RUN pnpm --filter "@nexus/api..." build
 
 # ─── Stage 3: pruner — pnpm deploy FROM builder so workspace dist/ files exist ─
 # Critical: must base on builder, not deps. pnpm deploy copies workspace packages

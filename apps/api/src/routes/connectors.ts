@@ -22,7 +22,7 @@
  *   LINEAR_CLIENT_ID / LINEAR_CLIENT_SECRET
  */
 
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 
 import {
   ConnectorRegistry,
@@ -40,6 +40,7 @@ import {
 import type { FastifyInstance } from "fastify";
 
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
+import { encryptWithKey, decryptWithKey } from "../lib/secret-crypto.js";
 import { requireAuth } from "../middleware/auth.js";
 
 // ── Registry bootstrap ────────────────────────────────────────────────────────
@@ -202,29 +203,19 @@ function getEncryptionKey(): Buffer | null {
   return Buffer.from(hex, "hex");
 }
 
-/** AES-256-GCM encrypt. Returns base64: iv(12) + tag(16) + ciphertext. */
+/** AES-256-GCM encrypt. Returns base64: iv(12) + tag(16) + ciphertext, or null if no key. */
 function encryptCredential(plaintext: string): string | null {
   const key = getEncryptionKey();
   if (!key) return null;
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
-  const enc = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return Buffer.concat([iv, tag, enc]).toString("base64");
+  return encryptWithKey(key, plaintext);
 }
 
-/** AES-256-GCM decrypt. Input: base64 from encryptCredential. */
+/** AES-256-GCM decrypt. Input: base64 from encryptCredential; null if no key or on tamper. */
 function decryptCredential(ciphertext: string): string | null {
   const key = getEncryptionKey();
   if (!key) return null;
   try {
-    const buf = Buffer.from(ciphertext, "base64");
-    const iv = buf.subarray(0, 12);
-    const tag = buf.subarray(12, 28);
-    const enc = buf.subarray(28);
-    const decipher = createDecipheriv("aes-256-gcm", key, iv);
-    decipher.setAuthTag(tag);
-    return decipher.update(enc).toString("utf8") + decipher.final("utf8");
+    return decryptWithKey(key, ciphertext);
   } catch {
     return null;
   }

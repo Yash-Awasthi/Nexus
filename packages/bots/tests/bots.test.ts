@@ -4,6 +4,7 @@ import {
   BotError,
   SlackBotAdapter,
   TeamsBotAdapter,
+  TelegramBotAdapter,
   echoHandler,
   nullHandler,
   signSlackRequest,
@@ -800,5 +801,136 @@ describe("SlackBotAdapter — allowedUserIds", () => {
       event: { type: "message", text: "<@U999> help me", channel: "C1", user: "U456", ts: "1.0" },
     });
     expect(r3.handled).toBe(true);
+  });
+});
+
+// ── Telegram payloads ────────────────────────────────────────────────────────
+
+function tgUpdate(overrides: Record<string, unknown> = {}) {
+  return {
+    update_id: 100,
+    message: {
+      message_id: 5,
+      from: { id: 4242, is_bot: false, username: "yash", first_name: "Yash" },
+      chat: { id: -1001, type: "supergroup" },
+      text: "Hello Nexus",
+      date: 1717000000,
+      ...overrides,
+    },
+  };
+}
+
+function makeTelegram(
+  handler: BotHandler,
+  fetchFn: FetchFn,
+  extra: Partial<Parameters<typeof TelegramBotAdapter.prototype.constructor>[0]> = {},
+) {
+  return new TelegramBotAdapter({
+    token: "123:ABC",
+    handler,
+    fetch: fetchFn,
+    apiBase: "https://tg.test",
+    ...extra,
+  });
+}
+
+describe("TelegramBotAdapter.handleUpdate", () => {
+  it("normalizes an update, invokes handler, and sends a reply", async () => {
+    const fetchFn = makeFetch([{ ok: true, body: { ok: true } }]);
+    const handler = vi.fn<BotHandler>().mockResolvedValue({ text: "Pong" });
+    const bot = makeTelegram(handler, fetchFn);
+
+    const res = await bot.handleUpdate(tgUpdate());
+
+    expect(res.handled).toBe(true);
+    expect(res.sendFailed).toBeFalsy();
+    const msg = handler.mock.calls[0]![0] as BotMessage;
+    expect(msg.platform).toBe("telegram");
+    expect(msg.channelId).toBe("-1001");
+    expect(msg.userId).toBe("4242");
+    expect(msg.text).toBe("Hello Nexus");
+    // sendMessage called against the injected API base + token
+    expect(fetchFn).toHaveBeenCalledWith(
+      "https://tg.test/bot123:ABC/sendMessage",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("ignores updates from other bots (loop prevention)", async () => {
+    const handler = vi.fn<BotHandler>().mockResolvedValue({ text: "x" });
+    const bot = makeTelegram(handler, makeFetch());
+    const res = await bot.handleUpdate(tgUpdate({ from: { id: 1, is_bot: true } }));
+    expect(res.handled).toBe(false);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("ignores empty-text and message-less updates", async () => {
+    const bot = makeTelegram(vi.fn<BotHandler>().mockResolvedValue({ text: "x" }), makeFetch());
+    expect((await bot.handleUpdate(tgUpdate({ text: "" }))).handled).toBe(false);
+    expect((await bot.handleUpdate({ update_id: 1 })).handled).toBe(false);
+  });
+
+  it("verifies the webhook secret token and rejects mismatches", async () => {
+    const handler = vi.fn<BotHandler>().mockResolvedValue({ text: "ok" });
+    const bot = makeTelegram(handler, makeFetch(), { secretToken: "s3cret" });
+
+    // Correct secret → handled
+    const ok = await bot.handleUpdate(tgUpdate(), {
+      "x-telegram-bot-api-secret-token": "s3cret",
+    });
+    expect(ok.handled).toBe(true);
+
+    // Wrong secret → throws SIGNATURE_INVALID
+    await expect(
+      bot.handleUpdate(tgUpdate(), { "x-telegram-bot-api-secret-token": "nope" }),
+    ).rejects.toMatchObject({ code: "SIGNATURE_INVALID" });
+  });
+
+  it("respects command trigger mode", async () => {
+    const handler = vi.fn<BotHandler>().mockResolvedValue({ text: "ran" });
+    const bot = makeTelegram(handler, makeFetch(), { triggerMode: "command" as BotTriggerMode });
+
+    expect((await bot.handleUpdate(tgUpdate({ text: "just chatting" }))).handled).toBe(false);
+    expect((await bot.handleUpdate(tgUpdate({ text: "/start" }))).handled).toBe(true);
+  });
+
+  it("enforces the user allowlist", async () => {
+    const handler = vi.fn<BotHandler>().mockResolvedValue({ text: "hi" });
+    const bot = makeTelegram(handler, makeFetch(), { allowedUserIds: ["999"] });
+    const res = await bot.handleUpdate(tgUpdate()); // user 4242 not allowed
+    expect(res.handled).toBe(false);
+  });
+
+  it("reports sendFailed when the Telegram API rejects", async () => {
+    const fetchFn = makeFetch([{ ok: false, status: 403, body: { ok: false, description: "blocked" } }]);
+    const bot = makeTelegram(echoHandler, fetchFn);
+    const res = await bot.handleUpdate(tgUpdate());
+    expect(res.handled).toBe(true);
+    expect(res.sendFailed).toBe(true);
+  });
+
+  it("emits task.before / task.after hooks", async () => {
+    const hooks = makeHooks();
+    const bot = makeTelegram(echoHandler, makeFetch(), { hooks });
+    await bot.handleUpdate(tgUpdate());
+    expect(hooks.emit).toHaveBeenCalledWith("task.before", expect.objectContaining({ platform: "telegram" }));
+    expect(hooks.emit).toHaveBeenCalledWith("task.after", expect.objectContaining({ platform: "telegram" }));
+  });
+});
+
+describe("TelegramBotAdapter.pollOnce", () => {
+  it("dispatches fetched updates and advances the offset", async () => {
+    const handler = vi.fn<BotHandler>().mockResolvedValue({ text: "ok" });
+    // First fetch = getUpdates batch; subsequent = sendMessage calls
+    const fetchFn = makeFetch([
+      { ok: true, body: { ok: true, result: [tgUpdate({}), { update_id: 101, message: { message_id: 6, from: { id: 7 }, chat: { id: 8 }, text: "yo", date: 1 } }] } },
+      { ok: true, body: { ok: true } },
+      { ok: true, body: { ok: true } },
+    ]);
+    const bot = makeTelegram(handler, fetchFn);
+    const { processed, nextOffset } = await bot.pollOnce(100);
+    expect(processed).toBe(2);
+    expect(nextOffset).toBe(102); // max update_id (101) + 1
+    expect(handler).toHaveBeenCalledTimes(2);
   });
 });

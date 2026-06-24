@@ -80,6 +80,7 @@ export default [
   route("sandbox", "routes/sandbox.tsx"),
   route("agents", "routes/agents.tsx"),
   route("api-tokens", "routes/api-tokens.tsx"),
+  route("provider-keys", "routes/provider-keys.tsx"),
   route("admin/feature-flags", "routes/admin-feature-flags.tsx"),
   route("standard-answers", "routes/standard-answers.tsx"),
   route("admin/feedback", "routes/admin-feedback.tsx"),

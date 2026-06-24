@@ -106,7 +106,10 @@ export class DeliberationEngine {
   /**
    * Run a full deliberation and return a CouncilResponse.
    */
-  async deliberate(request: CouncilRequest): Promise<CouncilResponse> {
+  async deliberate(
+    request: CouncilRequest,
+    opts?: { onVote?: (vote: ModelVote) => void },
+  ): Promise<CouncilResponse> {
     const startTime = Date.now();
     const proposalId = randomUUID();
 
@@ -167,7 +170,7 @@ export class DeliberationEngine {
         // Vote parsing uses the raw content so signal words aren't stripped.
         const reasoning = applySTMs(response.content, this.config.stmModules);
 
-        return {
+        const vote = {
           model: response.model,
           provider: "groq",
           vote: parseVote(response.content),
@@ -175,9 +178,11 @@ export class DeliberationEngine {
           confidence: parseConfidence(response.content),
           latencyMs: response.latencyMs,
         } satisfies ModelVote;
+        opts?.onVote?.(vote);
+        return vote;
       } catch (err) {
         // Non-fatal: record abstain for failed votes
-        return {
+        const vote = {
           model: this.config.defaultModel,
           provider: "unknown",
           vote: "abstain" as const,
@@ -185,6 +190,8 @@ export class DeliberationEngine {
           confidence: 0,
           latencyMs: Date.now() - voteStart,
         } satisfies ModelVote;
+        opts?.onVote?.(vote);
+        return vote;
       }
     });
 

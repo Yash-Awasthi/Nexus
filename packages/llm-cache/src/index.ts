@@ -349,3 +349,183 @@ export class CachingLLMProvider implements LLMProvider {
     return this.cache;
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TieredPromptCache — multi-layer (L1 in-memory → L2 shared/Redis)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Two-layer cache: a fast process-local L1 (e.g. {@link MemoryPromptCache})
+ * fronting a slower shared L2 (e.g. {@link KVPromptCache} on Redis).
+ *
+ * - get: L1 first; on L1 miss, try L2 and promote the hit into L1.
+ * - set: write-through to both layers.
+ * - stats: hits/misses are this tier's own counters; size reflects L1.
+ *
+ * This cuts both latency (most hits served from memory) and cost (cross-process
+ * sharing means one process's miss warms the others via L2).
+ */
+export class TieredPromptCache implements PromptCache {
+  private _hits = 0;
+  private _misses = 0;
+  private readonly l1TtlMs?: number;
+
+  constructor(
+    private readonly l1: PromptCache,
+    private readonly l2: PromptCache,
+    opts: { l1TtlMs?: number } = {},
+  ) {
+    this.l1TtlMs = opts.l1TtlMs;
+  }
+
+  async get(key: string): Promise<LLMResponse | undefined> {
+    const fromL1 = await this.l1.get(key);
+    if (fromL1 !== undefined) {
+      this._hits++;
+      return fromL1;
+    }
+    const fromL2 = await this.l2.get(key);
+    if (fromL2 !== undefined) {
+      this._hits++;
+      // Promote to L1 so subsequent reads are local.
+      await this.l1.set(key, fromL2, this.l1TtlMs);
+      return fromL2;
+    }
+    this._misses++;
+    return undefined;
+  }
+
+  async set(key: string, response: LLMResponse, ttlMs?: number): Promise<void> {
+    await Promise.all([
+      this.l1.set(key, response, this.l1TtlMs ?? ttlMs),
+      this.l2.set(key, response, ttlMs),
+    ]);
+  }
+
+  async delete(key: string): Promise<void> {
+    await Promise.all([this.l1.delete(key), this.l2.delete(key)]);
+  }
+
+  async clear(): Promise<void> {
+    await Promise.all([this.l1.clear(), this.l2.clear()]);
+    this._hits = 0;
+    this._misses = 0;
+  }
+
+  async stats(): Promise<CacheStats> {
+    const l1 = await this.l1.stats();
+    return { hits: this._hits, misses: this._misses, size: l1.size };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SemanticCachingLLMProvider — near-duplicate matching via embeddings
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Embeds a string into a fixed-length vector. Injectable (any embedding model). */
+export type EmbedFn = (text: string) => Promise<number[]>;
+
+/** Cosine similarity of two equal-length vectors. Returns 0 for degenerate input. */
+export function cosineSimilarity(a: readonly number[], b: readonly number[]): number {
+  if (a.length === 0 || a.length !== b.length) return 0;
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i]! * b[i]!;
+    na += a[i]! * a[i]!;
+    nb += b[i]! * b[i]!;
+  }
+  if (na === 0 || nb === 0) return 0;
+  return dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
+
+export interface SemanticCachingOptions {
+  /** Minimum cosine similarity to treat a prior request as a hit (default 0.95). */
+  threshold?: number;
+  /** Max entries kept in the in-memory vector index (default 1000, FIFO eviction). */
+  maxEntries?: number;
+  /** Bypass when request.metadata.noCache is truthy (default true). */
+  respectNoCache?: boolean;
+  /** Text to embed for a request. Default: the last user message content. */
+  textFn?: (request: LLMRequest) => string;
+}
+
+interface SemanticEntry {
+  embedding: number[];
+  model: string;
+  response: LLMResponse;
+}
+
+/**
+ * Wraps an {@link LLMProvider} with semantic (approximate) response caching.
+ *
+ * Exact-match caches miss when a user rephrases a question. This provider embeds
+ * each request and returns a cached response when a prior request for the SAME
+ * model scores ≥ `threshold` cosine similarity — catching paraphrases.
+ *
+ * The vector index is in-process and bounded; pair it with {@link CachingLLMProvider}
+ * (exact + persistent) for a full cache stack. Embedding is injectable for testing.
+ */
+export class SemanticCachingLLMProvider implements LLMProvider {
+  readonly name: string;
+  readonly models: readonly string[];
+
+  private readonly index: SemanticEntry[] = [];
+  private readonly threshold: number;
+  private readonly maxEntries: number;
+  private readonly respectNoCache: boolean;
+  private readonly textFn: (request: LLMRequest) => string;
+  private _hits = 0;
+  private _misses = 0;
+
+  constructor(
+    private readonly inner: LLMProvider,
+    private readonly embed: EmbedFn,
+    opts: SemanticCachingOptions = {},
+  ) {
+    this.name = `semantic(${inner.name})`;
+    this.models = inner.models;
+    this.threshold = opts.threshold ?? 0.95;
+    this.maxEntries = opts.maxEntries ?? 1000;
+    this.respectNoCache = opts.respectNoCache ?? true;
+    this.textFn = opts.textFn ?? defaultSemanticText;
+  }
+
+  async complete(request: LLMRequest): Promise<LLMResponse> {
+    const skip = this.respectNoCache && !!request.metadata?.noCache;
+    if (skip) return this.inner.complete(request);
+
+    const embedding = await this.embed(this.textFn(request));
+
+    // Search the index for the best same-model match above the threshold.
+    let best: { entry: SemanticEntry; score: number } | undefined;
+    for (const entry of this.index) {
+      if (entry.model !== request.model) continue;
+      const score = cosineSimilarity(embedding, entry.embedding);
+      if (score >= this.threshold && (!best || score > best.score)) {
+        best = { entry, score };
+      }
+    }
+    if (best) {
+      this._hits++;
+      return { ...best.entry.response, cached: true };
+    }
+
+    this._misses++;
+    const response = await this.inner.complete(request);
+    this.index.push({ embedding, model: request.model, response });
+    if (this.index.length > this.maxEntries) this.index.shift(); // FIFO eviction
+    return response;
+  }
+
+  stats(): CacheStats {
+    return { hits: this._hits, misses: this._misses, size: this.index.length };
+  }
+}
+
+/** Default semantic text: last user message, else concatenated message contents. */
+function defaultSemanticText(request: LLMRequest): string {
+  const lastUser = [...request.messages].reverse().find((m) => m.role === "user");
+  return lastUser?.content ?? request.messages.map((m) => m.content).join("\n");
+}

@@ -18,12 +18,31 @@
 
 // ── Core types ─────────────────────────────────────────────────────────────────
 
-export type LlmRole = "user" | "assistant" | "system";
+export type LlmRole = "user" | "assistant" | "system" | "tool";
+
+/** A tool/function the model may call (JSON-Schema parameters). */
+export interface LlmToolDefinition {
+  name: string;
+  description: string;
+  /** JSON Schema describing the tool's input arguments. */
+  parameters: Record<string, unknown>;
+}
+
+/** A tool call emitted by the model. */
+export interface LlmToolCall {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+}
 
 /** Llm message interface definition. */
 export interface LlmMessage {
   role: LlmRole;
   content: string;
+  /** Present on assistant messages that requested tool calls. */
+  toolCalls?: LlmToolCall[];
+  /** Present on `role: "tool"` messages — links the result to its call. */
+  toolCallId?: string;
 }
 
 /** Llm request options interface definition. */
@@ -36,6 +55,10 @@ export interface LlmRequestOptions {
   topP?: number;
   stream?: boolean;
   stop?: string[];
+  /** Tools advertised to the model for native tool-calling. */
+  tools?: LlmToolDefinition[];
+  /** Tool-choice policy (provider support varies). */
+  toolChoice?: "auto" | "none" | "required";
 }
 
 /** Llm usage interface definition. */
@@ -53,6 +76,8 @@ export interface LlmResponse {
   usage: LlmUsage;
   finishReason: "stop" | "length" | "tool_calls" | "error" | "unknown";
   durationMs: number;
+  /** Tool calls the model requested this turn (native tool-calling). */
+  toolCalls?: LlmToolCall[];
 }
 
 /** Stream delta interface definition. */
@@ -60,6 +85,8 @@ export interface StreamDelta {
   delta: string;
   done: boolean;
   usage?: LlmUsage;
+  /** On the final (done) delta: tool calls accumulated during the stream. */
+  toolCalls?: LlmToolCall[];
 }
 
 /** Stream handler type alias. */
@@ -145,6 +172,108 @@ function mapHttpError(status: number, provider: string, message = ""): LlmError 
   if (status === 413 || status === 422)
     return new LlmError("CONTEXT_LENGTH_EXCEEDED", message || "Context too long", provider, status);
   return new LlmError("SERVER_ERROR", message || `HTTP ${status}`, provider, status);
+}
+
+// ── Tool-calling translation helpers ────────────────────────────────────────────
+//
+// Drivers speak provider-specific wire formats; the loop speaks the
+// provider-agnostic LlmMessage / LlmToolDefinition / LlmToolCall shapes above.
+// These helpers translate in both directions so tool-calling works identically
+// across providers.
+
+function safeJsonParse(s: string): Record<string, unknown> {
+  try {
+    const v: unknown = JSON.parse(s);
+    return typeof v === "object" && v !== null ? (v as Record<string, unknown>) : { value: v };
+  } catch {
+    return { raw: s };
+  }
+}
+
+/** Provider-agnostic messages → OpenAI chat-completions format. */
+function toOpenAIMessages(
+  messages: LlmMessage[],
+  systemPrompt?: string,
+): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [];
+  if (systemPrompt) out.push({ role: "system", content: systemPrompt });
+  for (const m of messages) {
+    if (m.role === "tool") {
+      out.push({ role: "tool", tool_call_id: m.toolCallId ?? "", content: m.content });
+    } else if (m.role === "assistant" && m.toolCalls?.length) {
+      out.push({
+        role: "assistant",
+        content: m.content || null,
+        tool_calls: m.toolCalls.map((tc) => ({
+          id: tc.id,
+          type: "function",
+          function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
+        })),
+      });
+    } else {
+      out.push({ role: m.role, content: m.content });
+    }
+  }
+  return out;
+}
+
+/** Tool definitions → OpenAI `tools` array. */
+function toOpenAITools(tools?: LlmToolDefinition[]): Record<string, unknown>[] | undefined {
+  if (!tools?.length) return undefined;
+  return tools.map((t) => ({
+    type: "function",
+    function: { name: t.name, description: t.description, parameters: t.parameters },
+  }));
+}
+
+/** Parse OpenAI `message.tool_calls` (non-streaming) → LlmToolCall[]. */
+function parseOpenAIToolCalls(rawMessage: unknown): LlmToolCall[] {
+  const arr = (
+    rawMessage as
+      | { tool_calls?: { id?: string; function?: { name?: string; arguments?: string } }[] }
+      | undefined
+  )?.tool_calls;
+  if (!arr?.length) return [];
+  return arr.map((tc, i) => ({
+    id: tc.id ?? `call_${i}`,
+    name: tc.function?.name ?? "",
+    arguments: safeJsonParse(tc.function?.arguments ?? "{}"),
+  }));
+}
+
+/** Provider-agnostic messages → Anthropic `{ system, messages }`. */
+function toAnthropicMessages(messages: LlmMessage[]): {
+  system?: string;
+  messages: Record<string, unknown>[];
+} {
+  let system: string | undefined;
+  const out: Record<string, unknown>[] = [];
+  for (const m of messages) {
+    if (m.role === "system") {
+      system = system ? `${system}\n\n${m.content}` : m.content;
+    } else if (m.role === "tool") {
+      out.push({
+        role: "user",
+        content: [{ type: "tool_result", tool_use_id: m.toolCallId ?? "", content: m.content }],
+      });
+    } else if (m.role === "assistant" && m.toolCalls?.length) {
+      const blocks: Record<string, unknown>[] = [];
+      if (m.content) blocks.push({ type: "text", text: m.content });
+      for (const tc of m.toolCalls) {
+        blocks.push({ type: "tool_use", id: tc.id, name: tc.name, input: tc.arguments });
+      }
+      out.push({ role: "assistant", content: blocks });
+    } else {
+      out.push({ role: m.role, content: m.content });
+    }
+  }
+  return { system, messages: out };
+}
+
+/** Tool definitions → Anthropic `tools` array. */
+function toAnthropicTools(tools?: LlmToolDefinition[]): Record<string, unknown>[] | undefined {
+  if (!tools?.length) return undefined;
+  return tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters }));
 }
 
 // ── Base driver ────────────────────────────────────────────────────────────────
@@ -274,7 +403,7 @@ abstract class BaseDriver implements LlmDriver {
     // Default: call complete and emit as single delta (used by test path)
     const result = await this.complete({ ...opts, stream: false });
     await handler({ delta: result.content, done: false, usage: result.usage });
-    await handler({ delta: "", done: true, usage: result.usage });
+    await handler({ delta: "", done: true, usage: result.usage, toolCalls: result.toolCalls });
     return result;
   }
 
@@ -289,8 +418,9 @@ abstract class BaseDriver implements LlmDriver {
     usage: LlmUsage,
     durationMs: number,
     finishReason: LlmResponse["finishReason"] = "stop",
+    toolCalls?: LlmToolCall[],
   ): LlmResponse {
-    return { id, content, model, usage, finishReason, durationMs };
+    return { id, content, model, usage, finishReason, durationMs, toolCalls };
   }
 }
 
@@ -316,36 +446,53 @@ export class AnthropicDriver extends BaseDriver {
     super(transport);
     this.apiKey = config.apiKey;
     this.baseUrl = config.baseUrl ?? "https://api.anthropic.com";
-    this.model = config.model ?? "claude-3-5-sonnet-20241022";
+    this.model = config.model ?? "claude-sonnet-4-6";
   }
 
   async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
     const t0 = Date.now();
-    const systemMsg = opts.systemPrompt ?? opts.messages.find((m) => m.role === "system")?.content;
-    const messages = opts.messages.filter((m) => m.role !== "system");
+    const { system: msgSystem, messages } = toAnthropicMessages(opts.messages);
+    const systemMsg = opts.systemPrompt ?? msgSystem;
+    const tools = toAnthropicTools(opts.tools);
     const body = {
       model: opts.model ?? this.model,
       max_tokens: opts.maxTokens ?? 4096,
       messages,
       ...(systemMsg ? { system: systemMsg } : {}),
       ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+      ...(tools ? { tools } : {}),
     };
     const raw = (await this.transport.post(`${this.baseUrl}/v1/messages`, body, {
       "x-api-key": this.apiKey,
       "anthropic-version": "2023-06-01",
     })) as Record<string, unknown>;
 
-    const content = (raw["content"] as { text: string }[])?.[0]?.text ?? "";
+    const blocks = (raw["content"] as Record<string, unknown>[] | undefined) ?? [];
+    let content = "";
+    const toolCalls: LlmToolCall[] = [];
+    for (const b of blocks) {
+      if (b["type"] === "tool_use")
+        toolCalls.push({
+          id: (b["id"] as string) ?? `toolu_${toolCalls.length}`,
+          name: (b["name"] as string) ?? "",
+          arguments: (b["input"] as Record<string, unknown>) ?? {},
+        });
+      // Any block carrying text counts as text (covers {type:"text",text} and bare {text}).
+      else if (typeof b["text"] === "string") content += b["text"] as string;
+    }
     const usage = raw["usage"] as { input_tokens?: number; output_tokens?: number } | undefined;
     const inputTokens =
-      usage?.input_tokens ?? estimateTokens(messages.map((m) => m.content).join(" "));
+      usage?.input_tokens ?? estimateTokens(messages.map((m) => JSON.stringify(m)).join(" "));
     const outputTokens = usage?.output_tokens ?? estimateTokens(content);
+    const stopReason = raw["stop_reason"] as string | undefined;
     return this.makeResponse(
       (raw["id"] as string) ?? "anth-resp",
       content,
       opts.model ?? this.model,
       this.makeUsage(inputTokens, outputTokens),
       Date.now() - t0,
+      stopReason === "tool_use" || toolCalls.length ? "tool_calls" : "stop",
+      toolCalls.length ? toolCalls : undefined,
     );
   }
 
@@ -353,8 +500,9 @@ export class AnthropicDriver extends BaseDriver {
     if (!this._useDefaultTransport) return super.stream(opts, handler);
 
     const t0 = Date.now();
-    const systemMsg = opts.systemPrompt ?? opts.messages.find((m) => m.role === "system")?.content;
-    const messages = opts.messages.filter((m) => m.role !== "system");
+    const { system: msgSystem, messages } = toAnthropicMessages(opts.messages);
+    const systemMsg = opts.systemPrompt ?? msgSystem;
+    const tools = toAnthropicTools(opts.tools);
     const body = {
       model: opts.model ?? this.model,
       max_tokens: opts.maxTokens ?? 4096,
@@ -362,6 +510,7 @@ export class AnthropicDriver extends BaseDriver {
       stream: true,
       ...(systemMsg ? { system: systemMsg } : {}),
       ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+      ...(tools ? { tools } : {}),
     };
 
     let content = "";
@@ -369,6 +518,9 @@ export class AnthropicDriver extends BaseDriver {
     let responseModel = opts.model ?? this.model;
     let inputTokens = 0;
     let outputTokens = 0;
+    let stopReason: string | undefined;
+    // Accumulate tool_use blocks by content-block index (input_json_delta is streamed).
+    const toolBlocks = new Map<number, { id: string; name: string; json: string }>();
 
     for await (const line of this.sseLines(`${this.baseUrl}/v1/messages`, body, {
       "x-api-key": this.apiKey,
@@ -376,8 +528,7 @@ export class AnthropicDriver extends BaseDriver {
     })) {
       let event: Record<string, unknown>;
       try {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        event = JSON.parse(line);
+        event = JSON.parse(line) as Record<string, unknown>;
       } catch {
         continue;
       }
@@ -389,24 +540,60 @@ export class AnthropicDriver extends BaseDriver {
         if (msg?.["model"]) responseModel = msg["model"] as string;
         const u = msg?.["usage"] as Record<string, number> | undefined;
         if (u?.["input_tokens"]) inputTokens = u["input_tokens"];
+      } else if (type === "content_block_start") {
+        const idx = event["index"] as number;
+        const block = event["content_block"] as Record<string, unknown> | undefined;
+        if (block?.["type"] === "tool_use") {
+          toolBlocks.set(idx, {
+            id: (block["id"] as string) ?? `toolu_${idx}`,
+            name: (block["name"] as string) ?? "",
+            json: "",
+          });
+        }
       } else if (type === "content_block_delta") {
-        const delta = ((event["delta"] as Record<string, unknown>)?.["text"] as string) ?? "";
-        if (delta) {
-          content += delta;
-          await handler({ delta, done: false });
+        const idx = event["index"] as number;
+        const delta = event["delta"] as Record<string, unknown> | undefined;
+        if (delta?.["type"] === "input_json_delta") {
+          const block = toolBlocks.get(idx);
+          if (block) block.json += (delta["partial_json"] as string) ?? "";
+        } else {
+          const text = (delta?.["text"] as string) ?? "";
+          if (text) {
+            content += text;
+            await handler({ delta: text, done: false });
+          }
         }
       } else if (type === "message_delta") {
+        const d = event["delta"] as Record<string, unknown> | undefined;
+        if (d?.["stop_reason"]) stopReason = d["stop_reason"] as string;
         const u = event["usage"] as Record<string, number> | undefined;
         if (u?.["output_tokens"]) outputTokens = u["output_tokens"];
       }
     }
 
+    const toolCalls: LlmToolCall[] = [...toolBlocks.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([, b]) => ({ id: b.id, name: b.name, arguments: safeJsonParse(b.json || "{}") }));
+
     const usageObj = this.makeUsage(
-      inputTokens || estimateTokens(messages.map((m) => m.content).join(" ")),
+      inputTokens || estimateTokens(messages.map((m) => JSON.stringify(m)).join(" ")),
       outputTokens || estimateTokens(content),
     );
-    await handler({ delta: "", done: true, usage: usageObj });
-    return this.makeResponse(msgId, content, responseModel, usageObj, Date.now() - t0);
+    await handler({
+      delta: "",
+      done: true,
+      usage: usageObj,
+      toolCalls: toolCalls.length ? toolCalls : undefined,
+    });
+    return this.makeResponse(
+      msgId,
+      content,
+      responseModel,
+      usageObj,
+      Date.now() - t0,
+      stopReason === "tool_use" || toolCalls.length ? "tool_calls" : "stop",
+      toolCalls.length ? toolCalls : undefined,
+    );
   }
 }
 
@@ -423,29 +610,30 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
 
   async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
     const t0 = Date.now();
-    const messages = opts.systemPrompt
-      ? [{ role: "system", content: opts.systemPrompt }, ...opts.messages]
-      : opts.messages;
+    const messages = toOpenAIMessages(opts.messages, opts.systemPrompt);
+    const tools = toOpenAITools(opts.tools);
     const body: Record<string, unknown> = {
       model: opts.model ?? this.model,
       messages,
       ...(opts.maxTokens !== undefined ? { max_tokens: opts.maxTokens } : {}),
       ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
       ...(opts.stop ? { stop: opts.stop } : {}),
+      ...(tools ? { tools, ...(opts.toolChoice ? { tool_choice: opts.toolChoice } : {}) } : {}),
     };
     const raw = (await this.transport.post(`${this.baseUrl}/chat/completions`, body, {
       Authorization: `Bearer ${this.apiKey}`,
     })) as Record<string, unknown>;
 
     const choice = (
-      raw["choices"] as { message: { content: string }; finish_reason: string }[]
+      raw["choices"] as { message: Record<string, unknown>; finish_reason: string }[]
     )?.[0];
-    const content = choice?.message?.content ?? "";
+    const content = (choice?.message?.["content"] as string) ?? "";
+    const toolCalls = parseOpenAIToolCalls(choice?.message);
     const usage = raw["usage"] as
       | { prompt_tokens?: number; completion_tokens?: number }
       | undefined;
     const inputTokens =
-      usage?.prompt_tokens ?? estimateTokens(messages.map((m) => m.content).join(" "));
+      usage?.prompt_tokens ?? estimateTokens(opts.messages.map((m) => m.content).join(" "));
     const outputTokens = usage?.completion_tokens ?? estimateTokens(content);
     return this.makeResponse(
       (raw["id"] as string) ?? `${this.provider}-resp`,
@@ -453,7 +641,9 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
       opts.model ?? this.model,
       this.makeUsage(inputTokens, outputTokens),
       Date.now() - t0,
-      (choice?.finish_reason as LlmResponse["finishReason"]) ?? "stop",
+      (choice?.finish_reason as LlmResponse["finishReason"]) ??
+        (toolCalls.length ? "tool_calls" : "stop"),
+      toolCalls.length ? toolCalls : undefined,
     );
   }
 
@@ -461,9 +651,8 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
     if (!this._useDefaultTransport) return super.stream(opts, handler);
 
     const t0 = Date.now();
-    const messages = opts.systemPrompt
-      ? [{ role: "system", content: opts.systemPrompt }, ...opts.messages]
-      : opts.messages;
+    const messages = toOpenAIMessages(opts.messages, opts.systemPrompt);
+    const tools = toOpenAITools(opts.tools);
     const body: Record<string, unknown> = {
       model: opts.model ?? this.model,
       messages,
@@ -471,6 +660,7 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
       ...(opts.maxTokens !== undefined ? { max_tokens: opts.maxTokens } : {}),
       ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
       ...(opts.stop ? { stop: opts.stop } : {}),
+      ...(tools ? { tools, ...(opts.toolChoice ? { tool_choice: opts.toolChoice } : {}) } : {}),
     };
 
     let content = "";
@@ -478,14 +668,15 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
     let finishReason: LlmResponse["finishReason"] = "stop";
     let promptTokens = 0;
     let completionTokens = 0;
+    // Accumulate streaming tool_calls by their delta index.
+    const toolAcc = new Map<number, { id: string; name: string; args: string }>();
 
     for await (const line of this.sseLines(`${this.baseUrl}/chat/completions`, body, {
       Authorization: `Bearer ${this.apiKey}`,
     })) {
       let event: Record<string, unknown>;
       try {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        event = JSON.parse(line);
+        event = JSON.parse(line) as Record<string, unknown>;
       } catch {
         continue;
       }
@@ -495,18 +686,38 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
 
       const choices = event["choices"] as
         | {
-            delta?: { content?: string };
+            delta?: {
+              content?: string;
+              tool_calls?: {
+                index?: number;
+                id?: string;
+                function?: { name?: string; arguments?: string };
+              }[];
+            };
             finish_reason?: string;
           }[]
         | undefined;
 
-      const delta = choices?.[0]?.delta?.content ?? "";
+      const choice0 = choices?.[0];
+      const delta = choice0?.delta?.content ?? "";
       if (delta) {
         content += delta;
         await handler({ delta, done: false });
       }
 
-      const fr = choices?.[0]?.finish_reason;
+      const tcDeltas = choice0?.delta?.tool_calls;
+      if (tcDeltas?.length) {
+        for (const tc of tcDeltas) {
+          const idx = tc.index ?? 0;
+          const acc = toolAcc.get(idx) ?? { id: "", name: "", args: "" };
+          if (tc.id) acc.id = tc.id;
+          if (tc.function?.name) acc.name = tc.function.name;
+          if (tc.function?.arguments) acc.args += tc.function.arguments;
+          toolAcc.set(idx, acc);
+        }
+      }
+
+      const fr = choice0?.finish_reason;
       if (fr) finishReason = fr as LlmResponse["finishReason"];
 
       const usage = event["usage"] as
@@ -516,18 +727,32 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
       if (usage?.completion_tokens) completionTokens = usage.completion_tokens;
     }
 
+    const toolCalls: LlmToolCall[] = [...toolAcc.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([i, acc]) => ({
+        id: acc.id || `call_${i}`,
+        name: acc.name,
+        arguments: safeJsonParse(acc.args || "{}"),
+      }));
+
     const usageObj = this.makeUsage(
-      promptTokens || estimateTokens(messages.map((m) => m.content).join(" ")),
+      promptTokens || estimateTokens(opts.messages.map((m) => m.content).join(" ")),
       completionTokens || estimateTokens(content),
     );
-    await handler({ delta: "", done: true, usage: usageObj });
+    await handler({
+      delta: "",
+      done: true,
+      usage: usageObj,
+      toolCalls: toolCalls.length ? toolCalls : undefined,
+    });
     return this.makeResponse(
       id,
       content,
       opts.model ?? this.model,
       usageObj,
       Date.now() - t0,
-      finishReason,
+      toolCalls.length ? "tool_calls" : finishReason,
+      toolCalls.length ? toolCalls : undefined,
     );
   }
 }
@@ -900,6 +1125,62 @@ export class CodestralDriver extends OpenAICompatibleDriver {
   }
 }
 
+// ── 16. xAI (Grok) ────────────────────────────────────────────────────────────
+
+export class XaiDriver extends OpenAICompatibleDriver {
+  readonly provider = "xai";
+  readonly model: string;
+  protected baseUrl: string;
+
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://api.x.ai/v1";
+    this.model = config.model ?? "grok-2-latest";
+  }
+}
+
+// ── 17. Together AI ───────────────────────────────────────────────────────────
+
+export class TogetherDriver extends OpenAICompatibleDriver {
+  readonly provider = "together";
+  readonly model: string;
+  protected baseUrl: string;
+
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://api.together.xyz/v1";
+    this.model = config.model ?? "meta-llama/Llama-3.3-70B-Instruct-Turbo";
+  }
+}
+
+// ── 18. Perplexity ────────────────────────────────────────────────────────────
+
+export class PerplexityDriver extends OpenAICompatibleDriver {
+  readonly provider = "perplexity";
+  readonly model: string;
+  protected baseUrl: string;
+
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://api.perplexity.ai";
+    this.model = config.model ?? "sonar";
+  }
+}
+
+// ── 19. Cohere (OpenAI-compatibility endpoint) ────────────────────────────────
+
+export class CohereDriver extends OpenAICompatibleDriver {
+  readonly provider = "cohere";
+  readonly model: string;
+  protected baseUrl: string;
+
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://api.cohere.ai/compatibility/v1";
+    this.model = config.model ?? "command-r-plus";
+  }
+}
+
 // ── Driver registry + factory ──────────────────────────────────────────────────
 
 export type ProviderName =
@@ -916,7 +1197,11 @@ export type ProviderName =
   | "nvidia_nim"
   | "cerebras"
   | "kimi"
-  | "codestral";
+  | "codestral"
+  | "xai"
+  | "together"
+  | "perplexity"
+  | "cohere";
 
 /** Driver registration interface definition. */
 export interface DriverRegistration {
@@ -1020,7 +1305,7 @@ export async function probeLocalModel(
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     // Ollama returns { models: [{ name, details: { family, parameter_size } }] }
     const data = (await res.json()) as {
-      models?: Array<{ name: string; details?: { family?: string; parameter_size?: string } }>;
+      models?: { name: string; details?: { family?: string; parameter_size?: string } }[];
     };
     const match = (data.models ?? []).find(
       (m) => m.name === config.modelId || m.name.startsWith(config.modelId.split(":")[0] ?? ""),

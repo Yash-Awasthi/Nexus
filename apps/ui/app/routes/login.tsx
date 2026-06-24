@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
+import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router";
+
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Separator } from "~/components/ui/separator";
-import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useAuth } from "~/context/AuthContext";
 
 const OAUTH_ERRORS: Record<string, string> = {
@@ -22,7 +23,7 @@ export default function LoginPage() {
   const [searchParams] = useSearchParams();
   const { login, isAuthenticated } = useAuth();
 
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -43,12 +44,12 @@ export default function LoginPage() {
     }
   }, [searchParams]);
 
-  const handleSignIn = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
     try {
-      await login(username, password);
+      await login(email, password);
       navigate("/chat");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed. Please try again.");
@@ -102,13 +103,14 @@ export default function LoginPage() {
 
             <form onSubmit={handleSignIn} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
-                  id="username"
-                  placeholder="Enter your username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  autoComplete="username"
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
                   required
                 />
               </div>

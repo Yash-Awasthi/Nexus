@@ -133,10 +133,10 @@ describe("requireAuthWithTier", () => {
 
   it("extracts tier from valid JWT and attaches to request", async () => {
     process.env.NEXUS_JWT_SECRET = SECRET;
-    // dev bypass — NEXUS_API_KEY not set so requireAuth passes unconditionally
+    // With a JWT secret configured, requireAuth validates the token (no dev bypass).
     delete process.env.NEXUS_API_KEY;
     const token = makeJwt(
-      { sub: "u5", tier: "pro", exp: Math.floor(Date.now() / 1000) + 3600 },
+      { sub: "u5", role: "admin", tier: "pro", exp: Math.floor(Date.now() / 1000) + 3600 },
       SECRET,
     );
     const req = makeRequest(`Bearer ${token}`);

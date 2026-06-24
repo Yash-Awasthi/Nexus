@@ -33,20 +33,40 @@ import {
   type MemoryFact,
 } from "@nexus/context-pack";
 import { db } from "@nexus/db";
-import { runtimeTasks, signals, memoryEntries } from "@nexus/db/schema";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { desc, gte, or, eq } from "drizzle-orm";
+import { runtimeTasks, signals } from "@nexus/db/schema";
+import { desc, or, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+import {
+  FixedEmbedder,
+  GroqEmbedder,
+  InMemoryStore,
+  MemoryManager,
+  PgVectorStore,
+} from "@nexus/memory";
 
 import { requireAuth } from "../middleware/auth.js";
+
+// ── Singleton memory manager (mirrors agents.ts / memory.ts pattern) ──
+const _ctxMemStore = process.env.DATABASE_URL
+  ? new PgVectorStore({ databaseUrl: process.env.DATABASE_URL })
+  : new InMemoryStore();
+
+const _ctxEmbedder = process.env.GROQ_API_KEY
+  ? new GroqEmbedder({ apiKey: process.env.GROQ_API_KEY })
+  : new FixedEmbedder();
+
+const _ctxMemManager = new MemoryManager({
+  store: _ctxMemStore,
+  embedder: _ctxEmbedder,
+});
 
 // ── DB-backed fetchers ────────────────────────────────────────────────────────
 
 /**
- * Build ContextFetchers backed by the Drizzle DB instance.
+ * Build ContextFetchers backed by the Drizzle DB instance + MemoryManager.
  * Signals filter to high/critical priority within the last 48 h.
- * Memories are returned in insertion order (vector search deferred to a
- * future PR once the PgVectorStore is fully wired).
+ * Memories use semantic search when a query is provided, falling back to
+ * recency-based listing.
  */
 function buildDbFetchers(): ContextFetchers {
   return {
@@ -96,19 +116,27 @@ function buildDbFetchers(): ContextFetchers {
         }));
     },
 
-    fetchMemories: async (limit: number): Promise<MemoryFact[]> => {
-      // Full vector search deferred — return most recent entries for now
-      const rows = await db
-        .select({
-          id: memoryEntries.id,
-          text: memoryEntries.text,
-          createdAt: memoryEntries.createdAt,
-        })
-        .from(memoryEntries)
-        .orderBy(desc(memoryEntries.createdAt))
-        .limit(limit);
-
-      return rows.map((r) => ({ id: r.id, text: r.text, createdAt: r.createdAt }));
+    fetchMemories: async (limit: number, query?: string): Promise<MemoryFact[]> => {
+      if (query && query.trim()) {
+        // Semantic recall via MemoryManager (pgvector cosine similarity)
+        const results = await _ctxMemManager.recall(query, limit);
+        return results.map((r) => ({
+          id: r.entry.id,
+          text: r.entry.text,
+          score: r.score,
+          createdAt: r.entry.createdAt,
+        }));
+      }
+      // No query — return most recent entries (recency fallback)
+      const entries = await _ctxMemManager.list();
+      return entries
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .slice(0, limit)
+        .map((e) => ({
+          id: e.id,
+          text: e.text,
+          createdAt: e.createdAt,
+        }));
     },
   };
 }

@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as path from "path";
+import { fileURLToPath } from "url";
 
 import type { IApprovalRecord } from "./interfaces/governance.interface.js";
 import { createRuntimeContext, startRuntime } from "./runtime-context.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export async function bootstrap() {
   const bootStarted = Date.now();
@@ -134,7 +137,8 @@ export async function bootstrap() {
   );
 }
 
-if (require.main === module) {
+// ESM entry guard: run bootstrap only when this file is the process entry.
+if (import.meta.url === `file://${process.argv[1]}`) {
   bootstrap().catch((err) => {
     console.error("[CRITICAL] Bootstrap runtime crashed:", err);
     process.exit(1);

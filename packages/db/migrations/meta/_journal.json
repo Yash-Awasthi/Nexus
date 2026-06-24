@@ -50,6 +50,41 @@
       "when": 1718000000006,
       "tag": "0006_billing",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1718000000007,
+      "tag": "0007_user_provider_credentials",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1718000000008,
+      "tag": "0008_provider_credentials_metadata",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1718000000009,
+      "tag": "0009_prompts_and_build_tasks",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1718000000010,
+      "tag": "0010_mcp_servers",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1718000000011,
+      "tag": "0011_agent_sessions",
+      "breakpoints": true
     }
   ]
 }

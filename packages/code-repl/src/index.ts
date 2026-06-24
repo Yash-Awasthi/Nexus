@@ -19,7 +19,7 @@ import { spawn } from "node:child_process";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type ReplLanguage = "python" | "r" | "julia";
+export type ReplLanguage = "python" | "r" | "julia" | "shell";
 
 /** Repl input interface definition. */
 export interface ReplInput {
@@ -131,6 +131,9 @@ export class JupyterMode {
         return JupyterMode.wrapR(code);
       case "julia":
         return JupyterMode.wrapJulia(code);
+      case "shell":
+        // Shell commands run verbatim — there is no "last expression" to echo.
+        return code;
     }
   }
 }
@@ -200,10 +203,59 @@ const DOCKER_IMAGES: Record<ReplLanguage, { image: string; cmd: string[] }> = {
   python: { image: "python:3.12-slim", cmd: ["python3", "-"] },
   r: { image: "r-base:4.3", cmd: ["Rscript", "-"] },
   julia: { image: "julia:1.10-alpine", cmd: ["julia", "--startup-file=no", "-"] },
+  // Arbitrary Linux shell commands. Image overridable via SANDBOX_SHELL_IMAGE.
+  // `sh -s` reads the script from stdin (same delivery path as the interpreters).
+  shell: {
+    image: process.env["SANDBOX_SHELL_IMAGE"] ?? "alpine:3.20",
+    cmd: ["/bin/sh", "-s"],
+  },
 };
 
 const STDOUT_CAP = 65_536; // 64 KB
 const STDERR_CAP = 16_384; // 16 KB
+
+/** Resolved isolation knobs for a sandbox container. */
+export interface DockerSandboxLimits {
+  memoryLimit: string; // e.g. "512m"
+  cpuLimit: string; // e.g. "0.5"
+  networkMode: string; // "none" by default
+  pidsLimit: number;
+  /** Mount the container root filesystem read-only (with a writable /tmp tmpfs). */
+  readonlyRootfs: boolean;
+  /** Size of the writable /tmp tmpfs in MB (0 = none). */
+  tmpfsSizeMb: number;
+  /** Run as this uid:gid (empty = image default). 65534:65534 = nobody:nogroup. */
+  user: string;
+}
+
+/**
+ * Pure builder for `docker run` arguments — extracted so the isolation policy
+ * can be unit-tested without a running Docker daemon. Applies a hard memory cap
+ * (`--memory` + matching `--memory-swap` so swap can't be used to exceed it),
+ * CPU/PID caps, drops all Linux capabilities, and blocks privilege escalation.
+ * When `readonlyRootfs`/`user`/`tmpfsSizeMb` are set the container is further
+ * locked down — used for the arbitrary-shell language.
+ */
+export function buildDockerRunArgs(language: ReplLanguage, limits: DockerSandboxLimits): string[] {
+  const { image, cmd } = DOCKER_IMAGES[language];
+  const args = [
+    "run",
+    "--rm",
+    "--interactive",
+    `--network=${limits.networkMode}`,
+    `--memory=${limits.memoryLimit}`,
+    `--memory-swap=${limits.memoryLimit}`, // disable swap → memory cap is hard
+    `--cpus=${limits.cpuLimit}`,
+    `--pids-limit=${limits.pidsLimit}`,
+    "--cap-drop=ALL",
+    "--no-new-privileges",
+  ];
+  if (limits.user) args.push(`--user=${limits.user}`);
+  if (limits.readonlyRootfs) args.push("--read-only");
+  if (limits.tmpfsSizeMb > 0) args.push(`--tmpfs=/tmp:rw,nosuid,nodev,size=${limits.tmpfsSizeMb}m`);
+  args.push(image, ...cmd);
+  return args;
+}
 
 /**
  * Probes whether the `docker` binary is reachable and the daemon responds.
@@ -241,17 +293,34 @@ export class DockerReplExecutor implements ReplExecutor {
   private readonly cpuLimit: string;
   private readonly defaultTimeoutMs: number;
   private readonly networkMode: string;
+  private readonly pidsLimit: number;
 
   constructor(config?: {
     memoryLimit?: string;
     cpuLimit?: string;
     defaultTimeoutMs?: number;
     networkMode?: string;
+    pidsLimit?: number;
   }) {
     this.memoryLimit = config?.memoryLimit ?? "512m";
     this.cpuLimit = config?.cpuLimit ?? "0.5";
     this.defaultTimeoutMs = config?.defaultTimeoutMs ?? 10_000;
     this.networkMode = config?.networkMode ?? "none";
+    this.pidsLimit = config?.pidsLimit ?? 128;
+  }
+
+  /** Resolve isolation limits for a language. Shell gets the strictest lockdown. */
+  resolveLimits(language: ReplLanguage): DockerSandboxLimits {
+    const harden = language === "shell";
+    return {
+      memoryLimit: this.memoryLimit,
+      cpuLimit: this.cpuLimit,
+      networkMode: this.networkMode,
+      pidsLimit: this.pidsLimit,
+      readonlyRootfs: harden,
+      tmpfsSizeMb: harden ? 64 : 0,
+      user: harden ? "65534:65534" : "",
+    };
   }
 
   async execute(
@@ -265,22 +334,10 @@ export class DockerReplExecutor implements ReplExecutor {
     // Cap user-supplied timeout to prevent indefinite resource hold
     const MAX_TIMEOUT_MS = 300_000;
     const timeout = Math.min(timeoutMs ?? this.defaultTimeoutMs, MAX_TIMEOUT_MS);
-    const { image, cmd } = DOCKER_IMAGES[language];
     const t0 = Date.now();
 
     return new Promise<ReplResult>((resolve, reject) => {
-      const dockerArgs = [
-        "run",
-        "--rm",
-        "--interactive",
-        `--network=${this.networkMode}`,
-        `--memory=${this.memoryLimit}`,
-        `--cpus=${this.cpuLimit}`,
-        "--pids-limit=128",
-        "--no-new-privileges",
-        image,
-        ...cmd,
-      ];
+      const dockerArgs = buildDockerRunArgs(language, this.resolveLimits(language));
 
       const proc = spawn("docker", dockerArgs, { stdio: ["pipe", "pipe", "pipe"] });
 

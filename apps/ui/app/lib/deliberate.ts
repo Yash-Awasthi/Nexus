@@ -262,16 +262,26 @@ export async function toggleGlass(on: boolean) {
 }
 
 export async function connectProvider(provider: string): Promise<void> {
+  // Electron (desktop) drives a real browser via the molecule bridge.
   if (isMolecule()) return (window as any).molecule.connectProvider(provider);
-  const urls: Record<string, string> = {
-    chatgpt: "https://chat.openai.com",
-    gemini: "https://gemini.google.com/app",
-    claude: "https://claude.ai",
-  };
-  window.open(urls[provider] ?? `https://${provider}.com`, "_blank");
+  // Web cannot drive the user's logged-in browser (sandbox). Provider access on
+  // web is via server-side BYOK API keys (configured in Settings → Provider Keys),
+  // not by opening a tab. Surface that instead of a dead-end window.open.
+  throw new Error(
+    `Browser-driving "${provider}" needs the desktop app. On web, add your ${provider} API key in Settings → Provider Keys to use it via the server gateway.`,
+  );
 }
 
 export async function isProviderConnected(provider: string): Promise<boolean> {
   if (isMolecule()) return (window as any).molecule.isProviderConnected(provider);
-  return false;
+  // Web: "connected" means a server-side key exists for the provider's gateway.
+  try {
+    const res = await fetch("/api/user/provider-keys");
+    if (!res.ok) return false;
+    const data = await res.json();
+    const keys: Array<{ provider?: string }> = data.keys ?? data ?? [];
+    return keys.some((k) => (k.provider ?? "").toLowerCase().includes(provider.toLowerCase()));
+  } catch {
+    return false;
+  }
 }

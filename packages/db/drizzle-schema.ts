@@ -241,8 +241,12 @@ export const memoryEntries = pgTable(
     metadata: jsonb("metadata").notNull().default({}),
     createdAt: integer("created_at").notNull(),
     expiresAt: integer("expires_at"),
+    userId: text("user_id"),
   },
-  (t) => [index("memory_entries_created_at_idx").on(t.createdAt)],
+  (t) => [
+    index("memory_entries_created_at_idx").on(t.createdAt),
+    index("memory_entries_user_id_idx").on(t.userId),
+  ],
 );
 
 // ── api_keys ───────────────────────────────────────────────────────────────────

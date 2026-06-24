@@ -8,9 +8,15 @@ import {
   MockLlmStream,
   AgentStepExecutor,
   AgentRuntime,
+  ToolAgentRuntime,
+  classifyTool,
+  compactMessages,
+  estimateMessageTokens,
+  estimateContextTokens,
+  IMAGE_TOKEN_COST,
   CACHE_POLICIES,
-  type ToolCallRaw,
-  type StepInput,
+  type LlmToolFn,
+  type RuntimeMessage,
 } from "../src/index.js";
 
 // ── CacheControl ──────────────────────────────────────────────────────────────
@@ -46,7 +52,7 @@ describe("ToolStreamParser", () => {
     const calls = parser.feed('[TOOL:search]{"query":"hello"}[/TOOL]');
     expect(calls).toHaveLength(1);
     expect(calls[0]!.name).toBe("search");
-    expect((calls[0]!.arguments as any).query).toBe("hello");
+    expect((calls[0]!.arguments as Record<string, unknown>).query).toBe("hello");
   });
 
   it("feed parses multiple tool calls", () => {
@@ -88,7 +94,7 @@ describe("ToolStreamParser", () => {
     const parser = new ToolStreamParser();
     const calls = parser.feed("[TOOL:x]not-json[/TOOL]");
     expect(calls).toHaveLength(1);
-    expect((calls[0]!.arguments as any).raw).toBe("not-json");
+    expect((calls[0]!.arguments as Record<string, unknown>).raw).toBe("not-json");
   });
 });
 
@@ -341,7 +347,224 @@ describe("AgentRuntime", () => {
     });
     const mock = new MockLlmStream(['[TOOL:act]{"step":1}[/TOOL] finished']);
     const runtime = new AgentRuntime({ llm: mock.asStream(), toolSet: ts, maxSteps: 2 });
-    const result = await runtime.run("do it");
+    await runtime.run("do it");
     expect(called.length).toBeGreaterThan(0);
+  });
+});
+
+// ── classifyTool (permission tier) ──────────────────────────────────────────────
+
+describe("classifyTool", () => {
+  it("auto-allows read-only tool names (case-insensitive)", () => {
+    for (const n of ["read_file", "grep", "LS", "list_files", "session_search"]) {
+      expect(classifyTool(n)).toBe("auto_allowed");
+    }
+  });
+  it("requires permission for mutating / unknown tools", () => {
+    for (const n of ["write_file", "edit_file", "run_command", "mcp__do_thing"]) {
+      expect(classifyTool(n)).toBe("requires_permission");
+    }
+  });
+});
+
+// ── ToolAgentRuntime permission gate ────────────────────────────────────────────
+
+/** Build an LlmToolFn that calls `toolName` once, then returns plain text (done). */
+function scriptedLlm(toolName: string, args: Record<string, unknown> = {}): LlmToolFn {
+  let turn = 0;
+  return (_messages: RuntimeMessage[]) => {
+    turn += 1;
+    if (turn === 1) {
+      return Promise.resolve({
+        content: "",
+        toolCalls: [{ name: toolName, arguments: args, callId: "call_1" }],
+        usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+      });
+    }
+    return Promise.resolve({ content: "done", toolCalls: [] });
+  };
+}
+
+describe("ToolAgentRuntime permission gate", () => {
+  function toolSetWith(name: string, calls: string[]): RuntimeToolSet {
+    return new RuntimeToolSet().add({
+      name,
+      description: name,
+      handler: () => {
+        calls.push(name);
+        return Promise.resolve(`ran ${name}`);
+      },
+    });
+  }
+
+  it("denies a mutating tool when the gate refuses, feeding an error back (loop continues)", async () => {
+    const calls: string[] = [];
+    const runtime = new ToolAgentRuntime({
+      llm: scriptedLlm("write_file", { path: "x" }),
+      toolSet: toolSetWith("write_file", calls),
+      maxSteps: 3,
+      permissionGate: () => ({ allowed: false, reason: "test policy" }),
+    });
+    const result = await runtime.run("write something");
+    expect(calls).toEqual([]); // handler never ran
+    expect(result.aborted).toBe(false); // loop did not crash
+    const toolMsg = result.messages.find((m) => m.role === "tool");
+    expect(toolMsg?.content).toContain("permission_denied");
+  });
+
+  it("allows a mutating tool when the gate approves", async () => {
+    const calls: string[] = [];
+    const runtime = new ToolAgentRuntime({
+      llm: scriptedLlm("write_file", { path: "x" }),
+      toolSet: toolSetWith("write_file", calls),
+      maxSteps: 3,
+      permissionGate: () => ({ allowed: true }),
+    });
+    await runtime.run("write something");
+    expect(calls).toEqual(["write_file"]);
+  });
+
+  it("never gates an auto-allowed tool (gate not consulted)", async () => {
+    const calls: string[] = [];
+    let gateCalls = 0;
+    const runtime = new ToolAgentRuntime({
+      llm: scriptedLlm("read_file", { path: "x" }),
+      toolSet: toolSetWith("read_file", calls),
+      maxSteps: 3,
+      permissionGate: () => {
+        gateCalls += 1;
+        return { allowed: false };
+      },
+    });
+    await runtime.run("read something");
+    expect(calls).toEqual(["read_file"]); // ran despite a deny-all gate
+    expect(gateCalls).toBe(0); // gate never consulted for auto-allowed
+  });
+
+  it("runs all tools when no gate is set (back-compatible)", async () => {
+    const calls: string[] = [];
+    const runtime = new ToolAgentRuntime({
+      llm: scriptedLlm("run_command", { command: "ls" }),
+      toolSet: toolSetWith("run_command", calls),
+      maxSteps: 3,
+    });
+    await runtime.run("run it");
+    expect(calls).toEqual(["run_command"]);
+  });
+});
+
+// ── Context compaction ──────────────────────────────────────────────────────────
+
+describe("token estimation", () => {
+  it("estimates text tokens at ~chars/4", () => {
+    expect(estimateMessageTokens({ role: "user", content: "a".repeat(40) })).toBe(10);
+  });
+
+  it("charges a flat cost per inline image, not raw base64 length", () => {
+    const big = "data:image/png;base64," + "A".repeat(100_000);
+    const est = estimateMessageTokens({ role: "user", content: big });
+    // Flat image cost dominates; nowhere near 100k/4 = 25k tokens.
+    expect(est).toBeGreaterThanOrEqual(IMAGE_TOKEN_COST);
+    expect(est).toBeLessThan(IMAGE_TOKEN_COST + 30_000);
+  });
+
+  it("includes fixed system overhead in the context estimate", () => {
+    const msgs: RuntimeMessage[] = [{ role: "user", content: "hi" }];
+    expect(estimateContextTokens(msgs, 18_000)).toBeGreaterThanOrEqual(18_000);
+  });
+});
+
+describe("compactMessages", () => {
+  const summarize = (): Promise<string> => Promise.resolve("SUMMARY");
+
+  it("is a no-op below the threshold", async () => {
+    const msgs: RuntimeMessage[] = [
+      { role: "user", content: "short" },
+      { role: "assistant", content: "ok" },
+    ];
+    const r = await compactMessages(msgs, { summarize, tokenBudget: 1_000_000, systemOverhead: 0 });
+    expect(r.compacted).toBe(false);
+    expect(r.messages).toBe(msgs);
+  });
+
+  it("summarizes older turns and keeps the recent tail when over threshold", async () => {
+    // 20 fat messages; tiny budget forces compaction.
+    const msgs: RuntimeMessage[] = Array.from({ length: 20 }, (_, i) => ({
+      role: i % 2 === 0 ? ("user" as const) : ("assistant" as const),
+      content: "x".repeat(400),
+    }));
+    const r = await compactMessages(msgs, {
+      summarize,
+      tokenBudget: 1_000,
+      threshold: 0.8,
+      recentTurnsToKeep: 5,
+      systemOverhead: 0,
+    });
+    expect(r.compacted).toBe(true);
+    expect(r.summarizedCount).toBe(15);
+    // 1 summary system message + 5 recent.
+    expect(r.messages).toHaveLength(6);
+    expect(r.messages[0]!.role).toBe("system");
+    expect(r.messages[0]!.content).toContain("SUMMARY");
+    expect(r.postTokens).toBeLessThan(r.preTokens);
+  });
+
+  it("preserves a leading system message above the summary", async () => {
+    const msgs: RuntimeMessage[] = [
+      { role: "system", content: "SYSTEM RULES" },
+      ...Array.from({ length: 12 }, () => ({ role: "user" as const, content: "y".repeat(400) })),
+    ];
+    const r = await compactMessages(msgs, {
+      summarize,
+      tokenBudget: 1_000,
+      recentTurnsToKeep: 3,
+      systemOverhead: 0,
+    });
+    expect(r.compacted).toBe(true);
+    expect(r.messages[0]!.content).toBe("SYSTEM RULES");
+    expect(r.messages[1]!.content).toContain("SUMMARY");
+  });
+
+  it("does not summarize when nothing is older than the kept tail", async () => {
+    const msgs: RuntimeMessage[] = Array.from({ length: 4 }, () => ({
+      role: "user" as const,
+      content: "z".repeat(4000),
+    }));
+    const r = await compactMessages(msgs, {
+      summarize,
+      tokenBudget: 100,
+      recentTurnsToKeep: 10,
+      systemOverhead: 0,
+    });
+    expect(r.compacted).toBe(false);
+  });
+});
+
+describe("ToolAgentRuntime compaction", () => {
+  it("is off by default — history is never compacted without opts.compaction", async () => {
+    const llm: LlmToolFn = () => Promise.resolve({ content: "done", toolCalls: [] });
+    const runtime = new ToolAgentRuntime({ llm, maxSteps: 1 });
+    const result = await runtime.run("x".repeat(2_000_000));
+    // The huge user message is still present (untouched).
+    expect(result.messages[0]!.content.length).toBeGreaterThan(1_000_000);
+  });
+});
+
+describe("ToolAgentRuntime resume", () => {
+  it("seeds prior messages before the new instruction (resume)", async () => {
+    let seen: RuntimeMessage[] = [];
+    const llm: LlmToolFn = (messages) => {
+      seen = messages;
+      return Promise.resolve({ content: "ok", toolCalls: [] });
+    };
+    const prior: RuntimeMessage[] = [
+      { role: "user", content: "first task" },
+      { role: "assistant", content: "did the first task" },
+    ];
+    const runtime = new ToolAgentRuntime({ llm, maxSteps: 1, initialMessages: prior });
+    const result = await runtime.run("follow-up task");
+    expect(seen.slice(0, 2)).toEqual(prior);
+    expect(seen[2]).toEqual({ role: "user", content: "follow-up task" });
+    expect(result.messages[0]!.content).toBe("first task");
   });
 });

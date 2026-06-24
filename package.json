@@ -11,6 +11,8 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
+    "dev:api": "pnpm --filter @nexus/api dev",
+    "dev:ui": "pnpm --filter @nexus/ui dev",
     "dev:spectre": "pnpm --filter @nexus/spectre dev",
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",
@@ -23,6 +25,9 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,yaml,yml}\" --ignore-path .prettierignore",
     "clean": "turbo run clean && find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +",
     "generate": "tsx scripts/generate-clients.ts",
+    "scaffold:adapter": "tsx scripts/scaffold.ts adapter",
+    "scaffold:driver": "tsx scripts/scaffold.ts driver",
+    "scaffold:feed": "tsx scripts/scaffold.ts feed",
     "db:migrate": "turbo run db:migrate --filter @nexus/db",
     "db:generate": "turbo run db:generate --filter @nexus/db",
     "docs:check": "turbo run docs:check",

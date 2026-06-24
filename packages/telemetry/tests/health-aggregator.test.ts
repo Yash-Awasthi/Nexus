@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { fc } from "@fast-check/vitest";
+import * as fc from "fast-check";
 import { describe, it, expect } from "vitest";
 
 import { HealthAggregator, queueDepthProbe, type ProbeFn } from "../src/health-aggregator.js";

@@ -95,7 +95,10 @@ export function getTierFromRequest(request: FastifyRequest): Tier {
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const authConfig = {
     apiKey: process.env.NEXUS_API_KEY || undefined,
-    disabled: !process.env.NEXUS_API_KEY,
+    // Accept user JWTs (issued by /auth/login) in addition to the master API key.
+    jwtSecret: process.env.NEXUS_JWT_SECRET || undefined,
+    // Dev bypass only when NO auth method is configured at all.
+    disabled: !process.env.NEXUS_API_KEY && !process.env.NEXUS_JWT_SECRET,
   };
   try {
     authenticate(request.headers.authorization, authConfig);
