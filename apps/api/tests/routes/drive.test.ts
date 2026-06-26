@@ -1,15 +1,48 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { mkdtemp, rm, writeFile, mkdir, symlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import * as path from "node:path";
 import {
   makeUserRateLimitPreHandler,
   makeRateLimitPreHandler,
 } from "../../src/lib/rate-limiter.js";
+import { safeResolve } from "../../src/routes/drive.js";
 
-describe("Nexus Drive", () => {
-  it("drive status returns quota info", () => expect(true).toBe(true));
-  it("drive exec runs command in sandbox", () => expect(true).toBe(true));
-  it("drive upload enforces quota (413 on exceed)", () => expect(true).toBe(true));
-  it("rejects path traversal via safeResolve", () => expect(true).toBe(true));
+// Real path-traversal regression tests for the Nexus Drive guard. safeResolve
+// is the single chokepoint every /drive/* fs operation routes through, so a
+// traversal/symlink escape here is the whole vulnerability — these assert the
+// attack is blocked, not just the happy path.
+describe("Nexus Drive — safeResolve path guard", () => {
+  let root: string;
+
+  beforeAll(async () => {
+    root = await mkdtemp(path.join(tmpdir(), "drive-test-"));
+    await mkdir(path.join(root, "sub"), { recursive: true });
+    await writeFile(path.join(root, "sub", "file.txt"), "hello");
+  });
+
+  afterAll(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  it("resolves a legitimate sub-path to inside the drive root", async () => {
+    const resolved = await safeResolve(root, "sub/file.txt");
+    expect(resolved.startsWith(root)).toBe(true);
+  });
+
+  it("rejects ../ traversal escaping the drive root", async () => {
+    await expect(safeResolve(root, "../../../../etc/passwd")).rejects.toThrow(/escapes drive/);
+  });
+
+  it("rejects an absolute path outside the drive root", async () => {
+    await expect(safeResolve(root, "/etc/passwd")).rejects.toThrow(/escapes drive/);
+  });
+
+  it("rejects a symlink that points outside the drive root", async () => {
+    await symlink("/etc/passwd", path.join(root, "evil-link"));
+    await expect(safeResolve(root, "evil-link")).rejects.toThrow(/escapes drive/);
+  });
 });
 
 describe("Per-user rate limiting", () => {

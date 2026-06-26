@@ -48,6 +48,39 @@ const SAFE_COLUMNS = {
   lastHealthCheckAt: mcpServers.lastHealthCheckAt,
 };
 
+/**
+ * SSRF guard for user-supplied MCP endpoint URLs. Returns an error message to
+ * send to the client, or null when the endpoint is safe. Rejects non-http(s)
+ * schemes (file:, gopher:, etc.) and loopback hosts so a registered MCP server
+ * cannot be pointed at the API host's own internal services.
+ */
+export function validateMcpEndpoint(endpoint: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(endpoint.trim());
+  } catch {
+    return "endpoint must be a valid URL";
+  }
+  if (!["http:", "https:"].includes(url.protocol)) {
+    return "endpoint must use http or https scheme";
+  }
+  // url.hostname keeps the brackets for IPv6 literals (e.g. "[::1]"), so a raw
+  // equality list misses IPv6 loopback — strip them before comparing.
+  const host = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  // ponytail: RFC1918 private ranges (10/8, 172.16/12, 192.168/16) and link-local
+  // 169.254/16 are NOT blocked here — add them if MCP servers must be public-only.
+  if (
+    host === "localhost" ||
+    host === "::1" ||
+    host === "::" ||
+    host === "0.0.0.0" ||
+    /^127\./.test(host)
+  ) {
+    return "loopback endpoints are not allowed";
+  }
+  return null;
+}
+
 export async function mcpServersRoutes(app: FastifyInstance): Promise<void> {
   // ── List ────────────────────────────────────────────────────────────────────
   app.get("/mcp/servers", { preHandler: requireAuthWithTier }, async (request, reply) => {
@@ -83,17 +116,8 @@ export async function mcpServersRoutes(app: FastifyInstance): Promise<void> {
     if (!name?.trim()) return reply.code(400).send({ error: "name is required" });
     if (!endpoint?.trim()) return reply.code(400).send({ error: "endpoint is required" });
     // Validate endpoint URL: only http/https schemes, block internal/loopback SSRF
-    try {
-      const url = new URL(endpoint.trim());
-      if (!["http:", "https:"].includes(url.protocol)) {
-        return reply.code(400).send({ error: "endpoint must use http or https scheme" });
-      }
-      if (["localhost", "127.0.0.1", "::1", "0.0.0.0"].includes(url.hostname)) {
-        return reply.code(400).send({ error: "loopback endpoints are not allowed" });
-      }
-    } catch {
-      return reply.code(400).send({ error: "endpoint must be a valid URL" });
-    }
+    const endpointErr = validateMcpEndpoint(endpoint);
+    if (endpointErr) return reply.code(400).send({ error: endpointErr });
     if (!TRANSPORTS.includes(transportType as Transport)) {
       return reply.code(400).send({ error: "invalid_transport", valid: TRANSPORTS });
     }
@@ -163,17 +187,8 @@ export async function mcpServersRoutes(app: FastifyInstance): Promise<void> {
     }
     // Validate endpoint URL on update (mirrors create validation)
     if (endpoint?.trim()) {
-      try {
-        const url = new URL(endpoint.trim());
-        if (!["http:", "https:"].includes(url.protocol)) {
-          return reply.code(400).send({ error: "endpoint must use http or https scheme" });
-        }
-        if (["localhost", "127.0.0.1", "::1", "0.0.0.0"].includes(url.hostname)) {
-          return reply.code(400).send({ error: "loopback endpoints are not allowed" });
-        }
-      } catch {
-        return reply.code(400).send({ error: "endpoint must be a valid URL" });
-      }
+      const endpointErr = validateMcpEndpoint(endpoint);
+      if (endpointErr) return reply.code(400).send({ error: endpointErr });
     }
 
     // Key is write-only: an empty/absent apiKey keeps the stored one.

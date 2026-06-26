@@ -78,7 +78,7 @@ async function getDriveUsage(dir: string): Promise<number> {
 }
 
 /** Path-traversal guard + symlink resolution, ported from agent-tools. */
-async function safeResolve(rootDir: string, p: string): Promise<string> {
+export async function safeResolve(rootDir: string, p: string): Promise<string> {
   const resolved = path.resolve(rootDir, p);
   const rel = path.relative(rootDir, resolved);
   if (rel !== "" && (rel.startsWith("..") || path.isAbsolute(rel))) {
