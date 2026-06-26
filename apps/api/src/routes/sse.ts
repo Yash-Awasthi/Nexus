@@ -34,9 +34,20 @@ import { globalBus, formatSseEvent, formatPing, type SseEvent } from "@nexus/sse
 import type { FastifyInstance } from "fastify";
 
 import { startAgentEventsBridge, stopAgentEventsBridge } from "../lib/agent-events-bridge.js";
+import { makeUserRateLimitPreHandler } from "../lib/rate-limiter.js";
 import { requireAuthWithTier } from "../middleware/auth.js";
 
 const PING_INTERVAL_MS = 20_000;
+
+// Per-user limiter applied at SSE connection establishment. Generous limit
+// because connections are long-lived (the cap is on how often a user may open
+// a new stream, not on streamed traffic).
+const sseRL = makeUserRateLimitPreHandler({ limit: 120, windowMs: 60_000, keyPrefix: "sse" });
+
+// Known agent-stream selectors that are NOT a session/task id. Validated against
+// an explicit allowlist before any tier-gated security branch so a crafted
+// `:stream` param cannot bypass the ownership/tier checks below.
+const RESERVED_AGENT_STREAMS = new Set(["all"]);
 
 const SSE_HEADERS = {
   "Content-Type": "text/event-stream",
@@ -131,7 +142,7 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
 
   app.get(
     "/sse/tasks",
-    { preHandler: requireAuthWithTier },
+    { preHandler: [requireAuthWithTier, sseRL] },
     async (request, reply): Promise<void> => {
       if (request.nexusTier !== "enterprise") {
         reply.code(403);
@@ -153,7 +164,7 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
           403: {},
         },
       },
-      preHandler: requireAuthWithTier,
+      preHandler: [requireAuthWithTier, sseRL],
     },
     async (request, reply): Promise<void> => {
       if (!(await verifySessionOwnership(request.nexusUserId, request.params.taskId))) {
@@ -176,7 +187,7 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
           403: {},
         },
       },
-      preHandler: requireAuthWithTier,
+      preHandler: [requireAuthWithTier, sseRL],
     },
     async (request, reply): Promise<void> => {
       if (request.nexusTier !== "enterprise") {
@@ -199,7 +210,7 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
           403: {},
         },
       },
-      preHandler: requireAuthWithTier,
+      preHandler: [requireAuthWithTier, sseRL],
     },
     async (request, reply): Promise<void> => {
       if (request.nexusTier !== "enterprise") {
@@ -222,7 +233,7 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
           403: {},
         },
       },
-      preHandler: requireAuthWithTier,
+      preHandler: [requireAuthWithTier, sseRL],
     },
     async (request, reply): Promise<void> => {
       if (!(await verifySessionOwnership(request.nexusUserId, request.params.taskId))) {
@@ -246,12 +257,22 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
           403: {},
         },
       },
-      preHandler: requireAuthWithTier,
+      preHandler: [requireAuthWithTier, sseRL],
     },
     async (request, reply): Promise<void> => {
       const { stream } = request.params;
-      // Firehose → enterprise only
-      if (stream === "all") {
+      // Validate the user-controlled `:stream` selector against an explicit
+      // allowlist BEFORE the tier branch. Reserved selectors (e.g. "all") follow
+      // the firehose/tier path; everything else is treated strictly as a session
+      // id and must pass the ownership check — a crafted value cannot reach the
+      // enterprise-firehose branch unless it exactly matches a reserved name.
+      const isFirehose = RESERVED_AGENT_STREAMS.has(stream);
+      if (!isFirehose && !stream.trim()) {
+        reply.code(400);
+        return reply.send({ error: "Invalid stream selector" });
+      }
+      if (isFirehose) {
+        // Firehose → enterprise only
         if (request.nexusTier !== "enterprise") {
           reply.code(403);
           return reply.send({ error: "Agent firehose requires enterprise tier" });
@@ -263,7 +284,7 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
           return reply.send({ error: "Not your agent session" });
         }
       }
-      const channel = stream === "all" ? "agent" : `agent:${stream}`;
+      const channel = isFirehose ? "agent" : `agent:${stream}`;
       reply.hijack();
       openSseConnection(reply.raw, request.socket, [channel]);
     },

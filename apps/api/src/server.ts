@@ -238,6 +238,9 @@ export async function buildServer(): Promise<FastifyInstance> {
   });
   const _councilRL = makeRateLimitPreHandler({ limit: 30, windowMs: 60_000, keyPrefix: "council" });
 
+  // IP-keyed limiter for the authenticated /api bridge scope (defense in depth).
+  const apiScopeRL = makeRateLimitPreHandler({ limit: 300, windowMs: 60_000, keyPrefix: "api" });
+
   // Per-user limits layered on top of IP limits
   const _adminUserRL = makeUserRateLimitPreHandler({
     limit: 50,
@@ -371,6 +374,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await app.register(
     async (scoped) => {
       scoped.addHook("preHandler", requireAuth);
+      scoped.addHook("preHandler", apiScopeRL);
       await scoped.register(apiBridgeRoutes);
       await scoped.register(videoTranscriptRoutes);
     },

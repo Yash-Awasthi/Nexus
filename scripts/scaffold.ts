@@ -30,9 +30,15 @@ function pascal(name: string): string {
 }
 
 function write(path: string, content: string): void {
-  if (existsSync(path)) fail(`refusing to overwrite existing file: ${path}`);
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, content);
+  try {
+    // "wx" fails atomically if the file already exists — avoids a check-then-act race.
+    writeFileSync(path, content, { flag: "wx" });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "EEXIST")
+      fail(`refusing to overwrite existing file: ${path}`);
+    throw err;
+  }
   console.log(`  + ${path.replace(`${ROOT}/`, "")}`);
 }
 

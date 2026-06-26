@@ -120,6 +120,7 @@ import { Pool } from "pg";
 import { emitAuditEvent } from "../lib/audit-emitter.js";
 import { sha256hex } from "../lib/crypto-utils.js";
 import { resolveUserProviderKey, buildUserDriverRegistry } from "../lib/provider-keys.js";
+import { makeUserRateLimitPreHandler } from "../lib/rate-limiter.js";
 import { encryptSecret, SecretCryptoUnavailableError } from "../lib/secret-crypto.js";
 import { requireAuthWithTier } from "../middleware/auth.js";
 
@@ -454,6 +455,13 @@ const _roomsStore = new Map<
 // ── Route registrations ───────────────────────────────────────────────────────
 
 export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
+  // Per-user rate limiter shared across the bridge route group (falls back to IP).
+  const bridgeRL = makeUserRateLimitPreHandler({
+    limit: 60,
+    windowMs: 60_000,
+    keyPrefix: "bridge",
+  });
+
   // Ensure Postgres KV table exists (no-op if no DATABASE_URL)
   await _ensureTable();
 
@@ -3661,7 +3669,13 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
     const { text } = request.body ?? {};
     if (!text) return reply.code(400).send({ error: "text is required" });
     return reply.send({
-      sanitized: text.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "[removed]"),
+      // Encode HTML-significant characters instead of regex-matching tags: a
+      // tag-matching regex is bypassable (CodeQL js/bad-tag-filter). Escaping
+      // neutralizes <script>, event handlers, and any injected markup robustly.
+      sanitized: text.replace(
+        /[<>&"']/g,
+        (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&#39;" })[c] ?? c,
+      ),
     });
   });
 
@@ -8868,7 +8882,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     };
   }
 
-  app.get("/build/tasks", async (_req, reply) => {
+  app.get("/build/tasks", { preHandler: bridgeRL }, async (_req, reply) => {
     const pool = _getPool();
     if (!pool) return reply.send({ tasks: [] });
     const { rows } = await pool.query(
@@ -8878,25 +8892,29 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   });
 
   // IMPORTANT: register /steal before /:id routes so static path wins
-  app.post<{ Body: { agentId?: string } }>("/build/tasks/steal", async (request, reply) => {
-    const pool = _getPool();
-    if (!pool) return reply.send({ task: null, message: "DB unavailable" });
-    const agentId = request.body?.agentId ?? "agent";
-    const { rows } = await pool.query(
-      `UPDATE build_tasks SET status='claimed', claimed_by=$1, claimed_at=NOW(), updated_at=NOW()
+  app.post<{ Body: { agentId?: string } }>(
+    "/build/tasks/steal",
+    { preHandler: bridgeRL },
+    async (request, reply) => {
+      const pool = _getPool();
+      if (!pool) return reply.send({ task: null, message: "DB unavailable" });
+      const agentId = request.body?.agentId ?? "agent";
+      const { rows } = await pool.query(
+        `UPDATE build_tasks SET status='claimed', claimed_by=$1, claimed_at=NOW(), updated_at=NOW()
        WHERE id = (
          SELECT id FROM build_tasks WHERE status='planned' AND claimed_by IS NULL
          ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED
        ) RETURNING *`,
-      [agentId],
-    );
-    if (!rows.length) return reply.send({ task: null, message: "No available tasks" });
-    return reply.send({ task: _btRow(rows[0]) });
-  });
+        [agentId],
+      );
+      if (!rows.length) return reply.send({ task: null, message: "No available tasks" });
+      return reply.send({ task: _btRow(rows[0]) });
+    },
+  );
 
   app.post<{
     Body: { title: string; description?: string; status?: string; parentId?: number | null };
-  }>("/build/tasks", async (request, reply) => {
+  }>("/build/tasks", { preHandler: bridgeRL }, async (request, reply) => {
     const pool = _getPool();
     const { title, description = null, status = "planned", parentId = null } = request.body ?? {};
     if (!title?.trim()) return reply.code(400).send({ error: "title required" });
@@ -8911,6 +8929,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
 
   app.patch<{ Params: { id: string }; Body: { status?: string } }>(
     "/build/tasks/:id/status",
+    { preHandler: bridgeRL },
     async (request, reply) => {
       const pool = _getPool();
       if (!pool) return reply.code(503).send({ error: "DB unavailable" });
@@ -8924,32 +8943,41 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     },
   );
 
-  app.post<{ Params: { id: string } }>("/build/tasks/:id/claim", async (request, reply) => {
-    const pool = _getPool();
-    if (!pool) return reply.code(503).send({ error: "DB unavailable" });
-    const id = parseInt(request.params.id, 10);
-    const { rows } = await pool.query(
-      "UPDATE build_tasks SET status='claimed', claimed_by='user', claimed_at=NOW(), updated_at=NOW() WHERE id=$1 RETURNING *",
-      [id],
-    );
-    if (!rows.length) return reply.code(404).send({ error: "not found" });
-    return reply.send(_btRow(rows[0]));
-  });
+  app.post<{ Params: { id: string } }>(
+    "/build/tasks/:id/claim",
+    { preHandler: bridgeRL },
+    async (request, reply) => {
+      const pool = _getPool();
+      if (!pool) return reply.code(503).send({ error: "DB unavailable" });
+      const id = parseInt(request.params.id, 10);
+      const { rows } = await pool.query(
+        "UPDATE build_tasks SET status='claimed', claimed_by='user', claimed_at=NOW(), updated_at=NOW() WHERE id=$1 RETURNING *",
+        [id],
+      );
+      if (!rows.length) return reply.code(404).send({ error: "not found" });
+      return reply.send(_btRow(rows[0]));
+    },
+  );
 
-  app.post<{ Params: { id: string } }>("/build/tasks/:id/release", async (request, reply) => {
-    const pool = _getPool();
-    if (!pool) return reply.code(503).send({ error: "DB unavailable" });
-    const id = parseInt(request.params.id, 10);
-    const { rows } = await pool.query(
-      "UPDATE build_tasks SET status='planned', claimed_by=NULL, claimed_at=NULL, updated_at=NOW() WHERE id=$1 RETURNING *",
-      [id],
-    );
-    if (!rows.length) return reply.code(404).send({ error: "not found" });
-    return reply.send(_btRow(rows[0]));
-  });
+  app.post<{ Params: { id: string } }>(
+    "/build/tasks/:id/release",
+    { preHandler: bridgeRL },
+    async (request, reply) => {
+      const pool = _getPool();
+      if (!pool) return reply.code(503).send({ error: "DB unavailable" });
+      const id = parseInt(request.params.id, 10);
+      const { rows } = await pool.query(
+        "UPDATE build_tasks SET status='planned', claimed_by=NULL, claimed_at=NULL, updated_at=NOW() WHERE id=$1 RETURNING *",
+        [id],
+      );
+      if (!rows.length) return reply.code(404).send({ error: "not found" });
+      return reply.send(_btRow(rows[0]));
+    },
+  );
 
   app.post<{ Params: { id: string }; Body: { output: string } }>(
     "/build/tasks/:id/submit",
+    { preHandler: bridgeRL },
     async (request, reply) => {
       const pool = _getPool();
       if (!pool) return reply.code(503).send({ error: "DB unavailable" });
@@ -8963,12 +8991,16 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     },
   );
 
-  app.delete<{ Params: { id: string } }>("/build/tasks/:id", async (request, reply) => {
-    const pool = _getPool();
-    if (!pool) return reply.code(503).send({ error: "DB unavailable" });
-    await pool.query("DELETE FROM build_tasks WHERE id=$1", [parseInt(request.params.id, 10)]);
-    return reply.send({ ok: true });
-  });
+  app.delete<{ Params: { id: string } }>(
+    "/build/tasks/:id",
+    { preHandler: bridgeRL },
+    async (request, reply) => {
+      const pool = _getPool();
+      if (!pool) return reply.code(503).send({ error: "DB unavailable" });
+      await pool.query("DELETE FROM build_tasks WHERE id=$1", [parseInt(request.params.id, 10)]);
+      return reply.send({ ok: true });
+    },
+  );
 
   // ── Prompts (DB-backed, versioned, persisted in Neon prompts table) ─────────
   // Frontend: apps/ui/app/routes/prompts.tsx
@@ -8993,7 +9025,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     };
   }
 
-  app.get("/prompts", async (_req, reply) => {
+  app.get("/prompts", { preHandler: bridgeRL }, async (_req, reply) => {
     const pool = _getPool();
     if (!pool) return reply.send({ prompts: [] });
     const { rows: prompts } = await pool.query("SELECT * FROM prompts ORDER BY created_at DESC");
@@ -9015,6 +9047,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
 
   app.post<{ Body: { name: string; description?: string; content?: string } }>(
     "/prompts",
+    { preHandler: bridgeRL },
     async (request, reply) => {
       const pool = _getPool();
       if (!pool) return reply.code(503).send({ error: "DB unavailable" });
@@ -9039,24 +9072,28 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     },
   );
 
-  app.get<{ Params: { id: string } }>("/prompts/:id", async (request, reply) => {
-    const pool = _getPool();
-    if (!pool) return reply.code(503).send({ error: "DB unavailable" });
-    const pResult = await pool.query("SELECT * FROM prompts WHERE id=$1", [request.params.id]);
+  app.get<{ Params: { id: string } }>(
+    "/prompts/:id",
+    { preHandler: bridgeRL },
+    async (request, reply) => {
+      const pool = _getPool();
+      if (!pool) return reply.code(503).send({ error: "DB unavailable" });
+      const pResult = await pool.query("SELECT * FROM prompts WHERE id=$1", [request.params.id]);
 
-    const p = pResult.rows[0] as Record<string, unknown>;
-    if (!p) return reply.code(404).send({ error: "not found" });
-    const { rows: versions } = await pool.query(
-      "SELECT * FROM prompt_versions WHERE prompt_id=$1 ORDER BY version_num DESC",
-      [p.id],
-    );
-    return reply.send(_promptRow(p, versions));
-  });
+      const p = pResult.rows[0] as Record<string, unknown>;
+      if (!p) return reply.code(404).send({ error: "not found" });
+      const { rows: versions } = await pool.query(
+        "SELECT * FROM prompt_versions WHERE prompt_id=$1 ORDER BY version_num DESC",
+        [p.id],
+      );
+      return reply.send(_promptRow(p, versions));
+    },
+  );
 
   app.post<{
     Params: { id: string };
     Body: { content: string; model?: string; temperature?: number };
-  }>("/prompts/:id/versions", async (request, reply) => {
+  }>("/prompts/:id/versions", { preHandler: bridgeRL }, async (request, reply) => {
     const pool = _getPool();
     if (!pool) return reply.code(503).send({ error: "DB unavailable" });
     const pResult = await pool.query("SELECT * FROM prompts WHERE id=$1", [request.params.id]);
@@ -9092,12 +9129,16 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     });
   });
 
-  app.delete<{ Params: { id: string } }>("/prompts/:id", async (request, reply) => {
-    const pool = _getPool();
-    if (!pool) return reply.code(503).send({ error: "DB unavailable" });
-    await pool.query("DELETE FROM prompts WHERE id=$1", [request.params.id]);
-    return reply.send({ ok: true });
-  });
+  app.delete<{ Params: { id: string } }>(
+    "/prompts/:id",
+    { preHandler: bridgeRL },
+    async (request, reply) => {
+      const pool = _getPool();
+      if (!pool) return reply.code(503).send({ error: "DB unavailable" });
+      await pool.query("DELETE FROM prompts WHERE id=$1", [request.params.id]);
+      return reply.send({ ok: true });
+    },
+  );
 
   // ── Contacts CRUD ────────────────────────────────────────────────────────────
 

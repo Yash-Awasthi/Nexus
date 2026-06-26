@@ -373,7 +373,6 @@ export default function ArchetypesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Archetype | null>(null);
   const [viewTarget, setViewTarget] = useState<Archetype | null>(null);
-  const [apiLoaded, setApiLoaded] = useState(false);
 
   // Load custom archetypes from API on mount (fallback to local store)
   useEffect(() => {
@@ -402,7 +401,6 @@ export default function ArchetypesPage() {
       } catch {
         /* offline — use local store */
       }
-      setApiLoaded(true);
     }
     load();
   }, []);
