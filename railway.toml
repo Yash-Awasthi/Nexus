@@ -8,7 +8,11 @@
 #   nexus-worker: apps/worker/Dockerfile
 #
 # Required env vars (set in each service's Variables tab):
-#   DATABASE_URL   — auto-set by Railway PostgreSQL plugin
+#   NEXUS_API_KEY  — REQUIRED. Process exits at startup if unset (>=16 chars in
+#                    production). This is the #1 cause of nexus-api deploy_failed.
+#                    generate with: openssl rand -hex 32
+#   DATABASE_URL   — REQUIRED. Add the Railway PostgreSQL plugin to the service;
+#                    @nexus/db throws at import if unset → process exits.
 #   REDIS_URL      — auto-set by Railway Redis plugin
 #   JWT_SECRET     — generate with: openssl rand -hex 32
 #   HMAC_KEY       — generate with: openssl rand -hex 32
@@ -16,7 +20,9 @@
 #   NODE_ENV=production
 #
 # nexus-ui also needs:
-#   NEXUS_API_URL  — public URL of nexus-api service (from Railway)
+#   NEXUS_API_INTERNAL_URL — full origin nginx proxies /api/* to, e.g.
+#                    http://nexus-api.railway.internal:10000 (private networking).
+#                    REQUIRED: nginx fails to start if unset (no default).
 #
 # Optional (enables AI providers):
 #   OPENAI_API_KEY, ANTHROPIC_API_KEY, GROQ_API_KEY, GEMINI_API_KEY

@@ -36,7 +36,11 @@ import { eq, and, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
 import { sha256hex as _sha256hex } from "../lib/crypto-utils.js";
+import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
 import { getSharedKV } from "../lib/shared-kv.js";
+
+// IP-keyed limiter for unauthenticated OAuth callback routes (no user yet).
+const oauthRL = makeRateLimitPreHandler({ limit: 20, windowMs: 60_000, keyPrefix: "oauth" });
 
 // ── OAuth provider constants ───────────────────────────────────────────────────
 
@@ -177,6 +181,7 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{ Querystring: { code?: string; state?: string; error?: string } }>(
     "/oauth/google/callback",
+    { preHandler: oauthRL },
     async (request, reply) => {
       const { code, state, error } = request.query;
       if (error) return reply.code(400).send({ error });
@@ -257,6 +262,7 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{ Querystring: { code?: string; state?: string; error?: string } }>(
     "/oauth/github/callback",
+    { preHandler: oauthRL },
     async (request, reply) => {
       const { code, state, error } = request.query;
       if (error) return reply.code(400).send({ error });
@@ -344,6 +350,7 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
   /** GET /oauth/slack/callback */
   app.get<{ Querystring: { code?: string; state?: string; error?: string } }>(
     "/oauth/slack/callback",
+    { preHandler: oauthRL },
     async (request, reply) => {
       const { code, state, error } = request.query;
       if (error) return reply.code(400).send({ error });

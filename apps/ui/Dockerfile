@@ -29,8 +29,11 @@ FROM nginx:1.27-alpine AS runner
 # Remove default nginx config
 RUN rm /etc/nginx/conf.d/default.conf
 
-# Copy nginx config (SPA routing + /api/* proxy)
-COPY apps/ui/nginx.conf /etc/nginx/conf.d/nexus-ui.conf
+# Install nginx config as an envsubst template. The official nginx image runs
+# envsubst over /etc/nginx/templates/*.template at startup, writing the result
+# to /etc/nginx/conf.d/. Only env vars that are actually set are substituted,
+# so nginx's own $host / $remote_addr are left intact.
+COPY apps/ui/nginx.conf /etc/nginx/templates/nexus-ui.conf.template
 
 # Copy built SPA
 COPY --from=builder /app/apps/ui/build/client /usr/share/nginx/html

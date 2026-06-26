@@ -69,6 +69,17 @@ interface ExaResult {
   score?: number;
 }
 
+// Only allow http(s) URLs in href to prevent javascript:/data: scheme execution.
+function safeHref(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? url : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Scrape() {
@@ -321,7 +332,7 @@ export default function Scrape() {
                       {scrapeResult.title ?? scrapeResult.url}
                     </CardTitle>
                     <a
-                      href={scrapeResult.url}
+                      href={safeHref(scrapeResult.url)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs text-blue-500 hover:underline"
@@ -467,7 +478,7 @@ export default function Scrape() {
                             {selectedPage.title ?? selectedPage.url}
                           </CardTitle>
                           <a
-                            href={selectedPage.url}
+                            href={safeHref(selectedPage.url)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-xs text-blue-500 hover:underline"
@@ -579,7 +590,7 @@ export default function Scrape() {
                     <div className="flex items-start gap-3">
                       <div className="flex-1 min-w-0">
                         <a
-                          href={r.url}
+                          href={safeHref(r.url)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-sm font-medium text-blue-600 hover:underline"
@@ -609,7 +620,7 @@ export default function Scrape() {
                             {new Date(r.publishedDate).toLocaleDateString()}
                           </span>
                         )}
-                        <a href={r.url} target="_blank" rel="noopener noreferrer">
+                        <a href={safeHref(r.url)} target="_blank" rel="noopener noreferrer">
                           <ExternalLink className="w-3 h-3 text-muted-foreground hover:text-foreground" />
                         </a>
                       </div>

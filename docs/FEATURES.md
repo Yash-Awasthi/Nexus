@@ -8,59 +8,55 @@ A capability-by-capability reference. For how the pieces fit together see
 
 ## What's inside
 
-| Capability                   | How it works                                                                                                                                                                       |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Multi-model council**      | N models run in parallel via `Promise.allSettled`. Unanimous, majority, or weighted voting. 11 AI archetypes (YAML-driven).                                                        |
-| **15 LLM providers**         | Anthropic, OpenAI, Groq, Gemini, DeepSeek, Mistral, OpenRouter, Ollama, LMStudio, LlamaCpp, Fireworks, NvidiaNim, Cerebras, and more. Native SSE streaming, no buffering.          |
-| **Provider failover**        | `classifyFailoverError()` — 3-category, 30+ pattern classifier. Automatic retry with FallbackChain.                                                                                |
-| **Sandboxed code execution** | Piston API for Python, TypeScript, Bash, Go, Rust, Ruby, R. Docker REPL for Python/R/Julia with `--network none`, 256 MB cap, read-only FS.                                        |
-| **Long-term memory**         | pgvector + `MemoryGraph` BFS. IVFFlat ANN, BM25+RRF hybrid retrieval, TTL, multi-tenant ACL.                                                                                       |
-| **Knowledge graph**          | Entity + relation graph with Leiden clustering, multi-hop BFS, 6 search modes.                                                                                                     |
-| **Document pipeline**        | extract → classify → OCR → chunk → embed → index. 7 OCR modes, 11 layout categories.                                                                                               |
-| **16 domain feed sources**   | Aviation, climate, conflict, economic, displacement, cyber, health, seismology, wildfire, maritime, market, sanctions, radiation, space, imagery, patents. BullMQ repeatable jobs. |
-| **Orchestration**            | `VersionedPlan` + `ChannelIndex` — 13 lifecycle states, immutable plan snapshots, `PlanningEngine` with 11 blueprints.                                                             |
-| **Cost tracking**            | Per-call token accounting → Prometheus `/api/v1/metrics`. 18-model price table.                                                                                                    |
-| **Gauntlet**                 | Races 47 models in waves of 12, 150 ms stagger, `scoreResponse()` 0–100, 5 speed tiers.                                                                                            |
-| **Red-team engine**          | Input perturbation with configurable attack profiles.                                                                                                                              |
-| **RAG**                      | Chunk → embed → retrieve → rerank. Sub-query decomposition, Jaccard+cosine hybrid.                                                                                                 |
-| **RLHF + eval pipeline**     | Scorers, test runner, SFT auto-tagger, corpus builder.                                                                                                                             |
-| **MCP support**              | JSON-RPC 2.0 HTTP transport, batch invocation, OpenAPI-to-MCP auto-generation.                                                                                                     |
-| **Observability**            | OpenTelemetry (OTLP), Jaeger, Prometheus, Grafana dashboards pre-provisioned. HMAC-SHA256-chained audit logs.                                                                      |
-| **Auth + BYOK**              | API key + HS256 JWT. OAuth connectors for Google, GitHub, Slack. Per-user LLM keys encrypted at rest (AES-256-GCM), resolved server-side.                                          |
+| Capability               | How it works                                                                                                                    |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| Multi-model council      | Models run in parallel via `Promise.allSettled`; unanimous, majority, or weighted voting. Archetypes are YAML-driven.           |
+| LLM drivers              | Adapters for Anthropic, OpenAI, Groq, Gemini, DeepSeek, Mistral, OpenRouter, Ollama, and others, with SSE streaming.            |
+| Provider failover        | Error classifier groups failures into retryable categories and falls back across a configured chain.                            |
+| Sandboxed code execution | Piston for several languages; a Docker REPL for Python/R/Julia with `--network none`, a memory cap, and a read-only filesystem. |
+| Long-term memory         | pgvector with IVFFlat ANN and a BFS-traversable relation graph; hybrid BM25 + RRF retrieval; TTL and per-tenant ACL.            |
+| Knowledge graph          | Entity and relation graph with clustering, multi-hop traversal, and several search modes.                                       |
+| Document pipeline        | extract → classify → OCR → chunk → embed → index.                                                                               |
+| Domain feeds             | Adapters that ingest external sources into typed signals, scheduled as BullMQ repeatable jobs.                                  |
+| Orchestration            | `VersionedPlan` + `ChannelIndex`: a lifecycle state machine with immutable plan snapshots and a planning engine.                |
+| Cost tracking            | Per-call token accounting exposed as Prometheus metrics, with a configurable price table.                                       |
+| Gauntlet                 | Runs models against the same prompt in waves and scores each response.                                                          |
+| Red-team engine          | Input perturbation with configurable attack profiles.                                                                           |
+| RAG                      | chunk → embed → retrieve → rerank, with sub-query decomposition and hybrid scoring.                                             |
+| RLHF + eval              | Scorers, a test runner, an SFT auto-tagger, and a corpus builder.                                                               |
+| MCP support              | JSON-RPC 2.0 over HTTP, batch invocation, and OpenAPI-to-MCP generation.                                                        |
+| Observability            | OpenTelemetry (OTLP) traces, Prometheus metrics, Grafana dashboards, and HMAC-SHA256-chained audit logs.                        |
+| Auth + BYOK              | API key plus HS256 JWT; OAuth connectors; per-user LLM keys encrypted at rest (AES-256-GCM) and resolved server-side.           |
 
 ## Core concepts
 
-**Agent runtime** — multi-step tool loop. Agents plan, call tools, observe results, and
+**Agent runtime** — a multi-step tool loop. Agents plan, call tools, observe results, and
 loop until done or a step limit is reached. Swarm mode spawns sub-agents and coordinates
-them via `ChannelIndex`.
+them through `ChannelIndex`.
 
-**Council** — runs N models in parallel with `Promise.allSettled`. One model failure
-doesn't break the vote. Supports 11 AI archetypes (Analyst, Devil's Advocate,
-Synthesist, …) configured in YAML.
+**Council** — runs models in parallel with `Promise.allSettled`, so one model failing does
+not break the vote. Archetypes (Analyst, Devil's Advocate, Synthesist, and so on) are
+configured in YAML.
 
-**Runtime (orchestration)** — `PlanningEngine` breaks a goal into a `VersionedPlan` with
-11 blueprint types. `GovernanceEngine` applies constraints. `TaskExecutor` runs each step
-with retry, backoff, and circuit breaker. (All in `@nexus/runtime`.)
+**Runtime (orchestration)** — `PlanningEngine` turns a goal into a `VersionedPlan`,
+`GovernanceEngine` applies constraints, and `TaskExecutor` runs each step with retry,
+backoff, and a circuit breaker. All in `@nexus/runtime`.
 
-**Memory** — pgvector stores embeddings. `MemoryGraph` builds a BFS-traversable relation
-graph with score × edgeWeight × 0.7^depth decay. Hybrid BM25+RRF retrieval. Per-tenant ACL.
+**Memory** — pgvector stores embeddings; `MemoryGraph` builds a relation graph traversed
+with a depth-decayed score; retrieval combines BM25 and RRF. Per-tenant ACL applies.
 
-**Context management** — `MicroCompactor` fires at 8 turns OR 80 k tokens, keeps 4 recent
-turns. `LlmCompactor` handles consecutive failure blocking with a 0.80 compaction threshold.
+**Context management** — `MicroCompactor` compacts on a turn or token threshold and keeps
+the most recent turns; `LlmCompactor` handles compaction under repeated failures.
 
-**Gauntlet** — races 47 models in waves of 12 with 150 ms stagger. `scoreResponse()`
-returns 0–100. Results stream back as each wave completes.
+**Signal pipeline** — ingest → classify → typed `Signal` rows, with a PostgreSQL
+`LISTEN/NOTIFY` path for low-latency consumers.
 
-**Signal pipeline** — ingest → classify → typed `Signal` rows. 7 built-in classifier
-rules. PostgreSQL `LISTEN/NOTIFY` hot path for low-latency consumers.
-
-**Observability** — every request gets an OTel trace. Audit events are HMAC-SHA256
-chained (tamper-evident). Prometheus metrics scraped at `/api/v1/metrics`. Two Grafana
-dashboards pre-provisioned.
+**Observability** — each request carries an OpenTelemetry trace; audit events are
+HMAC-SHA256 chained (tamper-evident); metrics are exposed for Prometheus.
 
 **BYOK keys** — users add their own provider keys on the Provider Keys page. They are
-AES-256-GCM encrypted in Postgres and only ever decrypted server-side to make the user's
-own LLM calls; they are never returned to the client.
+AES-256-GCM encrypted in Postgres and decrypted only server-side to make that user's own
+LLM calls; they are never returned to the client.
 
 ## SDK usage
 

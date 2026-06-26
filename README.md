@@ -6,7 +6,7 @@
 
 # NEXUS
 
-**Multi-agent AI orchestration — from a single prompt to a self-coordinating swarm.**
+Run, coordinate, and compare large language models from one place.
 
 <p>
   <a href="https://github.com/Yash-Awasthi/Nexus/actions/workflows/test.yml">
@@ -32,18 +32,17 @@
 
 ---
 
-## What is NEXUS?
+## What it is
 
-NEXUS asks **many AI models the same question at once**, lets them deliberate, and
-returns one synthesised answer — with long-term memory, sandboxed code execution, and
-document ingestion behind it, all driven from a React dashboard.
+NEXUS sends the same task to several language models, coordinates multi-step agents,
+and keeps memory across sessions — behind a Fastify API, a React dashboard, and
+background workers. It is bring-your-own-key: you provide your LLM provider keys and
+they stay within your deployment.
 
-It's **bring-your-own-key (BYOK)**: connect your own LLM API keys and nothing leaves your
-deployment.
-
-Under the hood it's a 110-package TypeScript monorepo (pnpm + Turbo): a Fastify API, a
-React Router 7 UI, BullMQ workers, and ~100 focused `@nexus/*` packages. New here? Start
-below, then skim [docs/FEATURES.md](docs/FEATURES.md).
+It is a TypeScript monorepo (pnpm + Turbo): a handful of apps (`api`, `ui`, `worker`,
+`cli`, ingest) and a set of focused `@nexus/*` packages for the runtime, council,
+memory, retrieval, drivers, and the rest. This page is a starting point — the
+[docs](docs/) and the source go further.
 
 ---
 
@@ -51,7 +50,7 @@ below, then skim [docs/FEATURES.md](docs/FEATURES.md).
 
 You need **Docker**. For the hot-reload dev setup you also need **Node 20+** and **pnpm 9+**.
 
-### Option A — Docker (simplest, no Node required)
+### Option A — Docker
 
 ```bash
 git clone https://github.com/Yash-Awasthi/Nexus.git
@@ -89,38 +88,36 @@ pnpm dev                                 # API :3001 · UI :5173 · worker
 
 Run a single service with `pnpm dev:api` or `pnpm dev:ui`.
 
-First run not going to plan? See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+Setup not going to plan? See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
 ---
 
-## What can you do with it?
+## What you can do with it
 
-- **Ask a council** — pose a question and watch N models answer in parallel, then get a
-  single voted/synthesised verdict.
-- **Run agents** — multi-step tool-using agents (and swarms) that plan, execute, and loop.
-- **Give it memory** — store and recall facts with vector + graph retrieval across sessions.
-- **Race models** — the Gauntlet pits dozens of models against each other and scores them.
-- **Bring your own keys** — add provider keys on the Provider Keys page; they're encrypted
-  at rest and only ever used server-side.
+- Send one question to several models in parallel and combine their answers (council).
+- Run multi-step, tool-using agents.
+- Store and recall information across sessions with vector and graph retrieval.
+- Compare models against the same prompts.
+- Add your own provider keys on the Provider Keys page — encrypted at rest, used
+  server-side only.
 
-A full capability list and SDK snippets are in [docs/FEATURES.md](docs/FEATURES.md).
+The capability reference and SDK snippets are in [docs/FEATURES.md](docs/FEATURES.md).
 
 ---
 
 ## Documentation
 
-| Doc                                                | What's in it                                               |
-| -------------------------------------------------- | ---------------------------------------------------------- |
-| [docs/FEATURES.md](docs/FEATURES.md)               | Full capability reference, core concepts, SDK usage        |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)       | System diagram, repository layout, toolchain, ADR index    |
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)           | Env vars, Render+Vercel, Docker, Kubernetes, observability |
-| [docs/TESTING.md](docs/TESTING.md)                 | Unit, e2e, a11y, load (k6), and chaos testing              |
-| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common setup and dev-server fixes                          |
-| [docs/runbook.md](docs/runbook.md)                 | Day-2 operations: scaling, incidents, backup/DR            |
-| [FUTURE_CONTRIBUTION.md](FUTURE_CONTRIBUTION.md)   | Roadmap and where to contribute                            |
-| [CONTRIBUTING.md](CONTRIBUTING.md)                 | Code standards, branch strategy, PR template               |
+| Doc                                                | What's in it                                          |
+| -------------------------------------------------- | ----------------------------------------------------- |
+| [docs/FEATURES.md](docs/FEATURES.md)               | Capability reference, core concepts, SDK usage        |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)       | System diagram, repository layout, toolchain, ADRs    |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)           | Environment variables, Docker, hosting, observability |
+| [docs/TESTING.md](docs/TESTING.md)                 | Unit, e2e, accessibility, and load testing            |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common setup and dev-server fixes                     |
+| [docs/runbook.md](docs/runbook.md)                 | Operations: scaling, incidents, backup/restore        |
+| [CONTRIBUTING.md](CONTRIBUTING.md)                 | Code standards, branch strategy, PR template          |
 
-The full docs site (Docusaurus) lives in `apps/docs-site/`.
+The docs site (Docusaurus) lives in `apps/docs-site/`.
 
 ---
 
@@ -139,21 +136,20 @@ pnpm db:migrate   # Apply Drizzle migrations
 
 ## Contributing & security
 
-Contributions welcome — bug fixes, new LLM driver adapters, domain feed sources, or docs.
-Fork, branch, make changes with tests, run `pnpm typecheck && pnpm test && pnpm lint`, and
-open a PR. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Contributions are welcome — bug fixes, new LLM driver adapters, feed sources, or docs.
+Fork, branch, make your changes with tests, run `pnpm typecheck && pnpm test && pnpm lint`,
+and open a PR. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Security: code execution is sandboxed (`--network none`, `--read-only`, 256 MB cap), the
-audit log is HMAC-SHA256 chained (tamper-evident), and all secrets come from the
-environment. Threat model: [docs/security/threat-model.md](docs/security/threat-model.md).
-Report vulnerabilities privately via GitHub Security Advisories.
+Code execution runs in a sandbox (`--network none`, read-only filesystem, memory cap).
+Audit log entries are HMAC-SHA256 chained, and secrets are read from the environment.
+Report vulnerabilities privately via GitHub Security Advisories; see [SECURITY.md](SECURITY.md).
 
 ---
 
 ## License
 
-[Apache 2.0](LICENSE) — free to use, modify, and distribute. Attribution appreciated.
+[Apache 2.0](LICENSE).
 
 <div align="center">
-  <sub>Built by <a href="https://github.com/Yash-Awasthi">Yash Awasthi</a> · Apache 2.0</sub>
+  <sub>Built by <a href="https://github.com/Yash-Awasthi">Yash Awasthi</a></sub>
 </div>

@@ -90,6 +90,13 @@ export async function buildUserDriverRegistry(
   const registry = new DriverRegistry();
   const missing: string[] = [];
   for (const provider of new Set(providers)) {
+    // Allowlist guard: `provider` is user-controlled, so only invoke a factory
+    // that is an OWN property of DRIVER_FACTORIES. This rejects prototype-chain
+    // names (e.g. "constructor", "__proto__", "toString") before the dynamic call.
+    if (!Object.hasOwn(DRIVER_FACTORIES, provider)) {
+      missing.push(provider);
+      continue;
+    }
     const factory = DRIVER_FACTORIES[provider];
     if (!factory) {
       missing.push(provider);

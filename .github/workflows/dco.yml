@@ -17,6 +17,4 @@ jobs:
         with:
           fetch-depth: 0
       - name: Check DCO
-        uses: probot/actions-dco@v1
-        with:
-          require-sign-off: true
+        uses: tim-actions/dco@v1.1.0

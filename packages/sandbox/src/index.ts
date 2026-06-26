@@ -208,6 +208,8 @@ export const defaultRunner: Runner = (
     let stderr = "";
     let timedOut = false;
 
+    // safe: array args, no shell — no shell-metachar interpretation, so the
+    // command and its arguments cannot be re-parsed into additional commands.
     const proc = spawn(cmd, args, {
       signal: controller.signal,
       env: opts.env,
@@ -220,12 +222,19 @@ export const defaultRunner: Runner = (
       proc.stdin.end();
     }
 
+    // Cap in-memory accumulation so a runaway child cannot exhaust memory:
+    // stop appending once each stream reaches MAX_OUTPUT_BYTES. Final output is
+    // still passed through truncate() for the user-facing truncation marker.
     proc.stdout?.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString("utf8");
+      if (stdout.length < MAX_OUTPUT_BYTES) {
+        stdout += chunk.toString("utf8");
+      }
     });
 
     proc.stderr?.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString("utf8");
+      if (stderr.length < MAX_OUTPUT_BYTES) {
+        stderr += chunk.toString("utf8");
+      }
     });
 
     proc.on("close", (code) => {
