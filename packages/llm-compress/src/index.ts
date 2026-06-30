@@ -260,6 +260,100 @@ export function compressAuto(input: string): CompressResult & { traits: OutputTr
   return { ...compress(input, filters), traits };
 }
 
+// ── Tool-name → filter router ───────────────────────────────────────────────────
+// compressAuto picks filters from the text alone. But the SOURCE tool tells us more
+// than the bytes do: a `git diff`'s identical context lines must NOT be folded (the
+// ×N marker corrupts a patch), while a build log's huge progress-spam middle is the
+// one place tail-truncation is safe-ish. This router maps a tool name to a curated
+// profile, then still intersects with detected traits so a filter only runs when it
+// can actually help. Lossless by default; lossy truncation is opt-in per call.
+
+/** A tool-output shape with known compression characteristics. */
+export type ToolProfileName = "diff" | "grep" | "listing" | "build-log" | "generic";
+
+interface ToolCompressProfile {
+  /** Lossless filters this tool's output may safely receive (DEFAULT_FILTERS subset). */
+  filters: readonly CompressFilter[];
+  /** Optional tail-truncation for known-huge outputs — applied only when allowLossy. */
+  truncate?: { headLines: number; tailLines: number };
+}
+
+const TOOL_PROFILES: Record<ToolProfileName, ToolCompressProfile> = {
+  // No dedup: a diff legitimately repeats context lines and folding breaks the patch.
+  diff: { filters: [stripAnsi, trimTrailing, collapseBlankLines] },
+  // Full lossless set; never truncate — dropping matches would hide search results.
+  grep: { filters: DEFAULT_FILTERS },
+  // Listings fold well (repeated perms/owners) but have no meaningful blank runs.
+  listing: { filters: [stripAnsi, trimTrailing, dedupConsecutive] },
+  // Build/test logs: full lossless set, plus opt-in tail-truncation (head=errors/cmd,
+  // tail=failures/summary; the middle is progress spam).
+  "build-log": { filters: DEFAULT_FILTERS, truncate: { headLines: 80, tailLines: 40 } },
+  generic: { filters: DEFAULT_FILTERS },
+};
+
+/** Map a tool name (any separator/case) to its output profile. Falls back to generic. */
+export function resolveToolProfile(toolName: string): ToolProfileName {
+  const n = toolName.toLowerCase();
+  if (n.includes("diff")) return "diff";
+  if (/grep|ripgrep|\brg\b|\bag\b|\back\b|search/.test(n)) return "grep";
+  if (/build|compile|\btsc\b|test|vitest|jest|lint|\bnpm\b|pnpm|yarn|\bmake\b|cargo|gradle|webpack|bundle/.test(n))
+    return "build-log";
+  if (/\bls\b|\bdir\b|find|tree|glob|list|readdir|read_dir/.test(n)) return "listing";
+  return "generic";
+}
+
+/** A {@link compressForTool} result: the base pass plus what the router chose. */
+export interface ToolCompressResult extends CompressResult {
+  traits: OutputTrait[];
+  tool: ToolProfileName;
+  /** True when lossy truncation dropped content (only possible with allowLossy). */
+  lossy: boolean;
+}
+
+/**
+ * Compress `input` using the profile for `toolName`. The profile's filters are
+ * intersected with the text's detected traits, so nothing runs that can't help and
+ * — crucially — corruption-prone filters (dedup on diffs) are excluded by profile.
+ *
+ * Lossless unless `opts.allowLossy` is set AND the profile defines a truncation
+ * (only `build-log` today); then the cleaned text is tail-truncated and `lossy`
+ * is true. Never silently lossy.
+ */
+export function compressForTool(
+  toolName: string,
+  input: string,
+  opts: { allowLossy?: boolean } = {},
+): ToolCompressResult {
+  const tool = resolveToolProfile(toolName);
+  const profile = TOOL_PROFILES[tool];
+  const traits = detectTraits(input);
+  const allowed = new Set(profile.filters.map((f) => f.name));
+  // Keep a filter only if the profile allows it AND the text exhibits its trait.
+  const filters = DEFAULT_FILTERS.filter(
+    (f) => allowed.has(f.name) && traits.some((t) => TRAIT_FILTER[t].name === f.name),
+  );
+  let result = compress(input, filters);
+  let lossy = false;
+
+  if (opts.allowLossy && profile.truncate) {
+    const truncated = smartTruncate(result.text, profile.truncate);
+    if (truncated !== result.text) {
+      lossy = true;
+      const compressedTokens = estimateTokens(truncated);
+      result = {
+        ...result,
+        text: truncated,
+        compressedChars: truncated.length,
+        compressedTokens,
+        applied: [...result.applied, "smart-truncate"],
+        savedRatio: result.originalTokens === 0 ? 0 : 1 - compressedTokens / result.originalTokens,
+      };
+    }
+  }
+
+  return { ...result, traits, tool, lossy };
+}
+
 // ── System-prompt injectors (opt-in; NEVER silently alter agent semantics) ──────
 // These change how the MODEL behaves, not the text it reads, so they are never in
 // any default pipeline. A caller opts in per-agent / per-request and the injected

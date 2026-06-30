@@ -16,7 +16,7 @@
  */
 
 import {
-  compress,
+  compressForTool,
   encodeStructured,
   PRESETS,
   type PresetName,
@@ -1152,7 +1152,10 @@ export class ToolAgentRuntime {
         toolResults.push(result);
         let content = stringifyToolOutput(result, this.structuredEncoding);
         if (this.toolCompressFilters.length > 0) {
-          const c = compress(content, this.toolCompressFilters);
+          // Route by tool name so the filter set fits the output shape — e.g. a
+          // diff's identical context lines are never folded. Stays lossless
+          // (no truncation); the static preset above is the on/off switch.
+          const c = compressForTool(call.name, content);
           content = c.text;
           if (c.applied.length > 0) {
             this.onToolCompress?.({
