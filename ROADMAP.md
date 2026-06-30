@@ -34,9 +34,12 @@ Doubao, BytePlus, Hunyuan, Spark, Baidu ERNIE** (shipped), a
 `chatCompletionsUrl()`/`authHeaders()` base-class seam for non-Bearer/non-standard-path
 providers. Remaining:
 
-- **Tier-A2 non-OpenAI-shaped (remaining):** alibailian, dify (both app/workspace-scoped
-  auth). Each needs a request/response adapter — coordinate with the translation matrix
-  (§2). ERNIE tool-calling (`functions`) still unmapped — text chat only for now.
+- **Tier-A2 non-OpenAI-shaped:** alibailian (Alibaba Bailian/DashScope via OpenAI
+  compatible-mode) + dify (app-scoped chat-messages adapter) **shipped**. Remaining:
+  ERNIE tool-calling (`functions`) still unmapped — text chat only; Dify is
+  blocking-only (no SSE / conversation_id threading); Bailian native `/api/v1`
+  envelope deferred (only needed for Qwen-only extras). Coordinate further work with
+  the translation matrix (§2).
 - **Aux providers route to existing packages, not `llm-drivers`:** image-gen
   (flux/stability/recraft/fal/comfyui), voice (elevenlabs/deepgram/cartesia/assemblyai),
   retrieval/reranker embeddings (voyage/jina/cohere-embed), search (exa/brave/serper).
@@ -77,8 +80,11 @@ filters (ansi/trim/blank/dedup) + `smartTruncate`; `compressAuto`/`detectTraits`
   each pass emits an `agent.tool_compress` SSE/log event (tool, savedTokens, applied).
   **Remaining:** the raw **gateway proxy** path (`apps/api/routes/gateway.ts`) still
   doesn't compress message/tool bodies — only the agent runtime does.
+- **Tool-name→filter router — shipped** (`resolveToolProfile` / `compressForTool`):
+  per-tool profiles (diff/grep/listing/build-log/generic) that exclude
+  corruption-prone filters (no dedup on diffs) + opt-in lossy tail-truncate for build
+  logs; `ToolAgentRuntime` routes tool output through it (lossless default, tool-aware).
 - **GCF encoder** — spec/acronym unclear; pin a concrete format before building.
-- **Tool-name→filter router** (git diff/grep/ls/build) on top of the trait detector.
 - **Heavy lossy mode (opt-in):** `@atjsh/llmlingua-2` dep (⚠️ auto-downloads a 57 MB–2.2 GB
   model on first use).
 
@@ -113,8 +119,14 @@ input/output/cache-read/cache-write) seeded from `provider-registry`;
 overage/refund delta, composes for token<user<account); typed `QuotaExceededError`.
 Remaining:
 
-- Persist the per-request prompt/completion/cache token breakdown (add token columns to
-  `usage_events`) and wire the ledger pre-call check into gateway/middleware.
+- **Persistence + ledger gate — shipped** (migration 0010): `usage_events` gained
+  model + prompt/completion/cache-read/cache-write token columns + `cost_usd`;
+  `api_keys.monthly_cost_cap_usd` BYOK cap. `QuotaChecker.recordUsage` persists the
+  priced breakdown; `check()` seeds a `BillingLedger` with month-to-date spend and
+  reserves the pre-call estimate against the cap (`monthly_cost_cap_exceeded` → 429 in
+  `billingPreHandler`). **Remaining:** the **gateway** path (`routes/gateway.ts`) has a
+  separate auth identity (not api-key/billingKey) — wiring its per-call spend into
+  `usage_events` + a pre-dispatch `check(apiKey, estimateMaxCost(...))` is the open gap.
 - Usage-analytics UI route over the breakdown.
 
 ## 6. Multi-agent orchestration
@@ -218,8 +230,8 @@ orchestration. Consider `mcp-compressor` to shrink tool manifests 60–95%.
 ## 13. Domain feeds
 
 `domain-feeds` has 18 domains. **Shipped:** social signals — Hacker News (Algolia) +
-Reddit (listing JSON). Add: scientific preprints (**bioRxiv** has clean JSON — do first;
-arXiv is Atom XML, use the existing `RssFeedAdapter`), legislative tracking
+Reddit (listing JSON); scientific preprints — **bioRxiv/medRxiv** (`PreprintsFeed`).
+Add: arXiv (Atom XML, use the existing `RssFeedAdapter`), legislative tracking
 (congressional bills, EU directives), earnings & SEC filings (EDGAR, 8-K), supply chain
 (AIS shipping, port congestion). Dark-web sources need careful legal review first.
 

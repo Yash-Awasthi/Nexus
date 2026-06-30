@@ -48,3 +48,6 @@ Thumbs.db
 *.log
 sbom.json
 thepast-conv.txt
+
+# Local resume notes (not shared)
+PROGRESS.md
