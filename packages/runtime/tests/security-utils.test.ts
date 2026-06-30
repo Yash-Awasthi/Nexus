@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
 
-import { isSafeUrl, isSafeSandboxPath } from "../src/security-utils.js";
+import { isSafeUrl, assertSafeUrl, isSafeSandboxPath } from "../src/security-utils.js";
 
 describe("isSafeUrl", () => {
   describe("allowed protocols", () => {
@@ -70,6 +70,71 @@ describe("isSafeUrl", () => {
     it("blocks 192.168.x.x", () => {
       expect(isSafeUrl("http://192.168.1.1/")).toBe(false);
     });
+
+    it("blocks 172.16/12 (the gap the old check missed)", () => {
+      expect(isSafeUrl("http://172.16.0.1/")).toBe(false);
+      expect(isSafeUrl("http://172.31.255.255/")).toBe(false);
+    });
+
+    it("does NOT block 172.32.x.x (just outside the private range)", () => {
+      expect(isSafeUrl("http://172.32.0.1/")).toBe(true);
+    });
+
+    it("blocks 100.64/10 CGNAT", () => {
+      expect(isSafeUrl("http://100.64.0.1/")).toBe(false);
+    });
+
+    it("blocks 0.0.0.0", () => {
+      expect(isSafeUrl("http://0.0.0.0/")).toBe(false);
+    });
+
+    it("blocks link-local 169.254.x beyond the IMDS address", () => {
+      expect(isSafeUrl("http://169.254.1.1/")).toBe(false);
+    });
+  });
+
+  describe("SSRF — smuggled IPv4 encodings (all map to 127.0.0.1)", () => {
+    it("blocks decimal 2130706433", () => {
+      expect(isSafeUrl("http://2130706433/")).toBe(false);
+    });
+
+    it("blocks hex 0x7f000001", () => {
+      expect(isSafeUrl("http://0x7f000001/")).toBe(false);
+    });
+
+    it("blocks dotted-hex 0x7f.0.0.1", () => {
+      expect(isSafeUrl("http://0x7f.0.0.1/")).toBe(false);
+    });
+
+    it("blocks octal 0177.0.0.1", () => {
+      expect(isSafeUrl("http://0177.0.0.1/")).toBe(false);
+    });
+
+    it("blocks short form 127.1", () => {
+      expect(isSafeUrl("http://127.1/")).toBe(false);
+    });
+  });
+
+  describe("SSRF — IPv6", () => {
+    it("blocks ULA fc00::/7", () => {
+      expect(isSafeUrl("http://[fd00::1]/")).toBe(false);
+    });
+
+    it("blocks link-local fe80::/10", () => {
+      expect(isSafeUrl("http://[fe80::1]/")).toBe(false);
+    });
+
+    it("blocks IPv4-mapped to a private address", () => {
+      expect(isSafeUrl("http://[::ffff:10.0.0.1]/")).toBe(false);
+    });
+
+    it("blocks unspecified ::", () => {
+      expect(isSafeUrl("http://[::]/")).toBe(false);
+    });
+
+    it("allows a public IPv6 literal", () => {
+      expect(isSafeUrl("http://[2606:4700:4700::1111]/")).toBe(true);
+    });
   });
 
   describe("valid external URLs", () => {
@@ -97,6 +162,15 @@ describe("isSafeUrl", () => {
 
     it("returns false for relative paths", () => {
       expect(isSafeUrl("/etc/passwd")).toBe(false);
+    });
+  });
+
+  describe("assertSafeUrl", () => {
+    it("does not throw on a safe URL", () => {
+      expect(() => assertSafeUrl("https://api.openai.com/v1")).not.toThrow();
+    });
+    it("throws on an unsafe URL", () => {
+      expect(() => assertSafeUrl("http://169.254.169.254/")).toThrow(/SSRF/);
     });
   });
 });
