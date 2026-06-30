@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Billing routes — plan info, quota usage, API key management, Stripe webhooks.
+ * Billing routes — plan info, usage metering, API key management.
  *
- * API key CRUD is backed by Drizzle ORM → Neon Postgres (via @nexus/billing).
- * When DATABASE_URL is not set the key endpoints return 503 with a clear error.
+ * Nexus is free and open to all: there is no paid plan and no payment provider.
+ * These endpoints only report the single open plan and meter usage of the user's
+ * own BYOK keys. API key CRUD is backed by Drizzle ORM → Neon Postgres (via
+ * @nexus/billing). When DATABASE_URL is not set the key endpoints return 503.
  *
- * GET  /api/v1/billing/plan            — current plan definition
- * GET  /api/v1/billing/current-period  — usage for current billing period
+ * GET  /api/v1/billing/plan            — the open plan definition
+ * GET  /api/v1/billing/current-period  — usage for current period
  * GET  /api/v1/billing/keys            — list API keys for the authenticated owner
  * POST /api/v1/billing/keys            — create a new API key
  * DELETE /api/v1/billing/keys/:id      — revoke a key
  * GET  /api/v1/billing/quota           — current quota status
- * POST /api/v1/billing/webhook/stripe  — Stripe webhook handler
  */
 
 import type { FastifyInstance, FastifyReply } from "fastify";
@@ -24,44 +25,21 @@ const DB_AVAILABLE = !!process.env.DATABASE_URL;
 
 // ── Static plan definitions ───────────────────────────────────────────────────
 
+// Nexus is free and open to all — a single, unlimited plan. No paid tiers.
+// tokensPerMonth: -1 and rpmLimit: 0 are both treated as "unlimited" downstream.
 const PLANS = {
   free: {
-    name: "Free",
+    name: "Open",
     price: 0,
-    period: "month",
-    features: ["50K tokens/day", "Groq + Ollama", "Basic API access", "Community support"],
-    tokensPerMonth: 1_500_000,
-    rpmLimit: 60,
-    tier: "free",
-  },
-  pro: {
-    name: "Pro",
-    price: 29,
-    period: "month",
-    features: [
-      "2M tokens/day",
-      "All 15 providers",
-      "Query + JSONL export",
-      "Priority support",
-      "Analytics",
-    ],
-    tokensPerMonth: 60_000_000,
-    rpmLimit: 600,
-    tier: "pro",
-  },
-  enterprise: {
-    name: "Enterprise",
-    price: 199,
     period: "month",
     features: [
       "Unlimited tokens",
-      "All 15 providers",
-      "HF corpus push",
-      "SLA guarantee",
-      "SSO + audit logs",
+      "All providers (bring your own keys)",
+      "Full API access",
+      "Community support",
     ],
     tokensPerMonth: -1,
-    rpmLimit: 6000,
+    rpmLimit: 0,
     tier: "enterprise",
   },
 } as const;
@@ -316,231 +294,7 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // ── Stripe Checkout + Portal ──────────────────────────────────────────────
-
-  /**
-   * POST /billing/checkout
-   *
-   * Creates a Stripe Checkout Session for upgrading to the requested plan.
-   * Returns { url } — the frontend must redirect to it.
-   *
-   * Body: { plan: "pro" | "enterprise"; successUrl?: string; cancelUrl?: string }
-   */
-  app.post<{
-    Body: {
-      plan: "pro" | "enterprise";
-      successUrl?: string;
-      cancelUrl?: string;
-    };
-  }>(
-    "/billing/checkout",
-    {
-      preHandler: requireAuth,
-      schema: {
-        body: {
-          type: "object",
-          required: ["plan"],
-          properties: {
-            plan: { type: "string", enum: ["pro", "enterprise"] },
-            successUrl: { type: "string", format: "uri" },
-            cancelUrl: { type: "string", format: "uri" },
-          },
-        },
-      },
-    },
-    async (request, reply) => {
-      const stripeKey = process.env.STRIPE_SECRET_KEY;
-      if (!stripeKey) {
-        return (reply as FastifyReply)
-          .code(503)
-          .send({ error: "Stripe not configured — set STRIPE_SECRET_KEY" });
-      }
-
-      // Price IDs from env (set in Stripe dashboard → Product catalog)
-      const priceIds: Record<"pro" | "enterprise", string | undefined> = {
-        pro: process.env.STRIPE_PRICE_PRO,
-        enterprise: process.env.STRIPE_PRICE_ENTERPRISE,
-      };
-      const priceId = priceIds[request.body.plan];
-      if (!priceId) {
-        return (reply as FastifyReply).code(503).send({
-          error: `STRIPE_PRICE_${request.body.plan.toUpperCase()} env var not set`,
-        });
-      }
-
-      const origin = process.env.OAUTH_REDIRECT_BASE_URL ?? "http://localhost:5173";
-      const successUrl =
-        request.body.successUrl ?? `${origin}/billing?session_id={CHECKOUT_SESSION_ID}`;
-      const cancelUrl = request.body.cancelUrl ?? `${origin}/billing`;
-
-      try {
-        // Lightweight Stripe REST call — no SDK dependency needed
-        const body = new URLSearchParams({
-          mode: "subscription",
-          "line_items[0][price]": priceId,
-          "line_items[0][quantity]": "1",
-          success_url: successUrl,
-          cancel_url: cancelUrl,
-          allow_promotion_codes: "true",
-          billing_address_collection: "auto",
-          customer_email: request.nexusUserId ?? "",
-          "subscription_data[metadata][plan]": request.body.plan,
-          "subscription_data[metadata][userId]": request.nexusUserId ?? "anon",
-        });
-
-        const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${stripeKey}`,
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: body.toString(),
-        });
-
-        if (!res.ok) {
-          const err = (await res.json()) as { error?: { message?: string } };
-          return (reply as FastifyReply).code(502).send({
-            error: `Stripe error: ${err.error?.message ?? res.statusText}`,
-          });
-        }
-
-        const session = (await res.json()) as { id: string; url: string };
-        return reply.send({ sessionId: session.id, url: session.url });
-      } catch (err: unknown) {
-        const e = err as { message?: string };
-        return (reply as FastifyReply)
-          .code(500)
-          .send({ error: e.message ?? "Checkout session creation failed" });
-      }
-    },
-  );
-
-  /**
-   * POST /billing/portal
-   *
-   * Creates a Stripe Customer Portal session for managing subscriptions.
-   * Requires the user's Stripe customer ID (looked up from DB via userId).
-   * Returns { url } — the frontend must redirect to it.
-   *
-   * Body: { returnUrl?: string }
-   */
-  app.post<{ Body: { returnUrl?: string } }>(
-    "/billing/portal",
-    {
-      preHandler: requireAuth,
-      schema: {
-        body: {
-          type: "object",
-          properties: {
-            returnUrl: { type: "string", format: "uri" },
-          },
-        },
-      },
-    },
-    async (request, reply) => {
-      const stripeKey = process.env.STRIPE_SECRET_KEY;
-      if (!stripeKey) {
-        return (reply as FastifyReply)
-          .code(503)
-          .send({ error: "Stripe not configured — set STRIPE_SECRET_KEY" });
-      }
-
-      const origin = process.env.OAUTH_REDIRECT_BASE_URL ?? "http://localhost:5173";
-      const returnUrl = request.body.returnUrl ?? `${origin}/billing`;
-
-      // Resolve Stripe customer ID from DB
-      let customerId: string | undefined;
-      if (DB_AVAILABLE && request.nexusUserId) {
-        try {
-          const { db } = await import("@nexus/db");
-          const { subscriptions } = await import("@nexus/db/schema");
-          const { eq } = await import("drizzle-orm");
-          const [row] = await db
-            .select({ stripeCustomerId: subscriptions.stripeCustomerId })
-            .from(subscriptions)
-            .where(eq(subscriptions.ownerId, request.nexusUserId))
-            .limit(1);
-          customerId = row?.stripeCustomerId ?? undefined;
-        } catch {
-          // DB lookup failed — fall through to 503
-        }
-      }
-
-      if (!customerId) {
-        return (reply as FastifyReply).code(404).send({
-          error: "No Stripe customer linked to this account. Complete a checkout first.",
-        });
-      }
-
-      try {
-        const body = new URLSearchParams({
-          customer: customerId,
-          return_url: returnUrl,
-        });
-
-        const res = await fetch("https://api.stripe.com/v1/billing_portal/sessions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${stripeKey}`,
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: body.toString(),
-        });
-
-        if (!res.ok) {
-          const err = (await res.json()) as { error?: { message?: string } };
-          return (reply as FastifyReply).code(502).send({
-            error: `Stripe error: ${err.error?.message ?? res.statusText}`,
-          });
-        }
-
-        const session = (await res.json()) as { url: string };
-        return reply.send({ url: session.url });
-      } catch (err: unknown) {
-        const e = err as { message?: string };
-        return (reply as FastifyReply)
-          .code(500)
-          .send({ error: e.message ?? "Portal session creation failed" });
-      }
-    },
-  );
-
-  // ── Subscription / Usage / Cancel ──────────────────────────────────────────
-
-  app.get<{ Params: { tenantId: string } }>(
-    "/billing/subscription/:tenantId",
-    { preHandler: requireAuth },
-    async (request, reply) => {
-      const { tenantId } = request.params;
-      if (!DB_AVAILABLE) {
-        return reply.send({ id: null, tenantId, planId: "free", status: "active" });
-      }
-      try {
-        const { db: billingDb } = await import("@nexus/db");
-        const { subscriptions } = await import("@nexus/db/schema");
-        const { eq } = await import("drizzle-orm");
-        const [sub] = await billingDb
-          .select()
-          .from(subscriptions)
-          .where(eq(subscriptions.ownerId, tenantId))
-          .limit(1);
-        if (!sub) return reply.send({ id: null, tenantId, planId: "free", status: "active" });
-        return reply.send({
-          id: sub.id,
-          tenantId: sub.ownerId,
-          planId: sub.plan,
-          status: sub.status,
-          currentPeriodEnd: sub.currentPeriodEnd
-            ? new Date((sub.currentPeriodEnd as unknown as number) * 1000).toISOString()
-            : undefined,
-          cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
-          stripeCustomerId: sub.stripeCustomerId,
-        });
-      } catch (err: unknown) {
-        return reply.code(500).send({ error: (err as Error).message });
-      }
-    },
-  );
+  // ── Usage ──────────────────────────────────────────────────────────────────
 
   app.get<{ Params: { tenantId: string } }>(
     "/billing/usage/:tenantId",
@@ -581,75 +335,6 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
       } catch (err: unknown) {
         return reply.code(500).send({ error: (err as Error).message });
       }
-    },
-  );
-
-  app.post<{ Params: { tenantId: string } }>(
-    "/billing/cancel/:tenantId",
-    { preHandler: requireAuth },
-    async (request, reply) => {
-      const { tenantId } = request.params;
-      if (!DB_AVAILABLE) return reply.code(503).send({ error: "Database not configured" });
-      try {
-        const { db: billingDb } = await import("@nexus/db");
-        const { subscriptions } = await import("@nexus/db/schema");
-        const { eq } = await import("drizzle-orm");
-        const [sub] = await billingDb
-          .select()
-          .from(subscriptions)
-          .where(eq(subscriptions.ownerId, tenantId))
-          .limit(1);
-        if (!sub) return reply.code(404).send({ error: "No subscription found" });
-        await billingDb
-          .update(subscriptions)
-          .set({ cancelAtPeriodEnd: true })
-          .where(eq(subscriptions.id, sub.id));
-        return reply.send({ ok: true, cancelAtPeriodEnd: true });
-      } catch (err: unknown) {
-        return reply.code(500).send({ error: (err as Error).message });
-      }
-    },
-  );
-
-  /** POST /billing/webhook/stripe */
-  app.post(
-    "/billing/webhook/stripe",
-    {
-      schema: {
-        response: {
-          200: { type: "object", additionalProperties: true },
-          201: { type: "object", additionalProperties: true },
-        },
-      },
-      config: { rawBody: true },
-    },
-    async (request, reply) => {
-      const secret = process.env.STRIPE_WEBHOOK_SECRET;
-      if (!secret) {
-        app.log.warn("STRIPE_WEBHOOK_SECRET not set — skipping signature verification");
-      }
-
-      if (DB_AVAILABLE && secret) {
-        try {
-          const { StripeWebhookProcessor } = await import("@nexus/billing");
-          const processor = new StripeWebhookProcessor(secret);
-          const rawBody =
-            (request as { rawBody?: string | Buffer }).rawBody ?? JSON.stringify(request.body);
-          const sig = (request.headers["stripe-signature"] as string | undefined) ?? "";
-          const result = await processor.process(rawBody.toString(), sig);
-          return reply.code(200).send(result);
-        } catch (err: unknown) {
-          const e = err as { name?: string; message?: string };
-          if (e.name === "StripeSignatureError") {
-            return (reply as FastifyReply).code(400).send({ error: "Invalid Stripe signature" });
-          }
-          app.log.error({ err }, "Stripe webhook processing error");
-        }
-      }
-
-      // Acknowledge all events when DB or secret is unavailable
-      app.log.info({ event: "stripe-webhook" }, "Stripe webhook received (passthrough)");
-      return reply.code(200).send({ received: true });
     },
   );
 }
