@@ -34,6 +34,13 @@ import {
   QwenDriver,
   Ai360Driver,
   VercelAIGatewayDriver,
+  DoubaoDriver,
+  BytePlusDriver,
+  HunyuanDriver,
+  SparkDriver,
+  AzureOpenAIDriver,
+  CloudflareWorkersAIDriver,
+  XinferenceDriver,
   LocalRouterDriver,
   BedrockDriver,
   VertexDriver,
@@ -259,6 +266,15 @@ describe.each([
     provider: "vercel_ai_gateway",
     url: "ai-gateway.vercel.sh",
   },
+  { name: "DoubaoDriver", Factory: DoubaoDriver, provider: "doubao", url: "volces.com" },
+  { name: "BytePlusDriver", Factory: BytePlusDriver, provider: "byteplus", url: "bytepluses.com" },
+  {
+    name: "HunyuanDriver",
+    Factory: HunyuanDriver,
+    provider: "hunyuan",
+    url: "hunyuan.cloud.tencent.com",
+  },
+  { name: "SparkDriver", Factory: SparkDriver, provider: "spark", url: "spark-api-open.xf-yun.com" },
   {
     name: "LocalRouterDriver",
     Factory: LocalRouterDriver,
@@ -301,6 +317,79 @@ describe.each([
     const r = await d.complete(makeOpts());
     expect(r.usage.inputTokens).toBe(5);
     expect(r.usage.outputTokens).toBe(10);
+  });
+});
+
+// ── Azure OpenAI (deployment path + api-key header) ───────────────────────────
+
+describe("AzureOpenAIDriver", () => {
+  let t: MockTransport;
+  let d: AzureOpenAIDriver;
+  beforeEach(() => {
+    t = new MockTransport().setResponse(OAI_RESPONSE);
+    d = new AzureOpenAIDriver(
+      {
+        apiKey: "az-key",
+        endpoint: "https://my-res.openai.azure.com",
+        deployment: "gpt4o-deploy",
+        apiVersion: "2024-10-21",
+      },
+      t,
+    );
+  });
+
+  it("provider is 'azure_openai'", () => expect(d.provider).toBe("azure_openai"));
+
+  it("routes by deployment with an api-version query", async () => {
+    await d.complete(makeOpts());
+    expect(t.calls[0]!.url).toContain("/openai/deployments/gpt4o-deploy/chat/completions");
+    expect(t.calls[0]!.url).toContain("api-version=2024-10-21");
+  });
+
+  it("authenticates with an api-key header, not Bearer", async () => {
+    await d.complete(makeOpts());
+    expect(t.calls[0]!.headers["api-key"]).toBe("az-key");
+    expect(t.calls[0]!.headers["Authorization"]).toBeUndefined();
+  });
+
+  it("parses content + usage", async () => {
+    const r = await d.complete(makeOpts());
+    expect(r.content).toBe("Hi there!");
+    expect(r.usage.inputTokens).toBe(5);
+  });
+});
+
+// ── Cloudflare Workers AI (account id in path) ────────────────────────────────
+
+describe("CloudflareWorkersAIDriver", () => {
+  let t: MockTransport;
+  let d: CloudflareWorkersAIDriver;
+  beforeEach(() => {
+    t = new MockTransport().setResponse(OAI_RESPONSE);
+    d = new CloudflareWorkersAIDriver({ apiKey: "cf-key", accountId: "acc123" }, t);
+  });
+
+  it("provider is 'cloudflare'", () => expect(d.provider).toBe("cloudflare"));
+
+  it("puts the account id in the path and sends Bearer", async () => {
+    await d.complete(makeOpts());
+    expect(t.calls[0]!.url).toContain("/accounts/acc123/ai/v1/chat/completions");
+    expect(t.calls[0]!.headers["Authorization"]).toContain("Bearer cf-key");
+  });
+});
+
+// ── Xinference (local, no key required) ───────────────────────────────────────
+
+describe("XinferenceDriver", () => {
+  it("provider is 'xinference'", () => {
+    const t = new MockTransport().setResponse(OAI_RESPONSE);
+    expect(new XinferenceDriver({}, t).provider).toBe("xinference");
+  });
+
+  it("defaults to localhost:9997", async () => {
+    const t = new MockTransport().setResponse(OAI_RESPONSE);
+    await new XinferenceDriver({}, t).complete(makeOpts());
+    expect(t.calls[0]!.url).toContain("localhost:9997");
   });
 });
 

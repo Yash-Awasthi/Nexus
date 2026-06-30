@@ -614,6 +614,16 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
     this.apiKey = config.apiKey;
   }
 
+  /** Chat-completions endpoint URL. Override for non-standard paths (e.g. Azure). */
+  protected chatCompletionsUrl(): string {
+    return `${this.baseUrl}/chat/completions`;
+  }
+
+  /** Auth + extra request headers. Override for non-Bearer schemes (e.g. Azure `api-key`). */
+  protected authHeaders(): Record<string, string> {
+    return { Authorization: `Bearer ${this.apiKey}` };
+  }
+
   async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
     const t0 = Date.now();
     const messages = toOpenAIMessages(opts.messages, opts.systemPrompt);
@@ -626,9 +636,11 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
       ...(opts.stop ? { stop: opts.stop } : {}),
       ...(tools ? { tools, ...(opts.toolChoice ? { tool_choice: opts.toolChoice } : {}) } : {}),
     };
-    const raw = (await this.transport.post(`${this.baseUrl}/chat/completions`, body, {
-      Authorization: `Bearer ${this.apiKey}`,
-    })) as Record<string, unknown>;
+    const raw = (await this.transport.post(
+      this.chatCompletionsUrl(),
+      body,
+      this.authHeaders(),
+    )) as Record<string, unknown>;
 
     const choice = (
       raw["choices"] as { message: Record<string, unknown>; finish_reason: string }[]
@@ -677,9 +689,7 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
     // Accumulate streaming tool_calls by their delta index.
     const toolAcc = new Map<number, { id: string; name: string; args: string }>();
 
-    for await (const line of this.sseLines(`${this.baseUrl}/chat/completions`, body, {
-      Authorization: `Bearer ${this.apiKey}`,
-    })) {
+    for await (const line of this.sseLines(this.chatCompletionsUrl(), body, this.authHeaders())) {
       let event: Record<string, unknown>;
       try {
         event = JSON.parse(line) as Record<string, unknown>;
@@ -1375,6 +1385,119 @@ export class VercelAIGatewayDriver extends OpenAICompatibleDriver {
   }
 }
 
+/** Doubao / Volcengine Ark (ByteDance, China region). */
+export class DoubaoDriver extends OpenAICompatibleDriver {
+  readonly provider = "doubao";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://ark.cn-beijing.volces.com/api/v3";
+    this.model = config.model ?? "doubao-pro-32k";
+  }
+}
+
+/** BytePlus ModelArk (Volcengine Ark, international region). */
+export class BytePlusDriver extends OpenAICompatibleDriver {
+  readonly provider = "byteplus";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://ark.ap-southeast.bytepluses.com/api/v3";
+    this.model = config.model ?? "skylark-pro";
+  }
+}
+
+/** Tencent Hunyuan (OpenAI-compatible endpoint). */
+export class HunyuanDriver extends OpenAICompatibleDriver {
+  readonly provider = "hunyuan";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://api.hunyuan.cloud.tencent.com/v1";
+    this.model = config.model ?? "hunyuan-turbo";
+  }
+}
+
+/** iFlytek Spark (HTTP OpenAI-compatible endpoint, not the signed WebSocket API). */
+export class SparkDriver extends OpenAICompatibleDriver {
+  readonly provider = "spark";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://spark-api-open.xf-yun.com/v1";
+    this.model = config.model ?? "generalv3.5";
+  }
+}
+
+/**
+ * Azure OpenAI Service. Unlike the public OpenAI API, Azure routes by deployment
+ * name in the path, pins an `api-version` query param, and authenticates with an
+ * `api-key` header (not a Bearer token). Overrides the two base-class seams.
+ */
+export class AzureOpenAIDriver extends OpenAICompatibleDriver {
+  readonly provider = "azure_openai";
+  readonly model: string;
+  protected baseUrl: string;
+  private deployment: string;
+  private apiVersion: string;
+  constructor(
+    config: ApiKeyConfig & {
+      /** Resource endpoint, e.g. https://my-resource.openai.azure.com */
+      endpoint: string;
+      /** Azure deployment name (routes the request; distinct from the model id). */
+      deployment: string;
+      /** API version, e.g. 2024-10-21. */
+      apiVersion?: string;
+      model?: string;
+    },
+    transport?: HttpTransport,
+  ) {
+    super(config, transport);
+    this.baseUrl = config.endpoint.replace(/\/$/, "");
+    this.deployment = config.deployment;
+    this.apiVersion = config.apiVersion ?? "2024-10-21";
+    this.model = config.model ?? config.deployment;
+  }
+  protected override chatCompletionsUrl(): string {
+    return `${this.baseUrl}/openai/deployments/${this.deployment}/chat/completions?api-version=${this.apiVersion}`;
+  }
+  protected override authHeaders(): Record<string, string> {
+    return { "api-key": this.apiKey };
+  }
+}
+
+/** Cloudflare Workers AI (OpenAI-compatible gateway; needs the account id in the path). */
+export class CloudflareWorkersAIDriver extends OpenAICompatibleDriver {
+  readonly provider = "cloudflare";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(
+    config: ApiKeyConfig & { accountId: string; baseUrl?: string; model?: string },
+    transport?: HttpTransport,
+  ) {
+    super(config, transport);
+    this.baseUrl =
+      config.baseUrl ?? `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/ai/v1`;
+    this.model = config.model ?? "@cf/meta/llama-3.1-8b-instruct";
+  }
+}
+
+/** Xinference — self-hosted OpenAI-compatible inference server (default :9997). */
+export class XinferenceDriver extends OpenAICompatibleDriver {
+  readonly provider = "xinference";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: { apiKey?: string; model?: string; baseUrl?: string }, transport?: HttpTransport) {
+    super({ apiKey: config.apiKey ?? "xinference" }, transport);
+    this.baseUrl = config.baseUrl ?? "http://localhost:9997/v1";
+    this.model = config.model ?? "qwen2.5-instruct";
+  }
+}
+
 /**
  * Local sidecar router — any self-hosted OpenAI-compatible `/v1` endpoint.
  * Routes through it to inherit its provider catalog, fallback and compression
@@ -1639,6 +1762,13 @@ export type ProviderName =
   | "qwen"
   | "ai360"
   | "vercel_ai_gateway"
+  | "doubao"
+  | "byteplus"
+  | "hunyuan"
+  | "spark"
+  | "azure_openai"
+  | "cloudflare"
+  | "xinference"
   | "bedrock"
   | "vertex";
 

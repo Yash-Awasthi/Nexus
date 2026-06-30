@@ -37,6 +37,12 @@ import {
   QwenDriver,
   Ai360Driver,
   VercelAIGatewayDriver,
+  DoubaoDriver,
+  BytePlusDriver,
+  HunyuanDriver,
+  SparkDriver,
+  AzureOpenAIDriver,
+  CloudflareWorkersAIDriver,
   BedrockDriver,
   VertexDriver,
   type LlmDriver,
@@ -73,6 +79,18 @@ const DRIVER_FACTORIES: Record<string, (apiKey: string) => LlmDriver> = {
   qwen: (apiKey) => new QwenDriver({ apiKey }),
   ai360: (apiKey) => new Ai360Driver({ apiKey }),
   vercel_ai_gateway: (apiKey) => new VercelAIGatewayDriver({ apiKey }),
+  doubao: (apiKey) => new DoubaoDriver({ apiKey }),
+  byteplus: (apiKey) => new BytePlusDriver({ apiKey }),
+  hunyuan: (apiKey) => new HunyuanDriver({ apiKey }),
+  spark: (apiKey) => new SparkDriver({ apiKey }),
+  // Azure & Cloudflare also need composite credentials (endpoint+deployment /
+  // accountId alongside the key). Same JSON-blob convention as bedrock/vertex.
+  azure_openai: (key) =>
+    new AzureOpenAIDriver(JSON.parse(key) as ConstructorParameters<typeof AzureOpenAIDriver>[0]),
+  cloudflare: (key) =>
+    new CloudflareWorkersAIDriver(
+      JSON.parse(key) as ConstructorParameters<typeof CloudflareWorkersAIDriver>[0],
+    ),
   // Bedrock & Vertex need composite credentials, not a single key. The stored
   // secret is a JSON blob; parse it here. A malformed blob throws, which the
   // caller treats as "provider not configured" (same as a missing key).
