@@ -55,7 +55,9 @@ export async function billingPreHandler(
     const message =
       quotaResult.reason === "rpm_limit_exceeded"
         ? "Rate limit exceeded — retry after 1 minute"
-        : "Monthly quota exceeded — upgrade your plan";
+        : quotaResult.reason === "monthly_cost_cap_exceeded"
+          ? "Monthly BYOK spend cap reached for this key"
+          : "Monthly quota exceeded — upgrade your plan";
 
     await reply.code(429).send({
       error: quotaResult.reason,
@@ -64,6 +66,12 @@ export async function billingPreHandler(
         ? {
             monthlyUsage: quotaResult.monthlyUsage,
             monthlyRemaining: quotaResult.monthlyRemaining,
+          }
+        : {}),
+      ...(quotaResult.monthlyCostUsd !== undefined
+        ? {
+            monthlyCostUsd: quotaResult.monthlyCostUsd,
+            monthlyCostCapUsd: quotaResult.monthlyCostCapUsd,
           }
         : {}),
     });
