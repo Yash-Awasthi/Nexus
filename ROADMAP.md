@@ -29,12 +29,14 @@ unless a dependency is noted.
 
 Native `llm-drivers` covers ~30 providers + the local sidecar router (`nexus/omni`),
 Bedrock/Vertex BYOK, **Azure OpenAI, Cloudflare Workers AI, Xinference, Replicate,
-Doubao, BytePlus, Hunyuan, Spark** (shipped), and a `chatCompletionsUrl()`/
-`authHeaders()` base-class seam for non-Bearer/non-standard-path providers. Remaining:
+Doubao, BytePlus, Hunyuan, Spark, Baidu ERNIE** (shipped), a
+`MockTransport.setResponses()` queue for multi-POST drivers, and a
+`chatCompletionsUrl()`/`authHeaders()` base-class seam for non-Bearer/non-standard-path
+providers. Remaining:
 
-- **Tier-A2 non-OpenAI-shaped (remaining):** baidu-ernie (client-creds OAuth → 2-step;
-  needs a `MockTransport.setResponses()` queue to test), alibailian, dify. Each needs a
-  request/response adapter — coordinate with the translation matrix (§2).
+- **Tier-A2 non-OpenAI-shaped (remaining):** alibailian, dify (both app/workspace-scoped
+  auth). Each needs a request/response adapter — coordinate with the translation matrix
+  (§2). ERNIE tool-calling (`functions`) still unmapped — text chat only for now.
 - **Aux providers route to existing packages, not `llm-drivers`:** image-gen
   (flux/stability/recraft/fal/comfyui), voice (elevenlabs/deepgram/cartesia/assemblyai),
   retrieval/reranker embeddings (voyage/jina/cohere-embed), search (exa/brave/serper).

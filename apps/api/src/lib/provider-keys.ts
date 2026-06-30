@@ -44,6 +44,7 @@ import {
   AzureOpenAIDriver,
   CloudflareWorkersAIDriver,
   ReplicateDriver,
+  BaiduErnieDriver,
   BedrockDriver,
   VertexDriver,
   type LlmDriver,
@@ -93,6 +94,10 @@ const DRIVER_FACTORIES: Record<string, (apiKey: string) => LlmDriver> = {
     new CloudflareWorkersAIDriver(
       JSON.parse(key) as ConstructorParameters<typeof CloudflareWorkersAIDriver>[0],
     ),
+  // ERNIE needs client-credentials (clientId + clientSecret), not a single key.
+  // Same JSON-blob convention as azure/cloudflare/bedrock.
+  baidu_ernie: (key) =>
+    new BaiduErnieDriver(JSON.parse(key) as ConstructorParameters<typeof BaiduErnieDriver>[0]),
   // Bedrock & Vertex need composite credentials, not a single key. The stored
   // secret is a JSON blob; parse it here. A malformed blob throws, which the
   // caller treats as "provider not configured" (same as a missing key).

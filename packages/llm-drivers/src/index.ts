@@ -137,14 +137,26 @@ export interface HttpTransport {
 export class MockTransport implements HttpTransport {
   readonly calls: { url: string; body: unknown; headers: Record<string, string> }[] = [];
   private response: unknown = {};
+  private queue: unknown[] | null = null;
 
   setResponse(response: unknown): this {
     this.response = response;
+    this.queue = null;
+    return this;
+  }
+
+  /**
+   * Queue ordered responses for multi-POST drivers (e.g. OAuth token then chat).
+   * Each `post` shifts the next item; once drained, falls back to `setResponse`.
+   */
+  setResponses(responses: unknown[]): this {
+    this.queue = [...responses];
     return this;
   }
 
   async post(url: string, body: unknown, headers: Record<string, string>): Promise<unknown> {
     this.calls.push({ url, body, headers });
+    if (this.queue && this.queue.length > 0) return this.queue.shift();
     return this.response;
   }
 }
@@ -1553,6 +1565,146 @@ export class ReplicateDriver extends BaseDriver {
     const outputTokens = estimateTokens(content);
     return this.makeResponse(
       (raw["id"] as string) ?? "replicate-resp",
+      content,
+      model,
+      this.makeUsage(inputTokens, outputTokens),
+      Date.now() - t0,
+      "stop",
+    );
+  }
+}
+
+/**
+ * Baidu ERNIE (Wenxin / Qianfan classic API). Unlike the OpenAI-shaped drivers,
+ * ERNIE needs a two-step flow: a client-credentials OAuth POST to mint a 30-day
+ * `access_token`, then the chat POST with that token as a `?access_token=` query
+ * param. Both calls go through the transport seam (so tests drive them with
+ * `MockTransport.setResponses([token, chat])`). The token is cached until expiry.
+ *
+ * Wire format differs from OpenAI: the system prompt is a separate top-level
+ * `system` field, messages carry only user/assistant turns, and the reply text is
+ * `result` (errors arrive as `error_code`/`error_msg` inside a 200 body).
+ *
+ * ponytail: tool-calling (ERNIE `functions`) is not mapped — text chat only.
+ * Upgrade path: translate LlmToolDefinition ↔ ERNIE `functions`/`function_call`
+ * when the §2 translation matrix lands.
+ */
+export class BaiduErnieDriver extends BaseDriver {
+  readonly provider = "baidu_ernie";
+  readonly model: string;
+  private clientId: string;
+  private clientSecret: string;
+  private baseUrl: string;
+  private oauthUrl: string;
+  private token: { value: string; expiresAt: number } | null = null;
+
+  constructor(
+    config: {
+      /** Baidu app API Key (a.k.a. client_id / AK). */
+      clientId: string;
+      /** Baidu app Secret Key (a.k.a. client_secret / SK). */
+      clientSecret: string;
+      model?: string;
+      /** Chat endpoint base (the model id is appended as the final path segment). */
+      baseUrl?: string;
+      oauthUrl?: string;
+    },
+    transport?: HttpTransport,
+  ) {
+    super(transport);
+    this.clientId = config.clientId;
+    this.clientSecret = config.clientSecret;
+    this.model = config.model ?? "ernie-4.0-8k";
+    this.baseUrl =
+      config.baseUrl ??
+      "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat";
+    this.oauthUrl = config.oauthUrl ?? "https://aip.baidubce.com/oauth/2.0/token";
+  }
+
+  private async getToken(): Promise<string> {
+    if (this.token && Date.now() < this.token.expiresAt) return this.token.value;
+    const url =
+      `${this.oauthUrl}?grant_type=client_credentials` +
+      `&client_id=${encodeURIComponent(this.clientId)}` +
+      `&client_secret=${encodeURIComponent(this.clientSecret)}`;
+    const raw = (await this.transport.post(url, {}, { "Content-Type": "application/json" })) as {
+      access_token?: string;
+      expires_in?: number;
+      error?: string;
+      error_description?: string;
+    };
+    if (!raw.access_token) {
+      throw new LlmError(
+        "AUTH_FAILED",
+        raw.error_description ?? raw.error ?? "ERNIE OAuth token request failed",
+        this.provider,
+        401,
+      );
+    }
+    // Refresh a minute early; default ERNIE token lifetime is 30 days.
+    this.token = {
+      value: raw.access_token,
+      expiresAt: Date.now() + (raw.expires_in ?? 2_592_000) * 1000 - 60_000,
+    };
+    return this.token.value;
+  }
+
+  async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
+    const t0 = Date.now();
+    const token = await this.getToken();
+    const model = opts.model ?? this.model;
+
+    // ERNIE: system prompt is top-level; messages carry only user/assistant turns.
+    let system = opts.systemPrompt;
+    const messages: { role: string; content: string }[] = [];
+    for (const m of opts.messages) {
+      if (m.role === "system") {
+        system = system ? `${system}\n\n${m.content}` : m.content;
+      } else if (m.role === "assistant" || m.role === "user") {
+        messages.push({ role: m.role, content: m.content });
+      } else {
+        // tool/other roles fold into the user turn (no native mapping yet).
+        messages.push({ role: "user", content: m.content });
+      }
+    }
+
+    const body: Record<string, unknown> = {
+      messages,
+      ...(system ? { system } : {}),
+      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+      ...(opts.maxTokens !== undefined ? { max_output_tokens: opts.maxTokens } : {}),
+      ...(opts.stop ? { stop: opts.stop } : {}),
+    };
+
+    const url = `${this.baseUrl}/${encodeURIComponent(model)}?access_token=${encodeURIComponent(token)}`;
+    const raw = (await this.transport.post(url, body, { "Content-Type": "application/json" })) as {
+      id?: string;
+      result?: string;
+      error_code?: number;
+      error_msg?: string;
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
+    };
+
+    // ERNIE reports failures as error_code inside an HTTP 200 body.
+    if (raw.error_code) {
+      const msg = raw.error_msg ?? `ERNIE error ${raw.error_code}`;
+      // 110/111 = invalid/expired token; 17/18/336501 = quota / rate.
+      if (raw.error_code === 110 || raw.error_code === 111) {
+        this.token = null; // force re-auth next call
+        throw new LlmError("AUTH_FAILED", msg, this.provider, 401);
+      }
+      if (raw.error_code === 17 || raw.error_code === 18 || raw.error_code === 336501) {
+        throw new LlmError("RATE_LIMITED", msg, this.provider, 429);
+      }
+      throw new LlmError("SERVER_ERROR", msg, this.provider);
+    }
+
+    const content = raw.result ?? "";
+    const inputTokens =
+      raw.usage?.prompt_tokens ?? estimateTokens(opts.messages.map((m) => m.content).join(" "));
+    const outputTokens = raw.usage?.completion_tokens ?? estimateTokens(content);
+    return this.makeResponse(
+      raw.id ?? `${this.provider}-resp`,
       content,
       model,
       this.makeUsage(inputTokens, outputTokens),

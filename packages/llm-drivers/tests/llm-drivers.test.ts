@@ -42,6 +42,7 @@ import {
   CloudflareWorkersAIDriver,
   XinferenceDriver,
   ReplicateDriver,
+  BaiduErnieDriver,
   LocalRouterDriver,
   BedrockDriver,
   VertexDriver,
@@ -113,6 +114,13 @@ describe("MockTransport", () => {
     const t = new MockTransport().setResponse({ result: 42 });
     const r = (await t.post("url", {}, {})) as { result: number };
     expect(r.result).toBe(42);
+  });
+
+  it("setResponses returns queued responses in order, then falls back", async () => {
+    const t = new MockTransport().setResponse({ fallback: true }).setResponses([{ a: 1 }, { b: 2 }]);
+    expect(await t.post("u", {}, {})).toEqual({ a: 1 });
+    expect(await t.post("u", {}, {})).toEqual({ b: 2 });
+    expect(await t.post("u", {}, {})).toEqual({ fallback: true }); // queue drained
   });
 });
 
@@ -439,6 +447,65 @@ describe("ReplicateDriver", () => {
     const tf = new MockTransport().setResponse({ id: "p", status: "failed", error: "boom" });
     const df = new ReplicateDriver({ apiKey: "k" }, tf);
     await expect(df.complete(makeOpts())).rejects.toThrow(/failed/);
+  });
+});
+
+// ── Baidu ERNIE (client-creds OAuth → token + chat, 2 POSTs) ──────────────────
+
+describe("BaiduErnieDriver", () => {
+  const TOKEN = { access_token: "tok-abc", expires_in: 2592000 };
+  const CHAT = {
+    id: "ernie-1",
+    result: "Hi there!",
+    usage: { prompt_tokens: 5, completion_tokens: 10 },
+  };
+  let t: MockTransport;
+  let d: BaiduErnieDriver;
+  beforeEach(() => {
+    t = new MockTransport().setResponses([TOKEN, CHAT]);
+    d = new BaiduErnieDriver({ clientId: "ak", clientSecret: "sk" }, t);
+  });
+
+  it("provider is 'baidu_ernie'", () => expect(d.provider).toBe("baidu_ernie"));
+
+  it("mints a token then posts chat (2 calls, correct order)", async () => {
+    const r = await d.complete(makeOpts());
+    expect(t.calls).toHaveLength(2);
+    expect(t.calls[0]!.url).toContain("/oauth/2.0/token");
+    expect(t.calls[0]!.url).toContain("grant_type=client_credentials");
+    expect(t.calls[0]!.url).toContain("client_id=ak");
+    expect(t.calls[1]!.url).toContain("/wenxinworkshop/chat/");
+    expect(t.calls[1]!.url).toContain("access_token=tok-abc");
+    expect(r.content).toBe("Hi there!");
+    expect(r.usage.totalTokens).toBe(15);
+  });
+
+  it("caches the token across calls (no re-auth on second complete)", async () => {
+    await d.complete(makeOpts());
+    t.setResponses([CHAT]); // only a chat response left to queue
+    await d.complete(makeOpts());
+    // 2 (token+chat) + 1 (chat only) = 3 total; no second token POST
+    expect(t.calls).toHaveLength(3);
+    expect(t.calls[2]!.url).toContain("/wenxinworkshop/chat/");
+  });
+
+  it("lifts the system prompt to a top-level field", async () => {
+    await d.complete(makeOpts({ systemPrompt: "Be brief" }));
+    const body = t.calls[1]!.body as { system?: string; messages: unknown[] };
+    expect(body.system).toBe("Be brief");
+    expect(body.messages).toHaveLength(1);
+  });
+
+  it("throws AUTH_FAILED when the OAuth response has no token", async () => {
+    const tf = new MockTransport().setResponses([{ error: "invalid_client" }]);
+    const df = new BaiduErnieDriver({ clientId: "ak", clientSecret: "bad" }, tf);
+    await expect(df.complete(makeOpts())).rejects.toThrow(/invalid_client|OAuth/);
+  });
+
+  it("maps an in-body error_code to a typed LlmError and clears the token", async () => {
+    const te = new MockTransport().setResponses([TOKEN, { error_code: 110, error_msg: "token bad" }]);
+    const de = new BaiduErnieDriver({ clientId: "ak", clientSecret: "sk" }, te);
+    await expect(de.complete(makeOpts())).rejects.toMatchObject({ code: "AUTH_FAILED" });
   });
 });
 

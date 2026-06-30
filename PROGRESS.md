@@ -31,17 +31,23 @@ e2e3646 feat(llm-drivers): add 7 providers + OpenAI-compat base seam
 
 ### §1 LLM provider breadth — `@nexus/llm-drivers` (+ api BYOK, .env.example)
 
-- Added 8 drivers: **Doubao/Volcengine, BytePlus, Hunyuan, Spark (iFlytek HTTP),
-  Azure OpenAI, Cloudflare Workers AI, Xinference, Replicate**.
+- Added 9 drivers: **Doubao/Volcengine, BytePlus, Hunyuan, Spark (iFlytek HTTP),
+  Azure OpenAI, Cloudflare Workers AI, Xinference, Replicate, Baidu ERNIE**.
 - Added a base-class seam to `OpenAICompatibleDriver`: `chatCompletionsUrl()` +
   `authHeaders()` hooks (Azure needs deployment-path + `api-key` header +
   `api-version` query). Zero behaviour change for the 30 existing Bearer drivers.
 - Replicate uses synchronous `Prefer: wait` (one POST, no GET poll — fits the
   POST-only `HttpTransport` + MockTransport).
+- **Baidu ERNIE** (`BaiduErnieDriver`): client-creds OAuth → cached `access_token`,
+  then chat POST (2 POSTs, both via transport). ERNIE wire format (top-level
+  `system`, `result` reply, in-body `error_code`→typed `LlmError`, 110/111 clears
+  token). Tool-calling not mapped yet (text only; §2 matrix upgrade path noted).
+  Needed `MockTransport.setResponses([token, chat])` queue — **added** (ordered
+  responses, drains to `setResponse` fallback).
 - Each driver wired into `apps/api/src/lib/provider-keys.ts` BYOK factory
-  (Azure/Cloudflare use composite JSON-blob creds like bedrock/vertex; Xinference
-  is local, omitted) + `.env.example`.
-- **Tests:** 256 in `packages/llm-drivers/tests/llm-drivers.test.ts`.
+  (Azure/Cloudflare/ERNIE use composite JSON-blob creds like bedrock/vertex —
+  ERNIE: `{clientId, clientSecret}`; Xinference is local, omitted) + `.env.example`.
+- **Tests:** 263 in `packages/llm-drivers/tests/llm-drivers.test.ts`.
 
 ### §5 cost model + billing lifecycle — `@nexus/billing/src/cost.ts` (NEW)
 
@@ -123,8 +129,8 @@ e2e3646 feat(llm-drivers): add 7 providers + OpenAI-compat base seam
 
 ## Deferred (real work, not quick wins)
 
-- **§1 remaining non-OpenAI drivers:** baidu-ernie (client-creds OAuth → 2 POSTs;
-  needs `MockTransport.setResponses()` queue to test), dify (app-scoped), alibailian.
+- **§1 remaining non-OpenAI drivers:** dify (app-scoped), alibailian. (baidu-ernie
+  **shipped** — see §1 Done.)
 - **§13 scientific preprints:** bioRxiv **shipped** (`PreprintsFeed`). arXiv still
   deferred — Atom XML; existing `RssFeedAdapter` parses `<item>`/`<entry>` but its
   `http` returns text while `FeedAdapter.http` returns JSON (impedance). EDGAR/most
@@ -135,7 +141,7 @@ e2e3646 feat(llm-drivers): add 7 providers + OpenAI-compat base seam
 ## Verify (per package, fast)
 
 ```
-pnpm exec vitest run packages/llm-drivers/tests/llm-drivers.test.ts      # 256
+pnpm exec vitest run packages/llm-drivers/tests/llm-drivers.test.ts      # 263
 pnpm exec vitest run packages/billing/tests/                              # 43
 pnpm exec vitest run packages/runtime/tests/security-utils.test.ts       # 45
 pnpm exec vitest run packages/domain-feeds/tests/domain-feeds.test.ts    # 54
@@ -149,6 +155,6 @@ Note: edits to a package's `src` require `pnpm --filter <pkg> build` before
 
 ## Next up (suggested order)
 
-1. Add `MockTransport.setResponses([])` queue, then **baidu-ernie** driver (§1).
-2. Wire §3 compress into gateway/agent tool-output path (`x-nexus-compress`).
-3. Persist §5 cost breakdown + pre-call ledger check in middleware.
+1. Wire §3 compress into gateway/agent tool-output path (`x-nexus-compress`).
+2. Persist §5 cost breakdown + pre-call ledger check in middleware.
+3. **dify** / **alibailian** drivers (§1) — both app/workspace-scoped auth.
