@@ -15,6 +15,7 @@ import {
   SeismologyFeed,
   WildfireFeed,
   MaritimeFeed,
+  TechNewsFeed,
   type FeedEvent,
   type AviationEvent,
   type SeismologyEvent,
@@ -357,5 +358,77 @@ describe("FeedRegistry", () => {
       .register(new ClimateFeed({ baseUrl: "https://x.com", http: makeMockHttp([]) }));
     expect(result).toBe(registry);
     expect(registry.domains()).toHaveLength(2);
+  });
+});
+
+describe("TechNewsFeed (Hacker News via Algolia)", () => {
+  const HN = {
+    hits: [
+      {
+        objectID: "111",
+        title: "Show HN: a thing",
+        url: "https://example.com/thing",
+        points: 600,
+        num_comments: 120,
+        author: "alice",
+        created_at: "2026-06-01T00:00:00Z",
+      },
+      {
+        objectID: "222",
+        title: "low signal post",
+        points: 10,
+        num_comments: 1,
+        author: "bob",
+        created_at: "2026-06-01T01:00:00Z",
+      },
+    ],
+  };
+
+  it("domain is 'technews'", () => {
+    expect(new TechNewsFeed({ http: makeMockHttp(HN) }).domain).toBe("technews");
+  });
+
+  it("maps Algolia hits to TechNewsEvents", async () => {
+    const feed = new TechNewsFeed({ http: makeMockHttp(HN) });
+    const events = await feed.fetch();
+    expect(events).toHaveLength(2);
+    expect(events[0]!.id).toBe("111");
+    expect(events[0]!.title).toBe("Show HN: a thing");
+    expect(events[0]!.points).toBe(600);
+    expect(events[0]!.comments).toBe(120);
+    expect(events[0]!.metadata!.hnUrl).toContain("id=111");
+  });
+
+  it("scores virality into severity", async () => {
+    const feed = new TechNewsFeed({ http: makeMockHttp(HN) });
+    const events = await feed.fetch();
+    expect(events[0]!.severity).toBe("high"); // 600 pts
+    expect(events[1]!.severity).toBe("low"); // 10 pts
+  });
+
+  it("queries the requested tag", async () => {
+    let url = "";
+    const feed = new TechNewsFeed({
+      http: async (u) => {
+        url = u;
+        return HN;
+      },
+    });
+    await feed.fetch({ tags: "ask_hn" });
+    expect(url).toContain("tags=ask_hn");
+  });
+
+  it("filters by minPoints", async () => {
+    const feed = new TechNewsFeed({ http: makeMockHttp(HN) });
+    const events = await feed.fetch({ minPoints: 100 });
+    expect(events).toHaveLength(1);
+    expect(events[0]!.id).toBe("111");
+  });
+
+  it("falls back to mock data on empty hits", async () => {
+    const feed = new TechNewsFeed({ http: makeMockHttp({ hits: [] }) });
+    const events = await feed.fetch();
+    expect(events.length).toBeGreaterThan(0);
+    expect(events[0]!.source).toContain("mock");
   });
 });

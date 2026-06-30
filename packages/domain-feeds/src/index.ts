@@ -201,6 +201,15 @@ export interface RadiationEvent extends FeedEvent {
   deviceId?: string;
 }
 
+/** Hacker News front-page story (social / tech signals). */
+export interface TechNewsEvent extends FeedEvent {
+  title: string;
+  url?: string;
+  points: number;
+  comments: number;
+  author?: string;
+}
+
 // ── FeedAdapter base ───────────────────────────────────────────────────────────
 
 export interface FeedAdapterOptions {
@@ -1610,6 +1619,68 @@ export class TelegramAlerter {
   }
 }
 
+// ── Tech news — Hacker News via Algolia (no key required) ──────────────────────
+
+export class TechNewsFeed extends FeedAdapter<TechNewsEvent> {
+  readonly domain = "technews";
+
+  constructor(opts: Partial<FeedAdapterOptions> = {}) {
+    super({ baseUrl: "https://hn.algolia.com/api/v1", ...opts });
+  }
+
+  async fetch(opts?: { tags?: string; minPoints?: number }): Promise<TechNewsEvent[]> {
+    if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
+    const tags = opts?.tags ?? "front_page";
+    const url = `${this.baseUrl}/search?tags=${encodeURIComponent(tags)}`;
+
+    try {
+      const raw = await this.http(url, this.buildHeaders());
+      if (Array.isArray(raw)) return raw as TechNewsEvent[];
+
+      type Hit = {
+        objectID: string;
+        title?: string;
+        url?: string;
+        points?: number;
+        num_comments?: number;
+        author?: string;
+        created_at?: string;
+        created_at_i?: number;
+      };
+      const hits = (raw as { hits?: Hit[] } | null)?.hits ?? [];
+      if (!Array.isArray(hits) || hits.length === 0) {
+        return buildMockResponse<TechNewsEvent>("technews");
+      }
+      const minPoints = opts?.minPoints ?? 0;
+      return hits
+        .filter((h) => (h.points ?? 0) >= minPoints)
+        .map((h) => {
+          const points = Number(h.points ?? 0);
+          return {
+            id: h.objectID,
+            timestamp: h.created_at ?? new Date((h.created_at_i ?? 0) * 1000).toISOString(),
+            // Surface the loud stories: front-page virality as severity.
+            severity: (points >= 500
+              ? "high"
+              : points >= 150
+                ? "medium"
+                : "low") as FeedEvent["severity"],
+            source: "hacker-news",
+            summary: h.title ?? "(untitled)",
+            title: h.title ?? "(untitled)",
+            url: h.url,
+            points,
+            comments: Number(h.num_comments ?? 0),
+            author: h.author,
+            metadata: { hnUrl: `https://news.ycombinator.com/item?id=${h.objectID}` },
+          };
+        });
+    } catch {
+      return buildMockResponse<TechNewsEvent>("technews");
+    }
+  }
+}
+
 // ── createDefaultRegistry — wires all adapters with env-based config ───────────
 
 export function createDefaultRegistry(): FeedRegistry {
@@ -1630,7 +1701,8 @@ export function createDefaultRegistry(): FeedRegistry {
     .register(new MaritimeFeed())
     .register(new MarketFeed())
     .register(new SanctionsFeed())
-    .register(new RadiationFeed());
+    .register(new RadiationFeed())
+    .register(new TechNewsFeed());
 
   return registry;
 }
