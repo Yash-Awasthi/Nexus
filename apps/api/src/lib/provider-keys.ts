@@ -43,6 +43,7 @@ import {
   SparkDriver,
   AzureOpenAIDriver,
   CloudflareWorkersAIDriver,
+  ReplicateDriver,
   BedrockDriver,
   VertexDriver,
   type LlmDriver,
@@ -83,6 +84,7 @@ const DRIVER_FACTORIES: Record<string, (apiKey: string) => LlmDriver> = {
   byteplus: (apiKey) => new BytePlusDriver({ apiKey }),
   hunyuan: (apiKey) => new HunyuanDriver({ apiKey }),
   spark: (apiKey) => new SparkDriver({ apiKey }),
+  replicate: (apiKey) => new ReplicateDriver({ apiKey }),
   // Azure & Cloudflare also need composite credentials (endpoint+deployment /
   // accountId alongside the key). Same JSON-blob convention as bedrock/vertex.
   azure_openai: (key) =>

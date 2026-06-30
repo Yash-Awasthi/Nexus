@@ -41,6 +41,7 @@ import {
   AzureOpenAIDriver,
   CloudflareWorkersAIDriver,
   XinferenceDriver,
+  ReplicateDriver,
   LocalRouterDriver,
   BedrockDriver,
   VertexDriver,
@@ -390,6 +391,54 @@ describe("XinferenceDriver", () => {
     const t = new MockTransport().setResponse(OAI_RESPONSE);
     await new XinferenceDriver({}, t).complete(makeOpts());
     expect(t.calls[0]!.url).toContain("localhost:9997");
+  });
+});
+
+// ── Replicate (predictions, Prefer: wait) ────────────────────────────────────
+
+describe("ReplicateDriver", () => {
+  let t: MockTransport;
+  let d: ReplicateDriver;
+  beforeEach(() => {
+    t = new MockTransport().setResponse({
+      id: "pred_123",
+      status: "succeeded",
+      output: ["Hi", " ", "there!"],
+    });
+    d = new ReplicateDriver({ apiKey: "r8-key" }, t);
+  });
+
+  it("provider is 'replicate'", () => expect(d.provider).toBe("replicate"));
+
+  it("posts to /predictions with version + input.prompt", async () => {
+    await d.complete(makeOpts());
+    expect(t.calls[0]!.url).toContain("/predictions");
+    const body = t.calls[0]!.body as { version: string; input: { prompt: string } };
+    expect(body.version).toBe("test-model");
+    expect(body.input.prompt).toContain("Hello");
+  });
+
+  it("sends Bearer auth + Prefer: wait (synchronous mode)", async () => {
+    await d.complete(makeOpts());
+    expect(t.calls[0]!.headers["Authorization"]).toContain("Bearer r8-key");
+    expect(t.calls[0]!.headers["Prefer"]).toBe("wait");
+  });
+
+  it("maps systemPrompt to input.system_prompt", async () => {
+    await d.complete(makeOpts({ systemPrompt: "Be brief" }));
+    const body = t.calls[0]!.body as { input: { system_prompt?: string } };
+    expect(body.input.system_prompt).toBe("Be brief");
+  });
+
+  it("joins the output-chunk array into content", async () => {
+    const r = await d.complete(makeOpts());
+    expect(r.content).toBe("Hi there!");
+  });
+
+  it("throws on a failed prediction", async () => {
+    const tf = new MockTransport().setResponse({ id: "p", status: "failed", error: "boom" });
+    const df = new ReplicateDriver({ apiKey: "k" }, tf);
+    await expect(df.complete(makeOpts())).rejects.toThrow(/failed/);
   });
 });
 

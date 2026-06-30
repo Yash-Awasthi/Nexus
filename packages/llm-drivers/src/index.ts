@@ -1499,6 +1499,70 @@ export class XinferenceDriver extends OpenAICompatibleDriver {
 }
 
 /**
+ * Replicate. Replicate's native shape is "create a prediction, then poll until it
+ * finishes" — but the modern API accepts a `Prefer: wait` header that blocks and
+ * returns the completed prediction in a single response, so no poll loop (and no
+ * GET) is needed. `model` is the version hash or `owner/name`; chat models take a
+ * `prompt` + `system_prompt` and return `output` as an array of token chunks.
+ */
+export class ReplicateDriver extends BaseDriver {
+  readonly provider = "replicate";
+  readonly model: string;
+  private apiKey: string;
+  private baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(transport);
+    this.apiKey = config.apiKey;
+    this.baseUrl = config.baseUrl ?? "https://api.replicate.com/v1";
+    this.model = config.model ?? "meta/meta-llama-3-8b-instruct";
+  }
+
+  async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
+    const t0 = Date.now();
+    const model = opts.model ?? this.model;
+    const prompt = opts.messages
+      .map((m) => {
+        const role = m.role === "assistant" ? "Assistant" : m.role === "system" ? "System" : "User";
+        return `${role}: ${m.content}`;
+      })
+      .join("\n");
+    const input: Record<string, unknown> = {
+      prompt,
+      ...(opts.systemPrompt ? { system_prompt: opts.systemPrompt } : {}),
+      ...(opts.maxTokens !== undefined ? { max_tokens: opts.maxTokens } : {}),
+      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+    };
+    const raw = (await this.transport.post(
+      `${this.baseUrl}/predictions`,
+      { version: model, input },
+      { Authorization: `Bearer ${this.apiKey}`, Prefer: "wait" },
+    )) as Record<string, unknown>;
+
+    const status = raw["status"] as string | undefined;
+    if (status === "failed" || status === "canceled") {
+      throw new LlmError(
+        "SERVER_ERROR",
+        `Replicate prediction ${status}: ${String(raw["error"] ?? "")}`,
+        this.provider,
+      );
+    }
+    // `output` is usually an array of streamed string chunks; sometimes one string.
+    const out = raw["output"];
+    const content = Array.isArray(out) ? out.join("") : typeof out === "string" ? out : "";
+    const inputTokens = estimateTokens(prompt);
+    const outputTokens = estimateTokens(content);
+    return this.makeResponse(
+      (raw["id"] as string) ?? "replicate-resp",
+      content,
+      model,
+      this.makeUsage(inputTokens, outputTokens),
+      Date.now() - t0,
+      "stop",
+    );
+  }
+}
+
+/**
  * Local sidecar router — any self-hosted OpenAI-compatible `/v1` endpoint.
  * Routes through it to inherit its provider catalog, fallback and compression
  * without writing a native driver per provider. baseUrl required (no public
@@ -1769,6 +1833,7 @@ export type ProviderName =
   | "azure_openai"
   | "cloudflare"
   | "xinference"
+  | "replicate"
   | "bedrock"
   | "vertex";
 
