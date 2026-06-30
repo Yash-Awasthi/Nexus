@@ -1715,6 +1715,117 @@ export class BaiduErnieDriver extends BaseDriver {
 }
 
 /**
+ * Alibaba Cloud Bailian / DashScope (Qwen family). Uses DashScope's
+ * OpenAI-compatible endpoint (`/compatible-mode/v1`), so the standard
+ * chat-completions request/response shape — including tools and streaming —
+ * works with zero custom adapter. Default host is the international region; set
+ * `baseUrl` to the mainland host (`https://dashscope.aliyuncs.com/...`) if needed.
+ *
+ * ponytail: compatible-mode covers chat + tool-calling + streaming. The ceiling
+ * is Qwen-only extras (e.g. partial-output / enable_search) that only the native
+ * `/api/v1/services/aigc/text-generation` envelope exposes; add that adapter only
+ * if such a feature is actually required.
+ */
+export class AlibabaBailianDriver extends OpenAICompatibleDriver {
+  readonly provider = "alibaba_bailian";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
+    this.model = config.model ?? "qwen-plus";
+  }
+}
+
+/**
+ * Dify — an app-scoped platform, NOT a raw model API. Each Dify "app" owns its
+ * model, prompt, and tools server-side; the API key authenticates one app and the
+ * caller sends a single `query` string, not a messages array + model.
+ *
+ * We map Nexus's chat shape onto chat-messages (blocking mode): the latest user
+ * turn becomes `query`, and the system prompt + earlier turns are folded into the
+ * query as plain context (Dify threads real multi-turn server-side via
+ * conversation_id, which a stateless driver call doesn't carry).
+ *
+ * ponytail: blocking only (no SSE streaming), no conversation_id threading, no
+ * native tool-calls — those are the Dify app's job. Upgrade path: thread
+ * conversation_id + switch to response_mode "streaming" if true multi-turn or
+ * token streaming is needed.
+ */
+export class DifyDriver extends BaseDriver {
+  readonly provider = "dify";
+  /** Label only — the actual model is configured inside the Dify app. */
+  readonly model: string;
+  private apiKey: string;
+  private baseUrl: string;
+  private user: string;
+
+  constructor(
+    config: { apiKey: string; model?: string; baseUrl?: string; user?: string },
+    transport?: HttpTransport,
+  ) {
+    super(transport);
+    this.apiKey = config.apiKey;
+    this.model = config.model ?? "dify-app";
+    this.baseUrl = config.baseUrl ?? "https://api.dify.ai/v1";
+    this.user = config.user ?? "nexus";
+  }
+
+  async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
+    const t0 = Date.now();
+    const history = opts.messages.filter((m) => m.role !== "system");
+    const query = history.at(-1)?.content ?? "";
+    const context: string[] = [];
+    if (opts.systemPrompt) context.push(opts.systemPrompt);
+    for (const m of history.slice(0, -1)) context.push(`${m.role}: ${m.content}`);
+    const fullQuery = context.length ? `${context.join("\n")}\n\n${query}` : query;
+
+    const body = {
+      inputs: {},
+      query: fullQuery,
+      response_mode: "blocking",
+      user: this.user,
+    };
+
+    const raw = (await this.transport.post(`${this.baseUrl}/chat-messages`, body, {
+      Authorization: `Bearer ${this.apiKey}`,
+      "Content-Type": "application/json",
+    })) as {
+      answer?: string;
+      message_id?: string;
+      conversation_id?: string;
+      metadata?: { usage?: { prompt_tokens?: number; completion_tokens?: number } };
+      // Dify error body
+      code?: string;
+      message?: string;
+      status?: number;
+    };
+
+    // Dify can return an error envelope (sometimes with HTTP 200 via proxies).
+    if (raw.code) {
+      const msg = raw.message ?? raw.code;
+      if (raw.status === 401 || raw.code === "unauthorized" || raw.code === "invalid_api_key") {
+        throw new LlmError("AUTH_FAILED", msg, this.provider, 401);
+      }
+      if (raw.status === 429) throw new LlmError("RATE_LIMITED", msg, this.provider, 429);
+      throw new LlmError("SERVER_ERROR", msg, this.provider, raw.status);
+    }
+
+    const content = raw.answer ?? "";
+    const inputTokens = raw.metadata?.usage?.prompt_tokens ?? estimateTokens(fullQuery);
+    const outputTokens = raw.metadata?.usage?.completion_tokens ?? estimateTokens(content);
+    return this.makeResponse(
+      raw.message_id ?? `${this.provider}-resp`,
+      content,
+      this.model,
+      this.makeUsage(inputTokens, outputTokens),
+      Date.now() - t0,
+      "stop",
+    );
+  }
+}
+
+/**
  * Local sidecar router — any self-hosted OpenAI-compatible `/v1` endpoint.
  * Routes through it to inherit its provider catalog, fallback and compression
  * without writing a native driver per provider. baseUrl required (no public

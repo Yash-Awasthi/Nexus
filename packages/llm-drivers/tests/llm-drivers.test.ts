@@ -43,6 +43,8 @@ import {
   XinferenceDriver,
   ReplicateDriver,
   BaiduErnieDriver,
+  AlibabaBailianDriver,
+  DifyDriver,
   LocalRouterDriver,
   BedrockDriver,
   VertexDriver,
@@ -506,6 +508,107 @@ describe("BaiduErnieDriver", () => {
     const te = new MockTransport().setResponses([TOKEN, { error_code: 110, error_msg: "token bad" }]);
     const de = new BaiduErnieDriver({ clientId: "ak", clientSecret: "sk" }, te);
     await expect(de.complete(makeOpts())).rejects.toMatchObject({ code: "AUTH_FAILED" });
+  });
+});
+
+describe("AlibabaBailianDriver (DashScope compatible-mode)", () => {
+  let t: MockTransport;
+  let d: AlibabaBailianDriver;
+  beforeEach(() => {
+    t = new MockTransport().setResponse(OAI_RESPONSE);
+    d = new AlibabaBailianDriver({ apiKey: "sk-x" }, t);
+  });
+
+  it("provider is 'alibaba_bailian', model defaults to qwen-plus", () => {
+    expect(d.provider).toBe("alibaba_bailian");
+    expect(d.model).toBe("qwen-plus");
+  });
+
+  it("posts to the compatible-mode chat/completions endpoint with Bearer auth", async () => {
+    const r = await d.complete(makeOpts());
+    expect(t.calls[0]!.url).toBe(
+      "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions",
+    );
+    expect(t.calls[0]!.headers.Authorization).toBe("Bearer sk-x");
+    expect(r.content).toBe("Hi there!");
+    expect(r.usage.totalTokens).toBe(15);
+  });
+
+  it("honours a custom baseUrl (mainland region)", async () => {
+    const dm = new AlibabaBailianDriver(
+      { apiKey: "sk-x", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1" },
+      t,
+    );
+    await dm.complete(makeOpts());
+    expect(t.calls[0]!.url).toContain("dashscope.aliyuncs.com");
+  });
+});
+
+describe("DifyDriver (app-scoped chat-messages)", () => {
+  const DIFY_OK = {
+    answer: "Hi there!",
+    message_id: "dify-1",
+    conversation_id: "conv-1",
+    metadata: { usage: { prompt_tokens: 5, completion_tokens: 10 } },
+  };
+  let t: MockTransport;
+  let d: DifyDriver;
+  beforeEach(() => {
+    t = new MockTransport().setResponse(DIFY_OK);
+    d = new DifyDriver({ apiKey: "app-key" }, t);
+  });
+
+  it("provider is 'dify'", () => expect(d.provider).toBe("dify"));
+
+  it("posts the last user turn as query in blocking mode with Bearer auth", async () => {
+    const r = await d.complete(makeOpts());
+    expect(t.calls[0]!.url).toBe("https://api.dify.ai/v1/chat-messages");
+    expect(t.calls[0]!.headers.Authorization).toBe("Bearer app-key");
+    const body = t.calls[0]!.body as { query: string; response_mode: string; user: string };
+    expect(body.query).toBe("Hello");
+    expect(body.response_mode).toBe("blocking");
+    expect(body.user).toBe("nexus");
+    expect(r.content).toBe("Hi there!");
+    expect(r.usage.totalTokens).toBe(15);
+  });
+
+  it("folds system prompt + prior turns into the query as context", async () => {
+    await d.complete(
+      makeOpts({
+        systemPrompt: "Be brief",
+        messages: [
+          { role: "user", content: "first" },
+          { role: "assistant", content: "ok" },
+          { role: "user", content: "second" },
+        ],
+      }),
+    );
+    const body = t.calls[0]!.body as { query: string };
+    expect(body.query).toContain("Be brief");
+    expect(body.query).toContain("user: first");
+    expect(body.query).toContain("assistant: ok");
+    expect(body.query.endsWith("second")).toBe(true);
+  });
+
+  it("maps a Dify error envelope to a typed LlmError", async () => {
+    const te = new MockTransport().setResponse({
+      code: "invalid_api_key",
+      message: "bad key",
+      status: 401,
+    });
+    const de = new DifyDriver({ apiKey: "bad" }, te);
+    await expect(de.complete(makeOpts())).rejects.toMatchObject({ code: "AUTH_FAILED" });
+  });
+
+  it("honours a self-hosted baseUrl + custom user", async () => {
+    const ds = new DifyDriver(
+      { apiKey: "k", baseUrl: "https://dify.internal/v1", user: "u-42" },
+      t,
+    );
+    await ds.complete(makeOpts());
+    expect(t.calls[0]!.url).toBe("https://dify.internal/v1/chat-messages");
+    const body = t.calls[0]!.body as { user: string };
+    expect(body.user).toBe("u-42");
   });
 });
 

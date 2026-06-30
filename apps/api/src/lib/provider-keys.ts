@@ -45,6 +45,8 @@ import {
   CloudflareWorkersAIDriver,
   ReplicateDriver,
   BaiduErnieDriver,
+  AlibabaBailianDriver,
+  DifyDriver,
   BedrockDriver,
   VertexDriver,
   type LlmDriver,
@@ -86,6 +88,11 @@ const DRIVER_FACTORIES: Record<string, (apiKey: string) => LlmDriver> = {
   hunyuan: (apiKey) => new HunyuanDriver({ apiKey }),
   spark: (apiKey) => new SparkDriver({ apiKey }),
   replicate: (apiKey) => new ReplicateDriver({ apiKey }),
+  // Alibaba Bailian/DashScope (Qwen) via OpenAI compatible-mode — plain key.
+  alibaba_bailian: (apiKey) => new AlibabaBailianDriver({ apiKey }),
+  // Dify is app-scoped: the key authenticates one app. Optional baseUrl (self-host)
+  // + user travel as a JSON blob, same convention as the composite-cred providers.
+  dify: (key) => new DifyDriver(JSON.parse(key) as ConstructorParameters<typeof DifyDriver>[0]),
   // Azure & Cloudflare also need composite credentials (endpoint+deployment /
   // accountId alongside the key). Same JSON-blob convention as bedrock/vertex.
   azure_openai: (key) =>
