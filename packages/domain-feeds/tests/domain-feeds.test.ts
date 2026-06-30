@@ -16,6 +16,7 @@ import {
   WildfireFeed,
   MaritimeFeed,
   TechNewsFeed,
+  RedditFeed,
   type FeedEvent,
   type AviationEvent,
   type SeismologyEvent,
@@ -427,6 +428,81 @@ describe("TechNewsFeed (Hacker News via Algolia)", () => {
 
   it("falls back to mock data on empty hits", async () => {
     const feed = new TechNewsFeed({ http: makeMockHttp({ hits: [] }) });
+    const events = await feed.fetch();
+    expect(events.length).toBeGreaterThan(0);
+    expect(events[0]!.source).toContain("mock");
+  });
+});
+
+describe("RedditFeed", () => {
+  const REDDIT = {
+    data: {
+      children: [
+        {
+          data: {
+            id: "abc",
+            title: "Big news",
+            url: "https://example.com/big",
+            subreddit: "worldnews",
+            score: 12000,
+            num_comments: 800,
+            author: "carol",
+            permalink: "/r/worldnews/comments/abc/big_news/",
+            created_utc: 1_780_000_000,
+          },
+        },
+        {
+          data: {
+            id: "def",
+            title: "small post",
+            subreddit: "worldnews",
+            score: 5,
+            num_comments: 0,
+            author: "dave",
+            created_utc: 1_780_000_100,
+          },
+        },
+      ],
+    },
+  };
+
+  it("domain is 'reddit'", () => {
+    expect(new RedditFeed({ http: makeMockHttp(REDDIT) }).domain).toBe("reddit");
+  });
+
+  it("maps listing children to RedditEvents with absolute permalink", async () => {
+    const feed = new RedditFeed({ http: makeMockHttp(REDDIT) });
+    const events = await feed.fetch();
+    expect(events).toHaveLength(2);
+    expect(events[0]!.id).toBe("abc");
+    expect(events[0]!.subreddit).toBe("worldnews");
+    expect(events[0]!.score).toBe(12000);
+    expect(events[0]!.permalink).toBe("https://www.reddit.com/r/worldnews/comments/abc/big_news/");
+    expect(events[0]!.severity).toBe("high");
+    expect(events[1]!.severity).toBe("low");
+  });
+
+  it("builds the subreddit/sort URL", async () => {
+    let url = "";
+    const feed = new RedditFeed({
+      http: async (u) => {
+        url = u;
+        return REDDIT;
+      },
+    });
+    await feed.fetch({ subreddit: "programming", sort: "top" });
+    expect(url).toContain("/r/programming/top.json");
+  });
+
+  it("filters by minScore", async () => {
+    const feed = new RedditFeed({ http: makeMockHttp(REDDIT) });
+    const events = await feed.fetch({ minScore: 1000 });
+    expect(events).toHaveLength(1);
+    expect(events[0]!.id).toBe("abc");
+  });
+
+  it("falls back to mock on empty listing", async () => {
+    const feed = new RedditFeed({ http: makeMockHttp({ data: { children: [] } }) });
     const events = await feed.fetch();
     expect(events.length).toBeGreaterThan(0);
     expect(events[0]!.source).toContain("mock");

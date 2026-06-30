@@ -210,6 +210,17 @@ export interface TechNewsEvent extends FeedEvent {
   author?: string;
 }
 
+/** Reddit post (social signals). */
+export interface RedditEvent extends FeedEvent {
+  title: string;
+  url?: string;
+  subreddit: string;
+  score: number;
+  comments: number;
+  author?: string;
+  permalink?: string;
+}
+
 // ── FeedAdapter base ───────────────────────────────────────────────────────────
 
 export interface FeedAdapterOptions {
@@ -1681,6 +1692,77 @@ export class TechNewsFeed extends FeedAdapter<TechNewsEvent> {
   }
 }
 
+// ── Reddit — public listing JSON (no key required) ─────────────────────────────
+
+export class RedditFeed extends FeedAdapter<RedditEvent> {
+  readonly domain = "reddit";
+
+  constructor(opts: Partial<FeedAdapterOptions> = {}) {
+    super({ baseUrl: "https://www.reddit.com", ...opts });
+  }
+
+  async fetch(opts?: {
+    subreddit?: string;
+    sort?: "hot" | "new" | "top" | "rising";
+    minScore?: number;
+  }): Promise<RedditEvent[]> {
+    if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
+    const subreddit = opts?.subreddit ?? "all";
+    const sort = opts?.sort ?? "hot";
+    const url = `${this.baseUrl}/r/${encodeURIComponent(subreddit)}/${sort}.json?limit=25`;
+
+    try {
+      const raw = await this.http(url, this.buildHeaders());
+      if (Array.isArray(raw)) return raw as RedditEvent[];
+
+      type Child = {
+        data?: {
+          id?: string;
+          title?: string;
+          url?: string;
+          subreddit?: string;
+          score?: number;
+          num_comments?: number;
+          author?: string;
+          permalink?: string;
+          created_utc?: number;
+        };
+      };
+      const children = (raw as { data?: { children?: Child[] } } | null)?.data?.children ?? [];
+      if (!Array.isArray(children) || children.length === 0) {
+        return buildMockResponse<RedditEvent>("reddit");
+      }
+      const minScore = opts?.minScore ?? 0;
+      return children
+        .map((c) => c.data ?? {})
+        .filter((d) => (d.score ?? 0) >= minScore)
+        .map((d) => {
+          const score = Number(d.score ?? 0);
+          return {
+            id: d.id ?? "",
+            timestamp: new Date((d.created_utc ?? 0) * 1000).toISOString(),
+            severity: (score >= 10000
+              ? "high"
+              : score >= 2000
+                ? "medium"
+                : "low") as FeedEvent["severity"],
+            source: "reddit",
+            summary: d.title ?? "(untitled)",
+            title: d.title ?? "(untitled)",
+            url: d.url,
+            subreddit: d.subreddit ?? subreddit,
+            score,
+            comments: Number(d.num_comments ?? 0),
+            author: d.author,
+            permalink: d.permalink ? `https://www.reddit.com${d.permalink}` : undefined,
+          };
+        });
+    } catch {
+      return buildMockResponse<RedditEvent>("reddit");
+    }
+  }
+}
+
 // ── createDefaultRegistry — wires all adapters with env-based config ───────────
 
 export function createDefaultRegistry(): FeedRegistry {
@@ -1702,7 +1784,8 @@ export function createDefaultRegistry(): FeedRegistry {
     .register(new MarketFeed())
     .register(new SanctionsFeed())
     .register(new RadiationFeed())
-    .register(new TechNewsFeed());
+    .register(new TechNewsFeed())
+    .register(new RedditFeed());
 
   return registry;
 }
