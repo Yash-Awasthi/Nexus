@@ -17,6 +17,7 @@ import {
   MaritimeFeed,
   TechNewsFeed,
   RedditFeed,
+  PreprintsFeed,
   type FeedEvent,
   type AviationEvent,
   type SeismologyEvent,
@@ -503,6 +504,83 @@ describe("RedditFeed", () => {
 
   it("falls back to mock on empty listing", async () => {
     const feed = new RedditFeed({ http: makeMockHttp({ data: { children: [] } }) });
+    const events = await feed.fetch();
+    expect(events.length).toBeGreaterThan(0);
+    expect(events[0]!.source).toContain("mock");
+  });
+});
+
+describe("PreprintsFeed (bioRxiv details API)", () => {
+  const BIORXIV = {
+    collection: [
+      {
+        doi: "10.1101/2026.06.01.123456",
+        title: "A novel CRISPR approach",
+        authors: "Smith J.; Doe A.",
+        date: "2026-06-01",
+        version: "2",
+        category: "genetics",
+        abstract: "We describe a method.",
+        published: "10.1038/s41586-026-00000-0",
+      },
+      {
+        doi: "10.1101/2026.06.02.654321",
+        title: "Unpublished finding",
+        authors: "Roe B.",
+        date: "2026-06-02",
+        version: "1",
+        category: "neuroscience",
+        abstract: "Preliminary.",
+        published: "NA",
+      },
+    ],
+  };
+
+  it("domain is 'preprints'", () => {
+    expect(new PreprintsFeed({ http: makeMockHttp(BIORXIV) }).domain).toBe("preprints");
+  });
+
+  it("maps collection entries to PreprintEvents", async () => {
+    const feed = new PreprintsFeed({ http: makeMockHttp(BIORXIV) });
+    const events = await feed.fetch();
+    expect(events).toHaveLength(2);
+    expect(events[0]!.id).toBe("10.1101/2026.06.01.123456v2");
+    expect(events[0]!.title).toBe("A novel CRISPR approach");
+    expect(events[0]!.url).toBe("https://doi.org/10.1101/2026.06.01.123456");
+    expect(events[0]!.category).toBe("genetics");
+    expect(events[0]!.metadata!.abstract).toBe("We describe a method.");
+  });
+
+  it("scores publication into severity, treating NA as unpublished", async () => {
+    const feed = new PreprintsFeed({ http: makeMockHttp(BIORXIV) });
+    const events = await feed.fetch();
+    expect(events[0]!.severity).toBe("medium"); // has published DOI
+    expect(events[0]!.published).toBe("10.1038/s41586-026-00000-0");
+    expect(events[1]!.severity).toBe("low"); // published === "NA"
+    expect(events[1]!.published).toBeUndefined();
+  });
+
+  it("builds the server/date-range URL", async () => {
+    let url = "";
+    const feed = new PreprintsFeed({
+      http: async (u) => {
+        url = u;
+        return BIORXIV;
+      },
+    });
+    await feed.fetch({ server: "medrxiv", from: "2026-06-01", to: "2026-06-02" });
+    expect(url).toContain("/details/medrxiv/2026-06-01/2026-06-02/0");
+  });
+
+  it("filters by category", async () => {
+    const feed = new PreprintsFeed({ http: makeMockHttp(BIORXIV) });
+    const events = await feed.fetch({ category: "Genetics" });
+    expect(events).toHaveLength(1);
+    expect(events[0]!.category).toBe("genetics");
+  });
+
+  it("falls back to mock on empty collection", async () => {
+    const feed = new PreprintsFeed({ http: makeMockHttp({ collection: [] }) });
     const events = await feed.fetch();
     expect(events.length).toBeGreaterThan(0);
     expect(events[0]!.source).toContain("mock");

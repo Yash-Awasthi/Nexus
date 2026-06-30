@@ -221,6 +221,19 @@ export interface RedditEvent extends FeedEvent {
   permalink?: string;
 }
 
+/** bioRxiv/medRxiv preprint (scientific signals). */
+export interface PreprintEvent extends FeedEvent {
+  title: string;
+  doi: string;
+  authors?: string;
+  category?: string;
+  date: string;
+  version?: string;
+  url?: string;
+  /** Journal DOI once the preprint is published, if any. */
+  published?: string;
+}
+
 // ── FeedAdapter base ───────────────────────────────────────────────────────────
 
 export interface FeedAdapterOptions {
@@ -1763,6 +1776,75 @@ export class RedditFeed extends FeedAdapter<RedditEvent> {
   }
 }
 
+// ── Preprints — bioRxiv/medRxiv details API (no key required) ──────────────────
+
+export class PreprintsFeed extends FeedAdapter<PreprintEvent> {
+  readonly domain = "preprints";
+
+  constructor(opts: Partial<FeedAdapterOptions> = {}) {
+    super({ baseUrl: "https://api.biorxiv.org", ...opts });
+  }
+
+  async fetch(opts?: {
+    server?: "biorxiv" | "medrxiv";
+    from?: string;
+    to?: string;
+    category?: string;
+  }): Promise<PreprintEvent[]> {
+    if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
+    const server = opts?.server ?? "biorxiv";
+    const to = opts?.to ?? daysAgo(0);
+    const from = opts?.from ?? daysAgo(7);
+    const url = `${this.baseUrl}/details/${server}/${from}/${to}/0`;
+
+    try {
+      const raw = await this.http(url, this.buildHeaders());
+      if (Array.isArray(raw)) return raw as PreprintEvent[];
+
+      type Item = {
+        doi?: string;
+        title?: string;
+        authors?: string;
+        date?: string;
+        version?: string;
+        category?: string;
+        abstract?: string;
+        published?: string;
+      };
+      const collection = (raw as { collection?: Item[] } | null)?.collection ?? [];
+      if (!Array.isArray(collection) || collection.length === 0) {
+        return buildMockResponse<PreprintEvent>("preprints");
+      }
+      const category = opts?.category?.toLowerCase();
+      return collection
+        .filter((p) => !category || (p.category ?? "").toLowerCase() === category)
+        .map((p, i) => {
+          const doi = p.doi ?? "";
+          // bioRxiv returns "NA" for unpublished — surface graduation to a journal as severity.
+          const published = p.published && p.published !== "NA" ? p.published : undefined;
+          return {
+            id: doi ? `${doi}v${p.version ?? "1"}` : `biorxiv-${i}`,
+            timestamp: p.date ? new Date(p.date).toISOString() : new Date().toISOString(),
+            severity: (published ? "medium" : "low") as FeedEvent["severity"],
+            source: server,
+            summary: p.title ?? "(untitled)",
+            title: p.title ?? "(untitled)",
+            doi,
+            authors: p.authors,
+            category: p.category,
+            date: p.date ?? "",
+            version: p.version,
+            url: doi ? `https://doi.org/${doi}` : undefined,
+            published,
+            metadata: { abstract: p.abstract },
+          };
+        });
+    } catch {
+      return buildMockResponse<PreprintEvent>("preprints");
+    }
+  }
+}
+
 // ── createDefaultRegistry — wires all adapters with env-based config ───────────
 
 export function createDefaultRegistry(): FeedRegistry {
@@ -1785,7 +1867,8 @@ export function createDefaultRegistry(): FeedRegistry {
     .register(new SanctionsFeed())
     .register(new RadiationFeed())
     .register(new TechNewsFeed())
-    .register(new RedditFeed());
+    .register(new RedditFeed())
+    .register(new PreprintsFeed());
 
   return registry;
 }

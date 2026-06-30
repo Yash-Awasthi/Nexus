@@ -67,8 +67,11 @@ e2e3646 feat(llm-drivers): add 7 providers + OpenAI-compat base seam
 
 - **TechNewsFeed** (Hacker News via Algolia search JSON, no key) + `TechNewsEvent`.
 - **RedditFeed** (public subreddit listing JSON, no key) + `RedditEvent`.
-- Both registered in `createDefaultRegistry`, virality→severity, filters, mock
-  fallback. **Tests:** 48 in `packages/domain-feeds/tests/domain-feeds.test.ts`.
+- **PreprintsFeed** (bioRxiv/medRxiv `details` JSON API, no key) + `PreprintEvent`.
+  `server`/`from`/`to`/`category` opts; published-DOI→severity (NA = unpublished →
+  low); doi+version id; mock fallback.
+- All three registered in `createDefaultRegistry`, virality→severity, filters, mock
+  fallback. **Tests:** 54 in `packages/domain-feeds/tests/domain-feeds.test.ts`.
 
 ### "Free & open to all" — de-paywall (commit 67c3efb)
 
@@ -122,12 +125,10 @@ e2e3646 feat(llm-drivers): add 7 providers + OpenAI-compat base seam
 
 - **§1 remaining non-OpenAI drivers:** baidu-ernie (client-creds OAuth → 2 POSTs;
   needs `MockTransport.setResponses()` queue to test), dify (app-scoped), alibailian.
-- **§13 scientific preprints:** was mid-investigation. **bioRxiv** has a clean JSON
-  API (`https://api.biorxiv.org/details/biorxiv/<from>/<to>/0` → `{collection:[...]}`)
-  that fits `FeedAdapter` (JSON `http`). arXiv is Atom XML — there's an existing
-  `RssFeedAdapter` (parses `<item>` AND `<entry>`) but its `http` returns text while
-  `FeedAdapter.http` returns JSON (impedance) — use bioRxiv to avoid it. EDGAR/most
-  legislative are XML too.
+- **§13 scientific preprints:** bioRxiv **shipped** (`PreprintsFeed`). arXiv still
+  deferred — Atom XML; existing `RssFeedAdapter` parses `<item>`/`<entry>` but its
+  `http` returns text while `FeedAdapter.http` returns JSON (impedance). EDGAR/most
+  legislative are XML too — same impedance to resolve before those land.
 - §6 orchestration persistence, §7 coding-agent tools into RuntimeToolSet,
   §10 UI pages, §11 memory upgrade — bigger, touch DB/hot-path/UI.
 
@@ -137,7 +138,7 @@ e2e3646 feat(llm-drivers): add 7 providers + OpenAI-compat base seam
 pnpm exec vitest run packages/llm-drivers/tests/llm-drivers.test.ts      # 256
 pnpm exec vitest run packages/billing/tests/                              # 43
 pnpm exec vitest run packages/runtime/tests/security-utils.test.ts       # 45
-pnpm exec vitest run packages/domain-feeds/tests/domain-feeds.test.ts    # 48
+pnpm exec vitest run packages/domain-feeds/tests/domain-feeds.test.ts    # 54
 pnpm exec vitest run packages/llm-compress/tests/llm-compress.test.ts    # 30
 pnpm exec vitest run packages/provider-registry/tests/provider-registry.test.ts  # 27
 pnpm --filter @nexus/api typecheck
@@ -148,7 +149,6 @@ Note: edits to a package's `src` require `pnpm --filter <pkg> build` before
 
 ## Next up (suggested order)
 
-1. **bioRxiv preprints feed** (§13) — clean JSON, mirrors HN/Reddit. (was next)
-2. Add `MockTransport.setResponses([])` queue, then **baidu-ernie** driver (§1).
-3. Wire §3 compress into gateway/agent tool-output path (`x-nexus-compress`).
-4. Persist §5 cost breakdown + pre-call ledger check in middleware.
+1. Add `MockTransport.setResponses([])` queue, then **baidu-ernie** driver (§1).
+2. Wire §3 compress into gateway/agent tool-output path (`x-nexus-compress`).
+3. Persist §5 cost breakdown + pre-call ledger check in middleware.
