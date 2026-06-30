@@ -9,6 +9,7 @@
  * queue in single-process/local setups.
  */
 import { randomUUID } from "node:crypto";
+import type { PresetName } from "@nexus/agent-runtime";
 
 const QUEUE_HIGH = "nexus-high";
 
@@ -61,6 +62,27 @@ export interface LaunchAgentInput {
   /** Resume an existing session instead of starting a new one. */
   sessionId?: string;
   userId?: string;
+  /**
+   * Compress tool-result text before it re-enters context. `"lossless"` (default)
+   * or `"off"`/`false` to disable. Usually set from the `x-nexus-compress` header.
+   */
+  compressToolOutput?: PresetName | false;
+}
+
+/**
+ * Map an `x-nexus-compress` header value to a `compressToolOutput` setting.
+ * `off`/`false`/`0`/`none`/`no` → false (disable); `lossless`/`on`/`true`/`1`/`yes`
+ * → "lossless"; anything else (incl. absent/array) → undefined (keep the runtime
+ * default, currently lossless). Never throws.
+ */
+export function parseCompressHeader(
+  value: string | string[] | undefined,
+): PresetName | false | undefined {
+  const v = (Array.isArray(value) ? value[0] : value)?.trim().toLowerCase();
+  if (!v) return undefined;
+  if (["off", "false", "0", "none", "no"].includes(v)) return false;
+  if (["lossless", "on", "true", "1", "yes"].includes(v)) return "lossless";
+  return undefined;
 }
 
 /**

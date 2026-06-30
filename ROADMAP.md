@@ -71,9 +71,12 @@ filters (ansi/trim/blank/dedup) + `smartTruncate`; `compressAuto`/`detectTraits`
 (auto-detect traits → matched lossless filters); opt-in `injectSystemPrompt` +
 `INJECTORS` (terse-output, yagni-minimal-code). Remaining:
 
-- **Wire it in (biggest gap):** toggle via `x-nexus-compress` header + per-agent default;
-  apply to tool-output before it re-enters context (gateway / agent-runtime); log
-  measured saving per request (no silent black box). Hot-path — do carefully.
+- **Agent hot-path wired (shipped):** `ToolAgentRuntime` compresses tool-output before
+  it re-enters context (lossless default); `x-nexus-compress` header
+  (`apps/api` `/agent/run` → `agent.run` payload → worker runtime) toggles per request;
+  each pass emits an `agent.tool_compress` SSE/log event (tool, savedTokens, applied).
+  **Remaining:** the raw **gateway proxy** path (`apps/api/routes/gateway.ts`) still
+  doesn't compress message/tool bodies — only the agent runtime does.
 - **GCF encoder** — spec/acronym unclear; pin a concrete format before building.
 - **Tool-name→filter router** (git diff/grep/ls/build) on top of the trait detector.
 - **Heavy lossy mode (opt-in):** `@atjsh/llmlingua-2` dep (⚠️ auto-downloads a 57 MB–2.2 GB

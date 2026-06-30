@@ -92,12 +92,26 @@ e2e3646 feat(llm-drivers): add 7 providers + OpenAI-compat base seam
   `apps/api/src/routes/billing.ts`; collapsed `PLANS` to one open/unlimited plan.
   Kept API-key CRUD, quota meter, BYOK cost model.
 
-### §3 token compression — `@nexus/llm-compress` (partial, see below)
+### §3 token compression — `@nexus/llm-compress` (+ agent-runtime/worker/api wiring)
 
 - `compressAuto()` + `detectTraits()` (ansi/trailing-ws/blank-runs/repeat-runs →
   matched lossless filters). `injectSystemPrompt()` + `INJECTORS` (terse-output,
   yagni-minimal-code), opt-in/default-off/idempotent.
-- **Tests:** 30 in `packages/llm-compress/tests/llm-compress.test.ts`.
+- **Wired into the agent hot-path:** `ToolAgentRuntime` already compresses
+  tool-result text (lossless default) before it re-enters history via
+  `compressToolOutput` + `onToolCompress`. Now plumbed end-to-end:
+  - `apps/api` `/agent/run` reads the **`x-nexus-compress`** header
+    (`parseCompressHeader`: off/false/0/none/no→`false`; lossless/on/true/1/yes→
+    `"lossless"`; else default) → `LaunchAgentInput.compressToolOutput` →
+    `agent.run` payload.
+  - `apps/worker` agent-handler passes `compressToolOutput` into the runtime and
+    emits an **`agent.tool_compress`** SSE/log event per pass (tool, savedTokens,
+    applied) — measured saving, no silent black box. New `tool_compress`
+    `AgentEventType` in `@nexus/sse`.
+  - `PresetName`/`StructuredFormat` re-exported from `@nexus/agent-runtime` so
+    api/worker type the field without a direct llm-compress dep.
+- **Tests:** 30 in llm-compress; +4 `parseCompressHeader` in
+  `apps/api/tests/lib/agent-queue.test.ts`.
 
 ### §1 models.dev seeding — `@nexus/provider-registry` (partial, see below)
 
@@ -109,10 +123,12 @@ e2e3646 feat(llm-drivers): add 7 providers + OpenAI-compat base seam
 
 ## Partial / follow-ups
 
-- **§3 compression:** library done; **not wired** into gateway/agent (hot-path
-  integration deferred — needs `x-nexus-compress` header + per-agent default).
-  Not built: GCF encoder (spec/acronym ambiguous — don't invent), llmlingua-2
-  lossy (gated 2GB model dep), tool-name→filter router.
+- **§3 compression:** library + **agent hot-path wiring done** (`x-nexus-compress`
+  header → runtime → `agent.tool_compress` telemetry). Still open: the raw
+  **gateway** proxy path (`apps/api/routes/gateway.ts`) doesn't compress
+  tool/message bodies (only the agent runtime does); tool-name→filter router on
+  top of `compressAuto`; GCF encoder (spec ambiguous — don't invent); llmlingua-2
+  lossy (gated 2GB model dep).
 - **§1 models.dev:** importer done; **not auto-seeded** into `globalRegistry`
   (left manual to avoid a startup network call). Consider a CLI/admin seed cmd.
 - **§5 billing:** cost model done; **not persisted** (no `usage_events` token
@@ -155,6 +171,6 @@ Note: edits to a package's `src` require `pnpm --filter <pkg> build` before
 
 ## Next up (suggested order)
 
-1. Wire §3 compress into gateway/agent tool-output path (`x-nexus-compress`).
-2. Persist §5 cost breakdown + pre-call ledger check in middleware.
-3. **dify** / **alibailian** drivers (§1) — both app/workspace-scoped auth.
+1. Persist §5 cost breakdown + pre-call ledger check in middleware.
+2. **dify** / **alibailian** drivers (§1) — both app/workspace-scoped auth.
+3. Tool-name→filter router on `compressAuto` (git diff/grep/ls/build) (§3).

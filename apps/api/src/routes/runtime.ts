@@ -13,7 +13,7 @@ import type { SQL } from "drizzle-orm";
 import { eq, desc, and } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
-import { launchAgentRun, type LaunchAgentInput } from "../lib/agent-queue.js";
+import { launchAgentRun, parseCompressHeader, type LaunchAgentInput } from "../lib/agent-queue.js";
 import { requireAuth } from "../middleware/auth.js";
 
 export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
@@ -86,7 +86,13 @@ export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
       const instruction = (request.body?.instruction ?? "").trim();
       if (!instruction) return reply.code(400).send({ error: "instruction is required" });
 
-      const launched = await launchAgentRun({ ...request.body, instruction });
+      // x-nexus-compress header overrides any body value (explicit opt-in/out).
+      const headerCompress = parseCompressHeader(request.headers["x-nexus-compress"]);
+      const launched = await launchAgentRun({
+        ...request.body,
+        instruction,
+        ...(headerCompress !== undefined ? { compressToolOutput: headerCompress } : {}),
+      });
       if (!launched) {
         return reply
           .code(503)

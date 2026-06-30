@@ -27,6 +27,7 @@ import {
   type PermissionRequest,
   type RuntimeMessage,
   type CompactionResult,
+  type PresetName,
 } from "@nexus/agent-runtime";
 import { db } from "@nexus/db";
 import { agentSessions } from "@nexus/db/schema";
@@ -81,6 +82,12 @@ export interface AgentRunPayload {
   review?: boolean;
   /** Context token budget for compaction (default: model window). */
   tokenBudget?: number;
+  /**
+   * Compress tool-result text before it re-enters context. `"lossless"` (default,
+   * meaning-preserving) or `"off"`/`false` to disable. Set from the
+   * `x-nexus-compress` request header at the API edge.
+   */
+  compressToolOutput?: PresetName | false;
   /** Resume an existing agent_sessions row (loads its messages, continues it). */
   sessionId?: string;
   /** Owning user id, persisted on a new session. */
@@ -298,7 +305,7 @@ export async function handleAgentRunJob(
   // the run's sessionId/taskId; a no-op when neither is set or REDIS_URL is unset.
   const stream = payload.sessionId ?? payload.taskId;
   const emit = (
-    type: "run_started" | "step" | "compaction" | "status" | "learnings",
+    type: "run_started" | "step" | "compaction" | "status" | "learnings" | "tool_compress",
     data: Record<string, unknown>,
   ): void => {
     if (stream) void publishAgentEvent(stream, type, data);
@@ -388,6 +395,20 @@ export async function handleAgentRunJob(
         : {}),
     ...(payload.systemPrompt ? { systemPrompt: payload.systemPrompt } : {}),
     ...(payload.maxSteps ? { maxSteps: payload.maxSteps } : {}),
+    ...(payload.compressToolOutput !== undefined
+      ? { compressToolOutput: payload.compressToolOutput }
+      : {}),
+    onToolCompress: (info: { tool: string; savedTokens: number; applied: string[] }): void => {
+      console.log(
+        JSON.stringify({
+          level: "info",
+          event: "agent.tool_compress",
+          taskId: payload.taskId,
+          ...info,
+        }),
+      );
+      emit("tool_compress", info);
+    },
     onCompaction: (info: CompactionResult): void => {
       const data = {
         summarized: info.summarizedCount,

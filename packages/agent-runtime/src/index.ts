@@ -24,6 +24,10 @@ import {
   type StructuredFormat,
 } from "@nexus/llm-compress";
 
+// Re-export so consumers (api, worker) can type `compressToolOutput` without
+// taking a direct dependency on @nexus/llm-compress.
+export type { PresetName, StructuredFormat } from "@nexus/llm-compress";
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type RuntimeModel = string;
