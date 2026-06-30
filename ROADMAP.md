@@ -6,6 +6,13 @@ Single forward-looking plan. Open work only; shipped items are dropped (read the
 history for what landed). Grouped by theme, not by sprint. Each item is independent
 unless a dependency is noted.
 
+> **Nexus is free and open to all** — no paid tier, no payment provider. The tier
+> system is neutralised (everyone gets full access) and Stripe is removed. Items
+> below about "billing"/"quota" mean **BYOK spend-guards on the user's own keys**,
+> never charging for Nexus. (Multi-tenant SaaS / Stripe items are struck.)
+>
+> In-flight work + resume context live in [PROGRESS.md](PROGRESS.md).
+
 **Standing rules for every item below:**
 
 - Scope work to one package: `pnpm --filter @nexus/<pkg> typecheck && test`, not whole-repo.
@@ -20,25 +27,22 @@ unless a dependency is noted.
 
 ## 1. LLM provider breadth
 
-Native `llm-drivers` covers ~19 providers plus the local sidecar router (`nexus/omni`)
-and Bedrock/Vertex BYOK. Remaining:
+Native `llm-drivers` covers ~30 providers + the local sidecar router (`nexus/omni`),
+Bedrock/Vertex BYOK, **Azure OpenAI, Cloudflare Workers AI, Xinference, Replicate,
+Doubao, BytePlus, Hunyuan, Spark** (shipped), and a `chatCompletionsUrl()`/
+`authHeaders()` base-class seam for non-Bearer/non-standard-path providers. Remaining:
 
-- **Azure OpenAI driver** — custom base URL + `api-version`; enterprise requirement.
-- **Tier-A OpenAI-compatible drivers** (each ~12 lines, copy an existing driver,
-  `pnpm scaffold:driver`): zhipu/glm, moonshot-intl, lingyiwanwu (01.ai), baichuan,
-  minimax, stepfun, novita, siliconflow, doubao/volcengine, hunyuan, spark, hyperbolic,
-  chutes, nebius, venice, byteplus, qwen, ai360, vercel-ai-gateway. Batch ~10 per PR;
-  add a MockTransport test + `.env.example` entry per provider.
-- **Tier-A2 non-OpenAI-shaped** (need a request/response adapter, coordinate with the
-  translation matrix below): cloudflare-workers-ai, replicate (prediction-poll), baidu
-  ernie (access-token OAuth), alibailian, dify, xinference.
+- **Tier-A2 non-OpenAI-shaped (remaining):** baidu-ernie (client-creds OAuth → 2-step;
+  needs a `MockTransport.setResponses()` queue to test), alibailian, dify. Each needs a
+  request/response adapter — coordinate with the translation matrix (§2).
 - **Aux providers route to existing packages, not `llm-drivers`:** image-gen
   (flux/stability/recraft/fal/comfyui), voice (elevenlabs/deepgram/cartesia/assemblyai),
   retrieval/reranker embeddings (voyage/jina/cohere-embed), search (exa/brave/serper).
 - **Custom-driver framework** — document + simplify the provider interface so adding one
   doesn't require touching `llm-drivers` internals.
-- Seed model metadata (pricing, ctx limits, modality, cutoff) from the models.dev JSON
-  API into `provider-registry`.
+- **models.dev metadata:** importer shipped in `provider-registry`
+  (`modelsDevToDefinitions` / `registerFromModelsDev` / gated `fetchModelsDev`).
+  Remaining: a CLI/admin seed command (no auto network call at startup).
 
 > Don't silently skip a provider that needs non-trivial auth — list it as an explicit
 > deferred item with the reason, never drop it.
@@ -60,20 +64,18 @@ provider-OAuth endpoints work.
 
 ## 3. Token compression — `@nexus/llm-compress` (new)
 
-Output-side compression (current packages only prune input). Check `plugin-modes` /
-`context-pack` first to avoid rebuilding.
+`@nexus/llm-compress` exists. **Shipped:** TOON structured encoder + generic lossless
+filters (ansi/trim/blank/dedup) + `smartTruncate`; `compressAuto`/`detectTraits`
+(auto-detect traits → matched lossless filters); opt-in `injectSystemPrompt` +
+`INJECTORS` (terse-output, yagni-minimal-code). Remaining:
 
-- **Structured-payload encoders (highest ROI, cheap deps):** adopt `@toon-format/toon`
-  and a GCF encoder — opt-in, lossless, −40–90% on uniform arrays / code symbols.
-- **Lossless tool-output filters** (pure string→string, golden-tested): git diff/status,
-  grep, find, ls, tree, dedup-log, smart-truncate, read-numbered, build-output.
-  Auto-detect tool-output type → apply matching filter.
-- **Opt-in system-prompt injectors** (default off; never silently alter agent semantics):
-  terse-output mode, YAGNI/minimal-code mode. Named presets = filter+injector stacks.
+- **Wire it in (biggest gap):** toggle via `x-nexus-compress` header + per-agent default;
+  apply to tool-output before it re-enters context (gateway / agent-runtime); log
+  measured saving per request (no silent black box). Hot-path — do carefully.
+- **GCF encoder** — spec/acronym unclear; pin a concrete format before building.
+- **Tool-name→filter router** (git diff/grep/ls/build) on top of the trait detector.
 - **Heavy lossy mode (opt-in):** `@atjsh/llmlingua-2` dep (⚠️ auto-downloads a 57 MB–2.2 GB
   model on first use).
-- Toggle via `x-nexus-compress` header + per-agent default; log measured saving per
-  request (no silent black box).
 
 ## 4. Provider OAuth + accounts — `@nexus/llm-oauth` (framework landed)
 
@@ -95,17 +97,20 @@ client-ID reuse.** Remaining:
   power-of-2, quota-aware, tier-ladder); per-provider circuit breaker. Dedup + jitter to
   avoid refresh/cooldown thundering-herd.
 
-## 5. Quota, cost & multi-tenant billing
+## 5. BYOK spend-guard & usage metering
 
-`token-budget` rate-limits but there is no cost model or quota hierarchy. Extend
-`billing` / `governance` / `telemetry`:
+> Free/open: this is about capping/metering the user's **own** provider spend, not
+> charging for Nexus. Multi-tenant SaaS billing is struck (§15).
 
-- Per-provider/model input+output (+cache-hit) cost table, seeded from `provider-registry`
-  / models.dev.
-- Quota hierarchy (token < user < account), enforced pre-call; exhaustion returns a clean
-  typed error, not silent overspend.
-- Billing lifecycle: estimate → reserve → settle, reconciling streaming partials + overage/refund.
-- Per-request prompt/completion/cache token breakdown → usage analytics UI route.
+**Shipped** (`@nexus/billing/src/cost.ts`): USD cost model (`computeCost`,
+input/output/cache-read/cache-write) seeded from `provider-registry`;
+`estimateMaxCost`; `BillingLedger` (estimate→reserve→settle, cap enforced pre-call,
+overage/refund delta, composes for token<user<account); typed `QuotaExceededError`.
+Remaining:
+
+- Persist the per-request prompt/completion/cache token breakdown (add token columns to
+  `usage_events`) and wire the ledger pre-call check into gateway/middleware.
+- Usage-analytics UI route over the breakdown.
 
 ## 6. Multi-agent orchestration
 
@@ -164,11 +169,15 @@ injection), persistent volume + ephemeral compute.
 
 ## 9. Security hardening
 
+- **SSRF filter — shipped** (`runtime/security-utils.ts` `isSafeUrl`/`assertSafeUrl`:
+  full private/reserved ranges + smuggled IPv4/IPv6 encodings). Remaining: resolve-then-
+  pin at fetch time to defeat DNS rebinding; apply at more outbound call sites.
 - `run_tool_script` PTC sandbox — Worker-thread isolation for the `AsyncFunction` path.
-- Per-user API-key rate limiting (current limiter is IP-based only).
+- Per-user API-key rate limiting (current limiter is IP-based only;
+  `makeUserRateLimitPreHandler` exists — apply broadly).
 - Docker sandbox: seccomp profile, read-only rootfs, user-namespace remapping.
-- Security-baseline pass over `apps/api`: Helmet headers, SSRF filter on outbound
-  provider/tool calls, output sanitize, prompt-injection guard (`awesome-secure-defaults`).
+- Security-baseline pass over `apps/api`: Helmet headers (present in `server.ts`),
+  output sanitize, prompt-injection guard (`awesome-secure-defaults`).
 
 ## 10. UI surfaces over existing backends
 
@@ -203,10 +212,11 @@ orchestration. Consider `mcp-compressor` to shrink tool manifests 60–95%.
 
 ## 13. Domain feeds
 
-`domain-feeds` has 16 domains. Add: legislative tracking (congressional bills, EU
-directives), scientific preprints (arXiv, bioRxiv), earnings & SEC filings (EDGAR, 8-K),
-social signals (Reddit, HN — rate-limited), supply chain (AIS shipping, port congestion).
-Dark-web sources need careful legal review first.
+`domain-feeds` has 18 domains. **Shipped:** social signals — Hacker News (Algolia) +
+Reddit (listing JSON). Add: scientific preprints (**bioRxiv** has clean JSON — do first;
+arXiv is Atom XML, use the existing `RssFeedAdapter`), legislative tracking
+(congressional bills, EU directives), earnings & SEC filings (EDGAR, 8-K), supply chain
+(AIS shipping, port congestion). Dark-web sources need careful legal review first.
 
 ## 14. Production multi-tenant hardening
 
@@ -224,7 +234,8 @@ Mostly external-infra / ops, scoped here for completeness:
 
 ## 15. Long-term / ambitious
 
-Multi-tenant SaaS (org isolation, per-org quotas, Stripe), plugin marketplace
+~~Multi-tenant SaaS (org isolation, per-org quotas, Stripe)~~ (struck — Nexus is
+free/open, no monetization), plugin marketplace
 (`plugin-sdk` → hosted registry, Deno-isolate sandboxed execution), federation protocol
 (cross-instance delegation, federated council, CRDT knowledge-graph sync, OIDC/SAML trust),
 fine-tuning pipeline (SFT from conversation history via `sft-tagger` + `corpus-builder`),
@@ -244,7 +255,6 @@ worker), mobile app (React Native + push on task completion).
 | PgBouncer pooling          | DB admin                                 |
 | K8s HPA deploy             | K8s cluster (chart ready in `infra/k8s/`)|
 | Grafana dashboards         | Grafana instance (configs in `infra/`)   |
-| Stripe webhook verify      | Stripe dashboard                         |
 | Provider OAuth app reg     | Google/GitHub dev consoles for client IDs|
 
 ## Reference-router note
