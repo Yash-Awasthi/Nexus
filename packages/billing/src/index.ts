@@ -34,6 +34,9 @@ export type { CreateApiKeyInput, CreateApiKeyResult } from "./api-keys.js";
 export { QuotaChecker } from "./quota.js";
 export type { QuotaCheckResult } from "./quota.js";
 
+export { computeCost, estimateMaxCost, BillingLedger, QuotaExceededError } from "./cost.js";
+export type { TokenUsage, CostBreakdown, Reservation, SettleResult } from "./cost.js";
+
 export { billingPreHandler } from "./middleware.js";
 
 export {
