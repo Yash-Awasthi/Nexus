@@ -8,6 +8,10 @@ import {
   smartTruncate,
   compress,
   compressPreset,
+  compressAuto,
+  detectTraits,
+  injectSystemPrompt,
+  INJECTORS,
   encodeStructured,
   estimateTokens,
   DEFAULT_FILTERS,
@@ -132,5 +136,60 @@ describe("compress pipeline", () => {
     const input = "[31mAlpha[0m\nBeta\nBeta\nGamma";
     const r = compress(input);
     for (const word of ["Alpha", "Beta", "Gamma"]) expect(r.text).toContain(word);
+  });
+});
+
+describe("detectTraits", () => {
+  it("flags trailing-ws, blank-runs, repeat-runs", () => {
+    const input = "x   \n\n\n\n\ndup\ndup";
+    const traits = detectTraits(input);
+    expect(traits).toContain("trailing-ws");
+    expect(traits).toContain("blank-runs");
+    expect(traits).toContain("repeat-runs");
+  });
+  it("ignores ordinary brackets (no ESC) — clean text has no traits", () => {
+    expect(detectTraits("arr[0] = list[12]")).toEqual([]);
+  });
+  it("does not flag a single blank line or non-adjacent repeats", () => {
+    expect(detectTraits("a\n\nb\na")).toEqual([]);
+  });
+});
+
+describe("compressAuto", () => {
+  it("applies only the matched filters and reports detected traits", () => {
+    const r = compressAuto("ok   \nok   \nplain");
+    expect(r.traits).toContain("trailing-ws");
+    expect(r.traits).toContain("repeat-runs");
+    expect(r.traits).not.toContain("ansi");
+    expect(r.applied).toContain("trim-trailing");
+    expect(r.applied).not.toContain("strip-ansi");
+    expect(r.compressedTokens).toBeLessThanOrEqual(r.originalTokens);
+  });
+  it("equals the full lossless pipeline result on the text (lossless equivalence)", () => {
+    const input = "ok   \nok   \nok   \n\n\n\n\ndone";
+    expect(compressAuto(input).text).toBe(compress(input).text);
+  });
+  it("no-op on already-clean text", () => {
+    const r = compressAuto("clean single line");
+    expect(r.traits).toEqual([]);
+    expect(r.text).toBe("clean single line");
+    expect(r.savedRatio).toBe(0);
+  });
+});
+
+describe("injectSystemPrompt (opt-in)", () => {
+  it("returns base unchanged with no injectors", () => {
+    expect(injectSystemPrompt("You are a bot.", [])).toBe("You are a bot.");
+  });
+  it("appends requested injector blocks verbatim", () => {
+    const out = injectSystemPrompt("Base.", ["terse-output", "yagni-minimal-code"]);
+    expect(out).toContain("Base.");
+    expect(out).toContain(INJECTORS["terse-output"].text);
+    expect(out).toContain(INJECTORS["yagni-minimal-code"].text);
+  });
+  it("is idempotent — does not double-append an already-present block", () => {
+    const once = injectSystemPrompt("Base.", ["terse-output"]);
+    const twice = injectSystemPrompt(once, ["terse-output"]);
+    expect(twice).toBe(once);
   });
 });

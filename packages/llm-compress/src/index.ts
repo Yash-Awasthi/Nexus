@@ -207,3 +207,100 @@ export function compress(
 export function compressPreset(input: string, preset: PresetName = "lossless"): CompressResult {
   return compress(input, PRESETS[preset]);
 }
+
+// ── Auto-detect tool output → matched lossless filter set ───────────────────────
+// Rather than make callers know which filter their text needs, sniff the text for
+// cheap structural traits and apply only the lossless filters that can help. Pure
+// detection (no /g state) so it never mutates regex lastIndex between calls. Always
+// lossless: detection only ever selects from DEFAULT_FILTERS, never lossy steps.
+
+/** Structural traits a chunk of tool output can exhibit. A chunk may have several. */
+export type OutputTrait = "ansi" | "trailing-ws" | "blank-runs" | "repeat-runs";
+
+const ANSI_DETECT = /\[[0-9;?]*[ -/]*[@-~]/; // non-global: safe for .test()
+const TRAILING_WS_DETECT = /[ \t]+(\r?\n|$)/;
+const BLANK_RUNS_DETECT = /(\r?\n)[ \t]*(\r?\n)[ \t]*(\r?\n)/;
+
+/** Sniff which lossless-cleanable traits the text has. Cheap, allocation-free-ish. */
+export function detectTraits(input: string): OutputTrait[] {
+  const traits: OutputTrait[] = [];
+  if (ANSI_DETECT.test(input)) traits.push("ansi");
+  if (TRAILING_WS_DETECT.test(input)) traits.push("trailing-ws");
+  if (BLANK_RUNS_DETECT.test(input)) traits.push("blank-runs");
+  // repeat-runs: any line equal to the line before it.
+  const lines = input.split("\n");
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i] === lines[i - 1] && lines[i] !== "") {
+      traits.push("repeat-runs");
+      break;
+    }
+  }
+  return traits;
+}
+
+const TRAIT_FILTER: Record<OutputTrait, CompressFilter> = {
+  ansi: stripAnsi,
+  "trailing-ws": trimTrailing,
+  "blank-runs": collapseBlankLines,
+  "repeat-runs": dedupConsecutive,
+};
+
+/**
+ * Detect the text's traits and run only the matching lossless filters. Equivalent
+ * result to the full lossless pipeline, but `result.applied` reflects what the
+ * detector chose, and the returned `traits` let callers log what was found. Use
+ * this when the input type is unknown (generic tool/command output).
+ */
+export function compressAuto(input: string): CompressResult & { traits: OutputTrait[] } {
+  const traits = detectTraits(input);
+  // Preserve DEFAULT_FILTERS ordering (cheap byte-strips before line folds).
+  const filters = DEFAULT_FILTERS.filter((f) =>
+    traits.some((t) => TRAIT_FILTER[t].name === f.name),
+  );
+  return { ...compress(input, filters), traits };
+}
+
+// ── System-prompt injectors (opt-in; NEVER silently alter agent semantics) ──────
+// These change how the MODEL behaves, not the text it reads, so they are never in
+// any default pipeline. A caller opts in per-agent / per-request and the injected
+// block is appended to the system prompt verbatim.
+
+/** A named instruction block appended to a system prompt when opted in. */
+export interface SystemPromptInjector {
+  readonly name: string;
+  readonly text: string;
+}
+
+/** Ask for terse, preamble-free output. Cuts output tokens on chatty models. */
+export const terseOutput: SystemPromptInjector = {
+  name: "terse-output",
+  text: "Be terse. Answer directly with no preamble, restatement of the question, or closing summary. Drop filler and hedging. Use the fewest words that fully answer.",
+};
+
+/** Ask for the minimal code that solves the task — no speculative scaffolding. */
+export const yagniMinimalCode: SystemPromptInjector = {
+  name: "yagni-minimal-code",
+  text: "Write the minimum code that solves the stated problem. No speculative abstractions, configuration, or features that were not requested. Prefer editing existing code over adding new files.",
+};
+
+export const INJECTORS = {
+  "terse-output": terseOutput,
+  "yagni-minimal-code": yagniMinimalCode,
+} as const;
+
+export type InjectorName = keyof typeof INJECTORS;
+
+/**
+ * Append the named injector blocks to a base system prompt. Order-preserving and
+ * idempotent-safe (an injector whose text is already present is skipped). Returns
+ * the base unchanged when no injectors are requested.
+ */
+export function injectSystemPrompt(base: string, injectors: readonly InjectorName[]): string {
+  if (injectors.length === 0) return base;
+  const trimmed = base.trimEnd();
+  const blocks = injectors
+    .map((n) => INJECTORS[n].text)
+    .filter((text) => !trimmed.includes(text));
+  if (blocks.length === 0) return base;
+  return [trimmed, ...blocks].filter(Boolean).join("\n\n");
+}
