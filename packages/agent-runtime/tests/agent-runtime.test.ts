@@ -453,6 +453,50 @@ describe("ToolAgentRuntime permission gate", () => {
   });
 });
 
+// ── ToolAgentRuntime tool-output compression ─────────────────────────────────────
+
+describe("ToolAgentRuntime tool-output compression", () => {
+  // A tool whose output is ANSI-noisy with repeated lines — exactly what the
+  // lossless preset folds away.
+  const NOISY = "\x1b[31mERROR\x1b[0m: boom\nboom\nboom";
+  function noisyToolSet(): RuntimeToolSet {
+    return new RuntimeToolSet().add({
+      name: "read_file",
+      description: "read_file",
+      handler: () => Promise.resolve(NOISY),
+    });
+  }
+
+  it("compresses tool output losslessly by default (ANSI stripped, repeats folded)", async () => {
+    const events: { savedTokens: number; applied: string[] }[] = [];
+    const runtime = new ToolAgentRuntime({
+      llm: scriptedLlm("read_file", { path: "x" }),
+      toolSet: noisyToolSet(),
+      maxSteps: 3,
+      onToolCompress: (e) => events.push(e),
+    });
+    const result = await runtime.run("read it");
+    const toolMsg = result.messages.find((m) => m.role === "tool");
+    expect(toolMsg?.content).not.toContain("\x1b["); // ANSI gone
+    expect(toolMsg?.content).toContain("ERROR: boom"); // signal preserved
+    expect(toolMsg?.content).toContain("×2"); // repeat count preserved (lossless)
+    expect(events[0]?.savedTokens).toBeGreaterThan(0);
+    expect(events[0]?.applied).toContain("strip-ansi");
+  });
+
+  it("leaves tool output untouched when disabled", async () => {
+    const runtime = new ToolAgentRuntime({
+      llm: scriptedLlm("read_file", { path: "x" }),
+      toolSet: noisyToolSet(),
+      maxSteps: 3,
+      compressToolOutput: false,
+    });
+    const result = await runtime.run("read it");
+    const toolMsg = result.messages.find((m) => m.role === "tool");
+    expect(toolMsg?.content).toBe(NOISY); // verbatim
+  });
+});
+
 // ── Context compaction ──────────────────────────────────────────────────────────
 
 describe("token estimation", () => {

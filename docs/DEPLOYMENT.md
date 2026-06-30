@@ -81,6 +81,5 @@ docker compose -f docker-compose.yml -f infra/docker/docker-compose.observabilit
 
 ## Scaling
 
-See [FUTURE_CONTRIBUTION.md](../FUTURE_CONTRIBUTION.md#hosting--infrastructure-reference)
-for tier-by-tier hosting recommendations, connection pooling, worker scaling, and
-pgvector tuning at scale.
+See [ROADMAP.md](../ROADMAP.md#14-production-multi-tenant-hardening) for production
+hardening — connection pooling, worker scaling, observability, and pgvector tuning at scale.

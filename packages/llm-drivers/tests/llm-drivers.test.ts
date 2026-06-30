@@ -19,6 +19,25 @@ import {
   TogetherDriver,
   PerplexityDriver,
   CohereDriver,
+  ZhipuDriver,
+  MoonshotDriver,
+  ZeroOneDriver,
+  BaichuanDriver,
+  MiniMaxDriver,
+  StepFunDriver,
+  NovitaDriver,
+  SiliconFlowDriver,
+  HyperbolicDriver,
+  ChutesDriver,
+  NebiusDriver,
+  VeniceDriver,
+  QwenDriver,
+  Ai360Driver,
+  VercelAIGatewayDriver,
+  LocalRouterDriver,
+  BedrockDriver,
+  VertexDriver,
+  __sigV4ForTest,
   MockTransport,
   DriverRegistry,
   LlmError,
@@ -200,6 +219,52 @@ describe.each([
     url: "api.perplexity.ai",
   },
   { name: "CohereDriver", Factory: CohereDriver, provider: "cohere", url: "api.cohere.ai" },
+  { name: "ZhipuDriver", Factory: ZhipuDriver, provider: "zhipu", url: "open.bigmodel.cn" },
+  { name: "MoonshotDriver", Factory: MoonshotDriver, provider: "moonshot", url: "api.moonshot.ai" },
+  {
+    name: "ZeroOneDriver",
+    Factory: ZeroOneDriver,
+    provider: "zeroone",
+    url: "api.lingyiwanwu.com",
+  },
+  {
+    name: "BaichuanDriver",
+    Factory: BaichuanDriver,
+    provider: "baichuan",
+    url: "api.baichuan-ai.com",
+  },
+  { name: "MiniMaxDriver", Factory: MiniMaxDriver, provider: "minimax", url: "api.minimax.chat" },
+  { name: "StepFunDriver", Factory: StepFunDriver, provider: "stepfun", url: "api.stepfun.com" },
+  { name: "NovitaDriver", Factory: NovitaDriver, provider: "novita", url: "api.novita.ai" },
+  {
+    name: "SiliconFlowDriver",
+    Factory: SiliconFlowDriver,
+    provider: "siliconflow",
+    url: "api.siliconflow.cn",
+  },
+  {
+    name: "HyperbolicDriver",
+    Factory: HyperbolicDriver,
+    provider: "hyperbolic",
+    url: "api.hyperbolic.xyz",
+  },
+  { name: "ChutesDriver", Factory: ChutesDriver, provider: "chutes", url: "llm.chutes.ai" },
+  { name: "NebiusDriver", Factory: NebiusDriver, provider: "nebius", url: "api.studio.nebius.ai" },
+  { name: "VeniceDriver", Factory: VeniceDriver, provider: "venice", url: "api.venice.ai" },
+  { name: "QwenDriver", Factory: QwenDriver, provider: "qwen", url: "dashscope.aliyuncs.com" },
+  { name: "Ai360Driver", Factory: Ai360Driver, provider: "ai360", url: "api.360.cn" },
+  {
+    name: "VercelAIGatewayDriver",
+    Factory: VercelAIGatewayDriver,
+    provider: "vercel_ai_gateway",
+    url: "ai-gateway.vercel.sh",
+  },
+  {
+    name: "LocalRouterDriver",
+    Factory: LocalRouterDriver,
+    provider: "local-router",
+    url: "localhost:20128",
+  },
 ] as const)("$name", ({ Factory, provider, url }) => {
   let t: MockTransport;
   let d: InstanceType<typeof Factory>;
@@ -236,6 +301,132 @@ describe.each([
     const r = await d.complete(makeOpts());
     expect(r.usage.inputTokens).toBe(5);
     expect(r.usage.outputTokens).toBe(10);
+  });
+});
+
+// ── Bedrock (SigV4) ───────────────────────────────────────────────────────────
+
+const BEDROCK_RESPONSE = {
+  output: { message: { role: "assistant", content: [{ text: "Hi there!" }] } },
+  stopReason: "end_turn",
+  usage: { inputTokens: 5, outputTokens: 10, totalTokens: 15 },
+};
+
+describe("signV4 (AWS Signature V4)", () => {
+  // AWS's published "GET ListUsers" test-vector. If our signer matches this exact
+  // Authorization string, the canonical-request → string-to-sign → signing-key
+  // chain is all correct. Offline, deterministic — no network.
+  it("matches the AWS-documented GET ListUsers signature", () => {
+    const sig = __sigV4ForTest({
+      method: "GET",
+      host: "iam.amazonaws.com",
+      path: "/",
+      query: "Action=ListUsers&Version=2010-05-08",
+      service: "iam",
+      region: "us-east-1",
+      accessKeyId: "AKIDEXAMPLE",
+      secretAccessKey: "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
+      payload: "",
+      contentType: "application/x-www-form-urlencoded; charset=utf-8",
+      now: new Date("2015-08-30T12:36:00Z"),
+    });
+    expect(sig.amzDate).toBe("20150830T123600Z");
+    expect(sig.authorization).toBe(
+      "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20150830/us-east-1/iam/aws4_request, " +
+        "SignedHeaders=content-type;host;x-amz-date, " +
+        "Signature=5d672d79c15b13162d9279b0855cfba6789a8edb4c82c400e06b5924a6f2b5d7",
+    );
+  });
+
+  it("includes the security token header when a session token is given", () => {
+    const sig = __sigV4ForTest({
+      method: "POST",
+      host: "bedrock-runtime.us-east-1.amazonaws.com",
+      path: "/model/x/converse",
+      query: "",
+      service: "bedrock",
+      region: "us-east-1",
+      accessKeyId: "AKID",
+      secretAccessKey: "secret",
+      sessionToken: "tok",
+      payload: "{}",
+      contentType: "application/json",
+      now: new Date("2015-08-30T12:36:00Z"),
+    });
+    expect(sig.securityToken).toBe("tok");
+    expect(sig.authorization).toContain("x-amz-security-token");
+  });
+});
+
+describe("BedrockDriver", () => {
+  let t: MockTransport;
+  let d: BedrockDriver;
+  beforeEach(() => {
+    t = new MockTransport().setResponse(BEDROCK_RESPONSE);
+    d = new BedrockDriver(
+      { accessKeyId: "AKID", secretAccessKey: "secret", region: "us-west-2" },
+      t,
+    );
+  });
+
+  it("provider is 'bedrock'", () => expect(d.provider).toBe("bedrock"));
+
+  it("posts to the regional converse endpoint", async () => {
+    await d.complete(makeOpts({ model: "anthropic.claude-3-5-sonnet-20240620-v1:0" }));
+    expect(t.calls[0]!.url).toContain("bedrock-runtime.us-west-2.amazonaws.com");
+    expect(t.calls[0]!.url).toContain("/converse");
+  });
+
+  it("signs with a SigV4 Authorization + X-Amz-Date header", async () => {
+    await d.complete(makeOpts());
+    expect(t.calls[0]!.headers["Authorization"]).toContain("AWS4-HMAC-SHA256");
+    expect(t.calls[0]!.headers["X-Amz-Date"]).toMatch(/^\d{8}T\d{6}Z$/);
+  });
+
+  it("maps system prompt to a Converse system block", async () => {
+    await d.complete(makeOpts({ systemPrompt: "Be helpful" }));
+    const body = t.calls[0]!.body as { system?: { text: string }[] };
+    expect(body.system?.[0]?.text).toBe("Be helpful");
+  });
+
+  it("parses Converse output + usage", async () => {
+    const r = await d.complete(makeOpts());
+    expect(r.content).toBe("Hi there!");
+    expect(r.usage.inputTokens).toBe(5);
+    expect(r.usage.outputTokens).toBe(10);
+  });
+});
+
+// ── Vertex AI (OpenAI-compatible) ─────────────────────────────────────────────
+
+describe("VertexDriver", () => {
+  let t: MockTransport;
+  let d: VertexDriver;
+  beforeEach(() => {
+    t = new MockTransport().setResponse(OAI_RESPONSE);
+    d = new VertexDriver(
+      { apiKey: "gcp-access-token", project: "my-proj", region: "us-central1" },
+      t,
+    );
+  });
+
+  it("provider is 'vertex'", () => expect(d.provider).toBe("vertex"));
+
+  it("builds the project/region OpenAI-compat endpoint", async () => {
+    await d.complete(makeOpts());
+    expect(t.calls[0]!.url).toContain("us-central1-aiplatform.googleapis.com");
+    expect(t.calls[0]!.url).toContain("/projects/my-proj/locations/us-central1/endpoints/openapi");
+    expect(t.calls[0]!.url).toContain("/chat/completions");
+  });
+
+  it("sends the access token as a Bearer header", async () => {
+    await d.complete(makeOpts());
+    expect(t.calls[0]!.headers["Authorization"]).toBe("Bearer gcp-access-token");
+  });
+
+  it("parses content", async () => {
+    const r = await d.complete(makeOpts());
+    expect(r.content).toBe("Hi there!");
   });
 });
 

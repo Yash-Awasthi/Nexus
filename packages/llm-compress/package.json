@@ -1,0 +1,29 @@
+{
+  "name": "@nexus/llm-compress",
+  "version": "0.0.0",
+  "private": false,
+  "description": "Token compression for LLM context — lossless tool-output filters (ANSI strip, line dedup, blank collapse) plus opt-in lossy truncation.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@toon-format/toon": "^2.3.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

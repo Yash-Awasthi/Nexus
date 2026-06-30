@@ -45,7 +45,36 @@ const PROVIDERS = [
   "together",
   "perplexity",
   "cohere",
+  "bedrock",
+  "vertex",
 ] as const;
+
+/**
+ * Providers whose credential is NOT a single key but a composite. The backend
+ * stores the whole thing as one JSON blob in the same `apiKey` field and parses
+ * it at driver-construction time (see apps/api/src/lib/provider-keys.ts). The UI
+ * just collects the parts here and serialises them to that JSON blob on save.
+ */
+type CompositeField = {
+  name: string;
+  label: string;
+  type?: "text" | "password";
+  required: boolean;
+  placeholder?: string;
+};
+const COMPOSITE_FIELDS: Record<string, CompositeField[]> = {
+  bedrock: [
+    { name: "accessKeyId", label: "Access Key ID", required: true },
+    { name: "secretAccessKey", label: "Secret Access Key", type: "password", required: true },
+    { name: "region", label: "Region", required: false, placeholder: "us-east-1" },
+    { name: "sessionToken", label: "Session token (optional)", type: "password", required: false },
+  ],
+  vertex: [
+    { name: "apiKey", label: "Access token", type: "password", required: true },
+    { name: "project", label: "GCP project ID", required: true },
+    { name: "region", label: "Region", required: false, placeholder: "us-central1" },
+  ],
+};
 
 interface ProviderKey {
   id: string;
@@ -65,8 +94,14 @@ export default function ProviderKeysPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [provider, setProvider] = useState<string>("groq");
   const [apiKey, setApiKey] = useState("");
+  const [composite, setComposite] = useState<Record<string, string>>({});
   const [label, setLabel] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const compositeFields = COMPOSITE_FIELDS[provider];
+  const compositeValid =
+    !compositeFields || compositeFields.every((f) => !f.required || (composite[f.name] ?? "").trim());
+  const canSave = compositeFields ? compositeValid : apiKey.length >= 8;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -93,10 +128,21 @@ export default function ProviderKeysPage() {
     setError("");
     setSuccess("");
     try {
+      // Composite providers (bedrock/vertex) serialise their fields into the
+      // same apiKey field as a JSON blob; the backend parses it on use.
+      const keyBody = compositeFields
+        ? JSON.stringify(
+            Object.fromEntries(
+              compositeFields
+                .map((f) => [f.name, (composite[f.name] ?? "").trim()] as const)
+                .filter(([, v]) => v !== ""),
+            ),
+          )
+        : apiKey;
       const res = await authFetch("/api/user/provider-keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider, apiKey, label: label || undefined }),
+        body: JSON.stringify({ provider, apiKey: keyBody, label: label || undefined }),
       });
       if (res.status === 503)
         throw new Error("Server encryption is not configured. Contact admin.");
@@ -107,6 +153,7 @@ export default function ProviderKeysPage() {
       setSuccess(`Saved ${provider} key.`);
       setDialogOpen(false);
       setApiKey("");
+      setComposite({});
       setLabel("");
       await load();
     } catch (err) {
@@ -201,7 +248,14 @@ export default function ProviderKeysPage() {
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label>Provider</Label>
-              <Select value={provider} onValueChange={setProvider}>
+              <Select
+                value={provider}
+                onValueChange={(p) => {
+                  setProvider(p);
+                  setApiKey("");
+                  setComposite({});
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -214,17 +268,33 @@ export default function ProviderKeysPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="apiKey">API key</Label>
-              <Input
-                id="apiKey"
-                type="password"
-                placeholder="sk-…"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                autoComplete="off"
-              />
-            </div>
+            {compositeFields ? (
+              compositeFields.map((f) => (
+                <div key={f.name} className="space-y-1.5">
+                  <Label htmlFor={f.name}>{f.label}</Label>
+                  <Input
+                    id={f.name}
+                    type={f.type ?? "text"}
+                    placeholder={f.placeholder}
+                    value={composite[f.name] ?? ""}
+                    onChange={(e) => setComposite((c) => ({ ...c, [f.name]: e.target.value }))}
+                    autoComplete="off"
+                  />
+                </div>
+              ))
+            ) : (
+              <div className="space-y-1.5">
+                <Label htmlFor="apiKey">API key</Label>
+                <Input
+                  id="apiKey"
+                  type="password"
+                  placeholder="sk-…"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="label">Label (optional)</Label>
               <Input
@@ -239,7 +309,7 @@ export default function ProviderKeysPage() {
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
               Cancel
             </Button>
-            <Button onClick={addKey} disabled={saving || apiKey.length < 8}>
+            <Button onClick={addKey} disabled={saving || !canSave}>
               {saving ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
               Save
             </Button>

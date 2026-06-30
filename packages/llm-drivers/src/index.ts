@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * llm-drivers — Concrete HTTP adapters for 15 LLM providers.
+ * llm-drivers — Concrete HTTP adapters for 36 LLM providers.
  *
  * All drivers share a common LlmDriver interface. Each driver handles:
  *   • Auth header injection
@@ -15,6 +15,8 @@
  * is injected (_useDefaultTransport = false) stream() falls back to the
  * complete()-based single-delta path so existing tests pass unchanged.
  */
+
+import { createHash, createHmac } from "node:crypto";
 
 // ── Core types ─────────────────────────────────────────────────────────────────
 
@@ -1185,6 +1187,422 @@ export class CohereDriver extends OpenAICompatibleDriver {
   }
 }
 
+// ── 20-34. Extra OpenAI-compatible providers (extended provider set) ───────────────
+//
+// All speak the standard /chat/completions schema with a Bearer key, so each is
+// a one-liner subclass of OpenAICompatibleDriver — base URL + default model only.
+// Providers needing non-OpenAI auth (Bedrock SigV4, Vertex GCP, Cloudflare path
+// account-id, Baidu access-token) are intentionally NOT here — they need bespoke
+// drivers and are tracked as Phase 2b follow-ups.
+
+/** Zhipu GLM (open.bigmodel.cn). */
+export class ZhipuDriver extends OpenAICompatibleDriver {
+  readonly provider = "zhipu";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://open.bigmodel.cn/api/paas/v4";
+    this.model = config.model ?? "glm-4-plus";
+  }
+}
+
+/** Moonshot International (api.moonshot.ai — distinct from the .cn Kimi endpoint). */
+export class MoonshotDriver extends OpenAICompatibleDriver {
+  readonly provider = "moonshot";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://api.moonshot.ai/v1";
+    this.model = config.model ?? "moonshot-v1-32k";
+  }
+}
+
+/** 01.AI / Lingyiwanwu (Yi models). */
+export class ZeroOneDriver extends OpenAICompatibleDriver {
+  readonly provider = "zeroone";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://api.lingyiwanwu.com/v1";
+    this.model = config.model ?? "yi-large";
+  }
+}
+
+/** Baichuan. */
+export class BaichuanDriver extends OpenAICompatibleDriver {
+  readonly provider = "baichuan";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://api.baichuan-ai.com/v1";
+    this.model = config.model ?? "Baichuan4-Turbo";
+  }
+}
+
+/** MiniMax. */
+export class MiniMaxDriver extends OpenAICompatibleDriver {
+  readonly provider = "minimax";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://api.minimax.chat/v1";
+    this.model = config.model ?? "abab6.5s-chat";
+  }
+}
+
+/** StepFun. */
+export class StepFunDriver extends OpenAICompatibleDriver {
+  readonly provider = "stepfun";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://api.stepfun.com/v1";
+    this.model = config.model ?? "step-1-8k";
+  }
+}
+
+/** Novita AI. */
+export class NovitaDriver extends OpenAICompatibleDriver {
+  readonly provider = "novita";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://api.novita.ai/v3/openai";
+    this.model = config.model ?? "meta-llama/llama-3.1-70b-instruct";
+  }
+}
+
+/** SiliconFlow. */
+export class SiliconFlowDriver extends OpenAICompatibleDriver {
+  readonly provider = "siliconflow";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://api.siliconflow.cn/v1";
+    this.model = config.model ?? "Qwen/Qwen2.5-72B-Instruct";
+  }
+}
+
+/** Hyperbolic. */
+export class HyperbolicDriver extends OpenAICompatibleDriver {
+  readonly provider = "hyperbolic";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://api.hyperbolic.xyz/v1";
+    this.model = config.model ?? "meta-llama/Meta-Llama-3.1-70B-Instruct";
+  }
+}
+
+/** Chutes. */
+export class ChutesDriver extends OpenAICompatibleDriver {
+  readonly provider = "chutes";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://llm.chutes.ai/v1";
+    this.model = config.model ?? "deepseek-ai/DeepSeek-V3";
+  }
+}
+
+/** Nebius AI Studio. */
+export class NebiusDriver extends OpenAICompatibleDriver {
+  readonly provider = "nebius";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://api.studio.nebius.ai/v1";
+    this.model = config.model ?? "meta-llama/Meta-Llama-3.1-70B-Instruct";
+  }
+}
+
+/** Venice AI. */
+export class VeniceDriver extends OpenAICompatibleDriver {
+  readonly provider = "venice";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://api.venice.ai/api/v1";
+    this.model = config.model ?? "llama-3.3-70b";
+  }
+}
+
+/** Qwen / Alibaba DashScope (OpenAI-compatible mode). */
+export class QwenDriver extends OpenAICompatibleDriver {
+  readonly provider = "qwen";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://dashscope.aliyuncs.com/compatible-mode/v1";
+    this.model = config.model ?? "qwen-max";
+  }
+}
+
+/** 360 AI. */
+export class Ai360Driver extends OpenAICompatibleDriver {
+  readonly provider = "ai360";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://api.360.cn/v1";
+    this.model = config.model ?? "360gpt2-pro";
+  }
+}
+
+/** Vercel AI Gateway (meta-gateway; "creator/model" ids like OpenRouter). */
+export class VercelAIGatewayDriver extends OpenAICompatibleDriver {
+  readonly provider = "vercel_ai_gateway";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://ai-gateway.vercel.sh/v1";
+    this.model = config.model ?? "openai/gpt-4o-mini";
+  }
+}
+
+/**
+ * Local sidecar router — any self-hosted OpenAI-compatible `/v1` endpoint.
+ * Routes through it to inherit its provider catalog, fallback and compression
+ * without writing a native driver per provider. baseUrl required (no public
+ * default); apiKey is the sidecar's own key.
+ */
+export class LocalRouterDriver extends OpenAICompatibleDriver {
+  readonly provider = "local-router";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "http://localhost:20128/v1";
+    this.model = config.model ?? "auto";
+  }
+}
+
+// ── 35. Amazon Bedrock (SigV4) ──────────────────────────────────────────────────
+// Bedrock is NOT OpenAI-compatible: it uses the Converse API body shape and signs
+// every request with AWS Signature V4. We implement SigV4 here with node:crypto
+// (no aws-sdk dependency) and the Converse request/response format.
+
+function sha256Hex(data: string): string {
+  return createHash("sha256").update(data, "utf8").digest("hex");
+}
+function hmac(key: Buffer | string, data: string): Buffer {
+  return createHmac("sha256", key).update(data, "utf8").digest();
+}
+
+interface SigV4Input {
+  method: string;
+  host: string;
+  path: string;
+  query: string;
+  service: string;
+  region: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken?: string;
+  payload: string;
+  contentType: string;
+  /** Request time. Injectable so the signing can be tested against AWS vectors. */
+  now: Date;
+}
+
+/**
+ * AWS Signature Version 4. Returns the `Authorization` header value plus the
+ * `x-amz-date` it signed (the caller must send both, byte-identical).
+ *
+ * Verified offline against AWS's published GET ListUsers test vector — see
+ * tests. Scope is intentionally narrow (no chunked payloads, no presigned URLs).
+ */
+function signV4(i: SigV4Input): { authorization: string; amzDate: string; securityToken?: string } {
+  const amzDate = i.now.toISOString().replace(/[:-]|\.\d{3}/g, "");
+  const date = amzDate.slice(0, 8);
+  const scope = `${date}/${i.region}/${i.service}/aws4_request`;
+
+  const headers: Record<string, string> = {
+    "content-type": i.contentType,
+    host: i.host,
+    "x-amz-date": amzDate,
+  };
+  if (i.sessionToken) headers["x-amz-security-token"] = i.sessionToken;
+  const sortedKeys = Object.keys(headers).sort();
+  const signedHeaders = sortedKeys.join(";");
+  const canonicalHeaders = sortedKeys.map((k) => `${k}:${headers[k]}\n`).join("");
+
+  const canonicalRequest = [
+    i.method,
+    i.path,
+    i.query,
+    canonicalHeaders,
+    signedHeaders,
+    sha256Hex(i.payload),
+  ].join("\n");
+
+  const stringToSign = ["AWS4-HMAC-SHA256", amzDate, scope, sha256Hex(canonicalRequest)].join("\n");
+
+  const kDate = hmac(`AWS4${i.secretAccessKey}`, date);
+  const kRegion = hmac(kDate, i.region);
+  const kService = hmac(kRegion, i.service);
+  const kSigning = hmac(kService, "aws4_request");
+  const signature = createHmac("sha256", kSigning).update(stringToSign, "utf8").digest("hex");
+
+  return {
+    authorization: `AWS4-HMAC-SHA256 Credential=${i.accessKeyId}/${scope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
+    amzDate,
+    ...(i.sessionToken ? { securityToken: i.sessionToken } : {}),
+  };
+}
+
+/** Exported for offline signature testing only. Not part of the public driver API. */
+export const __sigV4ForTest = signV4;
+
+export interface BedrockConfig {
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken?: string;
+  region?: string;
+  model?: string;
+}
+
+/**
+ * Amazon Bedrock via the Converse API.
+ *
+ * ponytail: text-only — tool calls and true token streaming are NOT wired (Bedrock
+ * streaming uses a binary event-stream framing that would need its own decoder).
+ * stream() falls back to BaseDriver's complete()-then-single-delta path. Upgrade
+ * path when needed: add toolConfig to the Converse body + an event-stream parser.
+ */
+export class BedrockDriver extends BaseDriver {
+  readonly provider = "bedrock";
+  readonly model: string;
+  private region: string;
+  private creds: { accessKeyId: string; secretAccessKey: string; sessionToken?: string };
+
+  constructor(config: BedrockConfig, transport?: HttpTransport) {
+    super(transport);
+    this.region = config.region ?? "us-east-1";
+    this.creds = {
+      accessKeyId: config.accessKeyId,
+      secretAccessKey: config.secretAccessKey,
+      ...(config.sessionToken ? { sessionToken: config.sessionToken } : {}),
+    };
+    this.model = config.model ?? "anthropic.claude-3-5-sonnet-20240620-v1:0";
+  }
+
+  async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
+    const t0 = Date.now();
+    const modelId = opts.model ?? this.model;
+
+    // Map our messages to the Converse shape: system is a separate field, the
+    // rest become role + content blocks. Tool messages collapse to user text.
+    let system: string | undefined;
+    const messages: Record<string, unknown>[] = [];
+    for (const m of opts.messages) {
+      if (m.role === "system") {
+        system = system ? `${system}\n\n${m.content}` : m.content;
+      } else {
+        const role = m.role === "assistant" ? "assistant" : "user";
+        messages.push({ role, content: [{ text: m.content }] });
+      }
+    }
+    if (opts.systemPrompt) system = opts.systemPrompt + (system ? `\n\n${system}` : "");
+
+    const body: Record<string, unknown> = {
+      messages,
+      ...(system ? { system: [{ text: system }] } : {}),
+      inferenceConfig: {
+        ...(opts.maxTokens !== undefined ? { maxTokens: opts.maxTokens } : {}),
+        ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+        ...(opts.stop ? { stopSequences: opts.stop } : {}),
+      },
+    };
+
+    const host = `bedrock-runtime.${this.region}.amazonaws.com`;
+    const path = `/model/${encodeURIComponent(modelId)}/converse`;
+    const payload = JSON.stringify(body);
+    const sig = signV4({
+      method: "POST",
+      host,
+      path,
+      query: "",
+      service: "bedrock",
+      region: this.region,
+      accessKeyId: this.creds.accessKeyId,
+      secretAccessKey: this.creds.secretAccessKey,
+      sessionToken: this.creds.sessionToken,
+      payload,
+      contentType: "application/json",
+      now: new Date(),
+    });
+
+    const headers: Record<string, string> = {
+      Authorization: sig.authorization,
+      "X-Amz-Date": sig.amzDate,
+    };
+    if (sig.securityToken) headers["X-Amz-Security-Token"] = sig.securityToken;
+
+    const raw = (await this.transport.post(`https://${host}${path}`, body, headers)) as Record<
+      string,
+      unknown
+    >;
+
+    const output = raw["output"] as { message?: { content?: { text?: string }[] } } | undefined;
+    const content = output?.message?.content?.map((c) => c.text ?? "").join("") ?? "";
+    const usage = raw["usage"] as { inputTokens?: number; outputTokens?: number } | undefined;
+    const stopReason = raw["stopReason"] as string | undefined;
+    return this.makeResponse(
+      `bedrock-${t0}`,
+      content,
+      modelId,
+      this.makeUsage(
+        usage?.inputTokens ?? estimateTokens(opts.messages.map((m) => m.content).join(" ")),
+        usage?.outputTokens ?? estimateTokens(content),
+      ),
+      Date.now() - t0,
+      stopReason === "max_tokens" ? "length" : "stop",
+    );
+  }
+}
+
+// ── 36. Google Vertex AI (OpenAI-compatible endpoint) ────────────────────────────
+// Vertex exposes an OpenAI-compatible chat/completions endpoint. Auth is a Google
+// OAuth2 access token (Bearer). We treat that token as the BYOK "apiKey" — the
+// caller mints it (gcloud / a service-account exchange) so we avoid pulling in
+// google-auth-library. baseUrl is derived from the GCP project + region.
+
+export interface VertexConfig {
+  apiKey: string;
+  project: string;
+  region?: string;
+  model?: string;
+}
+
+export class VertexDriver extends OpenAICompatibleDriver {
+  readonly provider = "vertex";
+  readonly model: string;
+  protected baseUrl: string;
+
+  constructor(config: VertexConfig, transport?: HttpTransport) {
+    super(config, transport);
+    const region = config.region ?? "us-central1";
+    this.baseUrl = `https://${region}-aiplatform.googleapis.com/v1/projects/${config.project}/locations/${region}/endpoints/openapi`;
+    this.model = config.model ?? "google/gemini-2.0-flash-001";
+  }
+}
+
 // ── Driver registry + factory ──────────────────────────────────────────────────
 
 export type ProviderName =
@@ -1205,7 +1623,24 @@ export type ProviderName =
   | "xai"
   | "together"
   | "perplexity"
-  | "cohere";
+  | "cohere"
+  | "zhipu"
+  | "moonshot"
+  | "zeroone"
+  | "baichuan"
+  | "minimax"
+  | "stepfun"
+  | "novita"
+  | "siliconflow"
+  | "hyperbolic"
+  | "chutes"
+  | "nebius"
+  | "venice"
+  | "qwen"
+  | "ai360"
+  | "vercel_ai_gateway"
+  | "bedrock"
+  | "vertex";
 
 /** Driver registration interface definition. */
 export interface DriverRegistration {

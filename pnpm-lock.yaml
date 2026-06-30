@@ -540,6 +540,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@nexus/agent-orchestrator':
+        specifier: workspace:*
+        version: link:../../packages/agent-orchestrator
       '@nexus/agent-runtime':
         specifier: workspace:*
         version: link:../../packages/agent-runtime
@@ -1042,7 +1045,20 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@25.9.3)(lightningcss@1.32.0)(terser@5.48.0)
 
+  packages/agent-orchestrator:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(lightningcss@1.32.0)(terser@5.48.0)
+
   packages/agent-runtime:
+    dependencies:
+      '@nexus/llm-compress':
+        specifier: workspace:*
+        version: link:../llm-compress
     devDependencies:
       typescript:
         specifier: '*'
@@ -1605,6 +1621,19 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@25.9.3)(lightningcss@1.32.0)(terser@5.48.0)
 
+  packages/llm-compress:
+    dependencies:
+      '@toon-format/toon':
+        specifier: ^2.3.0
+        version: 2.3.0
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(lightningcss@1.32.0)(terser@5.48.0)
+
   packages/llm-drivers:
     devDependencies:
       typescript:
@@ -1612,6 +1641,15 @@ importers:
         version: 5.9.3
       vitest:
         specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(lightningcss@1.32.0)(terser@5.48.0)
+
+  packages/llm-oauth:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
         version: 2.1.9(@types/node@25.9.3)(lightningcss@1.32.0)(terser@5.48.0)
 
   packages/llm-router:
@@ -1633,6 +1671,15 @@ importers:
         version: 5.9.3
       vitest:
         specifier: '*'
+        version: 2.1.9(@types/node@25.9.3)(lightningcss@1.32.0)(terser@5.48.0)
+
+  packages/llm-translate:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
         version: 2.1.9(@types/node@25.9.3)(lightningcss@1.32.0)(terser@5.48.0)
 
   packages/llm-utils:
@@ -6561,6 +6608,9 @@ packages:
   '@tanstack/table-core@8.21.3':
     resolution: {integrity: sha512-ldZXEhOBb8Is7xLs01fR3YEc3DERiz5silj8tnGkFZytt1abEvl/GhUmCE0PMLaMPTa3Jk4HbKmRlHmu+gCftg==}
     engines: {node: '>=12'}
+
+  '@toon-format/toon@2.3.0':
+    resolution: {integrity: sha512-/Ew9etdRQKVMnm9fDaCG0JjyAOK/O7T0M97oum1aW4W+UR8ZhVVPBanIV7oWgHBiGlnVxV9M55PWQCHofDV07w==}
 
   '@ts-graphviz/adapter@2.0.6':
     resolution: {integrity: sha512-kJ10lIMSWMJkLkkCG5gt927SnGZcBuG0s0HHswGzcHTgvtUe7yk5/3zTEr0bafzsodsOq5Gi6FhQeV775nC35Q==}
@@ -18162,6 +18212,8 @@ snapshots:
       react-dom: 19.2.7(react@19.2.7)
 
   '@tanstack/table-core@8.21.3': {}
+
+  '@toon-format/toon@2.3.0': {}
 
   '@ts-graphviz/adapter@2.0.6':
     dependencies:

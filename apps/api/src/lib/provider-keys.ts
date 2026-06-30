@@ -22,6 +22,23 @@ import {
   PerplexityDriver,
   CohereDriver,
   CerebrasDriver,
+  ZhipuDriver,
+  MoonshotDriver,
+  ZeroOneDriver,
+  BaichuanDriver,
+  MiniMaxDriver,
+  StepFunDriver,
+  NovitaDriver,
+  SiliconFlowDriver,
+  HyperbolicDriver,
+  ChutesDriver,
+  NebiusDriver,
+  VeniceDriver,
+  QwenDriver,
+  Ai360Driver,
+  VercelAIGatewayDriver,
+  BedrockDriver,
+  VertexDriver,
   type LlmDriver,
 } from "@nexus/llm-drivers";
 import { and, eq, isNull } from "drizzle-orm";
@@ -41,6 +58,28 @@ const DRIVER_FACTORIES: Record<string, (apiKey: string) => LlmDriver> = {
   perplexity: (apiKey) => new PerplexityDriver({ apiKey }),
   cohere: (apiKey) => new CohereDriver({ apiKey }),
   cerebras: (apiKey) => new CerebrasDriver({ apiKey }),
+  zhipu: (apiKey) => new ZhipuDriver({ apiKey }),
+  moonshot: (apiKey) => new MoonshotDriver({ apiKey }),
+  zeroone: (apiKey) => new ZeroOneDriver({ apiKey }),
+  baichuan: (apiKey) => new BaichuanDriver({ apiKey }),
+  minimax: (apiKey) => new MiniMaxDriver({ apiKey }),
+  stepfun: (apiKey) => new StepFunDriver({ apiKey }),
+  novita: (apiKey) => new NovitaDriver({ apiKey }),
+  siliconflow: (apiKey) => new SiliconFlowDriver({ apiKey }),
+  hyperbolic: (apiKey) => new HyperbolicDriver({ apiKey }),
+  chutes: (apiKey) => new ChutesDriver({ apiKey }),
+  nebius: (apiKey) => new NebiusDriver({ apiKey }),
+  venice: (apiKey) => new VeniceDriver({ apiKey }),
+  qwen: (apiKey) => new QwenDriver({ apiKey }),
+  ai360: (apiKey) => new Ai360Driver({ apiKey }),
+  vercel_ai_gateway: (apiKey) => new VercelAIGatewayDriver({ apiKey }),
+  // Bedrock & Vertex need composite credentials, not a single key. The stored
+  // secret is a JSON blob; parse it here. A malformed blob throws, which the
+  // caller treats as "provider not configured" (same as a missing key).
+  bedrock: (key) =>
+    new BedrockDriver(JSON.parse(key) as ConstructorParameters<typeof BedrockDriver>[0]),
+  vertex: (key) =>
+    new VertexDriver(JSON.parse(key) as ConstructorParameters<typeof VertexDriver>[0]),
 };
 
 /**
@@ -107,7 +146,14 @@ export async function buildUserDriverRegistry(
       missing.push(provider);
       continue;
     }
-    registry.register(factory(key), provider);
+    // factory() can throw on malformed composite creds (bedrock/vertex JSON blob).
+    // Treat a construction failure as "not configured" rather than crashing the
+    // whole registry build.
+    try {
+      registry.register(factory(key), provider);
+    } catch {
+      missing.push(provider);
+    }
   }
   return { registry, missing };
 }

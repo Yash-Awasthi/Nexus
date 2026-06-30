@@ -2089,6 +2089,10 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     "cohere",
     "cerebras",
     "ollama",
+    // Composite-credential providers — apiKey carries a JSON blob (parsed in
+    // lib/provider-keys.ts). The UI collects the parts in a multi-field form.
+    "bedrock",
+    "vertex",
     "custom",
   ] as const;
   type ProviderName = (typeof VALID_PROVIDERS)[number];

@@ -10,6 +10,9 @@
     "test": "vitest run",
     "build": "tsc --project tsconfig.json"
   },
+  "dependencies": {
+    "@nexus/llm-compress": "workspace:*"
+  },
   "devDependencies": {
     "vitest": "*",
     "typescript": "*"

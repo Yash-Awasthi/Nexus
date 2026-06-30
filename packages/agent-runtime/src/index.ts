@@ -15,6 +15,15 @@
  *   • llmDriverToStreamFn       — bridge: LlmDriver.stream() → AsyncIterable<string>
  */
 
+import {
+  compress,
+  encodeStructured,
+  PRESETS,
+  type PresetName,
+  type CompressFilter,
+  type StructuredFormat,
+} from "@nexus/llm-compress";
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type RuntimeModel = string;
@@ -955,6 +964,21 @@ export interface ToolRuntimeOptions {
    * appended after these messages instead of starting a fresh history.
    */
   initialMessages?: RuntimeMessage[];
+  /**
+   * Lossless compression of tool-result text before it enters the history
+   * (strips ANSI, folds repeated log lines, collapses blank runs). Defaults to
+   * the `lossless` preset — meaning-preserving, so on by default. Pass `false`
+   * to disable, or another preset name. Lossy presets are never the default.
+   */
+  compressToolOutput?: PresetName | false;
+  /** Called after each tool-output compression pass with the token delta. */
+  onToolCompress?: (info: { tool: string; savedTokens: number; applied: string[] }) => void;
+  /**
+   * Wire format for non-string (object/array) tool results. `"json"` (default)
+   * is universally understood; `"toon"` is ~30-60% cheaper on arrays of uniform
+   * objects but the model must read TOON. Opt-in — string outputs are untouched.
+   */
+  structuredEncoding?: StructuredFormat;
 }
 
 function deriveToolSpecs(toolSet: RuntimeToolSet): ToolSpec[] {
@@ -965,11 +989,11 @@ function deriveToolSpecs(toolSet: RuntimeToolSet): ToolSpec[] {
   }));
 }
 
-function stringifyToolOutput(r: ToolResult): string {
+function stringifyToolOutput(r: ToolResult, format: StructuredFormat = "json"): string {
   if (r.error) return `Error: ${r.error}`;
   if (typeof r.output === "string") return r.output;
   try {
-    return JSON.stringify(r.output);
+    return encodeStructured(r.output, format);
   } catch {
     return String(r.output);
   }
@@ -996,6 +1020,9 @@ export class ToolAgentRuntime {
   private compaction?: CompactionOptions;
   private onCompaction?: (info: CompactionResult) => void;
   private initialMessages?: RuntimeMessage[];
+  private toolCompressFilters: readonly CompressFilter[];
+  private onToolCompress?: (info: { tool: string; savedTokens: number; applied: string[] }) => void;
+  private structuredEncoding: StructuredFormat;
 
   constructor(opts: ToolRuntimeOptions) {
     this.llm = opts.llm;
@@ -1012,6 +1039,11 @@ export class ToolAgentRuntime {
     this.compaction = opts.compaction;
     this.onCompaction = opts.onCompaction;
     this.initialMessages = opts.initialMessages;
+    // Default to lossless: meaning-preserving, so safe to run on every tool result.
+    this.toolCompressFilters =
+      opts.compressToolOutput === false ? [] : PRESETS[opts.compressToolOutput ?? "lossless"];
+    this.onToolCompress = opts.onToolCompress;
+    this.structuredEncoding = opts.structuredEncoding ?? "json";
   }
 
   /** Resolve a tool's effective permission tier (explicit override, else by name). */
@@ -1114,9 +1146,21 @@ export class ToolAgentRuntime {
         result.callId = call.callId;
         result.name = call.name;
         toolResults.push(result);
+        let content = stringifyToolOutput(result, this.structuredEncoding);
+        if (this.toolCompressFilters.length > 0) {
+          const c = compress(content, this.toolCompressFilters);
+          content = c.text;
+          if (c.applied.length > 0) {
+            this.onToolCompress?.({
+              tool: call.name,
+              savedTokens: c.originalTokens - c.compressedTokens,
+              applied: c.applied,
+            });
+          }
+        }
         messages.push({
           role: "tool",
-          content: stringifyToolOutput(result),
+          content,
           toolCallId: call.callId,
         });
       }

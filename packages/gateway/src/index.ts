@@ -150,7 +150,9 @@ export const BUILTIN_ALIASES: Record<string, ModelTarget> = {
   "nexus/planner": { provider: "groq", model: GROQ_SMART },
   "nexus/fast": { provider: "groq", model: GROQ_FAST },
   "nexus/eval": { provider: "groq", model: GROQ_FAST },
-  // Claude passthrough aliases (remap to Groq equivalents by default)
+  // sidecar router — local sidecar fat-router. Base URL comes from config.providers
+  // ["local-router"].baseUrl (falls back to DEFAULT_BASE_URLS below).
+  "nexus/omni": { provider: "local-router", model: "auto" },
   "claude-3-5-sonnet-20241022": { provider: "groq", model: GROQ_SMART },
   "claude-3-5-haiku-20241022": { provider: "groq", model: GROQ_FAST },
   "claude-3-haiku-20240307": { provider: "groq", model: GROQ_FAST },
@@ -162,6 +164,7 @@ const DEFAULT_BASE_URLS: Record<string, string> = {
   groq: "https://api.groq.com/openai/v1/chat/completions",
   openai: "https://api.openai.com/v1/chat/completions",
   local: "http://localhost:11434/v1/chat/completions",
+  "local-router": "http://localhost:20128/v1/chat/completions",
 };
 
 // ── GatewayError factory ──────────────────────────────────────────────────────

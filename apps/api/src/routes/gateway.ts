@@ -47,6 +47,7 @@ import {
   CerebrasDriver,
   KimiDriver,
   CodestralDriver,
+  LocalRouterDriver,
   type LlmRequestOptions,
   type LlmRole,
 } from "@nexus/llm-drivers";
@@ -250,6 +251,9 @@ export const DRIVER_ALIASES: Record<string, { provider: string; model: string }>
     model: "accounts/fireworks/models/llama-v3p1-70b-instruct",
   },
   "nexus/nvidia": { provider: "nvidia_nim", model: "meta/llama-3.1-70b-instruct" },
+  // sidecar router — route to the local sidecar router (env LOCAL_ROUTER_*).
+  // "auto" lets the sidecar pick; override per-request by sending a real model id.
+  "nexus/omni": { provider: "local-router", model: process.env.LOCAL_ROUTER_MODEL ?? "auto" },
 };
 
 /** Resolve model string → { provider, model }. Null if unrecognised. */
@@ -314,6 +318,17 @@ function buildDriverRegistry(): DriverRegistry {
   }
   if (process.env.LLAMA_CPP_BASE_URL) {
     reg.register(new LlamaCppDriver({ baseUrl: process.env.LLAMA_CPP_BASE_URL }));
+  }
+  // sidecar router — sidecar fat-router. One OpenAI-compat endpoint inherits the
+  // sidecar's full catalog (96–237 providers) + its fallback/compression.
+  if (process.env.LOCAL_ROUTER_BASE_URL) {
+    reg.register(
+      new LocalRouterDriver({
+        apiKey: process.env.LOCAL_ROUTER_API_KEY ?? "",
+        baseUrl: process.env.LOCAL_ROUTER_BASE_URL,
+        model: process.env.LOCAL_ROUTER_MODEL,
+      }),
+    );
   }
 
   return reg;

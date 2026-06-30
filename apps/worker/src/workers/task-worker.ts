@@ -47,6 +47,10 @@ import {
 import { handleCouncilJob, type CouncilJobPayload } from "../handlers/council-handler.js";
 import { handleDriveExecJob, type DriveExecPayload } from "../handlers/drive-handler.js";
 import { handleIngestJob, type IngestJobPayload } from "../handlers/ingest-handler.js";
+import {
+  handleOrchestrationJob,
+  type OrchestrationJobPayload,
+} from "../handlers/orchestration-handler.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -88,6 +92,11 @@ async function processJob(job: Job): Promise<unknown> {
     case "council.deliberate":
     case "council.evaluate":
       result = await handleCouncilJob(data as CouncilJobPayload);
+      break;
+
+    // ── Parallel multi-agent worktree fan-out ─────────────────────────────────
+    case "orchestration.run":
+      result = await handleOrchestrationJob(data as OrchestrationJobPayload);
       break;
 
     // ── Async package backbone ────────────────────────────────────────────────
