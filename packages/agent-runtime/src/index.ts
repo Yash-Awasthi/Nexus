@@ -280,6 +280,14 @@ export function classifyTool(name: string): ActionTier {
   return AUTO_ALLOWED_TOOLS.has(name.toLowerCase()) ? "auto_allowed" : "requires_permission";
 }
 
+// Read-only filesystem tools (`read_file`, `list_files`, `glob`, `grep`), scoped
+// to `ctx.workingDir`. Their names are all in AUTO_ALLOWED_TOOLS above.
+export {
+  createFilesystemTools,
+  resolveInWorkspace,
+  globToRegExp,
+} from "./fs-tools.js";
+
 /** A request to run a tool that requires approval. */
 export interface PermissionRequest {
   toolName: string;

@@ -145,9 +145,12 @@ scoring, merge defaults OFF) + the `orchestration.run` worker job exist. Remaini
 `ToolAgentRuntime`, the `agent.run` BullMQ job, and the `IExecutionAdapter` seam exist.
 Remaining:
 
-- **Tools into `RuntimeToolSet`:** bridge `tool-registry`; `edit_file` (reuse CodeEditor
-  apply + path-traversal guard), `find_files`, `read_file`, `run_command` (wrap
-  `@nexus/sandbox`), MCP tools (`McpClient.callTool()` from the per-user registry).
+- **Tools into `RuntimeToolSet`:** read-only set shipped — `read_file`, `list_files`,
+  `glob`, `grep` via `createFilesystemTools()` (`agent-runtime/src/fs-tools.ts`), each
+  scoped to `ctx.workingDir` with a path-traversal guard (`resolveInWorkspace`); all four
+  names auto-allow. Remaining: `edit_file` (reuse CodeEditor apply + the same guard),
+  `run_command` (wrap `@nexus/sandbox`), MCP tools (`McpClient.callTool()` from the
+  per-user registry).
 - **Worker→API SSE relay** for live step streaming (last gap for true end-to-end).
 - **Sessions, permissions, compaction:** two-tier permission gate (read-only auto-allow;
   mutating ops require approval via `GovernanceEngine`, surfaced over the event bus);
