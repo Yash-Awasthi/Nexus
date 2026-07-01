@@ -104,11 +104,14 @@ client-ID reuse.** Remaining:
 - Refresh-token DB persistence + a revoke/delete path that purges creds.
 - Additional providers only where a documented third-party auth path exists; otherwise
   leave a TODO with the reason (azure-openai, github-models are stubbed `supported:false`).
-- **Multi-account pool + tier ladder — `@nexus/llm-accounts` (new):** N creds per provider
-  with health/cooldown/quota state; route picks healthy highest-tier-that-fits
-  (sub→cheap→free); cooldown on 429/auth-fail; new router strategies (weighted,
-  power-of-2, quota-aware, tier-ladder); per-provider circuit breaker. Dedup + jitter to
-  avoid refresh/cooldown thundering-herd.
+- **Multi-account pool + tier ladder — `@nexus/llm-accounts` — shipped:** `AccountPool`
+  holds N creds/provider with health/cooldown/quota state; `pick()` returns the healthy
+  highest-tier-that-fits (sub→cheap→free), falling down the ladder as accounts cool down /
+  exhaust quota / trip. 429/401/403 → soft cooldown; consecutive failures → per-account
+  circuit breaker with jittered exponential backoff; strategies tier-ladder (default) /
+  weighted / power-of-2 / quota-aware / round-robin. Clock + RNG injected → deterministic,
+  no network, no deps. **Remaining:** wire the pool into the gateway/driver dispatch path
+  (routing consumer) — separate integration.
 
 ## 5. BYOK spend-guard & usage metering
 
