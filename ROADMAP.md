@@ -258,9 +258,11 @@ Reddit (listing JSON); scientific preprints — **bioRxiv/medRxiv** (`PreprintsF
 **arXiv** (`ArxivFeed`, Atom XML); **SEC EDGAR** filings (`EdgarFeed`, Atom, 8-K
 severity bump); **US Congress** bills (`LegislativeFeed`, Congress.gov JSON). A
 dependency-free Atom/XML extractor (`xmlBlocks`/`xmlAttr`/`decodeXmlEntities`) is the
-reusable seam for further XML feeds. Remaining: EU directives (EUR-Lex, XML — reuse
-the seam), supply chain (AIS shipping, port congestion — needs a non-paid source).
-Dark-web sources need careful legal review first.
+reusable seam for further XML feeds; **EU legislation** — `EurLexFeed` (EUR-Lex keyless
+RSS, `rssId` selects the predefined feed, default 162 = Parliament/Council legislation;
+CELEX descriptor → docType, directives bumped to medium). Remaining: supply chain (AIS
+shipping, port congestion — needs a non-paid source). Dark-web sources need careful legal
+review first.
 
 ## 14. Production multi-tenant hardening
 

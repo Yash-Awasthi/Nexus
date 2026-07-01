@@ -299,6 +299,22 @@ export interface LegislationEvent extends FeedEvent {
   url?: string;
 }
 
+/** EU legislative act (directive / regulation / decision) from EUR-Lex. */
+export interface DirectiveEvent extends FeedEvent {
+  /** CELEX identifier, e.g. "32026L1472". */
+  celex: string;
+  /** Document type derived from the CELEX descriptor: Directive / Regulation / Decision / … */
+  docType: string;
+  /** Full act title. */
+  title: string;
+  /** Authoring institution(s) (dc:creator), e.g. "European Parliament, Council…". */
+  author?: string;
+  /** URL to the act on EUR-Lex. */
+  url?: string;
+  /** Publication date (ISO), parsed from the RSS pubDate when present. */
+  published?: string;
+}
+
 // ── FeedAdapter base ───────────────────────────────────────────────────────────
 
 export interface FeedAdapterOptions {
@@ -2127,6 +2143,87 @@ export class LegislativeFeed extends FeedAdapter<LegislationEvent> {
   }
 }
 
+// ── EUR-Lex — EU legislation RSS (no key; predefined feeds by rssId) ────────────
+// EUR-Lex publishes keyless RSS 2.0 feeds selected by a numeric `rssId`. Default
+// 162 = "All Parliament and Council legislation" (directives + regulations +
+// decisions); other verified ids: 161 Commission proposals, 165 Official Journal
+// L (legislation), 164 case-law. Items are <title> ("CELEX:<id>: <text>"),
+// <link>, <guid>, <pubDate>, <dc:creator>. The CELEX descriptor letter after the
+// 4-digit year gives the document type (L directive, R regulation, D decision).
+// Reuses the §13 XML seam (xmlBlocks is namespace-tolerant, so it reads dc:creator).
+
+/** Map a CELEX id to its document type via the descriptor letter (sector 3 = legislation). */
+function celexDocType(celex: string): string {
+  const letter = /^\d\d{4}([A-Z])/.exec(celex)?.[1];
+  switch (letter) {
+    case "L":
+      return "Directive";
+    case "R":
+      return "Regulation";
+    case "D":
+      return "Decision";
+    case "H":
+      return "Recommendation";
+    default:
+      return letter ? `Act (${letter})` : "Act";
+  }
+}
+
+export class EurLexFeed extends FeedAdapter<DirectiveEvent> {
+  readonly domain = "eurlex";
+  private rssId: number;
+  private userAgent: string;
+
+  constructor(opts: Partial<FeedAdapterOptions> & { rssId?: number; userAgent?: string } = {}) {
+    super({ baseUrl: "https://eur-lex.europa.eu", ...opts });
+    // 162 = "All Parliament and Council legislation" (verified keyless RSS).
+    this.rssId = opts.rssId ?? Number(process.env["EURLEX_RSS_ID"] ?? 162);
+    this.userAgent =
+      opts.userAgent ?? process.env["EURLEX_USER_AGENT"] ?? "Nexus Feeds (contact@nexus.local)";
+  }
+
+  async fetch(opts?: { rssId?: number }): Promise<DirectiveEvent[]> {
+    if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
+    const rssId = opts?.rssId ?? this.rssId;
+    const url = `${this.baseUrl}/EN/display-feed.rss?rssId=${encodeURIComponent(String(rssId))}`;
+
+    try {
+      const raw = await this.http(url, { "User-Agent": this.userAgent, Accept: "application/rss+xml" });
+      const xml = typeof raw === "string" ? raw : "";
+      const items = xmlBlocks(xml, "item");
+      if (items.length === 0) return buildMockResponse<DirectiveEvent>("eurlex");
+
+      return items.map((item, i) => {
+        const title = xmlBlocks(item, "title")[0] ?? "";
+        const link = xmlBlocks(item, "link")[0];
+        // CELEX from "CELEX:<id>: <text>" or the ?uri=CELEX:<id> link.
+        const celex = /^CELEX:(\S+?):/.exec(title)?.[1] ?? /uri=CELEX:(\S+)/.exec(link ?? "")?.[1] ?? "";
+        const docType = celex ? celexDocType(celex) : "Act";
+        const pubDate = xmlBlocks(item, "pubDate")[0];
+        // Directives require national transposition → higher signal than other acts.
+        const severity: FeedEvent["severity"] = docType === "Directive" ? "medium" : "low";
+
+        return {
+          id: celex || `eurlex-${i}`,
+          timestamp: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
+          severity,
+          source: "eur-lex",
+          // Strip the "CELEX:<id>: " prefix for a clean summary.
+          summary: title.replace(/^CELEX:\S+?:\s*/, "").trim() || title || "(untitled)",
+          celex,
+          docType,
+          title: title.replace(/^CELEX:\S+?:\s*/, "").trim() || title || "(untitled)",
+          author: xmlBlocks(item, "creator")[0],
+          url: link,
+          published: pubDate ? new Date(pubDate).toISOString() : undefined,
+        };
+      });
+    } catch {
+      return buildMockResponse<DirectiveEvent>("eurlex");
+    }
+  }
+}
+
 // ── createDefaultRegistry — wires all adapters with env-based config ───────────
 
 export function createDefaultRegistry(): FeedRegistry {
@@ -2153,7 +2250,8 @@ export function createDefaultRegistry(): FeedRegistry {
     .register(new PreprintsFeed())
     .register(new ArxivFeed())
     .register(new EdgarFeed())
-    .register(new LegislativeFeed());
+    .register(new LegislativeFeed())
+    .register(new EurLexFeed());
 
   return registry;
 }

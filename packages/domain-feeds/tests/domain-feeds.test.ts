@@ -21,6 +21,7 @@ import {
   ArxivFeed,
   EdgarFeed,
   LegislativeFeed,
+  EurLexFeed,
   type FeedEvent,
   type AviationEvent,
   type SeismologyEvent,
@@ -811,5 +812,94 @@ describe("LegislativeFeed (Congress.gov bill tracking)", () => {
     expect(capturedUrl).toContain("api_key=secret");
     expect(capturedUrl).toContain("sort=updateDate+desc");
     expect(capturedUrl).toContain("limit=5");
+  });
+});
+
+describe("EurLexFeed (EU legislation RSS)", () => {
+  // Real EUR-Lex rssId=162 shape: RSS 2.0 items, CELEX-prefixed titles, namespaced
+  // dc:creator, ?uri=CELEX link. First item a directive (…L…), second a regulation (…R…).
+  const RSS = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+<channel xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <title>1 - All Parliament and Council legislation</title>
+  <item>
+    <title>CELEX:32026L1472: Directive (EU) 2026/1472 of the European Parliament and of the Council of 17 June 2026 amending Directive 2012/29/EU</title>
+    <description/>
+    <link>https://eur-lex.europa.eu/./legal-content/AUTO/?uri=CELEX:32026L1472</link>
+    <guid>https://eur-lex.europa.eu/./legal-content/AUTO/?uri=CELLAR:86beade5-741e-11f1-9800-01aa75ed71a1</guid>
+    <category>Lex Alerts</category>
+    <pubDate>Tue, 30 Jun 2026 00:00:00 +0200</pubDate>
+    <dc:creator>European Parliament, Council of the European Union,</dc:creator>
+  </item>
+  <item>
+    <title>CELEX:32026R1465: Council Regulation (EU) 2026/1465 of 25 June 2026 amending Regulation (EU) 2021/2283</title>
+    <description/>
+    <link>https://eur-lex.europa.eu/./legal-content/AUTO/?uri=CELEX:32026R1465</link>
+    <guid>https://eur-lex.europa.eu/./legal-content/AUTO/?uri=CELLAR:27e986a9-741f-11f1-9800-01aa75ed71a1</guid>
+    <category>Lex Alerts</category>
+    <pubDate>Tue, 30 Jun 2026 00:00:00 +0200</pubDate>
+    <dc:creator>Council of the European Union</dc:creator>
+  </item>
+</channel>
+</rss>`;
+
+  it("domain is 'eurlex'", () => {
+    expect(new EurLexFeed({ http: makeMockHttp(RSS) }).domain).toBe("eurlex");
+  });
+
+  it("parses RSS items into DirectiveEvents with CELEX + docType", async () => {
+    const events = await new EurLexFeed({ http: makeMockHttp(RSS) }).fetch();
+    expect(events).toHaveLength(2);
+    const d = events[0]!;
+    expect(d.celex).toBe("32026L1472");
+    expect(d.docType).toBe("Directive");
+    expect(d.id).toBe("32026L1472");
+    expect(d.severity).toBe("medium"); // directive requires transposition
+    expect(d.author).toContain("European Parliament");
+    expect(d.url).toContain("uri=CELEX:32026L1472");
+    expect(d.published).toBe("2026-06-29T22:00:00.000Z"); // 00:00 +0200 CEST = 22:00Z prev day
+    expect(d.summary.startsWith("CELEX:")).toBe(false); // prefix stripped
+    expect(d.title).toContain("Directive (EU) 2026/1472");
+  });
+
+  it("classifies regulations as low severity", async () => {
+    const events = await new EurLexFeed({ http: makeMockHttp(RSS) }).fetch();
+    expect(events[1]!.docType).toBe("Regulation");
+    expect(events[1]!.severity).toBe("low");
+  });
+
+  it("requests the configured rssId with a User-Agent", async () => {
+    let capturedUrl = "";
+    let capturedUA = "";
+    const feed = new EurLexFeed({
+      rssId: 165,
+      userAgent: "Test UA (t@e.com)",
+      http: async (url, headers) => {
+        capturedUrl = url;
+        capturedUA = headers?.["User-Agent"] ?? "";
+        return RSS;
+      },
+    });
+    await feed.fetch();
+    expect(capturedUA).toBe("Test UA (t@e.com)");
+    expect(capturedUrl).toContain("display-feed.rss?rssId=165");
+  });
+
+  it("per-call rssId overrides the instance default", async () => {
+    let capturedUrl = "";
+    const feed = new EurLexFeed({
+      http: async (url) => {
+        capturedUrl = url;
+        return RSS;
+      },
+    });
+    await feed.fetch({ rssId: 161 });
+    expect(capturedUrl).toContain("rssId=161");
+  });
+
+  it("falls back to mock on empty/non-XML response", async () => {
+    const events = await new EurLexFeed({ http: makeMockHttp("") }).fetch();
+    expect(events.length).toBeGreaterThan(0);
+    expect(events[0]!.source).toContain("mock");
   });
 });
