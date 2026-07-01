@@ -58,6 +58,38 @@ function daysAgo(n: number): string {
   return new Date(Date.now() - n * 86_400_000).toISOString().split("T")[0]!;
 }
 
+// ── Minimal Atom/XML extraction (dependency-free) ──────────────────────────────
+// arXiv (and later EDGAR / legislative) serve well-formed Atom/XML. Rather than
+// pull an XML-parser dep for a handful of regular feeds, extract the few fields we
+// need. Tags may carry a namespace prefix (e.g. `arxiv:doi`) — the (?:\w+:)? makes
+// it optional. Only for trusted, well-formed provider XML — not a general parser.
+
+function decodeXmlEntities(s: string): string {
+  return s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&"); // decode &amp; last so it can't double-decode
+}
+
+/** Inner text of every `<tag>…</tag>` (namespace prefix optional), trimmed + decoded. */
+function xmlBlocks(xml: string, tag: string): string[] {
+  const re = new RegExp(`<(?:\\w+:)?${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</(?:\\w+:)?${tag}>`, "g");
+  const out: string[] = [];
+  for (let m = re.exec(xml); m !== null; m = re.exec(xml)) {
+    out.push(decodeXmlEntities(m[1]!.replace(/\s+/g, " ").trim()));
+  }
+  return out;
+}
+
+/** Value of `attr` on the first `<tag … attr="…">` (namespace prefix optional). */
+function xmlAttr(xml: string, tag: string, attr: string): string | undefined {
+  const re = new RegExp(`<(?:\\w+:)?${tag}\\b[^>]*\\b${attr}="([^"]*)"`);
+  return re.exec(xml)?.[1];
+}
+
 // ── Base types ─────────────────────────────────────────────────────────────────
 
 export interface FeedEvent {
@@ -1845,6 +1877,75 @@ export class PreprintsFeed extends FeedAdapter<PreprintEvent> {
   }
 }
 
+// ── arXiv — Atom XML query API (no key required) ───────────────────────────────
+// The arXiv API returns Atom XML (content-type application/atom+xml), so the http
+// seam hands back a string, not JSON. We extract entries with the tiny Atom helper
+// above and map onto PreprintEvent (same shape as bioRxiv/medRxiv). arXiv mints a
+// canonical DataCite DOI (10.48550/arXiv.<id>); a journal DOI, when present, lands
+// in `published` to mirror bioRxiv's graduation semantics.
+
+export class ArxivFeed extends FeedAdapter<PreprintEvent> {
+  readonly domain = "arxiv";
+
+  constructor(opts: Partial<FeedAdapterOptions> = {}) {
+    super({ baseUrl: "http://export.arxiv.org/api", ...opts });
+  }
+
+  async fetch(opts?: {
+    /** arXiv category, e.g. "cs.AI" (default). */
+    category?: string;
+    /** Raw search_query override (takes precedence over category). */
+    search?: string;
+    maxResults?: number;
+  }): Promise<PreprintEvent[]> {
+    if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
+    const searchQuery = opts?.search ?? `cat:${opts?.category ?? "cs.AI"}`;
+    const max = opts?.maxResults ?? 25;
+    const url =
+      `${this.baseUrl}/query?search_query=${encodeURIComponent(searchQuery)}` +
+      `&start=0&max_results=${max}&sortBy=submittedDate&sortOrder=descending`;
+
+    try {
+      const raw = await this.http(url, this.buildHeaders());
+      const xml = typeof raw === "string" ? raw : "";
+      const entries = xmlBlocks(xml, "entry");
+      if (entries.length === 0) return buildMockResponse<PreprintEvent>("arxiv");
+
+      return entries.map((entry, i) => {
+        const absUrl = xmlBlocks(entry, "id")[0] ?? "";
+        // "http://arxiv.org/abs/2401.12345v2" → id "2401.12345v2", base "2401.12345"
+        const arxivId = absUrl.split("/abs/")[1] ?? `arxiv-${i}`;
+        const versionMatch = /v(\d+)$/.exec(arxivId);
+        const idNoVersion = arxivId.replace(/v\d+$/, "");
+        const published = xmlBlocks(entry, "published")[0] ?? "";
+        const journalDoi = xmlBlocks(entry, "doi")[0]; // arxiv:doi — only if published
+        const authors = xmlBlocks(entry, "name").join(", ");
+        const category =
+          xmlAttr(entry, "primary_category", "term") ?? xmlAttr(entry, "category", "term");
+
+        return {
+          id: arxivId,
+          timestamp: published ? new Date(published).toISOString() : new Date().toISOString(),
+          severity: (journalDoi ? "medium" : "low") as FeedEvent["severity"],
+          source: "arxiv",
+          summary: xmlBlocks(entry, "title")[0] ?? "(untitled)",
+          title: xmlBlocks(entry, "title")[0] ?? "(untitled)",
+          doi: `10.48550/arXiv.${idNoVersion}`,
+          authors: authors || undefined,
+          category,
+          date: published,
+          version: versionMatch?.[1],
+          url: absUrl || `https://arxiv.org/abs/${arxivId}`,
+          published: journalDoi,
+          metadata: { abstract: xmlBlocks(entry, "summary")[0] },
+        };
+      });
+    } catch {
+      return buildMockResponse<PreprintEvent>("arxiv");
+    }
+  }
+}
+
 // ── createDefaultRegistry — wires all adapters with env-based config ───────────
 
 export function createDefaultRegistry(): FeedRegistry {
@@ -1868,7 +1969,8 @@ export function createDefaultRegistry(): FeedRegistry {
     .register(new RadiationFeed())
     .register(new TechNewsFeed())
     .register(new RedditFeed())
-    .register(new PreprintsFeed());
+    .register(new PreprintsFeed())
+    .register(new ArxivFeed());
 
   return registry;
 }

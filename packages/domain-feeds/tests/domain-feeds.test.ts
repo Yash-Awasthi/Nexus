@@ -18,6 +18,7 @@ import {
   TechNewsFeed,
   RedditFeed,
   PreprintsFeed,
+  ArxivFeed,
   type FeedEvent,
   type AviationEvent,
   type SeismologyEvent,
@@ -582,6 +583,81 @@ describe("PreprintsFeed (bioRxiv details API)", () => {
   it("falls back to mock on empty collection", async () => {
     const feed = new PreprintsFeed({ http: makeMockHttp({ collection: [] }) });
     const events = await feed.fetch();
+    expect(events.length).toBeGreaterThan(0);
+    expect(events[0]!.source).toContain("mock");
+  });
+});
+
+describe("ArxivFeed (Atom XML query API)", () => {
+  // Two-entry Atom feed: first has a journal DOI (published), second doesn't.
+  const ATOM = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
+  <entry>
+    <id>http://arxiv.org/abs/2401.12345v2</id>
+    <published>2024-01-15T10:00:00Z</published>
+    <title>Attention &amp; Everything</title>
+    <summary>A study of   whitespace
+    and abstracts.</summary>
+    <author><name>Ada Lovelace</name></author>
+    <author><name>Alan Turing</name></author>
+    <arxiv:doi>10.1000/journal.2024.1</arxiv:doi>
+    <arxiv:primary_category term="cs.AI"/>
+    <category term="cs.AI"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2402.00001v1</id>
+    <published>2024-02-01T10:00:00Z</published>
+    <title>Unpublished Preprint</title>
+    <summary>No journal DOI yet.</summary>
+    <author><name>Grace Hopper</name></author>
+    <arxiv:primary_category term="cs.LG"/>
+  </entry>
+</feed>`;
+
+  it("domain is 'arxiv'", () => {
+    expect(new ArxivFeed({ http: makeMockHttp(ATOM) }).domain).toBe("arxiv");
+  });
+
+  it("parses Atom entries into PreprintEvents", async () => {
+    const feed = new ArxivFeed({ http: makeMockHttp(ATOM) });
+    const events = await feed.fetch();
+    expect(events).toHaveLength(2);
+    const e = events[0]!;
+    expect(e.id).toBe("2401.12345v2");
+    expect(e.version).toBe("2");
+    expect(e.title).toBe("Attention & Everything"); // entity decoded
+    expect(e.metadata!.abstract).toBe("A study of whitespace and abstracts."); // ws collapsed
+    expect(e.authors).toBe("Ada Lovelace, Alan Turing");
+    expect(e.category).toBe("cs.AI");
+    expect(e.doi).toBe("10.48550/arXiv.2401.12345"); // canonical, version stripped
+    expect(e.published).toBe("10.1000/journal.2024.1"); // journal DOI → graduated
+    expect(e.severity).toBe("medium");
+    expect(e.url).toBe("http://arxiv.org/abs/2401.12345v2");
+  });
+
+  it("unpublished preprint has no journal DOI and low severity", async () => {
+    const events = await new ArxivFeed({ http: makeMockHttp(ATOM) }).fetch();
+    expect(events[1]!.published).toBeUndefined();
+    expect(events[1]!.severity).toBe("low");
+    expect(events[1]!.category).toBe("cs.LG");
+  });
+
+  it("builds the query URL with category, sort, and max_results", async () => {
+    let capturedUrl = "";
+    const feed = new ArxivFeed({
+      http: async (url) => {
+        capturedUrl = url;
+        return ATOM;
+      },
+    });
+    await feed.fetch({ category: "cs.CL", maxResults: 5 });
+    expect(capturedUrl).toContain("search_query=cat%3Acs.CL");
+    expect(capturedUrl).toContain("max_results=5");
+    expect(capturedUrl).toContain("sortBy=submittedDate");
+  });
+
+  it("falls back to mock on empty/non-XML response", async () => {
+    const events = await new ArxivFeed({ http: makeMockHttp("") }).fetch();
     expect(events.length).toBeGreaterThan(0);
     expect(events[0]!.source).toContain("mock");
   });
