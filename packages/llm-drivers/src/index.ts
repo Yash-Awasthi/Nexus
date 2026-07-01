@@ -1107,7 +1107,8 @@ export class NvidiaNimDriver extends OpenAICompatibleDriver {
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://integrate.api.nvidia.com/v1";
-    this.model = config.model ?? "meta/llama-3.1-70b-instruct";
+    // Small, low-cost reasoning model; verified live on integrate.api.nvidia.com.
+    this.model = config.model ?? "nvidia/nvidia-nemotron-nano-9b-v2";
   }
 }
 
