@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   AUTO_ALLOWED_TOOLS,
   classifyTool,
+  createEditFileTool,
   createFilesystemTools,
   globToRegExp,
   resolveInWorkspace,
@@ -159,6 +160,63 @@ describe("grep", () => {
     await expect(
       tools().grep.handler({ pattern: "x" }, { workingDir: root, signal: ctrl.signal }),
     ).rejects.toThrow(/aborted/);
+  });
+});
+
+describe("edit_file", () => {
+  // Each test gets its own scratch dir so writes don't perturb the shared read fixtures.
+  let ws: string;
+  beforeAll(async () => {
+    ws = await fs.mkdtemp(path.join(os.tmpdir(), "nexus-fs-edit-"));
+  });
+  afterAll(async () => {
+    await fs.rm(ws, { recursive: true, force: true });
+  });
+
+  it("is gated (requires_permission, not auto-allowed)", () => {
+    const t = createEditFileTool();
+    expect(t.name).toBe("edit_file");
+    expect(AUTO_ALLOWED_TOOLS.has("edit_file")).toBe(false);
+    expect(classifyTool("edit_file")).toBe("requires_permission");
+  });
+
+  it("replaces a unique occurrence and writes back", async () => {
+    const f = path.join(ws, "u.txt");
+    await fs.writeFile(f, "alpha beta gamma\n");
+    const res = await createEditFileTool().handler(
+      { path: "u.txt", old_string: "beta", new_string: "BETA" },
+      { workingDir: ws },
+    );
+    expect(res).toEqual({ path: "u.txt", replaced: 1 });
+    expect(await fs.readFile(f, "utf8")).toBe("alpha BETA gamma\n");
+  });
+
+  it("rejects a non-unique old_string unless replace_all", async () => {
+    const f = path.join(ws, "dup.txt");
+    await fs.writeFile(f, "x x x\n");
+    await expect(
+      createEditFileTool().handler({ path: "dup.txt", old_string: "x", new_string: "y" }, { workingDir: ws }),
+    ).rejects.toThrow(/not unique/);
+    const res = await createEditFileTool().handler(
+      { path: "dup.txt", old_string: "x", new_string: "y", replace_all: true },
+      { workingDir: ws },
+    );
+    expect(res).toEqual({ path: "dup.txt", replaced: 3 });
+    expect(await fs.readFile(f, "utf8")).toBe("y y y\n");
+  });
+
+  it("throws when old_string is absent", async () => {
+    const f = path.join(ws, "n.txt");
+    await fs.writeFile(f, "nothing here\n");
+    await expect(
+      createEditFileTool().handler({ path: "n.txt", old_string: "zzz", new_string: "q" }, { workingDir: ws }),
+    ).rejects.toThrow(/not found/);
+  });
+
+  it("rejects a path escaping the workspace", async () => {
+    await expect(
+      createEditFileTool().handler({ path: "../evil", old_string: "a", new_string: "b" }, { workingDir: ws }),
+    ).rejects.toThrow(/escapes workspace/);
   });
 });
 

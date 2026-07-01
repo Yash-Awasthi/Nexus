@@ -148,9 +148,10 @@ Remaining:
 - **Tools into `RuntimeToolSet`:** read-only set shipped — `read_file`, `list_files`,
   `glob`, `grep` via `createFilesystemTools()` (`agent-runtime/src/fs-tools.ts`), each
   scoped to `ctx.workingDir` with a path-traversal guard (`resolveInWorkspace`); all four
-  names auto-allow. Remaining: `edit_file` (reuse CodeEditor apply + the same guard),
-  `run_command` (wrap `@nexus/sandbox`), MCP tools (`McpClient.callTool()` from the
-  per-user registry).
+  names auto-allow. `edit_file` shipped too (`createEditFileTool()`) — uniqueness-checked
+  exact replacement, mutating so it resolves to the `requires_permission` tier (opt-in,
+  not auto-allowed). Remaining: `run_command` (wrap `@nexus/sandbox`), MCP tools
+  (`McpClient.callTool()` from the per-user registry).
 - **Worker→API SSE relay** for live step streaming (last gap for true end-to-end).
 - **Sessions, permissions, compaction:** two-tier permission gate (read-only auto-allow;
   mutating ops require approval via `GovernanceEngine`, surfaced over the event bus);

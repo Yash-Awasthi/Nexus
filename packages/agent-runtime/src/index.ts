@@ -284,6 +284,7 @@ export function classifyTool(name: string): ActionTier {
 // to `ctx.workingDir`. Their names are all in AUTO_ALLOWED_TOOLS above.
 export {
   createFilesystemTools,
+  createEditFileTool,
   resolveInWorkspace,
   globToRegExp,
 } from "./fs-tools.js";

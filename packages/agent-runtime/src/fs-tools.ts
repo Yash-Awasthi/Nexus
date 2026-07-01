@@ -307,3 +307,70 @@ function grepTool(): RuntimeTool {
 export function createFilesystemTools(): RuntimeTool[] {
   return [readFileTool(), listFilesTool(), globTool(), grepTool()];
 }
+
+// ── edit_file (mutating, gated) ────────────────────────────────────────────────
+
+/** Count non-overlapping occurrences of `needle` in `haystack`. */
+function countOccurrences(haystack: string, needle: string): number {
+  if (needle === "") return 0;
+  let n = 0;
+  let i = haystack.indexOf(needle);
+  while (i !== -1) {
+    n++;
+    i = haystack.indexOf(needle, i + needle.length);
+  }
+  return n;
+}
+
+/**
+ * Build the `edit_file` tool: an exact string replacement on a workspace file.
+ *
+ * Unlike the batch {@link StrReplaceProcessor} (first-match, in-memory), this
+ * enforces uniqueness — `old_string` must match exactly once unless `replace_all`
+ * is set — so an edit can never silently hit the wrong occurrence. It is a
+ * mutating tool, so its name resolves to the `requires_permission` tier via
+ * {@link classifyTool} (NOT auto-allowed); callers opt in explicitly by adding it.
+ */
+export function createEditFileTool(): RuntimeTool {
+  return {
+    name: "edit_file",
+    description:
+      "Replace an exact string in a workspace file. `old_string` must appear exactly " +
+      "once unless `replace_all` is true. Paths outside the workspace are rejected. " +
+      "This is a mutating, permission-gated tool.",
+    parameters: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Workspace-relative file path." },
+        old_string: { type: "string", description: "Exact text to replace." },
+        new_string: { type: "string", description: "Replacement text." },
+        replace_all: { type: "boolean", description: "Replace every occurrence (default false)." },
+      },
+      required: ["path", "old_string", "new_string"],
+    },
+    async handler(args, ctx) {
+      const root = requireRoot(ctx);
+      const target = resolveInWorkspace(root, asString(args.path, "path"));
+      const oldStr = asString(args.old_string, "old_string");
+      const newStr = typeof args.new_string === "string" ? args.new_string : "";
+      if (oldStr === newStr) throw new Error("`old_string` and `new_string` are identical");
+      const stat = await fs.stat(target);
+      if (!stat.isFile()) throw new Error(`not a file: ${String(args.path)}`);
+      const content = await fs.readFile(target, "utf8");
+      const count = countOccurrences(content, oldStr);
+      if (count === 0) throw new Error(`\`old_string\` not found in ${String(args.path)}`);
+      const replaceAll = args.replace_all === true;
+      if (count > 1 && !replaceAll) {
+        throw new Error(
+          `\`old_string\` is not unique in ${String(args.path)} (${count} matches); ` +
+            "pass replace_all: true or include more surrounding context",
+        );
+      }
+      const updated = replaceAll
+        ? content.split(oldStr).join(newStr)
+        : content.replace(oldStr, newStr);
+      await fs.writeFile(target, updated, "utf8");
+      return { path: toRel(root, target), replaced: replaceAll ? count : 1 };
+    },
+  };
+}
