@@ -19,6 +19,7 @@ import {
   RedditFeed,
   PreprintsFeed,
   ArxivFeed,
+  EdgarFeed,
   type FeedEvent,
   type AviationEvent,
   type SeismologyEvent,
@@ -658,6 +659,81 @@ describe("ArxivFeed (Atom XML query API)", () => {
 
   it("falls back to mock on empty/non-XML response", async () => {
     const events = await new ArxivFeed({ http: makeMockHttp("") }).fetch();
+    expect(events.length).toBeGreaterThan(0);
+    expect(events[0]!.source).toContain("mock");
+  });
+});
+
+describe("EdgarFeed (SEC latest-filings Atom)", () => {
+  // Real EDGAR shape: link/category are attributes, id is the accession urn,
+  // summary is escaped HTML (Filed/AccNo/Size).
+  const ATOM = `<?xml version="1.0" encoding="ISO-8859-1" ?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+<title>Latest Filings</title>
+<updated>2026-06-30T22:45:26-04:00</updated>
+<entry>
+<title>8-K - ACME CORP (0001234567) (Filer)</title>
+<link rel="alternate" type="text/html" href="https://www.sec.gov/Archives/edgar/data/1234567/000123456726000001/0001234567-26-000001-index.htm"/>
+<summary type="html"> &lt;b&gt;Filed:&lt;/b&gt; 2026-06-30 &lt;b&gt;AccNo:&lt;/b&gt; 0001234567-26-000001 &lt;b&gt;Size:&lt;/b&gt; 12 KB</summary>
+<updated>2026-06-30T21:56:08-04:00</updated>
+<category scheme="https://www.sec.gov/" label="form type" term="8-K"/>
+<id>urn:tag:sec.gov,2008:accession-number=0001234567-26-000001</id>
+</entry>
+<entry>
+<title>4 - HU CHE-JEN (0002133608) (Reporting)</title>
+<link rel="alternate" type="text/html" href="https://www.sec.gov/Archives/edgar/data/2133608/000119312526291233/0001193125-26-291233-index.htm"/>
+<summary type="html"> &lt;b&gt;Filed:&lt;/b&gt; 2026-06-29 &lt;b&gt;AccNo:&lt;/b&gt; 0001193125-26-291233 &lt;b&gt;Size:&lt;/b&gt; 4 KB</summary>
+<updated>2026-06-30T21:48:56-04:00</updated>
+<category scheme="https://www.sec.gov/" label="form type" term="4"/>
+<id>urn:tag:sec.gov,2008:accession-number=0001193125-26-291233</id>
+</entry>
+</feed>`;
+
+  it("domain is 'edgar'", () => {
+    expect(new EdgarFeed({ http: makeMockHttp(ATOM) }).domain).toBe("edgar");
+  });
+
+  it("parses Atom entries (attribute link/category, accession id) into FilingEvents", async () => {
+    const events = await new EdgarFeed({ http: makeMockHttp(ATOM) }).fetch();
+    expect(events).toHaveLength(2);
+    const e = events[0]!;
+    expect(e.formType).toBe("8-K");
+    expect(e.company).toBe("ACME CORP");
+    expect(e.cik).toBe("0001234567");
+    expect(e.accessionNumber).toBe("0001234567-26-000001");
+    expect(e.id).toBe("0001234567-26-000001");
+    expect(e.filedDate).toBe("2026-06-30");
+    expect(e.url).toContain("0001234567-26-000001-index.htm");
+    expect(e.severity).toBe("medium"); // 8-K = material report
+    expect(e.summary).not.toContain("<b>"); // HTML stripped
+  });
+
+  it("non-8-K filings default to low severity", async () => {
+    const events = await new EdgarFeed({ http: makeMockHttp(ATOM) }).fetch();
+    expect(events[1]!.formType).toBe("4");
+    expect(events[1]!.severity).toBe("low");
+  });
+
+  it("sends a User-Agent and requests the atom output", async () => {
+    let capturedUrl = "";
+    let capturedUA = "";
+    const feed = new EdgarFeed({
+      userAgent: "Test UA (t@e.com)",
+      http: async (url, headers) => {
+        capturedUrl = url;
+        capturedUA = headers?.["User-Agent"] ?? "";
+        return ATOM;
+      },
+    });
+    await feed.fetch({ formType: "8-K", count: 10 });
+    expect(capturedUA).toBe("Test UA (t@e.com)");
+    expect(capturedUrl).toContain("type=8-K");
+    expect(capturedUrl).toContain("output=atom");
+    expect(capturedUrl).toContain("count=10");
+  });
+
+  it("falls back to mock on empty/non-XML response", async () => {
+    const events = await new EdgarFeed({ http: makeMockHttp("") }).fetch();
     expect(events.length).toBeGreaterThan(0);
     expect(events[0]!.source).toContain("mock");
   });

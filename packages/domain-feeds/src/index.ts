@@ -266,6 +266,22 @@ export interface PreprintEvent extends FeedEvent {
   published?: string;
 }
 
+/** SEC EDGAR filing (regulatory signal). */
+export interface FilingEvent extends FeedEvent {
+  /** Form type, e.g. "8-K", "10-K", "4", "144". */
+  formType: string;
+  /** Filing company or person name. */
+  company: string;
+  /** SEC CIK number, when parseable from the entry title. */
+  cik?: string;
+  /** Accession number, e.g. "0001477932-26-004135". */
+  accessionNumber: string;
+  /** Filing date (YYYY-MM-DD), parsed from the summary. */
+  filedDate?: string;
+  /** URL to the filing index page. */
+  url?: string;
+}
+
 // ── FeedAdapter base ───────────────────────────────────────────────────────────
 
 export interface FeedAdapterOptions {
@@ -1946,6 +1962,75 @@ export class ArxivFeed extends FeedAdapter<PreprintEvent> {
   }
 }
 
+// ── SEC EDGAR — latest filings Atom feed (no key; UA required) ─────────────────
+// EDGAR serves Atom, but — unlike arXiv — `link` and `category` are ATTRIBUTES
+// (self-closing tags), the `id` holds the accession number as a urn, and `summary`
+// is escaped HTML (Filed/AccNo/Size). SEC's fair-access policy REQUIRES a
+// descriptive User-Agent with a contact; set SEC_EDGAR_USER_AGENT (falls back to a
+// generic one). Reuses the Atom helper introduced for arXiv (§13 XML seam).
+
+export class EdgarFeed extends FeedAdapter<FilingEvent> {
+  readonly domain = "edgar";
+  private userAgent: string;
+
+  constructor(opts: Partial<FeedAdapterOptions> & { userAgent?: string } = {}) {
+    super({ baseUrl: "https://www.sec.gov", ...opts });
+    this.userAgent =
+      opts.userAgent ?? process.env["SEC_EDGAR_USER_AGENT"] ?? "Nexus Feeds (contact@nexus.local)";
+  }
+
+  async fetch(opts?: {
+    /** Restrict to one form type, e.g. "8-K" (default: all recent filings). */
+    formType?: string;
+    count?: number;
+  }): Promise<FilingEvent[]> {
+    if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
+    const count = opts?.count ?? 40;
+    const url =
+      `${this.baseUrl}/cgi-bin/browse-edgar?action=getcurrent` +
+      `&type=${encodeURIComponent(opts?.formType ?? "")}` +
+      `&company=&dateb=&owner=include&count=${count}&output=atom`;
+
+    try {
+      // SEC needs a real User-Agent; Accept XML (buildHeaders' JSON accept is wrong here).
+      const raw = await this.http(url, { "User-Agent": this.userAgent, Accept: "application/atom+xml" });
+      const xml = typeof raw === "string" ? raw : "";
+      const entries = xmlBlocks(xml, "entry");
+      if (entries.length === 0) return buildMockResponse<FilingEvent>("edgar");
+
+      return entries.map((entry, i) => {
+        const title = xmlBlocks(entry, "title")[0] ?? "";
+        // "8-K - ACME CORP (0001234567) (Filer)" → form, company, cik
+        const titleMatch = /^(.+?)\s+-\s+(.+?)\s+\((\d+)\)/.exec(title);
+        const formType = xmlAttr(entry, "category", "term") ?? titleMatch?.[1] ?? "";
+        const company = titleMatch?.[2] ?? title;
+        const idText = xmlBlocks(entry, "id")[0] ?? "";
+        const accessionNumber = /accession-number=(\S+)/.exec(idText)?.[1] ?? `edgar-${i}`;
+        const summary = xmlBlocks(entry, "summary")[0] ?? "";
+        const filedDate = /Filed:<\/b>\s*([\d-]+)/.exec(summary)?.[1];
+        const updated = xmlBlocks(entry, "updated")[0];
+
+        return {
+          id: accessionNumber,
+          timestamp: updated ? new Date(updated).toISOString() : new Date().toISOString(),
+          // 8-K = material current report → surface a notch higher than routine filings.
+          severity: (formType.startsWith("8-K") ? "medium" : "low") as FeedEvent["severity"],
+          source: "sec-edgar",
+          summary: summary.replace(/<[^>]+>/g, "").trim() || title,
+          formType,
+          company,
+          cik: titleMatch?.[3],
+          accessionNumber,
+          filedDate,
+          url: xmlAttr(entry, "link", "href"),
+        };
+      });
+    } catch {
+      return buildMockResponse<FilingEvent>("edgar");
+    }
+  }
+}
+
 // ── createDefaultRegistry — wires all adapters with env-based config ───────────
 
 export function createDefaultRegistry(): FeedRegistry {
@@ -1970,7 +2055,8 @@ export function createDefaultRegistry(): FeedRegistry {
     .register(new TechNewsFeed())
     .register(new RedditFeed())
     .register(new PreprintsFeed())
-    .register(new ArxivFeed());
+    .register(new ArxivFeed())
+    .register(new EdgarFeed());
 
   return registry;
 }
