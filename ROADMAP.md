@@ -29,7 +29,8 @@ unless a dependency is noted.
 
 Native `llm-drivers` covers ~30 providers + the local sidecar router (`nexus/omni`),
 Bedrock/Vertex BYOK, **Azure OpenAI, Cloudflare Workers AI, Xinference, Replicate,
-Doubao, BytePlus, Hunyuan, Spark, Baidu ERNIE** (shipped), a
+Doubao, BytePlus, Hunyuan, Spark, Baidu ERNIE, NVIDIA NIM** (shipped; NVIDIA NIM
+defaults to `nvidia/nvidia-nemotron-nano-9b-v2`, verified live), a
 `MockTransport.setResponses()` queue for multi-POST drivers, and a
 `chatCompletionsUrl()`/`authHeaders()` base-class seam for non-Bearer/non-standard-path
 providers. Remaining:
@@ -106,8 +107,15 @@ client-ID reuse.** Remaining:
   `TokenRefresher`, and `revoke()` best-effort-revokes upstream then HARD-DELETES. DB-agnostic
   via an injected `SealedTokenStore` port. **Remaining:** the concrete drizzle adapter binding
   the port + the login/callback routes below.
-- Login/callback API routes in `apps/api/src/routes/` (PKCE for web, device-code for
-  headless) — the last unshipped §4 piece; needs the operator's OAuth app (user-gated).
+- ✅ **Concrete drizzle `SealedTokenStore` adapter — shipped:**
+  `apps/api/src/lib/oauth-token-store.ts` (`DrizzleSealedTokenStore` +
+  `createOAuthTokenStore` factory, epoch-ms↔timestamptz mapping, dedicated
+  `NEXUS_OAUTH_VAULT_KEY` vault, 503-degrade when vault unavailable; 11 unit tests).
+- Login/callback/revoke API routes (PKCE for web, device-code for headless) — the last
+  unshipped §4 piece; needs the operator's OAuth app (user-gated). NOTE:
+  `apps/api/src/routes/oauth.ts` is **user SSO** (`GOOGLE_CLIENT_ID`) — the provider-OAuth
+  routes are a SEPARATE module under a distinct `/llm-oauth/*` prefix (env
+  `GOOGLE_OAUTH_CLIENT_ID`, `registryFromEnv` + `OAuthTokenStore`), must not collide.
 - Additional providers only where a documented third-party auth path exists; otherwise
   leave a TODO with the reason (azure-openai, github-models are stubbed `supported:false`).
 - **Multi-account pool + tier ladder — `@nexus/llm-accounts` — shipped:** `AccountPool`
@@ -272,9 +280,11 @@ severity bump); **US Congress** bills (`LegislativeFeed`, Congress.gov JSON). A
 dependency-free Atom/XML extractor (`xmlBlocks`/`xmlAttr`/`decodeXmlEntities`) is the
 reusable seam for further XML feeds; **EU legislation** — `EurLexFeed` (EUR-Lex keyless
 RSS, `rssId` selects the predefined feed, default 162 = Parliament/Council legislation;
-CELEX descriptor → docType, directives bumped to medium). Remaining: supply chain (AIS
-shipping, port congestion — needs a non-paid source). Dark-web sources need careful legal
-review first.
+CELEX descriptor → docType, directives bumped to medium); **AIS shipping** —
+`MaritimeFeed` now live over Digitraffic (Finnish Transport Agency open data, keyless;
+surfaces abnormal ITU-R M.1371 nav-states — aground / not-under-command / AIS-SART — as
+incidents; Finnish/Baltic coverage). Remaining: supply chain port-congestion source.
+Dark-web sources need careful legal review first.
 
 ## 14. Production multi-tenant hardening
 
@@ -306,7 +316,7 @@ worker), mobile app (React Native + push on task completion).
 
 | Task                       | Blocker                                  |
 | -------------------------- | ---------------------------------------- |
-| Firecracker microVM spike  | KVM host (bare-metal or nested-virt VM)  |
+| Firecracker microVM spike  | ~~KVM host~~ — `/dev/kvm` present on dev host; doable locally |
 | gVisor fallback testing    | Linux host with `runsc`                  |
 | Docker sandbox e2e         | Docker daemon on the worker host         |
 | Redis cluster rate-limit   | Upstash / managed Redis                  |
