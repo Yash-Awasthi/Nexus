@@ -282,6 +282,23 @@ export interface FilingEvent extends FeedEvent {
   url?: string;
 }
 
+/** US Congress bill / resolution (legislative signal). */
+export interface LegislationEvent extends FeedEvent {
+  congress: number;
+  /** Bill type, e.g. "HR", "S", "HJRES". */
+  billType: string;
+  billNumber: string;
+  title: string;
+  /** Origin chamber, "House" or "Senate". */
+  chamber?: string;
+  /** Text of the most recent action. */
+  latestAction?: string;
+  /** Date (YYYY-MM-DD) of the most recent action. */
+  actionDate?: string;
+  /** API referrer URL for the bill. */
+  url?: string;
+}
+
 // ── FeedAdapter base ───────────────────────────────────────────────────────────
 
 export interface FeedAdapterOptions {
@@ -2031,6 +2048,85 @@ export class EdgarFeed extends FeedAdapter<FilingEvent> {
   }
 }
 
+// ── US Congress — bill tracking (Congress.gov API; key required) ───────────────
+// Congress.gov returns JSON by default (no XML seam needed), so this mirrors the
+// Reddit/HN JSON feeds. The key goes in the `api_key` query param (a free
+// api.data.gov key); without it we skip the call and return mock rather than fire
+// a guaranteed 403. Recent activity = /bill sorted by updateDate desc.
+
+export class LegislativeFeed extends FeedAdapter<LegislationEvent> {
+  readonly domain = "legislative";
+  private key?: string;
+
+  constructor(opts: Partial<FeedAdapterOptions> = {}) {
+    super({ baseUrl: "https://api.congress.gov/v3", ...opts });
+    this.key = opts.apiKey ?? process.env["CONGRESS_GOV_API_KEY"];
+  }
+
+  async fetch(opts?: {
+    /** Congress number, e.g. 118 — narrows to /bill/{congress}. */
+    congress?: number;
+    /** Bill type, e.g. "hr" — requires `congress`; narrows to /bill/{congress}/{type}. */
+    billType?: string;
+    limit?: number;
+  }): Promise<LegislationEvent[]> {
+    if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
+    if (!this.key) return buildMockResponse<LegislationEvent>("legislative");
+
+    const path = opts?.congress
+      ? `/bill/${opts.congress}${opts.billType ? `/${opts.billType.toLowerCase()}` : ""}`
+      : "/bill";
+    const url =
+      `${this.baseUrl}${path}?format=json&sort=updateDate+desc` +
+      `&limit=${opts?.limit ?? 20}&api_key=${encodeURIComponent(this.key)}`;
+
+    try {
+      const raw = (await this.http(url, this.buildHeaders())) as {
+        bills?: {
+          congress?: number;
+          type?: string;
+          number?: string;
+          title?: string;
+          originChamber?: string;
+          url?: string;
+          updateDate?: string;
+          latestAction?: { actionDate?: string; text?: string };
+        }[];
+      } | null;
+      const bills = raw?.bills ?? [];
+      if (bills.length === 0) return buildMockResponse<LegislationEvent>("legislative");
+
+      return bills.map((b, i) => {
+        const actionText = b.latestAction?.text ?? "";
+        // Became law → high; passed a chamber → medium; otherwise routine.
+        const severity: FeedEvent["severity"] = /became (public|private) law/i.test(actionText)
+          ? "high"
+          : /passed|agreed to/i.test(actionText)
+            ? "medium"
+            : "low";
+        const actionDate = b.latestAction?.actionDate ?? b.updateDate;
+        return {
+          id: b.congress && b.type && b.number ? `${b.congress}-${b.type}-${b.number}` : `bill-${i}`,
+          timestamp: actionDate ? new Date(actionDate).toISOString() : new Date().toISOString(),
+          severity,
+          source: "congress.gov",
+          summary: b.title ?? `${b.type ?? ""}${b.number ?? ""}`,
+          congress: b.congress ?? 0,
+          billType: b.type ?? "",
+          billNumber: b.number ?? "",
+          title: b.title ?? "(untitled)",
+          chamber: b.originChamber,
+          latestAction: actionText || undefined,
+          actionDate,
+          url: b.url,
+        };
+      });
+    } catch {
+      return buildMockResponse<LegislationEvent>("legislative");
+    }
+  }
+}
+
 // ── createDefaultRegistry — wires all adapters with env-based config ───────────
 
 export function createDefaultRegistry(): FeedRegistry {
@@ -2056,7 +2152,8 @@ export function createDefaultRegistry(): FeedRegistry {
     .register(new RedditFeed())
     .register(new PreprintsFeed())
     .register(new ArxivFeed())
-    .register(new EdgarFeed());
+    .register(new EdgarFeed())
+    .register(new LegislativeFeed());
 
   return registry;
 }

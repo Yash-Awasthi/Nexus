@@ -20,6 +20,7 @@ import {
   PreprintsFeed,
   ArxivFeed,
   EdgarFeed,
+  LegislativeFeed,
   type FeedEvent,
   type AviationEvent,
   type SeismologyEvent,
@@ -736,5 +737,79 @@ describe("EdgarFeed (SEC latest-filings Atom)", () => {
     const events = await new EdgarFeed({ http: makeMockHttp("") }).fetch();
     expect(events.length).toBeGreaterThan(0);
     expect(events[0]!.source).toContain("mock");
+  });
+});
+
+describe("LegislativeFeed (Congress.gov bill tracking)", () => {
+  const BILLS = {
+    bills: [
+      {
+        congress: 118,
+        type: "HR",
+        number: "3076",
+        title: "Postal Service Reform Act of 2022",
+        originChamber: "House",
+        url: "https://api.congress.gov/v3/bill/118/hr/3076",
+        updateDate: "2026-06-20",
+        latestAction: { actionDate: "2026-06-25", text: "Became Public Law No: 118-108." },
+      },
+      {
+        congress: 118,
+        type: "S",
+        number: "1000",
+        title: "A routine bill",
+        originChamber: "Senate",
+        url: "https://api.congress.gov/v3/bill/118/s/1000",
+        updateDate: "2026-06-18",
+        latestAction: { actionDate: "2026-06-18", text: "Read twice and referred to committee." },
+      },
+    ],
+  };
+
+  it("domain is 'legislative'", () => {
+    expect(new LegislativeFeed({ apiKey: "k", http: makeMockHttp(BILLS) }).domain).toBe("legislative");
+  });
+
+  it("returns mock (no live call) when no api key is configured", async () => {
+    const prev = process.env["CONGRESS_GOV_API_KEY"];
+    delete process.env["CONGRESS_GOV_API_KEY"];
+    let called = false;
+    const feed = new LegislativeFeed({
+      http: async () => {
+        called = true;
+        return BILLS;
+      },
+    });
+    const events = await feed.fetch();
+    expect(called).toBe(false); // never fires a guaranteed-403 request
+    expect(events[0]!.source).toContain("mock");
+    if (prev !== undefined) process.env["CONGRESS_GOV_API_KEY"] = prev;
+  });
+
+  it("maps bills and ranks severity by latest action", async () => {
+    const feed = new LegislativeFeed({ apiKey: "k", http: makeMockHttp(BILLS) });
+    const events = await feed.fetch();
+    expect(events).toHaveLength(2);
+    expect(events[0]!.id).toBe("118-HR-3076");
+    expect(events[0]!.billType).toBe("HR");
+    expect(events[0]!.chamber).toBe("House");
+    expect(events[0]!.severity).toBe("high"); // became law
+    expect(events[1]!.severity).toBe("low"); // referred to committee
+  });
+
+  it("builds the query URL with key, sort, and congress/type narrowing", async () => {
+    let capturedUrl = "";
+    const feed = new LegislativeFeed({
+      apiKey: "secret",
+      http: async (url) => {
+        capturedUrl = url;
+        return BILLS;
+      },
+    });
+    await feed.fetch({ congress: 118, billType: "HR", limit: 5 });
+    expect(capturedUrl).toContain("/bill/118/hr?");
+    expect(capturedUrl).toContain("api_key=secret");
+    expect(capturedUrl).toContain("sort=updateDate+desc");
+    expect(capturedUrl).toContain("limit=5");
   });
 });
