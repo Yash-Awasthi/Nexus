@@ -252,6 +252,18 @@ export async function buildServer(): Promise<FastifyInstance> {
     windowMs: 60_000,
     keyPrefix: "billing",
   });
+  // code-repl + council carry a BYOK Bearer but often no resolved nexusUserId;
+  // the per-identity limiter buckets them by API key, not a shared NAT IP.
+  const _codeReplUserRL = makeUserRateLimitPreHandler({
+    limit: 20,
+    windowMs: 60_000,
+    keyPrefix: "code-repl",
+  });
+  const _councilUserRL = makeUserRateLimitPreHandler({
+    limit: 60,
+    windowMs: 60_000,
+    keyPrefix: "council",
+  });
 
   app.addHook("onRequest", async (request: FastifyRequest, reply) => {
     const url = request.url;
@@ -261,8 +273,13 @@ export async function buildServer(): Promise<FastifyInstance> {
     } else if (url.startsWith("/api/v1/billing")) {
       await _billingRL(request, reply);
       if (!reply.sent) await _billingUserRL(request, reply);
-    } else if (url.startsWith("/api/v1/code-repl")) await _codeReplRL(request, reply);
-    else if (url.startsWith("/api/v1/council")) await _councilRL(request, reply);
+    } else if (url.startsWith("/api/v1/code-repl")) {
+      await _codeReplRL(request, reply);
+      if (!reply.sent) await _codeReplUserRL(request, reply);
+    } else if (url.startsWith("/api/v1/council")) {
+      await _councilRL(request, reply);
+      if (!reply.sent) await _councilUserRL(request, reply);
+    }
   });
 
   // ── Health (no prefix — /health, /health/ready) ───────────────────────────

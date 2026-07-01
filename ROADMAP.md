@@ -204,8 +204,12 @@ injection), persistent volume + ephemeral compute.
   `safeLookup` into the outbound call sites (each uses native `fetch`, so needs an undici
   `Dispatcher` with a custom connector — per-site plumbing).
 - `run_tool_script` PTC sandbox — Worker-thread isolation for the `AsyncFunction` path.
-- Per-user API-key rate limiting (current limiter is IP-based only;
-  `makeUserRateLimitPreHandler` exists — apply broadly).
+- **Per-user API-key rate limiting — shipped:** `makeUserRateLimitPreHandler` now buckets
+  by the strongest identity available (`keyBy` → `nexusUserId` → **API key** = SHA-256 of
+  the Bearer token, so BYOK requests behind a shared NAT IP no longer collapse onto one
+  bucket → IP). Layered onto `/api/v1/code-repl` and `/council` (were IP-only) alongside
+  admin/billing. Raw token never enters a KV key/log/header. Remaining: extend to the
+  remaining authenticated route groups as needed.
 - Docker sandbox: seccomp profile, read-only rootfs, user-namespace remapping.
 - Security-baseline pass over `apps/api`: Helmet headers (present in `server.ts`),
   output sanitize, prompt-injection guard (`awesome-secure-defaults`).
