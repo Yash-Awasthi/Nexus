@@ -96,12 +96,18 @@ Framework, AES-256-GCM vault, token refresh (dedup), and the Google Vertex provi
 exist. **Sanctioned third-party OAuth only — no subscription-CLI routing, no official-CLI
 client-ID reuse.** Remaining:
 
-- **Security review of the token vault before any live token is stored** (threat-model:
-  encryption at rest, master-key handling, token scoping, no logging, revocation path).
-  Hard gate on everything below.
+- ✅ **Security review of the token vault — shipped** (`packages/llm-oauth/SECURITY.md`):
+  threat-model covering encryption at rest, master-key handling, token scoping, no-log
+  policy, and revocation. Flags the route-layer gates (state check, redirect allowlist,
+  single-use PendingAuth) that must close before live tokens flow.
+- ✅ **Refresh-token DB persistence + revoke path — shipped:** `oauth_credentials` table
+  (migration `0012`) stores the whole token bundle as one AES-256-GCM blob; `OAuthTokenStore`
+  (`llm-oauth/src/store.ts`) seals/saves, `resolveFresh()` refreshes + re-persists via
+  `TokenRefresher`, and `revoke()` best-effort-revokes upstream then HARD-DELETES. DB-agnostic
+  via an injected `SealedTokenStore` port. **Remaining:** the concrete drizzle adapter binding
+  the port + the login/callback routes below.
 - Login/callback API routes in `apps/api/src/routes/` (PKCE for web, device-code for
-  headless).
-- Refresh-token DB persistence + a revoke/delete path that purges creds.
+  headless) — the last unshipped §4 piece; needs the operator's OAuth app (user-gated).
 - Additional providers only where a documented third-party auth path exists; otherwise
   leave a TODO with the reason (azure-openai, github-models are stubbed `supported:false`).
 - **Multi-account pool + tier ladder — `@nexus/llm-accounts` — shipped:** `AccountPool`
