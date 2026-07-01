@@ -224,6 +224,95 @@ describe("All domain adapters – mock fallback", () => {
   }
 });
 
+// ── MaritimeFeed – Digitraffic AIS incident filtering ─────────────────────────
+
+describe("MaritimeFeed (Digitraffic AIS)", () => {
+  // Real-shape GeoJSON: mmsi + geometry.coordinates [lon,lat] + properties.navStat.
+  const AIS = {
+    type: "FeatureCollection",
+    features: [
+      {
+        mmsi: 230123000,
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [24.95, 60.16] },
+        properties: { navStat: 6, sog: 0, cog: 0, heading: 511, timestampExternal: 1659212938646 },
+      }, // aground → grounding / high
+      {
+        mmsi: 265111000,
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [18.1, 59.3] },
+        properties: { navStat: 14, sog: 0, timestampExternal: 1659212938700 },
+      }, // AIS-SART active → search_rescue / critical
+      {
+        mmsi: 219598000,
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [20.85, 55.77] },
+        properties: { navStat: 0, sog: 12.4, timestampExternal: 1659212938646 },
+      }, // under way → NOT an event
+      {
+        mmsi: 276333000,
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [23.5, 59.9] },
+        properties: { navStat: 5, sog: 0 },
+      }, // moored → NOT an event
+    ],
+  };
+
+  it("domain is 'maritime'", () => {
+    expect(new MaritimeFeed({ http: makeMockHttp(AIS) }).domain).toBe("maritime");
+  });
+
+  it("surfaces only abnormal navigational states as incidents", async () => {
+    const feed = new MaritimeFeed({ http: makeMockHttp(AIS) });
+    const events = await feed.fetch();
+    expect(events).toHaveLength(2); // aground + AIS-SART; under-way & moored dropped
+    const byId = Object.fromEntries(events.map((e) => [e.id, e]));
+    expect(byId["ais-230123000"]!.eventType).toBe("grounding");
+    expect(byId["ais-230123000"]!.severity).toBe("high");
+    expect(byId["ais-265111000"]!.eventType).toBe("search_rescue");
+    expect(byId["ais-265111000"]!.severity).toBe("critical");
+  });
+
+  it("maps mmsi, coordinates and nav-status metadata", async () => {
+    const feed = new MaritimeFeed({ http: makeMockHttp(AIS) });
+    const [aground] = await feed.fetch();
+    expect(aground!.mmsi).toBe("230123000");
+    expect(aground!.coordinates).toEqual({ lat: 60.16, lon: 24.95 });
+    expect(aground!.source).toBe("digitraffic");
+    expect(aground!.metadata!.navStat).toBe(6);
+    expect(aground!.metadata!.navStatus).toContain("aground");
+  });
+
+  it("returns an honest empty result when no vessel is abnormal", async () => {
+    const calm = { type: "FeatureCollection", features: [AIS.features[2], AIS.features[3]] };
+    const feed = new MaritimeFeed({ http: makeMockHttp(calm) });
+    expect(await feed.fetch()).toEqual([]); // NOT mock data
+  });
+
+  it("sends gzip + Digitraffic-User header to the locations endpoint", async () => {
+    let capturedUrl = "";
+    let capturedHeaders: Record<string, string> = {};
+    const feed = new MaritimeFeed({
+      http: async (url, headers) => {
+        capturedUrl = url;
+        capturedHeaders = headers ?? {};
+        return AIS;
+      },
+    });
+    await feed.fetch();
+    expect(capturedUrl).toContain("/locations");
+    expect(capturedHeaders["Accept-Encoding"]).toBe("gzip");
+    expect(capturedHeaders["Digitraffic-User"]).toBe("nexus/domain-feeds");
+  });
+
+  it("falls back to mock on a malformed payload", async () => {
+    const feed = new MaritimeFeed({ http: makeMockHttp("not-a-feature-collection") });
+    const events = await feed.fetch();
+    expect(events.length).toBeGreaterThan(0);
+    expect(events[0]!.source).toContain("mock");
+  });
+});
+
 // ── SeismologyFeed – query string ─────────────────────────────────────────────
 
 describe("SeismologyFeed", () => {

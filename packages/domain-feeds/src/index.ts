@@ -972,17 +972,117 @@ export class WildfireFeed extends FeedAdapter<WildfireEvent> {
   }
 }
 
-// ── Maritime — mock (AIS commercial APIs require paid access) ──────────────────
+// ── Maritime — Digitraffic AIS (Finnish Transport Agency; keyless open data) ───
+// Real vessel-position feed (GeoJSON). We surface only ABNORMAL navigational
+// states as incidents (aground / not-under-command / AIS-SART); the ~18k routine
+// positions (under way, anchored, moored) are not events. Coverage: Finnish/
+// Baltic waters. Keyless, but Digitraffic hard-requires gzip and a free-text
+// Digitraffic-User identifier header (not a credential).
+
+/** ITU-R M.1371 navigational-status codes → human label. */
+const AIS_NAV_STATUS: Record<number, string> = {
+  0: "under way using engine",
+  1: "at anchor",
+  2: "not under command",
+  3: "restricted maneuverability",
+  4: "constrained by draught",
+  5: "moored",
+  6: "aground",
+  7: "engaged in fishing",
+  8: "under way sailing",
+  14: "AIS-SART / MOB / EPIRB active",
+  15: "undefined",
+};
+
+/** navStat → (incident eventType, severity). Only genuinely abnormal states map. */
+function aisIncident(
+  navStat: number,
+): { eventType: MaritimeEvent["eventType"]; severity: FeedEvent["severity"] } | null {
+  switch (navStat) {
+    case 6:
+      return { eventType: "grounding", severity: "high" };
+    case 14:
+      return { eventType: "search_rescue", severity: "critical" };
+    case 2:
+      return { eventType: "search_rescue", severity: "high" }; // adrift / disabled
+    default:
+      return null;
+  }
+}
+
+interface AisFeature {
+  mmsi?: number;
+  geometry?: { coordinates?: [number, number] };
+  properties?: {
+    navStat?: number;
+    sog?: number;
+    cog?: number;
+    heading?: number;
+    timestampExternal?: number;
+  };
+}
 
 export class MaritimeFeed extends FeedAdapter<MaritimeEvent> {
   readonly domain = "maritime";
 
   constructor(opts: Partial<FeedAdapterOptions> = {}) {
-    super({ baseUrl: "https://maritime.placeholder", ...opts });
+    super({ baseUrl: "https://meri.digitraffic.fi/api/ais/v1", ...opts });
   }
 
   async fetch(): Promise<MaritimeEvent[]> {
-    return buildMockResponse<MaritimeEvent>("maritime");
+    if (!this.checkRateLimit()) throw new Error("Rate limit exceeded");
+    const url = `${this.baseUrl}/locations`;
+    // Digitraffic returns 406 without gzip; identify ourselves per its fair-use
+    // policy (free-text string, not a secret).
+    const headers = {
+      ...this.buildHeaders(),
+      "Accept-Encoding": "gzip",
+      "Digitraffic-User": "nexus/domain-feeds",
+    };
+
+    try {
+      const raw = (await this.http(url, headers)) as { features?: AisFeature[] } | null;
+      // Malformed/unexpected payload → mock fallback (shared adapter contract).
+      // A well-formed FeatureCollection with no abnormal vessels stays an honest
+      // empty result below.
+      if (!raw || !Array.isArray(raw.features)) return buildMockResponse<MaritimeEvent>("maritime");
+      const features = raw.features;
+      const events: MaritimeEvent[] = [];
+      for (const f of features) {
+        const navStat = f.properties?.navStat;
+        if (navStat === undefined) continue;
+        const incident = aisIncident(navStat);
+        if (!incident) continue;
+        const [lon, lat] = f.geometry?.coordinates ?? [undefined, undefined];
+        const ms = f.properties?.timestampExternal;
+        const status = AIS_NAV_STATUS[navStat] ?? `navStat ${navStat}`;
+        events.push({
+          id: `ais-${f.mmsi ?? "unknown"}`,
+          timestamp: ms ? new Date(ms).toISOString() : new Date().toISOString(),
+          severity: incident.severity,
+          source: "digitraffic",
+          summary: `Vessel MMSI ${f.mmsi ?? "?"} ${status}`,
+          eventType: incident.eventType,
+          mmsi: f.mmsi !== undefined ? String(f.mmsi) : undefined,
+          coordinates: lat !== undefined && lon !== undefined ? { lat, lon } : undefined,
+          metadata: {
+            navStat,
+            navStatus: status,
+            sog: f.properties?.sog,
+            cog: f.properties?.cog,
+            heading: f.properties?.heading,
+          },
+        });
+      }
+      // A successful call with no abnormal vessels is a real empty result — do
+      // NOT fabricate mock data here; mock only covers a hard failure (catch).
+      return events;
+      // ponytail: vessel name/flagState enrichment (join /api/ais/v1/vessels by
+      // mmsi) deferred — mmsi identifies the vessel. Add the second fetch only if
+      // human-readable names become a hard requirement.
+    } catch {
+      return buildMockResponse<MaritimeEvent>("maritime");
+    }
   }
 }
 
