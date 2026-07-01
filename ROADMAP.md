@@ -229,11 +229,14 @@ orchestration. Consider `mcp-compressor` to shrink tool manifests 60–95%.
 
 ## 13. Domain feeds
 
-`domain-feeds` has 18 domains. **Shipped:** social signals — Hacker News (Algolia) +
-Reddit (listing JSON); scientific preprints — **bioRxiv/medRxiv** (`PreprintsFeed`).
-Add: arXiv (Atom XML, use the existing `RssFeedAdapter`), legislative tracking
-(congressional bills, EU directives), earnings & SEC filings (EDGAR, 8-K), supply chain
-(AIS shipping, port congestion). Dark-web sources need careful legal review first.
+`domain-feeds` has 20 adapters. **Shipped:** social signals — Hacker News (Algolia) +
+Reddit (listing JSON); scientific preprints — **bioRxiv/medRxiv** (`PreprintsFeed`) +
+**arXiv** (`ArxivFeed`, Atom XML); **SEC EDGAR** filings (`EdgarFeed`, Atom, 8-K
+severity bump); **US Congress** bills (`LegislativeFeed`, Congress.gov JSON). A
+dependency-free Atom/XML extractor (`xmlBlocks`/`xmlAttr`/`decodeXmlEntities`) is the
+reusable seam for further XML feeds. Remaining: EU directives (EUR-Lex, XML — reuse
+the seam), supply chain (AIS shipping, port congestion — needs a non-paid source).
+Dark-web sources need careful legal review first.
 
 ## 14. Production multi-tenant hardening
 
