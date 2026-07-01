@@ -25,6 +25,7 @@ import {
 } from "@nexus/context-pruner";
 import { computeAutoTuneParams, detectContext, InMemoryEmaStore } from "@nexus/drift";
 import { KVGatewayLog } from "@nexus/gateway-log";
+import { compressAuto } from "@nexus/llm-compress";
 import {
   UltraplinianRunner,
   type SpeedTier,
@@ -71,6 +72,7 @@ import { createDefaultRegistry } from "@nexus/tool-registry";
 import type { ToolRegistry } from "@nexus/tool-registry";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 
+import { parseCompressHeader } from "../lib/agent-queue.js";
 import { getPromptCache, PromptCache, type CacheableRequest } from "../lib/prompt-cache.js";
 import { getSharedKV } from "../lib/shared-kv.js";
 import { getTierFromRequest, requireAuth } from "../middleware/auth.js";
@@ -231,6 +233,29 @@ async function pruneGatewayMessages(
       content: m.content,
     })),
   };
+}
+
+// ── Opt-in lossless body compression ──────────────────────────────────────────
+// The agent runtime compresses tool output by default; the raw proxy path must
+// not silently rewrite a user's prompt, so gateway compression is OPT-IN via
+// `x-nexus-compress: lossless` (same header as the agent path). Runs each message
+// through llm-compress's lossless auto filters (ansi-strip / trim / blank-collapse
+// / dedup) — safe transforms that never change meaning. Returns the (possibly)
+// rewritten opts plus the estimated token saving so the caller can surface it.
+function compressGatewayMessages(
+  opts: LlmRequestOptions,
+  enabled: boolean,
+): { opts: LlmRequestOptions; savedTokens: number } {
+  if (!enabled) return { opts, savedTokens: 0 };
+  let savedTokens = 0;
+  const messages = opts.messages.map((m) => {
+    if (!m.content) return m;
+    const res = compressAuto(m.content);
+    if (res.text.length >= m.content.length) return m; // no gain — keep original
+    savedTokens += res.originalTokens - res.compressedTokens;
+    return { ...m, content: res.text };
+  });
+  return { opts: savedTokens > 0 ? { ...opts, messages } : opts, savedTokens };
 }
 
 // ── Prompt cache (KV-backed, cross-pod safe) ───────────────────────────────────
@@ -449,6 +474,17 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
         toDriverRequest(request.body, resolvedModel),
         request.body.max_tokens ?? 4096,
       );
+
+      // Opt-in lossless body compression (x-nexus-compress: lossless). Off by
+      // default so the proxy never silently rewrites a prompt.
+      const _compress = compressGatewayMessages(
+        opts,
+        parseCompressHeader(request.headers["x-nexus-compress"]) === "lossless",
+      );
+      opts = _compress.opts;
+      if (_compress.savedTokens > 0) {
+        reply.header("X-Nexus-Compress-Saved-Tokens", String(_compress.savedTokens));
+      }
 
       // ── Parseltongue — obfuscate user messages when requested ─────────────
       // Activated by header: x-nexus-obfuscate: true  OR feature flag.

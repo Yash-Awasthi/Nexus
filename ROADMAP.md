@@ -78,8 +78,10 @@ filters (ansi/trim/blank/dedup) + `smartTruncate`; `compressAuto`/`detectTraits`
   it re-enters context (lossless default); `x-nexus-compress` header
   (`apps/api` `/agent/run` → `agent.run` payload → worker runtime) toggles per request;
   each pass emits an `agent.tool_compress` SSE/log event (tool, savedTokens, applied).
-  **Remaining:** the raw **gateway proxy** path (`apps/api/routes/gateway.ts`) still
-  doesn't compress message/tool bodies — only the agent runtime does.
+  **Gateway proxy path — shipped:** `apps/api/routes/gateway.ts` now compresses message
+  bodies via `compressGatewayMessages` (llm-compress lossless auto-filters) — but OPT-IN
+  only (`x-nexus-compress: lossless`, same header as the agent path) so the proxy never
+  silently rewrites a prompt; emits an `X-Nexus-Compress-Saved-Tokens` response header.
 - **Tool-name→filter router — shipped** (`resolveToolProfile` / `compressForTool`):
   per-tool profiles (diff/grep/listing/build-log/generic) that exclude
   corruption-prone filters (no dedup on diffs) + opt-in lossy tail-truncate for build

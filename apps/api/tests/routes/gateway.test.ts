@@ -215,6 +215,30 @@ describe("POST /api/v1/gateway/messages", () => {
     expect(res.statusCode).toBe(200);
   });
 
+  it("compresses message bodies only when x-nexus-compress: lossless is set", async () => {
+    process.env.GROQ_API_KEY = "test-key";
+    vi.stubGlobal("fetch", mockGroqFetch());
+    // Content with lots of trailing whitespace + blank lines → lossless-compressible.
+    const bloated = "line one   \n\n\n\nline two   \n\n\n\nline three   ";
+
+    const withHeader = await app.inject({
+      method: "POST",
+      url: "/api/v1/gateway/messages",
+      headers: { "x-nexus-compress": "lossless" },
+      payload: { model: "nexus/fast", messages: [{ role: "user", content: bloated }], temperature: 0 },
+    });
+    expect(withHeader.statusCode).toBe(200);
+    expect(Number(withHeader.headers["x-nexus-compress-saved-tokens"])).toBeGreaterThan(0);
+
+    const withoutHeader = await app.inject({
+      method: "POST",
+      url: "/api/v1/gateway/messages",
+      payload: { model: "nexus/fast", messages: [{ role: "user", content: bloated }], temperature: 0 },
+    });
+    expect(withoutHeader.statusCode).toBe(200);
+    expect(withoutHeader.headers["x-nexus-compress-saved-tokens"]).toBeUndefined();
+  });
+
   it("returns X-Nexus-Cache: MISS on first non-streaming call", async () => {
     process.env.GROQ_API_KEY = "test-key";
     vi.stubGlobal("fetch", mockGroqFetch());

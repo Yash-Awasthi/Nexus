@@ -194,6 +194,9 @@ importers:
       '@nexus/lens':
         specifier: workspace:*
         version: link:../../packages/lens
+      '@nexus/llm-compress':
+        specifier: workspace:*
+        version: link:../../packages/llm-compress
       '@nexus/llm-drivers':
         specifier: workspace:*
         version: link:../../packages/llm-drivers
