@@ -16,6 +16,7 @@
  *   Errors wrapped by StreamRecoveryOrchestrator (continuation suffix + block close).
  */
 
+import { estimateMaxCost, lookupApiKey, QuotaChecker } from "@nexus/billing";
 import {
   PrunerChain,
   SlidingWindowPruner,
@@ -80,6 +81,26 @@ import { getTierFromRequest, requireAuth } from "../middleware/auth.js";
 
 export const _costStore = new InMemoryRunCostStore();
 const costTracker = new RunCostTracker({ store: _costStore });
+
+// ── BYOK spend-guard (§5) ─────────────────────────────────────────────────────
+// The gateway authenticates with the master key / a user JWT (requireAuth), not a
+// billing api-key. So the spend-cap is best-effort: only when the caller's Bearer
+// token resolves to an `api_keys` row (an nxk_ BYOK key) do we enforce its
+// monthly_cost_cap_usd pre-dispatch and persist the priced usage afterwards.
+// Master-key / JWT callers have no api_key row → guard is a no-op for them.
+const _quota = new QuotaChecker();
+const _tok = new NaiveTokenizer();
+
+/** Resolve the request's Bearer token to a BYOK api-key, or null. Never throws. */
+async function _resolveBillingKey(request: FastifyRequest) {
+  const m = /^Bearer\s+(\S+)$/i.exec(request.headers.authorization ?? "");
+  if (!m?.[1]) return null;
+  try {
+    return (await lookupApiKey(m[1])) ?? null;
+  } catch {
+    return null; // DB unreachable — skip the guard rather than fail the request
+  }
+}
 
 // ── Token budget (RPM limiting per identity) ──────────────────────────────────
 // GATEWAY_RPM_LIMIT (default 60) requests per 60-second sliding window.
@@ -501,6 +522,28 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
         }
       }
 
+      // ── BYOK per-key spend cap (pre-dispatch ledger gate) ────────────────────
+      // No-op unless the Bearer token is an nxk_ api-key with a monthly USD cap.
+      const billingKey = await _resolveBillingKey(request);
+      if (billingKey) {
+        const inputTokens = _tok.count(opts.messages.map((mm) => mm.content).join("\n"));
+        const estUsd = estimateMaxCost(resolvedModel, inputTokens, {
+          assumedOutputTokens: request.body.max_tokens ?? 4096,
+        });
+        const verdict = await _quota.check(billingKey, estUsd);
+        if (!verdict.allowed) {
+          return reply.code(429).send({
+            type: "error",
+            error: {
+              type: "monthly_cost_cap_exceeded",
+              message: "Monthly BYOK spend cap reached for this key.",
+              monthly_cost_usd: verdict.monthlyCostUsd,
+              monthly_cost_cap_usd: verdict.monthlyCostCapUsd,
+            },
+          });
+        }
+      }
+
       // ── Streaming branch ────────────────────────────────────────────────────
       if (request.body.stream) {
         reply.hijack();
@@ -573,6 +616,17 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
                   identity: _logIdent,
                 })
                 .catch(() => {});
+              if (billingKey) {
+                _quota
+                  .recordUsage(billingKey.id, request.url, {
+                    model: resolvedModel,
+                    usage: {
+                      inputTokens: usage?.inputTokens ?? 0,
+                      outputTokens: usage?.outputTokens ?? 0,
+                    },
+                  })
+                  .catch(() => {});
+              }
             } else {
               // Feed through think-parser; only emit TEXT chunks to client
               for (const chunk of parser.feed(delta)) {
@@ -686,6 +740,19 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
           costTracker.endRun(runId);
         } catch {
           /* non-fatal */
+        }
+
+        // BYOK metering — persist the priced token breakdown (fire-and-forget).
+        if (billingKey) {
+          _quota
+            .recordUsage(billingKey.id, request.url, {
+              model: resolvedModel,
+              usage: {
+                inputTokens: response.usage.inputTokens,
+                outputTokens: response.usage.outputTokens,
+              },
+            })
+            .catch(() => {});
         }
 
         globalHooks
