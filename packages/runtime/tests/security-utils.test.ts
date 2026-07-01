@@ -1,7 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
 
-import { isSafeUrl, assertSafeUrl, isSafeSandboxPath } from "../src/security-utils.js";
+import {
+  assertSafeUrl,
+  isPrivateAddress,
+  isSafeSandboxPath,
+  isSafeUrl,
+  makeSafeLookup,
+  type AllAddressResolver,
+  type ResolvedAddress,
+} from "../src/security-utils.js";
 
 describe("isSafeUrl", () => {
   describe("allowed protocols", () => {
@@ -204,4 +212,96 @@ describe("isSafeSandboxPath", () => {
   it("handles trailing slash in parent gracefully", () => {
     expect(isSafeSandboxPath("/sandbox/", "/sandbox/file.txt")).toBe(true);
   });
+});
+
+describe("isPrivateAddress", () => {
+  it("flags loopback, private, link-local, CGNAT ranges", () => {
+    for (const ip of ["127.0.0.1", "10.0.0.5", "192.168.1.1", "172.16.9.9", "169.254.169.254", "100.64.0.1"]) {
+      expect(isPrivateAddress(ip)).toBe(true);
+    }
+  });
+
+  it("flags IPv6 loopback/ULA/link-local", () => {
+    for (const ip of ["::1", "fc00::1", "fd12::9", "fe80::1", "fe80::1%eth0"]) {
+      expect(isPrivateAddress(ip)).toBe(true);
+    }
+  });
+
+  it("allows real public addresses", () => {
+    expect(isPrivateAddress("93.184.216.34")).toBe(false); // example.com
+    expect(isPrivateAddress("2606:2800:220:1:248:1893:25c8:1946")).toBe(false);
+  });
+
+  it("treats a non-IP string as unsafe", () => {
+    expect(isPrivateAddress("not-an-ip")).toBe(true);
+  });
+});
+
+describe("makeSafeLookup (resolve-then-pin)", () => {
+  // Build a fake dns.lookup(all:true) resolver returning canned addresses.
+  const resolverOf =
+    (addrs: ResolvedAddress[], err?: NodeJS.ErrnoException): AllAddressResolver =>
+    (_host, _opts, cb) =>
+      cb(err ?? null, addrs);
+
+  it("pins the resolved public address (single-address callback form)", () =>
+    new Promise<void>((done, fail) => {
+      const lookup = makeSafeLookup(resolverOf([{ address: "93.184.216.34", family: 4 }]));
+      lookup("example.com", {}, (err, address, family) => {
+        try {
+          expect(err).toBeNull();
+          expect(address).toBe("93.184.216.34");
+          expect(family).toBe(4);
+          done();
+        } catch (e) {
+          fail(e);
+        }
+      });
+    }));
+
+  it("returns all addresses when { all: true } is requested", () =>
+    new Promise<void>((done, fail) => {
+      const addrs: ResolvedAddress[] = [
+        { address: "93.184.216.34", family: 4 },
+        { address: "2606:2800:220:1:248:1893:25c8:1946", family: 6 },
+      ];
+      makeSafeLookup(resolverOf(addrs))("example.com", { all: true }, (err, out) => {
+        try {
+          expect(err).toBeNull();
+          expect(out).toEqual(addrs);
+          done();
+        } catch (e) {
+          fail(e);
+        }
+      });
+    }));
+
+  it("rejects when ANY resolved address is private (rebinding attempt)", () =>
+    new Promise<void>((done, fail) => {
+      const addrs: ResolvedAddress[] = [
+        { address: "93.184.216.34", family: 4 },
+        { address: "169.254.169.254", family: 4 }, // smuggled IMDS
+      ];
+      makeSafeLookup(resolverOf(addrs))("evil.example", {}, (err) => {
+        try {
+          expect(err).toBeTruthy();
+          expect(String(err?.message)).toMatch(/private address 169\.254\.169\.254/);
+          done();
+        } catch (e) {
+          fail(e);
+        }
+      });
+    }));
+
+  it("propagates resolver errors and empty-resolution failures", () =>
+    new Promise<void>((done, fail) => {
+      makeSafeLookup(resolverOf([]))("nx.example", {}, (err) => {
+        try {
+          expect(String(err?.message)).toMatch(/did not resolve/);
+          done();
+        } catch (e) {
+          fail(e);
+        }
+      });
+    }));
 });

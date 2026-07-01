@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { lookup as dnsLookup } from "node:dns";
 import { isIP } from "node:net";
 import * as path from "path";
 import { URL } from "url";
@@ -11,10 +12,13 @@ import { URL } from "url";
  * smuggle those addresses past naïve string checks (decimal/hex/octal IPv4,
  * IPv6 ULA/link-local, IPv4-mapped IPv6).
  *
- * Limitation (ponytail): this is a *static* check on the URL's host. A hostname
- * that resolves to a private IP at request time (DNS rebinding) is not caught
- * here — defeating that needs resolve-then-pin-the-socket at fetch time. The
- * upgrade path is a custom `lookup`/agent that re-validates the resolved IP.
+ * `isSafeUrl` is a *static* check on the URL's host, so a hostname that resolves
+ * to a private IP at request time (DNS rebinding) slips past it. {@link safeLookup}
+ * closes that gap: it is a drop-in Node `lookup` that resolves the hostname,
+ * rejects the request if ANY resolved address is private/reserved, and pins the
+ * socket to the validated address (no second resolution to race). Pass it as the
+ * `lookup` option of an `http`/`https` Agent — or `undici` dispatcher — at every
+ * outbound call site that accepts a user-influenced URL.
  */
 
 // Known non-IP hostnames that must never be reachable.
@@ -112,6 +116,25 @@ function isPrivateIPv6(host: string): boolean {
 }
 
 /**
+ * True if `ip` (a canonical IPv4 or IPv6 literal, e.g. a DNS-resolved address) is
+ * private, loopback, link-local, or otherwise reserved. Anything that is not a
+ * parseable IP literal is treated as unsafe — a resolver must hand back a real
+ * address for the socket to be considered pinnable.
+ */
+export function isPrivateAddress(ip: string): boolean {
+  const version = isIP(ip);
+  if (version === 4) {
+    const octets = parseIPv4ToOctets(ip);
+    return octets ? isPrivateIPv4(octets) : true;
+  }
+  if (version === 6) {
+    // Strip a zone id (fe80::1%eth0) before inspection.
+    return isPrivateIPv6(ip.replace(/%.*$/, ""));
+  }
+  return true;
+}
+
+/**
  * Checks if a URL is safe to fetch — http(s) only, and not pointing at the local
  * host, a private/reserved network, or a metadata service.
  */
@@ -139,8 +162,91 @@ export function isSafeUrl(urlStr: string): boolean {
   const octets = parseIPv4ToOctets(host);
   if (octets) return !isPrivateIPv4(octets);
 
-  // A real hostname — allow (DNS-rebinding caveat documented above).
+  // A real hostname — allow the static check to pass; DNS rebinding is caught at
+  // fetch time by safeLookup, which validates the *resolved* address.
   return true;
+}
+
+// ── Resolve-then-pin (DNS rebinding defence) ───────────────────────────────────
+
+/** One resolved address, as returned by `dns.lookup(host, { all: true })`. */
+export interface ResolvedAddress {
+  address: string;
+  family: number;
+}
+
+/** The subset of `dns.lookup` (all-addresses form) that {@link makeSafeLookup} needs. */
+export type AllAddressResolver = (
+  hostname: string,
+  options: { all: true; verbatim?: boolean },
+  callback: (err: NodeJS.ErrnoException | null, addresses: ResolvedAddress[]) => void,
+) => void;
+
+/** Node's `LookupFunction` shape — what an `http.Agent`'s `lookup` option expects. */
+type LookupCallback = (
+  err: NodeJS.ErrnoException | null,
+  address: string | ResolvedAddress[],
+  family?: number,
+) => void;
+type LookupOptions = { all?: boolean; family?: number; hints?: number; verbatim?: boolean };
+export type SafeLookup = (
+  hostname: string,
+  options: LookupOptions | LookupCallback,
+  callback?: LookupCallback,
+) => void;
+
+/**
+ * Build a `lookup` function that resolves `hostname`, rejects the connection if
+ * ANY resolved address is private/reserved ({@link isPrivateAddress}), and hands
+ * the socket the already-validated addresses — so there is no second resolution
+ * for an attacker to rebind between the check and the connect.
+ *
+ * `resolver` is injectable for testing; it defaults to `dns.lookup`. The returned
+ * function honours the caller's `all` option so it drops straight into an
+ * `http`/`https` Agent's `lookup` slot.
+ */
+export function makeSafeLookup(resolver: AllAddressResolver = dnsLookup as AllAddressResolver): SafeLookup {
+  return function safeLookup(hostname, options, callback) {
+    const cb = (typeof options === "function" ? options : callback) as LookupCallback;
+    const opts: LookupOptions = typeof options === "function" ? {} : (options ?? {});
+    resolver(hostname, { all: true, verbatim: opts.verbatim ?? true }, (err, addresses) => {
+      if (err) return cb(err, "", undefined);
+      const addrs = addresses ?? [];
+      if (addrs.length === 0) {
+        return cb(new Error(`SSRF guard: ${hostname} did not resolve to any address`), "", undefined);
+      }
+      for (const a of addrs) {
+        if (isPrivateAddress(a.address)) {
+          return cb(
+            new Error(`Unsafe URL blocked (SSRF guard): ${hostname} resolves to private address ${a.address}`),
+            "",
+            undefined,
+          );
+        }
+      }
+      if (opts.all) return cb(null, addrs);
+      const first = addrs[0]!;
+      return cb(null, first.address, first.family);
+    });
+  };
+}
+
+/** Default resolve-then-pin lookup backed by `dns.lookup`. */
+export const safeLookup: SafeLookup = makeSafeLookup();
+
+/**
+ * Async assertion that `hostname` currently resolves only to public addresses.
+ * Useful as a pre-flight before handing a URL to a fetcher that cannot take a
+ * custom `lookup`. Note: only {@link safeLookup} (pinning the socket) fully
+ * defeats rebinding; this pre-flight still has a TOCTOU window on its own.
+ */
+export function assertHostResolvesSafely(
+  hostname: string,
+  resolver: AllAddressResolver = dnsLookup as AllAddressResolver,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    makeSafeLookup(resolver)(hostname, { all: true }, (err) => (err ? reject(err) : resolve()));
+  });
 }
 
 /** Throwing variant of {@link isSafeUrl} for call sites that should hard-fail. */

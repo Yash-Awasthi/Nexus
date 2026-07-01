@@ -197,8 +197,12 @@ injection), persistent volume + ephemeral compute.
 ## 9. Security hardening
 
 - **SSRF filter — shipped** (`runtime/security-utils.ts` `isSafeUrl`/`assertSafeUrl`:
-  full private/reserved ranges + smuggled IPv4/IPv6 encodings). Remaining: resolve-then-
-  pin at fetch time to defeat DNS rebinding; apply at more outbound call sites.
+  full private/reserved ranges + smuggled IPv4/IPv6 encodings). Resolve-then-pin also
+  shipped: `makeSafeLookup`/`safeLookup` (a drop-in Node `lookup` that resolves, rejects
+  if any resolved address is private via the extracted `isPrivateAddress`, and pins the
+  socket — defeats DNS rebinding) + `assertHostResolvesSafely`. Remaining: wire
+  `safeLookup` into the outbound call sites (each uses native `fetch`, so needs an undici
+  `Dispatcher` with a custom connector — per-site plumbing).
 - `run_tool_script` PTC sandbox — Worker-thread isolation for the `AsyncFunction` path.
 - Per-user API-key rate limiting (current limiter is IP-based only;
   `makeUserRateLimitPreHandler` exists — apply broadly).
