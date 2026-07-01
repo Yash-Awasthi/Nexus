@@ -232,10 +232,13 @@ injection), persistent volume + ephemeral compute.
 - **Build task DAG** — `build.tsx` filters out subtasks; add a Board↔Graph toggle, render
   `parentId` edges with `@xyflow/react` (already installed, used in `workflows.tsx`), reuse
   the existing `TaskDetailPanel`. Treat orphan `parentId` as roots, log don't drop.
-- **MCP server registry** — servers are hardcoded/in-memory. New `mcp_servers` table +
-  migration `0010`, per-user CRUD routes (`requireAuthWithTier`, fail-closed key encryption
-  via `secret-crypto`, key write-only, never return raw), a `/test` route (live outbound —
-  gate behind user go), and an `mcp-servers.tsx` route modeled on `provider-keys.tsx`.
+- **MCP server registry** — ✅ **backend shipped.** `mcp_servers` table + migration `0010`,
+  per-user CRUD routes (`requireAuthWithTier`, fail-closed AES-256-GCM key encryption via
+  `secret-crypto`, key write-only, `keyPrefix`-only responses), and a `POST /mcp/servers/:id/test`
+  route (live outbound: connect → `listTools` → persist health). SSRF guard now delegates to
+  `@nexus/runtime` `isSafeUrl` (blocks RFC1918 / IMDS 169.254 / metadata hosts / encoded IPv4).
+  **Remaining:** DNS-rebinding socket-pin on the /test call (`makeSafeLookup`); `mcp-servers.tsx`
+  UI route modeled on `provider-keys.tsx`.
 - **Workflow UI polish** — `workflows.tsx` exists; add `@lobehub/icons` provider/model
   icons and feed models.dev metadata into the picker.
 - Medium-term pages over mature backends: voice (push-to-talk + streaming transcription),
