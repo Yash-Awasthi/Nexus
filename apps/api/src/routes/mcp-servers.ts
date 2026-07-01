@@ -22,6 +22,7 @@ import { isSafeUrl } from "@nexus/runtime";
 import { and, eq, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
+import { pinnedFetch } from "../lib/pinned-fetch.js";
 import {
   encryptSecret,
   decryptSecret,
@@ -62,8 +63,8 @@ const SAFE_COLUMNS = {
  * checks stay inline to keep the granular client-facing messages.
  *
  * Note: this is a *static* host check. A hostname that resolves to a private IP
- * only at request time (DNS rebinding) still passes here — pinning the socket via
- * `makeSafeLookup` on the /test outbound call is the tracked follow-up.
+ * only at request time (DNS rebinding) still passes here; the /test outbound call
+ * pins the socket via `pinnedFetch` (safeLookup) to block that at connect time.
  */
 export function validateMcpEndpoint(endpoint: string): string | null {
   const trimmed = endpoint.trim();
@@ -295,6 +296,10 @@ export async function mcpServersRoutes(app: FastifyInstance): Promise<void> {
           apiKey,
           extraHeaders: headers,
           timeoutMs: 15_000,
+          // Socket-pinned fetch: blocks a hostname that re-resolves to a private
+          // / IMDS address between validateMcpEndpoint above and this live call
+          // (DNS rebinding) — the static check alone can't catch that.
+          fetchFn: pinnedFetch,
         });
         const serverInfo = await client.initialize();
         const tools = await client.listTools();
