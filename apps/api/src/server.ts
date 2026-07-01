@@ -62,6 +62,7 @@ import { imageGenRoutes } from "./routes/image-gen.js";
 import { ingestRoutes } from "./routes/ingest.js";
 import { knowledgeGraphRoutes } from "./routes/knowledge-graph.js";
 import { libertasRoutes } from "./routes/libertas.js";
+import { llmOauthRoutes } from "./routes/llm-oauth.js";
 import { llmRoutes } from "./routes/llm.js";
 import { mailIngestRoutes } from "./routes/mail-ingest.js";
 import { mcpServersRoutes } from "./routes/mcp-servers.js";
@@ -360,6 +361,9 @@ export async function buildServer(): Promise<FastifyInstance> {
 
       // Z — OAuth SSO (Google + GitHub)
       await api.register(oauthRoutes);
+
+      // Z — Provider OAuth (BYO Vertex via Google) — SEPARATE from SSO above
+      await api.register(llmOauthRoutes);
 
       // Enterprise — user auth, workspaces, MFA
       await api.register(authUsersRoutes);
