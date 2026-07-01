@@ -55,6 +55,7 @@
     "@nexus/council": "workspace:*",
     "@nexus/db": "workspace:*",
     "@nexus/governance": "workspace:*",
+    "@nexus/llm-oauth": "workspace:*",
     "@nexus/runtime": "workspace:*",
     "@nexus/shared": "workspace:*",
     "@nexus/telemetry": "workspace:*",

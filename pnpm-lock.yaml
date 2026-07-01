@@ -200,6 +200,9 @@ importers:
       '@nexus/llm-drivers':
         specifier: workspace:*
         version: link:../../packages/llm-drivers
+      '@nexus/llm-oauth':
+        specifier: workspace:*
+        version: link:../../packages/llm-oauth
       '@nexus/llm-router':
         specifier: workspace:*
         version: link:../../packages/llm-router
