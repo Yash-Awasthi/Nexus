@@ -18,6 +18,7 @@
 import { db } from "@nexus/db";
 import { mcpServers } from "@nexus/db/schema";
 import { McpClient } from "@nexus/mcp-client";
+import { isSafeUrl } from "@nexus/runtime";
 import { and, eq, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
@@ -50,33 +51,33 @@ const SAFE_COLUMNS = {
 
 /**
  * SSRF guard for user-supplied MCP endpoint URLs. Returns an error message to
- * send to the client, or null when the endpoint is safe. Rejects non-http(s)
- * schemes (file:, gopher:, etc.) and loopback hosts so a registered MCP server
- * cannot be pointed at the API host's own internal services.
+ * send to the client, or null when the endpoint is safe.
+ *
+ * Delegates host safety to `@nexus/runtime`'s shared `isSafeUrl`, so this now
+ * blocks — in addition to the old localhost/127 list — RFC1918 private ranges
+ * (10/8, 172.16/12, 192.168/16), link-local 169.254/16 (cloud metadata / IMDS),
+ * CGNAT, multicast/reserved, cloud-metadata hostnames, IPv6 loopback/ULA/
+ * link-local, and the decimal/hex/octal/IPv4-mapped-IPv6 encodings attackers use
+ * to smuggle those addresses past a naïve string check. The URL parse and scheme
+ * checks stay inline to keep the granular client-facing messages.
+ *
+ * Note: this is a *static* host check. A hostname that resolves to a private IP
+ * only at request time (DNS rebinding) still passes here — pinning the socket via
+ * `makeSafeLookup` on the /test outbound call is the tracked follow-up.
  */
 export function validateMcpEndpoint(endpoint: string): string | null {
+  const trimmed = endpoint.trim();
   let url: URL;
   try {
-    url = new URL(endpoint.trim());
+    url = new URL(trimmed);
   } catch {
     return "endpoint must be a valid URL";
   }
   if (!["http:", "https:"].includes(url.protocol)) {
     return "endpoint must use http or https scheme";
   }
-  // url.hostname keeps the brackets for IPv6 literals (e.g. "[::1]"), so a raw
-  // equality list misses IPv6 loopback — strip them before comparing.
-  const host = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
-  // ponytail: RFC1918 private ranges (10/8, 172.16/12, 192.168/16) and link-local
-  // 169.254/16 are NOT blocked here — add them if MCP servers must be public-only.
-  if (
-    host === "localhost" ||
-    host === "::1" ||
-    host === "::" ||
-    host === "0.0.0.0" ||
-    /^127\./.test(host)
-  ) {
-    return "loopback endpoints are not allowed";
+  if (!isSafeUrl(trimmed)) {
+    return "endpoint host is not allowed (loopback, private, or reserved address)";
   }
   return null;
 }

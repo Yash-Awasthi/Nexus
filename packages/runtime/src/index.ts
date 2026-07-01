@@ -137,6 +137,18 @@ export type { ConductorServer } from "./conductor-server.js";
 export { bootstrap } from "./bootstrap.js";
 export { runHealthcheck } from "./healthcheck.js";
 
+// ── SSRF / outbound-URL safety ────────────────────────────────────────────────
+export {
+  isSafeUrl,
+  assertSafeUrl,
+  isPrivateAddress,
+  isSafeSandboxPath,
+  makeSafeLookup,
+  safeLookup,
+  assertHostResolvesSafely,
+} from "./security-utils.js";
+export type { ResolvedAddress, AllAddressResolver, SafeLookup } from "./security-utils.js";
+
 // ── Governance interfaces ─────────────────────────────────────────────────────
 export type {
   ITaskSynthesisResult,
