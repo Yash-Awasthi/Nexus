@@ -374,3 +374,65 @@ export function createEditFileTool(): RuntimeTool {
     },
   };
 }
+
+// ── run_command (mutating, gated, injected executor) ───────────────────────────
+
+/** Outcome of a sandboxed command — a narrowing of `@nexus/sandbox`'s SandboxResult. */
+export interface CommandResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  timedOut: boolean;
+}
+
+/**
+ * Executor seam for {@link createRunCommandTool}. The intended binding is
+ * `@nexus/sandbox`'s `executeCode` running the command as `language: "bash"`,
+ * but any implementation satisfying this contract works — which keeps
+ * `agent-runtime` free of a hard sandbox dependency and makes the tool trivially
+ * mockable in tests.
+ *
+ * @example
+ * import { executeCode } from "@nexus/sandbox";
+ * const exec: CommandExecutor = async (command, opts) => {
+ *   const r = await executeCode({
+ *     taskType: "sandbox.execute", language: "bash", code: command,
+ *     timeoutMs: opts.timeoutMs,
+ *   });
+ *   return { stdout: r.stdout, stderr: r.stderr, exitCode: r.exitCode, timedOut: r.timedOut };
+ * };
+ * toolSet.add(createRunCommandTool(exec));
+ */
+export type CommandExecutor = (
+  command: string,
+  opts: { cwd?: string; timeoutMs?: number; signal?: AbortSignal },
+) => Promise<CommandResult>;
+
+/**
+ * Build the `run_command` tool, delegating execution to an injected sandbox
+ * {@link CommandExecutor}. The workspace root (`ctx.workingDir`) is forwarded as
+ * the command's `cwd`. Being mutating, its name resolves to `requires_permission`
+ * via {@link classifyTool} (NOT auto-allowed) — callers opt in explicitly.
+ */
+export function createRunCommandTool(exec: CommandExecutor): RuntimeTool {
+  return {
+    name: "run_command",
+    description:
+      "Execute a shell command inside the workspace sandbox. Runs in `ctx.workingDir`. " +
+      "Returns {stdout, stderr, exitCode, timedOut}. Mutating, permission-gated.",
+    parameters: {
+      type: "object",
+      properties: {
+        command: { type: "string", description: "Shell command to run (executed as bash)." },
+        timeout_ms: { type: "integer", description: "Optional execution timeout in milliseconds." },
+      },
+      required: ["command"],
+    },
+    async handler(args, ctx) {
+      throwIfAborted(ctx);
+      const command = asString(args.command, "command");
+      const timeoutMs = args.timeout_ms === undefined ? undefined : asPosInt(args.timeout_ms, 0) || undefined;
+      return exec(command, { cwd: ctx?.workingDir, timeoutMs, signal: ctx?.signal });
+    },
+  };
+}

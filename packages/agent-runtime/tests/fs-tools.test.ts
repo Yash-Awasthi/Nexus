@@ -10,9 +10,11 @@ import {
   classifyTool,
   createEditFileTool,
   createFilesystemTools,
+  createRunCommandTool,
   globToRegExp,
   resolveInWorkspace,
   RuntimeToolSet,
+  type CommandExecutor,
   type RuntimeTool,
 } from "../src/index.js";
 
@@ -217,6 +219,66 @@ describe("edit_file", () => {
     await expect(
       createEditFileTool().handler({ path: "../evil", old_string: "a", new_string: "b" }, { workingDir: ws }),
     ).rejects.toThrow(/escapes workspace/);
+  });
+});
+
+describe("run_command", () => {
+  it("is gated (requires_permission, not auto-allowed)", () => {
+    const t = createRunCommandTool(async () => ({ stdout: "", stderr: "", exitCode: 0, timedOut: false }));
+    expect(t.name).toBe("run_command");
+    expect(AUTO_ALLOWED_TOOLS.has("run_command")).toBe(false);
+    expect(classifyTool("run_command")).toBe("requires_permission");
+  });
+
+  it("delegates to the injected executor, forwarding cwd/timeout/signal", async () => {
+    const calls: Array<{ command: string; opts: unknown }> = [];
+    const exec: CommandExecutor = async (command, opts) => {
+      calls.push({ command, opts });
+      return { stdout: "ok\n", stderr: "", exitCode: 0, timedOut: false };
+    };
+    const ctrl = new AbortController();
+    const out = await createRunCommandTool(exec).handler(
+      { command: "echo ok", timeout_ms: 5000 },
+      { workingDir: "/ws", signal: ctrl.signal },
+    );
+    expect(out).toEqual({ stdout: "ok\n", stderr: "", exitCode: 0, timedOut: false });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].command).toBe("echo ok");
+    expect(calls[0].opts).toEqual({ cwd: "/ws", timeoutMs: 5000, signal: ctrl.signal });
+  });
+
+  it("omits timeout when not provided", async () => {
+    let seen: { timeoutMs?: number } | undefined;
+    const exec: CommandExecutor = async (_c, opts) => {
+      seen = opts;
+      return { stdout: "", stderr: "", exitCode: 0, timedOut: false };
+    };
+    await createRunCommandTool(exec).handler({ command: "ls" }, { workingDir: "/ws" });
+    expect(seen?.timeoutMs).toBeUndefined();
+  });
+
+  it("surfaces a non-zero exit / timeout result verbatim", async () => {
+    const exec: CommandExecutor = async () => ({ stdout: "", stderr: "boom", exitCode: 1, timedOut: false });
+    const out = (await createRunCommandTool(exec).handler({ command: "false" }, { workingDir: "/ws" })) as {
+      exitCode: number;
+      stderr: string;
+    };
+    expect(out.exitCode).toBe(1);
+    expect(out.stderr).toBe("boom");
+  });
+
+  it("rejects an already-aborted signal before executing", async () => {
+    let ran = false;
+    const exec: CommandExecutor = async () => {
+      ran = true;
+      return { stdout: "", stderr: "", exitCode: 0, timedOut: false };
+    };
+    const ctrl = new AbortController();
+    ctrl.abort();
+    await expect(
+      createRunCommandTool(exec).handler({ command: "x" }, { workingDir: "/ws", signal: ctrl.signal }),
+    ).rejects.toThrow(/aborted/);
+    expect(ran).toBe(false);
   });
 });
 

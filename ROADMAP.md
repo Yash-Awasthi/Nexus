@@ -150,8 +150,11 @@ Remaining:
   scoped to `ctx.workingDir` with a path-traversal guard (`resolveInWorkspace`); all four
   names auto-allow. `edit_file` shipped too (`createEditFileTool()`) — uniqueness-checked
   exact replacement, mutating so it resolves to the `requires_permission` tier (opt-in,
-  not auto-allowed). Remaining: `run_command` (wrap `@nexus/sandbox`), MCP tools
-  (`McpClient.callTool()` from the per-user registry).
+  not auto-allowed). `run_command` shipped as a DI seam (`createRunCommandTool(exec)` +
+  `CommandExecutor`) — keeps `agent-runtime` free of a hard sandbox dep; the intended
+  binding is `@nexus/sandbox`'s `executeCode` as `language: "bash"` (one-line adapter,
+  documented on the type). Remaining: MCP tools (`McpClient.callTool()` from the per-user
+  registry).
 - **Worker→API SSE relay** for live step streaming (last gap for true end-to-end).
 - **Sessions, permissions, compaction:** two-tier permission gate (read-only auto-allow;
   mutating ops require approval via `GovernanceEngine`, surfaced over the event bus);

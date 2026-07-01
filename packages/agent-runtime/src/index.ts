@@ -285,9 +285,11 @@ export function classifyTool(name: string): ActionTier {
 export {
   createFilesystemTools,
   createEditFileTool,
+  createRunCommandTool,
   resolveInWorkspace,
   globToRegExp,
 } from "./fs-tools.js";
+export type { CommandExecutor, CommandResult } from "./fs-tools.js";
 
 /** A request to run a tool that requires approval. */
 export interface PermissionRequest {
