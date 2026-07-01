@@ -260,6 +260,13 @@ export async function mcpServersRoutes(app: FastifyInstance): Promise<void> {
       if (!server) return reply.code(404).send({ error: "not_found" });
       if (server.userId !== userId) return reply.code(403).send({ error: "forbidden" });
 
+      // Defense-in-depth: re-validate the stored endpoint at the live-call sink.
+      // Create/update already guard, but a row written under an older/weaker guard
+      // (or via direct DB access) could hold a private/IMDS endpoint the current
+      // isSafeUrl rejects — never make the outbound request to it.
+      const endpointErr = validateMcpEndpoint(server.endpoint);
+      if (endpointErr) return reply.code(400).send({ error: endpointErr });
+
       if (server.transportType !== "http") {
         return reply
           .code(400)
