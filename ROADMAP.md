@@ -169,7 +169,11 @@ Remaining:
   local RPC; only stdout returns to context.
 - **Forked background learning loop:** propose `MEMORY.md` / skill updates off a warm
   cache or digest.
-- `nexus code <task>` command in `apps/cli` (currently HTTP-client only).
+- `nexus code <task>` command in `apps/cli` — **shipped** (launches `/agent/run`, streams
+  the SSE progress, `--repo`/`--base` worktree, `--provider`/`--model`/`--max-steps`/
+  `--review`/`--no-wait`). Remaining (gated): an in-process `--local` mode that runs the
+  agent loop in the CLI itself over the new `RuntimeToolSet` bridges — needs an LLM driver
+  + a live provider key.
 
 > g0dm0d3 is AGPL — ideas only, clean-room, never copy source.
 
