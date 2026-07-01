@@ -290,6 +290,14 @@ export {
   globToRegExp,
 } from "./fs-tools.js";
 export type { CommandExecutor, CommandResult } from "./fs-tools.js";
+// MCP tool bridge — dependency-injected, defaults to the requires_permission tier.
+export { createMcpTools } from "./mcp-tools.js";
+export type {
+  McpBridgeOptions,
+  McpToolClient,
+  McpToolInfo,
+  McpToolResult,
+} from "./mcp-tools.js";
 
 /** A request to run a tool that requires approval. */
 export interface PermissionRequest {

@@ -153,8 +153,11 @@ Remaining:
   not auto-allowed). `run_command` shipped as a DI seam (`createRunCommandTool(exec)` +
   `CommandExecutor`) — keeps `agent-runtime` free of a hard sandbox dep; the intended
   binding is `@nexus/sandbox`'s `executeCode` as `language: "bash"` (one-line adapter,
-  documented on the type). Remaining: MCP tools (`McpClient.callTool()` from the per-user
-  registry).
+  documented on the type). MCP bridge shipped as well (`createMcpTools(client, opts)` in
+  `agent-runtime/src/mcp-tools.ts`) — discovers `client.listTools()` and maps each to a
+  `RuntimeTool` calling `client.callTool()`; DI'd off a narrow `McpToolClient` (structural
+  subset of `@nexus/mcp-client`), optional name prefix, defaults to `requires_permission`.
+  **All §7 tool bridges shipped** (read set, edit_file, run_command, MCP).
 - **Worker→API SSE relay** for live step streaming (last gap for true end-to-end).
 - **Sessions, permissions, compaction:** two-tier permission gate (read-only auto-allow;
   mutating ops require approval via `GovernanceEngine`, surfaced over the event bus);
