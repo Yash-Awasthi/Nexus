@@ -1585,9 +1585,14 @@ export class ReplicateDriver extends BaseDriver {
  * `system` field, messages carry only user/assistant turns, and the reply text is
  * `result` (errors arrive as `error_code`/`error_msg` inside a 200 body).
  *
- * ponytail: tool-calling (ERNIE `functions`) is not mapped — text chat only.
- * Upgrade path: translate LlmToolDefinition ↔ ERNIE `functions`/`function_call`
- * when the §2 translation matrix lands.
+ * Tool-calling: ERNIE `functions` (request) ↔ top-level `function_call` (response)
+ * are mapped. ERNIE has no tool-call ids, so we use the function *name* as the
+ * LlmToolCall id — that lets a later `role:"tool"` result round-trip back to an
+ * ERNIE `role:"function"` message (which needs the name) without a lookup table.
+ *
+ * ponytail: ERNIE emits at most ONE function_call per turn (no parallel calls),
+ * and `tool_choice` is left to the model (auto). Upgrade path: map explicit
+ * tool_choice + parallel calls if a model variant ever supports them.
  */
 export class BaiduErnieDriver extends BaseDriver {
   readonly provider = "baidu_ernie";
@@ -1656,21 +1661,38 @@ export class BaiduErnieDriver extends BaseDriver {
 
     // ERNIE: system prompt is top-level; messages carry only user/assistant turns.
     let system = opts.systemPrompt;
-    const messages: { role: string; content: string }[] = [];
+    const messages: Record<string, unknown>[] = [];
     for (const m of opts.messages) {
       if (m.role === "system") {
         system = system ? `${system}\n\n${m.content}` : m.content;
+      } else if (m.role === "assistant" && m.toolCalls?.length) {
+        // ERNIE carries a single function_call on the assistant turn (id == name).
+        const tc = m.toolCalls[0]!;
+        messages.push({
+          role: "assistant",
+          content: m.content,
+          function_call: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
+        });
+      } else if (m.role === "tool") {
+        // Tool result → ERNIE `function` role; toolCallId is the function name.
+        messages.push({ role: "function", name: m.toolCallId ?? "", content: m.content });
       } else if (m.role === "assistant" || m.role === "user") {
         messages.push({ role: m.role, content: m.content });
       } else {
-        // tool/other roles fold into the user turn (no native mapping yet).
         messages.push({ role: "user", content: m.content });
       }
     }
 
+    const functions = opts.tools?.map((t) => ({
+      name: t.name,
+      description: t.description,
+      parameters: t.parameters,
+    }));
+
     const body: Record<string, unknown> = {
       messages,
       ...(system ? { system } : {}),
+      ...(functions?.length ? { functions } : {}),
       ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
       ...(opts.maxTokens !== undefined ? { max_output_tokens: opts.maxTokens } : {}),
       ...(opts.stop ? { stop: opts.stop } : {}),
@@ -1680,6 +1702,7 @@ export class BaiduErnieDriver extends BaseDriver {
     const raw = (await this.transport.post(url, body, { "Content-Type": "application/json" })) as {
       id?: string;
       result?: string;
+      function_call?: { name?: string; arguments?: string; thoughts?: string };
       error_code?: number;
       error_msg?: string;
       usage?: { prompt_tokens?: number; completion_tokens?: number };
@@ -1700,6 +1723,23 @@ export class BaiduErnieDriver extends BaseDriver {
     }
 
     const content = raw.result ?? "";
+
+    // Parse a native function_call (ERNIE emits at most one). Arguments arrive as
+    // a JSON string; tolerate malformed args by falling back to an empty object.
+    let toolCalls: LlmToolCall[] | undefined;
+    if (raw.function_call?.name) {
+      let parsedArgs: Record<string, unknown> = {};
+      try {
+        parsedArgs = raw.function_call.arguments
+          ? (JSON.parse(raw.function_call.arguments) as Record<string, unknown>)
+          : {};
+      } catch {
+        /* leave args empty on malformed JSON */
+      }
+      // id == name so a later tool-result message can name the ERNIE `function` turn.
+      toolCalls = [{ id: raw.function_call.name, name: raw.function_call.name, arguments: parsedArgs }];
+    }
+
     const inputTokens =
       raw.usage?.prompt_tokens ?? estimateTokens(opts.messages.map((m) => m.content).join(" "));
     const outputTokens = raw.usage?.completion_tokens ?? estimateTokens(content);
@@ -1709,7 +1749,8 @@ export class BaiduErnieDriver extends BaseDriver {
       model,
       this.makeUsage(inputTokens, outputTokens),
       Date.now() - t0,
-      "stop",
+      toolCalls?.length ? "tool_calls" : "stop",
+      toolCalls,
     );
   }
 }

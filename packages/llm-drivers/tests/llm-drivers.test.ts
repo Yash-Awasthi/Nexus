@@ -509,6 +509,72 @@ describe("BaiduErnieDriver", () => {
     const de = new BaiduErnieDriver({ clientId: "ak", clientSecret: "sk" }, te);
     await expect(de.complete(makeOpts())).rejects.toMatchObject({ code: "AUTH_FAILED" });
   });
+
+  it("sends opts.tools as ERNIE `functions`", async () => {
+    await d.complete(
+      makeOpts({
+        tools: [
+          { name: "get_weather", description: "Get weather", parameters: { type: "object" } },
+        ],
+      }),
+    );
+    const body = t.calls[1]!.body as { functions?: { name: string }[] };
+    expect(body.functions).toHaveLength(1);
+    expect(body.functions![0]!.name).toBe("get_weather");
+  });
+
+  it("parses a function_call reply into toolCalls (id == name, args parsed)", async () => {
+    const tc = new MockTransport().setResponses([
+      TOKEN,
+      {
+        id: "e2",
+        result: "",
+        function_call: { name: "get_weather", arguments: '{"city":"Paris"}' },
+        usage: { prompt_tokens: 3, completion_tokens: 4 },
+      },
+    ]);
+    const dc = new BaiduErnieDriver({ clientId: "ak", clientSecret: "sk" }, tc);
+    const r = await dc.complete(makeOpts());
+    expect(r.finishReason).toBe("tool_calls");
+    expect(r.toolCalls).toHaveLength(1);
+    expect(r.toolCalls![0]).toMatchObject({
+      id: "get_weather",
+      name: "get_weather",
+      arguments: { city: "Paris" },
+    });
+  });
+
+  it("round-trips assistant tool-call + tool result into ERNIE function messages", async () => {
+    await d.complete(
+      makeOpts({
+        messages: [
+          { role: "user", content: "weather?" },
+          {
+            role: "assistant",
+            content: "",
+            toolCalls: [{ id: "get_weather", name: "get_weather", arguments: { city: "Paris" } }],
+          },
+          { role: "tool", content: '{"tempC":18}', toolCallId: "get_weather" },
+        ],
+      }),
+    );
+    const body = t.calls[1]!.body as {
+      messages: { role: string; name?: string; function_call?: { name: string } }[];
+    };
+    expect(body.messages[1]!.function_call?.name).toBe("get_weather");
+    expect(body.messages[2]!.role).toBe("function");
+    expect(body.messages[2]!.name).toBe("get_weather");
+  });
+
+  it("tolerates malformed function_call arguments (empty object)", async () => {
+    const tc = new MockTransport().setResponses([
+      TOKEN,
+      { id: "e3", result: "", function_call: { name: "f", arguments: "{not json" } },
+    ]);
+    const dc = new BaiduErnieDriver({ clientId: "ak", clientSecret: "sk" }, tc);
+    const r = await dc.complete(makeOpts());
+    expect(r.toolCalls![0]!.arguments).toEqual({});
+  });
 });
 
 describe("AlibabaBailianDriver (DashScope compatible-mode)", () => {
