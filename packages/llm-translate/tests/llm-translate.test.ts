@@ -183,6 +183,52 @@ describe("openai → vertex → openai round-trip (lossless on tool calls)", () 
   });
 });
 
+describe("openai → responses (golden shape — input[] + instructions)", () => {
+  const resp = translate(OPENAI_REQ, "openai", "responses");
+  it("uses input[] not messages, and has no choices/messages keys", () => {
+    expect(Array.isArray(resp.input)).toBe(true);
+    expect(resp.messages).toBeUndefined();
+  });
+  it("lifts system to a top-level instructions string", () => {
+    expect(resp.instructions).toBe("You are helpful.");
+    expect((resp.input as { role?: string }[]).some((i) => i.role === "system")).toBe(false);
+  });
+  it("emits the assistant tool call as a standalone function_call item", () => {
+    const input = resp.input as { type?: string; call_id?: string; name?: string }[];
+    const call = input.find((i) => i.type === "function_call");
+    expect(call?.name).toBe("get_weather");
+    expect(call?.call_id).toBe("call_1");
+  });
+  it("emits the tool result as a function_call_output item", () => {
+    const input = resp.input as { type?: string; call_id?: string; output?: string }[];
+    const fco = input.find((i) => i.type === "function_call_output");
+    expect(fco?.call_id).toBe("call_1");
+    expect(fco?.output).toBe("18C sunny");
+  });
+  it("maps tools to the flat Responses shape (no nested function)", () => {
+    const tool = (resp.tools as { type: string; name: string; parameters: unknown }[])[0];
+    expect(tool?.type).toBe("function");
+    expect(tool?.name).toBe("get_weather");
+    expect(tool?.parameters).toBeTypeOf("object");
+  });
+  it("maps max_tokens to max_output_tokens", () => {
+    expect(resp.max_output_tokens).toBe(256);
+    expect(resp.temperature).toBe(0.2);
+  });
+});
+
+describe("openai → responses → openai round-trip (lossless on tool calls)", () => {
+  it("survives the round trip", () => {
+    const resp = translate(OPENAI_REQ, "openai", "responses");
+    const back = translate(resp, "responses", "openai");
+    const c = normalize(back, "openai") as CanonicalRequest;
+    expect(c.messages.find((m) => m.role === "tool")?.toolCallId).toBe("call_1");
+    expect(c.messages.find((m) => m.role === "assistant")?.toolCalls?.[0]?.name).toBe(
+      "get_weather",
+    );
+  });
+});
+
 describe("robustness", () => {
   it("malformed tool-call args become {} instead of throwing", () => {
     const c = normalize(

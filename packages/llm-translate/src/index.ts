@@ -54,7 +54,7 @@ export interface CanonicalRequest {
   stream?: boolean;
 }
 
-export type Format = "openai" | "anthropic" | "gemini" | "vertex";
+export type Format = "openai" | "anthropic" | "gemini" | "vertex" | "responses";
 
 // ── Loose provider shapes (input/output) ─────────────────────────────────────────
 // Typed loosely on purpose: callers pass parsed JSON from arbitrary clients. We
@@ -431,6 +431,137 @@ function toVertex(req: CanonicalRequest): Json {
   return out;
 }
 
+// ── OpenAI Responses API ⇄ canonical ─────────────────────────────────────────────
+// The Responses API is structurally distinct from Chat Completions: `messages`
+// becomes a flat `input[]` of items, the system prompt lifts to a top-level
+// `instructions` string, and tool calls / results are their OWN items
+// (`function_call` / `function_call_output`) rather than fields on a message. Tools
+// are flat (`{type,name,description,parameters}`, no nested `function`), and the
+// token cap is `max_output_tokens`. Content can be a plain string or typed parts
+// (`input_text` / `output_text`).
+
+/** Extract plain text from a Responses content field (string or typed parts). */
+function responsesText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map(obj)
+    .map((p) => str(p.text))
+    .filter(Boolean)
+    .join("\n");
+}
+
+function fromResponses(req: Json): CanonicalRequest {
+  const messages: CanonicalMessage[] = [];
+  if (req.instructions) messages.push({ role: "system", content: str(req.instructions) });
+
+  const input = req.input;
+  if (typeof input === "string") {
+    if (input) messages.push({ role: "user", content: input });
+  } else {
+    for (const raw of Array.isArray(input) ? input : []) {
+      const item = obj(raw);
+      const type = str(item.type);
+      if (type === "function_call") {
+        let args: Record<string, unknown> = {};
+        try {
+          args = item.arguments ? (JSON.parse(str(item.arguments)) as Record<string, unknown>) : {};
+        } catch {
+          args = {}; // malformed args from the wire → empty, never throw
+        }
+        const call = { id: str(item.call_id), name: str(item.name), arguments: args };
+        const prev = messages[messages.length - 1];
+        if (prev && prev.role === "assistant") {
+          prev.toolCalls = [...(prev.toolCalls ?? []), call];
+        } else {
+          messages.push({ role: "assistant", content: "", toolCalls: [call] });
+        }
+        continue;
+      }
+      if (type === "function_call_output") {
+        messages.push({
+          role: "tool",
+          content: responsesText(item.output),
+          toolCallId: str(item.call_id),
+        });
+        continue;
+      }
+      // message item (type "message" or bare role): user/assistant text.
+      const role = str(item.role) as CanonicalRole;
+      messages.push({ role, content: responsesText(item.content) });
+    }
+  }
+
+  const tools = Array.isArray(req.tools)
+    ? req.tools.map((t) => {
+        const tt = obj(t);
+        return {
+          name: str(tt.name),
+          description: tt.description ? str(tt.description) : undefined,
+          parameters: obj(tt.parameters),
+        };
+      })
+    : undefined;
+
+  return {
+    model: req.model ? str(req.model) : undefined,
+    messages,
+    ...(tools && { tools }),
+    ...(typeof req.max_output_tokens === "number" && { maxTokens: req.max_output_tokens }),
+    ...(typeof req.temperature === "number" && { temperature: req.temperature }),
+    ...(req.stream === true && { stream: true }),
+  };
+}
+
+function toResponses(req: CanonicalRequest): Json {
+  let instructions: string | undefined;
+  const input: Json[] = [];
+
+  for (const m of req.messages) {
+    if (m.role === "system") {
+      instructions = instructions ? `${instructions}\n${m.content}` : m.content;
+      continue;
+    }
+    if (m.role === "tool") {
+      input.push({
+        type: "function_call_output",
+        call_id: m.toolCallId ?? "",
+        output: m.content,
+      });
+      continue;
+    }
+    // user / assistant: text becomes a message item; tool calls become their own
+    // function_call items (an assistant turn can be pure tool calls → no message).
+    if (m.content) input.push({ role: m.role, content: m.content });
+    if (m.toolCalls?.length) {
+      for (const tc of m.toolCalls) {
+        input.push({
+          type: "function_call",
+          call_id: tc.id,
+          name: tc.name,
+          arguments: JSON.stringify(tc.arguments),
+        });
+      }
+    }
+  }
+
+  const out: Json = { input };
+  if (req.model) out.model = req.model;
+  if (instructions !== undefined) out.instructions = instructions;
+  if (req.tools) {
+    out.tools = req.tools.map((t) => ({
+      type: "function",
+      name: t.name,
+      ...(t.description !== undefined && { description: t.description }),
+      parameters: t.parameters,
+    }));
+  }
+  if (req.maxTokens !== undefined) out.max_output_tokens = req.maxTokens;
+  if (req.temperature !== undefined) out.temperature = req.temperature;
+  if (req.stream) out.stream = true;
+  return out;
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────────
 
 const NORMALIZERS: Record<Format, (req: Json) => CanonicalRequest> = {
@@ -438,12 +569,14 @@ const NORMALIZERS: Record<Format, (req: Json) => CanonicalRequest> = {
   anthropic: fromAnthropic,
   gemini: fromGemini,
   vertex: fromVertex,
+  responses: fromResponses,
 };
 const DENORMALIZERS: Record<Format, (req: CanonicalRequest) => Json> = {
   openai: toOpenAI,
   anthropic: toAnthropic,
   gemini: toGemini,
   vertex: toVertex,
+  responses: toResponses,
 };
 
 /** Parse a provider request into the canonical hub form. */
