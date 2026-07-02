@@ -19,6 +19,14 @@ import {
   compressForTool,
   compressHeavy,
   type HeavyPromptCompressor,
+  ENGINES,
+  liteEngine,
+  compressStacked,
+  compressStackedAsync,
+  compressMode,
+  extractPreservedBlocks,
+  restorePreservedBlocks,
+  type CompressEngine,
 } from "../src/index.js";
 import { decode as toonDecode } from "@toon-format/toon";
 
@@ -350,5 +358,154 @@ describe("compressHeavy (LLMLingua-2, opt-in / off by default)", () => {
       "atjsh/llmlingua-2-js-xlm-roberta-large-meetingbank",
       expect.anything(),
     );
+  });
+});
+
+// ── Engine core (§3.2) ──────────────────────────────────────────────────────────
+
+describe("preserved blocks (extract/restore)", () => {
+  it("round-trips code fences, inline code, URLs, paths, error lines", () => {
+    const input = [
+      "Here is code:",
+      "```js\nconst a = the thing;\n```",
+      "inline `a || b` and see https://example.com/x?y=1 and ./src/index.ts",
+      "Error: something broke at line 5",
+    ].join("\n");
+    const { text, blocks } = extractPreservedBlocks(input);
+    expect(blocks.length).toBeGreaterThanOrEqual(4);
+    // Masked text must not contain the raw protected content.
+    expect(text).not.toContain("```");
+    expect(text).not.toContain("https://");
+    expect(restorePreservedBlocks(text, blocks)).toBe(input);
+  });
+
+  it("a mangling transform on masked text leaves protected spans intact", () => {
+    const input = "drop the filler but keep `code_token` and https://a.b/c";
+    const { text, blocks } = extractPreservedBlocks(input);
+    // Simulate a lossy rule deleting the word "the" — must not touch sentinels.
+    const mangled = text.replace(/\bthe\b\s*/g, "");
+    const restored = restorePreservedBlocks(mangled, blocks);
+    expect(restored).toContain("`code_token`");
+    expect(restored).toContain("https://a.b/c");
+    expect(restored).not.toMatch(/\bthe\b/);
+  });
+});
+
+describe("engine registry + lite engine", () => {
+  it("registers the lite engine", () => {
+    expect(ENGINES.lite).toBe(liteEngine);
+    expect(liteEngine.lossless).toBe(true);
+  });
+  it("lite engine equals the DEFAULT_FILTERS pipeline output", () => {
+    const input = "[32mok[0m   \nok   \nok   \n\n\n\n\ndone";
+    expect(liteEngine.apply(input)).toBe(compress(input).text);
+  });
+});
+
+describe("compressStacked", () => {
+  const noisy = "[31mERR[0m   \ndup\ndup\ndup\n\n\n\n\ntail";
+
+  it("runs engines in stackPriority order (low first)", () => {
+    const order: string[] = [];
+    const a: CompressEngine = {
+      name: "a",
+      stackPriority: 30,
+      lossless: true,
+      apply: (t) => {
+        order.push("a");
+        return t.slice(0, -1); // shrink so the step is accepted
+      },
+    };
+    const b: CompressEngine = {
+      name: "b",
+      stackPriority: 10,
+      lossless: true,
+      apply: (t) => {
+        order.push("b");
+        return t.slice(0, -1);
+      },
+    };
+    compressStacked("abcdefgh", [a, b]);
+    expect(order).toEqual(["b", "a"]); // b (10) before a (30)
+  });
+
+  it("applies lite and reports a per-engine breakdown", () => {
+    const r = compressStacked(noisy, ["lite"]);
+    expect(r.applied).toContain("lite");
+    expect(r.engines).toHaveLength(1);
+    expect(r.engines[0]?.name).toBe("lite");
+    expect(r.compressedChars).toBeLessThan(r.originalChars);
+  });
+
+  it("throws on an unknown engine name", () => {
+    expect(() => compressStacked("x", ["nope"])).toThrow(/unknown compress engine/);
+  });
+
+  it("inflation guard: an engine that grows the text is skipped, result == input", () => {
+    const bloat: CompressEngine = {
+      name: "bloat",
+      stackPriority: 1,
+      lossless: false,
+      apply: (t) => t + " EXTRA PADDING ADDED",
+    };
+    const r = compressStacked("hello world", [bloat]);
+    expect(r.text).toBe("hello world");
+    expect(r.applied).toEqual([]);
+    expect(r.engines[0]?.applied).toBe(false);
+    expect(r.engines[0]?.note).toBe("inflates");
+  });
+
+  it("bail-out: a below-min-gain step is skipped when minGainPercent is set", () => {
+    const tiny: CompressEngine = {
+      name: "tiny",
+      stackPriority: 1,
+      lossless: true,
+      apply: (t) => t.replace(/.$/, ""), // drop 1 char — negligible gain
+    };
+    const long = "x".repeat(400);
+    const r = compressStacked(long, [tiny], { minGainPercent: 10 });
+    expect(r.applied).toEqual([]);
+    expect(r.engines[0]?.note).toMatch(/below-min-gain/);
+  });
+
+  it("a throwing engine is skipped (fail-open), not fatal", () => {
+    const boom: CompressEngine = {
+      name: "boom",
+      stackPriority: 1,
+      lossless: false,
+      apply: () => {
+        throw new Error("kaboom");
+      },
+    };
+    const r = compressStacked(noisy, [boom, "lite"]);
+    expect(r.engines.find((e) => e.name === "boom")?.note).toMatch(/error:kaboom/);
+    expect(r.applied).toContain("lite"); // pipeline continued
+  });
+});
+
+describe("compressStackedAsync", () => {
+  it("prefers applyAsync and still guards inflation", async () => {
+    const asyncEng: CompressEngine = {
+      name: "async",
+      stackPriority: 5,
+      lossless: false,
+      apply: (t) => t,
+      applyAsync: async (t) => t.replace(/\s+/g, " ").trim(),
+    };
+    const r = await compressStackedAsync("a   b   c   d   e   f", [asyncEng]);
+    expect(r.text).toBe("a b c d e f");
+    expect(r.applied).toContain("async");
+  });
+});
+
+describe("compressMode", () => {
+  it("off returns input unchanged with no engines applied", () => {
+    const r = compressMode("[31mx[0m   ", "off");
+    expect(r.text).toBe("[31mx[0m   ");
+    expect(r.applied).toEqual([]);
+  });
+  it("lite runs the lite engine", () => {
+    const r = compressMode("ok   \nok   \nplain", "lite");
+    expect(r.applied).toContain("lite");
   });
 });

@@ -554,3 +554,286 @@ export async function compressHeavy(
     lossy: true,
   };
 }
+
+// ── Engine abstraction + stacked pipeline ────────────────────────────────────────
+// Ported from OmniRoute's compression architecture (REF/OmniRoute/open-sse/services/
+// compression). Each engine is a pure text→text transform with a stack priority, so
+// engines compose in a deterministic order. Lossless engines (lite, headroom, ccr)
+// run before lossy ones (caveman, ultra). Everything here is pure-Node, no model and
+// no per-request API cost — the scalable path for a BYOK gateway. Fail-open: a step
+// that throws or fails to help is skipped, never breaking the request.
+
+/** Context passed to engines. All fields optional; each engine reads what it needs. */
+export interface EngineContext {
+  /** Fraction of tokens to KEEP (ultra/llmlingua). */
+  keepRate?: number;
+  /** Rule aggressiveness (caveman/rtk). */
+  intensity?: "lite" | "full" | "ultra";
+  /** Source tool name, for output-aware routing (rtk). */
+  toolName?: string;
+  /** Auth principal, for per-tenant store scoping (ccr). */
+  principalId?: string;
+}
+
+/** A composable text-compression engine. */
+export interface CompressEngine {
+  readonly name: string;
+  /** Lower runs first in a stacked pipeline. */
+  readonly stackPriority: number;
+  /** True if the transform provably preserves meaning. */
+  readonly lossless: boolean;
+  apply(text: string, ctx?: EngineContext): string;
+  /** Optional async variant (model-backed engines); the stacked-async runner prefers it. */
+  applyAsync?(text: string, ctx?: EngineContext): Promise<string>;
+}
+
+/** The engine registry. Engines self-register at module load via {@link registerEngine}. */
+export const ENGINES: Record<string, CompressEngine> = {};
+
+/** Register (or replace) an engine by name. */
+export function registerEngine(engine: CompressEngine): void {
+  ENGINES[engine.name] = engine;
+}
+
+// ── Preserved-block protection (shared by lossy prose engines) ───────────────────
+// Before a lossy prose rewrite, tombstone structured spans (code, URLs, paths, error
+// lines) with private-use sentinels so regex/word rules can't mangle them, then
+// restore them verbatim afterwards. Order matters: fenced code first (it may contain
+// URLs/paths that must not be extracted twice).
+
+const PB_OPEN = "";
+const PB_CLOSE = "";
+const PRESERVE_PATTERNS: readonly RegExp[] = [
+  /```[\s\S]*?```/g, // fenced code
+  /^.*(?:Error|Exception|Traceback)[:].*$/gm, // error/exception lines
+  /\bhttps?:\/\/[^\s)]+/g, // URLs
+  /`[^`]+`/g, // inline code
+  /(?:\.{0,2}\/)[\w./-]+/g, // relative/absolute file paths
+];
+
+/** Replace structured spans with sentinels. Returns the masked text + the blocks. */
+export function extractPreservedBlocks(text: string): { text: string; blocks: string[] } {
+  const blocks: string[] = [];
+  let out = text;
+  for (const re of PRESERVE_PATTERNS) {
+    out = out.replace(re, (m) => {
+      const i = blocks.length;
+      blocks.push(m);
+      return `${PB_OPEN}${i}${PB_CLOSE}`;
+    });
+  }
+  return { text: out, blocks };
+}
+
+/** Restore sentinels back to their original spans. Inverse of {@link extractPreservedBlocks}. */
+export function restorePreservedBlocks(text: string, blocks: string[]): string {
+  return text.replace(
+    new RegExp(`${PB_OPEN}(\\d+)${PB_CLOSE}`, "g"),
+    (_m, i: string) => blocks[Number(i)] ?? "",
+  );
+}
+
+// ── lite engine (lossless): the existing default filters, as an engine ───────────
+
+/** Lossless cleanup: ANSI strip → trailing-ws → blank-collapse → line-dedup. */
+export const liteEngine: CompressEngine = {
+  name: "lite",
+  stackPriority: 5,
+  lossless: true,
+  apply: (text) => DEFAULT_FILTERS.reduce((t, f) => f.apply(t), text),
+};
+registerEngine(liteEngine);
+
+// ── Stacked runner ────────────────────────────────────────────────────────────────
+
+/** Per-engine record of what a stacked run did. */
+export interface EngineBreakdown {
+  name: string;
+  beforeTokens: number;
+  afterTokens: number;
+  savedRatio: number;
+  /** False when the step was skipped (error / no-op / inflated / below-min-gain). */
+  applied: boolean;
+  /** Reason a step was skipped, if any. */
+  note?: string;
+}
+
+/** A {@link compressStacked} result: base delta + per-engine breakdown. */
+export interface StackedResult extends CompressResult {
+  engines: EngineBreakdown[];
+}
+
+export interface StackedOptions {
+  /** Passed through to each engine. */
+  ctx?: EngineContext;
+  /** If > 0, skip a step whose token gain is below this percentage (bail-out). */
+  minGainPercent?: number;
+}
+
+function resolveEngine(e: string | CompressEngine): CompressEngine {
+  if (typeof e !== "string") return e;
+  const found = ENGINES[e];
+  if (!found) throw new Error(`unknown compress engine: ${e}`);
+  return found;
+}
+
+/** Decide whether to keep a step's output. Never accept an inflating or no-op step. */
+function acceptStep(
+  before: string,
+  next: string,
+  minGainPercent?: number,
+): { accept: boolean; note?: string } {
+  if (next === before) return { accept: false, note: "no-op" };
+  const bt = estimateTokens(before);
+  const nt = estimateTokens(next);
+  if (nt > bt || next.length > before.length) return { accept: false, note: "inflates" };
+  if (minGainPercent && minGainPercent > 0) {
+    const gain = bt === 0 ? 0 : (1 - nt / bt) * 100;
+    if (gain < minGainPercent) return { accept: false, note: `below-min-gain(${gain.toFixed(1)}%)` };
+  }
+  return { accept: true };
+}
+
+function stackedResult(
+  input: string,
+  text: string,
+  applied: string[],
+  engines: EngineBreakdown[],
+): StackedResult {
+  const originalTokens = estimateTokens(input);
+  const compressedTokens = estimateTokens(text);
+  return {
+    text,
+    applied,
+    originalChars: input.length,
+    compressedChars: text.length,
+    originalTokens,
+    compressedTokens,
+    savedRatio: originalTokens === 0 ? 0 : 1 - compressedTokens / originalTokens,
+    engines,
+  };
+}
+
+/**
+ * Run `engines` (names or objects) over `input`, sorted by stack priority. Each step
+ * is fail-open: an engine that throws, no-ops, inflates, or gains less than
+ * `minGainPercent` is skipped and the prior text carried forward. A final inflation
+ * guard reverts to the original if the net result isn't smaller. Returns the text
+ * plus a per-engine breakdown for telemetry.
+ */
+export function compressStacked(
+  input: string,
+  engines: readonly (string | CompressEngine)[],
+  opts: StackedOptions = {},
+): StackedResult {
+  const list = engines.map(resolveEngine).slice().sort((a, b) => a.stackPriority - b.stackPriority);
+  let current = input;
+  const applied: string[] = [];
+  const breakdown: EngineBreakdown[] = [];
+  for (const e of list) {
+    const before = current;
+    const beforeTokens = estimateTokens(before);
+    let next = before;
+    let note: string | undefined;
+    try {
+      next = e.apply(before, opts.ctx);
+    } catch (err) {
+      note = `error:${(err as Error).message}`;
+      next = before;
+    }
+    if (!note) {
+      const s = acceptStep(before, next, opts.minGainPercent);
+      if (!s.accept) {
+        note = s.note;
+        next = before;
+      }
+    }
+    const accepted = note === undefined;
+    if (accepted) applied.push(e.name);
+    current = next;
+    breakdown.push({
+      name: e.name,
+      beforeTokens,
+      afterTokens: estimateTokens(current),
+      savedRatio: beforeTokens === 0 ? 0 : 1 - estimateTokens(current) / beforeTokens,
+      applied: accepted,
+      note,
+    });
+  }
+  // Global inflation guard: never return something bigger than we started with.
+  if (current.length >= input.length) return stackedResult(input, input, [], breakdown);
+  return stackedResult(input, current, applied, breakdown);
+}
+
+/**
+ * Async variant of {@link compressStacked}: prefers each engine's `applyAsync` (e.g.
+ * the model-backed `llmlingua` engine) and falls back to `apply`. Same fail-open and
+ * inflation-guard semantics.
+ */
+export async function compressStackedAsync(
+  input: string,
+  engines: readonly (string | CompressEngine)[],
+  opts: StackedOptions = {},
+): Promise<StackedResult> {
+  const list = engines.map(resolveEngine).slice().sort((a, b) => a.stackPriority - b.stackPriority);
+  let current = input;
+  const applied: string[] = [];
+  const breakdown: EngineBreakdown[] = [];
+  for (const e of list) {
+    const before = current;
+    const beforeTokens = estimateTokens(before);
+    let next = before;
+    let note: string | undefined;
+    try {
+      next = e.applyAsync ? await e.applyAsync(before, opts.ctx) : e.apply(before, opts.ctx);
+    } catch (err) {
+      note = `error:${(err as Error).message}`;
+      next = before;
+    }
+    if (!note) {
+      const s = acceptStep(before, next, opts.minGainPercent);
+      if (!s.accept) {
+        note = s.note;
+        next = before;
+      }
+    }
+    const accepted = note === undefined;
+    if (accepted) applied.push(e.name);
+    current = next;
+    breakdown.push({
+      name: e.name,
+      beforeTokens,
+      afterTokens: estimateTokens(current),
+      savedRatio: beforeTokens === 0 ? 0 : 1 - estimateTokens(current) / beforeTokens,
+      applied: accepted,
+      note,
+    });
+  }
+  if (current.length >= input.length) return stackedResult(input, input, [], breakdown);
+  return stackedResult(input, current, applied, breakdown);
+}
+
+// ── Named modes (mode → engine list), mirroring OmniRoute ────────────────────────
+// Engines are resolved lazily by compressStacked, so a mode may reference an engine
+// that a later work item registers; using such a mode before then throws a clear
+// "unknown compress engine" error rather than failing silently.
+
+export const COMPRESSION_MODES = {
+  off: [] as readonly string[],
+  lite: ["lite"],
+  standard: ["caveman"],
+  rtk: ["rtk"],
+  ultra: ["ultra"],
+  stacked: ["lite", "rtk", "caveman"],
+} as const;
+
+export type CompressionModeName = keyof typeof COMPRESSION_MODES;
+
+/** Run a named mode's engine list through the stacked runner. `off` returns input unchanged. */
+export function compressMode(
+  input: string,
+  mode: CompressionModeName = "lite",
+  opts: StackedOptions = {},
+): StackedResult {
+  return compressStacked(input, [...COMPRESSION_MODES[mode]], opts);
+}

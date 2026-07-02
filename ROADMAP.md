@@ -275,6 +275,40 @@ agent hot-path and the gateway proxy (opt-in `x-nexus-compress`).
   `eslint-disable no-control-regex` above `ANSI_DETECT` (pre-existing gap; lint-staged would trip
   on it once the file is touched). Package typecheck + build + 44/44 tests + eslint all green.
 
+**§3.2–§3.8 — multi-engine rework** *(added 2026-07-02 after auditing `REF/OmniRoute`; plan file
+`/home/yash/.claude/plans/wondrous-imagining-marshmallow.md`)*. The original Microsoft LLMLingua is
+Python/PyTorch (needs a causal LM at inference) — not portable to pure-Node BYOK. OmniRoute itself
+uses the JS port only as a low-priority optional engine; its real compression is a **pure-TS,
+no-model, multi-engine pipeline** we're porting. All engines are additive (existing exports
+untouched) and `compressHeavy`/§3.1 stays as the optional `llmlingua` engine. Text-level only;
+the message-array context manager is out of scope (belongs to gateway/translate).
+
+- **3.2 Engine core.** **DONE.** `CompressEngine`/`EngineContext`, `ENGINES` registry +
+  `registerEngine`, `compressStacked`/`compressStackedAsync` (priority-sorted, fail-open per-engine
+  bail-out on error/no-op/inflate/below-min-gain, global inflation guard, per-engine breakdown),
+  `extractPreservedBlocks`/`restorePreservedBlocks` (tombstone code/URLs/paths/error lines with
+  U+E000/E001 sentinels), `lite` engine (folds `DEFAULT_FILTERS`), `COMPRESSION_MODES` +
+  `compressMode`. 13 new tests (57 total). typecheck+build+eslint green.
+- **3.3 `ultra` engine.** Heuristic no-model token pruning: `scoreToken` (stopwords/short low,
+  digits/URLs/paths/errors force-kept, Capitalized/long high) + `pruneByScore` (keepRate default
+  0.5, whitespace-preserving) inside preserved-block extraction. Lossy, opt-in, stackPriority 40.
+  Test: `pnpm exec vitest run packages/llm-compress/tests/llm-compress.test.ts`.
+  Done: stopwords pruned first; code/URLs/numbers survive; keepRate honored.
+- **3.4 `caveman` engine.** Rule-based prose reduction (English), ~30 rules over `lite`/`full`/
+  `ultra` intensities (filler/pleasantries, purpose-phrases, verbose connectors, article-drop[full],
+  ultra abbreviations), keyword pre-filter, preserved blocks, cleanup+recapitalize, revert-on-mangle.
+  Lossy, opt-in, stackPriority 20. Done: filler removed; code/URLs untouched; intensity escalates.
+- **3.5 `rtk` engine.** Command/tool-output line filter (drop/keep/collapse + consecutive-dedup +
+  head/tail truncate to maxLines/maxChars) with bundled rulesets selected by `ctx.toolName`/content;
+  complements `compressForTool`. stackPriority 10. Done: build errors kept; noise dropped; caps hold.
+  *(Pause for review after §3.5 before the optional §3.6–§3.8.)*
+- **3.6 `headroom` engine** *(optional)*. Detect embedded homogeneous JSON arrays (≥minRows) and
+  columnarize via `encodeStructured`/TOON; replace only when strictly smaller; lossless. stackPriority 15.
+- **3.7 `ccr` engine** *(optional, reversible)*. `node:crypto` SHA-256 (24-hex) principal-scoped
+  bounded in-memory store; replace ≥minChars blocks with `[CCR retrieve …]`; `retrieveBlock()`.
+- **3.8 Wire `llmlingua` engine.** Register `compressHeavy` as the async `llmlingua` engine
+  (stackPriority 35, gated/optional) so stacked-async pipelines can include semantic pruning.
+
 ## 4. Provider OAuth + accounts — `@nexus/llm-oauth`, `@nexus/llm-accounts`
 
 Baseline: framework + AES-256-GCM vault (`AesGcmVault`) + PKCE + dedup refresh
