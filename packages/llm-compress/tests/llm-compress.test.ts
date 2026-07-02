@@ -634,6 +634,15 @@ describe("caveman engine", () => {
     expect(r.applied).toContain("caveman");
     expect(r.compressedChars).toBeLessThan(r.originalChars);
   });
+
+  it("does not re-capitalize line-start paths/commands, nor leave doubled commas", () => {
+    const input =
+      "Basically, really, fix it.\nsrc/index.ts has a bug\nnpm warn deprecated foo";
+    const out = cavemanCompress(input, "full");
+    expect(out).toContain("src/index.ts"); // not "Src/index.ts"
+    expect(out).toMatch(/^npm warn/m); // not "Npm warn"
+    expect(out).not.toMatch(/,\s*,/); // no doubled comma from removed filler
+  });
 });
 
 // ── rtk engine (§3.5) ───────────────────────────────────────────────────────────

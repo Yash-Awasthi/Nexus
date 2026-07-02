@@ -965,10 +965,10 @@ const CAVEMAN_RULES: readonly CavemanRule[] = [
   {
     name: "pleasantries",
     minIntensity: "lite",
-    keyword: /please|kindly|thank|no problem|of course|feel free/i,
+    keyword: /please|kindly|thank|no problem|of course|feel free|sure/i,
     apply: (t) =>
       t.replace(
-        /\b(?:please|kindly|thanks?(?: you)?|thank you|no problem|of course|feel free to)\b/gi,
+        /\b(?:please|kindly|thanks?(?: you)?|thank you|no problem|of course|feel free to|sure(?: thing)?)\b/gi,
         "",
       ),
   },
@@ -1066,6 +1066,8 @@ function cavemanCleanup(text: string): string {
   return text
     .replace(/[ \t]{2,}/g, " ")
     .replace(/\s+([,.;:!?])/g, "$1")
+    .replace(/([,;:])(?:\s*\1)+/g, "$1") // collapse doubled punctuation (", ," → ",")
+    .replace(/,(?=[.;:!?])/g, "") // drop a comma butting a stronger mark
     .replace(/\(\s+/g, "(")
     .replace(/\s+\)/g, ")")
     .replace(/[ \t]+\n/g, "\n")
@@ -1074,9 +1076,13 @@ function cavemanCleanup(text: string): string {
     .trim();
 }
 
-/** Re-capitalize sentence starts after deletions removed leading words. */
+/**
+ * Re-capitalize sentence starts after deletions removed leading words. Only fires
+ * after sentence punctuation + a HORIZONTAL space (not a newline): a line start may
+ * be a path/command (`src/index.ts`, `npm warn …`) that must not be re-cased.
+ */
 function cavemanRecapitalize(text: string): string {
-  return text.replace(/(^|[.!?]\s+)([a-z])/g, (_m, lead: string, ch: string) => lead + ch.toUpperCase());
+  return text.replace(/(^|[.!?][ \t]+)([a-z])/g, (_m, lead: string, ch: string) => lead + ch.toUpperCase());
 }
 
 /** Count how many preserved-block sentinels remain in `text`. */
