@@ -23,6 +23,7 @@ import chalk from "chalk";
 import { Command } from "commander";
 
 import { api } from "./lib/client.js";
+import { runLocalAgent } from "./lib/local-agent.js";
 import { streamSse } from "./lib/sse-stream.js";
 
 const program = new Command();
@@ -96,6 +97,39 @@ function renderAgentFrame(
   }
 }
 
+/** §7.4 — run the agent loop in-process, rendering each step to the console. */
+async function runCodeLocal(
+  task: string,
+  opts: {
+    provider?: string;
+    model?: string;
+    dir?: string;
+    apiKey?: string;
+    maxSteps?: string;
+    shell?: boolean;
+  },
+): Promise<void> {
+  console.log(chalk.gray(`  ▸ ${task.slice(0, 100)} ${chalk.dim("(local)")}\n`));
+  const result = await runLocalAgent({
+    instruction: task,
+    rootDir: opts.dir ?? process.cwd(),
+    ...(opts.provider ? { provider: opts.provider } : {}),
+    ...(opts.model ? { model: opts.model } : {}),
+    ...(opts.apiKey ? { apiKey: opts.apiKey } : {}),
+    ...(opts.maxSteps ? { maxSteps: Number(opts.maxSteps) } : {}),
+    enableShell: opts.shell !== false,
+    onStep: (step) => {
+      const tools = step.toolCalls.map((c) => c.name);
+      const label = tools.length ? tools.join(", ") : chalk.gray("(thinking)");
+      console.log(`  ${chalk.cyan(`step ${step.stepIndex}`)}  ${label}`);
+    },
+  });
+  const status = result.aborted ? "aborted" : result.stopReason ? result.stopReason : "completed";
+  const color = status === "completed" ? chalk.green : chalk.yellow;
+  console.log(color(`\n● ${status.toUpperCase()}`), chalk.gray(`(${result.steps.length} steps)`));
+  if (result.finalContent) console.log(`\n${result.finalContent}`);
+}
+
 program
   .command("code <task>")
   .description("Launch a coding-agent run and stream its progress")
@@ -107,7 +141,21 @@ program
   .option("--max-steps <n>", "Max agent steps")
   .option("--review", "Run a forked post-run learning review")
   .option("--no-wait", "Return after launch without streaming")
+  .option("--local", "Run the agent loop in-process (BYOK key from env) instead of via the API")
+  .option("--dir <path>", "Workspace root for --local runs (default: cwd)")
+  .option("--api-key <key>", "Provider API key for --local runs (else the provider env var)")
+  .option("--no-shell", "Disable the run_command tool for --local runs")
   .action(async (task: string, opts) => {
+    // §7.4 — in-process loop over the RuntimeToolSet; no API/worker involved.
+    if (opts.local) {
+      try {
+        await runCodeLocal(task, opts);
+      } catch (err) {
+        console.error(chalk.red("✗"), String(err));
+        process.exit(1);
+      }
+      return;
+    }
     try {
       const body: Record<string, unknown> = { instruction: task };
       if (opts.provider) body.provider = opts.provider;

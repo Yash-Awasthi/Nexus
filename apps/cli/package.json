@@ -25,7 +25,9 @@
     "nexus": "./dist/index.js"
   },
   "dependencies": {
+    "@nexus/agent-runtime": "workspace:*",
     "@nexus/contracts": "workspace:*",
+    "@nexus/llm-drivers": "workspace:*",
     "@nexus/runtime": "workspace:*",
     "chalk": "^5.3.0",
     "commander": "^12.1.0",
