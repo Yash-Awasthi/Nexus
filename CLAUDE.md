@@ -3,6 +3,17 @@
 Multi-agent AI orchestration platform. **110-package TypeScript monorepo** (pnpm workspaces + Turbo).
 BYOK: bring-your-own LLM keys; no data leaves the deployment.
 
+## Active work — start here
+
+- **Plan / spec:** [ROADMAP.md](ROADMAP.md) — forward-only execution spec. Work items are `N.k`
+  (Files / Do / Done), fork-free, sequenced under **Order of work**. Its **Execution protocol** is
+  authoritative for _how_ to work: inline only (no workflows/subagents/parallel), one item per
+  commit, the checkpoint-commit + PROGRESS-update cadence, and the build/test gotchas.
+- **Resume state:** [PROGRESS.md](PROGRESS.md) (gitignored) — the "Now / Next / Shipped" pointer;
+  its format is defined in ROADMAP.md. **Read PROGRESS.md first when resuming**, then ROADMAP.md.
+- Executing the roadmap? Follow it as written and **don't re-audit the codebase to confirm facts
+  already stated there** — the paths / shipped-state are current; act on them.
+
 ## Toolchain (must match)
 
 - **Node**: 20.x (repo pins `20.19.0` in `.nvmrc`; engines require `>=20.18.0`)
@@ -47,8 +58,13 @@ Packages are workspace deps referenced as `@nexus/<name>` with `workspace:*`.
 ```
 pnpm --filter @nexus/council test
 pnpm --filter @nexus/council typecheck
-turbo run build --filter=@nexus/council
+pnpm --filter @nexus/council build
 ```
+
+> `turbo` is often **not on PATH directly** — invoke it through the `pnpm` scripts
+> (`pnpm build` = `turbo run build`) or use `pnpm --filter <pkg> <script>` per package.
+> `apps/api`/`apps/worker` consume built `dist`: after editing a package's `src`, run its
+> `build` before an app typecheck will see the change.
 
 Per-package scripts: `build` (tsc), `dev` (tsx watch), `typecheck` (tsc --noEmit),
 `lint` (eslint src/), `test` (vitest run).
@@ -67,4 +83,16 @@ Per-package scripts: `build` (tsc), `dev` (tsx watch), `typecheck` (tsc --noEmit
   whole-repo runs unless a change is cross-cutting.
 - Before editing a package, read its `src/` and co-located tests; mirror existing patterns.
 - `.env.example` is the full env reference — copy to `.env` for local runs.
-- Don't commit unless asked. When you do, branch first (don't commit to `main`).
+
+## Commits
+
+- **Authorship:** always commit as author **`Yash-Awasthi <yashawasthi12032006@gmail.com>`**
+  (author = committer).
+- **No `Co-Authored-By` trailer by default.** Add the co-author trailer **only** for **CI fixes and
+  error/bug corrections** — never for features, docs, or refactors:
+  `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`.
+- Don't commit unless asked — **except** ROADMAP.md items, which carry a standing checkpoint-commit
+  approval (see ROADMAP's Execution protocol).
+- Always branch off `main` (never commit to `main`); **never push / open a PR** unless asked.
+- Stage explicit paths — **never `git add -A`**. Never stage `.claude/settings.json` or `.directory`.
+- Conventional Commits (commitlint + Husky enforce).
