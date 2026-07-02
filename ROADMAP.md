@@ -253,7 +253,7 @@ filters (`stripAnsi`/`trimTrailing`/`collapseBlankLines`/`dedupConsecutive`), `s
 `compress`/`compressAuto`/`compressForTool`, `TOOL_PROFILES` router, `INJECTORS`. Wired into the
 agent hot-path and the gateway proxy (opt-in `x-nexus-compress`).
 
-- **3.1 Heavy lossy mode** *(fork resolved: opt-in, off by default)*.
+- **3.1 Heavy lossy mode** *(fork resolved: opt-in, off by default)*. **DONE.**
   Files: `packages/llm-compress/src/index.ts` + `packages/llm-compress/package.json`.
   Do: 1) gate behind `NEXUS_LLMLINGUA=1` + lazy `import('@atjsh/llmlingua-2')`; 2) list it in
   `optionalDependencies` (not installed by default); 3) document the 57 MB–2.2 GB model download
@@ -261,6 +261,19 @@ agent hot-path and the gateway proxy (opt-in `x-nexus-compress`).
   (`vi.mock`), and that the default path never touches it.
   Test: `pnpm exec vitest run packages/llm-compress/tests/llm-compress.test.ts`
   Done: gated path tested with mocked import; default path untouched.
+  Done-state: added `compressHeavy(input, opts)` — async, `NEXUS_LLMLINGUA=1` (or `opts.enabled`)
+  gate; off → returns input unchanged with `enabled:false` and never imports the package/model.
+  On → lazy `import('@atjsh/llmlingua-2')` (+ `js-tiktoken`) via non-literal specifiers (so `tsc`
+  won't resolve the not-installed optional deps), `LLMLingua2.WithBERTMultilingual`/`WithXLMRoBERTa`
+  factory → `promptCompressor.compress_prompt(text,{rate})`; injectable `loadCompressor` seam for
+  tests. `optionalDependencies`: `@atjsh/llmlingua-2` + peers `@huggingface/transformers`,
+  `@tensorflow/tfjs`, `js-tiktoken` (manifest-only; lockfile intentionally not regenerated — deps
+  never installed by default). `.env.example` gained a compression section documenting the gate +
+  57 MB–2.2 GB HF model download. 6 new tests (44 total): default-off passthrough + loader-never-
+  called, non-"1" env stays off, opts.enabled + env-gate on with injected compressor, `vi.mock`ed
+  real loader path, XLM-RoBERTa model-id selection. Drive-by: added the missing
+  `eslint-disable no-control-regex` above `ANSI_DETECT` (pre-existing gap; lint-staged would trip
+  on it once the file is touched). Package typecheck + build + 44/44 tests + eslint all green.
 
 ## 4. Provider OAuth + accounts — `@nexus/llm-oauth`, `@nexus/llm-accounts`
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   stripAnsi,
   trimTrailing,
@@ -17,8 +17,26 @@ import {
   DEFAULT_FILTERS,
   resolveToolProfile,
   compressForTool,
+  compressHeavy,
+  type HeavyPromptCompressor,
 } from "../src/index.js";
 import { decode as toonDecode } from "@toon-format/toon";
+
+// Heavy mode's optional deps are NOT installed. Mock them so the real
+// `defaultLoadCompressor` path can be exercised without pulling the model.
+// `vi.hoisted` lets the (hoisted) `vi.mock` factories share these spies.
+const heavyMocks = vi.hoisted(() => {
+  const compress_prompt = vi.fn(async (_ctx: string, _opts: { rate?: number }) => "MOCK COMPRESSED");
+  const factory = vi.fn(async (_model: string, _cfg: unknown) => ({
+    promptCompressor: { compress_prompt },
+  }));
+  return { compress_prompt, factory };
+});
+vi.mock("@atjsh/llmlingua-2", () => ({
+  LLMLingua2: { WithBERTMultilingual: heavyMocks.factory, WithXLMRoBERTa: heavyMocks.factory },
+}));
+vi.mock("js-tiktoken/lite", () => ({ Tiktoken: vi.fn() }));
+vi.mock("js-tiktoken/ranks/o200k_base", () => ({ default: {} }));
 
 describe("estimateTokens", () => {
   it("≈ 1 token / 4 chars", () => expect(estimateTokens("hello")).toBe(2));
@@ -254,5 +272,83 @@ describe("compressForTool", () => {
     const r = compressForTool("git_diff", colored);
     expect(r.text).not.toContain("[31m");
     expect(r.applied).toContain("strip-ansi");
+  });
+});
+
+describe("compressHeavy (LLMLingua-2, opt-in / off by default)", () => {
+  const INPUT = "the quick brown fox jumps over the lazy dog again and again";
+
+  afterEach(() => {
+    delete process.env.NEXUS_LLMLINGUA;
+    vi.clearAllMocks();
+  });
+
+  it("is OFF by default: passthrough, no import, no model touched", async () => {
+    // A loader that would throw if ever called — proves the gate short-circuits
+    // BEFORE the (mocked) import or any model download.
+    const loadCompressor = vi.fn(async (): Promise<HeavyPromptCompressor> => {
+      throw new Error("loader must not run when heavy mode is off");
+    });
+    const r = await compressHeavy(INPUT, { loadCompressor });
+    expect(r.enabled).toBe(false);
+    expect(r.lossy).toBe(false);
+    expect(r.text).toBe(INPUT);
+    expect(r.applied).toEqual([]);
+    expect(r.savedRatio).toBe(0);
+    expect(loadCompressor).not.toHaveBeenCalled();
+    expect(heavyMocks.factory).not.toHaveBeenCalled();
+  });
+
+  it("stays off even with NEXUS_LLMLINGUA set to anything but '1'", async () => {
+    process.env.NEXUS_LLMLINGUA = "true";
+    const loadCompressor = vi.fn(async (): Promise<HeavyPromptCompressor> => {
+      throw new Error("loader must not run");
+    });
+    const r = await compressHeavy(INPUT, { loadCompressor });
+    expect(r.enabled).toBe(false);
+    expect(loadCompressor).not.toHaveBeenCalled();
+  });
+
+  it("runs when enabled via opts.enabled, using the injected compressor", async () => {
+    const compress_prompt = vi.fn(async () => "brown fox jumps lazy dog");
+    const loadCompressor = vi.fn(async (): Promise<HeavyPromptCompressor> => ({ compress_prompt }));
+    const r = await compressHeavy(INPUT, { enabled: true, rate: 0.3, loadCompressor });
+    expect(loadCompressor).toHaveBeenCalledOnce();
+    expect(compress_prompt).toHaveBeenCalledWith(INPUT, { rate: 0.3 });
+    expect(r.enabled).toBe(true);
+    expect(r.lossy).toBe(true);
+    expect(r.text).toBe("brown fox jumps lazy dog");
+    expect(r.applied).toEqual(["llmlingua-2"]);
+    expect(r.compressedTokens).toBeLessThan(r.originalTokens);
+    expect(r.savedRatio).toBeGreaterThan(0);
+  });
+
+  it("respects the NEXUS_LLMLINGUA=1 env gate", async () => {
+    process.env.NEXUS_LLMLINGUA = "1";
+    const compress_prompt = vi.fn(async () => "squeezed");
+    const loadCompressor = vi.fn(async (): Promise<HeavyPromptCompressor> => ({ compress_prompt }));
+    const r = await compressHeavy(INPUT, { loadCompressor });
+    expect(loadCompressor).toHaveBeenCalledOnce();
+    expect(r.enabled).toBe(true);
+    expect(r.text).toBe("squeezed");
+  });
+
+  it("default loader lazily imports the (mocked) @atjsh/llmlingua-2 package", async () => {
+    // No injected loader → drives the real defaultLoadCompressor, which dynamically
+    // imports @atjsh/llmlingua-2 + js-tiktoken (all mocked above).
+    const r = await compressHeavy(INPUT, { enabled: true });
+    expect(heavyMocks.factory).toHaveBeenCalledOnce();
+    expect(heavyMocks.compress_prompt).toHaveBeenCalledWith(INPUT, { rate: 0.5 });
+    expect(r.enabled).toBe(true);
+    expect(r.text).toBe("MOCK COMPRESSED");
+  });
+
+  it("selects the XLM-RoBERTa factory when model = xlm-roberta", async () => {
+    await compressHeavy(INPUT, { enabled: true, model: "xlm-roberta" });
+    // Both factory slots point at the same spy; assert it received the larger model id.
+    expect(heavyMocks.factory).toHaveBeenCalledWith(
+      "atjsh/llmlingua-2-js-xlm-roberta-large-meetingbank",
+      expect.anything(),
+    );
   });
 });

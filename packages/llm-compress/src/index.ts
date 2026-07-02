@@ -217,6 +217,7 @@ export function compressPreset(input: string, preset: PresetName = "lossless"): 
 /** Structural traits a chunk of tool output can exhibit. A chunk may have several. */
 export type OutputTrait = "ansi" | "trailing-ws" | "blank-runs" | "repeat-runs";
 
+// eslint-disable-next-line no-control-regex
 const ANSI_DETECT = /\[[0-9;?]*[ -/]*[@-~]/; // non-global: safe for .test()
 const TRAILING_WS_DETECT = /[ \t]+(\r?\n|$)/;
 const BLANK_RUNS_DETECT = /(\r?\n)[ \t]*(\r?\n)[ \t]*(\r?\n)/;
@@ -397,4 +398,159 @@ export function injectSystemPrompt(base: string, injectors: readonly InjectorNam
     .filter((text) => !trimmed.includes(text));
   if (blocks.length === 0) return base;
   return [trimmed, ...blocks].filter(Boolean).join("\n\n");
+}
+
+// ── Heavy lossy mode: LLMLingua-2 semantic compression (opt-in, off by default) ──
+// The lossy filter above (smartTruncate) is *structural*: it drops the middle of a
+// long output. LLMLingua-2 (@atjsh/llmlingua-2) goes further — a BERT-class model
+// scores every token's importance and drops the low-signal ones, a *semantic*
+// squeeze that keeps meaning while cutting far more than byte/line filters can.
+// That power costs a real ML model at runtime, so it is gated hard:
+//
+//   • OFF unless the `NEXUS_LLMLINGUA=1` env var is set (or `opts.enabled` in code).
+//   • `@atjsh/llmlingua-2` and its peers are OPTIONAL dependencies — NOT installed
+//     by default (see package.json `optionalDependencies`).
+//   • The package is imported lazily, only when the gate is on. When off,
+//     `compressHeavy` returns the input unchanged and NEVER imports it or touches
+//     a model — so the default install/hot-path pays nothing.
+//   • First enabled run downloads ONNX model weights from Hugging Face: ~57 MB
+//     (TinyBERT) up to ~2.2 GB (XLM-RoBERTa) depending on the chosen model. This
+//     large one-time download is the whole reason it is opt-in.
+//
+// To use it: `NEXUS_LLMLINGUA=1` and install the optional peers —
+//   pnpm add @atjsh/llmlingua-2 @huggingface/transformers @tensorflow/tfjs js-tiktoken
+
+/** Which bundled LLMLingua-2 model to load. Larger = more accurate but heavier. */
+export type HeavyModel = "bert-multilingual" | "xlm-roberta";
+
+/** Default Hugging Face model id per {@link HeavyModel} (download sizes in comments). */
+const HEAVY_MODEL_IDS: Record<HeavyModel, string> = {
+  "bert-multilingual": "Arcoldd/llmlingua4j-bert-base-onnx", // ~710 MB
+  "xlm-roberta": "atjsh/llmlingua-2-js-xlm-roberta-large-meetingbank", // ~2.2 GB
+};
+
+/** The single method of the LLMLingua-2 compressor we depend on. */
+export interface HeavyPromptCompressor {
+  compress_prompt(context: string, opts: { rate?: number }): Promise<string>;
+}
+
+/** An LLMLingua-2 factory (e.g. `WithBERTMultilingual`) as we call it. */
+type HeavyFactory = (
+  modelName: string,
+  cfg: unknown,
+) => Promise<{ promptCompressor: HeavyPromptCompressor }>;
+
+export interface HeavyCompressOptions {
+  /** Force on/off, overriding the `NEXUS_LLMLINGUA` env gate (mainly for tests). */
+  enabled?: boolean;
+  /** Fraction of tokens to KEEP, 0..1. Lower = more aggressive. Default 0.5. */
+  rate?: number;
+  /** Which model the default loader loads. Default "bert-multilingual". */
+  model?: HeavyModel;
+  /** Override the Hugging Face model id (else {@link HEAVY_MODEL_IDS}). */
+  modelName?: string;
+  /**
+   * Seam for tests / custom setups: supply a ready compressor instead of the
+   * default lazy `import('@atjsh/llmlingua-2')` + model download. Only consulted
+   * when heavy mode is enabled; when omitted, the real (optional) package is
+   * imported on demand.
+   */
+  loadCompressor?: () => Promise<HeavyPromptCompressor>;
+}
+
+/** A {@link compressHeavy} result: the base delta plus gate/lossy flags. */
+export interface HeavyCompressResult extends CompressResult {
+  /** True when LLMLingua-2 actually ran; false when the gate was off (passthrough). */
+  enabled: boolean;
+  /** LLMLingua-2 drops tokens — always lossy when it runs. */
+  lossy: boolean;
+}
+
+/** The env gate. Off unless `NEXUS_LLMLINGUA` is exactly "1". Browser-safe. */
+function heavyGateOn(): boolean {
+  return typeof process !== "undefined" && process.env?.NEXUS_LLMLINGUA === "1";
+}
+
+/**
+ * Default loader: lazily import the optional `@atjsh/llmlingua-2` package plus a
+ * tiktoken tokenizer, build a compressor for `model`, and return it. Only ever
+ * reached when heavy mode is enabled, so the import and the model download stay
+ * out of the default path entirely. The specifiers are held in variables so `tsc`
+ * does not try to resolve these not-installed optional deps at build time.
+ */
+async function defaultLoadCompressor(
+  model: HeavyModel,
+  modelName: string,
+): Promise<HeavyPromptCompressor> {
+  const llmlinguaPkg = "@atjsh/llmlingua-2";
+  const tiktokenLite = "js-tiktoken/lite";
+  const tiktokenRanks = "js-tiktoken/ranks/o200k_base";
+  const { LLMLingua2 } = (await import(llmlinguaPkg)) as {
+    LLMLingua2: { WithBERTMultilingual: HeavyFactory; WithXLMRoBERTa: HeavyFactory };
+  };
+  const { Tiktoken } = (await import(tiktokenLite)) as {
+    Tiktoken: new (ranks: unknown) => unknown;
+  };
+  const { default: o200kBase } = (await import(tiktokenRanks)) as { default: unknown };
+  const factory =
+    model === "xlm-roberta" ? LLMLingua2.WithXLMRoBERTa : LLMLingua2.WithBERTMultilingual;
+  const { promptCompressor } = await factory(modelName, {
+    transformerJSConfig: { device: "auto", dtype: "fp32" },
+    oaiTokenizer: new Tiktoken(o200kBase),
+    modelSpecificOptions: { subfolder: "" },
+  });
+  return promptCompressor;
+}
+
+/** A no-op result: input unchanged, zero savings. Used when the gate is off. */
+function heavyPassthrough(input: string): CompressResult {
+  const tokens = estimateTokens(input);
+  return {
+    text: input,
+    applied: [],
+    originalChars: input.length,
+    compressedChars: input.length,
+    originalTokens: tokens,
+    compressedTokens: tokens,
+    savedRatio: 0,
+  };
+}
+
+/**
+ * Heavy, *lossy*, semantic compression via LLMLingua-2. OFF by default: unless
+ * `NEXUS_LLMLINGUA=1` (or `opts.enabled`) this returns the input unchanged with
+ * `enabled:false` and never imports the model. When on, it drops low-importance
+ * tokens down to `rate` (default 0.5 — keep half) and reports the token delta.
+ *
+ * Async because the model runs off the main path and may download on first use;
+ * the rest of this module stays synchronous. Always treat the result as lossy.
+ */
+export async function compressHeavy(
+  input: string,
+  opts: HeavyCompressOptions = {},
+): Promise<HeavyCompressResult> {
+  const enabled = opts.enabled ?? heavyGateOn();
+  if (!enabled) {
+    // DEFAULT PATH — returns before touching the loader, the package, or a model.
+    return { ...heavyPassthrough(input), enabled: false, lossy: false };
+  }
+  const rate = opts.rate ?? 0.5;
+  const model = opts.model ?? "bert-multilingual";
+  const modelName = opts.modelName ?? HEAVY_MODEL_IDS[model];
+  const load = opts.loadCompressor ?? (() => defaultLoadCompressor(model, modelName));
+  const compressor = await load();
+  const text = await compressor.compress_prompt(input, { rate });
+  const originalTokens = estimateTokens(input);
+  const compressedTokens = estimateTokens(text);
+  return {
+    text,
+    applied: ["llmlingua-2"],
+    originalChars: input.length,
+    compressedChars: text.length,
+    originalTokens,
+    compressedTokens,
+    savedRatio: originalTokens === 0 ? 0 : 1 - compressedTokens / originalTokens,
+    enabled: true,
+    lossy: true,
+  };
 }
