@@ -352,7 +352,18 @@ Sanctioned third-party OAuth only.
   Done: dispatch picks a healthy account; cooldown/breaker exercised in a test; OAuth creds
   reach the vertex driver.
 
-- **4.2 More OAuth providers.**
+- **4.2 More OAuth providers.** **Done this branch (commits `0b54635` + `4f9920a` + `68e74cc`).**
+  The azure-openai stub reason was stale ("no AzureOpenAIDriver yet") — the driver exists; the
+  real gap was that it only spoke `api-key`, so an Entra OAuth token was unroutable. Fixed both
+  ends: `AzureOpenAIDriver` gained `authMode:"aad"` (→ `Authorization: Bearer`, default stays
+  api-key) in `@nexus/llm-drivers` (`0b54635`, 276 tests); `MicrosoftEntraAuthProvider`
+  (auth-code + PKCE, tenant-scoped `login.microsoftonline.com/{tenant}/oauth2/v2.0/*`,
+  `cognitiveservices.azure.com/.default` + `offline_access`; `toDriverCredentials` →
+  `{apiKey,authMode:"aad",endpoint,deployment,apiVersion}`) added in `@nexus/llm-oauth`
+  (`4f9920a`, 22 tests). Descriptor flipped `supported:true`; `registryFromEnv` registers it only
+  when all five AZURE_* vars are present. github-models stays `supported:false` (still preview —
+  third-party inference OAuth scope not documented). `.env.example` documents the Azure OAuth vars
+  (`68e74cc`).
   Files: `packages/llm-oauth/src/providers.ts` (`DESCRIPTORS`).
   Do: add `azure-openai` / `github-models` **only** when a documented third-party auth path
   exists; else keep `supported:false` with a TODO reason.
