@@ -301,10 +301,12 @@ the message-array context manager is out of scope (belongs to gateway/translate)
   cleanup + recapitalize, and sentinel-count validation that reverts on corruption. Lossy, opt-in,
   `cavemanEngine` stackPriority 20. 7 new tests (73 total). Done: filler removed; code/URLs
   untouched; intensity escalates; pure code block is a no-op.
-- **3.5 `rtk` engine.** Command/tool-output line filter (drop/keep/collapse + consecutive-dedup +
-  head/tail truncate to maxLines/maxChars) with bundled rulesets selected by `ctx.toolName`/content;
-  complements `compressForTool`. stackPriority 10. Done: build errors kept; noise dropped; caps hold.
-  *(Pause for review after §3.5 before the optional §3.6–§3.8.)*
+- **3.5 `rtk` engine.** **DONE.** Command/tool-output line filter: `keep` patterns (errors/warnings/
+  summaries — take precedence) + `drop` patterns, bundled rulesets (typescript-build, eslint,
+  npm-install, git, generic) selected by `ctx.toolName`, then consecutive-dedup + head/tail truncate
+  (70/30) to `maxLines` (200) and a hard `maxChars` (12000) cap. `rtkEngine` stackPriority 10. Lossy.
+  6 new tests (79 total). Done: build errors kept; blank/progress/deprecation noise dropped; caps hold.
+  *(Core §3.2–§3.5 complete — paused here for review before the optional §3.6–§3.8.)*
 - **3.6 `headroom` engine** *(optional)*. Detect embedded homogeneous JSON arrays (≥minRows) and
   columnarize via `encodeStructured`/TOON; replace only when strictly smaller; lossless. stackPriority 15.
 - **3.7 `ccr` engine** *(optional, reversible)*. `node:crypto` SHA-256 (24-hex) principal-scoped

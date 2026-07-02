@@ -32,6 +32,8 @@ import {
   ultraEngine,
   cavemanCompress,
   cavemanEngine,
+  rtkCompress,
+  rtkEngine,
 } from "../src/index.js";
 import { decode as toonDecode } from "@toon-format/toon";
 
@@ -631,5 +633,60 @@ describe("caveman engine", () => {
     const r = compressStacked(prose, ["caveman"], { ctx: { intensity: "full" } });
     expect(r.applied).toContain("caveman");
     expect(r.compressedChars).toBeLessThan(r.originalChars);
+  });
+});
+
+// ── rtk engine (§3.5) ───────────────────────────────────────────────────────────
+
+describe("rtk engine", () => {
+  it("is registered at stackPriority 10 and is lossy", () => {
+    expect(ENGINES.rtk).toBe(rtkEngine);
+    expect(rtkEngine.stackPriority).toBe(10);
+    expect(rtkEngine.lossless).toBe(false);
+  });
+
+  it("keeps TS errors while dropping blank/progress noise (tsc ruleset)", () => {
+    const log = [
+      "Compiling...",
+      "",
+      "src/index.ts(12,5): error TS2345: Argument of type 'string'.",
+      "",
+      "",
+      "42 files checked",
+    ].join("\n");
+    const out = rtkCompress(log, { toolName: "tsc" });
+    expect(out).toContain("error TS2345");
+    expect(out).not.toContain("42 files checked");
+    expect(out.split("\n").filter((l) => l === "").length).toBe(0); // blanks gone
+  });
+
+  it("keep patterns take precedence over drop patterns", () => {
+    // A generic ruleset drops blank lines but must keep an error line regardless.
+    const out = rtkCompress("ok\n\nError: boom\n\ndone", {});
+    expect(out).toContain("Error: boom");
+  });
+
+  it("truncates very long output to head+tail with an elision marker", () => {
+    const big = Array.from({ length: 400 }, (_, i) => `line ${i} unique`).join("\n");
+    const out = rtkCompress(big, { maxLines: 100 });
+    expect(out).toContain("line 0 unique");
+    expect(out).toContain("line 399 unique");
+    expect(out).toContain("elided");
+    expect(out.length).toBeLessThan(big.length);
+  });
+
+  it("enforces the hard character cap", () => {
+    const huge = "x".repeat(20000); // single long line, no newlines to filter
+    const out = rtkCompress(huge, { maxChars: 5000 });
+    expect(out.length).toBeLessThanOrEqual(5000 + "\n...[truncated]".length);
+    expect(out).toContain("[truncated]");
+  });
+
+  it("via compressStacked routes by ctx.toolName", () => {
+    const log = ["added 42 packages", "", "", "npm warn deprecated foo@1.0.0", ""].join("\n");
+    const r = compressStacked(log, ["rtk"], { ctx: { toolName: "npm install" } });
+    expect(r.applied).toContain("rtk");
+    expect(r.text).toContain("added 42 packages");
+    expect(r.text).not.toContain("deprecated");
   });
 });

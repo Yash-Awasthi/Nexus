@@ -1113,3 +1113,116 @@ export const cavemanEngine: CompressEngine = {
   apply: (text, ctx) => cavemanCompress(text, ctx?.intensity ?? "full"),
 };
 registerEngine(cavemanEngine);
+
+// ── rtk engine (lossy, command/tool-output line filter) ──────────────────────────
+// Ported from OmniRoute's rtk engine (engines/rtk/): the biggest single win on
+// agent transcripts is throwing away the non-essential lines of command output —
+// build progress, install trees, blank runs — while ALWAYS keeping errors, warnings
+// and summaries. Each ruleset has `keep` patterns (take precedence — never dropped)
+// and `drop` patterns; a source-tool name (`ctx.toolName`) selects the ruleset, else
+// a generic one. Then consecutive-dedup + head/tail truncation cap the size.
+
+interface RtkRuleset {
+  readonly id: string;
+  /** Tool-name patterns that select this ruleset. */
+  readonly commands: readonly RegExp[];
+  /** Lines matching any of these are ALWAYS kept (errors/summaries). */
+  readonly keep: readonly RegExp[];
+  /** Lines matching any of these are dropped (unless also matched by `keep`). */
+  readonly drop: readonly RegExp[];
+}
+
+const RTK_RULESETS: readonly RtkRuleset[] = [
+  {
+    id: "typescript-build",
+    commands: [/tsc|typecheck|vue-tsc/i],
+    keep: [/error TS\d+/i, /\bTS\d{4}\b/, /\berror\b/i, /\bwarning\b/i, /found \d+ error/i],
+    drop: [/^\s*$/, /^\s*\d+ files? (?:checked|compiled)/i, /^\s*Compiling/i],
+  },
+  {
+    id: "eslint",
+    commands: [/eslint|\blint\b/i],
+    keep: [/error|warning|problem/i, /\d+ problems?/i, /[\\/][^\s]*\.[cm]?[jt]sx?/],
+    drop: [/^\s*$/],
+  },
+  {
+    id: "npm-install",
+    commands: [/npm (?:i\b|install|ci)|pnpm (?:i\b|install|add)|yarn/i],
+    // Keep errors + summary lines. Deliberately NOT a bare `warn` — deprecation
+    // warnings are the noise we want dropped (they'd otherwise beat the drop rule).
+    keep: [/\berror\b|added \d+|removed \d+|changed \d+|audited \d+|packages? in/i],
+    drop: [/^\s*$/, /^npm warn deprecated/i, /^\s*[│├└]/, /idealTree|reify:|timing /i, /^\s*[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/],
+  },
+  {
+    id: "git",
+    commands: [/\bgit\b/i],
+    keep: [/^(?:commit|Author|Date|diff|@@|[+-])/, /\d+ files? changed/i, /insertion|deletion/i],
+    drop: [/^\s*$/],
+  },
+];
+
+const RTK_GENERIC: RtkRuleset = {
+  id: "generic",
+  commands: [],
+  keep: [/error|exception|fail(?:ed|ure)?|warning|traceback/i],
+  drop: [/^\s*$/],
+};
+
+/** Pick a ruleset by tool name; fall back to the generic one. */
+function pickRtkRuleset(toolName?: string): RtkRuleset {
+  if (toolName) {
+    for (const rs of RTK_RULESETS) if (rs.commands.some((r) => r.test(toolName))) return rs;
+  }
+  return RTK_GENERIC;
+}
+
+function rtkFilterLines(text: string, ruleset: RtkRuleset): string {
+  const out: string[] = [];
+  for (const line of text.split("\n")) {
+    if (ruleset.keep.some((r) => r.test(line))) {
+      out.push(line);
+      continue;
+    }
+    if (ruleset.drop.some((r) => r.test(line))) continue;
+    out.push(line);
+  }
+  return out.join("\n");
+}
+
+export interface RtkOptions {
+  /** Source tool name, selects the ruleset (e.g. "tsc", "npm install", "git diff"). */
+  toolName?: string;
+  /** Cap on output lines before head/tail truncation kicks in. Default 200. */
+  maxLines?: number;
+  /** Hard character cap. Default 12000. */
+  maxChars?: number;
+}
+
+/**
+ * Filter command/tool output: drop noise lines (keeping errors/warnings/summaries),
+ * fold consecutive duplicates, then head/tail-truncate to `maxLines`/`maxChars`.
+ * Lossy but signal-preserving. Pure string work.
+ */
+export function rtkCompress(text: string, opts: RtkOptions = {}): string {
+  const ruleset = pickRtkRuleset(opts.toolName);
+  let out = dedupConsecutive.apply(rtkFilterLines(text, ruleset));
+  const maxLines = opts.maxLines ?? 200;
+  if (out.split("\n").length > maxLines) {
+    out = smartTruncate(out, {
+      headLines: Math.ceil(maxLines * 0.7),
+      tailLines: Math.floor(maxLines * 0.3),
+    });
+  }
+  const maxChars = opts.maxChars ?? 12000;
+  if (out.length > maxChars) out = `${out.slice(0, maxChars)}\n...[truncated]`;
+  return out;
+}
+
+/** Command/tool-output line filter. Lossy; tool via `ctx.toolName`. */
+export const rtkEngine: CompressEngine = {
+  name: "rtk",
+  stackPriority: 10,
+  lossless: false,
+  apply: (text, ctx) => rtkCompress(text, { toolName: ctx?.toolName }),
+};
+registerEngine(rtkEngine);
