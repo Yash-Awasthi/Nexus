@@ -363,6 +363,21 @@ describe("AzureOpenAIDriver", () => {
     expect(t.calls[0]!.headers["Authorization"]).toBeUndefined();
   });
 
+  it("authMode 'aad' sends the key as a Bearer token (Entra ID), not api-key", async () => {
+    const aad = new AzureOpenAIDriver(
+      {
+        apiKey: "entra-access-token",
+        endpoint: "https://my-res.openai.azure.com",
+        deployment: "gpt4o-deploy",
+        authMode: "aad",
+      },
+      t,
+    );
+    await aad.complete(makeOpts());
+    expect(t.calls[0]!.headers["Authorization"]).toBe("Bearer entra-access-token");
+    expect(t.calls[0]!.headers["api-key"]).toBeUndefined();
+  });
+
   it("parses content + usage", async () => {
     const r = await d.complete(makeOpts());
     expect(r.content).toBe("Hi there!");

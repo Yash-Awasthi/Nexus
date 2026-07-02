@@ -1457,6 +1457,7 @@ export class AzureOpenAIDriver extends OpenAICompatibleDriver {
   protected baseUrl: string;
   private deployment: string;
   private apiVersion: string;
+  private authMode: "api-key" | "aad";
   constructor(
     config: ApiKeyConfig & {
       /** Resource endpoint, e.g. https://my-resource.openai.azure.com */
@@ -1465,6 +1466,13 @@ export class AzureOpenAIDriver extends OpenAICompatibleDriver {
       deployment: string;
       /** API version, e.g. 2024-10-21. */
       apiVersion?: string;
+      /**
+       * Auth scheme. `api-key` (default) sends the resource key in the `api-key`
+       * header. `aad` sends `apiKey` as a Microsoft Entra ID (Azure AD) bearer
+       * token (`Authorization: Bearer …`) — this is what the @nexus/llm-oauth
+       * Entra flow issues, so an OAuth-authed Azure account routes here unchanged.
+       */
+      authMode?: "api-key" | "aad";
       model?: string;
     },
     transport?: HttpTransport,
@@ -1473,13 +1481,16 @@ export class AzureOpenAIDriver extends OpenAICompatibleDriver {
     this.baseUrl = config.endpoint.replace(/\/$/, "");
     this.deployment = config.deployment;
     this.apiVersion = config.apiVersion ?? "2024-10-21";
+    this.authMode = config.authMode ?? "api-key";
     this.model = config.model ?? config.deployment;
   }
   protected override chatCompletionsUrl(): string {
     return `${this.baseUrl}/openai/deployments/${this.deployment}/chat/completions?api-version=${this.apiVersion}`;
   }
   protected override authHeaders(): Record<string, string> {
-    return { "api-key": this.apiKey };
+    return this.authMode === "aad"
+      ? { Authorization: `Bearer ${this.apiKey}` }
+      : { "api-key": this.apiKey };
   }
 }
 
