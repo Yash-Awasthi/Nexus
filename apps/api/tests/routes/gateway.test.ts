@@ -194,6 +194,51 @@ describe("POST /api/v1/gateway/messages", () => {
     expect(body.usage.output_tokens).toBe(7);
   });
 
+  it("BYOK spend-guard is a no-op for a non-api-key Bearer token", async () => {
+    // A Bearer token that doesn't resolve to an api_keys row (master key / JWT /
+    // no DB) must NOT block the request — the cap is best-effort, enforced only
+    // for real nxk_ BYOK keys.
+    process.env.GROQ_API_KEY = "test-key";
+    vi.stubGlobal("fetch", mockGroqFetch());
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/gateway/messages",
+      headers: { authorization: "Bearer not-a-billing-key" },
+      payload: {
+        model: "nexus/fast",
+        messages: [{ role: "user", content: "Hello!" }],
+        temperature: 0,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("compresses message bodies only when x-nexus-compress: lossless is set", async () => {
+    process.env.GROQ_API_KEY = "test-key";
+    vi.stubGlobal("fetch", mockGroqFetch());
+    // Content with lots of trailing whitespace + blank lines → lossless-compressible.
+    const bloated = "line one   \n\n\n\nline two   \n\n\n\nline three   ";
+
+    const withHeader = await app.inject({
+      method: "POST",
+      url: "/api/v1/gateway/messages",
+      headers: { "x-nexus-compress": "lossless" },
+      payload: { model: "nexus/fast", messages: [{ role: "user", content: bloated }], temperature: 0 },
+    });
+    expect(withHeader.statusCode).toBe(200);
+    expect(Number(withHeader.headers["x-nexus-compress-saved-tokens"])).toBeGreaterThan(0);
+
+    const withoutHeader = await app.inject({
+      method: "POST",
+      url: "/api/v1/gateway/messages",
+      payload: { model: "nexus/fast", messages: [{ role: "user", content: bloated }], temperature: 0 },
+    });
+    expect(withoutHeader.statusCode).toBe(200);
+    expect(withoutHeader.headers["x-nexus-compress-saved-tokens"]).toBeUndefined();
+  });
+
   it("returns X-Nexus-Cache: MISS on first non-streaming call", async () => {
     process.env.GROQ_API_KEY = "test-key";
     vi.stubGlobal("fetch", mockGroqFetch());

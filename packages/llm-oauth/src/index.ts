@@ -12,9 +12,14 @@
  * so an authed account is stored as the same encrypted JSON-blob credential the
  * BYOK path already routes — no new driver wiring required.
  *
- * Not yet wired: API login/callback routes + a DB column for the refresh token.
- * TODO(P5-routes): add apps/api routes that persist the sealed token blob and
- * call TokenRefresher.ensureFresh() at resolve time.
+ * Persistence: `OAuthTokenStore` (store.ts) seals the token bundle and persists
+ * it through an injected `SealedTokenStore` port; the DB adapter binds that port
+ * to the `oauth_credentials` table (@nexus/db). `resolveFresh()` refreshes +
+ * re-persists at resolve time; `revoke()` hard-deletes.
+ *
+ * Not yet wired: the API login/callback routes themselves + the concrete drizzle
+ * `SealedTokenStore` adapter. TODO(P5-routes): add apps/api routes that start the
+ * login, persist via OAuthTokenStore.save(), and resolve via resolveFresh().
  */
 export * from "./types.js";
 export { AesGcmVault, generatePkce, randomState, type Pkce } from "./crypto.js";
@@ -26,3 +31,5 @@ export {
   type GoogleVertexConfig,
 } from "./providers.js";
 export { AuthProviderRegistry, registryFromEnv } from "./registry.js";
+export { OAuthTokenStore } from "./store.js";
+export type { SealedRecord, SealedTokenStore, OAuthTokenStoreOptions } from "./store.js";

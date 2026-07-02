@@ -12,7 +12,17 @@ vi.mock("../../src/lib/shared-kv.js", () => ({
 }));
 
 // Import AFTER mock is registered
-const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
+const { makeRateLimitPreHandler, makeUserRateLimitPreHandler } = await import(
+  "../../src/lib/rate-limiter.js"
+);
+
+function makeUserRequest(opts: { ip?: string; auth?: string; nexusUserId?: string }): FastifyRequest {
+  return {
+    headers: { authorization: opts.auth },
+    socket: { remoteAddress: opts.ip ?? "127.0.0.1" },
+    nexusUserId: opts.nexusUserId,
+  } as unknown as FastifyRequest;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -144,5 +154,55 @@ describe("makeRateLimitPreHandler", () => {
     const reply = makeReply();
     await handler(makeRequest("5.5.5.5"), reply);
     expect(reply._code).toBe(200); // passes through
+  });
+});
+
+describe("makeUserRateLimitPreHandler — per-identity keying", () => {
+  beforeEach(async () => {
+    await _mockKV.clear();
+  });
+
+  it("buckets by nexusUserId across different IPs", async () => {
+    const h = makeUserRateLimitPreHandler({ limit: 1, windowMs: 60_000, keyPrefix: "u" });
+    await h(makeUserRequest({ ip: "1.1.1.1", nexusUserId: "alice" }), makeReply());
+    const r = makeReply();
+    await h(makeUserRequest({ ip: "2.2.2.2", nexusUserId: "alice" }), r); // same user, new IP
+    expect(r._code).toBe(429);
+    expect(r._headers["X-RateLimit-User"]).toBe("alice");
+  });
+
+  it("buckets by API key when no nexusUserId (BYOK behind shared IP)", async () => {
+    const h = makeUserRateLimitPreHandler({ limit: 1, windowMs: 60_000, keyPrefix: "k" });
+    const auth = "Bearer sk-secret-123";
+    await h(makeUserRequest({ ip: "10.0.0.9", auth }), makeReply());
+    const r = makeReply();
+    await h(makeUserRequest({ ip: "10.0.0.9", auth }), r); // same key
+    expect(r._code).toBe(429);
+    expect(r._headers["X-RateLimit-User"]).toBe("key");
+  });
+
+  it("keeps different API keys on the same IP independent", async () => {
+    const h = makeUserRateLimitPreHandler({ limit: 1, windowMs: 60_000, keyPrefix: "k2" });
+    await h(makeUserRequest({ ip: "10.0.0.9", auth: "Bearer key-A" }), makeReply());
+    const r = makeReply();
+    await h(makeUserRequest({ ip: "10.0.0.9", auth: "Bearer key-B" }), r); // different key
+    expect(r._sent).toBe(false); // independent bucket
+  });
+
+  it("never puts the raw token in the bucket header", async () => {
+    const h = makeUserRateLimitPreHandler({ limit: 5, windowMs: 60_000, keyPrefix: "k3" });
+    const r = makeReply();
+    await h(makeUserRequest({ auth: "Bearer sk-super-secret" }), r);
+    expect(r._headers["X-RateLimit-User"]).toBe("key");
+    expect(JSON.stringify(r._headers)).not.toContain("sk-super-secret");
+  });
+
+  it("falls back to IP when neither user nor key is present", async () => {
+    const h = makeUserRateLimitPreHandler({ limit: 1, windowMs: 60_000, keyPrefix: "ipf" });
+    await h(makeUserRequest({ ip: "3.3.3.3" }), makeReply());
+    const r = makeReply();
+    await h(makeUserRequest({ ip: "3.3.3.3" }), r);
+    expect(r._code).toBe(429);
+    expect(r._headers["X-RateLimit-User"]).toBe("ip");
   });
 });

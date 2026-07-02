@@ -62,6 +62,7 @@ import { imageGenRoutes } from "./routes/image-gen.js";
 import { ingestRoutes } from "./routes/ingest.js";
 import { knowledgeGraphRoutes } from "./routes/knowledge-graph.js";
 import { libertasRoutes } from "./routes/libertas.js";
+import { llmOauthRoutes } from "./routes/llm-oauth.js";
 import { llmRoutes } from "./routes/llm.js";
 import { mailIngestRoutes } from "./routes/mail-ingest.js";
 import { mcpServersRoutes } from "./routes/mcp-servers.js";
@@ -252,6 +253,18 @@ export async function buildServer(): Promise<FastifyInstance> {
     windowMs: 60_000,
     keyPrefix: "billing",
   });
+  // code-repl + council carry a BYOK Bearer but often no resolved nexusUserId;
+  // the per-identity limiter buckets them by API key, not a shared NAT IP.
+  const _codeReplUserRL = makeUserRateLimitPreHandler({
+    limit: 20,
+    windowMs: 60_000,
+    keyPrefix: "code-repl",
+  });
+  const _councilUserRL = makeUserRateLimitPreHandler({
+    limit: 60,
+    windowMs: 60_000,
+    keyPrefix: "council",
+  });
 
   app.addHook("onRequest", async (request: FastifyRequest, reply) => {
     const url = request.url;
@@ -261,8 +274,13 @@ export async function buildServer(): Promise<FastifyInstance> {
     } else if (url.startsWith("/api/v1/billing")) {
       await _billingRL(request, reply);
       if (!reply.sent) await _billingUserRL(request, reply);
-    } else if (url.startsWith("/api/v1/code-repl")) await _codeReplRL(request, reply);
-    else if (url.startsWith("/api/v1/council")) await _councilRL(request, reply);
+    } else if (url.startsWith("/api/v1/code-repl")) {
+      await _codeReplRL(request, reply);
+      if (!reply.sent) await _codeReplUserRL(request, reply);
+    } else if (url.startsWith("/api/v1/council")) {
+      await _councilRL(request, reply);
+      if (!reply.sent) await _councilUserRL(request, reply);
+    }
   });
 
   // ── Health (no prefix — /health, /health/ready) ───────────────────────────
@@ -343,6 +361,9 @@ export async function buildServer(): Promise<FastifyInstance> {
 
       // Z — OAuth SSO (Google + GitHub)
       await api.register(oauthRoutes);
+
+      // Z — Provider OAuth (BYO Vertex via Google) — SEPARATE from SSO above
+      await api.register(llmOauthRoutes);
 
       // Enterprise — user auth, workspaces, MFA
       await api.register(authUsersRoutes);

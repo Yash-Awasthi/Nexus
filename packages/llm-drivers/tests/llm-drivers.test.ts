@@ -34,6 +34,17 @@ import {
   QwenDriver,
   Ai360Driver,
   VercelAIGatewayDriver,
+  DoubaoDriver,
+  BytePlusDriver,
+  HunyuanDriver,
+  SparkDriver,
+  AzureOpenAIDriver,
+  CloudflareWorkersAIDriver,
+  XinferenceDriver,
+  ReplicateDriver,
+  BaiduErnieDriver,
+  AlibabaBailianDriver,
+  DifyDriver,
   LocalRouterDriver,
   BedrockDriver,
   VertexDriver,
@@ -105,6 +116,13 @@ describe("MockTransport", () => {
     const t = new MockTransport().setResponse({ result: 42 });
     const r = (await t.post("url", {}, {})) as { result: number };
     expect(r.result).toBe(42);
+  });
+
+  it("setResponses returns queued responses in order, then falls back", async () => {
+    const t = new MockTransport().setResponse({ fallback: true }).setResponses([{ a: 1 }, { b: 2 }]);
+    expect(await t.post("u", {}, {})).toEqual({ a: 1 });
+    expect(await t.post("u", {}, {})).toEqual({ b: 2 });
+    expect(await t.post("u", {}, {})).toEqual({ fallback: true }); // queue drained
   });
 });
 
@@ -259,6 +277,15 @@ describe.each([
     provider: "vercel_ai_gateway",
     url: "ai-gateway.vercel.sh",
   },
+  { name: "DoubaoDriver", Factory: DoubaoDriver, provider: "doubao", url: "volces.com" },
+  { name: "BytePlusDriver", Factory: BytePlusDriver, provider: "byteplus", url: "bytepluses.com" },
+  {
+    name: "HunyuanDriver",
+    Factory: HunyuanDriver,
+    provider: "hunyuan",
+    url: "hunyuan.cloud.tencent.com",
+  },
+  { name: "SparkDriver", Factory: SparkDriver, provider: "spark", url: "spark-api-open.xf-yun.com" },
   {
     name: "LocalRouterDriver",
     Factory: LocalRouterDriver,
@@ -301,6 +328,353 @@ describe.each([
     const r = await d.complete(makeOpts());
     expect(r.usage.inputTokens).toBe(5);
     expect(r.usage.outputTokens).toBe(10);
+  });
+});
+
+// ── Azure OpenAI (deployment path + api-key header) ───────────────────────────
+
+describe("AzureOpenAIDriver", () => {
+  let t: MockTransport;
+  let d: AzureOpenAIDriver;
+  beforeEach(() => {
+    t = new MockTransport().setResponse(OAI_RESPONSE);
+    d = new AzureOpenAIDriver(
+      {
+        apiKey: "az-key",
+        endpoint: "https://my-res.openai.azure.com",
+        deployment: "gpt4o-deploy",
+        apiVersion: "2024-10-21",
+      },
+      t,
+    );
+  });
+
+  it("provider is 'azure_openai'", () => expect(d.provider).toBe("azure_openai"));
+
+  it("routes by deployment with an api-version query", async () => {
+    await d.complete(makeOpts());
+    expect(t.calls[0]!.url).toContain("/openai/deployments/gpt4o-deploy/chat/completions");
+    expect(t.calls[0]!.url).toContain("api-version=2024-10-21");
+  });
+
+  it("authenticates with an api-key header, not Bearer", async () => {
+    await d.complete(makeOpts());
+    expect(t.calls[0]!.headers["api-key"]).toBe("az-key");
+    expect(t.calls[0]!.headers["Authorization"]).toBeUndefined();
+  });
+
+  it("parses content + usage", async () => {
+    const r = await d.complete(makeOpts());
+    expect(r.content).toBe("Hi there!");
+    expect(r.usage.inputTokens).toBe(5);
+  });
+});
+
+// ── Cloudflare Workers AI (account id in path) ────────────────────────────────
+
+describe("CloudflareWorkersAIDriver", () => {
+  let t: MockTransport;
+  let d: CloudflareWorkersAIDriver;
+  beforeEach(() => {
+    t = new MockTransport().setResponse(OAI_RESPONSE);
+    d = new CloudflareWorkersAIDriver({ apiKey: "cf-key", accountId: "acc123" }, t);
+  });
+
+  it("provider is 'cloudflare'", () => expect(d.provider).toBe("cloudflare"));
+
+  it("puts the account id in the path and sends Bearer", async () => {
+    await d.complete(makeOpts());
+    expect(t.calls[0]!.url).toContain("/accounts/acc123/ai/v1/chat/completions");
+    expect(t.calls[0]!.headers["Authorization"]).toContain("Bearer cf-key");
+  });
+});
+
+// ── Xinference (local, no key required) ───────────────────────────────────────
+
+describe("XinferenceDriver", () => {
+  it("provider is 'xinference'", () => {
+    const t = new MockTransport().setResponse(OAI_RESPONSE);
+    expect(new XinferenceDriver({}, t).provider).toBe("xinference");
+  });
+
+  it("defaults to localhost:9997", async () => {
+    const t = new MockTransport().setResponse(OAI_RESPONSE);
+    await new XinferenceDriver({}, t).complete(makeOpts());
+    expect(t.calls[0]!.url).toContain("localhost:9997");
+  });
+});
+
+// ── Replicate (predictions, Prefer: wait) ────────────────────────────────────
+
+describe("ReplicateDriver", () => {
+  let t: MockTransport;
+  let d: ReplicateDriver;
+  beforeEach(() => {
+    t = new MockTransport().setResponse({
+      id: "pred_123",
+      status: "succeeded",
+      output: ["Hi", " ", "there!"],
+    });
+    d = new ReplicateDriver({ apiKey: "r8-key" }, t);
+  });
+
+  it("provider is 'replicate'", () => expect(d.provider).toBe("replicate"));
+
+  it("posts to /predictions with version + input.prompt", async () => {
+    await d.complete(makeOpts());
+    expect(t.calls[0]!.url).toContain("/predictions");
+    const body = t.calls[0]!.body as { version: string; input: { prompt: string } };
+    expect(body.version).toBe("test-model");
+    expect(body.input.prompt).toContain("Hello");
+  });
+
+  it("sends Bearer auth + Prefer: wait (synchronous mode)", async () => {
+    await d.complete(makeOpts());
+    expect(t.calls[0]!.headers["Authorization"]).toContain("Bearer r8-key");
+    expect(t.calls[0]!.headers["Prefer"]).toBe("wait");
+  });
+
+  it("maps systemPrompt to input.system_prompt", async () => {
+    await d.complete(makeOpts({ systemPrompt: "Be brief" }));
+    const body = t.calls[0]!.body as { input: { system_prompt?: string } };
+    expect(body.input.system_prompt).toBe("Be brief");
+  });
+
+  it("joins the output-chunk array into content", async () => {
+    const r = await d.complete(makeOpts());
+    expect(r.content).toBe("Hi there!");
+  });
+
+  it("throws on a failed prediction", async () => {
+    const tf = new MockTransport().setResponse({ id: "p", status: "failed", error: "boom" });
+    const df = new ReplicateDriver({ apiKey: "k" }, tf);
+    await expect(df.complete(makeOpts())).rejects.toThrow(/failed/);
+  });
+});
+
+// ── Baidu ERNIE (client-creds OAuth → token + chat, 2 POSTs) ──────────────────
+
+describe("BaiduErnieDriver", () => {
+  const TOKEN = { access_token: "tok-abc", expires_in: 2592000 };
+  const CHAT = {
+    id: "ernie-1",
+    result: "Hi there!",
+    usage: { prompt_tokens: 5, completion_tokens: 10 },
+  };
+  let t: MockTransport;
+  let d: BaiduErnieDriver;
+  beforeEach(() => {
+    t = new MockTransport().setResponses([TOKEN, CHAT]);
+    d = new BaiduErnieDriver({ clientId: "ak", clientSecret: "sk" }, t);
+  });
+
+  it("provider is 'baidu_ernie'", () => expect(d.provider).toBe("baidu_ernie"));
+
+  it("mints a token then posts chat (2 calls, correct order)", async () => {
+    const r = await d.complete(makeOpts());
+    expect(t.calls).toHaveLength(2);
+    expect(t.calls[0]!.url).toContain("/oauth/2.0/token");
+    expect(t.calls[0]!.url).toContain("grant_type=client_credentials");
+    expect(t.calls[0]!.url).toContain("client_id=ak");
+    expect(t.calls[1]!.url).toContain("/wenxinworkshop/chat/");
+    expect(t.calls[1]!.url).toContain("access_token=tok-abc");
+    expect(r.content).toBe("Hi there!");
+    expect(r.usage.totalTokens).toBe(15);
+  });
+
+  it("caches the token across calls (no re-auth on second complete)", async () => {
+    await d.complete(makeOpts());
+    t.setResponses([CHAT]); // only a chat response left to queue
+    await d.complete(makeOpts());
+    // 2 (token+chat) + 1 (chat only) = 3 total; no second token POST
+    expect(t.calls).toHaveLength(3);
+    expect(t.calls[2]!.url).toContain("/wenxinworkshop/chat/");
+  });
+
+  it("lifts the system prompt to a top-level field", async () => {
+    await d.complete(makeOpts({ systemPrompt: "Be brief" }));
+    const body = t.calls[1]!.body as { system?: string; messages: unknown[] };
+    expect(body.system).toBe("Be brief");
+    expect(body.messages).toHaveLength(1);
+  });
+
+  it("throws AUTH_FAILED when the OAuth response has no token", async () => {
+    const tf = new MockTransport().setResponses([{ error: "invalid_client" }]);
+    const df = new BaiduErnieDriver({ clientId: "ak", clientSecret: "bad" }, tf);
+    await expect(df.complete(makeOpts())).rejects.toThrow(/invalid_client|OAuth/);
+  });
+
+  it("maps an in-body error_code to a typed LlmError and clears the token", async () => {
+    const te = new MockTransport().setResponses([TOKEN, { error_code: 110, error_msg: "token bad" }]);
+    const de = new BaiduErnieDriver({ clientId: "ak", clientSecret: "sk" }, te);
+    await expect(de.complete(makeOpts())).rejects.toMatchObject({ code: "AUTH_FAILED" });
+  });
+
+  it("sends opts.tools as ERNIE `functions`", async () => {
+    await d.complete(
+      makeOpts({
+        tools: [
+          { name: "get_weather", description: "Get weather", parameters: { type: "object" } },
+        ],
+      }),
+    );
+    const body = t.calls[1]!.body as { functions?: { name: string }[] };
+    expect(body.functions).toHaveLength(1);
+    expect(body.functions![0]!.name).toBe("get_weather");
+  });
+
+  it("parses a function_call reply into toolCalls (id == name, args parsed)", async () => {
+    const tc = new MockTransport().setResponses([
+      TOKEN,
+      {
+        id: "e2",
+        result: "",
+        function_call: { name: "get_weather", arguments: '{"city":"Paris"}' },
+        usage: { prompt_tokens: 3, completion_tokens: 4 },
+      },
+    ]);
+    const dc = new BaiduErnieDriver({ clientId: "ak", clientSecret: "sk" }, tc);
+    const r = await dc.complete(makeOpts());
+    expect(r.finishReason).toBe("tool_calls");
+    expect(r.toolCalls).toHaveLength(1);
+    expect(r.toolCalls![0]).toMatchObject({
+      id: "get_weather",
+      name: "get_weather",
+      arguments: { city: "Paris" },
+    });
+  });
+
+  it("round-trips assistant tool-call + tool result into ERNIE function messages", async () => {
+    await d.complete(
+      makeOpts({
+        messages: [
+          { role: "user", content: "weather?" },
+          {
+            role: "assistant",
+            content: "",
+            toolCalls: [{ id: "get_weather", name: "get_weather", arguments: { city: "Paris" } }],
+          },
+          { role: "tool", content: '{"tempC":18}', toolCallId: "get_weather" },
+        ],
+      }),
+    );
+    const body = t.calls[1]!.body as {
+      messages: { role: string; name?: string; function_call?: { name: string } }[];
+    };
+    expect(body.messages[1]!.function_call?.name).toBe("get_weather");
+    expect(body.messages[2]!.role).toBe("function");
+    expect(body.messages[2]!.name).toBe("get_weather");
+  });
+
+  it("tolerates malformed function_call arguments (empty object)", async () => {
+    const tc = new MockTransport().setResponses([
+      TOKEN,
+      { id: "e3", result: "", function_call: { name: "f", arguments: "{not json" } },
+    ]);
+    const dc = new BaiduErnieDriver({ clientId: "ak", clientSecret: "sk" }, tc);
+    const r = await dc.complete(makeOpts());
+    expect(r.toolCalls![0]!.arguments).toEqual({});
+  });
+});
+
+describe("AlibabaBailianDriver (DashScope compatible-mode)", () => {
+  let t: MockTransport;
+  let d: AlibabaBailianDriver;
+  beforeEach(() => {
+    t = new MockTransport().setResponse(OAI_RESPONSE);
+    d = new AlibabaBailianDriver({ apiKey: "sk-x" }, t);
+  });
+
+  it("provider is 'alibaba_bailian', model defaults to qwen-plus", () => {
+    expect(d.provider).toBe("alibaba_bailian");
+    expect(d.model).toBe("qwen-plus");
+  });
+
+  it("posts to the compatible-mode chat/completions endpoint with Bearer auth", async () => {
+    const r = await d.complete(makeOpts());
+    expect(t.calls[0]!.url).toBe(
+      "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions",
+    );
+    expect(t.calls[0]!.headers.Authorization).toBe("Bearer sk-x");
+    expect(r.content).toBe("Hi there!");
+    expect(r.usage.totalTokens).toBe(15);
+  });
+
+  it("honours a custom baseUrl (mainland region)", async () => {
+    const dm = new AlibabaBailianDriver(
+      { apiKey: "sk-x", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1" },
+      t,
+    );
+    await dm.complete(makeOpts());
+    expect(t.calls[0]!.url).toContain("dashscope.aliyuncs.com");
+  });
+});
+
+describe("DifyDriver (app-scoped chat-messages)", () => {
+  const DIFY_OK = {
+    answer: "Hi there!",
+    message_id: "dify-1",
+    conversation_id: "conv-1",
+    metadata: { usage: { prompt_tokens: 5, completion_tokens: 10 } },
+  };
+  let t: MockTransport;
+  let d: DifyDriver;
+  beforeEach(() => {
+    t = new MockTransport().setResponse(DIFY_OK);
+    d = new DifyDriver({ apiKey: "app-key" }, t);
+  });
+
+  it("provider is 'dify'", () => expect(d.provider).toBe("dify"));
+
+  it("posts the last user turn as query in blocking mode with Bearer auth", async () => {
+    const r = await d.complete(makeOpts());
+    expect(t.calls[0]!.url).toBe("https://api.dify.ai/v1/chat-messages");
+    expect(t.calls[0]!.headers.Authorization).toBe("Bearer app-key");
+    const body = t.calls[0]!.body as { query: string; response_mode: string; user: string };
+    expect(body.query).toBe("Hello");
+    expect(body.response_mode).toBe("blocking");
+    expect(body.user).toBe("nexus");
+    expect(r.content).toBe("Hi there!");
+    expect(r.usage.totalTokens).toBe(15);
+  });
+
+  it("folds system prompt + prior turns into the query as context", async () => {
+    await d.complete(
+      makeOpts({
+        systemPrompt: "Be brief",
+        messages: [
+          { role: "user", content: "first" },
+          { role: "assistant", content: "ok" },
+          { role: "user", content: "second" },
+        ],
+      }),
+    );
+    const body = t.calls[0]!.body as { query: string };
+    expect(body.query).toContain("Be brief");
+    expect(body.query).toContain("user: first");
+    expect(body.query).toContain("assistant: ok");
+    expect(body.query.endsWith("second")).toBe(true);
+  });
+
+  it("maps a Dify error envelope to a typed LlmError", async () => {
+    const te = new MockTransport().setResponse({
+      code: "invalid_api_key",
+      message: "bad key",
+      status: 401,
+    });
+    const de = new DifyDriver({ apiKey: "bad" }, te);
+    await expect(de.complete(makeOpts())).rejects.toMatchObject({ code: "AUTH_FAILED" });
+  });
+
+  it("honours a self-hosted baseUrl + custom user", async () => {
+    const ds = new DifyDriver(
+      { apiKey: "k", baseUrl: "https://dify.internal/v1", user: "u-42" },
+      t,
+    );
+    await ds.complete(makeOpts());
+    expect(t.calls[0]!.url).toBe("https://dify.internal/v1/chat-messages");
+    const body = t.calls[0]!.body as { user: string };
+    expect(body.user).toBe("u-42");
   });
 });
 

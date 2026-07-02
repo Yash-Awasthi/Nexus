@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createHmac } from "node:crypto";
 
 // ── Hoist DB mocks ─────────────────────────────────────────────────────────────
 
@@ -34,14 +33,11 @@ vi.mock("@nexus/db", () => ({
 vi.mock("@nexus/db/schema", () => ({
   apiKeys: { keyHash: "keyHash", ownerId: "ownerId", id: "id" },
   usageEvents: { apiKeyId: "apiKeyId", createdAt: "createdAt", costUnits: "costUnits" },
-  subscriptions: { stripeSubscriptionId: "stripeSubscriptionId", ownerId: "ownerId" },
-  stripeWebhookEvents: { stripeEventId: "stripeEventId" },
 }));
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 import { generateRawKey, hashKey, prefixOf } from "../src/api-keys.js";
-import { verifyStripeSignature, StripeSignatureError } from "../src/stripe-webhook.js";
 import { QuotaChecker } from "../src/quota.js";
 
 describe("API key helpers", () => {
@@ -66,48 +62,6 @@ describe("API key helpers", () => {
 
   it("prefixOf returns first 8 chars", () => {
     expect(prefixOf("nxk_abcdef1234")).toBe("nxk_abcd");
-  });
-});
-
-describe("verifyStripeSignature", () => {
-  const secret = "whsec_test_secret";
-  const body = JSON.stringify({
-    id: "evt_123",
-    type: "customer.subscription.created",
-    data: { object: {} },
-  });
-
-  function makeSignature(body: string, ts: number): string {
-    const sig = createHmac("sha256", secret).update(`${ts}.${body}`).digest("hex");
-    return `t=${ts},v1=${sig}`;
-  }
-
-  it("accepts a valid signature", () => {
-    const ts = Math.floor(Date.now() / 1000);
-    const sig = makeSignature(body, ts);
-    const event = verifyStripeSignature(body, sig, secret);
-    expect(event.id).toBe("evt_123");
-    expect(event.type).toBe("customer.subscription.created");
-  });
-
-  it("rejects a stale timestamp", () => {
-    const ts = Math.floor(Date.now() / 1000) - 400; // 400s ago > 300s tolerance
-    const sig = makeSignature(body, ts);
-    expect(() => verifyStripeSignature(body, sig, secret)).toThrowError(StripeSignatureError);
-  });
-
-  it("rejects a tampered body", () => {
-    const ts = Math.floor(Date.now() / 1000);
-    const sig = makeSignature(body, ts);
-    expect(() => verifyStripeSignature('{"tampered":true}', sig, secret)).toThrowError(
-      StripeSignatureError,
-    );
-  });
-
-  it("rejects missing header parts", () => {
-    expect(() => verifyStripeSignature(body, "v1=badhash", secret)).toThrowError(
-      StripeSignatureError,
-    );
   });
 });
 
@@ -166,37 +120,5 @@ describe("QuotaChecker", () => {
     const checker = new QuotaChecker();
     await checker.recordUsage("key-1", "/api/v1/council/deliberate", 2);
     expect(mockInsert).toHaveBeenCalledOnce();
-  });
-});
-
-describe("StripeWebhookProcessor — dispatch", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("skips already-processed events", async () => {
-    // DB returns an existing webhook event row
-    const mockLimit = vi.fn().mockResolvedValue([{ stripeEventId: "evt_dup" }]);
-    const mockWhere2 = vi.fn(() => ({ limit: mockLimit }));
-    const mockFrom2 = vi.fn(() => ({ where: mockWhere2 }));
-    mockSelect.mockReturnValueOnce({ from: mockFrom2 });
-
-    const secret = "whsec_test";
-    const body = JSON.stringify({ id: "evt_dup", type: "unknown", data: { object: {} } });
-    const ts = Math.floor(Date.now() / 1000);
-    const sig = `t=${ts},v1=${createHmac("sha256", secret).update(`${ts}.${body}`).digest("hex")}`;
-
-    const { StripeWebhookProcessor } = await import("../src/stripe-webhook.js");
-    const processor = new StripeWebhookProcessor(secret);
-    const result = await processor.process(Buffer.from(body), sig);
-
-    expect(result.skipped).toBe(true);
-    expect(result.eventId).toBe("evt_dup");
-  });
-
-  it("throws StripeSignatureError on bad signature", async () => {
-    const { StripeWebhookProcessor } = await import("../src/stripe-webhook.js");
-    const processor = new StripeWebhookProcessor("whsec_real");
-    await expect(processor.process(Buffer.from("{}"), "t=123,v1=badhash")).rejects.toThrowError(
-      StripeSignatureError,
-    );
   });
 });

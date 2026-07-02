@@ -16,6 +16,7 @@
  *   Errors wrapped by StreamRecoveryOrchestrator (continuation suffix + block close).
  */
 
+import { estimateMaxCost, lookupApiKey, QuotaChecker } from "@nexus/billing";
 import {
   PrunerChain,
   SlidingWindowPruner,
@@ -24,6 +25,7 @@ import {
 } from "@nexus/context-pruner";
 import { computeAutoTuneParams, detectContext, InMemoryEmaStore } from "@nexus/drift";
 import { KVGatewayLog } from "@nexus/gateway-log";
+import { compressAuto } from "@nexus/llm-compress";
 import {
   UltraplinianRunner,
   type SpeedTier,
@@ -70,6 +72,7 @@ import { createDefaultRegistry } from "@nexus/tool-registry";
 import type { ToolRegistry } from "@nexus/tool-registry";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 
+import { parseCompressHeader } from "../lib/agent-queue.js";
 import { getPromptCache, PromptCache, type CacheableRequest } from "../lib/prompt-cache.js";
 import { getSharedKV } from "../lib/shared-kv.js";
 import { getTierFromRequest, requireAuth } from "../middleware/auth.js";
@@ -80,6 +83,26 @@ import { getTierFromRequest, requireAuth } from "../middleware/auth.js";
 
 export const _costStore = new InMemoryRunCostStore();
 const costTracker = new RunCostTracker({ store: _costStore });
+
+// ── BYOK spend-guard (§5) ─────────────────────────────────────────────────────
+// The gateway authenticates with the master key / a user JWT (requireAuth), not a
+// billing api-key. So the spend-cap is best-effort: only when the caller's Bearer
+// token resolves to an `api_keys` row (an nxk_ BYOK key) do we enforce its
+// monthly_cost_cap_usd pre-dispatch and persist the priced usage afterwards.
+// Master-key / JWT callers have no api_key row → guard is a no-op for them.
+const _quota = new QuotaChecker();
+const _tok = new NaiveTokenizer();
+
+/** Resolve the request's Bearer token to a BYOK api-key, or null. Never throws. */
+async function _resolveBillingKey(request: FastifyRequest) {
+  const m = /^Bearer\s+(\S+)$/i.exec(request.headers.authorization ?? "");
+  if (!m?.[1]) return null;
+  try {
+    return (await lookupApiKey(m[1])) ?? null;
+  } catch {
+    return null; // DB unreachable — skip the guard rather than fail the request
+  }
+}
 
 // ── Token budget (RPM limiting per identity) ──────────────────────────────────
 // GATEWAY_RPM_LIMIT (default 60) requests per 60-second sliding window.
@@ -210,6 +233,29 @@ async function pruneGatewayMessages(
       content: m.content,
     })),
   };
+}
+
+// ── Opt-in lossless body compression ──────────────────────────────────────────
+// The agent runtime compresses tool output by default; the raw proxy path must
+// not silently rewrite a user's prompt, so gateway compression is OPT-IN via
+// `x-nexus-compress: lossless` (same header as the agent path). Runs each message
+// through llm-compress's lossless auto filters (ansi-strip / trim / blank-collapse
+// / dedup) — safe transforms that never change meaning. Returns the (possibly)
+// rewritten opts plus the estimated token saving so the caller can surface it.
+function compressGatewayMessages(
+  opts: LlmRequestOptions,
+  enabled: boolean,
+): { opts: LlmRequestOptions; savedTokens: number } {
+  if (!enabled) return { opts, savedTokens: 0 };
+  let savedTokens = 0;
+  const messages = opts.messages.map((m) => {
+    if (!m.content) return m;
+    const res = compressAuto(m.content);
+    if (res.text.length >= m.content.length) return m; // no gain — keep original
+    savedTokens += res.originalTokens - res.compressedTokens;
+    return { ...m, content: res.text };
+  });
+  return { opts: savedTokens > 0 ? { ...opts, messages } : opts, savedTokens };
 }
 
 // ── Prompt cache (KV-backed, cross-pod safe) ───────────────────────────────────
@@ -429,6 +475,17 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
         request.body.max_tokens ?? 4096,
       );
 
+      // Opt-in lossless body compression (x-nexus-compress: lossless). Off by
+      // default so the proxy never silently rewrites a prompt.
+      const _compress = compressGatewayMessages(
+        opts,
+        parseCompressHeader(request.headers["x-nexus-compress"]) === "lossless",
+      );
+      opts = _compress.opts;
+      if (_compress.savedTokens > 0) {
+        reply.header("X-Nexus-Compress-Saved-Tokens", String(_compress.savedTokens));
+      }
+
       // ── Parseltongue — obfuscate user messages when requested ─────────────
       // Activated by header: x-nexus-obfuscate: true  OR feature flag.
       if (request.headers["x-nexus-obfuscate"] === "true") {
@@ -498,6 +555,28 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
           }
         } catch {
           /* non-fatal — proceed if cost store unavailable */
+        }
+      }
+
+      // ── BYOK per-key spend cap (pre-dispatch ledger gate) ────────────────────
+      // No-op unless the Bearer token is an nxk_ api-key with a monthly USD cap.
+      const billingKey = await _resolveBillingKey(request);
+      if (billingKey) {
+        const inputTokens = _tok.count(opts.messages.map((mm) => mm.content).join("\n"));
+        const estUsd = estimateMaxCost(resolvedModel, inputTokens, {
+          assumedOutputTokens: request.body.max_tokens ?? 4096,
+        });
+        const verdict = await _quota.check(billingKey, estUsd);
+        if (!verdict.allowed) {
+          return reply.code(429).send({
+            type: "error",
+            error: {
+              type: "monthly_cost_cap_exceeded",
+              message: "Monthly BYOK spend cap reached for this key.",
+              monthly_cost_usd: verdict.monthlyCostUsd,
+              monthly_cost_cap_usd: verdict.monthlyCostCapUsd,
+            },
+          });
         }
       }
 
@@ -573,6 +652,17 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
                   identity: _logIdent,
                 })
                 .catch(() => {});
+              if (billingKey) {
+                _quota
+                  .recordUsage(billingKey.id, request.url, {
+                    model: resolvedModel,
+                    usage: {
+                      inputTokens: usage?.inputTokens ?? 0,
+                      outputTokens: usage?.outputTokens ?? 0,
+                    },
+                  })
+                  .catch(() => {});
+              }
             } else {
               // Feed through think-parser; only emit TEXT chunks to client
               for (const chunk of parser.feed(delta)) {
@@ -686,6 +776,19 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
           costTracker.endRun(runId);
         } catch {
           /* non-fatal */
+        }
+
+        // BYOK metering — persist the priced token breakdown (fire-and-forget).
+        if (billingKey) {
+          _quota
+            .recordUsage(billingKey.id, request.url, {
+              model: resolvedModel,
+              usage: {
+                inputTokens: response.usage.inputTokens,
+                outputTokens: response.usage.outputTokens,
+              },
+            })
+            .catch(() => {});
         }
 
         globalHooks

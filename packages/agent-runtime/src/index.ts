@@ -16,13 +16,17 @@
  */
 
 import {
-  compress,
+  compressForTool,
   encodeStructured,
   PRESETS,
   type PresetName,
   type CompressFilter,
   type StructuredFormat,
 } from "@nexus/llm-compress";
+
+// Re-export so consumers (api, worker) can type `compressToolOutput` without
+// taking a direct dependency on @nexus/llm-compress.
+export type { PresetName, StructuredFormat } from "@nexus/llm-compress";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -275,6 +279,25 @@ export const AUTO_ALLOWED_TOOLS: ReadonlySet<string> = new Set([
 export function classifyTool(name: string): ActionTier {
   return AUTO_ALLOWED_TOOLS.has(name.toLowerCase()) ? "auto_allowed" : "requires_permission";
 }
+
+// Read-only filesystem tools (`read_file`, `list_files`, `glob`, `grep`), scoped
+// to `ctx.workingDir`. Their names are all in AUTO_ALLOWED_TOOLS above.
+export {
+  createFilesystemTools,
+  createEditFileTool,
+  createRunCommandTool,
+  resolveInWorkspace,
+  globToRegExp,
+} from "./fs-tools.js";
+export type { CommandExecutor, CommandResult } from "./fs-tools.js";
+// MCP tool bridge — dependency-injected, defaults to the requires_permission tier.
+export { createMcpTools } from "./mcp-tools.js";
+export type {
+  McpBridgeOptions,
+  McpToolClient,
+  McpToolInfo,
+  McpToolResult,
+} from "./mcp-tools.js";
 
 /** A request to run a tool that requires approval. */
 export interface PermissionRequest {
@@ -1148,7 +1171,10 @@ export class ToolAgentRuntime {
         toolResults.push(result);
         let content = stringifyToolOutput(result, this.structuredEncoding);
         if (this.toolCompressFilters.length > 0) {
-          const c = compress(content, this.toolCompressFilters);
+          // Route by tool name so the filter set fits the output shape — e.g. a
+          // diff's identical context lines are never folded. Stays lossless
+          // (no truncation); the static preset above is the on/off switch.
+          const c = compressForTool(call.name, content);
           content = c.text;
           if (c.applied.length > 0) {
             this.onToolCompress?.({

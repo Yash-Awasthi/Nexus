@@ -14,3 +14,4 @@ export * from "./users.js";
 export * from "./user-provider-credentials.js";
 export * from "./mcp-servers.js";
 export * from "./agent-sessions.js";
+export * from "./oauth-credentials.js";

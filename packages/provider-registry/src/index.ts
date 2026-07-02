@@ -57,6 +57,19 @@ export interface ModelDefinition {
   rateLimits?: ProviderRateLimits;
   /** If true, model is end-of-life — warn on use */
   deprecated?: boolean;
+  // ── Optional extended metadata (populated by the models.dev importer) ──────────
+  /** Cost per cache-read token in USD (prompt-cache hit), if the model supports it. */
+  costPerCacheReadToken?: number;
+  /** Cost per cache-write token in USD (prompt-cache store), if applicable. */
+  costPerCacheWriteToken?: number;
+  /** Accepted input modalities, e.g. ["text", "image", "audio"]. */
+  inputModalities?: string[];
+  /** Produced output modalities, e.g. ["text"]. */
+  outputModalities?: string[];
+  /** Training knowledge cutoff, ISO-ish (e.g. "2024-04"). */
+  knowledgeCutoff?: string;
+  /** Public release date, ISO (e.g. "2024-10-22"). */
+  releaseDate?: string;
 }
 
 /** Registry filter interface definition. */
@@ -267,3 +280,116 @@ export const BUILTIN_MODELS: ModelDefinition[] = [
 /** Default registry pre-seeded with all known models. */
 export const globalRegistry = new ProviderRegistry();
 for (const model of BUILTIN_MODELS) globalRegistry.register(model);
+
+// ── models.dev importer ─────────────────────────────────────────────────────────
+// models.dev publishes a community-maintained catalogue of every provider/model
+// with pricing, context limits, modalities and knowledge cutoff. We map its JSON
+// onto ModelDefinition so the registry can be seeded from a single source instead
+// of hand-curating BUILTIN_MODELS. Pricing there is per MILLION tokens (USD); we
+// divide to per-token to match ModelDefinition's convention.
+
+/** Public catalogue endpoint. Fetching it is a live network call — gate it. */
+export const MODELS_DEV_API_URL = "https://models.dev/api.json";
+
+/** A single model entry as published by models.dev (only fields we consume). */
+export interface ModelsDevModel {
+  id?: string;
+  name?: string;
+  attachment?: boolean;
+  reasoning?: boolean;
+  tool_call?: boolean;
+  knowledge?: string;
+  release_date?: string;
+  modalities?: { input?: string[]; output?: string[] };
+  /** Per-million-token USD pricing. */
+  cost?: { input?: number; output?: number; cache_read?: number; cache_write?: number };
+  limit?: { context?: number; output?: number };
+}
+
+/** Top-level models.dev shape: provider-id → provider with a models map. */
+export type ModelsDevCatalogue = Record<
+  string,
+  { id?: string; name?: string; models?: Record<string, ModelsDevModel> }
+>;
+
+const PER_MILLION = 1e6;
+
+/** Map one models.dev model entry to a ModelDefinition. */
+function modelsDevModelToDefinition(
+  providerId: string,
+  modelKey: string,
+  m: ModelsDevModel,
+): ModelDefinition {
+  const inputModalities = m.modalities?.input ?? ["text"];
+  const outputModalities = m.modalities?.output ?? ["text"];
+  const hasCache = typeof m.cost?.cache_read === "number";
+  const capabilities: ProviderCapabilities = {
+    vision: inputModalities.includes("image"),
+    functionCalling: m.tool_call ?? false,
+    streaming: true, // models.dev doesn't track this; every served model streams.
+    promptCaching: hasCache,
+    jsonMode: m.tool_call ?? false, // best-effort proxy; models.dev has no json flag.
+    systemPrompt: true,
+  };
+  return {
+    id: `${providerId}/${modelKey}`,
+    provider: providerId,
+    name: m.name ?? modelKey,
+    contextWindow: m.limit?.context ?? 0,
+    maxOutputTokens: m.limit?.output ?? 0,
+    costPerInputToken: (m.cost?.input ?? 0) / PER_MILLION,
+    costPerOutputToken: (m.cost?.output ?? 0) / PER_MILLION,
+    capabilities,
+    ...(hasCache ? { costPerCacheReadToken: (m.cost!.cache_read ?? 0) / PER_MILLION } : {}),
+    ...(typeof m.cost?.cache_write === "number"
+      ? { costPerCacheWriteToken: m.cost.cache_write / PER_MILLION }
+      : {}),
+    inputModalities,
+    outputModalities,
+    ...(m.knowledge ? { knowledgeCutoff: m.knowledge } : {}),
+    ...(m.release_date ? { releaseDate: m.release_date } : {}),
+  };
+}
+
+/** Convert a full models.dev catalogue into ModelDefinitions (pure, no I/O). */
+export function modelsDevToDefinitions(catalogue: ModelsDevCatalogue): ModelDefinition[] {
+  const out: ModelDefinition[] = [];
+  for (const [providerId, provider] of Object.entries(catalogue)) {
+    for (const [modelKey, model] of Object.entries(provider.models ?? {})) {
+      out.push(modelsDevModelToDefinition(providerId, modelKey, model));
+    }
+  }
+  return out;
+}
+
+/**
+ * Seed a registry from a models.dev catalogue. By default existing ids are kept
+ * (curated BUILTIN_MODELS win); pass `{ overwrite: true }` to let models.dev data
+ * replace them. Returns the count added/replaced.
+ */
+export function registerFromModelsDev(
+  registry: ProviderRegistry,
+  catalogue: ModelsDevCatalogue,
+  opts: { overwrite?: boolean } = {},
+): number {
+  let n = 0;
+  for (const def of modelsDevToDefinitions(catalogue)) {
+    if (!opts.overwrite && registry.has(def.id)) continue;
+    registry.register(def);
+    n++;
+  }
+  return n;
+}
+
+/**
+ * Fetch the live models.dev catalogue. THIS MAKES A NETWORK CALL — callers must
+ * gate it behind explicit user intent (CLI flag / admin action), never run it on
+ * a hot path. Inject `fetchFn` in tests.
+ */
+export async function fetchModelsDev(
+  fetchFn: typeof fetch = fetch,
+): Promise<ModelsDevCatalogue> {
+  const res = await fetchFn(MODELS_DEV_API_URL);
+  if (!res.ok) throw new Error(`models.dev fetch failed: HTTP ${res.status}`);
+  return (await res.json()) as ModelsDevCatalogue;
+}

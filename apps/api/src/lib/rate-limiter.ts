@@ -15,6 +15,8 @@
  * Fails open (no 429) when KV is unavailable to avoid blocking all traffic.
  */
 
+import { createHash } from "node:crypto";
+
 import type { FastifyRequest, FastifyReply } from "fastify";
 
 import { getSharedKV } from "./shared-kv.js";
@@ -40,6 +42,17 @@ function _ipKey(req: FastifyRequest, prefix: string): string {
     (req.socket as { remoteAddress?: string } | undefined)?.remoteAddress ??
     "unknown";
   return `ratelimit:${prefix}:${ip}`;
+}
+
+/**
+ * Stable per-API-key bucket id derived from the Bearer token. The token is
+ * SHA-256'd and truncated — the raw key never appears in a KV key, log, or
+ * response header. Returns null when there is no Bearer token.
+ */
+function _apiKeyId(req: FastifyRequest): string | null {
+  const m = /^Bearer\s+(\S+)$/i.exec((req.headers.authorization as string | undefined) ?? "");
+  if (!m?.[1]) return null;
+  return createHash("sha256").update(m[1]).digest("hex").slice(0, 16);
 }
 
 // ── Atomic Redis INCR + EXPIRE (pipeline) ────────────────────────────────────
@@ -131,8 +144,10 @@ async function _getCurrentCount(key: string): Promise<number> {
 }
 
 /**
- * Per-user rate limiter — keys by nexusUserId instead of IP.
- * Falls back to IP when nexusUserId is not available.
+ * Per-identity rate limiter. Buckets by the strongest identity available:
+ * an explicit `keyBy`, else `nexusUserId`, else the caller's **API key**
+ * (SHA-256 of the Bearer token — BYOK requests without a resolved user still get
+ * a per-key bucket instead of collapsing onto a shared NAT IP), else the IP.
  * Layer this ON TOP of IP-based limits for defense in depth.
  */
 export function makeUserRateLimitPreHandler(opts: RateLimitOptions) {
@@ -143,9 +158,22 @@ export function makeUserRateLimitPreHandler(opts: RateLimitOptions) {
     request: FastifyRequest,
     reply: FastifyReply,
   ): Promise<void> {
+    // Identity class for the X-RateLimit-User header (never the raw key/token).
+    let identity = "ip";
     const resolveKey = (): string => {
-      if (keyBy) return `ratelimit:${keyPrefix}:${keyBy(request)}`;
-      if (request.nexusUserId) return `ratelimit:${keyPrefix}:user:${request.nexusUserId}`;
+      if (keyBy) {
+        identity = "custom";
+        return `ratelimit:${keyPrefix}:${keyBy(request)}`;
+      }
+      if (request.nexusUserId) {
+        identity = request.nexusUserId;
+        return `ratelimit:${keyPrefix}:user:${request.nexusUserId}`;
+      }
+      const apiKeyId = _apiKeyId(request);
+      if (apiKeyId) {
+        identity = "key";
+        return `ratelimit:${keyPrefix}:key:${apiKeyId}`;
+      }
       return _ipKey(request, keyPrefix);
     };
     const key = resolveKey();
@@ -161,7 +189,7 @@ export function makeUserRateLimitPreHandler(opts: RateLimitOptions) {
           .header("Retry-After", retryAfter)
           .header("X-RateLimit-Limit", limit)
           .header("X-RateLimit-Remaining", 0)
-          .header("X-RateLimit-User", request.nexusUserId ?? "ip")
+          .header("X-RateLimit-User", identity)
           .send({
             error: "Too Many Requests",
             code: "RATE_LIMIT_EXCEEDED",
@@ -174,7 +202,7 @@ export function makeUserRateLimitPreHandler(opts: RateLimitOptions) {
 
       reply.header("X-RateLimit-Limit", limit);
       reply.header("X-RateLimit-Remaining", Math.max(0, limit - current));
-      reply.header("X-RateLimit-User", request.nexusUserId ?? "ip");
+      reply.header("X-RateLimit-User", identity);
     } catch {
       // KV unavailable — fail open to avoid cascading downtime.
     }

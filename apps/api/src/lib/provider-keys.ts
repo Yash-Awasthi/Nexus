@@ -37,6 +37,16 @@ import {
   QwenDriver,
   Ai360Driver,
   VercelAIGatewayDriver,
+  DoubaoDriver,
+  BytePlusDriver,
+  HunyuanDriver,
+  SparkDriver,
+  AzureOpenAIDriver,
+  CloudflareWorkersAIDriver,
+  ReplicateDriver,
+  BaiduErnieDriver,
+  AlibabaBailianDriver,
+  DifyDriver,
   BedrockDriver,
   VertexDriver,
   type LlmDriver,
@@ -73,6 +83,28 @@ const DRIVER_FACTORIES: Record<string, (apiKey: string) => LlmDriver> = {
   qwen: (apiKey) => new QwenDriver({ apiKey }),
   ai360: (apiKey) => new Ai360Driver({ apiKey }),
   vercel_ai_gateway: (apiKey) => new VercelAIGatewayDriver({ apiKey }),
+  doubao: (apiKey) => new DoubaoDriver({ apiKey }),
+  byteplus: (apiKey) => new BytePlusDriver({ apiKey }),
+  hunyuan: (apiKey) => new HunyuanDriver({ apiKey }),
+  spark: (apiKey) => new SparkDriver({ apiKey }),
+  replicate: (apiKey) => new ReplicateDriver({ apiKey }),
+  // Alibaba Bailian/DashScope (Qwen) via OpenAI compatible-mode — plain key.
+  alibaba_bailian: (apiKey) => new AlibabaBailianDriver({ apiKey }),
+  // Dify is app-scoped: the key authenticates one app. Optional baseUrl (self-host)
+  // + user travel as a JSON blob, same convention as the composite-cred providers.
+  dify: (key) => new DifyDriver(JSON.parse(key) as ConstructorParameters<typeof DifyDriver>[0]),
+  // Azure & Cloudflare also need composite credentials (endpoint+deployment /
+  // accountId alongside the key). Same JSON-blob convention as bedrock/vertex.
+  azure_openai: (key) =>
+    new AzureOpenAIDriver(JSON.parse(key) as ConstructorParameters<typeof AzureOpenAIDriver>[0]),
+  cloudflare: (key) =>
+    new CloudflareWorkersAIDriver(
+      JSON.parse(key) as ConstructorParameters<typeof CloudflareWorkersAIDriver>[0],
+    ),
+  // ERNIE needs client-credentials (clientId + clientSecret), not a single key.
+  // Same JSON-blob convention as azure/cloudflare/bedrock.
+  baidu_ernie: (key) =>
+    new BaiduErnieDriver(JSON.parse(key) as ConstructorParameters<typeof BaiduErnieDriver>[0]),
   // Bedrock & Vertex need composite credentials, not a single key. The stored
   // secret is a JSON blob; parse it here. A malformed blob throws, which the
   // caller treats as "provider not configured" (same as a missing key).

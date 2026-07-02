@@ -137,14 +137,26 @@ export interface HttpTransport {
 export class MockTransport implements HttpTransport {
   readonly calls: { url: string; body: unknown; headers: Record<string, string> }[] = [];
   private response: unknown = {};
+  private queue: unknown[] | null = null;
 
   setResponse(response: unknown): this {
     this.response = response;
+    this.queue = null;
+    return this;
+  }
+
+  /**
+   * Queue ordered responses for multi-POST drivers (e.g. OAuth token then chat).
+   * Each `post` shifts the next item; once drained, falls back to `setResponse`.
+   */
+  setResponses(responses: unknown[]): this {
+    this.queue = [...responses];
     return this;
   }
 
   async post(url: string, body: unknown, headers: Record<string, string>): Promise<unknown> {
     this.calls.push({ url, body, headers });
+    if (this.queue && this.queue.length > 0) return this.queue.shift();
     return this.response;
   }
 }
@@ -614,6 +626,16 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
     this.apiKey = config.apiKey;
   }
 
+  /** Chat-completions endpoint URL. Override for non-standard paths (e.g. Azure). */
+  protected chatCompletionsUrl(): string {
+    return `${this.baseUrl}/chat/completions`;
+  }
+
+  /** Auth + extra request headers. Override for non-Bearer schemes (e.g. Azure `api-key`). */
+  protected authHeaders(): Record<string, string> {
+    return { Authorization: `Bearer ${this.apiKey}` };
+  }
+
   async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
     const t0 = Date.now();
     const messages = toOpenAIMessages(opts.messages, opts.systemPrompt);
@@ -626,9 +648,11 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
       ...(opts.stop ? { stop: opts.stop } : {}),
       ...(tools ? { tools, ...(opts.toolChoice ? { tool_choice: opts.toolChoice } : {}) } : {}),
     };
-    const raw = (await this.transport.post(`${this.baseUrl}/chat/completions`, body, {
-      Authorization: `Bearer ${this.apiKey}`,
-    })) as Record<string, unknown>;
+    const raw = (await this.transport.post(
+      this.chatCompletionsUrl(),
+      body,
+      this.authHeaders(),
+    )) as Record<string, unknown>;
 
     const choice = (
       raw["choices"] as { message: Record<string, unknown>; finish_reason: string }[]
@@ -677,9 +701,7 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
     // Accumulate streaming tool_calls by their delta index.
     const toolAcc = new Map<number, { id: string; name: string; args: string }>();
 
-    for await (const line of this.sseLines(`${this.baseUrl}/chat/completions`, body, {
-      Authorization: `Bearer ${this.apiKey}`,
-    })) {
+    for await (const line of this.sseLines(this.chatCompletionsUrl(), body, this.authHeaders())) {
       let event: Record<string, unknown>;
       try {
         event = JSON.parse(line) as Record<string, unknown>;
@@ -1085,7 +1107,8 @@ export class NvidiaNimDriver extends OpenAICompatibleDriver {
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://integrate.api.nvidia.com/v1";
-    this.model = config.model ?? "meta/llama-3.1-70b-instruct";
+    // Small, low-cost reasoning model; verified live on integrate.api.nvidia.com.
+    this.model = config.model ?? "nvidia/nvidia-nemotron-nano-9b-v2";
   }
 }
 
@@ -1375,6 +1398,475 @@ export class VercelAIGatewayDriver extends OpenAICompatibleDriver {
   }
 }
 
+/** Doubao / Volcengine Ark (ByteDance, China region). */
+export class DoubaoDriver extends OpenAICompatibleDriver {
+  readonly provider = "doubao";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://ark.cn-beijing.volces.com/api/v3";
+    this.model = config.model ?? "doubao-pro-32k";
+  }
+}
+
+/** BytePlus ModelArk (Volcengine Ark, international region). */
+export class BytePlusDriver extends OpenAICompatibleDriver {
+  readonly provider = "byteplus";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://ark.ap-southeast.bytepluses.com/api/v3";
+    this.model = config.model ?? "skylark-pro";
+  }
+}
+
+/** Tencent Hunyuan (OpenAI-compatible endpoint). */
+export class HunyuanDriver extends OpenAICompatibleDriver {
+  readonly provider = "hunyuan";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://api.hunyuan.cloud.tencent.com/v1";
+    this.model = config.model ?? "hunyuan-turbo";
+  }
+}
+
+/** iFlytek Spark (HTTP OpenAI-compatible endpoint, not the signed WebSocket API). */
+export class SparkDriver extends OpenAICompatibleDriver {
+  readonly provider = "spark";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://spark-api-open.xf-yun.com/v1";
+    this.model = config.model ?? "generalv3.5";
+  }
+}
+
+/**
+ * Azure OpenAI Service. Unlike the public OpenAI API, Azure routes by deployment
+ * name in the path, pins an `api-version` query param, and authenticates with an
+ * `api-key` header (not a Bearer token). Overrides the two base-class seams.
+ */
+export class AzureOpenAIDriver extends OpenAICompatibleDriver {
+  readonly provider = "azure_openai";
+  readonly model: string;
+  protected baseUrl: string;
+  private deployment: string;
+  private apiVersion: string;
+  constructor(
+    config: ApiKeyConfig & {
+      /** Resource endpoint, e.g. https://my-resource.openai.azure.com */
+      endpoint: string;
+      /** Azure deployment name (routes the request; distinct from the model id). */
+      deployment: string;
+      /** API version, e.g. 2024-10-21. */
+      apiVersion?: string;
+      model?: string;
+    },
+    transport?: HttpTransport,
+  ) {
+    super(config, transport);
+    this.baseUrl = config.endpoint.replace(/\/$/, "");
+    this.deployment = config.deployment;
+    this.apiVersion = config.apiVersion ?? "2024-10-21";
+    this.model = config.model ?? config.deployment;
+  }
+  protected override chatCompletionsUrl(): string {
+    return `${this.baseUrl}/openai/deployments/${this.deployment}/chat/completions?api-version=${this.apiVersion}`;
+  }
+  protected override authHeaders(): Record<string, string> {
+    return { "api-key": this.apiKey };
+  }
+}
+
+/** Cloudflare Workers AI (OpenAI-compatible gateway; needs the account id in the path). */
+export class CloudflareWorkersAIDriver extends OpenAICompatibleDriver {
+  readonly provider = "cloudflare";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(
+    config: ApiKeyConfig & { accountId: string; baseUrl?: string; model?: string },
+    transport?: HttpTransport,
+  ) {
+    super(config, transport);
+    this.baseUrl =
+      config.baseUrl ?? `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/ai/v1`;
+    this.model = config.model ?? "@cf/meta/llama-3.1-8b-instruct";
+  }
+}
+
+/** Xinference — self-hosted OpenAI-compatible inference server (default :9997). */
+export class XinferenceDriver extends OpenAICompatibleDriver {
+  readonly provider = "xinference";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: { apiKey?: string; model?: string; baseUrl?: string }, transport?: HttpTransport) {
+    super({ apiKey: config.apiKey ?? "xinference" }, transport);
+    this.baseUrl = config.baseUrl ?? "http://localhost:9997/v1";
+    this.model = config.model ?? "qwen2.5-instruct";
+  }
+}
+
+/**
+ * Replicate. Replicate's native shape is "create a prediction, then poll until it
+ * finishes" — but the modern API accepts a `Prefer: wait` header that blocks and
+ * returns the completed prediction in a single response, so no poll loop (and no
+ * GET) is needed. `model` is the version hash or `owner/name`; chat models take a
+ * `prompt` + `system_prompt` and return `output` as an array of token chunks.
+ */
+export class ReplicateDriver extends BaseDriver {
+  readonly provider = "replicate";
+  readonly model: string;
+  private apiKey: string;
+  private baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(transport);
+    this.apiKey = config.apiKey;
+    this.baseUrl = config.baseUrl ?? "https://api.replicate.com/v1";
+    this.model = config.model ?? "meta/meta-llama-3-8b-instruct";
+  }
+
+  async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
+    const t0 = Date.now();
+    const model = opts.model ?? this.model;
+    const prompt = opts.messages
+      .map((m) => {
+        const role = m.role === "assistant" ? "Assistant" : m.role === "system" ? "System" : "User";
+        return `${role}: ${m.content}`;
+      })
+      .join("\n");
+    const input: Record<string, unknown> = {
+      prompt,
+      ...(opts.systemPrompt ? { system_prompt: opts.systemPrompt } : {}),
+      ...(opts.maxTokens !== undefined ? { max_tokens: opts.maxTokens } : {}),
+      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+    };
+    const raw = (await this.transport.post(
+      `${this.baseUrl}/predictions`,
+      { version: model, input },
+      { Authorization: `Bearer ${this.apiKey}`, Prefer: "wait" },
+    )) as Record<string, unknown>;
+
+    const status = raw["status"] as string | undefined;
+    if (status === "failed" || status === "canceled") {
+      throw new LlmError(
+        "SERVER_ERROR",
+        `Replicate prediction ${status}: ${String(raw["error"] ?? "")}`,
+        this.provider,
+      );
+    }
+    // `output` is usually an array of streamed string chunks; sometimes one string.
+    const out = raw["output"];
+    const content = Array.isArray(out) ? out.join("") : typeof out === "string" ? out : "";
+    const inputTokens = estimateTokens(prompt);
+    const outputTokens = estimateTokens(content);
+    return this.makeResponse(
+      (raw["id"] as string) ?? "replicate-resp",
+      content,
+      model,
+      this.makeUsage(inputTokens, outputTokens),
+      Date.now() - t0,
+      "stop",
+    );
+  }
+}
+
+/**
+ * Baidu ERNIE (Wenxin / Qianfan classic API). Unlike the OpenAI-shaped drivers,
+ * ERNIE needs a two-step flow: a client-credentials OAuth POST to mint a 30-day
+ * `access_token`, then the chat POST with that token as a `?access_token=` query
+ * param. Both calls go through the transport seam (so tests drive them with
+ * `MockTransport.setResponses([token, chat])`). The token is cached until expiry.
+ *
+ * Wire format differs from OpenAI: the system prompt is a separate top-level
+ * `system` field, messages carry only user/assistant turns, and the reply text is
+ * `result` (errors arrive as `error_code`/`error_msg` inside a 200 body).
+ *
+ * Tool-calling: ERNIE `functions` (request) ↔ top-level `function_call` (response)
+ * are mapped. ERNIE has no tool-call ids, so we use the function *name* as the
+ * LlmToolCall id — that lets a later `role:"tool"` result round-trip back to an
+ * ERNIE `role:"function"` message (which needs the name) without a lookup table.
+ *
+ * ponytail: ERNIE emits at most ONE function_call per turn (no parallel calls),
+ * and `tool_choice` is left to the model (auto). Upgrade path: map explicit
+ * tool_choice + parallel calls if a model variant ever supports them.
+ */
+export class BaiduErnieDriver extends BaseDriver {
+  readonly provider = "baidu_ernie";
+  readonly model: string;
+  private clientId: string;
+  private clientSecret: string;
+  private baseUrl: string;
+  private oauthUrl: string;
+  private token: { value: string; expiresAt: number } | null = null;
+
+  constructor(
+    config: {
+      /** Baidu app API Key (a.k.a. client_id / AK). */
+      clientId: string;
+      /** Baidu app Secret Key (a.k.a. client_secret / SK). */
+      clientSecret: string;
+      model?: string;
+      /** Chat endpoint base (the model id is appended as the final path segment). */
+      baseUrl?: string;
+      oauthUrl?: string;
+    },
+    transport?: HttpTransport,
+  ) {
+    super(transport);
+    this.clientId = config.clientId;
+    this.clientSecret = config.clientSecret;
+    this.model = config.model ?? "ernie-4.0-8k";
+    this.baseUrl =
+      config.baseUrl ??
+      "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat";
+    this.oauthUrl = config.oauthUrl ?? "https://aip.baidubce.com/oauth/2.0/token";
+  }
+
+  private async getToken(): Promise<string> {
+    if (this.token && Date.now() < this.token.expiresAt) return this.token.value;
+    const url =
+      `${this.oauthUrl}?grant_type=client_credentials` +
+      `&client_id=${encodeURIComponent(this.clientId)}` +
+      `&client_secret=${encodeURIComponent(this.clientSecret)}`;
+    const raw = (await this.transport.post(url, {}, { "Content-Type": "application/json" })) as {
+      access_token?: string;
+      expires_in?: number;
+      error?: string;
+      error_description?: string;
+    };
+    if (!raw.access_token) {
+      throw new LlmError(
+        "AUTH_FAILED",
+        raw.error_description ?? raw.error ?? "ERNIE OAuth token request failed",
+        this.provider,
+        401,
+      );
+    }
+    // Refresh a minute early; default ERNIE token lifetime is 30 days.
+    this.token = {
+      value: raw.access_token,
+      expiresAt: Date.now() + (raw.expires_in ?? 2_592_000) * 1000 - 60_000,
+    };
+    return this.token.value;
+  }
+
+  async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
+    const t0 = Date.now();
+    const token = await this.getToken();
+    const model = opts.model ?? this.model;
+
+    // ERNIE: system prompt is top-level; messages carry only user/assistant turns.
+    let system = opts.systemPrompt;
+    const messages: Record<string, unknown>[] = [];
+    for (const m of opts.messages) {
+      if (m.role === "system") {
+        system = system ? `${system}\n\n${m.content}` : m.content;
+      } else if (m.role === "assistant" && m.toolCalls?.length) {
+        // ERNIE carries a single function_call on the assistant turn (id == name).
+        const tc = m.toolCalls[0]!;
+        messages.push({
+          role: "assistant",
+          content: m.content,
+          function_call: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
+        });
+      } else if (m.role === "tool") {
+        // Tool result → ERNIE `function` role; toolCallId is the function name.
+        messages.push({ role: "function", name: m.toolCallId ?? "", content: m.content });
+      } else if (m.role === "assistant" || m.role === "user") {
+        messages.push({ role: m.role, content: m.content });
+      } else {
+        messages.push({ role: "user", content: m.content });
+      }
+    }
+
+    const functions = opts.tools?.map((t) => ({
+      name: t.name,
+      description: t.description,
+      parameters: t.parameters,
+    }));
+
+    const body: Record<string, unknown> = {
+      messages,
+      ...(system ? { system } : {}),
+      ...(functions?.length ? { functions } : {}),
+      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+      ...(opts.maxTokens !== undefined ? { max_output_tokens: opts.maxTokens } : {}),
+      ...(opts.stop ? { stop: opts.stop } : {}),
+    };
+
+    const url = `${this.baseUrl}/${encodeURIComponent(model)}?access_token=${encodeURIComponent(token)}`;
+    const raw = (await this.transport.post(url, body, { "Content-Type": "application/json" })) as {
+      id?: string;
+      result?: string;
+      function_call?: { name?: string; arguments?: string; thoughts?: string };
+      error_code?: number;
+      error_msg?: string;
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
+    };
+
+    // ERNIE reports failures as error_code inside an HTTP 200 body.
+    if (raw.error_code) {
+      const msg = raw.error_msg ?? `ERNIE error ${raw.error_code}`;
+      // 110/111 = invalid/expired token; 17/18/336501 = quota / rate.
+      if (raw.error_code === 110 || raw.error_code === 111) {
+        this.token = null; // force re-auth next call
+        throw new LlmError("AUTH_FAILED", msg, this.provider, 401);
+      }
+      if (raw.error_code === 17 || raw.error_code === 18 || raw.error_code === 336501) {
+        throw new LlmError("RATE_LIMITED", msg, this.provider, 429);
+      }
+      throw new LlmError("SERVER_ERROR", msg, this.provider);
+    }
+
+    const content = raw.result ?? "";
+
+    // Parse a native function_call (ERNIE emits at most one). Arguments arrive as
+    // a JSON string; tolerate malformed args by falling back to an empty object.
+    let toolCalls: LlmToolCall[] | undefined;
+    if (raw.function_call?.name) {
+      let parsedArgs: Record<string, unknown> = {};
+      try {
+        parsedArgs = raw.function_call.arguments
+          ? (JSON.parse(raw.function_call.arguments) as Record<string, unknown>)
+          : {};
+      } catch {
+        /* leave args empty on malformed JSON */
+      }
+      // id == name so a later tool-result message can name the ERNIE `function` turn.
+      toolCalls = [{ id: raw.function_call.name, name: raw.function_call.name, arguments: parsedArgs }];
+    }
+
+    const inputTokens =
+      raw.usage?.prompt_tokens ?? estimateTokens(opts.messages.map((m) => m.content).join(" "));
+    const outputTokens = raw.usage?.completion_tokens ?? estimateTokens(content);
+    return this.makeResponse(
+      raw.id ?? `${this.provider}-resp`,
+      content,
+      model,
+      this.makeUsage(inputTokens, outputTokens),
+      Date.now() - t0,
+      toolCalls?.length ? "tool_calls" : "stop",
+      toolCalls,
+    );
+  }
+}
+
+/**
+ * Alibaba Cloud Bailian / DashScope (Qwen family). Uses DashScope's
+ * OpenAI-compatible endpoint (`/compatible-mode/v1`), so the standard
+ * chat-completions request/response shape — including tools and streaming —
+ * works with zero custom adapter. Default host is the international region; set
+ * `baseUrl` to the mainland host (`https://dashscope.aliyuncs.com/...`) if needed.
+ *
+ * ponytail: compatible-mode covers chat + tool-calling + streaming. The ceiling
+ * is Qwen-only extras (e.g. partial-output / enable_search) that only the native
+ * `/api/v1/services/aigc/text-generation` envelope exposes; add that adapter only
+ * if such a feature is actually required.
+ */
+export class AlibabaBailianDriver extends OpenAICompatibleDriver {
+  readonly provider = "alibaba_bailian";
+  readonly model: string;
+  protected baseUrl: string;
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
+    this.model = config.model ?? "qwen-plus";
+  }
+}
+
+/**
+ * Dify — an app-scoped platform, NOT a raw model API. Each Dify "app" owns its
+ * model, prompt, and tools server-side; the API key authenticates one app and the
+ * caller sends a single `query` string, not a messages array + model.
+ *
+ * We map Nexus's chat shape onto chat-messages (blocking mode): the latest user
+ * turn becomes `query`, and the system prompt + earlier turns are folded into the
+ * query as plain context (Dify threads real multi-turn server-side via
+ * conversation_id, which a stateless driver call doesn't carry).
+ *
+ * ponytail: blocking only (no SSE streaming), no conversation_id threading, no
+ * native tool-calls — those are the Dify app's job. Upgrade path: thread
+ * conversation_id + switch to response_mode "streaming" if true multi-turn or
+ * token streaming is needed.
+ */
+export class DifyDriver extends BaseDriver {
+  readonly provider = "dify";
+  /** Label only — the actual model is configured inside the Dify app. */
+  readonly model: string;
+  private apiKey: string;
+  private baseUrl: string;
+  private user: string;
+
+  constructor(
+    config: { apiKey: string; model?: string; baseUrl?: string; user?: string },
+    transport?: HttpTransport,
+  ) {
+    super(transport);
+    this.apiKey = config.apiKey;
+    this.model = config.model ?? "dify-app";
+    this.baseUrl = config.baseUrl ?? "https://api.dify.ai/v1";
+    this.user = config.user ?? "nexus";
+  }
+
+  async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
+    const t0 = Date.now();
+    const history = opts.messages.filter((m) => m.role !== "system");
+    const query = history.at(-1)?.content ?? "";
+    const context: string[] = [];
+    if (opts.systemPrompt) context.push(opts.systemPrompt);
+    for (const m of history.slice(0, -1)) context.push(`${m.role}: ${m.content}`);
+    const fullQuery = context.length ? `${context.join("\n")}\n\n${query}` : query;
+
+    const body = {
+      inputs: {},
+      query: fullQuery,
+      response_mode: "blocking",
+      user: this.user,
+    };
+
+    const raw = (await this.transport.post(`${this.baseUrl}/chat-messages`, body, {
+      Authorization: `Bearer ${this.apiKey}`,
+      "Content-Type": "application/json",
+    })) as {
+      answer?: string;
+      message_id?: string;
+      conversation_id?: string;
+      metadata?: { usage?: { prompt_tokens?: number; completion_tokens?: number } };
+      // Dify error body
+      code?: string;
+      message?: string;
+      status?: number;
+    };
+
+    // Dify can return an error envelope (sometimes with HTTP 200 via proxies).
+    if (raw.code) {
+      const msg = raw.message ?? raw.code;
+      if (raw.status === 401 || raw.code === "unauthorized" || raw.code === "invalid_api_key") {
+        throw new LlmError("AUTH_FAILED", msg, this.provider, 401);
+      }
+      if (raw.status === 429) throw new LlmError("RATE_LIMITED", msg, this.provider, 429);
+      throw new LlmError("SERVER_ERROR", msg, this.provider, raw.status);
+    }
+
+    const content = raw.answer ?? "";
+    const inputTokens = raw.metadata?.usage?.prompt_tokens ?? estimateTokens(fullQuery);
+    const outputTokens = raw.metadata?.usage?.completion_tokens ?? estimateTokens(content);
+    return this.makeResponse(
+      raw.message_id ?? `${this.provider}-resp`,
+      content,
+      this.model,
+      this.makeUsage(inputTokens, outputTokens),
+      Date.now() - t0,
+      "stop",
+    );
+  }
+}
+
 /**
  * Local sidecar router — any self-hosted OpenAI-compatible `/v1` endpoint.
  * Routes through it to inherit its provider catalog, fallback and compression
@@ -1639,6 +2131,14 @@ export type ProviderName =
   | "qwen"
   | "ai360"
   | "vercel_ai_gateway"
+  | "doubao"
+  | "byteplus"
+  | "hunyuan"
+  | "spark"
+  | "azure_openai"
+  | "cloudflare"
+  | "xinference"
+  | "replicate"
   | "bedrock"
   | "vertex";
 

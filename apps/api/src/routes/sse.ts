@@ -135,7 +135,7 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // Firehose routes — enterprise/admin tier only
+  // Firehose routes — open to all authenticated callers
   // ══════════════════════════════════════════════════════════════════════════
 
   // ── All task updates ─────────────────────────────────────────────────────
@@ -144,10 +144,6 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
     "/sse/tasks",
     { preHandler: [requireAuthWithTier, sseRL] },
     async (request, reply): Promise<void> => {
-      if (request.nexusTier !== "enterprise") {
-        reply.code(403);
-        return reply.send({ error: "Firehose requires enterprise tier" });
-      }
       reply.hijack();
       openSseConnection(reply.raw, request.socket, ["tasks"]);
     },
@@ -176,7 +172,7 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // ── All signals (enterprise only) ────────────────────────────────────────
+  // ── All signals ──────────────────────────────────────────────────────────
 
   app.get(
     "/sse/signals",
@@ -190,16 +186,12 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
       preHandler: [requireAuthWithTier, sseRL],
     },
     async (request, reply): Promise<void> => {
-      if (request.nexusTier !== "enterprise") {
-        reply.code(403);
-        return reply.send({ error: "Firehose requires enterprise tier" });
-      }
       reply.hijack();
       openSseConnection(reply.raw, request.socket, ["signals"]);
     },
   );
 
-  // ── All verdicts (enterprise only) ───────────────────────────────────────
+  // ── All verdicts ─────────────────────────────────────────────────────────
 
   app.get(
     "/sse/verdicts",
@@ -213,10 +205,6 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
       preHandler: [requireAuthWithTier, sseRL],
     },
     async (request, reply): Promise<void> => {
-      if (request.nexusTier !== "enterprise") {
-        reply.code(403);
-        return reply.send({ error: "Firehose requires enterprise tier" });
-      }
       reply.hijack();
       openSseConnection(reply.raw, request.socket, ["verdicts"]);
     },
@@ -246,7 +234,7 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // ── Live agent-run stream (step / compaction / status) ───────────────────
-  // `:stream` is the run's sessionId or taskId. "all" = firehose (enterprise only).
+  // `:stream` is the run's sessionId or taskId. "all" = the open firehose.
 
   app.get<{ Params: { stream: string } }>(
     "/sse/agent/:stream",
@@ -262,22 +250,16 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply): Promise<void> => {
       const { stream } = request.params;
       // Validate the user-controlled `:stream` selector against an explicit
-      // allowlist BEFORE the tier branch. Reserved selectors (e.g. "all") follow
-      // the firehose/tier path; everything else is treated strictly as a session
-      // id and must pass the ownership check — a crafted value cannot reach the
-      // enterprise-firehose branch unless it exactly matches a reserved name.
+      // allowlist. Reserved selectors (e.g. "all") are the open firehose;
+      // everything else is treated strictly as a session id and must pass the
+      // ownership check — a crafted value cannot reach the firehose branch unless
+      // it exactly matches a reserved name.
       const isFirehose = RESERVED_AGENT_STREAMS.has(stream);
       if (!isFirehose && !stream.trim()) {
         reply.code(400);
         return reply.send({ error: "Invalid stream selector" });
       }
-      if (isFirehose) {
-        // Firehose → enterprise only
-        if (request.nexusTier !== "enterprise") {
-          reply.code(403);
-          return reply.send({ error: "Agent firehose requires enterprise tier" });
-        }
-      } else {
+      if (!isFirehose) {
         // Specific session → verify ownership
         if (!(await verifySessionOwnership(request.nexusUserId, stream))) {
           reply.code(403);

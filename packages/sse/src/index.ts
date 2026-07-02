@@ -260,7 +260,13 @@ export function publishVerdict(payload: VerdictPayload): void {
 /** Redis pub/sub channel carrying agent-run events across processes. */
 export const AGENT_EVENTS_CHANNEL = "nexus:agent-events";
 
-export type AgentEventType = "run_started" | "step" | "compaction" | "status" | "learnings";
+export type AgentEventType =
+  | "run_started"
+  | "step"
+  | "compaction"
+  | "status"
+  | "learnings"
+  | "tool_compress";
 
 /** A worker-published agent-run event, scoped to one run's stream id. */
 export interface AgentStreamEvent {
