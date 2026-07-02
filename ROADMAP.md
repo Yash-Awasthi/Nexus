@@ -505,7 +505,17 @@ Worker-thread sandbox (`ptc-sandbox.ts`) + `nexus code` CLI. `agent_sessions` ta
 > about to be cleared; resume from **PROGRESS.md** → next item is **§7.3** (forked learning loop).
 > Everything through §7.2 is committed on `feat/provider-breadth-compress-billing` and FF-merged.
 
-- **7.3 Forked learning loop.** Do: propose `MEMORY.md` / skill updates off a warm cache/digest.
+- **7.3 Forked learning loop.** **Done this branch.** `reviewSession` learnings now feed
+  `proposeLearningUpdates` (`apps/worker/src/handlers/agent-review.ts`): `memory`/`pattern`/`gotcha`
+  learnings → an append-only unified diff against `MEMORY.md`, `skill` learnings → `SKILLS.md`
+  (`appendUnifiedDiff` keeps the file's last line as context so `git apply` locates the tail;
+  new/empty file → a `@@ -0,0 @@` hunk). Idempotent — a learning whose content already appears in
+  the target file is skipped. `agent-handler.ts` reads the warm on-disk `MEMORY.md`/`SKILLS.md` from
+  the run workspace and emits `agent.learning_proposal` (new `AgentEventType`) after `agent.learnings`
+  — best-effort/detached. **Nothing is written to disk or applied**; the diff is proposal-only for a
+  human (or a future approval gate) to apply. 8 new tests (12 total in `agent-review.test.ts`);
+  worker typecheck + eslint green.
+  Do: propose `MEMORY.md` / skill updates off a warm cache/digest.
   Done: emits a diff proposal; applies nothing without approval.
 - **7.4 CLI `--local`** *(Gate)*. Files: `apps/cli/src/index.ts`. Do: in-process agent loop over
   the `RuntimeToolSet`. Needs a live provider key — gated.
