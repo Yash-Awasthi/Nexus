@@ -8802,18 +8802,23 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   });
 
   // File attachments stub — accepts upload, returns file record
-  app.post<{ Params: { id: string } }>("/v1/projects/:id/files", async (request, reply) => {
-    return reply.code(201).send({
-      id: `file_${Date.now()}`,
-      projectId: request.params.id,
-      name: "upload",
-      size: 0,
-      createdAt: new Date().toISOString(),
-    });
-  });
+  app.post<{ Params: { id: string } }>(
+    "/v1/projects/:id/files",
+    { preHandler: bridgeRL },
+    async (request, reply) => {
+      return reply.code(201).send({
+        id: `file_${Date.now()}`,
+        projectId: request.params.id,
+        name: "upload",
+        size: 0,
+        createdAt: new Date().toISOString(),
+      });
+    },
+  );
 
   app.delete<{ Params: { id: string; fileId: string } }>(
     "/v1/projects/:id/files/:fileId",
+    { preHandler: bridgeRL },
     async (request, reply) => {
       return reply.send({ ok: true });
     },
@@ -8823,19 +8828,24 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   // ProjectInstructions.tsx calls /api/stm, /api/stm/project/:id, /api/stm/toggle.
   // Extend the existing STM in-memory store to support per-project modules.
 
-  app.get("/stm", async (_req, reply) => {
+  app.get("/stm", { preHandler: bridgeRL }, async (_req, reply) => {
     return reply.send({ modules: _stmActiveModules, active: _stmActiveModules });
   });
 
   const _stmProjectOverrides = new Map<string, string[]>();
 
-  app.get<{ Params: { id: string } }>("/stm/project/:id", async (request, reply) => {
-    const overrides = _stmProjectOverrides.get(request.params.id);
-    return reply.send({ projectId: request.params.id, active: overrides ?? _stmActiveModules });
-  });
+  app.get<{ Params: { id: string } }>(
+    "/stm/project/:id",
+    { preHandler: bridgeRL },
+    async (request, reply) => {
+      const overrides = _stmProjectOverrides.get(request.params.id);
+      return reply.send({ projectId: request.params.id, active: overrides ?? _stmActiveModules });
+    },
+  );
 
   app.post<{ Params: { id: string }; Body: { active: string[] } }>(
     "/stm/project/:id",
+    { preHandler: bridgeRL },
     async (request, reply) => {
       const { active = [] } = request.body ?? {};
       _stmProjectOverrides.set(request.params.id, active);
@@ -8845,6 +8855,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
 
   app.post<{ Body: { moduleId: string; enabled: boolean } }>(
     "/stm/toggle",
+    { preHandler: bridgeRL },
     async (request, reply) => {
       const { moduleId, enabled } = request.body ?? {};
       if (!moduleId) return reply.code(400).send({ error: "moduleId required" });

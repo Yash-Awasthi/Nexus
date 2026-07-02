@@ -155,14 +155,6 @@ const builtinArchetypes: Archetype[] = [
   },
 ];
 
-const modelOptions = [
-  { value: "gpt-4o", label: "GPT-4o" },
-  { value: "gpt-4o-mini", label: "GPT-4o Mini" },
-  { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
-  { value: "claude-haiku", label: "Claude Haiku" },
-  { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
-];
-
 const defaultFormState = {
   name: "",
   icon: "🤖",
