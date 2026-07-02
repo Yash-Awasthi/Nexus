@@ -679,3 +679,376 @@ export function denormalize(req: CanonicalRequest, to: Format): Json {
 export function translate(req: unknown, from: Format, to: Format): Json {
   return denormalize(normalize(req, from), to);
 }
+
+// ── Streaming (response chunk translation) ───────────────────────────────────────
+// Same hub-and-spoke idea, one level down: a provider's SSE chunk normalizes to a
+// flat list of CanonicalStreamEvents, then an emitter renders them into the target
+// provider's chunk shape. Callers own SSE line framing / `data: [DONE]` sentinels /
+// `event:` names — this layer works on already-decoded chunk objects.
+//
+// Parsing is defined for every Format; emitting is defined for the two formats the
+// gateway actually transcodes between (openai ⇄ anthropic — the dominant pair, and
+// the one §2.4 wires). Emitting to a parse-only format throws a clear error rather
+// than silently dropping deltas.
+
+export type CanonicalStreamEvent =
+  | { type: "text"; text: string }
+  | { type: "thinking"; text: string }
+  | { type: "tool_call_start"; index: number; id: string; name: string }
+  | { type: "tool_call_args"; index: number; delta: string }
+  | { type: "finish"; reason?: string };
+
+const num = (v: unknown): number => (typeof v === "number" ? v : 0);
+
+// ── Chunk parsers (provider chunk → canonical events) ─────────────────────────────
+
+function chunkFromOpenAI(d: Json): CanonicalStreamEvent[] {
+  const events: CanonicalStreamEvent[] = [];
+  for (const rawChoice of Array.isArray(d.choices) ? d.choices : []) {
+    const choice = obj(rawChoice);
+    const delta = obj(choice.delta);
+    if (delta.content) events.push({ type: "text", text: str(delta.content) });
+    // Some OpenAI-compatible providers stream reasoning as `reasoning_content`.
+    if (delta.reasoning_content) events.push({ type: "thinking", text: str(delta.reasoning_content) });
+    for (const rawTc of Array.isArray(delta.tool_calls) ? delta.tool_calls : []) {
+      const tc = obj(rawTc);
+      const index = num(tc.index);
+      const fn = obj(tc.function);
+      // The opening chunk carries id+name; later chunks carry only arg fragments.
+      if (tc.id || fn.name) {
+        events.push({ type: "tool_call_start", index, id: str(tc.id), name: str(fn.name) });
+      }
+      if (fn.arguments) events.push({ type: "tool_call_args", index, delta: str(fn.arguments) });
+    }
+    if (choice.finish_reason) events.push({ type: "finish", reason: str(choice.finish_reason) });
+  }
+  return events;
+}
+
+function chunkFromAnthropic(d: Json): CanonicalStreamEvent[] {
+  const events: CanonicalStreamEvent[] = [];
+  const type = str(d.type);
+  if (type === "content_block_start") {
+    const cb = obj(d.content_block);
+    if (str(cb.type) === "tool_use") {
+      events.push({ type: "tool_call_start", index: num(d.index), id: str(cb.id), name: str(cb.name) });
+    }
+  } else if (type === "content_block_delta") {
+    const delta = obj(d.delta);
+    const dt = str(delta.type);
+    if (dt === "text_delta") events.push({ type: "text", text: str(delta.text) });
+    else if (dt === "input_json_delta")
+      events.push({ type: "tool_call_args", index: num(d.index), delta: str(delta.partial_json) });
+    else if (dt === "thinking_delta") events.push({ type: "thinking", text: str(delta.thinking) });
+  } else if (type === "message_delta") {
+    const delta = obj(d.delta);
+    if (delta.stop_reason) events.push({ type: "finish", reason: str(delta.stop_reason) });
+  }
+  return events;
+}
+
+/** Gemini/Vertex stream: full `functionCall.args` arrive at once (no partial JSON). */
+function chunkFromGemini(d: Json): CanonicalStreamEvent[] {
+  const events: CanonicalStreamEvent[] = [];
+  for (const rawCand of Array.isArray(d.candidates) ? d.candidates : []) {
+    const cand = obj(rawCand);
+    const parts = Array.isArray(obj(cand.content).parts) ? (obj(cand.content).parts as unknown[]) : [];
+    let toolIndex = 0;
+    for (const rawPart of parts) {
+      const p = obj(rawPart);
+      if (p.text) events.push({ type: "text", text: str(p.text) });
+      if (p.functionCall) {
+        const fc = obj(p.functionCall);
+        const idx = toolIndex++;
+        events.push({ type: "tool_call_start", index: idx, id: str(fc.name), name: str(fc.name) });
+        events.push({ type: "tool_call_args", index: idx, delta: JSON.stringify(obj(fc.args)) });
+      }
+    }
+    if (cand.finishReason) events.push({ type: "finish", reason: str(cand.finishReason) });
+  }
+  return events;
+}
+
+/** Ollama `/api/chat` stream: content deltas + whole-object tool_calls; `done` ends. */
+function chunkFromOllama(d: Json): CanonicalStreamEvent[] {
+  const events: CanonicalStreamEvent[] = [];
+  const m = obj(d.message);
+  if (m.content) events.push({ type: "text", text: str(m.content) });
+  let toolIndex = 0;
+  for (const rawTc of Array.isArray(m.tool_calls) ? m.tool_calls : []) {
+    const fn = obj(obj(rawTc).function);
+    const idx = toolIndex++;
+    events.push({ type: "tool_call_start", index: idx, id: str(fn.name), name: str(fn.name) });
+    events.push({ type: "tool_call_args", index: idx, delta: JSON.stringify(obj(fn.arguments)) });
+  }
+  if (d.done === true) events.push({ type: "finish", reason: d.done_reason ? str(d.done_reason) : "stop" });
+  return events;
+}
+
+/** OpenAI Responses stream: typed `response.*` events carry text/arg deltas. */
+function chunkFromResponses(d: Json): CanonicalStreamEvent[] {
+  const events: CanonicalStreamEvent[] = [];
+  const type = str(d.type);
+  if (type === "response.output_text.delta") events.push({ type: "text", text: str(d.delta) });
+  else if (type === "response.reasoning_summary_text.delta")
+    events.push({ type: "thinking", text: str(d.delta) });
+  else if (type === "response.output_item.added") {
+    const item = obj(d.item);
+    if (str(item.type) === "function_call") {
+      events.push({
+        type: "tool_call_start",
+        index: num(d.output_index),
+        id: str(item.call_id),
+        name: str(item.name),
+      });
+    }
+  } else if (type === "response.function_call_arguments.delta") {
+    events.push({ type: "tool_call_args", index: num(d.output_index), delta: str(d.delta) });
+  } else if (type === "response.completed") {
+    events.push({ type: "finish", reason: "stop" });
+  }
+  return events;
+}
+
+const CHUNK_NORMALIZERS: Record<Format, (d: Json) => CanonicalStreamEvent[]> = {
+  openai: chunkFromOpenAI,
+  anthropic: chunkFromAnthropic,
+  gemini: chunkFromGemini,
+  vertex: chunkFromGemini, // identical stream shape to gemini
+  responses: chunkFromResponses,
+  ollama: chunkFromOllama,
+};
+
+/** Parse one decoded provider stream chunk into canonical events. */
+export function normalizeStreamChunk(chunk: unknown, from: Format): CanonicalStreamEvent[] {
+  return CHUNK_NORMALIZERS[from](obj(chunk));
+}
+
+// ── Chunk emitters (canonical events → provider chunk objects) ────────────────────
+// Emitters are stateful (a stream is a sequence): the OpenAI emitter is near-flat,
+// the Anthropic emitter tracks open content blocks so it can bracket text/tool_use
+// blocks with the start/stop events Anthropic requires.
+
+/** Map a canonical/OpenAI finish reason onto an Anthropic stop_reason. */
+function mapStopReasonToAnthropic(reason: string | undefined): string {
+  switch (reason) {
+    case "tool_calls":
+      return "tool_use";
+    case "length":
+      return "max_tokens";
+    case "content_filter":
+      return "stop_sequence";
+    default:
+      return "end_turn";
+  }
+}
+
+/** Map an Anthropic stop_reason onto an OpenAI finish_reason. */
+function mapStopReasonToOpenAI(reason: string | undefined): string {
+  switch (reason) {
+    case "tool_use":
+      return "tool_calls";
+    case "max_tokens":
+      return "length";
+    default:
+      return "stop";
+  }
+}
+
+export interface StreamEmitter {
+  emit(events: CanonicalStreamEvent[]): Json[];
+  /** Closing frames when the source stream ends without an explicit finish event. */
+  flush(): Json[];
+}
+
+class OpenAIStreamEmitter implements StreamEmitter {
+  emit(events: CanonicalStreamEvent[]): Json[] {
+    return events.map((e) => {
+      switch (e.type) {
+        case "text":
+          return { choices: [{ index: 0, delta: { content: e.text }, finish_reason: null }] };
+        case "thinking":
+          return {
+            choices: [{ index: 0, delta: { reasoning_content: e.text }, finish_reason: null }],
+          };
+        case "tool_call_start":
+          return {
+            choices: [
+              {
+                index: 0,
+                delta: {
+                  tool_calls: [
+                    { index: e.index, id: e.id, type: "function", function: { name: e.name, arguments: "" } },
+                  ],
+                },
+                finish_reason: null,
+              },
+            ],
+          };
+        case "tool_call_args":
+          return {
+            choices: [
+              {
+                index: 0,
+                delta: { tool_calls: [{ index: e.index, function: { arguments: e.delta } }] },
+                finish_reason: null,
+              },
+            ],
+          };
+        case "finish":
+          return {
+            choices: [{ index: 0, delta: {}, finish_reason: mapStopReasonToOpenAI(e.reason) }],
+          };
+      }
+    });
+  }
+  flush(): Json[] {
+    return [];
+  }
+}
+
+class AnthropicStreamEmitter implements StreamEmitter {
+  private started = false;
+  private nextIndex = 0;
+  private textOpen = false;
+  private textIndex = -1;
+  private finished = false;
+  private readonly toolBlocks = new Map<number, number>();
+
+  private open(out: Json[]): void {
+    if (!this.started) {
+      out.push({ type: "message_start", message: { role: "assistant", content: [] } });
+      this.started = true;
+    }
+  }
+
+  private closeOpenBlocks(out: Json[]): void {
+    if (this.textOpen) {
+      out.push({ type: "content_block_stop", index: this.textIndex });
+      this.textOpen = false;
+    }
+    for (const blockIndex of this.toolBlocks.values()) {
+      out.push({ type: "content_block_stop", index: blockIndex });
+    }
+    this.toolBlocks.clear();
+  }
+
+  emit(events: CanonicalStreamEvent[]): Json[] {
+    const out: Json[] = [];
+    for (const e of events) {
+      this.open(out);
+      switch (e.type) {
+        case "text":
+          if (!this.textOpen) {
+            this.textIndex = this.nextIndex++;
+            out.push({
+              type: "content_block_start",
+              index: this.textIndex,
+              content_block: { type: "text", text: "" },
+            });
+            this.textOpen = true;
+          }
+          out.push({
+            type: "content_block_delta",
+            index: this.textIndex,
+            delta: { type: "text_delta", text: e.text },
+          });
+          break;
+        case "thinking":
+          if (!this.textOpen) {
+            this.textIndex = this.nextIndex++;
+            out.push({
+              type: "content_block_start",
+              index: this.textIndex,
+              content_block: { type: "thinking", thinking: "" },
+            });
+            this.textOpen = true;
+          }
+          out.push({
+            type: "content_block_delta",
+            index: this.textIndex,
+            delta: { type: "thinking_delta", thinking: e.text },
+          });
+          break;
+        case "tool_call_start": {
+          // A tool block cannot share the open text block — close it first.
+          if (this.textOpen) {
+            out.push({ type: "content_block_stop", index: this.textIndex });
+            this.textOpen = false;
+          }
+          const blockIndex = this.nextIndex++;
+          this.toolBlocks.set(e.index, blockIndex);
+          out.push({
+            type: "content_block_start",
+            index: blockIndex,
+            content_block: { type: "tool_use", id: e.id, name: e.name, input: {} },
+          });
+          break;
+        }
+        case "tool_call_args": {
+          const blockIndex = this.toolBlocks.get(e.index) ?? 0;
+          out.push({
+            type: "content_block_delta",
+            index: blockIndex,
+            delta: { type: "input_json_delta", partial_json: e.delta },
+          });
+          break;
+        }
+        case "finish":
+          this.closeOpenBlocks(out);
+          out.push({
+            type: "message_delta",
+            delta: { stop_reason: mapStopReasonToAnthropic(e.reason) },
+          });
+          out.push({ type: "message_stop" });
+          this.finished = true;
+          break;
+      }
+    }
+    return out;
+  }
+
+  flush(): Json[] {
+    if (!this.started || this.finished) return [];
+    const out: Json[] = [];
+    this.closeOpenBlocks(out);
+    out.push({ type: "message_delta", delta: { stop_reason: "end_turn" } });
+    out.push({ type: "message_stop" });
+    this.finished = true;
+    return out;
+  }
+}
+
+const STREAM_EMITTERS: Partial<Record<Format, () => StreamEmitter>> = {
+  openai: () => new OpenAIStreamEmitter(),
+  anthropic: () => new AnthropicStreamEmitter(),
+};
+
+/**
+ * Stateful streaming transcoder. Feed decoded source chunks via `translateChunk`;
+ * it returns zero or more decoded target chunks. Call `flush()` once the source
+ * stream ends to emit any closing frames the target format requires.
+ */
+export class StreamTranslator {
+  private readonly parse: (d: Json) => CanonicalStreamEvent[];
+  private readonly emitter: StreamEmitter;
+
+  constructor(from: Format, to: Format) {
+    const makeEmitter = STREAM_EMITTERS[to];
+    if (!makeEmitter) {
+      throw new Error(`llm-translate: streaming emit not supported for format "${to}"`);
+    }
+    this.parse = CHUNK_NORMALIZERS[from];
+    this.emitter = makeEmitter();
+  }
+
+  /** Translate one decoded source chunk into zero or more decoded target chunks. */
+  translateChunk(chunk: unknown): Json[] {
+    return this.emitter.emit(this.parse(obj(chunk)));
+  }
+
+  /** Emit closing frames after the source stream ends. */
+  flush(): Json[] {
+    return this.emitter.flush();
+  }
+}

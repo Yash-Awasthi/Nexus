@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
-import { normalize, denormalize, translate, type CanonicalRequest } from "../src/index.js";
+import {
+  normalize,
+  denormalize,
+  translate,
+  normalizeStreamChunk,
+  StreamTranslator,
+  type CanonicalRequest,
+} from "../src/index.js";
 
 // A request exercising the hard parts: system prompt, a tool definition, an
 // assistant tool call, and the tool result that follows it.
@@ -291,5 +298,163 @@ describe("robustness", () => {
     expect(normalize("nonsense", "vertex").messages).toEqual([]);
     expect(normalize("nonsense", "responses").messages).toEqual([]);
     expect(normalize("nonsense", "ollama").messages).toEqual([]);
+  });
+});
+
+// ── Streaming ─────────────────────────────────────────────────────────────────────
+
+// An OpenAI streamed response exercising the hard parts: a text delta, then a tool
+// call opened across two chunks (id/name, then a partial-JSON args fragment), then a
+// tool_calls finish. Mirrors what a live upstream sends.
+const OPENAI_STREAM = [
+  { choices: [{ index: 0, delta: { content: "Hello" }, finish_reason: null }] },
+  {
+    choices: [
+      {
+        index: 0,
+        delta: {
+          tool_calls: [
+            { index: 0, id: "call_1", type: "function", function: { name: "get_weather", arguments: "" } },
+          ],
+        },
+        finish_reason: null,
+      },
+    ],
+  },
+  {
+    choices: [
+      {
+        index: 0,
+        delta: { tool_calls: [{ index: 0, function: { arguments: '{"city":"Paris"}' } }] },
+        finish_reason: null,
+      },
+    ],
+  },
+  { choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] },
+];
+
+describe("streaming: openai → anthropic (golden frame sequence)", () => {
+  it("brackets text/tool_use blocks and maps the stop reason", () => {
+    const t = new StreamTranslator("openai", "anthropic");
+    const frames = OPENAI_STREAM.flatMap((c) => t.translateChunk(c));
+    frames.push(...t.flush());
+    expect(frames).toEqual([
+      { type: "message_start", message: { role: "assistant", content: [] } },
+      { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+      { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Hello" } },
+      { type: "content_block_stop", index: 0 },
+      {
+        type: "content_block_start",
+        index: 1,
+        content_block: { type: "tool_use", id: "call_1", name: "get_weather", input: {} },
+      },
+      {
+        type: "content_block_delta",
+        index: 1,
+        delta: { type: "input_json_delta", partial_json: '{"city":"Paris"}' },
+      },
+      { type: "content_block_stop", index: 1 },
+      { type: "message_delta", delta: { stop_reason: "tool_use" } },
+      { type: "message_stop" },
+    ]);
+  });
+});
+
+describe("streaming: anthropic → openai (golden frame sequence)", () => {
+  const ANTHROPIC_STREAM = [
+    { type: "message_start", message: { role: "assistant", content: [] } },
+    { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+    { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Hello" } },
+    { type: "content_block_stop", index: 0 },
+    {
+      type: "content_block_start",
+      index: 1,
+      content_block: { type: "tool_use", id: "call_1", name: "get_weather", input: {} },
+    },
+    {
+      type: "content_block_delta",
+      index: 1,
+      delta: { type: "input_json_delta", partial_json: '{"city":"Paris"}' },
+    },
+    { type: "content_block_stop", index: 1 },
+    { type: "message_delta", delta: { stop_reason: "tool_use" } },
+    { type: "message_stop" },
+  ];
+  it("emits text/tool_call deltas and maps tool_use → tool_calls", () => {
+    const t = new StreamTranslator("anthropic", "openai");
+    const frames = ANTHROPIC_STREAM.flatMap((c) => t.translateChunk(c));
+    frames.push(...t.flush());
+    expect(frames).toEqual([
+      { choices: [{ index: 0, delta: { content: "Hello" }, finish_reason: null }] },
+      {
+        choices: [
+          {
+            index: 0,
+            delta: {
+              tool_calls: [
+                { index: 1, id: "call_1", type: "function", function: { name: "get_weather", arguments: "" } },
+              ],
+            },
+            finish_reason: null,
+          },
+        ],
+      },
+      {
+        choices: [
+          {
+            index: 0,
+            delta: { tool_calls: [{ index: 1, function: { arguments: '{"city":"Paris"}' } }] },
+            finish_reason: null,
+          },
+        ],
+      },
+      { choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] },
+    ]);
+  });
+});
+
+describe("streaming: parse spokes + flush + guards", () => {
+  it("parses a gemini stream chunk (whole-object tool args)", () => {
+    const events = normalizeStreamChunk(
+      {
+        candidates: [
+          {
+            content: { parts: [{ functionCall: { name: "get_weather", args: { city: "Paris" } } }] },
+            finishReason: "STOP",
+          },
+        ],
+      },
+      "gemini",
+    );
+    expect(events).toEqual([
+      { type: "tool_call_start", index: 0, id: "get_weather", name: "get_weather" },
+      { type: "tool_call_args", index: 0, delta: '{"city":"Paris"}' },
+      { type: "finish", reason: "STOP" },
+    ]);
+  });
+  it("parses an ollama stream chunk and its done marker", () => {
+    const events = normalizeStreamChunk({ message: { content: "Hi" }, done: true }, "ollama");
+    expect(events).toEqual([
+      { type: "text", text: "Hi" },
+      { type: "finish", reason: "stop" },
+    ]);
+  });
+  it("flush closes an unfinished anthropic stream", () => {
+    const t = new StreamTranslator("openai", "anthropic");
+    const frames = t.translateChunk({
+      choices: [{ index: 0, delta: { content: "Hi" }, finish_reason: null }],
+    });
+    frames.push(...t.flush());
+    expect(frames.map((f) => (f as { type: string }).type)).toEqual([
+      "message_start",
+      "content_block_start",
+      "content_block_delta",
+      "content_block_stop",
+      "message_delta",
+      "message_stop",
+    ]);
+  });
+  it("throws when emitting to a parse-only format", () => {
+    expect(() => new StreamTranslator("openai", "gemini")).toThrow(/streaming emit not supported/);
   });
 });
