@@ -70,6 +70,18 @@ export async function handleOrchestrationJob(
   const store = deps.store ?? new NullOrchestrationRunStore();
   const runId = payload.taskId ?? `orc-${Date.now()}`;
 
+  // Resume-from-checkpoint (§6.3): if a prior run of this id already captured
+  // candidates (fan-out done) but didn't finish, replay those diffs instead of
+  // re-running every agent.
+  const prior = await store.get(runId);
+  const resumeCandidates =
+    prior &&
+    (prior.status === "scoring" || prior.status === "merging" || prior.status === "blocked") &&
+    Array.isArray(prior.candidates) &&
+    prior.candidates.length > 0
+      ? (prior.candidates as Candidate[])
+      : undefined;
+
   // Stage transition: mark the run running + stash the payload so a worker restart
   // can re-enqueue it from persisted state.
   await store.upsert({
@@ -95,6 +107,28 @@ export async function handleOrchestrationJob(
       baseRef: payload.baseRef ?? "HEAD",
       merge: payload.merge ?? false,
       worktrees: new GitWorktreeManager(payload.repoPath),
+      ...(resumeCandidates ? { resumeFrom: { candidates: resumeCandidates } } : {}),
+
+      // Durable checkpoint at each stage boundary → persist so a restart resumes.
+      checkpoint: async (cp) => {
+        if (cp.stage === "scored") {
+          await store.upsert({ id: runId, status: "scoring", winner: cp.winnerId, candidates: cp.candidates });
+        } else if (cp.stage === "gate-blocked") {
+          await store.upsert({ id: runId, status: "blocked", winner: cp.winnerId, candidates: cp.candidates });
+        } else if (cp.stage === "merged") {
+          await store.upsert({ id: runId, status: "merging", winner: cp.winnerId });
+        } else if (cp.candidates) {
+          // fanned-out / resumed — persist the captured diffs for resume + compare UI.
+          await store.upsert({ id: runId, candidates: cp.candidates });
+        }
+      },
+
+      // Evidence-first merge gate (§6.3): only merge a winner that actually
+      // produced a change. Extend here to require passing tests / CI before merge.
+      mergeGate: async (winner) => ({
+        passed: winner.ok && winner.diff.trim().length > 0,
+        reason: winner.ok && winner.diff.trim().length > 0 ? undefined : "no verifiable diff",
+      }),
 
       // Run the real coding-agent loop, confined to the agent's worktree dir.
       runner: async ({ task, spec, workingDir, signal }) => {
@@ -141,12 +175,16 @@ export async function handleOrchestrationJob(
     throw err;
   }
 
-  // Stage transition: completed — persist candidates + winner for the compare UI.
+  // Final transition. A merge blocked by the gate stays non-terminal (`blocked`)
+  // so it can be resumed once the evidence exists; everything else is completed.
+  const mergeRequested = payload.merge ?? false;
+  const gateBlocked = mergeRequested && result.gate !== undefined && !result.gate.passed;
   await store.upsert({
     id: runId,
-    status: "completed",
+    status: gateBlocked ? "blocked" : "completed",
     candidates: result.candidates,
     winner: result.winnerId,
+    error: gateBlocked ? (result.gate?.reason ?? "merge gate blocked") : null,
   });
 
   return result;

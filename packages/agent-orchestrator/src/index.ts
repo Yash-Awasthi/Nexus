@@ -51,6 +51,34 @@ export type Scorer = (
   candidates: Candidate[],
 ) => Promise<{ winnerId: string; reason?: string }>;
 
+/** Result of the pre-merge verification gate (§6.3). */
+export interface MergeGateResult {
+  passed: boolean;
+  reason?: string;
+}
+
+/**
+ * Evidence-first verification gate run on the winning candidate BEFORE its diff is
+ * merged. Return `{passed:false}` to block the merge (the run is left resumable so
+ * the merge can be retried once the evidence exists). Wrap tests/CI/a council
+ * re-check here. When absent, a winner with a non-empty diff is allowed to merge.
+ */
+export type MergeGate = (winner: Candidate, candidates: Candidate[]) => Promise<MergeGateResult>;
+
+/** Stages a run passes through; emitted to {@link Checkpointer} for durable resume. */
+export type OrchestrationStage = "fanned-out" | "resumed" | "scored" | "gate-blocked" | "merged";
+
+export interface OrchestrationCheckpoint {
+  runId: string;
+  stage: OrchestrationStage;
+  candidates?: Candidate[];
+  winnerId?: string | null;
+  gate?: MergeGateResult;
+}
+
+/** Durable checkpoint sink — invoked at each stage boundary so a run can resume. */
+export type Checkpointer = (cp: OrchestrationCheckpoint) => Promise<void> | void;
+
 export interface OrchestrateOptions {
   task: string;
   agents: AgentSpec[];
@@ -63,6 +91,15 @@ export interface OrchestrateOptions {
   runId: string;
   /** Merge the winning diff into baseRef. Default true. */
   merge?: boolean;
+  /** Verification gate the winner must pass before merge (§6.3). */
+  mergeGate?: MergeGate;
+  /** Durable checkpoint sink invoked at each stage boundary (§6.3). */
+  checkpoint?: Checkpointer;
+  /**
+   * Resume from a checkpoint: replay these persisted candidate diffs into fresh
+   * worktrees instead of re-running the agents. The runner is never called.
+   */
+  resumeFrom?: { candidates: Candidate[] };
   signal?: AbortSignal;
 }
 
@@ -72,6 +109,8 @@ export interface OrchestrateResult {
   reason?: string;
   merged: boolean;
   candidates: Candidate[];
+  /** Gate outcome when a merge was attempted; absent when merge was not requested. */
+  gate?: MergeGateResult;
 }
 
 /**
@@ -82,46 +121,59 @@ export async function orchestrate(opts: OrchestrateOptions): Promise<Orchestrate
   const { task, agents, runner, scorer, worktrees, runId } = opts;
   const baseRef = opts.baseRef ?? "HEAD";
   const merge = opts.merge ?? true;
+  const emit = async (cp: OrchestrationCheckpoint): Promise<void> => {
+    if (opts.checkpoint) await opts.checkpoint(cp);
+  };
 
   if (agents.length === 0) throw new Error("orchestrate: at least one agent required");
   const ids = new Set(agents.map((a) => a.id));
   if (ids.size !== agents.length) throw new Error("orchestrate: agent ids must be unique");
 
-  // 1. Spin up one worktree per agent and run them all in parallel. allSettled
-  //    so one agent's crash doesn't sink its siblings.
-  const created: Array<{ spec: AgentSpec; wt: Worktree }> = [];
-  for (const spec of agents) {
-    const wt = await worktrees.create(`${runId}-${spec.id}`, baseRef);
-    created.push({ spec, wt });
-  }
+  const created: { spec: AgentSpec; wt: Worktree }[] = [];
 
   try {
-    const settled = await Promise.allSettled(
-      created.map(async ({ spec, wt }): Promise<Candidate> => {
-        const { summary } = await runner({
-          task,
-          spec,
-          workingDir: wt.path,
-          signal: opts.signal,
-        });
-        const diff = await worktrees.diff(wt, baseRef);
-        return { spec, summary, diff, ok: true };
-      }),
-    );
+    let candidates: Candidate[];
 
-    const candidates: Candidate[] = settled.map((r, i) =>
-      r.status === "fulfilled"
-        ? r.value
-        : {
-            spec: created[i]!.spec,
-            summary: "",
-            diff: "",
-            ok: false,
-            error: r.reason instanceof Error ? r.reason.message : String(r.reason),
-          },
-    );
+    if (opts.resumeFrom) {
+      // Resume path (§6.3): replay persisted diffs into fresh worktrees — the
+      // agents are NOT re-run — so the winner can still be scored/gated/merged.
+      candidates = opts.resumeFrom.candidates;
+      for (const c of candidates) {
+        if (!c.ok || !c.diff.trim()) continue;
+        const wt = await worktrees.create(`${runId}-${c.spec.id}`, baseRef);
+        await worktrees.applyDiff(wt, c.diff);
+        created.push({ spec: c.spec, wt });
+      }
+      await emit({ runId, stage: "resumed", candidates });
+    } else {
+      // 1. Spin up one worktree per agent and run them all in parallel. allSettled
+      //    so one agent's crash doesn't sink its siblings.
+      for (const spec of agents) {
+        const wt = await worktrees.create(`${runId}-${spec.id}`, baseRef);
+        created.push({ spec, wt });
+      }
+      const settled = await Promise.allSettled(
+        created.map(async ({ spec, wt }): Promise<Candidate> => {
+          const { summary } = await runner({ task, spec, workingDir: wt.path, signal: opts.signal });
+          const diff = await worktrees.diff(wt, baseRef);
+          return { spec, summary, diff, ok: true };
+        }),
+      );
+      candidates = settled.map((r, i) =>
+        r.status === "fulfilled"
+          ? r.value
+          : {
+              spec: created[i]!.spec,
+              summary: "",
+              diff: "",
+              ok: false,
+              error: r.reason instanceof Error ? r.reason.message : String(r.reason),
+            },
+      );
+      await emit({ runId, stage: "fanned-out", candidates });
+    }
 
-    // 2. Score only the agents that actually produced something.
+    // 2. Score only the candidates that actually produced something.
     const viable = candidates.filter((c) => c.ok && c.diff.trim().length > 0);
     if (viable.length === 0) {
       return { runId, winnerId: null, merged: false, candidates };
@@ -132,15 +184,27 @@ export async function orchestrate(opts: OrchestrateOptions): Promise<Orchestrate
     if (!winner) {
       throw new Error(`scorer returned unknown winnerId "${winnerId}"`);
     }
+    await emit({ runId, stage: "scored", candidates, winnerId });
 
-    // 3. Merge the winner into the base branch (losers are discarded on cleanup).
+    // 3. Evidence-first gate, then merge (losers are discarded on cleanup).
     let merged = false;
+    let gate: MergeGateResult | undefined;
     if (merge) {
-      await worktrees.merge(winner.wt, baseRef);
-      merged = true;
+      const winnerCandidate = viable.find((c) => c.spec.id === winnerId)!;
+      gate = opts.mergeGate
+        ? await opts.mergeGate(winnerCandidate, viable)
+        : { passed: winnerCandidate.diff.trim().length > 0 };
+      if (gate.passed) {
+        await worktrees.merge(winner.wt, baseRef);
+        merged = true;
+        await emit({ runId, stage: "merged", winnerId, gate });
+      } else {
+        // Merge blocked — leave the run resumable so it can retry once evidence exists.
+        await emit({ runId, stage: "gate-blocked", candidates, winnerId, gate });
+      }
     }
 
-    return { runId, winnerId, reason, merged, candidates };
+    return { runId, winnerId, reason, merged, candidates, gate };
   } finally {
     // 4. Always clean up every worktree, winner included (its work is already
     //    merged into baseRef by this point).

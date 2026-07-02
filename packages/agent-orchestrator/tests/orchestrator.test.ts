@@ -22,6 +22,10 @@ function fakeWorktrees() {
     async diff(wt: Worktree) {
       return diffs[wt.branch] ?? "";
     },
+    async applyDiff(wt: Worktree, diff: string) {
+      events.push(`apply:${wt.branch}`);
+      diffs[wt.branch] = diff;
+    },
     async merge(wt: Worktree) {
       events.push(`merge:${wt.branch}`);
     },
@@ -125,6 +129,76 @@ describe("orchestrate", () => {
     ).rejects.toThrow(/unknown winnerId/);
     // cleanup still ran despite the throw
     expect(wt.events.filter((e) => e.startsWith("remove:"))).toHaveLength(2);
+  });
+});
+
+describe("merge gate (§6.3)", () => {
+  it("blocks the merge when the gate fails, but still names a winner", async () => {
+    const wt = fakeWorktrees();
+    wt.diffs["orchestrator/r1-a"] = "diff-a";
+    wt.diffs["orchestrator/r1-b"] = "diff-b";
+    const res = await orchestrate(
+      baseOpts({ worktrees: wt, mergeGate: async () => ({ passed: false, reason: "tests failed" }) }),
+    );
+    expect(res.winnerId).toBe("b");
+    expect(res.merged).toBe(false);
+    expect(res.gate).toEqual({ passed: false, reason: "tests failed" });
+    expect(wt.events.some((e) => e.startsWith("merge:"))).toBe(false);
+    // worktrees still cleaned up
+    expect(wt.events.filter((e) => e.startsWith("remove:"))).toHaveLength(2);
+  });
+
+  it("merges when the gate passes and reports the gate result", async () => {
+    const wt = fakeWorktrees();
+    wt.diffs["orchestrator/r1-a"] = "diff-a";
+    wt.diffs["orchestrator/r1-b"] = "diff-b";
+    const res = await orchestrate(
+      baseOpts({ worktrees: wt, mergeGate: async (winner) => ({ passed: winner.spec.id === "b" }) }),
+    );
+    expect(res.merged).toBe(true);
+    expect(res.gate).toEqual({ passed: true });
+    expect(wt.events).toContain("merge:orchestrator/r1-b");
+  });
+});
+
+describe("resume from checkpoint (§6.3)", () => {
+  it("replays persisted diffs without re-running the agents, then merges", async () => {
+    const wt = fakeWorktrees();
+    let runnerCalls = 0;
+    const persisted: Candidate[] = [
+      { spec: { id: "a", model: "model-a" }, summary: "prior", diff: "diff-a", ok: true },
+      { spec: { id: "b", model: "model-b" }, summary: "prior", diff: "diff-b", ok: true },
+    ];
+
+    const res = await orchestrate(
+      baseOpts({
+        worktrees: wt,
+        resumeFrom: { candidates: persisted },
+        runner: async () => {
+          runnerCalls++;
+          return { summary: "should-not-run" };
+        },
+      }),
+    );
+
+    expect(runnerCalls).toBe(0); // agents were NOT re-run
+    expect(res.winnerId).toBe("b");
+    expect(res.merged).toBe(true);
+    // each viable candidate's diff was replayed into a fresh worktree
+    expect(wt.events.filter((e) => e.startsWith("apply:")).sort()).toEqual([
+      "apply:orchestrator/r1-a",
+      "apply:orchestrator/r1-b",
+    ]);
+    expect(wt.events).toContain("merge:orchestrator/r1-b");
+  });
+
+  it("emits stage checkpoints for durable resume", async () => {
+    const wt = fakeWorktrees();
+    wt.diffs["orchestrator/r1-a"] = "diff-a";
+    wt.diffs["orchestrator/r1-b"] = "diff-b";
+    const stages: string[] = [];
+    await orchestrate(baseOpts({ worktrees: wt, checkpoint: (cp) => void stages.push(cp.stage) }));
+    expect(stages).toEqual(["fanned-out", "scored", "merged"]);
   });
 });
 

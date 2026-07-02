@@ -6,7 +6,7 @@
  * interface, not this class, so unit tests inject a fake and skip real git.
  */
 import { execFile } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -25,6 +25,12 @@ export interface WorktreeManager {
   create(runId: string, baseRef: string): Promise<Worktree>;
   /** Unified diff of the worktree against `baseRef` (what the agent changed). */
   diff(wt: Worktree, baseRef: string): Promise<string>;
+  /**
+   * Apply a previously-captured unified diff into a fresh worktree. Used to
+   * resume a run from a checkpoint (§6.3) without re-running the agent — the
+   * persisted diff is replayed so the winner can still be scored/gated/merged.
+   */
+  applyDiff(wt: Worktree, diff: string): Promise<void>;
   /** Fast-forward/merge the worktree's branch into `baseRef` in the main repo. */
   merge(wt: Worktree, baseRef: string): Promise<void>;
   /** Tear down the worktree and delete its branch. Best-effort; never throws. */
@@ -55,6 +61,18 @@ export class GitWorktreeManager implements WorktreeManager {
     await this.git(["add", "-A"], wt.path);
     const { stdout } = await this.git(["diff", "--cached", baseRef], wt.path);
     return stdout;
+  }
+
+  async applyDiff(wt: Worktree, diff: string): Promise<void> {
+    if (!diff.trim()) return;
+    // Write the patch to a temp file (no shell, no stdin plumbing) and apply it.
+    const patch = join(wt.path, ".nexus-resume.patch");
+    await writeFile(patch, diff, "utf8");
+    try {
+      await this.git(["apply", "--whitespace=nowarn", patch], wt.path);
+    } finally {
+      await rm(patch, { force: true }).catch(() => {});
+    }
   }
 
   async merge(wt: Worktree, baseRef: string): Promise<void> {

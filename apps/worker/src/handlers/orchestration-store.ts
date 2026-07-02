@@ -13,14 +13,19 @@
  */
 import { db } from "@nexus/db";
 import { orchestrationRuns } from "@nexus/db/schema";
-import { notInArray } from "drizzle-orm";
+import { eq, notInArray } from "drizzle-orm";
 
-/** Lifecycle of an orchestration run. Terminal = completed | failed. */
+/**
+ * Lifecycle of an orchestration run. Terminal = completed | failed. `blocked`
+ * (merge gate failed, §6.3) is NON-terminal on purpose — it stays resumable so the
+ * merge can be retried once the evidence exists.
+ */
 export type OrchestrationStatus =
   | "pending"
   | "running"
   | "scoring"
   | "merging"
+  | "blocked"
   | "completed"
   | "failed";
 
@@ -50,6 +55,8 @@ export type OrchestrationRunPatch = Partial<OrchestrationRunRecord> & { id: stri
 export interface OrchestrationRunStore {
   /** Insert or update a run by id (stage transition). */
   upsert(patch: OrchestrationRunPatch): Promise<void>;
+  /** Fetch a single run by id, or null if absent (for checkpoint resume). */
+  get(id: string): Promise<OrchestrationRunRecord | null>;
   /** All runs not in a terminal status (for restart recovery). */
   listNonTerminal(): Promise<OrchestrationRunRecord[]>;
 }
@@ -58,6 +65,9 @@ export interface OrchestrationRunStore {
 export class NullOrchestrationRunStore implements OrchestrationRunStore {
   async upsert(): Promise<void> {
     /* intentionally does nothing */
+  }
+  async get(): Promise<OrchestrationRunRecord | null> {
+    return null;
   }
   async listNonTerminal(): Promise<OrchestrationRunRecord[]> {
     return [];
@@ -92,6 +102,25 @@ export class DrizzleOrchestrationRunStore implements OrchestrationRunStore {
         error: rest.error ?? null,
       })
       .onConflictDoUpdate({ target: orchestrationRuns.id, set });
+  }
+
+  async get(id: string): Promise<OrchestrationRunRecord | null> {
+    const [r] = await db
+      .select()
+      .from(orchestrationRuns)
+      .where(eq(orchestrationRuns.id, id))
+      .limit(1);
+    if (!r) return null;
+    return {
+      id: r.id,
+      status: r.status as OrchestrationStatus,
+      task: r.task,
+      payload: r.payload,
+      candidates: r.candidates ?? [],
+      scores: r.scores,
+      winner: r.winner,
+      error: r.error,
+    };
   }
 
   async listNonTerminal(): Promise<OrchestrationRunRecord[]> {

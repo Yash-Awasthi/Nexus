@@ -34,6 +34,9 @@ class FakeStore implements OrchestrationRunStore {
     const prev = this.rows.get(patch.id) ?? ({ id: patch.id } as OrchestrationRunRecord);
     this.rows.set(patch.id, { ...prev, ...patch });
   }
+  async get(id: string): Promise<OrchestrationRunRecord | null> {
+    return this.rows.get(id) ?? null;
+  }
   async listNonTerminal(): Promise<OrchestrationRunRecord[]> {
     return [...this.rows.values()].filter((r) => r.status !== "completed" && r.status !== "failed");
   }
@@ -87,6 +90,65 @@ describe("handleOrchestrationJob persistence (§6.1)", () => {
       candidates: [],
     });
     await expect(handleOrchestrationJob(basePayload)).resolves.toBeDefined();
+  });
+});
+
+describe("handleOrchestrationJob merge gate + resume (§6.3)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("leaves a gate-blocked run in the non-terminal 'blocked' status", async () => {
+    mockOrchestrate.mockResolvedValue({
+      runId: "run-1",
+      winnerId: "anthropic/claude#0",
+      merged: false,
+      candidates: [{ spec: { id: "anthropic/claude#0" }, diff: "", ok: false }],
+      gate: { passed: false, reason: "no verifiable diff" },
+    });
+    const store = new FakeStore();
+
+    await handleOrchestrationJob({ ...basePayload, merge: true }, { store });
+
+    const row = store.rows.get("run-1")!;
+    expect(row.status).toBe("blocked");
+    expect(row.error).toContain("no verifiable diff");
+    // blocked is non-terminal → recovery would resume it
+    expect(await store.listNonTerminal()).toHaveLength(1);
+  });
+
+  it("resumes from persisted candidates instead of re-running the fan-out", async () => {
+    mockOrchestrate.mockResolvedValue({
+      runId: "run-1",
+      winnerId: "anthropic/claude#0",
+      merged: true,
+      candidates: [],
+      gate: { passed: true },
+    });
+    const store = new FakeStore();
+    // A prior run got as far as scoring, with candidates captured.
+    await store.upsert({
+      id: "run-1",
+      status: "scoring",
+      task: basePayload.task,
+      candidates: [{ spec: { id: "anthropic/claude#0" }, diff: "d", ok: true }] as unknown[],
+    });
+
+    await handleOrchestrationJob({ ...basePayload, merge: true }, { store });
+
+    const opts = mockOrchestrate.mock.calls[0]![0] as { resumeFrom?: { candidates: unknown[] } };
+    expect(opts.resumeFrom?.candidates).toHaveLength(1);
+  });
+
+  it("does NOT resume a fresh run (no prior candidates)", async () => {
+    mockOrchestrate.mockResolvedValue({
+      runId: "run-1",
+      winnerId: null,
+      merged: false,
+      candidates: [],
+    });
+    const store = new FakeStore();
+    await handleOrchestrationJob(basePayload, { store });
+    const opts = mockOrchestrate.mock.calls[0]![0] as { resumeFrom?: unknown };
+    expect(opts.resumeFrom).toBeUndefined();
   });
 });
 
