@@ -686,9 +686,18 @@ POST `/api/prompts/:id/versions`) and **10.2 build-task DAG** (`components/build
 Board↔Graph toggle in `build.tsx`; orphan `parentId` → root with an orphans banner;
 `TaskDetailPanel` is defined in `build.tsx`).
 
-- **10.3 MCP servers UI.** Files: new `apps/ui/app/routes/mcp-servers.tsx` modeled on
-  `provider-keys.tsx`, over the existing API `apps/api/src/routes/mcp-servers.ts` (324 lines:
-  `mcp_servers` CRUD + `/test`, which already goes through `pinnedFetch`; mig `0010`).
+- **10.3 MCP servers UI.** **Done this branch (commit `03fb858`).** New
+  `apps/ui/app/routes/mcp-servers.tsx` (mirrors `provider-keys.tsx`) over the existing
+  `/api/v1/mcp/servers` CRUD + `/:id/test` API: server list with transport badge + persisted health
+  status + tool count + masked key prefix; add/edit dialog (name, transport select
+  http/stdio/websocket, endpoint, write-only optional `apiKey` — blank-on-edit keeps the stored one,
+  description); soft-delete; and a per-server "Test connection" (`Plug` button) that POSTs the live
+  SSRF-guarded/socket-pinned `/test`, then refreshes so the persisted status badge updates, surfacing
+  the returned tool list or the error message inline. Registered in `app/routes.ts` next to
+  `provider-keys`. UI typecheck + eslint green (the live `/test` call is a Gate — exercised only
+  through the UI at runtime, not in an automated test). Files: new `apps/ui/app/routes/mcp-servers.tsx`
+  modeled on `provider-keys.tsx`, over the existing API `apps/api/src/routes/mcp-servers.ts`
+  (`mcp_servers` CRUD + `/test`, which already goes through `pinnedFetch`; mig `0010`).
   `/test` is a live outbound call — **Gate** to exercise for real, mock it in tests. Done:
   CRUD + test-connection work.
 - **10.4 Workflow picker polish.** Files: `apps/ui/app/routes/workflows.tsx` (864 lines) +
