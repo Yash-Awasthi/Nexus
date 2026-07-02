@@ -289,11 +289,11 @@ the message-array context manager is out of scope (belongs to gateway/translate)
   `extractPreservedBlocks`/`restorePreservedBlocks` (tombstone code/URLs/paths/error lines with
   U+E000/E001 sentinels), `lite` engine (folds `DEFAULT_FILTERS`), `COMPRESSION_MODES` +
   `compressMode`. 13 new tests (57 total). typecheck+build+eslint green.
-- **3.3 `ultra` engine.** Heuristic no-model token pruning: `scoreToken` (stopwords/short low,
-  digits/URLs/paths/errors force-kept, Capitalized/long high) + `pruneByScore` (keepRate default
-  0.5, whitespace-preserving) inside preserved-block extraction. Lossy, opt-in, stackPriority 40.
-  Test: `pnpm exec vitest run packages/llm-compress/tests/llm-compress.test.ts`.
-  Done: stopwords pruned first; code/URLs/numbers survive; keepRate honored.
+- **3.3 `ultra` engine.** **DONE.** Heuristic no-model token pruning: `scoreToken` (stopwords 0.1 /
+  ≤2-char 0.2, digits/URLs/paths/errors force-kept 1.0, Capitalized 0.8, ≥6-char 0.7) +
+  `pruneByScore` (keepRate default 0.5, whitespace-preserving, only drops words below minScore 0.3)
+  inside preserved-block extraction. Lossy, opt-in, `ultraEngine` stackPriority 40. 9 new tests
+  (66 total). Done: stopwords pruned first; code/URLs/numbers survive; keepRate honored.
 - **3.4 `caveman` engine.** Rule-based prose reduction (English), ~30 rules over `lite`/`full`/
   `ultra` intensities (filler/pleasantries, purpose-phrases, verbose connectors, article-drop[full],
   ultra abbreviations), keyword pre-filter, preserved blocks, cleanup+recapitalize, revert-on-mangle.

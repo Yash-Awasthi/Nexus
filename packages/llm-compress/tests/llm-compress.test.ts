@@ -27,6 +27,9 @@ import {
   extractPreservedBlocks,
   restorePreservedBlocks,
   type CompressEngine,
+  scoreToken,
+  pruneByScore,
+  ultraEngine,
 } from "../src/index.js";
 import { decode as toonDecode } from "@toon-format/toon";
 
@@ -507,5 +510,69 @@ describe("compressMode", () => {
   it("lite runs the lite engine", () => {
     const r = compressMode("ok   \nok   \nplain", "lite");
     expect(r.applied).toContain("lite");
+  });
+});
+
+// ── ultra engine (§3.3) ─────────────────────────────────────────────────────────
+
+describe("scoreToken", () => {
+  it("force-preserves digits, URLs, paths, code, errors (1.0)", () => {
+    expect(scoreToken("42")).toBe(1.0);
+    expect(scoreToken("v1.2.3")).toBe(1.0);
+    expect(scoreToken("https://x.y/z")).toBe(1.0);
+    expect(scoreToken("./src/index.ts")).toBe(1.0);
+    expect(scoreToken("Error:")).toBe(1.0);
+  });
+  it("scores stopwords lowest, content words higher", () => {
+    expect(scoreToken("the")).toBe(0.1);
+    expect(scoreToken("and")).toBe(0.1);
+    expect(scoreToken("ok")).toBe(0.2); // <=2 chars
+    expect(scoreToken("run")).toBe(0.5); // medium
+    expect(scoreToken("database")).toBe(0.7); // long
+    expect(scoreToken("Postgres")).toBe(0.8); // capitalized
+  });
+  it("strips surrounding punctuation before the stopword check", () => {
+    expect(scoreToken("the,")).toBe(0.1);
+    expect(scoreToken("(and)")).toBe(0.1);
+  });
+});
+
+describe("pruneByScore", () => {
+  it("drops stopwords first and keeps content words", () => {
+    const out = pruneByScore("the quick brown fox and the lazy dog", 0.5);
+    expect(out).not.toMatch(/\bthe\b/);
+    expect(out).toContain("quick");
+    expect(out).toContain("brown");
+    expect(out).toContain("fox");
+  });
+  it("keeps everything at keepRate 1.0", () => {
+    const input = "the quick brown fox";
+    expect(pruneByScore(input, 1.0)).toBe(input);
+  });
+  it("never drops high-signal tokens even at aggressive keepRate", () => {
+    const out = pruneByScore("please fetch the file from https://api.example.com/v2 now", 0.1);
+    expect(out).toContain("https://api.example.com/v2");
+  });
+});
+
+describe("ultra engine", () => {
+  it("is registered at stackPriority 40 and is lossy", () => {
+    expect(ENGINES.ultra).toBe(ultraEngine);
+    expect(ultraEngine.stackPriority).toBe(40);
+    expect(ultraEngine.lossless).toBe(false);
+  });
+  it("preserves code fences, URLs and numbers while dropping filler", () => {
+    const input = "Please note that the value is really just `x = 42` and see https://a.b/c";
+    const out = ultraEngine.apply(input, { keepRate: 0.4 });
+    expect(out).toContain("`x = 42`");
+    expect(out).toContain("https://a.b/c");
+    expect(out).not.toMatch(/\bthat\b/);
+  });
+  it("via compressStacked shrinks prose and reports ultra applied", () => {
+    const prose =
+      "I would really just like to note that the function is basically a very simple helper.";
+    const r = compressStacked(prose, ["ultra"], { ctx: { keepRate: 0.5 } });
+    expect(r.applied).toContain("ultra");
+    expect(r.compressedChars).toBeLessThan(r.originalChars);
   });
 });

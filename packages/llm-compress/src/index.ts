@@ -837,3 +837,78 @@ export function compressMode(
 ): StackedResult {
   return compressStacked(input, [...COMPRESSION_MODES[mode]], opts);
 }
+
+// ── ultra engine (lossy, heuristic — no model) ───────────────────────────────────
+// Ported from OmniRoute's ultra "Tier A" heuristic (ultraHeuristic.ts). Scores each
+// whitespace-delimited token by a cheap informativeness heuristic and drops the
+// lowest-value ones (stopwords, tiny filler) down to a keep-rate — the no-model,
+// zero-cost stand-in for LLMLingua's perplexity pruning. Structured spans (code,
+// URLs, paths, errors) are force-preserved, so only prose loses tokens.
+
+/** Common English function words — low information, first to be pruned. */
+const ULTRA_STOPWORDS = new Set([
+  "a", "an", "the", "is", "are", "was", "were", "be", "been", "being", "am",
+  "and", "or", "but", "nor", "so", "yet", "for", "of", "to", "in", "on", "at",
+  "by", "with", "from", "into", "onto", "upon", "as", "if", "then", "than",
+  "that", "this", "these", "those", "it", "its", "they", "them", "their",
+  "we", "our", "you", "your", "i", "me", "my", "he", "she", "his", "her",
+  "do", "does", "did", "done", "have", "has", "had", "will", "would", "shall",
+  "should", "can", "could", "may", "might", "must", "not", "no", "yes",
+  "there", "here", "just", "very", "really", "quite", "some", "any", "all",
+  "about", "over", "under", "up", "down", "out", "off", "again", "also",
+]);
+
+// A token containing a digit, URL, path separator, code fence, or error marker is
+// always kept — these are high-signal and must never be silently dropped.
+const ULTRA_FORCE_PRESERVE = /\d|https?:\/\/|[._/\\]|Error:|Exception:|```/i;
+
+/** Heuristic informativeness score, 0..1 (higher = keep). See {@link ULTRA_STOPWORDS}. */
+export function scoreToken(token: string): number {
+  if (ULTRA_FORCE_PRESERVE.test(token)) return 1.0;
+  const bare = token.toLowerCase().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+  if (bare === "") return 0.2; // pure punctuation
+  if (ULTRA_STOPWORDS.has(bare)) return 0.1;
+  if (bare.length <= 2) return 0.2;
+  if (/^[A-Z]/.test(token)) return 0.8; // proper nouns / CONSTANTS
+  if (bare.length >= 6) return 0.7; // longer words tend to carry more meaning
+  return 0.5;
+}
+
+/**
+ * Drop the lowest-scoring words until only `keepRate` of them remain, but never a
+ * word scoring at/above `minScore`. Whitespace structure is preserved (runs of
+ * horizontal space left by removed words are collapsed). Pure heuristic, no model.
+ */
+export function pruneByScore(text: string, keepRate = 0.5, minScore = 0.3): string {
+  const parts = text.split(/(\s+)/); // alternating word / whitespace tokens
+  const wordIdx: number[] = [];
+  parts.forEach((p, i) => {
+    if (p !== "" && !/^\s+$/.test(p)) wordIdx.push(i);
+  });
+  const wordCount = wordIdx.length;
+  if (wordCount === 0) return text;
+  const toDrop = wordCount - Math.ceil(wordCount * keepRate);
+  if (toDrop <= 0) return text;
+  const scored = wordIdx.map((i) => ({ i, score: scoreToken(parts[i] ?? "") }));
+  scored.sort((a, b) => a.score - b.score);
+  const prune = new Set<number>();
+  for (const { i, score } of scored) {
+    if (prune.size >= toDrop) break;
+    if (score < minScore) prune.add(i);
+  }
+  const out = parts.map((p, i) => (prune.has(i) ? "" : p)).join("");
+  return out.replace(/[ \t]{2,}/g, " ").replace(/ *\n/g, "\n").trim();
+}
+
+/** Heuristic, no-model token pruning. Lossy; keep-rate via `ctx.keepRate` (default 0.5). */
+export const ultraEngine: CompressEngine = {
+  name: "ultra",
+  stackPriority: 40,
+  lossless: false,
+  apply: (text, ctx) => {
+    const { text: masked, blocks } = extractPreservedBlocks(text);
+    const pruned = pruneByScore(masked, ctx?.keepRate ?? 0.5);
+    return restorePreservedBlocks(pruned, blocks);
+  },
+};
+registerEngine(ultraEngine);
