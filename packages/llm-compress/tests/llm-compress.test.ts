@@ -41,6 +41,7 @@ import {
   storeBlock,
   retrieveBlock,
   ccrStoreSize,
+  llmlinguaEngine,
 } from "../src/index.js";
 import { decode as toonDecode } from "@toon-format/toon";
 
@@ -797,5 +798,45 @@ describe("ccr engine", () => {
     for (let i = 0; i < 5000; i++) storeBlock(`${i}-${"z".repeat(650)}`, "evict-test");
     expect(ccrStoreSize()).toBeLessThanOrEqual(5000);
     expect(retrieveBlock(first, "evict-test-first-marker")).toBeNull();
+  });
+});
+
+// ── llmlingua engine (§3.8) ─────────────────────────────────────────────────────
+
+describe("llmlingua engine (async, gated)", () => {
+  const INPUT = "the quick brown fox jumps over the lazy dog and keeps on running along";
+
+  afterEach(() => {
+    delete process.env.NEXUS_LLMLINGUA;
+    vi.clearAllMocks();
+  });
+
+  it("is registered at stackPriority 35, async, and its sync apply is a no-op", () => {
+    expect(ENGINES.llmlingua).toBe(llmlinguaEngine);
+    expect(llmlinguaEngine.stackPriority).toBe(35);
+    expect(typeof llmlinguaEngine.applyAsync).toBe("function");
+    expect(llmlinguaEngine.apply(INPUT)).toBe(INPUT); // sync path never compresses
+  });
+
+  it("is a no-op in an async stack when NEXUS_LLMLINGUA is off (model untouched)", async () => {
+    const r = await compressStackedAsync(INPUT, ["llmlingua"]);
+    expect(r.text).toBe(INPUT);
+    expect(r.applied).not.toContain("llmlingua");
+    expect(heavyMocks.factory).not.toHaveBeenCalled();
+  });
+
+  it("runs semantic pruning in an async stack when the gate is on", async () => {
+    process.env.NEXUS_LLMLINGUA = "1";
+    const r = await compressStackedAsync(INPUT, ["llmlingua"]);
+    expect(heavyMocks.factory).toHaveBeenCalledOnce();
+    expect(r.applied).toContain("llmlingua");
+    expect(r.text).toBe("MOCK COMPRESSED"); // from the hoisted @atjsh/llmlingua-2 mock
+  });
+
+  it("does not run under the sync stacked runner even when the gate is on", () => {
+    process.env.NEXUS_LLMLINGUA = "1";
+    const r = compressStacked(INPUT, ["llmlingua"]);
+    expect(r.text).toBe(INPUT); // sync apply is a no-op
+    expect(heavyMocks.factory).not.toHaveBeenCalled();
   });
 });

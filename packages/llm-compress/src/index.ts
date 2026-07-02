@@ -1379,3 +1379,20 @@ export const ccrEngine: CompressEngine = {
   apply: (text, ctx) => ccrCompress(text, { principalId: ctx?.principalId }),
 };
 registerEngine(ccrEngine);
+
+// ── llmlingua engine (async, optional, model-backed) ─────────────────────────────
+// Wraps §3.1 `compressHeavy` (LLMLingua-2) as an engine so stacked-ASYNC pipelines
+// can include semantic pruning as one step. It is async-only — the sync `apply` is a
+// no-op (mirrors OmniRoute, where the sync path never runs the model). The gate lives
+// in `compressHeavy`: with `NEXUS_LLMLINGUA` unset it returns the input unchanged, so
+// `compressStackedAsync` sees a no-op and skips it. Never imports the model when off.
+
+/** LLMLingua-2 semantic pruning as a stacked-async engine. Off unless `NEXUS_LLMLINGUA=1`. */
+export const llmlinguaEngine: CompressEngine = {
+  name: "llmlingua",
+  stackPriority: 35,
+  lossless: false,
+  apply: (text) => text, // async-only: the sync path never compresses
+  applyAsync: async (text, ctx) => (await compressHeavy(text, { rate: ctx?.keepRate })).text,
+};
+registerEngine(llmlinguaEngine);

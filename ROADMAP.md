@@ -316,8 +316,11 @@ the message-array context manager is out of scope (belongs to gateway/translate)
   paragraph with `[CCR retrieve hash=… chars=…]` (keeping separators) and stashes the original;
   `storeBlock`/`retrieveBlock`/`ccrStoreSize` exported. Lossless by reference; tenants isolated by
   principal-scoped keys. `ccrEngine` stackPriority 4. 6 new tests (91 total).
-- **3.8 Wire `llmlingua` engine.** Register `compressHeavy` as the async `llmlingua` engine
-  (stackPriority 35, gated/optional) so stacked-async pipelines can include semantic pruning.
+- **3.8 Wire `llmlingua` engine.** **DONE.** `llmlinguaEngine` wraps §3.1 `compressHeavy` as an
+  async-only engine (stackPriority 35): sync `apply` is a no-op; `applyAsync` calls `compressHeavy`
+  (rate via `ctx.keepRate`). Gate lives in `compressHeavy` — off (`NEXUS_LLMLINGUA` unset) it returns
+  input unchanged so `compressStackedAsync` skips it and never imports the model. 4 new tests
+  (95 total). **§3 fully complete** (§3.1–§3.8); llm-compress is a composable multi-engine pipeline.
 
 ## 4. Provider OAuth + accounts — `@nexus/llm-oauth`, `@nexus/llm-accounts`
 
