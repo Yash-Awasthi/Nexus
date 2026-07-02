@@ -628,9 +628,18 @@ MCP `/test`) + identity-keyed per-user rate limiting. `.cleanup-alerts.txt` = 48
   Done: every alert traces to a real fix (this branch) or already-fixed code; the alert list
   itself needs a GitHub-side re-scan to empty (external action, not a code change).
 
-- **9.3 Rate-limit remaining route groups.** Mirror: `makeRateLimitPreHandler`/
-  `makeUserRateLimitPreHandler` usage in `apps/api/src/server.ts`. Done: each authenticated
-  group buckets by identity.
+- **9.3 Rate-limit remaining route groups.** **Done this branch (commit `f358349`).** Refactored
+  the central `onRequest` rate-limit dispatcher in `apps/api/src/server.ts` from a hardcoded
+  if/else ladder into a table-driven `rlGroups`/`rlHandlers` (prefix → IP + per-identity limiter,
+  first-match-wins), and extended it to the remaining expensive authenticated `/api/v1` groups:
+  `drive`, `image-gen`, `voice`, `researcher`, `scraping`, `memory`, `agents`, `evals`, `mcp`
+  (limits scale with per-call cost; exec/outbound tightest). `gateway` is intentionally excluded —
+  that path is already spend-guarded per identity by `@nexus/billing` (§5), and its fast-check fuzz
+  suite fires 100+ requests/property that a central limiter would 429. Pre-existing 5 groups' limits
+  unchanged. api typecheck + eslint green; `drive`/`gateway`/`gateway-fuzz`/`health`/`admin` route
+  tests 42/42 (the 2 vitest "errors" = the known pre-existing `nexus_test` PG-auth rejection).
+  Mirror: `makeRateLimitPreHandler`/`makeUserRateLimitPreHandler` usage in
+  `apps/api/src/server.ts`. Done: each authenticated group buckets by identity.
 
 - **9.4 Docker sandbox hardening.**
   Files: `packages/sandbox/src/index.ts` (`buildDockerArgs`).
