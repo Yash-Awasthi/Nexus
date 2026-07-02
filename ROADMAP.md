@@ -486,12 +486,24 @@ Worker-thread sandbox (`ptc-sandbox.ts`) + `nexus code` CLI. `agent_sessions` ta
   Test: `pnpm exec vitest run packages/agent-runtime/tests/agent-runtime.test.ts`
   Done: gate blocks an unapproved mutating tool; compactor trims at threshold; session resumes.
 
-- **7.2 Full PTC wiring.**
+- **7.2 Full PTC wiring.** **Done this branch (commit `39ba3f9`).** Extracted a shared
+  `executePtcScript(code, context, call, opts)` in `ptc-sandbox.ts` — the single RPC + stdout-only
+  executor now used by BOTH the worker-thread entry (`call` bridges to the parent over
+  `postMessage`) and the in-process fallback. `runToolScript` now enforces `maxCalls` + `exclude` +
+  tool-list filtering in the parent bridge (parity with the in-process meta-tool).
+  `createProgrammaticToolTool` gained a `sandbox?: boolean` option that lazy-imports + delegates to
+  `runToolScript` (avoids the index↔ptc-sandbox static cycle); `agent-handler` exposes it as
+  `payload.ptcSandbox`. 4 new tests (RPC bridges every call, only printed output returns,
+  [return]/[error] lines, cooperative timeout, sandbox option builds) — 15 ptc + 53 runtime green.
   Files: `packages/agent-runtime/src/{ptc-sandbox,index}.ts`.
   Do: bridge the tool layer into the sandbox child over local RPC; only stdout returns to
   context.
   Test: `pnpm exec vitest run packages/agent-runtime/tests/ptc.test.ts`
   Done: a PTC script calls a tool via RPC and only stdout re-enters context.
+
+> **⏸ CONTEXT-CLEAR CHECKPOINT (2026-07-02).** Work paused here after §7.2. The context window is
+> about to be cleared; resume from **PROGRESS.md** → next item is **§7.3** (forked learning loop).
+> Everything through §7.2 is committed on `feat/provider-breadth-compress-billing` and FF-merged.
 
 - **7.3 Forked learning loop.** Do: propose `MEMORY.md` / skill updates off a warm cache/digest.
   Done: emits a diff proposal; applies nothing without approval.
