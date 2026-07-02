@@ -12,7 +12,6 @@
  * unset/invalid, so routes can degrade to 503 exactly like the BYOK path rather
  * than crash.
  */
-import { and, eq } from "drizzle-orm";
 import { db as defaultDb, type NexusDB } from "@nexus/db";
 import { oauthCredentials } from "@nexus/db/schema";
 import {
@@ -21,6 +20,7 @@ import {
   type SealedRecord,
   type SealedTokenStore,
 } from "@nexus/llm-oauth";
+import { and, eq } from "drizzle-orm";
 
 /** `timestamptz` Date → the port's epoch-ms mirror. */
 export const dateToMs = (d: Date | null | undefined): number | null => (d ? d.getTime() : null);

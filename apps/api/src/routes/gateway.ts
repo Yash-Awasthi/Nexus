@@ -25,7 +25,6 @@ import {
 } from "@nexus/context-pruner";
 import { computeAutoTuneParams, detectContext, InMemoryEmaStore } from "@nexus/drift";
 import { KVGatewayLog } from "@nexus/gateway-log";
-import { compressAuto } from "@nexus/llm-compress";
 import {
   UltraplinianRunner,
   type SpeedTier,
@@ -33,6 +32,8 @@ import {
   type SamplingParams as UltraplinianSamplingParams,
 } from "@nexus/gauntlet";
 import { globalHooks } from "@nexus/hooks";
+import { AccountPool, type AccountState } from "@nexus/llm-accounts";
+import { compressAuto } from "@nexus/llm-compress";
 import {
   DriverRegistry,
   AnthropicDriver,
@@ -50,9 +51,12 @@ import {
   KimiDriver,
   CodestralDriver,
   LocalRouterDriver,
+  VertexDriver,
   type LlmRequestOptions,
   type LlmRole,
+  type VertexConfig,
 } from "@nexus/llm-drivers";
+import { registryFromEnv } from "@nexus/llm-oauth";
 import {
   FixedEmbedder,
   GroqEmbedder,
@@ -73,9 +77,10 @@ import type { ToolRegistry } from "@nexus/tool-registry";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 
 import { parseCompressHeader } from "../lib/agent-queue.js";
+import { createOAuthTokenStore } from "../lib/oauth-token-store.js";
 import { getPromptCache, PromptCache, type CacheableRequest } from "../lib/prompt-cache.js";
 import { getSharedKV } from "../lib/shared-kv.js";
-import { getTierFromRequest, requireAuth } from "../middleware/auth.js";
+import { getTierFromRequest, requireAuth, requireAuthWithTier } from "../middleware/auth.js";
 
 // ── Run-cost tracker (per-gateway-call USD accounting) ────────────────────────
 // Records inputTokens + outputTokens per completion; exposes GET /gateway/cost-report.
@@ -380,6 +385,40 @@ function buildDriverRegistry(): DriverRegistry {
   return reg;
 }
 
+// ── Account pool (§4.1) ────────────────────────────────────────────────────────
+// One AccountPool per app instance (constructed in gatewayRoutes below) so
+// cooldown/breaker state persists across requests within a process but resets
+// per test server. Two kinds of accounts:
+//   - "env:<provider>"   — one per statically-configured driver (API-key auth),
+//                          seeded lazily so cooldown/breaker gate the existing keys.
+//   - "oauth:vertex:<userId>" — a caller's linked Google OAuth account; picked
+//     the same way, then resolved to fresh Vertex credentials at dispatch time.
+// Accounts are registered lazily (only when missing) so `register()` never
+// resets an already-tracked account's failure/cooldown state.
+
+/** Seed one "sub" tier account per statically-configured driver, if not already tracked. */
+function seedEnvAccounts(pool: AccountPool, registry: DriverRegistry): void {
+  for (const providerName of registry.list()) {
+    const id = `env:${providerName}`;
+    if (!pool.get(id)) pool.register({ id, provider: providerName, tier: "sub" });
+  }
+}
+
+/**
+ * Resolve the caller's linked Google OAuth account to a fresh `VertexDriver`, or
+ * null when no google-vertex app is configured, the vault is unavailable, or the
+ * caller has no stored credentials.
+ */
+async function resolveVertexOAuthDriver(userId: string): Promise<VertexDriver | null> {
+  const authProvider = registryFromEnv().get("google-vertex");
+  if (!authProvider) return null;
+  const store = createOAuthTokenStore();
+  if (!store) return null;
+  const tokens = await store.resolveFresh(userId, authProvider);
+  if (!tokens) return null;
+  return new VertexDriver(authProvider.toDriverCredentials(tokens) as unknown as VertexConfig);
+}
+
 // ── Anthropic-format request/response types ───────────────────────────────────
 
 interface AnthropicContentPart {
@@ -421,6 +460,10 @@ function toDriverRequest(body: AnthropicRequest, resolvedModel: string): LlmRequ
 // ── Route plugin ──────────────────────────────────────────────────────────────
 
 export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
+  // One pool per app instance — cooldown/breaker state persists across requests
+  // for the life of this server (fresh per test via buildServer()).
+  const accountPool = new AccountPool();
+
   /**
    * POST /gateway/messages
    *
@@ -438,10 +481,11 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
     Body: AnthropicRequest;
   }>(
     "/gateway/messages",
-    { preHandler: [requireAuth, _budgetPreHandler] },
+    { preHandler: [requireAuthWithTier, _budgetPreHandler] },
     async (request, reply) => {
       const overrideProvider = request.headers["x-nexus-provider"];
       const registry = buildDriverRegistry();
+      seedEnvAccounts(accountPool, registry);
 
       const alias = resolveAlias(request.body.model);
       const providerName = overrideProvider ?? alias?.provider;
@@ -457,7 +501,38 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      const driver = registry.get(providerName);
+      // A caller with a linked Google OAuth account gets a lazily-tracked pool
+      // account for "vertex" — registered once, then picked/health-gated like
+      // any other account (never re-registered, so breaker state survives).
+      if (providerName === "vertex" && request.nexusUserId) {
+        const oauthId = `oauth:vertex:${request.nexusUserId}`;
+        if (!accountPool.get(oauthId)) {
+          accountPool.register({ id: oauthId, provider: "vertex", tier: "sub" });
+        }
+      }
+
+      let driver = registry.get(providerName);
+      let account: AccountState | null = null;
+
+      const hasAccounts = accountPool.all().some((a) => a.provider === providerName);
+      if (hasAccounts) {
+        const picked = accountPool.pick(providerName);
+        if (!picked) {
+          return reply.code(503).send({
+            type: "error",
+            error: {
+              type: "provider_unavailable",
+              message: `All accounts for provider "${providerName}" are unhealthy (cooldown or circuit breaker open).`,
+            },
+          });
+        }
+        account = picked;
+        if (picked.id.startsWith("oauth:") && request.nexusUserId) {
+          const oauthDriver = await resolveVertexOAuthDriver(request.nexusUserId);
+          if (oauthDriver) driver = oauthDriver;
+        }
+      }
+
       if (!driver) {
         return reply.code(400).send({
           type: "error",
@@ -663,6 +738,12 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
                   })
                   .catch(() => {});
               }
+              if (account) {
+                accountPool.recordSuccess(
+                  account.id,
+                  (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0),
+                );
+              }
             } else {
               // Feed through think-parser; only emit TEXT chunks to client
               for (const chunk of parser.feed(delta)) {
@@ -690,7 +771,8 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
           clearTimeout(streamTimeoutId);
         } catch (err: unknown) {
           clearTimeout(streamTimeoutId);
-          const e = err as { message?: string };
+          const e = err as { message?: string; statusCode?: number };
+          if (account) accountPool.recordFailure(account.id, { status: e.statusCode });
           // Inject continuation suffix so the client gets a graceful truncation notice
           const { text: recoveredText } = orchestrator.handleError(lastText, "plain");
           const suffix = recoveredText.slice(lastText.length);
@@ -745,6 +827,13 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
 
       try {
         const response = await driver.complete(opts);
+
+        if (account) {
+          accountPool.recordSuccess(
+            account.id,
+            response.usage.inputTokens + response.usage.outputTokens,
+          );
+        }
 
         const _latMs = Date.now() - _logStart;
 
@@ -851,6 +940,7 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
       } catch (err: unknown) {
         const e = err as { code?: string; statusCode?: number; message?: string };
         const statusCode = e.statusCode && e.statusCode >= 400 ? e.statusCode : 502;
+        if (account) accountPool.recordFailure(account.id, { status: e.statusCode });
         gatewayLog
           .append({
             timestamp: _logStart,

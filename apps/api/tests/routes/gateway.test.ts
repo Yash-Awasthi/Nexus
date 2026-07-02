@@ -1,7 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
+import { signJwt } from "@nexus/auth";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { buildServer } from "../../src/server.js";
 import type { FastifyInstance } from "fastify";
+
+// §4.1: resolveFresh is mocked here — it exercises gateway.ts's own OAuth wiring
+// (pool → store.resolveFresh → provider.toDriverCredentials → VertexDriver), not
+// @nexus/llm-oauth's TokenRefresher, which already has its own unit coverage.
+vi.mock("../../src/lib/oauth-token-store.js", () => ({
+  createOAuthTokenStore: () => ({
+    resolveFresh: async () => ({
+      accessToken: "ya29.mock-vertex-token",
+      expiresAt: Date.now() + 3_600_000,
+    }),
+  }),
+}));
 
 // ── Groq mock response ─────────────────────────────────────────────────────────
 
@@ -268,6 +281,72 @@ describe("POST /api/v1/gateway/messages", () => {
     expect(res.statusCode).toBe(400);
     const body = res.json<{ error: { type: string } }>();
     expect(body.error.type).toBe("provider_unavailable");
+  });
+
+  // ── §4.1 AccountPool wiring ──────────────────────────────────────────────
+
+  it("trips the circuit breaker after repeated failures; the next pick is rejected", async () => {
+    process.env.GROQ_API_KEY = "test-key";
+    const failingFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: async () => ({ error: { message: "boom" } }),
+      text: async () => JSON.stringify({ error: { message: "boom" } }),
+    });
+    vi.stubGlobal("fetch", failingFetch);
+
+    const payload = { model: "nexus/fast", messages: [{ role: "user", content: "hi" }] };
+
+    // Breaker threshold is 5 consecutive failures (AccountPool default).
+    for (let i = 0; i < 5; i++) {
+      const res = await app.inject({ method: "POST", url: "/api/v1/gateway/messages", payload });
+      expect(res.statusCode).toBe(500);
+    }
+    expect(failingFetch).toHaveBeenCalledTimes(5);
+
+    // 6th call: the account's breaker is open — pool.pick() rejects before any driver call.
+    const tripped = await app.inject({ method: "POST", url: "/api/v1/gateway/messages", payload });
+    expect(tripped.statusCode).toBe(503);
+    const body = tripped.json<{ error: { type: string } }>();
+    expect(body.error.type).toBe("provider_unavailable");
+    expect(failingFetch).toHaveBeenCalledTimes(5); // breaker skipped the driver entirely
+  });
+
+  it("resolves a linked Google OAuth account to the vertex driver", async () => {
+    process.env.NEXUS_JWT_SECRET = "test-gateway-jwt-secret";
+    process.env.GOOGLE_OAUTH_CLIENT_ID = "cid";
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET = "csecret";
+    process.env.GOOGLE_CLOUD_PROJECT = "proj-1";
+    vi.stubGlobal("fetch", mockGroqFetch());
+
+    try {
+      const token = signJwt(
+        { sub: "user-oauth-1", role: "admin", iat: 1_000, exp: 9_999_999_999 } as Parameters<
+          typeof signJwt
+        >[0],
+        process.env.NEXUS_JWT_SECRET,
+      );
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/gateway/messages",
+        headers: { "x-nexus-provider": "vertex", authorization: `Bearer ${token}` },
+        payload: { model: "google/gemini-2.0-flash-001", messages: [{ role: "user", content: "hi" }] },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json<{ content: { text: string }[] }>();
+      expect(body.content[0]!.text).toBe("Hello from mock!");
+
+      // Dispatched via VertexDriver (aiplatform endpoint), not a registry driver.
+      const calledUrls = vi.mocked(fetch).mock.calls.map((c) => String(c[0]));
+      expect(calledUrls.some((u) => u.includes("aiplatform.googleapis.com"))).toBe(true);
+    } finally {
+      delete process.env.NEXUS_JWT_SECRET;
+      delete process.env.GOOGLE_OAUTH_CLIENT_ID;
+      delete process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+      delete process.env.GOOGLE_CLOUD_PROJECT;
+    }
   });
 });
 
