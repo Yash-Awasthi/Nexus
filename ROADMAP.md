@@ -641,7 +641,19 @@ MCP `/test`) + identity-keyed per-user rate limiting. `.cleanup-alerts.txt` = 48
   Mirror: `makeRateLimitPreHandler`/`makeUserRateLimitPreHandler` usage in
   `apps/api/src/server.ts`. Done: each authenticated group buckets by identity.
 
-- **9.4 Docker sandbox hardening.**
+- **9.4 Docker sandbox hardening.** **Done this branch (commit `53f507b`).** `buildDockerArgs`
+  (`packages/sandbox/src/index.ts`) now emits all three: (1) `--security-opt=seccomp=<path>` with a
+  checked-in `packages/sandbox/seccomp-default.json` (default-allow denylist erroring the dangerous
+  syscalls `--cap-drop=ALL` leaves reachable — namespace/mount, kernel-module, ptrace/tracing,
+  key-mgmt, host time/reboot); path resolved via `import.meta.url` so it works from both `src`
+  (vitest) and built `dist` (exported `SECCOMP_PROFILE_PATH`, verified to exist from dist). (2)
+  `--read-only` rootfs + a bounded writable scratch tmpfs at `/nexus-scratch`
+  (`--tmpfs=…:rw,nosuid,nodev,size=<scratchMb>m`) with `--env=TMPDIR=/nexus-scratch` so tsx/esbuild/
+  python temp writes still land on a writable mount (the existing read-only `-v tmpdir` input bind is
+  untouched). (3) `--user=1000:1000` non-root de-privileging (container-level half of userns; the
+  host complement is daemon `userns-remap`, documented in the runner doc-block since it's not a
+  `docker run` arg). All three configurable (`seccompProfilePath`/`readOnlyRootfs`/`scratchMb`/
+  `runAsUser`). 8 new arg-assertion tests (65 total); typecheck + build + eslint green.
   Files: `packages/sandbox/src/index.ts` (`buildDockerArgs`).
   Do: add seccomp profile (`--security-opt seccomp=<profile.json>`, profile file checked in),
   read-only rootfs (`--read-only` + tmpfs for scratch), user-namespace remapping.
