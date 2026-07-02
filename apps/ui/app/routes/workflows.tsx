@@ -5,6 +5,13 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import { Textarea } from "~/components/ui/textarea";
 import {
   Dialog,
@@ -47,6 +54,7 @@ import {
   type Connection,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { ProviderIcon, ModelIcon } from "@lobehub/icons";
 
 type WorkflowStatus = "success" | "failed" | "pending";
 
@@ -265,12 +273,33 @@ function NodePalette({ onAddNode }: { onAddNode: (type: string) => void }) {
   );
 }
 
+/** A model row from GET /api/v1/gateway/models (registry seeded from models.dev). */
+interface GatewayModel {
+  id: string;
+  provider: string;
+  backend_model?: string;
+  available?: boolean;
+}
+
+// Shown before /gateway/models responds (or if the call fails / is unauthorized).
+const FALLBACK_MODELS: GatewayModel[] = [
+  { id: "gpt-4o", provider: "openai" },
+  { id: "gpt-4o-mini", provider: "openai" },
+  { id: "claude-sonnet-4-6", provider: "anthropic" },
+  { id: "claude-haiku", provider: "anthropic" },
+  { id: "gemini-2.5-pro", provider: "google" },
+];
+
 function PropertiesPanel({
   selectedNode,
   onUpdateLabel,
+  onUpdateModel,
+  models,
 }: {
   selectedNode: Node | null;
   onUpdateLabel: (id: string, label: string) => void;
+  onUpdateModel: (id: string, model: string) => void;
+  models: GatewayModel[];
 }) {
   if (!selectedNode) {
     return (
@@ -293,6 +322,8 @@ function PropertiesPanel({
   const cfg = nodeTypeStyles[nodeType] || nodeTypeStyles.input;
   const Icon = cfg.icon;
   const label = (selectedNode.data?.label as string) || "";
+  const selectedModel =
+    (selectedNode.data?.model as string) || models[0]?.id || FALLBACK_MODELS[0]!.id;
 
   return (
     <div className="w-64 border-l border-border flex flex-col bg-background shrink-0">
@@ -328,13 +359,27 @@ function PropertiesPanel({
         {nodeType === "llm" && (
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Model</label>
-            <select className="w-full h-7 text-xs bg-background border border-border rounded-md px-2 text-foreground">
-              <option>gpt-4o</option>
-              <option>gpt-4o-mini</option>
-              <option>claude-sonnet-4-6</option>
-              <option>claude-haiku</option>
-              <option>gemini-2.5-pro</option>
-            </select>
+            <Select value={selectedModel} onValueChange={(m) => onUpdateModel(selectedNode.id, m)}>
+              <SelectTrigger className="h-7 text-xs">
+                <div className="flex items-center gap-1.5 truncate">
+                  <ModelIcon model={selectedModel} size={14} />
+                  <SelectValue placeholder="Select model" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                {models.map((m) => (
+                  <SelectItem key={m.id} value={m.id} className="text-xs">
+                    <span className="flex items-center gap-2">
+                      <ProviderIcon provider={m.provider} size={14} type="mono" />
+                      <span className="truncate">{m.id}</span>
+                      {m.available === false && (
+                        <span className="text-[10px] text-muted-foreground">(no key)</span>
+                      )}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )}
 
@@ -404,6 +449,28 @@ function WorkflowEditor({
   const [isRunning, setIsRunning] = useState(false);
   const [runOutput, setRunOutput] = useState<string | null>(null);
   const [outputExpanded, setOutputExpanded] = useState(true);
+  const [models, setModels] = useState<GatewayModel[]>(FALLBACK_MODELS);
+
+  // Feed the model picker from the registry (seeded from models.dev, §1.5).
+  // Falls back to the static list on any error / unauthorized.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/v1/gateway/models");
+        if (!res.ok) return;
+        const data = (await res.json()) as { models?: GatewayModel[] };
+        if (!cancelled && Array.isArray(data.models) && data.models.length > 0) {
+          setModels(data.models);
+        }
+      } catch {
+        /* keep FALLBACK_MODELS */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const onConnect = useCallback(
     (connection: Connection) =>
@@ -452,6 +519,16 @@ function WorkflowEditor({
       );
       setSelectedNode((prev) =>
         prev && prev.id === id ? { ...prev, data: { ...prev.data, label } } : prev,
+      );
+    },
+    [setNodes],
+  );
+
+  const handleUpdateModel = useCallback(
+    (id: string, model: string) => {
+      setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, model } } : n)));
+      setSelectedNode((prev) =>
+        prev && prev.id === id ? { ...prev, data: { ...prev.data, model } } : prev,
       );
     },
     [setNodes],
@@ -587,7 +664,12 @@ function WorkflowEditor({
           </div>
         </div>
 
-        <PropertiesPanel selectedNode={selectedNode} onUpdateLabel={handleUpdateLabel} />
+        <PropertiesPanel
+          selectedNode={selectedNode}
+          onUpdateLabel={handleUpdateLabel}
+          onUpdateModel={handleUpdateModel}
+          models={models}
+        />
       </div>
 
       {/* AI Run Output Panel */}
