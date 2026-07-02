@@ -594,6 +594,46 @@ describe("ToolAgentRuntime compaction", () => {
   });
 });
 
+describe("ToolAgentRuntime hard stop (§7.1)", () => {
+  it("aborts with stopReason when context stays over 95% of budget after compaction", async () => {
+    let calls = 0;
+    // The model keeps asking for a tool, so history would grow unbounded.
+    const llm: LlmToolFn = () => {
+      calls++;
+      return Promise.resolve({
+        content: "x".repeat(200_000),
+        toolCalls: calls < 3 ? [{ callId: `c${calls}`, name: "noop", arguments: {} }] : [],
+      });
+    };
+    const toolSet = new RuntimeToolSet().add({
+      name: "noop",
+      description: "",
+      tier: "auto_allowed",
+      handler: () => Promise.resolve({ name: "noop", output: "y".repeat(200_000) }),
+    });
+    const runtime = new ToolAgentRuntime({
+      llm,
+      toolSet,
+      maxSteps: 20,
+      // Tiny budget + a summarizer that can't shrink much → forces the hard stop.
+      compaction: { summarize: async () => "z".repeat(200_000), tokenBudget: 1_000, systemOverhead: 0 },
+    });
+    const result = await runtime.run("start");
+    expect(result.aborted).toBe(true);
+    expect(result.stopReason).toBe("context_budget_exceeded");
+    // It stopped early rather than running all 20 steps.
+    expect(result.steps.length).toBeLessThan(20);
+  });
+
+  it("does not hard-stop when compaction is off (back-compatible)", async () => {
+    const llm: LlmToolFn = () => Promise.resolve({ content: "done", toolCalls: [] });
+    const runtime = new ToolAgentRuntime({ llm, maxSteps: 1 });
+    const result = await runtime.run("x".repeat(2_000_000));
+    expect(result.aborted).toBe(false);
+    expect(result.stopReason).toBeUndefined();
+  });
+});
+
 describe("ToolAgentRuntime resume", () => {
   it("seeds prior messages before the new instruction (resume)", async () => {
     let seen: RuntimeMessage[] = [];

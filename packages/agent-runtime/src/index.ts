@@ -814,6 +814,12 @@ export function llmDriverToToolFn(driver: LlmToolDriver, modelOverride?: string)
 export const DEFAULT_TOKEN_BUDGET = 200_000;
 /** Compact when the estimate reaches this fraction of the budget. */
 export const COMPACTION_THRESHOLD = 0.8;
+/**
+ * Hard stop: if the context is still at/above this fraction of the budget AFTER a
+ * compaction pass, abort the run instead of calling the model — a further call
+ * would risk a provider context-length 4xx. Only enforced when compaction is on.
+ */
+export const HARD_STOP_THRESHOLD = 0.95;
 /** Keep this many most-recent turns verbatim (never summarized). */
 export const RECENT_TURNS_TO_KEEP = 10;
 /** Approximate chars per token for estimation. */
@@ -951,6 +957,8 @@ export interface ToolRuntimeResult {
   finalContent: string;
   totalUsage: RuntimeUsage;
   aborted: boolean;
+  /** Set when the run stopped for a reason other than completion/abort-signal (e.g. "context_budget_exceeded"). */
+  stopReason?: string;
   totalDurationMs: number;
 }
 
@@ -1084,6 +1092,7 @@ export class ToolAgentRuntime {
     const totalUsage: RuntimeUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
     const tools = this.tools ?? deriveToolSpecs(this.toolSet);
     let finalContent = "";
+    let stopReason: string | undefined;
 
     for (let i = 0; i < this.maxSteps; i++) {
       if (signal?.aborted) {
@@ -1103,6 +1112,14 @@ export class ToolAgentRuntime {
         if (result.compacted) {
           messages = result.messages;
           this.onCompaction?.(result);
+        }
+        // Hard stop: if compaction couldn't get us under the ceiling, abort rather
+        // than making a call that would 4xx on context length.
+        const budget = this.compaction.tokenBudget ?? DEFAULT_TOKEN_BUDGET;
+        const overhead = this.compaction.systemOverhead ?? SYSTEM_OVERHEAD_TOKENS;
+        if (estimateContextTokens(messages, overhead) >= budget * HARD_STOP_THRESHOLD) {
+          stopReason = "context_budget_exceeded";
+          break;
         }
       }
 
@@ -1211,7 +1228,8 @@ export class ToolAgentRuntime {
       steps,
       finalContent,
       totalUsage,
-      aborted: false,
+      aborted: stopReason !== undefined,
+      ...(stopReason ? { stopReason } : {}),
       totalDurationMs: Date.now() - t0,
     };
   }
