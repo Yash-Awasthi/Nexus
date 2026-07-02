@@ -24,6 +24,8 @@
 
 import { randomUUID } from "crypto";
 
+import { translate } from "@nexus/llm-translate";
+
 // ── Public types ──────────────────────────────────────────────────────────────
 
 export type ContentBlockType = "text";
@@ -209,35 +211,16 @@ export function resolveModel(
 
 // ── Format translation ────────────────────────────────────────────────────────
 
-/** Flatten Anthropic content (string | block[]) to a plain string */
-function flattenContent(content: string | ContentBlock[]): string {
-  if (typeof content === "string") return content;
-  return content
-    .filter((b): b is TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n");
-}
-
 /** Anthropic Messages request → OpenAI chat/completions request */
 export function toOpenAIRequest(req: AnthropicRequest, resolvedModel: string): OAIRequest {
-  const messages: OAIMessage[] = [];
-
-  // Anthropic's top-level `system` field → OAI system message prepended
-  if (req.system) {
-    messages.push({ role: "system", content: req.system });
-  }
-
-  for (const msg of req.messages) {
-    messages.push({ role: msg.role, content: flattenContent(msg.content) });
-  }
-
-  return {
-    model: resolvedModel,
-    messages,
-    ...(req.max_tokens !== undefined && { max_tokens: req.max_tokens }),
-    ...(req.temperature !== undefined && { temperature: req.temperature }),
-    ...(req.stream && { stream: true }),
-  };
+  // Delegate to the canonical hub translator (@nexus/llm-translate). Unlike the old
+  // bespoke flattening, it preserves tool calls / tool results / multi-turn
+  // structure — the parts that break agents when dropped. The provider-resolved
+  // model overrides the client's alias; everything else (system → system message,
+  // max_tokens, temperature, stream) is handled by the hub.
+  const oai = translate(req, "anthropic", "openai") as unknown as OAIRequest;
+  oai.model = resolvedModel;
+  return oai;
 }
 
 /** Map OAI finish_reason → Anthropic stop_reason */

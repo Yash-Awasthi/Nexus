@@ -24,5 +24,7 @@
   "devDependencies": {
     "typescript": "^5.6.3"
   },
-  "dependencies": {}
+  "dependencies": {
+    "@nexus/llm-translate": "workspace:*"
+  }
 }
