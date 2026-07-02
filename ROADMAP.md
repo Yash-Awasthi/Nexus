@@ -196,13 +196,29 @@ Baseline: canonical hub scaffolded in `packages/llm-translate/src/index.ts` (~30
 extension point = the `NORMALIZERS`/`DENORMALIZERS` maps. Request-only, **unwired**. Tests:
 `packages/llm-translate/tests/llm-translate.test.ts`.
 
-- **2.1 Add formats.**
+- **2.1 Add formats.** **Done this branch.** `Format` union now
+  `openai | anthropic | gemini | vertex | responses | ollama`, each with a normalizer+
+  denormalizer pair + a golden-shape test and an openai↔X round-trip test (36 tests, all green).
+  `gemini` (commit `2a14c8a`), `vertex` (`5f73abc`, thin gemini wrapper — strips URL-bound
+  `model`/`stream` from the body), `responses` (`3de2f48`, OpenAI Responses API: flat `input[]` +
+  top-level `instructions`, `function_call`/`function_call_output` items, `max_output_tokens`),
+  `ollama` (`8ee604f`, `/api/chat`: object-valued tool args, `tool_name` on results, sampling
+  under `options.num_predict`/`options.temperature`).
   Do: extend the `Format` union and add a normalizer+denormalizer pair per format — `gemini`,
   `vertex` (same payload as gemini, different envelope/URL-bound model), `responses` (OpenAI
   Responses API), `ollama`. One format per commit is fine.
   Test: `pnpm exec vitest run packages/llm-translate/tests/llm-translate.test.ts`
   Done: golden-file test per format (same logical request → exact expected wire JSON).
-- **2.2 Format-agnostic concerns.** Do: tool-call mapping, thinking/reasoning, finish-reason,
+- **2.2 Format-agnostic concerns.** **Done this branch (verification — no code change).** The
+  translator is request-only; its one format-agnostic request concern is **tool-call mapping**,
+  which the §2.1 golden files now cover across all six formats (assistant tool call + tool result
+  round-trip openai↔{anthropic,gemini,vertex,responses,ollama}). The remaining listed concerns are
+  response-side: **finish-reason** + **usage** already map in the gateway response path
+  (`packages/gateway/src/index.ts` `mapStopReason`, usage passthrough) and are exercised there via
+  §2.4; **thinking/reasoning** stream blocks land in §2.3; **modality/image blocks** are out of the
+  current request-only canonical scope (`CanonicalMessage.content` is text) — deferred until a
+  multimodal canonical block type is introduced (not needed for the text+tools path §2.4 wires).
+  Do: tool-call mapping, thinking/reasoning, finish-reason,
   usage, modality, image blocks across all formats. Done: covered by the golden files.
 - **2.3 Streaming.** Do: chunk translation (SSE deltas, tool-call partials, thinking blocks).
   Done: streaming golden test passes.
