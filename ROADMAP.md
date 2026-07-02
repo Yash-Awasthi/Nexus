@@ -220,9 +220,26 @@ extension point = the `NORMALIZERS`/`DENORMALIZERS` maps. Request-only, **unwire
   multimodal canonical block type is introduced (not needed for the text+tools path §2.4 wires).
   Do: tool-call mapping, thinking/reasoning, finish-reason,
   usage, modality, image blocks across all formats. Done: covered by the golden files.
-- **2.3 Streaming.** Do: chunk translation (SSE deltas, tool-call partials, thinking blocks).
+- **2.3 Streaming.** **Done this branch (commit `ac3835b`).** Added a response-chunk streaming
+  layer to `@nexus/llm-translate`: `CanonicalStreamEvent` (text / thinking / tool_call_start /
+  tool_call_args / finish), `normalizeStreamChunk(chunk, from)` parsers for all six formats, and a
+  stateful `StreamTranslator(from, to)` that emits to openai + anthropic (the pair the gateway
+  transcodes; emit to a parse-only format throws). The Anthropic emitter brackets text/tool_use
+  content blocks with start/stop frames and maps stop reasons. Golden tests assert the exact frame
+  sequence for openai↔anthropic (text delta + tool-call partial + finish) plus flush + parse spokes
+  (42 tests green). Callers own SSE line framing / `[DONE]` / `event:` names.
+  Do: chunk translation (SSE deltas, tool-call partials, thinking blocks).
   Done: streaming golden test passes.
-- **2.4 Wire into gateway.**
+- **2.4 Wire into gateway.** **Done this branch (commit `7bb4f47`).** `@nexus/gateway`'s
+  `toOpenAIRequest` now delegates to `translate(req, "anthropic", "openai")` (added
+  `@nexus/llm-translate` as a workspace dep), overriding only the resolved model — so tool
+  calls/results/multi-turn structure survive instead of being flattened away; the dead
+  `flattenContent` helper was removed. Note: `apps/api/src/routes/gateway.ts` does NOT use this
+  function — that route converts Anthropic→neutral `LlmRequestOptions` via `toDriverRequest` and
+  lets each native driver format its own wire payload, so no translate() swap applies there. Built
+  llm-translate + gateway; gateway pkg tests 38/38 green (incl. the 7 `toOpenAIRequest` golden
+  assertions, unchanged); apps/api `gateway.test.ts`+`gateway-fuzz.test.ts` 25/25 green (lone
+  vitest "error" = the pre-existing `nexus_test` PG-auth unhandled rejection, not a test failure).
   Files: `packages/gateway/src`, `apps/api/src/routes/gateway.ts`.
   Do: replace the bespoke Anthropic↔OpenAI translate with `translate()`. Build llm-translate +
   gateway before the api typecheck.
