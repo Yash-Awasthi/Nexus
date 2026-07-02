@@ -294,10 +294,13 @@ the message-array context manager is out of scope (belongs to gateway/translate)
   `pruneByScore` (keepRate default 0.5, whitespace-preserving, only drops words below minScore 0.3)
   inside preserved-block extraction. Lossy, opt-in, `ultraEngine` stackPriority 40. 9 new tests
   (66 total). Done: stopwords pruned first; code/URLs/numbers survive; keepRate honored.
-- **3.4 `caveman` engine.** Rule-based prose reduction (English), ~30 rules over `lite`/`full`/
-  `ultra` intensities (filler/pleasantries, purpose-phrases, verbose connectors, article-drop[full],
-  ultra abbreviations), keyword pre-filter, preserved blocks, cleanup+recapitalize, revert-on-mangle.
-  Lossy, opt-in, stackPriority 20. Done: filler removed; code/URLs untouched; intensity escalates.
+- **3.4 `caveman` engine.** **DONE.** Rule-based prose reduction (English), 11 rules over
+  `lite`/`full`/`ultra` cumulative intensities (pleasantries, filler adverbs, hedging, explanatory/
+  context prefixes, polite framing, purpose phrases, verbose connectors; article-drop + leader
+  phrases at `full`; ~20 abbreviations at `ultra`), non-global keyword pre-filter, preserved blocks,
+  cleanup + recapitalize, and sentinel-count validation that reverts on corruption. Lossy, opt-in,
+  `cavemanEngine` stackPriority 20. 7 new tests (73 total). Done: filler removed; code/URLs
+  untouched; intensity escalates; pure code block is a no-op.
 - **3.5 `rtk` engine.** Command/tool-output line filter (drop/keep/collapse + consecutive-dedup +
   head/tail truncate to maxLines/maxChars) with bundled rulesets selected by `ctx.toolName`/content;
   complements `compressForTool`. stackPriority 10. Done: build errors kept; noise dropped; caps hold.

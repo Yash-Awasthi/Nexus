@@ -912,3 +912,204 @@ export const ultraEngine: CompressEngine = {
   },
 };
 registerEngine(ultraEngine);
+
+// ── caveman engine (lossy, rule-based prose — no model) ──────────────────────────
+// Ported from OmniRoute's caveman engine (caveman.ts + cavemanRules.ts): telegraphic
+// prose compression by ~2 dozen regex rules across three cumulative intensities
+// (lite ⊂ full ⊂ ultra). Filler/pleasantries/hedging go at `lite`; article-drop and
+// leader phrases at `full`; ultra abbreviations (database→DB, function→fn, …) at
+// `ultra`. Structured spans are masked first (never rewritten), and a validation
+// step reverts to the original if a rule corrupted a protected span. English-only
+// for now (language-aware rule packs are a future extension).
+
+type CavemanIntensity = "lite" | "full" | "ultra";
+const CAVEMAN_RANK: Record<CavemanIntensity, number> = { lite: 0, full: 1, ultra: 2 };
+
+interface CavemanRule {
+  readonly name: string;
+  readonly minIntensity: CavemanIntensity;
+  /** Cheap pre-filter: skip the rule if this doesn't match (avoids needless work). */
+  readonly keyword: RegExp | null;
+  apply(text: string): string;
+}
+
+/** Long word → short form. Applied only at `ultra` intensity. */
+const CAVEMAN_ABBREV: Record<string, string> = {
+  database: "DB",
+  configuration: "config",
+  function: "fn",
+  request: "req",
+  response: "res",
+  authentication: "auth",
+  authorization: "authz",
+  dependency: "dep",
+  repository: "repo",
+  application: "app",
+  environment: "env",
+  development: "dev",
+  production: "prod",
+  message: "msg",
+  parameter: "param",
+  argument: "arg",
+  variable: "var",
+  directory: "dir",
+  document: "doc",
+  information: "info",
+};
+const CAVEMAN_ABBREV_RE = new RegExp(`\\b(${Object.keys(CAVEMAN_ABBREV).join("|")})\\b`, "gi");
+// Non-global twin for the .test() pre-filter (a /g regex's lastIndex is stateful).
+const CAVEMAN_ABBREV_KEYWORD = new RegExp(`\\b(${Object.keys(CAVEMAN_ABBREV).join("|")})\\b`, "i");
+
+const CAVEMAN_RULES: readonly CavemanRule[] = [
+  // ── lite: filler / pleasantries / hedging / verbose framing ──
+  {
+    name: "pleasantries",
+    minIntensity: "lite",
+    keyword: /please|kindly|thank|no problem|of course|feel free/i,
+    apply: (t) =>
+      t.replace(
+        /\b(?:please|kindly|thanks?(?: you)?|thank you|no problem|of course|feel free to)\b/gi,
+        "",
+      ),
+  },
+  {
+    name: "filler_adverbs",
+    minIntensity: "lite",
+    keyword: /basically|essentially|actually|really|very|quite|just|simply|literally|honestly|obviously|clearly|certainly|definitely/i,
+    apply: (t) =>
+      t.replace(
+        /\b(?:basically|essentially|actually|really|very|quite|just|simply|literally|honestly|obviously|clearly|certainly|definitely)\b/gi,
+        "",
+      ),
+  },
+  {
+    name: "hedging",
+    minIntensity: "lite",
+    keyword: /I think|I believe|I guess|it seems|it appears|in my opinion|sort of|kind of|probably|possibly|perhaps|maybe/i,
+    apply: (t) =>
+      t.replace(
+        /\b(?:I think|I believe|I guess|it seems that|it seems|it appears that|it appears|in my opinion|sort of|kind of|probably|possibly|perhaps|maybe)\b/gi,
+        "",
+      ),
+  },
+  {
+    name: "explanatory_prefix",
+    minIntensity: "lite",
+    keyword: /note that|keep in mind|bear in mind|important to note/i,
+    apply: (t) =>
+      t.replace(
+        /\b(?:it is important to note that|please note that|note that|keep in mind that|bear in mind that)\b/gi,
+        "",
+      ),
+  },
+  {
+    name: "context_setup",
+    minIntensity: "lite",
+    keyword: /here is|here's|the following is/i,
+    apply: (t) => t.replace(/\b(?:here is|here's|the following is)\b/gi, ""),
+  },
+  {
+    name: "polite_framing",
+    minIntensity: "lite",
+    keyword: /could you|would you|can you|I would like you to|I'd like you to|I want you to/i,
+    apply: (t) =>
+      t
+        .replace(/\b(?:could|would|can)\s+you(?:\s+please)?\s+/gi, "")
+        .replace(/\bI(?:'d| would) like you to\s+/gi, "")
+        .replace(/\bI want you to\s+/gi, ""),
+  },
+  {
+    name: "purpose_phrases",
+    minIntensity: "lite",
+    keyword: /in order to|due to the fact that|for the purpose of/i,
+    apply: (t) =>
+      t
+        .replace(/\bin order to\b/gi, "to")
+        .replace(/\bdue to the fact that\b/gi, "because")
+        .replace(/\bfor the purpose of\b/gi, "for"),
+  },
+  {
+    name: "verbose_connectors",
+    minIntensity: "lite",
+    keyword: /furthermore|moreover|additionally|in addition|however|nevertheless|nonetheless|therefore|consequently|as a result/i,
+    apply: (t) =>
+      t
+        .replace(/\b(?:furthermore|moreover|additionally|in addition)\b/gi, "also")
+        .replace(/\b(?:however|nevertheless|nonetheless)\b/gi, "but")
+        .replace(/\b(?:therefore|consequently|as a result)\b/gi, "so"),
+  },
+  // ── full: article drop + leader phrases (more aggressive) ──
+  {
+    name: "leader_phrases",
+    minIntensity: "full",
+    keyword: /I'll|I will|I can|I could|let me|allow me to/i,
+    apply: (t) => t.replace(/\b(?:I'll|I will|I can|I could|let me|allow me to)\b/gi, ""),
+  },
+  {
+    name: "articles",
+    minIntensity: "full",
+    keyword: /\b(?:a|an|the)\b/i,
+    apply: (t) => t.replace(/\b(?:an|a|the)\s+(?=[A-Za-z])/gi, ""),
+  },
+  // ── ultra: aggressive abbreviations ──
+  {
+    name: "ultra_abbreviations",
+    minIntensity: "ultra",
+    keyword: CAVEMAN_ABBREV_KEYWORD,
+    apply: (t) =>
+      t.replace(CAVEMAN_ABBREV_RE, (m) => CAVEMAN_ABBREV[m.toLowerCase()] ?? m),
+  },
+];
+
+/** Cheap post-pass: fix spacing/punctuation artifacts left by rule deletions. */
+function cavemanCleanup(text: string): string {
+  return text
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .replace(/\(\s+/g, "(")
+    .replace(/\s+\)/g, ")")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/** Re-capitalize sentence starts after deletions removed leading words. */
+function cavemanRecapitalize(text: string): string {
+  return text.replace(/(^|[.!?]\s+)([a-z])/g, (_m, lead: string, ch: string) => lead + ch.toUpperCase());
+}
+
+/** Count how many preserved-block sentinels remain in `text`. */
+function countSentinels(text: string): number {
+  const m = text.match(new RegExp(`${PB_OPEN}\\d+${PB_CLOSE}`, "g"));
+  return m ? m.length : 0;
+}
+
+/**
+ * Rule-based prose compression at `intensity` (default "full"). Masks structured
+ * spans, applies every rule at or below the intensity, cleans up, recapitalizes,
+ * then restores. Reverts to the original if a rule dropped a protected span
+ * (sentinel count changed) — never corrupts code/URLs/errors.
+ */
+export function cavemanCompress(text: string, intensity: CavemanIntensity = "full"): string {
+  const { text: masked, blocks } = extractPreservedBlocks(text);
+  const max = CAVEMAN_RANK[intensity];
+  let out = masked;
+  for (const rule of CAVEMAN_RULES) {
+    if (CAVEMAN_RANK[rule.minIntensity] > max) continue;
+    if (rule.keyword && !rule.keyword.test(out)) continue;
+    out = rule.apply(out);
+  }
+  out = cavemanRecapitalize(cavemanCleanup(out));
+  if (countSentinels(out) !== blocks.length) return text; // validation: revert on corruption
+  return restorePreservedBlocks(out, blocks);
+}
+
+/** Rule-based prose reduction. Lossy; intensity via `ctx.intensity` (default "full"). */
+export const cavemanEngine: CompressEngine = {
+  name: "caveman",
+  stackPriority: 20,
+  lossless: false,
+  apply: (text, ctx) => cavemanCompress(text, ctx?.intensity ?? "full"),
+};
+registerEngine(cavemanEngine);

@@ -30,6 +30,8 @@ import {
   scoreToken,
   pruneByScore,
   ultraEngine,
+  cavemanCompress,
+  cavemanEngine,
 } from "../src/index.js";
 import { decode as toonDecode } from "@toon-format/toon";
 
@@ -573,6 +575,61 @@ describe("ultra engine", () => {
       "I would really just like to note that the function is basically a very simple helper.";
     const r = compressStacked(prose, ["ultra"], { ctx: { keepRate: 0.5 } });
     expect(r.applied).toContain("ultra");
+    expect(r.compressedChars).toBeLessThan(r.originalChars);
+  });
+});
+
+// ── caveman engine (§3.4) ───────────────────────────────────────────────────────
+
+describe("caveman engine", () => {
+  it("is registered at stackPriority 20 and is lossy", () => {
+    expect(ENGINES.caveman).toBe(cavemanEngine);
+    expect(cavemanEngine.stackPriority).toBe(20);
+    expect(cavemanEngine.lossless).toBe(false);
+  });
+
+  it("removes pleasantries, polite framing and filler adverbs", () => {
+    const out = cavemanCompress("Please could you just basically fix the bug.", "full");
+    expect(out).not.toMatch(/please/i);
+    expect(out).not.toMatch(/basically/i);
+    expect(out).not.toMatch(/could you/i);
+    expect(out).toMatch(/fix/i);
+    expect(out).toMatch(/bug/i);
+  });
+
+  it("leaves code fences and URLs untouched", () => {
+    const input = "Please run `npm install` and then see https://x.io/docs now.";
+    const out = cavemanCompress(input, "ultra");
+    expect(out).toContain("`npm install`");
+    expect(out).toContain("https://x.io/docs");
+  });
+
+  it("escalates by intensity (articles + abbreviations only at higher tiers)", () => {
+    const input = "the database configuration is ready";
+    const lite = cavemanCompress(input, "lite");
+    expect(lite).toContain("database"); // no article-drop / abbrev at lite
+    const ultra = cavemanCompress(input, "ultra");
+    expect(ultra).toContain("DB");
+    expect(ultra).toContain("config");
+    expect(ultra).not.toMatch(/\bdatabase\b/);
+    expect(ultra).not.toMatch(/^the /i); // article dropped
+  });
+
+  it("is a no-op (lossless) on a pure code block", () => {
+    const code = "```js\nconst a = the value;\n```";
+    expect(cavemanCompress(code, "ultra")).toBe(code);
+  });
+
+  it("recapitalizes the sentence start after leading filler is removed", () => {
+    const out = cavemanCompress("Basically the answer is 42.", "full");
+    expect(out[0]).toBe(out[0]?.toUpperCase());
+    expect(out).toContain("42");
+  });
+
+  it("via compressStacked with intensity ctx shrinks prose", () => {
+    const prose = "Please note that I would like you to essentially refactor the parser.";
+    const r = compressStacked(prose, ["caveman"], { ctx: { intensity: "full" } });
+    expect(r.applied).toContain("caveman");
     expect(r.compressedChars).toBeLessThan(r.originalChars);
   });
 });
