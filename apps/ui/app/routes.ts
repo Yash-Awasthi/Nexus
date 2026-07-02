@@ -79,6 +79,7 @@ export default [
   route("rooms", "routes/rooms.tsx"),
   route("sandbox", "routes/sandbox.tsx"),
   route("voice", "routes/voice.tsx"),
+  route("prediction-markets", "routes/prediction-markets.tsx"),
   route("agents", "routes/agents.tsx"),
   route("api-tokens", "routes/api-tokens.tsx"),
   route("provider-keys", "routes/provider-keys.tsx"),
