@@ -54,7 +54,7 @@ export interface CanonicalRequest {
   stream?: boolean;
 }
 
-export type Format = "openai" | "anthropic" | "gemini" | "vertex" | "responses";
+export type Format = "openai" | "anthropic" | "gemini" | "vertex" | "responses" | "ollama";
 
 // ── Loose provider shapes (input/output) ─────────────────────────────────────────
 // Typed loosely on purpose: callers pass parsed JSON from arbitrary clients. We
@@ -562,6 +562,90 @@ function toResponses(req: CanonicalRequest): Json {
   return out;
 }
 
+// ── Ollama `/api/chat` ⇄ canonical ───────────────────────────────────────────────
+// Ollama's chat API resembles OpenAI Chat Completions (a `messages[]` with
+// system/user/assistant/tool roles and OpenAI-shaped `tools`), but three things
+// differ: tool-call `arguments` are a JSON OBJECT (not a stringified string); tool
+// calls carry no `id` and results reference the call by `tool_name` (not
+// `tool_call_id`) — so, like Gemini, we key by name; and sampling params live under
+// an `options` object (`num_predict` = max tokens, `temperature`), not top-level.
+
+function fromOllama(req: Json): CanonicalRequest {
+  const messages: CanonicalMessage[] = [];
+  for (const raw of Array.isArray(req.messages) ? req.messages : []) {
+    const m = obj(raw);
+    const role = str(m.role) as CanonicalRole;
+    const toolCalls = Array.isArray(m.tool_calls)
+      ? m.tool_calls.map((tc) => {
+          const fn = obj(obj(tc).function);
+          // Ollama arguments are already an object — no JSON.parse, never throws.
+          return { id: str(fn.name), name: str(fn.name), arguments: obj(fn.arguments) };
+        })
+      : undefined;
+    messages.push({
+      role,
+      content: str(m.content),
+      ...(toolCalls && toolCalls.length > 0 && { toolCalls }),
+      ...(m.tool_name !== undefined && { toolCallId: str(m.tool_name) }),
+    });
+  }
+
+  const tools = Array.isArray(req.tools)
+    ? req.tools.map((t) => {
+        const fn = obj(obj(t).function);
+        return {
+          name: str(fn.name),
+          description: fn.description ? str(fn.description) : undefined,
+          parameters: obj(fn.parameters),
+        };
+      })
+    : undefined;
+
+  const options = obj(req.options);
+  return {
+    model: req.model ? str(req.model) : undefined,
+    messages,
+    ...(tools && { tools }),
+    ...(typeof options.num_predict === "number" && { maxTokens: options.num_predict }),
+    ...(typeof options.temperature === "number" && { temperature: options.temperature }),
+    ...(req.stream === true && { stream: true }),
+  };
+}
+
+function toOllama(req: CanonicalRequest): Json {
+  const messages = req.messages.map((m) => {
+    const out: Json = { role: m.role, content: m.content };
+    if (m.toolCalls?.length) {
+      // Ollama keeps args as an object and carries no call id.
+      out.tool_calls = m.toolCalls.map((tc) => ({
+        function: { name: tc.name, arguments: tc.arguments },
+      }));
+    }
+    // Tool results reference their call by name via `tool_name`.
+    if (m.role === "tool" && m.toolCallId !== undefined) out.tool_name = m.toolCallId;
+    return out;
+  });
+
+  const out: Json = { messages };
+  if (req.model) out.model = req.model;
+  if (req.tools) {
+    out.tools = req.tools.map((t) => ({
+      type: "function",
+      function: {
+        name: t.name,
+        ...(t.description !== undefined && { description: t.description }),
+        parameters: t.parameters,
+      },
+    }));
+  }
+  const options: Json = {};
+  if (req.maxTokens !== undefined) options.num_predict = req.maxTokens;
+  if (req.temperature !== undefined) options.temperature = req.temperature;
+  if (Object.keys(options).length > 0) out.options = options;
+  if (req.stream) out.stream = true;
+  return out;
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────────
 
 const NORMALIZERS: Record<Format, (req: Json) => CanonicalRequest> = {
@@ -570,6 +654,7 @@ const NORMALIZERS: Record<Format, (req: Json) => CanonicalRequest> = {
   gemini: fromGemini,
   vertex: fromVertex,
   responses: fromResponses,
+  ollama: fromOllama,
 };
 const DENORMALIZERS: Record<Format, (req: CanonicalRequest) => Json> = {
   openai: toOpenAI,
@@ -577,6 +662,7 @@ const DENORMALIZERS: Record<Format, (req: CanonicalRequest) => Json> = {
   gemini: toGemini,
   vertex: toVertex,
   responses: toResponses,
+  ollama: toOllama,
 };
 
 /** Parse a provider request into the canonical hub form. */

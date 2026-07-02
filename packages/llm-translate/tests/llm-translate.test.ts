@@ -229,6 +229,46 @@ describe("openai → responses → openai round-trip (lossless on tool calls)", 
   });
 });
 
+describe("openai → ollama (golden shape — /api/chat)", () => {
+  const oll = translate(OPENAI_REQ, "openai", "ollama");
+  it("keeps a messages[] with system as a message (not lifted)", () => {
+    const msgs = oll.messages as { role: string }[];
+    expect(msgs[0]?.role).toBe("system");
+  });
+  it("emits tool-call arguments as an object, not a JSON string", () => {
+    const msgs = oll.messages as { tool_calls?: { function: { name: string; arguments: unknown } }[] }[];
+    const call = msgs.flatMap((m) => m.tool_calls ?? [])[0];
+    expect(call?.function.name).toBe("get_weather");
+    expect(call?.function.arguments).toEqual({ city: "Paris" });
+  });
+  it("references the tool result by tool_name", () => {
+    const msgs = oll.messages as { role: string; tool_name?: string }[];
+    const toolMsg = msgs.find((m) => m.role === "tool");
+    expect(toolMsg?.tool_name).toBe("call_1");
+  });
+  it("puts sampling params under options (num_predict/temperature)", () => {
+    expect(oll.options).toEqual({ num_predict: 256, temperature: 0.2 });
+    expect(oll.max_tokens).toBeUndefined();
+  });
+  it("maps tools to the OpenAI-nested function shape", () => {
+    const tool = (oll.tools as { type: string; function: { name: string } }[])[0];
+    expect(tool?.type).toBe("function");
+    expect(tool?.function.name).toBe("get_weather");
+  });
+});
+
+describe("openai → ollama → openai round-trip (lossless on tool calls)", () => {
+  it("survives the round trip", () => {
+    const oll = translate(OPENAI_REQ, "openai", "ollama");
+    const back = translate(oll, "ollama", "openai");
+    const c = normalize(back, "openai") as CanonicalRequest;
+    expect(c.messages.find((m) => m.role === "tool")?.toolCallId).toBe("call_1");
+    expect(c.messages.find((m) => m.role === "assistant")?.toolCalls?.[0]?.name).toBe(
+      "get_weather",
+    );
+  });
+});
+
 describe("robustness", () => {
   it("malformed tool-call args become {} instead of throwing", () => {
     const c = normalize(
@@ -248,5 +288,8 @@ describe("robustness", () => {
     expect(normalize(undefined, "openai").messages).toEqual([]);
     expect(normalize("nonsense", "anthropic").messages).toEqual([]);
     expect(normalize("nonsense", "gemini").messages).toEqual([]);
+    expect(normalize("nonsense", "vertex").messages).toEqual([]);
+    expect(normalize("nonsense", "responses").messages).toEqual([]);
+    expect(normalize("nonsense", "ollama").messages).toEqual([]);
   });
 });
