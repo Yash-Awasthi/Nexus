@@ -410,18 +410,19 @@ Baseline: SSRF filter + resolve-then-pin (`packages/runtime/src/security-utils.t
 `createPinnedFetch(lookup)`, `pinnedFetch` — socket pinned to the validated DNS answer; used by
 MCP `/test`) + identity-keyed per-user rate limiting. `.cleanup-alerts.txt` = 48 CodeQL alerts.
 
-- **9.1 Extend pinned-fetch.** *(In progress — 1/13 sinks done: `routes/connectors.ts`,
-  commit `b65f638`.)*
-  Files: `apps/api/src/lib/pinned-fetch.ts` + each sink. `routes/mcp-servers.ts` and
-  `routes/connectors.ts` use `pinnedFetch` today. Native-`fetch` files (audited 2026-07-02):
-  **user-influenced URLs — convert first:** routes/{api-bridge,researcher,bots,obs-providers,
-  mail-ingest}.ts (connectors.ts done); **fixed provider/infra endpoints — convert or
-  justify:** routes/{gateway,llm-oauth,oidc,oauth,geoip,libertas}.ts,
-  lib/{sentry-reporter,cf-adapter,rate-limiter,shared-kv}.ts.
-  Do: route user-influenced sinks through `pinnedFetch` (skip internal/localhost service
-  calls); one file per commit is fine.
-  Test: `cd apps/api && pnpm exec vitest run tests/routes/mcp-servers.ssrf.test.ts` + a new
-  test per converted sink.
+- **9.1 Extend pinned-fetch.** **Shipped this branch — do not redo.** Converted 3 sinks:
+  `routes/connectors.ts` OAuth token-exchange (commit `b65f638`), `routes/api-bridge.ts`
+  webhook-trigger delivery (commit `4160944` — the only user-supplied-URL sink among that
+  file's 14 `fetch(` sites), `routes/oidc.ts` discovery/JWKS/token-exchange (commit `35862a4`).
+  Every other native-`fetch` file (audited 2026-07-02) was justified-safe rather than
+  converted — no earlier validate-then-use gap for DNS rebinding to land in, because the URL
+  is a hardcoded literal or env-fixed infra host with no per-request variability:
+  `routes/{researcher,bots,obs-providers,mail-ingest,gateway,llm-oauth,oauth,geoip,libertas}.ts`,
+  `lib/{sentry-reporter,rate-limiter,shared-kv}.ts` (`lib/cf-adapter.ts` has no real fetch call,
+  docstring only). Full reasoning in PROGRESS.md's 2026-07-02 "Now" section.
+  Test: `cd apps/api && pnpm exec vitest run tests/routes/mcp-servers.ssrf.test.ts
+  tests/routes/connectors.ssrf.test.ts tests/routes/api-bridge.webhooks-ssrf.test.ts
+  tests/routes/oidc.ssrf.test.ts` — 27/27 pass.
   Done: an outbound call to a host resolving to a private IP is rejected.
 
 - **9.2 Clear CodeQL alerts** (one alert-class per commit; list = `.cleanup-alerts.txt`).
