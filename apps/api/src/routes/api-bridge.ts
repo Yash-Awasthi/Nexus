@@ -119,6 +119,7 @@ import { Pool } from "pg";
 
 import { emitAuditEvent } from "../lib/audit-emitter.js";
 import { sha256hex } from "../lib/crypto-utils.js";
+import { pinnedFetch } from "../lib/pinned-fetch.js";
 import { resolveUserProviderKey, buildUserDriverRegistry } from "../lib/provider-keys.js";
 import { makeUserRateLimitPreHandler } from "../lib/rate-limiter.js";
 import { encryptSecret, SecretCryptoUnavailableError } from "../lib/secret-crypto.js";
@@ -8087,7 +8088,10 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
       if (!wh?.active) return reply.code(404).send({ error: "not_found_or_inactive" });
       let delivered = false;
       try {
-        const r = await fetch(wh.url, {
+        // Socket-pinned fetch: validateWebhookUrl only runs at create/update time —
+        // a hostname that re-resolves to a private/IMDS address between then and
+        // this trigger-time call (DNS rebinding) would bypass that static check.
+        const r = await pinnedFetch(wh.url, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
