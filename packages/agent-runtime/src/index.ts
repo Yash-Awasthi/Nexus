@@ -2150,6 +2150,15 @@ export interface ProgrammaticToolOptions {
   maxOutputChars?: number;
   /** Tool names the script may not call (the PTC tool always excludes itself). */
   exclude?: readonly string[];
+  /**
+   * Run the script in a worker_thread sandbox instead of in-process (§7.2). The
+   * script executes in a separate OS thread; `call()` is bridged back over local
+   * RPC so tools still run gated in this thread, and only the script's stdout
+   * re-enters context. A synchronous infinite loop is force-killed on timeout
+   * (impossible in-process). Falls back to in-process when worker_threads is
+   * unavailable. Off by default (back-compatible).
+   */
+  sandbox?: boolean;
 }
 
 const PTC_DEFAULT_NAME = "run_tool_script";
@@ -2201,6 +2210,21 @@ export function createProgrammaticToolTool(opts: ProgrammaticToolOptions): Runti
     handler: async (args, ctx) => {
       const code = String(args.code ?? "");
       if (!code.trim()) return "Error: empty script";
+
+      // Sandbox path (§7.2): run in a worker_thread; `call()` bridges back over
+      // local RPC (still gated in this thread) and only stdout re-enters context.
+      if (opts.sandbox) {
+        const { runToolScript } = await import("./ptc-sandbox.js");
+        return runToolScript(code, {
+          toolSet: opts.toolSet,
+          ...(opts.permissionGate ? { permissionGate: opts.permissionGate } : {}),
+          ...(ctx ? { ctx } : {}),
+          timeoutMs,
+          maxOutputChars: maxOutput,
+          maxCalls,
+          exclude: [...excluded],
+        });
+      }
 
       const outputs: string[] = [];
       let calls = 0;

@@ -79,6 +79,8 @@ export interface AgentRunPayload {
   disableCompaction?: boolean;
   /** Disable the programmatic-tool-calling (PTC) meta-tool (on by default). */
   disablePtc?: boolean;
+  /** Run PTC scripts in a worker_thread sandbox (hard timeout for sync loops). Default false. */
+  ptcSandbox?: boolean;
   /** Run a forked post-run learning review (off by default — extra LLM call). */
   review?: boolean;
   /** Context token budget for compaction (default: model window). */
@@ -366,7 +368,13 @@ export async function handleAgentRunJob(
   // results stay out of context). Added last so it advertises every other tool;
   // gated by the same permission gate as direct calls.
   if (!payload.disablePtc) {
-    toolSet.add(createProgrammaticToolTool({ toolSet, permissionGate }));
+    toolSet.add(
+      createProgrammaticToolTool({
+        toolSet,
+        permissionGate,
+        ...(payload.ptcSandbox ? { sandbox: true } : {}),
+      }),
+    );
   }
 
   const compaction = payload.disableCompaction

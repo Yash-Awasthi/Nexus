@@ -36,6 +36,76 @@ export interface PtcSandboxOptions {
   maxOutputChars?: number;
 }
 
+/** JSON-stringify a value for `print`, never throwing on cycles. */
+function ptcSafeJson(v: unknown): string {
+  try {
+    return JSON.stringify(v);
+  } catch {
+    return String(v);
+  }
+}
+
+/**
+ * Shared PTC executor — the single source of truth for the RPC + stdout-only
+ * contract. Runs the model-authored script with two injected primitives:
+ *   - `call(name, args)` — bridged to `call` (in the sandbox: an RPC to the
+ *     parent thread; in the fallback: a direct gated invoke). Intermediate tool
+ *     outputs stay inside the script.
+ *   - `print(...)`        — the ONLY channel back to the model; captured stdout.
+ * A `return`ed value is appended as `[return] …`. Errors surface as `[error] …`
+ * alongside whatever was printed. Nothing else re-enters the conversation.
+ */
+export async function executePtcScript(
+  code: string,
+  context: Record<string, unknown>,
+  call: (name: string, args: Record<string, unknown>) => Promise<unknown>,
+  opts: { timeoutMs?: number; signal?: AbortSignal } = {},
+): Promise<string> {
+  const outputs: string[] = [];
+  const print = (...vals: unknown[]): void => {
+    outputs.push(vals.map((v) => (typeof v === "string" ? v : ptcSafeJson(v))).join(" "));
+  };
+  const bridgedCall = async (toolName: unknown, toolArgs?: unknown): Promise<unknown> => {
+    if (opts.signal?.aborted) throw new Error("aborted");
+    return call(String(toolName), (toolArgs ?? {}) as Record<string, unknown>);
+  };
+
+  const extraNames = Object.keys(context);
+  const extraVals = Object.values(context);
+  const AsyncFn = (async () => {}).constructor as new (
+    ...args: string[]
+  ) => (...callArgs: unknown[]) => Promise<unknown>;
+  const fn = new AsyncFn("call", "print", ...extraNames, code);
+
+  let returnLine = "";
+  const run = (async (): Promise<void> => {
+    const ret = await fn(bridgedCall, print, ...extraVals);
+    if (ret !== undefined) returnLine = `\n[return] ${typeof ret === "string" ? ret : ptcSafeJson(ret)}`;
+  })();
+
+  try {
+    if (opts.timeoutMs) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(`script timed out after ${opts.timeoutMs}ms`)), opts.timeoutMs);
+        timer?.unref?.();
+      });
+      try {
+        await Promise.race([run, timeout]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    } else {
+      await run;
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const partial = outputs.join("\n");
+    return `${partial}${partial ? "\n" : ""}[error] ${msg}`;
+  }
+  return (outputs.join("\n") + returnLine).trim() || "(script produced no output)";
+}
+
 // ── Worker-side execution ─────────────────────────────────────────────────────
 //
 // When this file is loaded as a worker (via `new Worker(filename)`), the
@@ -47,78 +117,27 @@ function workerEntry(): void {
 
   const { code, context } = workerData as { code: string; context: Record<string, unknown> };
 
-  const outputs: string[] = [];
-  const print = (...vals: unknown[]): void => {
-    outputs.push(
-      vals
-        .map((v) => {
-          if (typeof v === "string") return v;
-          try {
-            return JSON.stringify(v);
-          } catch {
-            return String(v);
-          }
-        })
-        .join(" "),
-    );
-  };
-
-  // call() is a stub in the worker — the real tool invocation happens in the
-  // parent thread via message passing. The worker sends {type:"call", name, args}
-  // and awaits a {type:"result", value|error} response.
-  const call = async (toolName: unknown, toolArgs?: unknown): Promise<unknown> => {
-    return new Promise((resolve, reject) => {
+  // call() bridges to the parent thread via message passing (local RPC): the
+  // worker sends {type:"call", name, args} and awaits a {type:"call_result", …}.
+  // The real, permission-gated tool invocation happens in the parent.
+  const call = (name: string, args: Record<string, unknown>): Promise<unknown> =>
+    new Promise((resolve, reject) => {
       const handle = (msg: unknown): void => {
         const m = msg as { type: string; result?: unknown; error?: string };
         if (m.type === "call_result") {
           parentPort!.off("message", handle);
-          if (m.error) {
-            reject(new Error(m.error));
-          } else {
-            resolve(m.result);
-          }
+          if (m.error) reject(new Error(m.error));
+          else resolve(m.result);
         }
       };
       parentPort!.on("message", handle);
-      parentPort!.postMessage({
-        type: "call",
-        name: String(toolName),
-        args: toolArgs ?? {},
-      });
+      parentPort!.postMessage({ type: "call", name, args });
     });
-  };
 
-  const extraNames = Object.keys(context);
-  const extraVals = Object.values(context);
-
-  // Derive AsyncFunction constructor
-  const AsyncFn = (async () => {}).constructor as new (
-    ...args: string[]
-  ) => (...callArgs: unknown[]) => Promise<unknown>;
-
-  const fn = new AsyncFn("call", "print", ...extraNames, code);
-  const returnLine: string[] = [];
-
-  void fn(call, print, ...extraVals)
-    .then((ret: unknown) => {
-      if (ret !== undefined) {
-        const s = typeof ret === "string" ? ret : JSON.stringify(ret);
-        returnLine.push(`\n[return] ${s}`);
-      }
-      return undefined;
-    })
-    .catch((e: unknown) => {
-      const msg = e instanceof Error ? e.message : String(e);
-      returnLine.push(`\n[error] ${msg}`);
-      return undefined;
-    })
-    .finally(() => {
-      const combined = (outputs.join("\n") + returnLine.join("")).trim();
-      parentPort!.postMessage({
-        type: "done",
-        output: combined || "(script produced no output)",
-      });
-    });
+  void executePtcScript(code, context, call).then((output) => {
+    parentPort!.postMessage({ type: "done", output });
+    return undefined;
+  });
 }
 
 // Execute worker entry when running as a worker
@@ -282,21 +301,34 @@ export async function runToolScript(
     timeoutMs?: number;
     maxOutputChars?: number;
     signal?: AbortSignal;
+    /** Max tool calls the script may make (parity with in-process PTC). */
+    maxCalls?: number;
+    /** Tool names the script may not call. */
+    exclude?: readonly string[];
   },
 ): Promise<string> {
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const maxOutput = opts.maxOutputChars ?? DEFAULT_MAX_OUTPUT;
+  const maxCalls = opts.maxCalls ?? 100;
+  const excluded = new Set<string>(opts.exclude ?? []);
 
   // Build context with callable tools list (same as in-process PTC)
-  const toolNames = opts.toolSet.list().map((t) => ({ name: t.name, description: t.description }));
+  const toolNames = opts.toolSet
+    .list()
+    .filter((t) => !excluded.has(t.name))
+    .map((t) => ({ name: t.name, description: t.description }));
 
   const context: Record<string, unknown> = {
     tools: toolNames,
   };
 
-  // Bridge worker tool calls -> main-thread gatedInvoke
+  // Bridge worker tool calls -> main-thread gatedInvoke, enforcing the same
+  // call-count + exclusion limits the in-process meta-tool applies.
+  let calls = 0;
   const onToolCall = async (name: string, args: Record<string, unknown>): Promise<unknown> => {
     if (opts.ctx?.signal?.aborted) throw new Error("aborted");
+    if (excluded.has(name)) throw new Error(`tool '${name}' is not callable from a script`);
+    if (++calls > maxCalls) throw new Error(`script exceeded ${maxCalls} tool calls`);
     return gatedInvoke(opts.toolSet, opts.permissionGate, name, args, {
       sessionId: opts.ctx?.sessionId,
       toolCallId: opts.ctx?.toolCallId,
@@ -335,74 +367,35 @@ async function runToolScriptFallback(
     timeoutMs?: number;
     maxOutputChars?: number;
     signal?: AbortSignal;
+    maxCalls?: number;
+    exclude?: readonly string[];
   },
 ): Promise<string> {
-  const AsyncFn = (async () => {}).constructor as new (
-    ...args: string[]
-  ) => (...callArgs: unknown[]) => Promise<unknown>;
-
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const maxOutput = opts.maxOutputChars ?? DEFAULT_MAX_OUTPUT;
+  const maxCalls = opts.maxCalls ?? 100;
+  const excluded = new Set<string>(opts.exclude ?? []);
 
-  const outputs: string[] = [];
-  const print = (...vals: unknown[]): void => {
-    outputs.push(
-      vals
-        .map((v) => {
-          if (typeof v === "string") return v;
-          try {
-            return JSON.stringify(v);
-          } catch {
-            return String(v);
-          }
-        })
-        .join(" "),
-    );
+  const toolNames = opts.toolSet
+    .list()
+    .filter((t) => !excluded.has(t.name))
+    .map((t) => ({ name: t.name, description: t.description }));
+
+  let calls = 0;
+  const call = async (name: string, args: Record<string, unknown>): Promise<unknown> => {
+    if (excluded.has(name)) throw new Error(`tool '${name}' is not callable from a script`);
+    if (++calls > maxCalls) throw new Error(`script exceeded ${maxCalls} tool calls`);
+    return gatedInvoke(opts.toolSet, opts.permissionGate, name, args, {
+      sessionId: opts.ctx?.sessionId,
+      toolCallId: opts.ctx?.toolCallId,
+      signal: opts.ctx?.signal,
+      workingDir: opts.ctx?.workingDir,
+    });
   };
 
-  const call = async (toolName: unknown, toolArgs?: unknown): Promise<unknown> => {
-    if (opts.ctx?.signal?.aborted) throw new Error("aborted");
-    const tn = String(toolName);
-    return gatedInvoke(
-      opts.toolSet,
-      opts.permissionGate,
-      tn,
-      (toolArgs ?? {}) as Record<string, unknown>,
-      {
-        sessionId: opts.ctx?.sessionId,
-        toolCallId: opts.ctx?.toolCallId,
-        signal: opts.ctx?.signal,
-        workingDir: opts.ctx?.workingDir,
-      },
-    );
-  };
-
-  const toolNames = opts.toolSet.list().map((t) => ({ name: t.name, description: t.description }));
-
-  const fn = new AsyncFn("call", "print", "tools", code);
-
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => reject(new Error(`script timed out after ${timeoutMs}ms`)), timeoutMs);
-    if (timer && typeof (timer as NodeJS.Timeout).unref === "function") {
-      (timer as NodeJS.Timeout).unref();
-    }
+  const out = await executePtcScript(code, { tools: toolNames }, call, {
+    timeoutMs,
+    ...(opts.ctx?.signal ? { signal: opts.ctx.signal } : {}),
   });
-
-  try {
-    const ret = await Promise.race([fn(call, print, toolNames), timeout]);
-
-    let returnLine = "";
-    if (ret !== undefined) {
-      returnLine = `\n[return] ${typeof ret === "string" ? ret : JSON.stringify(ret)}`;
-    }
-    const combined = (outputs.join("\n") + returnLine).trim();
-    return clipOutput(combined || "(script produced no output)", maxOutput);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    const partial = outputs.join("\n");
-    return clipOutput(`${partial}${partial ? "\n" : ""}[error] ${msg}`, maxOutput);
-  } finally {
-    clearTimeout(timer);
-  }
+  return clipOutput(out, maxOutput);
 }
