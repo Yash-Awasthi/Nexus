@@ -113,11 +113,13 @@ Updated: <YYYY-MM-DD>
 Near-term, in priority order (then continue in section order):
 
 1. **§4.1** wire `AccountPool` into dispatch — activates already-written pool + vault + routes.
-2. **§8.1** Drive isolation spike (decision gate for all of §8).
-3. **§5.1** usage-analytics UI (last piece of the metering loop).
-4. **§9.1 → §9.2** extend pinned-fetch to remaining sinks, then clear CodeQL alerts.
-5. Then §2 → §3 → rest of §4 → §6 → §7 → rest of §8 → rest of §9 → §10 → §11 → §12 → §13, with
-   §14/§15 as long-horizon tracks.
+2. **§5.1** usage-analytics UI (last piece of the metering loop).
+3. **§9.1 → §9.2** extend pinned-fetch to remaining sinks, then clear CodeQL alerts.
+4. **§8.1** Drive isolation spike — **DO AT THE END** (user-deferred 2026-07-02: throwaway
+   host-mutating spike that yields no committable code + costs tokens; run it last, after every
+   code-only item lands). Decision-gates the rest of §8.
+5. Then §2 → §3 → rest of §4 → §6 → §7 → §9 → §10 → §11 → §12 → §13 → §8 (§8.1 spike + §8.2–§8.6
+   last), with §14/§15 as long-horizon tracks.
 
 Item legend: **Files** = touch these · **Mirror** = existing pattern to copy · **Do** = the
 change, in order · **Test** = exact command · **Done** = acceptance check · **Gate** = needs
@@ -551,8 +553,10 @@ Baseline: `@nexus/sandbox` (`packages/sandbox/src/index.ts`, 442 lines: `execute
 `QUOTA_BYTES = 512MB`, status/exec/ls/upload-with-413/delete, Docker exec fallback) behind
 auth + rate limits.
 
-- **8.1 Isolation spike** *(Gate — do FIRST in §8; decision gate for the rest).*
-  **Judged 2026-07-02 — hardware READY, spike NOT YET RUN (skipped this session).** `/dev/kvm` is
+- **8.1 Isolation spike** *(Gate — **DO AT THE END** of the whole roadmap; decision gate for the
+  rest of §8).* **User-deferred 2026-07-02:** run this spike **last**, after all code-only items
+  (§9.3–§9.5, §10–§13) land — it's throwaway, host-mutating, yields no committable code, and burns
+  tokens, so it's not worth interleaving. **Judged 2026-07-02 — hardware READY, spike NOT YET RUN.** `/dev/kvm` is
   present and the CPU exposes vmx/svm (40 cores) — the old KVM-host blocker has cleared. Remaining
   gap: `firecracker`/`jailer` binaries are **not installed**, and this is a throwaway, live,
   host-mutating spike (install Firecracker + jailer, fetch a `vmlinux` kernel + an ext4 rootfs,
