@@ -23,6 +23,7 @@ import { randomUUID } from "crypto";
 import { writeFile, unlink } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
+import { fileURLToPath } from "url";
 
 import { defineAdapter, requireEnv, type IExecutionContext } from "@nexus/plugin-sdk";
 
@@ -377,7 +378,43 @@ export interface DockerSandboxConfig {
   cpuPercent?: number;
   /** Maximum number of processes the container may spawn. Default: 64 */
   pidsLimit?: number;
+  /**
+   * Absolute path to a seccomp profile JSON applied via
+   * `--security-opt seccomp=<path>`. Default: the checked-in
+   * `seccomp-default.json` (default-allow denylist of dangerous syscalls).
+   */
+  seccompProfilePath?: string;
+  /**
+   * Mount the container root filesystem read-only (`--read-only`). A writable
+   * scratch tmpfs is provided at {@link SCRATCH_DIR} and pointed to via TMPDIR.
+   * Default: true.
+   */
+  readOnlyRootfs?: boolean;
+  /**
+   * Size in megabytes of the writable scratch tmpfs mounted at
+   * {@link SCRATCH_DIR}. Default: 64.
+   */
+  scratchMb?: number;
+  /**
+   * UID:GID the container process runs as (`--user`). Running as a non-root
+   * user is the container-level half of user-namespace de-privileging; the
+   * host complement is daemon-level `userns-remap` (see class docs).
+   * Default: "1000:1000".
+   */
+  runAsUser?: string;
 }
+
+/**
+ * Absolute path to the checked-in seccomp profile. Resolved relative to this
+ * module so it works from both `src` (vitest) and built `dist` — both sit one
+ * directory below the package root where `seccomp-default.json` lives.
+ */
+export const SECCOMP_PROFILE_PATH = fileURLToPath(
+  new URL("../seccomp-default.json", import.meta.url),
+);
+
+/** In-container writable scratch directory (tmpfs) used when the rootfs is read-only. */
+export const SCRATCH_DIR = "/nexus-scratch";
 
 /**
  * Build the `docker run` argument list for a given config.
@@ -390,8 +427,12 @@ export function buildDockerArgs(config: DockerSandboxConfig = {}): string[] {
   const cpuPercent = Math.min(100, Math.max(1, config.cpuPercent ?? 50));
   const cpuPeriod = 100_000;
   const cpuQuota = Math.floor(cpuPeriod * (cpuPercent / 100));
+  const seccompProfilePath = config.seccompProfilePath ?? SECCOMP_PROFILE_PATH;
+  const readOnlyRootfs = config.readOnlyRootfs ?? true;
+  const scratchMb = config.scratchMb ?? 64;
+  const runAsUser = config.runAsUser ?? "1000:1000";
 
-  return [
+  const args = [
     "run",
     "--rm",
     "--network=none", // no outbound network access
@@ -399,15 +440,34 @@ export function buildDockerArgs(config: DockerSandboxConfig = {}): string[] {
     `--pids-limit=${pidsLimit}`, // limit fork bombs
     "--cap-drop=ALL", // drop all Linux capabilities
     "--security-opt=no-new-privileges", // prevent privilege escalation
+    // Syscall filter: default-allow denylist neutralising namespace/mount,
+    // kernel-module, tracing, key-management and host time/reboot surfaces.
+    `--security-opt=seccomp=${seccompProfilePath}`,
+    // Run as a non-root UID:GID — container-level user de-privileging.
+    `--user=${runAsUser}`,
     `--cpu-period=${cpuPeriod}`,
     `--cpu-quota=${cpuQuota}`,
+  ];
+
+  if (readOnlyRootfs) {
+    // Immutable rootfs. A writable scratch tmpfs is mounted at SCRATCH_DIR and
+    // advertised via TMPDIR so tsx/esbuild/python temp writes land there rather
+    // than on the now read-only rootfs. nosuid/nodev harden the scratch mount.
+    args.push("--read-only");
+    args.push(`--tmpfs=${SCRATCH_DIR}:rw,nosuid,nodev,size=${scratchMb}m`);
+    args.push(`--env=TMPDIR=${SCRATCH_DIR}`);
+  }
+
+  args.push(
     // Mount system tmpdir so TypeScript temp files created by prepareExecution
     // are accessible inside the container with read-only semantics.
     `-v`,
     `${tmpdir()}:${tmpdir()}:ro`,
     "-i", // keep stdin open for piped input
     image,
-  ];
+  );
+
+  return args;
 }
 
 /**
@@ -419,6 +479,13 @@ export function buildDockerArgs(config: DockerSandboxConfig = {}): string[] {
  *   • All Linux capabilities dropped
  *   • No privilege escalation (no-new-privileges)
  *   • PID limit to prevent fork bombs
+ *   • seccomp syscall filter (denylist of dangerous syscalls)
+ *   • Read-only rootfs + a bounded writable scratch tmpfs
+ *   • Non-root container user (--user)
+ *
+ * Host complement (daemon-level, not expressible as `docker run` args): enable
+ * `userns-remap` in the Docker daemon so container root maps to an unprivileged
+ * host UID. Combined with `--user` above, workloads run doubly de-privileged.
  *
  * Requires Docker to be installed and accessible on the host PATH.
  * Falls back gracefully: if Docker is unavailable the spawned process
