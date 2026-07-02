@@ -700,9 +700,17 @@ Board↔Graph toggle in `build.tsx`; orphan `parentId` → root with an orphans 
   (`mcp_servers` CRUD + `/test`, which already goes through `pinnedFetch`; mig `0010`).
   `/test` is a live outbound call — **Gate** to exercise for real, mock it in tests. Done:
   CRUD + test-connection work.
-- **10.4 Workflow picker polish.** Files: `apps/ui/app/routes/workflows.tsx` (864 lines) +
-  `@lobehub/icons` (new dep — not yet in `apps/ui/package.json`). Do: provider/model icons;
-  feed models.dev metadata (§1.5 table) into the picker. Done: icons render.
+- **10.4 Workflow picker polish.** **Done this branch (commit `da4fcad`).** Added `@lobehub/icons`
+  to `apps/ui/package.json` and replaced the hardcoded 5-option model `<select>` in the workflow
+  node `PropertiesPanel` with a shadcn `Select` fed from `GET /api/v1/gateway/models` (the driver
+  registry, seeded from models.dev per §1.5) — `FALLBACK_MODELS` until it responds / on error/401.
+  Each option renders a `ProviderIcon` (mono) + model id (+ "(no key)" when unavailable); the trigger
+  shows a `ModelIcon`. Selection now persists onto `node.data.model` via a new `handleUpdateModel`
+  (mirrors `handleUpdateLabel`). Models are fetched once in `WorkflowEditor` and passed down. UI
+  typecheck + `pnpm --filter @nexus/ui build` green; @lobehub/icons bundles cleanly (pre-existing
+  lint debt in the 864-line file left untouched). Files: `apps/ui/app/routes/workflows.tsx` +
+  `@lobehub/icons`. Do: provider/model icons; feed models.dev metadata (§1.5 table) into the picker.
+  Done: icons render.
 - **10.5 Medium-term pages** (each its own item; backends already mature): voice (`voice.tsx`),
   image-gen Sandbox tab, knowledge-graph viz, prediction-markets dashboard, gauntlet benchmark,
   RLHF thumbs → `rlhf-pipeline`, eval-runner UI.
