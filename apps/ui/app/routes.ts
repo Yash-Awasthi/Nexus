@@ -78,6 +78,7 @@ export default [
   route("web-search", "routes/web-search.tsx"),
   route("rooms", "routes/rooms.tsx"),
   route("sandbox", "routes/sandbox.tsx"),
+  route("voice", "routes/voice.tsx"),
   route("agents", "routes/agents.tsx"),
   route("api-tokens", "routes/api-tokens.tsx"),
   route("provider-keys", "routes/provider-keys.tsx"),
