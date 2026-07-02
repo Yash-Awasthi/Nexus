@@ -13,6 +13,7 @@
  * POST /api/v1/billing/keys            — create a new API key
  * DELETE /api/v1/billing/keys/:id      — revoke a key
  * GET  /api/v1/billing/quota           — current quota status
+ * GET  /api/v1/billing/usage/by-model-day — usage grouped by model + day (month-to-date)
  */
 
 import type { FastifyInstance, FastifyReply } from "fastify";
@@ -331,6 +332,61 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
           cost: (row?.cost ?? 0) / 1_000_000,
           periodStart,
           periodEnd,
+        });
+      } catch (err: unknown) {
+        return reply.code(500).send({ error: (err as Error).message });
+      }
+    },
+  );
+
+  /** GET /billing/usage/by-model-day — month-to-date usage grouped by model + day */
+  app.get(
+    "/billing/usage/by-model-day",
+    {
+      schema: {
+        response: {
+          200: { type: "object", additionalProperties: true },
+          500: { type: "object", additionalProperties: true },
+        },
+      },
+      preHandler: requireAuth,
+    },
+    async (_req, reply) => {
+      const now = new Date();
+      const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+      if (!DB_AVAILABLE) {
+        return reply.send({ periodStart, byModelDay: [] });
+      }
+
+      try {
+        const { db } = await import("@nexus/db");
+        const { usageEvents } = await import("@nexus/db/schema");
+        const { sql } = await import("drizzle-orm");
+        const rows = await db
+          .select({
+            model: usageEvents.model,
+            day: sql<string>`to_char(${usageEvents.createdAt}, 'YYYY-MM-DD')`,
+            promptTokens: sql<number>`coalesce(sum(${usageEvents.promptTokens}), 0)`,
+            completionTokens: sql<number>`coalesce(sum(${usageEvents.completionTokens}), 0)`,
+            costUsd: sql<number>`coalesce(sum(${usageEvents.costUsd}), 0)`,
+            requests: sql<number>`count(*)`,
+          })
+          .from(usageEvents)
+          .where(sql`${usageEvents.createdAt} >= ${periodStart}`)
+          .groupBy(usageEvents.model, sql`to_char(${usageEvents.createdAt}, 'YYYY-MM-DD')`)
+          .orderBy(sql`to_char(${usageEvents.createdAt}, 'YYYY-MM-DD') desc`);
+
+        return reply.send({
+          periodStart,
+          byModelDay: rows.map((r) => ({
+            model: r.model ?? "unknown",
+            day: r.day,
+            promptTokens: r.promptTokens,
+            completionTokens: r.completionTokens,
+            costUsd: r.costUsd,
+            requests: r.requests,
+          })),
         });
       } catch (err: unknown) {
         return reply.code(500).send({ error: (err as Error).message });
