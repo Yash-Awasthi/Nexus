@@ -31,6 +31,7 @@ import type { FastifyInstance } from "fastify";
 
 import { emitAuditEvent } from "../lib/audit-emitter.js";
 import { sha256hex as _sha256hex } from "../lib/crypto-utils.js";
+import { pinnedFetch } from "../lib/pinned-fetch.js";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
 import { getSharedKV } from "../lib/shared-kv.js";
 
@@ -107,7 +108,10 @@ async function fetchDiscovery(issuer: string): Promise<OidcDiscovery> {
     return _discoveryCache.doc;
   }
   const url = `${issuer.replace(/\/$/, "")}/.well-known/openid-configuration`;
-  const res = await fetch(url);
+  // NEXUS_OIDC_ISSUER is admin-configured, not request-time input, but the
+  // call itself fires on every user login — pin the socket to the validated
+  // DNS answer to close the DNS-rebinding window (defense in depth).
+  const res = await pinnedFetch(url);
   if (!res.ok) throw new Error(`OIDC discovery fetch failed: ${res.status} ${url}`);
   const doc = (await res.json()) as OidcDiscovery;
   _discoveryCache = { issuer, doc, cachedAt: now };
@@ -153,7 +157,9 @@ async function fetchJwks(uri: string, forceRefresh = false): Promise<JwkSet> {
   ) {
     return _jwksCache.set;
   }
-  const res = await fetch(uri);
+  // uri comes from the trusted discovery doc, but pin the socket anyway —
+  // same DNS-rebinding defense as fetchDiscovery above.
+  const res = await pinnedFetch(uri);
   if (!res.ok) throw new Error(`JWKS fetch failed: ${res.status} ${uri}`);
   const set = (await res.json()) as JwkSet;
   _jwksCache = { uri, set, cachedAt: now };
@@ -464,7 +470,9 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
         client_id: cfg.clientId!,
         client_secret: cfg.clientSecret!,
       });
-      const res = await fetch(discovery.token_endpoint, {
+      // token_endpoint comes from the trusted discovery doc — pin the socket
+      // anyway, same DNS-rebinding defense as fetchDiscovery above.
+      const res = await pinnedFetch(discovery.token_endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
