@@ -13,6 +13,10 @@
 
 import { Queue, type ConnectionOptions } from "bullmq";
 
+import {
+  DrizzleOrchestrationRunStore,
+  reenqueueOrchestrationRuns,
+} from "./handlers/orchestration-store.js";
 import { SignalNotifyListener } from "./workers/signal-notify-listener.js";
 import { SignalWorker } from "./workers/signal-worker.js";
 import { createTaskWorkers } from "./workers/task-worker.js";
@@ -86,6 +90,43 @@ async function bootstrapRepeatableJobs(connection: ConnectionOptions): Promise<v
   }
 }
 
+/**
+ * Recover in-flight orchestration runs after a restart (§6.1): reload every
+ * non-terminal `orchestration_runs` row and re-enqueue its job from the stored
+ * payload. Non-fatal — a DB/Redis hiccup here must not block worker startup.
+ */
+async function recoverOrchestrationRuns(connection: ConnectionOptions): Promise<void> {
+  if (!process.env.DATABASE_URL || !process.env.REDIS_URL) return;
+  const high = new Queue("nexus-high", { connection });
+  try {
+    const requeued = await reenqueueOrchestrationRuns(
+      new DrizzleOrchestrationRunStore(),
+      async (jobName, payload) => {
+        await high.add(jobName, payload);
+      },
+    );
+    if (requeued.length > 0) {
+      console.log(
+        JSON.stringify({
+          level: "info",
+          event: "worker.orchestration-runs-recovered",
+          count: requeued.length,
+        }),
+      );
+    }
+  } catch (err) {
+    console.warn(
+      JSON.stringify({
+        level: "warn",
+        event: "worker.orchestration-recovery-failed",
+        error: String(err),
+      }),
+    );
+  } finally {
+    await high.close();
+  }
+}
+
 async function main(): Promise<void> {
   console.log(JSON.stringify({ level: "info", event: "worker.starting", redis: REDIS_URL }));
 
@@ -93,6 +134,9 @@ async function main(): Promise<void> {
 
   // Bootstrap repeatable feed-poll jobs (idempotent — safe to call on every boot)
   await bootstrapRepeatableJobs(connection);
+
+  // Recover orchestration runs interrupted by a previous restart (§6.1)
+  await recoverOrchestrationRuns(connection);
 
   // Start BullMQ queue workers
   const workers = createTaskWorkers(connection);

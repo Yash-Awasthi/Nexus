@@ -85,6 +85,27 @@
       "when": 1718000000011,
       "tag": "0011_agent_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1718000000012,
+      "tag": "0010_usage_token_breakdown",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1718000000013,
+      "tag": "0012_oauth_credentials",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1718000000014,
+      "tag": "0013_orchestration_runs",
+      "breakpoints": true
     }
   ]
 }

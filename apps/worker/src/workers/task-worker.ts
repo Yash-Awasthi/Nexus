@@ -51,12 +51,16 @@ import {
   handleOrchestrationJob,
   type OrchestrationJobPayload,
 } from "../handlers/orchestration-handler.js";
+import { DrizzleOrchestrationRunStore } from "../handlers/orchestration-store.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const QUEUE_HIGH = "nexus-high";
 const QUEUE_MEDIUM = "nexus-medium";
 const QUEUE_LOW = "nexus-low";
+
+// Shared persistence store for orchestration runs (§6.1) — one instance per worker.
+const orchestrationStore = new DrizzleOrchestrationRunStore();
 
 // ── Job dispatcher ────────────────────────────────────────────────────────────
 
@@ -96,7 +100,9 @@ async function processJob(job: Job): Promise<unknown> {
 
     // ── Parallel multi-agent worktree fan-out ─────────────────────────────────
     case "orchestration.run":
-      result = await handleOrchestrationJob(data as OrchestrationJobPayload);
+      result = await handleOrchestrationJob(data as OrchestrationJobPayload, {
+        store: orchestrationStore,
+      });
       break;
 
     // ── Async package backbone ────────────────────────────────────────────────

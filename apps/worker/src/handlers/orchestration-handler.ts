@@ -20,6 +20,12 @@ import {
 
 import { handleAgentRunJob } from "./agent-handler.js";
 import { handleCouncilJob } from "./council-handler.js";
+import { NullOrchestrationRunStore, type OrchestrationRunStore } from "./orchestration-store.js";
+
+/** Injectable deps — the persistence store defaults to a no-op (tests inject a fake). */
+export interface OrchestrationDeps {
+  store?: OrchestrationRunStore;
+}
 
 export interface OrchestrationModel {
   /** Unique candidate id (defaults to provider/model). */
@@ -53,12 +59,25 @@ interface CouncilResultShape {
   result?: { outcome?: string; consensus?: number; dissent?: number };
 }
 
-export async function handleOrchestrationJob(payload: OrchestrationJobPayload): Promise<unknown> {
+export async function handleOrchestrationJob(
+  payload: OrchestrationJobPayload,
+  deps: OrchestrationDeps = {},
+): Promise<unknown> {
   if (!payload.task?.trim()) throw new Error("orchestration: task is required");
   if (!payload.repoPath) throw new Error("orchestration: repoPath is required");
   if (!payload.models?.length) throw new Error("orchestration: at least one model is required");
 
+  const store = deps.store ?? new NullOrchestrationRunStore();
   const runId = payload.taskId ?? `orc-${Date.now()}`;
+
+  // Stage transition: mark the run running + stash the payload so a worker restart
+  // can re-enqueue it from persisted state.
+  await store.upsert({
+    id: runId,
+    status: "running",
+    task: payload.task,
+    payload: payload as unknown as Record<string, unknown>,
+  });
   const agents: AgentSpec[] = payload.models.map((m, i) => ({
     id: m.id ?? `${m.provider ?? "default"}/${m.model ?? "default"}#${i}`,
     model: m.model ?? "",
@@ -67,45 +86,67 @@ export async function handleOrchestrationJob(payload: OrchestrationJobPayload): 
   // Map each agent spec back to its provider/model for the runner.
   const specMeta = new Map(agents.map((a, i) => [a.id, payload.models[i]!]));
 
-  const result = await orchestrate({
-    runId,
-    task: payload.task,
-    agents,
-    baseRef: payload.baseRef ?? "HEAD",
-    merge: payload.merge ?? false,
-    worktrees: new GitWorktreeManager(payload.repoPath),
+  let result;
+  try {
+    result = await orchestrate({
+      runId,
+      task: payload.task,
+      agents,
+      baseRef: payload.baseRef ?? "HEAD",
+      merge: payload.merge ?? false,
+      worktrees: new GitWorktreeManager(payload.repoPath),
 
-    // Run the real coding-agent loop, confined to the agent's worktree dir.
-    runner: async ({ task, spec, workingDir, signal }) => {
-      const meta = specMeta.get(spec.id);
-      const res = (await handleAgentRunJob({
-        instruction: task,
-        provider: meta?.provider,
-        model: meta?.model,
-        systemPrompt: payload.systemPrompt,
-        maxSteps: payload.maxSteps,
-        workspaceDir: workingDir,
-      })) as { content?: string; summary?: string };
-      void signal;
-      return { summary: res.summary ?? res.content ?? "" };
-    },
+      // Run the real coding-agent loop, confined to the agent's worktree dir.
+      runner: async ({ task, spec, workingDir, signal }) => {
+        const meta = specMeta.get(spec.id);
+        const res = (await handleAgentRunJob({
+          instruction: task,
+          provider: meta?.provider,
+          model: meta?.model,
+          systemPrompt: payload.systemPrompt,
+          maxSteps: payload.maxSteps,
+          workspaceDir: workingDir,
+        })) as { content?: string; summary?: string };
+        void signal;
+        return { summary: res.summary ?? res.content ?? "" };
+      },
 
-    // Score each candidate's diff with the council; consensus → 0..1 score.
-    scorer: scoreByConfidence(async (task: string, candidate: Candidate) => {
-      const verdict = (await handleCouncilJob({
-        proposal: {
-          title: `Candidate ${candidate.spec.id}`,
-          description:
-            `Task: ${task}\n\nThe following diff was produced by ${candidate.spec.model}. ` +
-            `Does it correctly and cleanly solve the task?\n\n` +
-            candidate.diff.slice(0, 12_000),
-        },
-      })) as CouncilResultShape;
-      const r = verdict.result;
-      if (!r) return 0;
-      // approved → reward by consensus; otherwise penalise by dissent.
-      return r.outcome === "approved" ? (r.consensus ?? 0.5) : Math.max(0, 0.5 - (r.dissent ?? 0.5));
-    }),
+      // Score each candidate's diff with the council; consensus → 0..1 score.
+      scorer: scoreByConfidence(async (task: string, candidate: Candidate) => {
+        const verdict = (await handleCouncilJob({
+          proposal: {
+            title: `Candidate ${candidate.spec.id}`,
+            description:
+              `Task: ${task}\n\nThe following diff was produced by ${candidate.spec.model}. ` +
+              `Does it correctly and cleanly solve the task?\n\n` +
+              candidate.diff.slice(0, 12_000),
+          },
+        })) as CouncilResultShape;
+        const r = verdict.result;
+        if (!r) return 0;
+        // approved → reward by consensus; otherwise penalise by dissent.
+        return r.outcome === "approved"
+          ? (r.consensus ?? 0.5)
+          : Math.max(0, 0.5 - (r.dissent ?? 0.5));
+      }),
+    });
+  } catch (err) {
+    // Stage transition: failed. Persist before rethrowing so recovery sees a
+    // terminal row (not a stuck "running" one that would loop on every restart).
+    await store.upsert({
+      id: runId,
+      status: "failed",
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
+
+  // Stage transition: completed — persist candidates + winner for the compare UI.
+  await store.upsert({
+    id: runId,
+    status: "completed",
+    candidates: result.candidates,
+    winner: result.winnerId,
   });
 
   return result;
