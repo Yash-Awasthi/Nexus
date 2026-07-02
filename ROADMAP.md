@@ -307,8 +307,10 @@ the message-array context manager is out of scope (belongs to gateway/translate)
   (70/30) to `maxLines` (200) and a hard `maxChars` (12000) cap. `rtkEngine` stackPriority 10. Lossy.
   6 new tests (79 total). Done: build errors kept; blank/progress/deprecation noise dropped; caps hold.
   *(Core §3.2–§3.5 complete — paused here for review before the optional §3.6–§3.8.)*
-- **3.6 `headroom` engine** *(optional)*. Detect embedded homogeneous JSON arrays (≥minRows) and
-  columnarize via `encodeStructured`/TOON; replace only when strictly smaller; lossless. stackPriority 15.
+- **3.6 `headroom` engine** *(optional)*. **DONE.** `headroomCompress` re-encodes ```json-fenced
+  arrays and whole-text bare JSON arrays (homogeneous objects, ≥8 rows) as ```toon via
+  `encodeStructured`; replaces only when strictly smaller; lossless (TOON round-trips). Never touches
+  arrays inside non-json code fences. `headroomEngine` stackPriority 15. 5 new tests (85 total).
 - **3.7 `ccr` engine** *(optional, reversible)*. `node:crypto` SHA-256 (24-hex) principal-scoped
   bounded in-memory store; replace ≥minChars blocks with `[CCR retrieve …]`; `retrieveBlock()`.
 - **3.8 Wire `llmlingua` engine.** Register `compressHeavy` as the async `llmlingua` engine

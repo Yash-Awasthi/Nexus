@@ -1232,3 +1232,70 @@ export const rtkEngine: CompressEngine = {
   apply: (text, ctx) => rtkCompress(text, { toolName: ctx?.toolName }),
 };
 registerEngine(rtkEngine);
+
+// ── headroom engine (lossless, tabular JSON compaction) ──────────────────────────
+// Ported from OmniRoute's headroom engine: a homogeneous JSON array requotes every
+// key on every row. Re-encoding it as TOON (via encodeStructured) declares keys once
+// and drops the punctuation — a big win on tabular tool output, and lossless (TOON
+// round-trips). Only replaces when strictly smaller, and only touches ```json fences
+// or a whole-text bare array — never arrays embedded in other code (which it would
+// corrupt).
+
+const HEADROOM_MIN_ROWS = 8;
+
+/** Encode `value` as TOON iff it's a homogeneous object-array with ≥ minRows rows; else null. */
+function toonIfTabular(value: unknown, minRows: number): string | null {
+  if (!Array.isArray(value) || value.length < minRows) return null;
+  const isPlainObject = (o: unknown): o is Record<string, unknown> =>
+    typeof o === "object" && o !== null && !Array.isArray(o);
+  const first: unknown = value[0];
+  if (!isPlainObject(first)) return null;
+  const keySig = Object.keys(first).sort().join(" ");
+  const homogeneous = value.every(
+    (it) => isPlainObject(it) && Object.keys(it).sort().join(" ") === keySig,
+  );
+  if (!homogeneous) return null;
+  return encodeStructured(value, "toon");
+}
+
+/**
+ * Columnarize tabular JSON in `text`. Handles ```json-fenced arrays and a whole-text
+ * bare JSON array; each qualifying array is re-encoded as a ```toon block, but only
+ * when that is strictly smaller. Lossless (TOON decodes back to the same value).
+ */
+export function headroomCompress(text: string, minRows: number = HEADROOM_MIN_ROWS): string {
+  let out = text.replace(/```json\b[ \t]*\r?\n([\s\S]*?)\r?\n?```/g, (m, inner: string) => {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(inner);
+    } catch {
+      return m;
+    }
+    const toon = toonIfTabular(parsed, minRows);
+    if (toon === null) return m;
+    const replacement = `\`\`\`toon\n${toon}\n\`\`\``;
+    return replacement.length < m.length ? replacement : m;
+  });
+  const trimmed = out.trim();
+  if (trimmed.startsWith("[")) {
+    try {
+      const toon = toonIfTabular(JSON.parse(trimmed), minRows);
+      if (toon !== null) {
+        const replacement = `\`\`\`toon\n${toon}\n\`\`\``;
+        if (replacement.length < out.length) out = replacement;
+      }
+    } catch {
+      // not a pure JSON array — leave as-is
+    }
+  }
+  return out;
+}
+
+/** Tabular-JSON → TOON compaction. Lossless. */
+export const headroomEngine: CompressEngine = {
+  name: "headroom",
+  stackPriority: 15,
+  lossless: true,
+  apply: (text) => headroomCompress(text),
+};
+registerEngine(headroomEngine);

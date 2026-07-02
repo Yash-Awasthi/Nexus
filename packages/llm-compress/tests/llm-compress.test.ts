@@ -34,6 +34,8 @@ import {
   cavemanEngine,
   rtkCompress,
   rtkEngine,
+  headroomCompress,
+  headroomEngine,
 } from "../src/index.js";
 import { decode as toonDecode } from "@toon-format/toon";
 
@@ -697,5 +699,48 @@ describe("rtk engine", () => {
     expect(r.applied).toContain("rtk");
     expect(r.text).toContain("added 42 packages");
     expect(r.text).not.toContain("deprecated");
+  });
+});
+
+// ── headroom engine (§3.6) ──────────────────────────────────────────────────────
+
+describe("headroom engine", () => {
+  const rows = Array.from({ length: 10 }, (_, i) => ({ id: i, name: `n${i}`, active: i % 2 === 0 }));
+
+  it("is registered at stackPriority 15 and is lossless", () => {
+    expect(ENGINES.headroom).toBe(headroomEngine);
+    expect(headroomEngine.stackPriority).toBe(15);
+    expect(headroomEngine.lossless).toBe(true);
+  });
+
+  it("columnarizes a fenced json array to a smaller toon block that round-trips", () => {
+    const input = "Results:\n```json\n" + JSON.stringify(rows, null, 2) + "\n```\ndone";
+    const out = headroomCompress(input);
+    expect(out).toContain("```toon");
+    expect(out).not.toContain("```json");
+    expect(out.length).toBeLessThan(input.length);
+    // Round-trip: the toon body decodes back to the original rows.
+    const toon = out.match(/```toon\n([\s\S]*?)\n```/)?.[1] ?? "";
+    expect(toonDecode(toon)).toEqual(rows);
+  });
+
+  it("compacts a whole-text bare JSON array", () => {
+    const out = headroomCompress(JSON.stringify(rows));
+    expect(out).toContain("```toon");
+    const toon = out.match(/```toon\n([\s\S]*?)\n```/)?.[1] ?? "";
+    expect(toonDecode(toon)).toEqual(rows);
+  });
+
+  it("leaves prose and small/non-homogeneous arrays untouched", () => {
+    expect(headroomCompress("just some prose, no json here")).toBe("just some prose, no json here");
+    const small = "```json\n" + JSON.stringify([{ a: 1 }, { a: 2 }]) + "\n```";
+    expect(headroomCompress(small)).toBe(small); // < minRows
+    const mixed = "```json\n" + JSON.stringify([{ a: 1 }, { b: 2 }, 3, 4, 5, 6, 7, 8, 9]) + "\n```";
+    expect(headroomCompress(mixed)).toBe(mixed); // not homogeneous
+  });
+
+  it("does not touch a JSON array inside a non-json code fence", () => {
+    const code = "```js\nconst xs = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];\n```";
+    expect(headroomCompress(code)).toBe(code);
   });
 });
