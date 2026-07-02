@@ -517,8 +517,22 @@ Worker-thread sandbox (`ptc-sandbox.ts`) + `nexus code` CLI. `agent_sessions` ta
   worker typecheck + eslint green.
   Do: propose `MEMORY.md` / skill updates off a warm cache/digest.
   Done: emits a diff proposal; applies nothing without approval.
-- **7.4 CLI `--local`** *(Gate)*. Files: `apps/cli/src/index.ts`. Do: in-process agent loop over
-  the `RuntimeToolSet`. Needs a live provider key — gated.
+- **7.4 CLI `--local`.** **Code done this branch (commit `5f74610`); live run stays a Gate.**
+  `nexus code <task> --local` runs the loop in-process instead of dispatching to the API/worker:
+  `apps/cli/src/lib/local-agent.ts` = `buildLocalCodingTools` (workspace-confined
+  read/write/edit/list_files + scrubbed-env `run_command`, path+symlink guarded — mirrors the
+  worker tool set minus Docker), `makeLocalLlm` (anthropic/groq/openrouter BYOK driver →
+  `llmDriverToToolFn`; throws `missing_api_key` when no key resolves), `runLocalAgent`
+  (`ToolAgentRuntime` over the tool set; injectable `llm` test seam). `index.ts` gained
+  `--local`/`--dir`/`--api-key`/`--no-shell` on `code` and renders each step to the console.
+  `buildSafeEnv` inlined so the CLI doesn't drag `@nexus/sandbox`'s plugin-sdk/onnx chain into its
+  runtime. Deps added: `@nexus/agent-runtime`, `@nexus/llm-drivers` (lockfile updated). 5 tests
+  (tool confinement/escape, mock-llm loop writes to disk, missing-key gate); cli typecheck + build
+  + eslint + `code --help` + missing-key smoke all green. **A real model completion needs a live
+  provider key (Gate)** — set `ANTHROPIC_API_KEY`/`GROQ_API_KEY`/`OPENROUTER_API_KEY` (or
+  `--api-key`) then e.g. `nexus code "add a hello fn" --local --dir <repo> --provider groq`.
+  Files: `apps/cli/src/index.ts`. Do: in-process agent loop over the `RuntimeToolSet`. Needs a
+  live provider key — gated.
 
 > g0dm0d3 is AGPL — ideas only, clean-room, never copy source.
 
@@ -537,12 +551,20 @@ Baseline: `@nexus/sandbox` (`packages/sandbox/src/index.ts`, 442 lines: `execute
 `QUOTA_BYTES = 512MB`, status/exec/ls/upload-with-413/delete, Docker exec fallback) behind
 auth + rate limits.
 
-- **8.1 Isolation spike** *(Gate — do FIRST in §8; decision gate for the rest; recorded Blocked
-  in PROGRESS — needs a dev host with `/dev/kvm` present).* Do: boot a
-  Firecracker microVM + prove FS-level 512 MB quota end-to-end on the dev host (`/dev/kvm`
-  present). Throwaway; record outcome in PROGRESS. If Firecracker fails documented KVM/jailer
-  checks → gVisor systrap; Docker-limits is the interim. No production isolation code until it
-  passes.
+- **8.1 Isolation spike** *(Gate — do FIRST in §8; decision gate for the rest).*
+  **Judged 2026-07-02 — hardware READY, spike NOT YET RUN (skipped this session).** `/dev/kvm` is
+  present and the CPU exposes vmx/svm (40 cores) — the old KVM-host blocker has cleared. Remaining
+  gap: `firecracker`/`jailer` binaries are **not installed**, and this is a throwaway, live,
+  host-mutating spike (install Firecracker + jailer, fetch a `vmlinux` kernel + an ext4 rootfs,
+  configure jailer/network, boot, then prove a 512 MB FS-level quota hard-fails a write) that
+  yields **no committable code** — so it's left as an explicit Gate needing user go, not run inside
+  a coding turn. `docker` (client 29.6.1) is present as the interim Docker-limits fallback.
+  To RUN it next session: install firecracker+jailer, grab a kernel+rootfs, boot a microVM, dd a
+  >512 MB file against a quota'd `/workspace`, record pass/fail here. If Firecracker fails
+  documented KVM/jailer checks → gVisor systrap; Docker-limits is the interim. **No production
+  isolation code (§8.2–§8.6) until this passes.**
+  Do: boot a Firecracker microVM + prove FS-level 512 MB quota end-to-end. Throwaway; record
+  outcome in PROGRESS.
 - **8.2 FS-level quota.** Files: `apps/api/src/routes/drive.ts` + sandbox mount. Do: replace the
   app-level `QUOTA_BYTES` accounting with loopback-ext4/XFS-project quota. Done: a write past
   512 MB hard-fails at the FS layer (`cd apps/api && pnpm exec vitest run tests/routes/drive.test.ts`).
@@ -699,7 +721,7 @@ OIDC/SAML), fine-tuning pipeline (SFT via `sft-tagger` + `corpus-builder`), agen
 
 | Task                      | Blocker                                                       |
 | ------------------------- | ------------------------------------------------------------ |
-| Firecracker microVM spike | ~~KVM host~~ — `/dev/kvm` present on dev host; doable locally |
+| Firecracker microVM spike | ~~KVM host~~ — `/dev/kvm` + vmx/svm present; needs `firecracker`/`jailer` installed + a live throwaway boot (user go) |
 | gVisor fallback testing   | Linux host with `runsc`                                      |
 | Docker sandbox e2e        | Docker daemon on the worker host                             |
 | Redis cluster rate-limit  | Upstash / managed Redis                                      |
