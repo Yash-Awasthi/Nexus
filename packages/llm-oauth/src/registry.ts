@@ -3,7 +3,7 @@
  * Provider registry — holds the live AuthProvider plugins and exposes the
  * catalog (including unsupported/skip-with-TODO entries) for UI + diagnostics.
  */
-import { DESCRIPTORS, GoogleVertexAuthProvider } from "./providers.js";
+import { DESCRIPTORS, GoogleVertexAuthProvider, MicrosoftEntraAuthProvider } from "./providers.js";
 import type { AuthProvider, ProviderDescriptor } from "./types.js";
 
 export class AuthProviderRegistry {
@@ -47,6 +47,24 @@ export function registryFromEnv(env: NodeJS.ProcessEnv = process.env): AuthProvi
         clientSecret: env.GOOGLE_OAUTH_CLIENT_SECRET,
         project: env.GOOGLE_CLOUD_PROJECT,
         region: env.GOOGLE_CLOUD_REGION,
+      }),
+    );
+  }
+  if (
+    env.AZURE_OAUTH_CLIENT_ID &&
+    env.AZURE_OAUTH_CLIENT_SECRET &&
+    env.AZURE_TENANT_ID &&
+    env.AZURE_OPENAI_ENDPOINT &&
+    env.AZURE_OPENAI_DEPLOYMENT
+  ) {
+    reg.register(
+      new MicrosoftEntraAuthProvider({
+        clientId: env.AZURE_OAUTH_CLIENT_ID,
+        clientSecret: env.AZURE_OAUTH_CLIENT_SECRET,
+        tenantId: env.AZURE_TENANT_ID,
+        endpoint: env.AZURE_OPENAI_ENDPOINT,
+        deployment: env.AZURE_OPENAI_DEPLOYMENT,
+        apiVersion: env.AZURE_OPENAI_API_VERSION,
       }),
     );
   }

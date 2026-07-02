@@ -8,8 +8,14 @@
  * resulting access token calls Vertex on the user's own GCP project — a fully
  * sanctioned third-party flow, not CLI impersonation.
  *
- * NOT IMPLEMENTED (descriptor stubs with reasons, per product direction — no
- * workarounds): Azure OpenAI, GitHub Models. See DESCRIPTORS below.
+ * IMPLEMENTED: Azure OpenAI (→ Microsoft Entra ID). Standard Entra authorization-
+ * code + PKCE against the operator's OWN registered app (AZURE_OAUTH_CLIENT_ID/
+ * SECRET + AZURE_TENANT_ID), documented `cognitiveservices.azure.com/.default`
+ * scope; the issued token is a Bearer AAD token the AzureOpenAIDriver consumes via
+ * `authMode:"aad"`. Sanctioned third-party flow, not CLI impersonation.
+ *
+ * NOT IMPLEMENTED (descriptor stub with reason, per product direction — no
+ * workarounds): GitHub Models. See DESCRIPTORS below.
  */
 import { generatePkce, randomState } from "./crypto.js";
 import type {
@@ -152,6 +158,124 @@ export class GoogleVertexAuthProvider implements AuthProvider {
   }
 }
 
+interface EntraTokenResponse {
+  access_token: string;
+  refresh_token?: string;
+  expires_in?: number;
+  scope?: string;
+  token_type?: string;
+}
+
+export interface MicrosoftEntraConfig {
+  clientId: string;
+  clientSecret: string;
+  /** Entra tenant id (or "organizations"/"common"). Segments the authorize/token URL. */
+  tenantId: string;
+  /** Azure OpenAI resource endpoint, e.g. https://my-resource.openai.azure.com (user-supplied). */
+  endpoint: string;
+  /** Azure deployment name to route to (distinct from the model id). */
+  deployment: string;
+  /** Azure API version. Default 2024-10-21. */
+  apiVersion?: string;
+}
+
+/**
+ * Microsoft Entra ID (Azure AD) OAuth → Azure OpenAI. Sanctioned third-party
+ * authorization-code + PKCE flow against the operator's own registered Entra app.
+ * The access token is an AAD bearer token routed through AzureOpenAIDriver's
+ * `authMode:"aad"` path — no api-key ever leaves the deployment.
+ */
+export class MicrosoftEntraAuthProvider implements AuthProvider {
+  readonly id = "azure-openai";
+  readonly displayName = "Azure OpenAI (Entra ID)";
+  readonly flow = "oauth-pkce" as const;
+
+  // `.default` requests the app's statically-consented scopes; offline_access buys a refresh token.
+  private static readonly SCOPE = "https://cognitiveservices.azure.com/.default offline_access";
+
+  constructor(
+    private readonly cfg: MicrosoftEntraConfig,
+    private readonly http: TokenHttp = new FetchTokenHttp(),
+  ) {}
+
+  private authUrl(): string {
+    return `https://login.microsoftonline.com/${this.cfg.tenantId}/oauth2/v2.0/authorize`;
+  }
+  private tokenUrl(): string {
+    return `https://login.microsoftonline.com/${this.cfg.tenantId}/oauth2/v2.0/token`;
+  }
+
+  async startLogin({ redirectUri }: { redirectUri: string }): Promise<AuthStartResult> {
+    const pkce = generatePkce();
+    const state = randomState();
+    const url = new URL(this.authUrl());
+    url.search = new URLSearchParams({
+      client_id: this.cfg.clientId,
+      redirect_uri: redirectUri,
+      response_type: "code",
+      response_mode: "query",
+      scope: MicrosoftEntraAuthProvider.SCOPE,
+      code_challenge: pkce.challenge,
+      code_challenge_method: pkce.method,
+      state,
+    }).toString();
+    return {
+      authUrl: url.toString(),
+      pending: { state, codeVerifier: pkce.verifier, redirectUri, providerId: this.id },
+    };
+  }
+
+  async completeLogin({ code, pending }: { code: string; pending: PendingAuth }): Promise<OAuthTokens> {
+    if (!pending.codeVerifier) throw new Error("azure-openai: missing PKCE verifier");
+    const res = (await this.http.postForm(this.tokenUrl(), {
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: pending.redirectUri,
+      client_id: this.cfg.clientId,
+      client_secret: this.cfg.clientSecret,
+      code_verifier: pending.codeVerifier,
+      scope: MicrosoftEntraAuthProvider.SCOPE,
+    })) as EntraTokenResponse;
+    return this.toTokens(res);
+  }
+
+  async refresh(tokens: OAuthTokens): Promise<OAuthTokens> {
+    if (!tokens.refreshToken) throw new Error("azure-openai: no refresh token");
+    const res = (await this.http.postForm(this.tokenUrl(), {
+      grant_type: "refresh_token",
+      refresh_token: tokens.refreshToken,
+      client_id: this.cfg.clientId,
+      client_secret: this.cfg.clientSecret,
+      scope: MicrosoftEntraAuthProvider.SCOPE,
+    })) as EntraTokenResponse;
+    // Entra rotates refresh tokens; fall back to the prior one if omitted.
+    return this.toTokens(res, tokens.refreshToken);
+  }
+
+  toDriverCredentials(tokens: OAuthTokens): Record<string, unknown> {
+    // Shape = AzureOpenAIDriver config with the AAD bearer path selected.
+    return {
+      apiKey: tokens.accessToken,
+      authMode: "aad",
+      endpoint: this.cfg.endpoint,
+      deployment: this.cfg.deployment,
+      apiVersion: this.cfg.apiVersion ?? "2024-10-21",
+    };
+  }
+
+  private toTokens(res: EntraTokenResponse, carryRefresh?: string): OAuthTokens {
+    if (!res.access_token) throw new Error("azure-openai: token response missing access_token");
+    return {
+      accessToken: res.access_token,
+      refreshToken: res.refresh_token ?? carryRefresh,
+      expiresAt: res.expires_in ? Date.now() + res.expires_in * 1000 : undefined,
+      tokenType: res.token_type,
+      scope: res.scope,
+      extra: { endpoint: this.cfg.endpoint, deployment: this.cfg.deployment },
+    };
+  }
+}
+
 /**
  * Provider catalog. `supported: false` entries are deliberate skip-with-TODO
  * markers — the provider has no clearly-documented third-party auth path we can
@@ -170,13 +294,16 @@ export const DESCRIPTORS: ProviderDescriptor[] = [
     id: "azure-openai",
     displayName: "Azure OpenAI (Entra ID)",
     flow: "oauth-pkce",
-    supported: false,
-    // TODO: Entra ID auth-code flow is documented and sanctioned, but Nexus has
-    // no Azure OpenAI driver yet (deployment-scoped URL shape differs from the
-    // OpenAI-compat base). Add an AzureOpenAIDriver first, then implement.
-    reason: "No AzureOpenAIDriver in @nexus/llm-drivers yet; auth is sanctioned but unroutable.",
-    driverProvider: "azure-openai",
-    requiredEnv: ["AZURE_OAUTH_CLIENT_ID", "AZURE_OAUTH_CLIENT_SECRET", "AZURE_TENANT_ID"],
+    supported: true,
+    driverProvider: "azure_openai",
+    // Endpoint + deployment are per-user resource config, not OAuth secrets.
+    requiredEnv: [
+      "AZURE_OAUTH_CLIENT_ID",
+      "AZURE_OAUTH_CLIENT_SECRET",
+      "AZURE_TENANT_ID",
+      "AZURE_OPENAI_ENDPOINT",
+      "AZURE_OPENAI_DEPLOYMENT",
+    ],
   },
   {
     id: "github-models",

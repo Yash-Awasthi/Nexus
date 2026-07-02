@@ -9,6 +9,7 @@ import {
   randomState,
   TokenRefresher,
   GoogleVertexAuthProvider,
+  MicrosoftEntraAuthProvider,
   AuthProviderRegistry,
   registryFromEnv,
   type TokenHttp,
@@ -76,9 +77,9 @@ describe("PKCE", () => {
 // ── Fake transport ────────────────────────────────────────────────────────────
 
 function fakeHttp(responder: (url: string, p: Record<string, string>) => unknown): TokenHttp & {
-  calls: Array<{ url: string; params: Record<string, string> }>;
+  calls: { url: string; params: Record<string, string> }[];
 } {
-  const calls: Array<{ url: string; params: Record<string, string> }> = [];
+  const calls: { url: string; params: Record<string, string> }[] = [];
   return {
     calls,
     async postForm(url, params) {
@@ -140,6 +141,75 @@ describe("GoogleVertexAuthProvider", () => {
 
   it("refuses to refresh without a refresh token", async () => {
     const p = new GoogleVertexAuthProvider(cfg, fakeHttp(() => ({})));
+    await expect(p.refresh({ accessToken: "x" })).rejects.toThrow(/no refresh token/);
+  });
+});
+
+// ── Microsoft Entra provider ──────────────────────────────────────────────────
+
+describe("MicrosoftEntraAuthProvider", () => {
+  const cfg = {
+    clientId: "cid",
+    clientSecret: "csec",
+    tenantId: "tenant-123",
+    endpoint: "https://my-res.openai.azure.com",
+    deployment: "gpt4o-deploy",
+    apiVersion: "2024-10-21",
+  };
+
+  it("builds a tenant-scoped Entra auth URL with PKCE + the cognitive-services scope", async () => {
+    const p = new MicrosoftEntraAuthProvider(cfg, fakeHttp(() => ({})));
+    const { authUrl, pending } = await p.startLogin({ redirectUri: "https://app/cb" });
+    const u = new URL(authUrl);
+    expect(u.hostname).toBe("login.microsoftonline.com");
+    expect(u.pathname).toContain("/tenant-123/oauth2/v2.0/authorize");
+    expect(u.searchParams.get("client_id")).toBe("cid");
+    expect(u.searchParams.get("code_challenge_method")).toBe("S256");
+    expect(u.searchParams.get("scope")).toContain("cognitiveservices.azure.com/.default");
+    expect(u.searchParams.get("scope")).toContain("offline_access");
+    expect(u.searchParams.get("state")).toBe(pending.state);
+    expect(pending.codeVerifier).toBeTruthy();
+    expect(pending.providerId).toBe("azure-openai");
+  });
+
+  it("exchanges a code for tokens and maps to AzureOpenAIDriver aad creds", async () => {
+    const http = fakeHttp(() => ({
+      access_token: "aad.jwt",
+      refresh_token: "0.refresh",
+      expires_in: 3600,
+      token_type: "Bearer",
+    }));
+    const p = new MicrosoftEntraAuthProvider(cfg, http);
+    const start = await p.startLogin({ redirectUri: "https://app/cb" });
+    const tokens = await p.completeLogin({ code: "auth-code", pending: start.pending });
+
+    expect(tokens.accessToken).toBe("aad.jwt");
+    expect(tokens.refreshToken).toBe("0.refresh");
+    expect(http.calls[0]!.url).toContain("/tenant-123/oauth2/v2.0/token");
+    expect(http.calls[0]!.params.grant_type).toBe("authorization_code");
+    expect(http.calls[0]!.params.code_verifier).toBe(start.pending.codeVerifier);
+
+    const creds = p.toDriverCredentials(tokens);
+    expect(creds).toEqual({
+      apiKey: "aad.jwt",
+      authMode: "aad",
+      endpoint: "https://my-res.openai.azure.com",
+      deployment: "gpt4o-deploy",
+      apiVersion: "2024-10-21",
+    });
+  });
+
+  it("carries the existing refresh token forward when Entra omits it", async () => {
+    const http = fakeHttp(() => ({ access_token: "aad.new", expires_in: 3600 }));
+    const p = new MicrosoftEntraAuthProvider(cfg, http);
+    const refreshed = await p.refresh({ accessToken: "old", refreshToken: "keep-me" });
+    expect(refreshed.accessToken).toBe("aad.new");
+    expect(refreshed.refreshToken).toBe("keep-me");
+    expect(http.calls[0]!.params.grant_type).toBe("refresh_token");
+  });
+
+  it("refuses to refresh without a refresh token", async () => {
+    const p = new MicrosoftEntraAuthProvider(cfg, fakeHttp(() => ({})));
     await expect(p.refresh({ accessToken: "x" })).rejects.toThrow(/no refresh token/);
   });
 });
@@ -213,14 +283,14 @@ describe("AuthProviderRegistry", () => {
   it("catalog marks unimplemented providers supported:false with a reason", () => {
     const reg = new AuthProviderRegistry();
     const cat = reg.catalog();
-    const azure = cat.find((c) => c.id === "azure-openai")!;
     const github = cat.find((c) => c.id === "github-models")!;
-    expect(azure.supported).toBe(false);
-    expect(azure.reason).toMatch(/driver/i);
     expect(github.supported).toBe(false);
     expect(github.reason).toMatch(/documented/i);
-    // google-vertex is supported only once a live plugin is registered
+    // implemented providers report supported:false until a live plugin is registered
     expect(cat.find((c) => c.id === "google-vertex")!.supported).toBe(false);
+    expect(cat.find((c) => c.id === "azure-openai")!.supported).toBe(false);
+    // azure-openai is a real implementation now — no skip-with-TODO reason
+    expect(cat.find((c) => c.id === "azure-openai")!.reason).toBeUndefined();
   });
 
   it("registryFromEnv only registers fully-configured providers", () => {
@@ -232,5 +302,25 @@ describe("AuthProviderRegistry", () => {
     });
     expect(reg.list().map((p) => p.id)).toEqual(["google-vertex"]);
     expect(reg.catalog().find((c) => c.id === "google-vertex")!.supported).toBe(true);
+  });
+
+  it("registryFromEnv registers azure-openai when its Entra app + resource are set", () => {
+    // partial config (no endpoint/deployment) must NOT half-register
+    expect(
+      registryFromEnv({
+        AZURE_OAUTH_CLIENT_ID: "c",
+        AZURE_OAUTH_CLIENT_SECRET: "s",
+        AZURE_TENANT_ID: "t",
+      }).list(),
+    ).toHaveLength(0);
+    const reg = registryFromEnv({
+      AZURE_OAUTH_CLIENT_ID: "c",
+      AZURE_OAUTH_CLIENT_SECRET: "s",
+      AZURE_TENANT_ID: "t",
+      AZURE_OPENAI_ENDPOINT: "https://my-res.openai.azure.com",
+      AZURE_OPENAI_DEPLOYMENT: "gpt4o-deploy",
+    });
+    expect(reg.list().map((p) => p.id)).toEqual(["azure-openai"]);
+    expect(reg.catalog().find((c) => c.id === "azure-openai")!.supported).toBe(true);
   });
 });

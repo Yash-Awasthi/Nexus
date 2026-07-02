@@ -26,9 +26,11 @@ export { AesGcmVault, generatePkce, randomState, type Pkce } from "./crypto.js";
 export { TokenRefresher } from "./refresh.js";
 export {
   GoogleVertexAuthProvider,
+  MicrosoftEntraAuthProvider,
   FetchTokenHttp,
   DESCRIPTORS,
   type GoogleVertexConfig,
+  type MicrosoftEntraConfig,
 } from "./providers.js";
 export { AuthProviderRegistry, registryFromEnv } from "./registry.js";
 export { OAuthTokenStore } from "./store.js";
