@@ -266,6 +266,7 @@ export type AgentEventType =
   | "compaction"
   | "status"
   | "learnings"
+  | "learning_proposal"
   | "tool_compress";
 
 /** A worker-published agent-run event, scoped to one run's stream id. */

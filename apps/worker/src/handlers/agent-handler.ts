@@ -15,6 +15,9 @@
  *   - "deny"   : deny all mutating tools (dry-run / read-only audit)
  *   - "allowlist": allow only tools named in `allowedTools`
  */
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import {
   ToolAgentRuntime,
   llmDriverToToolFn,
@@ -36,7 +39,7 @@ import { eq } from "drizzle-orm";
 import { publishAgentEvent } from "./agent-events.js";
 import { defaultAgentGovernanceEngine, makeGovernanceGate } from "./agent-governance.js";
 import { mcpToolsFromServers, type McpServerConfig } from "./agent-mcp.js";
-import { reviewSession } from "./agent-review.js";
+import { proposeLearningUpdates, reviewSession } from "./agent-review.js";
 import { createCodingToolSet } from "./agent-tools.js";
 import {
   WorkspaceManager,
@@ -305,7 +308,14 @@ export async function handleAgentRunJob(
   // the run's sessionId/taskId; a no-op when neither is set or REDIS_URL is unset.
   const stream = payload.sessionId ?? payload.taskId;
   const emit = (
-    type: "run_started" | "step" | "compaction" | "status" | "learnings" | "tool_compress",
+    type:
+      | "run_started"
+      | "step"
+      | "compaction"
+      | "status"
+      | "learnings"
+      | "learning_proposal"
+      | "tool_compress",
     data: Record<string, unknown>,
   ): void => {
     if (stream) void publishAgentEvent(stream, type, data);
@@ -495,6 +505,33 @@ export async function handleAgentRunJob(
             count: learnings.length,
           }),
         );
+
+        // §7.3 — forked learning loop: propose (never apply) a MEMORY.md / skills
+        // diff off the learnings + the warm on-disk copy. Emitted for human review;
+        // nothing is written to disk here. Best-effort — a missing MEMORY.md just
+        // yields a new-file proposal.
+        if (learnings.length > 0) {
+          const readIfExists = async (rel: string): Promise<string> => {
+            try {
+              return await readFile(join(workingDir, rel), "utf8");
+            } catch {
+              return "";
+            }
+          };
+          const proposals = proposeLearningUpdates(learnings, {
+            memory: await readIfExists("MEMORY.md"),
+            skills: await readIfExists("SKILLS.md"),
+          });
+          emit("learning_proposal", { proposals });
+          console.log(
+            JSON.stringify({
+              level: "info",
+              event: "agent.learning_proposal",
+              taskId: payload.taskId,
+              files: proposals.map((p) => p.path),
+            }),
+          );
+        }
 
         // Persist learnings to the memory vector store so they are
         // retrieved on future runs (best-effort — env-gated, never
