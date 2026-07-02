@@ -23,8 +23,6 @@ import {
   type LlmToolDriver,
   type LlmToolFn,
   type ToolStepRecord,
-  type PermissionGate,
-  type PermissionRequest,
   type RuntimeMessage,
   type CompactionResult,
   type PresetName,
@@ -36,6 +34,7 @@ import { GroqEmbedder, MemoryManager, PgVectorStore } from "@nexus/memory";
 import { eq } from "drizzle-orm";
 
 import { publishAgentEvent } from "./agent-events.js";
+import { defaultAgentGovernanceEngine, makeGovernanceGate } from "./agent-governance.js";
 import { mcpToolsFromServers, type McpServerConfig } from "./agent-mcp.js";
 import { reviewSession } from "./agent-review.js";
 import { createCodingToolSet } from "./agent-tools.js";
@@ -74,6 +73,8 @@ export interface AgentRunPayload {
   permissionPolicy?: "allow" | "deny" | "allowlist";
   /** When permissionPolicy is "allowlist", the mutating tools that are permitted. */
   allowedTools?: string[];
+  /** Bypass the @nexus/governance safety net (still honors permissionPolicy). Default false. */
+  disableGovernance?: boolean;
   /** Disable context compaction (on by default for long sessions). */
   disableCompaction?: boolean;
   /** Disable the programmatic-tool-calling (PTC) meta-tool (on by default). */
@@ -188,31 +189,28 @@ function makeSummarizer(llm: LlmToolFn): (messages: RuntimeMessage[]) => Promise
   };
 }
 
-/** Build the permission gate from the payload's policy. */
-function makePermissionGate(payload: AgentRunPayload): PermissionGate {
-  const policy = payload.permissionPolicy ?? "allow";
-  const allowed = new Set(payload.allowedTools ?? []);
-  return (req: PermissionRequest) => {
-    let allowedDecision: boolean;
-    if (policy === "deny") allowedDecision = false;
-    else if (policy === "allowlist") allowedDecision = allowed.has(req.toolName);
-    else allowedDecision = true;
-    if (!allowedDecision) {
+/**
+ * Build the permission gate: the run's static policy layered over the shared
+ * @nexus/governance safety net (§7.1). Read-only tools never reach here — the
+ * runtime auto-allows them.
+ */
+function makePermissionGate(payload: AgentRunPayload) {
+  return makeGovernanceGate({
+    policy: payload.permissionPolicy ?? "allow",
+    ...(payload.allowedTools ? { allowedTools: payload.allowedTools } : {}),
+    ...(payload.disableGovernance ? {} : { engine: defaultAgentGovernanceEngine() }),
+    onDeny: ({ tool, reason, layer }) =>
       console.log(
         JSON.stringify({
           level: "warn",
           event: "agent.permission_denied",
           taskId: payload.taskId,
-          tool: req.toolName,
-          policy,
+          tool,
+          layer,
+          reason,
         }),
-      );
-    }
-    return {
-      allowed: allowedDecision,
-      reason: allowedDecision ? undefined : `policy '${policy}' blocked tool '${req.toolName}'`,
-    };
-  };
+      ),
+  });
 }
 
 /**
@@ -458,10 +456,17 @@ export async function handleAgentRunJob(
     if (runHandle) await runner.stop(runHandle.key);
   }
 
+  // Distinguish a context-budget hard stop (§7.1) from a normal completion/abort.
+  const sessionStatus = result.stopReason
+    ? "rate_limited"
+    : result.aborted
+      ? "aborted"
+      : "completed";
   emit("status", {
-    status: result.aborted ? "aborted" : "completed",
+    status: sessionStatus,
     steps: result.steps.length,
     usage: result.totalUsage,
+    ...(result.stopReason ? { stopReason: result.stopReason } : {}),
   });
 
   // Forked learning loop (opt-in): a non-blocking post-run review extracts
@@ -543,7 +548,7 @@ export async function handleAgentRunJob(
   // Persist the session so it can be resumed (only when a sessionId is given).
   if (payload.sessionId) {
     await saveSession(payload.sessionId, payload, {
-      status: result.aborted ? "aborted" : "completed",
+      status: sessionStatus,
       messages: result.messages,
       usage: {
         inputTokens: result.totalUsage.inputTokens,
