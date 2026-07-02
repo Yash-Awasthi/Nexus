@@ -74,6 +74,7 @@ import { nlpRoutes } from "./routes/nlp.js";
 import { oauthRoutes } from "./routes/oauth.js";
 import { obsProvidersRoutes } from "./routes/obs-providers.js";
 import { oidcRoutes } from "./routes/oidc.js";
+import { orchestrationRoutes } from "./routes/orchestration.js";
 import { predictionMarketRoutes } from "./routes/prediction-market.js";
 import { redteamRoutes } from "./routes/redteam.js";
 import { researcherRoutes } from "./routes/researcher.js";
@@ -238,6 +239,11 @@ export async function buildServer(): Promise<FastifyInstance> {
     keyPrefix: "code-repl",
   });
   const _councilRL = makeRateLimitPreHandler({ limit: 30, windowMs: 60_000, keyPrefix: "council" });
+  const _orchestrationRL = makeRateLimitPreHandler({
+    limit: 30,
+    windowMs: 60_000,
+    keyPrefix: "orchestration",
+  });
 
   // IP-keyed limiter for the authenticated /api bridge scope (defense in depth).
   const apiScopeRL = makeRateLimitPreHandler({ limit: 300, windowMs: 60_000, keyPrefix: "api" });
@@ -265,6 +271,11 @@ export async function buildServer(): Promise<FastifyInstance> {
     windowMs: 60_000,
     keyPrefix: "council",
   });
+  const _orchestrationUserRL = makeUserRateLimitPreHandler({
+    limit: 60,
+    windowMs: 60_000,
+    keyPrefix: "orchestration",
+  });
 
   app.addHook("onRequest", async (request: FastifyRequest, reply) => {
     const url = request.url;
@@ -280,6 +291,9 @@ export async function buildServer(): Promise<FastifyInstance> {
     } else if (url.startsWith("/api/v1/council")) {
       await _councilRL(request, reply);
       if (!reply.sent) await _councilUserRL(request, reply);
+    } else if (url.startsWith("/api/v1/orchestration")) {
+      await _orchestrationRL(request, reply);
+      if (!reply.sent) await _orchestrationUserRL(request, reply);
     }
   });
 
@@ -318,6 +332,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       await api.register(imageGenRoutes);
       await api.register(voiceRoutes);
       await api.register(billingRoutes);
+      await api.register(orchestrationRoutes);
       await api.register(adminRoutes);
       await api.register(featureFlagsRoutes);
       await api.register(codeReplRoutes);

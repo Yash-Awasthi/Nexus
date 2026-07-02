@@ -89,6 +89,7 @@ export default [
   route("image-transform", "routes/image-transform.tsx"),
   route("costs", "routes/costs.tsx"),
   route("usage", "routes/usage.tsx"),
+  route("orchestration", "routes/orchestration.tsx"),
   route("moderation", "routes/moderation.tsx"),
   route("semantic-cache", "routes/semantic-cache.tsx"),
   route("fallback-chains", "routes/fallback-chains.tsx"),
