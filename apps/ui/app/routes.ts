@@ -81,6 +81,7 @@ export default [
   route("agents", "routes/agents.tsx"),
   route("api-tokens", "routes/api-tokens.tsx"),
   route("provider-keys", "routes/provider-keys.tsx"),
+  route("mcp-servers", "routes/mcp-servers.tsx"),
   route("admin/feature-flags", "routes/admin-feature-flags.tsx"),
   route("standard-answers", "routes/standard-answers.tsx"),
   route("admin/feedback", "routes/admin-feedback.tsx"),
