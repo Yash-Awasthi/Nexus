@@ -660,8 +660,19 @@ MCP `/test`) + identity-keyed per-user rate limiting. `.cleanup-alerts.txt` = 48
   Test: `pnpm exec vitest run packages/sandbox/tests/sandbox.test.ts` (assert the args array).
   Done: container runs with all three.
 
-- **9.5 apps/api baseline.** Do: output sanitize + prompt-injection guard. Done: guard rejects
-  a known injection payload in a test.
+- **9.5 apps/api baseline.** **Done this branch (commit after `53f507b`).** New dependency-free
+  `apps/api/src/lib/prompt-guard.ts`: (1) `detectPromptInjection`/`guardPromptInjection` —
+  phrase-level detection of known injection/jailbreak patterns (ignore-previous-instructions,
+  system-prompt exfiltration, DAN/developer-mode, guardrail-bypass, injected `system:`/`assistant:`
+  role prefixes), weighted risk scoring → `none|low|medium|high`, `PromptInjectionError`
+  (statusCode 400), tunable `minRisk`; (2) `makePromptInjectionPreHandler(extract, opts)` — a
+  framework-free Fastify preHandler that 400s an injection attempt; (3) `sanitizeModelOutput` —
+  strips ANSI + zero-width/bidi smuggling chars, redacts credential-shaped tokens (sk-/nxk_/ghp_/
+  xox/AKIA/AIza/Bearer/PEM), and HTML-escapes markup on outbound model text. Complements
+  `@nexus/redteam`'s whole-word `detectTriggers`. 19 unit tests
+  (`apps/api/tests/lib/prompt-guard.test.ts`) incl. the required "guard rejects a known injection
+  payload"; api typecheck + eslint green. Do: output sanitize + prompt-injection guard. Done: guard
+  rejects a known injection payload in a test.
 
 ## 10. UI surfaces over existing backends
 
