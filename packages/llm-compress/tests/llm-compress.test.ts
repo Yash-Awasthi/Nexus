@@ -36,6 +36,11 @@ import {
   rtkEngine,
   headroomCompress,
   headroomEngine,
+  ccrCompress,
+  ccrEngine,
+  storeBlock,
+  retrieveBlock,
+  ccrStoreSize,
 } from "../src/index.js";
 import { decode as toonDecode } from "@toon-format/toon";
 
@@ -742,5 +747,55 @@ describe("headroom engine", () => {
   it("does not touch a JSON array inside a non-json code fence", () => {
     const code = "```js\nconst xs = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];\n```";
     expect(headroomCompress(code)).toBe(code);
+  });
+});
+
+// ── ccr engine (§3.7) ───────────────────────────────────────────────────────────
+
+describe("ccr engine", () => {
+  const big = "X".repeat(800); // ≥ minChars
+
+  it("is registered at stackPriority 4 and lossless-by-reference", () => {
+    expect(ENGINES.ccr).toBe(ccrEngine);
+    expect(ccrEngine.stackPriority).toBe(4);
+    expect(ccrEngine.lossless).toBe(true);
+  });
+
+  it("replaces a large block with a marker and retrieves the original", () => {
+    const out = ccrCompress(big, { principalId: "tenantA" });
+    const m = out.match(/\[CCR retrieve hash=([0-9a-f]{24}) chars=(\d+)\]/);
+    expect(m).not.toBeNull();
+    const hash = m?.[1] ?? "";
+    expect(out.length).toBeLessThan(big.length);
+    expect(retrieveBlock(hash, "tenantA")).toBe(big);
+  });
+
+  it("isolates principals — another tenant cannot retrieve the block", () => {
+    const hash = storeBlock("Y".repeat(700), "owner-1");
+    expect(retrieveBlock(hash, "owner-1")).toBe("Y".repeat(700));
+    expect(retrieveBlock(hash, "owner-2")).toBeNull();
+  });
+
+  it("leaves short text untouched and keeps paragraph separators", () => {
+    const short = "one small para\n\nanother small para";
+    expect(ccrCompress(short)).toBe(short);
+  });
+
+  it("round-trips: expanding markers reproduces the original", () => {
+    const doc = `intro\n\n${big}\n\ntail`;
+    const compressed = ccrCompress(doc, { principalId: "rt" });
+    const restored = compressed.replace(
+      /\[CCR retrieve hash=([0-9a-f]{24}) chars=\d+\]/g,
+      (_m, h: string) => retrieveBlock(h, "rt") ?? "",
+    );
+    expect(restored).toBe(doc);
+  });
+
+  it("bounds the store (FIFO eviction of the oldest block)", () => {
+    const first = storeBlock("Z".repeat(650), "evict-test-first-marker");
+    // Fill past the cap with unique blocks so the first is evicted.
+    for (let i = 0; i < 5000; i++) storeBlock(`${i}-${"z".repeat(650)}`, "evict-test");
+    expect(ccrStoreSize()).toBeLessThanOrEqual(5000);
+    expect(retrieveBlock(first, "evict-test-first-marker")).toBeNull();
   });
 });

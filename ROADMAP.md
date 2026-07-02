@@ -311,8 +311,11 @@ the message-array context manager is out of scope (belongs to gateway/translate)
   arrays and whole-text bare JSON arrays (homogeneous objects, ≥8 rows) as ```toon via
   `encodeStructured`; replaces only when strictly smaller; lossless (TOON round-trips). Never touches
   arrays inside non-json code fences. `headroomEngine` stackPriority 15. 5 new tests (85 total).
-- **3.7 `ccr` engine** *(optional, reversible)*. `node:crypto` SHA-256 (24-hex) principal-scoped
-  bounded in-memory store; replace ≥minChars blocks with `[CCR retrieve …]`; `retrieveBlock()`.
+- **3.7 `ccr` engine** *(optional, reversible)*. **DONE.** `node:crypto` SHA-256 (24-hex)
+  principal-scoped bounded (5000, FIFO) in-memory store; `ccrCompress` replaces each ≥600-char
+  paragraph with `[CCR retrieve hash=… chars=…]` (keeping separators) and stashes the original;
+  `storeBlock`/`retrieveBlock`/`ccrStoreSize` exported. Lossless by reference; tenants isolated by
+  principal-scoped keys. `ccrEngine` stackPriority 4. 6 new tests (91 total).
 - **3.8 Wire `llmlingua` engine.** Register `compressHeavy` as the async `llmlingua` engine
   (stackPriority 35, gated/optional) so stacked-async pipelines can include semantic pruning.
 

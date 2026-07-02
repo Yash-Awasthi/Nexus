@@ -18,6 +18,8 @@
  * trivially. `compress()` runs a pipeline and reports the token delta.
  */
 
+import { createHash } from "node:crypto";
+
 import { encode as toonEncode } from "@toon-format/toon";
 
 // ── Structured-payload encoding ─────────────────────────────────────────────────
@@ -1299,3 +1301,81 @@ export const headroomEngine: CompressEngine = {
   apply: (text) => headroomCompress(text),
 };
 registerEngine(headroomEngine);
+
+// ── ccr engine (lossless-by-reference: compress-cache-retrieve) ──────────────────
+// Ported from OmniRoute's ccr engine: replace a large block with a short
+// `[CCR retrieve hash=… chars=…]` marker and stash the original in a bounded,
+// principal-scoped store. A consumer expands the marker on demand via
+// retrieveBlock — so it's lossless by reference (the content is recoverable), not by
+// value. Node-only (uses node:crypto). Principal scoping isolates tenants (the store
+// key mixes the principal id, so one tenant can't retrieve another's blocks).
+
+const CCR_MIN_CHARS = 600;
+const CCR_MAX_ENTRIES = 5000;
+const CCR_ANON = "__anon__";
+const ccrStore = new Map<string, string>();
+const ccrOrder: string[] = []; // FIFO of keys, for bounded eviction
+
+function ccrKey(hash: string, principal: string): string {
+  return `${principal} ${hash}`;
+}
+
+/** Stash `text` under a 24-hex content hash scoped to `principalId`; returns the hash. */
+export function storeBlock(text: string, principalId: string = CCR_ANON): string {
+  const hash = createHash("sha256").update(text).digest("hex").slice(0, 24);
+  const key = ccrKey(hash, principalId);
+  if (!ccrStore.has(key)) {
+    ccrStore.set(key, text);
+    ccrOrder.push(key);
+    if (ccrOrder.length > CCR_MAX_ENTRIES) {
+      const evict = ccrOrder.shift();
+      if (evict !== undefined) ccrStore.delete(evict);
+    }
+  }
+  return hash;
+}
+
+/** Retrieve a block by hash within `principalId`. Returns null if absent (or wrong principal). */
+export function retrieveBlock(hash: string, principalId: string = CCR_ANON): string | null {
+  return ccrStore.get(ccrKey(hash, principalId)) ?? null;
+}
+
+/** Current number of stored blocks (for tests/telemetry). */
+export function ccrStoreSize(): number {
+  return ccrStore.size;
+}
+
+export interface CcrOptions {
+  /** Tenant scope for the store. Blocks are only retrievable within the same principal. */
+  principalId?: string;
+  /** Minimum block length to bother replacing. Default 600. */
+  minChars?: number;
+}
+
+/**
+ * Replace each paragraph ≥ `minChars` with a short retrieval marker, stashing the
+ * original in the principal-scoped store. Separators between paragraphs are kept
+ * verbatim. Lossless by reference — expand markers with {@link retrieveBlock}.
+ */
+export function ccrCompress(text: string, opts: CcrOptions = {}): string {
+  const principal = opts.principalId ?? CCR_ANON;
+  const minChars = opts.minChars ?? CCR_MIN_CHARS;
+  const parts = text.split(/(\n{2,})/); // even indices = paragraphs, odd = separators
+  return parts
+    .map((seg, i) => {
+      if (i % 2 === 1 || seg.length < minChars) return seg;
+      const hash = storeBlock(seg, principal);
+      const marker = `[CCR retrieve hash=${hash} chars=${seg.length}]`;
+      return marker.length < seg.length ? marker : seg;
+    })
+    .join("");
+}
+
+/** Compress-cache-retrieve. Lossless by reference; scope via `ctx.principalId`. */
+export const ccrEngine: CompressEngine = {
+  name: "ccr",
+  stackPriority: 4,
+  lossless: true,
+  apply: (text, ctx) => ccrCompress(text, { principalId: ctx?.principalId }),
+};
+registerEngine(ccrEngine);
