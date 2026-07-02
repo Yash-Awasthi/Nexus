@@ -425,16 +425,23 @@ MCP `/test`) + identity-keyed per-user rate limiting. `.cleanup-alerts.txt` = 48
   tests/routes/oidc.ssrf.test.ts` — 27/27 pass.
   Done: an outbound call to a host resolving to a private IP is rejected.
 
-- **9.2 Clear CodeQL alerts** (one alert-class per commit; list = `.cleanup-alerts.txt`).
-  Known clusters: path-injection/command-injection (`drive.ts`, sandbox), reflected-XSS
-  (`api-bridge.ts:9097` — a 9.3k-line monolith, edit surgically), missing-rate-limiting (many
-  lines in `sse.ts`/`drive.ts`/`api-bridge.ts` — mirror `makeUserRateLimitPreHandler` usage in
-  `server.ts`), http-to-file/insecure-temp (`drive.ts:317`), unvalidated-dynamic-method-call
-  (`provider-keys.ts:103`), xss-through-dom (`scrape.tsx:318`).
-  Insufficient-password-hash (`apps/api/src/lib/crypto-utils.ts:11`): **likely false positive**
-  — `sha256hex` is documented token-only; passwords use scrypt (`hashPassword` in
-  `routes/auth-users.ts`). Dismiss/suppress with that justification; do not rewrite.
-  Done: the alert list is empty.
+- **9.2 Clear CodeQL alerts.** **Shipped this branch (commit `5433da5`) — do not redo.**
+  Audited all 48 `.cleanup-alerts.txt` entries 2026-07-02. Real fix needed and shipped: 6
+  `api-bridge.ts` routes (`/v1/projects/:id/files`, `/stm*`) were missing `bridgeRL` —
+  added after the June 24 scan, sibling routes already had it; plus a dead
+  `modelOptions` const in `archetypes.tsx` (js/unused-local-variable). Every other alert
+  (path-injection/command-injection/http-to-file/insecure-temp/resource-exhaustion/
+  unreachable-statement in `drive.ts`, command-injection in `sandbox/index.ts`,
+  file-system-race in `scaffold.ts`, xss-through-dom in `scrape.tsx`, the rest of
+  missing-rate-limiting in `sse.ts`/`oauth.ts`, unvalidated-dynamic-method-call in
+  `provider-keys.ts`, bad-tag-filter/reflected-xss in `api-bridge.ts`) was already fixed by
+  commit `7b9877e` ("fix(deploy,ci): Railway deploy, CodeQL alerts...", 2026-06-26) — which
+  landed *after* the scan that produced the alert list, so the list itself is stale, not the
+  code. Verified each by reading the current file at the flagged (or line-drifted) location.
+  `js/insufficient-password-hash` (`crypto-utils.ts:11`): confirmed false positive as noted
+  below — already documented in-code; dismiss in the CodeQL UI, no code change.
+  Done: every alert traces to a real fix (this branch) or already-fixed code; the alert list
+  itself needs a GitHub-side re-scan to empty (external action, not a code change).
 
 - **9.3 Rate-limit remaining route groups.** Mirror: `makeRateLimitPreHandler`/
   `makeUserRateLimitPreHandler` usage in `apps/api/src/server.ts`. Done: each authenticated
