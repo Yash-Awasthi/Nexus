@@ -54,7 +54,7 @@ export interface CanonicalRequest {
   stream?: boolean;
 }
 
-export type Format = "openai" | "anthropic";
+export type Format = "openai" | "anthropic" | "gemini";
 
 // ── Loose provider shapes (input/output) ─────────────────────────────────────────
 // Typed loosely on purpose: callers pass parsed JSON from arbitrary clients. We
@@ -276,15 +276,151 @@ function toAnthropic(req: CanonicalRequest): Json {
   return out;
 }
 
+// ── Gemini `contents[]` ⇄ canonical ──────────────────────────────────────────────
+// Gemini uses roles "user"/"model" (no "assistant"/"system"), a top-level
+// `systemInstruction`, and `parts[]` per turn holding `text` / `functionCall` /
+// `functionResponse`. Unlike OpenAI/Anthropic, Gemini has no per-call id — calls
+// and their responses match by `name` alone — so we use the function name as the
+// canonical `toolCallId`/`id` too.
+
+function fromGemini(req: Json): CanonicalRequest {
+  const messages: CanonicalMessage[] = [];
+  const sys = obj(req.systemInstruction);
+  const sysParts = Array.isArray(sys.parts) ? sys.parts.map(obj) : [];
+  const sysText = sysParts
+    .map((p) => str(p.text))
+    .filter(Boolean)
+    .join("\n");
+  if (sysText) messages.push({ role: "system", content: sysText });
+
+  for (const raw of Array.isArray(req.contents) ? req.contents : []) {
+    const c = obj(raw);
+    const role = str(c.role) === "model" ? "assistant" : "user";
+    const parts = Array.isArray(c.parts) ? c.parts.map(obj) : [];
+
+    const text = parts
+      .map((p) => str(p.text))
+      .filter(Boolean)
+      .join("\n");
+    const calls = parts.filter((p) => p.functionCall);
+    const responses = parts.filter((p) => p.functionResponse);
+
+    for (const p of responses) {
+      const fr = obj(p.functionResponse);
+      const response = obj(fr.response);
+      messages.push({
+        role: "tool",
+        content: typeof response.content === "string" ? response.content : JSON.stringify(response),
+        toolCallId: str(fr.name),
+      });
+    }
+    if (responses.length > 0 && calls.length === 0 && text === "") continue;
+
+    messages.push({
+      role,
+      content: text,
+      ...(calls.length > 0 && {
+        toolCalls: calls.map((p) => {
+          const fc = obj(p.functionCall);
+          return { id: str(fc.name), name: str(fc.name), arguments: obj(fc.args) };
+        }),
+      }),
+    });
+  }
+
+  const tools = Array.isArray(req.tools)
+    ? Array.isArray(obj(req.tools[0]).functionDeclarations)
+      ? (obj(req.tools[0]).functionDeclarations as unknown[]).map((t) => {
+          const tt = obj(t);
+          return {
+            name: str(tt.name),
+            description: tt.description ? str(tt.description) : undefined,
+            parameters: obj(tt.parameters),
+          };
+        })
+      : undefined
+    : undefined;
+
+  const gen = obj(req.generationConfig);
+  return {
+    model: req.model ? str(req.model) : undefined,
+    messages,
+    ...(tools && { tools }),
+    ...(typeof gen.maxOutputTokens === "number" && { maxTokens: gen.maxOutputTokens }),
+    ...(typeof gen.temperature === "number" && { temperature: gen.temperature }),
+    ...(req.stream === true && { stream: true }),
+  };
+}
+
+function toGemini(req: CanonicalRequest): Json {
+  let systemInstruction: Json | undefined;
+  const contents: Json[] = [];
+
+  for (const m of req.messages) {
+    if (m.role === "system") {
+      const prevText = systemInstruction
+        ? str(obj((systemInstruction.parts as Json[])[0]).text)
+        : "";
+      systemInstruction = { parts: [{ text: prevText ? `${prevText}\n${m.content}` : m.content }] };
+      continue;
+    }
+    if (m.role === "tool") {
+      const part: Json = {
+        functionResponse: { name: m.toolCallId ?? "", response: { content: m.content } },
+      };
+      const prev = contents[contents.length - 1];
+      if (prev && prev.role === "user" && Array.isArray(prev.parts)) {
+        (prev.parts as Json[]).push(part);
+      } else {
+        contents.push({ role: "user", parts: [part] });
+      }
+      continue;
+    }
+    const parts: Json[] = [];
+    if (m.content) parts.push({ text: m.content });
+    if (m.toolCalls?.length) {
+      for (const tc of m.toolCalls) {
+        parts.push({ functionCall: { name: tc.name, args: tc.arguments } });
+      }
+    }
+    contents.push({ role: m.role === "assistant" ? "model" : "user", parts });
+  }
+
+  const out: Json = { contents };
+  if (req.model) out.model = req.model;
+  if (systemInstruction) out.systemInstruction = systemInstruction;
+  if (req.tools) {
+    out.tools = [
+      {
+        functionDeclarations: req.tools.map((t) => ({
+          name: t.name,
+          ...(t.description !== undefined && { description: t.description }),
+          parameters: t.parameters,
+        })),
+      },
+    ];
+  }
+  if (req.maxTokens !== undefined || req.temperature !== undefined) {
+    out.generationConfig = {
+      ...(req.maxTokens !== undefined && { maxOutputTokens: req.maxTokens }),
+      ...(req.temperature !== undefined && { temperature: req.temperature }),
+    };
+  }
+  if (req.stream) out.stream = true;
+  return out;
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────────
 
 const NORMALIZERS: Record<Format, (req: Json) => CanonicalRequest> = {
   openai: fromOpenAI,
   anthropic: fromAnthropic,
+  gemini: fromGemini,
 };
 const DENORMALIZERS: Record<Format, (req: CanonicalRequest) => Json> = {
   openai: toOpenAI,
   anthropic: toAnthropic,
+  gemini: toGemini,
 };
 
 /** Parse a provider request into the canonical hub form. */

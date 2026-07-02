@@ -109,6 +109,46 @@ describe("anthropic → openai (reverse spoke) and back to canonical", () => {
   });
 });
 
+describe("openai → gemini (golden shape)", () => {
+  const gem = translate(OPENAI_REQ, "openai", "gemini");
+  it("lifts system into systemInstruction, not a content turn", () => {
+    expect(gem.systemInstruction).toEqual({ parts: [{ text: "You are helpful." }] });
+    expect((gem.contents as unknown[]).length).toBe(3);
+  });
+  it("maps assistant → model role and emits a functionCall part", () => {
+    const contents = gem.contents as { role: string; parts: { functionCall?: { name: string } }[] }[];
+    const modelTurn = contents.find((c) => c.role === "model");
+    expect(modelTurn?.parts.some((p) => p.functionCall?.name === "get_weather")).toBe(true);
+  });
+  it("carries the tool result as a functionResponse part in a user turn", () => {
+    const contents = gem.contents as {
+      role: string;
+      parts: { functionResponse?: { name: string } }[];
+    }[];
+    const fr = contents.flatMap((c) => c.parts).find((p) => p.functionResponse);
+    expect(fr?.functionResponse?.name).toBe("call_1");
+  });
+  it("maps tools to a functionDeclarations array", () => {
+    const tools = gem.tools as { functionDeclarations: { name: string }[] }[];
+    expect(tools[0]?.functionDeclarations[0]?.name).toBe("get_weather");
+  });
+  it("maps max_tokens/temperature into generationConfig", () => {
+    expect(gem.generationConfig).toEqual({ maxOutputTokens: 256, temperature: 0.2 });
+  });
+});
+
+describe("openai → gemini → openai round-trip (lossless on tool calls)", () => {
+  it("survives the round trip", () => {
+    const gem = translate(OPENAI_REQ, "openai", "gemini");
+    const back = translate(gem, "gemini", "openai");
+    const c = normalize(back, "openai") as CanonicalRequest;
+    expect(c.messages.find((m) => m.role === "tool")?.toolCallId).toBe("call_1");
+    expect(c.messages.find((m) => m.role === "assistant")?.toolCalls?.[0]?.name).toBe(
+      "get_weather",
+    );
+  });
+});
+
 describe("robustness", () => {
   it("malformed tool-call args become {} instead of throwing", () => {
     const c = normalize(
@@ -127,5 +167,6 @@ describe("robustness", () => {
   it("empty/garbage request yields empty messages, no throw", () => {
     expect(normalize(undefined, "openai").messages).toEqual([]);
     expect(normalize("nonsense", "anthropic").messages).toEqual([]);
+    expect(normalize("nonsense", "gemini").messages).toEqual([]);
   });
 });
