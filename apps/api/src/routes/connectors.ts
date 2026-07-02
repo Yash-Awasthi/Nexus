@@ -39,6 +39,7 @@ import {
 } from "@nexus/connectors";
 import type { FastifyInstance } from "fastify";
 
+import { pinnedFetch } from "../lib/pinned-fetch.js";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
 import { encryptWithKey, decryptWithKey } from "../lib/secret-crypto.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -494,9 +495,13 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
       const callbackUri = `${redirectBase}/api/v1/connectors/${id}/oauth/callback`;
 
       // Exchange code for token
+      // Socket-pinned fetch: the token URL is per-provider config, not raw user
+      // input, but this is a user-triggered outbound POST — pin the socket to
+      // the validated DNS answer to close the DNS-rebinding window (defense in
+      // depth, consistent with the mcp-servers.ts live-call sink).
       let tokenResponse: Record<string, unknown>;
       try {
-        const resp = await fetch(provider.tokenUrl, {
+        const resp = await pinnedFetch(provider.tokenUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
