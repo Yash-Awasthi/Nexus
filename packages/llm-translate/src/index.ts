@@ -54,7 +54,7 @@ export interface CanonicalRequest {
   stream?: boolean;
 }
 
-export type Format = "openai" | "anthropic" | "gemini";
+export type Format = "openai" | "anthropic" | "gemini" | "vertex";
 
 // ── Loose provider shapes (input/output) ─────────────────────────────────────────
 // Typed loosely on purpose: callers pass parsed JSON from arbitrary clients. We
@@ -410,17 +410,40 @@ function toGemini(req: CanonicalRequest): Json {
   return out;
 }
 
+// ── Vertex AI (Gemini) ⇄ canonical ───────────────────────────────────────────────
+// Vertex serves the *same* Gemini payload (contents/systemInstruction/tools/
+// generationConfig), but the model and streaming mode are URL-bound rather than
+// body fields: the request hits
+// `.../models/{model}:generateContent` vs `:streamGenerateContent`, so neither
+// `model` nor `stream` belongs in the body. The spokes are therefore thin wrappers
+// around the Gemini pair — read via the same parser, then strip the URL-bound keys.
+
+function fromVertex(req: Json): CanonicalRequest {
+  // Vertex bodies never carry `model`/`stream`; fromGemini already tolerates their
+  // absence, so it parses the shared payload as-is.
+  return fromGemini(req);
+}
+
+function toVertex(req: CanonicalRequest): Json {
+  const out = toGemini(req);
+  delete out.model; // model rides in the URL path segment
+  delete out.stream; // streaming is selected by the `:streamGenerateContent` verb
+  return out;
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────────
 
 const NORMALIZERS: Record<Format, (req: Json) => CanonicalRequest> = {
   openai: fromOpenAI,
   anthropic: fromAnthropic,
   gemini: fromGemini,
+  vertex: fromVertex,
 };
 const DENORMALIZERS: Record<Format, (req: CanonicalRequest) => Json> = {
   openai: toOpenAI,
   anthropic: toAnthropic,
   gemini: toGemini,
+  vertex: toVertex,
 };
 
 /** Parse a provider request into the canonical hub form. */

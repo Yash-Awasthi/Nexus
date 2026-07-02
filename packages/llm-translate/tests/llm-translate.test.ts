@@ -149,6 +149,40 @@ describe("openai → gemini → openai round-trip (lossless on tool calls)", () 
   });
 });
 
+describe("openai → vertex (golden shape — Gemini payload, URL-bound model)", () => {
+  const vx = translate(OPENAI_REQ, "openai", "vertex");
+  it("omits model and stream from the body (they are URL-bound on Vertex)", () => {
+    expect(vx.model).toBeUndefined();
+    expect(vx.stream).toBeUndefined();
+  });
+  it("keeps the Gemini contents/systemInstruction/tools shape", () => {
+    expect(vx.systemInstruction).toEqual({ parts: [{ text: "You are helpful." }] });
+    expect((vx.contents as unknown[]).length).toBe(3);
+    const tools = vx.tools as { functionDeclarations: { name: string }[] }[];
+    expect(tools[0]?.functionDeclarations[0]?.name).toBe("get_weather");
+  });
+  it("maps max_tokens/temperature into generationConfig", () => {
+    expect(vx.generationConfig).toEqual({ maxOutputTokens: 256, temperature: 0.2 });
+  });
+  it("differs from the gemini body only by the URL-bound keys", () => {
+    const gem = translate(OPENAI_REQ, "openai", "gemini");
+    const { model: _m, stream: _s, ...gemBody } = gem as Record<string, unknown>;
+    expect(vx).toEqual(gemBody);
+  });
+});
+
+describe("openai → vertex → openai round-trip (lossless on tool calls)", () => {
+  it("survives the round trip", () => {
+    const vx = translate(OPENAI_REQ, "openai", "vertex");
+    const back = translate(vx, "vertex", "openai");
+    const c = normalize(back, "openai") as CanonicalRequest;
+    expect(c.messages.find((m) => m.role === "tool")?.toolCallId).toBe("call_1");
+    expect(c.messages.find((m) => m.role === "assistant")?.toolCalls?.[0]?.name).toBe(
+      "get_weather",
+    );
+  });
+});
+
 describe("robustness", () => {
   it("malformed tool-call args become {} instead of throwing", () => {
     const c = normalize(
