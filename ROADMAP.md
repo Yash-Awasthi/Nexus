@@ -243,7 +243,8 @@ needs `NEXUS_OAUTH_VAULT_KEY`, else routes 503); `/llm-oauth/*` login/callback/r
 cooldown + circuit-breaker + quota strategies, injectable `now`/`random`, zero network).
 Sanctioned third-party OAuth only.
 
-- **4.1 Wire `AccountPool` into dispatch.**
+- **4.1 Wire `AccountPool` into dispatch.** **Shipped this branch (commit `211e41c`) — do not
+  redo.**
   Files: `apps/api/src/routes/gateway.ts` (anchors: `buildDriverRegistry()`, `resolveAlias()`,
   the POST `/gateway/messages` dispatch), `apps/api/src/lib/oauth-token-store.ts`.
   Mirror: pool behavior is already fully unit-tested in
@@ -281,7 +282,7 @@ keys, SHA-256). Gateway path is metered (`_resolveBillingKey` → `check(estimat
 (CRUD), `/billing/quota`, `/billing/usage/:tenantId` from `apps/api/src/routes/billing.ts`,
 which already aggregates `usageEvents` with drizzle `sql` sums.
 
-- **5.1 Usage-analytics UI.**
+- **5.1 Usage-analytics UI.** **Shipped this branch (commit `3dbb33b`) — do not redo.**
   Files: `apps/api/src/routes/billing.ts` (extend), new `apps/ui/app/routes/usage.tsx`,
   `apps/ui/app/routes.ts` (register next to `route("costs", "routes/costs.tsx")`).
   Mirror: API — the `/billing/current-period` handler's `usageEvents` aggregate; UI — the
@@ -377,7 +378,8 @@ Baseline: `@nexus/sandbox` (`packages/sandbox/src/index.ts`, 442 lines: `execute
 `QUOTA_BYTES = 512MB`, status/exec/ls/upload-with-413/delete, Docker exec fallback) behind
 auth + rate limits.
 
-- **8.1 Isolation spike** *(Gate — do FIRST in §8; decision gate for the rest).* Do: boot a
+- **8.1 Isolation spike** *(Gate — do FIRST in §8; decision gate for the rest; recorded Blocked
+  in PROGRESS — needs a dev host with `/dev/kvm` present).* Do: boot a
   Firecracker microVM + prove FS-level 512 MB quota end-to-end on the dev host (`/dev/kvm`
   present). Throwaway; record outcome in PROGRESS. If Firecracker fails documented KVM/jailer
   checks → gVisor systrap; Docker-limits is the interim. No production isolation code until it
@@ -408,12 +410,14 @@ Baseline: SSRF filter + resolve-then-pin (`packages/runtime/src/security-utils.t
 `createPinnedFetch(lookup)`, `pinnedFetch` — socket pinned to the validated DNS answer; used by
 MCP `/test`) + identity-keyed per-user rate limiting. `.cleanup-alerts.txt` = 48 CodeQL alerts.
 
-- **9.1 Extend pinned-fetch.**
-  Files: `apps/api/src/lib/pinned-fetch.ts` + each sink. Only `routes/mcp-servers.ts` uses
-  `pinnedFetch` today. Native-`fetch` files (audited 2026-07-02): **user-influenced URLs —
-  convert first:** routes/{api-bridge,connectors,researcher,bots,obs-providers,mail-ingest}.ts;
-  **fixed provider/infra endpoints — convert or justify:** routes/{gateway,llm-oauth,oidc,
-  oauth,geoip,libertas}.ts, lib/{sentry-reporter,cf-adapter,rate-limiter,shared-kv}.ts.
+- **9.1 Extend pinned-fetch.** *(In progress — 1/13 sinks done: `routes/connectors.ts`,
+  commit `b65f638`.)*
+  Files: `apps/api/src/lib/pinned-fetch.ts` + each sink. `routes/mcp-servers.ts` and
+  `routes/connectors.ts` use `pinnedFetch` today. Native-`fetch` files (audited 2026-07-02):
+  **user-influenced URLs — convert first:** routes/{api-bridge,researcher,bots,obs-providers,
+  mail-ingest}.ts (connectors.ts done); **fixed provider/infra endpoints — convert or
+  justify:** routes/{gateway,llm-oauth,oidc,oauth,geoip,libertas}.ts,
+  lib/{sentry-reporter,cf-adapter,rate-limiter,shared-kv}.ts.
   Do: route user-influenced sinks through `pinnedFetch` (skip internal/localhost service
   calls); one file per commit is fine.
   Test: `cd apps/api && pnpm exec vitest run tests/routes/mcp-servers.ssrf.test.ts` + a new
