@@ -460,7 +460,17 @@ worker→API SSE relay (`agent-events.ts` → Redis → `agent-events-bridge.ts`
 Worker-thread sandbox (`ptc-sandbox.ts`) + `nexus code` CLI. `agent_sessions` table = mig
 `0011`. Tests: `packages/agent-runtime/tests/{agent-runtime,fs-tools,mcp-tools,ptc}.test.ts`.
 
-- **7.1 Sessions/permissions/compaction** — mostly **wiring, not writing**: the pieces exist.
+- **7.1 Sessions/permissions/compaction.** **Done this branch (commits `6bd7f72` + `5069e39`).**
+  Compaction, session persist/resume + a static permission policy were already wired; this closed the
+  gaps: (1) runtime `HARD_STOP_THRESHOLD=0.95` — after a compaction pass that can't get under the
+  ceiling, the loop aborts with `stopReason:"context_budget_exceeded"` instead of 4xx-ing (only when
+  compaction is on; 2 tests). (2) Worker gate now layers the static policy over
+  `GovernanceEngine.evaluateTask` (`apps/worker/src/handlers/agent-governance.ts`:
+  `makeGovernanceGate`/`isDangerousToolCall`/`toGovernanceTask`) — a dangerous/unapproved mutating
+  tool is blocked even under policy "allow"; `disableGovernance` opts out; read-only tools never reach
+  the gate (8 tests). (3) A hard-stopped run persists as `rate_limited` (SessionStatus). Runtime 53
+  tests + worker governance 8 tests green.
+- **7.1 (orig notes) Sessions/permissions/compaction** — mostly **wiring, not writing**: the pieces exist.
   Files: `packages/agent-runtime/src/index.ts`, `apps/worker/src/handlers/agent-handler.ts`.
   Anchors: `PermissionGate` is a **callback type** already accepted as the `permissionGate?`
   option and consumed via `tierFor()` (`tool.tier ?? classifyTool`); `compactMessages` +
