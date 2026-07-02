@@ -407,7 +407,16 @@ handler forces `merge:false`). Worker handler:
 `apps/worker/src/handlers/orchestration-handler.ts` (112 lines, `handleOrchestrationJob`,
 runner = `handleAgentRunJob`, scorer = `handleCouncilJob`).
 
-- **6.1 Persist state.**
+- **6.1 Persist state.** **Done this branch (commit `ac88a14`).** `orchestration_runs` table
+  (mig `0013`, id=text runId, status, task, `payload`/`candidates`/`scores` jsonb, winner, error,
+  timestamps) + schema + index export; journal fixed (also appended the missing
+  `0010_usage_token_breakdown` + `0012_oauth_credentials` entries). Injectable
+  `OrchestrationRunStore` (`apps/worker/src/handlers/orchestration-store.ts`:
+  `DrizzleOrchestrationRunStore` + `NullOrchestrationRunStore` default + `reenqueueOrchestrationRuns`).
+  `handleOrchestrationJob` now takes `{store}` and upserts running(+payload)→completed|failed;
+  `task-worker` passes the Drizzle store; worker boot calls `recoverOrchestrationRuns` to re-enqueue
+  non-terminal runs (payload-less ones marked failed). 6 handler/recovery tests (fake store,
+  simulated restart) + orchestrator 7/7 + db 16/16 green.
   Files: next-free migration + `packages/db/src/schema/orchestration-runs.ts` (+ index export) +
   `apps/worker/src/handlers/orchestration-handler.ts`.
   Mirror: schema/migration recipe in Build/test rules (`agent-sessions.ts` is the closest table
