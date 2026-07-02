@@ -429,11 +429,25 @@ runner = `handleAgentRunJob`, scorer = `handleCouncilJob`).
   handler test with a fake store simulating restart.
   Done: a run survives a simulated restart.
 
-- **6.2 Compare/merge UI.** Files: new `apps/ui` route (register in `routes.ts`). Do: diff per
-  candidate; manual or scored winner select; merge stays opt-in. Done: candidates diffed,
-  winner selectable.
-- **6.3 Checkpoint/resume + gate.** Do: durable checkpoints + evidence-first verification gate
-  before merge. Done: resume-from-checkpoint test; merge blocked until the gate passes.
+- **6.2 Compare/merge UI.** **Done this branch (commit `d4e68e1`).** Read/select API
+  `apps/api/src/routes/orchestration.ts` (`GET /orchestration/runs`, `GET /orchestration/runs/:id`,
+  `POST /orchestration/runs/:id/winner` — winner must be a known candidate, guarded by the exported
+  `isKnownCandidate`; merge stays opt-in, this only records the choice) over the §6.1
+  `orchestration_runs` table; registered + rate-limited in `server.ts`. UI
+  `apps/ui/app/routes/orchestration.tsx` (registered in `routes.ts`): run list → candidate diffs in
+  `<pre>`, per-candidate score, winner badge, "Select winner". 4 guard tests; UI typecheck green.
+  Files: new `apps/ui` route (register in `routes.ts`). Done: candidates diffed, winner selectable.
+- **6.3 Checkpoint/resume + gate.** **Done this branch (commit `4d128bc`).** Orchestrator gained
+  `MergeGate` (evidence-first: winner verified before merge; `{passed:false}` blocks it),
+  `Checkpointer` (stage boundaries fanned-out/resumed/scored/gate-blocked/merged), and
+  `resumeFrom:{candidates}` — replays persisted diffs into fresh worktrees via new
+  `WorktreeManager.applyDiff` (`git apply`) WITHOUT re-running agents. Handler wires checkpoints →
+  store (scoring/blocked/merging statuses), an evidence gate (winner ok + non-empty diff), resume
+  detection (prior scoring/blocked/merging row with candidates → `resumeFrom`), and leaves a
+  gate-blocked run in the non-terminal `blocked` status (resumable). 11 orchestrator tests
+  (merge-blocked, resume-without-rerun, checkpoints) + 9 handler tests green.
+  Do: durable checkpoints + evidence-first verification gate before merge. Done: resume-from-checkpoint
+  test; merge blocked until the gate passes.
 
 ## 7. Coding-agent harness — `@nexus/agent-runtime`
 
