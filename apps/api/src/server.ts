@@ -231,70 +231,47 @@ export async function buildServer(): Promise<FastifyInstance> {
   });
 
   // ── Defense in depth: IP + per-user rate limiting on high-value route groups ──
-  const _adminRL = makeRateLimitPreHandler({ limit: 30, windowMs: 60_000, keyPrefix: "admin" });
-  const _billingRL = makeRateLimitPreHandler({ limit: 20, windowMs: 60_000, keyPrefix: "billing" });
-  const _codeReplRL = makeRateLimitPreHandler({
-    limit: 10,
-    windowMs: 60_000,
-    keyPrefix: "code-repl",
-  });
-  const _councilRL = makeRateLimitPreHandler({ limit: 30, windowMs: 60_000, keyPrefix: "council" });
-  const _orchestrationRL = makeRateLimitPreHandler({
-    limit: 30,
-    windowMs: 60_000,
-    keyPrefix: "orchestration",
-  });
+  // Each authenticated /api/v1 group below gets an IP-keyed limiter (throttles a
+  // shared-NAT/abusive source) layered with a per-identity limiter (buckets by
+  // nexusUserId or the SHA-256'd Bearer when no userId resolves). First prefix
+  // match wins. Limits scale with per-call cost: inference/exec/outbound groups
+  // are tighter than metadata reads. `gateway` is intentionally absent — that
+  // path is already spend-guarded per identity by @nexus/billing (§5).
+  const rlGroups: { prefix: string; ip: number; user: number; keyPrefix: string }[] = [
+    // Pre-existing groups (limits unchanged).
+    { prefix: "/api/v1/admin", ip: 30, user: 50, keyPrefix: "admin" },
+    { prefix: "/api/v1/billing", ip: 20, user: 100, keyPrefix: "billing" },
+    // code-repl + council carry a BYOK Bearer but often no resolved nexusUserId;
+    // the per-identity limiter buckets them by API key, not a shared NAT IP.
+    { prefix: "/api/v1/code-repl", ip: 10, user: 20, keyPrefix: "code-repl" },
+    { prefix: "/api/v1/council", ip: 30, user: 60, keyPrefix: "council" },
+    { prefix: "/api/v1/orchestration", ip: 30, user: 60, keyPrefix: "orchestration" },
+    // §9.3 — remaining high-value authenticated groups (exec / outbound / heavy compute).
+    { prefix: "/api/v1/drive", ip: 30, user: 60, keyPrefix: "drive" },
+    { prefix: "/api/v1/image-gen", ip: 20, user: 40, keyPrefix: "image-gen" },
+    { prefix: "/api/v1/voice", ip: 30, user: 60, keyPrefix: "voice" },
+    { prefix: "/api/v1/researcher", ip: 15, user: 30, keyPrefix: "researcher" },
+    { prefix: "/api/v1/scraping", ip: 30, user: 60, keyPrefix: "scraping" },
+    { prefix: "/api/v1/memory", ip: 120, user: 240, keyPrefix: "memory" },
+    { prefix: "/api/v1/agents", ip: 60, user: 120, keyPrefix: "agents" },
+    { prefix: "/api/v1/evals", ip: 30, user: 60, keyPrefix: "evals" },
+    { prefix: "/api/v1/mcp", ip: 60, user: 120, keyPrefix: "mcp" },
+  ];
+  const rlHandlers = rlGroups.map((g) => ({
+    prefix: g.prefix,
+    ip: makeRateLimitPreHandler({ limit: g.ip, windowMs: 60_000, keyPrefix: g.keyPrefix }),
+    user: makeUserRateLimitPreHandler({ limit: g.user, windowMs: 60_000, keyPrefix: g.keyPrefix }),
+  }));
 
   // IP-keyed limiter for the authenticated /api bridge scope (defense in depth).
   const apiScopeRL = makeRateLimitPreHandler({ limit: 300, windowMs: 60_000, keyPrefix: "api" });
 
-  // Per-user limits layered on top of IP limits
-  const _adminUserRL = makeUserRateLimitPreHandler({
-    limit: 50,
-    windowMs: 60_000,
-    keyPrefix: "admin",
-  });
-  const _billingUserRL = makeUserRateLimitPreHandler({
-    limit: 100,
-    windowMs: 60_000,
-    keyPrefix: "billing",
-  });
-  // code-repl + council carry a BYOK Bearer but often no resolved nexusUserId;
-  // the per-identity limiter buckets them by API key, not a shared NAT IP.
-  const _codeReplUserRL = makeUserRateLimitPreHandler({
-    limit: 20,
-    windowMs: 60_000,
-    keyPrefix: "code-repl",
-  });
-  const _councilUserRL = makeUserRateLimitPreHandler({
-    limit: 60,
-    windowMs: 60_000,
-    keyPrefix: "council",
-  });
-  const _orchestrationUserRL = makeUserRateLimitPreHandler({
-    limit: 60,
-    windowMs: 60_000,
-    keyPrefix: "orchestration",
-  });
-
   app.addHook("onRequest", async (request: FastifyRequest, reply) => {
     const url = request.url;
-    if (url.startsWith("/api/v1/admin")) {
-      await _adminRL(request, reply);
-      if (!reply.sent) await _adminUserRL(request, reply);
-    } else if (url.startsWith("/api/v1/billing")) {
-      await _billingRL(request, reply);
-      if (!reply.sent) await _billingUserRL(request, reply);
-    } else if (url.startsWith("/api/v1/code-repl")) {
-      await _codeReplRL(request, reply);
-      if (!reply.sent) await _codeReplUserRL(request, reply);
-    } else if (url.startsWith("/api/v1/council")) {
-      await _councilRL(request, reply);
-      if (!reply.sent) await _councilUserRL(request, reply);
-    } else if (url.startsWith("/api/v1/orchestration")) {
-      await _orchestrationRL(request, reply);
-      if (!reply.sent) await _orchestrationUserRL(request, reply);
-    }
+    const group = rlHandlers.find((g) => url.startsWith(g.prefix));
+    if (!group) return;
+    await group.ip(request, reply);
+    if (!reply.sent) await group.user(request, reply);
   });
 
   // ── Health (no prefix — /health, /health/ready) ───────────────────────────
