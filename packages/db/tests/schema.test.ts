@@ -9,7 +9,7 @@
  *
  * For integration tests against a real DB, see packages/db/tests/integration/.
  */
-import { fc } from "@fast-check/vitest";
+import * as fc from "fast-check";
 import { describe, it, expect } from "vitest";
 
 import {

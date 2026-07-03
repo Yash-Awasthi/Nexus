@@ -56,8 +56,13 @@ export const memoryEntries = pgTable(
     createdAt: integer("created_at").notNull(),
     /** Optional TTL — logically expired after this epoch second */
     expiresAt: integer("expires_at"),
+    /** Multi-tenant ACL — owning user/tenant identifier */
+    userId: text("user_id"),
   },
-  (t) => [index("memory_entries_created_at_idx").on(t.createdAt)],
+  (t) => [
+    index("memory_entries_created_at_idx").on(t.createdAt),
+    index("memory_entries_user_id_idx").on(t.userId),
+  ],
 );
 
 export type MemoryEntryRow = typeof memoryEntries.$inferSelect;

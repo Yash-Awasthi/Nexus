@@ -17,6 +17,7 @@ import {
   bigint,
   boolean,
   customType,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -241,8 +242,12 @@ export const memoryEntries = pgTable(
     metadata: jsonb("metadata").notNull().default({}),
     createdAt: integer("created_at").notNull(),
     expiresAt: integer("expires_at"),
+    userId: text("user_id"),
   },
-  (t) => [index("memory_entries_created_at_idx").on(t.createdAt)],
+  (t) => [
+    index("memory_entries_created_at_idx").on(t.createdAt),
+    index("memory_entries_user_id_idx").on(t.userId),
+  ],
 );
 
 // ── api_keys ───────────────────────────────────────────────────────────────────
@@ -260,6 +265,7 @@ export const apiKeys = pgTable(
       .default("free"),
     monthlyQuota: integer("monthly_quota"),
     rpmLimit: integer("rpm_limit"),
+    monthlyCostCapUsd: doublePrecision("monthly_cost_cap_usd"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
   },
@@ -279,6 +285,12 @@ export const usageEvents = pgTable(
     apiKeyId: uuid("api_key_id").notNull(),
     endpoint: text("endpoint").notNull(),
     costUnits: integer("cost_units").notNull().default(1),
+    model: text("model"),
+    promptTokens: integer("prompt_tokens").notNull().default(0),
+    completionTokens: integer("completion_tokens").notNull().default(0),
+    cacheReadTokens: integer("cache_read_tokens").notNull().default(0),
+    cacheWriteTokens: integer("cache_write_tokens").notNull().default(0),
+    costUsd: doublePrecision("cost_usd").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

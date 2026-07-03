@@ -171,3 +171,101 @@ CREATE TABLE IF NOT EXISTS "nexus_drizzle_migrations" (
   hash      text NOT NULL,
   created_at bigint
 );
+
+-- ─── api_keys ─────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS "api_keys" (
+  "id"             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "key_hash"       text NOT NULL,
+  "key_prefix"     text NOT NULL,
+  "name"           text NOT NULL,
+  "owner_id"       text NOT NULL,
+  "plan"           text NOT NULL DEFAULT 'free'
+                     CHECK ("plan" IN ('free','pro','enterprise')),
+  "monthly_quota"  integer,
+  "rpm_limit"      integer,
+  "created_at"     timestamptz NOT NULL DEFAULT now(),
+  "revoked_at"     timestamptz
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "api_keys_key_hash_udx" ON "api_keys" ("key_hash");
+CREATE INDEX IF NOT EXISTS "api_keys_owner_id_idx"        ON "api_keys" ("owner_id");
+CREATE INDEX IF NOT EXISTS "api_keys_plan_idx"            ON "api_keys" ("plan");
+
+-- ─── usage_events ─────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS "usage_events" (
+  "id"          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "api_key_id"  uuid NOT NULL,
+  "endpoint"    text NOT NULL,
+  "cost_units"  integer NOT NULL DEFAULT 1,
+  "created_at"  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS "usage_events_api_key_id_idx" ON "usage_events" ("api_key_id");
+CREATE INDEX IF NOT EXISTS "usage_events_created_at_idx" ON "usage_events" ("created_at");
+
+-- ─── subscriptions ────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS "subscriptions" (
+  "id"                     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "owner_id"               text NOT NULL,
+  "stripe_customer_id"     text NOT NULL,
+  "stripe_subscription_id" text NOT NULL,
+  "plan"                   text NOT NULL
+                             CHECK ("plan" IN ('free','pro','enterprise')),
+  "status"                 text NOT NULL
+                             CHECK ("status" IN ('active','past_due','canceled','trialing','incomplete')),
+  "current_period_end"     bigint,
+  "cancel_at_period_end"   boolean NOT NULL DEFAULT false,
+  "created_at"             timestamptz NOT NULL DEFAULT now(),
+  "updated_at"             timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "subscriptions_stripe_sub_id_udx"
+  ON "subscriptions" ("stripe_subscription_id");
+CREATE INDEX IF NOT EXISTS "subscriptions_owner_id_idx"
+  ON "subscriptions" ("owner_id");
+CREATE INDEX IF NOT EXISTS "subscriptions_stripe_customer_id_idx"
+  ON "subscriptions" ("stripe_customer_id");
+
+-- ─── stripe_webhook_events ────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS "stripe_webhook_events" (
+  "stripe_event_id"  text PRIMARY KEY,
+  "event_type"       text NOT NULL,
+  "processed_at"     timestamptz NOT NULL DEFAULT now(),
+  "error"            text
+);
+
+CREATE INDEX IF NOT EXISTS "stripe_webhook_events_event_type_idx"
+  ON "stripe_webhook_events" ("event_type");
+CREATE INDEX IF NOT EXISTS "stripe_webhook_events_processed_at_idx"
+  ON "stripe_webhook_events" ("processed_at");
+
+-- ─── forecast_runs ────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS "forecast_runs" (
+  "id"          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "domain"      text NOT NULL
+                  CHECK ("domain" IN ('risk','market','geo','military')),
+  "horizon"     text NOT NULL,
+  "result"      jsonb NOT NULL,
+  "created_at"  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS "forecast_runs_domain_idx"     ON "forecast_runs" ("domain");
+CREATE INDEX IF NOT EXISTS "forecast_runs_created_at_idx" ON "forecast_runs" ("created_at");
+
+-- ─── research_runs ────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS "research_runs" (
+  "id"          text PRIMARY KEY,
+  "query"       text NOT NULL,
+  "result"      jsonb NOT NULL,
+  "citations"   jsonb NOT NULL DEFAULT '[]'::jsonb,
+  "created_at"  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS "research_runs_query_idx"      ON "research_runs" ("query");
+CREATE INDEX IF NOT EXISTS "research_runs_created_at_idx" ON "research_runs" ("created_at");

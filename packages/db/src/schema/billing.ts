@@ -5,6 +5,7 @@ import {
   text,
   integer,
   bigint,
+  doublePrecision,
   timestamp,
   boolean,
   index,
@@ -40,6 +41,11 @@ export const apiKeys = pgTable(
     monthlyQuota: integer("monthly_quota"),
     /** Max requests per minute (null = no rate limit) */
     rpmLimit: integer("rpm_limit"),
+    /**
+     * BYOK spend-guard: max USD the user's own provider spend may reach this
+     * calendar month (null = uncapped). Metered, never charged by Nexus.
+     */
+    monthlyCostCapUsd: doublePrecision("monthly_cost_cap_usd"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     /** Set when the key is revoked; revoked keys are rejected immediately */
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
@@ -71,6 +77,18 @@ export const usageEvents = pgTable(
     endpoint: text("endpoint").notNull(),
     /** Logical cost units (1 = one API call; more for heavy inference) */
     costUnits: integer("cost_units").notNull().default(1),
+    /** Model id the call hit (null for non-inference endpoints). */
+    model: text("model"),
+    /** Prompt (input) tokens billed for this request. */
+    promptTokens: integer("prompt_tokens").notNull().default(0),
+    /** Completion (output) tokens billed for this request. */
+    completionTokens: integer("completion_tokens").notNull().default(0),
+    /** Prompt-cache read (hit) tokens. */
+    cacheReadTokens: integer("cache_read_tokens").notNull().default(0),
+    /** Prompt-cache write (store) tokens. */
+    cacheWriteTokens: integer("cache_write_tokens").notNull().default(0),
+    /** USD cost of the call, priced from provider-registry at record time. */
+    costUsd: doublePrecision("cost_usd").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
