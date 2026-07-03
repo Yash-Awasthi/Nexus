@@ -882,19 +882,55 @@ standalone fetchers (`NgaNavWarningFeed`, `SecEdgarFeed`, …). Tests:
 
 ## 14. Production multi-tenant hardening (mostly external infra; scaffolding in `infra/`)
 
-Each done when its infra is provisioned + configured (many are Blocked, see table): DB
-(PgBouncer, read replicas, PITR, encryption at rest); Auth (RS256 JWT multi-service, OAuth
-device flow for CLI, session revocation + audit, brute-force backoff); Observability (OTel
-tracing, SLO dashboards, alerting, per-tenant cost attribution); Infra (K8s HPA `infra/k8s`,
-multi-AZ PG/Redis, CDN, edge DDoS); Compliance (SOC2, GDPR residency + deletion,
-no-LLM-data-logged); Coverage (tests → 80%+ across `council`, `memory`, `runtime`).
+Backlog broken out (2026-07-03). Legend as elsewhere: **Files / Do / Done / Blocked**. Most
+items are **Blocked on provisioning**, not on code — the seams already exist. `infra/` already
+holds `k8s/` (api+worker deploys, ingress, HPA-ready), `helm/nexus`, `terraform/{modules,
+examples}`, `grafana/{dashboards,provisioning}`, `otel/{config,prometheus,grafana-datasources}`,
+`chaos/`, `k6/`. **Code-only items are executable now; do them before the Blocked ones.**
 
-## 15. Long-term / ambitious
+- **14.1 RS256 multi-service JWT** *(code-only).* **Done this branch (commit `03b0251`).**
+  `@nexus/auth` gained `signJwtRS256`/`verifyJwtRS256` (asymmetric: sign with private key, verify
+  with public — a downstream service validates without a forge-capable secret), with `alg`
+  pinning to defeat algorithm-confusion (`alg:"none"`/HS256-on-pubkey). Additive; HS256 path
+  untouched; not yet wired into `AuthConfig`/middleware. 7 new tests (37 total). **Next wiring
+  (code-only, when needed):** add `jwtPublicKey`/`jwtAlg` to `AuthConfig` + branch in
+  `authenticate` (`apps/api/src/middleware/auth.ts`), issue RS256 in `apps/api/src/routes/
+  auth-users.ts`.
+- **14.2 OTel tracing** *(code-only — already shipped earlier).* `packages/runtime/src/tracing/
+  otel-tracer.ts` (`NexusOtelTracer`, OTLP/HTTP export, `encodeTraceparent`/`parseTraceparent`).
+  Collector config in `infra/otel/config.yaml`. **Code DONE**; live collector wiring is infra.
+- **14.3 Brute-force backoff + session revocation** *(code-only, ready).* Files: `packages/auth`
+  (+ a small `apps/api/src/middleware/auth.ts` hook). Do: an in-memory/Redis-backed attempt
+  counter with exponential lockout keyed by subject+IP, and a `jti`/subject denylist checked in
+  `verifyJwt*`. Done: unit tests for lockout escalation + a revoked `jti` rejected. (Redis-backed
+  variant is Blocked on managed Redis; the in-memory library core is not.)
+- **14.4 GDPR erasure + no-LLM-data-logged assertion** *(code-only, ready).* Files: a
+  `DELETE /users/:id/data` route cascading across `packages/db` user-scoped tables + a
+  test asserting no request/response bodies hit logs. Done: deletion cascade test + log-shape
+  test green. (SOC2 evidence + data-residency routing are process/infra — **Blocked**.)
+- **14.5 Coverage → 80%** *(code-only, large).* Raise vitest coverage across `council`, `memory`,
+  `runtime` (each has a `vitest.config.ts`). Do: `pnpm --filter @nexus/<pkg> test --coverage`,
+  fill the lowest-covered modules. Done: ≥80% lines per package. Chip away one package/commit.
+- **14.6 DB / Infra provisioning** *(Blocked — see infra table).* PgBouncer, read replicas, PITR,
+  encryption-at-rest; K8s HPA (`infra/k8s`), multi-AZ PG/Redis, CDN, edge DDoS; Grafana SLO
+  dashboards + alerting (`infra/grafana`). Charts/manifests exist; each is Done when provisioned.
 
-~~Multi-tenant SaaS / Stripe~~ (struck). Plugin marketplace (`plugin-sdk` → hosted registry,
-Deno-isolate sandbox), federation (cross-instance delegation, federated council, CRDT KG sync,
-OIDC/SAML), fine-tuning pipeline (SFT via `sft-tagger` + `corpus-builder`), agentic browser
-(`stealth-browser`), desktop (Electron + offline worker), mobile (React Native + push).
+## 15. Long-term / ambitious (greenfield tracks — spec before building)
+
+~~Multi-tenant SaaS / Stripe~~ (struck). All below are multi-week greenfield; none is a
+one-commit item. Sequenced so the earliest is the most self-contained:
+
+- **15.1 Plugin marketplace.** `plugin-sdk` (typed manifest + capability grants) → hosted
+  registry → Deno-isolate sandbox execution. **First code-only slice:** the `plugin-sdk` package
+  (manifest schema + validator + a `loadPlugin` seam), mockable, no hosting. Registry + sandbox
+  runtime come after.
+- **15.2 Federation.** Cross-instance delegation, federated council, CRDT KG sync, OIDC/SAML.
+  Leans on §12's `@nexus/a2a` (agent-to-agent) as the delegation transport — start there.
+- **15.3 Fine-tuning pipeline.** SFT via `sft-tagger` + `corpus-builder` (dataset assembly →
+  export JSONL). Code-only up to the export; actual training runs are infra/GPU (**Blocked**).
+- **15.4 Agentic browser** (`stealth-browser`), **15.5 Desktop** (Electron + offline worker),
+  **15.6 Mobile** (React Native + push) — product tracks; each needs its own spec + scaffolding
+  decision before any roadmap `N.k` items are written.
 
 ---
 
