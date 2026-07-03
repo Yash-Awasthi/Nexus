@@ -779,6 +779,15 @@ Baseline: `packages/mcp-client/src/index.ts` (336 lines): `McpClient`, `McpTrans
   `McpToolClient` is a structural subset and the additions are purely additive. 30 tests
   (injectable-fetch, method-routing mock); typecheck + lint + build green.
 - **12.2** A2A JSON-RPC-over-SSE (authn'd, no impersonation) — greenfield package.
+  **Done this branch (commit follows).** New `@nexus/a2a` package: `A2AClient` drives one remote
+  agent over JSON-RPC 2.0 — `getAgentCard` (cached `/.well-known/agent-card.json` discovery),
+  `sendMessage` (`message/send`), `sendMessageStream` (`message/stream` over SSE, gated on the
+  card's `capabilities.streaming`), `getTask`/`cancelTask`. Full A2A type surface (Message/Part,
+  Task/TaskStatus/Artifact, status- & artifact-update stream events, Agent Card). Exported
+  `parseSseStream` decodes the byte stream (multi-line `data:`, CRLF, non-data fields).
+  **No impersonation:** authenticates only with the client's own bearer; any caller-supplied
+  `Authorization` in `extraHeaders` is stripped. Same injectable-`fetch` test seam as
+  `mcp-client`. 22 tests (real `Response`/`ReadableStream` SSE); typecheck + lint + build green.
 - **12.3** Optional `mcp-compressor` to shrink tool manifests 60–95%.
 
 ## 13. Domain feeds — `@nexus/domain-feeds`
