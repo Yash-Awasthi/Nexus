@@ -28,6 +28,20 @@ A capability-by-capability reference. For how the pieces fit together see
 | Observability            | OpenTelemetry (OTLP) traces, Prometheus metrics, Grafana dashboards, and HMAC-SHA256-chained audit logs.                        |
 | Auth + BYOK              | API key plus HS256 JWT; OAuth connectors; per-user LLM keys encrypted at rest (AES-256-GCM) and resolved server-side.           |
 
+## HTTP API surface
+
+The capabilities above are implemented as the `@nexus/*` packages and are exercised
+directly (SDK + tests). They are exposed over HTTP through two layers:
+
+- **`/api/v1/*`** — production, DB-backed endpoints: auth, council, memory, connectors,
+  billing, feature-flags, projects, orchestration, image-gen, voice, scraping, MCP,
+  knowledge-graph, and more. These are what the dashboard's core flows use.
+- **`/api/*`** — a broad compatibility bridge covering the wider feature catalogue
+  (simulate, extraction, analytics, and dozens more). It is backed by an in-memory store
+  for demonstration; treat its data as synthetic until a `/api/v1` handler exists.
+
+New endpoints graduate from the bridge to `/api/v1` as they are wired to Postgres.
+
 ## Core concepts
 
 **Agent runtime** — a multi-step tool loop. Agents plan, call tools, observe results, and
