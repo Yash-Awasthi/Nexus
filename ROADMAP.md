@@ -569,6 +569,38 @@ auth + rate limits.
   isolation code (§8.2–§8.6) until this passes.**
   Do: boot a Firecracker microVM + prove FS-level 512 MB quota end-to-end. Throwaway; record
   outcome in PROGRESS.
+
+  **Researched procedure (2026-07-03; from the official `firecracker/docs/getting-started.md`).
+  Ready to paste-and-run once the user opens the Gate — every step below is a live/host-mutating
+  action, so DO NOT run any of it inside a normal coding turn.**
+  1. *KVM preflight* (hardware already judged READY):
+     `lsmod | grep kvm` · `[ -r /dev/kvm ] && [ -w /dev/kvm ] && echo OK || sudo setfacl -m u:${USER}:rw /dev/kvm`
+  2. *Install the static binary* (no build):
+     ```
+     ARCH="$(uname -m)"; url="https://github.com/firecracker-microvm/firecracker/releases"
+     latest=$(basename $(curl -fsSLI -o /dev/null -w %{url_effective} ${url}/latest))
+     curl -L ${url}/download/${latest}/firecracker-${latest}-${ARCH}.tgz | tar -xz
+     mv release-${latest}-${ARCH}/firecracker-${latest}-${ARCH} ./firecracker
+     ```
+  3. *Kernel + rootfs* from Firecracker CI S3 (`https://s3.amazonaws.com/spec.ccfc.min`): `wget`
+     the latest `vmlinux` and the Ubuntu squashfs; `unsquashfs` → inject an ssh key into
+     `squashfs-root/root/.ssh/authorized_keys` → `truncate -s 1G ubuntu.ext4` →
+     `sudo mkfs.ext4 -d squashfs-root -F ubuntu.ext4`. **For the quota test build the rootfs on a
+     512 MB loopback-ext4 with a project quota instead**, so the write cap is FS-enforced.
+  4. *Run* (terminal 1): `sudo rm -f /tmp/fc.socket; sudo ./firecracker --api-sock /tmp/fc.socket`.
+  5. *Configure + boot* (terminal 2) — `PUT` over the unix socket in order: `/boot-source`
+     (`kernel_image_path`, `boot_args:"console=ttyS0 reboot=k panic=1"`), `/drives/rootfs`
+     (`path_on_host`, `is_root_device:true`), optional `/network-interfaces/net1` (tap0), then
+     `sleep 0.015; PUT /actions {"action_type":"InstanceStart"}`. (Or skip the API: `--config-file
+     vm.json` with kernel+rootfs.)
+  6. *Prove the quota*: SSH in (root/root), `dd if=/dev/zero of=/workspace/big bs=1M count=600` —
+     **PASS = write hard-fails at ~512 MB at the FS layer**, not app-level accounting. Record
+     pass/fail + `dd` error in PROGRESS.
+  7. *Teardown*: `reboot` inside the guest (Firecracker has no guest power-mgmt, so this exits the
+     VMM); `sudo rm -f /tmp/fc.socket`; delete the kernel/rootfs/tap. Nothing is committed.
+  Fallback if Firecracker fails its KVM/jailer checks: gVisor `runsc` (systrap); Docker `--memory`/
+  `--storage-opt` limits are the interim (docker client 29.6.1 present). **Gate stays closed until
+  the user says go.**
 - **8.2 FS-level quota.** Files: `apps/api/src/routes/drive.ts` + sandbox mount. Do: replace the
   app-level `QUOTA_BYTES` accounting with loopback-ext4/XFS-project quota. Done: a write past
   512 MB hard-fails at the FS layer (`cd apps/api && pnpm exec vitest run tests/routes/drive.test.ts`).
@@ -808,6 +840,34 @@ standalone fetchers (`NgaNavWarningFeed`, `SecEdgarFeed`, …). Tests:
 
 - **13.1 Port-congestion source.** Do: verify a live keyless source (**Gate** — live probe),
   then add the adapter mirroring `MaritimeFeed`. Done: adapter + mocked-fetch test.
+
+  **Researched candidate (2026-07-03): IMF PortWatch — official, public, KEYLESS.** Sourced from
+  UN Global Platform AIS; served from public ArcGIS Online feature services (no token/key, `httr`
+  GET only, per the IMF's own R tutorial). Two relevant datasets, both `/FeatureServer/0/query`
+  on host `services9.arcgis.com/weJ1QsnbMYJlCHdG`:
+  - **`Daily_Chokepoints_Data`** — *the port-congestion signal*: daily transit counts + capacity
+    at maritime chokepoints (Suez, Panama, Hormuz, Bosphorus, …). Fields: `date` (epoch **ms**),
+    `year/month/day`, `portid`, `portname`, `n_container/n_dry_bulk/n_general_cargo/n_roro/
+    n_tanker/n_cargo/n_total`, `capacity_*`, `capacity`, `ObjectId`. Congestion ≈ `n_total` vs a
+    trailing-mean `capacity` (a sharp transit drop or capacity overshoot = disruption).
+  - **`Daily_Ports_Data`** — 2065 ports: `date`, `portid`, `portname`, `country`, `ISO3`,
+    `portcalls*`, `import*`, `export*`, `ObjectId`. A `portcalls` collapse vs baseline = closure.
+
+  Full query URL (verbatim):
+  `https://services9.arcgis.com/weJ1QsnbMYJlCHdG/ArcGIS/rest/services/Daily_Chokepoints_Data/FeatureServer/0/query`
+  Params: `where=1=1` (or `portid='chokepoint1'` / `date>…`), `outFields=*`, `f=json`,
+  `returnCountOnly=true` for a count first, then paginate with `resultOffset` (batch ≤5000 via
+  `maxRecordCountFactor`). Field metadata: same URL minus `/query`, plus `?f=json`. Refreshed
+  weekly (Tue 09:00 ET) with daily rows.
+
+  **Execution plan (build behind the Gate):** (a) **Gate/live probe** — `curl` the count + one
+  page to confirm the current field names/date encoding still match this note; (b) add a
+  `PortCongestionFeed extends FeatureAdapter<MaritimeEvent>` (or a new `PortEvent`) next to
+  `MaritimeFeed`, baseUrl the FeatureServer, `eventType:"port_closure"`, parse epoch-ms `date`,
+  derive severity from the transit-vs-capacity anomaly, resilient mock fallback on malformed JSON
+  exactly like `MaritimeFeed`; (c) mocked-fetch test with a real-shape ArcGIS
+  `{features:[{attributes:{…}}]}` payload — **no live call in the test**. Done: adapter +
+  mocked-fetch test green. Only step (a) is the Gate.
 - **13.2 AIS vessel-name enrichment.** Files: `MaritimeFeed`. Do: enrich via Digitraffic
   `/vessels` (live probe = **Gate**; test with mocked fetch). Done: names attached to incidents.
   **Done this branch (commit `e85cb4f`).** Added opt-in `enrichVesselNames` to `MaritimeFeed`
