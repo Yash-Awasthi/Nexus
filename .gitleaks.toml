@@ -7,7 +7,7 @@ useDefault = true
 
 [allowlist]
 description = "Allowlisted patterns"
-# Allow placeholder values in example files and docs
+# Allow placeholder values in example files, docs, and tests
 regexes = [
   "NEXUS_API_KEY.*=.*<your-",
   "NEXUS_API_KEY.*=.*your-api-key",
@@ -15,12 +15,19 @@ regexes = [
   "NEXUS_API_KEY.*=.*dev-secret",
   "example\\.com",
   "localhost",
+  # AKIAIOSFODNN7EXAMPLE is the canonical fake AWS key used in AWS documentation
+  # See: https://docs.aws.amazon.com/general/latest/gr/aws-access-keys-best-practices.html
+  "AKIAIOSFODNN7EXAMPLE",
+  "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
 ]
 paths = [
   ".env.example",
+  "apps/.*\\.env\\.example",
   "docs/",
   "README.md",
   "CONTRIBUTING.md",
+  "packages/file-store/tests/",
+  "infra/terraform/examples/",
 ]
 
 # Custom rules on top of defaults

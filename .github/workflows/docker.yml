@@ -39,9 +39,12 @@ jobs:
           - service: ingest
             dockerfile: services/ingest/Dockerfile
             image_suffix: ingest
+          - service: ui
+            dockerfile: apps/ui/Dockerfile
+            image_suffix: ui
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -93,7 +96,7 @@ jobs:
     if: github.event_name == 'pull_request'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Start stack
         run: |

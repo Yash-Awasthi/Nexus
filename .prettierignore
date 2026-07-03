@@ -1,7 +1,9 @@
 node_modules/
 dist/
+build/
 coverage/
 .turbo/
+.react-router/
 *.gen.ts
 *.gen.py
 pnpm-lock.yaml

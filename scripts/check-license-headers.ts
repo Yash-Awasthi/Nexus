@@ -25,9 +25,11 @@ const SPDX_PATTERNS: Record<string, RegExp> = {
 const IGNORE_DIRS = new Set([
   "node_modules",
   "dist",
+  "build",
   "coverage",
   ".turbo",
   ".git",
+  ".react-router", // React Router SPA typegen output (generated, gitignored)
   ".changeset",
   "vendor",
   ".venv",
