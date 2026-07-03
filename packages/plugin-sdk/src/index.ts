@@ -440,3 +440,7 @@ export class SocialBadBodyError extends Error {
     this.identifier = identifier;
   }
 }
+
+// ── Marketplace: distributable plugin manifests (§15.1) ───────────────────────
+
+export * from "./plugin-manifest.js";
