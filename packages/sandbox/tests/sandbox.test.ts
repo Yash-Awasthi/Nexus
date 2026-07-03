@@ -15,6 +15,8 @@ import {
   MAX_TIMEOUT_MS,
   MAX_OUTPUT_BYTES,
   SAFE_ENV_KEYS,
+  SECCOMP_PROFILE_PATH,
+  SCRATCH_DIR,
   type SandboxTask,
   type Runner,
   type RunnerResult,
@@ -426,9 +428,7 @@ describe("defaultRunner — success paths", () => {
   });
 
   it("captures stderr separately", async () => {
-    spawnMock.mockReturnValue(
-      makeFakeProc({ stderr: "Warning: deprecated", exitCode: 0 }),
-    );
+    spawnMock.mockReturnValue(makeFakeProc({ stderr: "Warning: deprecated", exitCode: 0 }));
     const result = await defaultRunner("node", ["-e", "x"], {
       timeoutMs: 5000,
       env: {},
@@ -599,6 +599,46 @@ describe("buildDockerArgs", () => {
     const vIdx = args.indexOf("-v");
     expect(vIdx).toBeGreaterThan(-1);
     expect(args[vIdx + 1]).toMatch(/:ro$/);
+  });
+
+  // ── §9.4 hardening: seccomp + read-only rootfs + non-root user ──────────────
+  it("applies the default seccomp profile", () => {
+    const args = buildDockerArgs();
+    expect(args).toContain(`--security-opt=seccomp=${SECCOMP_PROFILE_PATH}`);
+    expect(SECCOMP_PROFILE_PATH).toMatch(/seccomp-default\.json$/);
+  });
+
+  it("respects a custom seccomp profile path", () => {
+    const args = buildDockerArgs({ seccompProfilePath: "/etc/custom-seccomp.json" });
+    expect(args).toContain("--security-opt=seccomp=/etc/custom-seccomp.json");
+  });
+
+  it("runs the container root filesystem read-only by default", () => {
+    const args = buildDockerArgs();
+    expect(args).toContain("--read-only");
+  });
+
+  it("provides a writable scratch tmpfs and points TMPDIR at it when read-only", () => {
+    const args = buildDockerArgs({ scratchMb: 32 });
+    expect(args).toContain(`--tmpfs=${SCRATCH_DIR}:rw,nosuid,nodev,size=32m`);
+    expect(args).toContain(`--env=TMPDIR=${SCRATCH_DIR}`);
+  });
+
+  it("omits read-only rootfs and scratch when readOnlyRootfs is false", () => {
+    const args = buildDockerArgs({ readOnlyRootfs: false });
+    expect(args).not.toContain("--read-only");
+    expect(args.some((a) => a.startsWith("--tmpfs="))).toBe(false);
+    expect(args.some((a) => a.startsWith("--env=TMPDIR="))).toBe(false);
+  });
+
+  it("runs as a non-root user by default (1000:1000)", () => {
+    const args = buildDockerArgs();
+    expect(args).toContain("--user=1000:1000");
+  });
+
+  it("respects a custom runAsUser", () => {
+    const args = buildDockerArgs({ runAsUser: "2000:2000" });
+    expect(args).toContain("--user=2000:2000");
   });
 });
 

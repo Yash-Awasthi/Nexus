@@ -48,7 +48,7 @@ describe("renderMarkdown", () => {
   });
 
   it("includes custom sections", () => {
-    const md = renderMarkdown("ctx", { sections: { "Custom": "body text" } });
+    const md = renderMarkdown("ctx", { sections: { Custom: "body text" } });
     expect(md).toContain("## Custom");
     expect(md).toContain("body text");
   });
@@ -110,7 +110,9 @@ describe("CursorAdapter", () => {
 
   it("inject returns success=false on fs error", async () => {
     const badFs: NullFs = Object.assign(new NullFs(), {
-      writeFile: async () => { throw new Error("disk full"); },
+      writeFile: async () => {
+        throw new Error("disk full");
+      },
     });
     const result = await adapter.inject(ROOT, CTX, badFs);
     expect(result.success).toBe(false);
@@ -135,7 +137,10 @@ describe("WindsurfAdapter", () => {
   let fs: NullFs;
   let adapter: WindsurfAdapter;
 
-  beforeEach(() => { fs = new NullFs(); adapter = new WindsurfAdapter(); });
+  beforeEach(() => {
+    fs = new NullFs();
+    adapter = new WindsurfAdapter();
+  });
 
   it("name is 'windsurf'", () => expect(adapter.name).toBe("windsurf"));
 
@@ -163,7 +168,10 @@ describe("CodexAdapter", () => {
   let fs: NullFs;
   let adapter: CodexAdapter;
 
-  beforeEach(() => { fs = new NullFs(); adapter = new CodexAdapter(); });
+  beforeEach(() => {
+    fs = new NullFs();
+    adapter = new CodexAdapter();
+  });
 
   it("name is 'codex'", () => expect(adapter.name).toBe("codex"));
 
@@ -191,7 +199,10 @@ describe("GeminiCLIAdapter", () => {
   let fs: NullFs;
   let adapter: GeminiCLIAdapter;
 
-  beforeEach(() => { fs = new NullFs(); adapter = new GeminiCLIAdapter(); });
+  beforeEach(() => {
+    fs = new NullFs();
+    adapter = new GeminiCLIAdapter();
+  });
 
   it("name is 'gemini-cli'", () => expect(adapter.name).toBe("gemini-cli"));
 

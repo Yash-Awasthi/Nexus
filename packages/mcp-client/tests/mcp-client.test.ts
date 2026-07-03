@@ -8,6 +8,26 @@ import {
   type McpResourceEntry,
 } from "../src/index.js";
 
+// Route each JSON-RPC call to a per-method result body, so initialize() (which
+// also fires notifications/initialized) and a subsequent gated call can resolve
+// independently regardless of call order.
+function mockFetchByMethod(byMethod: Record<string, unknown>) {
+  return vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+    const body = JSON.parse(init.body as string) as { method: string };
+    return {
+      ok: true,
+      status: 200,
+      json: async () => makeRpcResponse(byMethod[body.method] ?? {}),
+    };
+  }) as unknown as typeof fetch;
+}
+
+const INIT_WITH_CAPS = {
+  serverInfo: { name: "test-server", version: "1.0.0" },
+  capabilities: { tools: {}, resources: {}, prompts: {}, completions: {} },
+  protocolVersion: "2024-11-05",
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 // McpHttpTransport.send(method, params) → calls fetchFn(url, { method: "POST", body: jsonRpc })
 // Response must be { jsonrpc, id, result } or { jsonrpc, id, error }
@@ -204,7 +224,10 @@ describe("McpClient.callTool", () => {
     const client = new McpClient({ serverUrl: SERVER_URL, fetchFn });
     await client.callTool("read_file", { path: "/etc/hosts" });
 
-    const body = capturedBody as { method: string; params: { name: string; arguments: Record<string, unknown> } };
+    const body = capturedBody as {
+      method: string;
+      params: { name: string; arguments: Record<string, unknown> };
+    };
     expect(body.method).toBe("tools/call");
     expect(body.params.name).toBe("read_file");
     expect(body.params.arguments.path).toBe("/etc/hosts");
@@ -272,5 +295,173 @@ describe("McpClientError", () => {
     const fetchFn = vi.fn().mockRejectedValue(new Error("ECONNREFUSED")) as unknown as typeof fetch;
     const client = new McpClient({ serverUrl: SERVER_URL, fetchFn });
     await expect(client.initialize()).rejects.toThrow();
+  });
+});
+
+// ── Capability tracking ───────────────────────────────────────────────────────
+
+describe("McpClient.capabilities", () => {
+  it("is empty before initialize()", () => {
+    const client = new McpClient({
+      serverUrl: SERVER_URL,
+      fetchFn: mockFetch(makeRpcResponse({})),
+    });
+    expect(client.capabilities).toEqual({});
+  });
+
+  it("records the capabilities the server advertised at initialize()", async () => {
+    const fetchFn = mockFetchByMethod({ initialize: INIT_WITH_CAPS });
+    const client = new McpClient({ serverUrl: SERVER_URL, fetchFn });
+    await client.initialize();
+    expect(client.capabilities.prompts).toBeDefined();
+    expect(client.capabilities.completions).toBeDefined();
+    expect(client.capabilities.logging).toBeUndefined();
+  });
+});
+
+// ── McpClient.ping ────────────────────────────────────────────────────────────
+
+describe("McpClient.ping", () => {
+  it("resolves when the server answers (no capability required)", async () => {
+    const fetchFn = mockFetch(makeRpcResponse({}));
+    const client = new McpClient({ serverUrl: SERVER_URL, fetchFn });
+    await expect(client.ping()).resolves.toBeUndefined();
+  });
+
+  it("rejects when the transport errors", async () => {
+    const fetchFn = mockFetch({}, false);
+    const client = new McpClient({ serverUrl: SERVER_URL, fetchFn });
+    await expect(client.ping()).rejects.toThrow(McpClientError);
+  });
+});
+
+// ── Capability gating ─────────────────────────────────────────────────────────
+
+describe("McpClient capability gating (no unscoped capability)", () => {
+  it("throws NOT_INITIALIZED when a gated method is called before initialize()", async () => {
+    const client = new McpClient({
+      serverUrl: SERVER_URL,
+      fetchFn: mockFetch(makeRpcResponse({})),
+    });
+    await expect(client.listPrompts()).rejects.toMatchObject({ code: "NOT_INITIALIZED" });
+  });
+
+  it("throws CAPABILITY_UNSUPPORTED when the server did not advertise the capability", async () => {
+    // INIT_RESULT only advertises tools + resources, not prompts/completions.
+    const fetchFn = mockFetchByMethod({ initialize: INIT_RESULT });
+    const client = new McpClient({ serverUrl: SERVER_URL, fetchFn });
+    await client.initialize();
+    await expect(client.listPrompts()).rejects.toMatchObject({ code: "CAPABILITY_UNSUPPORTED" });
+    await expect(
+      client.complete({ type: "ref/prompt", name: "x" }, { name: "a", value: "" }),
+    ).rejects.toMatchObject({ code: "CAPABILITY_UNSUPPORTED" });
+  });
+
+  it("does not emit any request when a capability is unsupported", async () => {
+    const fetchFn = mockFetchByMethod({ initialize: INIT_RESULT });
+    const client = new McpClient({ serverUrl: SERVER_URL, fetchFn });
+    await client.initialize();
+    const callsAfterInit = (fetchFn as unknown as { mock: { calls: unknown[] } }).mock.calls.length;
+    await expect(client.getPrompt("greet")).rejects.toThrow(McpClientError);
+    expect((fetchFn as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBe(
+      callsAfterInit,
+    );
+  });
+});
+
+// ── McpClient.listPrompts / getPrompt ─────────────────────────────────────────
+
+describe("McpClient prompts", () => {
+  const PROMPTS = [
+    { name: "greet", description: "Greeting", arguments: [{ name: "who", required: true }] },
+  ];
+
+  it("lists prompts when the capability is advertised", async () => {
+    const fetchFn = mockFetchByMethod({
+      initialize: INIT_WITH_CAPS,
+      "prompts/list": { prompts: PROMPTS },
+    });
+    const client = new McpClient({ serverUrl: SERVER_URL, fetchFn });
+    await client.initialize();
+    const prompts = await client.listPrompts();
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]?.name).toBe("greet");
+  });
+
+  it("renders a prompt via getPrompt", async () => {
+    const fetchFn = mockFetchByMethod({
+      initialize: INIT_WITH_CAPS,
+      "prompts/get": {
+        description: "Greeting",
+        messages: [{ role: "user", content: { type: "text", text: "Hi Ada" } }],
+      },
+    });
+    const client = new McpClient({ serverUrl: SERVER_URL, fetchFn });
+    await client.initialize();
+    const rendered = await client.getPrompt("greet", { who: "Ada" });
+    expect(rendered.messages[0]?.content.text).toBe("Hi Ada");
+  });
+});
+
+// ── McpClient.listResourceTemplates ───────────────────────────────────────────
+
+describe("McpClient.listResourceTemplates", () => {
+  it("returns resource templates when resources capability is advertised", async () => {
+    const fetchFn = mockFetchByMethod({
+      initialize: INIT_WITH_CAPS,
+      "resources/templates/list": {
+        resourceTemplates: [{ uriTemplate: "file:///docs/{name}.md", name: "doc" }],
+      },
+    });
+    const client = new McpClient({ serverUrl: SERVER_URL, fetchFn });
+    await client.initialize();
+    const templates = await client.listResourceTemplates();
+    expect(templates[0]?.uriTemplate).toBe("file:///docs/{name}.md");
+  });
+});
+
+// ── McpClient.complete ────────────────────────────────────────────────────────
+
+describe("McpClient.complete", () => {
+  it("returns completion candidates", async () => {
+    const fetchFn = mockFetchByMethod({
+      initialize: INIT_WITH_CAPS,
+      "completion/complete": { completion: { values: ["ada", "alan"], total: 2, hasMore: false } },
+    });
+    const client = new McpClient({ serverUrl: SERVER_URL, fetchFn });
+    await client.initialize();
+    const res = await client.complete(
+      { type: "ref/prompt", name: "greet" },
+      { name: "who", value: "a" },
+    );
+    expect(res.values).toEqual(["ada", "alan"]);
+    expect(res.total).toBe(2);
+    expect(res.hasMore).toBe(false);
+  });
+});
+
+// ── Pagination ────────────────────────────────────────────────────────────────
+
+describe("McpClient pagination", () => {
+  it("listTools follows nextCursor across multiple pages", async () => {
+    let call = 0;
+    const fetchFn = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string) as {
+        method: string;
+        params?: { cursor?: string };
+      };
+      if (body.method !== "tools/list") return { ok: true, json: async () => makeRpcResponse({}) };
+      call++;
+      const page =
+        call === 1 ? { tools: [TOOLS_RESULT[0]], nextCursor: "c2" } : { tools: [TOOLS_RESULT[1]] };
+      return { ok: true, json: async () => makeRpcResponse(page) };
+    }) as unknown as typeof fetch;
+
+    const client = new McpClient({ serverUrl: SERVER_URL, fetchFn });
+    const tools = await client.listTools();
+    expect(call).toBe(2);
+    expect(tools).toHaveLength(2);
+    expect(tools[0]?.name).toBe("read_file");
+    expect(tools[1]?.name).toBe("write_file");
   });
 });

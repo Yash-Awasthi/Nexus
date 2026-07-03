@@ -23,7 +23,9 @@ const MODEL_CFG: MLXModelConfig = {
 describe("NullMLXBridge", () => {
   let bridge: NullMLXBridge;
 
-  beforeEach(() => { bridge = new NullMLXBridge(); });
+  beforeEach(() => {
+    bridge = new NullMLXBridge();
+  });
 
   it("loaded is false initially", () => expect(bridge.loaded).toBe(false));
   it("modelPath is undefined initially", () => expect(bridge.modelPath).toBeUndefined());
@@ -163,20 +165,29 @@ describe("MLXLLMProvider", () => {
   });
 
   it("complete auto-loads model on first call", async () => {
-    await provider.complete({ model: MODEL_CFG.modelPath, messages: [{ role: "user", content: "hi" }] });
+    await provider.complete({
+      model: MODEL_CFG.modelPath,
+      messages: [{ role: "user", content: "hi" }],
+    });
     expect(bridge.loaded).toBe(true);
     expect(bridge.loadCalls).toHaveLength(1);
   });
 
   it("complete does not reload if model already loaded", async () => {
     await bridge.load(MODEL_CFG);
-    await provider.complete({ model: MODEL_CFG.modelPath, messages: [{ role: "user", content: "hi" }] });
+    await provider.complete({
+      model: MODEL_CFG.modelPath,
+      messages: [{ role: "user", content: "hi" }],
+    });
     expect(bridge.loadCalls).toHaveLength(1); // loaded by us above, not again by provider
   });
 
   it("complete returns LLMResponse with content", async () => {
     bridge.setResponse({ text: "The answer is 42." });
-    const res = await provider.complete({ model: MODEL_CFG.modelPath, messages: [{ role: "user", content: "What is the answer?" }] });
+    const res = await provider.complete({
+      model: MODEL_CFG.modelPath,
+      messages: [{ role: "user", content: "What is the answer?" }],
+    });
     expect(res.content).toBe("The answer is 42.");
   });
 
@@ -186,10 +197,15 @@ describe("MLXLLMProvider", () => {
   });
 
   it("complete returns usage stats", async () => {
-    const res = await provider.complete({ model: MODEL_CFG.modelPath, messages: [{ role: "user", content: "hello" }] });
+    const res = await provider.complete({
+      model: MODEL_CFG.modelPath,
+      messages: [{ role: "user", content: "hello" }],
+    });
     expect(res.usage?.promptTokens).toBeGreaterThan(0);
     expect(res.usage?.completionTokens).toBeGreaterThan(0);
-    expect(res.usage?.totalTokens).toBe((res.usage?.promptTokens ?? 0) + (res.usage?.completionTokens ?? 0));
+    expect(res.usage?.totalTokens).toBe(
+      (res.usage?.promptTokens ?? 0) + (res.usage?.completionTokens ?? 0),
+    );
   });
 
   it("complete passes maxTokens to bridge", async () => {

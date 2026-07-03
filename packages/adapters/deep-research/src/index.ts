@@ -17,7 +17,12 @@
  * Task type: "deep-research.run"
  */
 
-import { defineAdapter, requireEnv, AdapterHttpError, type IExecutionContext } from "@nexus/plugin-sdk";
+import {
+  defineAdapter,
+  requireEnv,
+  AdapterHttpError,
+  type IExecutionContext,
+} from "@nexus/plugin-sdk";
 
 // ── External API constants ────────────────────────────────────────────────────
 
@@ -182,7 +187,12 @@ function parseGaps(raw: string): string[] {
   if (noGapPattern.test(raw)) return [];
   return raw
     .split("\n")
-    .map((line) => line.replace(/^\s*[\d]+[.)]\s*/, "").replace(/^[-•*]\s*/, "").trim())
+    .map((line) =>
+      line
+        .replace(/^\s*[\d]+[.)]\s*/, "")
+        .replace(/^[-•*]\s*/, "")
+        .trim(),
+    )
     .filter((line) => line.length > 8) // ignore trivially short lines
     .slice(0, 5); // max 5 gap queries per iteration
 }
@@ -211,10 +221,7 @@ function mergeSources(existing: GatheredSource[], newResults: TavilyResult[]): G
 
 function formatEvidence(sources: GatheredSource[]): string {
   return sources
-    .map(
-      (s, i) =>
-        `[${i + 1}] ${s.title}\nURL: ${s.url}\nSnippet: ${s.snippet}`,
-    )
+    .map((s, i) => `[${i + 1}] ${s.title}\nURL: ${s.url}\nSnippet: ${s.snippet}`)
     .join("\n\n");
 }
 

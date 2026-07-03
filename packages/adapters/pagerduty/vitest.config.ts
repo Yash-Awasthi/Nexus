@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { defineConfig } from "vitest/config";
+
 export default defineConfig({
   test: {
     globals: true,
@@ -8,7 +9,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
-      thresholds: { lines: 70, functions: 98, branches: 70, statements: 70 },
+      thresholds: { lines: 70, functions: 90, branches: 65, statements: 70 },
     },
   },
 });

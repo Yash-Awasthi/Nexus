@@ -1,8 +1,8 @@
 {
-  "name": "@nexus/adapter-ide",
+  "name": "@nexus/a2a",
   "version": "0.0.0",
   "private": false,
-  "description": "NEXUS IDE context adapters (Cursor, Windsurf, Codex, Gemini CLI)",
+  "description": "A2A (Agent2Agent) client — call remote agents over JSON-RPC 2.0 with SSE streaming; agent-card discovery, message/send, message/stream, tasks/get, tasks/cancel",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -17,10 +17,14 @@
     "build": "tsc --project tsconfig.json",
     "dev": "tsc --project tsconfig.json --watch",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
     "clean": "rm -rf dist coverage",
     "test": "vitest run --passWithNoTests"
   },
   "devDependencies": {
-    "typescript": "^5.6.3"
-  }
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8",
+    "@vitest/coverage-v8": "^2.1.8"
+  },
+  "dependencies": {}
 }

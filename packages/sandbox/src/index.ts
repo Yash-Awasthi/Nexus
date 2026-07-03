@@ -19,10 +19,11 @@
  */
 
 import { spawn } from "child_process";
+import { randomUUID } from "crypto";
 import { writeFile, unlink } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { randomUUID } from "crypto";
+import { fileURLToPath } from "url";
 
 import { defineAdapter, requireEnv, type IExecutionContext } from "@nexus/plugin-sdk";
 
@@ -30,6 +31,7 @@ import { defineAdapter, requireEnv, type IExecutionContext } from "@nexus/plugin
 
 export type SandboxLanguage = "javascript" | "typescript" | "python" | "bash";
 
+/** Sandbox task interface definition. */
 export interface SandboxTask {
   taskType: "sandbox.execute";
   /** Source code to execute */
@@ -48,6 +50,7 @@ export interface SandboxTask {
   extraEnv?: Record<string, string>;
 }
 
+/** Sandbox result interface definition. */
 export interface SandboxResult {
   ok: boolean;
   /** stdout output (truncated at 64 KiB) */
@@ -74,6 +77,7 @@ export interface RunnerOptions {
   env: NodeJS.ProcessEnv;
 }
 
+/** Runner result interface definition. */
 export interface RunnerResult {
   stdout: string;
   stderr: string;
@@ -81,11 +85,8 @@ export interface RunnerResult {
   timedOut: boolean;
 }
 
-export type Runner = (
-  cmd: string,
-  args: string[],
-  opts: RunnerOptions,
-) => Promise<RunnerResult>;
+/** Runner type alias. */
+export type Runner = (cmd: string, args: string[], opts: RunnerOptions) => Promise<RunnerResult>;
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -109,9 +110,7 @@ const SAFE_ENV_KEYS: ReadonlySet<string> = new Set([
 
 // ── Safe environment builder ──────────────────────────────────────────────────
 
-export function buildSafeEnv(
-  extraEnv?: Record<string, string>,
-): NodeJS.ProcessEnv {
+export function buildSafeEnv(extraEnv?: Record<string, string>): NodeJS.ProcessEnv {
   const safe: NodeJS.ProcessEnv = {};
 
   for (const key of Array.from(SAFE_ENV_KEYS)) {
@@ -156,20 +155,12 @@ export interface PreparedExecution {
  * Determine the command, args, and code delivery mechanism for a given language.
  * For TypeScript, a temp file path is returned (callers write + delete it).
  */
-export function prepareExecution(
-  language: SandboxLanguage,
-  code: string,
-): PreparedExecution {
+export function prepareExecution(language: SandboxLanguage, code: string): PreparedExecution {
   switch (language) {
     case "javascript":
       return {
         cmd: "node",
-        args: [
-          "--no-addons",
-          "--no-experimental-require-module",
-          "-e",
-          code,
-        ],
+        args: ["--no-addons", "--no-experimental-require-module", "-e", code],
         useStdin: false,
       };
 
@@ -218,6 +209,8 @@ export const defaultRunner: Runner = (
     let stderr = "";
     let timedOut = false;
 
+    // safe: array args, no shell — no shell-metachar interpretation, so the
+    // command and its arguments cannot be re-parsed into additional commands.
     const proc = spawn(cmd, args, {
       signal: controller.signal,
       env: opts.env,
@@ -230,12 +223,19 @@ export const defaultRunner: Runner = (
       proc.stdin.end();
     }
 
+    // Cap in-memory accumulation so a runaway child cannot exhaust memory:
+    // stop appending once each stream reaches MAX_OUTPUT_BYTES. Final output is
+    // still passed through truncate() for the user-facing truncation marker.
     proc.stdout?.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString("utf8");
+      if (stdout.length < MAX_OUTPUT_BYTES) {
+        stdout += chunk.toString("utf8");
+      }
     });
 
     proc.stderr?.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString("utf8");
+      if (stderr.length < MAX_OUTPUT_BYTES) {
+        stderr += chunk.toString("utf8");
+      }
     });
 
     proc.on("close", (code) => {
@@ -292,7 +292,8 @@ export async function executeCode(
   try {
     // Write temp file for TypeScript
     if (prep.tempFilePath) {
-      await writeFile(prep.tempFilePath, task.code, "utf8");
+      // Use exclusive flag to prevent TOCTOU on the randomised temp path
+      await writeFile(prep.tempFilePath, task.code, { encoding: "utf8", flag: "wx" });
       tempFileWritten = true;
     }
 
@@ -332,10 +333,7 @@ export async function executeCode(
 
 // ── Adapter wiring ────────────────────────────────────────────────────────────
 
-async function execute(
-  task: SandboxTask,
-  ctx: IExecutionContext,
-): Promise<SandboxResult> {
+async function execute(task: SandboxTask, ctx: IExecutionContext): Promise<SandboxResult> {
   // Log the execution (ctx.logger is always available)
   ctx.logger.info("sandbox.execute", {
     language: task.language,
@@ -351,6 +349,7 @@ async function execute(
   return executeCode(task);
 }
 
+/** Sandbox adapter. */
 export const sandboxAdapter = defineAdapter<SandboxTask, SandboxResult>({
   name: "nexus-adapter-sandbox",
   version: "0.1.0",
@@ -379,7 +378,43 @@ export interface DockerSandboxConfig {
   cpuPercent?: number;
   /** Maximum number of processes the container may spawn. Default: 64 */
   pidsLimit?: number;
+  /**
+   * Absolute path to a seccomp profile JSON applied via
+   * `--security-opt seccomp=<path>`. Default: the checked-in
+   * `seccomp-default.json` (default-allow denylist of dangerous syscalls).
+   */
+  seccompProfilePath?: string;
+  /**
+   * Mount the container root filesystem read-only (`--read-only`). A writable
+   * scratch tmpfs is provided at {@link SCRATCH_DIR} and pointed to via TMPDIR.
+   * Default: true.
+   */
+  readOnlyRootfs?: boolean;
+  /**
+   * Size in megabytes of the writable scratch tmpfs mounted at
+   * {@link SCRATCH_DIR}. Default: 64.
+   */
+  scratchMb?: number;
+  /**
+   * UID:GID the container process runs as (`--user`). Running as a non-root
+   * user is the container-level half of user-namespace de-privileging; the
+   * host complement is daemon-level `userns-remap` (see class docs).
+   * Default: "1000:1000".
+   */
+  runAsUser?: string;
 }
+
+/**
+ * Absolute path to the checked-in seccomp profile. Resolved relative to this
+ * module so it works from both `src` (vitest) and built `dist` — both sit one
+ * directory below the package root where `seccomp-default.json` lives.
+ */
+export const SECCOMP_PROFILE_PATH = fileURLToPath(
+  new URL("../seccomp-default.json", import.meta.url),
+);
+
+/** In-container writable scratch directory (tmpfs) used when the rootfs is read-only. */
+export const SCRATCH_DIR = "/nexus-scratch";
 
 /**
  * Build the `docker run` argument list for a given config.
@@ -392,23 +427,47 @@ export function buildDockerArgs(config: DockerSandboxConfig = {}): string[] {
   const cpuPercent = Math.min(100, Math.max(1, config.cpuPercent ?? 50));
   const cpuPeriod = 100_000;
   const cpuQuota = Math.floor(cpuPeriod * (cpuPercent / 100));
+  const seccompProfilePath = config.seccompProfilePath ?? SECCOMP_PROFILE_PATH;
+  const readOnlyRootfs = config.readOnlyRootfs ?? true;
+  const scratchMb = config.scratchMb ?? 64;
+  const runAsUser = config.runAsUser ?? "1000:1000";
 
-  return [
+  const args = [
     "run",
     "--rm",
-    "--network=none",           // no outbound network access
-    `--memory=${memoryMb}m`,    // hard memory cap
-    `--pids-limit=${pidsLimit}`,// limit fork bombs
-    "--cap-drop=ALL",            // drop all Linux capabilities
+    "--network=none", // no outbound network access
+    `--memory=${memoryMb}m`, // hard memory cap
+    `--pids-limit=${pidsLimit}`, // limit fork bombs
+    "--cap-drop=ALL", // drop all Linux capabilities
     "--security-opt=no-new-privileges", // prevent privilege escalation
+    // Syscall filter: default-allow denylist neutralising namespace/mount,
+    // kernel-module, tracing, key-management and host time/reboot surfaces.
+    `--security-opt=seccomp=${seccompProfilePath}`,
+    // Run as a non-root UID:GID — container-level user de-privileging.
+    `--user=${runAsUser}`,
     `--cpu-period=${cpuPeriod}`,
     `--cpu-quota=${cpuQuota}`,
+  ];
+
+  if (readOnlyRootfs) {
+    // Immutable rootfs. A writable scratch tmpfs is mounted at SCRATCH_DIR and
+    // advertised via TMPDIR so tsx/esbuild/python temp writes land there rather
+    // than on the now read-only rootfs. nosuid/nodev harden the scratch mount.
+    args.push("--read-only");
+    args.push(`--tmpfs=${SCRATCH_DIR}:rw,nosuid,nodev,size=${scratchMb}m`);
+    args.push(`--env=TMPDIR=${SCRATCH_DIR}`);
+  }
+
+  args.push(
     // Mount system tmpdir so TypeScript temp files created by prepareExecution
     // are accessible inside the container with read-only semantics.
-    `-v`, `${tmpdir()}:${tmpdir()}:ro`,
-    "-i",                        // keep stdin open for piped input
+    `-v`,
+    `${tmpdir()}:${tmpdir()}:ro`,
+    "-i", // keep stdin open for piped input
     image,
-  ];
+  );
+
+  return args;
 }
 
 /**
@@ -420,6 +479,13 @@ export function buildDockerArgs(config: DockerSandboxConfig = {}): string[] {
  *   • All Linux capabilities dropped
  *   • No privilege escalation (no-new-privileges)
  *   • PID limit to prevent fork bombs
+ *   • seccomp syscall filter (denylist of dangerous syscalls)
+ *   • Read-only rootfs + a bounded writable scratch tmpfs
+ *   • Non-root container user (--user)
+ *
+ * Host complement (daemon-level, not expressible as `docker run` args): enable
+ * `userns-remap` in the Docker daemon so container root maps to an unprivileged
+ * host UID. Combined with `--user` above, workloads run doubly de-privileged.
  *
  * Requires Docker to be installed and accessible on the host PATH.
  * Falls back gracefully: if Docker is unavailable the spawned process
