@@ -916,6 +916,15 @@ examples}`, `grafana/{dashboards,provisioning}`, `otel/{config,prometheus,grafan
   `DELETE /users/:id/data` route cascading across `packages/db` user-scoped tables + a
   test asserting no request/response bodies hit logs. Done: deletion cascade test + log-shape
   test green. (SOC2 evidence + data-residency routing are process/infra — **Blocked**.)
+  **Erasure cascade done this branch (commit `16107db`).** `packages/db/src/gdpr.ts`:
+  `USER_SCOPED_TABLES` manifest (10 user_id-keyed tables) + `eraseUserData(db, userId)` deleting
+  children first then the `users` row last (FK-safe), returning per-table counts, idempotent, over
+  a narrow `ErasableDb` structural seam (unit-tested with a fake recorder — no live DB). A test
+  asserts every manifest entry targets a `user_id` column so a forgotten new table is caught
+  structurally. Documented exclusions: billing/usage (legal-obligation retention), workspace
+  ownership (transfer policy). 8 tests. **Deferred:** the thin `DELETE /users/:id/data` route
+  wiring in `apps/api` (needs PG + built dist; route test is Blocked on the DB harness), and the
+  no-LLM-data-logged log-shape assertion (belongs to the `apps/api` logger layer).
 - **14.5 Coverage → 80%** *(code-only, large).* Raise vitest coverage across `council`, `memory`,
   `runtime` (each has a `vitest.config.ts`). Do: `pnpm --filter @nexus/<pkg> test --coverage`,
   fill the lowest-covered modules. Done: ≥80% lines per package. Chip away one package/commit.
