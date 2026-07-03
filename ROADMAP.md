@@ -743,6 +743,21 @@ Baseline: `packages/memory/src/index.ts` (~2.3k lines): `MemoryManager`, `IMemor
   single-pass) à la mem0; self-editing typed blocks (human/persona/scratch) à la letta — extend
   `MemoryManager`, keep `IMemoryStore` implementations interchangeable.
   Test: `pnpm exec vitest run packages/memory/tests/memory.test.ts`
+  **Done this branch (commit `63ba0c0`).** Extended `MemoryManager` (stores stay interchangeable):
+  - `fusionRecall()` — single-pass fusion of vector + BM25 + entity-overlap + temporal-recency,
+    each min-max-normalised across the candidate pool then weighted (`FusionWeights`, overridable
+    per call). Keeps the reused `BM25Lexicon`, an id→entry mirror, and an id→entities index in sync
+    via `remember`/`forget`/`purge`; `reindex()` rebuilds from a pre-populated store. Defence-in-depth
+    ACL vetting (`entryMatchesFilter`) since `InMemoryStore.search` ignores `userId`.
+  - `extractEntities()`/`normalizeEntity()` — deterministic, dependency-free entity linking
+    (@mentions, #hashtags, paths, dotted/snake/kebab/Camel identifiers, proper-noun runs).
+  - `parseRelativeTimeWindow()` — deterministic relative-time reasoning (today/yesterday/this·last·past
+    week·month / last N days / past N hours), no `Date.now()` inside; drives the fusion window boost.
+  - Typed self-editing core-memory blocks (`upsertBlock`/`getBlock`/`hasBlock`/`listBlocks`/
+    `coreMemoryAppend`/`coreMemoryReplace`/`renderCoreMemory`) with per-block char limits + fail-loud
+    replace (`BLOCK_NOT_FOUND`/`BLOCK_LIMIT_EXCEEDED`/`BLOCK_REPLACE_TARGET_MISSING`); seedable via
+    `MemoryManagerConfig.blocks`.
+  70 tests pass (FixedEmbedder + InMemoryStore, deterministic); typecheck + lint + build green.
   Done: fusion retrieval + typed-block edit unit-tested (deterministic embedder).
 
 ## 12. MCP breadth + A2A (last / optional)
