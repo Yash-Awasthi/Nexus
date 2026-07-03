@@ -1022,11 +1022,67 @@ interface AisFeature {
   };
 }
 
+/** Vessel metadata row from Digitraffic `/api/ais/v1/vessels` (keyed by MMSI). */
+interface AisVessel {
+  mmsi?: number;
+  name?: string;
+  callSign?: string;
+  imo?: number;
+  shipType?: number;
+  destination?: string;
+}
+
+/**
+ * Maritime Identification Digits (first three MMSI digits) → flag state. Focused
+ * on the Baltic/North-Sea region Digitraffic covers plus the major open-registry
+ * flags; deterministic, so flag enrichment needs no network call. Unknown MIDs
+ * yield `undefined` rather than a wrong guess.
+ */
+const MMSI_MID_FLAG: Record<number, string> = {
+  201: "Albania", 205: "Belgium", 209: "Cyprus", 210: "Cyprus", 212: "Cyprus",
+  211: "Germany", 218: "Germany", 219: "Denmark", 220: "Denmark", 230: "Finland",
+  231: "Faroe Islands", 232: "United Kingdom", 233: "United Kingdom",
+  234: "United Kingdom", 235: "United Kingdom", 236: "Gibraltar", 237: "Greece",
+  238: "Croatia", 244: "Netherlands", 245: "Netherlands", 246: "Netherlands",
+  247: "Italy", 248: "Malta", 249: "Malta", 256: "Malta", 250: "Ireland",
+  257: "Norway", 258: "Norway", 259: "Norway", 261: "Poland", 263: "Portugal",
+  265: "Sweden", 266: "Sweden", 271: "Turkey", 272: "Ukraine", 273: "Russia",
+  275: "Latvia", 276: "Estonia", 277: "Lithuania", 338: "United States",
+  366: "United States", 367: "United States", 368: "United States",
+  369: "United States", 477: "Hong Kong", 412: "China", 413: "China",
+  440: "South Korea", 441: "South Korea", 431: "Japan", 432: "Japan",
+  538: "Marshall Islands", 563: "Singapore", 564: "Singapore", 565: "Singapore",
+  566: "Singapore", 636: "Liberia", 637: "Liberia", 352: "Panama", 353: "Panama",
+  354: "Panama", 355: "Panama", 356: "Panama", 357: "Panama", 370: "Panama",
+  371: "Panama", 372: "Panama", 373: "Panama",
+};
+
+/** Derive a flag state from an MMSI's Maritime Identification Digits. */
+export function mmsiFlagState(mmsi: string | number | undefined): string | undefined {
+  if (mmsi === undefined) return undefined;
+  const digits = String(mmsi).replace(/\D/g, "");
+  if (digits.length < 3) return undefined;
+  return MMSI_MID_FLAG[Number(digits.slice(0, 3))];
+}
+
+/** Options for {@link MaritimeFeed}; adds vessel-name enrichment to the base set. */
+export type MaritimeFeedOptions = Partial<FeedAdapterOptions> & {
+  /**
+   * When true, incidents are enriched with human-readable vessel names via a
+   * second Digitraffic `/vessels` fetch (joined by MMSI) plus MID-derived flag
+   * states. Off by default: it costs an extra request and names are rarely
+   * needed for the abnormal-state incidents this feed surfaces.
+   */
+  enrichVesselNames?: boolean;
+};
+
 export class MaritimeFeed extends FeedAdapter<MaritimeEvent> {
   readonly domain = "maritime";
+  private readonly enrichVesselNames: boolean;
 
-  constructor(opts: Partial<FeedAdapterOptions> = {}) {
+  constructor(opts: MaritimeFeedOptions = {}) {
     super({ baseUrl: "https://meri.digitraffic.fi/api/ais/v1", ...opts });
+    this.enrichVesselNames = opts.enrichVesselNames ?? false;
   }
 
   async fetch(): Promise<MaritimeEvent[]> {
@@ -1076,12 +1132,55 @@ export class MaritimeFeed extends FeedAdapter<MaritimeEvent> {
       }
       // A successful call with no abnormal vessels is a real empty result — do
       // NOT fabricate mock data here; mock only covers a hard failure (catch).
+      // Opt-in: attach human-readable vessel names + flag states (§13.2).
+      if (this.enrichVesselNames && events.length > 0) await this.enrichEvents(events);
       return events;
-      // ponytail: vessel name/flagState enrichment (join /api/ais/v1/vessels by
-      // mmsi) deferred — mmsi identifies the vessel. Add the second fetch only if
-      // human-readable names become a hard requirement.
     } catch {
       return buildMockResponse<MaritimeEvent>("maritime");
+    }
+  }
+
+  /**
+   * Enrich incidents in place with a MID-derived flag state (deterministic, no
+   * network) and, from a second Digitraffic `/vessels` fetch joined by MMSI, the
+   * vessel name / call sign / destination. Best-effort: any failure of the second
+   * fetch leaves incidents with just the flag state — it never throws (so it
+   * cannot trip the caller's mock fallback) and never drops an incident.
+   */
+  private async enrichEvents(events: MaritimeEvent[]): Promise<void> {
+    for (const e of events) e.flagState = mmsiFlagState(e.mmsi) ?? e.flagState;
+
+    try {
+      const headers = {
+        ...this.buildHeaders(),
+        "Accept-Encoding": "gzip",
+        "Digitraffic-User": "nexus/domain-feeds",
+      };
+      const raw = (await this.http(`${this.baseUrl}/vessels`, headers)) as AisVessel[] | null;
+      if (!Array.isArray(raw)) return; // unexpected shape → keep flag-only enrichment
+      const byMmsi = new Map<string, AisVessel>();
+      for (const v of raw) {
+        if (v.mmsi !== undefined) byMmsi.set(String(v.mmsi), v);
+      }
+      for (const e of events) {
+        const v = e.mmsi !== undefined ? byMmsi.get(e.mmsi) : undefined;
+        if (!v) continue;
+        const name = v.name?.trim();
+        if (name) {
+          e.vesselName = name;
+          // Prefer the human-readable name over the bare MMSI in the summary.
+          e.summary = e.summary.replace(`MMSI ${e.mmsi ?? "?"}`, `${name} (MMSI ${e.mmsi ?? "?"})`);
+        }
+        e.metadata = {
+          ...(e.metadata ?? {}),
+          ...(v.callSign ? { callSign: v.callSign } : {}),
+          ...(v.imo ? { imo: v.imo } : {}),
+          ...(v.shipType !== undefined ? { shipType: v.shipType } : {}),
+          ...(v.destination ? { destination: v.destination } : {}),
+        };
+      }
+    } catch {
+      // Enrichment is best-effort; incidents keep their flag state.
     }
   }
 }

@@ -15,6 +15,7 @@ import {
   SeismologyFeed,
   WildfireFeed,
   MaritimeFeed,
+  mmsiFlagState,
   TechNewsFeed,
   RedditFeed,
   PreprintsFeed,
@@ -310,6 +311,98 @@ describe("MaritimeFeed (Digitraffic AIS)", () => {
     const events = await feed.fetch();
     expect(events.length).toBeGreaterThan(0);
     expect(events[0]!.source).toContain("mock");
+  });
+
+  it("does not fetch /vessels when enrichment is off (default)", async () => {
+    const urls: string[] = [];
+    const feed = new MaritimeFeed({
+      http: async (url) => {
+        urls.push(url);
+        return AIS;
+      },
+    });
+    await feed.fetch();
+    expect(urls).toHaveLength(1);
+    expect(urls[0]).toContain("/locations");
+    expect(urls.some((u) => u.includes("/vessels"))).toBe(false);
+  });
+});
+
+// ── MaritimeFeed – AIS vessel-name enrichment (§13.2) ──────────────────────────
+
+describe("MaritimeFeed vessel-name enrichment", () => {
+  const AIS = {
+    type: "FeatureCollection",
+    features: [
+      {
+        mmsi: 230123000, // MID 230 → Finland
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [24.95, 60.16] },
+        properties: { navStat: 6, timestampExternal: 1659212938646 },
+      },
+    ],
+  };
+  const VESSELS = [
+    { mmsi: 230123000, name: "MV SUOMI STAR", callSign: "OJXY", imo: 9123456, destination: "HELSINKI" },
+    { mmsi: 999999999, name: "UNRELATED", callSign: "ZZZ" },
+  ];
+
+  // Route /locations → AIS, /vessels → VESSELS.
+  function routedHttp(): HttpGetFn {
+    return async (url) => (url.includes("/vessels") ? VESSELS : AIS);
+  }
+
+  it("fetches /vessels and attaches the vessel name when enabled", async () => {
+    const feed = new MaritimeFeed({ enrichVesselNames: true, http: routedHttp() });
+    const [aground] = await feed.fetch();
+    expect(aground!.vesselName).toBe("MV SUOMI STAR");
+    expect(aground!.summary).toContain("MV SUOMI STAR");
+    expect(aground!.metadata!.callSign).toBe("OJXY");
+    expect(aground!.metadata!.destination).toBe("HELSINKI");
+  });
+
+  it("derives a flag state from the MMSI MID without a network call", async () => {
+    const feed = new MaritimeFeed({ enrichVesselNames: true, http: routedHttp() });
+    const [aground] = await feed.fetch();
+    expect(aground!.flagState).toBe("Finland");
+  });
+
+  it("keeps the flag state but no name when /vessels fails", async () => {
+    const feed = new MaritimeFeed({
+      enrichVesselNames: true,
+      http: async (url) => {
+        if (url.includes("/vessels")) throw new Error("boom");
+        return AIS;
+      },
+    });
+    const [aground] = await feed.fetch();
+    expect(aground!.flagState).toBe("Finland"); // deterministic, survived
+    expect(aground!.vesselName).toBeUndefined(); // name join failed gracefully
+    expect(aground!.eventType).toBe("grounding"); // incident NOT dropped
+  });
+
+  it("leaves an incident unnamed when no /vessels row matches its MMSI", async () => {
+    const feed = new MaritimeFeed({
+      enrichVesselNames: true,
+      http: async (url) => (url.includes("/vessels") ? [VESSELS[1]] : AIS),
+    });
+    const [aground] = await feed.fetch();
+    expect(aground!.vesselName).toBeUndefined();
+    expect(aground!.flagState).toBe("Finland");
+  });
+});
+
+describe("mmsiFlagState", () => {
+  it("maps a known MID to its flag state", () => {
+    expect(mmsiFlagState(230123000)).toBe("Finland");
+    expect(mmsiFlagState("636091234")).toBe("Liberia");
+    expect(mmsiFlagState(366123456)).toBe("United States");
+  });
+
+  it("returns undefined for an unknown MID or a too-short MMSI", () => {
+    expect(mmsiFlagState(100000000)).toBeUndefined();
+    expect(mmsiFlagState("12")).toBeUndefined();
+    expect(mmsiFlagState(undefined)).toBeUndefined();
   });
 });
 
