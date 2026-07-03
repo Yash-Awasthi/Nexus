@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * @nexus/billing — API key management, quota enforcement, Stripe webhook handler.
+ * @nexus/billing — API key management, quota enforcement, BYOK usage cost model.
  *
  * API key management
  * ------------------
@@ -14,11 +14,13 @@
  *   QuotaChecker       — monthly quota + RPM enforcement
  *   billingPreHandler  — Fastify preHandler hook (auth + quota)
  *
- * Stripe
- * ------
- *   StripeWebhookProcessor   — verify signature, deduplicate, dispatch
- *   verifyStripeSignature    — standalone HMAC-SHA256 verification
- *   StripeSignatureError     — thrown on invalid signatures
+ * Cost
+ * ----
+ *   computeCost / estimateMaxCost — USD cost of a call from provider-registry
+ *   BillingLedger                 — estimate → reserve → settle spend tracking
+ *
+ * Nexus is free and open: there is no payment provider. These primitives meter
+ * usage of the user's own BYOK keys; they never charge anyone to use Nexus.
  */
 
 export {
@@ -32,17 +34,9 @@ export {
 export type { CreateApiKeyInput, CreateApiKeyResult } from "./api-keys.js";
 
 export { QuotaChecker } from "./quota.js";
-export type { QuotaCheckResult } from "./quota.js";
+export type { QuotaCheckResult, UsageDetail } from "./quota.js";
+
+export { computeCost, estimateMaxCost, BillingLedger, QuotaExceededError } from "./cost.js";
+export type { TokenUsage, CostBreakdown, Reservation, SettleResult } from "./cost.js";
 
 export { billingPreHandler } from "./middleware.js";
-
-export {
-  StripeWebhookProcessor,
-  verifyStripeSignature,
-  StripeSignatureError,
-} from "./stripe-webhook.js";
-export type {
-  StripeEvent,
-  StripeSubscriptionObject,
-  WebhookProcessResult,
-} from "./stripe-webhook.js";

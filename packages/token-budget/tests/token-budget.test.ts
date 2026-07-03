@@ -55,7 +55,11 @@ function makeResponse(tokens: number, overrides: Partial<LLMResponse> = {}): LLM
     id: "resp-1",
     model: "gpt-4o",
     content: "response text",
-    usage: { promptTokens: Math.floor(tokens * 0.4), completionTokens: Math.ceil(tokens * 0.6), totalTokens: tokens },
+    usage: {
+      promptTokens: Math.floor(tokens * 0.4),
+      completionTokens: Math.ceil(tokens * 0.6),
+      totalTokens: tokens,
+    },
     provider: "openai",
     latencyMs: 100,
     ...overrides,
@@ -142,18 +146,16 @@ describe("MemoryTokenBudget", () => {
   });
 
   it("consume at exactly the limit succeeds", async () => {
-    await expect(
-      budget.consume({ identity: "u1", tokens: 1000 }),
-    ).resolves.toBeDefined();
+    await expect(budget.consume({ identity: "u1", tokens: 1000 })).resolves.toBeDefined();
     const s = await budget.status("u1");
     expect(s.remaining).toBe(0);
   });
 
   it("consume over limit throws BudgetExceededError", async () => {
     await budget.consume({ identity: "u1", tokens: 800 });
-    await expect(
-      budget.consume({ identity: "u1", tokens: 300 }),
-    ).rejects.toThrow(BudgetExceededError);
+    await expect(budget.consume({ identity: "u1", tokens: 300 })).rejects.toThrow(
+      BudgetExceededError,
+    );
   });
 
   it("BudgetExceededError carries correct fields", async () => {
@@ -262,9 +264,9 @@ describe("KVTokenBudget", () => {
 
   it("throws BudgetExceededError when over limit", async () => {
     await budget.consume({ identity: "u1", tokens: 900 });
-    await expect(
-      budget.consume({ identity: "u1", tokens: 200 }),
-    ).rejects.toThrow(BudgetExceededError);
+    await expect(budget.consume({ identity: "u1", tokens: 200 })).rejects.toThrow(
+      BudgetExceededError,
+    );
   });
 
   it("reset deletes KV entry", async () => {

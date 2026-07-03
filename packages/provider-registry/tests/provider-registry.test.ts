@@ -1,12 +1,38 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
-import { ProviderRegistry, globalRegistry, BUILTIN_MODELS, type ModelDefinition } from "../src/index.js";
+import {
+  ProviderRegistry,
+  globalRegistry,
+  BUILTIN_MODELS,
+  modelsDevToDefinitions,
+  registerFromModelsDev,
+  fetchModelsDev,
+  MODELS_DEV_API_URL,
+  type ModelDefinition,
+  type ModelsDevCatalogue,
+} from "../src/index.js";
 
-function makeModel(id: string, provider = "test", overrides: Partial<ModelDefinition> = {}): ModelDefinition {
+function makeModel(
+  id: string,
+  provider = "test",
+  overrides: Partial<ModelDefinition> = {},
+): ModelDefinition {
   return {
-    id, provider, name: id, contextWindow: 8192, maxOutputTokens: 2048,
-    costPerInputToken: 1e-6, costPerOutputToken: 2e-6,
-    capabilities: { vision: false, functionCalling: true, streaming: true, promptCaching: false, jsonMode: true, systemPrompt: true },
+    id,
+    provider,
+    name: id,
+    contextWindow: 8192,
+    maxOutputTokens: 2048,
+    costPerInputToken: 1e-6,
+    costPerOutputToken: 2e-6,
+    capabilities: {
+      vision: false,
+      functionCalling: true,
+      streaming: true,
+      promptCaching: false,
+      jsonMode: true,
+      systemPrompt: true,
+    },
     ...overrides,
   };
 }
@@ -28,21 +54,45 @@ describe("ProviderRegistry", () => {
 
   it("list() returns all models", () => {
     const r = new ProviderRegistry();
-    r.register(makeModel("a/1")); r.register(makeModel("b/2"));
+    r.register(makeModel("a/1"));
+    r.register(makeModel("b/2"));
     expect(r.list()).toHaveLength(2);
   });
 
   it("list() filters by provider", () => {
     const r = new ProviderRegistry();
-    r.register(makeModel("a/1", "openai")); r.register(makeModel("b/1", "anthropic"));
+    r.register(makeModel("a/1", "openai"));
+    r.register(makeModel("b/1", "anthropic"));
     expect(r.list({ provider: "openai" })).toHaveLength(1);
     expect(r.list({ provider: "openai" })[0]!.provider).toBe("openai");
   });
 
   it("list() filters by capability", () => {
     const r = new ProviderRegistry();
-    r.register(makeModel("a/1", "x", { capabilities: { vision: true, functionCalling: true, streaming: true, promptCaching: false, jsonMode: true, systemPrompt: true } }));
-    r.register(makeModel("b/1", "x", { capabilities: { vision: false, functionCalling: true, streaming: true, promptCaching: false, jsonMode: true, systemPrompt: true } }));
+    r.register(
+      makeModel("a/1", "x", {
+        capabilities: {
+          vision: true,
+          functionCalling: true,
+          streaming: true,
+          promptCaching: false,
+          jsonMode: true,
+          systemPrompt: true,
+        },
+      }),
+    );
+    r.register(
+      makeModel("b/1", "x", {
+        capabilities: {
+          vision: false,
+          functionCalling: true,
+          streaming: true,
+          promptCaching: false,
+          jsonMode: true,
+          systemPrompt: true,
+        },
+      }),
+    );
     expect(r.list({ capability: "vision" })).toHaveLength(1);
   });
 
@@ -74,7 +124,18 @@ describe("ProviderRegistry", () => {
 
   it("supportsCapability() returns correct value", () => {
     const r = new ProviderRegistry();
-    r.register(makeModel("m", "x", { capabilities: { vision: true, functionCalling: false, streaming: true, promptCaching: false, jsonMode: true, systemPrompt: true } }));
+    r.register(
+      makeModel("m", "x", {
+        capabilities: {
+          vision: true,
+          functionCalling: false,
+          streaming: true,
+          promptCaching: false,
+          jsonMode: true,
+          systemPrompt: true,
+        },
+      }),
+    );
     expect(r.supportsCapability("m", "vision")).toBe(true);
     expect(r.supportsCapability("m", "functionCalling")).toBe(false);
     expect(r.supportsCapability("missing", "vision")).toBe(false);
@@ -97,7 +158,9 @@ describe("ProviderRegistry", () => {
 
   it("providers() returns unique provider names", () => {
     const r = new ProviderRegistry();
-    r.register(makeModel("a/1", "openai")); r.register(makeModel("a/2", "openai")); r.register(makeModel("b/1", "anthropic"));
+    r.register(makeModel("a/1", "openai"));
+    r.register(makeModel("a/2", "openai"));
+    r.register(makeModel("b/1", "anthropic"));
     const p = r.providers();
     expect(p).toContain("openai");
     expect(p).toContain("anthropic");
@@ -137,7 +200,124 @@ describe("globalRegistry", () => {
   });
 
   it("estimateCost for 1M input + 100k output with sonnet", () => {
-    const cost = globalRegistry.estimateCost("anthropic/claude-3-5-sonnet-20241022", 1_000_000, 100_000);
+    const cost = globalRegistry.estimateCost(
+      "anthropic/claude-3-5-sonnet-20241022",
+      1_000_000,
+      100_000,
+    );
     expect(cost).toBeCloseTo(3.0 + 1.5); // $3 input + $1.5 output
+  });
+});
+
+// ── models.dev importer ─────────────────────────────────────────────────────────
+
+// Trimmed fixture mirroring the real models.dev api.json shape.
+const FIXTURE: ModelsDevCatalogue = {
+  anthropic: {
+    id: "anthropic",
+    name: "Anthropic",
+    models: {
+      "claude-3-5-sonnet-20241022": {
+        id: "claude-3-5-sonnet-20241022",
+        name: "Claude 3.5 Sonnet",
+        attachment: true,
+        tool_call: true,
+        knowledge: "2024-04",
+        release_date: "2024-10-22",
+        modalities: { input: ["text", "image"], output: ["text"] },
+        cost: { input: 3, output: 15, cache_read: 0.3, cache_write: 3.75 },
+        limit: { context: 200_000, output: 8192 },
+      },
+    },
+  },
+  groq: {
+    id: "groq",
+    name: "Groq",
+    models: {
+      "llama-3.1-8b-instant": {
+        name: "Llama 3.1 8B",
+        tool_call: false,
+        modalities: { input: ["text"], output: ["text"] },
+        cost: { input: 0.05, output: 0.08 },
+        limit: { context: 128_000, output: 8192 },
+      },
+    },
+  },
+};
+
+describe("modelsDevToDefinitions", () => {
+  const defs = modelsDevToDefinitions(FIXTURE);
+  const sonnet = defs.find((d) => d.id === "anthropic/claude-3-5-sonnet-20241022")!;
+
+  it("namespaces id as provider/model and flattens all providers", () => {
+    expect(defs).toHaveLength(2);
+    expect(defs.map((d) => d.id)).toContain("groq/llama-3.1-8b-instant");
+  });
+
+  it("converts per-million pricing to per-token", () => {
+    expect(sonnet.costPerInputToken).toBeCloseTo(3e-6, 12);
+    expect(sonnet.costPerOutputToken).toBeCloseTo(15e-6, 12);
+    expect(sonnet.costPerCacheReadToken).toBeCloseTo(0.3e-6, 12);
+    expect(sonnet.costPerCacheWriteToken).toBeCloseTo(3.75e-6, 12);
+  });
+
+  it("maps limits, modalities, cutoff and release date", () => {
+    expect(sonnet.contextWindow).toBe(200_000);
+    expect(sonnet.maxOutputTokens).toBe(8192);
+    expect(sonnet.inputModalities).toEqual(["text", "image"]);
+    expect(sonnet.knowledgeCutoff).toBe("2024-04");
+    expect(sonnet.releaseDate).toBe("2024-10-22");
+  });
+
+  it("derives capabilities from modality / tool_call / cache_read", () => {
+    expect(sonnet.capabilities.vision).toBe(true);
+    expect(sonnet.capabilities.functionCalling).toBe(true);
+    expect(sonnet.capabilities.promptCaching).toBe(true);
+    const groq = defs.find((d) => d.id === "groq/llama-3.1-8b-instant")!;
+    expect(groq.capabilities.vision).toBe(false);
+    expect(groq.capabilities.promptCaching).toBe(false);
+    expect(groq.costPerCacheReadToken).toBeUndefined();
+  });
+});
+
+describe("registerFromModelsDev", () => {
+  it("adds new models and counts them", () => {
+    const reg = new ProviderRegistry();
+    expect(registerFromModelsDev(reg, FIXTURE)).toBe(2);
+    expect(reg.estimateCost("anthropic/claude-3-5-sonnet-20241022", 1_000_000, 0)).toBeCloseTo(
+      3,
+      6,
+    );
+  });
+
+  it("keeps curated entries by default, overwrites only when asked", () => {
+    const reg = new ProviderRegistry();
+    reg.register(
+      makeModel("anthropic/claude-3-5-sonnet-20241022", "anthropic", { name: "Curated" }),
+    );
+    expect(registerFromModelsDev(reg, FIXTURE)).toBe(1); // groq added, anthropic kept
+    expect(reg.get("anthropic/claude-3-5-sonnet-20241022")!.name).toBe("Curated");
+
+    registerFromModelsDev(reg, FIXTURE, { overwrite: true });
+    expect(reg.get("anthropic/claude-3-5-sonnet-20241022")!.name).toBe("Claude 3.5 Sonnet");
+  });
+});
+
+describe("fetchModelsDev (injected fetch — no real network)", () => {
+  it("hits the catalogue URL and parses JSON", async () => {
+    let calledUrl = "";
+    const fakeFetch = (async (url: string) => {
+      calledUrl = url;
+      return { ok: true, json: async () => FIXTURE } as Response;
+    }) as unknown as typeof fetch;
+    const cat = await fetchModelsDev(fakeFetch);
+    expect(calledUrl).toBe(MODELS_DEV_API_URL);
+    expect(cat.anthropic?.models?.["claude-3-5-sonnet-20241022"]?.name).toBe("Claude 3.5 Sonnet");
+  });
+
+  it("throws on a non-ok response", async () => {
+    const fakeFetch = (async () =>
+      ({ ok: false, status: 503 }) as Response) as unknown as typeof fetch;
+    await expect(fetchModelsDev(fakeFetch)).rejects.toThrow("503");
   });
 });

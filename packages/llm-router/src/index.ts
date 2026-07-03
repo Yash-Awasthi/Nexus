@@ -64,11 +64,13 @@ export class LLMRouterError extends Error {
 
 export type MessageRole = "system" | "user" | "assistant";
 
+/** Llm message interface definition. */
 export interface LLMMessage {
   role: MessageRole;
   content: string;
 }
 
+/** Llm request interface definition. */
 export interface LLMRequest {
   /** Concrete model name (e.g. "claude-opus-4-5") or router alias (e.g. "nexus/smart"). */
   model: string;
@@ -79,12 +81,14 @@ export interface LLMRequest {
   metadata?: Record<string, unknown>;
 }
 
+/** Llm usage interface definition. */
 export interface LLMUsage {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
 }
 
+/** Llm response interface definition. */
 export interface LLMResponse {
   id: string;
   /** Resolved model name actually used. */
@@ -122,6 +126,7 @@ export interface NullProviderConfig {
   error?: Error;
 }
 
+/** Null provider. */
 export class NullProvider implements LLMProvider {
   readonly name: string;
   readonly models: readonly string[];
@@ -172,6 +177,7 @@ const CLAUDE_MODELS = [
   "claude-3-opus-20240229",
 ] as const;
 
+/** Claude provider. */
 export class ClaudeProvider implements LLMProvider {
   readonly name = "claude";
   readonly models: readonly string[] = CLAUDE_MODELS;
@@ -211,21 +217,23 @@ export class ClaudeProvider implements LLMProvider {
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      throw new LLMRouterError(
-        `Claude API error ${res.status}: ${text}`,
-        "PROVIDER_ERROR",
-        { provider: "claude", status: res.status },
-      );
+      throw new LLMRouterError(`Claude API error ${res.status}: ${text}`, "PROVIDER_ERROR", {
+        provider: "claude",
+        status: res.status,
+      });
     }
 
-    const data = await res.json() as {
+    const data = (await res.json()) as {
       id: string;
       model: string;
-      content: Array<{ type: string; text: string }>;
+      content: { type: string; text: string }[];
       usage: { input_tokens: number; output_tokens: number };
     };
 
-    const content = data.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+    const content = data.content
+      .filter((b) => b.type === "text")
+      .map((b) => b.text)
+      .join("");
     const latencyMs = Date.now() - start;
 
     return {
@@ -259,6 +267,7 @@ const GROQ_MODELS = [
   "gemma2-9b-it",
 ] as const;
 
+/** Groq provider. */
 export class GroqProvider implements LLMProvider {
   readonly name = "groq";
   readonly models: readonly string[] = GROQ_MODELS;
@@ -297,6 +306,7 @@ const OPENAI_MODELS = [
   "o1-mini",
 ] as const;
 
+/** Open ai provider. */
 export class OpenAIProvider implements LLMProvider {
   readonly name: string;
   readonly models: readonly string[] = OPENAI_MODELS;
@@ -322,7 +332,7 @@ export class OpenAIProvider implements LLMProvider {
 interface OpenAICompatResponse {
   id: string;
   model: string;
-  choices: Array<{ message: { content: string } }>;
+  choices: { message: { content: string } }[];
   usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
 }
 
@@ -341,9 +351,7 @@ async function _openAICompatComplete(
     ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
   };
 
-  const url = baseUrl.endsWith("/chat/completions")
-    ? baseUrl
-    : `${baseUrl}/chat/completions`;
+  const url = baseUrl.endsWith("/chat/completions") ? baseUrl : `${baseUrl}/chat/completions`;
 
   const res = await fetchFn(url, {
     method: "POST",
@@ -356,14 +364,13 @@ async function _openAICompatComplete(
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new LLMRouterError(
-      `${providerName} API error ${res.status}: ${text}`,
-      "PROVIDER_ERROR",
-      { provider: providerName, status: res.status },
-    );
+    throw new LLMRouterError(`${providerName} API error ${res.status}: ${text}`, "PROVIDER_ERROR", {
+      provider: providerName,
+      status: res.status,
+    });
   }
 
-  const data = await res.json() as OpenAICompatResponse;
+  const data = (await res.json()) as OpenAICompatResponse;
   const content = data.choices[0]?.message.content ?? "";
   const latencyMs = Date.now() - start;
 
@@ -385,6 +392,7 @@ async function _openAICompatComplete(
 
 export type RoutingStrategy = "first" | "round-robin" | "least-latency";
 
+/** Provider alias interface definition. */
 export interface ProviderAlias {
   /** The alias string callers use, e.g. "nexus/smart". */
   alias: string;
@@ -394,6 +402,7 @@ export interface ProviderAlias {
   model: string;
 }
 
+/** Router config interface definition. */
 export interface RouterConfig {
   providers: LLMProvider[];
   /**
@@ -457,11 +466,9 @@ export class LLMRouter {
     for (const alias of aliasChain) {
       const route = this._resolveAlias(alias);
       if (!route) {
-        lastError = new LLMRouterError(
-          `No provider found for alias "${alias}"`,
-          "NO_PROVIDER",
-          { alias },
-        );
+        lastError = new LLMRouterError(`No provider found for alias "${alias}"`, "NO_PROVIDER", {
+          alias,
+        });
         continue;
       }
 

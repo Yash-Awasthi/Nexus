@@ -1,0 +1,26 @@
+{
+  "name": "@nexus/llm-oauth",
+  "version": "0.0.0",
+  "private": false,
+  "description": "Official-authentication framework for LLM providers — provider-agnostic plugins, AES-256-GCM credential vault, PKCE/device-code OAuth, token refresh with dedup. scoped to SANCTIONED third-party auth only. No subscription-CLI routing, no official-CLI client-ID reuse.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

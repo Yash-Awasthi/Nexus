@@ -7,7 +7,12 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "dev": "tsc --project tsconfig.json --watch",
@@ -15,5 +20,7 @@
     "clean": "rm -rf dist coverage",
     "test": "vitest run --passWithNoTests"
   },
-  "devDependencies": { "typescript": "^5.6.3" }
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
 }
