@@ -928,6 +928,14 @@ examples}`, `grafana/{dashboards,provisioning}`, `otel/{config,prometheus,grafan
 - **14.5 Coverage → 80%** *(code-only, large).* Raise vitest coverage across `council`, `memory`,
   `runtime` (each has a `vitest.config.ts`). Do: `pnpm --filter @nexus/<pkg> test --coverage`,
   fill the lowest-covered modules. Done: ≥80% lines per package. Chip away one package/commit.
+  **Baseline measured 2026-07-03:** `council` **92.8%** (already ≥80% ✓), `memory` 65.4%, `runtime`
+  16.3%. **`memory` done this branch (commit `3fe5067`): 65.4% → 92.2% lines** (branches 83.9%)
+  via `tests/coverage.test.ts` — 23 deterministic tests over the three untested surfaces:
+  `TurboQuantStore` (int8-quant save/search/filter/expiry/delete/purge/stats), `MemoryGraph`
+  (add/remove/tag/link/supersede/contradict + BFS `cascadeRetrieve` depth-decay & tag fan-out),
+  and `rrfHybridSearch` + `nullQueryExpander`/`hybridSearchWithExpansion` (RRF fusion, bm25-only
+  fallback, `maxPerGroup` diversification, allSettled resilience). **Remaining: `runtime` (16.3%
+  → 80%)** — the large tail; chip away one module/commit next.
 - **14.6 DB / Infra provisioning** *(Blocked — see infra table).* PgBouncer, read replicas, PITR,
   encryption-at-rest; K8s HPA (`infra/k8s`), multi-AZ PG/Redis, CDN, edge DDoS; Grafana SLO
   dashboards + alerting (`infra/grafana`). Charts/manifests exist; each is Done when provisioned.
