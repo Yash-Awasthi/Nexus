@@ -789,6 +789,15 @@ Baseline: `packages/mcp-client/src/index.ts` (336 lines): `McpClient`, `McpTrans
   `Authorization` in `extraHeaders` is stripped. Same injectable-`fetch` test seam as
   `mcp-client`. 22 tests (real `Response`/`ReadableStream` SSE); typecheck + lint + build green.
 - **12.3** Optional `mcp-compressor` to shrink tool manifests 60–95%.
+  **Done this branch (commit follows).** New `@nexus/mcp-compressor` package (dependency-free TS
+  port of the Atlassian compressed-proxy *pattern*; the reference's real work is a Rust core, not
+  portable inline). Collapses a large tool surface into a fixed 3-tool gateway the model drills
+  into on demand: `list_tools` (compact catalog, optional filter), `get_tool_schema` (full schema
+  for one tool), `invoke_tool` (forwarded backend call). `compressManifest(tools)` is a pure
+  function returning the gateway + char/token savings `stats`; `CompressedToolProxy` wraps any
+  backend structurally compatible with `McpClient` (`listTools`/`callTool`) and routes gateway
+  calls, passing unknown names straight through. 15 tests (40-tool manifest shrinks >60%);
+  typecheck + lint + build green. **§12 complete.**
 
 ## 13. Domain feeds — `@nexus/domain-feeds`
 
