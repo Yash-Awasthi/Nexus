@@ -714,6 +714,23 @@ Board↔Graph toggle in `build.tsx`; orphan `parentId` → root with an orphans 
 - **10.5 Medium-term pages** (each its own item; backends already mature): voice (`voice.tsx`),
   image-gen Sandbox tab, knowledge-graph viz, prediction-markets dashboard, gauntlet benchmark,
   RLHF thumbs → `rlhf-pipeline`, eval-runner UI.
+  **Done this branch.** Surveyed `apps/ui/app/routes/` first: `image-gen.tsx`, `knowledge-graph.tsx`,
+  `gauntlet.tsx`, `evaluation.tsx` (that one over the separate `/api/evaluation/*` backend) already
+  existed — the four genuinely-missing pages were built, one commit each, mirroring
+  `provider-keys.tsx`/`costs.tsx`, all registered in `app/routes.ts`:
+  - **voice** (`routes/voice.tsx`) — TTS over `/api/v1/voice/*`: provider-status cards + voice picker
+    + Synthesize → plays returned `audio/mpeg` via a revoked object-URL `<audio>`; surfaces the
+    null-provider (no key) state.
+  - **prediction-markets** (`routes/prediction-markets.tsx`) — dashboard over
+    `/api/v1/prediction-markets`: market cards (category, volume/liquidity, per-outcome probability
+    bars), category filter + refresh, 401/429/empty handling.
+  - **rlhf** (`routes/rlhf.tsx`) — over `/api/v1/rlhf/stats` + `/rlhf/feedback`: stat cards
+    (feedback totals, thumbs up/down, preference pairs), rating filter, recent-feedback list.
+  - **evals** (`routes/evals.tsx`) — eval-runner over `/api/v1/evals/scorers` + `/evals/score`:
+    scorer picker with param hints, output (JSON-or-text) + params (JSON) inputs, Run → pass/fail +
+    score + reason, plus a scorer reference list.
+  image-gen Sandbox tab / knowledge-graph viz / gauntlet already shipped as their own routes.
+  UI typecheck + eslint + full `pnpm --filter @nexus/ui build` green.
 
 ## 11. Memory upgrade — `packages/memory` (library-only)
 
