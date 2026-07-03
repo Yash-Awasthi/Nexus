@@ -1,0 +1,30 @@
+{
+  "name": "@nexus/mcp-compressor",
+  "version": "0.0.0",
+  "private": false,
+  "description": "Shrink MCP tool manifests 60–95% — collapse a large tool surface into a 3-tool gateway (list_tools / get_tool_schema / invoke_tool) the model drills into on demand",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "dev": "tsc --project tsconfig.json --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "clean": "rm -rf dist coverage",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8",
+    "@vitest/coverage-v8": "^2.1.8"
+  },
+  "dependencies": {}
+}

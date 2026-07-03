@@ -1798,6 +1798,18 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@25.9.3)(lightningcss@1.32.0)(terser@5.48.0)
 
+  packages/mcp-compressor:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.8
+        version: 2.1.9(vitest@2.1.9(@types/node@25.9.3)(lightningcss@1.32.0)(terser@5.48.0))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.3)(lightningcss@1.32.0)(terser@5.48.0)
+
   packages/mcp-openapi:
     devDependencies:
       '@vitest/coverage-v8':
