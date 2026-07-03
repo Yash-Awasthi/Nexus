@@ -38,12 +38,18 @@ _WHITESPACE_RE = re.compile(r"\s{2,}")
 
 def strip_html(html: str) -> str:
     """Very lightweight HTML → plain-text (no external deps required)."""
-    # Remove script/style blocks entirely
+    # Guard against payloads large enough to cause ReDoS
+    if len(html) > 500_000:
+        html = html[:500_000]
+    # Remove script/style blocks entirely (tags + inner content) so that
+    # embedded JS/CSS is not indexed as plain text.
     text = re.sub(r"<(?:script|style)[^>]*>[\s\S]*?</(?:script|style)>", "", html, flags=re.IGNORECASE)
+    # Strip remaining tags
     text = _TAG_RE.sub(" ", text)
-    # Decode common entities
-    text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">") \
+    # Decode common entities (non-amp first to prevent double-decoding)
+    text = (text.replace("&lt;", "<").replace("&gt;", ">")
                .replace("&quot;", '"').replace("&#39;", "'").replace("&nbsp;", " ")
+               .replace("&amp;", "&"))
     text = _WHITESPACE_RE.sub(" ", text).strip()
     return text
 

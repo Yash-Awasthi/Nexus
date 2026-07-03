@@ -7,12 +7,7 @@ slug: /
 
 # NEXUS — Autonomous Orchestration Platform
 
-NEXUS is an open-source, production-grade autonomous orchestration platform. It consolidates four prior codebases into one coherent system with full contracts, schemas, tests, and operational tooling:
-
-- **Workspace** — agent wrappers and integration scaffolding
-- **Judica** (`@nexus/council`) — multi-model deliberation engine
-- **Ghoststack** (`@nexus/runtime`) — orchestration kernel with circuit breaker, crash recovery, and OTel tracing
-- **fin-scrape** — financial data ingestion adapters
+NEXUS is an open-source, production-grade multi-agent orchestration platform. **150 `@nexus/*` packages** in a Turborepo monorepo (TypeScript 94.9%). It consolidates Workspace, Judica, Ghoststack, and fin-scrape into one coherent system.
 
 The result is a single system that can **sense** external events, **think** through them with a multi-model council, **decide** via a governance engine, and **act** through first-party adapters — all with a complete, tamper-evident audit trail.
 
@@ -27,22 +22,40 @@ Most AI agent frameworks bolt on governance and observability as afterthoughts. 
 
 ## What ships today
 
-| Package                  | Status    | Description                                   |
-| ------------------------ | --------- | --------------------------------------------- |
-| `@nexus/runtime`         | ✅ v0.1.0 | Queues, circuit breaker, crash recovery, OTel |
-| `@nexus/auth`            | ✅ v0.1.0 | API key + HS256 JWT, Fastify hook             |
-| `@nexus/memory`          | ✅ v0.1.0 | Vector-search agent memory                    |
-| `@nexus/pipeline-signal` | ✅ v0.1.0 | Ingest → classify → Signal worker             |
-| `@nexus/council`         | ✅ v0.1.0 | Multi-model deliberation engine               |
-| `@nexus/db`              | ✅ v0.1.0 | Drizzle ORM, 7 schemas, migrations            |
-| `@nexus/telemetry`       | ✅ v0.1.0 | Health aggregation, SLOs, Prometheus          |
-| `@nexus/governance`      | ✅ v0.1.0 | Constraints, policies, guardrails, HITL       |
-| `@nexus/plugin-sdk`      | ✅ v0.1.0 | defineAdapter, capability types, test harness |
-| `apps/api`               | ✅        | Fastify REST gateway — 18 routes              |
-| `apps/worker`            | ✅        | BullMQ signal + task consumers                |
-| `apps/web`               | ✅        | React dashboard with real API integration     |
-| `apps/cli`               | ✅        | Developer CLI                                 |
-| `services/ingest`        | ✅        | Python FastAPI ingestion service              |
+### Applications
+
+| App               | Description                                                           |
+| ----------------- | --------------------------------------------------------------------- |
+| `apps/api`        | Fastify REST/SSE gateway — 47 routes                                  |
+| `apps/worker`     | BullMQ high/medium/low queues + signal workers + repeatable jobs      |
+| `apps/web`        | React dashboard — 17 pages, real API integration                      |
+| `apps/spectre`    | SPECTRE hacker chat UI — 4 modes, 4 themes (see [SPECTRE](./spectre)) |
+| `apps/cli`        | Developer CLI (commander.js)                                          |
+| `services/ingest` | Python FastAPI ingestion service (asyncpg, Redis pub, OTel)           |
+
+### Key packages
+
+| Package                | Description                                                     |
+| ---------------------- | --------------------------------------------------------------- |
+| `@nexus/client`        | Typed isomorphic SDK — chat, council, memory, agents, research  |
+| `@nexus/agent-runtime` | Multi-step LLM tool loop, spawn_agents, swarm layer             |
+| `@nexus/council`       | Multi-model deliberation: allSettled fanout, voting, synthesis  |
+| `@nexus/llm-drivers`   | 15 provider drivers with native SSE/NDJSON streaming            |
+| `@nexus/gauntlet`      | Race N models in parallel waves; composite scorer; 5 tiers      |
+| `@nexus/memory`        | pgvector store, MemoryGraph BFS, TTL, multi-tenant ACL          |
+| `@nexus/retrieval`     | RAG: chunk → embed → hybrid retrieve → rerank                   |
+| `@nexus/redteam`       | Input perturbation engine (6 techniques × 3 intensities)        |
+| `@nexus/drift`         | EMA adaptive sampling parameter tuning                          |
+| `@nexus/stm`           | Semantic transformation: hedge reducer, directness optimizer    |
+| `@nexus/supervisor`    | Multi-agent DAG scheduler (OmaTask, dependency-first, BFS)      |
+| `@nexus/gateway`       | IProvider failover, model alias routing, Singleflight coalescer |
+| `@nexus/adapters`      | Barrel re-exporting all 25 `@nexus/adapter-*` sub-packages      |
+| `@nexus/plugin-sdk`    | defineAdapter(), capability types, test harness                 |
+| `@nexus/db`            | Drizzle ORM — 11 schemas (verdicts, memory, signals, billing…)  |
+| `@nexus/telemetry`     | OTel bootstrap, SLO tracker, HMAC-chained audit log, Prometheus |
+| `@nexus/runtime`       | Circuit breaker, crash recovery, queue backends, OTel tracing   |
+
+> 150 `@nexus/*` packages total. See [README](https://github.com/Yash-Awasthi/Nexus#core-packages) for the full table.
 
 ## Core concepts
 

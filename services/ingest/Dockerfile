@@ -17,11 +17,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy project manifests
 COPY services/ingest/pyproject.toml services/ingest/
 
-# Install production deps into /build/venv
+# Install production deps into /venv (same path as final stage so console-script
+# shebangs stay valid after COPY — a venv is not relocatable).
 # finscrape is an optional [finscrape] extra (local sibling repo); not included in the
 # Docker image — scrapers degrade gracefully when finscrape is absent.
-RUN python -m venv /build/venv
-ENV PATH="/build/venv/bin:$PATH"
+RUN python -m venv /venv
+ENV PATH="/venv/bin:$PATH"
 
 # Copy the rest of the ingest service
 COPY services/ingest/ /build/services/ingest/
@@ -40,7 +41,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy venv and service source from builder
-COPY --from=builder /build/venv /venv
+COPY --from=builder /venv /venv
 COPY --from=builder /build/services/ingest /app
 
 ENV PATH="/venv/bin:$PATH" \
