@@ -15,8 +15,13 @@ import {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 let _time = 1_000_000;
-function makeNow() { _time = 1_000_000; return () => _time; }
-function advanceTime(ms: number) { _time += ms; }
+function makeNow() {
+  _time = 1_000_000;
+  return () => _time;
+}
+function advanceTime(ms: number) {
+  _time += ms;
+}
 
 function p(host: string, port = 8080): Proxy {
   return { url: `http://${host}:${port}`, protocol: "http", host, port };
@@ -32,7 +37,10 @@ describe("RoundRobinRotator", () => {
   let rot: RoundRobinRotator;
   let now: () => number;
 
-  beforeEach(() => { now = makeNow(); rot = new RoundRobinRotator({ now }); });
+  beforeEach(() => {
+    now = makeNow();
+    rot = new RoundRobinRotator({ now });
+  });
 
   it("returns undefined when empty", () => expect(rot.next()).toBeUndefined());
 
@@ -115,7 +123,7 @@ describe("RoundRobinRotator", () => {
     rot.add([P1, P2]);
     rot.markFail(P1);
     rot.markFail(P1); // hits limit
-    expect(rot.health().find(h => h.proxy.url === P1.url)?.banned).toBe(true);
+    expect(rot.health().find((h) => h.proxy.url === P1.url)?.banned).toBe(true);
     expect(rot.next()?.host).toBe("2.2.2.2"); // P1 skipped
   });
 
@@ -178,7 +186,10 @@ describe("RandomRotator", () => {
 
   it("injectable rand function for determinism", () => {
     let calls = 0;
-    const rand = () => { const v = [0, 0.5, 0.9][calls++ % 3]!; return v; };
+    const rand = () => {
+      const v = [0, 0.5, 0.9][calls++ % 3]!;
+      return v;
+    };
     const rot = new RandomRotator({ rand });
     rot.add([P1, P2, P3]);
     expect(rot.next()?.host).toBe("1.1.1.1"); // floor(0 * 3) = 0
@@ -192,7 +203,9 @@ describe("RandomRotator", () => {
 describe("LeastUsedRotator", () => {
   let rot: LeastUsedRotator;
 
-  beforeEach(() => { rot = new LeastUsedRotator(); });
+  beforeEach(() => {
+    rot = new LeastUsedRotator();
+  });
 
   it("returns undefined when empty", () => expect(rot.next()).toBeUndefined());
 
@@ -227,7 +240,10 @@ describe("StickyRotator", () => {
   let rot: StickyRotator;
   let now: () => number;
 
-  beforeEach(() => { now = makeNow(); rot = new StickyRotator({ now }); });
+  beforeEach(() => {
+    now = makeNow();
+    rot = new StickyRotator({ now });
+  });
 
   it("returns undefined when empty", () => expect(rot.next()).toBeUndefined());
 

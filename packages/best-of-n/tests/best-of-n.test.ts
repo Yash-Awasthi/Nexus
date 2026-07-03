@@ -25,7 +25,10 @@ describe("defaultScorer", () => {
 
   it("penalises hedge phrases", () => {
     const clean = defaultScorer("The answer is 42.", "what is the answer");
-    const hedged = defaultScorer("I cannot provide that. I'm unable to help.", "what is the answer");
+    const hedged = defaultScorer(
+      "I cannot provide that. I'm unable to help.",
+      "what is the answer",
+    );
     expect(clean).toBeGreaterThan(hedged);
   });
 
@@ -131,8 +134,7 @@ describe("BestOfNGenerator", () => {
   it("uses custom scorer when provided", async () => {
     const client = new NullBonLlmClient({ responses: ["alpha", "beta", "gamma"] });
     // Custom scorer: score based on last character ASCII value
-    const customScorer = (content: string) =>
-      content.charCodeAt(content.length - 1) ?? 0;
+    const customScorer = (content: string) => content.charCodeAt(content.length - 1) ?? 0;
 
     const gen = new BestOfNGenerator({ llm: client, n: 3, scorer: customScorer });
     const result = await gen.generate({ prompt: "pick one" });

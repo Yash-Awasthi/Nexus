@@ -57,6 +57,7 @@ export interface FileMeta {
   metadata?: Record<string, string>;
 }
 
+/** File content interface definition. */
 export interface FileContent {
   data: Uint8Array;
   meta: FileMeta;
@@ -294,7 +295,11 @@ export class LocalFileStore implements IFileStore {
   async delete(key: string): Promise<boolean> {
     try {
       await this.fs.unlink(this._dataPath(key));
-      try { await this.fs.unlink(this._metaPath(key)); } catch { /* ignore */ }
+      try {
+        await this.fs.unlink(this._metaPath(key));
+      } catch {
+        /* ignore */
+      }
       return true;
     } catch {
       return false;
@@ -359,6 +364,7 @@ export class LocalFileStore implements IFileStore {
 
 export type FetchFn = typeof fetch;
 
+/** S3 config interface definition. */
 export interface S3Config {
   bucket: string;
   region: string;
@@ -388,9 +394,7 @@ export class S3FileStore implements IFileStore {
   ) {
     this.fetch = opts.fetch ?? globalThis.fetch;
     this.now = opts.now ?? (() => Date.now());
-    this.endpoint =
-      config.endpoint ??
-      `https://${config.bucket}.s3.${config.region}.amazonaws.com`;
+    this.endpoint = config.endpoint ?? `https://${config.bucket}.s3.${config.region}.amazonaws.com`;
   }
 
   // ── AWS Sig V4 helpers ────────────────────────────────────────────────────
@@ -415,7 +419,10 @@ export class S3FileStore implements IFileStore {
   }
 
   private _isoDate(ts: number): string {
-    return new Date(ts).toISOString().replace(/[:-]/g, "").replace(/\.\d{3}/, "");
+    return new Date(ts)
+      .toISOString()
+      .replace(/[:-]/g, "")
+      .replace(/\.\d{3}/, "");
   }
 
   private _shortDate(ts: number): string {
@@ -616,7 +623,7 @@ export class S3FileStore implements IFileStore {
     });
   }
 
-  async url(key: string, ttlMs: number = 3600_000): Promise<string | undefined> {
+  async url(key: string, ttlMs = 3600_000): Promise<string | undefined> {
     if (this.config.publicUrlBase) {
       return `${this.config.publicUrlBase}/${encodeURIComponent(key)}`;
     }

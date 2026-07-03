@@ -34,7 +34,9 @@ describe("detectClient", () => {
   });
 
   it("detects browser via Mozilla User-Agent", () => {
-    const r = detectClient({ "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X) Chrome/120.0" });
+    const r = detectClient({
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X) Chrome/120.0",
+    });
     expect(r.clientType).toBe("browser");
     expect(r.responseFormat).toBe("markdown");
   });
@@ -85,9 +87,13 @@ describe("makeClientDetectMiddleware", () => {
     const mw = makeClientDetectMiddleware();
     const req = { headers: { "x-nexus-client": "cursor" } };
     let called = false;
-    mw(req, {}, () => { called = true; });
+    mw(req, {}, () => {
+      called = true;
+    });
     expect((req as Record<string, unknown>).nexusClient).toBeDefined();
-    expect(((req as Record<string, unknown>).nexusClient as { clientType: string }).clientType).toBe("cursor");
+    expect(
+      ((req as Record<string, unknown>).nexusClient as { clientType: string }).clientType,
+    ).toBe("cursor");
     expect(called).toBe(true);
   });
 

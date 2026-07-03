@@ -20,8 +20,13 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 
 let _time = 1_000_000;
-function makeNow() { _time = 1_000_000; return () => _time; }
-function advanceTime(ms: number) { _time += ms; }
+function makeNow() {
+  _time = 1_000_000;
+  return () => _time;
+}
+function advanceTime(ms: number) {
+  _time += ms;
+}
 
 function makeProxy(host: string): Proxy {
   return { url: `http://${host}:8080`, host, port: 8080, protocol: "http" };
@@ -33,7 +38,12 @@ type FetchMockMap = Record<string, MockRoute>;
 
 function makeFetch(routes: FetchMockMap, defaultBody = "<html><body></body></html>"): typeof fetch {
   return async (input: RequestInfo | URL) => {
-    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : (input as Request).url;
+    const url =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : (input as Request).url;
     const route = routes[url] ?? { status: 200, body: defaultBody };
     const status = route.status ?? 200;
     const body = route.body ?? defaultBody;
@@ -169,7 +179,9 @@ describe("parseSitemapUrls", () => {
 describe("CrawlScheduler", () => {
   let sched: CrawlScheduler;
 
-  beforeEach(() => { sched = new CrawlScheduler(); });
+  beforeEach(() => {
+    sched = new CrawlScheduler();
+  });
 
   it("enqueue / dequeue FIFO", () => {
     sched.enqueue("https://a.com", 0);
@@ -228,7 +240,9 @@ describe("CrawlScheduler", () => {
 describe("MemoryCookieJar", () => {
   let jar: MemoryCookieJar;
 
-  beforeEach(() => { jar = new MemoryCookieJar(); });
+  beforeEach(() => {
+    jar = new MemoryCookieJar();
+  });
 
   it("getCookieHeader returns empty string when no cookies", () => {
     expect(jar.getCookieHeader("https://example.com")).toBe("");
@@ -267,14 +281,18 @@ describe("MemoryCookieJar", () => {
 describe("Spider", () => {
   let now: () => number;
 
-  beforeEach(() => { now = makeNow(); });
+  beforeEach(() => {
+    now = makeNow();
+  });
 
   // Basic crawl
   it("crawls a single page and returns summary", async () => {
     const fetch = makeFetch({ "https://example.com": { body: "<html><body>hello</body></html>" } });
     const spider = new Spider({ fetch, now, delay: async () => {} });
     const pages: CrawledPage[] = [];
-    const summary = await spider.crawl(makeTarget({ followLinks: false }), async (p) => { pages.push(p); });
+    const summary = await spider.crawl(makeTarget({ followLinks: false }), async (p) => {
+      pages.push(p);
+    });
 
     expect(pages).toHaveLength(1);
     expect(pages[0]?.url).toContain("example.com");
@@ -292,32 +310,43 @@ describe("Spider", () => {
     });
     const spider = new Spider({ fetch, now, delay: async () => {} });
     const pages: CrawledPage[] = [];
-    await spider.crawl(makeTarget({ maxDepth: 2, maxPages: 10 }), async (p) => { pages.push(p); });
+    await spider.crawl(makeTarget({ maxDepth: 2, maxPages: 10 }), async (p) => {
+      pages.push(p);
+    });
     expect(pages.length).toBeGreaterThanOrEqual(2);
     expect(pages.map((p) => p.url)).toContain("https://example.com/page1");
   });
 
   // maxPages cap
   it("stops after maxPages", async () => {
-    const html = '<html><body>' + Array.from({ length: 20 }, (_, i) => `<a href="/p${i}">x</a>`).join("") + "</body></html>";
+    const html =
+      "<html><body>" +
+      Array.from({ length: 20 }, (_, i) => `<a href="/p${i}">x</a>`).join("") +
+      "</body></html>";
     const fetch = makeFetch({}, html);
     const spider = new Spider({ fetch, now, delay: async () => {} });
     const pages: CrawledPage[] = [];
-    await spider.crawl(makeTarget({ maxPages: 3, maxDepth: 5 }), async (p) => { pages.push(p); });
+    await spider.crawl(makeTarget({ maxPages: 3, maxDepth: 5 }), async (p) => {
+      pages.push(p);
+    });
     expect(pages).toHaveLength(3);
   });
 
   // Domain filter
   it("only crawls allowed domains", async () => {
     const fetch = makeFetch({
-      "https://example.com": { body: '<html><body><a href="https://other.com/page">ext</a><a href="/internal">int</a></body></html>' },
+      "https://example.com": {
+        body: '<html><body><a href="https://other.com/page">ext</a><a href="/internal">int</a></body></html>',
+      },
       "https://example.com/internal": { body: "<html><body>internal</body></html>" },
     });
     const spider = new Spider({ fetch, now, delay: async () => {} });
     const pages: CrawledPage[] = [];
     await spider.crawl(
       makeTarget({ maxDepth: 2, maxPages: 10, allowedDomains: ["example.com"] }),
-      async (p) => { pages.push(p); },
+      async (p) => {
+        pages.push(p);
+      },
     );
     expect(pages.every((p) => p.url.includes("example.com"))).toBe(true);
   });
@@ -325,14 +354,18 @@ describe("Spider", () => {
   // Blocked patterns
   it("skips URLs matching blockedPatterns", async () => {
     const fetch = makeFetch({
-      "https://example.com": { body: '<html><body><a href="/admin/secret">admin</a><a href="/about">about</a></body></html>' },
+      "https://example.com": {
+        body: '<html><body><a href="/admin/secret">admin</a><a href="/about">about</a></body></html>',
+      },
       "https://example.com/about": { body: "<html><body>about</body></html>" },
     });
     const spider = new Spider({ fetch, now, delay: async () => {} });
     const pages: CrawledPage[] = [];
     await spider.crawl(
       makeTarget({ maxDepth: 2, maxPages: 10, blockedPatterns: [/\/admin/] }),
-      async (p) => { pages.push(p); },
+      async (p) => {
+        pages.push(p);
+      },
     );
     expect(pages.every((p) => !p.url.includes("/admin"))).toBe(true);
   });
@@ -341,12 +374,19 @@ describe("Spider", () => {
   it("respects robots.txt disallowed paths", async () => {
     const fetch = makeFetch({
       "https://example.com/robots.txt": { body: "User-agent: *\nDisallow: /private" },
-      "https://example.com": { body: '<html><body><a href="/private/secret">priv</a><a href="/public">pub</a></body></html>' },
+      "https://example.com": {
+        body: '<html><body><a href="/private/secret">priv</a><a href="/public">pub</a></body></html>',
+      },
       "https://example.com/public": { body: "<html><body>public</body></html>" },
     });
     const spider = new Spider({ fetch, now, delay: async () => {} });
     const pages: CrawledPage[] = [];
-    await spider.crawl(makeTarget({ maxDepth: 2, maxPages: 10, respectRobotsTxt: true }), async (p) => { pages.push(p); });
+    await spider.crawl(
+      makeTarget({ maxDepth: 2, maxPages: 10, respectRobotsTxt: true }),
+      async (p) => {
+        pages.push(p);
+      },
+    );
     expect(pages.every((p) => !p.url.includes("/private"))).toBe(true);
   });
 
@@ -358,7 +398,12 @@ describe("Spider", () => {
     });
     const spider = new Spider({ fetch, now, delay: async () => {} });
     const pages: CrawledPage[] = [];
-    await spider.crawl(makeTarget({ maxDepth: 2, maxPages: 10, respectRobotsTxt: false }), async (p) => { pages.push(p); });
+    await spider.crawl(
+      makeTarget({ maxDepth: 2, maxPages: 10, respectRobotsTxt: false }),
+      async (p) => {
+        pages.push(p);
+      },
+    );
     expect(pages.some((p) => p.url.includes("/private"))).toBe(true);
   });
 
@@ -367,7 +412,7 @@ describe("Spider", () => {
     const fetch = makeFetch({
       "https://example.com": { body: "<html><body>home</body></html>" },
       "https://example.com/sitemap.xml": {
-        body: '<urlset><url><loc>https://example.com/from-sitemap</loc></url></urlset>',
+        body: "<urlset><url><loc>https://example.com/from-sitemap</loc></url></urlset>",
         headers: { "content-type": "text/xml" },
       },
       "https://example.com/from-sitemap": { body: "<html><body>sitemap page</body></html>" },
@@ -376,17 +421,23 @@ describe("Spider", () => {
     const pages: CrawledPage[] = [];
     await spider.crawl(
       makeTarget({ maxDepth: 0, maxPages: 10, crawlSitemap: true, followLinks: false }),
-      async (p) => { pages.push(p); },
+      async (p) => {
+        pages.push(p);
+      },
     );
     expect(pages.some((p) => p.url.includes("from-sitemap"))).toBe(true);
   });
 
   // Error handling
   it("records fetch errors in crawledPage.error", async () => {
-    const errFetch: typeof fetch = async () => { throw new Error("ECONNREFUSED"); };
+    const errFetch: typeof fetch = async () => {
+      throw new Error("ECONNREFUSED");
+    };
     const spider = new Spider({ fetch: errFetch, now, delay: async () => {}, maxRetries: 0 });
     const pages: CrawledPage[] = [];
-    await spider.crawl(makeTarget({ followLinks: false }), async (p) => { pages.push(p); });
+    await spider.crawl(makeTarget({ followLinks: false }), async (p) => {
+      pages.push(p);
+    });
     expect(pages[0]?.error).toContain("ECONNREFUSED");
     // summary
   });
@@ -403,7 +454,9 @@ describe("Spider", () => {
     const fetch = makeFetch({ "https://example.com": { body: "<html></html>" } });
     const spider = new Spider({ fetch, proxy: rotator, now, delay: async () => {} });
     const pages: CrawledPage[] = [];
-    await spider.crawl(makeTarget({ followLinks: false }), async (p) => { pages.push(p); });
+    await spider.crawl(makeTarget({ followLinks: false }), async (p) => {
+      pages.push(p);
+    });
     expect(pages[0]?.proxyUsed).toBe("http://proxy.host:8080");
     expect(rotator.markSuccess).toHaveBeenCalled();
   });
@@ -433,7 +486,10 @@ describe("Spider", () => {
     let callCount = 0;
     const fetch = makeFetch({
       "https://example.com": {
-        body: '<html>' + Array.from({ length: 10 }, (_, i) => `<a href="/p${i}">x</a>`).join("") + '</html>',
+        body:
+          "<html>" +
+          Array.from({ length: 10 }, (_, i) => `<a href="/p${i}">x</a>`).join("") +
+          "</html>",
       },
     });
     const spider = new Spider({ fetch, now, delay: async () => {} });
@@ -467,11 +523,16 @@ describe("Spider", () => {
     spider.restore({
       seedUrl: "https://example.com",
       visited: ["https://example.com"],
-      queue: [{ url: "https://example.com/a", depth: 1 }, { url: "https://example.com/b", depth: 1 }],
+      queue: [
+        { url: "https://example.com/a", depth: 1 },
+        { url: "https://example.com/b", depth: 1 },
+      ],
       createdAt: Date.now(),
     });
     const pages: CrawledPage[] = [];
-    await spider.crawl(makeTarget({ maxPages: 5 }), async (p) => { pages.push(p); });
+    await spider.crawl(makeTarget({ maxPages: 5 }), async (p) => {
+      pages.push(p);
+    });
     expect(pages.map((p) => p.url)).toContain("https://example.com/a");
     expect(pages.map((p) => p.url)).toContain("https://example.com/b");
   });
@@ -479,7 +540,9 @@ describe("Spider", () => {
   // Request delay
   it("applies requestDelayMs between fetches", async () => {
     const delays: number[] = [];
-    const delayFn = async (ms: number) => { delays.push(ms); };
+    const delayFn = async (ms: number) => {
+      delays.push(ms);
+    };
     const fetch = makeFetch({
       "https://example.com": { body: '<a href="/p1">p1</a>' },
       "https://example.com/p1": { body: "<html></html>" },
@@ -500,7 +563,11 @@ describe("Spider", () => {
     };
     const spider = new Spider({ fetch: hFetch, now, delay: async () => {} });
     await spider.crawl(
-      makeTarget({ followLinks: false, respectRobotsTxt: false, headers: { "x-api-key": "secret" } }),
+      makeTarget({
+        followLinks: false,
+        respectRobotsTxt: false,
+        headers: { "x-api-key": "secret" },
+      }),
       async () => {},
     );
     expect(capturedHeaders[0]).toBe("secret");

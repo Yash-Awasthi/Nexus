@@ -10,7 +10,10 @@ import {
 } from "../src/index.js";
 
 // Deterministic RNG for tests
-const deterministicRng = (seed = 0.5) => () => seed;
+const deterministicRng =
+  (seed = 0.5) =>
+  () =>
+    seed;
 
 // ── HumanTiming ───────────────────────────────────────────────────────────────
 
@@ -198,7 +201,9 @@ describe("BrowserSession", () => {
 describe("ActionPlayer", () => {
   it("plays all actions and returns results", async () => {
     const executed: string[] = [];
-    const player = new ActionPlayer((action) => { executed.push(action.type); });
+    const player = new ActionPlayer((action) => {
+      executed.push(action.type);
+    });
     const session = new BrowserSession(deterministicRng(0.5));
     session.click({ x: 0, y: 0 }).type("hi");
     const result = await player.play(session.getActions());
@@ -208,7 +213,9 @@ describe("ActionPlayer", () => {
   });
 
   it("counts errors when executor throws", async () => {
-    const player = new ActionPlayer(() => { throw new Error("failed"); });
+    const player = new ActionPlayer(() => {
+      throw new Error("failed");
+    });
     const session = new BrowserSession();
     session.click({ x: 0, y: 0 }).click({ x: 10, y: 10 });
     const result = await player.play(session.getActions());
@@ -218,7 +225,10 @@ describe("ActionPlayer", () => {
 
   it("handles async executor", async () => {
     let count = 0;
-    const player = new ActionPlayer(async () => { await Promise.resolve(); count++; });
+    const player = new ActionPlayer(async () => {
+      await Promise.resolve();
+      count++;
+    });
     const session = new BrowserSession();
     session.click({ x: 0, y: 0 });
     await player.play(session.getActions());

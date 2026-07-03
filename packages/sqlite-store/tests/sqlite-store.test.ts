@@ -12,7 +12,9 @@ import {
 
 describe("InMemoryKVStore", () => {
   let kv: InMemoryKVStore;
-  beforeEach(() => { kv = new InMemoryKVStore(); });
+  beforeEach(() => {
+    kv = new InMemoryKVStore();
+  });
 
   it("set and get", async () => {
     await kv.set("foo", "bar");
@@ -35,26 +37,32 @@ describe("InMemoryKVStore", () => {
   });
 
   it("list returns all entries sorted by key", async () => {
-    await kv.set("b", "2"); await kv.set("a", "1"); await kv.set("c", "3");
+    await kv.set("b", "2");
+    await kv.set("a", "1");
+    await kv.set("c", "3");
     const list = await kv.list();
     expect(list.map((e) => e.key)).toEqual(["a", "b", "c"]);
   });
 
   it("list with prefix filters correctly", async () => {
-    await kv.set("ns:a", "1"); await kv.set("ns:b", "2"); await kv.set("other:c", "3");
+    await kv.set("ns:a", "1");
+    await kv.set("ns:b", "2");
+    await kv.set("other:c", "3");
     const list = await kv.list("ns:");
     expect(list).toHaveLength(2);
     expect(list.every((e) => e.key.startsWith("ns:"))).toBe(true);
   });
 
   it("clear removes all entries", async () => {
-    await kv.set("a", "1"); await kv.set("b", "2");
+    await kv.set("a", "1");
+    await kv.set("b", "2");
     await kv.clear();
     expect(await kv.size()).toBe(0);
   });
 
   it("size returns correct count", async () => {
-    await kv.set("a", "1"); await kv.set("b", "2");
+    await kv.set("a", "1");
+    await kv.set("b", "2");
     expect(await kv.size()).toBe(2);
   });
 
@@ -85,7 +93,9 @@ describe("InMemoryObsStore", () => {
     return { id, sessionId, type, content, createdAt: Date.now() };
   }
 
-  beforeEach(() => { store = new InMemoryObsStore(); });
+  beforeEach(() => {
+    store = new InMemoryObsStore();
+  });
 
   it("add and getBySession", async () => {
     await store.add(obs("1", "s1", "note", "hello"));

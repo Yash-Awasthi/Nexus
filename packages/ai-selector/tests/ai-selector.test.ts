@@ -85,7 +85,9 @@ describe("truncateHtml", () => {
 
 describe("LLMAISelector", () => {
   it("parses valid JSON response from LLM", async () => {
-    const llm = makeLLM('{"selector":".add-to-cart","strategy":"css","confidence":0.95,"explanation":"Has class add-to-cart"}');
+    const llm = makeLLM(
+      '{"selector":".add-to-cart","strategy":"css","confidence":0.95,"explanation":"Has class add-to-cart"}',
+    );
     const sel = new LLMAISelector(llm, { model: "gpt-4o" });
     const result = await sel.find(makeRequest());
     expect(result).toBeDefined();
@@ -96,7 +98,9 @@ describe("LLMAISelector", () => {
   });
 
   it("returns undefined when LLM says element not found (confidence 0)", async () => {
-    const llm = makeLLM('{"selector":"","strategy":"css","confidence":0,"explanation":"Element not found"}');
+    const llm = makeLLM(
+      '{"selector":"","strategy":"css","confidence":0,"explanation":"Element not found"}',
+    );
     const sel = new LLMAISelector(llm, { model: "gpt-4o" });
     expect(await sel.find(makeRequest())).toBeUndefined();
   });
@@ -108,14 +112,18 @@ describe("LLMAISelector", () => {
   });
 
   it("handles JSON embedded in prose (extracts first object)", async () => {
-    const llm = makeLLM('Sure! Here you go: {"selector":"#atc-btn","strategy":"css","confidence":0.9,"explanation":"by id"}. Hope that helps!');
+    const llm = makeLLM(
+      'Sure! Here you go: {"selector":"#atc-btn","strategy":"css","confidence":0.9,"explanation":"by id"}. Hope that helps!',
+    );
     const sel = new LLMAISelector(llm, { model: "gpt-4o" });
     const result = await sel.find(makeRequest());
     expect(result?.selector).toBe("#atc-btn");
   });
 
   it("findAll parses JSON array response", async () => {
-    const llm = makeLLM('[{"selector":".add-to-cart","strategy":"css","confidence":0.95},{"selector":"#atc-btn","strategy":"css","confidence":0.85}]');
+    const llm = makeLLM(
+      '[{"selector":".add-to-cart","strategy":"css","confidence":0.95},{"selector":"#atc-btn","strategy":"css","confidence":0.85}]',
+    );
     const sel = new LLMAISelector(llm, { model: "gpt-4o" });
     const results = await sel.findAll(makeRequest());
     expect(results).toHaveLength(2);
@@ -130,14 +138,18 @@ describe("LLMAISelector", () => {
   });
 
   it("findAll sorts by confidence descending", async () => {
-    const llm = makeLLM('[{"selector":"a","strategy":"css","confidence":0.5},{"selector":"b","strategy":"css","confidence":0.9}]');
+    const llm = makeLLM(
+      '[{"selector":"a","strategy":"css","confidence":0.5},{"selector":"b","strategy":"css","confidence":0.9}]',
+    );
     const sel = new LLMAISelector(llm, { model: "gpt-4o" });
     const results = await sel.findAll(makeRequest());
     expect(results[0]?.confidence).toBeGreaterThan(results[1]?.confidence ?? 0);
   });
 
   it("findAll filters out zero-confidence results", async () => {
-    const llm = makeLLM('[{"selector":".good","strategy":"css","confidence":0.8},{"selector":"","strategy":"css","confidence":0}]');
+    const llm = makeLLM(
+      '[{"selector":".good","strategy":"css","confidence":0.8},{"selector":"","strategy":"css","confidence":0}]',
+    );
     const sel = new LLMAISelector(llm, { model: "gpt-4o" });
     const results = await sel.findAll(makeRequest());
     expect(results).toHaveLength(1);
@@ -197,7 +209,14 @@ describe("LLMAISelector", () => {
 
   it("includes hint in prompt", async () => {
     const captured: LLMRequest[] = [];
-    const llm: LLMProvider = { name: "spy", models: ["gpt-4o"], async complete(req) { captured.push(req); return { content: '{"selector":".x","strategy":"css","confidence":0.5}' }; } };
+    const llm: LLMProvider = {
+      name: "spy",
+      models: ["gpt-4o"],
+      async complete(req) {
+        captured.push(req);
+        return { content: '{"selector":".x","strategy":"css","confidence":0.5}' };
+      },
+    };
     const sel = new LLMAISelector(llm, { model: "gpt-4o" });
     await sel.find({ ...makeRequest(), hint: "checkout flow button" });
     expect(captured[0]?.messages[0]?.content).toContain("checkout flow button");
@@ -239,15 +258,22 @@ describe("CascadeSelector", () => {
       ai: new NullAISelector(),
       validate: (s, html) => html.includes(s.selector.slice(1)), // strip leading dot
     });
-    const result = await cascade.find({ html: '<button class="add-to-cart">Buy</button>', description: "buy button" });
+    const result = await cascade.find({
+      html: '<button class="add-to-cart">Buy</button>',
+      description: "buy button",
+    });
     expect(result?.selector).toBe(".add-to-cart");
     expect(result?.confidence).toBe(1.0);
   });
 
   it("falls back to AI when all statics fail", async () => {
     const mockAI: IAISelector = {
-      async find() { return { selector: "#ai-found", strategy: "css", confidence: 0.8 }; },
-      async findAll() { return []; },
+      async find() {
+        return { selector: "#ai-found", strategy: "css", confidence: 0.8 };
+      },
+      async findAll() {
+        return [];
+      },
     };
     const cascade = new CascadeSelector({
       statics: STATICS,
@@ -276,15 +302,22 @@ describe("CascadeSelector", () => {
       ai: new NullAISelector(),
       validate: (s, html) => s.selector === ".add-to-cart" && html.includes("add-to-cart"),
     });
-    const results = await cascade.findAll({ html: '<button class="add-to-cart">Buy</button>', description: "buy" });
+    const results = await cascade.findAll({
+      html: '<button class="add-to-cart">Buy</button>',
+      description: "buy",
+    });
     expect(results).toHaveLength(1);
     expect(results[0]?.selector).toBe(".add-to-cart");
   });
 
   it("findAll falls back to AI when no statics match", async () => {
     const mockAI: IAISelector = {
-      async find() { return undefined; },
-      async findAll() { return [{ selector: "#x", strategy: "css", confidence: 0.7 }]; },
+      async find() {
+        return undefined;
+      },
+      async findAll() {
+        return [{ selector: "#x", strategy: "css", confidence: 0.7 }];
+      },
     };
     const cascade = new CascadeSelector({
       statics: STATICS,

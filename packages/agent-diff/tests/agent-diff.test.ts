@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
-import { strReplace, generateDiff, applyPatch, validatePatch, parseFileBlocks, DiffError } from "../src/index.js";
+import {
+  strReplace,
+  generateDiff,
+  applyPatch,
+  validatePatch,
+  parseFileBlocks,
+  DiffError,
+} from "../src/index.js";
 
 // ── strReplace ────────────────────────────────────────────────────────────────
 
@@ -12,12 +19,20 @@ describe("strReplace", () => {
 
   it("throws NOT_FOUND when oldStr absent", () => {
     expect(() => strReplace("hello", "missing", "x")).toThrow(DiffError);
-    try { strReplace("hello", "missing", "x"); } catch (e) { expect((e as DiffError).code).toBe("NOT_FOUND"); }
+    try {
+      strReplace("hello", "missing", "x");
+    } catch (e) {
+      expect((e as DiffError).code).toBe("NOT_FOUND");
+    }
   });
 
   it("throws AMBIGUOUS when oldStr appears twice", () => {
     expect(() => strReplace("aa", "a", "b")).toThrow(DiffError);
-    try { strReplace("aa", "a", "b"); } catch (e) { expect((e as DiffError).code).toBe("AMBIGUOUS"); }
+    try {
+      strReplace("aa", "a", "b");
+    } catch (e) {
+      expect((e as DiffError).code).toBe("AMBIGUOUS");
+    }
   });
 
   it("allows non-unique when requireUnique=false", () => {
@@ -75,7 +90,7 @@ describe("applyPatch", () => {
 
   it("roundtrip: generateDiff then applyPatch", () => {
     const orig = "function add(a, b) {\n  return a + b;\n}\n";
-    const mod  = "function add(a, b) {\n  return a + b + 0;\n}\n";
+    const mod = "function add(a, b) {\n  return a + b + 0;\n}\n";
     const diff = generateDiff(orig, mod, "math.ts");
     const { content } = applyPatch(orig, diff);
     expect(content).toBe(mod);

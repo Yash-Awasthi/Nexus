@@ -47,6 +47,7 @@ interface KVEntry {
   expiresAt?: number;
 }
 
+/** In memory kv store. */
 export class InMemoryKVStore implements KVStore {
   private readonly data = new Map<string, KVEntry>();
 
@@ -99,6 +100,7 @@ export interface SqliteDatabase {
   prepare(sql: string): SqliteStatement;
 }
 
+/** Sqlite statement interface definition. */
 export interface SqliteStatement {
   run(...params: unknown[]): void;
   get(...params: unknown[]): unknown;
@@ -130,13 +132,19 @@ export class SqliteKVStore implements KVStore {
       )
     `);
     this.stmts = {
-      get:     db.prepare(`SELECT value, expires_at FROM ${table} WHERE key = ?`),
-      set:     db.prepare(`INSERT OR REPLACE INTO ${table} (key, value, expires_at) VALUES (?, ?, ?)`),
-      del:     db.prepare(`DELETE FROM ${table} WHERE key = ?`),
-      list:    db.prepare(`SELECT key, value FROM ${table} WHERE (expires_at IS NULL OR expires_at > ?) ORDER BY key`),
-      listPfx: db.prepare(`SELECT key, value FROM ${table} WHERE key LIKE ? AND (expires_at IS NULL OR expires_at > ?) ORDER BY key`),
-      clear:   db.prepare(`DELETE FROM ${table}`),
-      count:   db.prepare(`SELECT COUNT(*) as n FROM ${table} WHERE (expires_at IS NULL OR expires_at > ?)`),
+      get: db.prepare(`SELECT value, expires_at FROM ${table} WHERE key = ?`),
+      set: db.prepare(`INSERT OR REPLACE INTO ${table} (key, value, expires_at) VALUES (?, ?, ?)`),
+      del: db.prepare(`DELETE FROM ${table} WHERE key = ?`),
+      list: db.prepare(
+        `SELECT key, value FROM ${table} WHERE (expires_at IS NULL OR expires_at > ?) ORDER BY key`,
+      ),
+      listPfx: db.prepare(
+        `SELECT key, value FROM ${table} WHERE key LIKE ? AND (expires_at IS NULL OR expires_at > ?) ORDER BY key`,
+      ),
+      clear: db.prepare(`DELETE FROM ${table}`),
+      count: db.prepare(
+        `SELECT COUNT(*) as n FROM ${table} WHERE (expires_at IS NULL OR expires_at > ?)`,
+      ),
     };
   }
 
@@ -186,6 +194,7 @@ export interface Observation {
   createdAt: number;
 }
 
+/** Observation store interface definition. */
 export interface ObservationStore {
   add(obs: Observation): Promise<void>;
   getBySession(sessionId: string): Promise<Observation[]>;
@@ -241,6 +250,7 @@ export function serialize(value: unknown): string {
 }
 
 /** Deserialize a string from KV storage back to T. Returns undefined on parse failure. */
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 export function deserialize<T>(raw: string | undefined): T | undefined {
   if (raw === undefined) return undefined;
   try {

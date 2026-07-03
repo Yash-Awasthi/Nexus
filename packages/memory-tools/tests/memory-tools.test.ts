@@ -19,10 +19,7 @@ import {
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
 let _id = 0;
-function entry(
-  text: string,
-  overrides: Partial<MemoryEntry> = {},
-): MemoryEntry {
+function entry(text: string, overrides: Partial<MemoryEntry> = {}): MemoryEntry {
   return {
     id: `id-${++_id}`,
     text,
@@ -49,7 +46,9 @@ function makeExport(entries: MemoryEntry[]): MemoryExport {
   return { version: "1", exportedAt: new Date().toISOString(), count: entries.length, entries };
 }
 
-beforeEach(() => { _id = 0; });
+beforeEach(() => {
+  _id = 0;
+});
 
 // ── InMemoryToolsStore ────────────────────────────────────────────────────────
 
@@ -103,14 +102,11 @@ describe("InMemoryToolsStore", () => {
 describe("textFingerprint", () => {
   it("lowercases", () => expect(textFingerprint("HELLO")).toBe("hello"));
 
-  it("collapses whitespace", () =>
-    expect(textFingerprint("a  b   c")).toBe("a b c"));
+  it("collapses whitespace", () => expect(textFingerprint("a  b   c")).toBe("a b c"));
 
-  it("strips punctuation", () =>
-    expect(textFingerprint("Hello, World!")).toBe("hello world"));
+  it("strips punctuation", () => expect(textFingerprint("Hello, World!")).toBe("hello world"));
 
-  it("trims leading/trailing spaces", () =>
-    expect(textFingerprint("  hi  ")).toBe("hi"));
+  it("trims leading/trailing spaces", () => expect(textFingerprint("  hi  ")).toBe("hi"));
 
   it("returns empty string for punctuation-only input", () =>
     expect(textFingerprint("!!!")).toBe(""));
@@ -158,14 +154,11 @@ describe("cosineSimilarity", () => {
 // ── isUsableEmbedding ─────────────────────────────────────────────────────────
 
 describe("isUsableEmbedding", () => {
-  it("returns false for empty array", () =>
-    expect(isUsableEmbedding([])).toBe(false));
+  it("returns false for empty array", () => expect(isUsableEmbedding([])).toBe(false));
 
-  it("returns false for all-zero vector", () =>
-    expect(isUsableEmbedding([0, 0, 0])).toBe(false));
+  it("returns false for all-zero vector", () => expect(isUsableEmbedding([0, 0, 0])).toBe(false));
 
-  it("returns true for non-zero vector", () =>
-    expect(isUsableEmbedding([0, 0.1, 0])).toBe(true));
+  it("returns true for non-zero vector", () => expect(isUsableEmbedding([0, 0.1, 0])).toBe(true));
 });
 
 // ── MemoryToolsError ──────────────────────────────────────────────────────────
@@ -177,8 +170,7 @@ describe("MemoryToolsError", () => {
     expect(e.code).toBe("CODE");
   });
 
-  it("is instanceof Error", () =>
-    expect(new MemoryToolsError("x", "Y")).toBeInstanceOf(Error));
+  it("is instanceof Error", () => expect(new MemoryToolsError("x", "Y")).toBeInstanceOf(Error));
 
   it("stores optional context", () => {
     const e = new MemoryToolsError("m", "C", { k: 1 });
@@ -284,7 +276,9 @@ describe("importMemory", () => {
   it("collects errors from failed saves", async () => {
     const failing: MemoryToolsStore = {
       list: async () => [],
-      save: async () => { throw new Error("db down"); },
+      save: async () => {
+        throw new Error("db down");
+      },
       delete: async () => {},
     };
     const data = makeExport([entry("x")]);
@@ -394,7 +388,10 @@ describe("findDuplicates — embedding", () => {
   it("canonical is the oldest entry", () => {
     const older = entry("x", { createdAt: 100, embedding: [1, 0] });
     const newer = entry("x", { createdAt: 999, embedding: [1, 0] });
-    const groups = findDuplicates([newer, older], { strategy: "embedding", similarityThreshold: 0.99 });
+    const groups = findDuplicates([newer, older], {
+      strategy: "embedding",
+      similarityThreshold: 0.99,
+    });
     expect(groups[0]?.canonical.id).toBe(older.id);
   });
 });

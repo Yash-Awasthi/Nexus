@@ -39,6 +39,7 @@
 
 export type SupportedLanguage = "typescript" | "javascript" | "python" | "go" | "rust" | "java";
 
+/** Detect language. */
 export function detectLanguage(path: string): SupportedLanguage | "unknown" {
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
   switch (ext) {
@@ -78,6 +79,7 @@ export type SymbolKind =
   | "method"
   | "module";
 
+/** Symbol def interface definition. */
 export interface SymbolDef {
   name: string;
   kind: SymbolKind;
@@ -85,6 +87,7 @@ export interface SymbolDef {
   exported: boolean;
 }
 
+/** Import entry interface definition. */
 export interface ImportEntry {
   /** Module specifier (relative or package name). */
   from: string;
@@ -93,12 +96,14 @@ export interface ImportEntry {
   line: number;
 }
 
+/** Export entry interface definition. */
 export interface ExportEntry {
   name: string;
   kind: SymbolKind;
   line: number;
 }
 
+/** File index interface definition. */
 export interface FileIndex {
   path: string;
   language: SupportedLanguage | "unknown";
@@ -131,13 +136,16 @@ const TS_INTERFACE_RE = /(?:^|\s)(?:export\s+)?interface\s+([A-Za-z_$][A-Za-z0-9
 const TS_TYPE_RE = /(?:^|\s)(?:export\s+)?type\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=/gm;
 const TS_ENUM_RE = /(?:^|\s)(?:export\s+)?(?:const\s+)?enum\s+([A-Za-z_$][A-Za-z0-9_$]*)/gm;
 const TS_CONST_RE = /(?:^|\s)(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)/gm;
-const TS_IMPORT_RE = /^import\s+(?:type\s+)?(?:\{([^}]+)\}|([A-Za-z_$*][A-Za-z0-9_$*]*))\s+from\s+['"]([^'"]+)['"]/gm;
-const TS_EXPORT_RE = /^export\s+(?:type\s+)?(?:default\s+)?(?:function|class|interface|type|enum|const|let|var|abstract\s+class)\s+([A-Za-z_$][A-Za-z0-9_$]*)/gm;
+const TS_IMPORT_RE =
+  /^import\s+(?:type\s+)?(?:\{([^}]+)\}|([A-Za-z_$*][A-Za-z0-9_$*]*))\s+from\s+['"]([^'"]+)['"]/gm;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const TS_EXPORT_RE =
+  /^export\s+(?:type\s+)?(?:default\s+)?(?:function|class|interface|type|enum|const|let|var|abstract\s+class)\s+([A-Za-z_$][A-Za-z0-9_$]*)/gm;
 const TS_EXPORT_FROM_RE = /^export\s+(?:type\s+)?\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]/gm;
 
 // Python
 
-const PY_FUNCTION_RE = /^(?:    )*def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/gm;
+const PY_FUNCTION_RE = /^(?: {4})*def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/gm;
 const PY_CLASS_RE = /^class\s+([A-Za-z_][A-Za-z0-9_]*)/gm;
 const PY_IMPORT_RE = /^(?:from\s+([.\w]+)\s+import\s+([\w,\s*]+)|import\s+([\w,\s]+))/gm;
 const PY_CONST_RE = /^([A-Z_][A-Z0-9_]{2,})\s*=/gm;
@@ -159,8 +167,10 @@ const RUST_USE_RE = /^use\s+([\w:]+(?:::\{[^}]+\})?);/gm;
 
 // Java
 
-const JAVA_CLASS_RE = /^(?:public\s+|private\s+|protected\s+)?(?:abstract\s+|final\s+)?(?:class|interface|enum)\s+([A-Za-z_][A-Za-z0-9_]*)/gm;
-const JAVA_METHOD_RE = /^\s+(?:public|private|protected|static|final|abstract|\s)+\s+\w+\s+([a-z][A-Za-z0-9_]*)\s*\(/gm;
+const JAVA_CLASS_RE =
+  /^(?:public\s+|private\s+|protected\s+)?(?:abstract\s+|final\s+)?(?:class|interface|enum)\s+([A-Za-z_][A-Za-z0-9_]*)/gm;
+const JAVA_METHOD_RE =
+  /^\s+(?:public|private|protected|static|final|abstract|\s)+\s+\w+\s+([a-z][A-Za-z0-9_]*)\s*\(/gm;
 const JAVA_IMPORT_RE = /^import\s+([\w.]+(?:\.\*)?);/gm;
 
 // ── Helper: extract line number ───────────────────────────────────────────────
@@ -176,6 +186,17 @@ function isExported(fullMatch: string): boolean {
 // ── File parser ───────────────────────────────────────────────────────────────
 
 export function parseFile(path: string, content: string): FileIndex {
+  if (content.length > 10_000_000) {
+    // Skip regex extraction on enormous files to prevent ReDoS
+    return {
+      path,
+      language: detectLanguage(path),
+      symbols: [],
+      imports: [],
+      exports: [],
+      references: [],
+    };
+  }
   const language = detectLanguage(path);
   const symbols: SymbolDef[] = [];
   const imports: ImportEntry[] = [];
@@ -219,8 +240,19 @@ export function parseFile(path: string, content: string): FileIndex {
         const defaultName = m[2];
         const from = m[3] ?? "";
         const names = namedGroup
-          ? namedGroup.split(",").map((n) => n.trim().split(/\s+as\s+/)[0]?.trim() ?? "").filter(Boolean)
-          : defaultName ? [defaultName] : [];
+          ? namedGroup
+              .split(",")
+              .map(
+                (n) =>
+                  n
+                    .trim()
+                    .split(/\s+as\s+/)[0]
+                    ?.trim() ?? "",
+              )
+              .filter(Boolean)
+          : defaultName
+            ? [defaultName]
+            : [];
         imports.push({ from, names, line: getLine(content, m.index) });
         for (const n of names) references.add(n);
       }
@@ -228,7 +260,16 @@ export function parseFile(path: string, content: string): FileIndex {
       // Export-from re-exports
       TS_EXPORT_FROM_RE.lastIndex = 0;
       while ((m = TS_EXPORT_FROM_RE.exec(content)) !== null) {
-        const names = (m[1] ?? "").split(",").map((n) => n.trim().split(/\s+as\s+/)[0]?.trim() ?? "").filter(Boolean);
+        const names = (m[1] ?? "")
+          .split(",")
+          .map(
+            (n) =>
+              n
+                .trim()
+                .split(/\s+as\s+/)[0]
+                ?.trim() ?? "",
+          )
+          .filter(Boolean);
         const from = m[2] ?? "";
         imports.push({ from, names, line: getLine(content, m.index) });
       }
@@ -246,7 +287,10 @@ export function parseFile(path: string, content: string): FileIndex {
       while ((m = PY_IMPORT_RE.exec(content)) !== null) {
         const fromModule = m[1] ?? "";
         const importedNames = m[2] ?? m[3] ?? "";
-        const names = importedNames.split(",").map((n) => n.trim()).filter(Boolean);
+        const names = importedNames
+          .split(",")
+          .map((n) => n.trim())
+          .filter(Boolean);
         imports.push({ from: fromModule, names, line: getLine(content, m.index) });
         for (const n of names) references.add(n);
       }
@@ -325,6 +369,7 @@ export interface SourceFile {
   content: string;
 }
 
+/** Build code map. */
 export function buildCodeMap(files: SourceFile[]): CodeMap {
   const fileMap = new Map<string, FileIndex>();
   const symbolIndex = new Map<string, string[]>();
@@ -345,7 +390,7 @@ export function buildCodeMap(files: SourceFile[]): CodeMap {
 
   // Build import graphs
   for (const [filePath, index] of fileMap) {
-    const outSet: Set<string> = new Set();
+    const outSet = new Set<string>();
 
     for (const imp of index.imports) {
       const resolved = resolveImport(filePath, imp.from);

@@ -105,7 +105,10 @@ describe("bulkCall", () => {
         return { content: [], isError: false, text: "" };
       },
     };
-    const reqs: BulkToolRequest[] = Array.from({ length: 4 }, (_, i) => ({ tool: `t${i}`, args: {} }));
+    const reqs: BulkToolRequest[] = Array.from({ length: 4 }, (_, i) => ({
+      tool: `t${i}`,
+      args: {},
+    }));
     const t0 = Date.now();
     await bulkCall(client, reqs);
     const elapsed = Date.now() - t0;
@@ -206,7 +209,10 @@ describe("BulkToolCaller", () => {
       },
     };
     const caller = new BulkToolCaller({ client, mode: "sequential" });
-    await caller.call([{ tool: "first", args: {} }, { tool: "second", args: {} }]);
+    await caller.call([
+      { tool: "first", args: {} },
+      { tool: "second", args: {} },
+    ]);
     expect(order).toEqual(["first", "second"]);
   });
 
@@ -221,7 +227,10 @@ describe("BulkToolCaller", () => {
   it(".callInBatches() splits requests into batches", async () => {
     const client = new NullMcpToolClient();
     const caller = new BulkToolCaller({ client });
-    const reqs: BulkToolRequest[] = Array.from({ length: 6 }, (_, i) => ({ tool: `t${i}`, args: {} }));
+    const reqs: BulkToolRequest[] = Array.from({ length: 6 }, (_, i) => ({
+      tool: `t${i}`,
+      args: {},
+    }));
     const summaries = await caller.callInBatches(reqs, 2);
     expect(summaries).toHaveLength(3); // 6 / 2 = 3 batches
     for (const s of summaries) {
@@ -232,7 +241,10 @@ describe("BulkToolCaller", () => {
   it(".call() throws when request count exceeds maxBatchSize", async () => {
     const client = new NullMcpToolClient();
     const caller = new BulkToolCaller({ client, maxBatchSize: 2 });
-    const reqs: BulkToolRequest[] = Array.from({ length: 5 }, (_, i) => ({ tool: `t${i}`, args: {} }));
+    const reqs: BulkToolRequest[] = Array.from({ length: 5 }, (_, i) => ({
+      tool: `t${i}`,
+      args: {},
+    }));
     await expect(caller.call(reqs)).rejects.toThrow();
   });
 

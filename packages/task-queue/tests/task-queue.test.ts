@@ -30,14 +30,35 @@ describe("DEFAULT_RETRY_POLICY", () => {
 describe("InMemoryStreamClient", () => {
   it("xadd returns unique id", () => {
     const client = new InMemoryStreamClient();
-    const id1 = client.xadd("stream", { name: "t", payload: {}, status: "pending", createdAt: 0, attempts: 0, maxRetries: 3 });
-    const id2 = client.xadd("stream", { name: "t", payload: {}, status: "pending", createdAt: 0, attempts: 0, maxRetries: 3 });
+    const id1 = client.xadd("stream", {
+      name: "t",
+      payload: {},
+      status: "pending",
+      createdAt: 0,
+      attempts: 0,
+      maxRetries: 3,
+    });
+    const id2 = client.xadd("stream", {
+      name: "t",
+      payload: {},
+      status: "pending",
+      createdAt: 0,
+      attempts: 0,
+      maxRetries: 3,
+    });
     expect(id1).not.toBe(id2);
   });
 
   it("xread returns pending tasks", () => {
     const client = new InMemoryStreamClient();
-    client.xadd("s", { name: "t", payload: {}, status: "pending", createdAt: 0, attempts: 0, maxRetries: 3 });
+    client.xadd("s", {
+      name: "t",
+      payload: {},
+      status: "pending",
+      createdAt: 0,
+      attempts: 0,
+      maxRetries: 3,
+    });
     const tasks = client.xread("s");
     expect(tasks).toHaveLength(1);
   });
@@ -45,15 +66,27 @@ describe("InMemoryStreamClient", () => {
   it("xread skips delayed tasks not yet due", () => {
     const client = new InMemoryStreamClient();
     client.xadd("s", {
-      name: "t", payload: {}, status: "delayed",
-      runAt: Date.now() + 60_000, createdAt: 0, attempts: 0, maxRetries: 3,
+      name: "t",
+      payload: {},
+      status: "delayed",
+      runAt: Date.now() + 60_000,
+      createdAt: 0,
+      attempts: 0,
+      maxRetries: 3,
     });
     expect(client.xread("s")).toHaveLength(0);
   });
 
   it("xack marks task as done", () => {
     const client = new InMemoryStreamClient();
-    const id = client.xadd("s", { name: "t", payload: {}, status: "pending", createdAt: 0, attempts: 0, maxRetries: 3 });
+    const id = client.xadd("s", {
+      name: "t",
+      payload: {},
+      status: "pending",
+      createdAt: 0,
+      attempts: 0,
+      maxRetries: 3,
+    });
     client.xack("s", id);
     const tasks = client.allTasks("s");
     expect(tasks[0]!.status).toBe("done");
@@ -61,7 +94,14 @@ describe("InMemoryStreamClient", () => {
 
   it("markFailed sets status and lastError", () => {
     const client = new InMemoryStreamClient();
-    const id = client.xadd("s", { name: "t", payload: {}, status: "pending", createdAt: 0, attempts: 0, maxRetries: 3 });
+    const id = client.xadd("s", {
+      name: "t",
+      payload: {},
+      status: "pending",
+      createdAt: 0,
+      attempts: 0,
+      maxRetries: 3,
+    });
     client.markFailed("s", id, "boom");
     const tasks = client.allTasks("s");
     expect(tasks[0]!.status).toBe("failed");
@@ -70,7 +110,14 @@ describe("InMemoryStreamClient", () => {
 
   it("clear removes all tasks", () => {
     const client = new InMemoryStreamClient();
-    client.xadd("s", { name: "t", payload: {}, status: "pending", createdAt: 0, attempts: 0, maxRetries: 3 });
+    client.xadd("s", {
+      name: "t",
+      payload: {},
+      status: "pending",
+      createdAt: 0,
+      attempts: 0,
+      maxRetries: 3,
+    });
     client.clear("s");
     expect(client.allTasks("s")).toHaveLength(0);
   });
@@ -78,7 +125,14 @@ describe("InMemoryStreamClient", () => {
   it("xread count limits results", () => {
     const client = new InMemoryStreamClient();
     for (let i = 0; i < 5; i++) {
-      client.xadd("s", { name: "t", payload: {}, status: "pending", createdAt: 0, attempts: 0, maxRetries: 3 });
+      client.xadd("s", {
+        name: "t",
+        payload: {},
+        status: "pending",
+        createdAt: 0,
+        attempts: 0,
+        maxRetries: 3,
+      });
     }
     expect(client.xread("s", 3)).toHaveLength(3);
   });
@@ -90,7 +144,9 @@ describe("CronScheduler", () => {
   it("tick runs due entries", async () => {
     const cron = new CronScheduler();
     const ran: string[] = [];
-    cron.register("job-1", 0, async () => { ran.push("job-1"); });
+    cron.register("job-1", 0, async () => {
+      ran.push("job-1");
+    });
     await cron.tick();
     expect(ran).toContain("job-1");
   });
@@ -98,7 +154,9 @@ describe("CronScheduler", () => {
   it("tick skips entries not yet due", async () => {
     const cron = new CronScheduler();
     const ran: string[] = [];
-    cron.register("job-1", 60_000, async () => { ran.push("job-1"); });
+    cron.register("job-1", 60_000, async () => {
+      ran.push("job-1");
+    });
     // First tick runs it (lastRunAt=0)
     await cron.tick();
     ran.length = 0;
@@ -109,7 +167,9 @@ describe("CronScheduler", () => {
 
   it("handler error does not propagate", async () => {
     const cron = new CronScheduler();
-    cron.register("bad", 0, async () => { throw new Error("boom"); });
+    cron.register("bad", 0, async () => {
+      throw new Error("boom");
+    });
     await expect(cron.tick()).resolves.toBeDefined();
   });
 
@@ -150,7 +210,9 @@ describe("TaskQueue", () => {
   it("processBatch runs registered handler", async () => {
     const queue = new TaskQueue("test");
     const results: unknown[] = [];
-    queue.task("greet", async (t) => { results.push((t.payload as any).name); });
+    queue.task("greet", async (t) => {
+      results.push((t.payload as any).name);
+    });
     queue.enqueue("greet", { name: "Alice" });
     await queue.processBatch();
     expect(results).toContain("Alice");
@@ -183,7 +245,10 @@ describe("TaskQueue", () => {
   it("failed handler retries up to maxRetries times", async () => {
     const queue = new TaskQueue("test", undefined, { maxRetries: 2, backoffMs: () => 0 });
     let calls = 0;
-    queue.task("bad", async () => { calls++; throw new Error("fail"); });
+    queue.task("bad", async () => {
+      calls++;
+      throw new Error("fail");
+    });
     queue.enqueue("bad", {}, { maxRetries: 2 });
     // Each processBatch processes 1 attempt; need multiple passes
     await queue.processBatch();
@@ -196,7 +261,9 @@ describe("TaskQueue", () => {
   it("cron registers and ticks", async () => {
     const queue = new TaskQueue("test");
     const ran: number[] = [];
-    queue.cron_("ping", 0, async () => { ran.push(Date.now()); });
+    queue.cron_("ping", 0, async () => {
+      ran.push(Date.now());
+    });
     await queue.tickCron();
     expect(ran).toHaveLength(1);
   });
@@ -221,7 +288,9 @@ describe("SyncTaskRunner", () => {
   it("drainAll processes all tasks", async () => {
     const queue = new TaskQueue("drain-test");
     const results: string[] = [];
-    queue.task("item", async (t) => { results.push((t.payload as any).v); });
+    queue.task("item", async (t) => {
+      results.push((t.payload as any).v);
+    });
     queue.enqueue("item", { v: "one" });
     queue.enqueue("item", { v: "two" });
     queue.enqueue("item", { v: "three" });

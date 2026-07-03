@@ -364,7 +364,12 @@ function makeS3Config(override?: Partial<S3Config>): S3Config {
 
 function makeFetchMock(handler: RequestHandler): typeof fetch {
   return async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : (input as Request).url;
+    const url =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : (input as Request).url;
     return handler(url, init ?? {});
   };
 }
@@ -385,7 +390,11 @@ describe("S3FileStore", () => {
     const requests: Array<{ url: string; method: string; headers: Record<string, string> }> = [];
 
     const fetchMock = makeFetchMock((url, init) => {
-      requests.push({ url, method: init.method ?? "GET", headers: Object.fromEntries(new Headers(init.headers as HeadersInit).entries()) });
+      requests.push({
+        url,
+        method: init.method ?? "GET",
+        headers: Object.fromEntries(new Headers(init.headers as HeadersInit).entries()),
+      });
       return makeOkResponse("", 200);
     });
 
@@ -409,11 +418,12 @@ describe("S3FileStore", () => {
 
   // get
   it("get sends a signed GET request and returns FileContent", async () => {
-    const fetchMock = makeFetchMock((_url, _init) =>
-      new Response(enc("retrieved content"), {
-        status: 200,
-        headers: { "content-type": "text/plain" },
-      }),
+    const fetchMock = makeFetchMock(
+      (_url, _init) =>
+        new Response(enc("retrieved content"), {
+          status: 200,
+          headers: { "content-type": "text/plain" },
+        }),
     );
 
     const store = new S3FileStore(makeS3Config(), { fetch: fetchMock, now });
@@ -508,16 +518,19 @@ describe("S3FileStore", () => {
 
   // url
   it("url returns publicUrlBase when configured", async () => {
-    const store = new S3FileStore(
-      makeS3Config({ publicUrlBase: "https://cdn.example.com" }),
-      { fetch: makeFetchMock(() => makeOkResponse()), now },
-    );
+    const store = new S3FileStore(makeS3Config({ publicUrlBase: "https://cdn.example.com" }), {
+      fetch: makeFetchMock(() => makeOkResponse()),
+      now,
+    });
     const u = await store.url("images/logo.png");
     expect(u).toBe("https://cdn.example.com/images%2Flogo.png");
   });
 
   it("url generates a presigned URL with required query params", async () => {
-    const store = new S3FileStore(makeS3Config(), { fetch: makeFetchMock(() => makeOkResponse()), now });
+    const store = new S3FileStore(makeS3Config(), {
+      fetch: makeFetchMock(() => makeOkResponse()),
+      now,
+    });
     const u = await store.url("secure/file.pdf", 7200_000);
     expect(u).toBeDefined();
     expect(u).toContain("X-Amz-Algorithm=AWS4-HMAC-SHA256");

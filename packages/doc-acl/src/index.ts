@@ -30,15 +30,18 @@
 
 export type PrincipalType = "user" | "group" | "public";
 
+/** Principal type alias. */
 export type Principal =
   | { type: "user"; id: string }
   | { type: "group"; id: string }
   | { type: "public" };
 
+/** Permission type alias. */
 export type Permission = "read" | "write" | "admin";
 
 const PERM_ORDER: Record<Permission, number> = { read: 0, write: 1, admin: 2 };
 
+/** Acl entry interface definition. */
 export interface ACLEntry {
   principal: Principal;
   permission: Permission;
@@ -46,6 +49,7 @@ export interface ACLEntry {
   grantedBy?: string;
 }
 
+/** Document acl interface definition. */
 export interface DocumentACL {
   documentId: string;
   entries: ACLEntry[];
@@ -121,7 +125,6 @@ function satisfies(granted: Permission, required: Permission): boolean {
 function principalMatches(entry: ACLEntry, principal: Principal): boolean {
   if (entry.principal.type === "public") return true;
   if (entry.principal.type !== principal.type) return false;
-  if (entry.principal.type === "public") return true;
   return (entry.principal as { id: string }).id === (principal as { id: string }).id;
 }
 

@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
 import {
-  buildCachedPrompt, buildOpenAIPrompt, buildSegments,
-  estimateTokens, estimateCacheSavings, cacheKey,
+  buildCachedPrompt,
+  buildOpenAIPrompt,
+  buildSegments,
+  estimateTokens,
+  estimateCacheSavings,
+  cacheKey,
 } from "../src/index.js";
 
 const BASE_CFG = {

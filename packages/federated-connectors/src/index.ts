@@ -49,14 +49,17 @@ export interface SearchResult {
   metadata?: Record<string, unknown>;
 }
 
+/** Searchable connector interface definition. */
 export interface SearchableConnector {
   /** Unique identifier for this connector instance. */
   id: string;
   search(query: string, opts?: { limit?: number }): Promise<SearchResult[]>;
 }
 
+/** Dedup strategy type alias. */
 export type DedupStrategy = "id" | "title" | "url";
 
+/** Federated search options interface definition. */
 export interface FederatedSearchOptions {
   query: string;
   /** Maximum results after dedup + sort. Default 10. */
@@ -67,11 +70,13 @@ export interface FederatedSearchOptions {
   timeoutMs?: number;
 }
 
+/** Connector error interface definition. */
 export interface ConnectorError {
   source: string;
   error: string;
 }
 
+/** Federated search result interface definition. */
 export interface FederatedSearchResult {
   results: SearchResult[];
   /** Connector ids that returned results successfully. */
@@ -115,11 +120,14 @@ export class FederatedConnectorRegistry {
     const settled = await Promise.allSettled(
       connectors.map((c) =>
         Promise.race<SearchResult[]>([
-          c.search(query, { limit }).then((results) =>
-            results.map((r) => ({ ...r, source: c.id })),
-          ),
+          c
+            .search(query, { limit })
+            .then((results) => results.map((r) => ({ ...r, source: c.id }))),
           new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error(`Connector "${c.id}" timed out after ${timeoutMs}ms`)), timeoutMs),
+            setTimeout(
+              () => reject(new Error(`Connector "${c.id}" timed out after ${timeoutMs}ms`)),
+              timeoutMs,
+            ),
           ),
         ]),
       ),
@@ -145,9 +153,7 @@ export class FederatedConnectorRegistry {
 
     const totalBeforeDedup = allResults.length;
     const deduped = deduplicate(allResults, dedupBy);
-    const sorted = deduped
-      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-      .slice(0, limit);
+    const sorted = deduped.sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, limit);
 
     return {
       results: sorted,

@@ -10,16 +10,19 @@
  *   • NexusError         — typed error class
  */
 
+import { randomUUID } from "node:crypto";
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface NexusClientConfig {
   apiKey: string;
-  baseUrl?: string;    // default: https://api.nexus.dev
-  timeout?: number;    // ms; default: 30_000
+  baseUrl?: string; // default: https://api.nexus.dev
+  timeout?: number; // ms; default: 30_000
   defaultModel?: string;
-  version?: string;    // API version; default: "v1"
+  version?: string; // API version; default: "v1"
 }
 
+/** Send message options interface definition. */
 export interface SendMessageOptions {
   sessionId?: string;
   model?: string;
@@ -29,11 +32,13 @@ export interface SendMessageOptions {
   stream?: boolean;
 }
 
+/** Nexus message interface definition. */
 export interface NexusMessage {
   role: "user" | "assistant" | "system";
   content: string;
 }
 
+/** Send message result interface definition. */
 export interface SendMessageResult {
   id: string;
   content: string;
@@ -43,12 +48,14 @@ export interface SendMessageResult {
   durationMs: number;
 }
 
+/** Tool definition interface definition. */
 export interface ToolDefinition {
   name: string;
   description: string;
   parameters: Record<string, { type: string; description?: string; required?: boolean }>;
 }
 
+/** Session info interface definition. */
 export interface SessionInfo {
   sessionId: string;
   model: string;
@@ -83,8 +90,9 @@ export interface HttpTransport {
   get(url: string, headers: Record<string, string>): Promise<unknown>;
 }
 
+/** Mock http transport. */
 export class MockHttpTransport implements HttpTransport {
-  readonly requests: Array<{ method: "POST" | "GET"; url: string; body?: unknown }> = [];
+  readonly requests: { method: "POST" | "GET"; url: string; body?: unknown }[] = [];
   private handlers = new Map<string, () => unknown>();
 
   onPost(urlSuffix: string, response: () => unknown): this {
@@ -114,11 +122,11 @@ export class NexusClient {
 
   constructor(config: NexusClientConfig, transport?: HttpTransport) {
     this.config = {
-      apiKey:       config.apiKey,
-      baseUrl:      config.baseUrl ?? "https://api.nexus.dev",
-      timeout:      config.timeout ?? 30_000,
+      apiKey: config.apiKey,
+      baseUrl: config.baseUrl ?? "https://api.nexus.dev",
+      timeout: config.timeout ?? 30_000,
       defaultModel: config.defaultModel ?? "claude-3-5-sonnet-20241022",
-      version:      config.version ?? "v1",
+      version: config.version ?? "v1",
     };
     this.transport = transport ?? this.makeDefaultTransport();
   }
@@ -155,7 +163,7 @@ export class NexusClient {
 
   private headers(): Record<string, string> {
     return {
-      "Authorization": `Bearer ${this.config.apiKey}`,
+      Authorization: `Bearer ${this.config.apiKey}`,
       "X-Nexus-Version": this.config.version,
     };
   }
@@ -164,26 +172,32 @@ export class NexusClient {
     return `${this.config.baseUrl}/${this.config.version}${path}`;
   }
 
-  async sendMessage(
-    message: string,
-    opts: SendMessageOptions = {},
-  ): Promise<SendMessageResult> {
+  async sendMessage(message: string, opts: SendMessageOptions = {}): Promise<SendMessageResult> {
     const t0 = Date.now();
     const body = {
       message,
-      model:         opts.model ?? this.config.defaultModel,
-      session_id:    opts.sessionId,
-      tools:         opts.tools,
+      model: opts.model ?? this.config.defaultModel,
+      session_id: opts.sessionId,
+      tools: opts.tools,
       system_prompt: opts.systemPrompt,
-      max_tokens:    opts.maxTokens,
+      max_tokens: opts.maxTokens,
     };
-    const raw = await this.transport.post(this.url("/chat"), body, this.headers()) as Partial<SendMessageResult & { duration_ms?: number }>;
+    const raw = (await this.transport.post(this.url("/chat"), body, this.headers())) as Partial<
+      SendMessageResult & { duration_ms?: number }
+    >;
     return {
-      id:         (raw as { id?: string }).id ?? "unknown",
-      content:    (raw as { content?: string }).content ?? "",
-      model:      (raw as { model?: string }).model ?? opts.model ?? this.config.defaultModel,
-      sessionId:  (raw as { sessionId?: string; session_id?: string }).sessionId ?? (raw as { session_id?: string }).session_id ?? opts.sessionId ?? "",
-      usage:      (raw as { usage?: { inputTokens: number; outputTokens: number } }).usage ?? { inputTokens: 0, outputTokens: 0 },
+      id: (raw as { id?: string }).id ?? "unknown",
+      content: (raw as { content?: string }).content ?? "",
+      model: (raw as { model?: string }).model ?? opts.model ?? this.config.defaultModel,
+      sessionId:
+        (raw as { sessionId?: string; session_id?: string }).sessionId ??
+        (raw as { session_id?: string }).session_id ??
+        opts.sessionId ??
+        "",
+      usage: (raw as { usage?: { inputTokens: number; outputTokens: number } }).usage ?? {
+        inputTokens: 0,
+        outputTokens: 0,
+      },
       durationMs: Date.now() - t0,
     };
   }
@@ -192,9 +206,15 @@ export class NexusClient {
     return new ChatSession(this, model ?? this.config.defaultModel);
   }
 
-  get apiKey(): string { return this.config.apiKey; }
-  get baseUrl(): string { return this.config.baseUrl; }
-  get defaultModel(): string { return this.config.defaultModel; }
+  get apiKey(): string {
+    return this.config.apiKey;
+  }
+  get baseUrl(): string {
+    return this.config.baseUrl;
+  }
+  get defaultModel(): string {
+    return this.config.defaultModel;
+  }
 }
 
 // ── ChatSession ───────────────────────────────────────────────────────────────
@@ -207,13 +227,20 @@ export class ChatSession {
     private client: NexusClient,
     public model: string,
   ) {
-    this.sessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    this.sessionId = `session-${randomUUID()}`;
   }
 
-  get messages(): NexusMessage[] { return [...this._messages]; }
-  get messageCount(): number { return this._messages.length; }
+  get messages(): NexusMessage[] {
+    return [...this._messages];
+  }
+  get messageCount(): number {
+    return this._messages.length;
+  }
 
-  async send(message: string, opts: Omit<SendMessageOptions, "sessionId"> = {}): Promise<SendMessageResult> {
+  async send(
+    message: string,
+    opts: Omit<SendMessageOptions, "sessionId"> = {},
+  ): Promise<SendMessageResult> {
     this._messages.push({ role: "user", content: message });
     const result = await this.client.sendMessage(message, {
       ...opts,
@@ -266,7 +293,11 @@ export async function validateWebhookSignature(
     const msgData = encoder.encode(rawBody);
 
     const cryptoKey = await crypto.subtle.importKey(
-      "raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
+      "raw",
+      keyData,
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
     );
     const sigBuffer = await crypto.subtle.sign("HMAC", cryptoKey, msgData);
     const expectedHex = Array.from(new Uint8Array(sigBuffer))

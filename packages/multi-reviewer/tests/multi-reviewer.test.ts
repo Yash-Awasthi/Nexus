@@ -9,7 +9,11 @@ import {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makeReviewJson(scores: Partial<Record<string, number>> = {}, issues: unknown[] = [], summary = "Looks good"): string {
+function makeReviewJson(
+  scores: Partial<Record<string, number>> = {},
+  issues: unknown[] = [],
+  summary = "Looks good",
+): string {
   return JSON.stringify({
     scores: {
       correctness: scores["correctness"] ?? 8,
@@ -56,7 +60,9 @@ describe("MultiReviewer", () => {
   });
 
   it("approves code with high scores and no issues", async () => {
-    const fetchFn = mockFetch(makeReviewJson({ correctness: 9, readability: 9, security: 9, performance: 9, overall: 9 }));
+    const fetchFn = mockFetch(
+      makeReviewJson({ correctness: 9, readability: 9, security: 9, performance: 9, overall: 9 }),
+    );
     const reviewer = new MultiReviewer({
       apiKey: "test",
       models: [DEFAULT_REVIEW_MODELS[0]!],
@@ -101,7 +107,9 @@ describe("MultiReviewer", () => {
       return {
         ok: true,
         json: async () => ({
-          choices: [{ message: { content: makeReviewJson({ overall: score, correctness: score }) } }],
+          choices: [
+            { message: { content: makeReviewJson({ overall: score, correctness: score }) } },
+          ],
         }),
       };
     }) as unknown as typeof fetch;
@@ -119,7 +127,9 @@ describe("MultiReviewer", () => {
   });
 
   it("handles model failures gracefully (does not throw)", async () => {
-    const fetchFn = vi.fn().mockRejectedValue(new Error("Network error")) as unknown as typeof fetch;
+    const fetchFn = vi
+      .fn()
+      .mockRejectedValue(new Error("Network error")) as unknown as typeof fetch;
     const reviewer = new MultiReviewer({
       apiKey: "test",
       models: [DEFAULT_REVIEW_MODELS[0]!],
