@@ -949,6 +949,15 @@ one-commit item. Sequenced so the earliest is the most self-contained:
   registry → Deno-isolate sandbox execution. **First code-only slice:** the `plugin-sdk` package
   (manifest schema + validator + a `loadPlugin` seam), mockable, no hosting. Registry + sandbox
   runtime come after.
+  **First slice done this branch (commit `0c5d0a9`).** Added `plugin-sdk/src/plugin-manifest.ts`
+  (re-exported from index): `PluginManifest` type (id/name/version/entry/capabilities + optional
+  config/author/license/minHostVersion), `validatePluginManifest` (pure, collects ALL issues —
+  SemVer, reverse-DNS id, capability vocabulary reusing the existing `AdapterCapability`, dedupe,
+  config keys), and `loadPlugin` which **fails closed**: a plugin requesting any capability the
+  host did not grant throws `CAPABILITY_NOT_GRANTED` (never partial access); default grants
+  nothing. `KNOWN_CAPABILITIES` + typed `PluginManifestError`. 13 tests (32 pkg total); typecheck
+  + lint + build green. **Deferred:** hosted registry transport + the Deno-isolate sandbox runtime
+  that enforces the grant at execution time.
 - **15.2 Federation.** Cross-instance delegation, federated council, CRDT KG sync, OIDC/SAML.
   Leans on §12's `@nexus/a2a` (agent-to-agent) as the delegation transport — start there.
 - **15.3 Fine-tuning pipeline.** SFT via `sft-tagger` + `corpus-builder` (dataset assembly →
