@@ -96,7 +96,10 @@ describe("FunctionReranker", () => {
 
   it("passes query to scoring function", async () => {
     const received: string[] = [];
-    const fn = (q: string, _text: string) => { received.push(q); return 1; };
+    const fn = (q: string, _text: string) => {
+      received.push(q);
+      return 1;
+    };
     await new FunctionReranker(fn).rerank("test-query", [doc("d1", "hello")]);
     expect(received[0]).toBe("test-query");
   });
@@ -143,7 +146,11 @@ describe("rerankPipeline", () => {
   ]);
 
   it("builds documents from ids and rereanks", async () => {
-    const initial = [{ id: "b", score: 0.9 }, { id: "a", score: 0.7 }, { id: "c", score: 0.5 }];
+    const initial = [
+      { id: "b", score: 0.9 },
+      { id: "a", score: 0.7 },
+      { id: "c", score: 0.5 },
+    ];
     const r = await rerankPipeline(
       "authentication token",
       initial,
@@ -155,8 +162,17 @@ describe("rerankPipeline", () => {
   });
 
   it("passes through topK", async () => {
-    const initial = [{ id: "a", score: 1 }, { id: "b", score: 0.5 }];
-    const r = await rerankPipeline("q", initial, (id) => textStore.get(id) ?? "", new NullReranker(), { topK: 1 });
+    const initial = [
+      { id: "a", score: 1 },
+      { id: "b", score: 0.5 },
+    ];
+    const r = await rerankPipeline(
+      "q",
+      initial,
+      (id) => textStore.get(id) ?? "",
+      new NullReranker(),
+      { topK: 1 },
+    );
     expect(r.documents).toHaveLength(1);
   });
 });

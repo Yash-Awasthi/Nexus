@@ -244,7 +244,9 @@ describe("CloudflareBypass", () => {
     const bypass = new CloudflareBypass({
       maxAttempts: 2,
       waitMs: 500,
-      sleep: async (ms) => { sleeps.push(ms); },
+      sleep: async (ms) => {
+        sleeps.push(ms);
+      },
     });
     await page.navigate("https://example.com");
     await bypass.bypass(page, "https://example.com");
@@ -345,9 +347,11 @@ describe("StealthBrowser", () => {
   it("withPage releases even when callback throws", async () => {
     const driver = new MockBrowserDriver();
     const browser = new StealthBrowser({ driver, poolSize: 3 });
-    await expect(browser.withPage(async () => {
-      throw new Error("callback error");
-    })).rejects.toThrow("callback error");
+    await expect(
+      browser.withPage(async () => {
+        throw new Error("callback error");
+      }),
+    ).rejects.toThrow("callback error");
     expect(browser.pool_.inUseCount).toBe(0);
     await browser.close();
   });

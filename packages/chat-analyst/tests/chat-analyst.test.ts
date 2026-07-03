@@ -61,7 +61,8 @@ describe("ContextAssembler", () => {
   it("assemble returns system prompt and trimmed messages", () => {
     const assembler = new ContextAssembler(4);
     const messages = Array.from({ length: 6 }, (_, i) => ({
-      role: "user" as const, content: `msg ${i}`,
+      role: "user" as const,
+      content: `msg ${i}`,
     }));
     const ctx = assembler.assemble("aviation", messages);
     expect(ctx.messages.length).toBeLessThanOrEqual(4);
@@ -172,7 +173,7 @@ describe("StreamingAnalyst", () => {
     const llm = makeStreamingLlm(["Hello ", "world"]);
     const analyst = new StreamingAnalyst({ llm });
     const events = await collectEvents(
-      analyst.stream("s1", "general", [{ role: "user", content: "hi" }])
+      analyst.stream("s1", "general", [{ role: "user", content: "hi" }]),
     );
     const types = events.map((e) => e.type);
     expect(types[0]).toBe("stream_start");
@@ -184,7 +185,7 @@ describe("StreamingAnalyst", () => {
     const llm = makeStreamingLlm(["a", "b", "c"]);
     const analyst = new StreamingAnalyst({ llm });
     const events = await collectEvents(
-      analyst.stream("s1", "general", [{ role: "user", content: "hi" }])
+      analyst.stream("s1", "general", [{ role: "user", content: "hi" }]),
     );
     const chunks = events.filter((e) => e.type === "stream_chunk") as any[];
     expect(chunks.map((c) => c.index)).toEqual([0, 1, 2]);
@@ -194,7 +195,7 @@ describe("StreamingAnalyst", () => {
     const llm = makeStreamingLlm(["Look here [ACTION:open_panel threats] for more"]);
     const analyst = new StreamingAnalyst({ llm });
     const events = await collectEvents(
-      analyst.stream("s1", "aviation", [{ role: "user", content: "show me" }])
+      analyst.stream("s1", "aviation", [{ role: "user", content: "show me" }]),
     );
     const actionEvents = events.filter((e) => e.type === "in_app_action");
     expect(actionEvents).toHaveLength(1);
@@ -205,7 +206,7 @@ describe("StreamingAnalyst", () => {
     const llm = makeStreamingLlm(["Data [ACTION:open_panel map] follows"]);
     const analyst = new StreamingAnalyst({ llm });
     const events = await collectEvents(
-      analyst.stream("s1", "general", [{ role: "user", content: "?" }])
+      analyst.stream("s1", "general", [{ role: "user", content: "?" }]),
     );
     const chunks = events.filter((e) => e.type === "stream_chunk") as any[];
     const combined = chunks.map((c) => c.chunk).join("");
@@ -218,17 +219,19 @@ describe("StreamingAnalyst", () => {
     const llm = makeStreamingLlm(["hello"]);
     const analyst = new StreamingAnalyst({ llm, rateLimiter: rl });
     const events = await collectEvents(
-      analyst.stream("s1", "general", [{ role: "user", content: "hi" }])
+      analyst.stream("s1", "general", [{ role: "user", content: "hi" }]),
     );
     expect(events[0]!.type).toBe("rate_limited");
     expect(events).toHaveLength(1);
   });
 
   it("emits error event when LLM throws", async () => {
-    const llm = async function* () { throw new Error("llm crash"); };
+    const llm = async function* () {
+      throw new Error("llm crash");
+    };
     const analyst = new StreamingAnalyst({ llm });
     const events = await collectEvents(
-      analyst.stream("s1", "general", [{ role: "user", content: "hi" }])
+      analyst.stream("s1", "general", [{ role: "user", content: "hi" }]),
     );
     const errorEv = events.find((e) => e.type === "error") as any;
     expect(errorEv).toBeDefined();
@@ -239,7 +242,7 @@ describe("StreamingAnalyst", () => {
     const llm = makeStreamingLlm(["response text"]);
     const analyst = new StreamingAnalyst({ llm });
     const events = await collectEvents(
-      analyst.stream("s1", "general", [{ role: "user", content: "hello" }])
+      analyst.stream("s1", "general", [{ role: "user", content: "hello" }]),
     );
     const endEv = events.find((e) => e.type === "stream_end") as any;
     expect(endEv.totalTokens).toBeGreaterThan(0);

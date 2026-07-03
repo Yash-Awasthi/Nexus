@@ -209,9 +209,7 @@ describe("nullStore", () => {
   });
 
   it("returns IDs prefixed with 'null-chunk-'", async () => {
-    const chunks: EmbeddedChunk[] = [
-      { index: 0, text: "x", tokenEstimate: 1, embedding: [] },
-    ];
+    const chunks: EmbeddedChunk[] = [{ index: 0, text: "x", tokenEstimate: 1, embedding: [] }];
     const result = await nullStore.save(chunks, {
       format: "text",
       totalChunks: 1,
@@ -379,17 +377,16 @@ describe("runDocPipeline — extract stage", () => {
   });
 
   it("propagates extractor errors", async () => {
-    await expect(
-      runDocPipeline(makeInput({ format: "pdf", content: "data" })),
-    ).rejects.toThrow(/PDF extraction/);
+    await expect(runDocPipeline(makeInput({ format: "pdf", content: "data" }))).rejects.toThrow(
+      /PDF extraction/,
+    );
   });
 
   it("custom extractor receives format and content", async () => {
     const customExtractor: Extractor = vi.fn().mockResolvedValue("ok");
-    await runDocPipeline(
-      makeInput({ format: "docx", content: "docx-bytes" }),
-      { extractor: customExtractor },
-    );
+    await runDocPipeline(makeInput({ format: "docx", content: "docx-bytes" }), {
+      extractor: customExtractor,
+    });
     expect(customExtractor).toHaveBeenCalledWith("docx", "docx-bytes");
   });
 });

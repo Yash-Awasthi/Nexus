@@ -29,6 +29,7 @@ export interface RankedDocument {
   metadata?: Record<string, unknown>;
 }
 
+/** Rerank options interface definition. */
 export interface RerankOptions {
   /** Return only the top-K documents. Default: all. */
   topK?: number;
@@ -36,12 +37,14 @@ export interface RerankOptions {
   scoreThreshold?: number;
 }
 
+/** Reranker result interface definition. */
 export interface RerankerResult {
   documents: RankedDocument[];
   durationMs: number;
   rerankedAt: number;
 }
 
+/** Reranker interface definition. */
 export interface Reranker {
   rerank(query: string, documents: RankedDocument[], opts?: RerankOptions): Promise<RerankerResult>;
 }
@@ -115,9 +118,7 @@ export class BM25Reranker implements Reranker {
       score: rawScores[i]! / maxScore,
     }));
 
-    scored = scored
-      .filter((d) => d.score >= scoreThreshold)
-      .sort((a, b) => b.score - a.score);
+    scored = scored.filter((d) => d.score >= scoreThreshold).sort((a, b) => b.score - a.score);
 
     if (topK !== undefined) scored = scored.slice(0, topK);
 

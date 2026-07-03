@@ -39,7 +39,7 @@ function makeFakeMarket(id = "m-1"): Market {
     category: "politics",
     outcomes: [
       { id: `${id}-yes`, label: "Yes", price: 0.6, probability: 0.6 },
-      { id: `${id}-no`,  label: "No",  price: 0.4, probability: 0.4 },
+      { id: `${id}-no`, label: "No", price: 0.4, probability: 0.4 },
     ],
     volume: 1000,
     liquidity: 500,

@@ -12,10 +12,9 @@
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export interface EventProperties {
-  [key: string]: string | number | boolean | null | undefined;
-}
+export type EventProperties = Record<string, string | number | boolean | null | undefined>;
 
+/** Tracked event interface definition. */
 export interface TrackedEvent {
   event: string;
   distinctId: string;
@@ -23,11 +22,13 @@ export interface TrackedEvent {
   timestamp: string;
 }
 
+/** Identify payload interface definition. */
 export interface IdentifyPayload {
   distinctId: string;
   properties: EventProperties;
 }
 
+/** Page event interface definition. */
 export interface PageEvent {
   distinctId: string;
   url: string;
@@ -36,6 +37,7 @@ export interface PageEvent {
   timestamp: string;
 }
 
+/** Analytics client interface definition. */
 export interface AnalyticsClient {
   track(event: string, distinctId: string, properties?: EventProperties): Promise<void>;
   identify(distinctId: string, properties: EventProperties): Promise<void>;
@@ -101,6 +103,7 @@ export interface PostHogConfig {
   disabled?: boolean;
 }
 
+/** Post hog analytics client. */
 export class PostHogAnalyticsClient implements AnalyticsClient {
   private config: Required<Omit<PostHogConfig, "disabled">> & { disabled: boolean };
   private queue: TrackedEvent[] = [];
@@ -130,7 +133,7 @@ export class PostHogAnalyticsClient implements AnalyticsClient {
 
   async identify(distinctId: string, properties: EventProperties): Promise<void> {
     if (this.config.disabled) return;
-    await this.track("$identify", distinctId, { $set: properties as unknown as EventProperties });
+    await this.track("$identify", distinctId, { $set: JSON.stringify(properties) });
   }
 
   async page(distinctId: string, url: string, properties: EventProperties = {}): Promise<void> {
@@ -154,36 +157,39 @@ export class PostHogAnalyticsClient implements AnalyticsClient {
     void payload;
   }
 
-  get queueSize(): number { return this.queue.length; }
+  get queueSize(): number {
+    return this.queue.length;
+  }
 }
 
 // ── Nexus-specific event catalogue ────────────────────────────────────────────
 
 export const NexusEvents = {
   // Chat
-  CHAT_MESSAGE_SENT:       "chat_message_sent",
-  CHAT_MESSAGE_RATED:      "chat_message_rated",
-  CHAT_MODEL_SWITCHED:     "chat_model_switched",
+  CHAT_MESSAGE_SENT: "chat_message_sent",
+  CHAT_MESSAGE_RATED: "chat_message_rated",
+  CHAT_MODEL_SWITCHED: "chat_model_switched",
 
   // Memory
-  MEMORY_STORED:           "memory_stored",
-  MEMORY_RECALLED:         "memory_recalled",
+  MEMORY_STORED: "memory_stored",
+  MEMORY_RECALLED: "memory_recalled",
 
   // Agent
-  AGENT_TASK_STARTED:      "agent_task_started",
-  AGENT_TASK_COMPLETED:    "agent_task_completed",
-  AGENT_TASK_FAILED:       "agent_task_failed",
+  AGENT_TASK_STARTED: "agent_task_started",
+  AGENT_TASK_COMPLETED: "agent_task_completed",
+  AGENT_TASK_FAILED: "agent_task_failed",
 
   // Discovery
-  DISCOVERY_PROFILE_VIEWED:"discovery_profile_viewed",
-  SIGNAL_REPORTED:         "signal_reported",
+  DISCOVERY_PROFILE_VIEWED: "discovery_profile_viewed",
+  SIGNAL_REPORTED: "signal_reported",
 
   // SDK
-  SDK_INITIALIZED:         "sdk_initialized",
-  SDK_TOOL_CALLED:         "sdk_tool_called",
+  SDK_INITIALIZED: "sdk_initialized",
+  SDK_TOOL_CALLED: "sdk_tool_called",
 } as const;
 
-export type NexusEventName = typeof NexusEvents[keyof typeof NexusEvents];
+/** Nexus event name type alias. */
+export type NexusEventName = (typeof NexusEvents)[keyof typeof NexusEvents];
 
 // ── Convenience tracker ───────────────────────────────────────────────────────
 
@@ -191,19 +197,31 @@ export class NexusAnalytics {
   constructor(private client: AnalyticsClient) {}
 
   async chatMessageSent(userId: string, model: string, sessionId: string): Promise<void> {
-    await this.client.track(NexusEvents.CHAT_MESSAGE_SENT, userId, { model, session_id: sessionId });
+    await this.client.track(NexusEvents.CHAT_MESSAGE_SENT, userId, {
+      model,
+      session_id: sessionId,
+    });
   }
 
   async chatMessageRated(userId: string, messageId: string, rating: "up" | "down"): Promise<void> {
-    await this.client.track(NexusEvents.CHAT_MESSAGE_RATED, userId, { message_id: messageId, rating });
+    await this.client.track(NexusEvents.CHAT_MESSAGE_RATED, userId, {
+      message_id: messageId,
+      rating,
+    });
   }
 
   async agentTaskStarted(userId: string, taskId: string, taskType: string): Promise<void> {
-    await this.client.track(NexusEvents.AGENT_TASK_STARTED, userId, { task_id: taskId, task_type: taskType });
+    await this.client.track(NexusEvents.AGENT_TASK_STARTED, userId, {
+      task_id: taskId,
+      task_type: taskType,
+    });
   }
 
   async agentTaskCompleted(userId: string, taskId: string, durationMs: number): Promise<void> {
-    await this.client.track(NexusEvents.AGENT_TASK_COMPLETED, userId, { task_id: taskId, duration_ms: durationMs });
+    await this.client.track(NexusEvents.AGENT_TASK_COMPLETED, userId, {
+      task_id: taskId,
+      duration_ms: durationMs,
+    });
   }
 
   async identify(userId: string, traits: EventProperties): Promise<void> {

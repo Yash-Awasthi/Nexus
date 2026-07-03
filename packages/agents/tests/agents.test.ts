@@ -208,17 +208,13 @@ describe("LibrarianAgent", () => {
   it("respects nodeLimit option passed to kg.queryNodes", async () => {
     const agent = new LibrarianAgent({ memory, kg });
     await agent.recall("q", { nodeLimit: 3 });
-    expect(kg.queryNodes).toHaveBeenCalledWith(
-      expect.objectContaining({ limit: 3 }),
-    );
+    expect(kg.queryNodes).toHaveBeenCalledWith(expect.objectContaining({ limit: 3 }));
   });
 
   it("passes query as nameContains to kg.queryNodes", async () => {
     const agent = new LibrarianAgent({ memory, kg });
     await agent.recall("Alice");
-    expect(kg.queryNodes).toHaveBeenCalledWith(
-      expect.objectContaining({ nameContains: "Alice" }),
-    );
+    expect(kg.queryNodes).toHaveBeenCalledWith(expect.objectContaining({ nameContains: "Alice" }));
   });
 
   it("KG failure is non-fatal, returns empty entities", async () => {
@@ -325,9 +321,9 @@ describe("LibrarianAgent", () => {
   it("keywordSearch re-ranks memories by TF score (term frequency)", async () => {
     // "Alice" appears twice in first entry, once in second
     const mem = makeMemory([
-      makeMemoryResult("Bob is the CTO at Bob Corp", 0.95),  // high semantic, no 'alice'
+      makeMemoryResult("Bob is the CTO at Bob Corp", 0.95), // high semantic, no 'alice'
       makeMemoryResult("Alice works with Alice at Nexus", 0.6), // low semantic, 2× 'alice'
-      makeMemoryResult("Alice is a developer", 0.7),           // 1× 'alice'
+      makeMemoryResult("Alice is a developer", 0.7), // 1× 'alice'
     ]);
     const agent = new LibrarianAgent({ memory: mem, defaultRecallLimit: 3 });
     const result = await agent.keywordSearch("alice");
@@ -339,8 +335,8 @@ describe("LibrarianAgent", () => {
 
   it("keywordSearch uses semantic score as tie-breaker when TF scores are equal", async () => {
     const mem = makeMemory([
-      makeMemoryResult("Alice low score", 0.5),   // 1× alice, score 0.5
-      makeMemoryResult("Alice high score", 0.9),  // 1× alice, score 0.9
+      makeMemoryResult("Alice low score", 0.5), // 1× alice, score 0.5
+      makeMemoryResult("Alice high score", 0.9), // 1× alice, score 0.9
     ]);
     const agent = new LibrarianAgent({ memory: mem, defaultRecallLimit: 2 });
     const result = await agent.keywordSearch("alice");
@@ -621,7 +617,7 @@ describe("FileExplorerAgent", () => {
 
   beforeEach(() => {
     fs = makeFS(
-      { "/project/src/index.ts": 'export const x = 1;' },
+      { "/project/src/index.ts": "export const x = 1;" },
       { "/project/src": ["/project/src/index.ts", "/project/src/utils.ts"] },
     );
     hooks = makeHooks(false);
@@ -854,10 +850,7 @@ describe("FileExplorerAgent", () => {
   // ── TF-scored ranking via ListOptions.query ────────────────────────────────
 
   it("listFiles with query returns FileInfo with score field", async () => {
-    const agentFs = makeFS(
-      {},
-      { "/src": ["/src/auth.ts", "/src/index.ts", "/src/auth-utils.ts"] },
-    );
+    const agentFs = makeFS({}, { "/src": ["/src/auth.ts", "/src/index.ts", "/src/auth-utils.ts"] });
     const agent = new FileExplorerAgent({ fs: agentFs });
     const files = await agent.listFiles("/src", { query: "auth" });
     expect(files.every((f) => f.score !== undefined)).toBe(true);
@@ -868,9 +861,9 @@ describe("FileExplorerAgent", () => {
       {},
       {
         "/src": [
-          "/src/index.ts",          // no 'auth' — score 0
-          "/src/auth.ts",           // 'auth' appears once — score 1
-          "/src/auth-utils.ts",     // 'auth' appears twice (auth + utils split) — score higher
+          "/src/index.ts", // no 'auth' — score 0
+          "/src/auth.ts", // 'auth' appears once — score 1
+          "/src/auth-utils.ts", // 'auth' appears twice (auth + utils split) — score higher
         ],
       },
     );
@@ -899,7 +892,7 @@ describe("FileExplorerAgent", () => {
         "/src": [
           "/src/auth.ts",
           "/src/auth-service.ts",
-          "/src/user.ts",           // passes pattern 'ts' but not related to 'auth'
+          "/src/user.ts", // passes pattern 'ts' but not related to 'auth'
         ],
       },
     );

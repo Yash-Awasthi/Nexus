@@ -20,14 +20,84 @@ export interface SearchResult {
   source: "web" | "corpus";
 }
 
+/** Research finding interface definition. */
 export interface ResearchFinding {
   query: string;
   results: SearchResult[];
   synthesis: string;
-  citations: string[];
+  citations: string[]; // flat URL list (backward-compat)
+  richCitations?: SourceReference[]; // structured citations with keys + metadata
   durationMs: number;
 }
 
+// ── SourceReference & CitationIndex ──────────────────────────────────────────
+
+export interface SourceReference {
+  /** Numeric citation marker, e.g. "[1]". */
+  citationKey: string;
+  url: string;
+  title: string;
+  /** ISO-8601 timestamp when the URL was accessed. */
+  accessedAt: string;
+  /** Short excerpt from the source (≤200 chars). */
+  snippet?: string;
+}
+
+/** Citation index. */
+export class CitationIndex {
+  private refs = new Map<string, SourceReference>(); // citationKey → ref
+  private urlKeys = new Map<string, string>(); // url → citationKey (dedup)
+  private counter = 0;
+
+  /**
+   * Add a SearchResult to the index.  If the URL was already added the
+   * existing citationKey is returned without creating a duplicate.
+   */
+  add(result: SearchResult, accessedAt = new Date().toISOString()): string {
+    const existing = this.urlKeys.get(result.url);
+    if (existing) return existing;
+
+    const citationKey = `[${++this.counter}]`;
+    const ref: SourceReference = {
+      citationKey,
+      url: result.url,
+      title: result.title,
+      accessedAt,
+      snippet: result.snippet?.slice(0, 200),
+    };
+    this.refs.set(citationKey, ref);
+    this.urlKeys.set(result.url, citationKey);
+    return citationKey;
+  }
+
+  get(key: string): SourceReference | undefined {
+    return this.refs.get(key);
+  }
+  byUrl(url: string): SourceReference | undefined {
+    const key = this.urlKeys.get(url);
+    return key ? this.refs.get(key) : undefined;
+  }
+  list(): SourceReference[] {
+    return [...this.refs.values()];
+  }
+  size(): number {
+    return this.refs.size;
+  }
+  clear(): void {
+    this.refs.clear();
+    this.urlKeys.clear();
+    this.counter = 0;
+  }
+
+  /** Render all citations as a Markdown reference list. */
+  toMarkdown(): string {
+    return this.list()
+      .map((r) => `${r.citationKey} ${r.title} — <${r.url}>`)
+      .join("\n");
+  }
+}
+
+/** Corpus document interface definition. */
 export interface CorpusDocument {
   id: string;
   title: string;
@@ -39,6 +109,7 @@ export interface CorpusDocument {
 // ── Injectable interfaces ─────────────────────────────────────────────────────
 
 export type WebSearchFn = (query: string) => Promise<SearchResult[]>;
+/** Synthesize fn type alias. */
 export type SynthesizeFn = (query: string, results: SearchResult[]) => Promise<string>;
 
 const DEFAULT_SEARCH: WebSearchFn = async (query) => [
@@ -62,6 +133,7 @@ export interface WebResearcherOptions {
   maxResults?: number;
 }
 
+/** Web researcher. */
 export class WebResearcher {
   private searchFn: WebSearchFn;
   private synthesizeFn: SynthesizeFn;
@@ -79,19 +151,50 @@ export class WebResearcher {
     const results = all.slice(0, this.maxResults);
     const synthesis = await this.synthesizeFn(query, results);
     const citations = results.map((r) => r.url);
-    return { query, results, synthesis, citations, durationMs: Date.now() - t0 };
+    const index = new CitationIndex();
+    const accessedAt = new Date().toISOString();
+    results.forEach((r) => index.add(r, accessedAt));
+    return {
+      query,
+      results,
+      synthesis,
+      citations,
+      richCitations: index.list(),
+      durationMs: Date.now() - t0,
+    };
   }
 }
 
 // ── CorpusResearcher ──────────────────────────────────────────────────────────
 
 function tokenizeSimple(text: string): Set<string> {
-  const stop = new Set(["the", "a", "an", "is", "and", "or", "in", "of", "to", "for", "with", "on", "at", "be", "it"]);
+  const stop = new Set([
+    "the",
+    "a",
+    "an",
+    "is",
+    "and",
+    "or",
+    "in",
+    "of",
+    "to",
+    "for",
+    "with",
+    "on",
+    "at",
+    "be",
+    "it",
+  ]);
   return new Set(
-    text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((w) => w.length > 2 && !stop.has(w)),
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !stop.has(w)),
   );
 }
 
+/** Corpus researcher. */
 export class CorpusResearcher {
   private docs: CorpusDocument[] = [];
   private synthesizeFn: SynthesizeFn;
@@ -112,7 +215,7 @@ export class CorpusResearcher {
 
   search(query: string, limit = 10): SearchResult[] {
     const qKw = tokenizeSimple(query);
-    const scored: Array<{ doc: CorpusDocument; score: number }> = [];
+    const scored: { doc: CorpusDocument; score: number }[] = [];
 
     for (const doc of this.docs) {
       const dKw = tokenizeSimple(`${doc.title} ${doc.content}`);
@@ -141,10 +244,22 @@ export class CorpusResearcher {
     const results = this.search(query);
     const synthesis = await this.synthesizeFn(query, results);
     const citations = results.map((r) => r.url);
-    return { query, results, synthesis, citations, durationMs: Date.now() - t0 };
+    const index = new CitationIndex();
+    const accessedAt = new Date().toISOString();
+    results.forEach((r) => index.add(r, accessedAt));
+    return {
+      query,
+      results,
+      synthesis,
+      citations,
+      richCitations: index.list(),
+      durationMs: Date.now() - t0,
+    };
   }
 
-  docCount(): number { return this.docs.length; }
+  docCount(): number {
+    return this.docs.length;
+  }
 }
 
 // ── ResearchPlan ──────────────────────────────────────────────────────────────
@@ -155,6 +270,7 @@ export interface ResearchStep {
   finding?: ResearchFinding;
 }
 
+/** Research plan. */
 export class ResearchPlan {
   private steps: ResearchStep[] = [];
 
@@ -163,7 +279,9 @@ export class ResearchPlan {
     return this;
   }
 
-  getSteps(): ResearchStep[] { return [...this.steps]; }
+  getSteps(): ResearchStep[] {
+    return [...this.steps];
+  }
 
   setFinding(index: number, finding: ResearchFinding): void {
     const step = this.steps[index];
@@ -190,6 +308,7 @@ export interface ResearchSessionOptions {
   dedupByUrl?: boolean;
 }
 
+/** Combined finding interface definition. */
 export interface CombinedFinding {
   query: string;
   webFindings: ResearchFinding | null;
@@ -199,6 +318,7 @@ export interface CombinedFinding {
   durationMs: number;
 }
 
+/** Research session. */
 export class ResearchSession {
   private web: WebResearcher | null;
   private corpus: CorpusResearcher | null;
@@ -218,10 +338,7 @@ export class ResearchSession {
       this.corpus ? this.corpus.research(query) : Promise.resolve(null),
     ]);
 
-    let allResults = [
-      ...(webFindings?.results ?? []),
-      ...(corpusFindings?.results ?? []),
-    ];
+    let allResults = [...(webFindings?.results ?? []), ...(corpusFindings?.results ?? [])];
 
     if (this.dedupByUrl) {
       const seen = new Set<string>();
@@ -247,7 +364,11 @@ export class ResearchSession {
     return finding;
   }
 
-  getHistory(): CombinedFinding[] { return [...this.history]; }
+  getHistory(): CombinedFinding[] {
+    return [...this.history];
+  }
 
-  clearHistory(): void { this.history = []; }
+  clearHistory(): void {
+    this.history = [];
+  }
 }

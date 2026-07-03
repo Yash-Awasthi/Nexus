@@ -136,7 +136,9 @@ describe("MockObservationProvider", () => {
   });
 
   it("returns configured observation", async () => {
-    const provider = new MockObservationProvider("mock", "m", { observation: "Custom observation" });
+    const provider = new MockObservationProvider("mock", "m", {
+      observation: "Custom observation",
+    });
     const result = await provider.generate(makeRequest([publicEvent("test")]));
     expect(result.observation).toBe("Custom observation");
   });
@@ -183,7 +185,10 @@ describe("MockObservationProvider", () => {
 describe("ClaudeObservationProvider", () => {
   it("generate calls the LLM function", async () => {
     let called = false;
-    const provider = new ClaudeObservationProvider(async () => { called = true; return "observation"; });
+    const provider = new ClaudeObservationProvider(async () => {
+      called = true;
+      return "observation";
+    });
     await provider.generate(makeRequest([publicEvent("hello")]));
     expect(called).toBe(true);
   });
@@ -205,9 +210,9 @@ describe("ClaudeObservationProvider", () => {
   });
 
   it("handles LLM error", async () => {
-    const provider = new ClaudeObservationProvider(
-      async () => { throw new Error("401 Unauthorized"); },
-    );
+    const provider = new ClaudeObservationProvider(async () => {
+      throw new Error("401 Unauthorized");
+    });
     const result = await provider.generate(makeRequest([]));
     expect(result.errorClass).toBe("auth_invalid");
     expect(result.observation).toBeNull();
@@ -283,14 +288,17 @@ describe("ProviderRegistry", () => {
   });
 
   it("generateWithFallback returns error when all fail", async () => {
-    const reg = new ProviderRegistry()
-      .register(new MockObservationProvider("a", "m", { throws: "fail" }));
+    const reg = new ProviderRegistry().register(
+      new MockObservationProvider("a", "m", { throws: "fail" }),
+    );
     const result = await reg.generateWithFallback(makeRequest([]));
     expect(result.errorClass).toBe("provider_error");
   });
 
   it("generateWithFallback accepts skip result as success (no fallback needed)", async () => {
-    const skipper = new MockObservationProvider("skipper", "m", { skipReason: "all_events_private" });
+    const skipper = new MockObservationProvider("skipper", "m", {
+      skipReason: "all_events_private",
+    });
     const reg = new ProviderRegistry().register(skipper);
     const result = await reg.generateWithFallback(makeRequest([]));
     expect(result.skipReason).toBe("all_events_private");

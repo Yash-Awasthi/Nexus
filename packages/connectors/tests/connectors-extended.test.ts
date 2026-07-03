@@ -68,7 +68,10 @@ describe("AirtableDocumentConnector", () => {
   });
 
   it("connect() returns ok:false on 401", async () => {
-    const conn = new AirtableDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const conn = new AirtableDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     expect((await conn.connect()).ok).toBe(false);
   });
 
@@ -77,7 +80,7 @@ describe("AirtableDocumentConnector", () => {
     const conn = new AirtableDocumentConnector({
       ...cfg,
       fetch: makeFetch([
-        { ok: true, body: {} },      // connect() → maxRecords=1
+        { ok: true, body: {} }, // connect() → maxRecords=1
         { ok: true, body: syncBody }, // sync() → pageSize=100
       ]),
     });
@@ -130,12 +133,24 @@ describe("AsanaDocumentConnector", () => {
   });
 
   it("connect() fails on 401", async () => {
-    const conn = new AsanaDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const conn = new AsanaDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     expect((await conn.connect()).ok).toBe(false);
   });
 
   it("sync() yields tasks", async () => {
-    const syncBody = { data: [{ gid: "t1", name: "Task One", notes: "content", permalink_url: "https://app.asana.com/task/1" }] };
+    const syncBody = {
+      data: [
+        {
+          gid: "t1",
+          name: "Task One",
+          notes: "content",
+          permalink_url: "https://app.asana.com/task/1",
+        },
+      ],
+    };
     const conn = new AsanaDocumentConnector({
       ...cfg,
       fetch: makeFetch([
@@ -151,7 +166,12 @@ describe("AsanaDocumentConnector", () => {
   });
 
   it("sync() respects limit", async () => {
-    const syncBody = { data: [{ gid: "t1", name: "A" }, { gid: "t2", name: "B" }] };
+    const syncBody = {
+      data: [
+        { gid: "t1", name: "A" },
+        { gid: "t2", name: "B" },
+      ],
+    };
     const conn = new AsanaDocumentConnector({
       ...cfg,
       fetch: makeFetch([
@@ -183,18 +203,31 @@ describe("BitbucketDocumentConnector", () => {
   });
 
   it("connect() ok on 200", async () => {
-    const conn = new BitbucketDocumentConnector({ ...cfg, fetch: okFetch({ display_name: "User" }) });
+    const conn = new BitbucketDocumentConnector({
+      ...cfg,
+      fetch: okFetch({ display_name: "User" }),
+    });
     expect((await conn.connect()).ok).toBe(true);
   });
 
   it("connect() fails on 401", async () => {
-    const conn = new BitbucketDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const conn = new BitbucketDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     expect((await conn.connect()).ok).toBe(false);
   });
 
   it("sync() yields issues with formatted title", async () => {
     const syncBody = {
-      values: [{ id: 1, title: "Bug #1", content: { raw: "details" }, links: { html: { href: "https://bb.io/1" } } }],
+      values: [
+        {
+          id: 1,
+          title: "Bug #1",
+          content: { raw: "details" },
+          links: { html: { href: "https://bb.io/1" } },
+        },
+      ],
     };
     const conn = new BitbucketDocumentConnector({
       ...cfg,
@@ -231,7 +264,10 @@ describe("BookstackDocumentConnector", () => {
   });
 
   it("connect() fails on 401", async () => {
-    const conn = new BookstackDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const conn = new BookstackDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     expect((await conn.connect()).ok).toBe(false);
   });
 
@@ -241,7 +277,7 @@ describe("BookstackDocumentConnector", () => {
     const conn = new BookstackDocumentConnector({
       ...cfg,
       fetch: makeFetch([
-        { ok: true, body: {} },       // connect() → /api/users
+        { ok: true, body: {} }, // connect() → /api/users
         { ok: true, body: listBody }, // sync() → /api/pages list (1 page, < 50 → breaks)
         { ok: true, body: pageBody }, // sync() → /api/pages/1 detail
       ]),
@@ -275,14 +311,19 @@ describe("CanvasDocumentConnector", () => {
   it("sync() yields announcements with [Course] prefix", async () => {
     const coursesBody = [{ id: 10, name: "Math 101" }];
     const announcementsBody = [
-      { id: 1, title: "Midterm Info", message: "details", html_url: "https://canvas.example.edu/courses/10/discussion_topics/1" },
+      {
+        id: 1,
+        title: "Midterm Info",
+        message: "details",
+        html_url: "https://canvas.example.edu/courses/10/discussion_topics/1",
+      },
     ];
     const conn = new CanvasDocumentConnector({
       ...cfg,
       fetch: makeFetch([
-        { ok: true, body: { id: 1, name: "Me" } },    // connect()
-        { ok: true, body: coursesBody },                // sync() → get courses
-        { ok: true, body: announcementsBody },          // sync() → get announcements for course 10
+        { ok: true, body: { id: 1, name: "Me" } }, // connect()
+        { ok: true, body: coursesBody }, // sync() → get courses
+        { ok: true, body: announcementsBody }, // sync() → get announcements for course 10
       ]),
     });
     await conn.connect();
@@ -308,14 +349,19 @@ describe("ClickUpDocumentConnector", () => {
   });
 
   it("connect() ok on 200", async () => {
-    const conn = new ClickUpDocumentConnector({ ...cfg, fetch: okFetch({ user: { username: "yash" } }) });
+    const conn = new ClickUpDocumentConnector({
+      ...cfg,
+      fetch: okFetch({ user: { username: "yash" } }),
+    });
     expect((await conn.connect()).ok).toBe(true);
   });
 
   it("sync() yields tasks (last_page:true terminates inner loop)", async () => {
     const listsBody = { lists: [{ id: "l1", name: "List A" }] };
     const tasksBody = {
-      tasks: [{ id: "t1", name: "Task One", description: "desc", url: "https://app.clickup.com/t/t1" }],
+      tasks: [
+        { id: "t1", name: "Task One", description: "desc", url: "https://app.clickup.com/t/t1" },
+      ],
       last_page: true, // critical: without this the while(true) never breaks
     };
     const conn = new ClickUpDocumentConnector({
@@ -346,12 +392,18 @@ describe("CodaDocumentConnector", () => {
   });
 
   it("connect() ok on 200", async () => {
-    const conn = new CodaDocumentConnector({ ...cfg, fetch: okFetch({ id: "doc1", name: "My Doc" }) });
+    const conn = new CodaDocumentConnector({
+      ...cfg,
+      fetch: okFetch({ id: "doc1", name: "My Doc" }),
+    });
     expect((await conn.connect()).ok).toBe(true);
   });
 
   it("connect() fails on 401", async () => {
-    const conn = new CodaDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const conn = new CodaDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     expect((await conn.connect()).ok).toBe(false);
   });
 
@@ -362,8 +414,8 @@ describe("CodaDocumentConnector", () => {
       ...cfg,
       fetch: makeFetch([
         { ok: true, body: { id: "doc1", name: "My Doc" } }, // connect()
-        { ok: true, body: listBody },                         // sync() list pages
-        { ok: true, body: exportBody },                       // sync() export page
+        { ok: true, body: listBody }, // sync() list pages
+        { ok: true, body: exportBody }, // sync() export page
       ]),
     });
     await conn.connect();
@@ -394,7 +446,10 @@ describe("DiscordDocumentConnector", () => {
   });
 
   it("connect() ok on 200", async () => {
-    const conn = new DiscordDocumentConnector({ ...cfg, fetch: okFetch({ id: "bot1", username: "MyBot" }) });
+    const conn = new DiscordDocumentConnector({
+      ...cfg,
+      fetch: okFetch({ id: "bot1", username: "MyBot" }),
+    });
     expect((await conn.connect()).ok).toBe(true);
   });
 
@@ -407,7 +462,7 @@ describe("DiscordDocumentConnector", () => {
       ...cfg,
       fetch: makeFetch([
         { ok: true, body: { id: "bot1" } }, // connect()
-        { ok: true, body: msgs },             // sync() ch1 page 1 (2 msgs < 100 → done)
+        { ok: true, body: msgs }, // sync() ch1 page 1 (2 msgs < 100 → done)
       ]),
     });
     await conn.connect();
@@ -455,14 +510,16 @@ describe("DiscourseDocumentConnector", () => {
 
   it("sync() yields topics — connect and sync use different endpoints", async () => {
     const topicsBody = {
-      topic_list: { topics: [{ id: 1, title: "Hello World", excerpt: "first post", slug: "hello-world" }] },
+      topic_list: {
+        topics: [{ id: 1, title: "Hello World", excerpt: "first post", slug: "hello-world" }],
+      },
     };
     const conn = new DiscourseDocumentConnector({
       ...cfg,
       fetch: makeFetch([
-        { ok: true, body: { user: {} } },                    // connect() → /users/user.json
-        { ok: true, body: topicsBody },                       // sync() page 0 → /latest.json
-        { ok: true, body: { topic_list: { topics: [] } } },  // sync() page 1 → empty → break
+        { ok: true, body: { user: {} } }, // connect() → /users/user.json
+        { ok: true, body: topicsBody }, // sync() page 0 → /latest.json
+        { ok: true, body: { topic_list: { topics: [] } } }, // sync() page 1 → empty → break
       ]),
     });
     await conn.connect();
@@ -490,7 +547,10 @@ describe("DropboxDocumentConnector", () => {
   });
 
   it("connect() fails on 401", async () => {
-    const conn = new DropboxDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const conn = new DropboxDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     expect((await conn.connect()).ok).toBe(false);
   });
 
@@ -506,7 +566,7 @@ describe("DropboxDocumentConnector", () => {
       ...cfg,
       fetch: makeFetch([
         { ok: true, body: { account_id: "abc" } }, // connect()
-        { ok: true, body: listBody },                // sync() list_folder
+        { ok: true, body: listBody }, // sync() list_folder
       ]),
     });
     await conn.connect();
@@ -533,26 +593,39 @@ describe("FirefliesDocumentConnector", () => {
   });
 
   it("connect() ok when no GQL errors", async () => {
-    const conn = new FirefliesDocumentConnector({ ...cfg, fetch: okFetch({ data: { user: { email: "y@x.com" } } }) });
+    const conn = new FirefliesDocumentConnector({
+      ...cfg,
+      fetch: okFetch({ data: { user: { email: "y@x.com" } } }),
+    });
     expect((await conn.connect()).ok).toBe(true);
   });
 
   it("connect() fails when GQL errors present", async () => {
-    const conn = new FirefliesDocumentConnector({ ...cfg, fetch: okFetch({ errors: [{ message: "Unauthorized" }] }) });
+    const conn = new FirefliesDocumentConnector({
+      ...cfg,
+      fetch: okFetch({ errors: [{ message: "Unauthorized" }] }),
+    });
     expect((await conn.connect()).ok).toBe(false);
   });
 
   it("sync() yields transcripts", async () => {
     const transcriptsBody = {
       data: {
-        transcripts: [{ id: "t1", title: "Call with Bob", date: "2024-01-01", summary: { overview: "discussed roadmap" } }],
+        transcripts: [
+          {
+            id: "t1",
+            title: "Call with Bob",
+            date: "2024-01-01",
+            summary: { overview: "discussed roadmap" },
+          },
+        ],
       },
     };
     const conn = new FirefliesDocumentConnector({
       ...cfg,
       fetch: makeFetch([
         { ok: true, body: { data: { user: { email: "y@x.com" } } } }, // connect()
-        { ok: true, body: transcriptsBody },                             // sync()
+        { ok: true, body: transcriptsBody }, // sync()
       ]),
     });
     await conn.connect();
@@ -582,22 +655,30 @@ describe("FreshdeskDocumentConnector", () => {
   });
 
   it("connect() ok on 200", async () => {
-    const conn = new FreshdeskDocumentConnector({ ...cfg, fetch: okFetch({ email: "agent@co.com" }) });
+    const conn = new FreshdeskDocumentConnector({
+      ...cfg,
+      fetch: okFetch({ email: "agent@co.com" }),
+    });
     expect((await conn.connect()).ok).toBe(true);
   });
 
   it("connect() fails on 401", async () => {
-    const conn = new FreshdeskDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const conn = new FreshdeskDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     expect((await conn.connect()).ok).toBe(false);
   });
 
   it("sync() yields tickets with formatted title (1 ticket < 100 → last page)", async () => {
-    const ticketsBody = [{ id: 1, subject: "Login issue", description_text: "can't login", status: 2 }];
+    const ticketsBody = [
+      { id: 1, subject: "Login issue", description_text: "can't login", status: 2 },
+    ];
     const conn = new FreshdeskDocumentConnector({
       ...cfg,
       fetch: makeFetch([
         { ok: true, body: { email: "a@b.com" } }, // connect()
-        { ok: true, body: ticketsBody },             // sync() page 1 (1 ticket < 100 → done)
+        { ok: true, body: ticketsBody }, // sync() page 1 (1 ticket < 100 → done)
       ]),
     });
     await conn.connect();
@@ -624,7 +705,10 @@ describe("GitBookDocumentConnector", () => {
   });
 
   it("connect() ok on 200", async () => {
-    const conn = new GitBookDocumentConnector({ ...cfg, fetch: okFetch({ id: "sp1", title: "My Space" }) });
+    const conn = new GitBookDocumentConnector({
+      ...cfg,
+      fetch: okFetch({ id: "sp1", title: "My Space" }),
+    });
     expect((await conn.connect()).ok).toBe(true);
   });
 
@@ -634,7 +718,7 @@ describe("GitBookDocumentConnector", () => {
       ...cfg,
       fetch: makeFetch([
         { ok: true, body: { id: "sp1", title: "Docs" } }, // connect()
-        { ok: true, body: pagesBody },                      // sync()
+        { ok: true, body: pagesBody }, // sync()
       ]),
     });
     await conn.connect();
@@ -666,17 +750,22 @@ describe("GongDocumentConnector", () => {
   });
 
   it("connect() fails on 401", async () => {
-    const conn = new GongDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const conn = new GongDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     expect((await conn.connect()).ok).toBe(false);
   });
 
   it("sync() yields calls", async () => {
-    const callsBody = { calls: [{ id: "c1", title: "Sales call", started: "2024-01-01T10:00:00Z" }] };
+    const callsBody = {
+      calls: [{ id: "c1", title: "Sales call", started: "2024-01-01T10:00:00Z" }],
+    };
     const conn = new GongDocumentConnector({
       ...cfg,
       fetch: makeFetch([
         { ok: true, body: { requestedUserId: "u1" } }, // connect()
-        { ok: true, body: callsBody },                   // sync()
+        { ok: true, body: callsBody }, // sync()
       ]),
     });
     await conn.connect();
@@ -704,24 +793,37 @@ describe("GoogleDriveDocumentConnector", () => {
   });
 
   it("connect() ok on 200", async () => {
-    const conn = new GoogleDriveDocumentConnector({ ...cfg, fetch: okFetch({ user: { displayName: "Yash" } }) });
+    const conn = new GoogleDriveDocumentConnector({
+      ...cfg,
+      fetch: okFetch({ user: { displayName: "Yash" } }),
+    });
     expect((await conn.connect()).ok).toBe(true);
   });
 
   it("connect() fails on 401", async () => {
-    const conn = new GoogleDriveDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const conn = new GoogleDriveDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     expect((await conn.connect()).ok).toBe(false);
   });
 
   it("sync() yields files", async () => {
     const filesBody = {
-      files: [{ id: "f1", name: "Report.pdf", mimeType: "application/pdf", webViewLink: "https://drive.google.com/f1" }],
+      files: [
+        {
+          id: "f1",
+          name: "Report.pdf",
+          mimeType: "application/pdf",
+          webViewLink: "https://drive.google.com/f1",
+        },
+      ],
     };
     const conn = new GoogleDriveDocumentConnector({
       ...cfg,
       fetch: makeFetch([
         { ok: true, body: { user: { displayName: "Yash" } } }, // connect()
-        { ok: true, body: filesBody },                           // sync()
+        { ok: true, body: filesBody }, // sync()
       ]),
     });
     await conn.connect();
@@ -749,17 +851,27 @@ describe("GuruDocumentConnector", () => {
   });
 
   it("connect() ok on 200", async () => {
-    const conn = new GuruDocumentConnector({ ...cfg, fetch: okFetch({ user: { email: "u@co.com" } }) });
+    const conn = new GuruDocumentConnector({
+      ...cfg,
+      fetch: okFetch({ user: { email: "u@co.com" } }),
+    });
     expect((await conn.connect()).ok).toBe(true);
   });
 
   it("sync() yields cards (< 50 = last page, no extra request needed)", async () => {
-    const cardsBody = [{ id: "c1", preferredPhrase: "How to do X", content: { text: "Do Y first" }, shareLink: "https://app.getguru.com/cards/c1" }];
+    const cardsBody = [
+      {
+        id: "c1",
+        preferredPhrase: "How to do X",
+        content: { text: "Do Y first" },
+        shareLink: "https://app.getguru.com/cards/c1",
+      },
+    ];
     const conn = new GuruDocumentConnector({
       ...cfg,
       fetch: makeFetch([
         { ok: true, body: { user: { email: "u@co.com" } } }, // connect()
-        { ok: true, body: cardsBody },                         // sync() page 0 (1 card < 50 → done)
+        { ok: true, body: cardsBody }, // sync() page 0 (1 card < 50 → done)
       ]),
     });
     await conn.connect();
@@ -792,23 +904,28 @@ describe("HubSpotDocumentConnector", () => {
   });
 
   it("connect() fails on 401", async () => {
-    const conn = new HubSpotDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const conn = new HubSpotDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     expect((await conn.connect()).ok).toBe(false);
   });
 
   it("sync() yields CRM objects across object types", async () => {
     // Default objectTypes: ["contacts", "companies", "deals", "tickets"]
     // 1 contact result (no paging.next → inner loop breaks), 0 for the rest
-    const contactsPage = { results: [{ id: "c1", properties: { firstname: "Alice", email: "a@b.com" } }] };
+    const contactsPage = {
+      results: [{ id: "c1", properties: { firstname: "Alice", email: "a@b.com" } }],
+    };
     const emptyPage = { results: [] };
     const conn = new HubSpotDocumentConnector({
       ...cfg,
       fetch: makeFetch([
         { ok: true, body: { portalId: 123 } }, // connect()
-        { ok: true, body: contactsPage },        // contacts page (no paging → done)
-        { ok: true, body: emptyPage },           // companies
-        { ok: true, body: emptyPage },           // deals
-        { ok: true, body: emptyPage },           // tickets
+        { ok: true, body: contactsPage }, // contacts page (no paging → done)
+        { ok: true, body: emptyPage }, // companies
+        { ok: true, body: emptyPage }, // deals
+        { ok: true, body: emptyPage }, // tickets
       ]),
     });
     await conn.connect();
@@ -852,8 +969,20 @@ describe("ImapDocumentConnector", () => {
 
   it("sync() yields messages from queryFn", async () => {
     const messages = [
-      { uid: "101", subject: "Meeting notes", from: "boss@co.com", date: "2024-01-01", text: "agenda" },
-      { uid: "102", subject: "Re: Meeting", from: "peer@co.com", date: "2024-01-02", text: "agreed" },
+      {
+        uid: "101",
+        subject: "Meeting notes",
+        from: "boss@co.com",
+        date: "2024-01-01",
+        text: "agenda",
+      },
+      {
+        uid: "102",
+        subject: "Re: Meeting",
+        from: "peer@co.com",
+        date: "2024-01-02",
+        text: "agreed",
+      },
     ];
     const queryFn: ImapQueryFn = vi.fn().mockResolvedValue(messages);
     const conn = new ImapDocumentConnector({ ...cfg, queryFn });
@@ -865,9 +994,11 @@ describe("ImapDocumentConnector", () => {
   });
 
   it("sync() uses (no subject) fallback", async () => {
-    const queryFn: ImapQueryFn = vi.fn().mockResolvedValue([
-      { uid: "103", subject: "", from: "x@y.com", date: "2024-01-03", text: "" },
-    ]);
+    const queryFn: ImapQueryFn = vi
+      .fn()
+      .mockResolvedValue([
+        { uid: "103", subject: "", from: "x@y.com", date: "2024-01-03", text: "" },
+      ]);
     const conn = new ImapDocumentConnector({ ...cfg, queryFn });
     await conn.connect();
     const docs: SyncedDocument[] = [];
@@ -879,7 +1010,9 @@ describe("ImapDocumentConnector", () => {
     const queryFn: ImapQueryFn = vi.fn().mockResolvedValue([]);
     const conn = new ImapDocumentConnector({ ...cfg, queryFn });
     await conn.connect();
-    for await (const _ of conn.sync({ limit: 5 })) { /* drain */ }
+    for await (const _ of conn.sync({ limit: 5 })) {
+      /* drain */
+    }
     expect(queryFn).toHaveBeenCalledWith(expect.objectContaining({ limit: 5 }));
   });
 });
@@ -906,7 +1039,10 @@ describe("LoopiODocumentConnector", () => {
   });
 
   it("connect() fails on 401", async () => {
-    const conn = new LoopiODocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const conn = new LoopiODocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     expect((await conn.connect()).ok).toBe(false);
   });
 
@@ -915,8 +1051,8 @@ describe("LoopiODocumentConnector", () => {
     const conn = new LoopiODocumentConnector({
       ...cfg,
       fetch: makeFetch([
-        { ok: true, body: { items: [] } },  // connect()
-        { ok: true, body: entriesBody },     // sync() offset=0 (1 item < 50 → done)
+        { ok: true, body: { items: [] } }, // connect()
+        { ok: true, body: entriesBody }, // sync() offset=0 (1 item < 50 → done)
       ]),
     });
     await conn.connect();
@@ -952,8 +1088,8 @@ describe("MediaWikiDocumentConnector", () => {
       category: "Science", // field is "category", connector adds "Category:" prefix itself
       fetch: makeFetch([
         { ok: true, body: { query: {} } }, // connect()
-        { ok: true, body: categoryBody },   // sync() categorymembers query
-        { ok: true, body: pageBody },        // sync() extract for "Physics"
+        { ok: true, body: categoryBody }, // sync() categorymembers query
+        { ok: true, body: pageBody }, // sync() extract for "Physics"
       ]),
     });
     await conn.connect();
@@ -965,13 +1101,15 @@ describe("MediaWikiDocumentConnector", () => {
   });
 
   it("sync() via pageTitles yields pages", async () => {
-    const pageBody = { query: { pages: { "2": { pageid: 2, extract: "The study of reactions." } } } };
+    const pageBody = {
+      query: { pages: { "2": { pageid: 2, extract: "The study of reactions." } } },
+    };
     const conn = new MediaWikiDocumentConnector({
       apiUrl,
       pageTitles: ["Chemistry"],
       fetch: makeFetch([
         { ok: true, body: { query: {} } }, // connect()
-        { ok: true, body: pageBody },        // sync() extract for "Chemistry"
+        { ok: true, body: pageBody }, // sync() extract for "Chemistry"
       ]),
     });
     await conn.connect();
@@ -995,12 +1133,18 @@ describe("SharePointDocumentConnector", () => {
   });
 
   it("connect() ok on 200", async () => {
-    const conn = new SharePointDocumentConnector({ ...cfg, fetch: okFetch({ id: "site1", displayName: "My Site" }) });
+    const conn = new SharePointDocumentConnector({
+      ...cfg,
+      fetch: okFetch({ id: "site1", displayName: "My Site" }),
+    });
     expect((await conn.connect()).ok).toBe(true);
   });
 
   it("connect() fails on 401", async () => {
-    const conn = new SharePointDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const conn = new SharePointDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     expect((await conn.connect()).ok).toBe(false);
   });
 
@@ -1008,15 +1152,25 @@ describe("SharePointDocumentConnector", () => {
     // Sync goes directly to /drive/root/children — no intermediate "get drive" call
     const filesBody = {
       value: [
-        { id: "fold1", name: "Archived", webUrl: "https://tenant.sharepoint.com/Archived", folder: {} },
-        { id: "f1", name: "Proposal.docx", webUrl: "https://tenant.sharepoint.com/Proposal.docx", file: {} },
+        {
+          id: "fold1",
+          name: "Archived",
+          webUrl: "https://tenant.sharepoint.com/Archived",
+          folder: {},
+        },
+        {
+          id: "f1",
+          name: "Proposal.docx",
+          webUrl: "https://tenant.sharepoint.com/Proposal.docx",
+          file: {},
+        },
       ],
     };
     const conn = new SharePointDocumentConnector({
       ...cfg,
       fetch: makeFetch([
         { ok: true, body: { id: "site1" } }, // connect()
-        { ok: true, body: filesBody },         // sync() root/children (no @odata.nextLink → done)
+        { ok: true, body: filesBody }, // sync() root/children (no @odata.nextLink → done)
       ]),
     });
     await conn.connect();
@@ -1049,17 +1203,22 @@ describe("ZendeskDocumentConnector", () => {
   });
 
   it("connect() fails on 401", async () => {
-    const conn = new ZendeskDocumentConnector({ ...cfg, fetch: makeFetch([{ ok: false, status: 401 }]) });
+    const conn = new ZendeskDocumentConnector({
+      ...cfg,
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
     expect((await conn.connect()).ok).toBe(false);
   });
 
   it("sync() yields tickets with formatted title", async () => {
-    const ticketsBody = { tickets: [{ id: 101, subject: "Can't login", description: "error", status: "open" }] };
+    const ticketsBody = {
+      tickets: [{ id: 101, subject: "Can't login", description: "error", status: "open" }],
+    };
     const conn = new ZendeskDocumentConnector({
       ...cfg,
       fetch: makeFetch([
         { ok: true, body: { user: { id: 1 } } }, // connect()
-        { ok: true, body: ticketsBody },            // sync() page 1 (no next_page → done)
+        { ok: true, body: ticketsBody }, // sync() page 1 (no next_page → done)
       ]),
     });
     await conn.connect();
@@ -1081,8 +1240,8 @@ describe("ZendeskDocumentConnector", () => {
       ...cfg,
       fetch: makeFetch([
         { ok: true, body: { user: { id: 1 } } }, // connect()
-        { ok: true, body: page1Body },             // sync() page 1 (has next_page)
-        { ok: true, body: page2Body },             // sync() page 2 (no next_page → done)
+        { ok: true, body: page1Body }, // sync() page 1 (has next_page)
+        { ok: true, body: page2Body }, // sync() page 2 (no next_page → done)
       ]),
     });
     await conn.connect();

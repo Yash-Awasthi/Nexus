@@ -27,14 +27,17 @@ export type AnalystEventType =
   | "error"
   | "rate_limited";
 
+/** In app action type type alias. */
 export type InAppActionType = "open_panel" | "set_view" | "navigate" | "highlight";
 
+/** In app action interface definition. */
 export interface InAppAction {
   action: InAppActionType;
   target?: string;
   params?: Record<string, unknown>;
 }
 
+/** Stream start event interface definition. */
 export interface StreamStartEvent {
   type: "stream_start";
   sessionId: string;
@@ -42,6 +45,7 @@ export interface StreamStartEvent {
   timestamp: string;
 }
 
+/** Stream chunk event interface definition. */
 export interface StreamChunkEvent {
   type: "stream_chunk";
   sessionId: string;
@@ -49,6 +53,7 @@ export interface StreamChunkEvent {
   index: number;
 }
 
+/** Stream end event interface definition. */
 export interface StreamEndEvent {
   type: "stream_end";
   sessionId: string;
@@ -56,12 +61,14 @@ export interface StreamEndEvent {
   durationMs: number;
 }
 
+/** In app action event interface definition. */
 export interface InAppActionEvent {
   type: "in_app_action";
   sessionId: string;
   action: InAppAction;
 }
 
+/** Error event interface definition. */
 export interface ErrorEvent {
   type: "error";
   sessionId: string;
@@ -69,12 +76,14 @@ export interface ErrorEvent {
   message: string;
 }
 
+/** Rate limited event interface definition. */
 export interface RateLimitedEvent {
   type: "rate_limited";
   sessionId: string;
   retryAfterMs: number;
 }
 
+/** Analyst event type alias. */
 export type AnalystEvent =
   | StreamStartEvent
   | StreamChunkEvent
@@ -96,17 +105,28 @@ export type AnalystDomain =
   | "geopolitical"
   | "general";
 
+/** Domain system prompt. */
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class DomainSystemPrompt {
   private static readonly PROMPTS: Record<AnalystDomain, string> = {
-    aviation: "You are an aviation intelligence analyst. Focus on flight safety, airspace incidents, NOTAM analysis, and civil aviation trends. Provide structured analysis with risk assessments.",
-    climate: "You are a climate intelligence analyst. Focus on extreme weather events, climate patterns, environmental risks, and their geopolitical implications. Reference meteorological data when available.",
-    conflict: "You are a conflict intelligence analyst. Provide objective assessment of military operations, territorial changes, humanitarian impacts, and escalation risks. Maintain analytical neutrality.",
-    economic: "You are an economic intelligence analyst. Focus on market indicators, supply chain disruptions, sanctions impacts, currency movements, and macroeconomic trends.",
-    cyber: "You are a cybersecurity intelligence analyst. Analyze threat actor activity, vulnerability trends, incident attribution, and defensive recommendations. Use MITRE ATT&CK framework terminology.",
-    health: "You are a global health intelligence analyst. Monitor disease outbreaks, health system stress indicators, pharmaceutical supply chains, and public health policy impacts.",
-    maritime: "You are a maritime intelligence analyst. Track shipping lane disruptions, piracy incidents, port congestion, and maritime security events.",
-    geopolitical: "You are a geopolitical intelligence analyst. Provide analysis of state actor behavior, alliance dynamics, sanctions regimes, and regional stability assessments.",
-    general: "You are an intelligence analyst with broad expertise. Provide clear, objective analysis backed by available evidence. Structure your response with key findings, supporting evidence, and confidence levels.",
+    aviation:
+      "You are an aviation intelligence analyst. Focus on flight safety, airspace incidents, NOTAM analysis, and civil aviation trends. Provide structured analysis with risk assessments.",
+    climate:
+      "You are a climate intelligence analyst. Focus on extreme weather events, climate patterns, environmental risks, and their geopolitical implications. Reference meteorological data when available.",
+    conflict:
+      "You are a conflict intelligence analyst. Provide objective assessment of military operations, territorial changes, humanitarian impacts, and escalation risks. Maintain analytical neutrality.",
+    economic:
+      "You are an economic intelligence analyst. Focus on market indicators, supply chain disruptions, sanctions impacts, currency movements, and macroeconomic trends.",
+    cyber:
+      "You are a cybersecurity intelligence analyst. Analyze threat actor activity, vulnerability trends, incident attribution, and defensive recommendations. Use MITRE ATT&CK framework terminology.",
+    health:
+      "You are a global health intelligence analyst. Monitor disease outbreaks, health system stress indicators, pharmaceutical supply chains, and public health policy impacts.",
+    maritime:
+      "You are a maritime intelligence analyst. Track shipping lane disruptions, piracy incidents, port congestion, and maritime security events.",
+    geopolitical:
+      "You are a geopolitical intelligence analyst. Provide analysis of state actor behavior, alliance dynamics, sanctions regimes, and regional stability assessments.",
+    general:
+      "You are an intelligence analyst with broad expertise. Provide clear, objective analysis backed by available evidence. Structure your response with key findings, supporting evidence, and confidence levels.",
   };
 
   static get(domain: AnalystDomain): string {
@@ -134,12 +154,14 @@ export interface ContextMessage {
   content: string;
 }
 
+/** Assembled context interface definition. */
 export interface AssembledContext {
   systemPrompt: string;
   messages: ContextMessage[];
   tokenEstimate: number;
 }
 
+/** Context assembler. */
 export class ContextAssembler {
   private maxHistoryMessages: number;
 
@@ -174,7 +196,7 @@ export class ContextAssembler {
 
     const trimmed = messages.slice(-this.maxHistoryMessages);
     const tokenEstimate = Math.ceil(
-      (systemPrompt.length + trimmed.reduce((s, m) => s + m.content.length, 0)) / 4
+      (systemPrompt.length + trimmed.reduce((s, m) => s + m.content.length, 0)) / 4,
     );
 
     return { systemPrompt, messages: trimmed, tokenEstimate };
@@ -188,6 +210,7 @@ export interface RateLimiterOptions {
   windowMs?: number;
 }
 
+/** Rate limiter. */
 export class RateLimiter {
   private windows = new Map<string, number[]>();
   private requestsPerMinute: number;
@@ -215,8 +238,12 @@ export class RateLimiter {
     return { allowed: true, retryAfterMs: 0 };
   }
 
-  reset(sessionId: string): void { this.windows.delete(sessionId); }
-  clear(): void { this.windows.clear(); }
+  reset(sessionId: string): void {
+    this.windows.delete(sessionId);
+  }
+  clear(): void {
+    this.windows.clear();
+  }
 }
 
 // ── StreamingLlmFn ────────────────────────────────────────────────────────────
@@ -232,8 +259,10 @@ export type StreamingLlmFn = (
  * Extracts in-app action directives from streamed text.
  * Syntax: [ACTION:type target param=val param2=val2]
  */
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class InAppActionExtractor {
   static extract(text: string): InAppAction[] {
+    if (text.length > 100_000) return [];
     const actions: InAppAction[] = [];
     const regex = /\[ACTION:(\w+)(?:\s+([^\s\]]+))?([^\]]*)\]/g;
     let match;
@@ -256,7 +285,11 @@ export class InAppActionExtractor {
   }
 
   static strip(text: string): string {
-    return text.replace(/\[ACTION:[^\]]+\]/g, "").replace(/\s{2,}/g, " ").trim();
+    if (text.length > 100_000) return text;
+    return text
+      .replace(/\[ACTION:[^\]]+\]/g, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
   }
 }
 
@@ -268,6 +301,7 @@ export interface StreamingAnalystOptions {
   assembler?: ContextAssembler;
 }
 
+/** Streaming analyst. */
 export class StreamingAnalyst {
   private llm: StreamingLlmFn;
   private rateLimiter?: RateLimiter;
@@ -332,6 +366,7 @@ export class StreamingAnalyst {
 
 let _aSeq = 0;
 
+/** Analyst session. */
 export class AnalystSession {
   readonly id: string;
   readonly domain: AnalystDomain;
@@ -350,7 +385,9 @@ export class AnalystSession {
     this.history.push({ role, content });
   }
 
-  getHistory(): ContextMessage[] { return [...this.history]; }
+  getHistory(): ContextMessage[] {
+    return [...this.history];
+  }
 
   async *ask(
     userMessage: string,
@@ -386,9 +423,19 @@ export class AnalystSessionManager {
     return session;
   }
 
-  get(id: string): AnalystSession | undefined { return this.sessions.get(id); }
-  has(id: string): boolean { return this.sessions.has(id); }
-  destroy(id: string): boolean { return this.sessions.delete(id); }
-  list(): AnalystSession[] { return [...this.sessions.values()]; }
-  count(): number { return this.sessions.size; }
+  get(id: string): AnalystSession | undefined {
+    return this.sessions.get(id);
+  }
+  has(id: string): boolean {
+    return this.sessions.has(id);
+  }
+  destroy(id: string): boolean {
+    return this.sessions.delete(id);
+  }
+  list(): AnalystSession[] {
+    return [...this.sessions.values()];
+  }
+  count(): number {
+    return this.sessions.size;
+  }
 }

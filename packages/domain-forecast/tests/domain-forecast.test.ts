@@ -14,7 +14,10 @@ import {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makeReq(domain: ForecastDomain = "risk", horizon: ForecastHorizon = "7d"): ForecastRequest {
+function makeReq(
+  domain: ForecastDomain = "risk",
+  horizon: ForecastHorizon = "7d",
+): ForecastRequest {
   return { domain, horizon };
 }
 

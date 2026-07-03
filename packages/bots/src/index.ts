@@ -52,8 +52,7 @@
  * ```
  */
 
-import { createHmac, timingSafeEqual } from "node:crypto";
-import { randomUUID } from "node:crypto";
+import { createHmac, timingSafeEqual, randomUUID } from "node:crypto";
 
 // ── Error ─────────────────────────────────────────────────────────────────────
 
@@ -65,6 +64,7 @@ export type BotErrorCode =
   | "AUTH_FAILED"
   | "UNSUPPORTED_EVENT";
 
+/** Bot error. */
 export class BotError extends Error {
   readonly code: BotErrorCode;
   readonly context?: Record<string, unknown>;
@@ -79,7 +79,7 @@ export class BotError extends Error {
 
 // ── Shared message / reply types ──────────────────────────────────────────────
 
-export type BotPlatform = "slack" | "teams";
+export type BotPlatform = "slack" | "teams" | "telegram";
 
 /**
  * Normalized inbound message — all platform-specific fields flattened into
@@ -103,6 +103,7 @@ export interface BotMessage {
   raw: unknown;
 }
 
+/** Bot reply interface definition. */
 export interface BotReply {
   text: string;
   /** If set, the reply is sent into the same thread */
@@ -186,6 +187,7 @@ export interface SlackBotConfig {
   allowedUserIds?: string[];
 }
 
+/** Slack event result interface definition. */
 export interface SlackEventResult {
   /** Set on url_verification events — must be echoed back to Slack */
   challenge?: string;
@@ -222,6 +224,7 @@ interface SlackEventCallback {
 
 type SlackPayload = SlackUrlVerification | SlackEventCallback | { type: string };
 
+/** Slack bot adapter. */
 export class SlackBotAdapter {
   private readonly token: string;
   private readonly signingSecret?: string;
@@ -244,9 +247,7 @@ export class SlackBotAdapter {
     this.name = config.name ?? "slack-bot";
     this.triggerMode = config.triggerMode ?? "all";
     this.botUserId = config.botUserId;
-    this.allowedUserIds = config.allowedUserIds
-      ? new Set(config.allowedUserIds)
-      : undefined;
+    this.allowedUserIds = config.allowedUserIds ? new Set(config.allowedUserIds) : undefined;
   }
 
   /** Returns true when the message text matches the configured trigger mode. */
@@ -254,9 +255,7 @@ export class SlackBotAdapter {
     switch (this.triggerMode) {
       case "mention":
         // Matches <@UXXXXXXXX> mention format
-        return this.botUserId
-          ? text.includes(`<@${this.botUserId}>`)
-          : true; // no botUserId configured — pass through
+        return this.botUserId ? text.includes(`<@${this.botUserId}>`) : true; // no botUserId configured — pass through
       case "command":
         return text.trimStart().startsWith("/");
       case "all":
@@ -279,9 +278,7 @@ export class SlackBotAdapter {
     if (this.signingSecret) {
       const verified = this._verifySlackSignature(
         headers["x-slack-signature"] ?? headers["X-Slack-Signature"] ?? "",
-        headers["x-slack-request-timestamp"] ??
-          headers["X-Slack-Request-Timestamp"] ??
-          "",
+        headers["x-slack-request-timestamp"] ?? headers["X-Slack-Request-Timestamp"] ?? "",
         typeof body === "string" ? body : JSON.stringify(body),
       );
       if (!verified) {
@@ -377,19 +374,11 @@ export class SlackBotAdapter {
   /**
    * Send a message to a Slack channel directly (outside event handling).
    */
-  async send(
-    channelId: string,
-    text: string,
-    opts: { threadTs?: string } = {},
-  ): Promise<void> {
+  async send(channelId: string, text: string, opts: { threadTs?: string } = {}): Promise<void> {
     await this._sendSlackMessage(channelId, text, opts.threadTs);
   }
 
-  private async _sendSlackMessage(
-    channel: string,
-    text: string,
-    threadTs?: string,
-  ): Promise<void> {
+  private async _sendSlackMessage(channel: string, text: string, threadTs?: string): Promise<void> {
     const body: Record<string, unknown> = { channel, text };
     if (threadTs) body["thread_ts"] = threadTs;
 
@@ -417,11 +406,7 @@ export class SlackBotAdapter {
     }
   }
 
-  private _verifySlackSignature(
-    signature: string,
-    timestamp: string,
-    rawBody: string,
-  ): boolean {
+  private _verifySlackSignature(signature: string, timestamp: string, rawBody: string): boolean {
     if (!signature || !timestamp) return false;
     // Reject stale requests (> 5 minutes)
     const ts = parseInt(timestamp, 10);
@@ -475,6 +460,7 @@ export interface TeamsBotConfig {
   name?: string;
 }
 
+/** Teams activity result interface definition. */
 export interface TeamsActivityResult {
   /** Whether the handler was invoked */
   handled: boolean;
@@ -496,6 +482,7 @@ interface TeamsActivity {
   channelData?: { teamsChannelId?: string };
 }
 
+/** Teams bot adapter. */
 export class TeamsBotAdapter {
   private readonly serviceUrl: string;
   private readonly appId: string;
@@ -509,8 +496,7 @@ export class TeamsBotAdapter {
     "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token";
 
   constructor(config: TeamsBotConfig) {
-    this.serviceUrl =
-      config.serviceUrl ?? "https://smba.trafficmanager.net/apis";
+    this.serviceUrl = config.serviceUrl ?? "https://smba.trafficmanager.net/apis";
     this.appId = config.appId;
     this.appPassword = config.appPassword;
     this.handler = config.handler;
@@ -542,14 +528,9 @@ export class TeamsBotAdapter {
     }
 
     // Prefer teamsChannelId from channelData, fall back to conversation.id
-    const channelId =
-      activity.channelData?.teamsChannelId ??
-      activity.conversation?.id ??
-      "";
+    const channelId = activity.channelData?.teamsChannelId ?? activity.conversation?.id ?? "";
 
-    const tsMs = activity.timestamp
-      ? new Date(activity.timestamp).getTime()
-      : Date.now();
+    const tsMs = activity.timestamp ? new Date(activity.timestamp).getTime() : Date.now();
 
     const msg: BotMessage = {
       id: activity.id ?? randomUUID(),
@@ -655,6 +636,304 @@ export class TeamsBotAdapter {
         conversationId,
         status: res.status,
       });
+    }
+  }
+
+  private async _emitHook(event: string, payload: Record<string, unknown>): Promise<void> {
+    if (!this.hooks) return;
+    try {
+      await this.hooks.emit(event, payload);
+    } catch {
+      // Non-fatal
+    }
+  }
+}
+
+// ── Telegram Bot Adapter ───────────────────────────────────────────────────────
+
+export interface TelegramBotConfig {
+  /** Telegram Bot API token (from @BotFather, e.g. "123456:ABC-DEF…") */
+  token: string;
+  /**
+   * Secret token configured with setWebhook. When set, `handleUpdate` verifies
+   * the `X-Telegram-Bot-Api-Secret-Token` header (constant-time). Omit to skip
+   * (e.g. when using long-polling, which has no header to verify).
+   */
+  secretToken?: string;
+  /** Handler to invoke for each inbound message */
+  handler: BotHandler;
+  /** Injectable fetch (defaults to global fetch) */
+  fetch?: FetchFn;
+  /** Optional hooks for task.before / task.after lifecycle events */
+  hooks?: BotHooks;
+  /** Bot display name used in hook payloads (default: "telegram-bot") */
+  name?: string;
+  /** Base API URL override (defaults to https://api.telegram.org) — for testing */
+  apiBase?: string;
+  /**
+   * Controls which messages trigger the handler. Default: "all".
+   *   "mention" — only messages containing @<botUsername> (requires botUsername)
+   *   "command" — only messages starting with "/"
+   */
+  triggerMode?: BotTriggerMode;
+  /** Bot @username (without @) — required for triggerMode "mention". */
+  botUsername?: string;
+  /** Allowlist of Telegram numeric user IDs (as strings). Others are dropped. */
+  allowedUserIds?: string[];
+}
+
+/** Result of processing a single Telegram update. */
+export interface TelegramUpdateResult {
+  handled: boolean;
+  reply?: BotReply;
+  error?: string;
+  sendFailed?: boolean;
+}
+
+// Telegram Bot API update shapes (minimal subset we consume)
+interface TelegramUser {
+  id: number;
+  is_bot?: boolean;
+  username?: string;
+  first_name?: string;
+}
+interface TelegramChat {
+  id: number;
+  type?: string;
+}
+interface TelegramMessage {
+  message_id: number;
+  from?: TelegramUser;
+  chat: TelegramChat;
+  text?: string;
+  date: number;
+  message_thread_id?: number;
+}
+export interface TelegramUpdate {
+  update_id: number;
+  message?: TelegramMessage;
+  edited_message?: TelegramMessage;
+}
+
+/**
+ * Telegram bot adapter — webhook and long-polling.
+ *
+ * Webhook: register with setWebhook(secret_token), then feed each POST body to
+ * `handleUpdate(body, headers)`; the secret header is verified when configured.
+ *
+ * Long-polling: call `pollOnce(offset)` in a loop; it fetches getUpdates and
+ * dispatches each via the same `handleUpdate` path, returning the next offset.
+ *
+ * Replies are sent via the sendMessage API. `fetch` is injectable for testing.
+ */
+export class TelegramBotAdapter {
+  private readonly token: string;
+  private readonly secretToken?: string;
+  private readonly handler: BotHandler;
+  private readonly fetchFn: FetchFn;
+  private readonly hooks?: BotHooks;
+  private readonly name: string;
+  private readonly apiBase: string;
+  private readonly triggerMode: BotTriggerMode;
+  private readonly botUsername?: string;
+  private readonly allowedUserIds?: ReadonlySet<string>;
+
+  constructor(config: TelegramBotConfig) {
+    this.token = config.token;
+    this.secretToken = config.secretToken;
+    this.handler = config.handler;
+    this.fetchFn = config.fetch ?? fetch;
+    this.hooks = config.hooks;
+    this.name = config.name ?? "telegram-bot";
+    this.apiBase = (config.apiBase ?? "https://api.telegram.org").replace(/\/$/, "");
+    this.triggerMode = config.triggerMode ?? "all";
+    this.botUsername = config.botUsername;
+    this.allowedUserIds = config.allowedUserIds ? new Set(config.allowedUserIds) : undefined;
+  }
+
+  private _matchesTrigger(text: string): boolean {
+    switch (this.triggerMode) {
+      case "mention":
+        return this.botUsername ? text.includes(`@${this.botUsername}`) : true;
+      case "command":
+        return text.trimStart().startsWith("/");
+      case "all":
+      default:
+        return true;
+    }
+  }
+
+  /**
+   * Process a single inbound Telegram update.
+   *
+   * @param body    Parsed JSON update (or raw JSON string)
+   * @param headers Optional HTTP headers — used for secret-token verification
+   */
+  async handleUpdate(
+    body: unknown,
+    headers: Record<string, string> = {},
+  ): Promise<TelegramUpdateResult> {
+    // ── Secret-token verification (webhook) ─────────────────────────────────
+    if (this.secretToken) {
+      const provided =
+        headers["x-telegram-bot-api-secret-token"] ??
+        headers["X-Telegram-Bot-Api-Secret-Token"] ??
+        "";
+      if (!this._verifySecret(provided)) {
+        throw new BotError("SIGNATURE_INVALID", "Telegram webhook secret token mismatch");
+      }
+    }
+
+    // ── Parse ───────────────────────────────────────────────────────────────
+    let update: TelegramUpdate;
+    try {
+      update = (typeof body === "string" ? JSON.parse(body) : body) as TelegramUpdate;
+    } catch {
+      throw new BotError("PAYLOAD_INVALID", "Telegram update body is not valid JSON");
+    }
+
+    const message = update.message ?? update.edited_message;
+    if (!message) {
+      return { handled: false, error: "No message in update" };
+    }
+
+    // Ignore other bots (prevent loops)
+    if (message.from?.is_bot) {
+      return { handled: false };
+    }
+
+    const text = (message.text ?? "").trim();
+    if (!text) {
+      return { handled: false, error: "Empty message text" };
+    }
+
+    const msg: BotMessage = {
+      id: String(message.message_id),
+      platform: "telegram",
+      channelId: String(message.chat.id),
+      userId: message.from ? String(message.from.id) : "",
+      text,
+      threadId: message.message_thread_id ? String(message.message_thread_id) : undefined,
+      timestamp: message.date ? message.date * 1000 : Date.now(),
+      raw: update,
+    };
+
+    // ── Gates ────────────────────────────────────────────────────────────────
+    if (!this._matchesTrigger(text)) return { handled: false };
+    if (this.allowedUserIds && !this.allowedUserIds.has(msg.userId)) return { handled: false };
+
+    // ── Invoke handler ────────────────────────────────────────────────────────
+    await this._emitHook("task.before", {
+      bot: this.name,
+      platform: "telegram",
+      channelId: msg.channelId,
+      userId: msg.userId,
+    });
+
+    let reply: BotReply;
+    try {
+      reply = await this.handler(msg);
+    } catch (cause) {
+      throw new BotError("HANDLER_FAILED", `Handler threw: ${String(cause)}`, {
+        channelId: msg.channelId,
+      });
+    }
+
+    await this._emitHook("task.after", {
+      bot: this.name,
+      platform: "telegram",
+      channelId: msg.channelId,
+      replyLength: reply.text.length,
+    });
+
+    // ── Send reply ──────────────────────────────────────────────────────────
+    let sendFailed = false;
+    if (reply.text) {
+      try {
+        await this.send(msg.channelId, reply.text, { replyToMessageId: message.message_id });
+      } catch {
+        sendFailed = true;
+      }
+    }
+
+    return { handled: true, reply, sendFailed };
+  }
+
+  /**
+   * Fetch a batch of updates (long-polling) and dispatch each. Returns the
+   * number processed and the next offset to pass on the following call.
+   */
+  async pollOnce(
+    offset?: number,
+    opts: { timeoutSec?: number; limit?: number } = {},
+  ): Promise<{ processed: number; nextOffset: number }> {
+    const params = new URLSearchParams();
+    if (offset !== undefined) params.set("offset", String(offset));
+    params.set("timeout", String(opts.timeoutSec ?? 0));
+    if (opts.limit) params.set("limit", String(opts.limit));
+
+    const res = await this.fetchFn(`${this._url("getUpdates")}?${params.toString()}`, {
+      method: "GET",
+    });
+    if (!res.ok) {
+      throw new BotError("SEND_FAILED", `getUpdates returned ${res.status}`);
+    }
+    const json = (await res.json()) as { ok: boolean; result?: TelegramUpdate[] };
+    const updates = json.result ?? [];
+
+    let nextOffset = offset ?? 0;
+    for (const u of updates) {
+      nextOffset = Math.max(nextOffset, u.update_id + 1);
+      try {
+        await this.handleUpdate(u);
+      } catch {
+        // Per-update failures are non-fatal to the poll loop.
+      }
+    }
+    return { processed: updates.length, nextOffset };
+  }
+
+  /** Send a message to a Telegram chat directly. */
+  async send(
+    chatId: string,
+    text: string,
+    opts: { replyToMessageId?: number; parseMode?: "HTML" | "MarkdownV2" } = {},
+  ): Promise<void> {
+    const body: Record<string, unknown> = { chat_id: chatId, text };
+    if (opts.replyToMessageId) body["reply_to_message_id"] = opts.replyToMessageId;
+    if (opts.parseMode) body["parse_mode"] = opts.parseMode;
+
+    const res = await this.fetchFn(this._url("sendMessage"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      throw new BotError("SEND_FAILED", `Telegram sendMessage returned ${res.status}`, {
+        chatId,
+        status: res.status,
+      });
+    }
+    const json = (await res.json()) as { ok: boolean; description?: string };
+    if (!json.ok) {
+      throw new BotError("SEND_FAILED", `Telegram API error: ${json.description ?? "unknown"}`, {
+        chatId,
+      });
+    }
+  }
+
+  private _url(method: string): string {
+    return `${this.apiBase}/bot${this.token}/${method}`;
+  }
+
+  private _verifySecret(provided: string): boolean {
+    if (!provided || !this.secretToken) return false;
+    try {
+      const a = Buffer.from(provided);
+      const b = Buffer.from(this.secretToken);
+      return a.length === b.length && timingSafeEqual(a, b);
+    } catch {
+      return false;
     }
   }
 

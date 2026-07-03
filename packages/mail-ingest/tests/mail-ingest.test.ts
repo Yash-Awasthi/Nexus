@@ -251,7 +251,9 @@ describe("MailIngestor", () => {
     const received: ParsedEmail[] = [];
     const ingestor = new MailIngestor({
       imap: stub,
-      handler: async (email) => { received.push(email); },
+      handler: async (email) => {
+        received.push(email);
+      },
       pollIntervalMs: 9_999_999,
     });
     await stub.connect();
@@ -265,7 +267,9 @@ describe("MailIngestor", () => {
     const errHandler = vi.fn();
     const ingestor = new MailIngestor({
       imap: stub,
-      handler: async () => { throw new Error("handler error"); },
+      handler: async () => {
+        throw new Error("handler error");
+      },
       onError: errHandler,
       pollIntervalMs: 9_999_999,
     });

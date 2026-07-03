@@ -10,7 +10,10 @@ import {
   type BatchFilter,
 } from "../src/index.js";
 
-function makeSample(tag: CorpusSample["tag"] = "preferred", model = "gpt-4"): Omit<CorpusSample, "id" | "createdAt"> {
+function makeSample(
+  tag: CorpusSample["tag"] = "preferred",
+  model = "gpt-4",
+): Omit<CorpusSample, "id" | "createdAt"> {
   return {
     prompt: "Explain quantum entanglement",
     completion: "Quantum entanglement is...",
@@ -123,10 +126,18 @@ describe("InMemoryBatchStore", () => {
 describe("TierGate", () => {
   const gate = new TierGate();
 
-  it("free user passes free gate", () => { expect(gate.check("free", "free")).toBe(true); });
-  it("free user fails pro gate", () => { expect(gate.check("pro", "free")).toBe(false); });
-  it("pro user passes pro gate", () => { expect(gate.check("pro", "pro")).toBe(true); });
-  it("pro user fails enterprise gate", () => { expect(gate.check("enterprise", "pro")).toBe(false); });
+  it("free user passes free gate", () => {
+    expect(gate.check("free", "free")).toBe(true);
+  });
+  it("free user fails pro gate", () => {
+    expect(gate.check("pro", "free")).toBe(false);
+  });
+  it("pro user passes pro gate", () => {
+    expect(gate.check("pro", "pro")).toBe(true);
+  });
+  it("pro user fails enterprise gate", () => {
+    expect(gate.check("enterprise", "pro")).toBe(false);
+  });
   it("enterprise user passes all gates", () => {
     expect(gate.check("free", "enterprise")).toBe(true);
     expect(gate.check("pro", "enterprise")).toBe(true);
@@ -259,7 +270,10 @@ describe("ResearchApiRouter", () => {
     const { store, router } = makeRouter();
     store.addSample(makeSample("preferred"));
     store.flush("b");
-    const r = router.querySamples({ userTier: "pro", body: { tags: ["preferred"] } as BatchFilter });
+    const r = router.querySamples({
+      userTier: "pro",
+      body: { tags: ["preferred"] } as BatchFilter,
+    });
     expect(r.status).toBe(200);
     expect(r.data!.samples).toHaveLength(1);
   });

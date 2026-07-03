@@ -1,0 +1,21 @@
+{
+  "name": "@nexus/image-transformations",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "build": "tsc --project tsconfig.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "optionalDependencies": {
+    "sharp": "^0.35.3"
+  },
+  "devDependencies": {
+    "vitest": "*",
+    "typescript": "*"
+  }
+}

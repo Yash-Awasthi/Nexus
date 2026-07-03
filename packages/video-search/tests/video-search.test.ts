@@ -16,7 +16,8 @@ import {
 
 function makeVideo(id: string, title: string, overrides: Partial<VideoResult> = {}): VideoResult {
   return {
-    id, title,
+    id,
+    title,
     url: `https://youtube.com/watch?v=${id}`,
     source: "youtube",
     viewCount: 1000,
@@ -139,7 +140,9 @@ describe("IntentExtractor", () => {
   });
 
   it("falls back to original query when model throws", async () => {
-    const model = vi.fn(async () => { throw new Error("oops"); });
+    const model = vi.fn(async () => {
+      throw new Error("oops");
+    });
     const extractor = new IntentExtractor(model);
     const result = await extractor.refineQuery({ query: "original" });
     expect(result).toBe("original");
@@ -154,7 +157,10 @@ describe("IntentExtractor", () => {
 
   it("includes chat history in model message", async () => {
     let capturedUser = "";
-    const model = vi.fn(async (_sys: string, user: string) => { capturedUser = user; return "q"; });
+    const model = vi.fn(async (_sys: string, user: string) => {
+      capturedUser = user;
+      return "q";
+    });
     const extractor = new IntentExtractor(model);
     const history: ChatMessage[] = [
       { role: "user", content: "tell me about ML" },
@@ -273,7 +279,10 @@ describe("VideoSearchEngine", () => {
   it("forceRefresh bypasses cache", async () => {
     const backend = new MockVideoBackend([makeVideo("v1", "Python")]);
     let modelCalls = 0;
-    const model: ModelFn = async () => { modelCalls++; return "python"; };
+    const model: ModelFn = async () => {
+      modelCalls++;
+      return "python";
+    };
     const engine = new VideoSearchEngine({ model, backend });
     await engine.search({ query: "python" });
     await engine.search({ query: "python", forceRefresh: true });

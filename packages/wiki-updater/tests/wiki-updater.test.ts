@@ -140,7 +140,9 @@ describe("WikiUpdatePipeline", () => {
     const store = new WikiStore();
     store.create("Machine Learning", "machine learning algorithms neural");
     const pipeline = new WikiUpdatePipeline({ store, autoCreate: true });
-    const result = await pipeline.run(makeRequest(makeDoc("machine learning deep neural networks")));
+    const result = await pipeline.run(
+      makeRequest(makeDoc("machine learning deep neural networks")),
+    );
     expect(result.updated).toBe(true);
     expect(result.created).toBe(false);
   });
@@ -179,7 +181,10 @@ describe("WikiUpdatePipeline", () => {
     let distillCalled = false;
     const pipeline = new WikiUpdatePipeline({
       store,
-      distillFn: async (content) => { distillCalled = true; return content.slice(0, 50); },
+      distillFn: async (content) => {
+        distillCalled = true;
+        return content.slice(0, 50);
+      },
     });
     await pipeline.run(makeRequest());
     expect(distillCalled).toBe(true);

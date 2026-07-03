@@ -45,7 +45,9 @@ function makeSnapshot(overrides: Partial<DigestSnapshot> = {}): DigestSnapshot {
 describe("DigestStore", () => {
   let store: DigestStore;
 
-  beforeEach(() => { store = new DigestStore(); });
+  beforeEach(() => {
+    store = new DigestStore();
+  });
 
   it("saves and retrieves a snapshot", () => {
     const snap = makeSnapshot();
@@ -118,10 +120,14 @@ describe("SectionBuilder", () => {
 
   it("escapes HTML in summaries", () => {
     const builder = new SectionBuilder();
-    const events: DigestEvent[] = [{
-      id: "ev-1", domain: "cyber", summary: "<script>alert(1)</script>",
-      timestamp: "2024-01-01T00:00:00Z",
-    }];
+    const events: DigestEvent[] = [
+      {
+        id: "ev-1",
+        domain: "cyber",
+        summary: "<script>alert(1)</script>",
+        timestamp: "2024-01-01T00:00:00Z",
+      },
+    ];
     const section = builder.build("cyber", events);
     expect(section.html).not.toContain("<script>");
     expect(section.html).toContain("&lt;script&gt;");
@@ -129,10 +135,15 @@ describe("SectionBuilder", () => {
 
   it("includes severity class when severity is set", () => {
     const builder = new SectionBuilder();
-    const events: DigestEvent[] = [{
-      id: "ev-1", domain: "aviation", summary: "critical event",
-      severity: "critical", timestamp: "2024-01-01T00:00:00Z",
-    }];
+    const events: DigestEvent[] = [
+      {
+        id: "ev-1",
+        domain: "aviation",
+        summary: "critical event",
+        severity: "critical",
+        timestamp: "2024-01-01T00:00:00Z",
+      },
+    ];
     const section = builder.build("aviation", events);
     expect(section.html).toContain("severity-critical");
   });
@@ -144,7 +155,10 @@ describe("BriefCarousel", () => {
   it("paginates sections into pages of correct size", () => {
     const carousel = new BriefCarousel(2);
     const sections = ["a", "b", "c", "d", "e"].map((d) => ({
-      domain: d, title: d, html: `<p>${d}</p>`, eventCount: 1,
+      domain: d,
+      title: d,
+      html: `<p>${d}</p>`,
+      eventCount: 1,
     }));
     const pages = carousel.paginate(sections);
     expect(pages).toHaveLength(3);
@@ -156,7 +170,10 @@ describe("BriefCarousel", () => {
   it("returns 1 page when sections fit in one page", () => {
     const carousel = new BriefCarousel(5);
     const sections = ["a", "b"].map((d) => ({
-      domain: d, title: d, html: `<p>${d}</p>`, eventCount: 1,
+      domain: d,
+      title: d,
+      html: `<p>${d}</p>`,
+      eventCount: 1,
     }));
     const pages = carousel.paginate(sections);
     expect(pages).toHaveLength(1);
@@ -174,7 +191,8 @@ describe("BriefCarousel", () => {
   it("renderPage includes page index and section HTML", () => {
     const carousel = new BriefCarousel(3);
     const page = {
-      pageIndex: 0, totalPages: 2,
+      pageIndex: 0,
+      totalPages: 2,
       sections: [{ domain: "aviation", title: "Aviation", html: "<p>test</p>", eventCount: 1 }],
     };
     const html = carousel.renderPage(page);
@@ -240,7 +258,10 @@ describe("BriefRenderer", () => {
   it("produces valid HTML with doctype", () => {
     const renderer = new BriefRenderer();
     const sections = ["aviation", "cyber"].map((d) => ({
-      domain: d, title: `${d} Intel`, html: `<p>${d}</p>`, eventCount: 2,
+      domain: d,
+      title: `${d} Intel`,
+      html: `<p>${d}</p>`,
+      eventCount: 2,
     }));
     const html = renderer.render("user1", "2024-01-01", sections);
     expect(html).toContain("<!DOCTYPE html>");
@@ -252,7 +273,10 @@ describe("BriefRenderer", () => {
   it("includes carousel pages in output", () => {
     const renderer = new BriefRenderer(1); // 1 section per page
     const sections = ["a", "b", "c"].map((d) => ({
-      domain: d, title: d, html: `<section>${d}</section>`, eventCount: 1,
+      domain: d,
+      title: d,
+      html: `<section>${d}</section>`,
+      eventCount: 1,
     }));
     const html = renderer.render("u", "2024-01-01", sections);
     expect(html).toContain('data-page="0"');
