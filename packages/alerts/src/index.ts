@@ -124,10 +124,7 @@ export interface CompositeCondition {
 
 /** Alert condition type alias. */
 export type AlertCondition =
-  | ThresholdCondition
-  | RateCondition
-  | PatternCondition
-  | CompositeCondition;
+  ThresholdCondition | RateCondition | PatternCondition | CompositeCondition;
 
 // ── Rule ──────────────────────────────────────────────────────────────────────
 

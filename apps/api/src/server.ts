@@ -209,8 +209,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       const userId =
         ((
           (request as unknown as Record<string, unknown>)["user"] as
-            | Record<string, unknown>
-            | undefined
+            Record<string, unknown> | undefined
         )?.["id"] as string | undefined) ?? "anonymous";
       const path = request.url.split("?")[0] ?? request.url;
 

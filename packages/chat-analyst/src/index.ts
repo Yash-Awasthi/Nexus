@@ -20,12 +20,7 @@
 // ── Analyst event types ───────────────────────────────────────────────────────
 
 export type AnalystEventType =
-  | "stream_start"
-  | "stream_chunk"
-  | "stream_end"
-  | "in_app_action"
-  | "error"
-  | "rate_limited";
+  "stream_start" | "stream_chunk" | "stream_end" | "in_app_action" | "error" | "rate_limited";
 
 /** In app action type type alias. */
 export type InAppActionType = "open_panel" | "set_view" | "navigate" | "highlight";

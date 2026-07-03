@@ -200,18 +200,17 @@ export class DeliberationEngine {
     // LLM calls and lose the entire deliberation.  Each vote promise already
     // returns an abstain on expected failures — allSettled is a second safety net.
     const settled = await Promise.allSettled(votePromises);
-    const rawVotes = settled.map(
-      (s): ModelVote =>
-        s.status === "fulfilled"
-          ? s.value
-          : {
-              model: this.config.defaultModel,
-              provider: "unknown",
-              vote: "abstain",
-              reasoning: `Vote rejected: ${s.reason instanceof Error ? s.reason.message : String(s.reason)}`,
-              confidence: 0,
-              latencyMs: 0,
-            },
+    const rawVotes = settled.map((s): ModelVote =>
+      s.status === "fulfilled"
+        ? s.value
+        : {
+            model: this.config.defaultModel,
+            provider: "unknown",
+            vote: "abstain",
+            reasoning: `Vote rejected: ${s.reason instanceof Error ? s.reason.message : String(s.reason)}`,
+            confidence: 0,
+            latencyMs: 0,
+          },
     );
     votes.push(...rawVotes);
 
@@ -308,12 +307,7 @@ export type TraderAction = "Buy" | "Hold" | "Sell";
 
 /** 6-tier sentiment band (Sentiment Analyst). */
 export type SentimentBand =
-  | "Bullish"
-  | "Mildly Bullish"
-  | "Neutral"
-  | "Mixed"
-  | "Mildly Bearish"
-  | "Bearish";
+  "Bullish" | "Mildly Bullish" | "Neutral" | "Mixed" | "Mildly Bearish" | "Bearish";
 
 /**
  * Structured investment plan from the Research Manager.

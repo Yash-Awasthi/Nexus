@@ -34,8 +34,7 @@ export async function dispatchExtendedAction(
   endpointOrAction: string,
   actionOrPayload: string | Record<string, unknown>,
   payloadOrContext?:
-    | Record<string, unknown>
-    | ((event: string, payload: Record<string, unknown>) => Promise<void>),
+    Record<string, unknown> | ((event: string, payload: Record<string, unknown>) => Promise<void>),
   onEvent?: (event: string, payload: Record<string, unknown>) => Promise<void>,
 ): Promise<Record<string, unknown>> {
   let endpoint: string;

@@ -185,12 +185,8 @@ class ConductorMcpBridge implements IMCPTransport {
         const id = await this.ctx.memoryStore.store({
           type:
             (args.type as
-              | "observation"
-              | "decision"
-              | "result"
-              | "error"
-              | "state"
-              | "knowledge") ?? "knowledge",
+              "observation" | "decision" | "result" | "error" | "state" | "knowledge") ??
+            "knowledge",
           key: args.key as string,
           value: args.value,
           tags: (args.tags as string[]) || [],
@@ -202,12 +198,7 @@ class ConductorMcpBridge implements IMCPTransport {
       case "conductor_memory_query": {
         const result = await this.ctx.memoryStore.query({
           types: args.types as (
-            | "observation"
-            | "decision"
-            | "result"
-            | "error"
-            | "state"
-            | "knowledge"
+            "observation" | "decision" | "result" | "error" | "state" | "knowledge"
           )[],
           keyPrefix: args.keyPrefix as string,
           tags: args.tags as string[],
@@ -241,12 +232,8 @@ class ConductorMcpBridge implements IMCPTransport {
           to: args.to as string,
           type:
             (args.type as
-              | "result"
-              | "error"
-              | "request"
-              | "response"
-              | "broadcast"
-              | "delegation") ?? "broadcast",
+              "result" | "error" | "request" | "response" | "broadcast" | "delegation") ??
+            "broadcast",
           subject: args.subject as string,
           body: args.body,
         });

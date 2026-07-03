@@ -37,10 +37,7 @@ export interface SupabaseDeleteTask {
   filter: Record<string, unknown>;
 }
 export type SupabaseTask =
-  | SupabaseQueryTask
-  | SupabaseInsertTask
-  | SupabaseUpdateTask
-  | SupabaseDeleteTask;
+  SupabaseQueryTask | SupabaseInsertTask | SupabaseUpdateTask | SupabaseDeleteTask;
 export interface SupabaseResult {
   rows: Record<string, unknown>[];
   count: number;

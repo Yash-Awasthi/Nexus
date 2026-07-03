@@ -599,10 +599,7 @@ export interface OmaTask {
  * - `dependency-first` — prioritise tasks on the critical path (most blocked dependents)
  */
 export type OmaSchedulingStrategy =
-  | "round-robin"
-  | "least-busy"
-  | "capability-match"
-  | "dependency-first";
+  "round-robin" | "least-busy" | "capability-match" | "dependency-first";
 
 /**
  * Count how many tasks (transitively) are blocked waiting on `taskId`.

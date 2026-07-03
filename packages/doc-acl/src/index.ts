@@ -32,9 +32,7 @@ export type PrincipalType = "user" | "group" | "public";
 
 /** Principal type alias. */
 export type Principal =
-  | { type: "user"; id: string }
-  | { type: "group"; id: string }
-  | { type: "public" };
+  { type: "user"; id: string } | { type: "group"; id: string } | { type: "public" };
 
 /** Permission type alias. */
 export type Permission = "read" | "write" | "admin";

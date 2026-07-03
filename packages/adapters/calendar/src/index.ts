@@ -39,9 +39,7 @@ export interface CalendarDeleteEventTask {
 }
 
 export type CalendarTask =
-  | CalendarCreateEventTask
-  | CalendarListEventsTask
-  | CalendarDeleteEventTask;
+  CalendarCreateEventTask | CalendarListEventsTask | CalendarDeleteEventTask;
 
 export interface CalendarEventResult {
   id: string;

@@ -2967,16 +2967,14 @@ export class WorldBankFeed {
       const indicatorName = (data[1][0] as any)?.indicator?.value ?? indicatorCode;
       return data[1]
         .filter((r: any) => r.countryiso3code && r.value !== null)
-        .map(
-          (r: any): WorldBankRecord => ({
-            countryCode: r.countryiso3code ?? r.country?.id ?? "",
-            countryName: r.country?.value ?? "",
-            indicatorCode,
-            indicatorName,
-            year: parseInt(r.date, 10) || 0,
-            value: r.value,
-          }),
-        );
+        .map((r: any): WorldBankRecord => ({
+          countryCode: r.countryiso3code ?? r.country?.id ?? "",
+          countryName: r.country?.value ?? "",
+          indicatorCode,
+          indicatorName,
+          year: parseInt(r.date, 10) || 0,
+          value: r.value,
+        }));
     } finally {
       clearTimeout(timer);
     }
@@ -3114,16 +3112,14 @@ export class NgaNavWarningFeed {
       if (!res.ok) return [];
       const data = (await res.json()) as unknown[] | { broadcast_warn?: unknown[] };
       const raw: any[] = Array.isArray(data) ? data : ((data as any).broadcast_warn ?? []);
-      let warnings: NgaNavWarning[] = raw.map(
-        (w): NgaNavWarning => ({
-          id: `${w.navArea ?? ""}-${w.msgYear ?? ""}-${w.msgNumber ?? ""}`,
-          title: `NAVAREA ${w.navArea ?? ""} ${w.msgNumber ?? ""}/${w.msgYear ?? ""}`,
-          text: w.text ?? "",
-          area: `${w.navArea ?? ""}${w.subregion ? " " + w.subregion : ""}`,
-          issuedAt: this._parseDate(w.issueDate),
-          authority: w.authority ?? "",
-        }),
-      );
+      let warnings: NgaNavWarning[] = raw.map((w): NgaNavWarning => ({
+        id: `${w.navArea ?? ""}-${w.msgYear ?? ""}-${w.msgNumber ?? ""}`,
+        title: `NAVAREA ${w.navArea ?? ""} ${w.msgNumber ?? ""}/${w.msgYear ?? ""}`,
+        text: w.text ?? "",
+        area: `${w.navArea ?? ""}${w.subregion ? " " + w.subregion : ""}`,
+        issuedAt: this._parseDate(w.issueDate),
+        authority: w.authority ?? "",
+      }));
       if (area) {
         const aLow = area.toLowerCase();
         warnings = warnings.filter(
@@ -3310,19 +3306,11 @@ export type PaperSourceKind = "doi" | "arxiv" | "url" | "pdf" | "manual";
 
 /** Status of a paper import attempt into a reference manager. */
 export type PaperImportStatus =
-  | "imported_paper"
-  | "saved_webpage"
-  | "duplicate"
-  | "skipped"
-  | "failed";
+  "imported_paper" | "saved_webpage" | "duplicate" | "skipped" | "failed";
 
 /** Academic sub-collection role within a research review project. */
 export type ResearchSubCollection =
-  | "core_papers"
-  | "methods"
-  | "applications"
-  | "baselines"
-  | "to_read";
+  "core_papers" | "methods" | "applications" | "baselines" | "to_read";
 
 /** A single academic paper record. */
 export interface AcademicPaper {

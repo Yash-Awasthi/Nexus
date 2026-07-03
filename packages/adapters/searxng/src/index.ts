@@ -25,15 +25,7 @@ const DEFAULT_BASE_URL = "http://localhost:4000";
 // ---------------------------------------------------------------------------
 
 export type SearXNGCategory =
-  | "general"
-  | "images"
-  | "videos"
-  | "news"
-  | "science"
-  | "it"
-  | "files"
-  | "social media"
-  | "map";
+  "general" | "images" | "videos" | "news" | "science" | "it" | "files" | "social media" | "map";
 
 export interface SearXNGSearchTask {
   taskType: "searxng.search";

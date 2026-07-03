@@ -275,8 +275,7 @@ export class RedisStreamClient {
     // Active tasks via XRANGE (includes delivered + pending)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const entries = (await (r as any).xrange(this.streamKey(stream), "-", "+")) as
-      | [string, string[]][]
-      | null;
+      [string, string[]][] | null;
 
     if (entries) {
       for (const [msgId] of entries) {

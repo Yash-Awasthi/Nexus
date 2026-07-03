@@ -175,12 +175,10 @@ describe("createWebSearchTool", () => {
   });
 
   it("handler calls injected function", async () => {
-    const mockHandler = vi.fn(
-      async (_: WebSearchInput): Promise<WebSearchOutput> => ({
-        results: [{ title: "R", url: "https://x.com", snippet: "s" }],
-        query: "test",
-      }),
-    );
+    const mockHandler = vi.fn(async (_: WebSearchInput): Promise<WebSearchOutput> => ({
+      results: [{ title: "R", url: "https://x.com", snippet: "s" }],
+      query: "test",
+    }));
     const tool = createWebSearchTool(mockHandler);
     const result = await tool.handler({ query: "test" });
     expect(mockHandler).toHaveBeenCalledWith({ query: "test" });
@@ -254,13 +252,11 @@ describe("createNotifyTool", () => {
   });
 
   it("handler calls injected notify function", async () => {
-    const mockNotify = vi.fn(
-      async (i: NotifyInput): Promise<NotifyOutput> => ({
-        sent: true,
-        channel: i.channel,
-        messageId: "msg-1",
-      }),
-    );
+    const mockNotify = vi.fn(async (i: NotifyInput): Promise<NotifyOutput> => ({
+      sent: true,
+      channel: i.channel,
+      messageId: "msg-1",
+    }));
     const tool = createNotifyTool(mockNotify);
     const result = await tool.handler({ channel: "log", subject: "Test", body: "Hello" });
     expect(result.sent).toBe(true);
@@ -284,12 +280,10 @@ describe("createDefaultRegistry", () => {
   });
 
   it("injects handlers via createDefaultRegistry", async () => {
-    const mockSearch = vi.fn(
-      async (_: WebSearchInput): Promise<WebSearchOutput> => ({
-        results: [],
-        query: "q",
-      }),
-    );
+    const mockSearch = vi.fn(async (_: WebSearchInput): Promise<WebSearchOutput> => ({
+      results: [],
+      query: "q",
+    }));
     const registry = createDefaultRegistry({ web_search: mockSearch });
     await registry.invoke("web_search", { query: "hello" });
     expect(mockSearch).toHaveBeenCalledTimes(1);

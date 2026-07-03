@@ -10,11 +10,7 @@
  */
 
 export type EggId =
-  | "konami"
-  | "godmode_text"
-  | "logo_tripleclick"
-  | "elder_hash"
-  | "gauntlet_reverse";
+  "konami" | "godmode_text" | "logo_tripleclick" | "elder_hash" | "gauntlet_reverse";
 
 export interface EggEvent {
   id: EggId;

@@ -30,9 +30,7 @@ export interface BetterstackCheckUptimeTask {
   monitorId: string;
 }
 export type BetterstackTask =
-  | BetterstackLogTask
-  | BetterstackCreateAlertTask
-  | BetterstackCheckUptimeTask;
+  BetterstackLogTask | BetterstackCreateAlertTask | BetterstackCheckUptimeTask;
 export interface BetterstackLogResult {
   ok: boolean;
 }

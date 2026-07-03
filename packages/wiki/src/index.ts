@@ -19,11 +19,7 @@ export type PageStatus = "published" | "draft" | "archived" | "deleted";
 export type AclRole = "owner" | "editor" | "viewer";
 /** Notification event type alias. */
 export type NotificationEvent =
-  | "page_created"
-  | "page_updated"
-  | "comment_added"
-  | "page_deleted"
-  | "draft_saved";
+  "page_created" | "page_updated" | "comment_added" | "page_deleted" | "draft_saved";
 
 /** Wiki page version interface definition. */
 export interface WikiPageVersion {

@@ -28,11 +28,7 @@ import { requireAuth } from "../middleware/auth.js";
 // ── Built-in scorer registry ──────────────────────────────────────────────────
 
 type ScorerName =
-  | "exact_match"
-  | "fields_present"
-  | "contains_string"
-  | "matches_schema"
-  | "all_of";
+  "exact_match" | "fields_present" | "contains_string" | "matches_schema" | "all_of";
 
 const SCORERS: ScorerName[] = [
   "exact_match",
@@ -147,8 +143,7 @@ export async function evalsRoutes(app: FastifyInstance): Promise<void> {
         case "all_of": {
           // all_of is a composition — accept a list of { scorer, params } objects
           const specs = params["scorers"] as
-            | { scorer: ScorerName; params?: Record<string, unknown> }[]
-            | undefined;
+            { scorer: ScorerName; params?: Record<string, unknown> }[] | undefined;
           if (!Array.isArray(specs))
             return reply.code(400).send({ error: "params.scorers must be an array" });
 

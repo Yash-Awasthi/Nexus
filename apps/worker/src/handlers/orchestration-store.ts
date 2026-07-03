@@ -21,13 +21,7 @@ import { eq, notInArray } from "drizzle-orm";
  * merge can be retried once the evidence exists.
  */
 export type OrchestrationStatus =
-  | "pending"
-  | "running"
-  | "scoring"
-  | "merging"
-  | "blocked"
-  | "completed"
-  | "failed";
+  "pending" | "running" | "scoring" | "merging" | "blocked" | "completed" | "failed";
 
 /** Statuses from which a run needs no further work. */
 export const TERMINAL_STATUSES: readonly OrchestrationStatus[] = ["completed", "failed"];

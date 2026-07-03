@@ -660,8 +660,7 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
     const content = (choice?.message?.["content"] as string) ?? "";
     const toolCalls = parseOpenAIToolCalls(choice?.message);
     const usage = raw["usage"] as
-      | { prompt_tokens?: number; completion_tokens?: number }
-      | undefined;
+      { prompt_tokens?: number; completion_tokens?: number } | undefined;
     const inputTokens =
       usage?.prompt_tokens ?? estimateTokens(opts.messages.map((m) => m.content).join(" "));
     const outputTokens = usage?.completion_tokens ?? estimateTokens(content);
@@ -749,8 +748,7 @@ abstract class OpenAICompatibleDriver extends BaseDriver {
       if (fr) finishReason = fr as LlmResponse["finishReason"];
 
       const usage = event["usage"] as
-        | { prompt_tokens?: number; completion_tokens?: number }
-        | undefined;
+        { prompt_tokens?: number; completion_tokens?: number } | undefined;
       if (usage?.prompt_tokens) promptTokens = usage.prompt_tokens;
       if (usage?.completion_tokens) completionTokens = usage.completion_tokens;
     }
@@ -890,8 +888,7 @@ export class GeminiDriver extends BaseDriver {
     )?.[0];
     const content = candidate?.content?.parts?.[0]?.text ?? "";
     const usage = raw["usageMetadata"] as
-      | { promptTokenCount?: number; candidatesTokenCount?: number }
-      | undefined;
+      { promptTokenCount?: number; candidatesTokenCount?: number } | undefined;
     const inputTokens =
       usage?.promptTokenCount ??
       estimateTokens(contents.map((c) => c.parts[0]?.text ?? "").join(" "));

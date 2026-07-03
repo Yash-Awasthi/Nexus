@@ -37,10 +37,7 @@ export interface CloudflarePurgeCacheTask {
   purgeEverything?: boolean;
 }
 export type CloudflareTask =
-  | CloudflareDeployPagesTask
-  | CloudflareR2PutTask
-  | CloudflareR2GetTask
-  | CloudflarePurgeCacheTask;
+  CloudflareDeployPagesTask | CloudflareR2PutTask | CloudflareR2GetTask | CloudflarePurgeCacheTask;
 export interface CloudflareResult {
   ok: boolean;
   result?: unknown;

@@ -197,10 +197,7 @@ export interface A2ATaskArtifactUpdateEvent {
 
 /** Any event a `message/stream` may yield. Discriminate on `kind`. */
 export type A2AStreamEvent =
-  | A2ATask
-  | A2AMessage
-  | A2ATaskStatusUpdateEvent
-  | A2ATaskArtifactUpdateEvent;
+  A2ATask | A2AMessage | A2ATaskStatusUpdateEvent | A2ATaskArtifactUpdateEvent;
 
 // ── Agent Card ────────────────────────────────────────────────────────────────
 

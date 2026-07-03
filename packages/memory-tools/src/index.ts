@@ -507,11 +507,7 @@ export type MemoryItemKind =
 
 /** Provenance source type for a MemoryItem. */
 export type MemorySourceType =
-  | "observation"
-  | "session_summary"
-  | "user_prompt"
-  | "manual"
-  | "import";
+  "observation" | "session_summary" | "user_prompt" | "manual" | "import";
 
 /**
  * Rich memory item with structured knowledge extraction fields.

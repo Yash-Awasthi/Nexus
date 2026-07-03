@@ -64,13 +64,7 @@ export interface OpenApiServer {
 
 /** Json schema type type alias. */
 export type JsonSchemaType =
-  | "string"
-  | "number"
-  | "integer"
-  | "boolean"
-  | "array"
-  | "object"
-  | "null";
+  "string" | "number" | "integer" | "boolean" | "array" | "object" | "null";
 
 /** Open api schema interface definition. */
 export interface OpenApiSchema {

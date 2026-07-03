@@ -57,24 +57,21 @@ const _agentMemory: AgentMemory = {
   async recall(query, limit = 5, filter) {
     if (!_memManager) return [];
     const userId = (filter as Record<string, unknown> | undefined)?.["userId"] as
-      | string
-      | undefined;
+      string | undefined;
     const memFilter = userId ? { metadata: { userId } } : undefined;
     const results = await _memManager.recall(query, limit, memFilter);
-    return results.map(
-      (r): AgentMemorySearchResult => ({
-        entry: {
-          id: r.entry.id,
-          text: r.entry.text,
-          metadata: r.entry.metadata ?? {},
-          createdAt:
-            typeof r.entry.createdAt === "number"
-              ? r.entry.createdAt
-              : new Date(r.entry.createdAt as string).getTime() / 1000,
-        },
-        score: r.score,
-      }),
-    );
+    return results.map((r): AgentMemorySearchResult => ({
+      entry: {
+        id: r.entry.id,
+        text: r.entry.text,
+        metadata: r.entry.metadata ?? {},
+        createdAt:
+          typeof r.entry.createdAt === "number"
+            ? r.entry.createdAt
+            : new Date(r.entry.createdAt as string).getTime() / 1000,
+      },
+      score: r.score,
+    }));
   },
   async remember(text, metadata) {
     if (!_memManager) return null;
@@ -91,49 +88,41 @@ const _agentKG: AgentKG = {
       minConfidence: q?.minConfidence,
       limit: q?.limit,
     });
-    return nodes.map(
-      (n): AgentKGNode => ({
-        id: n.id,
-        name: n.name,
-        type: n.type,
-        confidence: n.confidence,
-        sources: n.sources ?? [],
-      }),
-    );
+    return nodes.map((n): AgentKGNode => ({
+      id: n.id,
+      name: n.name,
+      type: n.type,
+      confidence: n.confidence,
+      sources: n.sources ?? [],
+    }));
   },
   async findRelated(nodeId, opts) {
     const result = await _kg.findRelated(nodeId, opts);
     const outbound = result.neighbors
       .filter((nb) => nb.direction === "outbound")
-      .map(
-        (nb): AgentKGEdge => ({
-          id: nb.edge.id,
-          subjectId: nb.edge.subjectId,
-          predicate: nb.edge.predicate,
-          objectId: nb.edge.objectId,
-          confidence: nb.edge.confidence,
-        }),
-      );
+      .map((nb): AgentKGEdge => ({
+        id: nb.edge.id,
+        subjectId: nb.edge.subjectId,
+        predicate: nb.edge.predicate,
+        objectId: nb.edge.objectId,
+        confidence: nb.edge.confidence,
+      }));
     const inbound = result.neighbors
       .filter((nb) => nb.direction === "inbound")
-      .map(
-        (nb): AgentKGEdge => ({
-          id: nb.edge.id,
-          subjectId: nb.edge.subjectId,
-          predicate: nb.edge.predicate,
-          objectId: nb.edge.objectId,
-          confidence: nb.edge.confidence,
-        }),
-      );
-    const nodes = result.neighbors.map(
-      (nb): AgentKGNode => ({
-        id: nb.node.id,
-        name: nb.node.name,
-        type: nb.node.type,
-        confidence: nb.node.confidence,
-        sources: nb.node.sources ?? [],
-      }),
-    );
+      .map((nb): AgentKGEdge => ({
+        id: nb.edge.id,
+        subjectId: nb.edge.subjectId,
+        predicate: nb.edge.predicate,
+        objectId: nb.edge.objectId,
+        confidence: nb.edge.confidence,
+      }));
+    const nodes = result.neighbors.map((nb): AgentKGNode => ({
+      id: nb.node.id,
+      name: nb.node.name,
+      type: nb.node.type,
+      confidence: nb.node.confidence,
+      sources: nb.node.sources ?? [],
+    }));
     return { outbound, inbound, nodes };
   },
 };

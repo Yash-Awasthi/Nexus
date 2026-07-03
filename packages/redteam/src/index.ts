@@ -28,12 +28,7 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type ObfuscationTechnique =
-  | "leetspeak"
-  | "unicode"
-  | "zwj"
-  | "mixedcase"
-  | "phonetic"
-  | "random";
+  "leetspeak" | "unicode" | "zwj" | "mixedcase" | "phonetic" | "random";
 
 /** Obfuscation intensity type alias. */
 export type ObfuscationIntensity = "light" | "medium" | "heavy";
