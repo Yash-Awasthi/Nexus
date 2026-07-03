@@ -768,6 +768,16 @@ Baseline: `packages/mcp-client/src/index.ts` (336 lines): `McpClient`, `McpTrans
 
 - **12.1** Cherry-pick missing MCP tools (sandboxed, no unscoped capability) — extend
   `McpClient`/`packages/agent-runtime/src/mcp-tools.ts` (92 lines).
+  **Done this branch (commit `836fcc4`).** Extended `McpClient` with the missing standard MCP
+  methods, every optional one gated on the capability the server advertised at `initialize`
+  ("no unscoped capability"): `listPrompts`/`getPrompt` (gated `prompts`),
+  `listResourceTemplates` (gated `resources`), `complete` (gated `completions`), plus an ungated
+  `ping`. `initialize` now records `McpServerCapabilities` (exposed via `.capabilities`); gated
+  calls throw `NOT_INITIALIZED` before handshake and `CAPABILITY_UNSUPPORTED` (emitting **no**
+  request) when the capability is absent. `listTools`/`listResources` now transparently follow
+  `nextCursor` pagination (page-capped). `agent-runtime/src/mcp-tools.ts` needs no change — its
+  `McpToolClient` is a structural subset and the additions are purely additive. 30 tests
+  (injectable-fetch, method-routing mock); typecheck + lint + build green.
 - **12.2** A2A JSON-RPC-over-SSE (authn'd, no impersonation) — greenfield package.
 - **12.3** Optional `mcp-compressor` to shrink tool manifests 60–95%.
 
