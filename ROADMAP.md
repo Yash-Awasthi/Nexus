@@ -904,6 +904,14 @@ examples}`, `grafana/{dashboards,provisioning}`, `otel/{config,prometheus,grafan
   counter with exponential lockout keyed by subject+IP, and a `jti`/subject denylist checked in
   `verifyJwt*`. Done: unit tests for lockout escalation + a revoked `jti` rejected. (Redis-backed
   variant is Blocked on managed Redis; the in-memory library core is not.)
+  **Done this branch (commit `06020c4`).** `@nexus/auth` gained `LoginThrottle` (exponential
+  lockout `min(base·2^n, max)` past a threshold, idle-window reset, per-identifier state, injected
+  `Clock`; `assertNotLocked` throws `RATE_LIMITED`/429) and `SessionRevocationRegistry` (per-`jti`
+  denylist + per-subject `iat` cutoff for "log out everywhere"; `assertNotRevoked` throws
+  `REVOKED_TOKEN`/401; `gc()` prunes expired entries). Added `jti?` to `NexusTokenPayload`, two
+  new `AuthErrorCode`s, and a table-driven `httpStatus` map. In-memory core; the store is
+  swappable for Redis later (Blocked). 12 new tests (49 total); typecheck + lint + build green.
+  **Middleware wiring (`apps/api`) deferred** — library core is the committable unit.
 - **14.4 GDPR erasure + no-LLM-data-logged assertion** *(code-only, ready).* Files: a
   `DELETE /users/:id/data` route cascading across `packages/db` user-scoped tables + a
   test asserting no request/response bodies hit logs. Done: deletion cascade test + log-shape
