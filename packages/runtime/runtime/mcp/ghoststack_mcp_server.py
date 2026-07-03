@@ -432,12 +432,6 @@ def build_asgi_app() -> Any:
     # FastMCP's underlying Starlette/FastAPI app
     mcp_asgi = mcp.streamable_http_app()
 
-    app = Starlette(
-        routes=[
-            Route("/health", _health_probe, methods=["GET"]),
-        ],
-        middleware=[],
-    )
     # Mount FastMCP sub-app at /mcp, then layer auth middleware over everything
     from starlette.middleware import Middleware
     from starlette.routing import Mount

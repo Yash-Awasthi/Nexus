@@ -18,7 +18,7 @@
 import * as fs from "fs";
 import * as path from "path";
 
-export interface EnvLoaderResult {
+interface EnvLoaderResult {
   /** Path that was read (or null if not found). */
   filePath: string | null;
   /** Keys successfully loaded into process.env. */

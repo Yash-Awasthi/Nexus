@@ -21,7 +21,7 @@ import type { TaskRouter, Task } from "./task-router.js";
 /** Minimal interface for optional diagnostic inspector injection. */
 type InspectorLike = { recordPlan?(plan: unknown): void };
 
-export class GhostStackOrchestrator {
+export class ConductorOrchestrator {
   private runtimeManager: IRuntimeManager;
   private eventBus: IEventBus;
   private taskRouter: TaskRouter;
@@ -98,8 +98,8 @@ export class GhostStackOrchestrator {
     /** Optional custom dependency resolver — defaults to TaskDependencyResolver. */
     resolver?: ITaskDependencyResolver;
     inspector?: InspectorLike;
-  }): GhostStackOrchestrator {
-    const inst = new GhostStackOrchestrator(
+  }): ConductorOrchestrator {
+    const inst = new ConductorOrchestrator(
       opts.runtimeManager,
       opts.eventBus,
       opts.taskRouter,
@@ -121,7 +121,7 @@ export class GhostStackOrchestrator {
 
   async start(): Promise<string[]> {
     const startTimeMs = Date.now();
-    this.logger?.info("Starting GhostStack Unified Orchestrator Core...");
+    this.logger?.info("Starting Conductor Unified Orchestrator Core...");
     const traceSpan = this.tracer?.startSpan("orchestrator.start");
 
     if (this.eventStore) {
@@ -277,7 +277,7 @@ export class GhostStackOrchestrator {
    * Start the executor's continuous run loop, draining the queue until empty
    * or until `maxIterations` is reached.
    *
-   * This is the primary way to run GhostStack as a long-lived process:
+   * This is the primary way to run Conductor as a long-lived process:
    *   await orchestrator.start();
    *   await orchestrator.submitCognitiveObjective("deploy ingestion pipeline");
    *   const processed = await orchestrator.run();

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * RuntimeManager — central service lifecycle manager for GhostStack.
+ * RuntimeManager — central service lifecycle manager for Conductor.
  *
  * Tracks the lifecycle state of named services, supports start/stop/restart,
  * and exposes an aggregated health summary so the HTTP server and CLI can

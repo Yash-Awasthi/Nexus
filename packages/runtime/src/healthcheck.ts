@@ -71,7 +71,7 @@ function checkFolders(): boolean {
 
 function checkYAMLConfigs(): boolean {
   const root = path.join(__dirname, "..", "runtime");
-  const files = ["ports.yaml", "services.yaml", "healthchecks.yaml", "ghoststack.runtime.yaml"];
+  const files = ["ports.yaml", "services.yaml", "healthchecks.yaml", "conductor.runtime.yaml"];
   for (const file of files) {
     const p = path.join(root, file);
     if (!fs.existsSync(p)) {
@@ -142,7 +142,7 @@ function checkSchemas(): boolean {
 /**
  * Verify MCP bridge and runtime composition assets are present.
  * Checks for:
- *   - GhostStack MCP bridge orchestration module
+ *   - Conductor MCP bridge orchestration module
  *   - MCP host adapter
  *   - MCP registry schema
  *   - Python MCP server entrypoint (if Python is available)
@@ -151,12 +151,12 @@ function checkMcpBridgeHealth(): boolean {
   const root = path.join(__dirname, "..");
   let allOk = true;
 
-  // 1. GhostStack MCP bridge orchestration module
-  const bridgePath = path.join(root, "orchestration", "ghoststack-mcp-bridge.ts");
+  // 1. Conductor MCP bridge orchestration module
+  const bridgePath = path.join(root, "orchestration", "conductor-mcp-bridge.ts");
   if (fs.existsSync(bridgePath)) {
-    console.log(`  [OK] GhostStack MCP bridge module: ghoststack-mcp-bridge.ts`);
+    console.log(`  [OK] Conductor MCP bridge module: conductor-mcp-bridge.ts`);
   } else {
-    console.error(`  [ERR] Missing MCP bridge module: ghoststack-mcp-bridge.ts`);
+    console.error(`  [ERR] Missing MCP bridge module: conductor-mcp-bridge.ts`);
     allOk = false;
   }
 
@@ -186,12 +186,12 @@ function checkMcpBridgeHealth(): boolean {
   }
 
   // 4. Python MCP server entrypoint (optional — warn only)
-  const pythonMcpPath = path.join(root, "runtime", "mcp", "ghoststack_mcp_server.py");
+  const pythonMcpPath = path.join(root, "runtime", "mcp", "conductor_mcp_server.py");
   if (fs.existsSync(pythonMcpPath)) {
-    console.log(`  [OK] Python MCP server entrypoint: ghoststack_mcp_server.py`);
+    console.log(`  [OK] Python MCP server entrypoint: conductor_mcp_server.py`);
   } else {
     console.warn(
-      `  [WARN] Python MCP server entrypoint not found (optional if MCP external is disabled): ghoststack_mcp_server.py`,
+      `  [WARN] Python MCP server entrypoint not found (optional if MCP external is disabled): conductor_mcp_server.py`,
     );
   }
 

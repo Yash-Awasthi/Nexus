@@ -284,7 +284,7 @@ export class FederationHealthController {
    * Scan and clean up orphaned resources:
    * - Stale federation session files
    * - Zombie child processes with known PIDs
-   * - Orphaned Docker containers labelled ghoststack
+   * - Orphaned Docker containers labelled conductor
    */
   async cleanupOrphans(): Promise<OrphanCleanupReport> {
     const report: OrphanCleanupReport = {
@@ -379,7 +379,7 @@ export class FederationHealthController {
 
   private supervisorConfig(): { apiPort: number; mcpPort: number } | null {
     try {
-      const configPath = path.resolve(this.repoRoot, "ghoststack.config.json");
+      const configPath = path.resolve(this.repoRoot, "conductor.config.json");
       if (!fs.existsSync(configPath)) return null;
       const raw = fs.readFileSync(configPath, "utf8");
       const parsed = JSON.parse(raw);

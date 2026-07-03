@@ -1,0 +1,26 @@
+{
+  "name": "@nexus/agent-orchestrator",
+  "version": "0.0.0",
+  "private": false,
+  "description": "Parallel multi-agent fan-out in isolated git worktrees, then score and merge the winner. Worktree, scorer and runner are injectable so council can be reused for winner selection.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

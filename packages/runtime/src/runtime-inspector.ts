@@ -27,7 +27,7 @@ import type { IMemoryStore } from "./memory-store.js";
 
 // Forward reference to avoid circular dependency — context type is used
 // only at construction time via the static factory method.
-export interface GhostStackContextLike {
+interface ConductorContextLike {
   metrics: IMetricsCollector;
   queue: IQueueBackend;
   discovery: IServiceDiscovery;
@@ -110,9 +110,9 @@ export class RuntimeInspector implements IExtendedRuntimeInspector {
 
   /**
    * Static factory: construct from a context-like object instead of 20 positional params.
-   * Usage: `RuntimeInspector.fromContext(ctx)` where ctx satisfies GhostStackContextLike.
+   * Usage: `RuntimeInspector.fromContext(ctx)` where ctx satisfies ConductorContextLike.
    */
-  static fromContext(ctx: GhostStackContextLike): RuntimeInspector {
+  static fromContext(ctx: ConductorContextLike): RuntimeInspector {
     return new RuntimeInspector(
       ctx.metrics,
       ctx.queue,

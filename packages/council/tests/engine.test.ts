@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { CouncilRequest } from "@nexus/contracts";
+import type { CouncilRequest, ModelVote } from "@nexus/contracts";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { DeliberationEngine, type ILLMTransport, type ILLMResponse } from "../src/engine.js";
@@ -235,6 +235,40 @@ describe("DeliberationEngine — category detection", () => {
     expect(systemMsg).toBeDefined();
     // The system prompt content varies by archetype — just verify a vote was cast
     expect(firstCall).toBeDefined();
+  });
+});
+
+describe("DeliberationEngine — onVote streaming callback", () => {
+  it("fires onVote once per archetype, with each settled vote", async () => {
+    const transport = makeMockTransport();
+    const engine = new DeliberationEngine({ llm: transport, defaultCouncilSize: 5 });
+    const streamed: ModelVote[] = [];
+    const res = await engine.deliberate(makeRequest(), { onVote: (v) => streamed.push(v) });
+    // One callback per archetype, matching the final vote set.
+    expect(streamed).toHaveLength(5);
+    expect(streamed).toHaveLength(res.result!.votes.length);
+    for (const v of streamed) {
+      expect(["yes", "no", "abstain"]).toContain(v.vote);
+      expect(typeof v.reasoning).toBe("string");
+    }
+  });
+
+  it("fires onVote even when a vote fails (abstain)", async () => {
+    const transport: ILLMTransport = {
+      chat: vi.fn().mockRejectedValue(new Error("LLM timeout")),
+    };
+    const engine = new DeliberationEngine({ llm: transport, defaultCouncilSize: 3 });
+    const streamed: ModelVote[] = [];
+    await engine.deliberate(makeRequest(), { onVote: (v) => streamed.push(v) });
+    expect(streamed).toHaveLength(3);
+    for (const v of streamed) expect(v.vote).toBe("abstain");
+  });
+
+  it("works without an onVote callback (optional)", async () => {
+    const transport = makeMockTransport();
+    const engine = new DeliberationEngine({ llm: transport });
+    const res = await engine.deliberate(makeRequest());
+    expect(res.ok).toBe(true);
   });
 });
 

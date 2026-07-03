@@ -26,7 +26,7 @@ export interface AuditPayload {
   data?: Record<string, unknown>;
 }
 
-export interface AuditEntry {
+interface AuditEntry {
   id: string;
   sequence: number;
   entityType: string;
@@ -39,13 +39,13 @@ export interface AuditEntry {
   createdAt: Date;
 }
 
-export interface AuditWriteResult {
+interface AuditWriteResult {
   id: string;
   sequence: number;
   chainHash: string;
 }
 
-export interface VerifyResult {
+interface VerifyResult {
   valid: boolean;
   checkedCount: number;
   /** Populated only when valid=false */
@@ -65,7 +65,7 @@ export const GENESIS_SENTINEL = "NEXUS_AUDIT_CHAIN_GENESIS_V1";
  * A test double (MemoryAuditStore below) enables property-based testing
  * without a live DB.
  */
-export interface AuditStore {
+interface AuditStore {
   /** Return the current max sequence (0 if empty). */
   latestSequence(): Promise<number>;
   /** Return the chain_hash of the entry at `sequence` (undefined if genesis). */

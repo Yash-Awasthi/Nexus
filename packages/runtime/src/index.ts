@@ -87,10 +87,18 @@ export type {
 export { RuntimeDiagnosticAPI } from "./diagnostic-api.js";
 
 // ── MCP bridge ────────────────────────────────────────────────────────────────
-export { registerGhostStackMcpBridge, GHOSTSTACK_MCP_TOOLS } from "./ghoststack-mcp-bridge.js";
+export { registerConductorMcpBridge, GHOSTSTACK_MCP_TOOLS } from "./conductor-mcp-bridge.js";
 
 // ── Planning engine ───────────────────────────────────────────────────────────
 export { PlanningEngine } from "./planning-engine.js";
+
+// ── GhostStack orchestrator compatibility factory (for @nexus/api gs route) ─────
+export { createGhostStackOrchestrator } from "./conductor-compat.js";
+export type { GhostStackOrchestrator } from "./conductor-compat.js";
+
+// ── Native agent-runtime adapter (tool-calling coding-agent loop) ────────────────
+export { AgentRuntimeAdapter } from "./agent-runtime-adapter.js";
+export type { AgentRuntimeAdapterOptions, AgentRuntimeTask } from "./agent-runtime-adapter.js";
 
 // ── Spec loader ───────────────────────────────────────────────────────────────
 export {
@@ -102,7 +110,7 @@ export type { WorkflowSpecTask, WorkflowSpecFile } from "./spec-loader.js";
 
 // ── Runtime context factory ───────────────────────────────────────────────────
 export { createRuntimeContext, startRuntime, stopRuntime } from "./runtime-context.js";
-export type { GhostStackRuntimeContext } from "./runtime-context.js";
+export type { ConductorRuntimeContext } from "./runtime-context.js";
 
 // ── Adapter manifest ──────────────────────────────────────────────────────────
 export { ADAPTER_MANIFEST, getManifestEntry } from "./adapters/manifest.js";
@@ -117,17 +125,29 @@ export type {
   FederationSupervisorStatus,
 } from "./federation-supervisor.js";
 
-// ── GhostStack config ─────────────────────────────────────────────────────────
-export { loadGhostStackConfig } from "./ghoststack-config.js";
-export type { GhostStackConfig, GhostStackFeatures } from "./ghoststack-config.js";
+// ── Conductor config ─────────────────────────────────────────────────────────
+export { loadConductorConfig } from "./conductor-config.js";
+export type { ConductorConfig, ConductorFeatures } from "./conductor-config.js";
 
-// ── GhostStack server ─────────────────────────────────────────────────────────
-export { createGhostStackServer } from "./ghoststack-server.js";
-export type { GhostStackServer } from "./ghoststack-server.js";
+// ── Conductor server ─────────────────────────────────────────────────────────
+export { createConductorServer } from "./conductor-server.js";
+export type { ConductorServer } from "./conductor-server.js";
 
 // ── Bootstrap & healthcheck ───────────────────────────────────────────────────
 export { bootstrap } from "./bootstrap.js";
 export { runHealthcheck } from "./healthcheck.js";
+
+// ── SSRF / outbound-URL safety ────────────────────────────────────────────────
+export {
+  isSafeUrl,
+  assertSafeUrl,
+  isPrivateAddress,
+  isSafeSandboxPath,
+  makeSafeLookup,
+  safeLookup,
+  assertHostResolvesSafely,
+} from "./security-utils.js";
+export type { ResolvedAddress, AllAddressResolver, SafeLookup } from "./security-utils.js";
 
 // ── Governance interfaces ─────────────────────────────────────────────────────
 export type {

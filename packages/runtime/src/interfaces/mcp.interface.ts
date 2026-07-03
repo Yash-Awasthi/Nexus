@@ -18,7 +18,7 @@ export interface IMCPExecutionResult {
   correlationId: string;
 }
 
-export interface IMCPExecutionContext {
+interface IMCPExecutionContext {
   correlationId: string;
   startTime: Date;
   attempt: number;

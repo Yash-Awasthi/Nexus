@@ -103,7 +103,12 @@ describe("HealthChecker", () => {
   });
 
   it("returns unhealthy when probe throws", async () => {
-    const hc = new HealthChecker(async () => { throw new Error("connection refused"); }, { retries: 0 });
+    const hc = new HealthChecker(
+      async () => {
+        throw new Error("connection refused");
+      },
+      { retries: 0 },
+    );
     const r = await hc.check();
     expect(r.status).toBe("unhealthy");
     expect(r.error).toContain("connection refused");
@@ -111,10 +116,13 @@ describe("HealthChecker", () => {
 
   it("retries on failure", async () => {
     let calls = 0;
-    const hc = new HealthChecker(async () => {
-      if (++calls < 2) throw new Error("not ready");
-      return true;
-    }, { retries: 2, retryDelayMs: 0 });
+    const hc = new HealthChecker(
+      async () => {
+        if (++calls < 2) throw new Error("not ready");
+        return true;
+      },
+      { retries: 2, retryDelayMs: 0 },
+    );
     const r = await hc.check();
     expect(r.status).toBe("healthy");
     expect(calls).toBe(2);
@@ -134,7 +142,9 @@ describe("HealthChecker", () => {
 
 describe("ProcessRegistry", () => {
   let reg: ProcessRegistry;
-  beforeEach(() => { reg = new ProcessRegistry(); });
+  beforeEach(() => {
+    reg = new ProcessRegistry();
+  });
 
   it("register creates entry in 'starting' state", () => {
     const e = reg.register("worker");
@@ -221,13 +231,25 @@ describe("ProcessRegistry", () => {
 
 describe("ShutdownCascade", () => {
   let cascade: ShutdownCascade;
-  beforeEach(() => { cascade = new ShutdownCascade(); });
+  beforeEach(() => {
+    cascade = new ShutdownCascade();
+  });
 
   it("runs steps in order", async () => {
     const order: number[] = [];
     cascade
-      .addStep({ name: "a", handler: () => { order.push(1); } })
-      .addStep({ name: "b", handler: () => { order.push(2); } });
+      .addStep({
+        name: "a",
+        handler: () => {
+          order.push(1);
+        },
+      })
+      .addStep({
+        name: "b",
+        handler: () => {
+          order.push(2);
+        },
+      });
     await cascade.run();
     expect(order).toEqual([1, 2]);
   });
@@ -241,7 +263,12 @@ describe("ShutdownCascade", () => {
 
   it("marks failed step and continues", async () => {
     cascade
-      .addStep({ name: "fail", handler: () => { throw new Error("boom"); } })
+      .addStep({
+        name: "fail",
+        handler: () => {
+          throw new Error("boom");
+        },
+      })
       .addStep({ name: "ok", handler: () => {} });
     const results = await cascade.run();
     expect(results[0]!.success).toBe(false);
@@ -290,7 +317,13 @@ describe("ShutdownCascade", () => {
 
   it("async handlers are awaited", async () => {
     let done = false;
-    cascade.addStep({ name: "async", handler: async () => { await new Promise((r) => setTimeout(r, 5)); done = true; } });
+    cascade.addStep({
+      name: "async",
+      handler: async () => {
+        await new Promise((r) => setTimeout(r, 5));
+        done = true;
+      },
+    });
     await cascade.run();
     expect(done).toBe(true);
   });

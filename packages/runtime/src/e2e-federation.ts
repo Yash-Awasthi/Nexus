@@ -2,7 +2,7 @@
 /**
  * Federation end-to-end test runner.
  *
- * Validates that all federation services (Floci, MCP bridge, GhostStack API)
+ * Validates that all federation services (Floci, MCP bridge, Conductor API)
  * are reachable and responding correctly.
  */
 

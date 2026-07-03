@@ -20,7 +20,7 @@ import {
 } from "./workflow-engine.js";
 
 async function exportDiagnostics() {
-  console.log("[DIAG] Packaging GhostStack v1.1 Operational Diagnostics Snapshot...");
+  console.log("[DIAG] Packaging Conductor v1.1 Operational Diagnostics Snapshot...");
 
   const testDir = path.join(fileURLToPath(new URL(".", import.meta.url)), "../data-runtime");
   const eventLogPath = path.join(testDir, "events.jsonl");
@@ -62,7 +62,7 @@ async function exportDiagnostics() {
   const diagnosticsSnapshot = {
     timestamp: new Date().toISOString(),
     engine: {
-      platform: "GhostStack",
+      platform: "Conductor",
       version: "1.1-hardened",
       status: "operational",
     },

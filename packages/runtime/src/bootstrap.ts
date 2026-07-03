@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as path from "path";
+import { fileURLToPath } from "url";
 
 import type { IApprovalRecord } from "./interfaces/governance.interface.js";
 import { createRuntimeContext, startRuntime } from "./runtime-context.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export async function bootstrap() {
   const bootStarted = Date.now();
@@ -44,7 +47,7 @@ export async function bootstrap() {
       "\n[BOOT] Showcase skipped. Set GHOSTSTACK_BOOTSTRAP_SHOWCASE=true to run demo workflows.",
     );
     console.log("[BOOT] For a persistent API, run: npm start\n");
-    ctx.metrics.recordTiming("ghoststack.bootstrap.total_ms", Date.now() - bootStarted);
+    ctx.metrics.recordTiming("conductor.bootstrap.total_ms", Date.now() - bootStarted);
     return;
   }
 
@@ -122,8 +125,8 @@ export async function bootstrap() {
     `[SHOWCASE] SECURE Workflow execution completed after approval: status = \x1b[32m${approvedResult.status}\x1b[0m`,
   );
 
-  ctx.metrics.recordTiming("ghoststack.bootstrap.total_ms", Date.now() - bootStarted);
-  console.log(`[BOOT] ghoststack.bootstrap.total_ms=${Date.now() - bootStarted}`);
+  ctx.metrics.recordTiming("conductor.bootstrap.total_ms", Date.now() - bootStarted);
+  console.log(`[BOOT] conductor.bootstrap.total_ms=${Date.now() - bootStarted}`);
 
   console.log(
     "\n\x1b[35m===============================================================================",
@@ -134,7 +137,8 @@ export async function bootstrap() {
   );
 }
 
-if (require.main === module) {
+// ESM entry guard: run bootstrap only when this file is the process entry.
+if (import.meta.url === `file://${process.argv[1]}`) {
   bootstrap().catch((err) => {
     console.error("[CRITICAL] Bootstrap runtime crashed:", err);
     process.exit(1);

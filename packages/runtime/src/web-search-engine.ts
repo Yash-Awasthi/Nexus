@@ -22,20 +22,20 @@ import type { ILanguageModel, ChatMessage } from "./interfaces/language-model.in
 
 export type SearchMode = "speed" | "balanced" | "quality";
 
-export interface SearchResult {
+interface SearchResult {
   title: string;
   url: string;
   content: string;
   score?: number;
 }
 
-export interface SearchFinding {
+interface SearchFinding {
   title: string;
   url: string;
   content: string;
 }
 
-export interface WebSearchOutput {
+interface WebSearchOutput {
   answer: string;
   findings: SearchFinding[];
   queriesUsed: string[];
@@ -51,7 +51,7 @@ export interface SearchClassification {
   standaloneQuery: string;
 }
 
-export interface SearchEngineOptions {
+interface SearchEngineOptions {
   llm: ILanguageModel;
   tavilyApiKey?: string;
   /** Max web search iterations per research run */

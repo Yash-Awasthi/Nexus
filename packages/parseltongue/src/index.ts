@@ -1,270 +1,169 @@
 // SPDX-License-Identifier: Apache-2.0
-/**
- * @nexus/parseltongue — Input obfuscation engine.
- *
- * Detects trigger words likely to cause model refusals and applies
- * configurable obfuscation so the semantic meaning is preserved while
- * superficial pattern-matching fails.
- *
- * Techniques
- * ──────────
- *   leetspeak   — a→4, e→3, i→1, o→0, etc.
- *   unicode     — a→а (cyrillic homoglyph), e→е, o→о …
- *   zwj         — invisible zero-width characters inserted between letters
- *   mixedcase   — alternating / random capitalisation disruption
- *   phonetic    — ph→f, ck→k, c→k/s phoneme substitution
- *   random      — randomly pick one of the above per word
- *
- * Usage
- * ─────
- * ```ts
- * const result = applyParseltongue("how to bypass the firewall", {
- *   enabled: true, technique: "unicode", intensity: "medium", customTriggers: [],
- * });
- * console.log(result.transformedText); // "how to byp@ss the f1rewall" (approx)
- * ```
- */
+// Parseltongue — input perturbation / trigger-word obfuscation engine.
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-export type ObfuscationTechnique =
-  | "leetspeak"
-  | "unicode"
-  | "zwj"
-  | "mixedcase"
-  | "phonetic"
-  | "random";
-
-export type ObfuscationIntensity = "light" | "medium" | "heavy";
+export type Technique = "leetspeak" | "unicode" | "zwj" | "mixedcase" | "phonetic" | "random";
+export type Intensity = "light" | "medium" | "heavy";
 
 export interface ParseltongueConfig {
   enabled: boolean;
-  technique: ObfuscationTechnique;
-  intensity: ObfuscationIntensity;
-  customTriggers: string[];
+  technique: Technique;
+  intensity: Intensity;
+  customTriggers?: string[];
+}
+
+export interface Transformation {
+  original: string;
+  transformed: string;
+  position: number;
 }
 
 export interface ParseltongueResult {
   originalText: string;
   transformedText: string;
   triggersFound: string[];
-  techniqueUsed: ObfuscationTechnique;
-  transformations: Array<{
-    original: string;
-    transformed: string;
-    technique: ObfuscationTechnique;
-  }>;
+  techniqueUsed: Technique;
+  transformations: Transformation[];
 }
-
-// ── Default trigger list ──────────────────────────────────────────────────────
 
 export const DEFAULT_TRIGGERS: readonly string[] = [
-  // Security
-  "hack", "exploit", "bypass", "crack", "attack", "penetrate",
-  "inject", "manipulate", "override", "disable", "circumvent", "evade",
-  "malware", "virus", "trojan", "payload", "shellcode", "rootkit",
-  "keylogger", "backdoor", "vulnerability",
-  // Weapons
-  "weapon", "bomb", "explosive", "poison",
-  // System / privilege
-  "jailbreak", "unlock", "sudo", "privilege",
-  // Social engineering
-  "phishing", "scam", "impersonate", "deceive", "fraud",
-  // Content
-  "nsfw", "explicit", "uncensored", "unfiltered", "unrestricted",
-  // AI meta
-  "ignore", "disregard", "forget", "pretend",
+  "hack",
+  "exploit",
+  "malware",
+  "virus",
+  "ransomware",
+  "phishing",
+  "bypass",
+  "crack",
+  "ddos",
+  "sql injection",
+  "xss",
+  "zero day",
+  "rootkit",
+  "keylogger",
+  "botnet",
+  "weapon",
+  "bomb",
+  "explosive",
+  "illegal",
+  "piracy",
+  "counterfeit",
+  "fraud",
+  "jailbreak",
+  "uncensored",
+  "unrestricted",
+  "ignore instructions",
+  "ignore previous",
+  "dan",
+  "do anything now",
 ];
 
-// ── Character maps ────────────────────────────────────────────────────────────
-
-const LEET_MAP: Record<string, readonly string[]> = {
-  a: ["4", "@", "∂", "λ"],
-  b: ["8", "|3", "ß"],
-  c: ["(", "<", "¢"],
-  d: ["|)", "|>", "đ"],
-  e: ["3", "€", "£"],
-  f: ["|=", "ƒ"],
-  g: ["9", "6", "&"],
-  h: ["#", "|-|"],
-  i: ["1", "!", "|"],
-  j: ["_|", "]"],
-  k: ["|<", "|{"],
-  l: ["1", "|", "£"],
-  m: ["|V|", "µ"],
-  n: ["|\\|", "η"],
-  o: ["0", "()", "°"],
-  p: ["|*", "|>"],
-  q: ["0_", "ℚ"],
-  r: ["|2", "®"],
-  s: ["5", "$", "§"],
-  t: ["7", "+", "†"],
-  u: ["|_|", "µ"],
-  v: ["\\/", "√"],
-  w: ["\\/\\/", "ω"],
-  x: ["><", "×"],
-  y: ["`/", "¥"],
-  z: ["2", "ℤ"],
+const INTENSITY_RATIOS: Record<Intensity, number> = {
+  light: 0.3,
+  medium: 0.6,
+  heavy: 1.0,
 };
 
-const UNICODE_MAP: Record<string, readonly string[]> = {
-  a: ["а", "ɑ", "α"],
-  b: ["Ь", "ḅ"],
-  c: ["с", "ϲ"],
-  d: ["ԁ", "ⅾ"],
-  e: ["е", "ė"],
-  f: ["ƒ"],
-  g: ["ɡ"],
-  h: ["һ", "ḥ"],
-  i: ["і", "ι"],
-  j: ["ϳ"],
-  k: ["κ"],
-  l: ["ӏ", "ⅼ"],
-  m: ["м"],
-  n: ["ո"],
-  o: ["о", "ο"],
-  p: ["р", "ρ"],
-  s: ["ѕ"],
-  t: ["τ"],
-  u: ["υ"],
-  v: ["ν"],
-  w: ["ѡ"],
-  x: ["х"],
-  y: ["у", "γ"],
-  z: ["ᴢ"],
+const LEETSPEAK_MAP: Record<string, string> = {
+  a: "4",
+  e: "3",
+  i: "1",
+  o: "0",
+  s: "5",
+  t: "7",
+  l: "|",
+  g: "9",
 };
 
-const ZW_CHARS = ["\u200B", "\u200C", "\u200D", "\uFEFF"];
+const PHONETIC_MAP: Record<string, string> = {
+  a: "ay",
+  e: "ee",
+  i: "eye",
+  o: "oh",
+  u: "you",
+  c: "see",
+  k: "kay",
+  s: "ess",
+  x: "ex",
+};
 
-// ── Per-word obfuscation ──────────────────────────────────────────────────────
+const UNICODE_MAP: Record<string, string> = {
+  a: "\u0430",
+  e: "\u0435",
+  o: "\u043e",
+  p: "\u0440",
+  c: "\u0441",
+  x: "\u0445",
+  A: "\u0410",
+  B: "\u0412",
+  E: "\u0415",
+  H: "\u041d",
+  K: "\u041a",
+  M: "\u041c",
+  O: "\u041e",
+  P: "\u0420",
+  T: "\u0422",
+  X: "\u0425",
+};
 
-function countToTransform(len: number, intensity: ObfuscationIntensity): number {
-  if (intensity === "light") return 1;
-  if (intensity === "medium") return Math.ceil(len / 2);
-  return len;
-}
-
-function pickRandom<T>(arr: readonly T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)] as T;
-}
-
-function applyLeetspeak(word: string, intensity: ObfuscationIntensity): string {
+function applyTechnique(word: string, technique: Technique, intensity: Intensity): string {
+  const ratio = INTENSITY_RATIOS[intensity];
   const chars = word.split("");
-  const n = countToTransform(chars.length, intensity);
-  let count = 0;
-  for (let i = 0; i < chars.length && count < n; i++) {
-    const key = (chars[i] ?? "").toLowerCase();
-    const opts = LEET_MAP[key];
-    if (opts !== undefined && opts.length > 0) {
-      chars[i] = pickRandom(opts);
-      count++;
-    }
-  }
-  return chars.join("");
-}
-
-function applyUnicode(word: string, intensity: ObfuscationIntensity): string {
-  const chars = word.split("");
-  const n = countToTransform(chars.length, intensity);
-  let count = 0;
-  for (let i = 0; i < chars.length && count < n; i++) {
-    const key = (chars[i] ?? "").toLowerCase();
-    const opts = UNICODE_MAP[key];
-    if (opts !== undefined && opts.length > 0) {
-      chars[i] = pickRandom(opts);
-      count++;
-    }
-  }
-  return chars.join("");
-}
-
-function applyZwj(word: string, intensity: ObfuscationIntensity): string {
-  const chars = word.split("");
-  const n = countToTransform(chars.length - 1, intensity);
-  const result: string[] = [];
-  let inserted = 0;
-  for (let i = 0; i < chars.length; i++) {
-    result.push(chars[i] ?? "");
-    if (i < chars.length - 1 && inserted < n) {
-      result.push(pickRandom(ZW_CHARS));
-      inserted++;
-    }
-  }
-  return result.join("");
-}
-
-function applyMixedCase(word: string, intensity: ObfuscationIntensity): string {
-  const chars = word.split("");
-  if (intensity === "light") {
-    const idx = Math.floor(Math.random() * chars.length);
-    chars[idx] = (chars[idx] ?? "").toUpperCase();
-  } else if (intensity === "medium") {
-    for (let i = 0; i < chars.length; i++) {
-      chars[i] = i % 2 === 0 ? (chars[i] ?? "").toLowerCase() : (chars[i] ?? "").toUpperCase();
-    }
-  } else {
-    for (let i = 0; i < chars.length; i++) {
-      chars[i] =
-        Math.random() > 0.5
-          ? (chars[i] ?? "").toUpperCase()
-          : (chars[i] ?? "").toLowerCase();
-    }
-  }
-  return chars.join("");
-}
-
-function applyPhonetic(word: string): string {
-  return word
-    .replace(/ph/gi, "f")
-    .replace(/ck/gi, "k")
-    .replace(/qu/gi, "kw")
-    .replace(/c(?=[eiy])/gi, "s")
-    .replace(/c/g, "k");
-}
-
-function obfuscateWord(word: string, technique: ObfuscationTechnique, intensity: ObfuscationIntensity): string {
   switch (technique) {
     case "leetspeak":
-      return applyLeetspeak(word, intensity);
+      return chars
+        .map((c, i) =>
+          i / chars.length < ratio && LEETSPEAK_MAP[c.toLowerCase()]
+            ? LEETSPEAK_MAP[c.toLowerCase()]!
+            : c,
+        )
+        .join("");
     case "unicode":
-      return applyUnicode(word, intensity);
+      return chars
+        .map((c, i) => (i / chars.length < ratio && UNICODE_MAP[c] ? UNICODE_MAP[c]! : c))
+        .join("");
     case "zwj":
-      return applyZwj(word, intensity);
+      return chars.map((c, i) => (i > 0 && i / chars.length < ratio ? "\u200d" + c : c)).join("");
     case "mixedcase":
-      return applyMixedCase(word, intensity);
+      return chars
+        .map((c, i) =>
+          i / chars.length < ratio ? (i % 2 === 0 ? c.toUpperCase() : c.toLowerCase()) : c,
+        )
+        .join("");
     case "phonetic":
-      return applyPhonetic(word);
+      return chars
+        .map((c, i) =>
+          i / chars.length < ratio && PHONETIC_MAP[c.toLowerCase()]
+            ? PHONETIC_MAP[c.toLowerCase()]!
+            : c,
+        )
+        .join("");
     case "random": {
-      const techniques: ObfuscationTechnique[] = ["leetspeak", "unicode", "zwj", "mixedcase"];
-      return obfuscateWord(word, pickRandom(techniques), intensity);
+      const pool: Technique[] = ["leetspeak", "unicode", "mixedcase"];
+      const t = pool[Math.floor(Math.random() * pool.length)]!;
+      return applyTechnique(word, t, intensity);
     }
     default:
       return word;
   }
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
-
-/**
- * Detect trigger words present in the text (whole-word match, case-insensitive).
- */
-export function detectTriggers(text: string, customTriggers: readonly string[] = []): string[] {
-  const allTriggers = [...DEFAULT_TRIGGERS, ...customTriggers];
-  const found = new Set<string>();
-  const lower = text.toLowerCase();
-  for (const trigger of allTriggers) {
-    const re = new RegExp(
-      `\\b${trigger.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`,
-      "gi",
-    );
-    if (re.test(lower)) found.add(trigger);
-  }
-  return Array.from(found);
+export function getDefaultConfig(): ParseltongueConfig {
+  return { enabled: true, technique: "unicode", intensity: "medium", customTriggers: [] };
 }
 
-/**
- * Apply Parseltongue obfuscation to trigger words in the input text.
- */
+export function getTechniqueDescription(technique: string): string {
+  const descriptions: Record<string, string> = {
+    leetspeak: "Substitutes letters with visually similar numbers and symbols (a→4, e→3, i→1).",
+    unicode:
+      "Replaces Latin characters with Cyrillic/Greek homoglyphs identical to the eye but distinct in codepoint.",
+    zwj: "Inserts Zero-Width Joiner (U+200D) between letters to break token-level pattern detection.",
+    mixedcase: "Alternates uppercase and lowercase to defeat case-insensitive pattern matching.",
+    phonetic: "Replaces vowels and consonants with phonetic equivalents (a→ay, e→ee, i→eye).",
+    random: "Randomly selects between leetspeak, unicode, and mixedcase per word.",
+  };
+  return descriptions[technique] ?? "Unknown technique.";
+}
+
 export function applyParseltongue(text: string, config: ParseltongueConfig): ParseltongueResult {
   if (!config.enabled) {
     return {
@@ -276,57 +175,37 @@ export function applyParseltongue(text: string, config: ParseltongueConfig): Par
     };
   }
 
-  const triggersFound = detectTriggers(text, config.customTriggers);
+  const allTriggers = [...DEFAULT_TRIGGERS, ...(config.customTriggers ?? [])];
+  const triggersFound: string[] = [];
+  const transformations: Transformation[] = [];
 
-  if (triggersFound.length === 0) {
-    return {
-      originalText: text,
-      transformedText: text,
-      triggersFound: [],
-      techniqueUsed: config.technique,
-      transformations: [],
-    };
-  }
+  const segments = text.split(/(\s+)/);
+  const result: string[] = [];
+  let pos = 0;
 
-  let transformed = text;
-  const transformations: ParseltongueResult["transformations"] = [];
+  for (const seg of segments) {
+    const lower = seg.toLowerCase().trim();
+    const hit = lower.length > 0 ? allTriggers.find((t) => lower.includes(t)) : undefined;
 
-  // Sort by length (longest first) to avoid partial-match clobbering
-  const sorted = [...triggersFound].sort((a, b) => b.length - a.length);
-
-  for (const trigger of sorted) {
-    const re = new RegExp(
-      `\\b(${trigger.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})\\b`,
-      "gi",
-    );
-    transformed = transformed.replace(re, (match) => {
-      const result = obfuscateWord(match, config.technique, config.intensity);
-      transformations.push({ original: match, transformed: result, technique: config.technique });
-      return result;
-    });
+    if (hit) {
+      if (!triggersFound.includes(hit)) triggersFound.push(hit);
+      const core = seg.trimStart();
+      const lead = seg.slice(0, seg.length - core.length);
+      const obfuscated = applyTechnique(core, config.technique, config.intensity);
+      const full = lead + obfuscated;
+      transformations.push({ original: seg, transformed: full, position: pos });
+      result.push(full);
+    } else {
+      result.push(seg);
+    }
+    pos += seg.length;
   }
 
   return {
     originalText: text,
-    transformedText: transformed,
+    transformedText: result.join(""),
     triggersFound,
     techniqueUsed: config.technique,
     transformations,
   };
-}
-
-export function getDefaultConfig(): ParseltongueConfig {
-  return { enabled: false, technique: "leetspeak", intensity: "medium", customTriggers: [] };
-}
-
-export function getTechniqueDescription(technique: ObfuscationTechnique): string {
-  const map: Record<ObfuscationTechnique, string> = {
-    leetspeak: "Classic l33tspeak: a→4, e→3, etc.",
-    unicode: "Unicode homoglyphs (cyrillic, greek)",
-    zwj: "Invisible zero-width characters",
-    mixedcase: "Disrupted casing patterns",
-    phonetic: "Phonetic spelling substitutions",
-    random: "Random mix of all techniques",
-  };
-  return map[technique];
 }

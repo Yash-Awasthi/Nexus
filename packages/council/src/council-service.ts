@@ -74,9 +74,12 @@ export class CouncilService {
    */
   async deliberate(
     request: CouncilRequest,
-    opts?: { signalId?: string },
+    opts?: { signalId?: string; onVote?: (vote: ModelVote) => void },
   ): Promise<CouncilResponse> {
-    const response = await this.engine.deliberate(request);
+    const response = await this.engine.deliberate(
+      request,
+      opts?.onVote ? { onVote: opts.onVote } : undefined,
+    );
 
     if (this.onResult && response.ok && response.result) {
       const result = response.result;

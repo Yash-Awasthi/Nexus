@@ -128,7 +128,7 @@ def create_app() -> FastAPI:
             })
         except Exception as exc:
             logger.error("MCP tool call failed: %s", exc)
-            return JSONResponse({"success": False, "result": None, "error": str(exc)})
+            return JSONResponse({"success": False, "result": None, "error": "Tool call failed — check server logs"})
 
     return app
 

@@ -13,7 +13,7 @@ import type { IMetricsCollector } from "./interfaces/observability.interface.js"
 
 // ─── Types ───────────────────────────────────────────────────────────
 
-export type CircuitState = "closed" | "open" | "half-open";
+type CircuitState = "closed" | "open" | "half-open";
 
 export interface CircuitBreakerConfig {
   /** Maximum failures within the sliding window before opening the circuit */
@@ -34,7 +34,7 @@ export interface CircuitBreakerConfig {
   name: string;
 }
 
-export interface CircuitBreakerMetrics {
+interface CircuitBreakerMetrics {
   state: CircuitState;
   failureCount: number;
   successCount: number;

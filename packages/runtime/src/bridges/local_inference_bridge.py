@@ -49,6 +49,12 @@ from pydantic import BaseModel
 logger = logging.getLogger("local_inference_bridge")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(message)s")
 
+
+def _sanitize_log(val: Any) -> str:
+    """Strip newlines/control chars from user-supplied values before logging."""
+    return str(val).replace("\n", "\\n").replace("\r", "\\r").replace("\0", "")[:500]
+
+
 # ---------------------------------------------------------------------------
 # Optional deps
 # ---------------------------------------------------------------------------
@@ -102,15 +108,15 @@ def _get_model(model_name: str, compression: str | None) -> Any:
                 kwargs["compression"] = compression
                 logger.info(
                     "Loading %s with %s quantisation (VRAM-efficient) …",
-                    model_name,
+                    _sanitize_log(model_name),
                     compression,
                 )
             else:
-                logger.info("Loading %s (no extra quantisation) …", model_name)
+                logger.info("Loading %s (no extra quantisation) …", _sanitize_log(model_name))
 
             model = AutoModel.from_pretrained(**kwargs)
             _model_cache[cache_key] = model
-            logger.info("Model %s ready", model_name)
+            logger.info("Model %s ready", _sanitize_log(model_name))
 
         return _model_cache[cache_key]
 
@@ -258,7 +264,7 @@ def create_app() -> FastAPI:
                 "text": "",
                 "model": req.model,
                 "tokens_generated": 0,
-                "error": str(exc),
+                "error": "Inference failed — check server logs",
             })
 
     @app.post("/chat")
@@ -307,7 +313,7 @@ def create_app() -> FastAPI:
                 "text": "",
                 "model": req.model,
                 "tokens_generated": 0,
-                "error": str(exc),
+                "error": "Inference failed — check server logs",
             })
 
     return app

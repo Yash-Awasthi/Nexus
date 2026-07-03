@@ -7,7 +7,7 @@
 
 import { spawn } from "child_process";
 
-export interface DockerComposeResult {
+interface DockerComposeResult {
   /** Exit code of the docker compose process. */
   code: number;
   /** Alias for code — kept for compatibility. */
