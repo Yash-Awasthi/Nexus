@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
 
+import { generateKeyPairSync } from "node:crypto";
 import {
   AuthError,
   extractBearerToken,
   verifyApiKey,
   signJwt,
   verifyJwt,
+  signJwtRS256,
+  verifyJwtRS256,
   authenticate,
   makeFastifyAuthHook,
 } from "../src/index.js";
@@ -153,6 +156,74 @@ describe("JWT (signJwt + verifyJwt)", () => {
     };
     const t2 = signJwt(longLived, SECRET);
     expect(verifyJwt(t2, SECRET).sub).toBe("svc");
+  });
+});
+
+// ── signJwtRS256 / verifyJwtRS256 (asymmetric, §14) ───────────────────────────
+
+describe("JWT RS256 (signJwtRS256 + verifyJwtRS256)", () => {
+  const { publicKey, privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const PRIV = privateKey.export({ type: "pkcs1", format: "pem" }).toString();
+  const PUB = publicKey.export({ type: "spki", format: "pem" }).toString();
+
+  const PAYLOAD = {
+    sub: "svc-council",
+    role: "agent" as const,
+    exp: Math.floor(Date.now() / 1000) + 3600,
+  };
+
+  it("signs with the private key and verifies with the public key", () => {
+    const token = signJwtRS256(PAYLOAD, PRIV);
+    const decoded = verifyJwtRS256(token, PUB);
+    expect(decoded.sub).toBe("svc-council");
+    expect(decoded.role).toBe("agent");
+    expect(decoded.iat).toBeTypeOf("number");
+    expect(token.split(".")).toHaveLength(3);
+  });
+
+  it("sets alg=RS256 in the header", () => {
+    const [h] = signJwtRS256(PAYLOAD, PRIV).split(".");
+    const header = JSON.parse(Buffer.from(h!, "base64url").toString("utf8")) as { alg: string };
+    expect(header.alg).toBe("RS256");
+  });
+
+  it("rejects a token signed by a different private key", () => {
+    const other = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const token = signJwtRS256(PAYLOAD, other.privateKey.export({ type: "pkcs1", format: "pem" }).toString());
+    expect(() => verifyJwtRS256(token, PUB)).toThrow(AuthError);
+  });
+
+  it("rejects a tampered payload", () => {
+    const token = signJwtRS256(PAYLOAD, PRIV);
+    const [h, , s] = token.split(".");
+    const tampered = Buffer.from(JSON.stringify({ ...PAYLOAD, role: "admin" })).toString("base64url");
+    expect(() => verifyJwtRS256(`${h}.${tampered}.${s}`, PUB)).toThrow(AuthError);
+  });
+
+  it("pins alg — refuses an HS256 (algorithm-confusion) token", () => {
+    // An attacker who knows the PUBLIC key must not be able to forge an HS256
+    // token keyed on it. verifyJwtRS256 rejects on the alg mismatch alone.
+    const forged = signJwt(PAYLOAD, PUB);
+    expect(() => verifyJwtRS256(forged, PUB)).toThrow(AuthError);
+    try {
+      verifyJwtRS256(forged, PUB);
+    } catch (e) {
+      expect((e as AuthError).code).toBe("INVALID_TOKEN");
+    }
+  });
+
+  it("throws EXPIRED_TOKEN for an expired RS256 JWT", () => {
+    const expired = signJwtRS256({ ...PAYLOAD, exp: Math.floor(Date.now() / 1000) - 10 }, PRIV);
+    try {
+      verifyJwtRS256(expired, PUB);
+      expect.unreachable();
+    } catch (e) {
+      expect((e as AuthError).code).toBe("EXPIRED_TOKEN");
+    }
+  });
+
+  it("throws INVALID_TOKEN for a malformed token", () => {
+    expect(() => verifyJwtRS256("only.two", PUB)).toThrow(AuthError);
   });
 });
 

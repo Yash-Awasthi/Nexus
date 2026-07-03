@@ -18,7 +18,7 @@
  *   { sub: string, role: "admin"|"agent"|"read-only", iat: number, exp: number }
  */
 
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, createSign, createVerify, timingSafeEqual } from "node:crypto";
 
 // ── Error ─────────────────────────────────────────────────────────────────────
 
@@ -134,6 +134,77 @@ export function verifyJwt(token: string, secret: string): NexusTokenPayload {
   const sigBuf = Buffer.from(sig, "base64");
   const expectedBuf = Buffer.from(expectedSig, "base64");
   if (sigBuf.length !== expectedBuf.length || !timingSafeEqual(sigBuf, expectedBuf)) {
+    throw new AuthError("INVALID_TOKEN", "JWT signature verification failed");
+  }
+
+  let payload: NexusTokenPayload;
+  try {
+    payload = JSON.parse(base64UrlDecode(body).toString("utf8")) as NexusTokenPayload;
+  } catch {
+    throw new AuthError("INVALID_TOKEN", "JWT payload is not valid JSON");
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  if (payload.exp && payload.exp < now) {
+    throw new AuthError(
+      "EXPIRED_TOKEN",
+      `JWT expired at ${new Date(payload.exp * 1000).toISOString()}`,
+    );
+  }
+
+  return payload;
+}
+
+// ── JWT (RS256, asymmetric — multi-service, §14) ──────────────────────────────
+// RS256 signs with a PRIVATE key and verifies with the matching PUBLIC key, so a
+// downstream service can validate tokens minted by the auth service WITHOUT
+// holding a secret that would let it forge them — the multi-tenant hardening win
+// over the shared-secret HS256 path above. Same base64url + payload shape; only
+// the header `alg` and the signature primitive differ.
+
+/**
+ * Sign a NexusTokenPayload with an RSA private key (PEM) → compact RS256 JWT.
+ * Verify the result with {@link verifyJwtRS256} and the matching public key.
+ */
+export function signJwtRS256(
+  payload: Omit<NexusTokenPayload, "iat">,
+  privateKeyPem: string,
+): string {
+  const header = base64UrlEncode(Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })));
+  const body = base64UrlEncode(
+    Buffer.from(JSON.stringify({ ...payload, iat: Math.floor(Date.now() / 1000) })),
+  );
+  const signingInput = `${header}.${body}`;
+  const sig = base64UrlEncode(createSign("RSA-SHA256").update(signingInput).sign(privateKeyPem));
+  return `${signingInput}.${sig}`;
+}
+
+/**
+ * Verify and decode an RS256 JWT with an RSA public key (PEM).
+ * Throws AuthError on a wrong `alg`, bad signature, expiry, or malformed token.
+ * The `alg` header is pinned to `RS256` to defend against algorithm-confusion
+ * (e.g. an attacker swapping in `alg:"none"` or an HS256 forgery keyed on the
+ * public key).
+ */
+export function verifyJwtRS256(token: string, publicKeyPem: string): NexusTokenPayload {
+  const parts = token.split(".");
+  if (parts.length !== 3) throw new AuthError("INVALID_TOKEN", "Malformed JWT");
+  const [header, body, sig] = parts as [string, string, string];
+
+  let alg: unknown;
+  try {
+    alg = (JSON.parse(base64UrlDecode(header).toString("utf8")) as { alg?: unknown }).alg;
+  } catch {
+    throw new AuthError("INVALID_TOKEN", "JWT header is not valid JSON");
+  }
+  if (alg !== "RS256") {
+    throw new AuthError("INVALID_TOKEN", `Unexpected JWT alg "${String(alg)}" — RS256 required`);
+  }
+
+  const ok = createVerify("RSA-SHA256")
+    .update(`${header}.${body}`)
+    .verify(publicKeyPem, base64UrlDecode(sig));
+  if (!ok) {
     throw new AuthError("INVALID_TOKEN", "JWT signature verification failed");
   }
 
