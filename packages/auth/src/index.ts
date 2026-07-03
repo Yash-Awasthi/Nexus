@@ -26,7 +26,9 @@ export type AuthErrorCode =
   | "MISSING_TOKEN"
   | "INVALID_TOKEN"
   | "EXPIRED_TOKEN"
-  | "INSUFFICIENT_ROLE";
+  | "INSUFFICIENT_ROLE"
+  | "REVOKED_TOKEN"
+  | "RATE_LIMITED";
 
 /** Auth error. */
 export class AuthError extends Error {
@@ -37,9 +39,18 @@ export class AuthError extends Error {
     super(message);
     this.name = "AuthError";
     this.code = code;
-    this.httpStatus = code === "INSUFFICIENT_ROLE" ? 403 : 401;
+    this.httpStatus = AUTH_ERROR_STATUS[code];
   }
 }
+
+const AUTH_ERROR_STATUS: Record<AuthErrorCode, number> = {
+  MISSING_TOKEN: 401,
+  INVALID_TOKEN: 401,
+  EXPIRED_TOKEN: 401,
+  REVOKED_TOKEN: 401,
+  INSUFFICIENT_ROLE: 403,
+  RATE_LIMITED: 429,
+};
 
 // ── Token types ───────────────────────────────────────────────────────────────
 
@@ -53,6 +64,8 @@ export interface NexusTokenPayload {
   exp: number;
   /** Optional — agent-specific capability set */
   capabilities?: string[];
+  /** Optional — unique token id, enables per-token revocation (see SessionRevocationRegistry). */
+  jti?: string;
 }
 
 // ── extractBearerToken ────────────────────────────────────────────────────────
@@ -339,4 +352,171 @@ export function makeFastifyAuthHook(config: AuthConfig): FastifyAuthHookFn {
       }
     }
   };
+}
+
+// ── Brute-force backoff (§14.3) ───────────────────────────────────────────────
+// Framework-agnostic failed-attempt throttle: exponential lockout keyed by an
+// arbitrary identifier (compose it as `subject|ip` at the call site). The clock
+// is injectable so lockout escalation is deterministically testable. The state
+// is held in a plain Map — swap in a Redis-backed LoginThrottleStore later
+// without touching callers.
+
+/** A clock returning epoch milliseconds. Injected for deterministic tests. */
+export type Clock = () => number;
+
+/** Tuning for {@link LoginThrottle}. */
+export interface LoginThrottleOptions {
+  /** Failures tolerated before the first lockout. Default 5. */
+  threshold?: number;
+  /** Base lockout once the threshold is crossed, in ms. Default 1000. */
+  baseLockoutMs?: number;
+  /** Cap on any single lockout, in ms. Default 15 min. */
+  maxLockoutMs?: number;
+  /** Idle window after which an identifier's counter resets, in ms. Default 15 min. */
+  windowMs?: number;
+  /** Injectable clock (epoch ms). Defaults to Date.now. */
+  now?: Clock;
+}
+
+interface AttemptState {
+  fails: number;
+  /** Epoch ms until which the identifier is locked (0 = not locked). */
+  lockedUntil: number;
+  /** Epoch ms of the last recorded failure (for idle-window reset). */
+  lastFail: number;
+}
+
+/**
+ * Exponential-backoff lockout for repeated auth failures.
+ *
+ *   throttle.assertNotLocked(id)  — throws RATE_LIMITED while locked.
+ *   throttle.recordFailure(id)    — bump the counter; lock past the threshold.
+ *   throttle.recordSuccess(id)    — clear the counter on a good login.
+ *
+ * Lockout after the Nth failure past `threshold` is
+ * `min(baseLockoutMs * 2^(n-1), maxLockoutMs)`. An identifier idle longer than
+ * `windowMs` starts fresh.
+ */
+export class LoginThrottle {
+  private readonly threshold: number;
+  private readonly baseLockoutMs: number;
+  private readonly maxLockoutMs: number;
+  private readonly windowMs: number;
+  private readonly now: Clock;
+  private readonly attempts = new Map<string, AttemptState>();
+
+  constructor(opts: LoginThrottleOptions = {}) {
+    this.threshold = opts.threshold ?? 5;
+    this.baseLockoutMs = opts.baseLockoutMs ?? 1_000;
+    this.maxLockoutMs = opts.maxLockoutMs ?? 15 * 60_000;
+    this.windowMs = opts.windowMs ?? 15 * 60_000;
+    this.now = opts.now ?? Date.now;
+  }
+
+  /** ms remaining on an active lockout for `id`, else 0. */
+  lockedMsRemaining(id: string): number {
+    const s = this.attempts.get(id);
+    if (!s) return 0;
+    const now = this.now();
+    if (now - s.lastFail > this.windowMs) {
+      this.attempts.delete(id);
+      return 0;
+    }
+    return s.lockedUntil > now ? s.lockedUntil - now : 0;
+  }
+
+  /** Throw RATE_LIMITED if `id` is currently locked out. */
+  assertNotLocked(id: string): void {
+    const remaining = this.lockedMsRemaining(id);
+    if (remaining > 0) {
+      throw new AuthError(
+        "RATE_LIMITED",
+        `Too many attempts — retry in ${Math.ceil(remaining / 1000)}s`,
+      );
+    }
+  }
+
+  /** Record a failed attempt; returns the resulting lockout in ms (0 if none yet). */
+  recordFailure(id: string): number {
+    const now = this.now();
+    let s = this.attempts.get(id);
+    if (!s || now - s.lastFail > this.windowMs) {
+      s = { fails: 0, lockedUntil: 0, lastFail: now };
+      this.attempts.set(id, s);
+    }
+    s.fails += 1;
+    s.lastFail = now;
+    const over = s.fails - this.threshold;
+    if (over >= 0) {
+      const lockout = Math.min(this.baseLockoutMs * 2 ** over, this.maxLockoutMs);
+      s.lockedUntil = now + lockout;
+      return lockout;
+    }
+    return 0;
+  }
+
+  /** Clear all state for `id` after a successful auth. */
+  recordSuccess(id: string): void {
+    this.attempts.delete(id);
+  }
+}
+
+// ── Session revocation (§14.3) ────────────────────────────────────────────────
+// Two revocation modes, both O(1): a per-token `jti` denylist (log out one
+// session) and a per-subject cutoff (log out every session issued before a
+// timestamp — e.g. on password change). `assertNotRevoked` pairs with a verified
+// payload after signature/expiry checks pass.
+
+/** In-memory session-revocation registry. Swap for a Redis-backed store later. */
+export class SessionRevocationRegistry {
+  private readonly now: Clock;
+  private readonly revokedJti = new Map<string, number>(); // jti → expiry epoch ms (for GC)
+  private readonly subjectCutoff = new Map<string, number>(); // sub → revoke-iat-before (epoch s)
+
+  constructor(opts: { now?: Clock } = {}) {
+    this.now = opts.now ?? Date.now;
+  }
+
+  /**
+   * Revoke a single token by its `jti`. `expSeconds` (the token's `exp`) lets the
+   * entry be garbage-collected once the token would have expired anyway.
+   */
+  revokeJti(jti: string, expSeconds?: number): void {
+    this.revokedJti.set(jti, expSeconds ? expSeconds * 1000 : this.now() + 24 * 3600_000);
+  }
+
+  /**
+   * Revoke every token for `subject` issued at/before now — call on password
+   * change or "log out everywhere". Tokens with `iat <= cutoff` are rejected.
+   */
+  revokeAllForSubject(subject: string): void {
+    this.subjectCutoff.set(subject, Math.floor(this.now() / 1000));
+  }
+
+  /** True if the given verified payload has been revoked by either mechanism. */
+  isRevoked(payload: Pick<NexusTokenPayload, "sub" | "iat" | "jti">): boolean {
+    if (payload.jti !== undefined && this.revokedJti.has(payload.jti)) return true;
+    const cutoff = this.subjectCutoff.get(payload.sub);
+    return cutoff !== undefined && payload.iat <= cutoff;
+  }
+
+  /** Throw REVOKED_TOKEN if the payload has been revoked. */
+  assertNotRevoked(payload: Pick<NexusTokenPayload, "sub" | "iat" | "jti">): void {
+    if (this.isRevoked(payload)) {
+      throw new AuthError("REVOKED_TOKEN", "Token has been revoked");
+    }
+  }
+
+  /** Drop denylist entries whose tokens have already expired. Returns count removed. */
+  gc(): number {
+    const now = this.now();
+    let removed = 0;
+    for (const [jti, expMs] of this.revokedJti) {
+      if (expMs <= now) {
+        this.revokedJti.delete(jti);
+        removed += 1;
+      }
+    }
+    return removed;
+  }
 }

@@ -12,6 +12,8 @@ import {
   verifyJwtRS256,
   authenticate,
   makeFastifyAuthHook,
+  LoginThrottle,
+  SessionRevocationRegistry,
 } from "../src/index.js";
 
 // ── AuthError ─────────────────────────────────────────────────────────────────
@@ -361,5 +363,142 @@ describe("makeFastifyAuthHook", () => {
     const reply = makeMockReply();
     await hook(req, reply);
     expect(reply.statusCode).toBe(403);
+  });
+});
+
+// ── LoginThrottle (§14.3 brute-force backoff) ─────────────────────────────────
+
+describe("LoginThrottle", () => {
+  // Controllable clock so lockout escalation is deterministic.
+  function fixedClock(start = 1_000_000) {
+    let t = start;
+    return { now: () => t, advance: (ms: number) => (t += ms) };
+  }
+
+  it("does not lock before the threshold is crossed", () => {
+    const clk = fixedClock();
+    const th = new LoginThrottle({ threshold: 3, now: clk.now });
+    expect(th.recordFailure("a")).toBe(0);
+    expect(th.recordFailure("a")).toBe(0);
+    expect(() => th.assertNotLocked("a")).not.toThrow();
+  });
+
+  it("locks with exponential backoff past the threshold", () => {
+    const clk = fixedClock();
+    const th = new LoginThrottle({ threshold: 2, baseLockoutMs: 1000, now: clk.now });
+    th.recordFailure("a"); // 1
+    const first = th.recordFailure("a"); // 2 → over=0 → base * 2^0
+    expect(first).toBe(1000);
+    const second = th.recordFailure("a"); // 3 → over=1 → base * 2^1
+    expect(second).toBe(2000);
+  });
+
+  it("caps the lockout at maxLockoutMs", () => {
+    const clk = fixedClock();
+    const th = new LoginThrottle({ threshold: 1, baseLockoutMs: 1000, maxLockoutMs: 3000, now: clk.now });
+    let last = 0;
+    for (let i = 0; i < 8; i++) last = th.recordFailure("a");
+    expect(last).toBe(3000);
+  });
+
+  it("throws RATE_LIMITED while locked, then clears after the lockout elapses", () => {
+    const clk = fixedClock();
+    const th = new LoginThrottle({ threshold: 1, baseLockoutMs: 1000, now: clk.now });
+    th.recordFailure("a");
+    expect(() => th.assertNotLocked("a")).toThrow(AuthError);
+    try {
+      th.assertNotLocked("a");
+    } catch (e) {
+      expect((e as AuthError).code).toBe("RATE_LIMITED");
+      expect((e as AuthError).httpStatus).toBe(429);
+    }
+    clk.advance(1001);
+    expect(() => th.assertNotLocked("a")).not.toThrow();
+  });
+
+  it("recordSuccess clears the counter", () => {
+    const clk = fixedClock();
+    const th = new LoginThrottle({ threshold: 2, baseLockoutMs: 1000, now: clk.now });
+    th.recordFailure("a");
+    th.recordSuccess("a");
+    expect(th.recordFailure("a")).toBe(0); // counter reset → back under threshold
+  });
+
+  it("resets an identifier idle longer than windowMs", () => {
+    const clk = fixedClock();
+    const th = new LoginThrottle({ threshold: 2, windowMs: 5000, baseLockoutMs: 1000, now: clk.now });
+    th.recordFailure("a");
+    clk.advance(6000); // idle past the window
+    expect(th.recordFailure("a")).toBe(0); // fresh counter
+  });
+
+  it("tracks identifiers independently", () => {
+    const clk = fixedClock();
+    const th = new LoginThrottle({ threshold: 1, baseLockoutMs: 1000, now: clk.now });
+    th.recordFailure("a");
+    expect(() => th.assertNotLocked("a")).toThrow();
+    expect(() => th.assertNotLocked("b")).not.toThrow();
+  });
+});
+
+// ── SessionRevocationRegistry (§14.3 session revocation) ──────────────────────
+
+describe("SessionRevocationRegistry", () => {
+  function fixedClock(start = 1_000_000_000) {
+    let t = start;
+    return { now: () => t, advance: (ms: number) => (t += ms) };
+  }
+
+  it("revokes a single token by jti", () => {
+    const reg = new SessionRevocationRegistry();
+    const payload = { sub: "u1", iat: 100, jti: "tok-1" };
+    expect(reg.isRevoked(payload)).toBe(false);
+    reg.revokeJti("tok-1");
+    expect(reg.isRevoked(payload)).toBe(true);
+    expect(() => reg.assertNotRevoked(payload)).toThrow(AuthError);
+  });
+
+  it("does not revoke a different jti", () => {
+    const reg = new SessionRevocationRegistry();
+    reg.revokeJti("tok-1");
+    expect(reg.isRevoked({ sub: "u1", iat: 100, jti: "tok-2" })).toBe(false);
+  });
+
+  it("revokes all sessions for a subject issued at/before the cutoff", () => {
+    const clk = fixedClock();
+    const reg = new SessionRevocationRegistry({ now: clk.now });
+    const nowS = Math.floor(clk.now() / 1000);
+    reg.revokeAllForSubject("u1");
+    // Token issued before the cutoff → revoked.
+    expect(reg.isRevoked({ sub: "u1", iat: nowS - 10 })).toBe(true);
+    // A different subject is unaffected.
+    expect(reg.isRevoked({ sub: "u2", iat: nowS - 10 })).toBe(false);
+    // A token issued strictly after the cutoff survives.
+    clk.advance(2000);
+    const laterS = Math.floor(clk.now() / 1000);
+    expect(reg.isRevoked({ sub: "u1", iat: laterS })).toBe(false);
+  });
+
+  it("assertNotRevoked throws REVOKED_TOKEN with 401", () => {
+    const reg = new SessionRevocationRegistry();
+    reg.revokeJti("tok-1");
+    try {
+      reg.assertNotRevoked({ sub: "u1", iat: 100, jti: "tok-1" });
+      expect.unreachable();
+    } catch (e) {
+      expect((e as AuthError).code).toBe("REVOKED_TOKEN");
+      expect((e as AuthError).httpStatus).toBe(401);
+    }
+  });
+
+  it("gc drops jti entries past their expiry", () => {
+    const clk = fixedClock();
+    const reg = new SessionRevocationRegistry({ now: clk.now });
+    const expS = Math.floor(clk.now() / 1000) + 10; // expires in 10s
+    reg.revokeJti("tok-1", expS);
+    expect(reg.gc()).toBe(0); // not yet expired
+    clk.advance(11_000);
+    expect(reg.gc()).toBe(1); // now collected
+    expect(reg.isRevoked({ sub: "u1", iat: 100, jti: "tok-1" })).toBe(false);
   });
 });
