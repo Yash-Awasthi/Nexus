@@ -69,7 +69,7 @@ docker compose up
 | UI      | http://localhost:4173 |
 
 ```bash
-curl http://localhost:3000/api/v1/health   # verify
+curl http://localhost:3000/health   # verify
 ```
 
 ### Option B — Local dev (hot reload)

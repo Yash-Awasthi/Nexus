@@ -83,7 +83,7 @@ export default function ConnectorsSyncPage() {
     if (!silent) setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/connectors?limit=100");
+      const res = await fetch("/api/v1/connectors?limit=100");
       if (!res.ok) throw new Error(`Failed to load connectors (${res.status})`);
       const data = await res.json();
       const list: Connector[] = (data.connectors ?? []).map((c: any) => ({

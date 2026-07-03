@@ -189,7 +189,7 @@ export default function Home() {
         .catch(() => {}),
 
       // Connector summary
-      fetch("/api/connectors?limit=100")
+      fetch("/api/v1/connectors?limit=100")
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
           if (!data) return;

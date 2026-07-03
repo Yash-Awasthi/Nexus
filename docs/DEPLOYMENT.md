@@ -10,17 +10,25 @@ development see the [README Quick Start](../README.md#quick-start). For day-2 op
 
 Minimum required to start:
 
-| Variable        | Description                                                |
-| --------------- | ---------------------------------------------------------- |
-| `NEXUS_API_KEY` | Master API key for all `/api/v1/*` requests                |
-| `DATABASE_URL`  | PostgreSQL connection string (with pgvector)               |
-| `JWT_SECRET`    | HS256 signing secret for user auth tokens                  |
-| `GROQ_API_KEY`  | Server-side default LLM provider (or any other driver key) |
+| Variable            | Description                                                    |
+| ------------------- | ------------------------------------------------------------- |
+| `NEXUS_API_KEY`     | Master API key for all `/api/v1/*` requests                   |
+| `DATABASE_URL`      | PostgreSQL connection string (with pgvector)                  |
+| `REDIS_URL`         | Redis connection string for BullMQ (in-memory fallback if unset) |
+| `NEXUS_JWT_SECRET`  | HS256 signing secret for user auth tokens                     |
+| `NEXUS_AUDIT_KEY`   | HMAC key for the chained audit log (64-hex / 32 bytes)        |
+| `NEXUS_SECRETS_KEY` | AES key for BYOK provider-key encryption (64-hex / 32 bytes)  |
+| `GROQ_API_KEY`      | Server-side default LLM provider (or any other driver key)    |
 
 Full reference: [`.env.example`](../.env.example).
 
-For BYOK secret encryption, set `NEXUS_SECRETS_KEY` (64-hex / 32 bytes). The provider-key
-store **fails closed** without it — it will refuse to persist rather than store plaintext.
+> **Runtime reads the `NEXUS_`-prefixed names.** User sign-in / token issuance returns
+> `500 "NEXUS_JWT_SECRET is not set"` if you set the bare `JWT_SECRET`/`AUDIT_LOG_KEY`
+> names. Always set `NEXUS_JWT_SECRET`, `NEXUS_AUDIT_KEY`, and `NEXUS_SECRETS_KEY`.
+
+For BYOK secret encryption, `NEXUS_SECRETS_KEY` (64-hex / 32 bytes) is required. The
+provider-key store **fails closed** without it — it refuses to persist rather than store
+plaintext.
 
 OAuth connectors (optional):
 
@@ -35,17 +43,24 @@ OAuth connectors (optional):
 > encrypted at rest and resolved server-side. `GROQ_API_KEY` is only the server-side
 > default for system/internal tasks (e.g. code-agent planning) — not per-user AI spend.
 
-## Render + Vercel (recommended free tier)
+## Railway + Vercel (reference deployment)
 
 ```
-API  → Render   (apps/api, Docker)
-UI   → Vercel   (apps/ui, static SPA)
-DB   → Neon     (PostgreSQL + pgvector)
-KV   → Upstash  (Redis — optional, in-memory fallback included)
+API     → Railway  (apps/api,    Docker)
+worker  → Railway  (apps/worker, Docker)
+UI      → Vercel   (apps/ui, static SPA)
+DB      → Neon        (PostgreSQL + pgvector)
+KV      → Redis Cloud (BullMQ queue — in-memory fallback if REDIS_URL unset)
 ```
 
-Set all environment variables from `.env.example` in your Render service. The Vercel UI
-proxies `/api/*` to the Render API via `vercel.json` rewrites.
+Set the environment variables above as Railway **shared variables** so both the API and
+worker services inherit them. The Vercel UI proxies `/api/*` to the Railway API via
+`vercel.json` rewrites — update the rewrite destination to your API's public URL.
+
+> The dashboard talks to two route layers: `/api/v1/*` are the real, DB-backed handlers
+> (auth, council, memory, connectors, billing, feature-flags, projects, image-gen, voice,
+> scraping). The broader `/api/*` surface is served by an in-memory bridge for
+> demonstration and returns synthetic data.
 
 ## Docker Compose (production)
 

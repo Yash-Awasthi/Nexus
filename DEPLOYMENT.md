@@ -1,7 +1,7 @@
 # DEPLOYMENT.md — Nexus redeploy runbook
 
 > For interviews/demos. Trials deplete → use this to rebuild the live stack fast.
-> Repo: `https://github.com/Yash-Awasthi/Nexus` · Branch: **`claudecode`** · ~5 services, all free-tier.
+> Repo: `https://github.com/Yash-Awasthi/Nexus` · Branch: **`main`** · ~5 services, all free-tier.
 
 ---
 
@@ -11,19 +11,20 @@
 Browser → Vercel (static React SPA)
             │  /api/* proxied →
             ▼
-          Render (Fastify API, Docker)
+          Railway (Fastify API, Docker — service nexus-api)
             ├── Neon (Postgres)
             ├── Redis Cloud (BullMQ queue)
             ├── Browserbase (headless chromium, browser-agent)
             └── Groq/Gemini/Mistral/OpenRouter (LLMs)
-          Worker (BullMQ, your laptop OR Render w/ card)
+          Railway (BullMQ worker — service nexus-worker)
             └── same Neon + Redis Cloud
 ```
 
 | Service  | Provider                       | Free tier              | What                                       |
 | -------- | ------------------------------ | ---------------------- | ------------------------------------------ |
-| Frontend | **Vercel**                     | hobby (perm free)      | React SPA + /api proxy → Render            |
-| API      | **Render**                     | free web (sleeps idle) | Fastify, all routes                        |
+| Frontend | **Vercel**                     | hobby (perm free)      | React SPA + /api proxy → Railway           |
+| API      | **Railway**                    | trial credit           | Fastify, all routes (service `nexus-api`)  |
+| Worker   | **Railway**                    | trial credit           | BullMQ async jobs (service `nexus-worker`) |
 | DB       | **Neon**                       | free 0.5GB             | Postgres + pgvector                        |
 | Queue    | **Redis Cloud**                | free 30MB              | BullMQ (raw TCP — Upstash REST won't work) |
 | Browser  | **Browserbase**                | trial                  | browser-agent CDP                          |
@@ -31,8 +32,9 @@ Browser → Vercel (static React SPA)
 
 **Live URLs (current):**
 
-- Frontend: `https://nexus-api-three-kappa.vercel.app/chat`
-- API: `https://nexus-api-8xr0.onrender.com`
+- Frontend: Vercel project (see Vercel dashboard)
+- API: `https://nexus-api-production-f80f.up.railway.app`
+- Railway project: `airy-respect` (id `e05008a2-b2fc-4d18-b94c-138e19a86c3b`)
 
 ---
 
@@ -62,28 +64,34 @@ Browser → Vercel (static React SPA)
 2. `BROWSER_CDP_URL=wss://connect.browserbase.com?apiKey=<key>`
    - Alt: Steel.dev (`ste-...` key) — set BROWSER_CDP_URL to Steel wss.
 
-### 4. Render (API) — Docker web service
+### 4. Railway (API + worker) — Docker services
 
-1. https://dashboard.render.com → New → Web Service → connect repo `Yash-Awasthi/Nexus`
-2. Settings:
-   - Branch: **claudecode**
-   - Runtime: **Docker**, Dockerfile path: `./apps/api/Dockerfile`, context: `.`
+1. https://railway.app → New Project → Deploy from repo `Yash-Awasthi/Nexus` (grant access).
+   Railway auto-creates two services from the repo.
+2. Service `nexus-api`:
+   - Branch: **main**
+   - Builder: **Dockerfile**, path `apps/api/Dockerfile`, root context `.`
    - Health check: `/health`
-   - Plan: Free
-3. **Env vars** (Environment tab) — set ALL below (§ENV VARS).
-4. Deploy. Build ~5min (compiles 75 pkgs via topo build). Wait `live`.
-5. Verify: `curl https://<your-api>.onrender.com/health` → 200. `curl .../api/v1/drive/status` → 401 (auth-gated = new code).
+3. Service `nexus-worker`:
+   - Builder: **Dockerfile**, path `apps/worker/Dockerfile`, root context `.`
+4. **Shared variables** (project → Variables) — set ALL below (§ENV VARS) once; both services inherit.
+5. Deploy. Build ~5min (compiles pkgs via topo build). Wait `Active`.
+6. Verify: `curl https://<your-api>.up.railway.app/health` → 200. `curl .../api/v1/drive/status` → 401 (auth-gated = new code).
 
 ### 5. Vercel (frontend)
 
-1. https://vercel.com → import repo `Yash-Awasthi/Nexus`, branch **claudecode**
-2. `vercel.json` auto-configures: build `pnpm --filter @nexus/ui build`, output `apps/ui/build/client`, proxies `/api/*` → Render.
-3. **Edit `vercel.json` rewrites** → point to YOUR new Render URL (currently `nexus-api-8xr0.onrender.com`).
+1. https://vercel.com → import repo `Yash-Awasthi/Nexus`, branch **main**
+2. `vercel.json` auto-configures: build `pnpm --filter @nexus/ui build`, output `apps/ui/build/client`, proxies `/api/*` → Railway.
+3. **Edit `vercel.json` rewrites** → point to YOUR Railway API URL (currently `nexus-api-production-f80f.up.railway.app`).
 4. Deploy.
 
 ### 6. Worker (BullMQ) — async jobs (agent.run, council, feeds, drive-exec)
 
-**Free path = run on laptop** (Render/Railway background workers need a card):
+The `nexus-worker` Railway service (step 4) runs this. It shares the project's shared
+variables — no separate config beyond the Dockerfile path `apps/worker/Dockerfile`.
+Verify log: `worker.ready` + `job.completed`.
+
+**Local alternative** (no worker service):
 
 ```bash
 cd /home/yash/Nexus
@@ -91,16 +99,11 @@ pnpm --filter "@nexus/worker..." build       # first time only
 node --env-file=.env apps/worker/dist/index.js
 ```
 
-Keep terminal open. `.env` must have REDIS_URL (Redis Cloud) + DATABASE_URL (Neon) + keys.
-Verify log: `worker.ready` + `job.completed`.
-
-**With card** → Render: New → Background Worker → repo, branch claudecode, Dockerfile `./apps/worker/Dockerfile`, same env vars.
-
 Browser-agent + chat + auth work WITHOUT worker (run sync in API). Worker only for queued async jobs.
 
 ---
 
-## ENV VARS (set on Render API + worker .env)
+## ENV VARS (set as Railway shared variables — both services inherit)
 
 **Critical (app crashes without):**
 
@@ -112,7 +115,7 @@ NEXUS_JWT_SECRET=<64-hex>         # MUST be NEXUS_JWT_SECRET (not JWT_SECRET)
 NEXUS_SECRETS_KEY=<64-hex>        # encrypts BYOK keys at rest
 NEXUS_AUDIT_KEY=<64-hex>
 NODE_ENV=production
-PORT=10000                        # Render API
+PORT=3000                         # Railway sets $PORT automatically; app reads it
 HOST=0.0.0.0
 ```
 
@@ -136,21 +139,21 @@ STRIPE_SECRET_KEY=<sk_test_...>   # billing (test mode)
 
 ---
 
-## GOTCHAS (bugs already fixed in claudecode — don't reintroduce)
+## GOTCHAS (bugs already fixed on main — don't reintroduce)
 
 1. **Build order**: Dockerfiles use `pnpm --filter "@nexus/api..." build` (topo). Don't hand-order — `runtime` needs `agent-runtime` built first.
 2. **scrypt**: auth needs `maxmem` set (32768 N exceeds OpenSSL default) — already in auth-users.ts.
 3. **ESM**: runtime/bootstrap.ts uses `import.meta.url` not `require.main` (ESM pkg).
 4. **Redis**: BullMQ needs raw TCP `redis://` — Upstash REST fails (ECONNRESET/EHOSTUNREACH).
 5. **video-transcript**: unused pkg, removed from API deps. Don't re-add to Dockerfile.
-6. Render free: web services only (no background_worker without card).
+6. Redis Cloud free = only free raw-TCP option (Upstash REST + Render internal Redis both fail for BullMQ).
 
 ---
 
 ## VERIFY DEPLOY (smoke test)
 
 ```bash
-B=https://<your-api>.onrender.com
+B=https://<your-api>.up.railway.app
 curl $B/health                                    # 200
 # register → JWT
 EM="t$(date +%s)@x.co"
@@ -165,13 +168,11 @@ curl -s -X POST $B/api/browser-agent/tasks -H "Authorization: Bearer $TOK" \
 
 ---
 
-## API SERVICE IDS (for CLI/API ops — regenerate when redeploying)
+## SERVICE IDS (for CLI/API ops — regenerate when redeploying)
 
-- Render API svc (current): `srv-d8qijfm8bjmc738p8u90`, owner `tea-d7n6tk1o3t8c73eh0rh0`
+- Railway project: `airy-respect` id `e05008a2-b2fc-4d18-b94c-138e19a86c3b` (services `nexus-api`, `nexus-worker`)
+- Railway API: GraphQL `https://backboard.railway.app/graphql/v2`, mutation `variableUpsert` (needs an account/project token with write scope)
 - Vercel project (current): `prj_zwkcmZqDohI5GsKI7YziUtGJj5xF`, repoId `1266057168`
-- Render env-var API: `PUT https://api.render.com/v1/services/<svc>/env-vars/<KEY>` body `{"value":"..."}`
-- Render trigger deploy: `POST .../services/<svc>/deploys` body `{"clearCache":"clear"}`
-- Render build logs: `GET https://api.render.com/v1/logs?ownerId=<owner>&resource=<svc>&type=build&limit=200&direction=backward`
 
 ---
 
@@ -180,7 +181,7 @@ curl -s -X POST $B/api/browser-agent/tasks -H "Authorization: Bearer $TOK" \
 - [ ] Neon DB up + migrated
 - [ ] Redis Cloud DB up, `redis://` URL ready
 - [ ] Browserbase key valid
-- [ ] Render API: env vars set, deploy live, /health 200
-- [ ] Vercel: rewrites point to Render URL, deployed
-- [ ] Worker running (laptop terminal) — only if demoing async jobs
+- [ ] Railway shared vars set, `nexus-api` Active, /health 200
+- [ ] Vercel: rewrites point to Railway URL, deployed
+- [ ] `nexus-worker` Active (Dockerfile path `apps/worker/Dockerfile`) — only if demoing async jobs
 - [ ] Smoke test passes (register + browser-agent)
