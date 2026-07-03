@@ -27,17 +27,27 @@
  * timer are removed to prevent memory leaks.
  */
 
-import {
-  globalBus,
-  formatSseEvent,
-  formatPing,
-  type SseEvent,
-} from "@nexus/sse";
+import type { ServerResponse } from "http";
+import type { Socket } from "net";
+
+import { globalBus, formatSseEvent, formatPing, type SseEvent } from "@nexus/sse";
 import type { FastifyInstance } from "fastify";
 
-import { requireAuth } from "../middleware/auth.js";
+import { startAgentEventsBridge, stopAgentEventsBridge } from "../lib/agent-events-bridge.js";
+import { makeUserRateLimitPreHandler } from "../lib/rate-limiter.js";
+import { requireAuthWithTier } from "../middleware/auth.js";
 
 const PING_INTERVAL_MS = 20_000;
+
+// Per-user limiter applied at SSE connection establishment. Generous limit
+// because connections are long-lived (the cap is on how often a user may open
+// a new stream, not on streamed traffic).
+const sseRL = makeUserRateLimitPreHandler({ limit: 120, windowMs: 60_000, keyPrefix: "sse" });
+
+// Known agent-stream selectors that are NOT a session/task id. Validated against
+// an explicit allowlist before any tier-gated security branch so a crafted
+// `:stream` param cannot bypass the ownership/tier checks below.
+const RESERVED_AGENT_STREAMS = new Set(["all"]);
 
 const SSE_HEADERS = {
   "Content-Type": "text/event-stream",
@@ -52,11 +62,7 @@ const SSE_HEADERS = {
  * Open an SSE connection, subscribe to the given channel(s), and handle
  * clean-up on client disconnect.
  */
-function openSseConnection(
-  raw: import("http").ServerResponse,
-  socket: import("net").Socket,
-  channels: string[],
-): void {
+function openSseConnection(raw: ServerResponse, socket: Socket, channels: string[]): void {
   // Write status line + headers (hijacked reply, no Fastify layer)
   raw.writeHead(200, SSE_HEADERS);
 
@@ -64,7 +70,7 @@ function openSseConnection(
   raw.write(":\n\n");
 
   // Subscribe to each channel
-  const listeners: Array<[string, (e: SseEvent) => void]> = channels.map((channel) => {
+  const listeners: [string, (e: SseEvent) => void][] = channels.map((channel) => {
     const listener = (event: SseEvent): void => {
       if (!raw.destroyed) {
         raw.write(formatSseEvent(event));
@@ -97,27 +103,72 @@ function openSseConnection(
 // ── Route plugin ──────────────────────────────────────────────────────────────
 
 export async function sseRoutes(app: FastifyInstance): Promise<void> {
+  // Start the worker→API Redis bridge so agent-run events published by the
+  // worker process reach SSE clients here (no-op without REDIS_URL).
+  await startAgentEventsBridge();
+  app.addHook("onClose", async () => {
+    await stopAgentEventsBridge();
+  });
+
+  // ── Tenant-isolation helper ──────────────────────────────────────────────
+  // Verifies the authenticated user owns the given agent-session (by taskId).
+  async function verifySessionOwnership(
+    userId: string | undefined,
+    streamId: string,
+  ): Promise<boolean> {
+    if (!userId) return false; // no user context → deny
+    const dbUrl = process.env.DATABASE_URL;
+    if (!dbUrl) return true; // no DB → allow (single-tenant dev mode)
+    try {
+      const { default: pg } = await import("pg");
+      const pool = new pg.Pool({ connectionString: dbUrl, max: 1 });
+      const { rows } = await pool.query<{ user_id: string }>(
+        `SELECT user_id FROM agent_sessions WHERE task_id = $1 AND user_id IS NOT NULL LIMIT 1`,
+        [streamId],
+      );
+      await pool.end();
+      if (rows.length === 0) return true; // session not yet persisted → allow
+      return rows[0]!.user_id === userId;
+    } catch {
+      return true; // DB unreachable → fail open (don't break SSE for transient issues)
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Firehose routes — open to all authenticated callers
+  // ══════════════════════════════════════════════════════════════════════════
+
   // ── All task updates ─────────────────────────────────────────────────────
 
   app.get(
     "/sse/tasks",
-    { preHandler: requireAuth },
+    { preHandler: [requireAuthWithTier, sseRL] },
     async (request, reply): Promise<void> => {
       reply.hijack();
       openSseConnection(reply.raw, request.socket, ["tasks"]);
     },
   );
 
-  // ── Single task updates ──────────────────────────────────────────────────
+  // ── Single task updates (tenant-isolated) ────────────────────────────────
 
   app.get<{ Params: { taskId: string } }>(
     "/sse/tasks/:taskId",
-    { preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: {},
+          403: {},
+        },
+      },
+      preHandler: [requireAuthWithTier, sseRL],
+    },
     async (request, reply): Promise<void> => {
+      if (!(await verifySessionOwnership(request.nexusUserId, request.params.taskId))) {
+        reply.code(403);
+        return reply.send({ error: "Not your task" });
+      }
       reply.hijack();
-      openSseConnection(reply.raw, request.socket, [
-        `tasks:${request.params.taskId}`,
-      ]);
+      openSseConnection(reply.raw, request.socket, [`tasks:${request.params.taskId}`]);
     },
   );
 
@@ -125,7 +176,15 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
 
   app.get(
     "/sse/signals",
-    { preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: {},
+          403: {},
+        },
+      },
+      preHandler: [requireAuthWithTier, sseRL],
+    },
     async (request, reply): Promise<void> => {
       reply.hijack();
       openSseConnection(reply.raw, request.socket, ["signals"]);
@@ -136,23 +195,80 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
 
   app.get(
     "/sse/verdicts",
-    { preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: {},
+          403: {},
+        },
+      },
+      preHandler: [requireAuthWithTier, sseRL],
+    },
     async (request, reply): Promise<void> => {
       reply.hijack();
       openSseConnection(reply.raw, request.socket, ["verdicts"]);
     },
   );
 
-  // ── Verdict for a specific task ──────────────────────────────────────────
+  // ── Verdict for a specific task ─────────────────────────────────────────
 
   app.get<{ Params: { taskId: string } }>(
     "/sse/verdicts/:taskId",
-    { preHandler: requireAuth },
+    {
+      schema: {
+        response: {
+          200: {},
+          403: {},
+        },
+      },
+      preHandler: [requireAuthWithTier, sseRL],
+    },
     async (request, reply): Promise<void> => {
+      if (!(await verifySessionOwnership(request.nexusUserId, request.params.taskId))) {
+        reply.code(403);
+        return reply.send({ error: "Not your task" });
+      }
       reply.hijack();
-      openSseConnection(reply.raw, request.socket, [
-        `verdicts:${request.params.taskId}`,
-      ]);
+      openSseConnection(reply.raw, request.socket, [`verdicts:${request.params.taskId}`]);
+    },
+  );
+
+  // ── Live agent-run stream (step / compaction / status) ───────────────────
+  // `:stream` is the run's sessionId or taskId. "all" = the open firehose.
+
+  app.get<{ Params: { stream: string } }>(
+    "/sse/agent/:stream",
+    {
+      schema: {
+        response: {
+          200: {},
+          403: {},
+        },
+      },
+      preHandler: [requireAuthWithTier, sseRL],
+    },
+    async (request, reply): Promise<void> => {
+      const { stream } = request.params;
+      // Validate the user-controlled `:stream` selector against an explicit
+      // allowlist. Reserved selectors (e.g. "all") are the open firehose;
+      // everything else is treated strictly as a session id and must pass the
+      // ownership check — a crafted value cannot reach the firehose branch unless
+      // it exactly matches a reserved name.
+      const isFirehose = RESERVED_AGENT_STREAMS.has(stream);
+      if (!isFirehose && !stream.trim()) {
+        reply.code(400);
+        return reply.send({ error: "Invalid stream selector" });
+      }
+      if (!isFirehose) {
+        // Specific session → verify ownership
+        if (!(await verifySessionOwnership(request.nexusUserId, stream))) {
+          reply.code(403);
+          return reply.send({ error: "Not your agent session" });
+        }
+      }
+      const channel = isFirehose ? "agent" : `agent:${stream}`;
+      reply.hijack();
+      openSseConnection(reply.raw, request.socket, [channel]);
     },
   );
 }

@@ -56,9 +56,15 @@ describe("GET /health/ready", () => {
     const res = await app.inject({ method: "GET", url: "/health/ready" });
 
     expect(res.statusCode).toBe(503);
-    const body = res.json<{ status: string; checks: Record<string, string> }>();
-    expect(body.status).toBe("not_ready");
-    expect(body.checks.db).toMatch(/error/i);
+    const body = res.json<{
+      status: string;
+      checks: Record<string, string>;
+      messages: Record<string, string>;
+    }>();
+    // Aggregated readiness: a failed critical probe (db) drives status to "down".
+    expect(body.status).toBe("down");
+    expect(body.checks.db).toBe("fail");
+    expect(body.messages.db).toMatch(/refused|error|fail/i);
 
     await app.close();
   });
