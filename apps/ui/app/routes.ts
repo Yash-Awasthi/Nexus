@@ -81,6 +81,7 @@ export default [
   route("voice", "routes/voice.tsx"),
   route("prediction-markets", "routes/prediction-markets.tsx"),
   route("rlhf", "routes/rlhf.tsx"),
+  route("evals", "routes/evals.tsx"),
   route("agents", "routes/agents.tsx"),
   route("api-tokens", "routes/api-tokens.tsx"),
   route("provider-keys", "routes/provider-keys.tsx"),
