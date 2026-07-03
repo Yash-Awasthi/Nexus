@@ -17,6 +17,7 @@
 
 export type ChunkType = "TEXT" | "THINKING";
 
+/** Content chunk interface definition. */
 export interface ContentChunk {
   type: ChunkType;
   text: string;
@@ -24,9 +25,10 @@ export interface ContentChunk {
 
 // ── ThinkTagParser ────────────────────────────────────────────────────────────
 
-const OPEN_TAG  = "<think>";
+const OPEN_TAG = "<think>";
 const CLOSE_TAG = "</think>";
 
+/** Think tag parser. */
 export class ThinkTagParser {
   private buffer = "";
   private insideThink = false;
@@ -65,8 +67,12 @@ export class ThinkTagParser {
     this.insideThink = false;
   }
 
-  isInsideThink(): boolean { return this.insideThink; }
-  getBuffer(): string { return this.buffer; }
+  isInsideThink(): boolean {
+    return this.insideThink;
+  }
+  getBuffer(): string {
+    return this.buffer;
+  }
 
   // ── Private ────────────────────────────────────────────────────────────────
 
@@ -146,9 +152,7 @@ export function splitThinking(text: string): ContentChunk[] {
  * Async-iterable adapter: wraps an existing AsyncIterable<string> and emits
  * ContentChunks with type annotations.
  */
-export async function* collectChunks(
-  source: AsyncIterable<string>,
-): AsyncIterable<ContentChunk> {
+export async function* collectChunks(source: AsyncIterable<string>): AsyncIterable<ContentChunk> {
   const parser = new ThinkTagParser();
   for await (const chunk of source) {
     for (const c of parser.feed(chunk)) yield c;

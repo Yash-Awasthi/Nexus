@@ -36,8 +36,10 @@ export interface TextChunk {
   tokenEstimate: number;
 }
 
+/** Chunk strategy type alias. */
 export type ChunkStrategy = "fixed" | "sentence" | "paragraph" | "semantic";
 
+/** Fixed chunk options interface definition. */
 export interface FixedChunkOptions {
   /** Max tokens per chunk. Default: 256 */
   maxTokens?: number;
@@ -45,17 +47,20 @@ export interface FixedChunkOptions {
   overlapTokens?: number;
 }
 
+/** Segment chunk options interface definition. */
 export interface SegmentChunkOptions {
   /** Max characters before a forced split within sentence/paragraph mode */
   maxCharsPerChunk?: number;
 }
 
+/** Chunk options type alias. */
 export type ChunkOptions = FixedChunkOptions & SegmentChunkOptions;
 
 // ── Token estimation ──────────────────────────────────────────────────────────
 
 const CHARS_PER_TOKEN = 4;
 
+/** Estimate tokens. */
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / CHARS_PER_TOKEN);
 }
@@ -209,10 +214,7 @@ export interface SemanticChunkOptions {
  *
  * Returns 0 when both sets are empty.
  */
-export function jaccardSimilarity(
-  a: ReadonlySet<string>,
-  b: ReadonlySet<string>,
-): number {
+export function jaccardSimilarity(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
   if (a.size === 0 && b.size === 0) return 0;
   let intersection = 0;
   for (const w of a) {
@@ -250,10 +252,7 @@ const DEFAULT_SEMANTIC_MAX_CHARS = 2000;
  *
  * @returns TextChunk[] (may be empty for blank input).
  */
-export function chunkBySemantic(
-  text: string,
-  opts: SemanticChunkOptions = {},
-): TextChunk[] {
+export function chunkBySemantic(text: string, opts: SemanticChunkOptions = {}): TextChunk[] {
   if (text.trim().length === 0) return [];
 
   const threshold = opts.similarityThreshold ?? DEFAULT_SEMANTIC_THRESHOLD;
@@ -296,8 +295,7 @@ export function chunkBySemantic(
     const sentWords = wordSets[i]!;
     const sentChars = sentence.length;
 
-    const wouldExceedMax =
-      bufferChars > 0 && bufferChars + 1 + sentChars > maxChars;
+    const wouldExceedMax = bufferChars > 0 && bufferChars + 1 + sentChars > maxChars;
 
     if (bufferSentences.length === 0) {
       // Always start a new chunk with the first sentence
@@ -370,6 +368,7 @@ export type NlpScript =
   | "devanagari"
   | "unknown";
 
+/** Language result interface definition. */
 export interface LanguageResult {
   /** ISO 639-1 code or "unknown" */
   language: string;
@@ -380,7 +379,7 @@ export interface LanguageResult {
 }
 
 // Map script ranges for non-Latin scripts (ordered by specificity)
-const NONLATIN_SCRIPTS: ReadonlyArray<{ script: NlpScript; re: RegExp; lang: string }> = [
+const NONLATIN_SCRIPTS: readonly { script: NlpScript; re: RegExp; lang: string }[] = [
   { script: "hiragana", re: /[\u3040-\u309F]/g, lang: "ja" },
   { script: "katakana", re: /[\u30A0-\u30FF]/g, lang: "ja" },
   { script: "hangul", re: /[\uAC00-\uD7AF\u1100-\u11FF]/g, lang: "ko" },
@@ -393,13 +392,158 @@ const NONLATIN_SCRIPTS: ReadonlyArray<{ script: NlpScript; re: RegExp; lang: str
 ];
 
 // Common word fingerprints for Latin-script languages
-const LATIN_LANG_WORDS: ReadonlyArray<{ lang: string; words: ReadonlySet<string> }> = [
-  { lang: "en", words: new Set(["the","is","are","and","of","to","in","that","it","was","for","not","with","he","she","they","have","had","this","at","but","be"]) },
-  { lang: "es", words: new Set(["el","la","los","las","de","que","y","en","un","una","no","se","al","del","por","como","más","son","hay","todo"]) },
-  { lang: "fr", words: new Set(["le","la","les","de","et","un","une","du","au","je","il","est","pas","pour","en","qui","ne","sur","avec","ou"]) },
-  { lang: "de", words: new Set(["der","die","das","und","ist","zu","in","ein","eine","nicht","den","für","sich","mit","an","von","auch","es","auf","dem"]) },
-  { lang: "pt", words: new Set(["os","as","uma","do","da","em","com","não","para","por","ser","uma","mas","seus","sua","são","tem","foi","nos","nas"]) },
-  { lang: "it", words: new Set(["gli","una","che","non","per","con","del","della","dei","si","ci","più","sono","una","sul","nella","dello","alle","questo"]) },
+const LATIN_LANG_WORDS: readonly { lang: string; words: ReadonlySet<string> }[] = [
+  {
+    lang: "en",
+    words: new Set([
+      "the",
+      "is",
+      "are",
+      "and",
+      "of",
+      "to",
+      "in",
+      "that",
+      "it",
+      "was",
+      "for",
+      "not",
+      "with",
+      "he",
+      "she",
+      "they",
+      "have",
+      "had",
+      "this",
+      "at",
+      "but",
+      "be",
+    ]),
+  },
+  {
+    lang: "es",
+    words: new Set([
+      "el",
+      "la",
+      "los",
+      "las",
+      "de",
+      "que",
+      "y",
+      "en",
+      "un",
+      "una",
+      "no",
+      "se",
+      "al",
+      "del",
+      "por",
+      "como",
+      "más",
+      "son",
+      "hay",
+      "todo",
+    ]),
+  },
+  {
+    lang: "fr",
+    words: new Set([
+      "le",
+      "la",
+      "les",
+      "de",
+      "et",
+      "un",
+      "une",
+      "du",
+      "au",
+      "je",
+      "il",
+      "est",
+      "pas",
+      "pour",
+      "en",
+      "qui",
+      "ne",
+      "sur",
+      "avec",
+      "ou",
+    ]),
+  },
+  {
+    lang: "de",
+    words: new Set([
+      "der",
+      "die",
+      "das",
+      "und",
+      "ist",
+      "zu",
+      "in",
+      "ein",
+      "eine",
+      "nicht",
+      "den",
+      "für",
+      "sich",
+      "mit",
+      "an",
+      "von",
+      "auch",
+      "es",
+      "auf",
+      "dem",
+    ]),
+  },
+  {
+    lang: "pt",
+    words: new Set([
+      "os",
+      "as",
+      "uma",
+      "do",
+      "da",
+      "em",
+      "com",
+      "não",
+      "para",
+      "por",
+      "ser",
+      "uma",
+      "mas",
+      "seus",
+      "sua",
+      "são",
+      "tem",
+      "foi",
+      "nos",
+      "nas",
+    ]),
+  },
+  {
+    lang: "it",
+    words: new Set([
+      "gli",
+      "una",
+      "che",
+      "non",
+      "per",
+      "con",
+      "del",
+      "della",
+      "dei",
+      "si",
+      "ci",
+      "più",
+      "sono",
+      "una",
+      "sul",
+      "nella",
+      "dello",
+      "alle",
+      "questo",
+    ]),
+  },
 ];
 
 /**
@@ -488,6 +632,7 @@ export interface KeywordResult {
   frequency: number;
 }
 
+/** Keyword options interface definition. */
 export interface KeywordOptions {
   /** How many top keywords to return. Default: 10. */
   topK?: number;
@@ -497,14 +642,98 @@ export interface KeywordOptions {
 
 // Compact English stopword set (top 70 most common)
 const STOPWORDS = new Set([
-  "a","about","above","after","all","also","an","and","any","are","as","at",
-  "be","been","being","but","by","can","do","each","for","from","get","go",
-  "had","has","have","he","her","him","his","how","i","if","in","into","is",
-  "it","its","just","me","more","my","no","not","now","of","on","or","our",
-  "out","over","own","said","she","so","some","such","than","that","the",
-  "their","them","then","there","these","they","this","through","to","too",
-  "up","us","was","we","were","what","when","which","who","will","with",
-  "would","you","your","could","should","may","might","must","shall","did",
+  "a",
+  "about",
+  "above",
+  "after",
+  "all",
+  "also",
+  "an",
+  "and",
+  "any",
+  "are",
+  "as",
+  "at",
+  "be",
+  "been",
+  "being",
+  "but",
+  "by",
+  "can",
+  "do",
+  "each",
+  "for",
+  "from",
+  "get",
+  "go",
+  "had",
+  "has",
+  "have",
+  "he",
+  "her",
+  "him",
+  "his",
+  "how",
+  "i",
+  "if",
+  "in",
+  "into",
+  "is",
+  "it",
+  "its",
+  "just",
+  "me",
+  "more",
+  "my",
+  "no",
+  "not",
+  "now",
+  "of",
+  "on",
+  "or",
+  "our",
+  "out",
+  "over",
+  "own",
+  "said",
+  "she",
+  "so",
+  "some",
+  "such",
+  "than",
+  "that",
+  "the",
+  "their",
+  "them",
+  "then",
+  "there",
+  "these",
+  "they",
+  "this",
+  "through",
+  "to",
+  "too",
+  "up",
+  "us",
+  "was",
+  "we",
+  "were",
+  "what",
+  "when",
+  "which",
+  "who",
+  "will",
+  "with",
+  "would",
+  "you",
+  "your",
+  "could",
+  "should",
+  "may",
+  "might",
+  "must",
+  "shall",
+  "did",
 ]);
 
 /**
@@ -553,6 +782,7 @@ export function extractKeywords(text: string, opts: KeywordOptions = {}): Keywor
 
 export type EntityType = "PERSON" | "ORG" | "LOCATION" | "DATE" | "PRODUCT" | "EVENT" | "OTHER";
 
+/** Entity interface definition. */
 export interface Entity {
   text: string;
   type: EntityType;
@@ -561,7 +791,7 @@ export interface Entity {
 
 /** Minimal LLM call interface — structurally compatible with @nexus/llm-utils LlmClient */
 export type NlpLlmClient = (
-  messages: ReadonlyArray<{ role: "system" | "user" | "assistant"; content: string }>,
+  messages: readonly { role: "system" | "user" | "assistant"; content: string }[],
   opts?: { temperature?: number; maxTokens?: number },
 ) => Promise<{ content: string; model: string }>;
 
@@ -572,7 +802,13 @@ export const nullNlpLlmClient: NlpLlmClient = async () => ({
 });
 
 const VALID_ENTITY_TYPES = new Set<EntityType>([
-  "PERSON","ORG","LOCATION","DATE","PRODUCT","EVENT","OTHER",
+  "PERSON",
+  "ORG",
+  "LOCATION",
+  "DATE",
+  "PRODUCT",
+  "EVENT",
+  "OTHER",
 ]);
 
 function isEntityType(v: unknown): v is EntityType {
@@ -677,8 +913,7 @@ export async function extractRelationships(
   if (text.trim().length === 0 || entities.length === 0) return [];
 
   const entityList = entities.map((e) => `${e.text} (${e.type})`).join(", ");
-  const userMessage =
-    `Entities: ${entityList}\n\nText:\n${text}`;
+  const userMessage = `Entities: ${entityList}\n\nText:\n${text}`;
 
   const response = await llm(
     [

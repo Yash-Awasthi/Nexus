@@ -126,7 +126,9 @@ describe("ConflictResolver", () => {
 describe("SyncStore", () => {
   let store: SyncStore;
 
-  beforeEach(() => { store = new SyncStore(); });
+  beforeEach(() => {
+    store = new SyncStore();
+  });
 
   it("creates a session", () => {
     const s = store.createSession("user1", "device1", { theme: "dark" });
@@ -156,8 +158,12 @@ describe("SyncStore", () => {
   it("applies delete operation", () => {
     const s = store.createSession("u", "d", { toDelete: "yes" });
     const op: SyncOperation = {
-      sessionId: s.id, deviceId: "d", type: "delete", key: "toDelete",
-      timestamp: new Date().toISOString(), logicalTime: 1,
+      sessionId: s.id,
+      deviceId: "d",
+      type: "delete",
+      key: "toDelete",
+      timestamp: new Date().toISOString(),
+      logicalTime: 1,
     };
     const updated = store.applyOp(op);
     expect(updated!.data["toDelete"]).toBeUndefined();
@@ -166,9 +172,13 @@ describe("SyncStore", () => {
   it("applies merge operation", () => {
     const s = store.createSession("u", "d", { settings: { a: 1 } });
     const op: SyncOperation = {
-      sessionId: s.id, deviceId: "d", type: "merge", key: "settings",
+      sessionId: s.id,
+      deviceId: "d",
+      type: "merge",
+      key: "settings",
       value: { b: 2 },
-      timestamp: new Date().toISOString(), logicalTime: 1,
+      timestamp: new Date().toISOString(),
+      logicalTime: 1,
     };
     const updated = store.applyOp(op);
     expect(updated!.data["settings"]).toMatchObject({ a: 1, b: 2 });
@@ -176,16 +186,36 @@ describe("SyncStore", () => {
 
   it("applyOp returns undefined for unknown sessionId", () => {
     const op: SyncOperation = {
-      sessionId: "ghost", deviceId: "d", type: "set", key: "k",
-      timestamp: new Date().toISOString(), logicalTime: 1,
+      sessionId: "ghost",
+      deviceId: "d",
+      type: "set",
+      key: "k",
+      timestamp: new Date().toISOString(),
+      logicalTime: 1,
     };
     expect(store.applyOp(op)).toBeUndefined();
   });
 
   it("getOpsSince filters by logicalTime", () => {
     const s = store.createSession("u", "d");
-    const op1: SyncOperation = { sessionId: s.id, deviceId: "d", type: "set", key: "a", value: 1, timestamp: new Date().toISOString(), logicalTime: 1 };
-    const op2: SyncOperation = { sessionId: s.id, deviceId: "d", type: "set", key: "b", value: 2, timestamp: new Date().toISOString(), logicalTime: 5 };
+    const op1: SyncOperation = {
+      sessionId: s.id,
+      deviceId: "d",
+      type: "set",
+      key: "a",
+      value: 1,
+      timestamp: new Date().toISOString(),
+      logicalTime: 1,
+    };
+    const op2: SyncOperation = {
+      sessionId: s.id,
+      deviceId: "d",
+      type: "set",
+      key: "b",
+      value: 2,
+      timestamp: new Date().toISOString(),
+      logicalTime: 5,
+    };
     store.applyOp(op1);
     store.applyOp(op2);
     const ops = store.getOpsSince(s.id, 2);
@@ -259,8 +289,14 @@ describe("SyncManager", () => {
   it("merge returns remote for unknown sessionId", () => {
     const manager = new SyncManager("d1");
     const remote: SyncSession = {
-      id: "unknown", userId: "u", deviceId: "d2", data: { k: "v" },
-      vectorClock: {}, updatedAt: "", status: "clean", version: 1,
+      id: "unknown",
+      userId: "u",
+      deviceId: "d2",
+      data: { k: "v" },
+      vectorClock: {},
+      updatedAt: "",
+      status: "clean",
+      version: 1,
     };
     const result = manager.merge("unknown", remote);
     expect(result.winner).toBe("remote");

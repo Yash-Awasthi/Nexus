@@ -34,14 +34,9 @@ export interface SseEvent<T = unknown> {
 
 // ── Domain event payloads ─────────────────────────────────────────────────────
 
-export type TaskStatus =
-  | "queued"
-  | "running"
-  | "completed"
-  | "failed"
-  | "cancelled"
-  | "paused";
+export type TaskStatus = "queued" | "running" | "completed" | "failed" | "cancelled" | "paused";
 
+/** Task update payload interface definition. */
 export interface TaskUpdatePayload {
   taskId: string;
   status: TaskStatus;
@@ -53,8 +48,10 @@ export interface TaskUpdatePayload {
   updatedAt: string;
 }
 
+/** Signal priority type alias. */
 export type SignalPriority = "low" | "medium" | "high" | "critical";
 
+/** Signal payload interface definition. */
 export interface SignalPayload {
   signalId: string;
   signalType: string;
@@ -63,8 +60,10 @@ export interface SignalPayload {
   createdAt: string;
 }
 
+/** Verdict outcome type alias. */
 export type VerdictOutcome = "approved" | "rejected" | "deferred" | "escalated";
 
+/** Verdict payload interface definition. */
 export interface VerdictPayload {
   verdictId: string;
   taskId?: string;
@@ -248,4 +247,49 @@ export function publishVerdict(payload: VerdictPayload): void {
   if (payload.taskId) {
     globalBus.publish(`verdicts:${payload.taskId}`, event);
   }
+}
+
+// ── Agent-run streaming (cross-process worker → API bridge) ─────────────────────
+//
+// Agent runs execute in the worker process; their step/compaction/status events
+// must reach SSE clients connected to the API process. The worker PUBLISHes each
+// event as JSON on AGENT_EVENTS_CHANNEL; the API's Redis subscriber bridge calls
+// `dispatchAgentEvent` for each message, re-publishing onto this in-process bus
+// so the SSE routes deliver it unchanged.
+
+/** Redis pub/sub channel carrying agent-run events across processes. */
+export const AGENT_EVENTS_CHANNEL = "nexus:agent-events";
+
+export type AgentEventType =
+  | "run_started"
+  | "step"
+  | "compaction"
+  | "status"
+  | "learnings"
+  | "learning_proposal"
+  | "tool_compress";
+
+/** A worker-published agent-run event, scoped to one run's stream id. */
+export interface AgentStreamEvent {
+  /** Stream subscribers filter on — the run's sessionId or taskId. */
+  stream: string;
+  type: AgentEventType;
+  data: Record<string, unknown>;
+  /** Epoch ms the event was produced. */
+  ts: number;
+}
+
+/**
+ * Re-publish a cross-process agent event onto the in-process bus, fanning it to
+ * the run-specific `agent:<stream>` channel and the firehose `agent` channel.
+ * Called by the API bridge for each message on {@link AGENT_EVENTS_CHANNEL}.
+ */
+export function dispatchAgentEvent(ev: AgentStreamEvent): void {
+  const event: SseEvent = {
+    event: `agent.${ev.type}`,
+    data: { stream: ev.stream, ...ev.data },
+    id: `agent-${ev.stream}-${ev.ts}`,
+  };
+  globalBus.publish(`agent:${ev.stream}`, event);
+  globalBus.publish("agent", event);
 }

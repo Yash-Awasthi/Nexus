@@ -26,8 +26,12 @@ function sys(content = "You are a helpful assistant."): Message {
   return msg("system", content);
 }
 
-function user(content: string): Message { return msg("user", content); }
-function asst(content: string): Message { return msg("assistant", content); }
+function user(content: string): Message {
+  return msg("user", content);
+}
+function asst(content: string): Message {
+  return msg("assistant", content);
+}
 
 function makeProvider(response = "ok"): LLMProvider {
   return {
@@ -169,10 +173,10 @@ describe("TFIDFPruner", () => {
   it("scores relevant messages higher than irrelevant ones", async () => {
     // Last user message is about Python. Relevant prior msg should score higher.
     const msgs = [
-      user("I like cats and dogs"),  // irrelevant
-      asst("Nice! Cats are great"),   // irrelevant
+      user("I like cats and dogs"), // irrelevant
+      asst("Nice! Cats are great"), // irrelevant
       user("Python is a great language"), // relevant
-      asst("Python rocks"),            // relevant
+      asst("Python rocks"), // relevant
       user("Tell me more about Python"), // anchor
     ];
     // Tight budget: only fits ~3 messages (anchor + 2 others)
@@ -253,13 +257,25 @@ describe("PrunerChain", () => {
     const bigPruner: IContextPruner = {
       estimate: () => 9999,
       async prune(m) {
-        return { messages: m, originalCount: m.length, prunedCount: 0, estimatedTokens: 9999, strategy: "big" };
+        return {
+          messages: m,
+          originalCount: m.length,
+          prunedCount: 0,
+          estimatedTokens: 9999,
+          strategy: "big",
+        };
       },
     };
     const smallPruner: IContextPruner = {
       estimate: () => 1,
       async prune(m) {
-        return { messages: [m[m.length - 1]!], originalCount: m.length, prunedCount: m.length - 1, estimatedTokens: 1, strategy: "small" };
+        return {
+          messages: [m[m.length - 1]!],
+          originalCount: m.length,
+          prunedCount: m.length - 1,
+          estimatedTokens: 1,
+          strategy: "small",
+        };
       },
     };
     const chain = new PrunerChain([bigPruner, smallPruner]);
@@ -271,7 +287,13 @@ describe("PrunerChain", () => {
     const alwaysOver: IContextPruner = {
       estimate: () => 9999,
       async prune(m) {
-        return { messages: m, originalCount: m.length, prunedCount: 0, estimatedTokens: 9999, strategy: "over" };
+        return {
+          messages: m,
+          originalCount: m.length,
+          prunedCount: 0,
+          estimatedTokens: 9999,
+          strategy: "over",
+        };
       },
     };
     const chain = new PrunerChain([alwaysOver]);
@@ -287,7 +309,10 @@ describe("BudgetGuard", () => {
     const inner = makeProvider("response");
     const pruner = new SlidingWindowPruner(new NaiveTokenizer());
     const guard = new BudgetGuard(inner, pruner, { contextWindowTokens: 10000 });
-    const result = await guard.complete({ model: "gpt-4o", messages: [{ role: "user", content: "hi" }] });
+    const result = await guard.complete({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: "hi" }],
+    });
     expect(result.content).toBe("response");
   });
 
@@ -303,8 +328,14 @@ describe("BudgetGuard", () => {
     };
     const pruner = new SlidingWindowPruner(new NaiveTokenizer());
     // Very tight: 50 token window, 30 reserved for completion → only 20 for context
-    const guard = new BudgetGuard(inner, pruner, { contextWindowTokens: 50, reserveCompletionTokens: 30 });
-    const manyMessages = Array.from({ length: 20 }, (_, i) => ({ role: "user" as const, content: `message number ${i}` }));
+    const guard = new BudgetGuard(inner, pruner, {
+      contextWindowTokens: 50,
+      reserveCompletionTokens: 30,
+    });
+    const manyMessages = Array.from({ length: 20 }, (_, i) => ({
+      role: "user" as const,
+      content: `message number ${i}`,
+    }));
     await guard.complete({ model: "gpt-4o", messages: manyMessages });
     expect(captured[0]!.messages.length).toBeLessThan(manyMessages.length);
   });

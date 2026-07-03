@@ -13,7 +13,9 @@ import {
 
 describe("ThinkTagParser — one-shot feed + flush", () => {
   let p: ThinkTagParser;
-  beforeEach(() => { p = new ThinkTagParser(); });
+  beforeEach(() => {
+    p = new ThinkTagParser();
+  });
 
   it("plain text emits single TEXT chunk", () => {
     const chunks = [...p.feed("hello world"), ...p.flush()];
@@ -53,7 +55,10 @@ describe("ThinkTagParser — one-shot feed + flush", () => {
     const fromFeed = p.feed("partial<");
     // "partial" emits from feed, "<" is held; flush releases the held "<"
     const flushed = p.flush();
-    const allText = [...fromFeed, ...flushed].filter((c) => c.type === "TEXT").map((c) => c.text).join("");
+    const allText = [...fromFeed, ...flushed]
+      .filter((c) => c.type === "TEXT")
+      .map((c) => c.text)
+      .join("");
     expect(allText).toContain("partial");
     expect(allText).toContain("<");
   });
@@ -92,7 +97,7 @@ describe("ThinkTagParser — one-shot feed + flush", () => {
 describe("ThinkTagParser — chunk-boundary buffering", () => {
   it("tag split across chunks is handled correctly", () => {
     const p = new ThinkTagParser();
-    const chunks1 = p.feed("pre<thi");    // partial <think>
+    const chunks1 = p.feed("pre<thi"); // partial <think>
     const chunks2 = p.feed("nk>reasoning</think>post");
     const flushed = p.flush();
     const all = [...chunks1, ...chunks2, ...flushed];
@@ -117,8 +122,14 @@ describe("ThinkTagParser — chunk-boundary buffering", () => {
     const chunks: ContentChunk[] = [];
     for (const char of input) chunks.push(...p.feed(char));
     chunks.push(...p.flush());
-    const thinking = chunks.filter((c) => c.type === "THINKING").map((c) => c.text).join("");
-    const text = chunks.filter((c) => c.type === "TEXT").map((c) => c.text).join("");
+    const thinking = chunks
+      .filter((c) => c.type === "THINKING")
+      .map((c) => c.text)
+      .join("");
+    const text = chunks
+      .filter((c) => c.type === "TEXT")
+      .map((c) => c.text)
+      .join("");
     expect(thinking).toContain("hi");
     expect(text).toContain("ok");
   });
@@ -128,8 +139,14 @@ describe("ThinkTagParser — chunk-boundary buffering", () => {
     const c1 = p.feed("before<think>");
     const c2 = p.feed("inside</think>after");
     const all = [...c1, ...c2, ...p.flush()];
-    const text = all.filter((c) => c.type === "TEXT").map((c) => c.text).join("");
-    const thinking = all.filter((c) => c.type === "THINKING").map((c) => c.text).join("");
+    const text = all
+      .filter((c) => c.type === "TEXT")
+      .map((c) => c.text)
+      .join("");
+    const thinking = all
+      .filter((c) => c.type === "THINKING")
+      .map((c) => c.text)
+      .join("");
     expect(text).toContain("before");
     expect(text).toContain("after");
     expect(thinking).toContain("inside");
@@ -166,8 +183,14 @@ describe("collectChunks", () => {
     const source = makeStream(["<think>", "step", "</think>", "answer"]);
     const chunks: ContentChunk[] = [];
     for await (const c of collectChunks(source)) chunks.push(c);
-    const thinking = chunks.filter((c) => c.type === "THINKING").map((c) => c.text).join("");
-    const text = chunks.filter((c) => c.type === "TEXT").map((c) => c.text).join("");
+    const thinking = chunks
+      .filter((c) => c.type === "THINKING")
+      .map((c) => c.text)
+      .join("");
+    const text = chunks
+      .filter((c) => c.type === "TEXT")
+      .map((c) => c.text)
+      .join("");
     expect(thinking).toContain("step");
     expect(text).toContain("answer");
   });

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-export interface ITaskSnapshot {
+interface ITaskSnapshot {
   id: string;
   status: string;
   priority: string;
@@ -8,13 +8,13 @@ export interface ITaskSnapshot {
   retries: number;
 }
 
-export interface IQueueSnapshot {
+interface IQueueSnapshot {
   activeJobsCount: number;
   deadLetterJobsCount: number;
   jobs: { id: string; priority: string; retries: number }[];
 }
 
-export interface IEventSnapshot {
+interface IEventSnapshot {
   event: string;
   /** ISO string from the event log JSON, or a Date when constructed in-process. */
   timestamp: Date | string;

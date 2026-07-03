@@ -9,3 +9,4 @@ export * from "./logger.js";
 export * from "./observability-manager.js";
 export * from "./prometheus-format.js";
 export * from "./environment-telemetry.js";
+export * from "./llm-observability.js";
