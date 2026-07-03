@@ -113,7 +113,7 @@ export default function ProfilePage() {
     setIsSavingInstructions(true);
     setSaveError(null);
     try {
-      const res = await fetch("/api/auth/me", {
+      const res = await fetch("/api/v1/auth/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ custom_instructions: customInstructions }),

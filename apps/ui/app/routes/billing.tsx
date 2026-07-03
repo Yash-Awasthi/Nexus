@@ -110,7 +110,7 @@ export default function Billing() {
 
   // Get current user/tenant
   useEffect(() => {
-    fetch("/api/auth/me")
+    fetch("/api/v1/auth/me")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d?.tenantId || d?.id) setTenantId(d.tenantId ?? String(d.id));
