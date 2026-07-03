@@ -810,6 +810,14 @@ standalone fetchers (`NgaNavWarningFeed`, `SecEdgarFeed`, …). Tests:
   then add the adapter mirroring `MaritimeFeed`. Done: adapter + mocked-fetch test.
 - **13.2 AIS vessel-name enrichment.** Files: `MaritimeFeed`. Do: enrich via Digitraffic
   `/vessels` (live probe = **Gate**; test with mocked fetch). Done: names attached to incidents.
+  **Done this branch (commit `e85cb4f`).** Added opt-in `enrichVesselNames` to `MaritimeFeed`
+  (default OFF, so all existing behaviour/tests are byte-identical). When on, `enrichEvents`
+  attaches a deterministic MID-derived `flagState` (new exported `mmsiFlagState` + focused
+  Baltic/open-registry MID table — no network) and, from a second `/vessels` fetch joined by
+  MMSI, the `vesselName` (folded into the summary) plus `callSign`/`imo`/`shipType`/`destination`
+  metadata. Best-effort: a `/vessels` failure keeps flag-only enrichment, never throws (so it
+  can't trip the mock fallback) and never drops an incident. 12 new tests (URL-routing mock,
+  mocked fetch); typecheck + build green. **Live `/vessels` probe remains a Gate — not run.**
 - **13.3 Dark-web sources** *(Gate — legal review before any code).*
 
 ## 14. Production multi-tenant hardening (mostly external infra; scaffolding in `infra/`)
