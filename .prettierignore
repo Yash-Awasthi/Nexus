@@ -9,3 +9,5 @@ coverage/
 pnpm-lock.yaml
 infra/helm/
 .docusaurus/
+REF/
+.claude/worktrees/
