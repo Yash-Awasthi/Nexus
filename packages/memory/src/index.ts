@@ -125,7 +125,10 @@ export type MemoryErrorCode =
   | "STORE_READ_FAILED"
   | "EMBED_FAILED"
   | "NOT_FOUND"
-  | "DIMENSION_MISMATCH";
+  | "DIMENSION_MISMATCH"
+  | "BLOCK_NOT_FOUND"
+  | "BLOCK_LIMIT_EXCEEDED"
+  | "BLOCK_REPLACE_TARGET_MISSING";
 
 /** Memory error. */
 export class MemoryError extends Error {
@@ -598,6 +601,21 @@ export interface MemoryManagerConfig {
   embedder: IEmbedder;
   /** Default k for recall() when limit is not supplied */
   defaultRecallLimit?: number;
+  /**
+   * Weights for the single-pass fusion retrieval (see fusionRecall).
+   * Any subset may be supplied; missing keys fall back to defaults.
+   */
+  fusionWeights?: Partial<FusionWeights>;
+  /**
+   * Half-life (seconds) for the temporal recency signal in fusionRecall.
+   * Default: 7 days. A memory this old contributes half its recency score.
+   */
+  recencyHalfLifeSeconds?: number;
+  /**
+   * Seed the letta-style self-editing core-memory blocks.
+   * Each entry becomes an editable typed block (human / persona / scratch / …).
+   */
+  blocks?: MemoryBlockInit[];
 }
 
 /**
@@ -617,10 +635,24 @@ export class MemoryManager {
   private readonly embedder: IEmbedder;
   private readonly defaultLimit: number;
 
+  /** Lexical (BM25) index kept in sync for the fusion retrieval path. */
+  private readonly lexicon = new BM25Lexicon();
+  /** id → entry mirror, so BM25-only hits can be resolved without a store getById. */
+  private readonly entryCache = new Map<string, MemoryEntry>();
+  /** id → extracted entities, populated at remember() time (fusion entity signal). */
+  private readonly entityIndex = new Map<string, string[]>();
+  /** letta-style self-editing core-memory blocks, keyed by label. */
+  private readonly blocks = new Map<string, MemoryBlock>();
+  private readonly fusionWeights: FusionWeights;
+  private readonly recencyHalfLife: number;
+
   constructor(config: MemoryManagerConfig) {
     this.store = config.store;
     this.embedder = config.embedder;
     this.defaultLimit = config.defaultRecallLimit ?? 5;
+    this.fusionWeights = { ...DEFAULT_FUSION_WEIGHTS, ...config.fusionWeights };
+    this.recencyHalfLife = config.recencyHalfLifeSeconds ?? 7 * 24 * 3600;
+    for (const init of config.blocks ?? []) this.upsertBlock(init);
   }
 
   /**
@@ -645,11 +677,43 @@ export class MemoryManager {
       ...(options.ttl !== undefined ? { expiresAt: now + options.ttl } : {}),
     };
 
+    let saved: MemoryEntry;
     try {
-      return await this.store.save(entry);
+      saved = await this.store.save(entry);
     } catch (cause) {
       throw new MemoryError("STORE_WRITE_FAILED", `Store write failed: ${String(cause)}`);
     }
+
+    this.indexEntry(saved);
+    return saved;
+  }
+
+  /** Add/refresh an entry in the fusion indexes (lexicon, entry mirror, entities). */
+  private indexEntry(entry: MemoryEntry): void {
+    this.entryCache.set(entry.id, entry);
+    this.entityIndex.set(entry.id, extractEntities(entry.text));
+    this.lexicon.add({ id: entry.id, text: entry.text, groupId: entry.userId });
+  }
+
+  /** Drop an entry from every fusion index. */
+  private deindex(id: string): void {
+    this.entryCache.delete(id);
+    this.entityIndex.delete(id);
+    this.lexicon.remove(id);
+  }
+
+  /**
+   * Rebuild the fusion indexes from the backing store.
+   * Call once after constructing a manager over a pre-populated store
+   * (e.g. a PgVectorStore) so fusionRecall can see existing rows.
+   */
+  async reindex(): Promise<number> {
+    this.entryCache.clear();
+    this.entityIndex.clear();
+    this.lexicon.clear();
+    const all = await this.store.list({ excludeExpired: false });
+    for (const entry of all) this.indexEntry(entry);
+    return all.length;
   }
 
   /**
@@ -679,6 +743,7 @@ export class MemoryManager {
    */
   async forget(id: string): Promise<void> {
     await this.store.delete(id);
+    this.deindex(id);
   }
 
   /**
@@ -692,7 +757,11 @@ export class MemoryManager {
    * Bulk-delete memories matching a filter. Returns count removed.
    */
   async purge(filter?: MemoryFilter): Promise<number> {
-    return this.store.purge(filter);
+    // Resolve the affected ids first so the fusion indexes stay consistent.
+    const doomed = await this.store.list({ ...filter, excludeExpired: false });
+    const removed = await this.store.purge(filter);
+    for (const e of doomed) this.deindex(e.id);
+    return removed;
   }
 
   /**
@@ -708,6 +777,446 @@ export class MemoryManager {
       newest: Math.max(...times),
     };
   }
+
+  // ── Fusion retrieval (mem0-style single-pass BM25 + vector + entity) ──────────
+
+  /**
+   * Single-pass multi-signal recall à la mem0.
+   *
+   * Runs vector (embedding) search and BM25 lexical search over the same query,
+   * then fuses them with two extra deterministic signals in ONE ranking pass:
+   *   - **entity overlap** — shared named entities between query and memory
+   *     (entity linking; see {@link extractEntities}), and
+   *   - **temporal recency** — exponential decay on entry age, plus an optional
+   *     window boost when the query carries a relative-time reference
+   *     ("today", "yesterday", "last week"; see {@link parseRelativeTimeWindow}).
+   *
+   * Each raw signal is min-max normalised across the candidate pool so the
+   * weighted sum is comparable regardless of the underlying scales. Weights are
+   * taken from {@link MemoryManagerConfig.fusionWeights} and may be overridden
+   * per call.
+   *
+   * Deterministic given a {@link FixedEmbedder} + fixed `now`, so it is fully
+   * unit-testable without external services.
+   */
+  async fusionRecall(query: string, options: FusionRecallOptions = {}): Promise<FusionResult[]> {
+    const limit = options.limit ?? this.defaultLimit;
+    const now = options.now ?? Math.floor(Date.now() / 1000);
+    const weights: FusionWeights = { ...this.fusionWeights, ...options.weights };
+    const halfLife = options.recencyHalfLifeSeconds ?? this.recencyHalfLife;
+    // Pull a wider pool than `limit` so fusion can re-rank across signals.
+    const pool = Math.max(limit * 4, 20);
+
+    let queryEmbedding: number[];
+    try {
+      queryEmbedding = await this.embedder.embed(query);
+    } catch (cause) {
+      throw new MemoryError("EMBED_FAILED", `Query embedding failed: ${String(cause)}`);
+    }
+
+    let vecHits: MemorySearchResult[];
+    try {
+      vecHits = await this.store.search(queryEmbedding, pool, options.filter);
+    } catch (cause) {
+      throw new MemoryError("STORE_READ_FAILED", `Store search failed: ${String(cause)}`);
+    }
+    const bm25Hits = this.lexicon.search(query, pool);
+    const queryEntities = new Set(extractEntities(query).map(normalizeEntity));
+    const window =
+      options.temporal === false ? undefined : parseRelativeTimeWindow(query, now);
+
+    // ── Assemble the candidate pool (union of vector + lexical hits) ────────────
+    const vectorById = new Map<string, number>();
+    const candidates = new Map<string, MemoryEntry>();
+    for (const r of vecHits) {
+      vectorById.set(r.entry.id, r.score);
+      candidates.set(r.entry.id, r.entry);
+    }
+    const bm25ById = new Map<string, number>();
+    for (const h of bm25Hits) {
+      bm25ById.set(h.id, h.score);
+      if (!candidates.has(h.id)) {
+        const cached = this.entryCache.get(h.id);
+        // Respect the ACL/metadata filter for lexical-only hits too.
+        if (cached && entryMatchesFilter(cached, options.filter, now)) candidates.set(h.id, cached);
+      }
+    }
+    if (candidates.size === 0) return [];
+
+    // ── Raw per-signal scores ───────────────────────────────────────────────────
+    interface Raw {
+      entry: MemoryEntry;
+      vector: number;
+      bm25: number;
+      entity: number;
+      recency: number;
+      inWindow: boolean;
+    }
+    const raws: Raw[] = [];
+    for (const [id, entry] of candidates) {
+      // Defence-in-depth: vet every candidate against the filter, since not all
+      // IMemoryStore.search impls enforce the userId ACL (InMemoryStore does not).
+      if (!entryMatchesFilter(entry, options.filter, now)) continue;
+      const ents = this.entityIndex.get(id) ?? extractEntities(entry.text);
+      let overlap = 0;
+      const seen = new Set<string>();
+      for (const e of ents) {
+        const key = normalizeEntity(e);
+        if (queryEntities.has(key) && !seen.has(key)) {
+          seen.add(key);
+          overlap++;
+        }
+      }
+      const ageSeconds = Math.max(0, now - entry.createdAt);
+      const recency = halfLife > 0 ? Math.pow(2, -ageSeconds / halfLife) : 0;
+      const inWindow =
+        window !== undefined && entry.createdAt >= window.after && entry.createdAt <= window.before;
+      raws.push({
+        entry,
+        vector: vectorById.get(id) ?? 0,
+        bm25: bm25ById.get(id) ?? 0,
+        entity: overlap,
+        recency,
+        inWindow,
+      });
+    }
+
+    // ── Min-max normalise each signal across the pool, then weight & sum ─────────
+    const maxVector = Math.max(...raws.map((r) => r.vector), 0);
+    const maxBm25 = Math.max(...raws.map((r) => r.bm25), 0);
+    const maxEntity = Math.max(...raws.map((r) => r.entity), 0);
+
+    const results: FusionResult[] = raws.map((r) => {
+      const signals: FusionSignals = {
+        vector: maxVector > 0 ? r.vector / maxVector : 0,
+        bm25: maxBm25 > 0 ? r.bm25 / maxBm25 : 0,
+        entity: maxEntity > 0 ? r.entity / maxEntity : 0,
+        recency: r.recency,
+        entityMatches: r.entity,
+      };
+      let score =
+        weights.vector * signals.vector +
+        weights.bm25 * signals.bm25 +
+        weights.entity * signals.entity +
+        weights.recency * signals.recency;
+      if (r.inWindow) score += weights.windowBoost;
+      return { entry: r.entry, score, signals, inTemporalWindow: r.inWindow };
+    });
+
+    results.sort((a, b) => b.score - a.score);
+    return results.slice(0, limit);
+  }
+
+  // ── Self-editing typed core-memory blocks (letta pattern) ─────────────────────
+
+  /** Create or overwrite a typed core-memory block. */
+  upsertBlock(init: MemoryBlockInit): MemoryBlock {
+    const block: MemoryBlock = {
+      label: init.label,
+      value: init.value ?? "",
+      limit: init.limit ?? DEFAULT_BLOCK_LIMIT,
+      ...(init.description !== undefined ? { description: init.description } : {}),
+    };
+    if (block.value.length > block.limit) {
+      throw new MemoryError(
+        "BLOCK_LIMIT_EXCEEDED",
+        `Block "${block.label}" value (${block.value.length}) exceeds limit ${block.limit}`,
+      );
+    }
+    this.blocks.set(block.label, block);
+    return { ...block };
+  }
+
+  /** Fetch a block by label (throws BLOCK_NOT_FOUND if absent). */
+  getBlock(label: string): MemoryBlock {
+    const b = this.blocks.get(label);
+    if (!b) throw new MemoryError("BLOCK_NOT_FOUND", `No core-memory block "${label}"`);
+    return { ...b };
+  }
+
+  /** True if a block with this label exists. */
+  hasBlock(label: string): boolean {
+    return this.blocks.has(label);
+  }
+
+  /** All blocks in insertion order (defensive copies). */
+  listBlocks(): MemoryBlock[] {
+    return [...this.blocks.values()].map((b) => ({ ...b }));
+  }
+
+  /**
+   * letta `core_memory_append` — append a line to a block, enforcing its limit.
+   * Lines are newline-joined; an empty block appends without a leading newline.
+   */
+  coreMemoryAppend(label: string, content: string): MemoryBlock {
+    const b = this.requireBlock(label);
+    const next = b.value.length === 0 ? content : `${b.value}\n${content}`;
+    if (next.length > b.limit) {
+      throw new MemoryError(
+        "BLOCK_LIMIT_EXCEEDED",
+        `Appending to block "${label}" would reach ${next.length} chars (limit ${b.limit})`,
+      );
+    }
+    b.value = next;
+    return { ...b };
+  }
+
+  /**
+   * letta `core_memory_replace` — replace the first occurrence of `oldContent`
+   * with `newContent`. Throws BLOCK_REPLACE_TARGET_MISSING when the target text
+   * is not present (mirrors letta's fail-loud contract for self-edits).
+   */
+  coreMemoryReplace(label: string, oldContent: string, newContent: string): MemoryBlock {
+    const b = this.requireBlock(label);
+    const idx = b.value.indexOf(oldContent);
+    if (idx === -1) {
+      throw new MemoryError(
+        "BLOCK_REPLACE_TARGET_MISSING",
+        `Block "${label}" does not contain the text to replace`,
+      );
+    }
+    const next = b.value.slice(0, idx) + newContent + b.value.slice(idx + oldContent.length);
+    if (next.length > b.limit) {
+      throw new MemoryError(
+        "BLOCK_LIMIT_EXCEEDED",
+        `Replacing in block "${label}" would reach ${next.length} chars (limit ${b.limit})`,
+      );
+    }
+    b.value = next;
+    return { ...b };
+  }
+
+  /**
+   * Render all blocks as a stable, prompt-injectable string.
+   * Format mirrors letta's core-memory sections:
+   *   <persona>
+   *   …value…
+   *   </persona>
+   */
+  renderCoreMemory(): string {
+    return [...this.blocks.values()]
+      .map((b) => `<${b.label}>\n${b.value}\n</${b.label}>`)
+      .join("\n");
+  }
+
+  private requireBlock(label: string): MemoryBlock {
+    const b = this.blocks.get(label);
+    if (!b) throw new MemoryError("BLOCK_NOT_FOUND", `No core-memory block "${label}"`);
+    return b;
+  }
+}
+
+// ── Fusion retrieval types (mem0-style single-pass fusion) ─────────────────────
+
+/** Relative weight of each fusion signal. All default to sensible mem0-like values. */
+export interface FusionWeights {
+  /** Vector (embedding cosine) similarity weight. */
+  vector: number;
+  /** BM25 lexical weight. */
+  bm25: number;
+  /** Named-entity overlap weight (entity linking). */
+  entity: number;
+  /** Temporal recency (age decay) weight. */
+  recency: number;
+  /** Flat bonus added when the entry falls inside the query's temporal window. */
+  windowBoost: number;
+}
+
+export const DEFAULT_FUSION_WEIGHTS: FusionWeights = {
+  vector: 0.5,
+  bm25: 0.3,
+  entity: 0.15,
+  recency: 0.05,
+  windowBoost: 0.1,
+};
+
+/** Per-signal breakdown attached to every fusion result (all normalised to [0,1]). */
+export interface FusionSignals {
+  vector: number;
+  bm25: number;
+  entity: number;
+  recency: number;
+  /** Raw count of query↔entry entity matches (pre-normalisation), for debugging. */
+  entityMatches: number;
+}
+
+/** A fused, re-ranked recall result. */
+export interface FusionResult {
+  entry: MemoryEntry;
+  /** Final weighted fusion score. */
+  score: number;
+  signals: FusionSignals;
+  /** True when the entry fell inside the query's parsed temporal window. */
+  inTemporalWindow: boolean;
+}
+
+/** Options for {@link MemoryManager.fusionRecall}. */
+export interface FusionRecallOptions {
+  /** Max results (defaults to the manager's defaultRecallLimit). */
+  limit?: number;
+  /** Store filter (ACL / metadata / expiry) applied to both signal sources. */
+  filter?: MemoryFilter;
+  /** Per-call weight overrides. */
+  weights?: Partial<FusionWeights>;
+  /** Override the recency half-life (seconds) for this call. */
+  recencyHalfLifeSeconds?: number;
+  /** Fixed "current time" (epoch seconds) — pass for deterministic tests. */
+  now?: number;
+  /** Set false to skip temporal-window parsing/boosting. */
+  temporal?: boolean;
+}
+
+// ── Self-editing typed memory blocks (letta core-memory pattern) ───────────────
+
+/** Default character budget for a core-memory block (letta default). */
+export const DEFAULT_BLOCK_LIMIT = 2000;
+
+/** A typed, self-editable core-memory block (human / persona / scratch / …). */
+export interface MemoryBlock {
+  /** Stable label, e.g. "human", "persona", "scratch". */
+  label: string;
+  /** Current block contents. */
+  value: string;
+  /** Hard character cap; edits that would exceed it throw BLOCK_LIMIT_EXCEEDED. */
+  limit: number;
+  /** Optional human-readable purpose of the block. */
+  description?: string;
+}
+
+/** Seed for {@link MemoryManager.upsertBlock} / config.blocks. */
+export interface MemoryBlockInit {
+  label: string;
+  value?: string;
+  limit?: number;
+  description?: string;
+}
+
+// ── Entity linking (deterministic, rule-based) ─────────────────────────────────
+
+/** Lower-cased key used to compare two surface forms of the same entity. */
+export function normalizeEntity(entity: string): string {
+  return entity.toLowerCase().trim();
+}
+
+/**
+ * Deterministic, dependency-free entity extractor for entity-linked retrieval.
+ *
+ * Surfaces the high-signal tokens a lexical/semantic index tends to miss:
+ *   - `@mentions` and `#hashtags`
+ *   - file / path-like tokens (containing `/` or a dotted extension)
+ *   - dotted / slashed / snake / kebab identifiers and CamelCase symbols
+ *   - Proper-noun runs (sequences of Capitalised words), stop-words excluded
+ *
+ * No LLM, no network — same input always yields the same ordered, de-duplicated
+ * list, so it is safe in deterministic unit tests.
+ */
+export function extractEntities(text: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const push = (raw: string): void => {
+    const val = raw.trim().replace(/[.,;:!?]+$/, "");
+    if (val.length < 2) return;
+    const key = normalizeEntity(val);
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(val);
+  };
+
+  // @mentions and #hashtags
+  for (const m of text.matchAll(/[@#][A-Za-z0-9_./-]+/g)) push(m[0]);
+
+  // Path- / file-like and identifier tokens (a.b, a/b, snake_case, kebab-case)
+  for (const m of text.matchAll(/\b[A-Za-z0-9_]+(?:[./_-][A-Za-z0-9_]+)+\b/g)) push(m[0]);
+
+  // CamelCase / PascalCase identifiers (at least one internal capital)
+  for (const m of text.matchAll(/\b[A-Za-z][a-z0-9]+(?:[A-Z][a-z0-9]+)+\b/g)) push(m[0]);
+
+  // Proper-noun runs: consecutive Capitalised words, ignoring sentence-initial stop words.
+  for (const m of text.matchAll(/\b[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*\b/g)) {
+    const phrase = m[0];
+    const words = phrase.split(/\s+/).filter((w) => !ENTITY_STOPWORDS.has(w.toLowerCase()));
+    if (words.length === 0) continue;
+    push(words.join(" "));
+  }
+
+  return out;
+}
+
+const ENTITY_STOPWORDS = new Set([
+  "the",
+  "a",
+  "an",
+  "i",
+  "it",
+  "he",
+  "she",
+  "they",
+  "we",
+  "you",
+  "this",
+  "that",
+  "these",
+  "those",
+  "my",
+  "our",
+  "their",
+]);
+
+// ── Temporal reasoning (deterministic relative-time windows) ───────────────────
+
+/** An inclusive epoch-second window `[after, before]`. */
+export interface TimeWindow {
+  after: number;
+  before: number;
+}
+
+const DAY = 86400;
+
+/**
+ * Parse a relative-time reference out of a query into an epoch-second window,
+ * relative to `now`. Deterministic — no `Date.now()` inside. Returns undefined
+ * when the query carries no recognised temporal phrase.
+ *
+ * Recognised: today, yesterday, this/last/past week, this/last/past month,
+ * "last N days", "past N hours".
+ */
+export function parseRelativeTimeWindow(query: string, now: number): TimeWindow | undefined {
+  const q = query.toLowerCase();
+
+  const lastNDays = /\b(?:last|past)\s+(\d+)\s+days?\b/.exec(q);
+  if (lastNDays) {
+    const n = Number(lastNDays[1]);
+    return { after: now - n * DAY, before: now };
+  }
+  const pastNHours = /\b(?:last|past)\s+(\d+)\s+hours?\b/.exec(q);
+  if (pastNHours) {
+    const n = Number(pastNHours[1]);
+    return { after: now - n * 3600, before: now };
+  }
+
+  if (/\btoday\b/.test(q)) return { after: now - DAY, before: now };
+  if (/\byesterday\b/.test(q)) return { after: now - 2 * DAY, before: now - DAY };
+  if (/\b(?:this|last|past)\s+week\b/.test(q)) return { after: now - 7 * DAY, before: now };
+  if (/\b(?:this|last|past)\s+month\b/.test(q)) return { after: now - 30 * DAY, before: now };
+  if (/\brecent(?:ly)?\b/.test(q)) return { after: now - 3 * DAY, before: now };
+
+  return undefined;
+}
+
+/**
+ * Does an entry pass a MemoryFilter? Mirrors the InMemoryStore filter semantics
+ * so fusionRecall can vet lexical-only hits consistently.
+ */
+function entryMatchesFilter(entry: MemoryEntry, filter: MemoryFilter | undefined, now: number): boolean {
+  const excludeExpired = filter?.excludeExpired ?? true;
+  if (excludeExpired && entry.expiresAt !== undefined && entry.expiresAt < now) return false;
+  if (filter?.userId !== undefined && entry.userId !== filter.userId) return false;
+  if (filter?.metadata) {
+    for (const [k, v] of Object.entries(filter.metadata)) {
+      if (entry.metadata[k] !== v) return false;
+    }
+  }
+  return true;
 }
 
 // ── Math helpers ──────────────────────────────────────────────────────────────
