@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: Apache-2.0
+# Railway deployment configuration for NEXUS
+#
+# This file configures the nexus-api service.
+# nexus-ui and nexus-worker must have their Dockerfile paths set
+# manually in Railway UI → service → Settings → Build → Dockerfile path:
+#   nexus-ui:     apps/ui/Dockerfile
+#   nexus-worker: apps/worker/Dockerfile
+#
+# Required env vars (set in each service's Variables tab):
+#   NEXUS_API_KEY  — REQUIRED. Process exits at startup if unset (>=16 chars in
+#                    production). This is the #1 cause of nexus-api deploy_failed.
+#                    generate with: openssl rand -hex 32
+#   DATABASE_URL   — REQUIRED. Add the Railway PostgreSQL plugin to the service;
+#                    @nexus/db throws at import if unset → process exits.
+#   REDIS_URL      — auto-set by Railway Redis plugin
+#   JWT_SECRET     — generate with: openssl rand -hex 32
+#   HMAC_KEY       — generate with: openssl rand -hex 32
+#   SCRYPT_SECRET  — generate with: openssl rand -hex 32
+#   NODE_ENV=production
+#
+# nexus-ui also needs:
+#   NEXUS_API_INTERNAL_URL — full origin nginx proxies /api/* to, e.g.
+#                    http://nexus-api.railway.internal:10000 (private networking).
+#                    REQUIRED: nginx fails to start if unset (no default).
+#
+# Optional (enables AI providers):
+#   OPENAI_API_KEY, ANTHROPIC_API_KEY, GROQ_API_KEY, GEMINI_API_KEY
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "apps/api/Dockerfile"
+watchPatterns = ["apps/api/**", "packages/**"]
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 120
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 5

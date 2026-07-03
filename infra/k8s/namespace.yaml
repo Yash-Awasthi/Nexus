@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+# Nexus platform namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nexus
+  labels:
+    app.kubernetes.io/name: nexus
+    app.kubernetes.io/managed-by: kubectl

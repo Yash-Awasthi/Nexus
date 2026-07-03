@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: Apache-2.0
+# Prometheus scrape configuration for Nexus local observability stack.
+# Used by the prometheus service in infra/docker/docker-compose.observability.yml.
+#
+# Scrape targets:
+#   nexus-api          — /api/v1/metrics  (Prometheus text; set METRICS_NO_AUTH=true for local dev)
+#   otel-collector     — :8889            (OTel Collector Prometheus exporter)
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # ── Nexus API — direct Prometheus text endpoint ──────────────────────────────
+  - job_name: "nexus-api"
+    static_configs:
+      - targets: ["nexus-api:3000"]
+    metrics_path: "/api/v1/metrics"
+    # In local dev set METRICS_NO_AUTH=true so Prometheus can scrape without a token.
+    # For production, use bearer_token_file or a credentials file here.
+
+  # ── OpenTelemetry Collector — OTLP metrics re-exported as Prometheus ─────────
+  - job_name: "otel-collector"
+    static_configs:
+      - targets: ["otel-collector:8889"]
+
+  # ── Prometheus self-monitoring ────────────────────────────────────────────────
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]

@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: Apache-2.0
+# Render Blueprint — NEXUS backend services (free tier)
+#
+# Frontend → Vercel (nexus-ui, vercel.json at repo root)
+# Database → Neon   (external PostgreSQL, free forever)
+# Redis    → Upstash (external Redis, free forever)
+#
+# Secrets — set via Render dashboard or API (sync: false keeps them out of git):
+#   DATABASE_URL  — Neon pooler connection string
+#   REDIS_URL     — Upstash Redis URL  (rediss://default:TOKEN@host:6379)
+#   JWT_SECRET    — auto-generated
+#   HMAC_KEY      — auto-generated
+#   SCRYPT_SECRET — auto-generated
+#   GROQ_API_KEY  — optional: enables Groq LLM provider
+#   TAVILY_API_KEY — optional: enables Tavily web search
+
+services:
+  # ── Nexus API ─────────────────────────────────────────────────────────────────
+  - type: web
+    name: nexus-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    plan: free
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3001"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: HMAC_KEY
+        generateValue: true
+      - key: SCRYPT_SECRET
+        generateValue: true
+      - key: GROQ_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+
+  # ── Nexus Worker ──────────────────────────────────────────────────────────────
+  - type: worker
+    name: nexus-worker
+    runtime: docker
+    dockerfilePath: ./apps/worker/Dockerfile
+    dockerContext: .
+    plan: free
+    branch: main
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false

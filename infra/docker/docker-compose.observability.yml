@@ -60,6 +60,9 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
       - ./infra/otel/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/nexus.yaml:ro
+      - ./infra/grafana/provisioning/dashboards/dashboard.yml:/etc/grafana/provisioning/dashboards/nexus.yaml:ro
+      - ./infra/grafana/provisioning/alerting/rules.yml:/etc/grafana/provisioning/alerting/nexus-rules.yaml:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports:
       - "3001:3000" # offset from API port
     networks:
@@ -83,6 +86,9 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       OTEL_SERVICE_NAME: nexus-api
       OTEL_TRACES_EXPORTER: otlp
+      # Allow Prometheus to scrape /api/v1/metrics without a Bearer token in local dev.
+      # Remove or set to false in production — use bearer_token in prometheus.yml instead.
+      METRICS_NO_AUTH: "true"
 
   worker:
     environment:

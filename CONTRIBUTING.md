@@ -31,9 +31,29 @@ Thank you for your interest in contributing. This guide covers everything you ne
 | Docker  | 24+                | [docker.com](https://docker.com)                |
 | Git     | 2.40+              | system package manager                          |
 
+> **Reproducible environment (recommended):** Install [Devbox](https://www.jetify.com/devbox/docs/installing_devbox/) and run `devbox shell` from the repo root. This pins Node, pnpm, Python, and Go to the exact versions in `devbox.json` without touching your system.
+
 ---
 
 ## Local setup
+
+### With Devbox (recommended)
+
+```bash
+# 1. Install Devbox (one-time)
+curl -fsSL https://get.jetify.com/devbox | bash
+
+# 2. Clone and enter shell
+git clone https://github.com/Yash-Awasthi/Nexus.git
+cd Nexus
+devbox shell           # activates pinned Node / pnpm / Python / Go
+
+# 3. Install dependencies and build
+devbox run install
+devbox run build
+```
+
+### Manual setup
 
 ```bash
 git clone https://github.com/Yash-Awasthi/Nexus.git
@@ -54,7 +74,7 @@ pip install -e ".[dev]"
 Start the full stack (Postgres + Redis + API + ingest):
 
 ```bash
-docker compose -f infra/docker/docker-compose.dev.yml up -d
+docker compose up -d       # starts postgres, redis, ingest (see docker-compose.yml)
 pnpm dev
 ```
 

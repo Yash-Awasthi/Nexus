@@ -43,7 +43,7 @@ Interfaces contract layer fully preserved.
 
 ### GhostStack → apps/api/src/ (2 seed files)
 
-- ghoststack-server.ts (migrates to Fastify in M6)
+- conductor-server.ts (migrates to Fastify in M6)
 - runtime-server.ts (migrates to Fastify in M6)
 
 ### GhostStack → apps/cli/src/ (1 seed file)
@@ -65,7 +65,7 @@ Existing `src/index.ts` skeletons remain — integration.ts is the seed code.
 - `tests/` — 66 spec files rewritten as Vitest in M6
 - `docker/` — rebuilt in infra/docker/ per ADR-0018
 - `runtime/bridges/*.py` — rewritten in nexus-ingest (M4)
-- `runtime/mcp/ghoststack_mcp_server.py` — rewritten in M6
+- `runtime/mcp/conductor_mcp_server.py` — rewritten in M6
 - `runtime/docker-compose-runner.ts` — handled by infra/
 - `runtime/benchmark-runner.ts` — per-package benchmarks in M6
 
