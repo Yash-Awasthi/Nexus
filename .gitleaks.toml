@@ -27,6 +27,7 @@ paths = [
   "README.md",
   "CONTRIBUTING.md",
   "packages/file-store/tests/",
+  "apps/api/tests/",
   "infra/terraform/examples/",
 ]
 
