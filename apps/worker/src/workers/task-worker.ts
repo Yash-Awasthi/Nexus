@@ -5,6 +5,12 @@
  * Job routing:
  *   "ingest:event"        → handleIngestJob
  *   "council.deliberate"  → handleCouncilJob
+ *   "wiki:reconcile"      → handleWikiReconcileJob
+ *   "corpus:build"        → handleCorpusBuildJob
+ *   "obs:generate"        → handleObsGenerateJob
+ *   "feeds:refresh"       → handleFeedsRefreshJob
+ *   "feeds:refresh:rss"   → handleFeedsRefreshRssJob
+ *   "search:reindex"      → handleSearchReindexJob
  *   (unknown)             → log + complete (no-op)
  *
  * Concurrency:
@@ -23,14 +29,38 @@ import { runtimeTasks } from "@nexus/db/schema";
 import { type ConnectionOptions, Worker, type Job } from "bullmq";
 import { eq } from "drizzle-orm";
 
+import { handleAgentRunJob, type AgentRunPayload } from "../handlers/agent-handler.js";
+import {
+  handleWikiReconcileJob,
+  handleCorpusBuildJob,
+  handleObsGenerateJob,
+  handleFeedsRefreshJob,
+  handleFeedsRefreshRssJob,
+  handleSearchReindexJob,
+  type WikiReconcilePayload,
+  type CorpusBuildPayload,
+  type ObsGeneratePayload,
+  type FeedsRefreshPayload,
+  type FeedsRefreshRssPayload,
+  type SearchReindexPayload,
+} from "../handlers/async-handlers.js";
 import { handleCouncilJob, type CouncilJobPayload } from "../handlers/council-handler.js";
+import { handleDriveExecJob, type DriveExecPayload } from "../handlers/drive-handler.js";
 import { handleIngestJob, type IngestJobPayload } from "../handlers/ingest-handler.js";
+import {
+  handleOrchestrationJob,
+  type OrchestrationJobPayload,
+} from "../handlers/orchestration-handler.js";
+import { DrizzleOrchestrationRunStore } from "../handlers/orchestration-store.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const QUEUE_HIGH = "nexus-high";
 const QUEUE_MEDIUM = "nexus-medium";
 const QUEUE_LOW = "nexus-low";
+
+// Shared persistence store for orchestration runs (§6.1) — one instance per worker.
+const orchestrationStore = new DrizzleOrchestrationRunStore();
 
 // ── Job dispatcher ────────────────────────────────────────────────────────────
 
@@ -53,9 +83,51 @@ async function processJob(job: Job): Promise<unknown> {
       result = await handleIngestJob(data as IngestJobPayload);
       break;
 
+    // ── Native coding-agent loop ──────────────────────────────────────────────
+    case "agent.run":
+      result = await handleAgentRunJob(data as AgentRunPayload);
+      break;
+
+    // ── Drive sandbox execution ───────────────────────────────────────────────
+    case "drive.exec":
+      result = await handleDriveExecJob(data as DriveExecPayload);
+      break;
+
     case "council.deliberate":
     case "council.evaluate":
       result = await handleCouncilJob(data as CouncilJobPayload);
+      break;
+
+    // ── Parallel multi-agent worktree fan-out ─────────────────────────────────
+    case "orchestration.run":
+      result = await handleOrchestrationJob(data as OrchestrationJobPayload, {
+        store: orchestrationStore,
+      });
+      break;
+
+    // ── Async package backbone ────────────────────────────────────────────────
+    case "wiki:reconcile":
+      result = await handleWikiReconcileJob(data as WikiReconcilePayload);
+      break;
+
+    case "corpus:build":
+      result = await handleCorpusBuildJob(data as CorpusBuildPayload);
+      break;
+
+    case "obs:generate":
+      result = await handleObsGenerateJob(data as ObsGeneratePayload);
+      break;
+
+    case "feeds:refresh":
+      result = await handleFeedsRefreshJob(data as FeedsRefreshPayload);
+      break;
+
+    case "feeds:refresh:rss":
+      result = await handleFeedsRefreshRssJob(data as FeedsRefreshRssPayload);
+      break;
+
+    case "search:reindex":
+      result = await handleSearchReindexJob(data as SearchReindexPayload);
       break;
 
     default:
@@ -76,12 +148,31 @@ async function processJob(job: Job): Promise<unknown> {
 
 // ── Worker factory ────────────────────────────────────────────────────────────
 
+/** Parse a positive-integer env var, falling back to a default. */
+function envConcurrency(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
 export function createTaskWorkers(connection: ConnectionOptions): Worker[] {
   const workerOpts = { connection, removeOnComplete: { count: 100 }, removeOnFail: { count: 50 } };
 
-  const highWorker = new Worker(QUEUE_HIGH, processJob, { ...workerOpts, concurrency: 4 });
-  const mediumWorker = new Worker(QUEUE_MEDIUM, processJob, { ...workerOpts, concurrency: 8 });
-  const lowWorker = new Worker(QUEUE_LOW, processJob, { ...workerOpts, concurrency: 2 });
+  // Concurrency per queue is tunable per deployment (scale up on bigger nodes,
+  // down on constrained ones). Defaults preserve the previous 4 / 8 / 2 split.
+  const highWorker = new Worker(QUEUE_HIGH, processJob, {
+    ...workerOpts,
+    concurrency: envConcurrency("WORKER_CONCURRENCY_HIGH", 4),
+  });
+  const mediumWorker = new Worker(QUEUE_MEDIUM, processJob, {
+    ...workerOpts,
+    concurrency: envConcurrency("WORKER_CONCURRENCY_MEDIUM", 8),
+  });
+  const lowWorker = new Worker(QUEUE_LOW, processJob, {
+    ...workerOpts,
+    concurrency: envConcurrency("WORKER_CONCURRENCY_LOW", 2),
+  });
 
   const workers = [highWorker, mediumWorker, lowWorker];
 
