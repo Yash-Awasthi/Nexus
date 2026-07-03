@@ -27,8 +27,8 @@
     "@nexus/governance": "workspace:*",
     "@nexus/memory": "workspace:*",
     "@nexus/telemetry": "workspace:*",
-    "bullmq": "^5.78.1",
-    "js-yaml": "^4.1.0"
+    "bullmq": "^5.79.2",
+    "js-yaml": "^4.3.0"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",

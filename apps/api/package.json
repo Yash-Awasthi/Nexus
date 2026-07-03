@@ -17,7 +17,7 @@
   "devDependencies": {
     "@vitest/coverage-v8": "^2.1.8",
     "typescript": "^5.6.3",
-    "tsx": "^4.19.1",
+    "tsx": "^4.22.5",
     "vitest": "^2.1.8",
     "@types/node": "^22.0.0"
   },
@@ -106,8 +106,8 @@
     "@nexus/ragtime": "workspace:*",
     "@nexus/ultraplinian": "workspace:*",
     "drizzle-orm": "^0.45.2",
-    "bullmq": "^5.78.1",
-    "fastify": "^5.8.5",
-    "pg": "^8.13.3"
+    "bullmq": "^5.79.2",
+    "fastify": "^5.9.0",
+    "pg": "^8.22.0"
   }
 }
