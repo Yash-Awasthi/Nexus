@@ -4,11 +4,15 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 import { resolve } from "path";
 
-const API_TARGET = process.env.NEXUS_API_URL ?? "http://localhost:3001";
+const API_TARGET = process.env.NEXUS_API_URL ?? "http://localhost:3000";
 
 export default defineConfig({
   plugins: [tailwindcss(), reactRouter()],
   resolve: {
+    // Deduplicate React so pnpm's nested copies don't hand radix-ui / lobehub a
+    // second React instance (its dispatcher is null → "Cannot read properties of
+    // null (reading 'useRef')" on every dialog-based Configuration page).
+    dedupe: ["react", "react-dom"],
     alias: {
       "~": resolve(__dirname, "./app"),
       // Force any react-router-dom resolution to react-router v7. A transitive
