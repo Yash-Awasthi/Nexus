@@ -11,11 +11,21 @@ export default defineConfig({
   resolve: {
     alias: {
       "~": resolve(__dirname, "./app"),
+      // Force any react-router-dom resolution to react-router v7. A transitive
+      // (Docusaurus-era) react-router-dom@5 otherwise gets pulled in and explodes
+      // on missing v5 exports. The UI never uses the v5 API.
+      "react-router-dom": "react-router",
     },
   },
   define: {
     // Prevent build errors from packages that reference __filename
     __filename: "'index.ts'",
+  },
+  optimizeDeps: {
+    // A transitive dep drags in react-router-dom@5 (Docusaurus-era), which the
+    // app never imports. pnpm mis-links it against react-router@7, so pre-bundling
+    // it explodes on missing v5 exports (Switch/useHistory/…). Skip it entirely.
+    exclude: ["react-router-dom"],
   },
   server: {
     port: 5173,

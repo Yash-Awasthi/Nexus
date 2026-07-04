@@ -37,9 +37,11 @@ import { runtimeTasks, signals } from "@nexus/db/schema";
 import {
   FixedEmbedder,
   GroqEmbedder,
+  OpenAIEmbedder,
   InMemoryStore,
   MemoryManager,
   PgVectorStore,
+  createBestEmbedder,
 } from "@nexus/memory";
 import { desc, or, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
@@ -51,9 +53,13 @@ const _ctxMemStore = process.env.DATABASE_URL
   ? new PgVectorStore({ databaseUrl: process.env.DATABASE_URL })
   : new InMemoryStore();
 
-const _ctxEmbedder = process.env.GROQ_API_KEY
-  ? new GroqEmbedder({ apiKey: process.env.GROQ_API_KEY })
-  : new FixedEmbedder();
+const _ctxEmbedder = (() => {
+  try {
+    return createBestEmbedder();
+  } catch {
+    return new FixedEmbedder();
+  }
+})();
 
 const _ctxMemManager = new MemoryManager({
   store: _ctxMemStore,

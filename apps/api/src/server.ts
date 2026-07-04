@@ -20,7 +20,20 @@ import {
   NexusEvents,
   PostHogAnalyticsClient,
 } from "@nexus/posthog-analytics";
+import { createRequire } from "node:module";
+
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest } from "fastify";
+
+// Resolve pino-pretty to an absolute path so pino's transport worker can load it
+// under pnpm's strict node_modules layout (bare "pino-pretty" fails to resolve there).
+const _require = createRequire(import.meta.url);
+const _prettyTarget = (() => {
+  try {
+    return _require.resolve("pino-pretty");
+  } catch {
+    return undefined;
+  }
+})();
 
 import { makeRateLimitPreHandler, makeUserRateLimitPreHandler } from "./lib/rate-limiter.js";
 import { sentryReporter } from "./lib/sentry-reporter.js";
@@ -117,8 +130,8 @@ export async function buildServer(): Promise<FastifyInstance> {
     logger: {
       level: process.env.LOG_LEVEL ?? "info",
       transport:
-        process.env.NODE_ENV === "development"
-          ? { target: "pino-pretty", options: { colorize: true } }
+        process.env.NODE_ENV === "development" && _prettyTarget
+          ? { target: _prettyTarget, options: { colorize: true } }
           : undefined,
     },
     // Unique request ID on every incoming request — propagated through Pino logs.

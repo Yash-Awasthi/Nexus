@@ -16,9 +16,9 @@ import {
 import {
   MemoryManager,
   PgVectorStore,
-  GroqEmbedder,
   InMemoryStore,
   FixedEmbedder,
+  createBestEmbedder,
 } from "@nexus/memory";
 import { EnvironmentTelemetry, StructuredLogger } from "@nexus/telemetry";
 
@@ -253,15 +253,22 @@ export async function createRuntimeContext(repoRoot: string): Promise<ConductorR
   );
 
   // ------------------------------------------------------------------
-  // Semantic vector memory (PgVectorStore + GroqEmbedder in production;
-  // InMemoryStore + FixedEmbedder in offline / test mode)
+  // Semantic vector memory (PgVectorStore + createBestEmbedder in production;
+  // InMemoryStore + FixedEmbedder in offline / test mode).
+  // Prefers OPENAI_API_KEY over GROQ_API_KEY — Groq has no embeddings API.
   // ------------------------------------------------------------------
   const vectorMemory = new MemoryManager(
     offlineMode || !process.env.DATABASE_URL
       ? { store: new InMemoryStore(), embedder: new FixedEmbedder(768) }
       : {
           store: new PgVectorStore({ databaseUrl: process.env.DATABASE_URL }),
-          embedder: new GroqEmbedder({ apiKey: process.env.GROQ_API_KEY }),
+          embedder: (() => {
+            try {
+              return createBestEmbedder();
+            } catch {
+              return new FixedEmbedder(768);
+            }
+          })(),
         },
   );
 

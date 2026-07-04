@@ -60,9 +60,11 @@ import { registryFromEnv } from "@nexus/llm-oauth";
 import {
   FixedEmbedder,
   GroqEmbedder,
+  OpenAIEmbedder,
   InMemoryStore,
   MemoryManager,
   PgVectorStore,
+  createBestEmbedder,
 } from "@nexus/memory";
 import { applyParseltongue, getDefaultConfig as redteamDefaultConfig } from "@nexus/redteam";
 import { RunCostTracker, InMemoryRunCostStore } from "@nexus/run-cost";
@@ -130,9 +132,13 @@ const _stmPipeline = createDefaultPipeline();
 const _memStore = process.env.DATABASE_URL
   ? new PgVectorStore({ databaseUrl: process.env.DATABASE_URL })
   : new InMemoryStore();
-const _memEmbedder = process.env.GROQ_API_KEY
-  ? new GroqEmbedder({ apiKey: process.env.GROQ_API_KEY })
-  : new FixedEmbedder();
+const _memEmbedder = (() => {
+  try {
+    return createBestEmbedder();
+  } catch {
+    return new FixedEmbedder();
+  }
+})();
 export const _gatewayMemory = new MemoryManager({ store: _memStore, embedder: _memEmbedder });
 
 async function _budgetPreHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
