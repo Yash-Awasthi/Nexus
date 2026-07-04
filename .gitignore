@@ -23,6 +23,9 @@ test-results/
 # Turbo
 .turbo/
 
+# Local runtime data stores (PersistentStore JSON files — dev state, not source)
+apps/api/data/stores/
+
 # Python
 __pycache__/
 *.py[cod]

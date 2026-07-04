@@ -36,7 +36,7 @@ import {
   type TaskCategory,
 } from "@nexus/council";
 import { db } from "@nexus/db";
-import { userProviderCredentials } from "@nexus/db/schema";
+import { userProviderCredentials, users, auditLog } from "@nexus/db/schema";
 import { computeAutoTuneParams, InMemoryEmaStore } from "@nexus/drift";
 import { runFallbackChain, type FallbackModel } from "@nexus/gateway";
 import {
@@ -76,6 +76,7 @@ import {
   DriverRegistry,
   AnthropicDriver,
   GroqDriver,
+  OllamaDriver,
   GeminiDriver,
   DeepSeekDriver,
   MistralDriver,
@@ -85,9 +86,9 @@ import {
 import {
   InMemoryStore,
   FixedEmbedder,
-  GroqEmbedder,
   MemoryManager,
   PgVectorStore,
+  createBestEmbedder,
 } from "@nexus/memory";
 import { AdapterRegistry, NexusAdapterError, defineAdapter } from "@nexus/plugin-sdk";
 import {
@@ -113,7 +114,7 @@ import {
   type VideoBackend,
   type VideoResult,
 } from "@nexus/video-search";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, desc } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { Pool } from "pg";
 
@@ -124,6 +125,8 @@ import { resolveUserProviderKey, buildUserDriverRegistry } from "../lib/provider
 import { makeUserRateLimitPreHandler } from "../lib/rate-limiter.js";
 import { encryptSecret, SecretCryptoUnavailableError } from "../lib/secret-crypto.js";
 import { requireAuthWithTier } from "../middleware/auth.js";
+
+import { gatewayLog } from "./gateway.js";
 
 // ── SSE helpers ───────────────────────────────────────────────────────────────
 
@@ -155,6 +158,14 @@ function getRegistry(): DriverRegistry {
     reg.register(new MistralDriver({ apiKey: process.env.MISTRAL_API_KEY }));
   if (process.env.OPENROUTER_API_KEY)
     reg.register(new OpenRouterDriver({ apiKey: process.env.OPENROUTER_API_KEY }));
+  // Local Ollama — always registered, no API credits required. Used as the
+  // default when NEXUS_LLM_PROVIDER=ollama, and as the final fallback otherwise.
+  reg.register(
+    new OllamaDriver({
+      baseUrl: process.env.OLLAMA_BASE_URL,
+      model: process.env.NEXUS_DEFAULT_MODEL ?? "qwen2.5:7b",
+    }),
+  );
   _registry = reg;
   return reg;
 }
@@ -162,7 +173,7 @@ function getRegistry(): DriverRegistry {
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 
 /** Default model for all internal LLM calls — change once to affect the whole file. */
-const DEFAULT_MODEL = "anthropic/claude-3.5-haiku";
+const DEFAULT_MODEL = process.env.NEXUS_DEFAULT_MODEL ?? "anthropic/claude-3.5-haiku";
 
 /** Current UTC timestamp as ISO-8601. */
 const now = (): string => new Date().toISOString();
@@ -170,13 +181,33 @@ const now = (): string => new Date().toISOString();
 /** Highest-priority available LLM driver across all registered providers. */
 function getDefaultDriver() {
   const reg = getRegistry();
-  return reg.get("openrouter") ?? reg.get("anthropic") ?? reg.get("groq") ?? reg.get("openai");
+  const preferred = process.env.NEXUS_LLM_PROVIDER;
+  if (preferred) {
+    const d = reg.get(preferred);
+    if (d) return d;
+  }
+  return (
+    reg.get("openrouter") ??
+    reg.get("anthropic") ??
+    reg.get("groq") ??
+    reg.get("openai") ??
+    reg.get("ollama")
+  );
 }
 
 /** Strip markdown code fences then JSON.parse — handles ` ```json ` and ` ``` ` variants. */
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 function parseJsonResponse<T = unknown>(content: string): T {
-  return JSON.parse(content.replace(/^```(?:json)?\n?|```$/g, "").trim()) as T;
+  const cleaned = content.replace(/```(?:json)?/gi, "").trim();
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch {
+    // Local models (qwen) often wrap JSON in prose. Extract the first balanced
+    // object/array span and parse that.
+    const m = /[[{][\s\S]*[\]}]/.exec(cleaned);
+    if (m) return JSON.parse(m[0]) as T;
+    throw new Error("no JSON found in model response");
+  }
 }
 
 /** Typed LLM message constructors. */
@@ -385,10 +416,17 @@ function getMemory(): MemoryManager {
   const store = process.env.DATABASE_URL
     ? new PgVectorStore({ databaseUrl: process.env.DATABASE_URL })
     : new InMemoryStore();
-  const embedder = process.env.GROQ_API_KEY
-    ? new GroqEmbedder({ apiKey: process.env.GROQ_API_KEY })
-    : new FixedEmbedder();
+  const embedder = (() => {
+    try {
+      return createBestEmbedder();
+    } catch {
+      return new FixedEmbedder(768);
+    }
+  })();
   _memory = new MemoryManager({ store, embedder });
+  // Warm up the embedder (Ollama loads the model on first call) so the first
+  // real recall isn't a cold miss. Fire-and-forget; failure is harmless.
+  void embedder.embed("warmup").catch(() => {});
   return _memory;
 }
 
@@ -483,6 +521,14 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     status: string;
     label: string;
   }>("connectors");
+  const _connectorSyncJobs = new PersistentStore<{
+    id: string;
+    connectorId: string;
+    status: string;
+    items: number;
+    startedAt: string;
+    finishedAt: string;
+  }>("connector_sync_jobs");
   const _craftStore = new PersistentStore<{
     id: string;
     template: string;
@@ -519,6 +565,7 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   await Promise.all([
     _workflowStore.load(),
     _connectors.load(),
+    _connectorSyncJobs.load(),
     _craftStore.load(),
     _skills.load(),
     _kbStore.load(),
@@ -536,9 +583,12 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   // Streams: init → response* → done
   // ══════════════════════════════════════════════════════════════════════════
 
-  app.post<{ Body: { question: string; tier?: number } }>(
+  app.post<{ Body: { question?: string; tier?: number } }>(
     "/gauntlet/stream",
     async (request, reply) => {
+      if (!request.body || !request.body.question) {
+        return reply.code(400).send({ error: "question is required" });
+      }
       const { question, tier: numTier = 10 } = request.body;
       const speedTier = numericToSpeedTier(numTier);
 
@@ -1540,9 +1590,31 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get("/costs/limits", async (_req, reply) => {
+    const monthly = process.env.NEXUS_MONTHLY_LIMIT_USD
+      ? Number(process.env.NEXUS_MONTHLY_LIMIT_USD)
+      : null;
+    const daily = process.env.NEXUS_DAILY_LIMIT_USD
+      ? Number(process.env.NEXUS_DAILY_LIMIT_USD)
+      : null;
+    // Real spend from the cost log (ts is ISO-8601, so prefix-match the period).
+    const monthPrefix = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const dayPrefix = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const round = (n: number) => Math.round(n * 10_000) / 10_000;
+    const spentMonth = round(
+      _costLog.filter((e) => e.ts.startsWith(monthPrefix)).reduce((s, e) => s + e.costUsd, 0),
+    );
+    const spentToday = round(
+      _costLog.filter((e) => e.ts.startsWith(dayPrefix)).reduce((s, e) => s + e.costUsd, 0),
+    );
     return reply.send({
-      limits: { monthly_usd: null, daily_usd: null },
-      note: "Set limits via env NEXUS_MONTHLY_LIMIT_USD and NEXUS_DAILY_LIMIT_USD",
+      limits: { monthly_usd: monthly, daily_usd: daily },
+      spent: { monthly_usd: spentMonth, daily_usd: spentToday },
+      remaining: {
+        monthly_usd: monthly !== null ? round(Math.max(0, monthly - spentMonth)) : null,
+        daily_usd: daily !== null ? round(Math.max(0, daily - spentToday)) : null,
+      },
+      enforced: false,
+      note: "Limits are reported, not hard-enforced. Set NEXUS_MONTHLY_LIMIT_USD / NEXUS_DAILY_LIMIT_USD.",
     });
   });
 
@@ -1558,7 +1630,35 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   // -- ANALYTICS -------------------------------------------------------------
 
   app.get("/analytics/overview", async (_req, reply) => {
-    return reply.send({ requests: 0, tokens: 0, latencyP50ms: 0, latencyP99ms: 0, errorRate: 0 });
+    // Real analytics: aggregate from the gateway request log (actual measured
+    // latency + error counts), falling back to the internal _costLog for token
+    // totals when the gateway hasn't served traffic yet.
+    try {
+      const s = await gatewayLog.stats();
+      const requests = s.totalRequests;
+      const tokens =
+        s.totalTokens || _costLog.reduce((sum, e) => sum + e.inputTokens + e.outputTokens, 0);
+      const errorRate = requests > 0 ? s.errorRequests / requests : 0;
+      return reply.send({
+        requests,
+        tokens,
+        latencyP50ms: Math.round(s.p50LatencyMs),
+        latencyP99ms: Math.round(s.p99LatencyMs),
+        errorRate: Math.round(errorRate * 10000) / 10000,
+        source: "gateway-log",
+      });
+    } catch {
+      // Gateway log unavailable (no KV) — report token totals from _costLog only.
+      const tokens = _costLog.reduce((sum, e) => sum + e.inputTokens + e.outputTokens, 0);
+      return reply.send({
+        requests: _costLog.length,
+        tokens,
+        latencyP50ms: 0,
+        latencyP99ms: 0,
+        errorRate: 0,
+        source: "cost-log",
+      });
+    }
   });
 
   // -- FINE TUNE — real OpenAI fine-tune API when OPENAI_API_KEY present ------
@@ -1770,14 +1870,71 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     };
   }
 
+  // Lazy Pyodide — local Python via WASM. No Docker, no external Piston, no cost.
+  let _pyodidePromise: Promise<unknown> | null = null;
+  async function _getPyodide(): Promise<{
+    setStdout: (o: { batched: (s: string) => void }) => void;
+    setStderr: (o: { batched: (s: string) => void }) => void;
+    runPythonAsync: (c: string) => Promise<unknown>;
+  }> {
+    if (!_pyodidePromise) {
+      _pyodidePromise = (async () => {
+        const mod = (await import("pyodide")) as { loadPyodide: () => Promise<unknown> };
+        return mod.loadPyodide();
+      })();
+    }
+    return _pyodidePromise as Promise<{
+      setStdout: (o: { batched: (s: string) => void }) => void;
+      setStderr: (o: { batched: (s: string) => void }) => void;
+      runPythonAsync: (c: string) => Promise<unknown>;
+    }>;
+  }
+
+  async function _runViaPyodide(
+    code: string,
+  ): Promise<{ stdout: string; stderr: string; exitCode: number; durationMs: number }> {
+    const t0 = Date.now();
+    const py = await _getPyodide();
+    const out: string[] = [];
+    const err: string[] = [];
+    py.setStdout({ batched: (s: string) => out.push(s) });
+    py.setStderr({ batched: (s: string) => err.push(s) });
+    try {
+      await py.runPythonAsync(code);
+      return { stdout: out.join("\n"), stderr: err.join("\n"), exitCode: 0, durationMs: Date.now() - t0 };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return {
+        stdout: out.join("\n"),
+        stderr: `${err.join("\n")}\n${msg}`.trim(),
+        exitCode: 1,
+        durationMs: Date.now() - t0,
+      };
+    }
+  }
+
   /** GET /sandbox/status — overall sandbox availability (no execution ID needed). */
   app.get("/sandbox/status", async (_request, reply) => {
     const dockerAvail = await _dockerReady;
+    // Public Piston API (emkc.org) went whitelist-only Feb 2026.  Non-JS languages
+    // only work if PISTON_URL is set to a self-hosted or custom Piston endpoint.
+    // emkc.org went whitelist-only Feb 2026 — treat any explicit PISTON_URL that
+    // isn't the dead public endpoint as a custom (working) Piston instance.
+    const pistonUrl = process.env.PISTON_URL;
+    const usingCustomPiston = pistonUrl !== undefined && !pistonUrl.includes('emkc.org');
+    const nonJsLangs = usingCustomPiston
+      ? ["typescript", "python", "bash", "r", "ruby", "go", "rust"]
+      : ["typescript", "python"]; // python runs locally via Pyodide (WASM), no Piston needed
     return reply.send({
       available: true,
       dockerAvailable: dockerAvail,
-      pistonAvailable: true,
-      languages: ["javascript", "typescript", "python", "bash", "r", "ruby", "go", "rust"],
+      pistonAvailable: usingCustomPiston,
+      pythonRuntime: "pyodide-local",
+      languages: ["javascript", ...nonJsLangs],
+      pistonUrl: process.env.PISTON_URL ?? null,
+      note: usingCustomPiston
+        ? undefined
+        : "JS + Python run locally (Pyodide). Set PISTON_URL to a self-hosted Piston for Go/Rust/Ruby/R/bash.",
     });
   });
 
@@ -1787,6 +1944,28 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
       const { code, language = "javascript" } = request.body;
       const executionId = crypto.randomUUID();
       const lang = language.toLowerCase();
+
+      // Python → run locally via Pyodide (WASM) unless a custom Piston is configured.
+      if (lang === "python" || lang === "py" || lang === "python3") {
+        const customPiston =
+          process.env.PISTON_URL !== undefined && !process.env.PISTON_URL.includes("emkc.org");
+        if (!customPiston) {
+          const r = await _runViaPyodide(code);
+          const result = {
+            executionId,
+            status: r.exitCode === 0 ? "done" : "error",
+            output: r.stdout,
+            error: r.stderr || undefined,
+            stdout: r.stdout,
+            stderr: r.stderr,
+            exitCode: r.exitCode,
+            language: "python",
+            durationMs: r.durationMs,
+          };
+          _sandboxResults.set(executionId, result);
+          return reply.code(201).send(result);
+        }
+      }
 
       // Non-JS languages → route through Piston
       if (lang !== "javascript" && lang !== "js") {
@@ -2002,25 +2181,116 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   ]);
 
   app.get("/admin/users", async (_req, reply) => {
-    return reply.send({ users: Array.from(_adminUsers.values()), total: _adminUsers.size });
+    // Real users from the Postgres `users` table (auth-backed). Falls back to the
+    // in-memory seed only if the DB is unreachable.
+    try {
+      const rows = await db
+        .select({
+          id: users.id,
+          email: users.email,
+          name: users.name,
+          role: users.role,
+          tier: users.tier,
+          emailVerified: users.emailVerified,
+          createdAt: users.createdAt,
+          deletedAt: users.deletedAt,
+        })
+        .from(users)
+        .orderBy(desc(users.createdAt))
+        .limit(500);
+      const list = rows.map((u) => ({
+        id: u.id,
+        email: u.email,
+        name: u.name ?? null,
+        role: u.role,
+        tier: u.tier,
+        emailVerified: u.emailVerified,
+        status: u.deletedAt ? "deleted" : "active",
+        createdAt:
+          u.createdAt instanceof Date ? u.createdAt.toISOString() : String(u.createdAt ?? ""),
+      }));
+      return reply.send({ users: list, total: list.length, source: "db" });
+    } catch (err) {
+      app.log.warn({ err: String(err) }, "admin/users db fallback");
+      return reply.send({
+        users: Array.from(_adminUsers.values()),
+        total: _adminUsers.size,
+        source: "memory",
+      });
+    }
   });
 
   app.put<{ Params: { id: string }; Body: { role?: string; status?: string } }>(
     "/admin/users/:id",
     async (request, reply) => {
-      const user = _adminUsers.get(request.params.id);
-      if (!user) return reply.code(404).send({ error: "not_found" });
-      const updated = { ...user, ...request.body };
-      _adminUsers.set(request.params.id, updated);
-      return reply.send(updated);
+      const { role, status } = request.body ?? {};
+      const VALID_ROLES = ["owner", "admin", "member", "viewer"];
+      const updates: Record<string, unknown> = {};
+      if (role !== undefined) {
+        if (!VALID_ROLES.includes(role)) {
+          return reply.code(400).send({ error: "invalid_role", valid: VALID_ROLES });
+        }
+        updates.role = role;
+      }
+      // status maps to soft-delete: "deleted"/"suspended" → set deletedAt; "active" → clear.
+      if (status !== undefined) {
+        updates.deletedAt = status === "active" ? null : new Date();
+      }
+      if (Object.keys(updates).length === 0) {
+        return reply.code(400).send({ error: "no_updatable_fields" });
+      }
+      try {
+        const [updated] = await db
+          .update(users)
+          .set(updates)
+          .where(eq(users.id, request.params.id))
+          .returning({
+            id: users.id,
+            email: users.email,
+            role: users.role,
+            deletedAt: users.deletedAt,
+          });
+        if (!updated) return reply.code(404).send({ error: "not_found" });
+        return reply.send({
+          id: updated.id,
+          email: updated.email,
+          role: updated.role,
+          status: updated.deletedAt ? "deleted" : "active",
+        });
+      } catch (err) {
+        app.log.warn({ err: String(err) }, "admin/users update");
+        return reply.code(500).send({ error: "update_failed" });
+      }
     },
   );
 
-  const _auditLog: { id: string; action: string; user: string; resource: string; ts: string }[] =
-    [];
-
   app.get("/admin/audit-logs", async (_req, reply) => {
-    return reply.send({ logs: _auditLog, total: _auditLog.length });
+    // Real, hash-chained audit trail from the `audit_log` table (see audit-emitter).
+    try {
+      const rows = await db
+        .select({
+          id: auditLog.id,
+          action: auditLog.action,
+          actor: auditLog.actor,
+          entityType: auditLog.entityType,
+          entityId: auditLog.entityId,
+          createdAt: auditLog.createdAt,
+        })
+        .from(auditLog)
+        .orderBy(desc(auditLog.createdAt))
+        .limit(200);
+      const logs = rows.map((r) => ({
+        id: r.id,
+        action: r.action,
+        user: r.actor,
+        resource: `${r.entityType}:${r.entityId}`,
+        ts: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt ?? ""),
+      }));
+      return reply.send({ logs, total: logs.length, source: "db" });
+    } catch (err) {
+      app.log.warn({ err: String(err) }, "admin/audit-logs db fallback");
+      return reply.send({ logs: [], total: 0, source: "memory" });
+    }
   });
 
   // -- BILLING ---------------------------------------------------------------
@@ -2188,6 +2458,20 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
         createdAt: userProviderCredentials.createdAt,
       });
 
+    // Record a hash-chained audit event (fire-and-forget, never throws).
+    if (row) {
+      void emitAuditEvent(
+        {
+          entityType: "provider_credential",
+          entityId: row.id,
+          action: existing ? "provider_key.rotate" : "provider_key.create",
+          actor: userId,
+          payload: { provider },
+        },
+        request.log,
+      );
+    }
+
     return reply.code(201).send(row);
   });
 
@@ -2263,10 +2547,74 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
 
   // -- FEEDBACK --------------------------------------------------------------
 
-  app.get("/feedback/stats", async (_req, reply) =>
-    reply.send({ total: 0, byRating: {}, byModel: {} }),
+  const _feedbackStore = new PersistentStore<{
+    id: string;
+    rating: number;
+    model: string | null;
+    comment: string | null;
+    messageId: string | null;
+    createdAt: string;
+  }>("feedback");
+  _feedbackStore.load().catch(() => {});
+
+  // POST /feedback — submit an explicit 1-5 rating with optional model/comment.
+  app.post<{ Body: { rating: number; model?: string; comment?: string; messageId?: string } }>(
+    "/feedback",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["rating"],
+          properties: {
+            rating: { type: "number", minimum: 1, maximum: 5 },
+            model: { type: "string", maxLength: 128 },
+            comment: { type: "string", maxLength: 4_096 },
+            messageId: { type: "string", maxLength: 128 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const id = crypto.randomUUID();
+      const item = {
+        id,
+        rating: Math.round(request.body.rating),
+        model: request.body.model ?? null,
+        comment: request.body.comment ?? null,
+        messageId: request.body.messageId ?? null,
+        createdAt: now(),
+      };
+      _feedbackStore.set(id, item);
+      return reply.code(201).send(item);
+    },
   );
-  app.get("/feedback/export", async (_req, reply) => reply.send({ entries: [] }));
+
+  app.get("/feedback/stats", async (_req, reply) => {
+    const entries = Array.from(_feedbackStore.values());
+    const byRating: Record<string, number> = {};
+    const byModel: Record<string, number> = {};
+    let ratingSum = 0;
+    for (const e of entries) {
+      byRating[e.rating] = (byRating[e.rating] ?? 0) + 1;
+      if (e.model) byModel[e.model] = (byModel[e.model] ?? 0) + 1;
+      ratingSum += e.rating;
+    }
+    // Emoji reactions are an implicit feedback signal — surface their counts too.
+    const reactions = Array.from(_reactionsStore.values());
+    const byEmoji: Record<string, number> = {};
+    for (const r of reactions) byEmoji[r.emoji] = (byEmoji[r.emoji] ?? 0) + 1;
+    return reply.send({
+      total: entries.length,
+      avgRating: entries.length ? Math.round((ratingSum / entries.length) * 100) / 100 : 0,
+      byRating,
+      byModel,
+      reactions: { total: reactions.length, byEmoji },
+    });
+  });
+
+  app.get("/feedback/export", async (_req, reply) =>
+    reply.send({ entries: Array.from(_feedbackStore.values()) }),
+  );
 
   // -- CONNECTORS -----------------------------------------------------------
 
@@ -2289,14 +2637,31 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(204).send();
   });
 
-  app.get<{ Params: { id: string } }>("/connectors/:id/sync-jobs", async (_req, reply) => {
-    return reply.send({ jobs: [], total: 0 });
+  app.get<{ Params: { id: string } }>("/connectors/:id/sync-jobs", async (request, reply) => {
+    const jobs = Array.from(_connectorSyncJobs.values())
+      .filter((j) => j.connectorId === request.params.id)
+      .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+    return reply.send({ jobs, total: jobs.length });
   });
 
   app.post<{ Params: { id: string } }>("/connectors/:id/sync", async (request, reply) => {
-    return reply
-      .code(202)
-      .send({ jobId: crypto.randomUUID(), status: "queued", connectorId: request.params.id });
+    const connectorId = request.params.id;
+    if (!_connectors.has(connectorId)) {
+      return reply.code(404).send({ error: "connector_not_found" });
+    }
+    // Synchronous local sync: record a completed job row. A real remote connector
+    // would enqueue work; here we persist an auditable job with a timestamp.
+    const startedAt = now();
+    const job = {
+      id: crypto.randomUUID(),
+      connectorId,
+      status: "completed",
+      items: 0,
+      startedAt,
+      finishedAt: now(),
+    };
+    _connectorSyncJobs.set(job.id, job);
+    return reply.code(201).send(job);
   });
 
   // -- CRAFT (LLM-powered content generation) --------------------------------
@@ -2745,9 +3110,30 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(201).send({ id, status: "running" });
   });
 
-  app.get<{ Params: { id: string } }>("/research/related-questions", async (request, reply) => {
-    return reply.send({ questions: [] });
-  });
+  app.get<{ Querystring: { q?: string; topic?: string } }>(
+    "/research/related-questions",
+    async (request, reply) => {
+      const topic = (request.query.q ?? request.query.topic ?? "").trim();
+      if (!topic) return reply.send({ questions: [] });
+      try {
+        const out = await _llm(
+          [
+            userMsg(
+              `Generate 5 concise related follow-up research questions about "${topic}". ` +
+                `Reply with JSON only: {"questions":["q1","q2","q3","q4","q5"]}.`,
+            ),
+          ],
+          300,
+        );
+        const p = parseJsonResponse<{ questions?: string[] }>(out);
+        return reply.send({
+          questions: Array.isArray(p.questions) ? p.questions.slice(0, 5) : [],
+        });
+      } catch {
+        return reply.send({ questions: [] });
+      }
+    },
+  );
 
   app.get<{ Params: { id: string } }>("/research/:id", async (request, reply) => {
     const job = _researchJobs.get(request.params.id);
@@ -3866,10 +4252,23 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
   app.post<{ Body: { prompt: string } }>("/task-routing/classify", async (request, reply) => {
     const { prompt } = request.body ?? {};
     if (!prompt) return reply.code(400).send({ error: "prompt is required" });
-    return reply.send({
-      category: "general",
-      confidence: 0.75,
-    });
+    const cats = ["code", "research", "writing", "math", "creative", "data", "general"];
+    try {
+      const out = await _llm(
+        [
+          userMsg(
+            `Classify the task into exactly ONE category from [${cats.join(", ")}]. ` +
+              `Reply with JSON only: {"category":"<one>","confidence":<0-1>}.\n\nTask: ${prompt.slice(0, 600)}`,
+          ),
+        ],
+        120,
+      );
+      const p = parseJsonResponse<{ category?: string; confidence?: number }>(out);
+      const category = cats.includes(p.category ?? "") ? p.category! : "general";
+      return reply.send({ category, confidence: p.confidence ?? 0.6 });
+    } catch {
+      return reply.send({ category: "general", confidence: 0.5 });
+    }
   });
 
   /** GET /task-routing/stats — routing statistics */
@@ -4354,25 +4753,48 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     },
     async (request, reply) => {
       const { topic, stance, strength = 0.7 } = request.body;
+      // Generate a genuine, well-reasoned counter-argument via the local LLM.
+      let dissentingView = `Counterpoint on ${topic}: consider an alternative to "${stance.slice(0, 80)}".`;
+      try {
+        const out = await _llm(
+          [
+            systemMsg(
+              "You are a rigorous devil's-advocate. Given a topic and a stated stance, " +
+                "write ONE concise, substantive dissenting argument (2-4 sentences) that " +
+                "challenges the stance with concrete reasoning. No preamble.",
+            ),
+            userMsg(`Topic: ${topic}\nStance: ${stance}\n\nDissenting argument:`),
+          ],
+          256,
+        );
+        if (out.trim()) dissentingView = out.trim();
+      } catch {
+        /* keep template fallback */
+      }
       return reply.code(201).send({
         id: crypto.randomUUID(),
         topic,
         originalStance: stance,
-        dissentingView: `Counterpoint to "${stance.slice(0, 80)}..." — consider an alternative perspective on ${topic}.`,
+        dissentingView,
         strength,
         injectedAt: now(),
       });
     },
   );
 
-  /** GET /echo-chamber/config — echo-chamber detection configuration. */
+  const _echoDefaults = {
+    detectionEnabled: true,
+    sycophancyThreshold: 0.6,
+    autoInjectDissent: false,
+    maxHistoryTurns: 10,
+    providers: ["anthropic", "openai"],
+  };
+
+  /** GET /echo-chamber/config — echo-chamber detection configuration (persisted). */
   app.get("/echo-chamber/config", async (_req, reply) => {
     return reply.send({
-      detectionEnabled: true,
-      sycophancyThreshold: 0.6,
-      autoInjectDissent: false,
-      maxHistoryTurns: 10,
-      providers: ["anthropic", "openai"],
+      ..._echoDefaults,
+      ...((_settingsStore.get("echoChamber") as Record<string, unknown>) ?? {}),
     });
   });
 
@@ -4400,13 +4822,16 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
       },
     },
     async (request, reply) => {
-      return reply.send({
-        detectionEnabled: request.body.detectionEnabled ?? true,
-        sycophancyThreshold: request.body.sycophancyThreshold ?? 0.6,
-        autoInjectDissent: request.body.autoInjectDissent ?? false,
-        maxHistoryTurns: request.body.maxHistoryTurns ?? 10,
-        updatedAt: now(),
-      });
+      const current = {
+        ..._echoDefaults,
+        ...((_settingsStore.get("echoChamber") as Record<string, unknown>) ?? {}),
+      };
+      const updated = { ...current };
+      for (const [k, v] of Object.entries(request.body)) {
+        if (v !== undefined) (updated as Record<string, unknown>)[k] = v;
+      }
+      _settingsStore.set("echoChamber", updated);
+      return reply.send({ ...updated, updatedAt: now() });
     },
   );
 
@@ -4517,9 +4942,28 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     "/cross-memory/context",
     async (request, reply) => {
       const { memories = [] } = request.body ?? {};
-      return reply.send({
-        fusedContext: memories.map((m) => `- ${m.content}`).join("\n"),
-      });
+      const bullets = memories.map((m) => `- ${m.content}`).join("\n");
+      if (memories.length === 0) return reply.send({ fusedContext: "" });
+      // LLM-fuse the raw memories into a coherent context paragraph; fall back
+      // to the bullet list if the model is unavailable.
+      let fusedContext = bullets;
+      try {
+        const out = await _llm(
+          [
+            systemMsg(
+              "Synthesize the following memory fragments into a single coherent " +
+                "context paragraph. Preserve all concrete facts, drop redundancy. " +
+                "Output only the paragraph.",
+            ),
+            userMsg(bullets),
+          ],
+          400,
+        );
+        if (out.trim()) fusedContext = out.trim();
+      } catch {
+        /* keep bullet fallback */
+      }
+      return reply.send({ fusedContext });
     },
   );
 
@@ -4942,10 +5386,23 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   app.post<{ Body: { text: string } }>("/specialisation/detect", async (request, reply) => {
     const { text } = request.body ?? {};
     if (!text) return reply.code(400).send({ error: "text is required" });
-    return reply.send({
-      domain: "code-review",
-      confidence: 0.85,
-    });
+    const domains = ["code-review", "debugger", "architect", "devops", "data-science", "general"];
+    try {
+      const out = await _llm(
+        [
+          userMsg(
+            `Which domain best fits this text? Choose exactly ONE from [${domains.join(", ")}]. ` +
+              `Reply with JSON only: {"domain":"<one>","confidence":<0-1>}.\n\nText: ${text.slice(0, 600)}`,
+          ),
+        ],
+        120,
+      );
+      const p = parseJsonResponse<{ domain?: string; confidence?: number }>(out);
+      const domain = domains.includes(p.domain ?? "") ? p.domain! : "general";
+      return reply.send({ domain, confidence: p.confidence ?? 0.6 });
+    } catch {
+      return reply.send({ domain: "general", confidence: 0.5 });
+    }
   });
 
   /** POST /specialisation/apply — apply a specialisation to a session */
@@ -5032,14 +5489,17 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   app.post<{ Body: { model: string } }>("/member-evolution/recompute", async (request, reply) => {
     const { model } = request.body ?? {};
     if (!model) return reply.code(400).send({ error: "model is required" });
+    // Read the real accumulated evolution state for this archetype/model.
+    const existing = _evolutionStore.get(model);
     return reply.send({
-      profile: {
-        model,
+      profile: existing ?? {
+        archetypeId: model,
         sessions: 0,
-        avgScore: 0.5,
+        avgScore: 0,
         lastSeen: now(),
-        traits: { default: 0.5 },
+        traits: {},
       },
+      hasHistory: !!existing,
     });
   });
 
@@ -5050,10 +5510,12 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
       const { model, sessionId } = request.body ?? {};
       if (!model || !sessionId)
         return reply.code(400).send({ error: "model and sessionId are required" });
+      const profile = _evolutionStore.get(model) ?? null;
       return reply.send({
         applied: true,
         model,
         sessionId,
+        profile,
         appliedAt: now(),
       });
     },
@@ -5556,6 +6018,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     return reply.send({
       enabled: true,
       defaultAggressiveness: 0.5,
+      activeBudgets: _tokenBudgets.size,
     });
   });
 
@@ -5773,12 +6236,19 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
 
   app.post<{ Body: { convId: string } }>("/negation/inject", async (request, reply) => {
     const rules = _negationRules.get(request.body.convId);
-    const injected = rules?.size ?? 0;
+    const list = rules ? Array.from(rules.values()) : [];
+    const injected = list.length;
+    // Compose the real system-constraint block the caller would prepend.
+    const contextBlock = injected
+      ? "Negation constraints:\n" + list.map((r) => `- Avoid: ${r.pattern}`).join("\n")
+      : "";
     return reply.send({
       message: injected
-        ? `Injected ${injected} negation rules into context.`
+        ? `Injected ${injected} negation rule(s) into context.`
         : "No rules found for this conversation.",
       injected,
+      contextBlock,
+      rules: list,
     });
   });
 
@@ -7101,6 +7571,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     key: string;
     query: string;
     response: string;
+    embedding: number[] | null;
     hits: number;
     createdAt: string;
     lastHit: string;
@@ -7111,6 +7582,31 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     similarityThreshold: 0.85,
     maxEntries: 1000,
     ttlHours: 24,
+  };
+
+  // Lazy embedder (Ollama 768-dim locally) for real semantic matching.
+  let _semEmbedder: { embed(t: string): Promise<number[]> } | null = null;
+  const getSemEmbedder = () => {
+    if (!_semEmbedder) {
+      try {
+        _semEmbedder = createBestEmbedder();
+      } catch {
+        _semEmbedder = new FixedEmbedder(768);
+      }
+    }
+    return _semEmbedder;
+  };
+  const _cosine = (a: number[], b: number[]): number => {
+    if (a.length !== b.length || a.length === 0) return 0;
+    let dot = 0;
+    let na = 0;
+    let nb = 0;
+    for (let i = 0; i < a.length; i++) {
+      dot += a[i]! * b[i]!;
+      na += a[i]! * a[i]!;
+      nb += b[i]! * b[i]!;
+    }
+    return na && nb ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
   };
 
   app.get("/semantic-cache/stats", async (_req, reply) => {
@@ -7135,17 +7631,93 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     },
   );
 
+  // POST /semantic-cache/store — populate the cache with a {query,response} pair.
+  app.post<{ Body: { query: string; response: string } }>(
+    "/semantic-cache/store",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["query", "response"],
+          properties: {
+            query: { type: "string", maxLength: 8_192 },
+            response: { type: "string", maxLength: 65_536 },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const query = req.body.query.trim();
+      let embedding: number[] | null = null;
+      try {
+        embedding = await getSemEmbedder().embed(query);
+      } catch {
+        /* embedder unavailable — fall back to string match on lookup */
+      }
+      const key = sha256hex(query).slice(0, 16);
+      const entry: CacheEntry = {
+        key,
+        query,
+        response: req.body.response,
+        embedding,
+        hits: 0,
+        createdAt: now(),
+        lastHit: now(),
+      };
+      _semCache.set(key, entry);
+      // Evict oldest when over capacity.
+      if (_semCache.size > _semCacheConfig.maxEntries) {
+        const oldest = [..._semCache.values()].sort((a, b) =>
+          a.createdAt.localeCompare(b.createdAt),
+        )[0];
+        if (oldest) _semCache.delete(oldest.key);
+      }
+      return reply.code(201).send({ key, cached: true, embedded: embedding !== null });
+    },
+  );
+
   app.post<{ Body: { query: string } }>("/semantic-cache/lookup", async (req, reply) => {
-    const q = (req.body.query ?? "").toLowerCase().trim();
-    // Naive exact/prefix match (real impl would use embeddings)
+    const q = (req.body.query ?? "").trim();
+    if (!q || _semCache.size === 0) {
+      return reply.send({ hit: false, entry: null, similarity: 0 });
+    }
+    // Embedding cosine match; falls back to substring match if embedding fails.
+    let qVec: number[] | null = null;
+    try {
+      qVec = await getSemEmbedder().embed(q);
+    } catch {
+      qVec = null;
+    }
+    let best: CacheEntry | null = null;
+    let bestSim = 0;
     for (const e of _semCache.values()) {
-      if (e.query.toLowerCase().includes(q) || q.includes(e.query.toLowerCase())) {
-        e.hits += 1;
-        e.lastHit = now();
-        return reply.send({ hit: true, entry: e, similarity: 0.91 });
+      let sim = 0;
+      if (qVec && e.embedding) {
+        sim = _cosine(qVec, e.embedding);
+      } else {
+        const a = e.query.toLowerCase();
+        const b = q.toLowerCase();
+        sim = a.includes(b) || b.includes(a) ? 0.9 : 0;
+      }
+      if (sim > bestSim) {
+        bestSim = sim;
+        best = e;
       }
     }
-    return reply.send({ hit: false, entry: null, similarity: 0 });
+    if (best && bestSim >= _semCacheConfig.similarityThreshold) {
+      best.hits += 1;
+      best.lastHit = now();
+      return reply.send({
+        hit: true,
+        entry: best,
+        similarity: Math.round(bestSim * 10_000) / 10_000,
+      });
+    }
+    return reply.send({
+      hit: false,
+      entry: null,
+      similarity: Math.round(bestSim * 10_000) / 10_000,
+    });
   });
 
   app.post<{ Body: { key?: string } }>("/semantic-cache/invalidate", async (req, reply) => {
@@ -9315,7 +9887,14 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
         speed: "Fast",
       },
     ];
-    return reply.send({ models, updated: new Date().toISOString().slice(0, 10), source: "static" });
+    return reply.send({
+      models,
+      updated: new Date().toISOString().slice(0, 10),
+      source: "static",
+      measured: false,
+      disclaimer:
+        "Curated static benchmark figures from public reports — not live-measured on this instance.",
+    });
   });
 
   // ── Admin traces (legacy /api/traces alias) ────────────────────────────────

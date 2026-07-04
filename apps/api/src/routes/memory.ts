@@ -20,11 +20,10 @@
 
 import { globalHooks } from "@nexus/hooks";
 import {
-  FixedEmbedder,
-  GroqEmbedder,
   InMemoryStore,
   MemoryManager,
   PgVectorStore,
+  createBestEmbedder,
 } from "@nexus/memory";
 import {
   RagtimeRetriever,
@@ -42,9 +41,7 @@ const store = process.env.DATABASE_URL
   ? new PgVectorStore({ databaseUrl: process.env.DATABASE_URL })
   : new InMemoryStore();
 
-const embedder = process.env.GROQ_API_KEY
-  ? new GroqEmbedder({ apiKey: process.env.GROQ_API_KEY })
-  : new FixedEmbedder();
+const embedder = createBestEmbedder();
 
 const manager = new MemoryManager({ store, embedder });
 

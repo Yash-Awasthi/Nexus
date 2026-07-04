@@ -22,8 +22,10 @@ process.on("uncaughtException", (err) => {
   process.exit(1);
 });
 process.on("unhandledRejection", (reason) => {
-  console.error("[fatal] Unhandled rejection:", reason);
-  process.exit(1);
+  console.error("[warn] Unhandled rejection (logged — not fatal):", reason);
+  // Log but do NOT crash — one bad request must never take down the entire API.
+  // Fastify + async route handlers catch most rejections; any that slip through
+  // are logged here and the connection is dropped gracefully.
 });
 
 // ── Startup validation ────────────────────────────────────────────────────────

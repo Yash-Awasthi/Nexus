@@ -230,6 +230,257 @@ export class GroqEmbedder implements IEmbedder {
   }
 }
 
+// ── OpenAIEmbedder ────────────────────────────────────────────────────────────
+
+/** OpenAI embedder config. */
+export interface OpenAIEmbedderConfig {
+  /** OpenAI API key — defaults to process.env.OPENAI_API_KEY */
+  apiKey?: string;
+  /**
+   * Embedding model.
+   * Default: "text-embedding-3-small" (1536 dimensions, high performance, low cost).
+   */
+  model?: string;
+  /**
+   * Base URL for the OpenAI-compatible API.
+   * Default: "https://api.openai.com/v1/embeddings"
+   */
+  baseUrl?: string;
+}
+
+interface OpenAIEmbeddingResponse {
+  data: { embedding: number[]; index: number }[];
+  model: string;
+  usage: { prompt_tokens: number; total_tokens: number };
+}
+
+/**
+ * Real semantic embedder backed by the OpenAI embeddings API.
+ *
+ * Uses `text-embedding-3-small` (1536-dimensional) by default.
+ * Drop-in replacement for GroqEmbedder — same IEmbedder contract.
+ * Requires OPENAI_API_KEY env var (or pass apiKey in config).
+ *
+ * Why OpenAI over Groq:
+ *   Groq has NO embeddings API endpoint. The codebase previously used GroqEmbedder
+ *   which always 400'd — breaking Memory, Cross-Memory, and Semantic-Cache.
+ *   OpenAIEmbedder hits the real OpenAI embeddings API and works out of the box
+ *   with any OPENAI_API_KEY.
+ *
+ * Usage:
+ *   const memory = new MemoryManager({
+ *     store: new InMemoryStore(),
+ *     embedder: new OpenAIEmbedder({ apiKey: process.env.OPENAI_API_KEY }),
+ *   });
+ */
+export class OpenAIEmbedder implements IEmbedder {
+  readonly dimensions = 1536;
+  private readonly apiKey: string;
+  private readonly model: string;
+  private readonly baseUrl: string;
+
+  constructor(config: OpenAIEmbedderConfig = {}) {
+    const key = config.apiKey ?? process.env.OPENAI_API_KEY ?? "";
+    if (!key) {
+      throw new MemoryError(
+        "EMBED_FAILED",
+        "OpenAIEmbedder requires an API key — set OPENAI_API_KEY or pass apiKey in config",
+      );
+    }
+    this.apiKey = key;
+    this.model = config.model ?? "text-embedding-3-small";
+    this.baseUrl = config.baseUrl ?? "https://api.openai.com/v1/embeddings";
+  }
+
+  async embed(text: string): Promise<number[]> {
+    let response: Response;
+    try {
+      response = await fetch(this.baseUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ model: this.model, input: text }),
+      });
+    } catch (cause) {
+      throw new MemoryError("EMBED_FAILED", `OpenAI embeddings request failed: ${String(cause)}`);
+    }
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "(unreadable)");
+      throw new MemoryError("EMBED_FAILED", `OpenAI API error ${response.status}: ${body}`);
+    }
+
+    let data: OpenAIEmbeddingResponse;
+    try {
+      data = (await response.json()) as OpenAIEmbeddingResponse;
+    } catch (cause) {
+      throw new MemoryError("EMBED_FAILED", `Failed to parse OpenAI response: ${String(cause)}`);
+    }
+
+    const embedding = data.data[0]?.embedding;
+    if (!embedding || embedding.length === 0) {
+      throw new MemoryError("EMBED_FAILED", "OpenAI returned an empty embedding");
+    }
+    if (embedding.length !== this.dimensions) {
+      throw new MemoryError(
+        "DIMENSION_MISMATCH",
+        `Expected ${this.dimensions} dimensions, got ${embedding.length}`,
+      );
+    }
+    return embedding;
+  }
+
+  /**
+   * Embed multiple texts in a single API call (batched).
+   * More efficient than calling embed() N times for bulk operations.
+   */
+  async embedBatch(texts: string[]): Promise<number[][]> {
+    if (texts.length === 0) return [];
+    if (texts.length === 1) return [await this.embed(texts[0]!)];
+
+    let response: Response;
+    try {
+      response = await fetch(this.baseUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ model: this.model, input: texts }),
+      });
+    } catch (cause) {
+      throw new MemoryError("EMBED_FAILED", `OpenAI batch embeddings request failed: ${String(cause)}`);
+    }
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "(unreadable)");
+      throw new MemoryError("EMBED_FAILED", `OpenAI API error ${response.status}: ${body}`);
+    }
+
+    let data: OpenAIEmbeddingResponse;
+    try {
+      data = (await response.json()) as OpenAIEmbeddingResponse;
+    } catch (cause) {
+      throw new MemoryError("EMBED_FAILED", `Failed to parse OpenAI batch response: ${String(cause)}`);
+    }
+
+    // Restore original order via index
+    const sorted = [...data.data].sort((a, b) => a.index - b.index);
+    const embeddings = sorted.map((d) => d.embedding);
+
+    for (const emb of embeddings) {
+      if (!emb || emb.length === 0) {
+        throw new MemoryError("EMBED_FAILED", "OpenAI returned an empty embedding in batch");
+      }
+      if (emb.length !== this.dimensions) {
+        throw new MemoryError(
+          "DIMENSION_MISMATCH",
+          `Expected ${this.dimensions} dimensions, got ${emb.length}`,
+        );
+      }
+    }
+
+    return embeddings;
+  }
+}
+
+// ── OllamaEmbedder ────────────────────────────────────────────────────────────
+
+/** Ollama embedder config. */
+export interface OllamaEmbedderConfig {
+  /** Base URL of the local Ollama server. Default: http://localhost:11434 */
+  baseUrl?: string;
+  /** Embedding model. Default: "nomic-embed-text" (768-dim). */
+  model?: string;
+}
+
+interface OllamaEmbeddingResponse {
+  embedding: number[];
+}
+
+/**
+ * Local semantic embedder backed by Ollama (http://localhost:11434).
+ *
+ * Uses `nomic-embed-text` (768-dimensional) by default — matches the
+ * pgvector(768) column, so NO schema migration is needed. Requires NO API key
+ * and NO paid credits: runs entirely on the local machine.
+ */
+export class OllamaEmbedder implements IEmbedder {
+  readonly dimensions = 768;
+  private readonly baseUrl: string;
+  private readonly model: string;
+
+  constructor(config: OllamaEmbedderConfig = {}) {
+    this.baseUrl = config.baseUrl ?? process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
+    this.model = config.model ?? process.env.NEXUS_EMBED_MODEL ?? "nomic-embed-text";
+  }
+
+  async embed(text: string): Promise<number[]> {
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}/api/embeddings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: this.model, prompt: text }),
+      });
+    } catch (cause) {
+      throw new MemoryError("EMBED_FAILED", `Ollama embeddings request failed: ${String(cause)}`);
+    }
+    if (!response.ok) {
+      const body = await response.text().catch(() => "(unreadable)");
+      throw new MemoryError("EMBED_FAILED", `Ollama API error ${response.status}: ${body}`);
+    }
+    let data: OllamaEmbeddingResponse;
+    try {
+      data = (await response.json()) as OllamaEmbeddingResponse;
+    } catch (cause) {
+      throw new MemoryError("EMBED_FAILED", `Failed to parse Ollama response: ${String(cause)}`);
+    }
+    const embedding = data.embedding;
+    if (!embedding || embedding.length === 0) {
+      throw new MemoryError("EMBED_FAILED", "Ollama returned an empty embedding");
+    }
+    if (embedding.length !== this.dimensions) {
+      throw new MemoryError(
+        "DIMENSION_MISMATCH",
+        `Expected ${this.dimensions} dimensions, got ${embedding.length}`,
+      );
+    }
+    return embedding;
+  }
+}
+
+/**
+ * Helper: pick the best available embedder.
+ * Local-first: Ollama (free, no credits) > OpenAI > Groq (only if forced) > Fixed.
+ * Override with NEXUS_EMBED_PROVIDER = ollama | openai | groq | fixed.
+ * Never throws — falls back to a 768-dim FixedEmbedder (matches pgvector schema).
+ */
+export function createBestEmbedder(config?: {
+  openAiApiKey?: string;
+  groqApiKey?: string;
+  ollamaBaseUrl?: string;
+}): IEmbedder {
+  const provider = process.env.NEXUS_EMBED_PROVIDER?.toLowerCase();
+  const ollamaUrl = config?.ollamaBaseUrl ?? process.env.OLLAMA_BASE_URL;
+
+  if (provider === "ollama" || (!provider && ollamaUrl)) {
+    return new OllamaEmbedder({ baseUrl: ollamaUrl });
+  }
+  const openAiKey = config?.openAiApiKey ?? process.env.OPENAI_API_KEY;
+  if ((provider === "openai" || !provider) && openAiKey) {
+    return new OpenAIEmbedder({ apiKey: openAiKey });
+  }
+  const groqKey = config?.groqApiKey ?? process.env.GROQ_API_KEY;
+  if (provider === "groq" && groqKey) {
+    return new GroqEmbedder({ apiKey: groqKey });
+  }
+  // Deterministic dev fallback — 768 dims to match the pgvector(768) schema.
+  return new FixedEmbedder(768);
+}
+
 // ── FixedEmbedder ─────────────────────────────────────────────────────────────
 
 /**

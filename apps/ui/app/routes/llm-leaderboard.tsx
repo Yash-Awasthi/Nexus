@@ -325,12 +325,14 @@ export default function LLMLeaderboard() {
   const [activeTab, setActiveTab] = useState<FilterTab>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [liveModels, setLiveModels] = useState<Model[] | null>(null);
+  const [disclaimer, setDisclaimer] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/leaderboard")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d?.models) setLiveModels(d.models as Model[]);
+        if (d?.disclaimer) setDisclaimer(d.disclaimer as string);
       })
       .catch(() => {});
   }, []);
@@ -370,6 +372,11 @@ export default function LLMLeaderboard() {
             A community-maintained comparison of large language models. Sorted by Arena Elo rating.
             JUDICA supports all listed models through its multi-agent deliberation engine.
           </p>
+          {disclaimer ? (
+            <p className="mx-auto mt-3 max-w-2xl text-xs text-muted-foreground/80 italic">
+              {disclaimer}
+            </p>
+          ) : null}
         </FadeIn>
       </section>
 

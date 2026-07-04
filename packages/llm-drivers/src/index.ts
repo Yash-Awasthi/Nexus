@@ -859,7 +859,10 @@ export class GeminiDriver extends BaseDriver {
 
   async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
     const t0 = Date.now();
-    const model = opts.model ?? this.model;
+    // Ollama only knows local model tags (e.g. "qwen2.5:7b"). Callers across the
+    // app hardcode cloud aliases like "anthropic/claude-3.5-sonnet"; route any
+    // such "provider/model" string to this driver's configured local model.
+    const model = opts.model && !opts.model.includes("/") ? opts.model : this.model;
     const contents = opts.messages
       .filter((m) => m.role !== "system")
       .map((m) => ({
@@ -906,7 +909,10 @@ export class GeminiDriver extends BaseDriver {
     if (!this._useDefaultTransport) return super.stream(opts, handler);
 
     const t0 = Date.now();
-    const model = opts.model ?? this.model;
+    // Ollama only knows local model tags (e.g. "qwen2.5:7b"). Callers across the
+    // app hardcode cloud aliases like "anthropic/claude-3.5-sonnet"; route any
+    // such "provider/model" string to this driver's configured local model.
+    const model = opts.model && !opts.model.includes("/") ? opts.model : this.model;
     const contents = opts.messages
       .filter((m) => m.role !== "system")
       .map((m) => ({
@@ -984,7 +990,10 @@ export class OllamaDriver extends BaseDriver {
 
   async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
     const t0 = Date.now();
-    const model = opts.model ?? this.model;
+    // Ollama only knows local model tags (e.g. "qwen2.5:7b"). Callers across the
+    // app hardcode cloud aliases like "anthropic/claude-3.5-sonnet"; route any
+    // such "provider/model" string to this driver's configured local model.
+    const model = opts.model && !opts.model.includes("/") ? opts.model : this.model;
     const body = {
       model,
       messages: opts.messages,
@@ -1008,7 +1017,10 @@ export class OllamaDriver extends BaseDriver {
     if (!this._useDefaultTransport) return super.stream(opts, handler);
 
     const t0 = Date.now();
-    const model = opts.model ?? this.model;
+    // Ollama only knows local model tags (e.g. "qwen2.5:7b"). Callers across the
+    // app hardcode cloud aliases like "anthropic/claude-3.5-sonnet"; route any
+    // such "provider/model" string to this driver's configured local model.
+    const model = opts.model && !opts.model.includes("/") ? opts.model : this.model;
     const body = {
       model,
       messages: opts.messages,
@@ -1543,7 +1555,10 @@ export class ReplicateDriver extends BaseDriver {
 
   async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
     const t0 = Date.now();
-    const model = opts.model ?? this.model;
+    // Ollama only knows local model tags (e.g. "qwen2.5:7b"). Callers across the
+    // app hardcode cloud aliases like "anthropic/claude-3.5-sonnet"; route any
+    // such "provider/model" string to this driver's configured local model.
+    const model = opts.model && !opts.model.includes("/") ? opts.model : this.model;
     const prompt = opts.messages
       .map((m) => {
         const role = m.role === "assistant" ? "Assistant" : m.role === "system" ? "System" : "User";
@@ -1668,7 +1683,10 @@ export class BaiduErnieDriver extends BaseDriver {
   async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
     const t0 = Date.now();
     const token = await this.getToken();
-    const model = opts.model ?? this.model;
+    // Ollama only knows local model tags (e.g. "qwen2.5:7b"). Callers across the
+    // app hardcode cloud aliases like "anthropic/claude-3.5-sonnet"; route any
+    // such "provider/model" string to this driver's configured local model.
+    const model = opts.model && !opts.model.includes("/") ? opts.model : this.model;
 
     // ERNIE: system prompt is top-level; messages carry only user/assistant turns.
     let system = opts.systemPrompt;

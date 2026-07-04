@@ -61,23 +61,25 @@ export async function emitAuditEvent(
 
     const auditKey = process.env.NEXUS_AUDIT_KEY ?? "nexus-dev-audit-key";
 
-    await db.transaction(async (tx) => {
-      // Fetch the latest chain link (sequence + hash) inside the transaction
-      // so concurrent inserts don't race on the same sequence number.
-      const [latest] = await tx
+    // Compute the next chain link against an executor (a transaction when the
+    // driver supports one, otherwise the plain db handle). The transactional
+    // path row-locks the latest entry so concurrent inserts don't race on the
+    // sequence number; the fallback path is best-effort append (fine for the
+    // single-writer neon-http driver, which has no transaction support).
+    const appendWith = async (exec: typeof db, locked: boolean) => {
+      const q = exec
         .select({ sequence: auditLog.sequence, chainHash: auditLog.chainHash })
         .from(auditLog)
         .orderBy(desc(auditLog.sequence))
-        .limit(1)
-        .for("update"); // row-level lock on the latest row
+        .limit(1);
+      const [latest] = await (locked ? q.for("update") : q);
 
       const nextSeq = (latest?.sequence ?? 0) + 1;
       const prevHash = latest?.chainHash ?? GENESIS_SENTINEL;
-
       const pHash = payloadHash(event.payload ?? null);
       const cHash = chainHash(auditKey, prevHash, pHash);
 
-      await tx.insert(auditLog).values({
+      await exec.insert(auditLog).values({
         sequence: nextSeq,
         entityType: event.entityType,
         entityId: event.entityId,
@@ -87,7 +89,19 @@ export async function emitAuditEvent(
         payloadHash: pHash,
         chainHash: cHash,
       });
-    });
+    };
+
+    try {
+      await db.transaction(async (tx) => appendWith(tx as unknown as typeof db, true));
+    } catch (txErr) {
+      // neon-http (and other transaction-less drivers) throw here — fall back to
+      // a non-transactional append rather than dropping the audit entry.
+      if ((txErr as Error)?.message?.includes("transaction")) {
+        await appendWith(db, false);
+      } else {
+        throw txErr;
+      }
+    }
   } catch (err) {
     // Never propagate — audit failures must not break the caller's flow
     logger?.error({ err, event }, "audit-emitter: failed to write audit entry");

@@ -59,10 +59,10 @@ import {
 import { registryFromEnv } from "@nexus/llm-oauth";
 import {
   FixedEmbedder,
-  GroqEmbedder,
   InMemoryStore,
   MemoryManager,
   PgVectorStore,
+  createBestEmbedder,
 } from "@nexus/memory";
 import { applyParseltongue, getDefaultConfig as redteamDefaultConfig } from "@nexus/redteam";
 import { RunCostTracker, InMemoryRunCostStore } from "@nexus/run-cost";
@@ -130,9 +130,13 @@ const _stmPipeline = createDefaultPipeline();
 const _memStore = process.env.DATABASE_URL
   ? new PgVectorStore({ databaseUrl: process.env.DATABASE_URL })
   : new InMemoryStore();
-const _memEmbedder = process.env.GROQ_API_KEY
-  ? new GroqEmbedder({ apiKey: process.env.GROQ_API_KEY })
-  : new FixedEmbedder();
+const _memEmbedder = (() => {
+  try {
+    return createBestEmbedder();
+  } catch {
+    return new FixedEmbedder();
+  }
+})();
 export const _gatewayMemory = new MemoryManager({ store: _memStore, embedder: _memEmbedder });
 
 async function _budgetPreHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
@@ -293,7 +297,10 @@ export const DRIVER_ALIASES: Record<string, { provider: string; model: string }>
   "nexus/deepseek": { provider: "deepseek", model: "deepseek-chat" },
   "nexus/mistral": { provider: "mistral", model: "mistral-large-latest" },
   "nexus/router": { provider: "openrouter", model: "anthropic/claude-3.5-sonnet" },
-  "nexus/local": { provider: "ollama", model: "llama3.2" },
+  "nexus/local": {
+    provider: "ollama",
+    model: process.env.NEXUS_DEFAULT_MODEL ?? "qwen2.5:7b",
+  },
   "nexus/cerebras": { provider: "cerebras", model: "llama3.1-70b" },
   "nexus/kimi": { provider: "kimi", model: "moonshot-v1-32k" },
   "nexus/code": { provider: "codestral", model: "codestral-latest" },
@@ -319,6 +326,8 @@ function resolveAlias(model: string): { provider: string; model: string } | null
   if (model.startsWith("moonshot")) return { provider: "kimi", model };
   if (model.startsWith("codestral")) return { provider: "codestral", model };
   if (model.startsWith("llama") || model.startsWith("meta/")) return { provider: "groq", model };
+  // Bare Ollama model ids ("qwen2.5:7b", "llama3.2:3b", …) → local Ollama.
+  if (/^[\w.-]+:[\w.-]+$/.test(model)) return { provider: "ollama", model };
   return null;
 }
 
@@ -488,18 +497,12 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
       seedEnvAccounts(accountPool, registry);
 
       const alias = resolveAlias(request.body.model);
-      const providerName = overrideProvider ?? alias?.provider;
-      const resolvedModel = alias?.model ?? request.body.model;
-
-      if (!providerName) {
-        return reply.code(400).send({
-          type: "error",
-          error: {
-            type: "invalid_request_error",
-            message: `Unknown model: "${request.body.model}". Use a nexus/* alias or a known model prefix.`,
-          },
-        });
-      }
+      // Unknown model with no provider → default to local Ollama so a keyless
+      // instance still answers instead of 400-ing.
+      const providerName = overrideProvider ?? alias?.provider ?? "ollama";
+      let resolvedModel =
+        alias?.model ??
+        (overrideProvider ? request.body.model : (process.env.NEXUS_DEFAULT_MODEL ?? "qwen2.5:7b"));
 
       // A caller with a linked Google OAuth account gets a lazily-tracked pool
       // account for "vertex" — registered once, then picked/health-gated like
@@ -530,6 +533,17 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
         if (picked.id.startsWith("oauth:") && request.nexusUserId) {
           const oauthDriver = await resolveVertexOAuthDriver(request.nexusUserId);
           if (oauthDriver) driver = oauthDriver;
+        }
+      }
+
+      // Local fallback: if the requested provider has no configured driver
+      // (e.g. a cloud alias like nexus/fast with no GROQ_API_KEY), route to the
+      // always-registered local Ollama driver so chat works with zero keys.
+      if (!driver && providerName !== "ollama") {
+        const localDriver = registry.get("ollama");
+        if (localDriver) {
+          driver = localDriver;
+          resolvedModel = process.env.NEXUS_DEFAULT_MODEL ?? "qwen2.5:7b";
         }
       }
 

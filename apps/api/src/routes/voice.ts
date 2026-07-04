@@ -9,6 +9,7 @@
  * GET  /api/v1/voice/providers    — list configured STT/TTS providers
  */
 
+import { OllamaDriver } from "@nexus/llm-drivers";
 import {
   VoiceSession,
   NullTranscribeProvider,
@@ -79,17 +80,30 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
       preHandler: requireAuth,
     },
     async (request, reply) => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { text, voice = "alloy" } = request.body;
       if (!text?.trim()) return reply.code(400).send({ error: "text is required" });
 
       const t0 = Date.now();
-      // Use echo handler directly — VoiceSession.process() requires audio; text-only mode bypasses it
-      const echoHandler = async (t: string): Promise<string> =>
-        `You said: "${t}". (Voice handler not yet wired to LLM)`;
-      const responseText = await echoHandler(text);
+      let responseText: string;
+      try {
+        const driver = new OllamaDriver({
+          baseUrl: process.env.OLLAMA_BASE_URL,
+          model: process.env.NEXUS_DEFAULT_MODEL ?? "qwen2.5:7b",
+        });
+        const res = await driver.complete({
+          model: process.env.NEXUS_DEFAULT_MODEL ?? "qwen2.5:7b",
+          messages: [
+            { role: "system", content: "You are a concise voice assistant. Reply in 1-3 sentences." },
+            { role: "user", content: text },
+          ],
+          maxTokens: 256,
+        });
+        responseText = res.content.trim() || "(no response)";
+      } catch (e) {
+        responseText = `Voice LLM unavailable: ${e instanceof Error ? e.message : String(e)}`;
+      }
 
-      return reply.send({ text: responseText, latencyMs: Date.now() - t0 });
+      return reply.send({ text: responseText, voice, latencyMs: Date.now() - t0 });
     },
   );
 

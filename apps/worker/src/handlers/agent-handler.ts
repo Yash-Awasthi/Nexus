@@ -33,7 +33,7 @@ import {
 import { db } from "@nexus/db";
 import { agentSessions } from "@nexus/db/schema";
 import { AnthropicDriver, GroqDriver, OpenRouterDriver, type LlmDriver } from "@nexus/llm-drivers";
-import { GroqEmbedder, MemoryManager, PgVectorStore } from "@nexus/memory";
+import { FixedEmbedder, MemoryManager, PgVectorStore, createBestEmbedder } from "@nexus/memory";
 import { eq } from "drizzle-orm";
 
 import { publishAgentEvent } from "./agent-events.js";
@@ -539,7 +539,13 @@ export async function handleAgentRunJob(
         if (learnings.length > 0 && process.env.GROQ_API_KEY && process.env.DATABASE_URL) {
           try {
             const memStore = new PgVectorStore({ databaseUrl: process.env.DATABASE_URL });
-            const embedder = new GroqEmbedder({ apiKey: process.env.GROQ_API_KEY });
+            const embedder = (() => {
+              try {
+                return createBestEmbedder();
+              } catch {
+                return new FixedEmbedder(768);
+              }
+            })();
             const memManager = new MemoryManager({ store: memStore, embedder });
             for (const learning of learnings) {
               try {

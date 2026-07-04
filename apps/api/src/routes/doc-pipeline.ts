@@ -23,20 +23,24 @@ import {
   type DocInput,
   type Embedder,
 } from "@nexus/doc-pipeline";
-import { GroqEmbedder } from "@nexus/memory";
+import { createBestEmbedder } from "@nexus/memory";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
 
 // ── Embedder ──────────────────────────────────────────────────────────────────
 
-// Batch wrapper: GroqEmbedder.embed() takes one string; doc-pipeline Embedder takes string[].
-const groqSingleton = process.env.GROQ_API_KEY
-  ? new GroqEmbedder({ apiKey: process.env.GROQ_API_KEY })
-  : null;
+// Batch wrapper: createBestEmbedder().embed() takes one string; doc-pipeline Embedder takes string[].
+const _bestEmbedder = (() => {
+  try {
+    return createBestEmbedder();
+  } catch {
+    return null;
+  }
+})();
 
-const embedder: Embedder = groqSingleton
-  ? async (texts: string[]) => Promise.all(texts.map((t) => groqSingleton.embed(t)))
+const embedder: Embedder = _bestEmbedder
+  ? async (texts: string[]) => Promise.all(texts.map((t) => _bestEmbedder.embed(t)))
   : async (texts: string[]) => texts.map(() => [0, 0, 0, 0]); // null embedder
 
 // ── Supported formats ─────────────────────────────────────────────────────────

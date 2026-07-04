@@ -30,7 +30,7 @@ import {
 } from "@nexus/agents";
 import { globalHooks } from "@nexus/hooks";
 import { KnowledgeGraph, InMemoryKGStore } from "@nexus/knowledge-graph";
-import { GroqEmbedder, InMemoryStore, MemoryManager, PgVectorStore } from "@nexus/memory";
+import { InMemoryStore, MemoryManager, PgVectorStore, createBestEmbedder } from "@nexus/memory";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
@@ -42,9 +42,13 @@ const _memStore = process.env.DATABASE_URL
   ? new PgVectorStore({ databaseUrl: process.env.DATABASE_URL })
   : new InMemoryStore();
 
-const _embedder = process.env.GROQ_API_KEY
-  ? new GroqEmbedder({ apiKey: process.env.GROQ_API_KEY })
-  : null;
+const _embedder = (() => {
+  try {
+    return createBestEmbedder();
+  } catch {
+    return null;
+  }
+})();
 
 const _memManager = _embedder ? new MemoryManager({ store: _memStore, embedder: _embedder }) : null;
 
