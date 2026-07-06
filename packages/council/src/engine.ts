@@ -87,6 +87,25 @@ function parseConfidence(content: string): number {
   return 0.65;
 }
 
+/**
+ * Infer a provider label from a concrete model id. The transport returns the
+ * model that actually served the vote but not the provider, so derive a best-
+ * effort label (avoids hardcoding "groq" when a vote ran on local Ollama, etc.).
+ */
+function providerFromModel(model: string): string {
+  const m = model.toLowerCase();
+  if (m.includes("claude")) return "anthropic";
+  if (m.includes("gpt") || m.startsWith("o1") || m.startsWith("o3")) return "openai";
+  if (m.includes("gemini")) return "google";
+  if (m.includes("mistral") || m.includes("codestral")) return "mistral";
+  if (m.includes("deepseek")) return "deepseek";
+  // Groq serves llama/mixtral/gemma too, but locally these run on Ollama; when
+  // the platform is configured for Ollama, prefer that label.
+  if (process.env.NEXUS_LLM_PROVIDER === "ollama") return "ollama";
+  if (m.includes("llama") || m.includes("mixtral") || m.includes("gemma")) return "groq";
+  return "unknown";
+}
+
 // ── DeliberationEngine ────────────────────────────────────────────────────────
 
 export class DeliberationEngine {
@@ -172,7 +191,7 @@ export class DeliberationEngine {
 
         const vote = {
           model: response.model,
-          provider: "groq",
+          provider: providerFromModel(response.model),
           vote: parseVote(response.content),
           reasoning,
           confidence: parseConfidence(response.content),

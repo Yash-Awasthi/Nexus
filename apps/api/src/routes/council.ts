@@ -22,7 +22,7 @@ import type {
 } from "@nexus/council";
 import { db } from "@nexus/db";
 import { verdicts, councilTranscripts, signals } from "@nexus/db/schema";
-import type { DriverRegistry, LlmRole } from "@nexus/llm-drivers";
+import { OllamaDriver, type DriverRegistry, type LlmRole } from "@nexus/llm-drivers";
 import { makeTierGatePreHandler } from "@nexus/tier-gate";
 import { eq, desc } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
@@ -32,7 +32,10 @@ import { requireAuth, requireAuthWithTier, getTierFromRequest } from "../middlew
 
 // ── Council config ─────────────────────────────────────────────────────────────
 
-const COUNCIL_MODEL = process.env.COUNCIL_MODEL ?? "nexus/smart";
+const LOCAL_OLLAMA = process.env.NEXUS_LLM_PROVIDER === "ollama";
+// In local mode default the council to the local Ollama alias so deliberations
+// run key-free; cloud deployments still default to nexus/smart (BYOK).
+const COUNCIL_MODEL = process.env.COUNCIL_MODEL ?? (LOCAL_OLLAMA ? "nexus/local" : "nexus/smart");
 const COUNCIL_MAX_TOKENS = parseInt(process.env.COUNCIL_MAX_TOKENS ?? "4096", 10);
 
 // ── Driver alias table ────────────────────────────────────────────────────────
@@ -46,6 +49,7 @@ const COUNCIL_DRIVER_ALIASES: Record<string, { provider: string; model: string }
   "nexus/gemini": { provider: "gemini", model: "gemini-1.5-pro" },
   "nexus/deepseek": { provider: "deepseek", model: "deepseek-chat" },
   "nexus/mistral": { provider: "mistral", model: "mistral-large-latest" },
+  "nexus/local": { provider: "ollama", model: process.env.NEXUS_DEFAULT_MODEL ?? "qwen2.5:7b" },
 };
 
 // ── LlmDriversTransport ───────────────────────────────────────────────────────
@@ -115,14 +119,38 @@ class NoCouncilKeyError extends Error {}
  */
 async function buildCouncilServiceForUser(userId: string | undefined): Promise<CouncilService> {
   const { registry, missing } = await buildUserDriverRegistry(userId, COUNCIL_PROVIDERS);
+  let effectiveModel = COUNCIL_MODEL;
   const councilProvider = (COUNCIL_DRIVER_ALIASES[COUNCIL_MODEL] ?? { provider: "groq" }).provider;
-  if (missing.includes(councilProvider)) {
-    throw new NoCouncilKeyError(
-      `No API key configured for the council provider "${councilProvider}". ` +
-        `Add one under Settings → Provider Keys.`,
-    );
+
+  const registerLocalOllama = () => {
+    if (!registry.get("ollama")) {
+      registry.register(
+        new OllamaDriver({
+          baseUrl: process.env.OLLAMA_BASE_URL,
+          model: process.env.NEXUS_DEFAULT_MODEL ?? "qwen2.5:7b",
+        }),
+        "ollama",
+      );
+    }
+  };
+
+  if (councilProvider === "ollama") {
+    // Local Ollama is keyless — register it directly.
+    registerLocalOllama();
+  } else if (missing.includes(councilProvider)) {
+    if (LOCAL_OLLAMA) {
+      // Local mode with no cloud key: degrade to local Ollama instead of 400 so
+      // deliberations run key-free (mirrors gateway.ts local fallback).
+      registerLocalOllama();
+      effectiveModel = "nexus/local";
+    } else {
+      throw new NoCouncilKeyError(
+        `No API key configured for the council provider "${councilProvider}". ` +
+          `Add one under Settings → Provider Keys.`,
+      );
+    }
   }
-  const transport = new LlmDriversTransport(registry, COUNCIL_MODEL);
+  const transport = new LlmDriversTransport(registry, effectiveModel);
   return new CouncilService({ llm: transport, onResult: persistCouncilResult });
 }
 
