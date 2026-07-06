@@ -72,13 +72,33 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
     const { query = "", limit: limitStr, userId } = request.query;
     const limit = Math.min(parseInt(limitStr ?? "10", 10) || 10, 100);
 
-    // RagtimeRetriever: two-stage recall (cosine pool) + composite rerank
-    // (α·relevance + β·importance + γ·recency_decay).
     // Filter by metadata.userId for multi-tenant isolation.
     const retrievalFilter: RetrievalMemoryFilter | undefined = userId
       ? { metadata: { userId } }
       : undefined;
 
+    // No query → list recent entries (no embedding). Embedding an empty string
+    // makes some backends (Ollama) return an empty vector → EMBED_FAILED 500.
+    if (!query.trim()) {
+      const entries = (await manager.list(userId ? { metadata: { userId } } : undefined)).slice(
+        0,
+        limit,
+      );
+      return reply.send({
+        results: entries.map((e) => ({
+          id: e.id,
+          text: e.text,
+          score: 0,
+          metadata: e.metadata,
+          createdAt: e.createdAt,
+          userId: e.metadata?.["userId"] as string | undefined,
+        })),
+        total: entries.length,
+      });
+    }
+
+    // RagtimeRetriever: two-stage recall (cosine pool) + composite rerank
+    // (α·relevance + β·importance + γ·recency_decay).
     const results = await retriever.retrieve(query, limit, retrievalFilter);
 
     return reply.send({
