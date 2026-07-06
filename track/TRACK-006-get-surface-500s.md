@@ -27,4 +27,4 @@ before and is now live** (agent_sessions, oauth_credentials, mcp_servers, prompt
 - billing/keys, billing/usage/by-model-day, orchestration/runs → 200.
 - Re-running full GET sweep to confirm 0 × 500.
 
-## Status: ✅ code fixed + DB migrated. Re-sweep pending confirm.
+## Status: ✅ DONE. Re-sweep confirmed: 242 GET routes, **0 × 500**.

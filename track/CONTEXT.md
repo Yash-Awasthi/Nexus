@@ -31,8 +31,13 @@ TWO LLM stacks: `@nexus/llm-drivers` (has Ollama, works) vs `@nexus/llm-router` 
 - `/api/*` auth 501 = api-bridge stubs. gateway 200 (has ollama fallback, prefers groq if key). 503 = needs key (images/exa/scim/fine-tune/video). code-agent 200 but Piston remote exec whitelist-only (Sandbox uses Pyodide local instead).
 
 ## TODO / next
-- [ ] commit mail-ingest fix (apps/api/src/routes/mail-ingest.ts).
-- [ ] optional: gateway force-local when NEXUS_LLM_PROVIDER=ollama (currently prefers groq if key present).
+- [x] mail-ingest fix committed.
+- [x] `_getPool` sentinel fixed (raw-pg routes live).
+- [x] DB migrated 0007→0013 (drizzle-kit migrate) — billing/orchestration/agent-sessions/oauth/mcp tables now exist.
+- [x] GET surface swept twice → 0×500 (242 routes). POST swept twice → 0×500 (130).
+- [ ] optional: gateway force-local when NEXUS_LLM_PROVIDER=ollama (skipped — not erroring, risky).
 - [ ] optional: remove stale GROQ_API_KEY from .env for truly key-free local.
-- [ ] re-sweep GET surface + PATCH/DELETE (only POST fully swept twice; GET swept once early = green).
-- Smoke scripts: `track/smoke2.sh` (v1+bridge POST, auto-relogin), results in `/tmp/smoke2.txt`.
+- [ ] not yet swept: PATCH/DELETE verbs (low risk, mostly store ops).
+- Migrate cmd: `DBURL=$(grep ^DATABASE_URL= .env|cut -d= -f2-); DATABASE_URL="$DBURL" pnpm --filter @nexus/db exec drizzle-kit migrate`
+
+## Status: whole GET+POST surface = 0×500. All remaining non-2xx are expected (501 stubs, 503 needs-key, 400 validation, 403 tier, 404 artifact).
