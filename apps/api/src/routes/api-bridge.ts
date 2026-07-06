@@ -271,7 +271,11 @@ async function _llm(
 
 const _DATA_DIR = process.env.NEXUS_DATA_DIR ?? path.join(process.cwd(), "data", "stores");
 
-let _pgPool: Pool | null = null;
+// `_pgPool` uses `undefined` as the "not yet initialised" sentinel; `null` means
+// "initialised, but no DATABASE_URL". Initialising to `null` here would make the
+// `!== undefined` guard below short-circuit on the first call and never build the
+// pool (silently disabling every raw-pg route). Keep it `undefined` until built.
+let _pgPool: Pool | null | undefined;
 function _getPool(): Pool | null {
   if (_pgPool !== undefined) return _pgPool;
   if (process.env.DATABASE_URL) {
