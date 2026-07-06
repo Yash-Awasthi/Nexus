@@ -25,6 +25,7 @@ import {
   GroqProvider,
   LLMRouter,
   NullProvider,
+  OpenAIProvider,
   type LLMMessage,
   type RoutingStrategy,
 } from "@nexus/llm-router";
@@ -36,6 +37,22 @@ import { requireAuth } from "../middleware/auth.js";
 
 function buildRouter(): LLMRouter {
   const providers = [];
+  const aliases = [];
+
+  // Local-first: when configured for Ollama, route both aliases to the local
+  // model via Ollama's OpenAI-compatible /v1 endpoint. Registered first so the
+  // "first" strategy prefers it over cloud providers.
+  if (process.env.NEXUS_LLM_PROVIDER === "ollama") {
+    const base = (process.env.OLLAMA_BASE_URL ?? "http://localhost:11434").replace(/\/+$/, "");
+    const model = process.env.NEXUS_DEFAULT_MODEL ?? "qwen2.5:7b";
+    providers.push(
+      new OpenAIProvider({ apiKey: "ollama", baseUrl: `${base}/v1`, providerName: "ollama" }),
+    );
+    aliases.push(
+      { alias: "nexus/fast", provider: "ollama", model },
+      { alias: "nexus/smart", provider: "ollama", model },
+    );
+  }
 
   if (process.env.ANTHROPIC_API_KEY) {
     providers.push(new ClaudeProvider({ apiKey: process.env.ANTHROPIC_API_KEY }));
@@ -53,14 +70,16 @@ function buildRouter(): LLMRouter {
     );
   }
 
+  aliases.push(
+    { alias: "nexus/fast", provider: "groq", model: "llama-3.1-70b-versatile" },
+    { alias: "nexus/fast", provider: "null", model: "nexus/fast" },
+    { alias: "nexus/smart", provider: "claude", model: "claude-sonnet-4-5" },
+    { alias: "nexus/smart", provider: "null", model: "nexus/smart" },
+  );
+
   return new LLMRouter({
     providers,
-    aliases: [
-      { alias: "nexus/fast", provider: "groq", model: "llama-3.1-70b-versatile" },
-      { alias: "nexus/fast", provider: "null", model: "nexus/fast" },
-      { alias: "nexus/smart", provider: "claude", model: "claude-sonnet-4-5" },
-      { alias: "nexus/smart", provider: "null", model: "nexus/smart" },
-    ],
+    aliases,
     fallbacks: {
       "nexus/smart": ["nexus/fast"],
     },

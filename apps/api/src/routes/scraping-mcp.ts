@@ -289,6 +289,9 @@ export async function scrapingMcpRoutes(app: FastifyInstance): Promise<void> {
       preHandler: requireAuth,
     },
     async (request, reply) => {
+      if (!Array.isArray(request.body?.urls) || request.body.urls.length === 0) {
+        return (reply as FastifyReply).code(400).send({ error: "urls (non-empty array) is required" });
+      }
       const result = await server.call("bulk_get", request.body);
       if (result.isError) {
         const msg =

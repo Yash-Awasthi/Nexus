@@ -369,7 +369,13 @@ export async function councilRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: "signalId is required" });
       }
 
-      const [signal] = await db.select().from(signals).where(eq(signals.id, signalId));
+      let signal;
+      try {
+        [signal] = await db.select().from(signals).where(eq(signals.id, signalId));
+      } catch {
+        // Malformed id (e.g. not a valid UUID) → Postgres cast error, not a 500.
+        return reply.code(400).send({ error: "invalid signalId" });
+      }
 
       if (!signal) {
         return reply.code(404).send({ error: `Signal ${signalId} not found` });

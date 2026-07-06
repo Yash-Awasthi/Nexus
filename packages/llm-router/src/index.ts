@@ -278,7 +278,9 @@ export class GroqProvider implements LLMProvider {
 
   constructor(config: GroqProviderConfig) {
     this.apiKey = config.apiKey;
-    this.baseUrl = config.baseUrl ?? "https://api.groq.com/openai";
+    // Groq's OpenAI-compatible endpoint lives under /openai/v1 — the shared
+    // completion helper appends /chat/completions, so the base must include /v1.
+    this.baseUrl = config.baseUrl ?? "https://api.groq.com/openai/v1";
     this.fetch = config.fetch ?? globalThis.fetch;
   }
 

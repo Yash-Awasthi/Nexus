@@ -694,6 +694,8 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     };
   }>("/godmode/stream", { preHandler: requireAuthWithTier }, async (request, reply) => {
     const { question, members } = request.body;
+    if (!question?.trim() || !Array.isArray(members) || members.length === 0)
+      return reply.code(400).send({ error: "question and members[] are required" });
     // Strict BYOK: build a registry from the authenticated user's stored keys
     // only — no env-var fallback. Members whose provider lacks a stored key fail
     // individually below.
@@ -6211,6 +6213,8 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     Body: { convId: string; patterns: { id: string; pattern: string; confidence: number }[] };
   }>("/negation/add", async (request, reply) => {
     const { convId, patterns } = request.body;
+    if (!convId || !Array.isArray(patterns))
+      return reply.code(400).send({ error: "convId and patterns[] are required" });
     if (!_negationRules.has(convId)) _negationRules.set(convId, new Map());
     for (const p of patterns) _negationRules.get(convId)!.set(p.id ?? crypto.randomUUID(), p);
     return reply.send({ ok: true, added: patterns.length });
@@ -6616,6 +6620,8 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     "/honesty/sycophancy-check",
     async (request, reply) => {
       const { prompt = "", response } = request.body;
+      if (!response?.trim())
+        return reply.code(400).send({ error: "response is required" });
       const driver = getDefaultDriver();
       if (!driver)
         return reply.send({
@@ -6651,6 +6657,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
 
   app.post<{ Body: { response: string } }>("/honesty/reframe", async (request, reply) => {
     const { response } = request.body;
+    if (!response?.trim()) return reply.code(400).send({ error: "response is required" });
     const driver = getDefaultDriver();
     if (!driver)
       return reply.send({
@@ -6678,6 +6685,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
 
   app.post<{ Body: { text: string } }>("/honesty/confidence-calibrate", async (request, reply) => {
     const { text } = request.body;
+    if (!text?.trim()) return reply.code(400).send({ error: "text is required" });
     const driver = getDefaultDriver();
     if (!driver)
       return reply.send({
@@ -6713,6 +6721,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     "/honesty/minority-report",
     async (request, reply) => {
       const { topic, mainView = "" } = request.body;
+      if (!topic?.trim()) return reply.code(400).send({ error: "topic is required" });
       const driver = getDefaultDriver();
       if (!driver)
         return reply.send({
@@ -6854,6 +6863,8 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   app.post<{ Body: { response: string; context?: string } }>(
     "/hallucination/score",
     async (request, reply) => {
+      if (!request.body?.response?.trim())
+        return reply.code(400).send({ error: "response is required" });
       const result = await _scoreHallucination(request.body.response, request.body.context);
       return reply.send(result);
     },
@@ -6863,6 +6874,8 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     "/hallucination/groundedness",
     async (request, reply) => {
       const { answer, context } = request.body;
+      if (!answer?.trim() || !context?.trim())
+        return reply.code(400).send({ error: "answer and context are required" });
       const driver = getDefaultDriver();
       if (!driver) return reply.send({ groundedness: 0.5, supported: [], unsupported: [] });
       const res = await driver.complete({
@@ -8535,6 +8548,7 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     },
   );
   app.post<{ Body: { response: string } }>("/citations/score-response", async (req, reply) => {
+    if (!req.body?.response?.trim()) return reply.code(400).send({ error: "response is required" });
     const result = await _llm(
       [
         systemMsg(

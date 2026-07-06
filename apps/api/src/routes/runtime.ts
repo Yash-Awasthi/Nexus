@@ -59,6 +59,8 @@ export async function runtimeRoutes(app: FastifyInstance): Promise<void> {
     };
   }>("/runtime/tasks", { preHandler: requireAuth }, async (request, reply) => {
     const { type, payload, priority, verdict_id, idempotency_key } = request.body;
+    if (!type || !payload)
+      return reply.code(400).send({ error: "type and payload are required" });
 
     const [row] = await db
       .insert(runtimeTasks)
