@@ -1,0 +1,5 @@
+smoke-*.sh
+smoke2.sh
+smoke-post.sh
+smoke-v1post.sh
+*-results.txt
