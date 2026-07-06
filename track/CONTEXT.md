@@ -40,4 +40,25 @@ TWO LLM stacks: `@nexus/llm-drivers` (has Ollama, works) vs `@nexus/llm-router` 
 - [ ] not yet swept: PATCH/DELETE verbs (low risk, mostly store ops).
 - Migrate cmd: `DBURL=$(grep ^DATABASE_URL= .env|cut -d= -f2-); DATABASE_URL="$DBURL" pnpm --filter @nexus/db exec drizzle-kit migrate`
 
-## Status: whole GET+POST surface = 0×500. All remaining non-2xx are expected (501 stubs, 503 needs-key, 400 validation, 403 tier, 404 artifact).
+## Status: whole GET+POST API surface = 0×500. Remaining non-2xx expected (501 stubs, 503 needs-key, 400 validation, 403 tier, 404 artifact).
+
+## UI (TRACK-007) — the REAL "broken"
+- **Root cause:** UI raw `fetch("/api/...")` (178 sites) sent NO token → `/api/*` requireAuth → 401 → pages empty.
+- **Fix:** `apps/ui/app/lib/install-auth-fetch.ts` global fetch interceptor (attaches nexus_token), wired in root.tsx.
+- Notifications backend added (bell was 404). agents + knowledge-graph shape-crash fixed.
+- UI smoke: 59/59 FAIL → ~2 non-bugs. Playwright: `node track/ui-smoke.mjs` (needs UI on :5173).
+  Chrome: `/home/yash/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome`. Use `playwright-core`, run FROM repo root.
+- Boot UI: `nohup bash scripts/dev-local.sh ui > /tmp/nui.log 2>&1 & disown`
+
+## Commits on `ollama`: 10. Clean tree.
+
+## ═══ NEXT PLANS (do in order) ═══
+1. **Full UI crash sweep** — `track/ui-smoke.mjs` catches blank/ErrorBoundary but ~90 pages exist and only
+   agents+kg checked deeply. Now that data flows, MORE shape-mismatch crashes likely (array-vs-{key:[]},
+   name-vs-label class). Expand PAGES list to all routes, run warm (2x each), fix each `.map/.length on undefined`.
+2. **/api-tokens** page → blank (len 82). Investigate (real crash or route).
+3. **PATCH/DELETE verb sweep** — never swept. Extract via python (multiline regex), hit with dummy ids, capture 500s.
+4. **Notifications are empty** — store exists but nothing emits. Wire real events (or leave as honest empty).
+5. Optional: gateway force-local (NEXUS_LLM_PROVIDER=ollama); drop stale GROQ_API_KEY from .env.
+6. Optional: replace 178 raw fetches with authFetch explicitly (interceptor covers them, but explicit is cleaner + SSR-safe).
+7. Merge `ollama` → main when satisfied (user override put us on ollama; confirm before merge).

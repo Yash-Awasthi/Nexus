@@ -35,6 +35,8 @@ User: "a specific feature returns an error (500 / wrong data)". Sign-in works. B
 | 003 | llm/complete 502 → local Ollama; council/gateway reviewed (no bug) | ✅ done |
 | 004 | Class B (DB-insert 500s) + Class C (undefined-access 500s) | ✅ done |
 | 005 | Council runs fully key-free on local Ollama (+ correct provider label) | ✅ done |
+| 006 | GET-surface 500s: memory embed, admin/traces, DB migrate 0007→0013 | ✅ done |
+| 007 | UI: raw-fetch missed JWT (178 sites) → auth-fetch interceptor; notifications; agents/kg shapes | ✅ done |
 
 ## Branch
 Work is on branch **`ollama`** (user override of main-only rule, for this effort).

@@ -1,0 +1,15 @@
+import { chromium } from "playwright-core";
+const BASE="http://localhost:5173";
+const b=await chromium.launch({headless:true,executablePath:"/home/yash/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome",args:["--no-sandbox"]});
+const pg=await (await b.newContext()).newPage();
+const r=await pg.request.post(`${BASE}/api/v1/auth/login`,{data:{email:"audit@nexus.local",password:"LocalDev12345!"}});
+const body=await r.json();
+await pg.addInitScript(t=>{localStorage.setItem("nexus_token",t.accessToken);localStorage.setItem("nexus_user",JSON.stringify(t.user??{}));},body);
+const s404=new Set(), errs=[];
+pg.on("response",x=>{if(x.status()===404)s404.add(x.url().replace(BASE,""));});
+pg.on("console",m=>{if(m.type()==="error")errs.push(m.text().replace(/\s+/g," ").slice(0,220));});
+await pg.goto(`${BASE}/honesty`,{waitUntil:"networkidle",timeout:20000}).catch(()=>{});
+await pg.waitForTimeout(1200);
+console.log("=== 404 urls ==="); [...s404].forEach(u=>console.log("  ",u));
+console.log("=== console errors (uniq) ==="); [...new Set(errs)].slice(0,6).forEach(e=>console.log("  ",e));
+await b.close();
