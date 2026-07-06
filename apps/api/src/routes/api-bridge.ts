@@ -9952,6 +9952,60 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     return reply.send(trace);
   });
 
+  // ── Notifications (per-user, in-memory) ─────────────────────────────────────
+  // Backs the sidebar bell (apps/ui/app/root.tsx). Auth-scoped: keyed by
+  // request.nexusUserId. In-memory is fine — notifications are ephemeral UI hints;
+  // they repopulate from live events and don't need to survive a restart.
+  interface Notification {
+    id: number;
+    type: string;
+    title: string;
+    message?: string;
+    isRead: boolean;
+    dismissed: boolean;
+    createdAt: string;
+  }
+  const _notifs = new Map<string, Notification[]>();
+  const _notifKey = (req: { nexusUserId?: string }) => req.nexusUserId ?? "anonymous";
+  const _visibleNotifs = (uid: string) => (_notifs.get(uid) ?? []).filter((n) => !n.dismissed);
+
+  app.get("/notifications/count", async (request, reply) => {
+    const unreadCount = _visibleNotifs(_notifKey(request)).filter((n) => !n.isRead).length;
+    return reply.send({ unreadCount });
+  });
+
+  app.get<{ Querystring: { limit?: string } }>("/notifications", async (request, reply) => {
+    const limit = Math.min(parseInt(request.query.limit ?? "20", 10) || 20, 100);
+    const all = _visibleNotifs(_notifKey(request)).sort((a, b) =>
+      b.createdAt.localeCompare(a.createdAt),
+    );
+    return reply.send({
+      notifications: all.slice(0, limit),
+      unreadCount: all.filter((n) => !n.isRead).length,
+    });
+  });
+
+  app.post<{ Params: { id: string } }>("/notifications/:id/read", async (request, reply) => {
+    const n = (_notifs.get(_notifKey(request)) ?? []).find(
+      (x) => x.id === Number(request.params.id),
+    );
+    if (n) n.isRead = true;
+    return reply.send({ ok: true });
+  });
+
+  app.post<{ Params: { id: string } }>("/notifications/:id/dismiss", async (request, reply) => {
+    const n = (_notifs.get(_notifKey(request)) ?? []).find(
+      (x) => x.id === Number(request.params.id),
+    );
+    if (n) n.dismissed = true;
+    return reply.send({ ok: true });
+  });
+
+  app.post("/notifications/dismiss-all", async (request, reply) => {
+    for (const n of _notifs.get(_notifKey(request)) ?? []) n.dismissed = true;
+    return reply.send({ ok: true });
+  });
+
   // ── Web Scraping routes already registered at line ~4554 ────────────────────
   // (GET /web-scraping/providers, POST /scrape, /crawl, /exa/search, /exa/contents)
   // Do NOT re-register here — Fastify throws FST_ERR_DUPLICATED_ROUTE.

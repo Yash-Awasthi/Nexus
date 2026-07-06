@@ -89,7 +89,14 @@ import { AuthProvider, useAuth } from "~/context/AuthContext";
 import { StoreProvider } from "~/context/StoreContext";
 import { ThemeProvider, useTheme } from "~/context/ThemeContext";
 import { useEasterEggs } from "~/hooks/useEasterEggs";
+import { authFetch } from "~/lib/api";
+import { installAuthFetch } from "~/lib/install-auth-fetch";
 import "./app.css";
+
+// Attach the stored JWT to same-origin /api/* calls made via raw fetch (runs
+// once, client-only). Without this, auth-gated bridge routes 401 and pages
+// render empty. See ~/lib/install-auth-fetch.
+installAuthFetch();
 
 const PUBLIC_PATHS = new Set(["/", "/login", "/register", "/setup"]);
 
@@ -325,7 +332,7 @@ function NotificationBell() {
   // Fetch unread count (lightweight — runs on interval)
   const fetchCount = useCallback(async () => {
     try {
-      const res = await fetch("/api/notifications/count");
+      const res = await authFetch("/api/notifications/count");
       if (res.ok) {
         const data = (await res.json()) as { unreadCount?: number };
         setUnread(data.unreadCount ?? 0);
@@ -339,7 +346,7 @@ function NotificationBell() {
   const fetchList = useCallback(async () => {
     setLoadingList(true);
     try {
-      const res = await fetch("/api/notifications?limit=8");
+      const res = await authFetch("/api/notifications?limit=8");
       if (res.ok) {
         const data = (await res.json()) as { notifications?: Notif[]; unreadCount?: number };
         setNotifs(data.notifications ?? []);
@@ -379,7 +386,7 @@ function NotificationBell() {
 
   const markRead = async (id: number) => {
     try {
-      await fetch(`/api/notifications/${id}/read`, { method: "POST" });
+      await authFetch(`/api/notifications/${id}/read`, { method: "POST" });
       setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
       setUnread((c) => Math.max(0, c - 1));
     } catch {
@@ -390,7 +397,7 @@ function NotificationBell() {
   const dismiss = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await fetch(`/api/notifications/${id}/dismiss`, { method: "POST" });
+      await authFetch(`/api/notifications/${id}/dismiss`, { method: "POST" });
       setNotifs((prev) => prev.filter((n) => n.id !== id));
       setUnread((c) => Math.max(0, c - 1));
     } catch {
@@ -400,7 +407,7 @@ function NotificationBell() {
 
   const dismissAll = async () => {
     try {
-      await fetch("/api/notifications/dismiss-all", { method: "POST" });
+      await authFetch("/api/notifications/dismiss-all", { method: "POST" });
       setNotifs([]);
       setUnread(0);
     } catch {
