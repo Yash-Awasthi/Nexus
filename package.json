@@ -41,15 +41,15 @@
     "prune:depcheck": "depcheck"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.27.7",
+    "@changesets/cli": "^2.31.1",
     "@commitlint/cli": "^19.5.0",
     "@commitlint/config-conventional": "^19.5.0",
-    "@eslint/js": "^9.13.0",
+    "@eslint/js": "^9.39.5",
     "@types/node": "^20.14.0",
     "@vitest/coverage-v8": "^2.1.4",
     "vitest": "^2.1.9",
     "depcheck": "^1.4.7",
-    "eslint": "^9.13.0",
+    "eslint": "^9.39.5",
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-promise": "^7.1.0",
     "eslint-plugin-vitest": "^0.5.4",
@@ -57,11 +57,11 @@
     "knip": "^5.33.0",
     "lint-staged": "^15.2.10",
     "madge": "^8.0.0",
-    "prettier": "^3.9.4",
-    "tsx": "^4.19.1",
-    "turbo": "^2.10.2",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.1",
+    "turbo": "^2.10.7",
     "typescript": "^5.6.3",
-    "typescript-eslint": "^8.62.1"
+    "typescript-eslint": "^8.65.0"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs}": [
