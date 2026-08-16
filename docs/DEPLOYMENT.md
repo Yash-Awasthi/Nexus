@@ -43,6 +43,10 @@ OAuth connectors (optional):
 > encrypted at rest and resolved server-side. `GROQ_API_KEY` is only the server-side
 > default for system/internal tasks (e.g. code-agent planning) — not per-user AI spend.
 
+> For a concrete, step-by-step rebuild of the live Railway + Vercel + Neon + Redis
+> Cloud + Browserbase stack (service order, smoke test, live service IDs), see
+> [`REDEPLOY_RUNBOOK.md`](../REDEPLOY_RUNBOOK.md) at the repo root.
+
 ## Railway + Vercel (reference deployment)
 
 ```

@@ -1,7 +1,11 @@
-# DEPLOYMENT.md — Nexus redeploy runbook
+# REDEPLOY_RUNBOOK.md — Nexus fast redeploy runbook
 
 > For interviews/demos. Trials deplete → use this to rebuild the live stack fast.
 > Repo: `https://github.com/Yash-Awasthi/Nexus` · Branch: **`main`** · ~5 services, all free-tier.
+>
+> For the general environment-variable reference and other deployment options
+> (Docker Compose, Kubernetes, Terraform), see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+> This file only covers the concrete step-by-step rebuild of the specific live stack above.
 
 ---
 
