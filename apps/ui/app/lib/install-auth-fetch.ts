@@ -35,10 +35,13 @@ export function installAuthFetch(): void {
             ? input.href
             : (input as Request).url;
 
-      // Same-origin /api/* only (relative "/api..." or absolute to this host).
-      const sameHost = url.includes(`//${window.location.host}/api`);
-      const relative = url.startsWith("/api");
-      if (relative || sameHost) {
+      // Same-origin /api/* only. Resolve against location so a relative
+      // "/api/..." and an absolute URL both go through one real comparison —
+      // a substring check on the raw string can be tricked by an attacker
+      // URL that merely contains "//host/api" somewhere (e.g. in a query param).
+      const parsed = new URL(url, window.location.href);
+      const sameOriginApi = parsed.host === window.location.host && parsed.pathname.startsWith("/api");
+      if (sameOriginApi) {
         const token = window.localStorage.getItem(TOKEN_KEY);
         if (token) {
           const headers = new Headers(
