@@ -31,6 +31,7 @@ import {
   GeminiDriver,
   DeepSeekDriver,
   MistralDriver,
+  OpenRouterDriver,
   type LlmRole,
 } from "@nexus/llm-drivers";
 
@@ -48,10 +49,21 @@ const COUNCIL_DRIVER_ALIASES: Record<string, { provider: string; model: string }
   "nexus/opus": { provider: "anthropic", model: "claude-opus-4-5" },
   "nexus/sonnet": { provider: "anthropic", model: "claude-3-5-sonnet-20241022" },
   "nexus/haiku": { provider: "anthropic", model: "claude-haiku-3-5" },
-  "nexus/gemini": { provider: "gemini", model: "gemini-1.5-pro" },
+  "nexus/gemini": { provider: "gemini", model: "gemini-flash-latest" },
   "nexus/deepseek": { provider: "deepseek", model: "deepseek-chat" },
   "nexus/mistral": { provider: "mistral", model: "mistral-large-latest" },
+  "nexus/openrouter": { provider: "openrouter", model: "anthropic/claude-sonnet-5" },
 };
+
+// COUNCIL_MODEL picks a fixed alias for the life of the process; fail at boot
+// on a typo'd or stale value so it cannot silently resolve to the wrong
+// provider on every job.
+if (!Object.hasOwn(COUNCIL_DRIVER_ALIASES, COUNCIL_MODEL)) {
+  throw new Error(
+    `COUNCIL_MODEL "${COUNCIL_MODEL}" is not a known council model alias. ` +
+      `Valid values: ${Object.keys(COUNCIL_DRIVER_ALIASES).join(", ")}.`,
+  );
+}
 
 // ── LlmDriversTransport ────────────────────────────────────────────────────────
 
@@ -69,10 +81,10 @@ class LlmDriversTransport implements ILLMTransport {
     messages: ILLMMessage[],
     options?: { model?: string; temperature?: number; maxTokens?: number },
   ): Promise<ILLMResponse> {
-    const aliased = COUNCIL_DRIVER_ALIASES[this.modelAlias] ?? {
-      provider: "groq",
-      model: "llama-3.3-70b-versatile",
-    };
+    const aliased = COUNCIL_DRIVER_ALIASES[this.modelAlias];
+    if (!aliased) {
+      throw new Error(`Council: unknown model alias "${this.modelAlias}".`);
+    }
 
     const driver = this.registry.get(aliased.provider);
     if (!driver) {
@@ -113,6 +125,8 @@ function buildCouncilRegistry(): DriverRegistry {
     reg.register(new DeepSeekDriver({ apiKey: process.env.DEEPSEEK_API_KEY }));
   if (process.env.MISTRAL_API_KEY)
     reg.register(new MistralDriver({ apiKey: process.env.MISTRAL_API_KEY }));
+  if (process.env.OPENROUTER_API_KEY)
+    reg.register(new OpenRouterDriver({ apiKey: process.env.OPENROUTER_API_KEY }));
   return reg;
 }
 

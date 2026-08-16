@@ -46,11 +46,22 @@ const COUNCIL_DRIVER_ALIASES: Record<string, { provider: string; model: string }
   "nexus/opus": { provider: "anthropic", model: "claude-opus-4-5" },
   "nexus/sonnet": { provider: "anthropic", model: "claude-3-5-sonnet-20241022" },
   "nexus/haiku": { provider: "anthropic", model: "claude-haiku-3-5" },
-  "nexus/gemini": { provider: "gemini", model: "gemini-1.5-pro" },
+  "nexus/gemini": { provider: "gemini", model: "gemini-flash-latest" },
   "nexus/deepseek": { provider: "deepseek", model: "deepseek-chat" },
   "nexus/mistral": { provider: "mistral", model: "mistral-large-latest" },
+  "nexus/openrouter": { provider: "openrouter", model: "anthropic/claude-sonnet-5" },
   "nexus/local": { provider: "ollama", model: process.env.NEXUS_DEFAULT_MODEL ?? "qwen2.5:7b" },
 };
+
+// COUNCIL_MODEL picks a fixed alias for the life of the process; fail at boot
+// on a typo'd or stale value so it cannot silently resolve to the wrong
+// provider on every request.
+if (!Object.hasOwn(COUNCIL_DRIVER_ALIASES, COUNCIL_MODEL)) {
+  throw new Error(
+    `COUNCIL_MODEL "${COUNCIL_MODEL}" is not a known council model alias. ` +
+      `Valid values: ${Object.keys(COUNCIL_DRIVER_ALIASES).join(", ")}.`,
+  );
+}
 
 // ── LlmDriversTransport ───────────────────────────────────────────────────────
 
@@ -69,10 +80,10 @@ class LlmDriversTransport implements ILLMTransport {
     messages: ILLMMessage[],
     options?: { model?: string; temperature?: number; maxTokens?: number },
   ): Promise<ILLMResponse> {
-    const aliased = COUNCIL_DRIVER_ALIASES[this.modelAlias] ?? {
-      provider: "groq",
-      model: "llama-3.3-70b-versatile",
-    };
+    const aliased = COUNCIL_DRIVER_ALIASES[this.modelAlias];
+    if (!aliased) {
+      throw new Error(`Council: unknown model alias "${this.modelAlias}".`);
+    }
 
     const driver = this.registry.get(aliased.provider);
     if (!driver) {
@@ -120,7 +131,9 @@ class NoCouncilKeyError extends Error {}
 async function buildCouncilServiceForUser(userId: string | undefined): Promise<CouncilService> {
   const { registry, missing } = await buildUserDriverRegistry(userId, COUNCIL_PROVIDERS);
   let effectiveModel = COUNCIL_MODEL;
-  const councilProvider = (COUNCIL_DRIVER_ALIASES[COUNCIL_MODEL] ?? { provider: "groq" }).provider;
+  // COUNCIL_MODEL is validated against COUNCIL_DRIVER_ALIASES at module load, so
+  // this lookup always hits.
+  const councilProvider = COUNCIL_DRIVER_ALIASES[COUNCIL_MODEL]!.provider;
 
   const registerLocalOllama = () => {
     if (!registry.get("ollama")) {

@@ -838,7 +838,7 @@ export class OpenRouterDriver extends OpenAICompatibleDriver {
   ) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://openrouter.ai/api/v1";
-    this.model = config.model ?? "anthropic/claude-3.5-sonnet";
+    this.model = config.model ?? "anthropic/claude-sonnet-5";
   }
 }
 
@@ -854,15 +854,12 @@ export class GeminiDriver extends BaseDriver {
     super(transport);
     this.apiKey = config.apiKey;
     this.baseUrl = config.baseUrl ?? "https://generativelanguage.googleapis.com/v1beta";
-    this.model = config.model ?? "gemini-1.5-pro";
+    this.model = config.model ?? "gemini-flash-latest";
   }
 
   async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
     const t0 = Date.now();
-    // Ollama only knows local model tags (e.g. "qwen2.5:7b"). Callers across the
-    // app hardcode cloud aliases like "anthropic/claude-3.5-sonnet"; route any
-    // such "provider/model" string to this driver's configured local model.
-    const model = opts.model && !opts.model.includes("/") ? opts.model : this.model;
+    const model = opts.model ?? this.model;
     const contents = opts.messages
       .filter((m) => m.role !== "system")
       .map((m) => ({
@@ -909,10 +906,7 @@ export class GeminiDriver extends BaseDriver {
     if (!this._useDefaultTransport) return super.stream(opts, handler);
 
     const t0 = Date.now();
-    // Ollama only knows local model tags (e.g. "qwen2.5:7b"). Callers across the
-    // app hardcode cloud aliases like "anthropic/claude-3.5-sonnet"; route any
-    // such "provider/model" string to this driver's configured local model.
-    const model = opts.model && !opts.model.includes("/") ? opts.model : this.model;
+    const model = opts.model ?? this.model;
     const contents = opts.messages
       .filter((m) => m.role !== "system")
       .map((m) => ({
@@ -1555,10 +1549,7 @@ export class ReplicateDriver extends BaseDriver {
 
   async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
     const t0 = Date.now();
-    // Ollama only knows local model tags (e.g. "qwen2.5:7b"). Callers across the
-    // app hardcode cloud aliases like "anthropic/claude-3.5-sonnet"; route any
-    // such "provider/model" string to this driver's configured local model.
-    const model = opts.model && !opts.model.includes("/") ? opts.model : this.model;
+    const model = opts.model ?? this.model;
     const prompt = opts.messages
       .map((m) => {
         const role = m.role === "assistant" ? "Assistant" : m.role === "system" ? "System" : "User";
@@ -1683,10 +1674,7 @@ export class BaiduErnieDriver extends BaseDriver {
   async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
     const t0 = Date.now();
     const token = await this.getToken();
-    // Ollama only knows local model tags (e.g. "qwen2.5:7b"). Callers across the
-    // app hardcode cloud aliases like "anthropic/claude-3.5-sonnet"; route any
-    // such "provider/model" string to this driver's configured local model.
-    const model = opts.model && !opts.model.includes("/") ? opts.model : this.model;
+    const model = opts.model ?? this.model;
 
     // ERNIE: system prompt is top-level; messages carry only user/assistant turns.
     let system = opts.systemPrompt;
