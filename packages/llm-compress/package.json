@@ -20,7 +20,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@toon-format/toon": "^2.3.0"
+    "@toon-format/toon": "^2.3.1"
   },
   "optionalDependencies": {
     "@atjsh/llmlingua-2": "^2.0.3",
