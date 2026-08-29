@@ -14,7 +14,10 @@ from dataclasses import dataclass
 from typing import List, Optional, Dict, Any
 import time
 import random
+import logging
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 
 class ProviderStatus(Enum):
@@ -286,7 +289,7 @@ class LLMRouter:
                         provider.error_count = 0
                 
             except Exception as e:
-                print(f"Health check failed for {provider.name}: {e}")
+                logger.warning(f"Health check failed for {provider.name}: {e}")
                 provider.status = ProviderStatus.DOWN
     
     def get_provider_stats(self) -> Dict[str, Dict[str, Any]]:

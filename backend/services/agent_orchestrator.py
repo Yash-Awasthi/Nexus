@@ -14,7 +14,10 @@ from typing import List, Dict, Any, Optional, Callable
 from enum import Enum
 import time
 import asyncio
+import logging
 from concurrent.futures import ThreadPoolExecutor
+
+logger = logging.getLogger(__name__)
 
 
 class AgentStatus(Enum):
@@ -79,13 +82,13 @@ class AgentOrchestrator:
     def register_agent(self, agent: Agent):
         """Register a new agent"""
         self.agents[agent.id] = agent
-        print(f"[Orchestrator] Registered agent: {agent.name} ({agent.role})")
+        logger.info(f"Registered agent: {agent.name} ({agent.role})")
     
     def unregister_agent(self, agent_id: str):
         """Unregister an agent"""
         if agent_id in self.agents:
             del self.agents[agent_id]
-            print(f"[Orchestrator] Unregistered agent: {agent_id}")
+            logger.info(f"Unregistered agent: {agent_id}")
     
     def submit_task(self, task: Task) -> str:
         """Submit a task for processing"""
@@ -95,7 +98,7 @@ class AgentOrchestrator:
         # Sort by priority (higher first)
         self.task_queue.sort(key=lambda t: t.priority, reverse=True)
         
-        print(f"[Orchestrator] Submitted task: {task.id} (priority: {task.priority})")
+        logger.info(f"Submitted task: {task.id} (priority: {task.priority})")
         return task.id
     
     def assign_task(self, task_id: str) -> Optional[str]:
@@ -112,7 +115,7 @@ class AgentOrchestrator:
         ]
         
         if not capable_agents:
-            print(f"[Orchestrator] No capable agents for task {task_id}")
+            logger.warning(f"No capable agents for task {task_id}")
             return None
         
         # Select best agent based on performance score and response time
@@ -126,7 +129,7 @@ class AgentOrchestrator:
         task.status = "assigned"
         best_agent.status = AgentStatus.BUSY
         
-        print(f"[Orchestrator] Assigned task {task_id} to agent {best_agent.name}")
+        logger.info(f"Assigned task {task_id} to agent {best_agent.name}")
         return best_agent.id
     
     def execute_task(self, task_id: str, handler: Callable[[Task], Any]) -> Any:
@@ -162,7 +165,7 @@ class AgentOrchestrator:
             # Update performance score
             agent.performance_score = min(1.0, agent.performance_score + 0.01)
             
-            print(f"[Orchestrator] Task {task_id} completed in {execution_time:.0f}ms")
+            logger.info(f"Task {task_id} completed in {execution_time:.0f}ms")
             return result
             
         except Exception as e:
@@ -171,7 +174,7 @@ class AgentOrchestrator:
             agent.status = AgentStatus.ERROR
             agent.performance_score = max(0.0, agent.performance_score - 0.1)
             
-            print(f"[Orchestrator] Task {task_id} failed: {e}")
+            logger.error(f"Task {task_id} failed: {e}")
             raise
     
     def build_consensus(
@@ -206,7 +209,7 @@ class AgentOrchestrator:
             timestamp=time.time()
         )
         
-        print(f"[Orchestrator] Consensus for {task_id}: {consensus} (confidence: {confidence:.2f})")
+        logger.info(f"Consensus for {task_id}: {consensus} (confidence: {confidence:.2f})")
         return result
     
     def get_agent_stats(self) -> Dict[str, Dict[str, Any]]:
@@ -239,7 +242,7 @@ class AgentOrchestrator:
     def shutdown(self):
         """Graceful shutdown"""
         self.executor.shutdown(wait=True)
-        print("[Orchestrator] Shutdown complete")
+        logger.info("Shutdown complete")
 
 
 def create_orchestrator_with_agents(agent_configs: List[Dict[str, Any]]) -> AgentOrchestrator:
