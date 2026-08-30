@@ -1,274 +1,264 @@
 """
-Agent Orchestrator
-Extracted from TradingAgents' multi-agent orchestration patterns
-
-Features:
-- Agent registration and management
-- Task distribution and routing
-- Consensus building
-- Performance tracking
+Agent Orchestrator — Multi-agent coordination and task delegation
+Inspired by CrewAI, LangGraph, and AutoGen patterns
 """
 
-from dataclasses import dataclass
-from typing import List, Dict, Any, Optional, Callable
-from enum import Enum
 import time
-import asyncio
-import logging
-from concurrent.futures import ThreadPoolExecutor
+import json
+from typing import List, Dict, Optional, Any, Callable
+from dataclasses import dataclass, field
+from enum import Enum
+from collections import defaultdict
+import hashlib
 
-logger = logging.getLogger(__name__)
+
+class AgentRole(Enum):
+    PLANNER = "planner"
+    EXECUTOR = "executor"
+    REVIEWER = "reviewer"
+    COORDINATOR = "coordinator"
+    SPECIALIST = "specialist"
 
 
-class AgentStatus(Enum):
-    IDLE = "idle"
-    BUSY = "busy"
-    ERROR = "error"
-    OFFLINE = "offline"
+class TaskStatus(Enum):
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    BLOCKED = "blocked"
 
 
 @dataclass
 class Agent:
-    """Agent definition with capabilities"""
-    id: str
+    agent_id: str
     name: str
-    role: str
+    role: AgentRole
     capabilities: List[str]
-    status: AgentStatus
-    performance_score: float  # 0-1
-    tasks_completed: int
-    average_response_time: float  # ms
-    last_active: float
+    max_concurrent_tasks: int = 1
+    current_tasks: int = 0
+    success_rate: float = 1.0
+    avg_response_time: float = 0.0
+    total_tasks: int = 0
+    enabled: bool = True
+
+    @property
+    def available(self) -> bool:
+        return self.enabled and self.current_tasks < self.max_concurrent_tasks
+
+    @property
+    def load(self) -> float:
+        if self.max_concurrent_tasks == 0:
+            return 1.0
+        return self.current_tasks / self.max_concurrent_tasks
 
 
 @dataclass
 class Task:
-    """Task definition for agent processing"""
-    id: str
-    type: str
-    payload: Dict[str, Any]
+    task_id: str
+    description: str
     required_capabilities: List[str]
-    priority: int  # 1-5
-    created_at: float
-    assigned_to: Optional[str] = None
-    status: str = "pending"
-    result: Optional[Dict[str, Any]] = None
+    status: TaskStatus = TaskStatus.PENDING
+    assigned_agent: Optional[str] = None
+    priority: int = 0
+    created_at: float = field(default_factory=time.time)
+    started_at: Optional[float] = None
+    completed_at: Optional[float] = None
+    result: Optional[Any] = None
+    error: Optional[str] = None
+    dependencies: List[str] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
-class ConsensusResult:
-    """Result from consensus building"""
-    task_id: str
-    participants: List[str]
-    votes: Dict[str, Any]
-    consensus: Any
-    confidence: float
-    timestamp: float
+class Workflow:
+    workflow_id: str
+    name: str
+    tasks: List[Task]
+    status: str = "pending"
+    created_at: float = field(default_factory=time.time)
+    completed_at: Optional[float] = None
 
 
 class AgentOrchestrator:
-    """
-    Orchestrates multiple agents for complex tasks
-    Inspired by TradingAgents' approach to multi-agent collaboration
-    """
-    
-    def __init__(self, max_workers: int = 4):
+    """Orchestrates multiple agents for complex task completion."""
+
+    def __init__(self):
         self.agents: Dict[str, Agent] = {}
         self.tasks: Dict[str, Task] = {}
-        self.task_queue: List[Task] = []
-        self.executor = ThreadPoolExecutor(max_workers=max_workers)
-        self.consensus_threshold = 0.6  # 60% agreement needed
-        
+        self.workflows: Dict[str, Workflow] = {}
+        self.task_history: List[Dict] = []
+        self.event_handlers: Dict[str, List[Callable]] = defaultdict(list)
+
     def register_agent(self, agent: Agent):
-        """Register a new agent"""
-        self.agents[agent.id] = agent
-        logger.info(f"Registered agent: {agent.name} ({agent.role})")
-    
+        self.agents[agent.agent_id] = agent
+
     def unregister_agent(self, agent_id: str):
-        """Unregister an agent"""
         if agent_id in self.agents:
             del self.agents[agent_id]
-            logger.info(f"Unregistered agent: {agent_id}")
-    
+
     def submit_task(self, task: Task) -> str:
-        """Submit a task for processing"""
-        self.tasks[task.id] = task
-        self.task_queue.append(task)
-        
-        # Sort by priority (higher first)
-        self.task_queue.sort(key=lambda t: t.priority, reverse=True)
-        
-        logger.info(f"Submitted task: {task.id} (priority: {task.priority})")
-        return task.id
-    
-    def assign_task(self, task_id: str) -> Optional[str]:
-        """Assign task to best available agent"""
+        self.tasks[task.task_id] = task
+        self._notify("task_submitted", {"task_id": task.task_id})
+        return task.task_id
+
+    def assign_task(self, task_id: str, agent_id: Optional[str] = None) -> bool:
         task = self.tasks.get(task_id)
-        if not task:
-            return None
-        
-        # Find agents with required capabilities
-        capable_agents = [
-            agent for agent in self.agents.values()
-            if agent.status == AgentStatus.IDLE
-            and all(cap in agent.capabilities for cap in task.required_capabilities)
-        ]
-        
-        if not capable_agents:
-            logger.warning(f"No capable agents for task {task_id}")
-            return None
-        
-        # Select best agent based on performance score and response time
-        best_agent = max(
-            capable_agents,
-            key=lambda a: a.performance_score * (1 / (a.average_response_time + 1))
-        )
-        
-        # Assign task
-        task.assigned_to = best_agent.id
-        task.status = "assigned"
-        best_agent.status = AgentStatus.BUSY
-        
-        logger.info(f"Assigned task {task_id} to agent {best_agent.name}")
-        return best_agent.id
-    
-    def execute_task(self, task_id: str, handler: Callable[[Task], Any]) -> Any:
-        """Execute a task with its assigned agent"""
-        task = self.tasks.get(task_id)
-        if not task or not task.assigned_to:
-            raise ValueError(f"Task {task_id} not assigned")
-        
-        agent = self.agents.get(task.assigned_to)
-        if not agent:
-            raise ValueError(f"Agent {task.assigned_to} not found")
-        
-        start_time = time.time()
-        
-        try:
-            # Execute task
-            result = handler(task)
-            
-            # Update task
-            task.status = "completed"
-            task.result = result
-            
-            # Update agent stats
-            execution_time = (time.time() - start_time) * 1000
-            agent.tasks_completed += 1
-            agent.average_response_time = (
-                (agent.average_response_time * (agent.tasks_completed - 1) + execution_time)
-                / agent.tasks_completed
-            )
-            agent.status = AgentStatus.IDLE
-            agent.last_active = time.time()
-            
-            # Update performance score
-            agent.performance_score = min(1.0, agent.performance_score + 0.01)
-            
-            logger.info(f"Task {task_id} completed in {execution_time:.0f}ms")
-            return result
-            
-        except Exception as e:
-            # Handle error
-            task.status = "error"
-            agent.status = AgentStatus.ERROR
-            agent.performance_score = max(0.0, agent.performance_score - 0.1)
-            
-            logger.error(f"Task {task_id} failed: {e}")
-            raise
-    
-    def build_consensus(
-        self,
-        task_id: str,
-        participants: List[str],
-        votes: Dict[str, Any]
-    ) -> ConsensusResult:
-        """Build consensus from multiple agents"""
-        # Count votes
-        vote_counts: Dict[Any, int] = {}
-        for agent_id, vote in votes.items():
-            if agent_id in participants:
-                vote_counts[vote] = vote_counts.get(vote, 0) + 1
-        
-        # Find majority
-        total_votes = len(votes)
-        if total_votes == 0:
-            consensus = None
-            confidence = 0.0
+        if not task or task.status != TaskStatus.PENDING:
+            return False
+        if agent_id:
+            agent = self.agents.get(agent_id)
+            if not agent or not agent.available:
+                return False
+            if not self._agent_has_capabilities(agent, task.required_capabilities):
+                return False
         else:
-            max_votes = max(vote_counts.values())
-            consensus = max(vote_counts, key=vote_counts.get)
-            confidence = max_votes / total_votes
-        
-        result = ConsensusResult(
-            task_id=task_id,
-            participants=participants,
-            votes=votes,
-            consensus=consensus,
-            confidence=confidence,
-            timestamp=time.time()
-        )
-        
-        logger.info(f"Consensus for {task_id}: {consensus} (confidence: {confidence:.2f})")
-        return result
-    
-    def get_agent_stats(self) -> Dict[str, Dict[str, Any]]:
-        """Get statistics for all agents"""
-        stats = {}
-        
-        for agent_id, agent in self.agents.items():
-            stats[agent_id] = {
-                'name': agent.name,
-                'role': agent.role,
-                'status': agent.status.value,
-                'performance_score': agent.performance_score,
-                'tasks_completed': agent.tasks_completed,
-                'average_response_time': agent.average_response_time,
-                'capabilities': agent.capabilities
-            }
-        
-        return stats
-    
-    def get_task_stats(self) -> Dict[str, int]:
-        """Get task statistics"""
+            agent = self._find_best_agent(task)
+            if not agent:
+                return False
+            agent_id = agent.agent_id
+        task.assigned_agent = agent_id
+        task.status = TaskStatus.IN_PROGRESS
+        task.started_at = time.time()
+        self.agents[agent_id].current_tasks += 1
+        self._notify("task_assigned", {"task_id": task_id, "agent_id": agent_id})
+        return True
+
+    def complete_task(self, task_id: str, result: Any) -> bool:
+        task = self.tasks.get(task_id)
+        if not task or task.status != TaskStatus.IN_PROGRESS:
+            return False
+        task.status = TaskStatus.COMPLETED
+        task.result = result
+        task.completed_at = time.time()
+        if task.assigned_agent and task.assigned_agent in self.agents:
+            agent = self.agents[task.assigned_agent]
+            agent.current_tasks = max(0, agent.current_tasks - 1)
+            agent.total_tasks += 1
+            duration = task.completed_at - (task.started_at or task.created_at)
+            agent.avg_response_time = (
+                (agent.avg_response_time * (agent.total_tasks - 1) + duration) /
+                agent.total_tasks
+            )
+        self._notify("task_completed", {"task_id": task_id})
+        self._check_dependents(task_id)
+        return True
+
+    def fail_task(self, task_id: str, error: str) -> bool:
+        task = self.tasks.get(task_id)
+        if not task or task.status != TaskStatus.IN_PROGRESS:
+            return False
+        task.status = TaskStatus.FAILED
+        task.error = error
+        task.completed_at = time.time()
+        if task.assigned_agent and task.assigned_agent in self.agents:
+            agent = self.agents[task.assigned_agent]
+            agent.current_tasks = max(0, agent.current_tasks - 1)
+        self._notify("task_failed", {"task_id": task_id, "error": error})
+        return True
+
+    def get_pending_tasks(self) -> List[Task]:
+        return [t for t in self.tasks.values() if t.status == TaskStatus.PENDING]
+
+    def get_available_agents(self) -> List[Agent]:
+        return [a for a in self.agents.values() if a.available]
+
+    def get_workflow_status(self, workflow_id: str) -> Optional[Dict]:
+        workflow = self.workflows.get(workflow_id)
+        if not workflow:
+            return None
+        tasks_status = defaultdict(int)
+        for task in workflow.tasks:
+            tasks_status[task.status.value] += 1
         return {
-            'total': len(self.tasks),
-            'pending': sum(1 for t in self.tasks.values() if t.status == 'pending'),
-            'assigned': sum(1 for t in self.tasks.values() if t.status == 'assigned'),
-            'completed': sum(1 for t in self.tasks.values() if t.status == 'completed'),
-            'error': sum(1 for t in self.tasks.values() if t.status == 'error')
+            "workflow_id": workflow_id,
+            "name": workflow.name,
+            "status": workflow.status,
+            "tasks": dict(tasks_status),
+            "total_tasks": len(workflow.tasks),
+            "progress": tasks_status.get("completed", 0) / max(len(workflow.tasks), 1)
         }
-    
-    def shutdown(self):
-        """Graceful shutdown"""
-        self.executor.shutdown(wait=True)
-        logger.info("Shutdown complete")
 
-
-def create_orchestrator_with_agents(agent_configs: List[Dict[str, Any]]) -> AgentOrchestrator:
-    """
-    Create an orchestrator with pre-configured agents
-    
-    Args:
-        agent_configs: List of agent configuration dictionaries
-    
-    Returns:
-        Configured AgentOrchestrator
-    """
-    orchestrator = AgentOrchestrator()
-    
-    for config in agent_configs:
-        agent = Agent(
-            id=config['id'],
-            name=config['name'],
-            role=config['role'],
-            capabilities=config.get('capabilities', []),
-            status=AgentStatus.IDLE,
-            performance_score=0.5,
-            tasks_completed=0,
-            average_response_time=0.0,
-            last_active=time.time()
+    def create_workflow(self, name: str, tasks: List[Task]) -> Workflow:
+        workflow_id = f"wf_{hashlib.md5(f"{name}{time.time()}".encode()).hexdigest()[:8]}"
+        workflow = Workflow(
+            workflow_id=workflow_id,
+            name=name,
+            tasks=tasks
         )
-        orchestrator.register_agent(agent)
-    
-    return orchestrator
+        self.workflows[workflow_id] = workflow
+        for task in tasks:
+            self.tasks[task.task_id] = task
+        return workflow
+
+    def process_queue(self):
+        pending = self.get_pending_tasks()
+        available = self.get_available_agents()
+        for task in sorted(pending, key=lambda t: -t.priority):
+            if not available:
+                break
+            if task.dependencies:
+                deps_met = all(
+                    self.tasks.get(dep, Task()).status == TaskStatus.COMPLETED
+                    for dep in task.dependencies
+                )
+                if not deps_met:
+                    continue
+            for agent in available:
+                if self._agent_has_capabilities(agent, task.required_capabilities):
+                    self.assign_task(task.task_id, agent.agent_id)
+                    available.remove(agent)
+                    break
+
+    def _find_best_agent(self, task: Task) -> Optional[Agent]:
+        candidates = [
+            a for a in self.agents.values()
+            if a.available and self._agent_has_capabilities(a, task.required_capabilities)
+        ]
+        if not candidates:
+            return None
+        candidates.sort(key=lambda a: (-a.success_rate, a.load))
+        return candidates[0]
+
+    def _agent_has_capabilities(self, agent: Agent, required: List[str]) -> bool:
+        return all(cap in agent.capabilities for cap in required)
+
+    def _check_dependents(self, completed_task_id: str):
+        for task in self.tasks.values():
+            if task.status == TaskStatus.PENDING and completed_task_id in task.dependencies:
+                deps_met = all(
+                    self.tasks.get(dep, Task()).status == TaskStatus.COMPLETED
+                    for dep in task.dependencies
+                )
+                if deps_met:
+                    self._notify("task_unblocked", {"task_id": task.task_id})
+
+    def _notify(self, event: str, data: Dict):
+        for handler in self.event_handlers.get(event, []):
+            handler(data)
+
+    def on(self, event: str, handler: Callable):
+        self.event_handlers[event].append(handler)
+
+    def get_metrics(self) -> Dict:
+        tasks_by_status = defaultdict(int)
+        for task in self.tasks.values():
+            tasks_by_status[task.status.value] += 1
+        agent_metrics = {}
+        for agent in self.agents.values():
+            agent_metrics[agent.agent_id] = {
+                "name": agent.name,
+                "role": agent.role.value,
+                "total_tasks": agent.total_tasks,
+                "current_tasks": agent.current_tasks,
+                "success_rate": agent.success_rate,
+                "avg_response_time": agent.avg_response_time,
+                "load": agent.load
+            }
+        return {
+            "total_tasks": len(self.tasks),
+            "tasks_by_status": dict(tasks_by_status),
+            "total_agents": len(self.agents),
+            "available_agents": len(self.get_available_agents()),
+            "agent_metrics": agent_metrics,
+            "total_workflows": len(self.workflows)
+        }

@@ -1,361 +1,257 @@
 """
-LLM Router Service
-Inspired by litellm - multi-provider routing, load balancing, fallback chains
-
-Pure functions for intelligent LLM request routing:
-- Provider selection based on model/capability
-- Load balancing across providers
-- Fallback chain management
-- Cost optimization
-- Rate limit handling
+LLM Router Service — Inspired by LLM orchestration frameworks
+Intelligent routing, load balancing, fallback chains, and cost optimization
 """
 
-from dataclasses import dataclass
-from typing import List, Optional, Dict, Any
 import time
-import random
-import logging
+import json
+from typing import List, Dict, Optional, Tuple, Any
+from dataclasses import dataclass, field
 from enum import Enum
+from collections import defaultdict
+import hashlib
 
-logger = logging.getLogger(__name__)
 
-
-class ProviderStatus(Enum):
-    HEALTHY = "healthy"
-    DEGRADED = "degraded"
-    DOWN = "down"
-    RATE_LIMITED = "rate_limited"
+class ModelCapability(Enum):
+    CHAT = "chat"
+    COMPLETION = "completion"
+    EMBEDDING = "embedding"
+    VISION = "vision"
+    CODE = "code"
+    REASONING = "reasoning"
 
 
 @dataclass
 class LLMProvider:
-    """LLM provider configuration"""
     name: str
-    api_key: str
-    base_url: str
     models: List[str]
-    rate_limit: int  # requests per minute
-    cost_per_1k_tokens: float
-    status: ProviderStatus
-    last_health_check: float
-    error_count: int
-    success_count: int
-    avg_latency: float  # ms
-
-
-@dataclass
-class LLMRequest:
-    """LLM request with routing metadata"""
-    id: str
-    model: str
-    messages: List[Dict[str, str]]
+    cost_per_1k_input: float
+    cost_per_1k_output: float
+    rate_limit_rpm: int
     max_tokens: int
-    temperature: float
-    user_id: str
-    priority: int  # 1-5, 5 being highest
-    metadata: Dict[str, Any]
+    capabilities: List[ModelCapability]
+    priority: int = 0
+    enabled: bool = True
+    health_score: float = 1.0
 
 
 @dataclass
-class LLMResponse:
-    """LLM response with provider metadata"""
-    id: str
-    content: str
-    model: str
+class RoutingRequest:
+    prompt: str
+    required_capabilities: List[ModelCapability] = field(default_factory=list)
+    max_cost: float = float('inf')
+    max_latency_ms: float = float('inf')
+    preferred_provider: Optional[str] = None
+    fallback_allowed: bool = True
+    cache_key: Optional[str] = None
+
+
+@dataclass
+class RoutingResponse:
     provider: str
-    tokens_used: int
+    model: str
+    latency_ms: float
     cost: float
-    latency: float  # ms
-    cached: bool
-    metadata: Dict[str, Any]
+    tokens_used: int
+    cached: bool = False
+    fallback_used: bool = False
+    error: Optional[str] = None
 
 
 @dataclass
-class RoutingDecision:
-    """Routing decision for a request"""
-    provider: LLMProvider
-    model: str
-    reason: str
-    fallback_chain: List[LLMProvider]
-    estimated_cost: float
-    estimated_latency: float
+class ProviderMetrics:
+    total_requests: int = 0
+    successful_requests: int = 0
+    failed_requests: int = 0
+    total_latency_ms: float = 0.0
+    total_cost: float = 0.0
+    avg_latency_ms: float = 0.0
+    success_rate: float = 1.0
+    last_error: Optional[str] = None
+    last_error_time: Optional[float] = None
 
 
 class LLMRouter:
-    def __init__(self, providers: List[LLMProvider]):
-        self.providers = providers
-        self.provider_stats: Dict[str, Dict[str, Any]] = {}
-        self._initialize_stats()
-    
-    def _initialize_stats(self):
-        """Initialize provider statistics"""
-        for provider in self.providers:
-            self.provider_stats[provider.name] = {
-                'requests': 0,
-                'errors': 0,
-                'total_latency': 0,
-                'total_cost': 0,
-                'last_used': 0,
-                'cooldown_until': 0
-            }
-    
-    def route_request(self, request: LLMRequest) -> RoutingDecision:
-        """
-        Route an LLM request to the best provider
-        
-        Args:
-            request: LLM request with routing metadata
-        
-        Returns:
-            RoutingDecision with selected provider and fallback chain
-        """
-        # Filter providers that support the requested model
-        capable_providers = [
-            p for p in self.providers 
-            if request.model in p.models and p.status != ProviderStatus.DOWN
+    """Intelligent LLM routing with load balancing and fallback."""
+
+    def __init__(self):
+        self.providers: Dict[str, LLMProvider] = {}
+        self.metrics: Dict[str, ProviderMetrics] = defaultdict(ProviderMetrics)
+        self.request_cache: Dict[str, Any] = {}
+        self.rate_limiters: Dict[str, List[float]] = defaultdict(list)
+        self.cost_budget: float = float('inf')
+        self.total_cost: float = 0.0
+
+    def register_provider(self, provider: LLMProvider):
+        self.providers[provider.name] = provider
+        if provider.name not in self.metrics:
+            self.metrics[provider.name] = ProviderMetrics()
+
+    def route_request(self, request: RoutingRequest) -> RoutingResponse:
+        if request.cache_key:
+            cached = self._check_cache(request.cache_key)
+            if cached:
+                return RoutingResponse(
+                    provider=cached['provider'],
+                    model=cached['model'],
+                    latency_ms=0,
+                    cost=0,
+                    tokens_used=cached['tokens'],
+                    cached=True
+                )
+        candidates = self._find_candidates(request)
+        if not candidates:
+            return RoutingResponse(
+                provider="none",
+                model="none",
+                latency_ms=0,
+                cost=0,
+                tokens_used=0,
+                error="No suitable provider found"
+            )
+        for provider in candidates:
+            if not self._check_rate_limit(provider.name):
+                continue
+            if not self._check_health(provider.name):
+                continue
+            estimated_cost = self._estimate_cost(provider, request)
+            if estimated_cost > request.max_cost:
+                continue
+            model = self._select_model(provider, request)
+            if not model:
+                continue
+            self._record_request(provider.name)
+            return RoutingResponse(
+                provider=provider.name,
+                model=model,
+                latency_ms=0,
+                cost=estimated_cost,
+                tokens_used=0,
+                fallback_used=provider.name != (request.preferred_provider or "")
+            )
+        return RoutingResponse(
+            provider="none",
+            model="none",
+            latency_ms=0,
+            cost=0,
+            tokens_used=0,
+            error="All providers exhausted"
+        )
+
+    def _find_candidates(self, request: RoutingRequest) -> List[LLMProvider]:
+        candidates = []
+        for provider in self.providers.values():
+            if not provider.enabled:
+                continue
+            if request.preferred_provider and provider.name == request.preferred_provider:
+                candidates.insert(0, provider)
+                continue
+            if request.required_capabilities:
+                if all(cap in provider.capabilities for cap in request.required_capabilities):
+                    candidates.append(provider)
+            else:
+                candidates.append(provider)
+        candidates.sort(key=lambda p: (-p.priority, -p.health_score))
+        return candidates
+
+    def _check_rate_limit(self, provider_name: str) -> bool:
+        provider = self.providers.get(provider_name)
+        if not provider:
+            return False
+        now = time.time()
+        self.rate_limiters[provider_name] = [
+            t for t in self.rate_limiters[provider_name] if now - t < 60
         ]
-        
-        if not capable_providers:
-            raise ValueError(f"No providers available for model {request.model}")
-        
-        # Score providers
-        scored_providers = []
-        for provider in capable_providers:
-            score = self._score_provider(provider, request)
-            scored_providers.append((provider, score))
-        
-        # Sort by score (highest first)
-        scored_providers.sort(key=lambda x: x[1], reverse=True)
-        
-        # Select primary provider
-        primary_provider = scored_providers[0][0]
-        
-        # Build fallback chain (top 3 providers)
-        fallback_chain = [p[0] for p in scored_providers[1:4]]
-        
-        # Calculate estimates
-        estimated_cost = self._estimate_cost(primary_provider, request)
-        estimated_latency = self._estimate_latency(primary_provider)
-        
-        return RoutingDecision(
-            provider=primary_provider,
-            model=request.model,
-            reason=f"Selected based on score {scored_providers[0][1]:.2f}",
-            fallback_chain=fallback_chain,
-            estimated_cost=estimated_cost,
-            estimated_latency=estimated_latency
-        )
-    
-    def _score_provider(self, provider: LLMProvider, request: LLMRequest) -> float:
-        """
-        Score a provider for a specific request
-        
-        Args:
-            provider: Provider to score
-            request: LLM request
-        
-        Returns:
-            Score between 0 and 1 (higher is better)
-        """
-        score = 0.0
-        
-        # Health score (0-0.3)
-        if provider.status == ProviderStatus.HEALTHY:
-            score += 0.3
-        elif provider.status == ProviderStatus.DEGRADED:
-            score += 0.15
-        
-        # Cost score (0-0.25)
-        if provider.cost_per_1k_tokens > 0:
-            cost_score = 1.0 / (1.0 + provider.cost_per_1k_tokens)
-            score += cost_score * 0.25
-        
-        # Latency score (0-0.25)
-        if provider.avg_latency > 0:
-            latency_score = 1.0 / (1.0 + provider.avg_latency / 1000)
-            score += latency_score * 0.25
-        
-        # Load score (0-0.2)
-        stats = self.provider_stats.get(provider.name, {})
-        recent_requests = stats.get('requests', 0)
-        load_score = 1.0 / (1.0 + recent_requests / 100)
-        score += load_score * 0.2
-        
-        # Priority bonus (0-0.15)
-        if request.priority >= 4:
-            score += 0.15
-        elif request.priority >= 3:
-            score += 0.1
-        
-        # Cooldown penalty
-        cooldown_until = stats.get('cooldown_until', 0)
-        if time.time() < cooldown_until:
-            score *= 0.1
-        
-        return min(max(score, 0.0), 1.0)
-    
-    def _estimate_cost(self, provider: LLMProvider, request: LLMRequest) -> float:
-        """
-        Estimate cost for a request
-        
-        Args:
-            provider: Selected provider
-            request: LLM request
-        
-        Returns:
-            Estimated cost in dollars
-        """
-        # Rough estimate: 1 token ≈ 4 characters
-        estimated_tokens = len(str(request.messages)) / 4
-        return (estimated_tokens / 1000) * provider.cost_per_1k_tokens
-    
-    def _estimate_latency(self, provider: LLMProvider) -> float:
-        """
-        Estimate latency for a request
-        
-        Args:
-            provider: Selected provider
-        
-        Returns:
-            Estimated latency in milliseconds
-        """
-        return provider.avg_latency
-    
-    def record_success(self, provider_name: str, latency: float, cost: float):
-        """
-        Record a successful request
-        
-        Args:
-            provider_name: Provider name
-            latency: Request latency in ms
-            cost: Request cost in dollars
-        """
-        stats = self.provider_stats.get(provider_name, {})
-        stats['requests'] = stats.get('requests', 0) + 1
-        stats['total_latency'] = stats.get('total_latency', 0) + latency
-        stats['total_cost'] = stats.get('total_cost', 0) + cost
-        stats['last_used'] = time.time()
-        
-        # Update provider stats
-        provider = next((p for p in self.providers if p.name == provider_name), None)
-        if provider:
-            provider.success_count += 1
-            provider.avg_latency = (provider.avg_latency + latency) / 2
-    
-    def record_error(self, provider_name: str, error_type: str):
-        """
-        Record a failed request
-        
-        Args:
-            provider_name: Provider name
-            error_type: Type of error
-        """
-        stats = self.provider_stats.get(provider_name, {})
-        stats['errors'] = stats.get('errors', 0) + 1
-        
-        # Update provider stats
-        provider = next((p for p in self.providers if p.name == provider_name), None)
-        if provider:
-            provider.error_count += 1
-            
-            # Mark as down if too many errors
-            if provider.error_count > 10:
-                provider.status = ProviderStatus.DOWN
-                stats['cooldown_until'] = time.time() + 300  # 5 minute cooldown
-            
-            # Mark as degraded if error rate is high
-            elif provider.error_count > 5 and provider.success_count > 0:
-                error_rate = provider.error_count / (provider.error_count + provider.success_count)
-                if error_rate > 0.3:
-                    provider.status = ProviderStatus.DEGRADED
-    
-    def health_check(self):
-        """
-        Perform health check on all providers
-        
-        This would typically ping provider endpoints
-        """
-        for provider in self.providers:
-            try:
-                # Simulate health check
-                # In production, this would make a test API call
-                provider.last_health_check = time.time()
-                
-                # Reset status if provider has recovered
-                if provider.status == ProviderStatus.DOWN:
-                    stats = self.provider_stats.get(provider.name, {})
-                    if time.time() > stats.get('cooldown_until', 0):
-                        provider.status = ProviderStatus.HEALTHY
-                        provider.error_count = 0
-                
-            except Exception as e:
-                logger.warning(f"Health check failed for {provider.name}: {e}")
-                provider.status = ProviderStatus.DOWN
-    
-    def get_provider_stats(self) -> Dict[str, Dict[str, Any]]:
-        """Get statistics for all providers"""
-        return self.provider_stats.copy()
-    
-    def add_provider(self, provider: LLMProvider):
-        """Add a new provider"""
-        self.providers.append(provider)
-        self._initialize_stats()
-    
-    def remove_provider(self, provider_name: str):
-        """Remove a provider"""
-        self.providers = [p for p in self.providers if p.name != provider_name]
-        self.provider_stats.pop(provider_name, None)
-    
-    def update_provider_status(self, provider_name: str, status: ProviderStatus):
-        """Update provider status"""
-        provider = next((p for p in self.providers if p.name == provider_name), None)
-        if provider:
-            provider.status = status
+        return len(self.rate_limiters[provider_name]) < provider.rate_limit_rpm
 
+    def _check_health(self, provider_name: str) -> bool:
+        metrics = self.metrics[provider_name]
+        if metrics.total_requests > 10 and metrics.success_rate < 0.5:
+            return False
+        if metrics.last_error_time and time.time() - metrics.last_error_time < 60:
+            return False
+        return True
 
-# Example usage
-def create_default_router() -> LLMRouter:
-    """Create a router with default providers"""
-    providers = [
-        LLMProvider(
-            name="openai",
-            api_key="sk-...",
-            base_url="https://api.openai.com/v1",
-            models=["gpt-4", "gpt-3.5-turbo", "gpt-4-turbo"],
-            rate_limit=100,
-            cost_per_1k_tokens=0.03,
-            status=ProviderStatus.HEALTHY,
-            last_health_check=0,
-            error_count=0,
-            success_count=0,
-            avg_latency=1000
-        ),
-        LLMProvider(
-            name="anthropic",
-            api_key="sk-ant-...",
-            base_url="https://api.anthropic.com/v1",
-            models=["claude-3-opus", "claude-3-sonnet", "claude-3-haiku"],
-            rate_limit=50,
-            cost_per_1k_tokens=0.015,
-            status=ProviderStatus.HEALTHY,
-            last_health_check=0,
-            error_count=0,
-            success_count=0,
-            avg_latency=1200
-        ),
-        LLMProvider(
-            name="google",
-            api_key="AIza...",
-            base_url="https://generativelanguage.googleapis.com/v1beta",
-            models=["gemini-pro", "gemini-flash"],
-            rate_limit=60,
-            cost_per_1k_tokens=0.001,
-            status=ProviderStatus.HEALTHY,
-            last_health_check=0,
-            error_count=0,
-            success_count=0,
-            avg_latency=800
-        )
-    ]
-    
-    return LLMRouter(providers)
+    def _estimate_cost(self, provider: LLMProvider, request: RoutingRequest) -> float:
+        estimated_tokens = len(request.prompt.split()) * 1.3
+        input_cost = (estimated_tokens / 1000) * provider.cost_per_1k_input
+        output_cost = (estimated_tokens * 0.5 / 1000) * provider.cost_per_1k_output
+        return input_cost + output_cost
+
+    def _select_model(self, provider: LLMProvider, request: RoutingRequest) -> Optional[str]:
+        if not provider.models:
+            return None
+        for model in provider.models:
+            if 'gpt-4' in model and ModelCapability.REASONING in request.required_capabilities:
+                return model
+        return provider.models[0] if provider.models else None
+
+    def _check_cache(self, cache_key: str) -> Optional[Dict]:
+        return self.request_cache.get(cache_key)
+
+    def _record_request(self, provider_name: str):
+        self.rate_limiters[provider_name].append(time.time())
+        self.metrics[provider_name].total_requests += 1
+
+    def record_success(self, provider_name: str, latency_ms: float, cost: float, tokens: int):
+        metrics = self.metrics[provider_name]
+        metrics.successful_requests += 1
+        metrics.total_latency_ms += latency_ms
+        metrics.total_cost += cost
+        metrics.avg_latency_ms = metrics.total_latency_ms / metrics.successful_requests
+        metrics.success_rate = metrics.successful_requests / metrics.total_requests
+        self.total_cost += cost
+
+    def record_failure(self, provider_name: str, error: str):
+        metrics = self.metrics[provider_name]
+        metrics.failed_requests += 1
+        metrics.last_error = error
+        metrics.last_error_time = time.time()
+        if metrics.total_requests > 0:
+            metrics.success_rate = metrics.successful_requests / metrics.total_requests
+
+    def get_provider_rankings(self) -> List[Dict]:
+        rankings = []
+        for name, provider in self.providers.items():
+            metrics = self.metrics[name]
+            rankings.append({
+                "name": name,
+                "health_score": provider.health_score,
+                "success_rate": metrics.success_rate,
+                "avg_latency_ms": metrics.avg_latency_ms,
+                "total_requests": metrics.total_requests,
+                "total_cost": metrics.total_cost,
+                "enabled": provider.enabled,
+                "score": provider.health_score * metrics.success_rate
+            })
+        rankings.sort(key=lambda x: -x['score'])
+        return rankings
+
+    def get_cost_report(self) -> Dict:
+        by_provider = {}
+        for name, metrics in self.metrics.items():
+            by_provider[name] = {
+                "total_cost": metrics.total_cost,
+                "avg_cost_per_request": metrics.total_cost / max(metrics.total_requests, 1),
+                "request_count": metrics.total_requests
+            }
+        return {
+            "total_cost": self.total_cost,
+            "by_provider": by_provider,
+            "budget_remaining": self.cost_budget - self.total_cost
+        }
+
+    def get_metrics(self) -> Dict:
+        return {
+            "providers": {
+                name: {
+                    "total_requests": m.total_requests,
+                    "success_rate": m.success_rate,
+                    "avg_latency_ms": m.avg_latency_ms,
+                    "total_cost": m.total_cost,
+                    "last_error": m.last_error
+                }
+                for name, m in self.metrics.items()
+            },
+            "total_cost": self.total_cost
+        }
