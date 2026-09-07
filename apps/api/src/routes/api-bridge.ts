@@ -10858,7 +10858,9 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     region: process.env.NEXUS_REGION ?? "us-east-1",
     retentionDays: 90,
     encryptAtRest: false,
-    gdprEnabled: false,
+    // True since §14.4 shipped: DELETE /api/v1/users/:id/data performs the
+    // self-service erasure cascade (403 unless caller == target).
+    gdprEnabled: true,
     dataClassification: "internal",
     backupRegion: null,
     updatedAt: new Date().toISOString(),

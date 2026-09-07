@@ -296,7 +296,14 @@ function toAnthropicTools(tools?: LlmToolDefinition[]): Record<string, unknown>[
 
 // ── Base driver ────────────────────────────────────────────────────────────────
 
-abstract class BaseDriver implements LlmDriver {
+/**
+ * Base driver — real HTTP + SSE/NDJSON streaming, error mapping, and shared
+ * response/usage helpers. Extend it directly for providers that are NOT
+ * OpenAI-chat-completions-shaped (e.g. Anthropic, Gemini). For OpenAI-compatible
+ * endpoints, extend {@link OpenAICompatibleDriver} instead. See
+ * `packages/llm-drivers/README.md` for the add-a-driver recipe.
+ */
+export abstract class BaseDriver implements LlmDriver {
   abstract readonly provider: string;
   abstract readonly model: string;
   protected transport: HttpTransport;
@@ -462,13 +469,16 @@ abstract class BaseDriver implements LlmDriver {
 
 // ── Driver config types ────────────────────────────────────────────────────────
 
-interface ApiKeyConfig {
+/** A driver needs at least an API key. */
+export interface ApiKeyConfig {
   apiKey: string;
 }
-interface BaseUrlConfig {
+/** Optional override for self-hosted / proxy endpoints. */
+export interface BaseUrlConfig {
   baseUrl?: string;
 }
-type FullConfig = ApiKeyConfig & BaseUrlConfig;
+/** Standard driver config — API key + optional base URL override. */
+export type FullConfig = ApiKeyConfig & BaseUrlConfig;
 
 // ── 1. Anthropic ──────────────────────────────────────────────────────────────
 
@@ -635,7 +645,14 @@ export class AnthropicDriver extends BaseDriver {
 
 // ── 2. OpenAI-compatible base ─────────────────────────────────────────────────
 
-abstract class OpenAICompatibleDriver extends BaseDriver {
+/**
+ * OpenAI-compatible base driver — implements `complete`/`stream` against a
+ * chat-completions endpoint. Subclass it and set `provider`, `model`, and
+ * `baseUrl`; override {@link chatCompletionsUrl} / {@link authHeaders} for
+ * non-standard paths or auth schemes (e.g. Azure's `api-key` header). See
+ * `packages/llm-drivers/README.md` for the add-a-driver recipe.
+ */
+export abstract class OpenAICompatibleDriver extends BaseDriver {
   protected apiKey: string;
   protected abstract baseUrl: string;
 

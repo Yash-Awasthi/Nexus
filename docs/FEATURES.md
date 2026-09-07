@@ -26,7 +26,7 @@ A capability-by-capability reference. For how the pieces fit together see
 | RLHF + eval              | Scorers, a test runner, an SFT auto-tagger, and a corpus builder.                                                               |
 | MCP support              | JSON-RPC 2.0 over HTTP, batch invocation, and OpenAPI-to-MCP generation.                                                        |
 | Observability            | OpenTelemetry (OTLP) traces, Prometheus metrics, Grafana dashboards, and HMAC-SHA256-chained audit logs.                        |
-| Auth + BYOK              | API key plus HS256 JWT; OAuth connectors; per-user LLM keys encrypted at rest (AES-256-GCM) and resolved server-side.           |
+| Auth + BYOK              | API key plus JWT (HS256 or RS256 via `NEXUS_JWT_ALG`); OAuth/OIDC/SAML SSO; login throttle with exponential backoff (§14.3); per-session and per-user token revocation; self-service GDPR erasure (`DELETE /users/:id/data`, §14.4); per-user LLM keys encrypted at rest (AES-256-GCM) and resolved server-side. |
 
 ## HTTP API surface
 
@@ -71,6 +71,15 @@ HMAC-SHA256 chained (tamper-evident); metrics are exposed for Prometheus.
 **BYOK keys** — users add their own provider keys on the Provider Keys page. They are
 AES-256-GCM encrypted in Postgres and decrypted only server-side to make that user's own
 LLM calls; they are never returned to the client.
+
+**Auth hardening (§14)** — access tokens are signed HS256 (shared secret) or RS256
+(asymmetric key pair via `NEXUS_JWT_ALG` + `NEXUS_JWT_PRIVATE_KEY`/`NEXUS_JWT_PUBLIC_KEY`,
+verified alg-pinned so a downstream service can validate without the signing secret).
+Failed logins lock the `email|ip` key with exponential backoff (429 after the threshold),
+and every verified JWT is checked against a revocation registry — per-`jti` (log out one
+session) or per-subject cutoff (log out everywhere, e.g. after a password change). Users
+can erase their own data with `DELETE /api/v1/users/:id/data` — a content-free audit line
+(user id + per-table row counts, never LLM/prompt data) records the cascade.
 
 ## SDK usage
 

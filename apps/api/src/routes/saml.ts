@@ -28,7 +28,7 @@
 import { createHash, createHmac, createVerify, randomBytes, createPublicKey } from "node:crypto";
 import { deflateRawSync } from "node:zlib";
 
-import { signJwt } from "@nexus/auth";
+import { issueAccessToken } from "../lib/issue-access-token.js";
 import { db } from "@nexus/db";
 import { users, refreshTokens } from "@nexus/db/schema";
 import { eq } from "drizzle-orm";
@@ -294,15 +294,8 @@ async function upsertSamlUser(
     userId = newUser!.id;
   }
 
-  // Issue access token (15 min) via @nexus/auth signJwt (HS256)
-  const accessToken = signJwt(
-    {
-      sub: userId,
-      role: "read-only",
-      exp: Math.floor(Date.now() / 1_000) + 15 * 60,
-    } as Parameters<typeof signJwt>[0],
-    JWT_SECRET,
-  );
+  // Issue access token (15 min) honoring NEXUS_JWT_ALG (§14.1)
+  const { accessToken } = issueAccessToken(userId, "read-only", undefined, JWT_SECRET);
 
   // Opaque refresh token (30 days)
   const rawRefresh = randomBytes(32).toString("hex");

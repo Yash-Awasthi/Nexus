@@ -11,7 +11,8 @@
  *
  * Security:
  *   Passwords — scrypt (N=32768, r=8, p=1) — NIST SP 800-132 compliant.
- *   Access tokens — HS256 JWT, 15-minute expiry.
+ *   Access tokens — HS256 or RS256 JWT (NEXUS_JWT_ALG, §14.1), 15-minute expiry.
+ *   Brute-force — failed logins lock the email|ip key with exponential backoff (§14.3).
  *   Refresh tokens — 32-byte cryptographically random, SHA-256 hashed before storage.
  *   Refresh rotation — each refresh revokes the previous token (no re-use).
  *   Timing-safe compares everywhere (timingSafeEqual).
@@ -21,13 +22,13 @@ import { randomBytes, scrypt as _scrypt, timingSafeEqual } from "node:crypto";
 import type { ScryptOptions } from "node:crypto";
 import { promisify } from "node:util";
 
-import { signJwt, signJwtRS256 } from "@nexus/auth";
 import {
   assertLoginAllowed,
   loginThrottleKey,
   recordLoginFailure,
   recordLoginSuccess,
 } from "../lib/auth-hardening.js";
+import { ACCESS_TOKEN_TTL_SEC, issueAccessToken } from "../lib/issue-access-token.js";
 import { db } from "@nexus/db";
 import {
   users,
@@ -101,43 +102,10 @@ function generateRefreshToken(): string {
 
 // ── JWT issuance ──────────────────────────────────────────────────────────────
 
-// Env-overridable so dev/playtest can prove refresh with a short TTL.
-const ACCESS_TOKEN_TTL_SEC = parseInt(process.env.ACCESS_TOKEN_TTL_SEC ?? String(15 * 60), 10);
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 3600 * 1000; // 30 days
-
-/**
- * Map a platform role (users.role: owner|admin|member|viewer) to a NexusRole
- * (admin|agent|read-only) understood by @nexus/auth's role hierarchy. Without
- * this, tokens carry a role outside ROLE_RANK and fail authenticate().
- */
-function toNexusRole(role: string): "admin" | "agent" | "read-only" {
-  switch (role) {
-    case "owner":
-    case "admin":
-      return "admin";
-    case "member":
-      return "agent";
-    default:
-      return "read-only"; // viewer / unknown
-  }
-}
-
-function issueAccessToken(userId: string, role: string, tier: string, secret: string): string {
-  const payload = {
-    sub: userId,
-    role: toNexusRole(role),
-    tier,
-    exp: Math.floor(Date.now() / 1000) + ACCESS_TOKEN_TTL_SEC,
-  } as Parameters<typeof signJwt>[0];
-  // RS256 mode (§14.1): sign with the private key so a downstream service can
-  // verify without the signing secret. HS256 (shared secret) remains the default.
-  if (process.env.NEXUS_JWT_ALG === "RS256") {
-    const privateKey = process.env.NEXUS_JWT_PRIVATE_KEY;
-    if (!privateKey) throw new Error("NEXUS_JWT_PRIVATE_KEY is not set (NEXUS_JWT_ALG=RS256)");
-    return signJwtRS256(payload, privateKey);
-  }
-  return signJwt(payload, secret);
-}
+// Access-token issuance (TTL, RS256/HS256 selection, role mapping) lives in
+// lib/issue-access-token.ts — shared with the OAuth/OIDC/SAML SSO routes so
+// NEXUS_JWT_ALG is honored everywhere (§14.1).
 
 // ── Safe user view (never return passwordHash, totpSecret) ────────────────────
 
@@ -277,7 +245,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
       if (!user) return reply.code(500).send({ error: "insert_failed" });
 
       // Issue tokens
-      const accessToken = issueAccessToken(user.id, user.role, user.tier, jwtSecret());
+      const { accessToken } = issueAccessToken(user.id, user.role, user.tier, jwtSecret());
       const rawRefresh = generateRefreshToken();
       const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
 
@@ -364,7 +332,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
 
       recordLoginSuccess(throttleKey);
 
-      const accessToken = issueAccessToken(user.id, user.role, user.tier, jwtSecret());
+      const { accessToken } = issueAccessToken(user.id, user.role, user.tier, jwtSecret());
       const rawRefresh = generateRefreshToken();
       const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
 
@@ -455,7 +423,12 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(401).send({ error: "user_not_found" });
       }
 
-      const newAccessToken = issueAccessToken(user.id, user.role, user.tier, jwtSecret());
+      const { accessToken: newAccessToken } = issueAccessToken(
+        user.id,
+        user.role,
+        user.tier,
+        jwtSecret(),
+      );
       const newRawRefresh = generateRefreshToken();
       const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
 

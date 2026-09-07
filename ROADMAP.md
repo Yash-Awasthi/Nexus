@@ -42,11 +42,12 @@ Baseline: `@nexus/llm-drivers` = ~48 native drivers in `packages/llm-drivers/src
     transcribe).
   - `packages/retrieval` / `packages/reranker` — voyage, jina, cohere embeddings.
   - `packages/search-orchestrator/src` — exa, brave, serper (mirror the `SearxNG` strategy).
-- **1.4 Custom-driver framework.** Files: `packages/llm-drivers/README.md` (new). Do:
-  document the extension seams (`OpenAICompatibleDriver` + `chatCompletionsUrl()`/
-  `authHeaders()` overrides, `_useDefaultTransport`, `DriverRegistry`, the `MockTransport`
-  test recipe) so a new driver needs no core edits. Done: README exists; the template
-  compiles as a standalone driver.
+- **1.4 Custom-driver framework** _✓ shipped._ `packages/llm-drivers/README.md` documents
+  the extension seams — `OpenAICompatibleDriver` (`chatCompletionsUrl()`/`authHeaders()`
+  overrides) and `BaseDriver` (`sseLines`/`ndjsonLines`, `_useDefaultTransport`) are now
+  public exports, with the `MockTransport` test recipe and a compilable standalone
+  template. A new driver is a single file importing the package — no core edits. (There is
+  deliberately no global registry: consumers build a `provider → driver factory` map.)
 - **1.5 models.dev seed** _(DB-backed, no startup network)_. Files: next-free migration
   `provider_models.sql` + schema + index export + `apps/cli/src/index.ts` + the API boot
   path. Do: `provider_models` table (per `ModelDefinition` in `provider-registry`); CLI

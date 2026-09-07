@@ -44,6 +44,10 @@ It is a TypeScript monorepo (pnpm + Turbo): a handful of apps (`api`, `ui`, `wor
 memory, retrieval, drivers, and the rest. This page is a starting point — the
 [docs](docs/) and the source go further.
 
+Auth is hardened by default: HS256 or RS256 JWTs (`NEXUS_JWT_ALG`), exponential-backoff
+login throttling, per-session / per-user token revocation, and self-service GDPR
+erasure (`DELETE /api/v1/users/:id/data`) — see [docs/FEATURES.md](docs/FEATURES.md).
+
 ---
 
 ## Quick Start
@@ -83,7 +87,7 @@ docker compose up -d postgres redis     # just the infra
 
 cp .env.example .env                     # set NEXUS_API_KEY + one LLM key
 pnpm db:migrate
-pnpm dev                                 # API :3001 · UI :5173 · worker
+pnpm dev                                 # API :3000 · UI :5173 · worker
 ```
 
 Run a single service with `pnpm dev:api` or `pnpm dev:ui`.

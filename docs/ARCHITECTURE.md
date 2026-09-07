@@ -99,7 +99,8 @@ nexus/
 │   ├── evals/                  Scorers, test runner, result types
 │   ├── rlhf-pipeline/          RLHF data pipeline
 │   ├── telemetry/              OTel, HMAC-chained audit log, Prometheus
-│   ├── auth/                   API key + HS256 JWT, Fastify preHandler
+│   ├── auth/                   API key + JWT (HS256/RS256), login throttle,
+│   │                           session revocation, Fastify preHandler
 │   ├── db/                     Drizzle ORM — typed schemas + migrations
 │   ├── prediction-market/      Polymarket + Kalshi + Metaculus CLOB
 │   ├── plugin-sdk/             defineAdapter(), ISocialProvider, test harness

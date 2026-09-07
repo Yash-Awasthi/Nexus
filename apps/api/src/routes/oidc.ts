@@ -23,7 +23,7 @@
 
 import { createPublicKey, randomBytes, createVerify } from "node:crypto";
 
-import { signJwt } from "@nexus/auth";
+import { issueAccessToken } from "../lib/issue-access-token.js";
 import { db } from "@nexus/db";
 import { users, refreshTokens } from "@nexus/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
@@ -273,7 +273,6 @@ async function verifyIdToken(
 
 // ── User upsert + token issuance ──────────────────────────────────────────────
 
-const _OIDC_ACCESS_TTL_SEC = 15 * 60;
 const _OIDC_REFRESH_TTL_MS = 30 * 24 * 3600 * 1000;
 
 async function upsertOidcUser(
@@ -330,15 +329,9 @@ async function upsertOidcUser(
     userId = `${provider}:${_sha256hex(rawEmail).slice(0, 16)}`;
   }
 
-  const accessToken = signJwt(
-    {
-      sub: userId,
-      role: role as "admin" | "agent" | "read-only",
-      tier,
-      exp: Math.floor(Date.now() / 1000) + _OIDC_ACCESS_TTL_SEC,
-    } as Parameters<typeof signJwt>[0],
-    secret,
-  );
+  // Issue access token honoring NEXUS_JWT_ALG (§14.1) — role mapped via
+  // toNexusRole inside the shared helper (platform roles are not NexusRoles).
+  const { accessToken } = issueAccessToken(userId, role, tier, secret);
 
   const rawRefresh = randomBytes(32).toString("hex");
   if (process.env.DATABASE_URL) {

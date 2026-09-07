@@ -1,6 +1,6 @@
 # Nexus — Feature Status (local, no paid APIs)
 
-_Last verified 2026-07-04. Stack: Fastify API (`:3000`) + React Router UI (`:5173`) + local Ollama (`:11434`, `qwen2.5:7b` + `nomic-embed-text`) + Neon Postgres + Redis Cloud. Tier gating is OFF — the only gate is login._
+_Last verified 2026-09-07. Stack: Fastify API (`:3000`) + React Router UI (`:5173`) + local Ollama (`:11434`, `qwen2.5:7b` + `nomic-embed-text`) + Neon Postgres + local Redis (`:6379`). Tier gating is OFF — the only gate is login._
 
 **How to test the AI quickly:** register in the UI, then any LLM page works locally. Or curl:
 
@@ -22,7 +22,7 @@ curl -s -X POST $API/api/reasoning/run -H "Authorization: Bearer $T" \
 | Dashboard                      | loads                                                                                                                                            |
 | Deliberations                  | real council: 5 **archetypes** each cast an LLM vote (`packages/council/engine.ts`)                                                              |
 | Archetypes                     | roster of the council personas used in Deliberations (not decorative)                                                                            |
-| Workflows                      | UI loads (lobehub icons fixed); CRUD store — **no run engine yet** (see below)                                                                   |
+| Workflows                      | CRUD + DAG run engine (see below)                                                                                                               |
 | Prompts                        | Postgres CRUD + versions                                                                                                                         |
 | Skills                         | store-backed                                                                                                                                     |
 | Knowledge Bases                | KG-store backed list + ingest                                                                                                                    |
@@ -94,6 +94,7 @@ curl -s -X POST $API/api/reasoning/run -H "Authorization: Bearer $T" \
 - **KB/KG deep ingest** — POST `/symbolic/ingest` now auto-chunks documents >4000 chars using `@nexus/doc-pipeline` chunkText, then processes chunks in parallel via `extractGraphFromChunks`. Supports up to 500KB input.
 - **Video transcript** — YouTube transcripts extracted by parsing the YouTube page for caption tracks and fetching the caption XML. No API key needed. Whisper (OpenAI) and Deepgram STT for file/URL uploads.
 - **Notifications** — Full CRUD: POST create, POST bulk create, GET list + count, POST read/dismiss, DELETE remove. Per-user scoped, in-memory (ephemeral UI hints).
+- **Auth hardening (§14)** — access tokens now honor `NEXUS_JWT_ALG` (HS256 shared secret or RS256 key pair, alg-pinned verification via `NEXUS_JWT_PUBLIC_KEY`); the login route locks the `email|ip` key with exponential backoff after 5 failures (429); every verified JWT is checked against a revocation registry (per-`jti` and per-subject cutoff); `DELETE /api/v1/users/:id/data` performs the self-service GDPR erasure cascade (403 unless caller == target, content-free audit line). OAuth/OIDC/SAML SSO routes issue through the same shared `lib/issue-access-token.ts` so all issuers agree on the algorithm and role mapping. Verified live: register/login, 5-failure lockout → 429, self-erasure 204 / cross-user 403 / erased-user login 401, both e2e suites green (74 + 41). 11 new unit tests in `apps/api/tests/lib/` (auth-hardening, gdpr-erasure, issue-access-token).
 
 ## 🔧 Has code but needs plumbing (partial — real handler, missing engine/wiring)
 
