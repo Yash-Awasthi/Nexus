@@ -28,16 +28,14 @@ Baseline: `@nexus/llm-drivers` = ~48 native drivers in `packages/llm-drivers/src
 `chatCompletionsUrl()`/`authHeaders()`); `HttpTransport` (real) vs `MockTransport`
 (`setResponses([...])`, all tests). `provider-registry` has the models.dev importer.
 
-- **1.2 Dify SSE + threading.** Files: `packages/llm-drivers/src/index.ts` (`DifyDriver` —
-  blocking-only today), tests. Mirror: any streaming driver consuming `this.sseLines(...)`.
-  Do: on `stream: true` send `response_mode: "streaming"` and parse Dify SSE
-  (`event: message` → delta, `event: message_end` → usage + `conversation_id`); surface and
-  accept `conversation_id` so a follow-up threads the conversation. Done: streamed chunks
-  reassemble; a second call passes the returned `conversation_id` on the wire.
+- **1.2 Dify SSE + threading** _✓ shipped_ — `DifyDriver.stream()` sends `response_mode: "streaming"` and parses the Dify SSE envelope (message/agent_message deltas reassemble, `message_end` → usage + conversation_id, `error` → typed LlmError, ping/workflow events skipped); `conversationId` rides `LlmRequestOptions`/`LlmResponse` so a follow-up passes `conversation_id` on the wire. Injected-transport (test) calls fall back to the blocking single-delta path.
 - **1.3 Aux provider gaps** (one provider = one commit; mirror the sibling adapter; add a
   unit test per provider against mocked fetch):
-  - `packages/image-gen/src` — flux, stability, recraft, fal, comfyui (mirror
-    `ReplicateProvider`/`OpenAIImageProvider`).
+  - `packages/image-gen/src` — flux, stability, recraft, fal, comfyui _✓ shipped_
+    (`FluxProvider` BFL direct POST→poll, `StabilityProvider` v2beta stable-image,
+    `RecraftProvider`, `FalProvider` queue API, `ComfyUIProvider` self-hosted
+    /prompt→/history→/view; wired into the image-gen route + `.env.example`;
+    package suite 92/92).
   - `packages/voice/src` — deepgram, cartesia, assemblyai (mirror ElevenLabs synth + Groq
     transcribe).
   - `packages/retrieval` / `packages/reranker` — voyage, jina, cohere embeddings.

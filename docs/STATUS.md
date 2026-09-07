@@ -1,6 +1,6 @@
 # Nexus — Feature Status (local, no paid APIs)
 
-_Last verified 2026-09-07. Stack: Fastify API (`:3000`) + React Router UI (`:5173`) + local Ollama (`:11434`, `qwen2.5:7b` + `nomic-embed-text`) + Neon Postgres + local Redis (`:6379`). Tier gating is OFF — the only gate is login._
+_Last verified 2026-09-08. Stack: Fastify API (`:3000`) + React Router UI (`:5173`) + local Ollama (`:11434`, `qwen2.5:7b` + `nomic-embed-text`) + Neon Postgres + local Redis (`:6379`). Tier gating is OFF — the only gate is login._
 
 **How to test the AI quickly:** register in the UI, then any LLM page works locally. Or curl:
 
@@ -44,7 +44,7 @@ curl -s -X POST $API/api/reasoning/run -H "Authorization: Bearer $T" \
 | Evaluation                     | LLM judge + results store                                                                                                                        |
 | Marketplace                    | plugin registry CRUD                                                                                                                             |
 | Sandbox                        | JS (Node vm) + Python (Pyodide/WASM) local                                                                                                       |
-| Image Gen                      | needs `OPENAI_API_KEY`/Replicate key                                                                                                             |
+| Image Gen                      | DALL·E 3/2, Replicate (FLUX/SDXL), FLUX (BFL direct), Stable Image Core/Ultra, Recraft V3, fal, self-hosted ComfyUI                              |
 | Moderation                     | OpenAI moderation or heuristic fallback                                                                                                          |
 | Semantic Cache                 | **real Ollama-embedding cosine** + `/store`                                                                                                      |
 | Fallback Chains                | list/run/test (test needs a valid `chainId`)                                                                                                     |
@@ -67,7 +67,8 @@ curl -s -X POST $API/api/reasoning/run -H "Authorization: Bearer $T" \
 
 ## ⚙️ Needs a key/runtime (code is real, just unconfigured)
 
-- **Image Gen / Fine-Tune** → `OPENAI_API_KEY` (or Replicate).
+- **Image Gen (FLUX/Stability/Recraft/fal/ComfyUI)** → `FLUX_API_KEY` / `STABILITY_API_KEY` / `RECRAFT_API_KEY` / `FAL_KEY` / `COMFYUI_URL` (+ `COMFYUI_WORKFLOW`/`COMFYUI_PROMPT_NODE`); DALL·E → `OPENAI_API_KEY`, Replicate → `REPLICATE_API_KEY`.
+- **Fine-Tune** → `OPENAI_API_KEY`.
 - **Voice transcribe/synthesize** → `GROQ_API_KEY` / `ELEVENLABS_API_KEY`.
 - **Repositories** → `GITHUB_TOKEN`.
 - **Sandbox Go/Rust/Ruby/etc** → local Piston (`PISTON_URL`); JS + Python already work with nothing.
