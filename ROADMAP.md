@@ -42,12 +42,9 @@ Baseline: `@nexus/llm-drivers` = ~48 native drivers in `packages/llm-drivers/src
     transcribe).
   - `packages/retrieval` / `packages/reranker` — voyage, jina, cohere embeddings.
   - `packages/search-orchestrator/src` — exa, brave, serper (mirror the `SearxNG` strategy).
-- **1.4 Custom-driver framework** _✓ shipped._ `packages/llm-drivers/README.md` documents
-  the extension seams — `OpenAICompatibleDriver` (`chatCompletionsUrl()`/`authHeaders()`
-  overrides) and `BaseDriver` (`sseLines`/`ndjsonLines`, `_useDefaultTransport`) are now
-  public exports, with the `MockTransport` test recipe and a compilable standalone
-  template. A new driver is a single file importing the package — no core edits. (There is
-  deliberately no global registry: consumers build a `provider → driver factory` map.)
+- **1.4 Custom-driver framework** _✓ shipped_ — `packages/llm-drivers/README.md` documents the
+  extension seams (`OpenAICompatibleDriver`, `BaseDriver` are public exports) with a compilable
+  standalone driver template; no core edits needed.
 - **1.5 models.dev seed** _(DB-backed, no startup network)_. Files: next-free migration
   `provider_models.sql` + schema + index export + `apps/cli/src/index.ts` + the API boot
   path. Do: `provider_models` table (per `ModelDefinition` in `provider-registry`); CLI
@@ -163,31 +160,10 @@ Baseline: abstract `FeedAdapter<T>` + ~26 adapters (`MaritimeFeed`, `AviationFee
 Most items are **Blocked on provisioning**, not on code — the seams already exist. `infra/`
 holds `k8s/`, `helm/nexus`, `terraform/`, `grafana/`, `otel/`, `chaos/`, `k6/`.
 
-- **14.1 RS256 wiring** _✓ shipped._ `jwtPublicKey`/`jwtAlg` added to `AuthConfig` + branched in
-  `authenticate` (`apps/api/src/middleware/auth.ts`); `auth-users.ts` issues RS256 when
-  `NEXUS_JWT_ALG=RS256` (`NEXUS_JWT_PRIVATE_KEY`). A downstream service verifies with the
-  public key (`verifyJwtRS256`, alg-pinned). Env vars documented in `.env.example`.
-- **14.3 Brute-force / revocation middleware wiring** _✓ shipped._ `LoginThrottle` +
-  `SessionRevocationRegistry` (in-memory, unit-tested) are hooked into
-  `apps/api/src/lib/auth-hardening.ts`, enforced in `middleware/auth.ts` (`revocations`),
-  and wired into the login route (per-`email|ip` exponential backoff → 429). A Redis-backed
-  store remains Blocked on managed Redis.
-- **14.4 GDPR erasure route** _✓ shipped._ `DELETE /users/:id/data` (self-service only → 403
-  otherwise) in `apps/api/src/routes/user-data.ts`, guarded + audit-logged by
-  `apps/api/src/lib/gdpr-erasure.ts` (content-free log line: user id + per-table counts, never
-  LLM data). Route + guard unit-tested.
-- **14.5 Coverage → 80%** _✓ shipped._ `council` 92.8% ✓, `memory` 92.2% ✓, and
-  **`@nexus/runtime` 16.3% → 80.5% lines** (functions 94%, branches 84%) — 623 tests across
-  46 files, green, `tsc --noEmit` clean. One-module-per-commit grind covered the core
-  execution + resilience stack (TaskExecutor, workflow-engine incl. engine core/replay/
-  idempotency, runtime-graph, task-router, spec-loader, agent-bus, queue backends —
-  memory/file/redis — circuit-breaker, crash-recovery, council-bridge, dependency-resolver),
-  the composition root (runtime-context end-to-end wiring + start/stop lifecycle), the
-  knowledge/governance layer (memory-store, planning-engine, security-utils, otel tracer),
-  and the full adapter + bridge surface (browser/scraping/floci/local-inference/web-search/
-  code-agent-pool, web-search-engine, language-model providers, MCPRuntime +
-  conductor-mcp-bridge tools, federation health controller, persistence, runtime-manager,
-  compactor/leak/quota, inspector/diagnostic API, config loaders, sandboxes, registries).
+- **14.1 RS256 wiring** _✓ shipped_ — HS256/RS256 JWT issuance + alg-pinned verification (`NEXUS_JWT_ALG`, `.env.example`).
+- **14.3 Brute-force / revocation** _✓ shipped_ — login throttle (429 backoff) + revocation registry wired in `middleware/auth.ts`; Redis-backed store Blocked on managed Redis.
+- **14.4 GDPR erasure route** _✓ shipped_ — self-service `DELETE /users/:id/data` with content-free audit line.
+- **14.5 Coverage → 80%** _✓ shipped_ — `council` 92.8%, `memory` 92.2%, `@nexus/runtime` 80.5% lines (623 tests, green).
   Remaining uncovered lines are concentrated in genuinely server/process-bound modules
   (federation-supervisor, bootstrap, docker-compose-runner, mcp-server-host, manifest
   export) that need live services; nothing there is a correctness gap.
