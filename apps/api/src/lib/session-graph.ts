@@ -122,11 +122,16 @@ export async function appendGraphEvent(
       if (!graph.nodes.some((n) => n.id === node.id)) {
         graph.nodes.push(node);
         if (event.edge) {
+          // Resolve the "last" sentinel to the node BEFORE the one just pushed
+          // (the previous newest node). On an empty graph there IS no previous
+          // node — skip the edge rather than self-link the first node.
           const from =
             event.edge.from === "last"
-              ? (graph.nodes[graph.nodes.length - 2]?.id ?? node.id)
+              ? graph.nodes.length >= 2
+                ? graph.nodes[graph.nodes.length - 2]!.id
+                : undefined
               : event.edge.from;
-          if (graph.nodes.some((n) => n.id === from)) {
+          if (from !== undefined && graph.nodes.some((n) => n.id === from)) {
             graph.edges.push({ from, to: node.id, kind: event.edge.kind ?? "next" });
           }
         }

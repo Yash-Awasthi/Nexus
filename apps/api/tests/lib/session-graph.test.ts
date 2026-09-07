@@ -42,6 +42,26 @@ describe("session-graph", () => {
     expect(g!.nodes.every((n) => !Number.isNaN(new Date(n.ts).getTime()))).toBe(true);
   });
 
+  it("the first node of a graph never self-links via the last sentinel", async () => {
+    // A mission's first event carries an edge from "last" on an empty graph.
+    // It must record the node with NO edge (there is no previous node), not a
+    // self-edge {from: id, to: id}.
+    await appendGraphEvent("u1", "mission:m1", "mission", {
+      node: { id: "m1:skill:1:start", kind: "skill", label: "bootstrap" },
+      edge: { from: "last", to: "m1:skill:1:start", kind: "skill" },
+    });
+    const g = await getSessionGraph("u1", "mission:m1");
+    expect(g!.nodes).toHaveLength(1);
+    expect(g!.edges).toHaveLength(0);
+    // A second event still chains to the first.
+    await appendGraphEvent("u1", "mission:m1", "mission", {
+      node: { id: "m1:phase:started", kind: "phase", label: "started" },
+      edge: { from: "last", to: "m1:phase:started", kind: "phase" },
+    });
+    const g2 = await getSessionGraph("u1", "mission:m1");
+    expect(g2!.edges).toEqual([{ from: "m1:skill:1:start", to: "m1:phase:started", kind: "phase" }]);
+  });
+
   it("dedupes by node id — re-appends never duplicate a node", async () => {
     for (let i = 0; i < 3; i++) {
       await appendGraphEvent("u1", "research:j1", "research", {

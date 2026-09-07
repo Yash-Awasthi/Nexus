@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
-import type { LlmToolFn, RuntimeMessage } from "@nexus/agent-runtime";
+import { RuntimeToolSet } from "@nexus/agent-runtime";
+import type { LlmToolFn } from "@nexus/agent-runtime";
 
 import { MissionRunner, type MissionRecord, type MissionStore } from "./mission.js";
 
@@ -137,6 +138,64 @@ describe("MissionRunner", () => {
     expect(record.accepted).toBe(false);
     expect(record.maxIterationsReached).toBe(true);
     expect(record.iteration).toBe(1); // last iteration attempted
+  });
+
+  it("an accept with no output and no tool activity is deterministically blocked — empty work never passes", async () => {
+    const runner = new MissionRunner({
+      // The acting model produces NOTHING (no text, no tool calls) yet the
+      // reviewer "accepts" at 95 — the harness must block that, whatever the
+      // model says, and keep the reviewer's score on the record for audit.
+      llm: makeLlm({
+        acting: [""],
+        reviews: ['{"score": 95, "verdict": "accept", "issues": [], "suggestions": []}'],
+      }),
+      thinkPrompt: THINK,
+      maxIterations: 2,
+    });
+    const record = await runner.run("Produce the report");
+    expect(record.status).toBe("completed");
+    expect(record.accepted).toBe(false);
+    expect(record.maxIterationsReached).toBe(true);
+    // The override is auditable: the reviewer's accept is kept, marked noWork.
+    expect(record.lastReview?.verdict).toBe("accept");
+    expect(record.lastReview?.noWork).toBe(true);
+    // The loop kept pushing instead of self-approving, with an explicit note.
+    expect(record.phases.some((p) => p.phase === "improving")).toBe(true);
+    expect(
+      record.phases.some((p) => p.phase === "improving" && (p.note ?? "").includes("no work produced")),
+    ).toBe(true);
+  });
+
+  it("an accept with tool activity but no closing text is NOT blocked", async () => {
+    let toolCall = true;
+    const llm = makeLlm({
+      acting: [""], // final text empty — but a tool ran this iteration
+      reviews: ['{"score": 90, "verdict": "accept", "issues": [], "suggestions": []}'],
+    });
+    const runner = new MissionRunner({
+      llm: async (messages, o) => {
+        if (o.tools !== undefined && toolCall) {
+          toolCall = false;
+          return {
+            content: "",
+            toolCalls: [{ name: "write", arguments: { path: "out.md", content: "# Done" }, callId: "c1" }],
+            usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+          };
+        }
+        return llm(messages, o);
+      },
+      thinkPrompt: THINK,
+      maxIterations: 3,
+      toolSet: new RuntimeToolSet().add({
+        name: "write",
+        description: "",
+        handler: () => Promise.resolve("written"),
+      }),
+    });
+    const record = await runner.run("Write out.md");
+    expect(record.status).toBe("completed");
+    expect(record.accepted).toBe(true);
+    expect(record.lastReview?.noWork).toBeUndefined();
   });
 
   it("aborts cleanly when the signal fires", async () => {

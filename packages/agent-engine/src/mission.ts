@@ -67,6 +67,10 @@ export interface MissionReview {
   /** True when the reviewer produced no parseable structured verdict — a
    *  harness signal, NOT an actual rejection (never chase it as 0/100). */
   unparsed?: boolean;
+  /** True when the reviewer returned `accept` but the iteration produced no
+   *  output text and no tool activity — the harness blocks that acceptance
+   *  deterministically (an empty result can never pass, regardless of model). */
+  noWork?: boolean;
 }
 
 /** Reference to a skill attached to a mission (id + name; the record carries
@@ -202,7 +206,7 @@ export class MissionRunner {
     this.thinkPrompt = opts.thinkPrompt;
     this.reviewerSystemPrompt =
       opts.reviewerSystemPrompt ??
-      'You are a rigorous reviewer. Score the work 0-100 against the goal; >= 70 accepts. Be specific: name concrete problems, not generalities. The user message ends with the exact JSON schema — return ONLY that JSON object, nothing else.';
+      'You are a rigorous reviewer. Score the work 0-100 against the goal; >= 70 accepts. Be specific: name concrete problems, not generalities. If the work under review is empty or contains no concrete result, score it 0 and reject it — never accept empty work. The user message ends with the exact JSON schema — return ONLY that JSON object, nothing else.';
     this.maxIterations = opts.maxIterations ?? 3;
     this.acceptScore = opts.acceptScore ?? 70;
     this.stepsPerIteration = opts.stepsPerIteration ?? 5;
@@ -284,6 +288,8 @@ export class MissionRunner {
 
       // 2. ACT — bounded harness run toward the goal (resuming prior work).
       let actingOutput = "";
+      /** This iteration produced output text or ran a tool (blocks empty accepts). */
+      let actingEvidence = false;
       try {
         const acting = new ToolAgentRuntime({
           llm: this.llm,
@@ -300,6 +306,9 @@ export class MissionRunner {
         actingOutput = res.finalContent;
         record.finalContent = actingOutput;
         carried = res.messages;
+        actingEvidence =
+          actingOutput.trim().length > 0 ||
+          res.steps.some((s) => (s.content ?? "").trim().length > 0 || s.toolCalls.length > 0);
         await this.phase(
           record,
           "acting",
@@ -378,12 +387,34 @@ export class MissionRunner {
         review.unparsed ? "reviewer returned no structured verdict — retrying" : `score ${review.score}/100 — ${review.verdict}`,
       );
 
-      // 5. Accept → done.
-      if (review.verdict === "accept" && review.score >= this.acceptScore) {
+      // 5. Accept → done — but never on an empty iteration. Whatever the
+      //     reviewer said, an accept with no output text AND no tool activity
+      //     in this iteration is blocked deterministically (the model can
+      //     self-gratify; the harness cannot). The reviewer's score is kept on
+      //     the record with the noWork marker so the override is auditable.
+      const noWork = !actingEvidence;
+      if (noWork && review.verdict === "accept" && review.score >= this.acceptScore) {
+        review.noWork = true;
+        record.lastReview = review;
+      }
+
+      if (review.verdict === "accept" && review.score >= this.acceptScore && !review.noWork) {
         record.status = "completed";
         record.accepted = true;
         await this.phase(record, "completed", iter, `accepted at score ${review.score}`);
         return record;
+      }
+
+      // 5a. Reviewer accepted, but the run produced nothing this iteration —
+      //     deterministic rejection: feed a concrete directive back, not the
+      //     reviewer's (groundless) praise.
+      if (review.noWork) {
+        improveDirective =
+          "The reviewer scored the work, but this iteration produced no output and no tool " +
+          "activity, so acceptance was blocked. Actually perform the task now: run your tools " +
+          "or write the concrete result, then return the deliverable — it will be re-reviewed.";
+        await this.phase(record, "improving", iter, "accept blocked — no work produced in iteration");
+        continue;
       }
 
       // 5b. Unparsed review = harness failure, NOT a rejection. Never fabricate

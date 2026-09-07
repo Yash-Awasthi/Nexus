@@ -121,6 +121,60 @@ function outcomeDetail(r: {
   return `completed in ${ms}ms (exit ${r.exitCode})`;
 }
 
+type RunCodeResult = Awaited<ReturnType<typeof executeCode>>;
+
+/**
+ * One shared skill-run choreography (used by BOTH the harness pre-execution
+ * path and the run_skill_code tool, so a change to the event shape lands in
+ * one place): emit a `started` event, run the code, emit the terminal
+ * `completed`/`failed` event chained to the start, and — if the sandbox
+ * itself throws — emit `failed` and rethrow so the caller (and the harness
+ * loop / tool wrapper) sees the failure exactly as before.
+ */
+async function runSkillWithExecution(
+  skill: SkillRecord,
+  language: SandboxLanguage,
+  budgetMs: number,
+  recorder: SkillExecutionRecorder | undefined,
+  run: () => Promise<RunCodeResult>,
+): Promise<RunCodeResult> {
+  const started = recorder?.recordSkillExecution({
+    skillId: skill.id,
+    skillName: skill.name,
+    status: "started",
+    detail: `${language} · ${budgetMs}ms budget`,
+  });
+  try {
+    const result = await run();
+    const ok = result.ok && result.exitCode === 0 && !result.timedOut;
+    recorder?.recordSkillExecution({
+      skillId: skill.id,
+      skillName: skill.name,
+      status: ok ? "completed" : "failed",
+      detail: outcomeDetail({
+        ok,
+        exitCode: result.exitCode,
+        timedOut: result.timedOut,
+        durationMs: result.durationMs,
+        error: result.error,
+        output: `${result.stdout}\n${result.stderr}`,
+      }),
+      from: started,
+    });
+    return result;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    recorder?.recordSkillExecution({
+      skillId: skill.id,
+      skillName: skill.name,
+      status: "failed",
+      detail: `sandbox threw: ${message.slice(0, OUTCOME_DETAIL_CHARS)}`,
+      from: started,
+    });
+    throw err;
+  }
+}
+
 /** Result of one deterministic harness-side skill execution. */
 export interface SkillExecutionResult {
   skillId: string;
@@ -178,18 +232,20 @@ export async function executeSkillsOnce(
       });
       continue;
     }
-    // Runtime-emitted execution events (started → completed/failed) — the graph
-    // gets the skill run without the model writing a single token.
-    const started = opts.onExecution?.recordSkillExecution({
-      skillId: skill.id,
-      skillName: skill.name,
-      status: "started",
-      detail: `${language} · ${SKILL_EXEC_TIMEOUT_MS}ms budget`,
-    });
     try {
-      const r = await executeCode(
-        { taskType: "sandbox.execute", language, code, timeoutMs: SKILL_EXEC_TIMEOUT_MS },
-        opts.runner,
+      // One shared choreography: started → run → completed/failed, emitted by
+      // the runtime — the graph gets the skill run without the model writing a
+      // single token.
+      const r = await runSkillWithExecution(
+        skill,
+        language,
+        SKILL_EXEC_TIMEOUT_MS,
+        opts.onExecution,
+        () =>
+          executeCode(
+            { taskType: "sandbox.execute", language, code, timeoutMs: SKILL_EXEC_TIMEOUT_MS },
+            opts.runner,
+          ),
       );
       const compressed = compressForTool(
         "run_skill_code",
@@ -197,20 +253,6 @@ export async function executeSkillsOnce(
         { allowLossy: true },
       );
       const ok = r.ok && r.exitCode === 0 && !r.timedOut;
-      opts.onExecution?.recordSkillExecution({
-        skillId: skill.id,
-        skillName: skill.name,
-        status: ok ? "completed" : "failed",
-        detail: outcomeDetail({
-          ok,
-          exitCode: r.exitCode,
-          timedOut: r.timedOut,
-          durationMs: r.durationMs,
-          error: r.error,
-          output: `${r.stdout}\n${r.stderr}`,
-        }),
-        from: started,
-      });
       results.push({
         skillId: skill.id,
         skillName: skill.name,
@@ -223,14 +265,8 @@ export async function executeSkillsOnce(
         error: !r.ok ? r.error : undefined,
       });
     } catch (err) {
+      // runSkillWithExecution already recorded the `failed` event + rethrew.
       const message = err instanceof Error ? err.message : String(err);
-      opts.onExecution?.recordSkillExecution({
-        skillId: skill.id,
-        skillName: skill.name,
-        status: "failed",
-        detail: `sandbox threw: ${message.slice(0, OUTCOME_DETAIL_CHARS)}`,
-        from: started,
-      });
       results.push({
         skillId: skill.id,
         skillName: skill.name,
@@ -305,53 +341,22 @@ export function makeRunSkillCodeTool(
       );
       const signal = ctx?.signal;
 
-      // Runtime-emitted skill execution events around the sandbox run (started →
-      // completed/failed), so model-driven runs carry the same structured nodes
-      // as harness pre-execution — the model never writes these.
-      const started = opts.onExecution?.recordSkillExecution({
-        skillId: skill.id,
-        skillName: skill.name,
-        status: "started",
-        detail: `${language} · ${timeoutMs}ms budget`,
-      });
-      let result: Awaited<ReturnType<typeof executeCode>>;
-      try {
-        result = await executeCode(
-          { taskType: "sandbox.execute", language, code, timeoutMs },
-          opts.runner,
-        );
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        opts.onExecution?.recordSkillExecution({
-          skillId: skill.id,
-          skillName: skill.name,
-          status: "failed",
-          detail: `sandbox threw: ${message.slice(0, OUTCOME_DETAIL_CHARS)}`,
-          from: started,
-        });
-        throw err; // the harness loop (and tool wrapper) still sees the failure
-      }
+      // Model-driven runs carry the same structured nodes as harness
+      // pre-execution (started → completed/failed) via the shared helper; a
+      // thrown sandbox error records `failed` and propagates so the harness
+      // loop (and tool wrapper) still sees the failure.
+      const result = await runSkillWithExecution(
+        skill,
+        language,
+        timeoutMs,
+        opts.onExecution,
+        () => executeCode({ taskType: "sandbox.execute", language, code, timeoutMs }, opts.runner),
+      );
       const compressed = compressForTool(
         "run_skill_code",
         `=== stdout ===\n${result.stdout}\n=== stderr ===\n${result.stderr}`,
         { allowLossy: true },
       );
-
-      const ok = result.ok && result.exitCode === 0 && !result.timedOut;
-      opts.onExecution?.recordSkillExecution({
-        skillId: skill.id,
-        skillName: skill.name,
-        status: ok ? "completed" : "failed",
-        detail: outcomeDetail({
-          ok,
-          exitCode: result.exitCode,
-          timedOut: result.timedOut,
-          durationMs: result.durationMs,
-          error: result.error,
-          output: `${result.stdout}\n${result.stderr}`,
-        }),
-        from: started,
-      });
 
       const payload: Record<string, unknown> = {
         ok: result.ok,
