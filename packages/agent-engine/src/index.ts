@@ -54,7 +54,7 @@ export interface ToolCall {
   result?: string;
 }
 
-// ── Missions (long-horizon autonomous runs — Freebuff "Mission" parity) ──────
+// ── Missions (long-horizon autonomous runs) ─────────────────────────────────
 
 export {
   MissionRunner,

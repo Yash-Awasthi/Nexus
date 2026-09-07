@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Lifecycle hooks (Claude Code parity) — focused tests for the hooks module
+// Lifecycle hooks — focused tests for the hooks module
 // and its wiring into ToolAgentRuntime / makeSpawnAgentsTool.
 import { describe, it, expect } from "vitest";
 import {

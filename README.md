@@ -112,14 +112,24 @@ observability.
 
 ## What you can do with it
 
-- Send one question to several models in parallel and combine their answers (council).
-- Run multi-step, tool-using agents.
-- Store and recall information across sessions with vector and graph retrieval.
-- Compare models against the same prompts.
-- Add your own provider keys on the Provider Keys page — encrypted at rest, used
-  server-side only.
+- Send one question to several models in parallel and combine their answers (council), with blind review, debate, and A/B model arenas.
+- Run long-horizon missions: plan → act → review → improve loops with skill execution, deterministic harness pre-execution, and a reviewer that rejects empty or dishonest work.
+- Route across providers automatically — health-aware failover, tiered response caching (LRU + shared KV, deterministic-only), and live per-model capability discovery.
+- Store and recall information across sessions with vector and graph retrieval; every research run and deliberation is captured as a zero-write-cost session graph.
+- Compare models against the same prompts, keep prompt/response caches honest (cache hits cost $0 in the usage stats), and track spend per model.
+- Add your own provider keys on the Provider Keys page — AES-256-GCM encrypted, used server-side only.
+
+Auth is hardened by default: HS256 or RS256 JWTs (alg-pinned, one shared issuance path for password + OAuth/OIDC/SAML), exponential-backoff login throttling, per-session token revocation, and self-service GDPR erasure.
 
 The capability reference and SDK snippets are in [docs/FEATURES.md](docs/FEATURES.md).
+
+---
+
+## Quality bar
+
+- **623 tests** in the agent-runtime package alone (80%+ line coverage); hundreds more across API, council, memory, and drivers — unit suites are hermetic (no live services).
+- **115 e2e assertions** in two suites exercised against the real HTTP surface, plus live proofs for auth (token rotation, lockout, revocation, erasure), rate limiting (atomic under 320 concurrent requests), and durability (restart-survival of every user-facing store).
+- CI runs lint, typecheck, and tests on every push; audit log is HMAC-SHA256 chained.
 
 ---
 
@@ -134,7 +144,8 @@ The capability reference and SDK snippets are in [docs/FEATURES.md](docs/FEATURE
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common setup and dev-server fixes                      |
 | [docs/runbook.md](docs/runbook.md)                 | Operations: scaling, incidents, backup/restore         |
 | [docs/OPS.md](docs/OPS.md)                         | Health payloads, SSE streams, durable stores, shutdown |
-| [docs/STATUS.md](docs/STATUS.md)                   | Live build status — what works, what is next           |
+| [docs/STATUS.md](docs/STATUS.md)                   | Live build status — what works, architecture invariants |
+| [ROADMAP.md](ROADMAP.md)                           | Shipped work, external gates, future direction          |
 | [CONTRIBUTING.md](CONTRIBUTING.md)                 | Code standards, branch strategy, PR template           |
 
 The docs site (Docusaurus) lives in `apps/docs-site/`.

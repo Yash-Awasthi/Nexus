@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Missions — long-horizon autonomous agent runs (Freebuff Desktop "Mission"
- * parity), wired to the @nexus/agent-engine MissionRunner over the
+ * Missions — long-horizon autonomous agent runs, wired to the
+ * @nexus/agent-engine MissionRunner over the
  * @nexus/agent-runtime self-loop harness.
  *
  * A mission is a goal the agent pursues across multiple harness iterations

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * @nexus/agent-runtime — lifecycle hooks (Claude Code parity).
+ * @nexus/agent-runtime — lifecycle hooks.
  *
- * Claude Code's hook system (PreToolUse / PostToolUse / SubagentStop / Stop)
+ * The hook system (PreToolUse / PostToolUse / SubagentStop / Stop)
  * is the seam that turns a coding agent from a fixed loop into an operator-
  * controllable one: deterministic guards, redaction, audit logging, and
  * verdict overrides — all without touching the model or the tools.

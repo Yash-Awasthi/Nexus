@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * MissionRunner — long-horizon autonomous missions (Freebuff Desktop "Mission"
- * parity), built on the @nexus/agent-runtime harness loop.
+ * MissionRunner — long-horizon autonomous missions, built on the
+ * @nexus/agent-runtime harness loop.
  *
  * A mission is a goal the agent pursues across MULTIPLE harness iterations:
  *

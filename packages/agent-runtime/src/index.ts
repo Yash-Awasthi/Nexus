@@ -1005,7 +1005,7 @@ export interface ToolRuntimeOptions {
    */
   initialMessages?: RuntimeMessage[];
   /**
-   * Optional steering hook (freebuff harness parity). Drained at each step
+   * Optional steering hook. Drained at each step
    * boundary — after a step's LLM call + tools complete, before the next model
    * call. Any returned texts are appended to the message history as user
    * messages and keep the turn going, letting a host steer a running agent
@@ -1433,9 +1433,9 @@ export function makeSpawnAgentsTool(llm: LlmStreamFn, opts: SpawnAgentsOptions =
   };
 }
 
-// ── Self-loop harness (freebuff parity) ────────────────────────────────────────
+// ── Self-loop harness ───────────────────────────────────────────────────────
 //
-// The freebuff harness's self-loop surface, ported onto the existing
+// The self-loop surface, built on the existing
 // ToolAgentRuntime loop:
 //
 //   AgentTemplateRegistry   — named agent templates; a template can reference
@@ -1445,7 +1445,7 @@ export function makeSpawnAgentsTool(llm: LlmStreamFn, opts: SpawnAgentsOptions =
 //                             including the parent's own → self-spawn) and
 //                             return its output as a tool result.
 //   think_deeply            — explicit reasoning step: logs the model's thought
-//                             (freebuff parity — the cost is the model's own
+//                             (the cost is the model's own
 //                             chain of thought, this just makes it observable).
 //   review                  — run a reviewer agent over work product against
 //                             criteria; returns { score, verdict, issues,
@@ -1556,7 +1556,7 @@ export function makeSpawnAgentInlineTool(
 }
 
 /**
- * Factory: returns a `think_deeply` RuntimeTool (freebuff parity). The thought
+ * Factory: returns a `think_deeply` RuntimeTool. The thought
  * is logged and acknowledged; the reasoning itself happens in the model's own
  * chain of thought. Costs nothing beyond the model's normal turn.
  */
@@ -2176,7 +2176,7 @@ export class ToolOutput {
 /**
  * Normalise tool name aliases to canonical internal names.
  *
- * Providers present tools under various names (e.g. OAuth APIs use Claude Code
+ * Providers present tools under various names (e.g. some OAuth APIs use
  * names like `file_grep`, `shell_exec`). This mapper ensures both forms resolve
  * to the same internal registry entry.
  *
@@ -2343,8 +2343,7 @@ export interface TokenUsageTotals {
   cacheCreationInputTokens: number;
 }
 
-// ── Codebuff Agent Runtime Schemas ────────────────────────────────────────────
-// Extracted from: CodebuffAI/codebuff packages/agent-runtime/ + common/src/
+// ── Agent Runtime Schemas ────────────────────────────────────────────────
 // Covers: AgentDefinition, AgentState, AgentOutput, SkillDefinition, retry config, HttpError
 
 /** Error with an HTTP statusCode attached — used by retry logic. */
@@ -2489,7 +2488,7 @@ export interface AgentMcpServerConfig {
 
 /**
  * Declarative agent definition — a portable blueprint for spawnable agents.
- * Compatible with Codebuff AgentDefinition and OpenRouter provider routing.
+ * Portable blueprint for spawnable agents; pairs with OpenRouter provider routing.
  */
 export interface AgentDefinition {
   /** Unique lowercase-hyphenated identifier, e.g. "code-reviewer" */
