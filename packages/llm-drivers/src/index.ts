@@ -61,6 +61,11 @@ export interface LlmRequestOptions {
   tools?: LlmToolDefinition[];
   /** Tool-choice policy (provider support varies). */
   toolChoice?: "auto" | "none" | "required";
+  /**
+   * Opaque server-side thread id (e.g. Dify `conversation_id`, §1.2). Pass it
+   * back on the next request to continue the same provider-side conversation.
+   */
+  conversationId?: string;
 }
 
 /** Llm usage interface definition. */
@@ -80,6 +85,8 @@ export interface LlmResponse {
   durationMs: number;
   /** Tool calls the model requested this turn (native tool-calling). */
   toolCalls?: LlmToolCall[];
+  /** Server-side thread id (e.g. Dify `conversation_id`, §1.2) — pass back to thread. */
+  conversationId?: string;
 }
 
 /** Stream delta interface definition. */
@@ -2021,19 +2028,38 @@ export class AlibabaBailianDriver extends OpenAICompatibleDriver {
 }
 
 /**
+ * Dify streaming SSE event (§1.2) — the event type rides inside the data
+ * payload, not in an SSE `event:` line.
+ */
+interface DifyStreamEvent {
+  event: string;
+  answer?: string;
+  id?: string;
+  conversation_id?: string;
+  metadata?: { usage?: { prompt_tokens?: number; completion_tokens?: number } };
+  // error events
+  status?: number;
+  code?: string;
+  message?: string;
+}
+
+/**
  * Dify — an app-scoped platform, NOT a raw model API. Each Dify "app" owns its
  * model, prompt, and tools server-side; the API key authenticates one app and the
  * caller sends a single `query` string, not a messages array + model.
  *
- * We map Nexus's chat shape onto chat-messages (blocking mode): the latest user
- * turn becomes `query`, and the system prompt + earlier turns are folded into the
- * query as plain context (Dify threads real multi-turn server-side via
- * conversation_id, which a stateless driver call doesn't carry).
- *
- * ponytail: blocking only (no SSE streaming), no conversation_id threading, no
- * native tool-calls — those are the Dify app's job. Upgrade path: thread
- * conversation_id + switch to response_mode "streaming" if true multi-turn or
- * token streaming is needed.
+ * We map Nexus's chat shape onto chat-messages: the latest user turn becomes
+ * `query`, and the system prompt + earlier turns are folded into the query as
+ * plain context. Dify threads real multi-turn server-side via conversation_id
+ * (§1.2): the response carries `conversationId`, and passing it back via
+ * `opts.conversationId` sends `conversation_id` on the wire so the follow-up
+ * continues the same Dify conversation. Blocking mode folds context into the
+ * query; streaming mode (`stream()`, response_mode "streaming") parses Dify's
+ * SSE — `event: message` deltas reassemble, `event: message_end` carries usage
+ * + the conversation id, `event: error` maps to a typed LlmError. Native
+ * tool-calls remain the Dify app's job. With an injected (mock) transport,
+ * `stream()` falls back to the blocking single-delta path like every other
+ * non-OpenAI-shaped driver.
  */
 export class DifyDriver extends BaseDriver {
   readonly provider = "dify";
@@ -2054,20 +2080,27 @@ export class DifyDriver extends BaseDriver {
     this.user = config.user ?? "nexus";
   }
 
-  async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
-    const t0 = Date.now();
+  /** Latest user turn becomes `query`; system + prior turns fold in as context. */
+  private buildQuery(opts: LlmRequestOptions): { fullQuery: string; query: string } {
     const history = opts.messages.filter((m) => m.role !== "system");
     const query = history.at(-1)?.content ?? "";
     const context: string[] = [];
     if (opts.systemPrompt) context.push(opts.systemPrompt);
     for (const m of history.slice(0, -1)) context.push(`${m.role}: ${m.content}`);
     const fullQuery = context.length ? `${context.join("\n")}\n\n${query}` : query;
+    return { fullQuery, query };
+  }
+
+  async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
+    const t0 = Date.now();
+    const { fullQuery } = this.buildQuery(opts);
 
     const body = {
       inputs: {},
       query: fullQuery,
       response_mode: "blocking",
       user: this.user,
+      ...(opts.conversationId ? { conversation_id: opts.conversationId } : {}),
     };
 
     const raw = (await this.transport.post(`${this.baseUrl}/chat-messages`, body, {
@@ -2097,7 +2130,7 @@ export class DifyDriver extends BaseDriver {
     const content = raw.answer ?? "";
     const inputTokens = raw.metadata?.usage?.prompt_tokens ?? estimateTokens(fullQuery);
     const outputTokens = raw.metadata?.usage?.completion_tokens ?? estimateTokens(content);
-    return this.makeResponse(
+    const resp = this.makeResponse(
       raw.message_id ?? `${this.provider}-resp`,
       content,
       this.model,
@@ -2105,6 +2138,91 @@ export class DifyDriver extends BaseDriver {
       Date.now() - t0,
       "stop",
     );
+    if (raw.conversation_id) resp.conversationId = raw.conversation_id;
+    return resp;
+  }
+
+  /**
+   * Real SSE streaming (§1.2): `response_mode: "streaming"`, Dify events parsed
+   * from the `data:` payloads — `message`/`agent_message` deltas reassemble,
+   * `message_end` carries usage + conversation_id, `error` maps to LlmError,
+   * `ping` and workflow events are skipped. With an injected transport (tests),
+   * falls back to the blocking single-delta path.
+   */
+  override async stream(opts: LlmRequestOptions, handler: StreamHandler): Promise<LlmResponse> {
+    if (!this._useDefaultTransport) return super.stream(opts, handler);
+
+    const t0 = Date.now();
+    const { fullQuery } = this.buildQuery(opts);
+    const body = {
+      inputs: {},
+      query: fullQuery,
+      response_mode: "streaming",
+      user: this.user,
+      ...(opts.conversationId ? { conversation_id: opts.conversationId } : {}),
+    };
+
+    let content = "";
+    let conversationId = opts.conversationId;
+    let messageId = `${this.provider}-stream-${Date.now()}`;
+    let promptTokens = 0;
+    let completionTokens = 0;
+
+    for await (const payload of this.sseLines(`${this.baseUrl}/chat-messages`, body, {
+      Authorization: `Bearer ${this.apiKey}`,
+      "Content-Type": "application/json",
+    })) {
+      let event: DifyStreamEvent;
+      try {
+        event = JSON.parse(payload) as DifyStreamEvent;
+      } catch {
+        continue; // malformed payload — skip, keep the stream alive
+      }
+      switch (event.event) {
+        case "message":
+        case "agent_message": {
+          if (event.answer) {
+            content += event.answer;
+            await handler({ delta: event.answer, done: false });
+          }
+          if (event.conversation_id) conversationId = event.conversation_id;
+          if (event.id) messageId = event.id;
+          break;
+        }
+        case "message_replace": {
+          // Moderation replaced the whole answer — emit it as one delta.
+          content = event.answer ?? "";
+          await handler({ delta: content, done: false });
+          break;
+        }
+        case "message_end": {
+          if (event.conversation_id) conversationId = event.conversation_id;
+          if (event.metadata?.usage?.prompt_tokens) promptTokens = event.metadata.usage.prompt_tokens;
+          if (event.metadata?.usage?.completion_tokens)
+            completionTokens = event.metadata.usage.completion_tokens;
+          break;
+        }
+        case "error": {
+          const msg = event.message ?? event.code ?? "dify stream error";
+          if (event.status === 401 || event.code === "unauthorized" || event.code === "invalid_api_key") {
+            throw new LlmError("AUTH_FAILED", msg, this.provider, 401);
+          }
+          if (event.status === 429) throw new LlmError("RATE_LIMITED", msg, this.provider, 429);
+          throw new LlmError("SERVER_ERROR", msg, this.provider, event.status);
+        }
+        default:
+          break; // ping keepalive + workflow/tts events — not part of the answer
+      }
+    }
+
+    const usageObj = this.makeUsage(
+      promptTokens || estimateTokens(fullQuery),
+      completionTokens || estimateTokens(content),
+    );
+    await handler({ delta: "", done: true, usage: usageObj });
+    const resp = this.makeResponse(messageId, content, this.model, usageObj, Date.now() - t0, "stop");
+    if (conversationId) resp.conversationId = conversationId;
+    return resp;
   }
 }
 
