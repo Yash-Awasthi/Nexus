@@ -6,6 +6,11 @@ import {
   NullImageProvider,
   OpenAIImageProvider,
   ReplicateProvider,
+  FluxProvider,
+  StabilityProvider,
+  RecraftProvider,
+  FalProvider,
+  ComfyUIProvider,
   type ImageProvider,
   type ImageHooks,
   type FetchFn,
@@ -486,6 +491,413 @@ describe("ReplicateProvider", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────
+// FluxProvider (§1.3 — Black Forest Labs direct API)
+// ─────────────────────────────────────────────────────────────────────
+
+describe("FluxProvider", () => {
+  it("has name 'flux'", () => {
+    expect(new FluxProvider({ apiKey: "k" }).name).toBe("flux");
+  });
+
+  it("throws INVALID_PROMPT for empty prompt", async () => {
+    const p = new FluxProvider({ apiKey: "k", fetch: makeFetch([]) });
+    await expect(p.generate(" ")).rejects.toMatchObject({ code: "INVALID_PROMPT" });
+  });
+
+  it("POSTs to the model endpoint with x-key auth and prompt/size", async () => {
+    const fetchFn = makeFetch([
+      { ok: true, body: { id: "t1", polling_url: "https://api.bfl.ai/v1/get_result?id=t1" } },
+      { ok: true, body: { status: "Ready", result: { sample: "https://bfl.ai/img.png" } } },
+    ]);
+    const p = new FluxProvider({ apiKey: "bfl-key", fetch: fetchFn, sleep: noSleep });
+    await p.generate("a cat", { size: "1024x1024" });
+    const f = fetchFn as ReturnType<typeof vi.fn>;
+    expect(f.mock.calls[0]![0]).toBe("https://api.bfl.ai/v1/flux-pro-1.1");
+    const headers = f.mock.calls[0]![1]!.headers as Record<string, string>;
+    expect(headers["x-key"]).toBe("bfl-key");
+    const body = JSON.parse(f.mock.calls[0]![1]!.body as string);
+    expect(body).toMatchObject({ prompt: "a cat", width: 1024, height: 1024 });
+  });
+
+  it("polls polling_url until Ready and returns the sample URL", async () => {
+    const fetchFn = makeFetch([
+      { ok: true, body: { id: "t1", polling_url: "https://api.bfl.ai/v1/get_result?id=t1" } },
+      { ok: true, body: { status: "Pending" } },
+      { ok: true, body: { status: "Ready", result: { sample: "https://bfl.ai/img.png" } } },
+    ]);
+    const p = new FluxProvider({ apiKey: "k", fetch: fetchFn, sleep: noSleep, pollIntervalMs: 0 });
+    const imgs = await p.generate("x");
+    expect(imgs).toHaveLength(1);
+    expect(imgs[0]!.url).toBe("https://bfl.ai/img.png");
+    expect((fetchFn as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(3);
+  });
+
+  it("throws PREDICTION_FAILED on Error status", async () => {
+    const fetchFn = makeFetch([
+      { ok: true, body: { id: "t1", polling_url: "https://api.bfl.ai/v1/get_result?id=t1" } },
+      { ok: true, body: { status: "Error" } },
+    ]);
+    const p = new FluxProvider({ apiKey: "k", fetch: fetchFn, sleep: noSleep, pollIntervalMs: 0 });
+    await expect(p.generate("x")).rejects.toMatchObject({ code: "PREDICTION_FAILED" });
+  });
+
+  it("throws AUTH_FAILED on 401", async () => {
+    const p = new FluxProvider({ apiKey: "bad", fetch: makeFetch([{ ok: false, status: 401 }]) });
+    await expect(p.generate("x")).rejects.toMatchObject({ code: "AUTH_FAILED" });
+  });
+
+  it("throws POLL_TIMEOUT when deadline exceeded", async () => {
+    const pending = {
+      ok: true,
+      body: { id: "t1", polling_url: "https://api.bfl.ai/v1/get_result?id=t1" },
+    };
+    const p = new FluxProvider({
+      apiKey: "k",
+      fetch: makeFetch(Array(20).fill(pending)),
+      sleep: noSleep,
+      timeoutMs: 0,
+    });
+    await expect(p.generate("x")).rejects.toMatchObject({ code: "POLL_TIMEOUT" });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// StabilityProvider (§1.3)
+// ─────────────────────────────────────────────────────────────────────
+
+describe("StabilityProvider", () => {
+  it("has name 'stability'", () => {
+    expect(new StabilityProvider({ apiKey: "k" }).name).toBe("stability");
+  });
+
+  it("throws INVALID_PROMPT for empty prompt", async () => {
+    const p = new StabilityProvider({ apiKey: "k", fetch: makeFetch([]) });
+    await expect(p.generate(" ")).rejects.toMatchObject({ code: "INVALID_PROMPT" });
+  });
+
+  it("POSTs multipart to the engine endpoint with Bearer auth and JSON accept", async () => {
+    const fetchFn = makeFetch([
+      {
+        ok: true,
+        body: { image: Buffer.from("PNG").toString("base64"), finish_reason: "SUCCESS" },
+      },
+    ]);
+    const p = new StabilityProvider({ apiKey: "sk-key", engine: "core", fetch: fetchFn });
+    await p.generate("a cat", { size: "1792x1024" });
+    const f = fetchFn as ReturnType<typeof vi.fn>;
+    expect(f.mock.calls[0]![0]).toBe(
+      "https://api.stability.ai/v2beta/stable-image/generate/core",
+    );
+    const headers = f.mock.calls[0]![1]!.headers as Record<string, string>;
+    expect(headers["Authorization"]).toBe("Bearer sk-key");
+    expect(headers["Accept"]).toBe("application/json");
+    const form = f.mock.calls[0]![1]!.body as FormData;
+    expect(form.get("prompt")).toBe("a cat");
+    expect(form.get("aspect_ratio")).toBe("16:9"); // closest to 1792/1024
+    expect(form.get("output_format")).toBe("png");
+  });
+
+  it("decodes base64 image into data", async () => {
+    const b64 = Buffer.from("PNGDATA").toString("base64");
+    const p = new StabilityProvider({
+      apiKey: "k",
+      fetch: makeFetch([{ ok: true, body: { image: b64 } }]),
+    });
+    const imgs = await p.generate("x");
+    expect(imgs).toHaveLength(1);
+    expect(imgs[0]!.data).toBeInstanceOf(Uint8Array);
+    expect(Buffer.from(imgs[0]!.data!).toString()).toBe("PNGDATA");
+  });
+
+  it("throws AUTH_FAILED on 401", async () => {
+    const p = new StabilityProvider({
+      apiKey: "bad",
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
+    await expect(p.generate("x")).rejects.toMatchObject({ code: "AUTH_FAILED" });
+  });
+
+  it("throws INVALID_PROMPT on 400", async () => {
+    const p = new StabilityProvider({
+      apiKey: "k",
+      fetch: makeFetch([{ ok: false, status: 400, body: { errors: ["prompt too weird"] } }]),
+    });
+    await expect(p.generate("x")).rejects.toMatchObject({ code: "INVALID_PROMPT" });
+  });
+
+  it("throws PROVIDER_ERROR on 5xx", async () => {
+    const p = new StabilityProvider({
+      apiKey: "k",
+      fetch: makeFetch([{ ok: false, status: 500 }]),
+    });
+    await expect(p.generate("x")).rejects.toMatchObject({ code: "PROVIDER_ERROR" });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// RecraftProvider (§1.3)
+// ─────────────────────────────────────────────────────────────────────
+
+describe("RecraftProvider", () => {
+  it("has name 'recraft'", () => {
+    expect(new RecraftProvider({ apiKey: "k" }).name).toBe("recraft");
+  });
+
+  it("throws INVALID_PROMPT for empty prompt", async () => {
+    const p = new RecraftProvider({ apiKey: "k", fetch: makeFetch([]) });
+    await expect(p.generate(" ")).rejects.toMatchObject({ code: "INVALID_PROMPT" });
+  });
+
+  it("POSTs to the generations endpoint with Bearer auth and model/size/n", async () => {
+    const fetchFn = makeFetch([
+      { ok: true, body: { data: [{ url: "https://recraft.ai/a.png" }] } },
+    ]);
+    const p = new RecraftProvider({ apiKey: "rk-key", fetch: fetchFn });
+    const imgs = await p.generate("logo", { n: 2, size: "512x512" });
+    const f = fetchFn as ReturnType<typeof vi.fn>;
+    expect(f.mock.calls[0]![0]).toBe("https://external.api.recraft.ai/v1/images/generations");
+    const headers = f.mock.calls[0]![1]!.headers as Record<string, string>;
+    expect(headers["Authorization"]).toBe("Bearer rk-key");
+    const body = JSON.parse(f.mock.calls[0]![1]!.body as string);
+    expect(body).toMatchObject({ prompt: "logo", model: "recraftv3", size: "512x512", n: 2 });
+    expect(imgs[0]!.url).toBe("https://recraft.ai/a.png");
+  });
+
+  it("decodes b64 data when the response carries it", async () => {
+    const p = new RecraftProvider({
+      apiKey: "k",
+      fetch: makeFetch([
+        { ok: true, body: { data: [{ b64: Buffer.from("IMG").toString("base64") }] } },
+      ]),
+    });
+    const imgs = await p.generate("x");
+    expect(imgs[0]!.data).toBeInstanceOf(Uint8Array);
+  });
+
+  it("throws AUTH_FAILED on 401 and PROVIDER_ERROR on 5xx", async () => {
+    const p1 = new RecraftProvider({
+      apiKey: "bad",
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
+    await expect(p1.generate("x")).rejects.toMatchObject({ code: "AUTH_FAILED" });
+    const p2 = new RecraftProvider({
+      apiKey: "k",
+      fetch: makeFetch([{ ok: false, status: 500 }]),
+    });
+    await expect(p2.generate("x")).rejects.toMatchObject({ code: "PROVIDER_ERROR" });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// FalProvider (§1.3)
+// ─────────────────────────────────────────────────────────────────────
+
+describe("FalProvider", () => {
+  it("has name 'fal'", () => {
+    expect(new FalProvider({ apiKey: "k" }).name).toBe("fal");
+  });
+
+  it("throws INVALID_PROMPT for empty prompt", async () => {
+    const p = new FalProvider({ apiKey: "k", fetch: makeFetch([]) });
+    await expect(p.generate(" ")).rejects.toMatchObject({ code: "INVALID_PROMPT" });
+  });
+
+  it("queues, polls status, fetches result, returns images", async () => {
+    const fetchFn = makeFetch([
+      {
+        ok: true,
+        body: {
+          request_id: "rq1",
+          status_url: "https://queue.fal.run/fal-ai/flux/dev/requests/rq1/status",
+          response_url: "https://queue.fal.run/fal-ai/flux/dev/requests/rq1",
+        },
+      },
+      { ok: true, body: { status: "IN_QUEUE" } },
+      { ok: true, body: { status: "IN_PROGRESS" } },
+      { ok: true, body: { status: "COMPLETED" } },
+      {
+        ok: true,
+        body: { images: [{ url: "https://fal.media/out.png", width: 1024, height: 1024 }] },
+      },
+    ]);
+    const p = new FalProvider({
+      apiKey: "id:secret",
+      fetch: fetchFn,
+      sleep: noSleep,
+      pollIntervalMs: 0,
+    });
+    const imgs = await p.generate("x");
+    const f = fetchFn as ReturnType<typeof vi.fn>;
+    expect(f.mock.calls[0]![0]).toBe("https://queue.fal.run/fal-ai/flux/dev");
+    const headers = f.mock.calls[0]![1]!.headers as Record<string, string>;
+    expect(headers["Authorization"]).toBe("Key id:secret");
+    expect(imgs).toHaveLength(1);
+    expect(imgs[0]!.url).toBe("https://fal.media/out.png");
+    expect(imgs[0]!.width).toBe(1024);
+  });
+
+  it("throws PREDICTION_FAILED when the status poll reports an error", async () => {
+    const fetchFn = makeFetch([
+      {
+        ok: true,
+        body: { request_id: "rq1", status_url: "https://q/status", response_url: "https://q/result" },
+      },
+      { ok: true, body: { status: "FAILED", error: "NSFW filter" } },
+    ]);
+    const p = new FalProvider({
+      apiKey: "k",
+      fetch: fetchFn,
+      sleep: noSleep,
+      pollIntervalMs: 0,
+    });
+    await expect(p.generate("x")).rejects.toMatchObject({ code: "PREDICTION_FAILED" });
+  });
+
+  it("throws AUTH_FAILED on 401 and POLL_TIMEOUT on deadline", async () => {
+    const p1 = new FalProvider({
+      apiKey: "bad",
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
+    await expect(p1.generate("x")).rejects.toMatchObject({ code: "AUTH_FAILED" });
+    const p2 = new FalProvider({
+      apiKey: "k",
+      fetch: makeFetch([
+        { ok: true, body: { request_id: "rq1", status_url: "https://q/status" } },
+      ]),
+      sleep: noSleep,
+      timeoutMs: 0,
+    });
+    await expect(p2.generate("x")).rejects.toMatchObject({ code: "POLL_TIMEOUT" });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// ComfyUIProvider (§1.3 — self-hosted)
+// ─────────────────────────────────────────────────────────────────────
+
+/** ComfyUI needs raw-bytes responses for /view — dedicated mock. */
+function comfyFetch(sequence: unknown[]): FetchFn {
+  let idx = 0;
+  return vi.fn(async () => {
+    const r = sequence[idx++] as { raw?: Uint8Array; body?: unknown };
+    if (r && "raw" in r && r.raw) {
+      return {
+        ok: true,
+        status: 200,
+        arrayBuffer: async () =>
+          r.raw!.buffer.slice(
+            r.raw!.byteOffset,
+            r.raw!.byteOffset + r.raw!.byteLength,
+          ),
+      } as unknown as Response;
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => (r as { body?: unknown }).body ?? {},
+    } as Response;
+  });
+}
+
+const COMFY_WORKFLOW: Record<string, unknown> = {
+  "3": { class_type: "KSampler", inputs: { seed: 1 } },
+  "9": { class_type: "SaveImage", inputs: {} },
+};
+
+describe("ComfyUIProvider", () => {
+  it("has name 'comfyui'", () => {
+    expect(new ComfyUIProvider({ workflow: COMFY_WORKFLOW, promptNode: "9" }).name).toBe(
+      "comfyui",
+    );
+  });
+
+  it("throws INVALID_PROMPT for empty prompt", async () => {
+    const p = new ComfyUIProvider({
+      workflow: COMFY_WORKFLOW,
+      promptNode: "9",
+      fetch: comfyFetch([]),
+    });
+    await expect(p.generate(" ")).rejects.toMatchObject({ code: "INVALID_PROMPT" });
+  });
+
+  it("throws PROVIDER_ERROR when the promptNode is missing from the workflow", async () => {
+    const p = new ComfyUIProvider({
+      workflow: COMFY_WORKFLOW,
+      promptNode: "nope",
+      fetch: comfyFetch([]),
+    });
+    await expect(p.generate("x")).rejects.toMatchObject({ code: "PROVIDER_ERROR" });
+  });
+
+  it("queues the workflow with the prompt injected, polls history, fetches image bytes", async () => {
+    const fetchFn = comfyFetch([
+      { body: { prompt_id: "job-1" } },
+      { body: {} }, // history not ready yet
+      {
+        body: {
+          "job-1": {
+            status: { completed: true },
+            outputs: {
+              "9": { images: [{ filename: "c.png", subfolder: "", type: "output" }] },
+            },
+          },
+        },
+      },
+      { raw: new Uint8Array([1, 2, 3]) },
+    ]);
+    const p = new ComfyUIProvider({
+      workflow: COMFY_WORKFLOW,
+      promptNode: "9",
+      baseUrl: "http://127.0.0.1:8188",
+      fetch: fetchFn,
+      sleep: noSleep,
+      pollIntervalMs: 0,
+    });
+    const imgs = await p.generate("a cat");
+    const f = fetchFn as ReturnType<typeof vi.fn>;
+    expect(f.mock.calls[0]![0]).toBe("http://127.0.0.1:8188/prompt");
+    const body = JSON.parse(f.mock.calls[0]![1]!.body as string) as {
+      prompt: Record<string, { inputs: Record<string, unknown> }>;
+    };
+    expect(body.prompt["9"]!.inputs.text).toBe("a cat");
+    expect(f.mock.calls[2]![0]).toContain("/history/job-1");
+    expect(f.mock.calls[3]![0]).toContain("/view?filename=c.png");
+    expect(imgs).toHaveLength(1);
+    expect(imgs[0]!.data).toBeInstanceOf(Uint8Array);
+    expect(imgs[0]!.data!.length).toBe(3);
+  });
+
+  it("throws POLL_TIMEOUT when the history never completes", async () => {
+    const p = new ComfyUIProvider({
+      workflow: COMFY_WORKFLOW,
+      promptNode: "9",
+      fetch: comfyFetch([
+        { body: { prompt_id: "job-1" } },
+        { body: {} },
+        { body: {} },
+      ]),
+      sleep: noSleep,
+      pollIntervalMs: 0,
+      timeoutMs: 0,
+    });
+    await expect(p.generate("x")).rejects.toMatchObject({ code: "POLL_TIMEOUT" });
+  });
+
+  it("throws PROVIDER_ERROR when /prompt is rejected", async () => {
+    const fetchFn: FetchFn = vi.fn(async () => {
+      return { ok: false, status: 400, json: async () => ({}) } as Response;
+    });
+    const p = new ComfyUIProvider({
+      workflow: COMFY_WORKFLOW,
+      promptNode: "9",
+      fetch: fetchFn,
+      sleep: noSleep,
+    });
+    await expect(p.generate("x")).rejects.toMatchObject({ code: "PROVIDER_ERROR" });
+  });
+});
+
 // ImageGenerator
 // ─────────────────────────────────────────────────────────────────────────────
 

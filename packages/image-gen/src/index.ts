@@ -14,6 +14,13 @@
  *                            returns URL or base64 depending on response_format
  *   ReplicateProvider      — Flux / SDXL via Replicate Predictions API
  *                            two-phase: POST → poll until succeeded/failed
+ *   FluxProvider           — Black Forest Labs direct API (flux-pro/flux-dev)
+ *                            two-phase: POST → poll polling_url until Ready
+ *   StabilityProvider      — Stability AI v2beta stable-image (core/ultra/sd3)
+ *                            single POST, base64 image back
+ *   RecraftProvider        — Recraft v3 via images/generations (OpenAI-like shape)
+ *   FalProvider            — fal.ai queue API: POST → poll status → fetch result
+ *   ComfyUIProvider        — self-hosted ComfyUI: /prompt → /history → /view bytes
  *   NullImageProvider      — returns deterministic placeholder images (dev/tests)
  *
  * Hook integration
@@ -475,6 +482,624 @@ export class ReplicateProvider implements ImageProvider {
         : [];
 
     return urls.map((url) => ({ url, format, width, height }));
+  }
+}
+
+// ── Flux (Black Forest Labs direct API) provider ─────────────────────────────
+
+export interface FluxConfig {
+  /** BFL API key — defaults to process.env.FLUX_API_KEY */
+  apiKey?: string;
+  /** Model path segment. Default: "flux-pro-1.1" */
+  model?: string;
+  /** Poll interval in ms. Default: 1500. Inject 0 in tests. */
+  pollIntervalMs?: number;
+  /** Max time in ms to wait (default: 120_000). */
+  timeoutMs?: number;
+  /** Injectable fetch */
+  fetch?: FetchFn;
+  /** Injectable sleep for testing without real delays */
+  sleep?: SleepFn;
+}
+
+interface FluxTaskResponse {
+  id?: string;
+  polling_url?: string;
+  status?: string;
+  result?: { sample?: string };
+}
+
+/** Flux provider — BFL direct API (api.bfl.ai), two-phase POST → poll. */
+export class FluxProvider implements ImageProvider {
+  readonly name = "flux";
+
+  private readonly apiKey: string;
+  private readonly model: string;
+  private readonly pollIntervalMs: number;
+  private readonly timeoutMs: number;
+  private readonly fetchFn: FetchFn;
+  private readonly sleepFn: SleepFn;
+
+  private static readonly BASE = "https://api.bfl.ai/v1";
+
+  constructor(config: FluxConfig = {}) {
+    this.apiKey = config.apiKey ?? process.env["FLUX_API_KEY"] ?? "";
+    this.model = config.model ?? "flux-pro-1.1";
+    this.pollIntervalMs = config.pollIntervalMs ?? 1500;
+    this.timeoutMs = config.timeoutMs ?? 120_000;
+    this.fetchFn = config.fetch ?? fetch;
+    this.sleepFn = config.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  }
+
+  async generate(prompt: string, opts: GenerateOptions = {}): Promise<GeneratedImage[]> {
+    if (!prompt.trim()) throw new ImageGenError("INVALID_PROMPT", "Prompt must not be empty");
+    const [width, height] = parseSize(opts.size ?? "1024x1024");
+
+    const body: Record<string, unknown> = {
+      prompt,
+      width,
+      height,
+      ...(opts.negativePrompt ? { negative_prompt: opts.negativePrompt } : {}),
+      ...(opts.seed !== undefined ? { seed: opts.seed } : {}),
+      ...(opts.numInferenceSteps !== undefined
+        ? { num_inference_steps: opts.numInferenceSteps }
+        : {}),
+      ...(opts.guidanceScale !== undefined ? { guidance_scale: opts.guidanceScale } : {}),
+    };
+
+    let createRes: Response;
+    try {
+      createRes = await this.fetchFn(`${FluxProvider.BASE}/${this.model}`, {
+        method: "POST",
+        headers: {
+          "x-key": this.apiKey,
+          "Content-Type": "application/json",
+          accept: "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (cause) {
+      throw new ImageGenError("PROVIDER_ERROR", `Flux network error: ${String(cause)}`);
+    }
+    if (createRes.status === 401) {
+      throw new ImageGenError("AUTH_FAILED", "Flux API key is invalid or missing");
+    }
+    if (!createRes.ok) {
+      throw new ImageGenError("PROVIDER_ERROR", `Flux create returned ${createRes.status}`, {
+        model: this.model,
+        status: createRes.status,
+      });
+    }
+
+    let task = (await createRes.json()) as FluxTaskResponse;
+    const pollUrl =
+      task.polling_url ?? `${FluxProvider.BASE}/get_result?id=${encodeURIComponent(task.id ?? "")}`;
+
+    const deadline = Date.now() + this.timeoutMs;
+    while (task.status !== "Ready") {
+      if (Date.now() >= deadline) {
+        throw new ImageGenError("POLL_TIMEOUT", `Flux task timed out after ${this.timeoutMs}ms`, {
+          taskId: task.id,
+        });
+      }
+      if (this.pollIntervalMs > 0) await this.sleepFn(this.pollIntervalMs);
+      let pollRes: Response;
+      try {
+        pollRes = await this.fetchFn(pollUrl, { headers: { "x-key": this.apiKey } });
+      } catch (cause) {
+        throw new ImageGenError("PROVIDER_ERROR", `Flux poll network error: ${String(cause)}`);
+      }
+      if (!pollRes.ok) {
+        throw new ImageGenError("PROVIDER_ERROR", `Flux poll returned ${pollRes.status}`);
+      }
+      task = (await pollRes.json()) as FluxTaskResponse;
+      if (task.status === "Error" || task.status === "Content Moderation") {
+        throw new ImageGenError(
+          "PREDICTION_FAILED",
+          `Flux task failed: ${task.status}`,
+          { taskId: task.id, status: task.status },
+        );
+      }
+    }
+
+    const url = task.result?.sample;
+    return url ? [{ url, format: opts.format ?? "png", width, height }] : [];
+  }
+}
+
+// ── Stability AI provider ────────────────────────────────────────────────────
+
+export interface StabilityConfig {
+  /** Stability API key — defaults to process.env.STABILITY_API_KEY */
+  apiKey?: string;
+  /** Engine path: "core" | "ultra" | "sd3" (default: "core"). */
+  engine?: string;
+  /** Injectable fetch */
+  fetch?: FetchFn;
+}
+
+const ASPECT_RATIOS = [
+  "1:1", "16:9", "9:16", "21:9", "9:21", "3:2", "2:3", "4:3", "3:4", "5:4", "4:5",
+] as const;
+
+/** Closest supported Stability aspect_ratio for a width×height pair. */
+function closestAspectRatio(width: number, height: number): string {
+  const target = width / height;
+  let best: string = ASPECT_RATIOS[0]!;
+  let bestDiff = Infinity;
+  for (const r of ASPECT_RATIOS) {
+    const [w, h] = r.split(":").map(Number);
+    const diff = Math.abs(target - (w ?? 1) / (h ?? 1));
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = r;
+    }
+  }
+  return best;
+}
+
+interface StabilityJsonResponse {
+  image?: string;
+  seed?: number;
+  finish_reason?: string;
+}
+
+/**
+ * Stability provider — v2beta stable-image. Single POST with JSON accept
+ * (base64 image back), so no polling loop is needed.
+ */
+export class StabilityProvider implements ImageProvider {
+  readonly name = "stability";
+
+  private readonly apiKey: string;
+  private readonly engine: string;
+  private readonly fetchFn: FetchFn;
+
+  private static readonly BASE = "https://api.stability.ai/v2beta/stable-image/generate";
+
+  constructor(config: StabilityConfig = {}) {
+    this.apiKey = config.apiKey ?? process.env["STABILITY_API_KEY"] ?? "";
+    this.engine = config.engine ?? "core";
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  async generate(prompt: string, opts: GenerateOptions = {}): Promise<GeneratedImage[]> {
+    if (!prompt.trim()) throw new ImageGenError("INVALID_PROMPT", "Prompt must not be empty");
+    const [width, height] = parseSize(opts.size ?? "1024x1024");
+    const format = opts.format ?? "png";
+
+    const form = new FormData();
+    form.append("prompt", prompt);
+    form.append("output_format", format);
+    form.append("aspect_ratio", closestAspectRatio(width, height));
+    if (opts.negativePrompt) form.append("negative_prompt", opts.negativePrompt);
+    if (opts.seed !== undefined) form.append("seed", String(opts.seed));
+
+    let res: Response;
+    try {
+      res = await this.fetchFn(`${StabilityProvider.BASE}/${this.engine}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          Accept: "application/json",
+        },
+        body: form,
+      });
+    } catch (cause) {
+      throw new ImageGenError("PROVIDER_ERROR", `Stability network error: ${String(cause)}`);
+    }
+    if (res.status === 401 || res.status === 403) {
+      throw new ImageGenError("AUTH_FAILED", "Stability API key is invalid or missing");
+    }
+    if (res.status === 400) {
+      const json = (await res.json().catch(() => ({}))) as { errors?: string[] };
+      const msg = json.errors?.join("; ") ?? "Bad request";
+      throw new ImageGenError("INVALID_PROMPT", `Stability rejected prompt: ${msg}`, { prompt });
+    }
+    if (!res.ok) {
+      throw new ImageGenError("PROVIDER_ERROR", `Stability API returned ${res.status}`, {
+        engine: this.engine,
+        status: res.status,
+      });
+    }
+
+    const json = (await res.json().catch(() => ({}))) as StabilityJsonResponse;
+    if (!json.image) return [];
+    return [
+      {
+        data: Buffer.from(json.image, "base64"),
+        format,
+        width,
+        height,
+      },
+    ];
+  }
+}
+
+// ── Recraft provider ─────────────────────────────────────────────────────────
+
+export interface RecraftConfig {
+  /** Recraft API key — defaults to process.env.RECRAFT_API_KEY */
+  apiKey?: string;
+  /** Model id. Default: "recraftv3" */
+  model?: string;
+  /** Optional Recraft style (e.g. "realistic_image", "digital_illustration"). */
+  style?: string;
+  /** Injectable fetch */
+  fetch?: FetchFn;
+}
+
+interface RecraftResponse {
+  data?: { url?: string; b64?: string }[];
+}
+
+/** Recraft provider — OpenAI-like images/generations shape. */
+export class RecraftProvider implements ImageProvider {
+  readonly name = "recraft";
+
+  private readonly apiKey: string;
+  private readonly model: string;
+  private readonly style: string | undefined;
+  private readonly fetchFn: FetchFn;
+
+  private static readonly ENDPOINT = "https://external.api.recraft.ai/v1/images/generations";
+
+  constructor(config: RecraftConfig = {}) {
+    this.apiKey = config.apiKey ?? process.env["RECRAFT_API_KEY"] ?? "";
+    this.model = config.model ?? "recraftv3";
+    this.style = config.style;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  async generate(prompt: string, opts: GenerateOptions = {}): Promise<GeneratedImage[]> {
+    if (!prompt.trim()) throw new ImageGenError("INVALID_PROMPT", "Prompt must not be empty");
+    const [width, height] = parseSize(opts.size ?? "1024x1024");
+    const format = opts.format ?? "png";
+
+    const body: Record<string, unknown> = {
+      prompt,
+      model: this.model,
+      size: `${width}x${height}`,
+      n: opts.n ?? 1,
+      ...(opts.negativePrompt ? { negative_prompt: opts.negativePrompt } : {}),
+      ...(this.style ? { style: this.style } : {}),
+    };
+
+    let res: Response;
+    try {
+      res = await this.fetchFn(RecraftProvider.ENDPOINT, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (cause) {
+      throw new ImageGenError("PROVIDER_ERROR", `Recraft network error: ${String(cause)}`);
+    }
+    if (res.status === 401) {
+      throw new ImageGenError("AUTH_FAILED", "Recraft API key is invalid or missing");
+    }
+    if (res.status === 400) {
+      const json = (await res.json().catch(() => ({}))) as { message?: string };
+      throw new ImageGenError(
+        "INVALID_PROMPT",
+        `Recraft rejected prompt: ${json.message ?? "Bad request"}`,
+        { prompt },
+      );
+    }
+    if (!res.ok) {
+      throw new ImageGenError("PROVIDER_ERROR", `Recraft API returned ${res.status}`, {
+        status: res.status,
+      });
+    }
+
+    const json = (await res.json().catch(() => ({}))) as RecraftResponse;
+    return (json.data ?? []).map((item) => {
+      const image: GeneratedImage = { format, width, height };
+      if (item.url) image.url = item.url;
+      if (item.b64) image.data = Buffer.from(item.b64, "base64");
+      return image;
+    });
+  }
+}
+
+// ── fal.ai provider ──────────────────────────────────────────────────────────
+
+export interface FalConfig {
+  /** fal.ai key ("<id>:<secret>") — defaults to process.env.FAL_KEY */
+  apiKey?: string;
+  /** Model id, e.g. "fal-ai/flux/dev" (default). */
+  model?: string;
+  /** Poll interval in ms. Default: 1000. Inject 0 in tests. */
+  pollIntervalMs?: number;
+  /** Max time in ms to wait (default: 120_000). */
+  timeoutMs?: number;
+  /** Injectable fetch */
+  fetch?: FetchFn;
+  /** Injectable sleep for testing without real delays */
+  sleep?: SleepFn;
+}
+
+interface FalQueueResponse {
+  request_id?: string;
+  status_url?: string;
+  response_url?: string;
+  status?: string;
+  error?: string | null;
+}
+
+interface FalResultResponse {
+  images?: { url?: string; width?: number; height?: number }[];
+}
+
+/** fal.ai provider — queue API: POST → poll status_url → GET response_url. */
+export class FalProvider implements ImageProvider {
+  readonly name = "fal";
+
+  private readonly apiKey: string;
+  private readonly model: string;
+  private readonly pollIntervalMs: number;
+  private readonly timeoutMs: number;
+  private readonly fetchFn: FetchFn;
+  private readonly sleepFn: SleepFn;
+
+  private static readonly BASE = "https://queue.fal.run";
+
+  constructor(config: FalConfig = {}) {
+    this.apiKey = config.apiKey ?? process.env["FAL_KEY"] ?? "";
+    this.model = config.model ?? "fal-ai/flux/dev";
+    this.pollIntervalMs = config.pollIntervalMs ?? 1000;
+    this.timeoutMs = config.timeoutMs ?? 120_000;
+    this.fetchFn = config.fetch ?? fetch;
+    this.sleepFn = config.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  }
+
+  async generate(prompt: string, opts: GenerateOptions = {}): Promise<GeneratedImage[]> {
+    if (!prompt.trim()) throw new ImageGenError("INVALID_PROMPT", "Prompt must not be empty");
+    const [width, height] = parseSize(opts.size ?? "1024x1024");
+    const format = opts.format ?? "png";
+
+    const body: Record<string, unknown> = {
+      prompt,
+      ...(opts.negativePrompt ? { negative_prompt: opts.negativePrompt } : {}),
+      ...(opts.seed !== undefined ? { seed: opts.seed } : {}),
+      ...(opts.numInferenceSteps !== undefined
+        ? { num_inference_steps: opts.numInferenceSteps }
+        : {}),
+      ...(opts.guidanceScale !== undefined ? { guidance_scale: opts.guidanceScale } : {}),
+      ...(opts.n && opts.n > 1 ? { num_images: opts.n } : {}),
+    };
+
+    let createRes: Response;
+    try {
+      createRes = await this.fetchFn(`${FalProvider.BASE}/${this.model}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Key ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (cause) {
+      throw new ImageGenError("PROVIDER_ERROR", `fal network error: ${String(cause)}`);
+    }
+    if (createRes.status === 401) {
+      throw new ImageGenError("AUTH_FAILED", "fal API key is invalid or missing");
+    }
+    if (!createRes.ok) {
+      throw new ImageGenError("PROVIDER_ERROR", `fal create returned ${createRes.status}`, {
+        model: this.model,
+        status: createRes.status,
+      });
+    }
+
+    const queued = (await createRes.json()) as FalQueueResponse;
+    const statusUrl =
+      queued.status_url ?? `${FalProvider.BASE}/${this.model}/requests/${queued.request_id}/status`;
+    const responseUrl =
+      queued.response_url ?? `${FalProvider.BASE}/${this.model}/requests/${queued.request_id}`;
+
+    const deadline = Date.now() + this.timeoutMs;
+    let status: string | undefined = queued.status;
+    while (status === "IN_QUEUE" || status === "IN_PROGRESS" || status === undefined) {
+      if (Date.now() >= deadline) {
+        throw new ImageGenError("POLL_TIMEOUT", `fal request timed out after ${this.timeoutMs}ms`, {
+          requestId: queued.request_id,
+        });
+      }
+      if (this.pollIntervalMs > 0) await this.sleepFn(this.pollIntervalMs);
+      let pollRes: Response;
+      try {
+        pollRes = await this.fetchFn(statusUrl, {
+          headers: { Authorization: `Key ${this.apiKey}` },
+        });
+      } catch (cause) {
+        throw new ImageGenError("PROVIDER_ERROR", `fal poll network error: ${String(cause)}`);
+      }
+      if (!pollRes.ok) {
+        throw new ImageGenError("PROVIDER_ERROR", `fal poll returned ${pollRes.status}`);
+      }
+      const polled = (await pollRes.json()) as FalQueueResponse;
+      status = polled.status;
+      if (polled.error) {
+        throw new ImageGenError("PREDICTION_FAILED", `fal request failed: ${polled.error}`, {
+          requestId: queued.request_id,
+        });
+      }
+    }
+
+    let resultRes: Response;
+    try {
+      resultRes = await this.fetchFn(responseUrl, {
+        headers: { Authorization: `Key ${this.apiKey}` },
+      });
+    } catch (cause) {
+      throw new ImageGenError("PROVIDER_ERROR", `fal result network error: ${String(cause)}`);
+    }
+    if (!resultRes.ok) {
+      throw new ImageGenError("PROVIDER_ERROR", `fal result returned ${resultRes.status}`);
+    }
+    const result = (await resultRes.json()) as FalResultResponse;
+    return (result.images ?? []).map((img) => ({
+      url: img.url,
+      format,
+      width: img.width ?? width,
+      height: img.height ?? height,
+    }));
+  }
+}
+
+// ── ComfyUI provider (self-hosted) ───────────────────────────────────────────
+
+export interface ComfyUIConfig {
+  /**
+   * ComfyUI workflow graph — the JSON exported by the ComfyUI editor
+   * (API format). The prompt is injected into the node named by `promptNode`.
+   */
+  workflow: Record<string, unknown>;
+  /** Node id in the workflow whose text input receives the prompt. */
+  promptNode: string;
+  /** Text input key on the prompt node (default: "text"). */
+  promptInput?: string;
+  /** ComfyUI base URL (default: process.env.COMFYUI_URL or http://127.0.0.1:8188). */
+  baseUrl?: string;
+  /** Poll interval in ms. Default: 500. Inject 0 in tests. */
+  pollIntervalMs?: number;
+  /** Max time in ms to wait (default: 300_000). */
+  timeoutMs?: number;
+  /** Injectable fetch */
+  fetch?: FetchFn;
+  /** Injectable sleep for testing without real delays */
+  sleep?: SleepFn;
+}
+
+interface ComfyQueueResponse {
+  prompt_id?: string;
+}
+
+interface ComfyHistoryEntry {
+  status?: { completed?: boolean };
+  outputs?: Record<string, { images?: { filename?: string; subfolder?: string; type?: string }[] }>;
+}
+
+/**
+ * ComfyUI provider — talks to a self-hosted ComfyUI instance: /prompt queues
+ * the workflow, /history/{id} is polled until outputs appear, /view fetches
+ * the image bytes. No auth (local service); the workflow carries the model.
+ */
+export class ComfyUIProvider implements ImageProvider {
+  readonly name = "comfyui";
+
+  private readonly workflow: Record<string, unknown>;
+  private readonly promptNode: string;
+  private readonly promptInput: string;
+  private readonly baseUrl: string;
+  private readonly pollIntervalMs: number;
+  private readonly timeoutMs: number;
+  private readonly fetchFn: FetchFn;
+  private readonly sleepFn: SleepFn;
+
+  constructor(config: ComfyUIConfig) {
+    this.workflow = config.workflow;
+    this.promptNode = config.promptNode;
+    this.promptInput = config.promptInput ?? "text";
+    this.baseUrl = (config.baseUrl ?? process.env["COMFYUI_URL"] ?? "http://127.0.0.1:8188").replace(
+      /\/$/,
+      "",
+    );
+    this.pollIntervalMs = config.pollIntervalMs ?? 500;
+    this.timeoutMs = config.timeoutMs ?? 300_000;
+    this.fetchFn = config.fetch ?? fetch;
+    this.sleepFn = config.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  }
+
+  async generate(prompt: string, opts: GenerateOptions = {}): Promise<GeneratedImage[]> {
+    if (!prompt.trim()) throw new ImageGenError("INVALID_PROMPT", "Prompt must not be empty");
+    const [width, height] = parseSize(opts.size ?? "1024x1024");
+    const format = opts.format ?? "png";
+
+    const node = this.workflow[this.promptNode] as
+      | { inputs?: Record<string, unknown> }
+      | undefined;
+    if (!node) {
+      throw new ImageGenError(
+        "PROVIDER_ERROR",
+        `ComfyUI workflow has no node "${this.promptNode}"`,
+        { promptNode: this.promptNode },
+      );
+    }
+    node.inputs = { ...node.inputs, [this.promptInput]: prompt };
+
+    let queueRes: Response;
+    try {
+      queueRes = await this.fetchFn(`${this.baseUrl}/prompt`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: this.workflow }),
+      });
+    } catch (cause) {
+      throw new ImageGenError("PROVIDER_ERROR", `ComfyUI network error: ${String(cause)}`);
+    }
+    if (!queueRes.ok) {
+      throw new ImageGenError(
+        "PROVIDER_ERROR",
+        `ComfyUI /prompt returned ${queueRes.status} (workflow rejected?)`,
+        { status: queueRes.status },
+      );
+    }
+    const queued = (await queueRes.json()) as ComfyQueueResponse;
+    if (!queued.prompt_id) {
+      throw new ImageGenError("PROVIDER_ERROR", "ComfyUI did not return a prompt_id");
+    }
+
+    // Poll /history until the queue entry completes with outputs.
+    const deadline = Date.now() + this.timeoutMs;
+    let entry: ComfyHistoryEntry | undefined;
+    while (true) {
+      if (Date.now() >= deadline) {
+        throw new ImageGenError(
+          "POLL_TIMEOUT",
+          `ComfyUI job ${queued.prompt_id} timed out after ${this.timeoutMs}ms`,
+          { promptId: queued.prompt_id },
+        );
+      }
+      if (this.pollIntervalMs > 0) await this.sleepFn(this.pollIntervalMs);
+      let historyRes: Response;
+      try {
+        historyRes = await this.fetchFn(`${this.baseUrl}/history/${queued.prompt_id}`);
+      } catch (cause) {
+        throw new ImageGenError("PROVIDER_ERROR", `ComfyUI history network error: ${String(cause)}`);
+      }
+      if (!historyRes.ok) {
+        throw new ImageGenError("PROVIDER_ERROR", `ComfyUI history returned ${historyRes.status}`);
+      }
+      const history = (await historyRes.json()) as Record<string, ComfyHistoryEntry>;
+      const current = history[queued.prompt_id];
+      if (current?.status?.completed) {
+        entry = current;
+        break;
+      }
+    }
+
+    const files = Object.values(entry?.outputs ?? {}).flatMap((o) => o.images ?? []);
+    const images: GeneratedImage[] = [];
+    for (const f of files) {
+      if (!f.filename) continue;
+      const viewUrl = `${this.baseUrl}/view?filename=${encodeURIComponent(f.filename)}&subfolder=${encodeURIComponent(f.subfolder ?? "")}&type=${encodeURIComponent(f.type ?? "output")}`;
+      let viewRes: Response;
+      try {
+        viewRes = await this.fetchFn(viewUrl);
+      } catch (cause) {
+        throw new ImageGenError("PROVIDER_ERROR", `ComfyUI view network error: ${String(cause)}`);
+      }
+      if (!viewRes.ok) {
+        throw new ImageGenError("PROVIDER_ERROR", `ComfyUI view returned ${viewRes.status}`);
+      }
+      images.push({ data: new Uint8Array(await viewRes.arrayBuffer()), format, width, height });
+    }
+    return images;
   }
 }
 
