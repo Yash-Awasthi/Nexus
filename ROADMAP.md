@@ -177,8 +177,14 @@ holds `k8s/`, `helm/nexus`, `terraform/`, `grafana/`, `otel/`, `chaos/`, `k6/`.
   `apps/api/src/lib/gdpr-erasure.ts` (content-free log line: user id + per-table counts, never
   LLM data). Route + guard unit-tested.
 - **14.5 Coverage → 80%** _(code-only)._ `council` 92.8% ✓ and `memory` 92.2% ✓ are done.
-  **Remaining: `runtime` 16.3% → 80%** — the large tail. `pnpm --filter @nexus/runtime test
---coverage`, fill the lowest-covered modules, one module per commit. Done: ≥80% lines.
+  **In progress: `@nexus/runtime` 16.3% → 29.2%** (functions 58→70%, branches 77→81%).
+  Seven modules shipped one-commit-at-a-time: TaskExecutor, spec-loader,
+  service-discovery+floci-client, agent-bus, MemoryQueueBackend, runtime-graph (the
+  1,105-line core), and an env-loader top-up — 318 tests green. `pnpm --filter
+  @nexus/runtime test --coverage`; the next tier of 0% modules is runtime-context,
+  workflow-engine, code-agent-pool, runtime-compactor, the federation controllers,
+  orchestrator, and the infra-bound tail (redis/file queues, docker runner, otel
+  tracing, adapters). Done: ≥80% lines.
 - **14.6 DB / Infra provisioning** _(Blocked — see infra table)._ PgBouncer, read replicas,
   PITR, encryption-at-rest; K8s HPA; multi-AZ PG/Redis; CDN/edge DDoS; Grafana SLO dashboards +
   alerting. Charts/manifests exist; each is Done when provisioned.
