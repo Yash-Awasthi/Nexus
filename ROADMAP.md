@@ -162,18 +162,19 @@ Baseline: abstract `FeedAdapter<T>` + ~26 adapters (`MaritimeFeed`, `AviationFee
 Most items are **Blocked on provisioning**, not on code — the seams already exist. `infra/`
 holds `k8s/`, `helm/nexus`, `terraform/`, `grafana/`, `otel/`, `chaos/`, `k6/`.
 
-- **14.1 RS256 wiring** _(code-only)._ `@nexus/auth` already has `signJwtRS256`/
-  `verifyJwtRS256` (alg-pinned). Remaining: add `jwtPublicKey`/`jwtAlg` to `AuthConfig` +
-  branch in `authenticate` (`apps/api/src/middleware/auth.ts`), issue RS256 in
-  `apps/api/src/routes/auth-users.ts`. Done: a downstream service verifies with the public key.
-- **14.3 Brute-force / revocation middleware wiring** _(code-only)._ `@nexus/auth` has
-  `LoginThrottle` + `SessionRevocationRegistry` (in-memory, unit-tested). Remaining: hook them
-  into `apps/api/src/middleware/auth.ts` and the login route. (A Redis-backed store is Blocked
-  on managed Redis.) Done: middleware locks out after N failures; a revoked `jti` is rejected.
-- **14.4 GDPR erasure route** _(code-only)._ `packages/db/src/gdpr.ts` has `eraseUserData`
-  (unit-tested, no live DB). Remaining: the thin `DELETE /users/:id/data` route in `apps/api`
-  (Blocked on the PG test harness) + a no-LLM-data-logged log-shape assertion in the logger
-  layer. Done: deletion cascade + log-shape tests green.
+- **14.1 RS256 wiring** _✓ shipped._ `jwtPublicKey`/`jwtAlg` added to `AuthConfig` + branched in
+  `authenticate` (`apps/api/src/middleware/auth.ts`); `auth-users.ts` issues RS256 when
+  `NEXUS_JWT_ALG=RS256` (`NEXUS_JWT_PRIVATE_KEY`). A downstream service verifies with the
+  public key (`verifyJwtRS256`, alg-pinned). Env vars documented in `.env.example`.
+- **14.3 Brute-force / revocation middleware wiring** _✓ shipped._ `LoginThrottle` +
+  `SessionRevocationRegistry` (in-memory, unit-tested) are hooked into
+  `apps/api/src/lib/auth-hardening.ts`, enforced in `middleware/auth.ts` (`revocations`),
+  and wired into the login route (per-`email|ip` exponential backoff → 429). A Redis-backed
+  store remains Blocked on managed Redis.
+- **14.4 GDPR erasure route** _✓ shipped._ `DELETE /users/:id/data` (self-service only → 403
+  otherwise) in `apps/api/src/routes/user-data.ts`, guarded + audit-logged by
+  `apps/api/src/lib/gdpr-erasure.ts` (content-free log line: user id + per-table counts, never
+  LLM data). Route + guard unit-tested.
 - **14.5 Coverage → 80%** _(code-only)._ `council` 92.8% ✓ and `memory` 92.2% ✓ are done.
   **Remaining: `runtime` 16.3% → 80%** — the large tail. `pnpm --filter @nexus/runtime test
 --coverage`, fill the lowest-covered modules, one module per commit. Done: ≥80% lines.

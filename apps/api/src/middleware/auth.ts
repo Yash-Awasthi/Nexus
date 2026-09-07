@@ -14,9 +14,11 @@
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-import { authenticate, AuthError } from "@nexus/auth";
+import { authenticate, AuthError, verifyJwtRS256 } from "@nexus/auth";
 import type { Tier } from "@nexus/tier-gate";
 import type { FastifyRequest, FastifyReply } from "fastify";
+
+import { sessionRevocations } from "../lib/auth-hardening.js";
 
 // ── HS256 JWT verifier (no npm dep — Node 22 crypto) ──────────────────────────
 
@@ -79,8 +81,16 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
     apiKey: process.env.NEXUS_API_KEY || undefined,
     // Accept user JWTs (issued by /auth/login) in addition to the master API key.
     jwtSecret: process.env.NEXUS_JWT_SECRET || undefined,
+    // RS256 (asymmetric) mode (§14.1): verify with the public key, alg-pinned.
+    jwtAlg: (process.env.NEXUS_JWT_ALG === "RS256" ? "RS256" : "HS256") as "HS256" | "RS256",
+    jwtPublicKey: process.env.NEXUS_JWT_PUBLIC_KEY || undefined,
+    // Reject revoked sessions (§14.3) on every verified JWT.
+    revocations: sessionRevocations,
     // Dev bypass only when NO auth method is configured at all.
-    disabled: !process.env.NEXUS_API_KEY && !process.env.NEXUS_JWT_SECRET,
+    disabled:
+      !process.env.NEXUS_API_KEY &&
+      !process.env.NEXUS_JWT_SECRET &&
+      !process.env.NEXUS_JWT_PUBLIC_KEY,
   };
   try {
     authenticate(request.headers.authorization, authConfig);
@@ -118,8 +128,19 @@ export async function requireAuthWithTier(
 
   // Identity from a verified JWT (no DB round-trip).
   const jwtSecret = process.env.NEXUS_JWT_SECRET;
-  if (jwtSecret) {
-    const payload = _verifyHs256(token, jwtSecret);
+  const jwtPublicKey = process.env.NEXUS_JWT_PUBLIC_KEY;
+  const jwtAlg = process.env.NEXUS_JWT_ALG === "RS256" ? "RS256" : "HS256";
+  if (jwtSecret || (jwtAlg === "RS256" && jwtPublicKey)) {
+    let payload: JwtPayload | null = null;
+    if (jwtAlg === "RS256" && jwtPublicKey) {
+      try {
+        payload = verifyJwtRS256(token, jwtPublicKey) as unknown as JwtPayload;
+      } catch {
+        payload = null; // fall through — identity stays undefined
+      }
+    } else if (jwtSecret) {
+      payload = _verifyHs256(token, jwtSecret);
+    }
     if (payload) {
       request.nexusUserId = typeof payload.sub === "string" ? payload.sub : undefined;
       return;

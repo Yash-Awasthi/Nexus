@@ -21,7 +21,13 @@ import { randomBytes, scrypt as _scrypt, timingSafeEqual } from "node:crypto";
 import type { ScryptOptions } from "node:crypto";
 import { promisify } from "node:util";
 
-import { signJwt } from "@nexus/auth";
+import { signJwt, signJwtRS256 } from "@nexus/auth";
+import {
+  assertLoginAllowed,
+  loginThrottleKey,
+  recordLoginFailure,
+  recordLoginSuccess,
+} from "../lib/auth-hardening.js";
 import { db } from "@nexus/db";
 import {
   users,
@@ -117,15 +123,20 @@ function toNexusRole(role: string): "admin" | "agent" | "read-only" {
 }
 
 function issueAccessToken(userId: string, role: string, tier: string, secret: string): string {
-  return signJwt(
-    {
-      sub: userId,
-      role: toNexusRole(role),
-      tier,
-      exp: Math.floor(Date.now() / 1000) + ACCESS_TOKEN_TTL_SEC,
-    } as Parameters<typeof signJwt>[0],
-    secret,
-  );
+  const payload = {
+    sub: userId,
+    role: toNexusRole(role),
+    tier,
+    exp: Math.floor(Date.now() / 1000) + ACCESS_TOKEN_TTL_SEC,
+  } as Parameters<typeof signJwt>[0];
+  // RS256 mode (§14.1): sign with the private key so a downstream service can
+  // verify without the signing secret. HS256 (shared secret) remains the default.
+  if (process.env.NEXUS_JWT_ALG === "RS256") {
+    const privateKey = process.env.NEXUS_JWT_PRIVATE_KEY;
+    if (!privateKey) throw new Error("NEXUS_JWT_PRIVATE_KEY is not set (NEXUS_JWT_ALG=RS256)");
+    return signJwtRS256(payload, privateKey);
+  }
+  return signJwt(payload, secret);
 }
 
 // ── Safe user view (never return passwordHash, totpSecret) ────────────────────
@@ -330,6 +341,11 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
       // Always do scrypt work to prevent user-enumeration via timing
       const DUMMY_HASH = "scrypt$" + "0".repeat(64) + "$" + "0".repeat(128);
 
+      // Brute-force backoff (§14.3) — checked BEFORE credential work so a locked
+      // key is never billed scrypt cycles, and incremented on each failure.
+      const throttleKey = loginThrottleKey(normalEmail, request.ip);
+      assertLoginAllowed(throttleKey);
+
       const [user] = await db
         .select()
         .from(users)
@@ -340,10 +356,13 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
       const valid = await verifyPassword(password, hashToVerify);
 
       if (!user || !valid) {
+        recordLoginFailure(throttleKey);
         return reply
           .code(401)
           .send({ error: "invalid_credentials", message: "Invalid email or password" });
       }
+
+      recordLoginSuccess(throttleKey);
 
       const accessToken = issueAccessToken(user.id, user.role, user.tier, jwtSecret());
       const rawRefresh = generateRefreshToken();

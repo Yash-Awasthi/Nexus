@@ -48,6 +48,7 @@ import { alertsRoutes } from "./routes/alerts.js";
 import { apiBridgeRoutes } from "./routes/api-bridge.js";
 import { auditRoutes } from "./routes/audit.js";
 import { authUsersRoutes } from "./routes/auth-users.js";
+import { userDataRoutes } from "./routes/user-data.js";
 import { billingRoutes } from "./routes/billing.js";
 import { botsRoutes } from "./routes/bots.js";
 import { briefRoutes } from "./routes/brief.js";
@@ -405,6 +406,7 @@ export async function buildServer(): Promise<FastifyInstance> {
 
       // Enterprise — user auth, workspaces, MFA
       await api.register(authUsersRoutes);
+      await api.register(userDataRoutes);
       await api.register(workspacesRoutes);
       await api.register(driveRoutes);
       await api.register(mfaRoutes);
