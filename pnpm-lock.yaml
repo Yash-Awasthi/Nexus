@@ -275,6 +275,9 @@ importers:
       '@nexus/scraping-mcp':
         specifier: workspace:*
         version: link:../../packages/scraping-mcp
+      '@nexus/search-orchestrator':
+        specifier: workspace:*
+        version: link:../../packages/search-orchestrator
       '@nexus/session-sync':
         specifier: workspace:*
         version: link:../../packages/session-sync

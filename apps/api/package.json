@@ -82,6 +82,7 @@
     "@nexus/ragtime": "workspace:*",
     "@nexus/redteam": "workspace:*",
     "@nexus/reranker": "workspace:*",
+    "@nexus/search-orchestrator": "workspace:*",
     "@nexus/researcher": "workspace:*",
     "@nexus/retrieval": "workspace:*",
     "@nexus/rlhf-pipeline": "workspace:*",

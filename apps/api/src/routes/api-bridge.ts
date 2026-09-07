@@ -104,6 +104,11 @@ import {
   getDefaultConfig as redteamDefaultConfig,
 } from "@nexus/redteam";
 import {
+  searchBrave,
+  searchExa,
+  searchSerper,
+} from "@nexus/search-orchestrator";
+import {
   StealthBrowser,
   PatchrightDriver,
   MockBrowserDriver,
@@ -2393,6 +2398,57 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   async function _webSearch(
     query: string,
   ): Promise<{ results: WebSearchHit[]; provider: string | null }> {
+    // ── Exa (§1.3) ───────────────────────────────────────────────────────
+    if (process.env.EXA_API_KEY) {
+      try {
+        const exaResults = await searchExa(query);
+        return {
+          results: exaResults.slice(0, 10).map((r) => ({
+            url: String(r.metadata?.url ?? ""),
+            title: String(r.metadata?.title ?? ""),
+            snippet: r.content?.slice(0, 300) ?? "",
+            score: r.score,
+          })),
+          provider: "exa",
+        };
+      } catch {
+        /* fall through to the next provider */
+      }
+    }
+    // ── Brave (§1.3) ─────────────────────────────────────────────────────
+    if (process.env.BRAVE_API_KEY) {
+      try {
+        const braveResults = await searchBrave(query);
+        return {
+          results: braveResults.slice(0, 10).map((r) => ({
+            url: String(r.metadata?.url ?? ""),
+            title: String(r.metadata?.title ?? ""),
+            snippet: r.content?.slice(0, 300) ?? "",
+            score: r.score,
+          })),
+          provider: "brave",
+        };
+      } catch {
+        /* fall through to the next provider */
+      }
+    }
+    // ── Serper (§1.3) ────────────────────────────────────────────────────
+    if (process.env.SERPER_API_KEY) {
+      try {
+        const serperResults = await searchSerper(query);
+        return {
+          results: serperResults.slice(0, 10).map((r) => ({
+            url: String(r.metadata?.url ?? ""),
+            title: String(r.metadata?.title ?? ""),
+            snippet: r.content?.slice(0, 300) ?? "",
+            score: r.score,
+          })),
+          provider: "serper",
+        };
+      } catch {
+        /* fall through to the next provider */
+      }
+    }
     if (process.env.TAVILY_API_KEY) {
       try {
         const res = await fetch("https://api.tavily.com/search", {
@@ -2469,6 +2525,9 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   app.get("/web-search/providers", async (_req, reply) => {
     return reply.send({
       providers: [
+        { id: "exa", name: "Exa", available: !!process.env.EXA_API_KEY },
+        { id: "brave", name: "Brave", available: !!process.env.BRAVE_API_KEY },
+        { id: "serper", name: "Serper", available: !!process.env.SERPER_API_KEY },
         { id: "tavily", name: "Tavily", available: !!process.env.TAVILY_API_KEY },
         { id: "searxng", name: "SearXNG", available: !!process.env.SEARXNG_URL },
       ],
