@@ -13,7 +13,6 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
-import { useAuth } from "~/context/AuthContext";
 import {
   MessageSquare,
   Send,
@@ -25,7 +24,15 @@ import {
   RefreshCw,
   ChevronRight,
 } from "lucide-react";
-import { deliberate, createThread, onOpinion, onVerdict, onDone } from "~/lib/deliberate";
+import {
+  deliberate,
+  createThread,
+  listThreads,
+  onOpinion,
+  onVerdict,
+  onDone,
+  type StoredThread,
+} from "~/lib/deliberate";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -94,7 +101,6 @@ function mapMessage(raw: any, index: number): Message {
 
 export default function ChatDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
 
   const [conversations, setConversations] = useState<StoredConv[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -107,17 +113,25 @@ export default function ChatDetailPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const currentConv = conversations.find((c) => c.id === id);
 
-  // ── Load sidebar conversations from localStorage ───────────────────────────
+  // ── Load sidebar conversations from the threads bridge (offline-capable) ──
   useEffect(() => {
-    if (!user?.id) return;
-    try {
-      const raw = localStorage.getItem(`nexus-chats-${user.id}`);
-      const all: StoredConv[] = raw ? JSON.parse(raw) : [];
-      setConversations(all);
-    } catch {
-      setConversations([]);
-    }
-  }, [user?.id]);
+    let cancelled = false;
+    (async () => {
+      const threads = await listThreads();
+      if (cancelled) return;
+      setConversations(
+        threads.map((t) => ({
+          id: t.id,
+          title: t.title,
+          date: new Date(t.updated_at).toLocaleDateString(),
+          mode: t.mode ?? "",
+        })),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // ── Load thread messages from API ─────────────────────────────────────────
   const loadMessages = useCallback(async () => {

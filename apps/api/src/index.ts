@@ -12,6 +12,41 @@
  */
 
 import { createServer } from "node:http";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+// ── .env loader (zero-dependency) ───────────────────────────────────────────
+// Parses a standard KEY=VALUE .env file at the monorepo root so `pnpm dev:api`
+// works without manually exporting variables. Values may be bare or quoted;
+// inline # comments are stripped only from unquoted values. Already-set env
+// vars win (we never overwrite). Safe for values containing & ? = etc., which
+// break `source .env` under bash.
+(function loadEnvFile() {
+  let text: string;
+  try {
+    text = readFileSync(resolve(process.cwd(), "../../.env"), "utf8");
+  } catch {
+    try {
+      text = readFileSync(resolve(process.cwd(), ".env"), "utf8");
+    } catch {
+      return; // no .env — rely on real env vars
+    }
+  }
+  for (const line of text.split("\n")) {
+    const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+    if (!m) continue;
+    const key = m[1]!;
+    let val = m[2]!;
+    // Strip inline comment from unquoted values
+    if (!/^["']/.test(val)) {
+      val = val.replace(/\s+#.*$/, "");
+    } else {
+      // Remove surrounding quotes
+      val = val.slice(1, val.length - 1);
+    }
+    if (process.env[key] === undefined) process.env[key] = val.trim();
+  }
+})();
 
 const PORT = parseInt(process.env.PORT ?? "10000", 10);
 const HOST = process.env.HOST ?? "0.0.0.0";
@@ -75,9 +110,34 @@ function validateSecrets(): void {
   }
 }
 
-// Handle graceful shutdown
-process.on("SIGTERM", () => process.exit(0));
-process.on("SIGINT", () => process.exit(0));
+// ── Graceful shutdown ───────────────────────────────────────────────────────
+// The Fastify `app` instance is created inside main() but signal handlers need
+// to reach it. We store it in a module-level ref so the shutdown sequence can
+// call app.close() to drain in-flight requests, close DB pools, and unregister
+// plugins — instead of hard-killing the process mid-request.
+let _app: { close?: () => Promise<void>; log?: { info: (m: string) => void } } | null = null;
+let _shuttingDown = false;
+
+async function gracefulShutdown(signal: string): Promise<void> {
+  if (_shuttingDown) return; // second Ctrl+C → hard exit
+  _shuttingDown = true;
+  console.log(`[shutdown] ${signal} received, draining connections...`);
+
+  if (_app?.close) {
+    try {
+      await _app.close();
+      console.log("[shutdown] Fastify server closed cleanly ✓");
+    } catch (err) {
+      console.error("[shutdown] Error during app.close():", err);
+    }
+  }
+
+  console.log(`[shutdown] ${signal} handled, exiting.`);
+  process.exit(0);
+}
+
+process.on("SIGTERM", () => void gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => void gracefulShutdown("SIGINT"));
 
 async function main(): Promise<void> {
   console.log("[startup] nexus-api starting...");
@@ -131,6 +191,9 @@ async function main(): Promise<void> {
     console.error("[startup] FATAL: app.listen() failed:", err);
     process.exit(1);
   }
+
+  // Wire the running app into the graceful-shutdown handler.
+  _app = app;
 
   // ── Step 4: Non-blocking connection probes ───────────────────────────────────
   if (process.env.DATABASE_URL) {

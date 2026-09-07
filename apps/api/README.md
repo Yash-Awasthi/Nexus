@@ -10,12 +10,17 @@ All routes under `/v1/` require `Authorization: Bearer <token>` (API key or HS25
 
 ### Health
 
-| Method | Path                   | Description                        |
-| ------ | ---------------------- | ---------------------------------- |
-| `GET`  | `/v1/health`           | Liveness check                     |
-| `GET`  | `/v1/health/ready`     | Readiness check (DB + Redis)       |
-| `GET`  | `/v1/health/aggregate` | Full component health + SLO status |
-| `GET`  | `/metrics`             | Prometheus scrape endpoint         |
+Health routes are registered at the Fastify **root** (no `/v1` or `/api` prefix)
+and require no auth:
+
+| Method | Path            | Description                                                                   |
+| ------ | --------------- | ----------------------------------------------------------------------------- |
+| `GET`  | `/health`       | Liveness check (always 200 while serving)                                     |
+| `GET`  | `/health/ready` | Readiness — probes `db` (critical), `kv`, `costlog_flush`; 503 only on `down` |
+
+`/health/ready` also returns a `costLog` block (flush health of the durable
+usage/cost log: pending tail, last flush age, consecutive failures) on **every**
+response — see `docs/OPS.md` for the payload and the degraded probe semantics.
 
 ### Gateway (LLM streaming)
 

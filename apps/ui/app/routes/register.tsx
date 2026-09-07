@@ -36,7 +36,10 @@ export default function RegisterPage() {
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `Registration failed: ${res.status}`);
+        // body.message carries the useful explanation (e.g. "body/password
+        // must NOT have fewer than 8 characters"); body.error is just the
+        // HTTP category ("Bad Request") — prefer message.
+        throw new Error(body.message ?? body.error ?? `Registration failed: ${res.status}`);
       }
 
       // Account created — send to login to sign in explicitly

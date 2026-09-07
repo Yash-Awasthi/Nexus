@@ -75,6 +75,14 @@ export interface ModelResult {
   success: boolean;
   error?: string;
   score: number;
+  /** Time to first token in ms (only populated when streaming). */
+  timeToFirstTokenMs?: number;
+  /** Tokens per second throughput (only populated when streaming). */
+  tokensPerSecond?: number;
+  /** Total tokens generated. */
+  totalTokens?: number;
+  /** Token count from prompt (input tokens). */
+  promptTokens?: number;
 }
 
 // ── Speed tiers ───────────────────────────────────────────────────────────────

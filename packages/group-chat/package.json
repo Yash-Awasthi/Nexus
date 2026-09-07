@@ -1,0 +1,9 @@
+{
+  "name": "@nexus/group-chat",
+  "version": "0.1.0",
+  "description": "Multi-agent group chat patterns: Selector, RoundRobin, Swarm, DiGraph",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@nexus/llm-router": "workspace:*"
+  }
+}

@@ -90,6 +90,20 @@ Run a single service with `pnpm dev:api` or `pnpm dev:ui`.
 
 Setup not going to plan? See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
+### Runtime data layer
+
+Two state backends, both optional in dev:
+
+- **PostgreSQL** (`DATABASE_URL`) — relational data, vector memory, migrations via `pnpm db:migrate`.
+- **Redis** (`REDIS_URL`) — BullMQ queues and the **shared KV** that makes research jobs, threads, notifications, and the usage/cost log durable across API restarts and pods.
+
+If no Redis/Upstash is configured, the shared KV falls back to an in-process
+memory store — fine for a quick dev spin-up, but **not** durable: data does not
+survive an API restart and is not shared across pods. Production needs Redis
+(or `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`). See
+[docs/OPS.md](docs/OPS.md) for the store TTLs, recovery semantics, and health
+observability.
+
 ---
 
 ## What you can do with it
@@ -107,15 +121,17 @@ The capability reference and SDK snippets are in [docs/FEATURES.md](docs/FEATURE
 
 ## Documentation
 
-| Doc                                                | What's in it                                          |
-| -------------------------------------------------- | ----------------------------------------------------- |
-| [docs/FEATURES.md](docs/FEATURES.md)               | Capability reference, core concepts, SDK usage        |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)       | System diagram, repository layout, toolchain, ADRs    |
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)           | Environment variables, Docker, hosting, observability |
-| [docs/TESTING.md](docs/TESTING.md)                 | Unit, e2e, accessibility, and load testing            |
-| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common setup and dev-server fixes                     |
-| [docs/runbook.md](docs/runbook.md)                 | Operations: scaling, incidents, backup/restore        |
-| [CONTRIBUTING.md](CONTRIBUTING.md)                 | Code standards, branch strategy, PR template          |
+| Doc                                                | What's in it                                           |
+| -------------------------------------------------- | ------------------------------------------------------ |
+| [docs/FEATURES.md](docs/FEATURES.md)               | Capability reference, core concepts, SDK usage         |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)       | System diagram, repository layout, toolchain, ADRs     |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)           | Environment variables, Docker, hosting, observability  |
+| [docs/TESTING.md](docs/TESTING.md)                 | Unit, e2e, accessibility, and load testing             |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common setup and dev-server fixes                      |
+| [docs/runbook.md](docs/runbook.md)                 | Operations: scaling, incidents, backup/restore         |
+| [docs/OPS.md](docs/OPS.md)                         | Health payloads, SSE streams, durable stores, shutdown |
+| [docs/STATUS.md](docs/STATUS.md)                   | Live build status — what works, what is next           |
+| [CONTRIBUTING.md](CONTRIBUTING.md)                 | Code standards, branch strategy, PR template           |
 
 The docs site (Docusaurus) lives in `apps/docs-site/`.
 

@@ -49,7 +49,7 @@ describe("MODEL_REGISTRY", () => {
 
   it("type-level: ModelKey is a literal union of registry keys", () => {
     // Compile-time check: this assignment would fail if ModelKey were 'string'
-    const key: ModelKey = "groq/llama-3-3-70b-versatile";
+    const key: ModelKey = "groq/openai/gpt-oss-120b";
     expect(MODEL_REGISTRY[key].provider).toBe("groq");
   });
 });

@@ -361,3 +361,17 @@ export function recordLlmCompletion(
   if (totalTokens !== undefined) span.setAttribute("llm.total_tokens", totalTokens);
   span.addEvent("llm.completion_received", { "llm.completion_tokens": completionTokens });
 }
+
+// ── OTLP/HTTP (JSON) trace export ─────────────────────────────────────────────
+export {
+  spanToOtlpSpan,
+  buildOtlpPayload,
+  buildOtlpJsonPayload,
+  exportSpansOtlp,
+} from "./otlp-exporter.js";
+export type {
+  OtlpJsonPayload,
+  OtlpExportResponse,
+  OtlpExporterOptions,
+  OtlpFetchFn,
+} from "./otlp-exporter.js";

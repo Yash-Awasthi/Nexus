@@ -14,7 +14,7 @@
  *   Neither set           → NullProvider for local dev / CI
  *
  * Aliases (always registered):
- *   nexus/fast  → groq  | llama-3.1-70b-versatile   (or null fallback)
+ *   nexus/fast  → groq  | openai/gpt-oss-120b   (or null fallback)
  *   nexus/smart → claude | claude-sonnet-4-5          (or null fallback)
  *
  * Fallback chain: nexus/smart → nexus/fast → null
@@ -29,7 +29,10 @@ import {
   type LLMMessage,
   type RoutingStrategy,
 } from "@nexus/llm-router";
+import { SmartRouter } from "../lib/smart-router.js";
 import type { FastifyInstance } from "fastify";
+
+import { discoverModels } from "../lib/model-discovery.js";
 
 import { requireAuth } from "../middleware/auth.js";
 
@@ -71,7 +74,7 @@ function buildRouter(): LLMRouter {
   }
 
   aliases.push(
-    { alias: "nexus/fast", provider: "groq", model: "llama-3.1-70b-versatile" },
+    { alias: "nexus/fast", provider: "groq", model: "openai/gpt-oss-120b" },
     { alias: "nexus/fast", provider: "null", model: "nexus/fast" },
     { alias: "nexus/smart", provider: "claude", model: "claude-sonnet-4-5" },
     { alias: "nexus/smart", provider: "null", model: "nexus/smart" },
@@ -151,6 +154,29 @@ export async function llmRoutes(app: FastifyInstance): Promise<void> {
         return { name, models: p ? [...p.models] : [] };
       });
       return reply.send({ providers });
+    },
+  );
+
+  /**
+   * GET /llm/models
+   *
+   * Model discovery with per-model capabilities (mission pillar 4 —
+   * OpenCode-depth provider layer). Returns every known model grouped by
+   * provider with contextWindow / maxOutput / vision / toolUse / streaming /
+   * reasoningTier / cost, plus a live probe of the local Ollama daemon when
+   * it is reachable.
+   */
+  app.get(
+    "/llm/models",
+    { preHandler: requireAuth },
+    async (_request, reply) => {
+      const result = await discoverModels({
+        ollamaBaseUrl: process.env.OLLAMA_BASE_URL,
+        declaredProviders: process.env.NEXUS_LLM_PROVIDER
+          ? [process.env.NEXUS_LLM_PROVIDER]
+          : undefined,
+      });
+      return reply.send(result);
     },
   );
 

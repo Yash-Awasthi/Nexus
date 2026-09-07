@@ -89,6 +89,9 @@ importers:
       '@nexus/admin-gateway':
         specifier: workspace:*
         version: link:../../packages/admin-gateway
+      '@nexus/agent-engine':
+        specifier: workspace:*
+        version: link:../../packages/agent-engine
       '@nexus/agent-runtime':
         specifier: workspace:*
         version: link:../../packages/agent-runtime
@@ -335,6 +338,9 @@ importers:
       fastify:
         specifier: ^5.11.2
         version: 5.11.2
+      ioredis:
+        specifier: ^5.11.1
+        version: 5.11.1
       pg:
         specifier: ^8.22.0
         version: 8.22.0
@@ -369,9 +375,18 @@ importers:
       '@nexus/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@nexus/council':
+        specifier: workspace:*
+        version: link:../../packages/council
+      '@nexus/debate-engine':
+        specifier: workspace:*
+        version: link:../../packages/debate-engine
       '@nexus/llm-drivers':
         specifier: workspace:*
         version: link:../../packages/llm-drivers
+      '@nexus/mcp-client':
+        specifier: workspace:*
+        version: link:../../packages/mcp-client
       '@nexus/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
@@ -588,6 +603,9 @@ importers:
       '@nexus/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@nexus/debate-engine':
+        specifier: workspace:*
+        version: link:../../packages/debate-engine
       '@nexus/domain-feeds':
         specifier: workspace:*
         version: link:../../packages/domain-feeds
@@ -667,6 +685,8 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/a2a-protocol: {}
 
   packages/adapters:
     dependencies:
@@ -1072,11 +1092,48 @@ importers:
         specifier: '*'
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
+  packages/adaptive-testing:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
   packages/admin-gateway:
     devDependencies:
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
+
+  packages/admission-control:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  packages/agent-audit-handlers:
+    devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+
+  packages/agent-authorization: {}
+
+  packages/agent-automation:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  packages/agent-checkpoint: {}
+
+  packages/agent-classifier:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
   packages/agent-diff:
     devDependencies:
@@ -1087,6 +1144,21 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
+  packages/agent-engine:
+    dependencies:
+      '@nexus/agent-runtime':
+        specifier: workspace:*
+        version: link:../agent-runtime
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/agent-network: {}
+
   packages/agent-orchestrator:
     devDependencies:
       typescript:
@@ -1096,8 +1168,19 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
+  packages/agent-protocol: {}
+
+  packages/agent-router:
+    dependencies:
+      '@nexus/llm-router':
+        specifier: workspace:*
+        version: link:../llm-router
+
   packages/agent-runtime:
     dependencies:
+      '@nexus/best-of-n':
+        specifier: workspace:*
+        version: link:../best-of-n
       '@nexus/llm-compress':
         specifier: workspace:*
         version: link:../llm-compress
@@ -1114,6 +1197,15 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^2.1.8
         version: 2.1.9(vitest@2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2))
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/ai-act-audit:
+    devDependencies:
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -1141,6 +1233,20 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/api-key-rotation:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  packages/async-inference:
+    devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+
+  packages/audit-logging: {}
 
   packages/auth:
     devDependencies:
@@ -1222,6 +1328,26 @@ importers:
         specifier: '*'
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
+  packages/browser-automation:
+    dependencies:
+      '@nexus/stealth-browser':
+        specifier: workspace:*
+        version: link:../stealth-browser
+
+  packages/budget-manager:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  packages/bulkhead:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  packages/chart-generator: {}
+
   packages/chat-analyst:
     devDependencies:
       typescript:
@@ -1249,6 +1375,8 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
+  packages/code-knowledge-graph: {}
+
   packages/code-map:
     devDependencies:
       '@vitest/coverage-v8':
@@ -1269,6 +1397,14 @@ importers:
       vitest:
         specifier: '*'
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/complexity-router:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  packages/confidence-circuit-breaker: {}
 
   packages/connectors:
     devDependencies:
@@ -1294,6 +1430,16 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
+  packages/context-assembly: {}
+
+  packages/context-builder: {}
+
+  packages/context-codec:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
   packages/context-pack:
     devDependencies:
       typescript:
@@ -1308,6 +1454,12 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/context-pruning:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
 
   packages/contracts:
     devDependencies:
@@ -1342,6 +1494,11 @@ importers:
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/council-config: {}
 
   packages/db:
     dependencies:
@@ -1370,6 +1527,36 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/debate-engine:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/deep-research:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/deliberation:
+    dependencies:
+      '@nexus/llm-router':
+        specifier: workspace:*
+        version: link:../llm-router
+
+  packages/disagreement-engine:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
 
   packages/discord-bot:
     devDependencies:
@@ -1435,6 +1622,26 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
+  packages/drift-detection:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  packages/elo-rating: {}
+
+  packages/embedded-kg:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  packages/ensemble-refinement:
+    dependencies:
+      '@nexus/llm-router':
+        specifier: workspace:*
+        version: link:../llm-router
+
   packages/evals:
     dependencies:
       '@nexus/plugin-sdk':
@@ -1453,6 +1660,8 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.21)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/execution-cache: {}
 
   packages/feature-flags:
     devDependencies:
@@ -1489,6 +1698,14 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/filesystem-debate:
+    dependencies:
+      '@nexus/llm-router':
+        specifier: workspace:*
+        version: link:../llm-router
+
+  packages/function-registry: {}
 
   packages/gateway:
     dependencies:
@@ -1533,6 +1750,14 @@ importers:
         specifier: '*'
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
+  packages/glicko-rating: {}
+
+  packages/gnn-router:
+    dependencies:
+      '@nexus/llm-router':
+        specifier: workspace:*
+        version: link:../llm-router
+
   packages/governance:
     dependencies:
       '@nexus/shared':
@@ -1548,6 +1773,27 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/graphrag-query:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/group-chat:
+    dependencies:
+      '@nexus/llm-router':
+        specifier: workspace:*
+        version: link:../llm-router
+
+  packages/heuristic-classifier:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
 
   packages/hf-research:
     devDependencies:
@@ -1579,7 +1825,22 @@ importers:
         specifier: '*'
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
+  packages/human-operator: {}
+
+  packages/human-review:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+
   packages/hybrid-search:
+    dependencies:
+      '@nexus/reranker':
+        specifier: workspace:*
+        version: link:../reranker
+      '@nexus/retrieval':
+        specifier: workspace:*
+        version: link:../retrieval
     devDependencies:
       typescript:
         specifier: ^5.6.3
@@ -1622,6 +1883,39 @@ importers:
         specifier: '*'
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
+  packages/intelligence-hub:
+    dependencies:
+      '@nexus/admission-control':
+        specifier: workspace:*
+        version: link:../admission-control
+      '@nexus/agent-checkpoint':
+        specifier: workspace:*
+        version: link:../agent-checkpoint
+      '@nexus/api-key-rotation':
+        specifier: workspace:*
+        version: link:../api-key-rotation
+      '@nexus/budget-manager':
+        specifier: workspace:*
+        version: link:../budget-manager
+      '@nexus/complexity-router':
+        specifier: workspace:*
+        version: link:../complexity-router
+      '@nexus/context-pruning':
+        specifier: workspace:*
+        version: link:../context-pruning
+      '@nexus/disagreement-engine':
+        specifier: workspace:*
+        version: link:../disagreement-engine
+      '@nexus/drift-detection':
+        specifier: workspace:*
+        version: link:../drift-detection
+      '@nexus/heuristic-classifier':
+        specifier: workspace:*
+        version: link:../heuristic-classifier
+      '@nexus/mixture-of-agents':
+        specifier: workspace:*
+        version: link:../mixture-of-agents
+
   packages/knowledge-graph:
     devDependencies:
       '@vitest/coverage-v8':
@@ -1633,6 +1927,8 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/knowledge-graph-lite: {}
 
   packages/kv:
     devDependencies:
@@ -1666,6 +1962,12 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/llm-arena:
+    dependencies:
+      '@nexus/llm-router':
+        specifier: workspace:*
+        version: link:../llm-router
 
   packages/llm-cache:
     devDependencies:
@@ -1713,6 +2015,8 @@ importers:
       vitest:
         specifier: '*'
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/llm-gateway: {}
 
   packages/llm-oauth:
     devDependencies:
@@ -1850,6 +2154,10 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
+  packages/memory-consolidation: {}
+
+  packages/memory-scoring: {}
+
   packages/memory-tools:
     devDependencies:
       '@vitest/coverage-v8':
@@ -1861,6 +2169,21 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/mission-engine:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/mixture-of-agents:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
 
   packages/multi-reviewer:
     devDependencies:
@@ -1943,6 +2266,8 @@ importers:
         specifier: '*'
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
+  packages/prediction-backtest: {}
+
   packages/prediction-market:
     devDependencies:
       typescript:
@@ -1960,6 +2285,8 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/proposal-system: {}
 
   packages/provider-registry:
     devDependencies:
@@ -1979,10 +2306,22 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
+  packages/rag-modes:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
   packages/ragtime:
     devDependencies:
       typescript:
         specifier: '*'
+        version: 5.9.3
+
+  packages/rate-limiter:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
         version: 5.9.3
 
   packages/redteam:
@@ -1996,6 +2335,8 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/request-hooks: {}
 
   packages/reranker:
     devDependencies:
@@ -2015,7 +2356,19 @@ importers:
         specifier: '*'
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
+  packages/resource-manager: {}
+
+  packages/resumable-streams:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
   packages/retrieval:
+    dependencies:
+      '@nexus/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       '@vitest/coverage-v8':
         specifier: ^2.1.8
@@ -2027,6 +2380,12 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
+  packages/rl-router:
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
   packages/rlhf-pipeline:
     devDependencies:
       typescript:
@@ -2035,6 +2394,12 @@ importers:
       vitest:
         specifier: '*'
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/routing-policy:
+    devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
 
   packages/run-cost:
     devDependencies:
@@ -2091,6 +2456,9 @@ importers:
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
   packages/scenario-planner:
     devDependencies:
@@ -2135,6 +2503,14 @@ importers:
         specifier: '*'
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
+  packages/secret-guardrail: {}
+
+  packages/self-improving-reasoning:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
   packages/session-sync:
     dependencies:
       '@neondatabase/serverless':
@@ -2169,6 +2545,12 @@ importers:
         specifier: ^2.1.4
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
+  packages/software-sop:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
   packages/spider:
     devDependencies:
       typescript:
@@ -2191,6 +2573,12 @@ importers:
     devDependencies:
       typescript:
         specifier: ^5.6.3
+        version: 5.9.3
+
+  packages/stance-library:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
         version: 5.9.3
 
   packages/stealth-browser:
@@ -2233,6 +2621,12 @@ importers:
         specifier: '*'
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
+  packages/swarm-graph:
+    dependencies:
+      '@nexus/llm-router':
+        specifier: workspace:*
+        version: link:../llm-router
+
   packages/task-queue:
     dependencies:
       '@nexus/knowledge-graph':
@@ -2273,6 +2667,14 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/temporal-kg:
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
+  packages/temporal-knowledge-graph: {}
 
   packages/think-parser:
     devDependencies:
@@ -2319,8 +2721,11 @@ importers:
   packages/ultraplinian:
     devDependencies:
       typescript:
-        specifier: '*'
+        specifier: ^5.6.3
         version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
   packages/video-search:
     devDependencies:
@@ -2374,6 +2779,12 @@ importers:
       vitest:
         specifier: '*'
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
+
+  packages/workflow-chain:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
 
 packages:
 

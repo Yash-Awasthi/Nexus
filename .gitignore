@@ -26,6 +26,9 @@ test-results/
 # Local runtime data stores (PersistentStore JSON files — dev state, not source)
 apps/api/data/stores/
 
+# Local runtime state under data/ (auth tokens, run ids — dev state, not source)
+data/.*
+
 # Python
 __pycache__/
 *.py[cod]
@@ -36,6 +39,9 @@ venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# Vendored Python runtime (embedded interpreter, dev convenience only)
+apps/api/Python/
 
 # OS
 .DS_Store
@@ -60,3 +66,6 @@ REF/
 
 # Local Claude Code config & worktrees (not part of the project)
 .claude/
+
+# Local dev tooling (portable Redis etc.)
+.local/

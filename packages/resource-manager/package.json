@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/resource-manager",
+  "version": "0.1.0",
+  "description": "GPU/CPU resource management with mutual exclusion and competing-group eviction",
+  "main": "src/index.ts"
+}

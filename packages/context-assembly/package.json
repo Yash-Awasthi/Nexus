@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/context-assembly",
+  "version": "0.1.0",
+  "description": "Composable context assembly and compaction strategies inspired by ag2",
+  "main": "src/index.ts"
+}

@@ -255,3 +255,61 @@ class LLMRouter:
             },
             "total_cost": self.total_cost
         }
+
+    # ---- Retry with exponential backoff (extracted from litellm) ----
+
+    def retry_with_backoff(
+        self,
+        request: RoutingRequest,
+        max_retries: int = 3,
+        base_delay: float = 1.0,
+        max_delay: float = 30.0,
+        jitter: bool = True,
+    ) -> RoutingResponse:
+        """Route a request with retry-on-failure and exponential backoff.
+
+        Extracted from litellm's retry/fallback pattern:
+        - Try the preferred provider first
+        - On failure, wait (exponential backoff + jitter) and retry
+        - After max_retries, fall back to next available provider
+        - Records each failure for health score updates
+        """
+        import random as _rng
+        last_error = None
+        for attempt in range(max_retries + 1):
+            response = self.route_request(request)
+            if not response.error:
+                return response
+            last_error = response.error
+            # Record the failure
+            if response.provider != "none":
+                self.record_failure(response.provider, last_error)
+            # Don't sleep on the last attempt
+            if attempt < max_retries:
+                delay = min(base_delay * (2 ** attempt), max_delay)
+                if jitter:
+                    delay = delay * (0.5 + _rng.random() * 0.5)
+                time.sleep(delay)
+            # On final retry, try fallback providers
+            if attempt == max_retries and request.fallback_allowed:
+                fallback_request = RoutingRequest(
+                    prompt=request.prompt,
+                    required_capabilities=request.required_capabilities,
+                    max_cost=request.max_cost,
+                    max_latency_ms=request.max_latency_ms,
+                    preferred_provider=None,  # Clear preference to allow any provider
+                    fallback_allowed=False,
+                    cache_key=request.cache_key,
+                )
+                fallback_response = self.route_request(fallback_request)
+                if not fallback_response.error:
+                    fallback_response.fallback_used = True
+                    return fallback_response
+        return RoutingResponse(
+            provider="none",
+            model="none",
+            latency_ms=0,
+            cost=0,
+            tokens_used=0,
+            error=f"All retries exhausted: {last_error}",
+        )

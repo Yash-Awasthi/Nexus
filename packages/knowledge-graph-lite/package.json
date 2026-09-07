@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/knowledge-graph-lite",
+  "version": "0.1.0",
+  "description": "Embedded knowledge graph with Cypher-like queries and text scoring",
+  "main": "src/index.ts"
+}

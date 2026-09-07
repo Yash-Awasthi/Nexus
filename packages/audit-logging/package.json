@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/audit-logging",
+  "version": "0.1.0",
+  "description": "Tamper-evident audit logging with SHA-256 hash chains for AI systems",
+  "main": "src/index.ts"
+}

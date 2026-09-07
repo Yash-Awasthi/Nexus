@@ -31,7 +31,7 @@ import type { FastifyInstance } from "fastify";
 
 import { emitAuditEvent } from "../lib/audit-emitter.js";
 import { sha256hex } from "../lib/crypto-utils.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuthWithTier } from "../middleware/auth.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -67,7 +67,7 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Body: { name: string; slug?: string } }>(
     "/workspaces",
     {
-      preHandler: requireAuth,
+      preHandler: requireAuthWithTier,
       schema: {
         body: {
           type: "object",
@@ -129,7 +129,7 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
   );
 
   /** GET /workspaces — list workspaces the caller belongs to */
-  app.get("/workspaces", { preHandler: requireAuth }, async (request, reply) => {
+  app.get("/workspaces", { preHandler: requireAuthWithTier }, async (request, reply) => {
     const userId = request.nexusUserId;
     if (!userId) return reply.send({ workspaces: [], total: 0 });
 
@@ -157,7 +157,7 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
   /** GET /workspaces/:id — workspace details (member+) */
   app.get<{ Params: { id: string } }>(
     "/workspaces/:id",
-    { preHandler: requireAuth },
+    { preHandler: requireAuthWithTier },
     async (request, reply) => {
       const userId = request.nexusUserId;
       const { id } = request.params;
@@ -186,7 +186,7 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Params: { id: string }; Body: { name?: string; slug?: string } }>(
     "/workspaces/:id",
     {
-      preHandler: requireAuth,
+      preHandler: requireAuthWithTier,
       schema: {
         body: {
           type: "object",
@@ -243,7 +243,7 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
   /** DELETE /workspaces/:id — soft-delete (owner only) */
   app.delete<{ Params: { id: string } }>(
     "/workspaces/:id",
-    { preHandler: requireAuth },
+    { preHandler: requireAuthWithTier },
     async (request, reply) => {
       const userId = request.nexusUserId;
       const { id } = request.params;
@@ -281,7 +281,7 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
   /** GET /workspaces/:id/members — list members (member+) */
   app.get<{ Params: { id: string } }>(
     "/workspaces/:id/members",
-    { preHandler: requireAuth },
+    { preHandler: requireAuthWithTier },
     async (request, reply) => {
       const userId = request.nexusUserId;
       const { id } = request.params;
@@ -322,7 +322,7 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
   }>(
     "/workspaces/:id/invitations",
     {
-      preHandler: requireAuth,
+      preHandler: requireAuthWithTier,
       schema: {
         body: {
           type: "object",
@@ -401,7 +401,7 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
   /** GET /workspaces/invitations/:token — accept invitation */
   app.get<{ Params: { token: string } }>(
     "/workspaces/invitations/:token",
-    { preHandler: requireAuth },
+    { preHandler: requireAuthWithTier },
     async (request, reply) => {
       const userId = request.nexusUserId;
       if (!userId) return reply.code(403).send({ error: "jwt_required" });
@@ -453,7 +453,7 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
   }>(
     "/workspaces/:id/members/:userId",
     {
-      preHandler: requireAuth,
+      preHandler: requireAuthWithTier,
       schema: {
         body: {
           type: "object",
@@ -528,7 +528,7 @@ export async function workspacesRoutes(app: FastifyInstance): Promise<void> {
   /** DELETE /workspaces/:id/members/:userId — remove member (admin+; owner can remove any) */
   app.delete<{ Params: { id: string; userId: string } }>(
     "/workspaces/:id/members/:userId",
-    { preHandler: requireAuth },
+    { preHandler: requireAuthWithTier },
     async (request, reply) => {
       const callerId = request.nexusUserId;
       const { id: workspaceId, userId: targetUserId } = request.params;

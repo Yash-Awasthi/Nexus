@@ -71,6 +71,12 @@ export interface RememberOptions {
   metadata?: Record<string, unknown>;
   /** TTL in seconds from now */
   ttl?: number;
+  /**
+   * Owner of the memory. When set, the entry is only visible to this userId
+   * (the stores enforce the ACL on list/search). Entries without a userId are
+   * system/shared and are never returned to a user-scoped query.
+   */
+  userId?: string;
 }
 
 // ── IEmbedder ─────────────────────────────────────────────────────────────────
@@ -926,6 +932,7 @@ export class MemoryManager {
       metadata: options.metadata ?? {},
       createdAt: now,
       ...(options.ttl !== undefined ? { expiresAt: now + options.ttl } : {}),
+      ...(options.userId !== undefined ? { userId: options.userId } : {}),
     };
 
     let saved: MemoryEntry;
@@ -1016,10 +1023,13 @@ export class MemoryManager {
   }
 
   /**
-   * Summarise the memory store (count, oldest, newest).
+   * Summarise the memory store (count, oldest, newest), optionally filtered to
+   * a single user so account A never sees account B's chunks.
    */
-  async stats(): Promise<{ total: number; oldest?: number; newest?: number }> {
-    const all = await this.store.list({ excludeExpired: false });
+  async stats(
+    filter?: MemoryFilter,
+  ): Promise<{ total: number; oldest?: number; newest?: number }> {
+    const all = await this.store.list({ ...filter, excludeExpired: false });
     if (all.length === 0) return { total: 0 };
     const times = all.map((e) => e.createdAt);
     return {

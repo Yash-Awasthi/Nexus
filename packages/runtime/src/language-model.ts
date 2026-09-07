@@ -124,7 +124,7 @@ class GroqModelProvider implements ILanguageModel {
 
   constructor(opts: { apiKey: string; model?: string }) {
     this.apiKey = opts.apiKey;
-    this.model = opts.model ?? "llama-3.3-70b-versatile";
+    this.model = opts.model ?? "openai/gpt-oss-120b";
     this.modelId = `groq:${this.model}`;
   }
 

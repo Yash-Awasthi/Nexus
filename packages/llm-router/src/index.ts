@@ -580,3 +580,17 @@ export class LLMRouter {
     this.latencyAvg.set(providerName, next);
   }
 }
+
+// ── Re-export additional routers ─────────────────────────────────────────────
+
+export { KNNRouter } from "./knn-router.js";
+export type { KNNModelProfile, KNNRouteResult, KNNRouterConfig } from "./knn-router.js";
+
+export { MLPRouter } from "./mlp-router.js";
+export type { MLPRouterConfig, MLPRouteResult, ActivationFn } from "./mlp-router.js";
+
+export { SVMRouter } from "./svm-router.js";
+export type { SVMRouterConfig, SVMRouteResult } from "./svm-router.js";
+
+export { MFBilinearRouter } from "./mf-router.js";
+export type { MFBilinearRouterConfig, MFModelProfile, MFRouteResult } from "./mf-router.js";

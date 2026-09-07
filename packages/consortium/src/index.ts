@@ -52,21 +52,21 @@ export type SpeedTier = "fast" | "standard" | "smart" | "power" | "ultra";
 
 const TIER_MODELS: Record<SpeedTier, readonly string[]> = {
   fast: [
-    "google/gemini-2.5-flash",
+    "google/gemini-3.6-flash",
     "deepseek/deepseek-chat",
-    "perplexity/sonar",
+    "perplexity/sonar-pro",
     "meta-llama/llama-3.1-8b-instruct",
-    "moonshotai/kimi-k2.5",
+    "moonshotai/kimi-k3",
     "openai/gpt-oss-20b",
     "google/gemini-3.1-flash-lite",
     "mistralai/mistral-small-3.2-24b-instruct",
   ],
   standard: [
-    "anthropic/claude-3.5-sonnet",
+    "anthropic/claude-sonnet-4-6",
     "deepseek/deepseek-v3.2",
     "openai/gpt-4o",
-    "google/gemini-2.5-pro",
-    "anthropic/claude-sonnet-4.6",
+    "google/gemini-3.6-flash",
+    "anthropic/claude-haiku-4-5",
     "mistralai/mixtral-8x22b-instruct",
     "meta-llama/llama-3.3-70b-instruct",
   ],

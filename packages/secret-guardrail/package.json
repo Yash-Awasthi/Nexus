@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/secret-guardrail",
+  "version": "0.1.0",
+  "description": "Secret detection and input sanitization guardrail",
+  "main": "src/index.ts"
+}

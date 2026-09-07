@@ -2,16 +2,21 @@
 /**
  * Dashboard — main landing page after login.
  *
- * Pulls live data from:
- *   GET /api/analytics/overview  — conversations, tokens, cost, latency
- *   GET /api/connectors?limit=100 — connector count + error count
- *   GET /api/research?limit=3    — recent research jobs
+ * Composition over three owners, so each concern lives in one place:
+ *   - useDashboard (hooks/use-dashboard.ts)   — usage stats/series/research,
+ *                                               health, connectors, providers
+ *   - NotificationsContext                    — the notification tray (bell +
+ *                                               this page's Activity card render
+ *                                               the same state)
+ *   - listThreads (lib/deliberate.ts)         — recent deliberations (per-user
+ *                                               API; localStorage only as an
+ *                                               offline cache + ghost migration)
  *
  * Falls back gracefully to zeros/empty when any call fails.
  */
 
-import { useState, useEffect, useCallback } from "react";
-import { Link } from "react-router";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router";
 import {
   MessageSquare,
   Plus,
@@ -26,17 +31,33 @@ import {
   TrendingUp,
   Clock,
   DollarSign,
-  MemoryStick,
+  Activity,
   Loader2,
   CheckCircle2,
   XCircle,
+  Bell,
+  Cpu,
+  Database,
+  Server,
+  FolderOpen,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
+import { FeatureCard } from "~/components/FeatureCard";
+import { StatCard } from "~/components/StatCard";
 import { useAuth } from "~/context/AuthContext";
+import { useNotifications } from "~/context/NotificationsContext";
+import { listThreads } from "~/lib/deliberate";
+import { fmtCost, fmtLatency, fmtTokens } from "~/lib/format";
+import { useDashboard, type UsagePoint } from "~/hooks/use-dashboard";
 
 import type { Route } from "./+types/home";
+
+// Lazy chart — recharts must not run during SSR (see analytics-charts.tsx).
+const UsageChart = lazy(() =>
+  import("~/components/dashboard-charts").then((m) => ({ default: m.UsageChart })),
+);
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -49,16 +70,6 @@ export function clientLoader() {
   return {};
 }
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface AnalyticsOverview {
-  totalConversations: number;
-  totalMessages: number;
-  totalTokensUsed: number;
-  totalCostUsd: number;
-  avgLatencyMs: number;
-}
-
 interface StoredConv {
   id: string;
   title: string;
@@ -66,226 +77,149 @@ interface StoredConv {
   mode: string;
 }
 
-interface ResearchJob {
-  id: string;
-  query: string;
-  status: string;
-  createdAt: string;
-}
+const RECENT_ACTIVITY = 5;
 
-interface ProviderStatus {
-  id: string;
-  name: string;
-  models: number;
-  connected: boolean;
-}
+type WindowKey = "today" | "7d" | "30d";
 
-// ── Stat card ─────────────────────────────────────────────────────────────────
+const WINDOWS: { key: WindowKey; label: string; days: number }[] = [
+  { key: "today", label: "Today", days: 1 },
+  { key: "7d", label: "7 days", days: 7 },
+  { key: "30d", label: "30 days", days: 30 },
+];
 
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  sub,
-  color = "text-primary",
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  sub?: string;
-  color?: string;
-}) {
-  return (
-    <Card>
-      <CardContent className="pt-5 pb-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="text-2xl font-bold mt-1 tracking-tight">{value}</p>
-            {sub && <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>}
-          </div>
-          <div className={`p-2 rounded-lg bg-primary/10 ${color}`}>
-            <Icon className="size-4" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+const windowLabel = (w: WindowKey) => WINDOWS.find((x) => x.key === w)!.label.toLowerCase();
+
+/** Sum the series rows inside a window (today = the newest row). */
+function windowSums(series: UsagePoint[] | undefined, w: WindowKey) {
+  const rows = (series ?? []).slice(-(w === "today" ? 1 : w === "7d" ? 7 : 30));
+  return rows.reduce(
+    (acc, r) => ({
+      requests: acc.requests + r.requests,
+      tokens: acc.tokens + r.tokens,
+      costUsd: acc.costUsd + r.costUsd,
+    }),
+    { requests: 0, tokens: 0, costUsd: 0 },
   );
 }
 
-// ── Feature shortcut ───────────────────────────────────────────────────────────
-
-function FeatureCard({
-  icon: Icon,
-  label,
-  description,
-  to,
-  color,
-}: {
-  icon: React.ElementType;
-  label: string;
-  description: string;
-  to: string;
-  color: string;
-}) {
-  return (
-    <Link
-      to={to}
-      className="group flex items-start gap-3 p-3 rounded-xl transition-colors hover:bg-muted/50"
-      style={{ border: "1px solid hsl(var(--border)/0.5)" }}
-    >
-      <div className={`p-2 rounded-lg shrink-0 ${color}`}>
-        <Icon className="size-4" />
-      </div>
-      <div className="min-w-0">
-        <p className="text-sm font-medium group-hover:text-primary transition-colors">{label}</p>
-        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{description}</p>
-      </div>
-      <ArrowRight className="size-3.5 shrink-0 mt-1 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-    </Link>
-  );
+/** Rows the chart draws: the window itself, or the trailing week for Today. */
+function windowRows(series: UsagePoint[] | undefined, w: WindowKey) {
+  const rows = series ?? [];
+  return w === "today" ? rows.slice(-7) : rows.slice(-(w === "7d" ? 7 : 30));
 }
-
-// ── Main component ─────────────────────────────────────────────────────────────
 
 export default function Home() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const { dash, health, connectorCount, providers, loading, refreshing, refresh } = useDashboard();
+  const { items: notifications, unread, markRead, refresh: refreshTray } = useNotifications();
 
-  // Local state
+  // Stat window — one control drives the cards and the chart.
+  const [window, setWindow] = useState<WindowKey>("7d");
+
+  // Recent deliberations come from the threads bridge (per-user API with a
+  // localStorage offline cache + one-time ghost migration) — one owner, one
+  // mapping, no page-local fetch/fallback copy.
   const [recentConvs, setRecentConvs] = useState<StoredConv[]>([]);
-  const [analytics, setAnalytics] = useState<AnalyticsOverview | null>(null);
-  const [connectorCount, setConnectorCount] = useState<{ total: number; errors: number } | null>(
-    null,
-  );
-  const [recentResearch, setRecentResearch] = useState<ResearchJob[]>([]);
-  const [providers, setProviders] = useState<ProviderStatus[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  // Load from localStorage
   useEffect(() => {
-    if (!user?.id) return;
-    try {
-      const raw = localStorage.getItem(`nexus-chats-${user.id}`);
-      const all: StoredConv[] = raw ? JSON.parse(raw) : [];
-      setRecentConvs(all.slice(0, 5));
-    } catch {
-      setRecentConvs([]);
-    }
-  }, [user?.id]);
-
-  // Fetch live stats
-  const fetchStats = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    else setRefreshing(true);
-
-    await Promise.allSettled([
-      // Analytics overview
-      fetch("/api/analytics/overview")
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data) => {
-          if (data) setAnalytics(data);
-        })
-        .catch(() => {}),
-
-      // Connector summary
-      fetch("/api/v1/connectors?limit=100")
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data) => {
-          if (!data) return;
-          const list = data.connectors ?? [];
-          setConnectorCount({
-            total: list.length,
-            errors: list.filter((c: any) => c.status === "error").length,
-          });
-        })
-        .catch(() => {}),
-
-      // Recent research jobs
-      fetch("/api/research?limit=3")
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data) => {
-          if (data?.jobs) setRecentResearch(data.jobs);
-        })
-        .catch(() => {}),
-
-      // Provider status
-      fetch("/api/providers")
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data) => {
-          if (!data?.providers) return;
-          const connected = new Map<string, number>();
-          for (const p of data.providers as any[]) {
-            const key = (p.provider ?? p.type ?? "custom").toLowerCase();
-            connected.set(key, (connected.get(key) ?? 0) + (p.model ? 1 : 0));
-          }
-          const DISPLAY: Record<string, string> = {
-            openai: "OpenAI",
-            anthropic: "Anthropic",
-            google: "Google Gemini",
-            groq: "Groq",
-            ollama: "Ollama",
-            openrouter: "OpenRouter",
-            mistral: "Mistral",
-          };
-          setProviders(
-            ["openai", "anthropic", "google", "groq", "ollama", "openrouter", "mistral"].map(
-              (id) => ({
-                id,
-                name: DISPLAY[id] ?? id,
-                models: connected.get(id) ?? 0,
-                connected: connected.has(id),
-              }),
-            ),
-          );
-        })
-        .catch(() => {}),
-    ]);
-
-    setLoading(false);
-    setRefreshing(false);
+    let cancelled = false;
+    (async () => {
+      const threads = await listThreads();
+      if (cancelled) return;
+      setRecentConvs(
+        threads.slice(0, 5).map((t) => ({
+          id: t.id,
+          title: t.title,
+          date: new Date(t.updated_at).toLocaleDateString(),
+          mode: t.mode ?? "",
+        })),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+  const stats = dash?.stats;
+  const research = dash?.research;
+  const sums = windowSums(dash?.series, window);
+  const chartData = windowRows(dash?.series, window);
+  const todayDate = dash?.series.at(-1)?.date;
+  const ollama = providers.find((p) => p.id === "ollama");
+  // /health/ready reports checks as { db: "ok" | "degraded" | "down", kv: … }
+  const dbOk = health?.db === "ok";
+  const kvOk = health?.kv === "ok";
 
   const displayName = user?.username ?? "there";
 
-  // Format helpers
-  const fmtTokens = (n: number) =>
-    n >= 1_000_000
-      ? `${(n / 1_000_000).toFixed(1)}M`
-      : n >= 1_000
-        ? `${(n / 1_000).toFixed(1)}k`
-        : String(n);
-
-  const fmtCost = (usd: number) =>
-    usd < 0.01 ? `$${(usd * 100).toFixed(2)}¢` : `$${usd.toFixed(2)}`;
-
-  const fmtLatency = (ms: number) =>
-    ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`;
+  // Activity click: mark read via the shared tray owner, then follow the link
+  // when one is attached (emitters set /deep-research?id=… or /projects).
+  const openNotification = (id: string, link?: string) => {
+    const n = notifications.find((x) => x.id === id);
+    if (n && !n.isRead) void markRead(n.id);
+    if (link) navigate(link);
+  };
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="p-6 space-y-6 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Welcome back, {displayName}</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Your private AI deliberation workspace
           </p>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8 text-muted-foreground"
-          onClick={() => fetchStats(true)}
-          disabled={refreshing}
-          title="Refresh stats"
-        >
-          <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 text-muted-foreground"
+            onClick={() => void refresh(true)}
+            disabled={refreshing}
+            title="Refresh stats"
+          >
+            <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
+          </Button>
+          <Button size="sm" className="h-8 gap-1.5" asChild>
+            <Link to="/chat">
+              <Plus className="size-3.5" /> New Deliberation
+            </Link>
+          </Button>
+        </div>
+      </div>
+
+      {/* System health strip */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mr-1">
+          System
+        </span>
+        {[
+          { key: "api", label: "API", ok: true, icon: Server },
+          { key: "db", label: "Database", ok: dbOk, icon: Database },
+          { key: "kv", label: "Redis KV", ok: kvOk, icon: Cpu },
+          { key: "ollama", label: "Ollama", ok: ollama?.connected, icon: Brain },
+        ].map((s) => (
+          <span
+            key={s.key}
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium border ${
+              s.ok === true
+                ? "text-green-400 border-green-400/20 bg-green-400/5"
+                : s.ok === false
+                  ? "text-destructive border-destructive/20 bg-destructive/5"
+                  : "text-muted-foreground border-border bg-muted/30"
+            }`}
+          >
+            {s.ok === true ? (
+              <CheckCircle2 className="size-3" />
+            ) : s.ok === false ? (
+              <XCircle className="size-3" />
+            ) : (
+              <Loader2 className="size-3 animate-spin" />
+            )}
+            {s.label}
+          </span>
+        ))}
       </div>
 
       {/* Stat cards */}
@@ -303,30 +237,34 @@ export default function Home() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard
             icon={MessageSquare}
-            label="Deliberations"
-            value={String(analytics?.totalConversations ?? 0)}
-            sub={`${analytics?.totalMessages ?? 0} messages`}
+            label="Requests"
+            value={String(sums.requests)}
+            sub={windowLabel(window)}
             color="text-blue-400"
           />
           <StatCard
             icon={Brain}
             label="Tokens Used"
-            value={fmtTokens(analytics?.totalTokensUsed ?? 0)}
-            sub="lifetime total"
+            value={fmtTokens(sums.tokens)}
+            sub={windowLabel(window)}
             color="text-purple-400"
           />
           <StatCard
             icon={DollarSign}
-            label="Total Cost"
-            value={fmtCost(analytics?.totalCostUsd ?? 0)}
-            sub="USD all time"
+            label="Cost"
+            value={fmtCost(sums.costUsd)}
+            sub={`USD · ${windowLabel(window)}`}
             color="text-green-400"
           />
           <StatCard
             icon={Clock}
             label="Avg Latency"
-            value={analytics?.avgLatencyMs ? fmtLatency(analytics.avgLatencyMs) : "—"}
-            sub="per response"
+            value={stats?.latencyP50ms ? fmtLatency(stats.latencyP50ms) : "—"}
+            sub={
+              stats?.errorRate
+                ? `${(stats.errorRate * 100).toFixed(2)}% errors`
+                : "p50 · per response"
+            }
             color="text-amber-400"
           />
         </div>
@@ -334,8 +272,58 @@ export default function Home() {
 
       {/* Main content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Deliberations — 2/3 width */}
+        {/* Left 2/3 */}
         <div className="lg:col-span-2 space-y-4">
+          {/* 7-day usage */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 gap-2 flex-wrap">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <TrendingUp className="size-3.5 text-primary" /> Usage — {windowLabel(window)}
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-0.5 rounded-lg border border-border p-0.5">
+                  {WINDOWS.map((w) => (
+                    <button
+                      key={w.key}
+                      onClick={() => setWindow(w.key)}
+                      className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
+                        window === w.key
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {w.label}
+                    </button>
+                  ))}
+                </div>
+                <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
+                  <Link to="/costs">Cost Analytics</Link>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {dash ? (
+                <Suspense
+                  fallback={
+                    <div className="flex items-center justify-center h-[200px] text-xs text-muted-foreground">
+                      Loading chart…
+                    </div>
+                  }
+                >
+                  <UsageChart
+                    data={chartData}
+                    highlightDate={window === "today" ? todayDate : undefined}
+                  />
+                </Suspense>
+              ) : (
+                <div className="flex items-center justify-center h-[200px] text-xs text-muted-foreground">
+                  No usage data yet — run a deliberation to see it here.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Recent Deliberations */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-3">
               <CardTitle className="text-sm font-semibold">Recent Deliberations</CardTitle>
@@ -396,27 +384,34 @@ export default function Home() {
           </Card>
 
           {/* Recent Research */}
-          {recentResearch.length > 0 && (
+          {research && research.recent.length > 0 && (
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-3">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <Search className="size-3.5 text-primary" /> Deep Research
+                  {research.running > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-normal text-amber-400">
+                      <Loader2 className="size-3 animate-spin" />
+                      {research.running} running
+                    </span>
+                  )}
                 </CardTitle>
                 <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
                   <Link to="/deep-research">Open</Link>
                 </Button>
               </CardHeader>
               <CardContent className="pt-0 space-y-0.5">
-                {recentResearch.map((job) => (
-                  <div
+                {research.recent.map((job) => (
+                  <Link
                     key={job.id}
+                    to={`/deep-research?id=${job.id}`}
                     className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-muted/40 transition-colors text-sm"
                   >
                     <span
                       className={`text-[10px] font-mono shrink-0 ${
                         job.status === "done"
                           ? "text-green-400"
-                          : job.status === "failed"
+                          : job.status === "error" || job.status === "failed"
                             ? "text-destructive"
                             : "text-amber-400"
                       }`}
@@ -427,15 +422,75 @@ export default function Home() {
                     <span className="text-[10px] text-muted-foreground shrink-0">
                       {new Date(job.createdAt).toLocaleDateString()}
                     </span>
-                  </div>
+                  </Link>
                 ))}
               </CardContent>
             </Card>
           )}
         </div>
 
-        {/* Right column — 1/3 width */}
+        {/* Right 1/3 */}
         <div className="space-y-4">
+          {/* Activity — the shared notification tray */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Bell className="size-3.5 text-primary" /> Activity
+                {unread > 0 && <Badge className="text-[10px] h-4 px-1.5">{unread} new</Badge>}
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => void refreshTray()}
+              >
+                <RefreshCw className="size-3 mr-1" />
+                Refresh
+              </Button>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {notifications.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
+                  <Bell className="size-6 text-muted-foreground/30" />
+                  <p className="text-xs text-muted-foreground">
+                    Nothing yet — research jobs and autopilot runs appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {notifications.slice(0, RECENT_ACTIVITY).map((n) => (
+                    <button
+                      key={n.id}
+                      onClick={() => openNotification(n.id, n.link)}
+                      className={`w-full text-left flex items-start gap-2.5 rounded-lg px-3 py-2 transition-colors hover:bg-muted/40 ${
+                        n.isRead ? "opacity-60" : ""
+                      }`}
+                    >
+                      {!n.isRead && (
+                        <span className="mt-1.5 size-1.5 rounded-full bg-primary shrink-0" />
+                      )}
+                      <div className={`flex-1 min-w-0 ${n.isRead ? "pl-3.5" : ""}`}>
+                        <p
+                          className={`text-xs font-medium leading-tight ${n.isRead ? "text-muted-foreground" : ""}`}
+                        >
+                          {n.title}
+                        </p>
+                        {n.message && (
+                          <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">
+                            {n.message}
+                          </p>
+                        )}
+                        <p className="text-[10px] text-muted-foreground/60 mt-1">
+                          {new Date(n.createdAt).toLocaleString()}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Connectors status */}
           <Card>
             <CardHeader className="pb-3">
@@ -457,7 +512,7 @@ export default function Home() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground text-xs">
-                      {connectorCount.total} connected
+                      {connectorCount.connected} connected · {connectorCount.total} total
                     </span>
                     {connectorCount.errors > 0 && (
                       <div className="flex items-center gap-1 text-destructive text-xs">
@@ -521,7 +576,7 @@ export default function Home() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <TrendingUp className="size-3.5 text-primary" /> Workspace
+                <Activity className="size-3.5 text-primary" /> Workspace
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0 space-y-1">
@@ -547,11 +602,11 @@ export default function Home() {
                 color="bg-blue-400/10 text-blue-400"
               />
               <FeatureCard
-                icon={MemoryStick}
-                label="STM Modules"
-                description="Active prompt injections"
-                to="/stm"
-                color="bg-purple-400/10 text-purple-400"
+                icon={FolderOpen}
+                label="Projects / Autopilot"
+                description="Autonomous project runs"
+                to="/projects"
+                color="bg-emerald-400/10 text-emerald-400"
               />
             </CardContent>
           </Card>

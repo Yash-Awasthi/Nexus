@@ -500,6 +500,26 @@ export class SearchOrchestrator {
 // ── Convenience factory ───────────────────────────────────────────────────────
 
 /**
+ * Adapt a {@link ChromaSearchStrategy} to @nexus/hybrid-search's
+ * {@link VectorSearchAdapter} so its hits feed the RRF fusion engine (the
+ * dense leg of {@link HybridSearchStrategy}). Pure object construction — no
+ * I/O until `search` is called.
+ */
+export function chromaAsVectorAdapter(chroma: ChromaSearchStrategy): VectorSearchAdapter {
+  return {
+    async search(query: string, limit: number): Promise<HybridSearchHit[]> {
+      const resp = await chroma.search({ query, maxResults: limit });
+      return resp.results.map((r) => ({
+        id: r.id,
+        score: r.score,
+        text: r.content,
+        metadata: r.metadata,
+      }));
+    },
+  };
+}
+
+/**
  * Build a default SearchOrchestrator wired to real backends when env vars are present.
  *
  * Priority:
@@ -519,20 +539,8 @@ export function createDefaultOrchestrator(strategies?: SearchStrategy[]): Search
   if (process.env.CHROMA_URL) {
     const chroma = new ChromaSearchStrategy();
     resolved.push(chroma);
-
     // Hybrid strategy: vector from Chroma + BM25 RRF fusion
-    const chromaAsVector: VectorSearchAdapter = {
-      async search(query: string, limit: number): Promise<HybridSearchHit[]> {
-        const resp = await chroma.search({ query, maxResults: limit });
-        return resp.results.map((r) => ({
-          id: r.id,
-          score: r.score,
-          text: r.content,
-          metadata: r.metadata,
-        }));
-      },
-    };
-    resolved.push(new HybridSearchStrategy(chromaAsVector));
+    resolved.push(new HybridSearchStrategy(chromaAsVectorAdapter(chroma)));
   }
 
   if (process.env.DATABASE_URL) {

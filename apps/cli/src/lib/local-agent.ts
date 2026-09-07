@@ -24,6 +24,15 @@ import {
 } from "@nexus/agent-runtime";
 import { AnthropicDriver, GroqDriver, OpenRouterDriver } from "@nexus/llm-drivers";
 
+import { toolTranscriptEvent, type CouncilTranscript } from "@nexus/council";
+import type { BM25SearchAdapter, VectorSearchAdapter } from "@nexus/hybrid-search";
+import type { Reranker } from "@nexus/reranker";
+import {
+  councilRuntimeToolsFromLlm,
+  debateRuntimeToolFromLlm,
+  hybridSearchRuntimeTools,
+} from "./deliberation-tools.js";
+
 const DEFAULT_MAX_OUTPUT = 64 * 1024;
 const DEFAULT_CMD_TIMEOUT = 30_000;
 
@@ -210,6 +219,13 @@ export function makeLocalLlm(provider: string, model?: string, apiKey?: string):
   return llmDriverToToolFn(driver satisfies LlmToolDriver);
 }
 
+export interface ToolTranscriptEvent {
+  level: "info";
+  event: "tool.transcript";
+  taskId?: string;
+  transcript: CouncilTranscript;
+}
+
 export interface LocalAgentOptions {
   instruction: string;
   /** Workspace root the tools are confined to. */
@@ -225,12 +241,45 @@ export interface LocalAgentOptions {
   /** Injectable LLM (test seam). When omitted, a driver is built from provider+key. */
   llm?: LlmToolFn;
   signal?: AbortSignal;
+  /** Opt-in: serve the council protocols + converging debate as runtime tools. */
+  deliberation?: boolean;
+  /**
+   * Opt-in: serve the pass-69 hybrid single-query tool (`hybrid__hybrid_search`)
+   * over caller-supplied corpus adapters. Not registered by default — a local
+   * run has no corpus unless one is provided here.
+   */
+  retrieval?: {
+    /** Dense leg adapter over the caller's vector index. */
+    vector: VectorSearchAdapter;
+    /** Sparse leg adapter over the caller's BM25 index (e.g. InMemoryBM25). */
+    bm25: BM25SearchAdapter;
+    /** Optional post-fusion reranker. */
+    reranker?: Reranker;
+  };
+  /** Run id stamped onto emitted tool.transcript events (worker taskId parity). */
+  taskId?: string;
+  /** Structured tool.transcript emitter (worker-shaped event contract). */
+  onToolTranscript?: (event: ToolTranscriptEvent) => void;
 }
 
 /** Run the coding agent loop in-process and return the full run result. */
 export async function runLocalAgent(opts: LocalAgentOptions): Promise<ToolRuntimeResult> {
   const llm = opts.llm ?? makeLocalLlm(opts.provider ?? "anthropic", opts.model, opts.apiKey);
   const toolSet = buildLocalCodingTools(opts.rootDir, opts.enableShell ?? true);
+  const hooks = opts.onToolTranscript
+    ? {
+        onTranscript: (transcript: CouncilTranscript) =>
+          opts.onToolTranscript?.(toolTranscriptEvent(opts.taskId, transcript)),
+      }
+    : undefined;
+  if (opts.deliberation) {
+    for (const tool of await councilRuntimeToolsFromLlm(llm, { hooks })) toolSet.add(tool);
+    toolSet.add(debateRuntimeToolFromLlm(llm, { hooks }));
+  }
+  if (opts.retrieval) {
+    for (const tool of await hybridSearchRuntimeTools({ ...opts.retrieval, hooks }))
+      toolSet.add(tool);
+  }
   const runtime = new ToolAgentRuntime({
     llm,
     toolSet,

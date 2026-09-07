@@ -20,7 +20,7 @@ const RESPONSE = {
   type: "message" as const,
   role: "assistant" as const,
   content: [{ type: "text" as const, text: "Hi!" }],
-  model: "llama-3.3-70b-versatile",
+  model: "openai/gpt-oss-120b",
   stop_reason: "end_turn",
   usage: { input_tokens: 5, output_tokens: 3 },
 };

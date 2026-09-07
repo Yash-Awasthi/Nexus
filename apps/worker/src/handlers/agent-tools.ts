@@ -15,6 +15,18 @@ import { spawn } from "node:child_process";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
+/** Shell + argv prefix for `command` on this platform (POSIX sh / Windows cmd).
+ *  Agent-tools previously hardcoded /bin/sh, which ENOENTs on Windows. */
+function shellInvocation(command: string): { file: string; args: string[] } {
+  if (process.platform === "win32") {
+    // Verified on Windows: node serializes the arg, so passing the raw command
+    // with /d /s /c makes cmd.exe run it exactly (manual quote-wrapping makes
+    // cmd treat the whole quoted string as the program name). /d skips autorun.
+    return { file: process.env.ComSpec ?? "cmd.exe", args: ["/d", "/s", "/c", command] };
+  }
+  return { file: "/bin/sh", args: ["-c", command] };
+}
+
 import { RuntimeToolSet } from "@nexus/agent-runtime";
 import {
   buildSafeEnv,
@@ -106,8 +118,9 @@ function runCommand(
   // ── Docker path ──────────────────────────────────────────────────
   if (dockerConfig) {
     const runner = createDockerRunner(dockerConfig);
+    const si = shellInvocation(command);
     return new Promise((resolve) => {
-      runner("/bin/sh", ["-c", command], {
+      runner(si.file, si.args, {
         timeoutMs,
         env: safeEnv,
       })
@@ -130,7 +143,8 @@ function runCommand(
 
   // ── Direct subprocess path (scrubbed env) ────────────────────────
   return new Promise((resolve) => {
-    const child = spawn("/bin/sh", ["-c", command], { cwd, env: safeEnv });
+    const si = shellInvocation(command);
+    const child = spawn(si.file, si.args, { cwd, env: safeEnv });
     let out = "";
     let killed = false;
     const append = (d: Buffer): void => {

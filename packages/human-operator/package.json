@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/human-operator",
+  "version": "0.1.0",
+  "description": "Human-in-the-loop escalation for agent systems",
+  "main": "src/index.ts"
+}

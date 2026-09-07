@@ -1,0 +1,16 @@
+{
+  "name": "@nexus/context-codec",
+  "version": "0.1.0",
+  "description": "Content-addressed context blocks with deterministic ordering and provider-specific rendering",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

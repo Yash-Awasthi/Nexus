@@ -55,7 +55,7 @@ registry.register(new TavilyConnector({ apiKey: process.env.TAVILY_API_KEY ?? ""
 if (process.env.GITHUB_TOKEN) {
   registry.register(new GitHubConnector({ token: process.env.GITHUB_TOKEN }));
 } else {
-  registry.register(new NullConnector("github", "GitHub"));
+  registry.register(new NullConnector("github", "GitHub", { placeholder: true }));
 }
 
 if (process.env.DATABASE_URL) {
@@ -72,10 +72,10 @@ if (process.env.DATABASE_URL) {
       }),
     );
   } catch {
-    registry.register(new NullConnector("neon", "Neon DB"));
+    registry.register(new NullConnector("neon", "Neon DB", { placeholder: true }));
   }
 } else {
-  registry.register(new NullConnector("neon", "Neon DB"));
+  registry.register(new NullConnector("neon", "Neon DB", { placeholder: true }));
 }
 
 // Wire real connectors when credentials present; fall back to NullConnector
@@ -86,19 +86,19 @@ if (process.env.SLACK_BOT_TOKEN) {
     }),
   );
 } else if (!registry.get("slack")) {
-  registry.register(new NullConnector("slack", "Slack"));
+  registry.register(new NullConnector("slack", "Slack", { placeholder: true }));
 }
 
 if (process.env.LINEAR_API_KEY) {
   registry.register(new LinearConnector({ apiKey: process.env.LINEAR_API_KEY }));
 } else if (!registry.get("linear")) {
-  registry.register(new NullConnector("linear", "Linear"));
+  registry.register(new NullConnector("linear", "Linear", { placeholder: true }));
 }
 
 if (process.env.NOTION_API_KEY) {
   registry.register(new NotionConnector({ apiKey: process.env.NOTION_API_KEY }));
 } else if (!registry.get("notion")) {
-  registry.register(new NullConnector("notion", "Notion"));
+  registry.register(new NullConnector("notion", "Notion", { placeholder: true }));
 }
 
 if (process.env.BITBUCKET_TOKEN) {
@@ -111,7 +111,7 @@ if (process.env.BITBUCKET_TOKEN) {
     }),
   );
 } else if (!registry.get("bitbucket")) {
-  registry.register(new NullConnector("bitbucket", "Bitbucket"));
+  registry.register(new NullConnector("bitbucket", "Bitbucket", { placeholder: true }));
 }
 
 if (process.env.JIRA_HOST && process.env.JIRA_EMAIL && process.env.JIRA_API_TOKEN) {
@@ -123,16 +123,10 @@ if (process.env.JIRA_HOST && process.env.JIRA_EMAIL && process.env.JIRA_API_TOKE
     }),
   );
 } else if (!registry.get("jira")) {
-  registry.register(new NullConnector("jira", "Jira"));
+  registry.register(new NullConnector("jira", "Jira", { placeholder: true }));
 }
 
-// Static placeholder connectors for integrations without dedicated connector classes yet
-const PLACEHOLDER_CONNECTORS: { id: string; name: string }[] = [];
-for (const p of PLACEHOLDER_CONNECTORS) {
-  if (!registry.get(p.id)) {
-    registry.register(new NullConnector(p.id, p.name));
-  }
-}
+
 
 // ── Manual enabled/disabled state (overlay on top of registry) ───────────────
 
@@ -576,8 +570,10 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
 
   /**
    * GET /connectors/:id/oauth/credential
-   * Returns the decrypted credential (admin-only, for debugging).
-   * Remove or gate behind admin auth in production.
+   * Returns MASKED metadata about the stored credential (provider, scope,
+   * obtained-at). The raw token is decrypted server-side only at use time and
+   * is never returned over HTTP — a leaked token would compromise the
+   * connector's upstream account.
    */
   app.get<{ Params: { id: string } }>(
     "/connectors/:id/oauth/credential",
@@ -585,7 +581,7 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
       schema: {
         response: {
           200: { type: "object", additionalProperties: true },
-          201: { type: "object", additionalProperties: true },
+          404: { type: "object", additionalProperties: true },
         },
       },
       preHandler: requireAuth,
@@ -598,7 +594,22 @@ export async function connectorsRoutes(app: FastifyInstance): Promise<void> {
         return reply
           .code(500)
           .send({ error: "Failed to decrypt credential (check OAUTH_ENCRYPTION_KEY)" });
-      return reply.send(JSON.parse(decrypted) as Record<string, unknown>);
+      const credential = JSON.parse(decrypted) as {
+        accessToken?: string;
+        tokenType?: string;
+        scope?: string;
+        obtainedAt?: string;
+      };
+      // Masked only — never the token itself.
+      return reply.send({
+        connector: request.params.id,
+        tokenType: credential.tokenType ?? "bearer",
+        scope: credential.scope ?? null,
+        obtainedAt: credential.obtainedAt ?? null,
+        accessTokenMasked: credential.accessToken
+          ? `${credential.accessToken.slice(0, 4)}…${credential.accessToken.slice(-4)}`
+          : null,
+      });
     },
   );
 }

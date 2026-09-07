@@ -8,6 +8,7 @@ import {
   DefaultCloudflareDector,
   StealthPage,
   StealthBrowser,
+  buildContextOptions,
   type MockPageOptions,
   type StealthProfile,
 } from "../src/index.js";
@@ -380,5 +381,37 @@ describe("StealthBrowser", () => {
     await browser.acquire();
     await expect(browser.acquire()).rejects.toThrow("PagePool exhausted");
     await browser.close();
+  });
+});
+
+// ── buildContextOptions (per-context proxy) ───────────────────────────────────
+
+describe("buildContextOptions", () => {
+  it("strips undefined options but keeps defaults", () => {
+    const opts = buildContextOptions({});
+    expect(opts.userAgent).toBeTruthy(); // pool rotation default
+    expect(opts.viewport).toEqual({ width: 1280, height: 720 });
+    expect("locale" in opts).toBe(false);
+    expect("proxy" in opts).toBe(false);
+  });
+
+  it("passes an explicit proxy through verbatim", () => {
+    const proxy = { server: "http://gate.proxy:8080", username: "u", password: "p" };
+    const opts = buildContextOptions({ proxy });
+    expect(opts.proxy).toEqual(proxy);
+    expect(opts.extraHTTPHeaders).toBeUndefined();
+  });
+
+  it("honours explicit userAgent/locale/timezone", () => {
+    const opts = buildContextOptions({
+      userAgent: "Test/1.0",
+      locale: "de-DE",
+      timezone: "Europe/Berlin",
+    });
+    expect(opts).toMatchObject({
+      userAgent: "Test/1.0",
+      locale: "de-DE",
+      timezoneId: "Europe/Berlin",
+    });
   });
 });

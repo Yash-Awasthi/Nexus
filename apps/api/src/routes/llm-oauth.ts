@@ -26,6 +26,8 @@
  */
 import { timingSafeEqual } from "node:crypto";
 
+import { db } from "@nexus/db";
+import { oauthCredentials } from "@nexus/db/schema";
 import {
   registryFromEnv,
   type AuthProviderRegistry,
@@ -33,6 +35,7 @@ import {
   type OAuthTokens,
   type PendingAuth,
 } from "@nexus/llm-oauth";
+import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
 import { createOAuthTokenStore } from "../lib/oauth-token-store.js";
@@ -102,6 +105,49 @@ export function makeLlmOauthRoutes(deps: LlmOauthDeps = {}) {
     // ── Catalog ──────────────────────────────────────────────────────────────
     app.get("/llm-oauth/providers", async (_request, reply) => {
       return reply.send({ providers: getRegistry().catalog() });
+    });
+
+    // ── Status: what the current user has linked (auth) ────────────────────────
+    app.get("/llm-oauth/status", { preHandler: requireAuthWithTier }, async (request, reply) => {
+      const userId = request.nexusUserId;
+      if (!userId) return reply.code(401).send({ error: "unauthenticated" });
+      const catalog = getRegistry().catalog();
+      let rows: {
+        provider: string;
+        scope: string | null;
+        expiresAt: Date | null;
+        lastRefreshedAt: Date | null;
+        createdAt: Date;
+      }[] = [];
+      try {
+        rows = await db
+          .select({
+            provider: oauthCredentials.provider,
+            scope: oauthCredentials.scope,
+            expiresAt: oauthCredentials.expiresAt,
+            lastRefreshedAt: oauthCredentials.lastRefreshedAt,
+            createdAt: oauthCredentials.createdAt,
+          })
+          .from(oauthCredentials)
+          .where(eq(oauthCredentials.userId, userId));
+      } catch (err) {
+        app.log.error(err, "llm-oauth status: query failed");
+        return reply.code(503).send({ error: "status_unavailable" });
+      }
+      // Join with the catalog so the UI gets displayName + capability flags even
+      // for linked providers whose OAuth app is currently unconfigured.
+      const catalogById = new Map(catalog.map((p) => [p.id, p]));
+      const linked = rows.map((r) => ({
+        providerId: r.provider,
+        displayName: catalogById.get(r.provider)?.displayName ?? r.provider,
+        driverProvider: catalogById.get(r.provider)?.driverProvider ?? null,
+        supported: catalogById.get(r.provider)?.supported ?? false,
+        scope: r.scope,
+        expiresAt: r.expiresAt ? r.expiresAt.getTime() : null,
+        linkedAt: r.createdAt.getTime(),
+        lastRefreshedAt: r.lastRefreshedAt ? r.lastRefreshedAt.getTime() : null,
+      }));
+      return reply.send({ linked });
     });
 
     // ── Start login ────────────────────────────────────────────────────────────

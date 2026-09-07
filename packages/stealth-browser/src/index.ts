@@ -55,6 +55,13 @@ export interface StealthProfile {
   canvasNoise?: boolean;
   /** Inject WebGL noise to prevent GPU fingerprinting (default: true) */
   webGlNoise?: boolean;
+  /**
+   * Per-context network proxy (playwright/patchright proxy settings). Network
+   * identity is part of the fingerprint: cloakbrowser/nodriver/rayobrowse all
+   * treat a coherent proxy as core to looking like a real user, and per-context
+   * (not per-browser) is what makes per-session proxy rotation possible.
+   */
+  proxy?: { server: string; username?: string; password?: string; bypass?: string };
 }
 
 /** Navigate result interface definition. */
@@ -357,6 +364,31 @@ export class PatchrightPage implements BrowserPage {
  *   const driver = available ? new PatchrightDriver() : new MockBrowserDriver();
  *   const browser = new StealthBrowser({ driver });
  */
+/**
+ * Build patchright/playwright context options from a stealth profile (pure —
+ * testable without a browser). Undefined values are stripped to avoid
+ * patchright validation errors; `proxy` passes through verbatim when set.
+ */
+export function buildContextOptions(profile?: StealthProfile): Record<string, unknown> {
+  // Resolve user-agent: explicit → pool rotation → chromium default
+  const userAgent =
+    profile?.userAgent ?? pickRandomUserAgent(profile?.userAgentPool ?? DEFAULT_USER_AGENT_POOL);
+
+  const contextOptions: Record<string, unknown> = {
+    userAgent,
+    locale: profile?.locale,
+    timezoneId: profile?.timezone,
+    viewport: profile?.viewport ?? { width: 1280, height: 720 },
+    extraHTTPHeaders: profile?.extraHeaders,
+    proxy: profile?.proxy,
+  };
+
+  for (const k of Object.keys(contextOptions)) {
+    if (contextOptions[k] === undefined) delete contextOptions[k];
+  }
+  return contextOptions;
+}
+
 export class PatchrightDriver implements BrowserDriver {
   private _browser: PatchrightBrowserType | null = null;
   private _open = false;
@@ -433,22 +465,7 @@ export class PatchrightDriver implements BrowserDriver {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const browser = await this.ensureOpen();
 
-    // Resolve user-agent: explicit → pool rotation → chromium default
-    const userAgent =
-      profile?.userAgent ?? pickRandomUserAgent(profile?.userAgentPool ?? DEFAULT_USER_AGENT_POOL);
-
-    const contextOptions: Record<string, unknown> = {
-      userAgent,
-      locale: profile?.locale,
-      timezoneId: profile?.timezone,
-      viewport: profile?.viewport ?? { width: 1280, height: 720 },
-      extraHTTPHeaders: profile?.extraHeaders,
-    };
-
-    // Remove undefined values to avoid patchright validation errors
-    for (const k of Object.keys(contextOptions)) {
-      if (contextOptions[k] === undefined) delete contextOptions[k];
-    }
+    const contextOptions = buildContextOptions(profile);
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
     const context = await (browser as any).newContext(contextOptions);

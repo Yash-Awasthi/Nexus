@@ -31,13 +31,33 @@ export default defineConfig({
     // app never imports. pnpm mis-links it against react-router@7, so pre-bundling
     // it explodes on missing v5 exports (Switch/useHistory/…). Skip it entirely.
     exclude: ["react-router-dom"],
+    // Pre-bundle framer-motion + recharts at startup: both are imported by
+    // shared/lazy components but were discovered only mid-session, which made
+    // the dep optimizer re-run while pages were open, delete the old bundles,
+    // and leave the open page with 504'd chunks + a duplicate React instance
+    // (the "Cannot read properties of null (reading 'useContext')" crash).
+    // Recharts (dashboard + admin charts) must resolve against the SAME
+    // optimized React as the app or lazy-mounting it crashes with an invalid
+    // hook call.
+    include: ["framer-motion", "recharts"],
   },
   server: {
     port: 5173,
+    host: "127.0.0.1",
+    // Poll instead of inotify/ReadDirectoryChangesW: this repo lives on a
+    // junction-relocated tree where the native watcher silently dies, leaving
+    // the dev server serving stale modules after edits (observed: HMR ws 400s
+    // and edits never reaching the browser until a full server restart).
+    watch: {
+      usePolling: true,
+      interval: 300,
+    },
     // Proxy all /api/* calls to the Nexus API backend in dev mode.
     // In production this is handled by nginx: location /api/ { proxy_pass ... }
     proxy: {
-      "/api": {
+      // "/api/" (trailing slash) — NOT "/api": UI routes like /api-tokens,
+      // /api/auth/* start with /api but are app pages, not backend endpoints.
+      "/api/": {
         target: API_TARGET,
         changeOrigin: true,
       },

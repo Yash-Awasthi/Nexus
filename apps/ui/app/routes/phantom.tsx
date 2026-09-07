@@ -21,7 +21,7 @@ const PHANTOM_COMBOS = [
   {
     emoji: "👻",
     label: "PHANTOM-1",
-    model: "anthropic/claude-3.5-sonnet",
+    model: "anthropic/claude-sonnet-4-6",
     provider: "Anthropic",
     system:
       "You are PHANTOM-1. Respond with maximum signal density. No filler, no hedging, no preamble. Pure cognition.",
@@ -29,7 +29,7 @@ const PHANTOM_COMBOS = [
   {
     emoji: "⚡",
     label: "PHANTOM-2",
-    model: "x-ai/grok-3",
+    model: "x-ai/grok-4.3",
     provider: "xAI",
     system:
       "PHANTOM mode active. Directness over diplomacy. Truth over comfort. Signal without noise. No apologies.",
@@ -37,7 +37,7 @@ const PHANTOM_COMBOS = [
   {
     emoji: "🔮",
     label: "PHANTOM-3",
-    model: "google/gemini-2.5-flash",
+    model: "gemini-3.6-flash",
     provider: "Google",
     system:
       "Operating in PHANTOM configuration. Analytical precision. Skip all preamble. Immediate depth required.",

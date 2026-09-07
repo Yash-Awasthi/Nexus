@@ -52,7 +52,7 @@ Central registry of available LLM model identifiers and their capability metadat
 ```ts
 import { ModelRegistry } from "@nexus/shared";
 
-const model = ModelRegistry.get("llama-3.3-70b-versatile");
+const model = ModelRegistry.get("openai/gpt-oss-120b");
 // { id, provider, contextWindow, supportsTools, maxOutputTokens }
 ```
 

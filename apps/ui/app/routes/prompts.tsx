@@ -66,7 +66,7 @@ async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-const MODELS = ["gpt-4o", "gpt-4o-mini", "claude-sonnet-4-6", "claude-haiku", "gemini-2.5-pro"];
+const MODELS = ["openai/gpt-oss-120b", "gpt-4o-mini", "claude-sonnet-4-6", "claude-haiku-4-5", "gemini-3.6-flash"];
 
 function extractVariables(content: string): string[] {
   const matches = content.match(/\{\{([^}]+)\}\}/g);

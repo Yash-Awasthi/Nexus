@@ -194,7 +194,7 @@ export default function KnowledgeGraph() {
         const data = await r.json();
         // API nodes carry `name`; the UI renders `label`. Normalise so node
         // labels (and .label.length) don't crash on undefined.
-        const nodes = (data.nodes ?? []).map((n: KGNode & { name?: string }) => ({
+        const nodes = (data.nodes ?? []).map((n: GraphNode & { name?: string }) => ({
           ...n,
           label: n.label ?? n.name ?? "",
         }));

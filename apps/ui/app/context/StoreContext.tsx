@@ -27,7 +27,7 @@ export interface CustomArchetype {
 const BUILTIN_MODELS = [
   { id: "gpt-4o", label: "GPT-4o" },
   { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
-  { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+  { id: "gemini-3.6-flash", label: "Gemini 3.6 Flash" },
   { id: "llama-3.3-70b", label: "Llama 3.3 70B" },
 ];
 

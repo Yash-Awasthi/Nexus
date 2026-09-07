@@ -47,6 +47,29 @@ function passesGate(priority: string): boolean {
   return sigIdx >= (minIdx === -1 ? 2 : minIdx);
 }
 
+// ── Listen connection URL ──────────────────────────────────────────────────────
+// LISTEN/NOTIFY does not work over Neon's pooled endpoint (pgBouncer-style
+// transaction pooling drops the session), so the listener must use the direct
+// endpoint. Prefer DATABASE_URL_DIRECT when set; otherwise derive the direct
+// URL from DATABASE_URL by stripping "-pooler" from the host and switching the
+// pooled port 5432 → direct 5433.
+function resolveListenUrl(): string | undefined {
+  if (process.env.DATABASE_URL_DIRECT) return process.env.DATABASE_URL_DIRECT;
+  const url = process.env.DATABASE_URL;
+  if (!url) return undefined;
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes("-pooler")) {
+      u.hostname = u.hostname.replace("-pooler", "");
+      if (u.port === "5432") u.port = "5433";
+      return u.toString();
+    }
+  } catch {
+    // fall through to the raw URL
+  }
+  return url;
+}
+
 // ── Parsed signal shape from pg_notify payload ────────────────────────────────
 
 interface NotifiedSignal {
@@ -120,7 +143,7 @@ export class SignalNotifyListener {
       };
 
       const client = new Client({
-        connectionString: process.env.DATABASE_URL,
+        connectionString: resolveListenUrl(),
         // Keep connection alive — not suitable for a pool
         keepAlive: true,
       });

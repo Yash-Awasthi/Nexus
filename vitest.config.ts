@@ -57,7 +57,12 @@ function buildNexusAliases(): ViteAlias[] {
 
 export default defineConfig({
   resolve: {
-    alias: buildNexusAliases(),
+    alias: [
+      ...buildNexusAliases(),
+      // UI `~` alias (matches apps/ui/vite.config.ts) so apps/ui/app tests and
+      // any lazy imports inside them resolve under the root vitest run.
+      { find: "~", replacement: resolve(__dirname, "apps/ui/app") },
+    ],
   },
   test: {
     globals: true,
@@ -66,6 +71,7 @@ export default defineConfig({
       "packages/*/tests/**/*.test.ts",
       "packages/*/src/**/*.test.ts",
       "apps/*/tests/**/*.test.ts",
+      "apps/ui/app/**/*.test.ts",
     ],
     server: {
       deps: {

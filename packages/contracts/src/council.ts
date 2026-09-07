@@ -52,6 +52,8 @@ export interface CouncilRequest {
   budgetUsd?: number;
   /** Max wall-clock time for the deliberation in ms */
   timeoutMs?: number;
+  /** Number of archetypes to summon (2–5). Defaults to the council config. */
+  councilSize?: number;
 }
 
 export interface CouncilResponse {

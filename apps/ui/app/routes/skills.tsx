@@ -18,6 +18,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "~/components/ui/dialog";
 import {
@@ -40,6 +41,14 @@ import {
   FileText,
   Loader2,
   Trash2,
+  GitMerge,
+  Play,
+  CircleCheck,
+  CircleX,
+  Clock,
+  Sparkles,
+  Save,
+  RefreshCw,
 } from "lucide-react";
 
 interface Skill {
@@ -73,6 +82,183 @@ interface BackendSkill {
   version: string;
   parameters: Record<string, unknown>;
   createdAt: string;
+}
+
+interface MissionPhase {
+  phase: string;
+  iteration: number;
+  note?: string;
+  timestamp: string;
+}
+
+interface MissionReview {
+  score: number;
+  verdict: "accept" | "reject" | "unknown";
+  issues: string[];
+  suggestions: string[];
+  unparsed?: boolean;
+}
+
+interface CompressReport {
+  inputTokens: number;
+  outputTokens: number;
+  estimatedTokensSaved: number;
+  savedRatio: number;
+  keptSkills: { id: string; name: string; score: number }[];
+  droppedSkills: { id: string; name: string; score: number }[];
+  matchSource: "semantic" | "keyword";
+}
+
+interface CompressResponse {
+  composite: { name: string; description: string; code: string };
+  report: CompressReport & {
+    polished?: boolean;
+    polishTokens?: { inputTokens: number; outputTokens: number };
+    polishError?: string;
+    polishServedBy?: string;
+  };
+  skill?: BackendSkill;
+}
+
+interface MissionRecord {
+  id: string;
+  goal: string;
+  status: "running" | "completed" | "failed" | "aborted";
+  accepted: boolean;
+  iteration: number;
+  maxIterations: number;
+  phases: MissionPhase[];
+  actingSteps: number;
+  spawnCount: number;
+  lastReview?: MissionReview;
+  memoryFrom?: { missionId: string; outcome: string };
+  finalContent: string;
+  usage: { inputTokens: number; outputTokens: number; totalTokens: number };
+  error?: string;
+  skills?: { id: string; name: string }[];
+}
+
+const PHASE_LABELS: Record<string, string> = {
+  started: "Started",
+  thinking: "Thinking",
+  acting: "Acting",
+  spawning: "Spawning",
+  reviewing: "Reviewing",
+  improving: "Improving",
+  completed: "Completed",
+  failed: "Failed",
+  aborted: "Aborted",
+};
+
+/** Live view of a skill-execution mission: phases, review verdict, output.
+ *  `onContinue` renders a "Continue with Memory" action on terminal runs — it
+ *  re-runs the mission with the prior run's execution memory attached. */
+function MissionProgress({
+  mission,
+  onReset,
+  onContinue,
+}: {
+  mission: MissionRecord;
+  onReset: () => void;
+  onContinue?: () => void;
+}) {
+  const running = mission.status === "running";
+  return (
+    <div className="space-y-4 py-2">
+      {/* Status header */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          {running ? (
+            <Loader2 className="size-4 animate-spin text-primary shrink-0" />
+          ) : mission.status === "completed" && mission.accepted ? (
+            <CircleCheck className="size-4 text-green-500 shrink-0" />
+          ) : mission.status === "failed" || mission.status === "aborted" ? (
+            <CircleX className="size-4 text-destructive shrink-0" />
+          ) : (
+            <Clock className="size-4 text-muted-foreground shrink-0" />
+          )}
+          <span className="text-sm font-medium capitalize">{mission.status}</span>
+          {mission.lastReview && (
+            <Badge
+              variant={mission.lastReview.unparsed ? "secondary" : mission.lastReview.verdict === "accept" ? "default" : "destructive"}
+              className="text-[10px]"
+            >
+              {mission.lastReview.unparsed
+                ? "review inconclusive — no structured verdict"
+                : `review ${mission.lastReview.score}/100 — ${mission.lastReview.verdict}`}
+            </Badge>
+          )}
+          {mission.memoryFrom && (
+            <Badge variant="secondary" className="text-[10px]">
+              continuing from {mission.memoryFrom.missionId.slice(-8)} — {mission.memoryFrom.outcome}
+            </Badge>
+          )}
+        </div>
+        <span className="text-[10px] text-muted-foreground shrink-0">
+          iter {mission.iteration + 1}/{mission.maxIterations} · {mission.actingSteps} steps ·{" "}
+          {(mission.usage?.totalTokens ?? 0).toLocaleString()} tokens
+        </span>
+      </div>
+
+      {mission.skills && mission.skills.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {mission.skills.map((s) => (
+            <Badge key={s.id} variant="secondary" className="text-[10px]">
+              skill: {s.name}
+            </Badge>
+          ))}
+        </div>
+      )}
+
+      {/* Phase timeline */}
+      <div className="max-h-40 overflow-y-auto space-y-1.5 rounded-md border p-3">
+        {mission.phases.map((p, i) => (
+          <div key={i} className="flex items-start gap-2 text-xs">
+            <span className="text-muted-foreground shrink-0">
+              {new Date(p.timestamp).toLocaleTimeString()}
+            </span>
+            <span className="font-medium shrink-0">{PHASE_LABELS[p.phase] ?? p.phase}</span>
+            {p.note && <span className="text-muted-foreground truncate">{p.note}</span>}
+          </div>
+        ))}
+      </div>
+
+      {mission.error && (
+        <p className="text-xs text-destructive">
+          <CircleX className="inline size-3.5 mr-1" />
+          {mission.error}
+        </p>
+      )}
+
+      {/* Final output */}
+      {mission.finalContent && (
+        <div className="space-y-1.5">
+          <Label className="text-xs">Final output</Label>
+          <pre className="max-h-48 overflow-y-auto rounded-md bg-muted p-3 text-xs leading-relaxed whitespace-pre-wrap">
+            {mission.finalContent}
+          </pre>
+        </div>
+      )}
+
+      <DialogFooter>
+        {!running && onContinue && (
+          <Button onClick={onContinue} className="gap-2">
+            <RefreshCw className="size-3" />
+            Continue with Memory
+          </Button>
+        )}
+        {!running && (
+          <Button variant="outline" onClick={onReset} className="gap-2">
+            <Play className="size-3" />
+            Run Again
+          </Button>
+        )}
+        <Button variant="outline" onClick={onReset}>
+          Close
+        </Button>
+      </DialogFooter>
+    </div>
+  );
 }
 
 function normalizeLanguage(lang: string): Skill["language"] {
@@ -779,6 +965,180 @@ export default function SkillsPage() {
     code: "",
   });
 
+  // ── Skill compression (merge) ────────────────────────────────────────────
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [mergeSelected, setMergeSelected] = useState<Set<string>>(new Set());
+  const [mergeLoading, setMergeLoading] = useState(false);
+  const [mergeForm, setMergeForm] = useState({
+    name: "",
+    description: "",
+    deleteOriginals: true,
+    polish: false,
+  });
+  const [mergeNotice, setMergeNotice] = useState<string | null>(null);
+
+  // ── Task compression (composite skill) ───────────────────────────────────
+  const [compressOpen, setCompressOpen] = useState(false);
+  const [compressTask, setCompressTask] = useState("");
+  const [compressLoading, setCompressLoading] = useState(false);
+  const [compressResult, setCompressResult] = useState<CompressResponse | null>(null);
+  const [compressForm, setCompressForm] = useState({ polish: false, save: false });
+  const [compressError, setCompressError] = useState<string | null>(null);
+
+  const handleCompressSkills = async (save: boolean) => {
+    const ids = [...mergeSelected];
+    if (ids.length === 0 || !compressTask.trim()) return;
+    setCompressLoading(true);
+    setCompressError(null);
+    try {
+      const res = await apiFetch<CompressResponse>("/api/skills/compress", {
+        method: "POST",
+        body: JSON.stringify({
+          ids,
+          task: compressTask.trim(),
+          polish: compressForm.polish,
+          save,
+        }),
+      });
+      setCompressResult(res);
+      if (save && res.skill) refreshSkills();
+    } catch (e) {
+      setCompressError(e instanceof Error ? e.message : "Failed to compress skills");
+    } finally {
+      setCompressLoading(false);
+    }
+  };
+
+  const toggleMergeSelect = (id: string) => {
+    setMergeSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const refreshSkills = () => {
+    apiFetch<{ skills: BackendSkill[] }>("/api/skills")
+      .then(({ skills: list }) => setSkills(list.length > 0 ? list.map(toSkill) : EXAMPLE_SKILLS))
+      .catch(() => setSkills(EXAMPLE_SKILLS));
+  };
+
+  const handleMergeSkills = async () => {
+    const ids = [...mergeSelected];
+    if (ids.length < 2) return;
+    setMergeLoading(true);
+    setMergeNotice(null);
+    try {
+      const res = await apiFetch<{
+        skill: BackendSkill;
+        report: {
+          estimatedTokensSaved: number;
+          inputTokens: number;
+          outputTokens: number;
+          polished: boolean;
+          polishError?: string;
+          polishServedBy?: string;
+        };
+      }>("/api/skills/merge", {
+        method: "POST",
+        body: JSON.stringify({
+          ids,
+          name: mergeForm.name || undefined,
+          description: mergeForm.description || undefined,
+          deleteOriginals: mergeForm.deleteOriginals,
+          polish: mergeForm.polish,
+        }),
+      });
+      setMergeNotice(
+        `Merged ${ids.length} skills into “${res.skill.name}” — ` +
+          `~${res.report.estimatedTokensSaved.toLocaleString()} tokens saved` +
+          (res.report.polished
+            ? ` (AI-polished${res.report.polishServedBy ? ` via ${res.report.polishServedBy}` : ""})`
+            : res.report.polishError
+              ? " (AI polish failed — deterministic merge kept)"
+              : "") +
+          ` (${res.report.inputTokens.toLocaleString()} → ${res.report.outputTokens.toLocaleString()})`,
+      );
+      setMergeSelected(new Set());
+      setMergeOpen(false);
+      setMergeForm({ name: "", description: "", deleteOriginals: true, polish: false });
+      refreshSkills();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to merge skills");
+    } finally {
+      setMergeLoading(false);
+    }
+  };
+
+  // ── Skill execution (run as a mission — skills execute end-to-end) ─────
+  const [runSkill, setRunSkill] = useState<Skill | null>(null);
+  /** Composite mode: run a task-compressed composite (ids + task) as a mission
+   *  without saving it — the mission rebuilds it server-side at start. */
+  const [runComposite, setRunComposite] = useState<{
+    ids: string[];
+    task: string;
+    name: string;
+  } | null>(null);
+  const [runGoal, setRunGoal] = useState("");
+  const [runLoading, setRunLoading] = useState(false);
+  const [runMission, setRunMission] = useState<MissionRecord | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
+  const [runTerse, setRunTerse] = useState(true); // caveman-ponytail output style
+
+  useEffect(() => {
+    // Poll the mission while it's live; stop when it reaches a terminal state.
+    if (!runMission || runMission.status === "completed" || runMission.status === "failed" || runMission.status === "aborted") {
+      return;
+    }
+    const t = setInterval(() => {
+      apiFetch<MissionRecord>(`/api/missions/${runMission.id}`)
+        .then(setRunMission)
+        .catch(() => {
+          /* transient poll failure — keep trying */
+        });
+    }, 2000);
+    return () => clearInterval(t);
+  }, [runMission?.id, runMission?.status]);
+
+  const handleRunSkill = async (overrides?: { continueFrom?: string; goal?: string }) => {
+    const composite = runComposite;
+    if (!runSkill && !composite && !overrides?.continueFrom) return;
+    setRunLoading(true);
+    setRunError(null);
+    setRunMission(null);
+    try {
+      const goal =
+        overrides?.goal?.trim() ||
+        runGoal.trim() ||
+        (composite
+          ? `Execute the composite skill "${composite.name}" end-to-end: run its code, verify the output, and report the result.`
+          : runSkill
+            ? `Execute skill "${runSkill.name}" end-to-end: run its code, verify the output, and report the result.`
+            : "");
+      const record = await apiFetch<MissionRecord>("/api/missions", {
+        method: "POST",
+        body: JSON.stringify({
+          goal,
+          ...(composite
+            ? { compress: { ids: composite.ids, task: composite.task } }
+            : runSkill
+              ? { skillIds: [runSkill.id] }
+              : {}),
+          ...(overrides?.continueFrom ? { continueFrom: overrides.continueFrom } : {}),
+          maxIterations: 3,
+          think: true,
+          outputStyle: runTerse ? "ponytail" : "normal",
+        }),
+      });
+      setRunMission(record);
+    } catch (e) {
+      setRunError(e instanceof Error ? e.message : "Failed to start skill run");
+    } finally {
+      setRunLoading(false);
+    }
+  };
+
   // ── Load skills from API ─────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
@@ -909,6 +1269,14 @@ export default function SkillsPage() {
           </button>
         </div>
       )}
+      {mergeNotice && (
+        <div className="fixed top-14 right-4 z-50 bg-primary text-primary-foreground text-xs px-3 py-2 rounded-md shadow-lg flex items-center gap-2">
+          {mergeNotice}
+          <button onClick={() => setMergeNotice(null)} className="font-bold">
+            ✕
+          </button>
+        </div>
+      )}
       <div className="max-w-6xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -930,6 +1298,41 @@ export default function SkillsPage() {
             >
               <Upload className="size-4" />
               Import
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2"
+              disabled={mergeSelected.size < 2}
+              title={
+                mergeSelected.size < 2
+                  ? "Select at least two skills to merge"
+                  : "Compress selected skills into one"
+              }
+              onClick={() => setMergeOpen(true)}
+            >
+              <GitMerge className="size-4" />
+              Merge ({mergeSelected.size})
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2"
+              disabled={mergeSelected.size === 0}
+              title={
+                mergeSelected.size === 0
+                  ? "Select at least one skill"
+                  : "Compress the selected skills into one task-specific composite (token-optimized)"
+              }
+              onClick={() => {
+                setCompressOpen(true);
+                setCompressTask("");
+                setCompressResult(null);
+                setCompressError(null);
+              }}
+            >
+              <Sparkles className="size-4" />
+              Compress for Task ({mergeSelected.size})
             </Button>
             <Button size="sm" className="gap-2" onClick={() => setAddOpen(true)}>
               <Plus className="size-4" />
@@ -954,11 +1357,22 @@ export default function SkillsPage() {
           {filtered.map((skill) => (
             <Card
               key={skill.id}
-              className="cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all"
+              className={`cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all ${
+                mergeSelected.has(skill.id) ? "ring-2 ring-primary/50 bg-primary/5" : ""
+              }`}
             >
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-2">
-                  <CardTitle className="text-sm">{skill.name}</CardTitle>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${skill.name} for compress/merge`}
+                      className="size-3.5 accent-primary shrink-0"
+                      checked={mergeSelected.has(skill.id)}
+                      onChange={() => toggleMergeSelect(skill.id)}
+                    />
+                    <CardTitle className="text-sm truncate">{skill.name}</CardTitle>
+                  </div>
                   <Badge
                     variant="outline"
                     className={`text-[10px] shrink-0 ${languageColors[skill.language]}`}
@@ -976,8 +1390,7 @@ export default function SkillsPage() {
                     </Badge>
                   ))}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
+                <div className="flex items-center gap-2">                  <Button
                     size="sm"
                     variant="outline"
                     className="flex-1 gap-2 text-xs"
@@ -985,6 +1398,20 @@ export default function SkillsPage() {
                   >
                     <Code className="size-3" />
                     View Code
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1 gap-2 text-xs"
+                    title="Execute this skill end-to-end as a mission"
+                    onClick={() => {
+                      setRunSkill(skill);
+                      setRunGoal("");
+                      setRunMission(null);
+                      setRunError(null);
+                    }}
+                  >
+                    <Play className="size-3" />
+                    Run
                   </Button>
                   {/* Export dropdown */}
                   <DropdownMenu>
@@ -1066,6 +1493,377 @@ export default function SkillsPage() {
               <CodeViewer code={selectedSkill.code} />
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Run Skill Dialog — executes the skill end-to-end as a mission */}
+      <Dialog
+        open={!!runSkill || !!runComposite}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRunSkill(null);
+            setRunComposite(null);
+            setRunMission(null);
+            setRunError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Play className="size-4" />
+              {runComposite
+                ? `Run Mission: ${runComposite.name}`
+                : `Run Skill${runSkill ? `: ${runSkill.name}` : ""}`}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Executes the {runComposite ? "composite's" : "skill's"} code in the sandbox through the
+              mission harness — plan, run, inspect output, recover from failures, and verify.
+              You can watch it live below.
+            </DialogDescription>
+          </DialogHeader>
+
+          {!runMission ? (
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="rn-goal">Goal (optional)</Label>
+                <Textarea
+                  id="rn-goal"
+                  placeholder={`Execute ${runComposite ? `composite "${runComposite.name}"` : `skill "${runSkill?.name ?? ""}"`} end-to-end and verify its output`}
+                  className="min-h-[80px] text-xs leading-relaxed"
+                  value={runGoal}
+                  onChange={(e) => setRunGoal(e.target.value)}
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="size-3.5 accent-primary"
+                  checked={runTerse}
+                  onChange={(e) => setRunTerse(e.target.checked)}
+                />
+                Terse caveman-ponytail output (fewer output tokens)
+              </label>
+              {runError && (
+                <p className="text-xs text-destructive">
+                  <CircleX className="inline size-3.5 mr-1" />
+                  {runError}
+                </p>
+              )}
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setRunSkill(null);
+                    setRunComposite(null);
+                    setRunError(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={() => void handleRunSkill()} disabled={runLoading} className="gap-2">
+                  {runLoading ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Starting...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="size-4" />
+                      {runComposite ? "Run Mission" : "Run Skill"}
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <MissionProgress
+              mission={runMission}
+              onReset={() => setRunMission(null)}
+              onContinue={() => {
+                if (runMission) {
+                  void handleRunSkill({ continueFrom: runMission.id, goal: runMission.goal });
+                }
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Compress for Task Dialog — one task-specific composite skill */}
+      <Dialog
+        open={compressOpen}
+        onOpenChange={(open) => {
+          if (!open && !compressLoading) {
+            setCompressOpen(false);
+            setCompressResult(null);
+            setCompressError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="size-4" />
+              Compress {mergeSelected.size} Skills for a Task
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Generates ONE temporary composite skill containing only the capabilities relevant to
+              your task — optimized for context-token reduction, not just file organization.
+            </DialogDescription>
+          </DialogHeader>
+
+          {!compressResult ? (
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="cp-task">What are you building?</Label>
+                <Textarea
+                  id="cp-task"
+                  placeholder="e.g. build a frontend landing page with a hero section and responsive grid — but not the payment logic"
+                  className="min-h-[90px] text-xs leading-relaxed"
+                  value={compressTask}
+                  onChange={(e) => setCompressTask(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-4 text-sm">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="size-3.5 accent-primary"
+                    checked={compressForm.polish}
+                    onChange={(e) =>
+                      setCompressForm((f) => ({ ...f, polish: e.target.checked }))
+                    }
+                  />
+                  AI-polish the composite (uses LLM tokens)
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="size-3.5 accent-primary"
+                    checked={compressForm.save}
+                    onChange={(e) => setCompressForm((f) => ({ ...f, save: e.target.checked }))}
+                  />
+                  Save as a skill (off = temporary, for the current context only)
+                </label>
+              </div>
+              {compressError && (
+                <p className="text-xs text-destructive">
+                  <CircleX className="inline size-3.5 mr-1" />
+                  {compressError}
+                </p>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCompressOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => void handleCompressSkills(false)}
+                  disabled={!compressTask.trim() || compressLoading}
+                  className="gap-2"
+                >
+                  {compressLoading ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Compressing...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="size-4" />
+                      Compress
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4 py-2">
+              {/* Token report */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-md border p-2 text-center">
+                  <div className="text-lg font-semibold">
+                    {compressResult.report.inputTokens.toLocaleString()}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">tokens before</div>
+                </div>
+                <div className="rounded-md border p-2 text-center">
+                  <div className="text-lg font-semibold">
+                    {compressResult.report.outputTokens.toLocaleString()}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">tokens after</div>
+                </div>
+                <div className="rounded-md border p-2 text-center border-primary/40 bg-primary/5">
+                  <div className="text-lg font-semibold text-primary">
+                    {compressResult.report.estimatedTokensSaved.toLocaleString()}
+                    <span className="text-xs ml-1">
+                      ({(compressResult.report.savedRatio * 100).toFixed(0)}%)
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">tokens saved</div>
+                </div>
+              </div>
+
+              {/* Kept / dropped */}
+              <div className="flex flex-wrap gap-1">
+                <Badge variant="secondary" className="text-[10px]">
+                  matched by {compressResult.report.matchSource === "semantic" ? "semantic embeddings" : "keywords"}
+                </Badge>
+                {compressResult.report.keptSkills.map((s) => (
+                  <Badge key={s.id} variant="default" className="text-[10px]">
+                    kept: {s.name} ({s.score})
+                  </Badge>
+                ))}
+                {compressResult.report.droppedSkills.map((s) => (
+                  <Badge key={s.id} variant="outline" className="text-[10px] text-muted-foreground">
+                    dropped: {s.name}
+                  </Badge>
+                ))}
+              </div>
+              {compressResult.report.polished && (
+                <p className="text-xs text-muted-foreground">
+                  AI-polished{compressResult.report.polishServedBy ? ` via ${compressResult.report.polishServedBy}` : ""}
+                </p>
+              )}
+              {compressResult.report.polishError && (
+                <p className="text-xs text-muted-foreground">
+                  AI polish failed — deterministic composite kept: {compressResult.report.polishError}
+                </p>
+              )}
+
+              {/* Code preview */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">{compressResult.composite.name}</Label>
+                <pre className="max-h-48 overflow-y-auto rounded-md bg-muted p-3 text-xs leading-relaxed whitespace-pre-wrap">
+                  {compressResult.composite.code.slice(0, 3000)}
+                  {compressResult.composite.code.length > 3000 ? "\n…" : ""}
+                </pre>
+              </div>
+
+              <DialogFooter>
+                {!compressResult.skill && (
+                  <Button
+                    variant="outline"
+                    onClick={() => void handleCompressSkills(true)}
+                    disabled={compressLoading}
+                    className="gap-2"
+                  >
+                    {compressLoading ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="size-4" />
+                        Save as Skill
+                      </>
+                    )}
+                  </Button>
+                )}
+                {compressResult.skill && (
+                  <p className="text-xs text-muted-foreground mr-auto">Saved as a skill ✓</p>
+                )}
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => {
+                    const kept = compressResult.report.keptSkills;
+                    if (kept.length === 0) return;
+                    setRunComposite({
+                      ids: kept.map((k) => k.id),
+                      task: compressTask.trim(),
+                      name: compressResult.composite.name,
+                    });
+                    setCompressOpen(false);
+                    setRunMission(null);
+                    setRunError(null);
+                    setRunGoal("");
+                  }}
+                >
+                  <Play className="size-4" />
+                  Run as Mission
+                </Button>
+                <Button onClick={() => setCompressOpen(false)}>Done</Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Merge Skills Dialog */}
+      <Dialog open={mergeOpen} onOpenChange={setMergeOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GitMerge className="size-4" />
+              Merge {mergeSelected.size} Skills
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Compress the selected skills into one. Shared imports are deduped and each source
+              becomes a section — you can optionally have the AI polish the combined body.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="mg-name">New skill name</Label>
+              <Input
+                id="mg-name"
+                placeholder={`Merged Skill (${mergeSelected.size})`}
+                value={mergeForm.name}
+                onChange={(e) => setMergeForm((f) => ({ ...f, name: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="mg-description">Description</Label>
+              <Input
+                id="mg-description"
+                placeholder="What does the merged skill do?"
+                value={mergeForm.description}
+                onChange={(e) => setMergeForm((f) => ({ ...f, description: e.target.value }))}
+              />
+            </div>
+
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                className="size-3.5 accent-primary"
+                checked={mergeForm.deleteOriginals}
+                onChange={(e) => setMergeForm((f) => ({ ...f, deleteOriginals: e.target.checked }))}
+              />
+              Remove originals after merging (recommended — this is what saves tokens)
+            </label>
+
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                className="size-3.5 accent-primary"
+                checked={mergeForm.polish}
+                onChange={(e) => setMergeForm((f) => ({ ...f, polish: e.target.checked }))}
+              />
+              AI-polish the merged code (uses LLM tokens)
+            </label>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMergeOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleMergeSkills} disabled={mergeLoading} className="gap-2">
+              {mergeLoading ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Merging...
+                </>
+              ) : (
+                <>
+                  <GitMerge className="size-4" />
+                  Merge Skills
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

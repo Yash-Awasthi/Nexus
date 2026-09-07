@@ -121,7 +121,7 @@ Run a full multi-model council deliberation. Calls up to 14 Groq LLM archetypes 
     "title": "Deploy PR #42 to production?",
     "outcome": "approved",
     "votes": [
-      { "model": "llama-3.3-70b-versatile", "vote": "yes", "confidence": 0.85, "reasoning": "..." }
+      { "model": "openai/gpt-oss-120b", "vote": "yes", "confidence": 0.85, "reasoning": "..." }
     ],
     "consensus": 0.78,
     "majority": "yes",

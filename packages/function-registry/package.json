@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/function-registry",
+  "version": "0.1.0",
+  "description": "Versioned function registry with dependency tracking and auto-loading",
+  "main": "src/index.ts"
+}

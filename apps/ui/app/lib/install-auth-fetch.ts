@@ -18,17 +18,26 @@
 
 const TOKEN_KEY = "nexus_token";
 
-export function installAuthFetch(): void {
-  if (typeof window === "undefined") return;
-  const w = window as unknown as { __nexusFetchPatched?: boolean };
-  if (w.__nexusFetchPatched) return;
-  w.__nexusFetchPatched = true;
+export type RefreshSessionFn = () => Promise<boolean>;
 
-  const original = window.fetch.bind(window);
-
-  window.fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+/**
+ * Build the patched fetch. Pure and dependency-injected so unit tests can drive
+ * it with mocks (see install-auth-fetch.test.ts). `refreshSession` is invoked
+ * at most once per 401; if it returns true the request is retried ONCE from the
+ * caller's original init (so the freshly rotated token gets attached — retrying
+ * from the failed attempt's init would ride the stale Authorization header).
+ */
+export function createAuthFetch(
+  original: typeof fetch,
+  refreshSession: RefreshSessionFn,
+  tokenKey: string = TOKEN_KEY,
+): typeof fetch {
+  return (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    let url = "";
+    let sameOriginApi = false;
+    let hadToken = false;
     try {
-      const url =
+      url =
         typeof input === "string"
           ? input
           : input instanceof URL
@@ -40,22 +49,67 @@ export function installAuthFetch(): void {
       // a substring check on the raw string can be tricked by an attacker
       // URL that merely contains "//host/api" somewhere (e.g. in a query param).
       const parsed = new URL(url, window.location.href);
-      const sameOriginApi = parsed.host === window.location.host && parsed.pathname.startsWith("/api");
-      if (sameOriginApi) {
-        const token = window.localStorage.getItem(TOKEN_KEY);
-        if (token) {
-          const headers = new Headers(
-            init?.headers ?? (input instanceof Request ? input.headers : undefined),
-          );
-          if (!headers.has("Authorization")) {
-            headers.set("Authorization", `Bearer ${token}`);
-            init = { ...init, headers };
-          }
-        }
-      }
+      sameOriginApi = parsed.host === window.location.host && parsed.pathname.startsWith("/api");
+      hadToken = sameOriginApi && window.localStorage.getItem(tokenKey) !== null;
     } catch {
       /* fall through to the original fetch on any error */
     }
-    return original(input as RequestInfo | URL, init);
+    const isAuthEndpoint = /^\/api\/v1\/auth\//.test(url.split("?")[0] ?? "");
+
+    const attempt = (reqInit: RequestInit | undefined, retried: boolean): Promise<Response> => {
+      let finalInit = reqInit;
+      try {
+        if (sameOriginApi) {
+          const token = window.localStorage.getItem(tokenKey);
+          if (token) {
+            const headers = new Headers(
+              reqInit?.headers ?? (input instanceof Request ? input.headers : undefined),
+            );
+            if (!headers.has("Authorization")) {
+              headers.set("Authorization", `Bearer ${token}`);
+              finalInit = { ...reqInit, headers };
+            }
+          }
+        }
+      } catch {
+        /* keep the caller's init */
+      }
+      return original(input as RequestInfo | URL, finalInit).then(async (res) => {
+        if (!retried && res.status === 401 && sameOriginApi && hadToken && !isAuthEndpoint) {
+          const refreshed = await refreshSession();
+          // Retry from the CALLER's init (not finalInit): finalInit already
+          // carries the stale Authorization header that just 401'd, and the
+          // retry must attach the freshly rotated token.
+          if (refreshed) return attempt(init, true);
+        }
+        return res;
+      });
+    };
+
+    return attempt(init, false);
   };
+}
+
+export function installAuthFetch(): void {
+  if (typeof window === "undefined") return;
+  const w = window as unknown as { __nexusFetchPatched?: boolean };
+  if (w.__nexusFetchPatched) return;
+  w.__nexusFetchPatched = true;
+
+  const original = window.fetch.bind(window);
+
+  // One 401-retry per request: a page that mounts with a just-expired access
+  // token would otherwise 401 on every initial fetch and render an empty state
+  // until the next refresh tick. On 401 we exchange the refresh token once
+  // (coalesced — concurrent 401s share a single rotation) and retry with the
+  // fresh token. Genuinely dead sessions fall through: refreshSession returns
+  // false, the 401 surfaces, and AuthContext's own retry-then-clean-logout
+  // path (F9) still handles sign-out. Auth endpoints are excluded so a login
+  // failure or a revoked refresh token can never recurse through this.
+  //
+  // The refresh callback is imported lazily so this module stays free of the
+  // `~` alias at module-eval time (the unit test imports it without vite).
+  window.fetch = createAuthFetch(original, () =>
+    import("~/context/AuthContext").then((m) => m.refreshSession()),
+  );
 }

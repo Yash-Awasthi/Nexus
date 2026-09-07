@@ -31,7 +31,7 @@ import type { FastifyInstance } from "fastify";
 const GROQ_MOCK = {
   id: "chatcmpl-fuzz",
   object: "chat.completion",
-  model: "llama-3.3-70b-versatile",
+  model: "openai/gpt-oss-120b",
   choices: [
     {
       index: 0,
@@ -83,7 +83,7 @@ const unknownModelArb = fc
         "claude-3-opus-20240229",
         "claude-3-sonnet-20240229",
         "claude-3-haiku-20240307",
-        "llama-3.3-70b-versatile",
+        "openai/gpt-oss-120b",
         "gemma2-9b-it",
         "mixtral-8x7b-32768",
       ].includes(s),

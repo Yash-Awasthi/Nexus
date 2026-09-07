@@ -59,17 +59,17 @@ interface ABStats {
 
 // ─── Model catalogue ──────────────────────────────────────────────────────────
 
+// Only live model IDs: claude-3-5-sonnet / 3-haiku / 3-opus and gemini-1.5
+// were retired by their vendors; llama-3.1-70b-versatile was decommissioned
+// by Groq; gpt-4-turbo shuts down 2026-10-23.
 const MODELS = [
-  "gpt-4o",
+  "openai/gpt-oss-120b",
   "gpt-4o-mini",
-  "gpt-4-turbo",
-  "claude-3-5-sonnet-20241022",
-  "claude-3-haiku-20240307",
-  "claude-3-opus-20240229",
-  "gemini-1.5-pro",
-  "gemini-1.5-flash",
-  "llama-3.1-70b-versatile",
-  "mixtral-8x7b-32768",
+  "claude-sonnet-4-6",
+  "claude-haiku-4-5",
+  "gemini-3.6-flash",
+  "gemini-3.5-flash-lite",
+  "deepseek-chat",
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ function timeAgo(d: string) {
 export default function ABCompare() {
   const [prompt, setPrompt] = useState("");
   const [modelA, setModelA] = useState("gpt-4o");
-  const [modelB, setModelB] = useState("claude-3-5-sonnet-20241022");
+  const [modelB, setModelB] = useState("claude-sonnet-4-6");
   const [running, setRunning] = useState(false);
   const [current, setCurrent] = useState<ABResult | null>(null);
   const [history, setHistory] = useState<ABResult[]>([]);

@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/temporal-knowledge-graph",
+  "version": "0.1.0",
+  "description": "Temporal knowledge graph with episodes, entity edges, and validity windows",
+  "main": "src/index.ts"
+}

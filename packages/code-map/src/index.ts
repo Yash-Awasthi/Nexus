@@ -457,3 +457,5 @@ export function listAllSymbols(map: CodeMap): string[] {
 export function getSymbolsByKind(map: CodeMap, filePath: string, kind: SymbolKind): SymbolDef[] {
   return (map.files.get(filePath)?.symbols ?? []).filter((s) => s.kind === kind);
 }
+
+export * from "./edit.js";

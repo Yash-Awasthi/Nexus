@@ -1,0 +1,16 @@
+{
+  "name": "@nexus/temporal-kg",
+  "version": "0.1.0",
+  "description": "Temporal Knowledge Graph with bi-temporal fact management, episode provenance, contradiction detection, and graph distance reranking — inspired by Graphiti",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

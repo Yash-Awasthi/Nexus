@@ -11,8 +11,13 @@
  * All handlers log structured results for the BullMQ telemetry layer.
  * Each handler uses in-memory / mock implementations when real backends
  * (DB, external APIs) are not configured — so jobs always complete rather
- * than crashing the worker process.
+ * than crashing the worker process. search:reindex selects its strategies
+ * from env via lib/reindex-strategies.ts (pass 73): real Chroma + hybrid
+ * when CHROMA_URL is set, Postgres full-text when DATABASE_URL is set, and
+ * the mock fallback when neither is configured.
  */
+
+import { loadReindexStrategies } from "../lib/reindex-strategies.js";
 
 // ── wiki:reconcile ─────────────────────────────────────────────────────────────
 
@@ -300,12 +305,13 @@ export interface SearchReindexPayload {
 }
 
 export async function handleSearchReindexJob(payload: SearchReindexPayload): Promise<unknown> {
-  const { SearchOrchestrator, MockSearchStrategy, StrategyChain } =
-    await import("@nexus/search-orchestrator");
-
-  // Production: replace with real Chroma / SQLite strategies wired from env.
-  const strategy = new MockSearchStrategy("mock");
-  const chain = new StrategyChain({ strategies: [strategy] });
+  const { SearchOrchestrator, StrategyChain } = await import("@nexus/search-orchestrator");
+  const strategies = await loadReindexStrategies({
+    chromaUrl: process.env.CHROMA_URL,
+    chromaCollection: process.env.CHROMA_COLLECTION,
+    databaseUrl: process.env.DATABASE_URL,
+  });
+  const chain = new StrategyChain({ strategies });
   const orch = new SearchOrchestrator({ chain });
 
   // Full-sweep: run an empty query across the project to warm the index.

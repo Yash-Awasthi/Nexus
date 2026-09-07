@@ -33,7 +33,7 @@ import { GroqTransport } from "@nexus/council";
 const council = new CouncilService({
   transports: [new GroqTransport({ apiKey: process.env.GROQ_API_KEY })],
   votingMode: "majority",   // "unanimous" | "majority" | "weighted"
-  synthesisModel: "llama-3.3-70b-versatile",
+  synthesisModel: "openai/gpt-oss-120b",
 });
 
 const result = await council.deliberate({
@@ -72,7 +72,7 @@ Production transport using the Groq API (Llama 3.3 70B, Llama 3.1 8B, Mixtral).
 ```ts
 new GroqTransport({
   apiKey: process.env.GROQ_API_KEY,
-  model: "llama-3.3-70b-versatile",
+  model: "openai/gpt-oss-120b",
   temperature: 0.1,
 });
 ```

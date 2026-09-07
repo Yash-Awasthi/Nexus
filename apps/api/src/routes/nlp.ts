@@ -50,7 +50,7 @@ function buildNlpLlmClient(): NlpLlmClient {
 
   if (process.env.GROQ_API_KEY) {
     providers.push(new GroqProvider({ apiKey: process.env.GROQ_API_KEY }));
-    aliases.push({ alias: "nexus/fast", provider: "groq", model: "llama-3.1-70b-versatile" });
+    aliases.push({ alias: "nexus/fast", provider: "groq", model: "openai/gpt-oss-120b" });
   }
   if (process.env.ANTHROPIC_API_KEY) {
     providers.push(new ClaudeProvider({ apiKey: process.env.ANTHROPIC_API_KEY }));

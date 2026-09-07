@@ -35,7 +35,7 @@ import type { FastifyInstance } from "fastify";
 import { emitAuditEvent } from "../lib/audit-emitter.js";
 import { sha256hex } from "../lib/crypto-utils.js";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuthWithTier } from "../middleware/auth.js";
 
 const scrypt = promisify(_scrypt) as (
   password: Buffer | string,
@@ -95,7 +95,8 @@ function generateRefreshToken(): string {
 
 // ── JWT issuance ──────────────────────────────────────────────────────────────
 
-const ACCESS_TOKEN_TTL_SEC = 15 * 60; // 15 minutes
+// Env-overridable so dev/playtest can prove refresh with a short TTL.
+const ACCESS_TOKEN_TTL_SEC = parseInt(process.env.ACCESS_TOKEN_TTL_SEC ?? String(15 * 60), 10);
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 3600 * 1000; // 30 days
 
 /**
@@ -491,7 +492,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
    * Return the authenticated user's profile.
    * Reads userId from the JWT sub claim.
    */
-  app.get("/auth/me", { preHandler: requireAuth }, async (request, reply) => {
+  app.get("/auth/me", { preHandler: requireAuthWithTier }, async (request, reply) => {
     const userId = request.nexusUserId;
     if (!userId) {
       // API key auth — no user record; return minimal profile
@@ -528,7 +529,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
   }>(
     "/auth/me",
     {
-      preHandler: requireAuth,
+      preHandler: requireAuthWithTier,
       schema: {
         body: {
           type: "object",
@@ -749,7 +750,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
    * List all active (non-revoked, non-expired) refresh token sessions
    * for the currently authenticated user. Does not return token hashes.
    */
-  app.get("/auth/sessions", { preHandler: requireAuth }, async (request, reply) => {
+  app.get("/auth/sessions", { preHandler: requireAuthWithTier }, async (request, reply) => {
     const userId = request.nexusUserId;
     if (!userId) return reply.code(403).send({ error: "jwt_required" });
 
@@ -789,7 +790,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
    */
   app.delete<{
     Params: { id: string };
-  }>("/auth/sessions/:id", { preHandler: requireAuth }, async (request, reply) => {
+  }>("/auth/sessions/:id", { preHandler: requireAuthWithTier }, async (request, reply) => {
     const userId = request.nexusUserId;
     if (!userId) return reply.code(403).send({ error: "jwt_required" });
 
@@ -835,7 +836,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post(
     "/auth/send-verification",
-    { preHandler: [requireAuth, sendVerifyRateLimit] },
+    { preHandler: [requireAuthWithTier, sendVerifyRateLimit] },
     async (request, reply) => {
       const userId = request.nexusUserId;
       if (!userId) return reply.code(403).send({ error: "jwt_required" });

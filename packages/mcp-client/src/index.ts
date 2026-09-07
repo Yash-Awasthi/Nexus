@@ -521,3 +521,7 @@ export class McpClient {
     }
   }
 }
+
+// MCP-over-HTTP server core (transport-agnostic JSON-RPC handler).
+export * from "./server.js";
+export * from "./proxy.js";

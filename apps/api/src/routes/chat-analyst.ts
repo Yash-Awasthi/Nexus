@@ -116,7 +116,7 @@ function buildLlmFn(): StreamingLlmFn {
       const chunks: string[] = [];
       await driver.stream(
         {
-          model: process.env.ANALYST_MODEL ?? "llama-3.3-70b-versatile",
+          model: process.env.ANALYST_MODEL ?? "openai/gpt-oss-120b",
           messages: allMessages,
           maxTokens: 2048,
           temperature: 0.3,
@@ -143,7 +143,7 @@ function buildLlmFn(): StreamingLlmFn {
       const chunks: string[] = [];
       await driver.stream(
         {
-          model: process.env.ANALYST_MODEL ?? "anthropic/claude-3-5-haiku",
+          model: process.env.ANALYST_MODEL ?? "anthropic/claude-haiku-4-5",
           messages: allMessages,
           maxTokens: 2048,
           temperature: 0.3,

@@ -326,6 +326,8 @@ abstract class BaseDriver implements LlmDriver {
    * Async generator that streams SSE lines from a POST request.
    * Yields the raw payload of each "data: <payload>" line (skipping "[DONE]").
    * Uses native fetch ReadableStream — only call when _useDefaultTransport is true.
+   * On non-2xx, includes the provider's own error body (e.g. Gemini's
+   * INVALID_ARGUMENT details) in the thrown error.
    */
   protected async *sseLines(
     url: string,
@@ -337,7 +339,15 @@ abstract class BaseDriver implements LlmDriver {
       headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify(body),
     });
-    if (!resp.ok) throw mapHttpError(resp.status, this.provider);
+    if (!resp.ok) {
+      let detail = "";
+      try {
+        detail = (await resp.text()).slice(0, 500);
+      } catch {
+        /* best-effort */
+      }
+      throw mapHttpError(resp.status, this.provider, detail || undefined);
+    }
     if (!resp.body) return;
 
     const reader = resp.body.getReader();
@@ -385,7 +395,15 @@ abstract class BaseDriver implements LlmDriver {
       headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify(body),
     });
-    if (!resp.ok) throw mapHttpError(resp.status, this.provider);
+    if (!resp.ok) {
+      let detail = "";
+      try {
+        detail = (await resp.text()).slice(0, 500);
+      } catch {
+        /* best-effort */
+      }
+      throw mapHttpError(resp.status, this.provider, detail || undefined);
+    }
     if (!resp.body) return;
 
     const reader = resp.body.getReader();
@@ -793,7 +811,28 @@ export class GroqDriver extends OpenAICompatibleDriver {
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://api.groq.com/openai/v1";
-    this.model = config.model ?? "llama-3.3-70b-versatile";
+    this.model = config.model ?? "openai/gpt-oss-120b";
+  }
+}
+
+// ── 3b. OpenAI (official ChatGPT API) ─────────────────────────────────────────
+// Missing driver: `openai` members (the default ChatGPT council member) could
+// never resolve a driver — not in the env registry, not in the per-user BYOK
+// registry, and not in the worker's agent executor. api.openai.com is a plain
+// OpenAI-compatible chat-completions endpoint, so this is the same pattern as
+// every other OpenAI-compatible driver above.
+
+export class OpenAIDriver extends OpenAICompatibleDriver {
+  readonly provider = "openai";
+  readonly model: string;
+  protected baseUrl: string;
+
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://api.openai.com/v1";
+    // gpt-4o was retired from the API 2026-02-16; the GA replacements are the
+    // gpt-5.6 family (sol = flagship / terra = fast / luna = nano).
+    this.model = config.model ?? "gpt-5.6-sol";
   }
 }
 
@@ -807,7 +846,8 @@ export class DeepSeekDriver extends OpenAICompatibleDriver {
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://api.deepseek.com/v1";
-    this.model = config.model ?? "deepseek-chat";
+    // deepseek-chat was retired; the live family is deepseek-v4-* (flash/reasoner).
+    this.model = config.model ?? "deepseek-v4-flash";
   }
 }
 
@@ -849,26 +889,118 @@ export class GeminiDriver extends BaseDriver {
   readonly model: string;
   private apiKey: string;
   private baseUrl: string;
+  /** Gemini 3+ returns a `thoughtSignature` on functionCall parts and requires
+   *  it to be echoed back in the next request (400 otherwise). Keyed by the
+   *  call id we mint (`fc_<name>_<i>`), which the runtime preserves verbatim
+   *  through tool-result round trips. */
+  private thoughtSignatures = new Map<string, string>();
+  /** API-issued call ids (`id` on functionCall parts) keyed the same way, so
+   *  the exact id the API assigned can be echoed back on functionCall and
+   *  functionResponse parts (Gemini 3+ call-id validation). */
+  private callIds = new Map<string, string>();
 
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(transport);
     this.apiKey = config.apiKey;
     this.baseUrl = config.baseUrl ?? "https://generativelanguage.googleapis.com/v1beta";
-    this.model = config.model ?? "gemini-flash-latest";
+    this.model = config.model ?? "gemini-3.6-flash";
+  }
+
+  /** Map runtime messages to Gemini `contents` (role + parts). Tool results
+   *  become functionResponse parts; assistant tool calls become functionCall
+   *  parts (echoing the captured thoughtSignature as a sibling part key). The
+   *  id→name table lets a `role: "tool"` message (which only carries the call
+   *  id) resolve the function name Gemini requires. */
+  private toGeminiContents(messages: LlmMessage[]): { role: string; parts: Record<string, unknown>[] }[] {
+    const idToName = new Map<string, string>();
+    const out: { role: string; parts: Record<string, unknown>[] }[] = [];
+    for (const m of messages) {
+      if (m.role === "system") continue;
+      const parts: Record<string, unknown>[] = [];
+      if (m.role === "tool") {
+        const name = idToName.get(m.toolCallId ?? "") ?? "tool_result";
+        // Gemini's functionResponse.response is a Struct — a bare string is
+        // rejected with INVALID_ARGUMENT. Wrap non-object payloads.
+        let response: unknown = m.content;
+        try {
+          response = JSON.parse(m.content) as unknown;
+        } catch {
+          response = { result: m.content };
+        }
+        if (typeof response !== "object" || response === null) response = { result: String(response) };
+        const fr: Record<string, unknown> = { name, response };
+        // Echo the API-issued call id back when we captured it (Gemini 3+
+        // validates call ids across the round trip).
+        const callId = this.callIds.get(m.toolCallId ?? "");
+        if (callId) fr["id"] = callId;
+        parts.push({ functionResponse: fr });
+      } else if (m.toolCalls?.length) {
+        for (const tc of m.toolCalls) {
+          idToName.set(tc.id, tc.name);
+          const part: Record<string, unknown> = {
+            functionCall: {
+              name: tc.name,
+              args: tc.arguments,
+              ...(this.callIds.get(tc.id) ? { id: this.callIds.get(tc.id) } : {}),
+            },
+          };
+          const sig = this.thoughtSignatures.get(tc.id);
+          if (sig) part["thoughtSignature"] = sig;
+          parts.push(part);
+        }
+      }
+      if (m.content) parts.push({ text: m.content });
+      if (!parts.length) parts.push({ text: "" });
+      out.push({ role: m.role === "assistant" ? "model" : "user", parts });
+    }
+    return out;
+  }
+
+  private toGeminiTools(tools: LlmToolDefinition[]): Record<string, unknown>[] {
+    return [
+      {
+        functionDeclarations: tools.map((t) => ({
+          name: t.name,
+          description: t.description,
+          parameters: t.parameters,
+        })),
+      },
+    ];
+  }
+
+  private parseFunctionCalls(
+    parts: {
+      functionCall?: { name?: string; args?: unknown; id?: string };
+      thoughtSignature?: string;
+    }[],
+  ): LlmToolCall[] {
+    const calls: LlmToolCall[] = [];
+    parts?.forEach((p, i) => {
+      if (p.functionCall?.name) {
+        const id = `fc_${p.functionCall.name}_${i}`;
+        if (p.thoughtSignature) this.thoughtSignatures.set(id, p.thoughtSignature);
+        if (p.functionCall.id) this.callIds.set(id, p.functionCall.id);
+        calls.push({
+          id,
+          name: p.functionCall.name,
+          arguments:
+            typeof p.functionCall.args === "object" && p.functionCall.args !== null
+              ? (p.functionCall.args as Record<string, unknown>)
+              : {},
+        });
+      }
+    });
+    return calls;
   }
 
   async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
     const t0 = Date.now();
     const model = opts.model ?? this.model;
-    const contents = opts.messages
-      .filter((m) => m.role !== "system")
-      .map((m) => ({
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }],
-      }));
+    const contents = this.toGeminiContents(opts.messages);
     const body: Record<string, unknown> = {
       contents,
       ...(opts.systemPrompt ? { systemInstruction: { parts: [{ text: opts.systemPrompt }] } } : {}),
+      ...(opts.tools?.length ? { tools: this.toGeminiTools(opts.tools) } : {}),
       generationConfig: {
         maxOutputTokens: opts.maxTokens ?? 8192,
         ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
@@ -882,23 +1014,37 @@ export class GeminiDriver extends BaseDriver {
 
     const candidate = (
       raw["candidates"] as {
-        content: { parts: { text: string }[] };
+        content: {
+          parts: {
+            text?: string;
+            functionCall?: { name?: string; args?: unknown; id?: string };
+            thoughtSignature?: string;
+          }[];
+        };
         finishReason?: string;
       }[]
     )?.[0];
-    const content = candidate?.content?.parts?.[0]?.text ?? "";
+    const parts = candidate?.content?.parts ?? [];
+    const content = parts.map((p) => p.text ?? "").join("");
+    const toolCalls = this.parseFunctionCalls(parts);
     const usage = raw["usageMetadata"] as
       { promptTokenCount?: number; candidatesTokenCount?: number } | undefined;
     const inputTokens =
-      usage?.promptTokenCount ??
-      estimateTokens(contents.map((c) => c.parts[0]?.text ?? "").join(" "));
+      usage?.promptTokenCount ?? estimateTokens(contents.map((c) => JSON.stringify(c)).join(" "));
     const outputTokens = usage?.candidatesTokenCount ?? estimateTokens(content);
+    const finishReason: LlmResponse["finishReason"] = toolCalls.length
+      ? "tool_calls"
+      : candidate?.finishReason === "MAX_TOKENS"
+        ? "length"
+        : "stop";
     return this.makeResponse(
       `gemini-${Date.now()}`,
       content,
       model,
       this.makeUsage(inputTokens, outputTokens),
       Date.now() - t0,
+      finishReason,
+      toolCalls.length ? toolCalls : undefined,
     );
   }
 
@@ -907,15 +1053,11 @@ export class GeminiDriver extends BaseDriver {
 
     const t0 = Date.now();
     const model = opts.model ?? this.model;
-    const contents = opts.messages
-      .filter((m) => m.role !== "system")
-      .map((m) => ({
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }],
-      }));
+    const contents = this.toGeminiContents(opts.messages);
     const body: Record<string, unknown> = {
       contents,
       ...(opts.systemPrompt ? { systemInstruction: { parts: [{ text: opts.systemPrompt }] } } : {}),
+      ...(opts.tools?.length ? { tools: this.toGeminiTools(opts.tools) } : {}),
       generationConfig: {
         maxOutputTokens: opts.maxTokens ?? 8192,
         ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
@@ -925,6 +1067,21 @@ export class GeminiDriver extends BaseDriver {
     let content = "";
     let inputTokens = 0;
     let outputTokens = 0;
+    // Gemini streams a function call across several parts: the first carries
+    // the call name, later parts carry the (cumulative) args object. Merge
+    // into one entry per named call.
+    const toolAcc: {
+      name: string;
+      args: Record<string, unknown>;
+      sig?: string;
+      apiId?: string;
+    }[] = [];
+    let curCall: {
+      name: string;
+      args: Record<string, unknown>;
+      sig?: string;
+      apiId?: string;
+    } | null = null;
 
     for await (const line of this.sseLines(
       `${this.baseUrl}/models/${model}:streamGenerateContent?alt=sse&key=${this.apiKey}`,
@@ -941,13 +1098,42 @@ export class GeminiDriver extends BaseDriver {
 
       const candidates = event["candidates"] as
         | {
-            content: { parts: { text: string }[] };
+            content: {
+              parts: {
+                text?: string;
+                functionCall?: { name?: string; args?: unknown; id?: string };
+                thoughtSignature?: string;
+              }[];
+            };
+            finishReason?: string;
           }[]
         | undefined;
-      const text = candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-      if (text) {
-        content += text;
-        await handler({ delta: text, done: false });
+      const parts = candidates?.[0]?.content?.parts;
+      for (const p of parts ?? []) {
+        if (p.text) {
+          content += p.text;
+          await handler({ delta: p.text, done: false });
+        }
+        if (p.functionCall) {
+          if (p.functionCall.name) {
+            if (curCall) toolAcc.push(curCall);
+            curCall = {
+              name: p.functionCall.name,
+              args: {},
+              ...(p.functionCall.id ? { apiId: p.functionCall.id } : {}),
+            };
+          }
+          if (curCall && typeof p.functionCall.args === "object" && p.functionCall.args !== null) {
+            curCall.args = {
+              ...curCall.args,
+              ...(p.functionCall.args as Record<string, unknown>),
+            };
+          }
+          // The thought signature rides on the first functionCall part.
+          if (p.thoughtSignature && curCall) curCall.sig = p.thoughtSignature;
+          // So does the API-issued call id.
+          if (p.functionCall.id && curCall) curCall.apiId = p.functionCall.id;
+        }
       }
 
       const usage = event["usageMetadata"] as
@@ -959,13 +1145,33 @@ export class GeminiDriver extends BaseDriver {
       if (usage?.promptTokenCount) inputTokens = usage.promptTokenCount;
       if (usage?.candidatesTokenCount) outputTokens = usage.candidatesTokenCount;
     }
+    if (curCall) toolAcc.push(curCall);
 
+    const toolCalls: LlmToolCall[] = toolAcc.map((tc, i) => {
+      const id = `fc_${tc.name}_${i}`;
+      if (tc.sig) this.thoughtSignatures.set(id, tc.sig);
+      if (tc.apiId) this.callIds.set(id, tc.apiId);
+      return { id, name: tc.name, arguments: tc.args };
+    });
     const usageObj = this.makeUsage(
-      inputTokens || estimateTokens(contents.map((c) => c.parts[0]?.text ?? "").join(" ")),
+      inputTokens || estimateTokens(contents.map((c) => JSON.stringify(c)).join(" ")),
       outputTokens || estimateTokens(content),
     );
-    await handler({ delta: "", done: true, usage: usageObj });
-    return this.makeResponse(`gemini-${Date.now()}`, content, model, usageObj, Date.now() - t0);
+    await handler({
+      delta: "",
+      done: true,
+      usage: usageObj,
+      ...(toolCalls.length ? { toolCalls } : {}),
+    });
+    return this.makeResponse(
+      `gemini-${Date.now()}`,
+      content,
+      model,
+      usageObj,
+      Date.now() - t0,
+      toolCalls.length ? "tool_calls" : "stop",
+      toolCalls.length ? toolCalls : undefined,
+    );
   }
 }
 
@@ -1096,7 +1302,7 @@ export class FireworksDriver extends OpenAICompatibleDriver {
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://api.fireworks.ai/inference/v1";
-    this.model = config.model ?? "accounts/fireworks/models/llama-v3p1-70b-instruct";
+    this.model = config.model ?? "accounts/fireworks/models/llama-3.3-70b-instruct";
   }
 }
 
@@ -1125,7 +1331,7 @@ export class CerebrasDriver extends OpenAICompatibleDriver {
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://api.cerebras.ai/v1";
-    this.model = config.model ?? "llama3.1-70b";
+    this.model = config.model ?? "llama-3.3-70b";
   }
 }
 
@@ -1139,7 +1345,7 @@ export class KimiDriver extends OpenAICompatibleDriver {
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://api.moonshot.cn/v1";
-    this.model = config.model ?? "moonshot-v1-32k";
+    this.model = config.model ?? "kimi-k3";
   }
 }
 
@@ -1167,7 +1373,7 @@ export class XaiDriver extends OpenAICompatibleDriver {
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://api.x.ai/v1";
-    this.model = config.model ?? "grok-2-latest";
+    this.model = config.model ?? "grok-4.3";
   }
 }
 
@@ -1195,7 +1401,7 @@ export class PerplexityDriver extends OpenAICompatibleDriver {
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://api.perplexity.ai";
-    this.model = config.model ?? "sonar";
+    this.model = config.model ?? "sonar-pro";
   }
 }
 
@@ -1209,7 +1415,7 @@ export class CohereDriver extends OpenAICompatibleDriver {
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://api.cohere.ai/compatibility/v1";
-    this.model = config.model ?? "command-r-plus";
+    this.model = config.model ?? "command-a";
   }
 }
 
@@ -1241,7 +1447,7 @@ export class MoonshotDriver extends OpenAICompatibleDriver {
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://api.moonshot.ai/v1";
-    this.model = config.model ?? "moonshot-v1-32k";
+    this.model = config.model ?? "kimi-k3";
   }
 }
 
@@ -2109,7 +2315,7 @@ export class VertexDriver extends OpenAICompatibleDriver {
     super(config, transport);
     const region = config.region ?? "us-central1";
     this.baseUrl = `https://${region}-aiplatform.googleapis.com/v1/projects/${config.project}/locations/${region}/endpoints/openapi`;
-    this.model = config.model ?? "google/gemini-2.0-flash-001";
+    this.model = config.model ?? "gemini-3.6-flash";
   }
 }
 

@@ -2,7 +2,7 @@
   "name": "@nexus/worker",
   "version": "0.0.0",
   "private": true,
-  "description": "BullMQ queue consumers — signal pipeline, task execution",
+  "description": "BullMQ queue consumers \u00e2\u20ac\u201d signal pipeline, task execution",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -44,6 +44,7 @@
     "bullmq": "^5.81.3",
     "drizzle-orm": "^0.45.2",
     "ioredis": "^5.4.1",
-    "pg": "^8.22.0"
+    "pg": "^8.22.0",
+    "@nexus/debate-engine": "workspace:*"
   }
 }

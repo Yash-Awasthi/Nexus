@@ -4,6 +4,9 @@ import { HealthAggregator } from "@nexus/telemetry";
 import { sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
+import { costLogStore } from "../lib/cost-log.js";
+import { getLlmCacheStats } from "../lib/llm-cache-driver.js";
+import { getProviderSnapshot, getProviderStats } from "../lib/llm-failover.js";
 import { getSharedKV } from "../lib/shared-kv.js";
 
 // ── Readiness probes ────────────────────────────────────────────────────────────
@@ -40,6 +43,25 @@ function getAggregator(): HealthAggregator {
     { critical: false, timeoutMs: 2000 },
   );
 
+  // Cost-log write-behind persistence health (non-critical). The store keeps
+  // recording in memory even when KV flushes fail, so a silently failing flush
+  // degrades the system back to in-memory — this probe flips "degraded" once
+  // failures become consecutive, and the raw stats ride on every /health/ready
+  // response so an operator always sees the flush age / pending tail.
+  agg.register(
+    "costlog_flush",
+    async () => {
+      const s = costLogStore.flushStats();
+      return s.consecutiveFailures >= 3
+        ? {
+            ok: false,
+            message: `${s.consecutiveFailures} consecutive KV flush failures — usage history may be lost on restart (${s.pendingEntries} entries pending)`,
+          }
+        : { ok: true };
+    },
+    { critical: false, timeoutMs: 1000 },
+  );
+
   _aggregator = agg;
   return agg;
 }
@@ -70,6 +92,15 @@ export async function healthRoutes(app: FastifyInstance): Promise<void> {
       messages: health.messages,
       latencies: health.latencies,
       durationMs: health.durationMs,
+      // Cost-log write-behind durability, always visible (raw store stats).
+      costLog: costLogStore.flushStats(),
+      // LLM response cache health (hits/misses/skips/size).
+      llmCache: await getLlmCacheStats(),
+      // Live provider discovery + failover stats (sourced from the registry).
+      llmProviders: {
+        providers: getProviderSnapshot(),
+        stats: getProviderStats(),
+      },
     });
   });
 }

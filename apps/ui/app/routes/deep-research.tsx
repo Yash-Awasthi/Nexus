@@ -9,6 +9,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useSearchParams } from "react-router";
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
 import { Badge } from "~/components/ui/badge";
@@ -33,7 +34,7 @@ import type { Citation as CardCitation } from "~/components/CitationCard";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type JobStatus = "idle" | "pending" | "running" | "done" | "failed";
+type JobStatus = "idle" | "pending" | "running" | "done" | "failed" | "error";
 
 type ResearchPhase =
   | "clarification"
@@ -41,6 +42,7 @@ type ResearchPhase =
   | "researching"
   | "thinking"
   | "generating_report"
+  | "synthesis"
   | "complete"
   | "failed"
   | "timed_out";
@@ -83,9 +85,59 @@ const PHASE_COLORS: Partial<Record<ResearchPhase, string>> = {
   researching: "text-yellow-400",
   thinking: "text-cyan-400",
   generating_report: "text-orange-400",
+  synthesis: "text-cyan-400",
   complete: "text-green-400",
   failed: "text-destructive",
 };
+
+/**
+ * Milestone shape persisted on the job record (lib/research-jobs.ts) by the
+ * stream handler's phaseStart/phaseDone write-throughs.
+ */
+interface ResearchMilestones {
+  [phase: string]: { startedAt?: string; finishedAt?: string; detail?: string };
+}
+
+const PHASE_ORDER = ["planning", "researching", "synthesis", "complete"];
+
+/**
+ * Rebuild the phase list from a job record's persisted milestones. Used when a
+ * job is loaded from history / a deep link (no live SSE): a completed job shows
+ * the phases it ran through, a running one shows real progress, and an
+ * interrupted one shows how far it got before the crash.
+ */
+function milestonesToSteps(
+  jobStatus: string | undefined,
+  milestones?: ResearchMilestones,
+): ResearchStep[] {
+  if (!milestones) return [];
+  const terminal = jobStatus === "done" || jobStatus === "error" || jobStatus === "failed";
+  return Object.entries(milestones)
+    .sort((a, b) => {
+      const ia = PHASE_ORDER.indexOf(a[0]);
+      const ib = PHASE_ORDER.indexOf(b[0]);
+      return (ia < 0 ? PHASE_ORDER.length : ia) - (ib < 0 ? PHASE_ORDER.length : ib);
+    })
+    .map(([phase, m]) => {
+      const startedAt = m.startedAt ? new Date(m.startedAt).getTime() : Date.now();
+      return {
+        id: phase,
+        phase: phase as ResearchPhase,
+        label: phase.charAt(0).toUpperCase() + phase.slice(1),
+        detail: m.detail,
+        // A completed job ran every recorded phase through the end; an
+        // interrupted one keeps unfinished phases visibly not-done.
+        status:
+          m.finishedAt || (jobStatus === "done" && m.startedAt)
+            ? ("done" as const)
+            : terminal
+              ? ("error" as const)
+              : ("running" as const),
+        startedAt,
+        completedAt: m.finishedAt ? new Date(m.finishedAt).getTime() : undefined,
+      };
+    });
+}
 
 // ── Past jobs list hook ────────────────────────────────────────────────────────
 
@@ -146,7 +198,117 @@ export default function DeepResearchPage() {
   const [relatedQuestions, setRelatedQuestions] = useState<string[]>([]);
   const [relatedLoading, setRelatedLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  // True when the current job came from history / a deep link (no live SSE) —
+  // a running one is followed via polling instead of a stream.
+  const [seeded, setSeeded] = useState(false);
   const { jobs: pastJobs, refresh: refreshPast } = usePastJobs();
+
+  // Load a job by id (history sidebar + ?id= deep link from the dashboard rows
+  // / notification links). Steps are rebuilt from the persisted milestones so a
+  // completed job shows the phases it ran and a running one shows progress.
+  const loadJob = useCallback(async (id: string) => {
+    const res = await fetch(`/api/research/${id}`);
+    if (!res.ok) return;
+    const data = (await res.json()) as {
+      query?: string;
+      status?: string;
+      citations?: Citation[];
+      cycles?: number;
+      report?: string;
+      durationMs?: number;
+      error?: string;
+      milestones?: ResearchMilestones;
+      relatedQuestions?: string[];
+    };
+    const status = (data.status as JobStatus) ?? "done";
+    setJob({
+      id,
+      query: data.query ?? "",
+      status,
+      steps: milestonesToSteps(status, data.milestones),
+      citations: data.citations ?? [],
+      cycleCount: data.cycles ?? 0,
+      report: data.report,
+      totalMs: data.durationMs,
+      error: data.error,
+    });
+    setQuery(data.query ?? "");
+    setSeeded(true);
+    // A job loaded in a terminal state from the record (history click / deep
+    // link) carries its related questions — the backend persists them in the
+    // background after completion. Render those instead of an empty block.
+    // Running jobs keep the live-generation path (SSE / poll) untouched.
+    if (
+      (status === "done" || status === "error" || status === "failed") &&
+      data.relatedQuestions?.length
+    ) {
+      setRelatedQuestions(data.relatedQuestions);
+    }
+  }, []);
+
+  // A job seeded from history has no live SSE connection. If it is still
+  // running (page reloaded mid-run, or opened from another tab), the run keeps
+  // going server-side — poll the record so phase progress and the finished
+  // report surface without a manual reload.
+  useEffect(() => {
+    if (!seeded || !job?.id || job.status !== "running") return;
+    const t = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/research/${job.id}`);
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          status?: string;
+          milestones?: ResearchMilestones;
+          report?: string;
+          citations?: Citation[];
+          durationMs?: number;
+          error?: string;
+        };
+        const status = (data.status as JobStatus) ?? "running";
+        const terminal = status === "done" || status === "error" || status === "failed";
+        setJob((j) => {
+          if (!j) return j;
+          const next = { ...j, steps: milestonesToSteps(status, data.milestones) };
+          if (terminal) {
+            next.status = status === "failed" ? "error" : status;
+            next.report = data.report;
+            next.citations = data.citations ?? j.citations;
+            next.totalMs = data.durationMs;
+            next.error = data.error;
+          }
+          return next;
+        });
+        if (terminal) {
+          refreshPast();
+          if (status === "done") {
+            setRelatedLoading(true);
+            fetch("/api/research/related-questions", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ query: job.query, report_summary: "" }),
+            })
+              .then((r) => (r.ok ? r.json() : { questions: [] }))
+              .then((d) => {
+                setRelatedQuestions(d.questions ?? []);
+                setRelatedLoading(false);
+              })
+              .catch(() => setRelatedLoading(false));
+          }
+        }
+      } catch {
+        /* transient — keep polling */
+      }
+    }, 2500);
+    return () => clearInterval(t);
+  }, [seeded, job?.id, job?.status, refreshPast]);
+
+  // Deep link — ?id=<jobId> seeds the report view (dashboard research rows,
+  // notification links). Re-runs when the param changes.
+  const [searchParams] = useSearchParams();
+  const linkedId = searchParams.get("id");
+  useEffect(() => {
+    if (linkedId) void loadJob(linkedId);
+  }, [linkedId, loadJob]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -168,6 +330,10 @@ export default function DeepResearchPage() {
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
+    setSeeded(false);
+    // Captured here — the async stream loop below runs after many renders,
+    // so the component-scope `job` would be stale by the time `done` arrives.
+    const q = query.trim();
 
     // Create job
     const newJob: ResearchJob = {
@@ -261,12 +427,12 @@ export default function DeepResearchPage() {
               );
               refreshPast();
               // Fetch related questions after report is complete (non-blocking)
-              if (job?.query) {
+              if (q) {
                 setRelatedLoading(true);
                 fetch("/api/research/related-questions", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ query: job.query, report_summary: "" }),
+                  body: JSON.stringify({ query: q, report_summary: "" }),
                 })
                   .then((r) => (r.ok ? r.json() : { questions: [] }))
                   .then((d) => {
@@ -313,28 +479,12 @@ export default function DeepResearchPage() {
               pastJobs.map((j) => (
                 <button
                   key={j.id}
-                  onClick={async () => {
-                    const res = await fetch(`/api/research/${j.id}`);
-                    if (res.ok) {
-                      const data = await res.json();
-                      setJob({
-                        id: j.id,
-                        query: j.query,
-                        status: j.status as JobStatus,
-                        steps: [],
-                        citations: data.citations ?? [],
-                        cycleCount: data.cycles ?? 0,
-                        report: data.report,
-                        totalMs: data.durationMs,
-                      });
-                      setQuery(j.query);
-                    }
-                  }}
+                  onClick={() => void loadJob(j.id)}
                   className="w-full text-left px-2.5 py-2 rounded-md text-xs hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex items-center gap-1.5 mb-1">
                     <span
-                      className={`text-[10px] ${j.status === "done" ? "text-green-400" : j.status === "failed" ? "text-destructive" : "text-yellow-400"}`}
+                      className={`text-[10px] ${j.status === "done" ? "text-green-400" : j.status === "failed" || j.status === "error" ? "text-destructive" : "text-yellow-400"}`}
                     >
                       ● {j.status}
                     </span>
@@ -569,8 +719,9 @@ export default function DeepResearchPage() {
                   </div>
                 )}
 
-                {/* Error state */}
-                {job.status === "failed" && (
+                {/* Error state — the backend persists failures as "error" (stream
+                    catch, stale-running recovery), so both statuses are terminal. */}
+                {(job.status === "failed" || job.status === "error") && (
                   <div
                     className="rounded-lg p-4 flex items-start gap-3"
                     style={{

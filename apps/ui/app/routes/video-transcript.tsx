@@ -84,7 +84,12 @@ export default function VideoTranscript() {
         body: JSON.stringify(base64 ? { base64 } : { url: target }),
       }).catch(() => null);
       if (r?.ok) setResult(await r.json());
-      else setErr("Transcription failed");
+      else {
+        const detail = (await r?.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        setErr(detail?.message ?? "Transcription failed");
+      }
       setTranscribing(false);
     },
     [url],

@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/a2a-protocol",
+  "version": "0.1.0",
+  "description": "Agent-to-Agent communication protocol inspired by Google ADK",
+  "main": "src/index.ts"
+}

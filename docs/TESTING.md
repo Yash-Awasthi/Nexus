@@ -22,6 +22,32 @@ Integration tests that need a live database/Redis are env-guarded with
 docker compose up -d postgres redis
 ```
 
+### Vitest config topology (where tests actually run)
+
+Two Vitest configs matter for `apps/api`:
+
+- **Root config** (`vitest.config.ts` at the repo root) runs the unit tier
+  (`packages/*` and `apps/*/tests/**`) but **excludes** `apps/api/tests/routes/**`
+  and `apps/api/tests/server.test.ts`. The api lib tier is:
+
+  ```bash
+  npx vitest run apps/api/tests/lib   # store/unit tests — hermetic, ~185 tests
+  ```
+
+- **`apps/api/vitest.config.ts`** includes `tests/**`, so route-level tests
+  (`tests/routes/*`) run under it — from `apps/api`:
+
+  ```bash
+  npx vitest run tests/routes/health.test.ts
+  ```
+
+  Route tests that build the full server (`buildServer()`) import every route
+  module, and `obs-providers.ts` constructs a Postgres store at **module scope**
+  whenever `DATABASE_URL` is set (`tests/setup.ts` always sets one) — so they
+  need a reachable database. The health route tests are the exception: they mock
+  `@nexus/db` and `pg`, so `tests/routes/health.test.ts` is fully hermetic and
+  green without infra.
+
 ## End-to-end & accessibility (Playwright)
 
 ```bash

@@ -35,7 +35,6 @@
  * const results = await retriever.retrieve("explain monads", 5);
  * ```
  */
-
 // ── Memory entry types ────────────────────────────────────────────────────────
 
 export interface MemoryEntry {
@@ -57,7 +56,16 @@ export interface MemorySearchResult {
 
 /** Memory filter interface definition. */
 export interface MemoryFilter {
+  /** Exact-match AND over metadata keys (legacy filter, kept for compatibility). */
   metadata?: Record<string, unknown>;
+  /**
+   * Chroma-style where clause over metadata (operator vocabulary in where.ts):
+   * shorthand equality, $eq/$ne/$gt/$gte/$lt/$lte/$in/$nin/$contains,
+   * $and/$or composition. `metadata` (when set) and `where` combine with AND.
+   */
+  where?: WhereClause;
+  /** Chroma-style where_document clause over the entry text ($contains/...). */
+  whereDocument?: WhereDocumentClause;
   excludeExpired?: boolean;
 }
 
@@ -81,26 +89,27 @@ export interface IEmbedder {
   readonly dimensions: number;
 }
 
+// Chroma-style where/where_document clause vocabulary.
+import { validateWhere, validateWhereDocument, whereMatches, whereDocumentMatches } from "./where.js";
+import type { WhereClause, WhereDocumentClause } from "./where.js";
+export {
+  validateWhere,
+  validateWhereDocument,
+  whereMatches,
+  whereDocumentMatches,
+  type WhereClause,
+  type WhereDocumentClause,
+  type Scalar,
+  type MetadataValue,
+} from "./where.js";
+
 // ── Math helpers ──────────────────────────────────────────────────────────────
+// dot/magnitude/cosineSimilarity live in @nexus/shared/math (single home).
+// cosineSimilarity is re-exported here for the package's public API.
 
-function dotProduct(a: number[], b: number[]): number {
-  let sum = 0;
-  const len = Math.min(a.length, b.length);
-  for (let i = 0; i < len; i++) sum += (a[i] ?? 0) * (b[i] ?? 0);
-  return sum;
-}
+import { cosineSimilarity, magnitude } from "@nexus/shared";
 
-function magnitude(v: number[]): number {
-  return Math.sqrt(v.reduce((s, x) => s + x * x, 0));
-}
-
-/** Cosine similarity. */
-export function cosineSimilarity(a: number[], b: number[]): number {
-  const magA = magnitude(a);
-  const magB = magnitude(b);
-  if (magA === 0 || magB === 0) return 0;
-  return Math.max(0, Math.min(1, dotProduct(a, b) / (magA * magB)));
-}
+export { cosineSimilarity };
 
 // ── In-memory store for tests ─────────────────────────────────────────────────
 
@@ -126,6 +135,9 @@ export class InMemoryRagtimeStore implements IMemoryStore {
           if (e.metadata[k] !== v) return false;
         }
       }
+      if (filter?.where && !whereMatches(e.metadata, filter.where)) return false;
+      if (filter?.whereDocument && !whereDocumentMatches(e.text, filter.whereDocument))
+        return false;
       return true;
     });
   }
@@ -1009,3 +1021,6 @@ export function combineRetrievalResults<
   }
   return Array.from(unique.values()).sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 }
+
+export * from "./hnsw-index.js";
+export * from "./collection.js";

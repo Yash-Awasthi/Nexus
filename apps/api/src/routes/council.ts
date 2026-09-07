@@ -28,6 +28,7 @@ import { eq, desc } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
 import { buildUserDriverRegistry } from "../lib/provider-keys.js";
+import { emitCouncilTranscript } from "../lib/council-transcript.js";
 import { requireAuth, requireAuthWithTier, getTierFromRequest } from "../middleware/auth.js";
 
 // ── Council config ─────────────────────────────────────────────────────────────
@@ -36,17 +37,26 @@ const LOCAL_OLLAMA = process.env.NEXUS_LLM_PROVIDER === "ollama";
 // In local mode default the council to the local Ollama alias so deliberations
 // run key-free; cloud deployments still default to nexus/smart (BYOK).
 const COUNCIL_MODEL = process.env.COUNCIL_MODEL ?? (LOCAL_OLLAMA ? "nexus/local" : "nexus/smart");
+
+/** Resolve the active council model alias (env-aware, shared with callers). */
+export function resolveCouncilModelAlias(): string {
+  return COUNCIL_MODEL;
+}
 const COUNCIL_MAX_TOKENS = parseInt(process.env.COUNCIL_MAX_TOKENS ?? "4096", 10);
 
 // ── Driver alias table ────────────────────────────────────────────────────────
 
-const COUNCIL_DRIVER_ALIASES: Record<string, { provider: string; model: string }> = {
-  "nexus/fast": { provider: "groq", model: "llama-3.3-70b-versatile" },
-  "nexus/smart": { provider: "groq", model: "llama-3.3-70b-versatile" },
+export const COUNCIL_DRIVER_ALIASES: Record<string, { provider: string; model: string }> = {
+  // llama-3.3-70b-versatile was decommissioned by Groq on 2026-08-16 — the
+  // groq aliases now point at openai/gpt-oss-120b (Groq's recommended swap).
+  "nexus/fast": { provider: "groq", model: "openai/gpt-oss-120b" },
+  "nexus/smart": { provider: "groq", model: "openai/gpt-oss-120b" },
   "nexus/opus": { provider: "anthropic", model: "claude-opus-4-5" },
-  "nexus/sonnet": { provider: "anthropic", model: "claude-3-5-sonnet-20241022" },
-  "nexus/haiku": { provider: "anthropic", model: "claude-haiku-3-5" },
-  "nexus/gemini": { provider: "gemini", model: "gemini-flash-latest" },
+  // claude-3-5-sonnet-20241022 was retired by Anthropic on 2025-10-22.
+  "nexus/sonnet": { provider: "anthropic", model: "claude-sonnet-4-6" },
+  "nexus/haiku": { provider: "anthropic", model: "claude-haiku-4-5" },
+  // Gemini 1.5/2.x lines are shut down; 3.6 Flash is GA and cheap.
+  "nexus/gemini": { provider: "gemini", model: "gemini-3.6-flash" },
   "nexus/deepseek": { provider: "deepseek", model: "deepseek-chat" },
   "nexus/mistral": { provider: "mistral", model: "mistral-large-latest" },
   "nexus/openrouter": { provider: "openrouter", model: "anthropic/claude-sonnet-5" },
@@ -70,7 +80,7 @@ if (!Object.hasOwn(COUNCIL_DRIVER_ALIASES, COUNCIL_MODEL)) {
  * Identical to the one in council-handler.ts — both code paths share the
  * same transport so provider behaviour is consistent.
  */
-class LlmDriversTransport implements ILLMTransport {
+export class LlmDriversTransport implements ILLMTransport {
   constructor(
     private readonly registry: DriverRegistry,
     private readonly modelAlias: string,
@@ -255,8 +265,20 @@ export async function councilRoutes(app: FastifyInstance): Promise<void> {
           return reply.code(400).send({ ok: false, error: err.message });
         throw err;
       }
+      const startedAt = Date.now();
       try {
         const response = await svc.deliberate(councilRequest, { signalId: signal_id });
+        if (response.ok && response.result) {
+          // Pass 65: emit the run-level transcript (worker-shaped event) so the
+          // sync API path leaves the same observability artifact as the worker.
+          emitCouncilTranscript({
+            signalId: signal_id,
+            request: councilRequest,
+            result: response.result,
+            votes: response.result.votes,
+            startedAt,
+          });
+        }
         return reply.code(response.ok ? 200 : 500).send(response);
       } catch (err) {
         request.log.error(err, "council/deliberate failed");
@@ -307,11 +329,22 @@ export async function councilRoutes(app: FastifyInstance): Promise<void> {
         reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
       };
 
+      const startedAt = Date.now();
       try {
         const response = await svc.deliberate(councilRequest, {
           signalId: signal_id,
           onVote: (vote: ModelVote) => send("vote", vote),
         });
+        if (response.ok && response.result) {
+          // Pass 65: the streamed path leaves the same run-level artifact.
+          emitCouncilTranscript({
+            signalId: signal_id,
+            request: councilRequest,
+            result: response.result,
+            votes: response.result.votes,
+            startedAt,
+          });
+        }
         send("done", response);
       } catch (err) {
         request.log.error(err, "council/deliberate/stream failed");
@@ -439,8 +472,19 @@ export async function councilRoutes(app: FastifyInstance): Promise<void> {
           return reply.code(400).send({ ok: false, error: err.message });
         throw err;
       }
+      const startedAt = Date.now();
       try {
         const response = await svc.deliberate(councilRequest, { signalId });
+        if (response.ok && response.result) {
+          // Pass 65: signal-triggered runs leave the same run-level artifact.
+          emitCouncilTranscript({
+            signalId,
+            request: councilRequest,
+            result: response.result,
+            votes: response.result.votes,
+            startedAt,
+          });
+        }
         return reply.code(response.ok ? 200 : 500).send(response);
       } catch (err) {
         request.log.error(err, "council/trigger failed");

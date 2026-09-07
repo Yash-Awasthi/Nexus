@@ -22,6 +22,7 @@ import {
   type ILLMResponse,
   type CouncilPersistPayload,
 } from "@nexus/council";
+import { buildCouncilRunTranscript, councilTranscriptEvent } from "@nexus/council";
 import { db } from "@nexus/db";
 import { verdicts, councilTranscripts } from "@nexus/db/schema";
 import {
@@ -44,12 +45,15 @@ const COUNCIL_DAILY_BUDGET = parseInt(process.env.COUNCIL_DAILY_BUDGET ?? "100",
 // ── Driver alias table (council-local subset of gateway DRIVER_ALIASES) ───────
 
 const COUNCIL_DRIVER_ALIASES: Record<string, { provider: string; model: string }> = {
-  "nexus/fast": { provider: "groq", model: "llama-3.3-70b-versatile" },
-  "nexus/smart": { provider: "groq", model: "llama-3.3-70b-versatile" },
+  // llama-3.3-70b-versatile was decommissioned by Groq on 2026-08-16 — the
+  // groq aliases now point at openai/gpt-oss-120b (Groq's recommended swap),
+  // mirroring apps/api/src/routes/council.ts.
+  "nexus/fast": { provider: "groq", model: "openai/gpt-oss-120b" },
+  "nexus/smart": { provider: "groq", model: "openai/gpt-oss-120b" },
   "nexus/opus": { provider: "anthropic", model: "claude-opus-4-5" },
-  "nexus/sonnet": { provider: "anthropic", model: "claude-3-5-sonnet-20241022" },
-  "nexus/haiku": { provider: "anthropic", model: "claude-haiku-3-5" },
-  "nexus/gemini": { provider: "gemini", model: "gemini-flash-latest" },
+  "nexus/sonnet": { provider: "anthropic", model: "claude-sonnet-4-6" },
+  "nexus/haiku": { provider: "anthropic", model: "claude-haiku-4-5" },
+  "nexus/gemini": { provider: "gemini", model: "gemini-3.6-flash" },
   "nexus/deepseek": { provider: "deepseek", model: "deepseek-chat" },
   "nexus/mistral": { provider: "mistral", model: "mistral-large-latest" },
   "nexus/openrouter": { provider: "openrouter", model: "anthropic/claude-sonnet-5" },
@@ -243,6 +247,7 @@ export interface CouncilJobPayload {
 
 export async function handleCouncilJob(payload: CouncilJobPayload): Promise<unknown> {
   // Phase 6 — reject early if daily budget exhausted
+  const startedAt = Date.now();
   const budget = await checkDailyBudget();
   if (!budget.ok) {
     throw new Error(
@@ -275,6 +280,21 @@ export async function handleCouncilJob(payload: CouncilJobPayload): Promise<unkn
         dailyLimit: budget.limit,
       }),
     );
+    // Pass 59: emit the run-level inspectable transcript (pass-58 recorder) so
+    // every completed deliberation leaves a full observability artifact
+    // (route evidence, per-vote stages, dissent, timings, degradation verdict).
+    try {
+      const transcript = buildCouncilRunTranscript({
+        signalId: payload.signalId,
+        request,
+        result: r,
+        votes: r.votes,
+        startedAt,
+      });
+      console.log(JSON.stringify(councilTranscriptEvent(payload.signalId, transcript)));
+    } catch (err) {
+      console.error("[council-handler] transcript emission failed:", err);
+    }
   }
 
   return response;
