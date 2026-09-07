@@ -180,6 +180,23 @@ async function main(): Promise<void> {
   const app = await buildServer();
   console.log("[startup] Fastify server built.");
 
+  // ── Step 2.5: Await the memory embedder warm-up (bounded) ───────────────────
+  // The Ollama embed model loads on first call; api-bridge started it during
+  // route registration so the load overlaps server startup. Await it here —
+  // bounded, fail-open — so the first real recall after a restart can never
+  // race a cold model load. Health checks were already served by the early
+  // server during this window, so the 30-second deploy window is unaffected.
+  try {
+    const { embedderWarmup } = await import("./routes/api-bridge.js");
+    await Promise.race([
+      embedderWarmup(),
+      new Promise<void>((resolve) => setTimeout(resolve, 8_000)),
+    ]);
+    console.log("[startup] memory embedder warm (or bound elapsed) ✓");
+  } catch {
+    console.warn("[startup] ⚠ embedder warm-up await failed — continuing (fail-open)");
+  }
+
   // ── Step 3: Hand off port from early server to Fastify ──────────────────────
   console.log("[startup] closing early server, handing off port to Fastify...");
   await new Promise<void>((resolve) => earlyServer.close(() => resolve()));

@@ -456,22 +456,31 @@ function getImageGen(): { gen: ImageGenerator; provider: string } | null {
 let _imageGenProvider = "";
 
 let _memory: MemoryManager | null = null;
+let _embedder: import("@nexus/memory").IEmbedder | null = null;
+function getEmbedder(): import("@nexus/memory").IEmbedder {
+  if (_embedder) return _embedder;
+  try {
+    _embedder = createBestEmbedder();
+  } catch {
+    _embedder = new FixedEmbedder(768);
+  }
+  return _embedder;
+}
+/** Resolves after the memory embedder's first real call completes (the Ollama
+ * model load). Started at bridge registration and awaited — bounded — in
+ * index.ts BEFORE the port handoff, so the first real recall after a restart
+ * can never race a cold model load. Fail-open: if Ollama is unreachable the
+ * promise still resolves (the fixed-size fallback embedder serves). */
+let _embedderWarmup: Promise<void> = Promise.resolve();
+export function embedderWarmup(): Promise<void> {
+  return _embedderWarmup;
+}
 function getMemory(): MemoryManager {
   if (_memory) return _memory;
   const store = process.env.DATABASE_URL
     ? new PgVectorStore({ databaseUrl: process.env.DATABASE_URL })
     : new InMemoryStore();
-  const embedder = (() => {
-    try {
-      return createBestEmbedder();
-    } catch {
-      return new FixedEmbedder(768);
-    }
-  })();
-  _memory = new MemoryManager({ store, embedder });
-  // Warm up the embedder (Ollama loads the model on first call) so the first
-  // real recall isn't a cold miss. Fire-and-forget; failure is harmless.
-  void embedder.embed("warmup").catch(() => {});
+  _memory = new MemoryManager({ store, embedder: getEmbedder() });
   return _memory;
 }
 
@@ -672,6 +681,14 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   // Reload the durable usage/cost log before any analytics/dashboard/digest read
   // can run (day-sharded KV keys written by lib/cost-log.ts). Best-effort.
   await costLogStore.load();
+
+  // Warm the memory embedder NOW (bridge registration, long before listen) so
+  // the Ollama model load overlaps server startup. index.ts awaits the promise
+  // (bounded) before the port handoff — a restart can never drop a recall.
+  _embedderWarmup = getEmbedder()
+    .embed("warmup")
+    .then(() => undefined)
+    .catch(() => undefined);
 
   // Seed the failover/discovery layer from the live registry so the health
   // surfaces show configured providers even before the first LLM call.

@@ -151,6 +151,5 @@ that reintroduces the duplicate-React crash.
 
 ## Known caveats
 
-- Memory cold-recall can miss once right after restart (Ollama warm-up); warm calls are reliable.
 - `diff/rollback` history is same-session-only by design — `rollbackId` lives in React state. Revisit only if a cross-session rollback UI is ever built.
 - Billing/subscription is intentionally a no-op: Nexus is free + BYOK.
