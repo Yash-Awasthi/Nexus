@@ -47,7 +47,7 @@ OAuth connectors (optional):
 
 > For a concrete, step-by-step rebuild of the live Railway + Vercel + Neon + Redis
 > Cloud + Browserbase stack (service order, smoke test, live service IDs), see
-> [`REDEPLOY_RUNBOOK.md`](../REDEPLOY_RUNBOOK.md) at the repo root.
+> the free-tier rebuild section below.
 
 ## Railway + Vercel (reference deployment)
 
@@ -104,3 +104,42 @@ docker compose -f docker-compose.yml -f infra/docker/docker-compose.observabilit
 
 See [ROADMAP.md](../ROADMAP.md#14-production-multi-tenant-hardening) for production
 hardening — connection pooling, worker scaling, observability, and pgvector tuning at scale.
+
+## Free-tier cloud rebuild (Railway + Neon + Vercel)
+
+The whole stack deploys on free tiers: Vercel (static SPA + `/api` proxy) →
+Railway (Fastify API + BullMQ worker, Docker) → Neon (Postgres) + Redis Cloud
+(raw TCP — Upstash REST and Render's internal Redis both fail for BullMQ) →
+Browserbase (headless browser, optional). Deploy dependencies in order:
+**Neon** (migrate with `pnpm run db:migrate` from `packages/db`) → **Redis
+Cloud** (`redis://default:<password>@<host>:<port>`, eviction `noeviction`) →
+**Browserbase** (`BROWSER_CDP_URL=wss://connect.browserbase.com?apiKey=…`) →
+**Railway** (deploy from the repo; service `nexus-api` with
+`apps/api/Dockerfile`, service `nexus-worker` with `apps/worker/Dockerfile`,
+both reading the project's shared variables) → **Vercel** (import repo, the
+`vercel.json` rewrites `/api/*` to your Railway URL — edit it to point at your
+own deployment, not anyone else's).
+
+Required shared variables (exact names — the code reads `NEXUS_*`, not
+`JWT_SECRET`/`SCRYPT_SECRET`): `DATABASE_URL`, `REDIS_URL`, `NEXUS_API_KEY`,
+`NEXUS_JWT_SECRET`, `NEXUS_SECRETS_KEY`, `NEXUS_AUDIT_KEY`, `NODE_ENV=production`,
+plus the LLM keys you use (`GROQ_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`,
+`MISTRAL_API_KEY`, `OPENROUTER_API_KEY`, `DEEPSEEK_API_KEY`, `TAVILY_API_KEY`,
+`BROWSER_CDP_URL`). Generate the four 64-hex secrets with `openssl rand -hex 32`.
+
+Gotchas already fixed — do not reintroduce: Dockerfiles build with
+`pnpm --filter "@nexus/api..."` (topological — don't hand-order packages);
+auth needs the `maxmem` scrypt option; the runtime is ESM (`import.meta.url`);
+BullMQ needs raw TCP Redis; the worker is optional (chat/auth/browser-agent run
+synchronously in the API without it).
+
+Deploy smoke test:
+
+```bash
+B=https://<your-api>.up.railway.app
+curl $B/health                                    # 200
+EM="t$(date +%s)@x.co"
+TOK=$(curl -s -X POST $B/api/v1/auth/register -H 'Content-Type: application/json' \
+  -d "{\"email\":\"$EM\",\"password\":\"Test12345!\",\"name\":\"t\"}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["accessToken"])')
+curl $B/api/v1/drive/status -H "Authorization: Bearer $TOK"   # 401-free authed response
+```

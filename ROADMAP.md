@@ -210,6 +210,14 @@ first.
 - **15.4 Agentic browser** (`stealth-browser`), **15.5 Desktop** (Electron + offline worker),
   **15.6 Mobile** (React Native + push) — product tracks; each needs its own spec + scaffolding
   decision first.
+- **15.7 Per-model capability routing.** Agents/skills auto-selected onto models by capability
+  (context window, tool-calling, vision, reasoning tier). Discovery surface is shipped
+  (`GET /api/v1/llm/models`, `apps/api/src/lib/model-discovery.ts`); missing is the routing
+  decision layer that consumes it.
+- **15.8 Cheap extraction model.** Wire a small local model (e.g. `llama3.2:1b` on Ollama) as
+  the automatic extractor turning execution events into memory, replacing the current
+  deterministic distillation in `apps/api/src/lib/mission-memory.ts` (enhancement, not a
+  hole — distillation works today at zero cost).
 
 ---
 

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="apps/docs-site/static/img/nexus-logo.svg" alt="NEXUS" width="96" />
+<img src=".github/assets/nexus-logo.svg" alt="NEXUS" width="96" />
 
 # NEXUS
 
@@ -147,8 +147,6 @@ The capability reference and SDK snippets are in [docs/FEATURES.md](docs/FEATURE
 | [docs/STATUS.md](docs/STATUS.md)                   | Live build status — what works, architecture invariants |
 | [ROADMAP.md](ROADMAP.md)                           | Shipped work, external gates, future direction          |
 | [CONTRIBUTING.md](CONTRIBUTING.md)                 | Code standards, branch strategy, PR template           |
-
-The docs site (Docusaurus) lives in `apps/docs-site/`.
 
 ---
 

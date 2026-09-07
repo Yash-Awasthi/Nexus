@@ -66,7 +66,6 @@ nexus/
 ├── apps/
 │   ├── api/            Fastify HTTP/SSE/WebSocket gateway (61 route modules)
 │   ├── cli/            Developer CLI (commander.js)
-│   ├── docs-site/      Docusaurus documentation site
 │   ├── ingest-py/      Python ingest helpers
 │   ├── ui/             React Router v7 SPA dashboard (100+ routes)
 │   └── worker/         BullMQ workers — signal, task, and repeatable feed jobs
