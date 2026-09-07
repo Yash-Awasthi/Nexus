@@ -12,24 +12,45 @@
  */
 
 import { createServer } from "node:http";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // ── .env loader (zero-dependency) ───────────────────────────────────────────
 // Parses a standard KEY=VALUE .env file at the monorepo root so `pnpm dev:api`
-// works without manually exporting variables. Values may be bare or quoted;
-// inline # comments are stripped only from unquoted values. Already-set env
-// vars win (we never overwrite). Safe for values containing & ? = etc., which
-// break `source .env` under bash.
+// works without manually exporting variables. The root is found by walking up
+// from THIS MODULE's directory to the directory containing
+// pnpm-workspace.yaml — NOT from process.cwd(), which depends on where the
+// dev server was launched from (a restart from the wrong cwd silently loses
+// REDIS_URL/DATABASE_URL and degrades the shared KV to in-memory). Values may
+// be bare or quoted; inline # comments are stripped only from unquoted
+// values. Already-set env vars win (we never overwrite). Safe for values
+// containing & ? = etc., which break `source .env` under bash.
 (function loadEnvFile() {
-  let text: string;
+  let text: string | undefined;
   try {
-    text = readFileSync(resolve(process.cwd(), "../../.env"), "utf8");
+    let dir = dirname(fileURLToPath(import.meta.url)); // .../apps/api/src
+    for (let i = 0; i < 6; i++) {
+      if (existsSync(resolve(dir, "pnpm-workspace.yaml"))) {
+        text = readFileSync(resolve(dir, ".env"), "utf8");
+        break;
+      }
+      const parent = dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
   } catch {
+    /* fall through to cwd-based candidates */
+  }
+  if (text === undefined) {
     try {
-      text = readFileSync(resolve(process.cwd(), ".env"), "utf8");
+      text = readFileSync(resolve(process.cwd(), "../../.env"), "utf8");
     } catch {
-      return; // no .env — rely on real env vars
+      try {
+        text = readFileSync(resolve(process.cwd(), ".env"), "utf8");
+      } catch {
+        return; // no .env — rely on real env vars
+      }
     }
   }
   for (const line of text.split("\n")) {
@@ -48,8 +69,17 @@ import { resolve } from "node:path";
   }
 })();
 
-const PORT = parseInt(process.env.PORT ?? "10000", 10);
+// PORT=0 (or empty/garbage) must never reach listen() — port 0 makes the OS
+// bind an ephemeral port and the whole stack comes up somewhere unreachable.
+const parsedPort = Number.parseInt(process.env.PORT ?? "", 10);
+const PORT = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : 10000;
 const HOST = process.env.HOST ?? "0.0.0.0";
+
+console.log(
+  `[startup] env after load: REDIS_URL=${process.env.REDIS_URL ? "set" : "UNSET"} ` +
+    `DATABASE_URL=${process.env.DATABASE_URL ? "set" : "UNSET"} ` +
+    `UPSTASH=${process.env.UPSTASH_REDIS_REST_URL ? "set" : "UNSET"}`,
+);
 
 // ── Global error traps ────────────────────────────────────────────────────────
 process.on("uncaughtException", (err) => {

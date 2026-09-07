@@ -139,6 +139,7 @@ import { createNotification } from "../lib/notifications-store.js";
 import { maybeEmitWeeklyDigest } from "../lib/weekly-digest.js";
 import { requireAuthWithTier } from "../middleware/auth.js";
 import { listResearchJobs } from "../lib/research-jobs.js";
+import { getDiffRecord, saveDiffRecord } from "../lib/diff-history.js";
 import { costLogStore, type CostEntry } from "../lib/cost-log.js";
 
 import { gatewayLog } from "./gateway.js";
@@ -9634,11 +9635,16 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     },
   );
 
-  const _diffRollbacks = new Map<string, { original: string; appliedAt: string }>();
+  // -- DIFF APPLY / ROLLBACK --------------------------------------------------
+  // Backed by the durable per-user store (lib/diff-history.ts) — a rollback
+  // works across API restarts and is scoped to the caller (the old process-
+  // local Map made history same-session-only and cross-user visible).
 
-  app.post<{ Body: { original: string; modified: string } }>("/diff/apply", async (req, reply) => {
-    const orig = (req.body.original ?? "").split("\n");
-    const mod = (req.body.modified ?? "").split("\n");
+  app.post<{
+    Body: { original: string; modified: string };
+  }>("/diff/apply", { preHandler: requireAuthWithTier }, async (request, reply) => {
+    const orig = (request.body.original ?? "").split("\n");
+    const mod = (request.body.modified ?? "").split("\n");
     const hunks: { lineNo: number; type: "add" | "remove" | "change"; content: string }[] = [];
     const maxLen = Math.max(orig.length, mod.length);
     for (let i = 0; i < maxLen; i++) {
@@ -9649,11 +9655,19 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
         hunks.push({ lineNo: i + 1, type: "change", content: mod[i] ?? "" });
     }
     // Record the original so the applied change can be rolled back.
-    const rollbackId = crypto.randomUUID().slice(0, 8);
-    _diffRollbacks.set(rollbackId, {
-      original: req.body.original ?? "",
-      appliedAt: new Date().toISOString(),
-    });
+    let rollbackId: string;
+    try {
+      const record = await saveDiffRecord(request.nexusUserId, {
+        original: request.body.original ?? "",
+        modified: request.body.modified ?? "",
+      });
+      rollbackId = record.id;
+    } catch (err) {
+      return reply.code(413).send({
+        error: "diff_too_large",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
     return reply.send({
       applied: true,
       rollbackId,
@@ -9664,12 +9678,14 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
   });
 
   /** POST /diff/rollback — restore a change previously applied via /diff/apply. */
-  app.post<{ Body: { rollbackId: string } }>("/diff/rollback", async (req, reply) => {
-    const rec = _diffRollbacks.get(req.body.rollbackId ?? "");
+  app.post<{
+    Body: { rollbackId: string };
+  }>("/diff/rollback", { preHandler: requireAuthWithTier }, async (request, reply) => {
+    const rec = await getDiffRecord(request.nexusUserId, request.body.rollbackId ?? "");
     if (!rec) return reply.code(404).send({ error: "rollback_not_found" });
     return reply.send({
       rolledBack: true,
-      rollbackId: req.body.rollbackId,
+      rollbackId: request.body.rollbackId,
       original: rec.original,
       appliedAt: rec.appliedAt,
     });

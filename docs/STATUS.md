@@ -80,7 +80,6 @@ curl -s -X POST $API/api/reasoning/run -H "Authorization: Bearer $T" \
 
 ## ❌ Not built yet (nav item with no real backend)
 
-- **Diff rollback** — `/diff/apply` works; `/diff/rollback` missing (no edit history).
 - **Billing / subscription** — intentional: Nexus is free + BYOK, checkout is a no-op.
 
 ## Architecture — invariants (durable rules; the passes that established them are in git history)
@@ -151,5 +150,4 @@ that reintroduces the duplicate-React crash.
 
 ## Known caveats
 
-- `diff/rollback` history is same-session-only by design — `rollbackId` lives in React state. Revisit only if a cross-session rollback UI is ever built.
 - Billing/subscription is intentionally a no-op: Nexus is free + BYOK.
