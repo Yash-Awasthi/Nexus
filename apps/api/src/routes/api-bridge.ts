@@ -139,7 +139,6 @@ import { createNotification } from "../lib/notifications-store.js";
 import { maybeEmitWeeklyDigest } from "../lib/weekly-digest.js";
 import { requireAuthWithTier } from "../middleware/auth.js";
 import { listResearchJobs } from "../lib/research-jobs.js";
-import { getDiffRecord, saveDiffRecord } from "../lib/diff-history.js";
 import { costLogStore, type CostEntry } from "../lib/cost-log.js";
 
 import { gatewayLog } from "./gateway.js";
@@ -9634,62 +9633,6 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
       return reply.send({ code, language: req.body.language ?? "typescript" });
     },
   );
-
-  // -- DIFF APPLY / ROLLBACK --------------------------------------------------
-  // Backed by the durable per-user store (lib/diff-history.ts) — a rollback
-  // works across API restarts and is scoped to the caller (the old process-
-  // local Map made history same-session-only and cross-user visible).
-
-  app.post<{
-    Body: { original: string; modified: string };
-  }>("/diff/apply", { preHandler: requireAuthWithTier }, async (request, reply) => {
-    const orig = (request.body.original ?? "").split("\n");
-    const mod = (request.body.modified ?? "").split("\n");
-    const hunks: { lineNo: number; type: "add" | "remove" | "change"; content: string }[] = [];
-    const maxLen = Math.max(orig.length, mod.length);
-    for (let i = 0; i < maxLen; i++) {
-      if (i >= orig.length) hunks.push({ lineNo: i + 1, type: "add", content: mod[i] ?? "" });
-      else if (i >= mod.length)
-        hunks.push({ lineNo: i + 1, type: "remove", content: orig[i] ?? "" });
-      else if (orig[i] !== mod[i])
-        hunks.push({ lineNo: i + 1, type: "change", content: mod[i] ?? "" });
-    }
-    // Record the original so the applied change can be rolled back.
-    let rollbackId: string;
-    try {
-      const record = await saveDiffRecord(request.nexusUserId, {
-        original: request.body.original ?? "",
-        modified: request.body.modified ?? "",
-      });
-      rollbackId = record.id;
-    } catch (err) {
-      return reply.code(413).send({
-        error: "diff_too_large",
-        message: err instanceof Error ? err.message : String(err),
-      });
-    }
-    return reply.send({
-      applied: true,
-      rollbackId,
-      hunks,
-      linesAdded: hunks.filter((h) => h.type === "add").length,
-      linesRemoved: hunks.filter((h) => h.type === "remove").length,
-    });
-  });
-
-  /** POST /diff/rollback — restore a change previously applied via /diff/apply. */
-  app.post<{
-    Body: { rollbackId: string };
-  }>("/diff/rollback", { preHandler: requireAuthWithTier }, async (request, reply) => {
-    const rec = await getDiffRecord(request.nexusUserId, request.body.rollbackId ?? "");
-    if (!rec) return reply.code(404).send({ error: "rollback_not_found" });
-    return reply.send({
-      rolledBack: true,
-      rollbackId: request.body.rollbackId,
-      original: rec.original,
-      appliedAt: rec.appliedAt,
-    });
-  });
 
   // -- CONTEXT MENTION SEARCH --------------------------------------------------
   // Frontend: apps/ui/app/components/ContextMention.tsx + chat.tsx mentions.

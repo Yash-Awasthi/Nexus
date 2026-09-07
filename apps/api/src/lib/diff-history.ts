@@ -73,3 +73,20 @@ export async function getDiffRecord(
   const userId = uidFor(uid);
   return getSharedKV().get<DiffRecord>(itemKey(userId, id));
 }
+
+/**
+ * Newest-first page through the caller's applied diffs (the index order).
+ * Evicted/TTL-expired items are silently skipped; without the index (fresh
+ * user) returns []. Powers GET /diff/history so a rollback survives reloads.
+ */
+export async function listDiffRecords(
+  uid: string | undefined,
+  limit = 10,
+): Promise<DiffRecord[]> {
+  const userId = uidFor(uid);
+  const capped = Math.max(1, Math.min(limit, MAX_RECORDS));
+  const kv = getSharedKV();
+  const ids = (await kv.get<string[]>(indexKey(userId))) ?? [];
+  const records = await Promise.all(ids.slice(0, capped).map((id) => kv.get<DiffRecord>(itemKey(userId, id))));
+  return records.filter((r): r is DiffRecord => r !== undefined);
+}

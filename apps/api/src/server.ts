@@ -100,6 +100,7 @@ import { predictionMarketRoutes } from "./routes/prediction-market.js";
 import { redteamRoutes } from "./routes/redteam.js";
 import { researcherRoutes } from "./routes/researcher.js";
 import { sessionGraphRoutes } from "./routes/session-graph.js";
+import { diffRoutes } from "./routes/diff.js";
 import { missionRoutes } from "./routes/missions.js";
 import { rlhfRoutes } from "./routes/rlhf.js";
 import { runtimeRoutes } from "./routes/runtime.js";
@@ -452,6 +453,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       await scoped.register(notificationsRoutes);
       await scoped.register(threadsRoutes);
       await scoped.register(sessionGraphRoutes);
+      await scoped.register(diffRoutes);
       await scoped.register(missionRoutes);
     },
     { prefix: "/api" },
