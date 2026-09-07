@@ -27,6 +27,14 @@ export default defineConfig({
     __filename: "'index.ts'",
   },
   optimizeDeps: {
+    // noDiscovery + the full include list below: pre-bundle every dependency
+    // exactly once at startup and never re-run the optimizer mid-session.
+    // Discovery-based optimization re-bundles react under a new hash whenever a
+    // not-yet-seen import shows up (e.g. the first client-side navigation to a
+    // lazy route), which strands the open page on the old hash — a second React
+    // instance whose dispatcher is null → "Cannot read properties of null
+    // (reading 'useContext')". With discovery off, the optimizer cannot rerun.
+    noDiscovery: true,
     // A transitive dep drags in react-router-dom@5 (Docusaurus-era), which the
     // app never imports. pnpm mis-links it against react-router@7, so pre-bundling
     // it explodes on missing v5 exports (Switch/useHistory/…). Skip it entirely.
@@ -39,7 +47,53 @@ export default defineConfig({
     // Recharts (dashboard + admin charts) must resolve against the SAME
     // optimized React as the app or lazy-mounting it crashes with an invalid
     // hook call.
-    include: ["framer-motion", "recharts"],
+    include: [
+      // Same rationale as above, extended to every route-only dependency the
+      // static scan cannot see (lazy routes): if any of these is discovered
+      // mid-session the optimizer re-bundles react under a new hash while the
+      // open page still holds the old one → duplicate React → "Cannot read
+      // properties of null (reading 'useContext')" on the next client-side
+      // navigation. Pre-bundling them all at startup keeps the first visit to
+      // chat / council / workflows / dashboard crash-free.
+      // Every remaining direct dependency that only route modules import is
+      // listed below so the crawler cannot discover any of them mid-session.
+      "framer-motion",
+      "recharts",
+      "@ai-sdk/react",
+      "ai",
+      "react-markdown",
+      "remark-gfm",
+      "echarts",
+      "echarts-for-react",
+      "@tanstack/react-table",
+      "@xyflow/react",
+      "papaparse",
+      "@monaco-editor/react",
+      "date-fns",
+      "lucide-react",
+      "radix-ui",
+      "class-variance-authority",
+      "clsx",
+      "tailwind-merge",
+      // CSS-only; never a JS import, so it cannot be pre-bundled.
+      // ("tw-animate-css")
+      "@lobehub/icons",
+      "@lobehub/ui",
+      "react-is",
+      "isbot",
+      "lodash-es",
+      "nanoid",
+      "zod",
+      // React itself: with noDiscovery the crawler is off, so react and its
+      // runtimes must be explicit or nothing pre-bundles them.
+      "react",
+      "react-dom",
+      "react-dom/client",
+      "react/jsx-runtime",
+      "react/jsx-dev-runtime",
+      "react-router",
+      "@remix-run/router",
+    ],
   },
   server: {
     port: 5173,
