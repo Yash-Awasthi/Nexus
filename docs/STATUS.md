@@ -27,7 +27,7 @@ curl -s -X POST $API/api/reasoning/run -H "Authorization: Bearer $T" \
 | Skills                         | store-backed                                                                                                                                     |
 | Knowledge Bases                | KG-store backed list + ingest                                                                                                                    |
 | Repositories                   | GitHub API when `GITHUB_TOKEN` set, else empty list                                                                                              |
-| Memory                         | write + embed (Ollama 768-dim) + recall + list                                                                                                   |
+| Memory                         | write + embed + recall + list — embedder via `NEXUS_EMBED_PROVIDER`: ollama (default, 768-dim), groq, openai, voyage, jina, cohere (key-gated), fixed  |
 | Connectors / Add / Sync Status | registry + **sync-jobs now persisted**                                                                                                           |
 | God Mode                       | per-member `driver.complete()`                                                                                                                   |
 | Gauntlet                       | streams; crash-guarded                                                                                                                           |

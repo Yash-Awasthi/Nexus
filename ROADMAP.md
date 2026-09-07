@@ -41,7 +41,10 @@ Baseline: `@nexus/llm-drivers` = ~48 native drivers in `packages/llm-drivers/src
     /tts/bytes with versioned header + explicit voice id, `AssemblyAiTranscribeProvider`
     async upload→create→poll; route accepts an explicit `provider` field,
     `/voice/providers` reports the selectable set; voice suite 104/104).
-  - `packages/retrieval` / `packages/reranker` — voyage, jina, cohere embeddings.
+  - `packages/retrieval` / `packages/reranker` — voyage, jina, cohere embeddings _✓ shipped_
+    (the embedder home is `packages/memory`: `VoyageEmbedder` (dims pinned per model),
+    `JinaEmbedder` (optional task hint), `CohereEmbedder` (v2 envelope + input_type);
+    `createBestEmbedder` selects them via `NEXUS_EMBED_PROVIDER`; memory suite 181/181).
   - `packages/search-orchestrator/src` — exa, brave, serper (mirror the `SearxNG` strategy).
 - **1.4 Custom-driver framework** _✓ shipped_ — `packages/llm-drivers/README.md` documents the
   extension seams (`OpenAICompatibleDriver`, `BaseDriver` are public exports) with a compilable
