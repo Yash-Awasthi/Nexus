@@ -236,6 +236,285 @@ export class GroqEmbedder implements IEmbedder {
   }
 }
 
+// ── VoyageEmbedder (§1.3) ───────────────────────────────────────────────────
+
+/** Voyage embedder config. */
+export interface VoyageEmbedderConfig {
+  /** Voyage API key — defaults to process.env.VOYAGE_API_KEY */
+  apiKey?: string;
+  /**
+   * Embedding model.
+   * Default: "voyage-3-lite" (512 dimensions, fast + cheap).
+   * "voyage-3" is 1024-dim; "voyage-code-3" is 2048-dim.
+   */
+  model?: string;
+}
+
+interface VoyageEmbeddingResponse {
+  data?: { embedding?: number[]; index?: number }[];
+  // error body
+  detail?: string;
+}
+
+/**
+ * Real semantic embedder backed by the Voyage AI embeddings API (§1.3).
+ *
+ * Default `voyage-3-lite` (512-dimensional). Drop-in `IEmbedder` — the
+ * pgvector schema is 768, so prefer `voyage-3`-class models (1024) only when
+ * the store is dimensioned for it; the constructor pins `dimensions` to the
+ * model's documented output size and embed() enforces the match.
+ */
+export class VoyageEmbedder implements IEmbedder {
+  readonly dimensions: number;
+  private readonly apiKey: string;
+  private readonly model: string;
+  private static readonly ENDPOINT = "https://api.voyageai.com/v1/embeddings";
+
+  private static readonly MODEL_DIMENSIONS: Record<string, number> = {
+    "voyage-3-lite": 512,
+    "voyage-3": 1024,
+    "voyage-3-large": 1024,
+    "voyage-code-3": 2048,
+  };
+
+  constructor(config: VoyageEmbedderConfig = {}) {
+    const key = config.apiKey ?? process.env.VOYAGE_API_KEY ?? "";
+    if (!key) {
+      throw new MemoryError(
+        "EMBED_FAILED",
+        "VoyageEmbedder requires an API key — set VOYAGE_API_KEY or pass apiKey in config",
+      );
+    }
+    this.apiKey = key;
+    this.model = config.model ?? "voyage-3-lite";
+    this.dimensions = VoyageEmbedder.MODEL_DIMENSIONS[this.model] ?? 1024;
+  }
+
+  async embed(text: string): Promise<number[]> {
+    let response: Response;
+    try {
+      response = await fetch(VoyageEmbedder.ENDPOINT, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ model: this.model, input: [text] }),
+      });
+    } catch (cause) {
+      throw new MemoryError("EMBED_FAILED", `Voyage embeddings request failed: ${String(cause)}`);
+    }
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "(unreadable)");
+      throw new MemoryError("EMBED_FAILED", `Voyage API error ${response.status}: ${body}`);
+    }
+
+    let data: VoyageEmbeddingResponse;
+    try {
+      data = (await response.json()) as VoyageEmbeddingResponse;
+    } catch (cause) {
+      throw new MemoryError("EMBED_FAILED", `Failed to parse Voyage response: ${String(cause)}`);
+    }
+
+    const embedding = data.data?.[0]?.embedding;
+    if (!embedding || embedding.length === 0) {
+      throw new MemoryError("EMBED_FAILED", "Voyage returned an empty embedding");
+    }
+    if (embedding.length !== this.dimensions) {
+      throw new MemoryError(
+        "DIMENSION_MISMATCH",
+        `Expected ${this.dimensions} dimensions, got ${embedding.length}`,
+      );
+    }
+    return embedding;
+  }
+}
+
+// ── JinaEmbedder (§1.3) ──────────────────────────────────────────────────────
+
+/** Jina embedder config. */
+export interface JinaEmbedderConfig {
+  /** Jina API key — defaults to process.env.JINA_API_KEY */
+  apiKey?: string;
+  /**
+   * Embedding model.
+   * Default: "jina-embeddings-v3" (1024 dimensions).
+   */
+  model?: string;
+  /** Task hint sent with the request (retrieval.passage / retrieval.query). */
+  task?: string;
+}
+
+interface JinaEmbeddingResponse {
+  data?: { embedding?: number[]; index?: number }[];
+  // error body
+  detail?: string;
+}
+
+/**
+ * Real semantic embedder backed by the Jina AI embeddings API (§1.3).
+ * Default `jina-embeddings-v3` (1024-dimensional). OpenAI-shaped request
+ * with an extra `task` field for late-chunking retrieval hints.
+ */
+export class JinaEmbedder implements IEmbedder {
+  readonly dimensions = 1024;
+  private readonly apiKey: string;
+  private readonly model: string;
+  private readonly task: string | undefined;
+  private static readonly ENDPOINT = "https://api.jina.ai/v1/embeddings";
+
+  constructor(config: JinaEmbedderConfig = {}) {
+    const key = config.apiKey ?? process.env.JINA_API_KEY ?? "";
+    if (!key) {
+      throw new MemoryError(
+        "EMBED_FAILED",
+        "JinaEmbedder requires an API key — set JINA_API_KEY or pass apiKey in config",
+      );
+    }
+    this.apiKey = key;
+    this.model = config.model ?? "jina-embeddings-v3";
+    this.task = config.task;
+  }
+
+  async embed(text: string): Promise<number[]> {
+    let response: Response;
+    try {
+      response = await fetch(JinaEmbedder.ENDPOINT, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: this.model,
+          input: [text],
+          ...(this.task ? { task: this.task } : {}),
+        }),
+      });
+    } catch (cause) {
+      throw new MemoryError("EMBED_FAILED", `Jina embeddings request failed: ${String(cause)}`);
+    }
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "(unreadable)");
+      throw new MemoryError("EMBED_FAILED", `Jina API error ${response.status}: ${body}`);
+    }
+
+    let data: JinaEmbeddingResponse;
+    try {
+      data = (await response.json()) as JinaEmbeddingResponse;
+    } catch (cause) {
+      throw new MemoryError("EMBED_FAILED", `Failed to parse Jina response: ${String(cause)}`);
+    }
+
+    const embedding = data.data?.[0]?.embedding;
+    if (!embedding || embedding.length === 0) {
+      throw new MemoryError("EMBED_FAILED", "Jina returned an empty embedding");
+    }
+    if (embedding.length !== this.dimensions) {
+      throw new MemoryError(
+        "DIMENSION_MISMATCH",
+        `Expected ${this.dimensions} dimensions, got ${embedding.length}`,
+      );
+    }
+    return embedding;
+  }
+}
+
+// ── CohereEmbedder (§1.3) ────────────────────────────────────────────────────
+
+/** Cohere embedder config. */
+export interface CohereEmbedderConfig {
+  /** Cohere API key — defaults to process.env.COHERE_API_KEY */
+  apiKey?: string;
+  /**
+   * Embedding model.
+   * Default: "embed-v4.0" (1536 dimensions).
+   */
+  model?: string;
+  /** Input type: search_document (writes) / search_query (reads). Default: search_document. */
+  inputType?: string;
+}
+
+interface CohereEmbedResponse {
+  embeddings?: { float?: number[][] };
+  // error body
+  message?: string;
+}
+
+/**
+ * Real semantic embedder backed by the Cohere embed API v2 (§1.3).
+ * Default `embed-v4.0` (1536-dimensional). Cohere v2 returns
+ * `{ embeddings: { float: [[...]] } }` and requires `input_type` —
+ * search_document for writes, search_query for reads.
+ */
+export class CohereEmbedder implements IEmbedder {
+  readonly dimensions = 1536;
+  private readonly apiKey: string;
+  private readonly model: string;
+  private readonly inputType: string;
+  private static readonly ENDPOINT = "https://api.cohere.com/v2/embed";
+
+  constructor(config: CohereEmbedderConfig = {}) {
+    const key = config.apiKey ?? process.env.COHERE_API_KEY ?? "";
+    if (!key) {
+      throw new MemoryError(
+        "EMBED_FAILED",
+        "CohereEmbedder requires an API key — set COHERE_API_KEY or pass apiKey in config",
+      );
+    }
+    this.apiKey = key;
+    this.model = config.model ?? "embed-v4.0";
+    this.inputType = config.inputType ?? "search_document";
+  }
+
+  async embed(text: string): Promise<number[]> {
+    let response: Response;
+    try {
+      response = await fetch(CohereEmbedder.ENDPOINT, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: this.model,
+          texts: [text],
+          input_type: this.inputType,
+          embedding_types: ["float"],
+        }),
+      });
+    } catch (cause) {
+      throw new MemoryError("EMBED_FAILED", `Cohere embeddings request failed: ${String(cause)}`);
+    }
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "(unreadable)");
+      throw new MemoryError("EMBED_FAILED", `Cohere API error ${response.status}: ${body}`);
+    }
+
+    let data: CohereEmbedResponse;
+    try {
+      data = (await response.json()) as CohereEmbedResponse;
+    } catch (cause) {
+      throw new MemoryError("EMBED_FAILED", `Failed to parse Cohere response: ${String(cause)}`);
+    }
+
+    const embedding = data.embeddings?.float?.[0];
+    if (!embedding || embedding.length === 0) {
+      throw new MemoryError("EMBED_FAILED", "Cohere returned an empty embedding");
+    }
+    if (embedding.length !== this.dimensions) {
+      throw new MemoryError(
+        "DIMENSION_MISMATCH",
+        `Expected ${this.dimensions} dimensions, got ${embedding.length}`,
+      );
+    }
+    return embedding;
+  }
+}
+
 // ── OpenAIEmbedder ────────────────────────────────────────────────────────────
 
 /** OpenAI embedder config. */
@@ -461,13 +740,16 @@ export class OllamaEmbedder implements IEmbedder {
 /**
  * Helper: pick the best available embedder.
  * Local-first: Ollama (free, no credits) > OpenAI > Groq (only if forced) > Fixed.
- * Override with NEXUS_EMBED_PROVIDER = ollama | openai | groq | fixed.
+ * Override with NEXUS_EMBED_PROVIDER = ollama | openai | groq | voyage | jina | cohere | fixed.
  * Never throws — falls back to a 768-dim FixedEmbedder (matches pgvector schema).
  */
 export function createBestEmbedder(config?: {
   openAiApiKey?: string;
   groqApiKey?: string;
   ollamaBaseUrl?: string;
+  voyageApiKey?: string;
+  jinaApiKey?: string;
+  cohereApiKey?: string;
 }): IEmbedder {
   const provider = process.env.NEXUS_EMBED_PROVIDER?.toLowerCase();
   const ollamaUrl = config?.ollamaBaseUrl ?? process.env.OLLAMA_BASE_URL;
@@ -482,6 +764,18 @@ export function createBestEmbedder(config?: {
   const groqKey = config?.groqApiKey ?? process.env.GROQ_API_KEY;
   if (provider === "groq" && groqKey) {
     return new GroqEmbedder({ apiKey: groqKey });
+  }
+  const voyageKey = config?.voyageApiKey ?? process.env.VOYAGE_API_KEY;
+  if (provider === "voyage" && voyageKey) {
+    return new VoyageEmbedder({ apiKey: voyageKey });
+  }
+  const jinaKey = config?.jinaApiKey ?? process.env.JINA_API_KEY;
+  if (provider === "jina" && jinaKey) {
+    return new JinaEmbedder({ apiKey: jinaKey });
+  }
+  const cohereKey = config?.cohereApiKey ?? process.env.COHERE_API_KEY;
+  if (provider === "cohere" && cohereKey) {
+    return new CohereEmbedder({ apiKey: cohereKey });
   }
   // Deterministic dev fallback — 768 dims to match the pgvector(768) schema.
   return new FixedEmbedder(768);
