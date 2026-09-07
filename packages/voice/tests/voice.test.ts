@@ -7,6 +7,10 @@ import {
   NullSynthesizeProvider,
   GroqTranscribeProvider,
   ElevenLabsSynthesizeProvider,
+  DeepgramTranscribeProvider,
+  DeepgramSynthesizeProvider,
+  CartesiaSynthesizeProvider,
+  AssemblyAiTranscribeProvider,
   EnergyVadProvider,
   NullVadProvider,
   SilenceVadProvider,
@@ -885,5 +889,287 @@ describe("VoiceSession — VAD gate", () => {
 
     expect((await sessionSmall.process(smallAudio)).skipped).toBe(true);
     expect((await sessionLarge.process(largeAudio)).skipped).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DeepgramTranscribeProvider (§1.3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("DeepgramTranscribeProvider", () => {
+  it("has name 'deepgram'", () => {
+    expect(new DeepgramTranscribeProvider({ apiKey: "k" }).name).toBe("deepgram");
+  });
+
+  it("throws INVALID_AUDIO for an empty buffer", async () => {
+    const p = new DeepgramTranscribeProvider({ apiKey: "k", fetch: makeFetch([]) });
+    await expect(
+      p.transcribe({ data: new Uint8Array(0), format: "wav", sampleRate: 16000 }),
+    ).rejects.toMatchObject({ code: "INVALID_AUDIO" });
+  });
+
+  it("POSTs raw audio to /v1/listen with Token auth and model param", async () => {
+    const fetchFn = makeFetch([
+      {
+        ok: true,
+        body: {
+          results: { channels: [{ alternatives: [{ transcript: "  hello world  " }] }] },
+          metadata: { duration: 1.5 },
+        },
+      },
+    ]);
+    const p = new DeepgramTranscribeProvider({ apiKey: "dg-key", fetch: fetchFn });
+    const r = await p.transcribe(createAudioBuffer(new Uint8Array(50), "wav"), {
+      language: "en",
+    });
+    const f = fetchFn as ReturnType<typeof vi.fn>;
+    expect(f.mock.calls[0]![0]).toContain("https://api.deepgram.com/v1/listen?");
+    expect(f.mock.calls[0]![0]).toContain("model=nova-2");
+    expect(f.mock.calls[0]![0]).toContain("language=en");
+    const headers = f.mock.calls[0]![1]!.headers as Record<string, string>;
+    expect(headers["Authorization"]).toBe("Token dg-key");
+    expect(headers["Content-Type"]).toBe("audio/wav");
+    expect(r.transcript).toBe("hello world"); // trimmed
+    expect(r.durationSeconds).toBe(1.5);
+  });
+
+  it("throws PROVIDER_AUTH_FAILED on 401", async () => {
+    const p = new DeepgramTranscribeProvider({
+      apiKey: "bad",
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
+    await expect(
+      p.transcribe(createAudioBuffer(new Uint8Array(10), "wav")),
+    ).rejects.toMatchObject({ code: "PROVIDER_AUTH_FAILED" });
+  });
+
+  it("throws TRANSCRIBE_FAILED on 5xx and network errors", async () => {
+    const p1 = new DeepgramTranscribeProvider({
+      apiKey: "k",
+      fetch: makeFetch([{ ok: false, status: 500 }]),
+    });
+    await expect(
+      p1.transcribe(createAudioBuffer(new Uint8Array(10), "wav")),
+    ).rejects.toMatchObject({ code: "TRANSCRIBE_FAILED" });
+    const p2 = new DeepgramTranscribeProvider({
+      apiKey: "k",
+      fetch: vi.fn().mockRejectedValue(new Error("down")),
+    });
+    await expect(
+      p2.transcribe(createAudioBuffer(new Uint8Array(10), "wav")),
+    ).rejects.toMatchObject({ code: "TRANSCRIBE_FAILED" });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DeepgramSynthesizeProvider (§1.3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("DeepgramSynthesizeProvider", () => {
+  it("has name 'deepgram-tts'", () => {
+    expect(new DeepgramSynthesizeProvider({ apiKey: "k" }).name).toBe("deepgram-tts");
+  });
+
+  it("rejects empty text", async () => {
+    const p = new DeepgramSynthesizeProvider({ apiKey: "k", fetch: makeFetch([]) });
+    await expect(p.synthesize("  ")).rejects.toMatchObject({ code: "SYNTHESIZE_FAILED" });
+  });
+
+  it("POSTs {text} to /v1/speak with Token auth and returns mp3 bytes", async () => {
+    const fetchFn = makeFetch([{ ok: true, arrayBuffer: new Uint8Array([1, 2, 3]) }]);
+    const p = new DeepgramSynthesizeProvider({ apiKey: "dg-key", fetch: fetchFn });
+    const audio = await p.synthesize("hi there");
+    const f = fetchFn as ReturnType<typeof vi.fn>;
+    expect(f.mock.calls[0]![0]).toContain("https://api.deepgram.com/v1/speak?");
+    expect(f.mock.calls[0]![0]).toContain("model=aura-2-thalia-en");
+    const headers = f.mock.calls[0]![1]!.headers as Record<string, string>;
+    expect(headers["Authorization"]).toBe("Token dg-key");
+    expect(JSON.parse(f.mock.calls[0]![1]!.body as string)).toEqual({ text: "hi there" });
+    expect(audio.data.length).toBe(3);
+    expect(audio.format).toBe("mp3");
+  });
+
+  it("throws PROVIDER_AUTH_FAILED on 401 and SYNTHESIZE_FAILED on 5xx", async () => {
+    const p1 = new DeepgramSynthesizeProvider({
+      apiKey: "bad",
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
+    await expect(p1.synthesize("x")).rejects.toMatchObject({ code: "PROVIDER_AUTH_FAILED" });
+    const p2 = new DeepgramSynthesizeProvider({
+      apiKey: "k",
+      fetch: makeFetch([{ ok: false, status: 500 }]),
+    });
+    await expect(p2.synthesize("x")).rejects.toMatchObject({ code: "SYNTHESIZE_FAILED" });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CartesiaSynthesizeProvider (§1.3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("CartesiaSynthesizeProvider", () => {
+  it("has name 'cartesia'", () => {
+    expect(new CartesiaSynthesizeProvider({ apiKey: "k" }).name).toBe("cartesia");
+  });
+
+  it("fails fast when no voice id is available", async () => {
+    const p = new CartesiaSynthesizeProvider({ apiKey: "k", fetch: makeFetch([]) });
+    await expect(p.synthesize("x")).rejects.toMatchObject({ code: "SYNTHESIZE_FAILED" });
+  });
+
+  it("POSTs to /tts/bytes with X-API-Key, Cartesia-Version, and the voice id", async () => {
+    const fetchFn = makeFetch([{ ok: true, arrayBuffer: new Uint8Array([9, 9]) }]);
+    const p = new CartesiaSynthesizeProvider({
+      apiKey: "c-key",
+      defaultVoice: "voice-uuid-1",
+      fetch: fetchFn,
+    });
+    const audio = await p.synthesize("hello", { speed: 1.2 });
+    const f = fetchFn as ReturnType<typeof vi.fn>;
+    expect(f.mock.calls[0]![0]).toBe("https://api.cartesia.ai/tts/bytes");
+    const headers = f.mock.calls[0]![1]!.headers as Record<string, string>;
+    expect(headers["X-API-Key"]).toBe("c-key");
+    expect(headers["Cartesia-Version"]).toBe("2024-06-10");
+    const body = JSON.parse(f.mock.calls[0]![1]!.body as string);
+    expect(body).toMatchObject({
+      model_id: "sonic-english",
+      transcript: "hello",
+      voice: { mode: "id", id: "voice-uuid-1" },
+      speed: 1.2,
+    });
+    expect(body.output_format).toMatchObject({ container: "mp3", sample_rate: 44100 });
+    expect(audio.data.length).toBe(2);
+    expect(audio.sampleRate).toBe(44100);
+  });
+
+  it("opts.voice overrides defaultVoice", async () => {
+    const fetchFn = makeFetch([{ ok: true, arrayBuffer: new Uint8Array([1]) }]);
+    const p = new CartesiaSynthesizeProvider({
+      apiKey: "k",
+      defaultVoice: "default-voice",
+      fetch: fetchFn,
+    });
+    await p.synthesize("x", { voice: "override-voice" });
+    const body = JSON.parse(
+      (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string,
+    );
+    expect(body.voice.id).toBe("override-voice");
+  });
+
+  it("throws PROVIDER_AUTH_FAILED on 401", async () => {
+    const p = new CartesiaSynthesizeProvider({
+      apiKey: "bad",
+      defaultVoice: "v",
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
+    await expect(p.synthesize("x")).rejects.toMatchObject({ code: "PROVIDER_AUTH_FAILED" });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AssemblyAiTranscribeProvider (§1.3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const noSleep = async (_ms: number) => {};
+
+describe("AssemblyAiTranscribeProvider", () => {
+  it("has name 'assemblyai'", () => {
+    expect(new AssemblyAiTranscribeProvider({ apiKey: "k" }).name).toBe("assemblyai");
+  });
+
+  it("throws INVALID_AUDIO for an empty buffer", async () => {
+    const p = new AssemblyAiTranscribeProvider({ apiKey: "k", fetch: makeFetch([]) });
+    await expect(
+      p.transcribe({ data: new Uint8Array(0), format: "mp3", sampleRate: 16000 }),
+    ).rejects.toMatchObject({ code: "INVALID_AUDIO" });
+  });
+
+  it("uploads, creates the job, polls until completed, returns the transcript", async () => {
+    const fetchFn = makeFetch([
+      { ok: true, body: { upload_url: "https://cdn.assemblyai.com/up/abc" } }, // upload
+      { ok: true, body: { id: "t1", status: "queued" } }, // create
+      { ok: true, body: { id: "t1", status: "processing" } }, // poll 1
+      {
+        ok: true,
+        body: {
+          id: "t1",
+          status: "completed",
+          text: "  universal transcript  ",
+          language_code: "en",
+          audio_duration: 3.2,
+        },
+      }, // poll 2
+    ]);
+    const p = new AssemblyAiTranscribeProvider({
+      apiKey: "aa-key",
+      fetch: fetchFn,
+      sleep: noSleep,
+      pollIntervalMs: 0,
+    });
+    const r = await p.transcribe(createAudioBuffer(new Uint8Array(30), "mp3"), {
+      language: "en",
+    });
+    const f = fetchFn as ReturnType<typeof vi.fn>;
+    expect(f.mock.calls).toHaveLength(4);
+    // upload: PUT raw bytes with the authorization header
+    expect(f.mock.calls[0]![0]).toBe("https://api.assemblyai.com/v2/upload");
+    expect(f.mock.calls[0]![1]!.method).toBe("PUT");
+    expect((f.mock.calls[0]![1]!.headers as Record<string, string>).authorization).toBe("aa-key");
+    // create: JSON body carries the upload_url + speech model
+    expect(f.mock.calls[1]![0]).toBe("https://api.assemblyai.com/v2/transcript");
+    expect(JSON.parse(f.mock.calls[1]![1]!.body as string)).toMatchObject({
+      audio_url: "https://cdn.assemblyai.com/up/abc",
+      speech_model: "universal",
+      language_code: "en",
+    });
+    // poll: GET /transcript/{id}
+    expect(f.mock.calls[3]![0]).toBe("https://api.assemblyai.com/v2/transcript/t1");
+    expect(r.transcript).toBe("universal transcript"); // trimmed
+    expect(r.language).toBe("en");
+    expect(r.durationSeconds).toBe(3.2);
+  });
+
+  it("throws PROVIDER_AUTH_FAILED when the upload is rejected", async () => {
+    const p = new AssemblyAiTranscribeProvider({
+      apiKey: "bad",
+      fetch: makeFetch([{ ok: false, status: 401 }]),
+    });
+    await expect(
+      p.transcribe(createAudioBuffer(new Uint8Array(10), "wav")),
+    ).rejects.toMatchObject({ code: "PROVIDER_AUTH_FAILED" });
+  });
+
+  it("throws TRANSCRIBE_FAILED when the job errors", async () => {
+    const fetchFn = makeFetch([
+      { ok: true, body: { upload_url: "https://cdn.assemblyai.com/up/abc" } },
+      { ok: true, body: { id: "t1", status: "queued" } },
+      { ok: true, body: { id: "t1", status: "error", error: "audio unreadable" } },
+    ]);
+    const p = new AssemblyAiTranscribeProvider({
+      apiKey: "k",
+      fetch: fetchFn,
+      sleep: noSleep,
+      pollIntervalMs: 0,
+    });
+    await expect(
+      p.transcribe(createAudioBuffer(new Uint8Array(10), "wav")),
+    ).rejects.toMatchObject({ code: "TRANSCRIBE_FAILED" });
+  });
+
+  it("throws TRANSCRIBE_FAILED on poll timeout", async () => {
+    const fetchFn = makeFetch([
+      { ok: true, body: { upload_url: "https://cdn.assemblyai.com/up/abc" } },
+      { ok: true, body: { id: "t1", status: "queued" } },
+    ]);
+    const p = new AssemblyAiTranscribeProvider({
+      apiKey: "k",
+      fetch: fetchFn,
+      sleep: noSleep,
+      pollIntervalMs: 0,
+      timeoutMs: 0,
+    });
+    await expect(
+      p.transcribe(createAudioBuffer(new Uint8Array(10), "wav")),
+    ).rejects.toMatchObject({ code: "TRANSCRIBE_FAILED" });
   });
 });
