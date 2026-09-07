@@ -122,6 +122,17 @@ export function distillMissionMemory(record: MissionRecord, graph?: SessionGraph
     lines.push("", "Resume from where the previous output ended:", excerpt.slice(0, MAX_EXCERPT_CHARS));
   }
 
+  // §15.8 — insights the cheap local extractor distilled AFTER the prior run
+  // went terminal. Additive only: the deterministic facts above stay the source
+  // of truth; absent insights change nothing.
+  if (record.memoryInsights?.text) {
+    lines.push(
+      "", 
+      `Extracted insights (${record.memoryInsights.model}):`,
+      record.memoryInsights.text.slice(0, 600),
+    );
+  }
+
   lines.push("", "Act on the prior run now and complete the new goal on top of it.");
 
   const text = lines.join("\n").trim();

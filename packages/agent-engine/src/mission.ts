@@ -102,6 +102,11 @@ export interface MissionRecord {
   lastReview?: MissionReview;
   /** Provenance: this run continues a prior mission's execution memory. */
   memoryFrom?: { missionId: string; outcome: string };
+  /** §15.8 — ≤3 carry-forward insights from the cheap local extractor
+   * (lib/memory-extractor.ts), written once after this record went terminal.
+   * Absent when the extractor is disabled or the local model was unavailable —
+   * the deterministic distillation never depends on it. */
+  memoryInsights?: { text: string; model: string };
   finalContent: string;
   usage: RuntimeUsage;
   error?: string;

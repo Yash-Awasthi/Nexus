@@ -294,4 +294,20 @@ describe("loadMissionMemory", () => {
     expect(memory?.text).toContain("report-writer ok — completed in 1200ms (exit 0)");
     expect(memory?.text).toContain("scraper FAILED");
   });
+
+  it("§15.8: extracted insights ride the memory block when present, absent otherwise", async () => {
+    const withInsights = await loadMissionMemory("u1", "mission-abc123", {
+      getRecord: async () => ({
+        ...REJECTED,
+        memoryInsights: { text: "- verify the file before claiming success", model: "llama3.2:1b" },
+      }),
+    });
+    expect(withInsights?.text).toContain("Extracted insights (llama3.2:1b):");
+    expect(withInsights?.text).toContain("- verify the file before claiming success");
+
+    const without = await loadMissionMemory("u1", "mission-abc123", {
+      getRecord: async () => REJECTED,
+    });
+    expect(without?.text).not.toContain("Extracted insights");
+  });
 });

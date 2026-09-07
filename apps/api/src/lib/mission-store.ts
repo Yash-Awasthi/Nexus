@@ -19,6 +19,7 @@ import type { MissionRecord, MissionStore } from "@nexus/agent-engine";
 
 import { getSharedKV } from "./shared-kv.js";
 import { withKeyLock } from "./with-key-lock.js";
+import { extractMissionInsights } from "./memory-extractor.js";
 
 const MISSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const MAX_MISSIONS = 100;
@@ -107,6 +108,41 @@ export async function saveMission(uid: string | undefined, record: MissionRecord
   const userId = missionUserIdFor(uid);
   const kv = getSharedKV();
   await kv.set(itemKey(userId, record.id), record, MISSION_TTL_MS);
+  maybeExtractMissionMemory(userId, record);
+}
+
+/**
+ * §15.8 — after a mission goes TERMINAL, fire-and-forget the cheap local
+ * extractor (lib/memory-extractor.ts) and write ≤3 carry-forward insights back
+ * onto the record. Single choke point: every terminal path funnels through
+ * saveMission. Bounded + never throws + degrades silently — the deterministic
+ * distillation never depends on this succeeding. Kill switch:
+ * NEXUS_MEMORY_EXTRACTOR=0.
+ */
+function maybeExtractMissionMemory(userId: string, record: MissionRecord): void {
+  if (process.env.NEXUS_MEMORY_EXTRACTOR === "0") return;
+  if (record.status === "running") return;
+  if (record.memoryInsights) return;
+  void (async () => {
+    const insights = await extractMissionInsights({
+      goal: record.goal,
+      outcome:
+        record.status === "completed"
+          ? `completed — ${record.lastReview?.score ?? "?"}/100`
+          : `failed — ${record.error ?? "unknown error"}`.slice(0, 200),
+      finalContent: record.finalContent ?? "",
+    });
+    if (!insights) return;
+    // Re-read under the lock and merge onto the CURRENT record — the stored
+    // version is authoritative (same rule as the runner-owns-the-record).
+    await withKeyLock(itemKey(userId, record.id), async () => {
+      const kv = getSharedKV();
+      const fresh = await kv.get<MissionRecord>(itemKey(userId, record.id));
+      if (!fresh || fresh.status === "running" || fresh.memoryInsights) return;
+      fresh.memoryInsights = insights;
+      await kv.set(itemKey(userId, record.id), fresh, MISSION_TTL_MS);
+    });
+  })().catch(() => {});
 }
 
 /** KV-backed MissionStore implementation for MissionRunner. */
