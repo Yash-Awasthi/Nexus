@@ -32,7 +32,8 @@ import {
 import { SmartRouter } from "../lib/smart-router.js";
 import type { FastifyInstance } from "fastify";
 
-import { discoverModels } from "../lib/model-discovery.js";
+import { discoverModels, type ReasoningTier } from "../lib/model-discovery.js";
+import { routeModel, type CapabilityRequirement } from "../lib/model-routing.js";
 
 import { requireAuth } from "../middleware/auth.js";
 
@@ -177,6 +178,55 @@ export async function llmRoutes(app: FastifyInstance): Promise<void> {
           : undefined,
       });
       return reply.send(result);
+    },
+  );
+
+  /**
+   * GET /llm/route — §15.7 per-model capability routing.
+   *
+   * Picks the best model for a requirement set on top of the discovery
+   * surface: hard requirements filter (vision / toolUse / streaming /
+   * minContextWindow / maxOutputNeeded / minReasoningTier), soft preferences
+   * rank (capability-first, or preferCheapest). Returns the chosen model,
+   * the ranked top 5 with reasons, and — when nothing qualifies — every
+   * filter each candidate failed.
+   */
+  app.get<{ Querystring: Record<string, string> }>(
+    "/llm/route",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const q = request.query;
+      const bool = (k: string): boolean | undefined =>
+        q[k] === undefined ? undefined : q[k] === "true" || q[k] === "1";
+      const num = (k: string): number | undefined => {
+        if (q[k] === undefined) return undefined;
+        const n = Number(q[k]);
+        return Number.isFinite(n) && n >= 0 ? n : undefined;
+      };
+      const tier = (k: string): ReasoningTier | undefined => {
+        if (q[k] !== "fast" && q[k] !== "reasoning" && q[k] !== "deep") return undefined;
+        return q[k];
+      };
+
+      const discovery = await discoverModels({
+        ollamaBaseUrl: process.env.OLLAMA_BASE_URL,
+        declaredProviders: process.env.NEXUS_LLM_PROVIDER
+          ? [process.env.NEXUS_LLM_PROVIDER]
+          : undefined,
+      });
+      const models = discovery.providers.flatMap((p) => p.models);
+
+      const requirement: CapabilityRequirement = {
+        vision: bool("vision"),
+        toolUse: bool("toolUse"),
+        streaming: bool("streaming"),
+        minContextWindow: num("minContextWindow"),
+        maxOutputNeeded: num("maxOutputNeeded"),
+        minReasoningTier: tier("minReasoningTier"),
+        preferCheapest: bool("preferCheapest"),
+      };
+      const result = routeModel(models, requirement);
+      return reply.send({ requirement, ...result });
     },
   );
 
