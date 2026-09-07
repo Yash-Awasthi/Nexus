@@ -69,7 +69,8 @@ curl -s -X POST $API/api/reasoning/run -H "Authorization: Bearer $T" \
 
 - **Image Gen (FLUX/Stability/Recraft/fal/ComfyUI)** → `FLUX_API_KEY` / `STABILITY_API_KEY` / `RECRAFT_API_KEY` / `FAL_KEY` / `COMFYUI_URL` (+ `COMFYUI_WORKFLOW`/`COMFYUI_PROMPT_NODE`); DALL·E → `OPENAI_API_KEY`, Replicate → `REPLICATE_API_KEY`.
 - **Fine-Tune** → `OPENAI_API_KEY`.
-- **Voice transcribe/synthesize** → `GROQ_API_KEY` / `ELEVENLABS_API_KEY`.
+- **Voice transcribe** → `GROQ_API_KEY` (whisper) / `DEEPGRAM_API_KEY` (nova-2) / `ASSEMBLYAI_API_KEY` (universal) — pass `provider` in the request body.
+- **Voice synthesize** → `ELEVENLABS_API_KEY` (eleven_turbo_v2_5) / `DEEPGRAM_API_KEY` (aura-2) / `CARTESIA_API_KEY` + `CARTESIA_VOICE_ID` (sonic-english).
 - **Repositories** → `GITHUB_TOKEN`.
 - **Sandbox Go/Rust/Ruby/etc** → local Piston (`PISTON_URL`); JS + Python already work with nothing.
 - **Video transcript** → `YOUTUBE_API_KEY` (honest 503 without it).

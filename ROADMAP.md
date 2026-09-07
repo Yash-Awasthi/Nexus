@@ -36,8 +36,11 @@ Baseline: `@nexus/llm-drivers` = ~48 native drivers in `packages/llm-drivers/src
     `RecraftProvider`, `FalProvider` queue API, `ComfyUIProvider` self-hosted
     /prompt→/history→/view; wired into the image-gen route + `.env.example`;
     package suite 92/92).
-  - `packages/voice/src` — deepgram, cartesia, assemblyai (mirror ElevenLabs synth + Groq
-    transcribe).
+  - `packages/voice/src` — deepgram, cartesia, assemblyai _✓ shipped_ (`DeepgramTranscribeProvider`
+    raw-body /v1/listen + `DeepgramSynthesizeProvider` /v1/speak, `CartesiaSynthesizeProvider`
+    /tts/bytes with versioned header + explicit voice id, `AssemblyAiTranscribeProvider`
+    async upload→create→poll; route accepts an explicit `provider` field,
+    `/voice/providers` reports the selectable set; voice suite 104/104).
   - `packages/retrieval` / `packages/reranker` — voyage, jina, cohere embeddings.
   - `packages/search-orchestrator/src` — exa, brave, serper (mirror the `SearxNG` strategy).
 - **1.4 Custom-driver framework** _✓ shipped_ — `packages/llm-drivers/README.md` documents the
