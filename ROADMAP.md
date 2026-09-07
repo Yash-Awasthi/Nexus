@@ -176,15 +176,21 @@ holds `k8s/`, `helm/nexus`, `terraform/`, `grafana/`, `otel/`, `chaos/`, `k6/`.
   otherwise) in `apps/api/src/routes/user-data.ts`, guarded + audit-logged by
   `apps/api/src/lib/gdpr-erasure.ts` (content-free log line: user id + per-table counts, never
   LLM data). Route + guard unit-tested.
-- **14.5 Coverage → 80%** _(code-only)._ `council` 92.8% ✓ and `memory` 92.2% ✓ are done.
-  **In progress: `@nexus/runtime` 16.3% → 29.2%** (functions 58→70%, branches 77→81%).
-  Seven modules shipped one-commit-at-a-time: TaskExecutor, spec-loader,
-  service-discovery+floci-client, agent-bus, MemoryQueueBackend, runtime-graph (the
-  1,105-line core), and an env-loader top-up — 318 tests green. `pnpm --filter
-  @nexus/runtime test --coverage`; the next tier of 0% modules is runtime-context,
-  workflow-engine, code-agent-pool, runtime-compactor, the federation controllers,
-  orchestrator, and the infra-bound tail (redis/file queues, docker runner, otel
-  tracing, adapters). Done: ≥80% lines.
+- **14.5 Coverage → 80%** _✓ shipped._ `council` 92.8% ✓, `memory` 92.2% ✓, and
+  **`@nexus/runtime` 16.3% → 80.5% lines** (functions 94%, branches 84%) — 623 tests across
+  46 files, green, `tsc --noEmit` clean. One-module-per-commit grind covered the core
+  execution + resilience stack (TaskExecutor, workflow-engine incl. engine core/replay/
+  idempotency, runtime-graph, task-router, spec-loader, agent-bus, queue backends —
+  memory/file/redis — circuit-breaker, crash-recovery, council-bridge, dependency-resolver),
+  the composition root (runtime-context end-to-end wiring + start/stop lifecycle), the
+  knowledge/governance layer (memory-store, planning-engine, security-utils, otel tracer),
+  and the full adapter + bridge surface (browser/scraping/floci/local-inference/web-search/
+  code-agent-pool, web-search-engine, language-model providers, MCPRuntime +
+  conductor-mcp-bridge tools, federation health controller, persistence, runtime-manager,
+  compactor/leak/quota, inspector/diagnostic API, config loaders, sandboxes, registries).
+  Remaining uncovered lines are concentrated in genuinely server/process-bound modules
+  (federation-supervisor, bootstrap, docker-compose-runner, mcp-server-host, manifest
+  export) that need live services; nothing there is a correctness gap.
 - **14.6 DB / Infra provisioning** _(Blocked — see infra table)._ PgBouncer, read replicas,
   PITR, encryption-at-rest; K8s HPA; multi-AZ PG/Redis; CDN/edge DDoS; Grafana SLO dashboards +
   alerting. Charts/manifests exist; each is Done when provisioned.
