@@ -54,7 +54,7 @@ curl -s -X POST $API/api/reasoning/run -H "Authorization: Bearer $T" \
 | Provider Keys                  | AES-256-GCM encrypted, Postgres                                                                                                                  |
 | Notifications                  | **real per-user store** (shared KV, 30-day TTL) + sidebar bell + dashboard Activity feed; live emitters: research done/failed, autopilot run end |
 | Standard Answers               | persistent + LLM match                                                                                                                           |
-| Web Search                     | POST `/web-search {query}` — Tavily→SearXNG                                                                                                      |
+| Web Search                     | POST `/web-search {query}` — Exa→Brave→Serper→Tavily→SearXNG (key-gated providers; exa/brave/serper via `@nexus/search-orchestrator`)               |
 | Scraping                       | Firecrawl/Exa/basic                                                                                                                              |
 | Rooms                          | in-mem CRUD                                                                                                                                      |
 | Admin → Users                  | **real Postgres `users` table**                                                                                                                  |
@@ -71,6 +71,7 @@ curl -s -X POST $API/api/reasoning/run -H "Authorization: Bearer $T" \
 - **Fine-Tune** → `OPENAI_API_KEY`.
 - **Voice transcribe** → `GROQ_API_KEY` (whisper) / `DEEPGRAM_API_KEY` (nova-2) / `ASSEMBLYAI_API_KEY` (universal) — pass `provider` in the request body.
 - **Voice synthesize** → `ELEVENLABS_API_KEY` (eleven_turbo_v2_5) / `DEEPGRAM_API_KEY` (aura-2) / `CARTESIA_API_KEY` + `CARTESIA_VOICE_ID` (sonic-english).
+- **Web search** → `EXA_API_KEY` / `BRAVE_API_KEY` / `SERPER_API_KEY` / `TAVILY_API_KEY` / `SEARXNG_URL` — precedence exa → brave → serper → tavily → searxng.
 - **Repositories** → `GITHUB_TOKEN`.
 - **Sandbox Go/Rust/Ruby/etc** → local Piston (`PISTON_URL`); JS + Python already work with nothing.
 - **Video transcript** → `YOUTUBE_API_KEY` (honest 503 without it).

@@ -45,7 +45,12 @@ Baseline: `@nexus/llm-drivers` = ~48 native drivers in `packages/llm-drivers/src
     (the embedder home is `packages/memory`: `VoyageEmbedder` (dims pinned per model),
     `JinaEmbedder` (optional task hint), `CohereEmbedder` (v2 envelope + input_type);
     `createBestEmbedder` selects them via `NEXUS_EMBED_PROVIDER`; memory suite 181/181).
-  - `packages/search-orchestrator/src` — exa, brave, serper (mirror the `SearxNG` strategy).
+  - `packages/search-orchestrator/src` — exa, brave, serper _✓ shipped_ (`searchExa`/
+    `ExaSearchStrategy`, `searchBrave`/`BraveSearchStrategy`, `searchSerper`/
+    `SerperSearchStrategy` — injectable `fetchFn`, typed `SearchError`; wired into
+    `api-bridge._webSearch()` and `researcher.buildSearchFn()` with exa → brave → serper
+    → tavily → searxng precedence, `/web-search/providers` lists all five;
+    search-orchestrator suite 38/38).
 - **1.4 Custom-driver framework** _✓ shipped_ — `packages/llm-drivers/README.md` documents the
   extension seams (`OpenAICompatibleDriver`, `BaseDriver` are public exports) with a compilable
   standalone driver template; no core edits needed.
