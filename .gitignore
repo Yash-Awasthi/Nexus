@@ -26,8 +26,12 @@ test-results/
 # Local runtime data stores (PersistentStore JSON files — dev state, not source)
 apps/api/data/stores/
 
+# Autopilot/mission run workspaces (generated at runtime — never source)
+apps/api/data/workspaces/
+
 # Local runtime state under data/ (auth tokens, run ids — dev state, not source)
 data/.*
+data/bridge/
 
 # Python
 __pycache__/

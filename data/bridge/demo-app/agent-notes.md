@@ -1,1 +1,0 @@
-Investigated by cloud agent: demo app prints greeting.
