@@ -74,3 +74,6 @@ REF/
 
 # Local dev tooling (portable Redis etc.)
 .local/
+
+# Docusaurus build cache
+.docusaurus/
