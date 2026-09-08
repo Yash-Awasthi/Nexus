@@ -21,6 +21,7 @@ import { randomUUID } from "crypto";
 import {
   createDefaultRegistry,
   DeltaEngine,
+  PortCongestionFeed,
   SweepOrchestrator,
   TelegramAlerter,
 } from "@nexus/domain-feeds";
@@ -237,6 +238,33 @@ export async function domainFeedsRoutes(app: FastifyInstance): Promise<void> {
 
       const limit = Math.min(parseInt(request.query.limit ?? "50"), 200);
       return reply.send({ ...page, events: page.events.slice(0, limit) });
+    },
+  );
+
+  /**
+   * GET /domain-feeds/intel/port-congestion?limit=&where=&includeNormal=
+   *
+   * Direct fetch from the IMF PortWatch chokepoint feed (§13.1) — independent
+   * of the sweep cache, so it can be polled on its own cadence. `where` is an
+   * ArcGIS where-clause (e.g. `portid='SUEZ'`); `includeNormal=1` also returns
+   * within-band (normal) rows.
+   */
+  app.get<{
+    Querystring: { limit?: string; where?: string; includeNormal?: string };
+  }>(
+    "/domain-feeds/intel/port-congestion",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const limit = Math.min(parseInt(request.query.limit ?? "50", 10) || 50, 200);
+      const includeNormal = request.query.includeNormal === "1" || request.query.includeNormal === "true";
+      const feed = new PortCongestionFeed({ includeNormal });
+      const events = await feed.fetch(request.query.where ? { where: request.query.where } : undefined);
+      return reply.send({
+        domain: feed.domain,
+        events: events.slice(0, limit),
+        total: events.length,
+        fetchedAt: new Date().toISOString(),
+      });
     },
   );
 

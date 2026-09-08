@@ -227,6 +227,18 @@ async function main(): Promise<void> {
     console.warn("[startup] ⚠ embedder warm-up await failed — continuing (fail-open)");
   }
 
+  // ── Step 2.6: Hydrate the model registry from provider_models (§1.5) ───────
+  // DB read only — zero network at startup. The table is written offline by
+  // `nexus models seed [--file <path>]`; with no DATABASE_URL or an empty
+  // table the registry keeps its curated defaults (fail-open).
+  try {
+    const { loadProviderModelsIntoRegistry } = await import("./lib/models-seed.js");
+    const seeded = await loadProviderModelsIntoRegistry();
+    console.log(`[startup] provider_models loaded: ${seeded} model(s) ✓`);
+  } catch {
+    console.warn("[startup] ⚠ provider_models load failed — continuing (fail-open)");
+  }
+
   // ── Step 3: Hand off port from early server to Fastify ──────────────────────
   console.log("[startup] closing early server, handing off port to Fastify...");
   await new Promise<void>((resolve) => earlyServer.close(() => resolve()));

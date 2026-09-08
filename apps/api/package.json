@@ -93,6 +93,7 @@
     "@nexus/scraping-mcp": "workspace:*",
     "@nexus/session-sync": "workspace:*",
     "@nexus/sft-tagger": "workspace:*",
+    "@nexus/finetune-pipeline": "workspace:*",
     "@nexus/shared": "workspace:*",
     "@nexus/sse": "workspace:*",
     "@nexus/stealth-browser": "workspace:*",

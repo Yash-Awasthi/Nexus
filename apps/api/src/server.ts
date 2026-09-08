@@ -110,6 +110,7 @@ import { scimRoutes } from "./routes/scim.js";
 import { scrapingMcpRoutes } from "./routes/scraping-mcp.js";
 import { sessionSyncRoutes } from "./routes/session-sync.js";
 import { sftRoutes } from "./routes/sft.js";
+import { pluginRegistryRoutes } from "./routes/plugin-registry.js";
 import { sseRoutes } from "./routes/sse.js";
 import { threadsRoutes } from "./routes/threads.js";
 import { stmRoutes } from "./routes/stm.js";
@@ -391,6 +392,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       // P — rlhf, sft-tagger, llm-router, evals, scenario-planner
       await api.register(rlhfRoutes);
       await api.register(sftRoutes);
+      await api.register(pluginRegistryRoutes);
       await api.register(llmRoutes);
       await api.register(evalsRoutes);
       await api.register(scenarioPlannerRoutes);

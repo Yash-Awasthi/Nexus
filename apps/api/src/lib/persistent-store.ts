@@ -69,7 +69,13 @@ export class PersistentStore<T> {
           "SELECT id, data FROM nexus_kv WHERE collection = $1",
           [this._name],
         );
-        for (const r of rows) this._mem.set(r.id, r.data);
+        for (const r of rows) {
+          // Key contract is a string id — skip rows that violate it (e.g. a
+          // test pg mock that answers arbitrary row shapes for every query)
+          // instead of hydrating garbage entries that crash readers.
+          if (typeof r.id !== "string" || r.data === undefined || r.data === null) continue;
+          this._mem.set(r.id, r.data);
+        }
       } catch {
         /* table not yet created — first boot */
       }

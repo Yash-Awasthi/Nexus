@@ -296,3 +296,21 @@ export class CostLogStore {
 
 /** Process-wide singleton — api-bridge records into and reads from this. */
 export const costLogStore = new CostLogStore();
+
+/**
+ * Per-1M-token pricing [input, output] USD for cost tracking and the
+ * `/api/costs/pricing` surface. Owned here so the recording path (api-bridge's
+ * `_trackCost`) and the reporting path (routes/costs.ts, §16.7) share one table.
+ */
+export const MODEL_PRICES: Record<string, [number, number]> = {
+  "anthropic/claude-3.5-haiku": [0.8, 4.0],
+  "anthropic/claude-sonnet-4-6": [3.0, 15.0],
+  "anthropic/claude-3-opus": [15.0, 75.0],
+  "openai/gpt-4o": [2.5, 10.0],
+  "openai/gpt-4o-mini": [0.15, 0.6],
+  "groq/llama-3.1-8b-instant": [0.05, 0.08],
+  // llama-3.3-70b-versatile was decommissioned by Groq on 2026-08-16; the row is
+  // kept for historical cost lookups. openai/gpt-oss-120b is the replacement.
+  "groq/llama-3.3-70b-versatile": [0.59, 0.79],
+  "groq/openai/gpt-oss-120b": [0.15, 0.6],
+};

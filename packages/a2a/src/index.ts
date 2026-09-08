@@ -408,6 +408,33 @@ export class A2AClient {
     return (await this.rpc("tasks/cancel", { id })) as A2ATask;
   }
 
+  /**
+   * Delegate a message to this agent and wait for the final result. Requests
+   * the peer's blocking path (`configuration.blocking: true`). When the peer
+   * still answers with a non-terminal task (state `working`/`submitted`/
+   * `input-required`), polls `tasks/get` until the task reaches a terminal
+   * state (`completed` / `failed` / `canceled` / `rejected`) or the poll budget
+   * is exhausted. Convenience for callers that need the FINAL result.
+   */
+  async delegate(
+    message: A2AMessage,
+    opts: { pollIntervalMs?: number; maxPolls?: number } = {},
+  ): Promise<A2ATask | A2AMessage> {
+    const pollIntervalMs = opts.pollIntervalMs ?? 500;
+    const maxPolls = opts.maxPolls ?? 60;
+    const result = await this.sendMessage({
+      message,
+      configuration: { blocking: true },
+    });
+    if (result.kind !== "task") return result; // direct reply — nothing to poll
+    let task = result;
+    for (let poll = 0; poll < maxPolls && !isTerminalTaskState(task.status.state); poll++) {
+      await new Promise<void>((resolve) => setTimeout(resolve, pollIntervalMs));
+      task = await this.getTask(task.id);
+    }
+    return task;
+  }
+
   // ── Internals ───────────────────────────────────────────────────────────────
 
   /** Perform a unary JSON-RPC call and return its `result` (throws on error). */
@@ -454,4 +481,225 @@ export class A2AClient {
     }
     return res as Response;
   }
+}
+
+// ── Delegation orchestration (§15.2) ─────────────────────────────────────────
+
+/** A single delegated call: peer client + message. */
+export interface DelegationTarget {
+  client: A2AClient;
+  message: A2AMessage;
+  /** Optional per-target label for results/errors. */
+  label?: string;
+}
+
+/** Outcome of one delegated call. */
+/** True when an A2A task state is terminal (no further polling needed). */
+export function isTerminalTaskState(state: A2ATaskState): boolean {
+  return state === "completed" || state === "failed" || state === "canceled" || state === "rejected";
+}
+
+export interface DelegationOutcome {
+  label?: string;
+  ok: boolean;
+  /** The final task when the peer completed (state `completed`). */
+  task?: A2ATask;
+  /** The direct message reply when the peer answered without a task. */
+  reply?: A2AMessage;
+  error?: A2AClientError | Error;
+}
+
+/** Options for {@link delegateWithRetry}. */
+export interface DelegateRetryOptions {
+  /** Max attempts (including the first). Default 3. */
+  maxAttempts?: number;
+  /** Base delay between attempts in ms. Default 250. */
+  baseDelayMs?: number;
+  /** Backoff multiplier per retry. Default 2 (250 → 500 → 1000). */
+  backoffMultiplier?: number;
+  /** Injectable sleep for tests. Defaults to a real setTimeout. */
+  sleepFn?: (ms: number) => Promise<void>;
+}
+
+/**
+ * Delegate a message with retry + backoff. Retries only on *transport*
+ * failures (network, HTTP, RPC errors) — never on a completed-but-failed
+ * task, which is a peer decision, not a transport glitch. Returns the last
+ * outcome after exhausting attempts.
+ */
+export async function delegateWithRetry(
+  target: DelegationTarget,
+  opts: DelegateRetryOptions = {},
+): Promise<DelegationOutcome> {
+  const maxAttempts = opts.maxAttempts ?? 3;
+  const baseDelayMs = opts.baseDelayMs ?? 250;
+  const backoff = opts.backoffMultiplier ?? 2;
+  const sleep = opts.sleepFn ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+
+  let last: DelegationOutcome = { ok: false, error: new Error("no attempts made") };
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const result = await target.client.delegate(target.message);
+      // A2ATask has `status.state`; A2AMessage has `role`. Discriminate on the
+      // required fields (both `kind` fields are optional, so they cannot narrow).
+      if ("status" in result) {
+        if (result.status.state === "failed") {
+          // Peer rejected the work — not a transport error; do not retry.
+          return { label: target.label, ok: false, task: result };
+        }
+        return { label: target.label, ok: true, task: result };
+      }
+      return { label: target.label, ok: true, reply: result };
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error(String(e));
+      last = { label: target.label, ok: false, error: err };
+      if (attempt < maxAttempts) {
+        await sleep(baseDelayMs * Math.pow(backoff, attempt - 1));
+      }
+    }
+  }
+  return last;
+}
+
+/**
+ * Fan out one message to several peers and collect every outcome — the
+ * "federated council" primitive. All peers run concurrently; failures are
+ * isolated per peer (one dead peer does not fail the fan-out).
+ */
+export async function delegateFanOut(
+  targets: DelegationTarget[],
+  opts: DelegateRetryOptions = {},
+): Promise<DelegationOutcome[]> {
+  return Promise.all(targets.map((t) => delegateWithRetry(t, opts)));
+}
+
+/**
+ * A delegation coordinator: tracks a named delegation session, fans out to
+ * peers, and exposes the aggregated results. Useful for federation flows
+ * that need a stable handle on a multi-peer delegation.
+ */
+export class A2ADelegationCoordinator {
+  private readonly outcomes: DelegationOutcome[] = [];
+  readonly sessionId: string;
+  readonly startedAt: string;
+
+  constructor(sessionId?: string) {
+    this.sessionId = sessionId ?? `delegation-${randomUUID()}`;
+    this.startedAt = new Date().toISOString();
+  }
+
+  /** Fan out to every target and record the outcomes. */
+  async delegate(
+    targets: DelegationTarget[],
+    opts: DelegateRetryOptions = {},
+  ): Promise<DelegationOutcome[]> {
+    const results = await delegateFanOut(targets, opts);
+    this.outcomes.push(...results);
+    return results;
+  }
+
+  /** Every recorded outcome. */
+  all(): DelegationOutcome[] {
+    return [...this.outcomes];
+  }
+
+  /** Outcomes that completed successfully. */
+  succeeded(): DelegationOutcome[] {
+    return this.outcomes.filter((o) => o.ok);
+  }
+
+  /** Outcomes that failed (transport or peer rejection). */
+  failed(): DelegationOutcome[] {
+    return this.outcomes.filter((o) => !o.ok);
+  }
+
+  /** True when every peer succeeded. */
+  get allSucceeded(): boolean {
+    return this.outcomes.length > 0 && this.failed().length === 0;
+  }
+}
+
+// ── Federated council (§15.2) ────────────────────────────────────────────────
+
+/** One peer's contribution to a council decision. */
+export interface CouncilVote {
+  /** Peer label (or its index when unlabeled). */
+  peer: string;
+  /** True when the peer answered successfully. */
+  ok: boolean;
+  /** The peer's text answer: the first text part of its reply/final artifact. */
+  answer?: string;
+}
+
+/** Aggregated result of a federated council round. */
+export interface CouncilDecision {
+  /** Extracted peer answers (ok peers only). */
+  votes: CouncilVote[];
+  /** Peers that failed (label + error message). */
+  errors: { peer: string; error: string }[];
+  /** True when at least one peer answered. */
+  reachedQuorum: boolean;
+  /** Peer count that answered / was asked. */
+  quorum: { answered: number; asked: number };
+}
+
+/** First non-empty text part of a message or task artifact set. */
+function firstTextPart(parts: A2APart[] | undefined): string | undefined {
+  for (const p of parts ?? []) {
+    if (p.kind === "text" && p.text.trim().length > 0) return p.text;
+  }
+  return undefined;
+}
+
+/** Extract a peer's answer from a delegation outcome. */
+export function outcomeAnswer(outcome: DelegationOutcome): string | undefined {
+  if (!outcome.ok) return undefined;
+  if (outcome.reply) return firstTextPart(outcome.reply.parts);
+  if (outcome.task) {
+    // Prefer the final artifact, then the status message.
+    const fromArtifacts = outcome.task.artifacts
+      ?.map((a) => firstTextPart(a.parts))
+      .find((t) => t !== undefined);
+    if (fromArtifacts) return fromArtifacts;
+    return firstTextPart(outcome.task.status.message?.parts);
+  }
+  return undefined;
+}
+
+/**
+ * Aggregate a fan-out into a council decision: extract each peer's answer,
+ * isolate failures, and report quorum. Pure — the caller decides how to weigh
+ * or merge the answers (majority vote, judge LLM, synthesis, …).
+ */
+export function aggregateCouncilDecision(outcomes: DelegationOutcome[]): CouncilDecision {
+  const votes: CouncilVote[] = [];
+  const errors: { peer: string; error: string }[] = [];
+  outcomes.forEach((o, i) => {
+    const peer = o.label ?? `peer-${i}`;
+    const answer = outcomeAnswer(o);
+    if (o.ok && answer !== undefined) {
+      votes.push({ peer, ok: true, answer });
+    } else {
+      errors.push({ peer, error: o.error?.message ?? (o.ok ? "no answer content" : "peer failed") });
+    }
+  });
+  return {
+    votes,
+    errors,
+    reachedQuorum: votes.length > 0,
+    quorum: { answered: votes.length, asked: outcomes.length },
+  };
+}
+
+/**
+ * One-shot federated council: fan the message out to every peer, aggregate
+ * into a {@link CouncilDecision}. Failure-isolated — a dead peer lands in
+ * `errors`, never breaks the round.
+ */
+export async function federatedCouncil(
+  targets: DelegationTarget[],
+  opts: DelegateRetryOptions = {},
+): Promise<CouncilDecision> {
+  const outcomes = await delegateFanOut(targets, opts);
+  return aggregateCouncilDecision(outcomes);
 }

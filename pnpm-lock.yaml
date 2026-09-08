@@ -158,6 +158,9 @@ importers:
       '@nexus/feature-flags':
         specifier: workspace:*
         version: link:../../packages/feature-flags
+      '@nexus/finetune-pipeline':
+        specifier: workspace:*
+        version: link:../../packages/finetune-pipeline
       '@nexus/gateway':
         specifier: workspace:*
         version: link:../../packages/gateway
@@ -381,6 +384,9 @@ importers:
       '@nexus/council':
         specifier: workspace:*
         version: link:../../packages/council
+      '@nexus/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@nexus/debate-engine':
         specifier: workspace:*
         version: link:../../packages/debate-engine
@@ -390,6 +396,9 @@ importers:
       '@nexus/mcp-client':
         specifier: workspace:*
         version: link:../../packages/mcp-client
+      '@nexus/provider-registry':
+        specifier: workspace:*
+        version: link:../../packages/provider-registry
       '@nexus/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
@@ -1670,6 +1679,22 @@ importers:
       '@nexus/llm-router':
         specifier: workspace:*
         version: link:../llm-router
+
+  packages/finetune-pipeline:
+    dependencies:
+      '@nexus/corpus-builder':
+        specifier: workspace:*
+        version: link:../corpus-builder
+      '@nexus/sft-tagger':
+        specifier: workspace:*
+        version: link:../sft-tagger
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: '*'
+        version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
   packages/function-registry: {}
 

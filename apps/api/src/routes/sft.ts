@@ -12,6 +12,7 @@
  * Store: in-process SftDataset singleton.
  */
 
+import { FinetunePipeline, FinetuneExportError } from "@nexus/finetune-pipeline";
 import {
   DatasetFilter,
   SftDataset,
@@ -22,6 +23,8 @@ import {
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../middleware/auth.js";
+
+const now = (): string => new Date().toISOString();
 
 // ── Singletons ────────────────────────────────────────────────────────────────
 
@@ -139,6 +142,76 @@ export async function sftRoutes(app: FastifyInstance): Promise<void> {
         `attachment; filename="sft-dataset.${fmt === "jsonl" ? "jsonl" : "json"}"`,
       )
       .send(output);
+  });
+
+  /**
+   * POST /sft/pipeline/export
+   *
+   * §15.3 dataset assembly → OpenAI JSONL export. Accepts corpus documents and/or
+   * raw conversations, runs them through the finetune-pipeline (tag → score →
+   * filter → OpenAI chat-completions JSONL), enforces the ≥10-example export
+   * precondition, and returns the JSONL as a download.
+   *
+   * Body:
+   *   documents     — [{ id, title, content, source?, topics? }] corpus docs
+   *   conversations — [[{ role, content }, …], …] raw turns
+   *   minQuality    — optional 0–1 quality gate (default 0.5)
+   *   systemPrompt  — optional system message (default "You are a helpful assistant.")
+   */
+  app.post<{
+    Body: {
+      documents?: {
+        id: string;
+        title: string;
+        content: string;
+        source?: string;
+        topics?: string[];
+      }[];
+      conversations?: { role: TurnRole; content: string }[][];
+      minQuality?: number;
+      systemPrompt?: string;
+    };
+  }>("/sft/pipeline/export", { preHandler: requireAuth }, async (request, reply) => {
+    const { documents = [], conversations = [], minQuality, systemPrompt } = request.body;
+    if (documents.length === 0 && conversations.length === 0) {
+      return reply.code(400).send({
+        error: "empty_input",
+        message: "Provide at least one corpus document or conversation to assemble a dataset.",
+      });
+    }
+
+    const pipeline = new FinetunePipeline();
+    pipeline.addCorpusDocuments(documents);
+    pipeline.addConversations(conversations);
+    const { ready, counts } = pipeline.assemble({ minQuality: minQuality ?? 0.5 });
+
+    let jsonl: string;
+    try {
+      jsonl = pipeline.exportOpenAiJsonl(ready, { systemPrompt });
+    } catch (e) {
+      if (e instanceof FinetuneExportError) {
+        return reply.code(e.code === "EMPTY_DATASET" ? 404 : 422).send({
+          error: e.code === "EMPTY_DATASET" ? "no_data" : "insufficient_data",
+          message: e.message,
+          readyCount: e.readyCount,
+        });
+      }
+      throw e;
+    }
+
+    const lines = jsonl.split("\n").filter(Boolean).length;
+    return reply
+      .header("Content-Type", "application/x-ndjson")
+      .header(
+        "Content-Disposition",
+        `attachment; filename="nexus-sft-dataset-${now().slice(0, 10)}.jsonl"`,
+      )
+      // Metadata rides headers — the body is PURE JSONL so any ndjson consumer
+      // (and OpenAI's upload endpoint) can parse every line.
+      .header("X-Dataset-Count-Corpus", String(counts.corpus))
+      .header("X-Dataset-Count-Conversations", String(counts.conversations))
+      .header("X-Dataset-Lines", String(lines))
+      .send(jsonl);
   });
 
   /**

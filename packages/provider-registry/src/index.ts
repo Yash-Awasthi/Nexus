@@ -277,13 +277,13 @@ export class ProviderRegistry {
     return undefined;
   }
 
-  findCheapest(modelPattern: string): { provider: ProviderEntry; model: ProviderModel } | undefined {
+  findCheapest(modelPattern?: string): { provider: ProviderEntry; model: ProviderModel } | undefined {
     let cheapest: { provider: ProviderEntry; model: ProviderModel } | undefined;
     let lowestCost = Infinity;
 
     for (const provider of this.providers.values()) {
       for (const model of provider.models) {
-        if (!model.id.includes(modelPattern)) continue;
+        if (modelPattern !== undefined && !model.id.includes(modelPattern)) continue;
         const cost = model.inputCost ?? 0;
         if (cost < lowestCost) {
           lowestCost = cost;
@@ -306,6 +306,98 @@ export class ProviderRegistry {
       }
     }
     return results;
+  }
+
+  // ── Flattened-model view ───────────────────────────────────────────────────
+  // The provider-centric API keys everything off ProviderEntry.models. These
+  // methods surface the same data keyed by flat "provider/model" ids — the
+  // shape the models.dev importer (§1.5) and quick lookups want.
+
+  /** True when any registered provider exposes `modelId`. */
+  has(modelId: string): boolean {
+    return this.findModel(modelId) !== undefined;
+  }
+
+  /** All (provider, model) pairs across every registered provider. */
+  allModels(): { provider: ProviderEntry; model: ProviderModel }[] {
+    const results: { provider: ProviderEntry; model: ProviderModel }[] = [];
+    for (const provider of this.providers.values()) {
+      for (const model of provider.models) {
+        results.push({ provider, model });
+      }
+    }
+    return results;
+  }
+
+  /** Registered provider ids (insertion order). */
+  providerIds(): string[] {
+    return this.list().map((p) => p.id);
+  }
+
+  /** One model by flat id, tagged with its owning provider. */
+  getModel(modelId: string): ModelDefinition | undefined {
+    const hit = this.findModel(modelId);
+    return hit ? { ...hit.model, provider: hit.provider.id } : undefined;
+  }
+
+  /** All models as flattened ModelDefinitions, optionally filtered. */
+  listModels(filter: RegistryFilter = {}): ModelDefinition[] {
+    return this.allModels()
+      .map(({ provider, model }) => ({ ...model, provider: provider.id }))
+      .filter((m) => {
+        if (filter.provider !== undefined && m.provider !== filter.provider) return false;
+        if (filter.capability !== undefined && !modelSupportsCapability(m, filter.capability))
+          return false;
+        if (
+          filter.maxCostPerOutputToken !== undefined &&
+          (m.outputCost ?? 0) > filter.maxCostPerOutputToken
+        )
+          return false;
+        if (filter.minContextWindow !== undefined && m.contextWindow < filter.minContextWindow)
+          return false;
+        return true;
+      });
+  }
+
+  /** True when the model advertises the capability (vision/functionCalling/streaming). */
+  supportsCapability(modelId: string, capability: string): boolean {
+    const m = this.getModel(modelId);
+    return m !== undefined && modelSupportsCapability(m, capability);
+  }
+
+  /**
+   * Price a request in USD: tokens × per-1M-token rate. Unknown models cost 0
+   * (metering must never lose a completed call — mirrors billing's computeCost).
+   */
+  estimateCost(modelId: string, inputTokens: number, outputTokens: number): number {
+    const m = this.getModel(modelId);
+    if (!m) return 0;
+    const inRate = m.inputCost != null ? m.inputCost / 1_000_000 : 0;
+    const outRate = m.outputCost != null ? m.outputCost / 1_000_000 : 0;
+    return inputTokens * inRate + outputTokens * outRate;
+  }
+
+  /** The cheapest model overall (free = $0 output rate). */
+  findCheapestModel(): { provider: ProviderEntry; model: ProviderModel } | undefined {
+    let cheapest: { provider: ProviderEntry; model: ProviderModel } | undefined;
+    let lowestCost = Infinity;
+    for (const hit of this.allModels()) {
+      const cost = hit.model.outputCost ?? 0;
+      if (cost < lowestCost) {
+        lowestCost = cost;
+        cheapest = hit;
+      }
+    }
+    return cheapest;
+  }
+
+  /** The model with the largest context window. */
+  findLargestContext(): { provider: ProviderEntry; model: ProviderModel } | undefined {
+    let largest: { provider: ProviderEntry; model: ProviderModel } | undefined;
+    for (const hit of this.allModels()) {
+      if (!largest || hit.model.contextWindow > largest.model.contextWindow) largest = hit;
+    }
+    return largest;
   }
 
   // ── Bulk Registration Helpers ──────────────────────────────────────────────
@@ -496,8 +588,29 @@ export default ProviderRegistry;
 // The old API used globalRegistry + ModelDefinition. These aliases ensure
 // existing code keeps working while we migrate to the new ProviderEntry API.
 
-/** @deprecated Use ProviderRegistry instead */
-export type ModelDefinition = ProviderModel;
+/**
+ * A ProviderModel flattened to carry its owning provider id — the shape the
+ * models.dev importer (§1.5) and the registry's flattened-model view use.
+ */
+export interface ModelDefinition extends ProviderModel {
+  provider: string;
+  /** Optional rich capability flags (models.dev importer / DB rows). */
+  capabilities?: Record<string, boolean>;
+  /** Knowledge cutoff date (models.dev `knowledge`), when published. */
+  knowledgeCutoff?: string;
+  /** Release date (models.dev `release_date`), when published. */
+  releaseDate?: string;
+}
+
+/** Capability check with legacy fallbacks for the curated ProviderModel flags. */
+export function modelSupportsCapability(m: ModelDefinition, capability: string): boolean {
+  const caps = m.capabilities;
+  if (caps && capability in caps) return caps[capability] === true;
+  if (capability === "vision") return m.vision === true;
+  if (capability === "functionCalling") return m.toolUse === true;
+  if (capability === "streaming") return m.streaming !== false;
+  return false;
+}
 
 /** @deprecated Use ProviderEntry.capabilities instead */
 export interface ProviderCapabilities {
@@ -516,33 +629,292 @@ export interface ProviderRateLimits {
   tokensPerDay: number;
 }
 
-/** @deprecated Use new ProviderRegistry() instead */
-export const globalRegistry = new ProviderRegistry();
-
-/** @deprecated Use ProviderEntry.models instead */
+/**
+ * Shared singleton registry. Curated defaults register lazily on first access
+ * — the module must never require network or DB at import time (ROADMAP §1.5:
+ * boot hydrates from the table, zero startup network). BUILTIN_MODELS fills
+ * alongside it; explicit registrations (e.g. the §1.5 "seeded" entry) still
+ * work — only the default catalogue itself is registered once.
+ */
+/**
+ * Curated builtin catalogue — a flattened snapshot of the shared registry's
+ * defaults, filled at module init below.
+ */
 export const BUILTIN_MODELS: ModelDefinition[] = [];
+
+/**
+ * Shared singleton registry with the curated defaults pre-registered. Static
+ * data only — no network, no DB at import time (ROADMAP §1.5: boot hydrates
+ * from the provider_models table, zero startup network). Explicit
+ * registrations (e.g. the §1.5 "seeded" entry) work as usual.
+ */
+export const globalRegistry: ProviderRegistry = new ProviderRegistry().registerDefaults();
+for (const { provider, model } of globalRegistry.allModels()) {
+  BUILTIN_MODELS.push({ ...model, provider: provider.id });
+}
 
 /** @deprecated No longer needed — models are built into the registry */
 export const MODELS_DEV_API_URL = "https://models.dev/api.json";
 
-/** @deprecated Use registry.register() with ProviderEntry */
-export function modelsDevToDefinitions(_catalogue: unknown): ModelDefinition[] {
-  return [];
+/** One model inside the models.dev catalogue (subset of fields we consume). */
+export interface ModelsDevModel {
+  id?: string;
+  name?: string;
+  attachment?: boolean;
+  tool_call?: boolean;
+  knowledge?: string;
+  release_date?: string;
+  status?: string;
+  modalities?: { input?: string[]; output?: string[] } | null;
+  cost?: {
+    input?: number | null;
+    output?: number | null;
+    cache_read?: number | null;
+    cache_write?: number | null;
+  } | null;
+  limit?: { context?: number; output?: number } | null;
 }
 
-/** @deprecated No-op — kept for backward compatibility */
-export async function fetchModelsDev(_fetchFn?: typeof fetch): Promise<unknown> {
-  return {};
+/** models.dev catalogue: provider id → provider record with nested models. */
+export type ModelsDevCatalogue = Record<
+  string,
+  { id?: string; name?: string; models?: Record<string, ModelsDevModel> } | undefined
+>;
+
+/**
+ * Convert a models.dev catalogue into flattened ModelDefinitions:
+ * ids namespaced `provider/model`; per-million pricing stays per-1M-token USD
+ * (null = free); capabilities derived from modalities/tool_call. Deprecated
+ * models are kept flagged — registerFromModelsDev skips them.
+ */
+export function modelsDevToDefinitions(catalogue: ModelsDevCatalogue): ModelDefinition[] {
+  const defs: ModelDefinition[] = [];
+  for (const [providerKey, provider] of Object.entries(catalogue ?? {})) {
+    for (const [modelKey, raw] of Object.entries(provider?.models ?? {})) {
+      if (!raw) continue;
+      const input = raw.modalities?.input ?? ["text"];
+      const caps: Record<string, boolean> = {
+        vision: input.includes("image"),
+        functionCalling: raw.tool_call === true,
+        streaming: true,
+        promptCaching: raw.cost?.cache_read != null,
+        jsonMode: true,
+        systemPrompt: true,
+        deprecated: raw.status === "deprecated",
+      };
+      defs.push({
+        id: `${providerKey}/${modelKey}`,
+        provider: providerKey,
+        name: raw.name ?? modelKey,
+        contextWindow: raw.limit?.context ?? 0,
+        maxOutput: raw.limit?.output ?? 0,
+        inputCost: raw.cost?.input ?? null,
+        outputCost: raw.cost?.output ?? null,
+        vision: caps.vision,
+        toolUse: caps.functionCalling,
+        streaming: true,
+        capabilities: caps,
+        knowledgeCutoff: raw.knowledge,
+        releaseDate: raw.release_date,
+      });
+    }
+  }
+  return defs;
 }
 
-/** @deprecated No-op — kept for backward compatibility */
-export async function registerFromModelsDev(_registry?: ProviderRegistry, _fetchFn?: typeof fetch): Promise<void> {
-  // no-op
+/**
+ * Fetch the models.dev catalogue. Injectable fetch (tests pass a fake); throws
+ * on non-ok responses so callers decide fail-open vs fail-closed.
+ */
+export async function fetchModelsDev(
+  fetchFn: typeof fetch = fetch,
+): Promise<ModelsDevCatalogue> {
+  const res = await fetchFn(MODELS_DEV_API_URL);
+  if (!res.ok) throw new Error(`models.dev fetch failed: HTTP ${res.status}`);
+  return (await res.json()) as ModelsDevCatalogue;
 }
 
-/** @deprecated Use ProviderRegistry filter methods */
+/** Options for registerFromModelsDev. */
+export interface RegisterFromModelsDevOptions {
+  /** Overwrite curated entries with catalogue data (default: keep curated). */
+  overwrite?: boolean;
+}
+
+/**
+ * Register a models.dev catalogue into a registry: one synthetic provider
+ * entry per catalogue provider (mirrors the "seeded" grouping of
+ * registerFromProviderModelRows). Skips deprecated models; by default keeps
+ * curated entries already present. Returns the number of models added.
+ */
+export function registerFromModelsDev(
+  registry: ProviderRegistry,
+  catalogue?: ModelsDevCatalogue,
+  opts: RegisterFromModelsDevOptions = {},
+): number {
+  if (!catalogue) return 0; // live fetch stays a Gate (ROADMAP §1.5)
+  const defs = modelsDevToDefinitions(catalogue).filter(
+    (d) => !d.capabilities?.deprecated,
+  );
+  const now = new Date().toISOString();
+  const byProvider = new Map<string, ProviderModel[]>();
+  let added = 0;
+  for (const def of defs) {
+    if (!opts.overwrite && registry.has(def.id)) continue;
+    const models = byProvider.get(def.provider) ?? [];
+    models.push({
+      id: def.id,
+      name: def.name,
+      contextWindow: def.contextWindow,
+      maxOutput: def.maxOutput,
+      inputCost: def.inputCost,
+      outputCost: def.outputCost,
+      vision: def.vision,
+      toolUse: def.toolUse,
+      streaming: def.streaming,
+    });
+    byProvider.set(def.provider, models);
+    added++;
+  }
+  for (const [providerId, models] of byProvider) {
+    const existing = registry.get(providerId);
+    if (existing) {
+      const known = new Set(existing.models.map((m) => m.id));
+      for (const m of models) {
+        if (known.has(m.id)) {
+          // overwrite: true must actually replace the curated entry, not skip it
+          if (opts.overwrite) {
+            const idx = existing.models.findIndex((cur) => cur.id === m.id);
+            existing.models[idx] = m;
+          }
+          continue;
+        }
+        existing.models.push(m);
+      }
+    } else {
+      registry.register({
+        id: providerId,
+        name: catalogue[providerId]?.name ?? providerId,
+        baseUrl: "",
+        authType: "none",
+        models,
+        monthlySpendLimit: null,
+        currentSpend: 0,
+        currentTokens: 0,
+        healthScore: 100,
+        lastHealthCheck: now,
+        capabilities: {
+          chat: true,
+          embeddings: false,
+          imageGeneration: false,
+          audioTranscription: false,
+          webSearch: false,
+          codeExecution: false,
+        },
+      });
+    }
+  }
+  return added;
+}
+
+/**
+ * Filter over the flattened model view. `maxCostPerOutputToken` is USD per
+ * 1M output tokens (matching ProviderModel.outputCost).
+ */
 export interface RegistryFilter {
   capability?: string;
   maxCost?: number;
+  maxCostPerOutputToken?: number;
+  minContextWindow?: number;
   provider?: string;
+}
+
+// ── §1.5 models.dev seed — DB round-trip helpers ─────────────────────────────
+// The provider_models table (packages/db migration 0014) stores one row per
+// model; `nexus models seed` writes rows and the API boot path reads them into
+// a ProviderRegistry — both via these helpers. No network is involved at
+// either end: the catalogue comes from a fixture or a file (live fetch is a
+// Gate), and boot reads the table only.
+
+/** Row shape as persisted in provider_models (structural — avoids a hard dep on @nexus/db). */
+export interface ProviderModelRowLike {
+  id: string;
+  provider: string;
+  name: string;
+  contextWindow: number;
+  maxOutputTokens: number;
+  costPerInputToken: number | null;
+  costPerOutputToken: number | null;
+  costPerCacheReadToken?: number | null;
+  costPerCacheWriteToken?: number | null;
+  inputModalities?: string[] | null;
+  outputModalities?: string[] | null;
+  knowledgeCutoff?: string | null;
+  releaseDate?: string | null;
+  deprecated?: boolean | null;
+  capabilities?: Record<string, boolean> | null;
+  source?: string | null;
+}
+
+/**
+ * Convert a provider_models row into the registry's model shape. Prices are
+ * stored per-token in the DB and passed through as per-1M-token USD on
+ * ProviderModel (inputCost/outputCost, null = free); capability flags come
+ * from the stored record, falling back to modality/price derivation for
+ * legacy rows.
+ */
+export function rowToModelDefinition(row: ProviderModelRowLike): ProviderModel {
+  const inputModalities = row.inputModalities ?? ["text"];
+  const caps = row.capabilities ?? {};
+  return {
+    id: row.id,
+    name: row.name,
+    contextWindow: row.contextWindow,
+    maxOutput: row.maxOutputTokens,
+    inputCost: row.costPerInputToken != null ? row.costPerInputToken * 1_000_000 : null,
+    outputCost: row.costPerOutputToken != null ? row.costPerOutputToken * 1_000_000 : null,
+    vision: caps.vision ?? inputModalities.includes("image"),
+    toolUse: caps.functionCalling ?? false,
+    streaming: caps.streaming ?? true,
+  };
+}
+
+/**
+ * Load provider_models rows into a registry. Skips deprecated rows (they stay
+ * in the table for history but must not be routed to). Returns the number of
+ * models registered.
+ *
+ * The registry's live surface is ProviderEntry-shaped (findModel/billing
+ * pricing walk `provider.models`), so rows are grouped under one synthetic
+ * "seeded" provider entry rather than registered as orphan models. `rows`
+ * accepts the Drizzle select shape structurally, so this stays
+ * dependency-free and unit-testable without a DB.
+ */
+export function registerFromProviderModelRows(
+  registry: ProviderRegistry,
+  rows: readonly ProviderModelRowLike[],
+): number {
+  const live = rows.filter((row) => row.deprecated !== true);
+  if (live.length === 0) return 0;
+  const now = new Date().toISOString();
+  registry.register({
+    id: "seeded",
+    name: "Seeded from models.dev (§1.5)",
+    baseUrl: "",
+    authType: "none",
+    models: live.map(rowToModelDefinition),
+    monthlySpendLimit: null,
+    currentSpend: 0,
+    currentTokens: 0,
+    healthScore: 100,
+    lastHealthCheck: now,
+    capabilities: {
+      chat: true,
+      embeddings: false,
+      imageGeneration: false,
+      audioTranscription: false,
+      webSearch: false,
+      codeExecution: false,
+    },
+  });
+  return live.length;
 }

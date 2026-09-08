@@ -74,6 +74,7 @@ function parseRedisUrl(url: string): {
  *   crypto       — every 1 min  (CoinGecko free tier, no key required)
  *   news         — every 10 min (NEWS_API_KEY required, else noop in handler)
  *   feeds:rss    — every 15 min (RSS_FEED_URLS required, else noop in handler)
+ *   port-congestion — every 6 h (keyless IMF PortWatch; Telegram alert on critical)
  */
 async function bootstrapRepeatableJobs(connection: ConnectionOptions): Promise<void> {
   if (!process.env.REDIS_URL) return;
@@ -99,8 +100,15 @@ async function bootstrapRepeatableJobs(connection: ConnectionOptions): Promise<v
       {},
       { repeat: { every: 900_000 }, jobId: "nexus:repeat:feeds:rss" },
     );
+    // §16.1 — port-congestion: the IMF PortWatch service refreshes weekly, so
+    // a 6-hour poll is ample; alerts fire on critical chokepoint closures.
+    await medium.add(
+      "feeds:refresh:port-congestion",
+      { alertOn: ["critical"] },
+      { repeat: { every: 21_600_000 }, jobId: "nexus:repeat:feeds:port-congestion" },
+    );
     console.log(
-      JSON.stringify({ level: "info", event: "worker.repeatable-jobs-bootstrapped", jobs: 4 }),
+      JSON.stringify({ level: "info", event: "worker.repeatable-jobs-bootstrapped", jobs: 5 }),
     );
   } catch (err) {
     // Non-fatal: if Redis is unreachable at startup, the worker will still

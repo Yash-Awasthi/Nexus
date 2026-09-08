@@ -67,16 +67,7 @@ import {
   type WatermarkOptions,
   type ImageFormat,
 } from "@nexus/image-transformations";
-import {
-  InMemoryKGStore,
-  NeonKGStore,
-  KnowledgeGraph,
-  type KGStore,
-  type NeonRow,
-  clusterGraph,
-  buildCommunities,
-  type NeonQueryFn,
-} from "@nexus/knowledge-graph";
+
 import {
   DriverRegistry,
   AnthropicDriver,
@@ -144,12 +135,25 @@ import { createNotification } from "../lib/notifications-store.js";
 import { maybeEmitWeeklyDigest } from "../lib/weekly-digest.js";
 import { requireAuthWithTier } from "../middleware/auth.js";
 import { listResearchJobs } from "../lib/research-jobs.js";
-import { costLogStore, type CostEntry } from "../lib/cost-log.js";
+import { costLogStore, MODEL_PRICES, type CostEntry } from "../lib/cost-log.js";
 
 import { gatewayLog } from "./gateway.js";
 import { getFailoverDriver, setFailoverProviders } from "../lib/llm-failover.js";
 import { CachingDriver } from "../lib/llm-cache-driver.js";
 import { registerResearchRoutes } from "./research.js";
+import { registerFineTuneRoutes } from "./finetune.js";
+import { marketplaceRoutes } from "./marketplace.js";
+import { costsRoutes } from "./costs.js";
+import { sandboxRoutes, runViaPyodide, runViaPiston } from "./sandbox.js";
+import { reposRoutes } from "./repos.js";
+import { connectorsBridgeRoutes } from "./connectors-bridge.js";
+import { tokensRoutes } from "./tokens.js";
+import { roomsRoutes } from "./rooms.js";
+import { workflowsRoutes } from "./workflows.js";
+import { kbRoutes } from "./kb.js";
+import { memoryBridgeRoutes } from "./memory-bridge.js";
+import { kgRoutes } from "./kg.js";
+import { getKG, getKGStore } from "../lib/knowledge-graph-store.js";
 import { registerSkillRoutes } from "./skills.js";
 
 // ── SSE helpers ───────────────────────────────────────────────────────────────
@@ -246,14 +250,6 @@ const DEFAULT_MODEL = process.env.NEXUS_DEFAULT_MODEL ?? "anthropic/claude-3.5-h
 /** Current UTC timestamp as ISO-8601. */
 const now = (): string => new Date().toISOString();
 
-function getDocTypeFromName(filename: string): string {
-  const ext = filename.split(".").pop()?.toLowerCase();
-  if (ext === "pdf") return "pdf";
-  if (ext === "docx") return "docx";
-  if (ext === "csv") return "csv";
-  if (ext === "txt") return "txt";
-  return "md";
-}
 
 /**
  * Highest-priority available LLM driver across all registered providers.
@@ -375,23 +371,12 @@ async function callDefaultLLM(prompt: string, maxTokens: number): Promise<string
 // read below touches; only recording moved into the store.
 const _costLog: readonly CostEntry[] = costLogStore.entries;
 
-const _PRICES: Record<string, [number, number]> = {
-  "anthropic/claude-3.5-haiku": [0.8, 4.0],
-  "anthropic/claude-sonnet-4-6": [3.0, 15.0],
-  "anthropic/claude-3-opus": [15.0, 75.0],
-  "openai/gpt-4o": [2.5, 10.0],
-  "openai/gpt-4o-mini": [0.15, 0.6],
-  "groq/llama-3.1-8b-instant": [0.05, 0.08],
-  // llama-3.3-70b-versatile was decommissioned by Groq on 2026-08-16; the row is
-  // kept for historical cost lookups. openai/gpt-oss-120b is the replacement.
-  "groq/llama-3.3-70b-versatile": [0.59, 0.79],
-  "groq/openai/gpt-oss-120b": [0.15, 0.6],
-};
-
 function _trackCost(model: string, usage?: { inputTokens?: number; outputTokens?: number }) {
   const inp = usage?.inputTokens ?? 0;
   const out = usage?.outputTokens ?? 0;
-  const [pi, po] = _PRICES[model] ?? [1.0, 3.0];
+  // Pricing table owned by lib/cost-log.ts (MODEL_PRICES) — shared with the
+  // /api/costs/* surface (routes/costs.ts, §16.7).
+  const [pi, po] = MODEL_PRICES[model] ?? [1.0, 3.0];
   // Synchronous in-memory record (hot path unchanged); the store flushes the
   // tail to KV on a debounce and reloads it at boot.
   costLogStore.record({
@@ -489,28 +474,6 @@ function getMemory(): MemoryManager {
   return _memory;
 }
 
-let _kgStore: KGStore | null = null;
-let _kg: KnowledgeGraph | null = null;
-
-function getKGStore(): KGStore {
-  if (_kgStore) return _kgStore;
-  if (process.env.DATABASE_URL) {
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-    const queryFn: NeonQueryFn = (sql, params) =>
-      pool.query(sql, params!).then((r) => ({ rows: r.rows as NeonRow[] }));
-    _kgStore = new NeonKGStore({ query: queryFn });
-  } else {
-    _kgStore = new InMemoryKGStore();
-  }
-  return _kgStore;
-}
-
-function getKG(): KnowledgeGraph {
-  if (_kg) return _kg;
-  _kg = new KnowledgeGraph(getKGStore());
-  return _kg;
-}
-
 // ── Numeric tier → SpeedTier mapping ─────────────────────────────────────────
 
 const NUMERIC_TIER_MAP: Record<number, SpeedTier> = {
@@ -544,10 +507,7 @@ interface AbResult {
 }
 
 const _abStore = new Map<string, AbResult>();
-const _roomsStore = new Map<
-  string,
-  { id: string; name: string; createdAt: string; members: string[] }
->();
+// Rooms store lives in routes/rooms.ts (§16.7).
 
 // ── Council member model-availability validation ──────────────────────────────
 // Settings → Council members are saved with a provider + model id. If the model
@@ -710,41 +670,8 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   // Each store loads its data from JSON files or Postgres on first boot.
   // Route handlers use them exactly like a Map — .get/.set/.delete/.values.
 
-  const _workflowStore = new PersistentStore<{
-    id: string;
-    name: string;
-    steps: unknown[];
-    status: string;
-    createdAt: string;
-    timeout?: number;
-    lastResult?: unknown;
-    lastError?: string;
-    lastRunAt?: string;
-  }>("workflows");
-  const _connectors = new PersistentStore<{
-    id: string;
-    type: string;
-    status: string;
-    label: string;
-  }>("connectors");
-  const _connectorSyncJobs = new PersistentStore<{
-    id: string;
-    connectorId: string;
-    status: string;
-    items: number;
-    startedAt: string;
-    finishedAt: string;
-  }>("connector_sync_jobs");
-  const _connectorSyncSchedules = new PersistentStore<{
-    id: string;
-    connectorId: string;
-    syncMode: "load" | "poll" | "slim";
-    cronExpression: string;
-    enabled: boolean;
-    lastRunAt: string | null;
-    nextRunAt: string | null;
-    createdAt: string;
-  }>("connector_sync_schedules");
+  // Workflows store lives in routes/workflows.ts (§16.7).
+  // Bridge connectors stores live in routes/connectors-bridge.ts (§16.7).
   const _craftStore = new PersistentStore<{
     id: string;
     template: string;
@@ -752,14 +679,7 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     result: string;
     createdAt: string;
   }>("craft");
-  const _kbStore = new PersistentStore<{
-    id: string;
-    name: string;
-    description: string;
-    docCount: number;
-    createdAt: string;
-    documents: { id: string; name: string; size: string; type: string }[];
-  }>("kb");
+  // KB store lives in routes/kb.ts (§16.7).
 
   // Per-user council config (collection "council", row id = userId).
   const _councilStore = new PersistentStore<{
@@ -810,12 +730,7 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   const _autopilotRuns = new PersistentStore<AutopilotRun>("autopilot_runs");
 
   await Promise.all([
-    _workflowStore.load(),
-    _connectors.load(),
-    _connectorSyncJobs.load(),
-    _connectorSyncSchedules.load(),
     _craftStore.load(),
-    _kbStore.load(),
     _councilStore.load(),
     _prefsStore.load(),
     _echoStore.load(),
@@ -1464,154 +1379,19 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
-  // -- MEMORY ----------------------------------------------------------------
-  // All memory is scoped to the authenticated user: entries/stats are keyed by
-  // userId so account A never sees account B's chunks. Legacy entries written
-  // without a userId (pre-scoping gateway auto-ingest) are system/shared and
-  // intentionally invisible to user-scoped queries.
+  // -- MEMORY — owned by routes/memory-bridge.ts (§16.7) --------------------
+  // (The rest of the bridge memory surface — backend config, compact,
+  // delete-all — lives in the same module; see below.)
+  await memoryBridgeRoutes(app, { getMemory });
 
-  app.get<{ Querystring: { limit?: number; query?: string } }>(
-    "/memory/entries",
-    { preHandler: requireAuthWithTier },
-    async (request, reply) => {
-      const mem = getMemory();
-      const uid = request.nexusUserId ?? "local";
-      const { limit = 20, query } = request.query;
-      if (query) {
-        const results = await mem.recall(query, limit, { userId: uid });
-        const entries = results.map((r) => ({ ...r.entry, score: r.score }));
-        return reply.send({ entries, total: entries.length });
-      }
-      const entries = await mem.list({ userId: uid });
-      // Surface the fields the Memory page actually renders: the store returns
-      // raw text/createdAt (epoch seconds) while the UI expects topic/chunks/
-      // date/source — without this mapping the page showed NaN/undefined.
-      return reply.send({
-        entries: entries.slice(0, limit).map((e) => ({
-          ...e,
-          topic: (e.text ?? "").slice(0, 80) || "Untitled memory",
-          chunks: Math.max(1, Math.ceil((e.text?.length ?? 0) / 1000)),
-          date: e.createdAt ? new Date(e.createdAt * 1000).toLocaleDateString() : "",
-          source: typeof e.metadata?.category === "string" ? e.metadata.category : "memory",
-        })),
-        total: entries.length,
-      });
-    },
-  );
+  // -- KNOWLEDGE GRAPH — owned by routes/kg.ts (§16.7) ----------------------
+  // Store/graph singletons shared via lib/knowledge-graph-store.ts (the
+  // /symbolic/* surface below imports the same helpers).
+  await kgRoutes(app);
 
-  app.post<{ Body: { content: string; category?: string; tags?: string[] } }>(
-    "/memory/entries",
-    { preHandler: requireAuthWithTier },
-    async (request, reply) => {
-      const mem = getMemory();
-      const { content, category, tags } = request.body;
-      const entry = await mem.remember(content, {
-        metadata: { category, tags },
-        userId: request.nexusUserId ?? "local",
-      });
-      return reply.code(201).send(entry);
-    },
-  );
-
-  app.delete<{ Params: { id: string } }>(
-    "/memory/entries/:id",
-    { preHandler: requireAuthWithTier },
-    async (request, reply) => {
-      const mem = getMemory();
-      const uid = request.nexusUserId ?? "local";
-      // Ownership check — users can only delete their own entries.
-      const owned = await mem.list({ userId: uid });
-      if (!owned.some((e) => e.id === request.params.id)) {
-        return reply.code(404).send({ error: "memory entry not found" });
-      }
-      await mem.forget(request.params.id);
-      return reply.code(204).send();
-    },
-  );
-
-  app.get("/memory/stats", { preHandler: requireAuthWithTier }, async (request, reply) => {
-    const mem = getMemory();
-    const stats = await mem.stats({ userId: request.nexusUserId ?? "local" });
-    return reply.send(stats);
-  });
-
-  // -- KNOWLEDGE GRAPH -------------------------------------------------------
-
-  app.get<{ Querystring: { limit?: number; q?: string } }>("/kg/graph", async (request, reply) => {
-    const store = getKGStore();
-    const { limit = 50, q } = request.query;
-    const nodes = await store.findNodes(q ? { nameContains: q, limit } : { limit });
-    const edges = await store.findEdges({ limit });
-    return reply.send({ nodes, edges });
-  });
-
-  app.get<{ Querystring: { q?: string; k?: number } }>("/kg/search", async (request, reply) => {
-    const store = getKGStore();
-    const nodes = await store.findNodes({
-      nameContains: request.query.q ?? "",
-      limit: request.query.k ?? 10,
-    });
-    return reply.send({ nodes });
-  });
-
-  // POST variant used by knowledge-graph.tsx UI
-  app.post<{ Body: { query?: string; q?: string; k?: number } }>(
-    "/kg/search",
-    async (request, reply) => {
-      const store = getKGStore();
-      const q = request.body.query ?? request.body.q ?? "";
-      const k = request.body.k ?? 10;
-      const nodes = await store.findNodes({ nameContains: q, limit: k });
-      return reply.send({ nodes });
-    },
-  );
-
-  app.post<{ Body: { text: string } }>("/kg/extract", async (request, reply) => {
-    const kg = getKG();
-    const result = await kg.ingest(request.body.text);
-    return reply.code(201).send(result);
-  });
-
-  app.get<{ Querystring: { id?: string } }>("/kg/traverse", async (request, reply) => {
-    const store = getKGStore();
-    const subjectId = request.query.id ?? "";
-    const edges = await store.findEdges({ subjectId, limit: 50 });
-    const nodeIds = [...new Set(edges.flatMap((e) => [e.subjectId, e.objectId]))];
-    const nodes = await Promise.all(nodeIds.map((id) => store.getNode(id)));
-    return reply.send({ nodes: nodes.filter(Boolean), edges });
-  });
-
-  // POST variant used by knowledge-graph.tsx UI
-  app.post<{ Body: { id?: string; entityId?: string; depth?: number } }>(
-    "/kg/traverse",
-    async (request, reply) => {
-      const store = getKGStore();
-      const subjectId = request.body.id ?? request.body.entityId ?? "";
-      const edges = await store.findEdges({ subjectId, limit: 50 });
-      const nodeIds = [...new Set(edges.flatMap((e) => [e.subjectId, e.objectId]))];
-      const nodes = await Promise.all(nodeIds.map((id) => store.getNode(id)));
-      return reply.send({ nodes: nodes.filter(Boolean), edges });
-    },
-  );
-
-  // -- KNOWLEDGE BASES -------------------------------------------------------
-  // GET /kb serves the KB store; the KG ingestion alias lives under POST /kb/:id.
-
-  app.get("/kb", async (_req, reply) => {
-    const kbs = [..._kbStore.values()]
-      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-      .map((kb) => ({ ...kb, docCount: kb.documents.length }));
-    return reply.send({ kbs, total: kbs.length });
-  });
-
-  app.post<{ Params: { id: string }; Body: { text: string } }>(
-    "/kb/:id",
-    async (request, reply) => {
-      const kg = getKG();
-      const result = await kg.ingest(request.body.text, { source: request.params.id });
-      return reply.code(201).send(result);
-    },
-  );
+  // -- KNOWLEDGE BASES — owned by routes/kb.ts (§16.7) ----------------------
+  // Listing, CRUD, documents and the KG-ingestion alias live in the module.
+  await kbRoutes(app, { getKG });
 
   // ══════════════════════════════════════════════════════════════════════════
   // C.1 — IN-MEMORY CRUD: Settings, Rooms, Workflows
@@ -1784,604 +1564,21 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // -- ROOMS -----------------------------------------------------------------
+  // -- ROOMS — owned by routes/rooms.ts (§16.7) -----------------------------
+  await app.register(roomsRoutes);
 
-  app.get("/rooms", async (_req, reply) => {
-    return reply.send([..._roomsStore.values()]);
-  });
+  // -- WORKFLOWS — owned by routes/workflows.ts (§16.7) ---------------------
+  // Runs use the bridge's LLM wiring (getDefaultDriver/buildChatRegistry) via
+  // explicit injection — the module has no circular import.
+  await workflowsRoutes(app, { getDefaultDriver, buildChatRegistry });
 
-  app.post<{ Body: { name: string } }>("/rooms", async (request, reply) => {
-    const id = crypto.randomUUID();
-    const room = { id, name: request.body.name, createdAt: now(), members: [] };
-    _roomsStore.set(id, room);
-    return reply.code(201).send(room);
-  });
+  // -- REPOS — owned by routes/repos.ts (§16.7) ------------------------------
+  // GitHub REST API listing (TTL-cached 10 min) + code search; byte-identical
+  // response shapes, no shared state with the rest of the bridge.
+  await app.register(reposRoutes);
 
-  app.delete<{ Params: { id: string } }>("/rooms/:id", async (request, reply) => {
-    _roomsStore.delete(request.params.id);
-    return reply.code(204).send();
-  });
-
-  // -- WORKFLOWS -------------------------------------------------------------
-
-  app.get("/workflows", async (_req, reply) => {
-    return reply.send([..._workflowStore.values()]);
-  });
-
-  app.post<{ Body: { name: string; steps?: unknown[] } }>("/workflows", async (request, reply) => {
-    const id = crypto.randomUUID();
-    const wf = {
-      id,
-      name: request.body.name,
-      steps: request.body.steps ?? [],
-      status: "idle",
-      createdAt: now(),
-    };
-    _workflowStore.set(id, wf);
-    return reply.code(201).send(wf);
-  });
-
-  app.patch<{ Params: { id: string }; Body: { status?: string; steps?: unknown[] } }>(
-    "/workflows/:id",
-    async (request, reply) => {
-      const wf = _workflowStore.get(request.params.id);
-      if (!wf) return reply.code(404).send({ error: "not_found" });
-      if (request.body.status) wf.status = request.body.status;
-      if (request.body.steps) wf.steps = request.body.steps;
-      return reply.send(wf);
-    },
-  );
-
-  app.delete<{ Params: { id: string } }>("/workflows/:id", async (request, reply) => {
-    _workflowStore.delete(request.params.id);
-    return reply.code(204).send();
-  });
-
-  /**
-   * POST /workflows/:id/run — Execute a stored workflow.
-   *
-   * Builds a WorkflowChain from the stored steps definition and runs it.
-   * Supports: steps with kind=fn|condition|agent|loop|parallel, retry config,
-   * timeout, abort signal via AbortController.
-   *
-   * Body: { input?: any }
-   * Response: WorkflowResult
-   */
-  app.post<{
-    Params: { id: string };
-    Body: { input?: unknown; steps?: unknown[] };
-  }>(
-    "/workflows/:id/run",
-    {
-      schema: {
-        body: {
-          type: "object",
-          properties: {
-            input: {},
-            steps: { type: "array" },
-          },
-        },
-      },
-    },
-    async (request, reply) => {
-      const wf = _workflowStore.get(request.params.id);
-      if (!wf) return reply.code(404).send({ error: "not_found" });
-
-      const { createWorkflowChain } = await import("@nexus/workflow-chain");
-
-      // Build chain from stored steps definition. A steps array in the body
-      // overrides the stored definition so a run right after (or while)
-      // saving always executes the canvas as the user sees it.
-      let chain = createWorkflowChain({
-        id: wf.id,
-        name: wf.name,
-      });
-
-      const stepsArr = Array.isArray(request.body.steps)
-        ? request.body.steps
-        : Array.isArray(wf.steps)
-          ? wf.steps
-          : [];
-      if (stepsArr.length === 0) {
-        return reply.code(400).send({
-          status: "error",
-          error: "workflow has no steps to run — add nodes and save first",
-        });
-      }
-      for (const stepDef of stepsArr) {
-        const s = stepDef as Record<string, unknown>;
-        const kind = String(s.kind ?? "fn");
-        const stepId = String(s.id ?? `step-${Math.random().toString(36).slice(2, 8)}`);
-        const retries = typeof s.retries === "number" ? s.retries : 0;
-        const timeout = typeof s.timeout === "number" ? s.timeout : undefined;
-
-        if (kind === "condition") {
-          chain = chain.andWhen({
-            id: stepId,
-            name: s.name ? String(s.name) : undefined,
-            condition: async () => Boolean(s.conditionResult ?? true),
-            execute: async ({ data }) => {
-              if (typeof s.execute === "function") return (s.execute as Function)(data);
-              return data;
-            },
-            otherwise: s.otherwise
-              ? async ({ data }) => {
-                  if (typeof s.otherwise === "function") return (s.otherwise as Function)(data);
-                  return data;
-                }
-              : undefined,
-            retries: typeof s.retries === "number" ? s.retries : 0,
-          });
-        } else if (kind === "agent") {
-          // Agent step — delegate to an LLM via a fallback chain (models tried
-          // in order until one succeeds). Chain: s.models (array of
-          // { provider, model }) when present, else a single entry built from
-          // s.provider/s.model, else the server default driver.
-          const { runFallbackChain } = await import("@nexus/gateway");
-          const maxTokens = typeof s.maxTokens === "number" ? s.maxTokens : 2048;
-          chain = chain.andThen({
-            id: stepId,
-            name: s.name ? String(s.name) : undefined,
-            execute: async ({ data }) => {
-              const prompt =
-                typeof s.task === "function"
-                  ? await (s.task as Function)(data)
-                  : String(s.task ?? JSON.stringify(data));
-              const models: { model: string; provider?: string }[] = Array.isArray(s.models)
-                ? (s.models as { model: string; provider?: string }[])
-                : s.model
-                  ? [
-                      {
-                        model: String(s.model),
-                        provider: s.provider ? String(s.provider) : undefined,
-                      },
-                    ]
-                  : [];
-              const fallback =
-                models.length > 0
-                  ? models
-                  : (() => {
-                      const driver = getDefaultDriver();
-                      return driver
-                        ? [{ model: (driver as { model?: string }).model ?? "default" }]
-                        : [];
-                    })();
-              if (fallback.length === 0) {
-                throw new Error("agent step: no model configured and no default driver available");
-              }
-              const result = await runFallbackChain(fallback, async (target) => {
-                const { registry } = await buildChatRegistry(
-                  request.nexusUserId,
-                  target.provider ? [target.provider] : [],
-                );
-                const driver =
-                  (target.provider ? registry.get(target.provider) : undefined) ??
-                  getDefaultDriver();
-                if (!driver) throw new Error(`no driver for ${target.provider ?? "default"}`);
-                const res = await driver.complete({
-                  model: target.model,
-                  messages: [{ role: "user" as LlmRole, content: prompt }],
-                  maxTokens,
-                });
-                return res.content;
-              });
-              const agentText = result.result;
-              if (s.map && typeof s.map === "function") {
-                return (s.map as Function)(agentText, data);
-              }
-              return { ...(data as object), agentResult: agentText };
-            },
-            retries,
-            timeout,
-          });
-        } else if (kind === "parallel") {
-          const subSteps = Array.isArray(s.steps) ? s.steps : [];
-          chain = chain.andParallel({
-            id: stepId,
-            name: s.name ? String(s.name) : undefined,
-            steps: subSteps.map((sub: any, i: number) => ({
-              id: `${stepId}-branch-${i}`,
-              execute: async ({ data }: any) => {
-                if (typeof sub.execute === "function") return sub.execute(data);
-                return data;
-              },
-            })),
-            continueOnFailure: Boolean(s.continueOnFailure),
-          });
-        } else {
-          // Default: function step
-          chain = chain.andThen({
-            id: stepId,
-            name: s.name ? String(s.name) : undefined,
-            execute: async ({ data }) => {
-              if (typeof s.execute === "function") {
-                return (s.execute as Function)(data);
-              }
-              // If the step has a 'transform' string, evaluate it as a simple expression
-              if (typeof s.transform === "string") {
-                try {
-                  const fn = new Function("data", `return (${s.transform});`);
-                  return fn(data);
-                } catch {
-                  return data;
-                }
-              }
-              return data;
-            },
-            retries: typeof s.retries === "number" ? s.retries : 0,
-            timeout: typeof s.timeout === "number" ? s.timeout : undefined,
-          });
-        }
-      }
-
-      // Run with timeout
-      const controller = new AbortController();
-      const overallTimeout = typeof wf.timeout === "number" ? wf.timeout : 120_000;
-      const timer = setTimeout(() => controller.abort(), overallTimeout);
-
-      try {
-        wf.status = "running";
-        _workflowStore.set(wf.id, wf);
-
-        const result = await chain.run(request.body.input ?? {}, {
-          signal: controller.signal,
-        });
-
-        wf.status = result.status === "completed" ? "completed" : "error";
-        wf.lastResult = result;
-        wf.lastRunAt = now();
-        _workflowStore.set(wf.id, wf);
-
-        return reply.send(result);
-      } catch (err) {
-        wf.status = "error";
-        wf.lastError = err instanceof Error ? err.message : String(err);
-        wf.lastRunAt = now();
-        _workflowStore.set(wf.id, wf);
-
-        return reply.code(500).send({
-          status: "error",
-          error: err instanceof Error ? err.message : String(err),
-        });
-      } finally {
-        clearTimeout(timer);
-      }
-    },
-  );
-
-  // -- REPOS -----------------------------------------------------------------
-  // Calls GitHub REST API when GITHUB_TOKEN is set; TTL-cached 10 min to
-  // avoid burning the 5000 req/hr authenticated rate limit on UI polling.
-
-  interface GhRepo {
-    id: number;
-    name: string;
-    full_name: string;
-    html_url: string;
-    description: string | null;
-    private: boolean;
-    stargazers_count: number;
-    updated_at: string;
-    language: string | null;
-    default_branch: string;
-  }
-
-  // Repo transform extracted to eliminate copy-paste between /repos and /repos/github
-  function _toRepoView(r: GhRepo) {
-    return {
-      id: r.id,
-      name: r.name,
-      fullName: r.full_name,
-      url: r.html_url,
-      description: r.description,
-      private: r.private,
-      stars: r.stargazers_count,
-      updatedAt: r.updated_at,
-      language: r.language,
-      defaultBranch: r.default_branch,
-    };
-  }
-
-  let _repoCache: { data: GhRepo[]; expiresAt: number } | null = null;
-  const REPO_TTL_MS = 10 * 60 * 1000; // 10 minutes
-
-  async function _listGithubRepos(): Promise<GhRepo[]> {
-    const token = process.env.GITHUB_TOKEN;
-    if (!token) return [];
-    if (_repoCache && Date.now() < _repoCache.expiresAt) return _repoCache.data;
-    try {
-      const res = await fetch(
-        "https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-          },
-          signal: AbortSignal.timeout(10_000),
-        },
-      );
-      if (!res.ok) return _repoCache?.data ?? [];
-      const data = (await res.json()) as GhRepo[];
-      _repoCache = { data, expiresAt: Date.now() + REPO_TTL_MS };
-      return data;
-    } catch {
-      return _repoCache?.data ?? []; // return stale on timeout/error
-    }
-  }
-
-  app.get("/repos", async (_req, reply) => {
-    const repos = await _listGithubRepos();
-    if (repos.length === 0 && !process.env.GITHUB_TOKEN) {
-      return reply.send({ repos: [], message: "Set GITHUB_TOKEN to list repos." });
-    }
-    return reply.send({ repos: repos.map(_toRepoView) });
-  });
-
-  app.get("/repos/github", async (_req, reply) => {
-    return reply.send({ repos: (await _listGithubRepos()).map(_toRepoView) });
-  });
-
-  /**
-   * POST /repos/:id/search — search files in a repo via GitHub Code Search API.
-   * When GITHUB_TOKEN is set, uses the real GitHub Search API; otherwise falls back
-   * to a basic local search of the repo's file listing.
-   *
-   * Body: { query: string, path?: string, maxResults?: number }
-   */
-  app.post<{
-    Params: { id: string };
-    Body: { query: string; path?: string; maxResults?: number };
-  }>(
-    "/repos/:id/search",
-    {
-      schema: {
-        body: {
-          type: "object",
-          required: ["query"],
-          properties: {
-            query: { type: "string", maxLength: 512 },
-            path: { type: "string", maxLength: 256 },
-            maxResults: { type: "number", minimum: 1, maximum: 100 },
-          },
-        },
-      },
-    },
-    async (request, reply) => {
-      const { query, path: searchPath = "/", maxResults = 10 } = request.body;
-      const repoId = request.params.id;
-      const ghToken = process.env.GITHUB_TOKEN;
-
-      // Find the repo's full_name from the cached list
-      const repos = await _listGithubRepos();
-      const repo = repos.find(
-        (r) => String(r.id) === repoId || r.name === repoId || r.full_name === repoId,
-      );
-
-      if (!repo) {
-        return reply.code(404).send({ error: "repo_not_found", repoId });
-      }
-
-      if (ghToken) {
-        // Real GitHub Code Search API
-        try {
-          const qualifiers = [`repo:${repo.full_name}`];
-          if (searchPath && searchPath !== "/") {
-            qualifiers.push(`path:${searchPath}`);
-          }
-          const searchQuery = `${query} ${qualifiers.join(" ")}`;
-          const url = `https://api.github.com/search/code?q=${encodeURIComponent(searchQuery)}&per_page=${Math.min(maxResults, 30)}`;
-
-          const res = await fetch(url, {
-            headers: {
-              Authorization: `Bearer ${ghToken}`,
-              Accept: "application/vnd.github+json",
-              "X-GitHub-Api-Version": "2022-11-28",
-            },
-          });
-
-          if (!res.ok) {
-            const errBody = await res.text();
-            app.log.warn({ status: res.status, body: errBody }, "GitHub code search failed");
-            return reply.send({
-              repoId,
-              query,
-              hits: [],
-              total: 0,
-              searchedAt: now(),
-              source: "github-api",
-              error: `GitHub API returned ${res.status}`,
-            });
-          }
-
-          const data = (await res.json()) as {
-            total_count: number;
-            items: Array<{
-              name: string;
-              path: string;
-              text_matches?: Array<{
-                fragment: string;
-                matches?: Array<{ indices: number[]; text: string }>;
-              }>;
-            }>;
-          };
-
-          const hits = (data.items ?? []).slice(0, maxResults).map((item) => {
-            const match = item.text_matches?.[0]?.fragment ?? "";
-            // Extract line number from text_matches if available
-            const lineMatch = item.text_matches?.[0]?.matches?.[0];
-            const indices = (lineMatch?.indices as number[] | undefined) ?? [];
-            return {
-              file: item.path,
-              line: indices[0] ?? 0,
-              match: match.slice(0, 500),
-              score: 0.9,
-            };
-          });
-
-          return reply.send({
-            repoId,
-            query,
-            hits,
-            total: data.total_count ?? hits.length,
-            searchedAt: now(),
-            source: "github-api",
-          });
-        } catch (err) {
-          app.log.error({ err }, "GitHub code search error");
-          return reply.send({
-            repoId,
-            query,
-            hits: [],
-            total: 0,
-            searchedAt: now(),
-            source: "github-api",
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      }
-
-      // Fallback: search through the repo's file tree via GitHub Trees API
-      try {
-        const treeUrl = `https://api.github.com/repos/${repo.full_name}/git/trees/${repo.default_branch}?recursive=1`;
-        const treeRes = await fetch(treeUrl, {
-          headers: {
-            Accept: "application/vnd.github+json",
-            ...(ghToken ? { Authorization: `Bearer ${ghToken}` } : {}),
-          },
-        });
-
-        if (!treeRes.ok) {
-          return reply.send({
-            repoId,
-            query,
-            hits: [],
-            total: 0,
-            searchedAt: now(),
-            source: "tree-fallback",
-            error: `GitHub trees API returned ${treeRes.status}`,
-          });
-        }
-
-        const treeData = (await treeRes.json()) as {
-          tree: Array<{ path: string; type: string; size?: number }>;
-        };
-
-        const queryLower = query.toLowerCase();
-        const hits = (treeData.tree ?? [])
-          .filter((item) => item.type === "blob")
-          .filter((item) => {
-            const p =
-              searchPath === "/" ? true : item.path.startsWith(searchPath.replace(/^\//, ""));
-            return p;
-          })
-          .filter((item) => item.path.toLowerCase().includes(queryLower))
-          .slice(0, maxResults)
-          .map((item) => ({
-            file: item.path,
-            line: 0,
-            match: `File: ${item.path} (${item.size ?? 0} bytes)`,
-            score: item.path.toLowerCase() === queryLower ? 1.0 : 0.7,
-          }));
-
-        return reply.send({
-          repoId,
-          query,
-          hits,
-          total: hits.length,
-          searchedAt: now(),
-          source: "tree-fallback",
-        });
-      } catch (err) {
-        app.log.error({ err }, "Tree search fallback error");
-        return reply.send({
-          repoId,
-          query,
-          hits: [],
-          total: 0,
-          searchedAt: now(),
-          source: "tree-fallback",
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    },
-  );
-
-  /** GET /repos/:id/status — repo metadata and sync status. */
-  app.get<{ Params: { id: string } }>("/repos/:id/status", async (request, reply) => {
-    const repoId = request.params.id;
-    return reply.send({
-      id: repoId,
-      name: repoId,
-      status: "synced",
-      lastSyncedAt: new Date(Date.now() - 3_600_000).toISOString(),
-      branchCount: 3,
-      defaultBranch: "main",
-      sizeKb: 1_280,
-      provider: "github",
-    });
-  });
-
-  // -- API TOKENS ------------------------------------------------------------
-  // In-memory API token store. Each token is hashed for safe listing;
-  // the raw value is returned only at creation time.
-
-  interface ApiToken {
-    id: string;
-    name: string;
-    prefix: string;
-    hash: string;
-    scopes: string[];
-    createdAt: string;
-    lastUsedAt: string | null;
-  }
-  const _apiTokens = new Map<string, ApiToken>();
-
-  app.get("/tokens", async (_req, reply) => {
-    return reply.send({
-      tokens: Array.from(_apiTokens.values()).map(
-        ({ id, name, prefix, scopes, createdAt, lastUsedAt }) => ({
-          id,
-          name,
-          prefix,
-          scopes,
-          createdAt,
-          lastUsedAt,
-        }),
-      ),
-    });
-  });
-
-  app.post<{ Body: { name: string; scopes?: string[] } }>("/tokens", async (request, reply) => {
-    const raw = `nxk_${crypto.randomBytes(24).toString("hex")}`;
-    const hash = sha256hex(raw);
-    const id = crypto.randomUUID();
-    const entry: ApiToken = {
-      id,
-      name: request.body.name,
-      prefix: raw.slice(0, 10),
-      hash,
-      scopes: request.body.scopes ?? ["*"],
-      createdAt: now(),
-      lastUsedAt: null,
-    };
-    _apiTokens.set(id, entry);
-    return reply.code(201).send({
-      id,
-      name: entry.name,
-      token: raw,
-      prefix: entry.prefix,
-      scopes: entry.scopes,
-      createdAt: entry.createdAt,
-    });
-  });
-
-  app.delete<{ Params: { id: string } }>("/tokens/:id", async (request, reply) => {
-    if (!_apiTokens.has(request.params.id))
-      return reply.code(404).send({ error: "Token not found" });
-    _apiTokens.delete(request.params.id);
-    return reply.code(204).send();
-  });
+  // -- API TOKENS — owned by routes/tokens.ts (§16.7) -----------------------
+  await app.register(tokensRoutes);
 
   // -- WEB SEARCH ------------------------------------------------------------
   // Delegates to Tavily when TAVILY_API_KEY is set, then SearXNG, then returns
@@ -2535,11 +1732,8 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // -- COSTS (real — derived from _costLog accumulated by _llm() helper) ------
-
-  function _costsInWindow(days: number) {
-    const cutoff = Date.now() - days * 86_400_000;
-    return _costLog.filter((e) => new Date(e.ts).getTime() >= cutoff);
-  }
+  // §16.7: the /costs/* surface lives in routes/costs.ts (same mount, same
+  // scope, byte-identical response shapes).
 
   /**
    * Roll _costLog into a zero-filled per-day series for the last `days` days.
@@ -2563,120 +1757,9 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     return series;
   }
 
-  app.get<{ Querystring: { days?: string } }>("/costs/dashboard", async (req, reply) => {
-    const days = parseInt(req.query.days ?? "30", 10);
-    const entries = _costsInWindow(days);
-    const totalUsd = entries.reduce((s, e) => s + e.costUsd, 0);
-    const totalTokens = entries.reduce((s, e) => s + e.inputTokens + e.outputTokens, 0);
-    // Group by day
-    const byDay: Record<string, number> = {};
-    for (const e of entries) {
-      const d = e.ts.slice(0, 10);
-      byDay[d] = (byDay[d] ?? 0) + e.costUsd;
-    }
-    // Group by model
-    const byModel: Record<string, number> = {};
-    for (const e of entries) byModel[e.model] = (byModel[e.model] ?? 0) + e.costUsd;
-    return reply.send({
-      totalUsd: Math.round(totalUsd * 10_000) / 10_000,
-      totalTokens,
-      byDay,
-      byModel,
-      period: `${days} days`,
-      requests: entries.length,
-    });
-  });
-
-  app.get("/costs/breakdown", async (_req, reply) => {
-    const breakdown = Object.entries(
-      _costLog.reduce<Record<string, { calls: number; tokens: number; usd: number }>>((acc, e) => {
-        if (!acc[e.model]) acc[e.model] = { calls: 0, tokens: 0, usd: 0 };
-        acc[e.model]!.calls += 1;
-        acc[e.model]!.tokens += e.inputTokens + e.outputTokens;
-        acc[e.model]!.usd += e.costUsd;
-        return acc;
-      }, {}),
-    ).map(([model, stats]) => ({ model, ...stats, usd: Math.round(stats.usd * 10_000) / 10_000 }));
-    return reply.send({
-      breakdown,
-      totalUsd: Math.round(_costLog.reduce((s, e) => s + e.costUsd, 0) * 10_000) / 10_000,
-    });
-  });
-
-  app.get("/costs/per-provider", async (_req, reply) => {
-    const map: Record<string, number> = {};
-    for (const e of _costLog) {
-      const provider = e.model.split("/")[0] ?? e.model;
-      map[provider] = (map[provider] ?? 0) + e.costUsd;
-    }
-    const providers = Object.entries(map).map(([name, usd]) => ({
-      name,
-      usd: Math.round(usd * 10_000) / 10_000,
-    }));
-    return reply.send({ providers });
-  });
-
-  app.get("/costs/efficiency", async (_req, reply) => {
-    // Tokens per dollar for each model
-    const stats: Record<string, { tokens: number; usd: number }> = {};
-    for (const e of _costLog) {
-      if (!stats[e.model]) stats[e.model] = { tokens: 0, usd: 0 };
-      stats[e.model]!.tokens += e.inputTokens + e.outputTokens;
-      stats[e.model]!.usd += e.costUsd;
-    }
-    const efficiency = Object.entries(stats).map(([model, { tokens, usd }]) => ({
-      model,
-      tokensPerDollar: usd > 0 ? Math.round(tokens / usd) : 0,
-    }));
-    return reply.send({ efficiency });
-  });
-
-  app.get("/costs/organization", async (_req, reply) => {
-    const totalUsd = _costLog.reduce((s, e) => s + e.costUsd, 0);
-    return reply.send({
-      totalUsd: Math.round(totalUsd * 10_000) / 10_000,
-      seats: 1,
-      perSeatUsd: Math.round(totalUsd * 10_000) / 10_000,
-    });
-  });
-
-  app.get("/costs/limits", async (_req, reply) => {
-    const monthly = process.env.NEXUS_MONTHLY_LIMIT_USD
-      ? Number(process.env.NEXUS_MONTHLY_LIMIT_USD)
-      : null;
-    const daily = process.env.NEXUS_DAILY_LIMIT_USD
-      ? Number(process.env.NEXUS_DAILY_LIMIT_USD)
-      : null;
-    // Real spend from the cost log (ts is ISO-8601, so prefix-match the period).
-    const monthPrefix = new Date().toISOString().slice(0, 7); // YYYY-MM
-    const dayPrefix = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    const round = (n: number) => Math.round(n * 10_000) / 10_000;
-    const spentMonth = round(
-      _costLog.filter((e) => e.ts.startsWith(monthPrefix)).reduce((s, e) => s + e.costUsd, 0),
-    );
-    const spentToday = round(
-      _costLog.filter((e) => e.ts.startsWith(dayPrefix)).reduce((s, e) => s + e.costUsd, 0),
-    );
-    return reply.send({
-      limits: { monthly_usd: monthly, daily_usd: daily },
-      spent: { monthly_usd: spentMonth, daily_usd: spentToday },
-      remaining: {
-        monthly_usd: monthly !== null ? round(Math.max(0, monthly - spentMonth)) : null,
-        daily_usd: daily !== null ? round(Math.max(0, daily - spentToday)) : null,
-      },
-      enforced: false,
-      note: "Limits are reported, not hard-enforced. Set NEXUS_MONTHLY_LIMIT_USD / NEXUS_DAILY_LIMIT_USD.",
-    });
-  });
-
-  app.get("/costs/pricing", async (_req, reply) => {
-    const models = Object.entries(_PRICES).map(([model, [input, output]]) => ({
-      model,
-      inputPer1MTokens: input,
-      outputPer1MTokens: output,
-    }));
-    return reply.send({ models });
-  });
+  // §16.7 extraction: the /costs/* handlers live in routes/costs.ts (single
+  // owner, byte-identical response shapes).
+  await app.register(costsRoutes);
 
   // -- ANALYTICS -------------------------------------------------------------
 
@@ -2803,538 +1886,18 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // -- FINE TUNE — real OpenAI fine-tune API when OPENAI_API_KEY present ------
+  // -- FINE TUNE — owned by routes/finetune.ts (§16.7) -----------------------
 
-  app.get("/fine-tune/dataset", async (_req, reply) => {
-    const apiKey = process.env.OPENAI_API_KEY;
-    const examples = Array.from(_evalStore.values()).filter((e) => e.quality >= 4);
-    let jobs: unknown[] = [];
-    if (apiKey) {
-      try {
-        const r = await fetch("https://api.openai.com/v1/fine_tuning/jobs?limit=10", {
-          headers: { Authorization: `Bearer ${apiKey}` },
-        });
-        if (r.ok) {
-          const d = (await r.json()) as { data?: unknown[] };
-          jobs = d.data ?? [];
-        }
-      } catch {
-        /* offline gracefully */
-      }
-    }
-    return reply.send({
-      success: true,
-      count: examples.length,
-      eligible: examples.length >= 10,
-      configured: !!apiKey,
-      jobs,
-      threshold: 10,
-      message: apiKey
-        ? examples.length >= 10
-          ? `${examples.length} eligible examples ready.`
-          : `Need ${10 - examples.length} more rated examples (threshold: 10).`
-        : "Add OPENAI_API_KEY to enable fine-tuning.",
-    });
-  });
+  // -- SANDBOX — owned by routes/sandbox.ts (§16.7) --------------------------
+  // JS via vm, Python via Pyodide (WASM), others via a self-hosted Piston.
+  // runViaPyodide / runViaPiston are imported from there for the code-agent
+  // build/run path below; _dockerReady feeds /sandbox/status telemetry.
 
-  app.get("/fine-tune/export", async (_req, reply) => {
-    const examples = Array.from(_evalStore.values()).filter((e) => e.quality >= 4);
-    if (examples.length === 0) {
-      return reply.code(404).send({
-        error: "no_data",
-        message: "No rated examples yet. Score responses in the Evaluation page first.",
-      });
-    }
-    const lines = examples
-      .map((e) =>
-        JSON.stringify({
-          messages: [
-            {
-              role: "system",
-              content: "You are a helpful AI assistant participating in a council deliberation.",
-            },
-            { role: "user", content: e.conversation ?? `Evaluation ${e.id}` },
-            {
-              role: "assistant",
-              content: `High-quality response. Quality score: ${e.quality}/5. Coherence: ${e.coherence}/5. Consensus: ${e.consensus}/5.`,
-            },
-          ],
-        }),
-      )
-      .join("\n");
-    reply.header("Content-Type", "application/jsonl");
-    reply.header(
-      "Content-Disposition",
-      `attachment; filename="nexus-finetune-${now().slice(0, 10)}.jsonl"`,
-    );
-    return reply.send(lines);
-  });
+  const _dockerReady = isDockerAvailable();
+  await sandboxRoutes(app, { dockerReady: _dockerReady });
 
-  app.post<{ Body: { baseModel?: string; model?: string } }>(
-    "/fine-tune/initiate",
-    async (req, reply) => {
-      // BYOK: platform key → x-openai-key header → stored user provider key
-      const headerKey = req.headers["x-openai-key"] as string | undefined;
-      const storedKey = (await resolveUserProviderKey(req.nexusUserId, "openai")) ?? undefined;
-      const apiKey = process.env.OPENAI_API_KEY || headerKey || storedKey;
-      if (!apiKey)
-        return reply.code(503).send({
-          error: "not_configured",
-          message:
-            "Fine-tuning requires an OpenAI key. Set OPENAI_API_KEY, pass x-openai-key header, or store via POST /user/provider-keys.",
-        });
-      const examples = Array.from(_evalStore.values()).filter((e) => e.quality >= 4);
-      if (examples.length < 10) {
-        return reply.code(422).send({
-          error: "insufficient_data",
-          message: `Need at least 10 rated examples (have ${examples.length}). Rate more responses in the Evaluation page.`,
-        });
-      }
-      const jsonl = examples
-        .map((e) =>
-          JSON.stringify({
-            messages: [
-              {
-                role: "system",
-                content: "You are a helpful AI assistant participating in a council deliberation.",
-              },
-              { role: "user", content: e.conversation ?? `Evaluation ${e.id}` },
-              {
-                role: "assistant",
-                content: `High-quality response. Quality score: ${e.quality}/5. Coherence: ${e.coherence}/5. Consensus: ${e.consensus}/5.`,
-              },
-            ],
-          }),
-        )
-        .join("\n");
-      // 1. Upload dataset file
-      const formData = new FormData();
-      formData.append("file", new Blob([jsonl], { type: "application/jsonl" }), "dataset.jsonl");
-      formData.append("purpose", "fine-tune");
-      let fileId: string;
-      try {
-        const uploadR = await fetch("https://api.openai.com/v1/files", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${apiKey}` },
-          body: formData,
-        });
-        if (!uploadR.ok) {
-          const e = (await uploadR.json()) as { error?: { message?: string } };
-          return reply
-            .code(502)
-            .send({ error: "upload_failed", message: e.error?.message ?? uploadR.statusText });
-        }
-        fileId = ((await uploadR.json()) as { id: string }).id;
-      } catch (e) {
-        return reply
-          .code(502)
-          .send({ error: "upload_failed", message: e instanceof Error ? e.message : String(e) });
-      }
-      // 2. Create fine-tune job
-      try {
-        const jobR = await fetch("https://api.openai.com/v1/fine_tuning/jobs", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-          body: JSON.stringify({
-            training_file: fileId,
-            model: req.body?.baseModel ?? req.body?.model ?? "gpt-4o-mini-2024-07-18",
-          }),
-        });
-        if (!jobR.ok) {
-          const e = (await jobR.json()) as { error?: { message?: string } };
-          return reply
-            .code(502)
-            .send({ error: "job_create_failed", message: e.error?.message ?? jobR.statusText });
-        }
-        const job = (await jobR.json()) as { id: string; status: string };
-        return reply.code(202).send({
-          success: true,
-          jobId: job.id,
-          status: job.status,
-          fileId,
-          examples: examples.length,
-        });
-      } catch (e) {
-        return reply.code(502).send({
-          error: "job_create_failed",
-          message: e instanceof Error ? e.message : String(e),
-        });
-      }
-    },
-  );
-
-  // -- SANDBOX (alias to code-repl) ------------------------------------------
-
-  const _sandboxResults = new Map<
-    string,
-    { executionId: string; status: string; output: string; error?: string; durationMs: number }
-  >();
-
-  // Piston public API — supports Python, Bash, TypeScript, and 70+ others.
-  // The public emkc.org endpoint went whitelist-only on 2026-02-15, so it is
-  // NOT a usable default anymore: only an explicitly configured non-emkc
-  // PISTON_URL (self-hosted) is a working Piston.
-  const PISTON_URL = process.env.PISTON_URL ?? "";
-  const PISTON_AVAILABLE = PISTON_URL !== "" && !PISTON_URL.includes("emkc.org");
-  const PISTON_SETUP_HINT =
-    "Piston's public API is whitelist-only since 2026-02-15. Set PISTON_URL to a " +
-    "self-hosted Piston instance (e.g. docker run -p 2000:2000 ghcr.io/engineer-man/piston) " +
-    "to run this language.";
-  const PISTON_LANG_MAP: Record<string, { language: string; version: string; filename: string }> = {
-    python: { language: "python", version: "3.10.0", filename: "main.py" },
-    bash: { language: "bash", version: "5.2.0", filename: "main.sh" },
-    typescript: { language: "typescript", version: "5.0.3", filename: "main.ts" },
-    r: { language: "r", version: "4.1.1", filename: "main.r" },
-    ruby: { language: "ruby", version: "3.0.1", filename: "main.rb" },
-    go: { language: "go", version: "1.21.0", filename: "main.go" },
-    rust: { language: "rust", version: "1.68.2", filename: "main.rs" },
-  };
-
-  async function _runViaPiston(
-    code: string,
-    language: string,
-  ): Promise<{ stdout: string; stderr: string; exitCode: number; durationMs: number }> {
-    const mapping = PISTON_LANG_MAP[language.toLowerCase()];
-    if (!mapping) throw new Error(`Unsupported language: ${language}`);
-    if (!PISTON_AVAILABLE) throw new Error(PISTON_SETUP_HINT);
-    const t0 = Date.now();
-    const res = await fetch(`${PISTON_URL}/execute`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        language: mapping.language,
-        version: mapping.version,
-        files: [{ name: mapping.filename, content: code }],
-      }),
-    });
-    const data = (await res.json()) as {
-      run?: { stdout: string; stderr: string; code: number; output: string };
-      message?: string;
-    };
-    const run = data.run;
-    if (!run) throw new Error(data.message ?? "Piston returned no run result");
-    return {
-      stdout: run.stdout ?? run.output ?? "",
-      stderr: run.stderr ?? "",
-      exitCode: run.code ?? 0,
-      durationMs: Date.now() - t0,
-    };
-  }
-
-  // Lazy Pyodide — local Python via WASM. No Docker, no external Piston, no cost.
-  let _pyodidePromise: Promise<unknown> | null = null;
-  async function _getPyodide(): Promise<{
-    setStdout: (o: { batched: (s: string) => void }) => void;
-    setStderr: (o: { batched: (s: string) => void }) => void;
-    runPythonAsync: (c: string) => Promise<unknown>;
-  }> {
-    if (!_pyodidePromise) {
-      _pyodidePromise = (async () => {
-        const mod = (await import("pyodide")) as { loadPyodide: () => Promise<unknown> };
-        return mod.loadPyodide();
-      })();
-    }
-    return _pyodidePromise as Promise<{
-      setStdout: (o: { batched: (s: string) => void }) => void;
-      setStderr: (o: { batched: (s: string) => void }) => void;
-      runPythonAsync: (c: string) => Promise<unknown>;
-    }>;
-  }
-
-  async function _runViaPyodide(
-    code: string,
-  ): Promise<{ stdout: string; stderr: string; exitCode: number; durationMs: number }> {
-    const t0 = Date.now();
-    const py = await _getPyodide();
-    const out: string[] = [];
-    const err: string[] = [];
-    py.setStdout({ batched: (s: string) => out.push(s) });
-    py.setStderr({ batched: (s: string) => err.push(s) });
-    try {
-      await py.runPythonAsync(code);
-      return {
-        stdout: out.join("\n"),
-        stderr: err.join("\n"),
-        exitCode: 0,
-        durationMs: Date.now() - t0,
-      };
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return {
-        stdout: out.join("\n"),
-        stderr: `${err.join("\n")}\n${msg}`.trim(),
-        exitCode: 1,
-        durationMs: Date.now() - t0,
-      };
-    }
-  }
-
-  /** GET /sandbox/status — overall sandbox availability (no execution ID needed). */
-  app.get("/sandbox/status", async (_request, reply) => {
-    const dockerAvail = await _dockerReady;
-    // emkc.org went whitelist-only Feb 2026 — only an explicit non-emkc
-    // PISTON_URL counts as a working Piston instance.
-    const usingCustomPiston = PISTON_AVAILABLE;
-    // Only advertise languages that actually run on this box: JS (vm) and
-    // Python (Pyodide) always; everything else needs a working Piston.
-    const nonJsLangs = usingCustomPiston
-      ? ["typescript", "python", "bash", "r", "ruby", "go", "rust"]
-      : ["python"];
-    return reply.send({
-      available: true,
-      dockerAvailable: dockerAvail,
-      pistonAvailable: usingCustomPiston,
-      pythonRuntime: "pyodide-local",
-      languages: ["javascript", ...nonJsLangs],
-      pistonUrl: process.env.PISTON_URL ?? null,
-      note: usingCustomPiston
-        ? undefined
-        : "JS + Python run locally (Pyodide). Set PISTON_URL to a self-hosted Piston for Go/Rust/Ruby/R/bash.",
-    });
-  });
-
-  app.post<{ Body: { code: string; language?: string } }>(
-    "/sandbox/execute",
-    async (request, reply) => {
-      const { code, language = "javascript" } = request.body;
-      const executionId = crypto.randomUUID();
-      const lang = language.toLowerCase();
-
-      // Python → run locally via Pyodide (WASM) unless a custom Piston is configured.
-      if (lang === "python" || lang === "py" || lang === "python3") {
-        const customPiston =
-          process.env.PISTON_URL !== undefined && !process.env.PISTON_URL.includes("emkc.org");
-        if (!customPiston) {
-          const r = await _runViaPyodide(code);
-          const result = {
-            executionId,
-            status: r.exitCode === 0 ? "done" : "error",
-            output: r.stdout,
-            error: r.stderr || undefined,
-            stdout: r.stdout,
-            stderr: r.stderr,
-            exitCode: r.exitCode,
-            language: "python",
-            durationMs: r.durationMs,
-          };
-          _sandboxResults.set(executionId, result);
-          return reply.code(201).send(result);
-        }
-      }
-
-      // Non-JS languages → route through Piston (guarded: without a custom
-      // PISTON_URL this throws the actionable setup hint instead of hitting
-      // the dead whitelist-only public endpoint).
-      if (lang !== "javascript" && lang !== "js") {
-        const pistonLang = lang === "typescript" || lang === "ts" ? "typescript" : lang;
-        try {
-          const pResult = await _runViaPiston(code, pistonLang);
-          const result = {
-            executionId,
-            status: pResult.exitCode === 0 ? "done" : "error",
-            output: pResult.stdout,
-            error: pResult.stderr || undefined,
-            stdout: pResult.stdout,
-            stderr: pResult.stderr,
-            exitCode: pResult.exitCode,
-            language: pistonLang,
-            durationMs: pResult.durationMs,
-          };
-          _sandboxResults.set(executionId, result);
-          return reply.code(201).send(result);
-        } catch (e) {
-          const result = {
-            executionId,
-            status: "error",
-            output: "",
-            error: e instanceof Error ? e.message : String(e),
-            stdout: "",
-            stderr: e instanceof Error ? e.message : String(e),
-            exitCode: 1,
-            language: lang,
-            durationMs: Date.now(),
-          };
-          _sandboxResults.set(executionId, result);
-          return reply.code(201).send(result);
-        }
-      }
-
-      // JavaScript: run in isolated vm context with timeout
-      const t0 = Date.now();
-      // Cap captured output: a runaway loop that console.logs in a tight
-      // loop survives until the 5s vm timeout, but by then it can have
-      // emitted millions of lines that wedge the browser when rendered.
-      const MAX_LOG_LINES = 500;
-      const MAX_LOG_CHARS = 200_000;
-      const logs: string[] = [];
-      let logTruncated = false;
-      let logChars = 0;
-      const pushLog = (line: string) => {
-        if (logs.length >= MAX_LOG_LINES || logChars >= MAX_LOG_CHARS) {
-          logTruncated = true;
-          return;
-        }
-        logs.push(line);
-        logChars += line.length;
-      };
-      const ctx = vm.createContext({
-        console: {
-          log: (...a: unknown[]) => pushLog(a.map(String).join(" ")),
-          error: (...a: unknown[]) => pushLog("[err] " + a.map(String).join(" ")),
-          warn: (...a: unknown[]) => pushLog("[warn] " + a.map(String).join(" ")),
-        },
-        Math,
-        JSON,
-        parseInt,
-        parseFloat,
-        isNaN,
-        isFinite,
-        encodeURIComponent,
-        decodeURIComponent,
-        setTimeout: undefined,
-        setInterval: undefined,
-        fetch: undefined,
-        require: undefined,
-      });
-      let output = "";
-      let error: string | undefined;
-      try {
-        const returnVal = vm.runInContext(code, ctx, { timeout: 5000, filename: "sandbox.js" });
-        output = [...logs, returnVal !== undefined ? String(returnVal) : ""]
-          .filter(Boolean)
-          .join("\n");
-      } catch (e) {
-        error = e instanceof Error ? e.message : String(e);
-        output = logs.join("\n");
-      }
-      if (logTruncated) {
-        output += "\n… output truncated (too many lines)";
-      }
-      const result = {
-        executionId,
-        status: error ? "error" : "done",
-        output,
-        error,
-        // Normalized fields matching UI ExecResult interface
-        stdout: error ? output : output,
-        stderr: error ? error : "",
-        exitCode: error ? 1 : 0,
-        language: "javascript",
-        durationMs: Date.now() - t0,
-        truncated: logTruncated,
-      };
-      _sandboxResults.set(executionId, result);
-      return reply.code(201).send(result);
-    },
-  );
-
-  app.get<{ Params: { id: string } }>("/sandbox/status/:id", async (request, reply) => {
-    return reply.send(
-      _sandboxResults.get(request.params.id) ?? {
-        executionId: request.params.id,
-        status: "not_found",
-      },
-    );
-  });
-
-  // -- EVALUATION (alias to evals) -------------------------------------------
-
-  // -- EVALUATION (LLM-backed scoring) ----------------------------------------
-
-  interface EvalEntry {
-    id: string;
-    conversation: string;
-    quality: number;
-    coherence: number;
-    consensus: number;
-    diversity: number;
-    date: string;
-  }
-  const _evalStore = new PersistentStore<EvalEntry>("eval_results");
-  await _evalStore.load();
-
-  app.get<{ Querystring: { days?: string } }>("/evaluation/dashboard", async (req, reply) => {
-    const days = parseInt(req.query.days ?? "30", 10);
-    const cutoff = Date.now() - days * 86_400_000;
-    const entries = Array.from(_evalStore.values()).filter(
-      (e) => new Date(e.date).getTime() >= cutoff,
-    );
-    const avg = (key: keyof EvalEntry) =>
-      entries.length ? entries.reduce((s, e) => s + (e[key] as number), 0) / entries.length : 0;
-    return reply.send({
-      period: `${days} days`,
-      totalRuns: entries.length,
-      currentPerformance: {
-        overallScore: Math.round(avg("quality") * 100) / 100,
-        quality: Math.round(avg("coherence") * 100) / 100,
-        consensus: Math.round(avg("consensus") * 100) / 100,
-        diversity: Math.round(avg("diversity") * 100) / 100,
-      },
-    });
-  });
-
-  app.get("/evaluation/metrics", async (_req, reply) => {
-    const entries = Array.from(_evalStore.values());
-    if (!entries.length) return reply.send({ metrics: [], message: "No evaluation runs yet." });
-    const avg = (key: keyof EvalEntry) =>
-      entries.reduce((s, e) => s + (e[key] as number), 0) / entries.length;
-    return reply.send({
-      metrics: [
-        { name: "Quality", value: Math.round(avg("quality") * 100) / 100, trend: "stable" },
-        { name: "Coherence", value: Math.round(avg("coherence") * 100) / 100, trend: "stable" },
-        { name: "Consensus", value: Math.round(avg("consensus") * 100) / 100, trend: "stable" },
-        { name: "Diversity", value: Math.round(avg("diversity") * 100) / 100, trend: "stable" },
-      ],
-    });
-  });
-
-  app.get("/evaluation/results", async (_req, reply) => {
-    return reply.send({
-      results: Array.from(_evalStore.values()).sort((a, b) => b.date.localeCompare(a.date)),
-    });
-  });
-
-  app.post<{ Body: EvalEntry }>("/evaluation/results", async (req, reply) => {
-    const entry: EvalEntry = {
-      ...req.body,
-      id: req.body.id ?? crypto.randomUUID(),
-      date: req.body.date ?? now().slice(0, 10),
-    };
-    _evalStore.set(entry.id, entry);
-    return reply.code(201).send(entry);
-  });
-
-  app.post<{ Body: { topic?: string; prompt?: string } }>("/evaluate", async (req, reply) => {
-    const prompt =
-      req.body.prompt ?? req.body.topic ?? "Evaluate the quality of this council deliberation.";
-    // LLM-scored eval run
-    const scoreText = await _llm(
-      [
-        systemMsg(
-          "You are an AI evaluation system. Score the given topic on four dimensions: quality, coherence, consensus, diversity. Each score is 0.0–1.0. Return only JSON: {quality, coherence, consensus, diversity}",
-        ),
-        userMsg(prompt),
-      ],
-      128,
-    );
-    const scores = { quality: 0.75, coherence: 0.72, consensus: 0.68, diversity: 0.81 };
-    try {
-      Object.assign(scores, parseJsonResponse(scoreText));
-    } catch {
-      /* use defaults */
-    }
-    const entry: EvalEntry = {
-      id: crypto.randomUUID(),
-      conversation: prompt.slice(0, 80),
-      quality: Math.min(1, Math.max(0, scores.quality)),
-      coherence: Math.min(1, Math.max(0, scores.coherence)),
-      consensus: Math.min(1, Math.max(0, scores.consensus)),
-      diversity: Math.min(1, Math.max(0, scores.diversity)),
-      date: now().slice(0, 10),
-    };
-    _evalStore.set(entry.id, entry);
-    return reply.send(entry);
-  });
+  // -- EVALUATION + FINE TUNE — owned by routes/finetune.ts (§16.7) ----------
+  // Registered further down via registerFineTuneRoutes(app, { llm: _llm }).
 
   // -- CONNECTORS ------------------------------------------------------------
 
@@ -3854,206 +2417,9 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     reply.send({ entries: Array.from(_feedbackStore.values()) }),
   );
 
-  // -- CONNECTORS -----------------------------------------------------------
-
-  // Seed the bridge connector store with the registry connectors (v1
-  // /connectors in connectors.ts registers groq/tavily/github/neon/slack/
-  // linear/notion/bitbucket/jira) so the sync panel works for them. Only when
-  // empty — never clobber user-added connectors.
-  if (_connectors.size === 0) {
-    const seed = [
-      "groq",
-      "tavily",
-      "github",
-      "neon",
-      "slack",
-      "linear",
-      "notion",
-      "bitbucket",
-      "jira",
-    ];
-    for (const id of seed) {
-      _connectors.set(id, { id, type: id, status: "connected", label: id });
-    }
-  }
-
-  app.get("/connectors", async (_req, reply) => {
-    return reply.send({ connectors: Array.from(_connectors.values()) });
-  });
-
-  app.post<{ Body: { type?: string; label?: string; [k: string]: unknown } }>(
-    "/connectors",
-    async (request, reply) => {
-      const id = crypto.randomUUID();
-      const { type = "custom", label = "Connector" } = request.body;
-      _connectors.set(id, { id, type, label, status: "connected" });
-      return reply.code(201).send({ id, type, label, status: "connected" });
-    },
-  );
-
-  app.delete<{ Params: { id: string } }>("/connectors/:id", async (request, reply) => {
-    _connectors.delete(request.params.id);
-    return reply.code(204).send();
-  });
-
-  // Map a persisted job row to the UI contract (ConnectorSyncPanel / connectors-sync):
-  // { id, connectorId, syncMode, status, startedAt, completedAt, documentsProcessed,
-  //   documentsDeleted, errorMessage, createdAt }
-  const toSyncJob = (j: {
-    id: string;
-    connectorId: string;
-    status: string;
-    items: number;
-    startedAt: string;
-    finishedAt: string;
-  }) => ({
-    id: j.id,
-    connectorId: j.connectorId,
-    syncMode: "load" as const,
-    status: j.status,
-    startedAt: j.startedAt,
-    completedAt: j.finishedAt,
-    documentsProcessed: j.items,
-    documentsDeleted: 0,
-    errorMessage: null,
-    createdAt: j.startedAt,
-  });
-
-  app.get<{ Params: { id: string }; Querystring: { status?: string; limit?: string } }>(
-    "/connectors/:id/sync-jobs",
-    async (request, reply) => {
-      const { id } = request.params;
-      const statuses = (request.query.status ?? "").split(",").filter(Boolean);
-      const limit = Number(request.query.limit ?? 50) || 50;
-      let jobs = Array.from(_connectorSyncJobs.values())
-        .filter((j) => j.connectorId === id)
-        .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
-        .map(toSyncJob);
-      if (statuses.length > 0) jobs = jobs.filter((j) => statuses.includes(j.status));
-      jobs = jobs.slice(0, limit);
-      return reply.send({ jobs, total: jobs.length });
-    },
-  );
-
-  app.post<{ Params: { id: string } }>("/connectors/:id/sync", async (request, reply) => {
-    const connectorId = request.params.id;
-    if (!_connectors.has(connectorId)) {
-      return reply.code(404).send({ error: "connector_not_found" });
-    }
-    // Synchronous local sync: record a completed job row. A real remote connector
-    // would enqueue work; here we persist an auditable job with a timestamp.
-    const startedAt = now();
-    const job = {
-      id: crypto.randomUUID(),
-      connectorId,
-      status: "completed",
-      items: 0,
-      startedAt,
-      finishedAt: now(),
-    };
-    _connectorSyncJobs.set(job.id, job);
-    // Mark any schedule for this connector as last-run now.
-    for (const s of _connectorSyncSchedules.values()) {
-      if (s.connectorId === connectorId) {
-        _connectorSyncSchedules.set(s.id, { ...s, lastRunAt: now() });
-      }
-    }
-    return reply.code(201).send(toSyncJob(job));
-  });
-
-  // -- Connector sync panel (ConnectorSyncPanel.tsx) --------------------------
-
-  app.get<{ Params: { id: string }; Querystring: { limit?: string } }>(
-    "/connectors/:id/sync/jobs",
-    async (request, reply) => {
-      const { id } = request.params;
-      const limit = Number(request.query.limit ?? 50) || 50;
-      const jobs = Array.from(_connectorSyncJobs.values())
-        .filter((j) => j.connectorId === id)
-        .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
-        .slice(0, limit)
-        .map(toSyncJob);
-      return reply.send({ jobs });
-    },
-  );
-
-  app.delete<{ Params: { id: string; jobId: string } }>(
-    "/connectors/:id/sync/jobs/:jobId",
-    async (request, reply) => {
-      const { id, jobId } = request.params;
-      const job = _connectorSyncJobs.get(jobId);
-      if (!job || job.connectorId !== id) {
-        return reply.code(404).send({ error: "job_not_found" });
-      }
-      _connectorSyncJobs.delete(jobId);
-      return reply.code(204).send();
-    },
-  );
-
-  app.get<{ Params: { id: string } }>("/connectors/:id/sync/schedules", async (request, reply) => {
-    const schedules = Array.from(_connectorSyncSchedules.values()).filter(
-      (s) => s.connectorId === request.params.id,
-    );
-    return reply.send({ schedules });
-  });
-
-  app.post<{
-    Params: { id: string };
-    Body: { syncMode?: string; cronExpression?: string; enabled?: boolean };
-  }>("/connectors/:id/sync/schedules", async (request, reply) => {
-    const connectorId = request.params.id;
-    if (!_connectors.has(connectorId)) {
-      return reply.code(404).send({ error: "connector_not_found" });
-    }
-    const schedule = {
-      id: crypto.randomUUID(),
-      connectorId,
-      syncMode: (request.body.syncMode === "poll" || request.body.syncMode === "slim"
-        ? request.body.syncMode
-        : "load") as "load" | "poll" | "slim",
-      cronExpression: request.body.cronExpression ?? "0 * * * *",
-      enabled: request.body.enabled ?? true,
-      lastRunAt: null,
-      nextRunAt: null,
-      createdAt: now(),
-    };
-    _connectorSyncSchedules.set(schedule.id, schedule);
-    return reply.code(201).send(schedule);
-  });
-
-  app.patch<{
-    Params: { id: string; scheduleId: string };
-    Body: Partial<{
-      syncMode: string;
-      cronExpression: string;
-      enabled: boolean;
-    }>;
-  }>("/connectors/:id/sync/schedules/:scheduleId", async (request, reply) => {
-    const { id, scheduleId } = request.params;
-    const existing = _connectorSyncSchedules.get(scheduleId);
-    if (!existing || existing.connectorId !== id) {
-      return reply.code(404).send({ error: "schedule_not_found" });
-    }
-    const updated = {
-      ...existing,
-      ...(request.body as Partial<typeof existing>),
-    };
-    _connectorSyncSchedules.set(scheduleId, updated);
-    return reply.send(updated);
-  });
-
-  app.delete<{ Params: { id: string; scheduleId: string } }>(
-    "/connectors/:id/sync/schedules/:scheduleId",
-    async (request, reply) => {
-      const { id, scheduleId } = request.params;
-      const existing = _connectorSyncSchedules.get(scheduleId);
-      if (!existing || existing.connectorId !== id) {
-        return reply.code(404).send({ error: "schedule_not_found" });
-      }
-      _connectorSyncSchedules.delete(scheduleId);
-      return reply.code(204).send();
-    },
-  );
+  // -- CONNECTORS — owned by routes/connectors-bridge.ts (§16.7) -------------
+  // Seed + load live in the module; byte-identical response shapes.
+  await app.register(connectorsBridgeRoutes);
 
   // -- CRAFT (LLM-powered content generation) --------------------------------
 
@@ -4364,61 +2730,7 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // -- KNOWLEDGE BASES -------------------------------------------------------
-  // GET /kb is declared above in the KG section (real implementation via @nexus/knowledge-graph).
-
-  app.post<{ Body: { name: string; description?: string } }>("/kb", async (request, reply) => {
-    const id = crypto.randomUUID();
-    const kb = {
-      id,
-      name: request.body.name ?? "KB",
-      description: request.body.description ?? "",
-      docCount: 0,
-      createdAt: now(),
-      documents: [],
-    };
-    _kbStore.set(id, kb);
-    return reply.code(201).send(kb);
-  });
-
-  app.delete<{ Params: { id: string } }>("/kb/:id", async (request, reply) => {
-    _kbStore.delete(request.params.id);
-    return reply.code(204).send();
-  });
-
-  app.get<{ Params: { id: string } }>("/kb/:id/documents", async (request, reply) => {
-    const kb = _kbStore.get(request.params.id);
-    return reply.send({ documents: kb?.documents ?? [], total: kb?.documents.length ?? 0 });
-  });
-
-  app.post<{ Params: { id: string }; Body: { name: string; size?: string } }>(
-    "/kb/:id/documents",
-    async (request, reply) => {
-      const kb = _kbStore.get(request.params.id);
-      if (!kb) return reply.code(404).send({ error: "knowledge base not found" });
-      const doc = {
-        id: "doc_" + crypto.randomUUID(),
-        name: request.body.name ?? "untitled",
-        size: request.body.size ?? "0 KB",
-        type: getDocTypeFromName(request.body.name ?? ""),
-      };
-      kb.documents.push(doc);
-      _kbStore.set(kb.id, kb);
-      return reply.code(201).send(doc);
-    },
-  );
-
-  app.delete<{ Params: { id: string; docId: string } }>(
-    "/kb/:id/documents/:docId",
-    async (request, reply) => {
-      const kb = _kbStore.get(request.params.id);
-      if (kb) {
-        kb.documents = kb.documents.filter((d) => d.id !== request.params.docId);
-        _kbStore.set(kb.id, kb);
-      }
-      return reply.code(204).send();
-    },
-  );
+  // KB CRUD + documents live in routes/kb.ts (§16.7) — registered above.
 
   // -- IMAGE GENERATION ------------------------------------------------------
 
@@ -4516,6 +2828,9 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     getScraper,
   });
 
+  // Evaluation + fine-tune surface (§16.7) — owned by routes/finetune.ts.
+  registerFineTuneRoutes(app, { llm: _llm });
+
   // ══════════════════════════════════════════════════════════════════════════
   // C.3 — code-agent: sandboxed code execution via @nexus/code-repl
   //        Routes: POST /code-agent/execute (one-shot)
@@ -4526,7 +2841,6 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   //        Also wires: POST /build/run (same executor, build-task flavour)
   // ══════════════════════════════════════════════════════════════════════════
 
-  const _dockerReady = isDockerAvailable();
   const _kernelManager = new KernelManager({
     executor: new DockerReplExecutor(),
     jupyterMode: true,
@@ -4782,7 +3096,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
       } else if (lang === "python" || lang === "py" || lang === "python3") {
         // Python runs locally via Pyodide (WASM) — no Piston needed.
         try {
-          const pr = await _runViaPyodide(generatedCode);
+          const pr = await runViaPyodide(generatedCode);
           finalOutput = pr.stdout;
           finalError = pr.exitCode !== 0 ? pr.stderr : undefined;
         } catch (e) {
@@ -4791,7 +3105,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
       } else {
         // Other languages → Piston (guarded against the dead public endpoint).
         try {
-          const pr = await _runViaPiston(generatedCode, lang);
+          const pr = await runViaPiston(generatedCode, lang);
           finalOutput = pr.stdout;
           finalError = pr.exitCode !== 0 ? pr.stderr : undefined;
         } catch (e) {
@@ -8808,76 +7122,9 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     }
   });
 
-  // Memory backend config (single-engine display for now — the selector is
-  // cosmetic until a second backend ships, but it must at least round-trip).
-  app.post("/memory/backend", async (_req, reply) => reply.send({ ok: true }));
-  app.put("/memory/backend", async (_req, reply) => reply.send({ ok: true }));
+  // Memory backend config, compact + delete-all live in routes/memory-bridge.ts (§16.7).
 
-  // Compact: lossless dedup of the caller's memories (same normalized text).
-  // Previously a stub returning {ok:true, compacted:0} while the UI faked a
-  // local merge — the store was never touched.
-  app.post("/memory/compact", { preHandler: requireAuthWithTier }, async (request, reply) => {
-    const mem = getMemory();
-    const uid = request.nexusUserId ?? "local";
-    const entries = await mem.list({ userId: uid });
-    const seen = new Map<string, string>();
-    let compacted = 0;
-    for (const e of entries) {
-      const key = (e.text ?? "").trim().replace(/\s+/g, " ").toLowerCase();
-      if (!key) continue;
-      if (seen.has(key)) {
-        await mem.forget(e.id);
-        compacted++;
-      } else {
-        seen.set(key, e.id);
-      }
-    }
-    return reply.send({ ok: true, compacted });
-  });
-
-  // Memory delete-all (user-scoped). Previously a stub returning
-  // {ok:true, deleted:0} — the UI emptied its list while the store kept
-  // every entry, so they reappeared on the next load.
-  app.delete("/memory/entries", { preHandler: requireAuthWithTier }, async (request, reply) => {
-    const mem = getMemory();
-    const uid = request.nexusUserId ?? "local";
-    const owned = await mem.list({ userId: uid });
-    for (const e of owned) await mem.forget(e.id);
-    return reply.send({ ok: true, deleted: owned.length });
-  });
-
-  // KG communities — hierarchical label-propagation clustering via @nexus/knowledge-graph
-  app.get<{ Querystring: { maxLevels?: string; maxClusterSize?: string } }>(
-    "/kg/communities",
-    async (request, reply) => {
-      try {
-        const store = getKGStore();
-        const maxLevels = Math.min(parseInt(request.query.maxLevels ?? "2", 10) || 2, 4);
-        const maxClusterSize = Math.min(
-          parseInt(request.query.maxClusterSize ?? "10", 10) || 10,
-          50,
-        );
-
-        const clusters = await clusterGraph(store, { maxLevels, maxClusterSize });
-        const communities = buildCommunities(clusters);
-
-        return reply.send({
-          communities,
-          total: communities.length,
-          levels: maxLevels,
-          message:
-            communities.length === 0
-              ? "No entities in graph yet — ingest documents first."
-              : `${communities.length} communities detected across ${maxLevels} level(s).`,
-        });
-      } catch (err) {
-        return reply.code(500).send({
-          error: "community_detection_failed",
-          message: err instanceof Error ? err.message : String(err),
-        });
-      }
-    },
-  );
+  // KG communities live in routes/kg.ts (§16.7) — registered above.
 
   // AutoTune optimize — real prompt optimization via LLM + EMA context detection
   app.post<{
@@ -11057,220 +9304,6 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     },
   );
 
-  // ── marketplace CRUD ───────────────────────────────────────────────────────
-  // Full marketplace: list, detail, star, install, publish.
-  // Seeded with a handful of built-in items; user items stored in-memory.
-
-  interface _MpItem {
-    id: string;
-    name: string;
-    author: string;
-    description: string;
-    category: string;
-    downloads: number;
-    rating: number;
-    tags: string[];
-    price: "free" | "premium";
-    installedBy: Set<string>;
-    starredBy: Set<string>;
-  }
-  const _mpItems = new Map<string, _MpItem>([
-    [
-      "mp_1",
-      {
-        id: "mp_1",
-        name: "Advanced Code Reviewer",
-        author: "nexus-labs",
-        description: "Multi-archetype code review with security and performance analysis",
-        category: "development",
-        downloads: 1247,
-        rating: 4.8,
-        tags: ["code-review", "security", "performance"],
-        price: "free",
-        installedBy: new Set(),
-        starredBy: new Set(),
-      },
-    ],
-    [
-      "mp_2",
-      {
-        id: "mp_2",
-        name: "Legal Document Analyzer",
-        author: "legaltech-co",
-        description: "Contract analysis using ethicist and judge archetypes",
-        category: "legal",
-        downloads: 834,
-        rating: 4.6,
-        tags: ["legal", "contracts", "compliance"],
-        price: "premium",
-        installedBy: new Set(),
-        starredBy: new Set(),
-      },
-    ],
-    [
-      "mp_3",
-      {
-        id: "mp_3",
-        name: "Market Research Suite",
-        author: "bizinsights",
-        description: "Market analysis with futurist and empiricist perspectives",
-        category: "research",
-        downloads: 2103,
-        rating: 4.9,
-        tags: ["market-research", "analysis"],
-        price: "free",
-        installedBy: new Set(),
-        starredBy: new Set(),
-      },
-    ],
-    [
-      "mp_4",
-      {
-        id: "mp_4",
-        name: "Creative Writing Workshop",
-        author: "wordcraft-ai",
-        description: "Multi-perspective creative writing with iterative refinement",
-        category: "creative",
-        downloads: 567,
-        rating: 4.3,
-        tags: ["writing", "creative", "storytelling"],
-        price: "free",
-        installedBy: new Set(),
-        starredBy: new Set(),
-      },
-    ],
-    [
-      "mp_5",
-      {
-        id: "mp_5",
-        name: "Tech Architecture Planner",
-        author: "nexus-labs",
-        description: "System design with architect and strategist archetypes",
-        category: "development",
-        downloads: 1892,
-        rating: 4.7,
-        tags: ["architecture", "system-design"],
-        price: "premium",
-        installedBy: new Set(),
-        starredBy: new Set(),
-      },
-    ],
-    [
-      "mp_6",
-      {
-        id: "mp_6",
-        name: "Stakeholder Communication Kit",
-        author: "comms-pro",
-        description: "Stakeholder reports through empath and pragmatist lenses",
-        category: "business",
-        downloads: 421,
-        rating: 4.4,
-        tags: ["communication", "stakeholders"],
-        price: "free",
-        installedBy: new Set(),
-        starredBy: new Set(),
-      },
-    ],
-  ]);
-
-  function _mpView(item: _MpItem, userId?: string) {
-    return {
-      id: item.id,
-      name: item.name,
-      author: item.author,
-      description: item.description,
-      category: item.category,
-      downloads: item.downloads,
-      rating: item.rating,
-      tags: item.tags,
-      price: item.price,
-      stars: item.starredBy.size,
-      installed: userId ? item.installedBy.has(userId) : false,
-      starred: userId ? item.starredBy.has(userId) : false,
-    };
-  }
-
-  app.get<{ Querystring: { limit?: string; category?: string; q?: string } }>(
-    "/marketplace",
-    async (request, reply) => {
-      const { limit, category, q } = request.query;
-      let items = [..._mpItems.values()];
-      if (category && category !== "all") items = items.filter((i) => i.category === category);
-      if (q) {
-        const ql = q.toLowerCase();
-        items = items.filter(
-          (i) => i.name.toLowerCase().includes(ql) || i.description.toLowerCase().includes(ql),
-        );
-      }
-      items = items.slice(0, parseInt(limit ?? "50") || 50);
-      return reply.send({ items: items.map((i) => _mpView(i)) });
-    },
-  );
-
-  app.get("/marketplace/me", async (_req, reply) => {
-    // Return installed + starred items for anonymous user
-    return reply.send({ installed: [], starred: [] });
-  });
-
-  app.get<{ Params: { id: string } }>("/marketplace/:id", async (request, reply) => {
-    const item = _mpItems.get(request.params.id);
-    if (!item) return reply.code(404).send({ error: "not found" });
-    return reply.send({ item: _mpView(item) });
-  });
-
-  app.post<{ Params: { id: string } }>("/marketplace/:id/star", async (request, reply) => {
-    const item = _mpItems.get(request.params.id);
-    if (!item) return reply.code(404).send({ error: "not found" });
-    item.starredBy.add("anon");
-    return reply.send({ ok: true, stars: item.starredBy.size });
-  });
-
-  app.delete<{ Params: { id: string } }>("/marketplace/:id/star", async (request, reply) => {
-    const item = _mpItems.get(request.params.id);
-    if (!item) return reply.code(404).send({ error: "not found" });
-    item.starredBy.delete("anon");
-    return reply.send({ ok: true, stars: item.starredBy.size });
-  });
-
-  app.post<{ Params: { id: string } }>("/marketplace/:id/install", async (request, reply) => {
-    const item = _mpItems.get(request.params.id);
-    if (!item) return reply.code(404).send({ error: "not found" });
-    item.installedBy.add("anon");
-    item.downloads += 1;
-    return reply.send({ ok: true });
-  });
-
-  app.delete<{ Params: { id: string } }>("/marketplace/:id/install", async (request, reply) => {
-    const item = _mpItems.get(request.params.id);
-    if (!item) return reply.code(404).send({ error: "not found" });
-    item.installedBy.delete("anon");
-    return reply.send({ ok: true });
-  });
-
-  app.post<{
-    Body: { name: string; description: string; category: string; tags?: string[]; price?: string };
-  }>("/marketplace", async (request, reply) => {
-    const { name, description, category, tags = [], price = "free" } = request.body ?? {};
-    if (!name || !description)
-      return reply.code(400).send({ error: "name and description required" });
-    const id = `mp_${Date.now()}`;
-    const item: _MpItem = {
-      id,
-      name,
-      author: "you",
-      description,
-      category: category ?? "other",
-      downloads: 0,
-      rating: 0,
-      tags,
-      price: price as "free" | "premium",
-      installedBy: new Set(),
-      starredBy: new Set(),
-    };
-    _mpItems.set(id, item);
-    return reply.code(201).send({ ok: true, item: _mpView(item) });
-  });
-
   // ── /v1/projects — Projects CRUD + Groups + Tasks + Archive ──────────────
   // Extended from mission-control: grouping, pinning, task status, archive.
 
@@ -12709,7 +10742,11 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
     return reply.send(trace);
   });
 
-  // ── Web Scraping routes already registered at line ~4554 ────────────────────
+  // ── Web Scraping routes registered earlier in this module ────────────────────
   // (GET /web-scraping/providers, POST /scrape, /crawl, /exa/search, /exa/contents)
   // Do NOT re-register here — Fastify throws FST_ERR_DUPLICATED_ROUTE.
+
+  // Marketplace surface (§16.7 extraction, §16.2 registry-backed) — formerly
+  // inline in this file; now owned by routes/marketplace.ts.
+  await marketplaceRoutes(app);
 }

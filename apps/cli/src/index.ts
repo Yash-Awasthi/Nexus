@@ -15,6 +15,7 @@
  *   nexus council deliberate --title <title> [--desc <text>] [--budget 0.10]
  *   nexus council verdict <verdictId>
  *   nexus ingest event --source <src> --type <type> --payload <json>
+ *   nexus models seed [--file <path>]
  *   nexus audit [--limit 50]
  *   nexus audit verify
  */
@@ -25,6 +26,7 @@ import { Command } from "commander";
 import { api } from "./lib/client.js";
 import { runLocalAgent } from "./lib/local-agent.js";
 import { streamSse } from "./lib/sse-stream.js";
+import { loadModelsDevSource, seedModelsFromSource } from "./lib/models-seed.js";
 
 const program = new Command();
 
@@ -721,6 +723,31 @@ admin
           ` ${chalk.gray(time)}  ${statusColor(e.status.padEnd(8))}  ${e.provider}/${e.model.slice(0, 24)}  ${e.latencyMs}ms`,
         );
       }
+    } catch (err) {
+      console.error(chalk.red("✗"), String(err));
+      process.exit(1);
+    }
+  });
+
+// ── models (§1.5 models.dev seed) ───────────────────────────────────────────
+
+const models = program.command("models").description("Model catalog commands");
+
+models
+  .command("seed")
+  .description("Seed the provider_models table from models.dev data (no network)")
+  .option(
+    "--file <path>",
+    "Path to a models.dev api.json-shaped JSON file (default: built-in fixture)",
+  )
+  .action(async (opts: { file?: string }) => {
+    try {
+      const source = await loadModelsDevSource(opts.file);
+      const written = await seedModelsFromSource(source);
+      console.log(
+        chalk.green("✓"),
+        `provider_models seeded: ${written} model(s) from ${source.source}`,
+      );
     } catch (err) {
       console.error(chalk.red("✗"), String(err));
       process.exit(1);

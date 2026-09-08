@@ -27,7 +27,9 @@
   "dependencies": {
     "@nexus/agent-runtime": "workspace:*",
     "@nexus/contracts": "workspace:*",
+    "@nexus/db": "workspace:*",
     "@nexus/llm-drivers": "workspace:*",
+    "@nexus/provider-registry": "workspace:*",
     "@nexus/runtime": "workspace:*",
     "chalk": "^5.3.0",
     "commander": "^12.1.0",

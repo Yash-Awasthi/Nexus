@@ -444,3 +444,5 @@ export class SocialBadBodyError extends Error {
 // ── Marketplace: distributable plugin manifests (§15.1) ───────────────────────
 
 export * from "./plugin-manifest.js";
+export * from "./plugin-registry.js";
+export * from "./sandbox.js";

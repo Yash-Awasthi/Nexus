@@ -3,10 +3,15 @@ import { describe, it, expect, vi } from "vitest";
 import {
   A2AClient,
   A2AClientError,
+  A2ADelegationCoordinator,
+  delegateWithRetry,
+  delegateFanOut,
   parseSseStream,
   type A2AAgentCard,
   type A2AStreamEvent,
   type A2ATask,
+  type A2AMessage,
+  type DelegationTarget,
 } from "../src/index.js";
 
 const RPC_URL = "https://agent.example.com/a2a";
@@ -282,6 +287,207 @@ describe("A2AClient.sendMessageStream", () => {
     const client = new A2AClient({ rpcUrl: RPC_URL, fetchFn });
     const iter = client.sendMessageStream({ message: A2AClient.textMessage("x") });
     await expect(iter.next()).rejects.toMatchObject({ code: "RPC_ERROR" });
+  });
+});
+
+// ── delegate() blocking semantics (§16.3) ────────────────────────────────────
+
+describe("A2AClient.delegate (blocking)", () => {
+  it("requests configuration.blocking:true on message/send", async () => {
+    let body: { params: { configuration?: { blocking?: boolean } } } | undefined;
+    const fetchFn = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      body = JSON.parse(init.body as string);
+      return rpcResult(DONE_TASK);
+    }) as unknown as typeof fetch;
+    const client = new A2AClient({ rpcUrl: RPC_URL, fetchFn });
+    await client.delegate(A2AClient.textMessage("weather?"));
+    expect(body?.params.configuration?.blocking).toBe(true);
+  });
+
+  it("polls tasks/get when the peer answers with a working task, until terminal", async () => {
+    const WORKING: A2ATask = { kind: "task", id: "task-9", status: { state: "working" } };
+    const methods: string[] = [];
+    const fetchFn = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string) as { method: string; params: { id?: string } };
+      methods.push(body.method);
+      if (body.method === "message/send") return rpcResult(WORKING);
+      if (body.method === "tasks/get" && body.params.id === "task-9") {
+        return rpcResult({ ...DONE_TASK, id: "task-9" });
+      }
+      return rpcResult(DONE_TASK);
+    }) as unknown as typeof fetch;
+    const client = new A2AClient({ rpcUrl: RPC_URL, fetchFn });
+    const result = (await client.delegate(A2AClient.textMessage("weather?"), {
+      pollIntervalMs: 1,
+      maxPolls: 5,
+    })) as A2ATask;
+    expect(result.id).toBe("task-9");
+    expect(result.status.state).toBe("completed");
+    expect(methods).toContain("tasks/get");
+  });
+
+  it("returns a direct message reply without polling", async () => {
+    const reply: A2AMessage = {
+      kind: "message",
+      role: "agent",
+      parts: [{ kind: "text", text: "hi" }],
+      messageId: "m1",
+    };
+    const methods: string[] = [];
+    const fetchFn = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string) as { method: string };
+      methods.push(body.method);
+      return rpcResult(reply);
+    }) as unknown as typeof fetch;
+    const client = new A2AClient({ rpcUrl: RPC_URL, fetchFn });
+    const result = await client.delegate(A2AClient.textMessage("hi"), { maxPolls: 3 });
+    expect(result.kind).toBe("message");
+    expect(methods).toEqual(["message/send"]); // never polled
+  });
+
+  it("returns a completed task immediately without polling", async () => {
+    const methods: string[] = [];
+    const fetchFn = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string) as { method: string };
+      methods.push(body.method);
+      return rpcResult(DONE_TASK);
+    }) as unknown as typeof fetch;
+    const client = new A2AClient({ rpcUrl: RPC_URL, fetchFn });
+    await client.delegate(A2AClient.textMessage("x"), { maxPolls: 3 });
+    expect(methods).toEqual(["message/send"]);
+  });
+});
+
+// ── Delegation orchestration (§15.2) ─────────────────────────────────────────
+
+describe("delegateWithRetry", () => {
+  function clientReturning(result: A2ATask | A2AMessage): A2AClient {
+    return new A2AClient({
+      rpcUrl: RPC_URL,
+      fetchFn: vi.fn().mockResolvedValue(rpcResult(result)) as unknown as typeof fetch,
+    });
+  }
+
+  function clientFailing(times: number): A2AClient {
+    const fetchFn = vi.fn();
+    for (let i = 0; i < times; i++) {
+      fetchFn.mockRejectedValueOnce(new A2AClientError("boom", "HTTP_ERROR", { status: 500 }));
+    }
+    return new A2AClient({ rpcUrl: RPC_URL, fetchFn: fetchFn as unknown as typeof fetch });
+  }
+
+  it("returns the completed task on success", async () => {
+    const out = await delegateWithRetry({
+      label: "weather",
+      client: clientReturning(DONE_TASK),
+      message: A2AClient.textMessage("weather?"),
+    });
+    expect(out.ok).toBe(true);
+    expect(out.task?.id).toBe("task-1");
+    expect(out.label).toBe("weather");
+  });
+
+  it("returns a direct message reply as ok", async () => {
+    const reply: A2AMessage = { kind: "message", role: "agent", parts: [{ kind: "text", text: "hi" }], messageId: "m1" };
+    const out = await delegateWithRetry({
+      client: clientReturning(reply),
+      message: A2AClient.textMessage("hi"),
+    });
+    expect(out.ok).toBe(true);
+    expect(out.reply?.messageId).toBe("m1");
+  });
+
+  it("retries transport failures with backoff then succeeds", async () => {
+    const sleeps: number[] = [];
+    const fetchFn = vi.fn();
+    fetchFn.mockRejectedValueOnce(new A2AClientError("boom", "HTTP_ERROR", { status: 500 }));
+    fetchFn.mockResolvedValueOnce(rpcResult(DONE_TASK));
+    const client = new A2AClient({ rpcUrl: RPC_URL, fetchFn: fetchFn as unknown as typeof fetch });
+
+    const out = await delegateWithRetry(
+      { client, message: A2AClient.textMessage("x") },
+      { maxAttempts: 3, baseDelayMs: 10, backoffMultiplier: 2, sleepFn: async (ms) => sleeps.push(ms) },
+    );
+    expect(out.ok).toBe(true);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(sleeps).toEqual([10]); // 10ms base, first retry only
+  });
+
+  it("exhausts attempts and returns the last error", async () => {
+    const sleeps: number[] = [];
+    const out = await delegateWithRetry(
+      { client: clientFailing(3), message: A2AClient.textMessage("x") },
+      { maxAttempts: 3, baseDelayMs: 10, backoffMultiplier: 2, sleepFn: async (ms) => sleeps.push(ms) },
+    );
+    expect(out.ok).toBe(false);
+    expect(out.error).toBeInstanceOf(A2AClientError);
+    expect(sleeps).toEqual([10, 20]); // 10ms then 20ms backoff
+  });
+
+  it("does NOT retry a peer-failed task (peer decision, not transport)", async () => {
+    const failedTask: A2ATask = { ...DONE_TASK, status: { state: "failed" } };
+    const client = clientReturning(failedTask);
+    const out = await delegateWithRetry(
+      { client, message: A2AClient.textMessage("x") },
+      { maxAttempts: 5, baseDelayMs: 1, sleepFn: async () => {} },
+    );
+    expect(out.ok).toBe(false);
+    expect(out.task?.status.state).toBe("failed");
+    expect((client as unknown as { fetchFn: { mock: { calls: unknown[] } } }).fetchFn.mock.calls).toHaveLength(1);
+  });
+});
+
+describe("delegateFanOut + A2ADelegationCoordinator", () => {
+  it("fans out to several peers and isolates failures", async () => {
+    const okClient = new A2AClient({
+      rpcUrl: RPC_URL,
+      fetchFn: vi.fn().mockResolvedValue(rpcResult(DONE_TASK)) as unknown as typeof fetch,
+    });
+    const deadClient = new A2AClient({
+      rpcUrl: RPC_URL,
+      fetchFn: vi.fn().mockRejectedValue(new A2AClientError("down", "HTTP_ERROR", { status: 503 })) as unknown as typeof fetch,
+    });
+    const targets: DelegationTarget[] = [
+      { label: "peer-a", client: okClient, message: A2AClient.textMessage("q") },
+      { label: "peer-b", client: deadClient, message: A2AClient.textMessage("q") },
+    ];
+    const outcomes = await delegateFanOut(targets, { maxAttempts: 1 });
+    expect(outcomes).toHaveLength(2);
+    const byLabel = Object.fromEntries(outcomes.map((o) => [o.label!, o]));
+    expect(byLabel["peer-a"]!.ok).toBe(true);
+    expect(byLabel["peer-b"]!.ok).toBe(false);
+  });
+
+  it("coordinator tracks a session and aggregates outcomes", async () => {
+    const okClient = new A2AClient({
+      rpcUrl: RPC_URL,
+      fetchFn: vi.fn().mockResolvedValue(rpcResult(DONE_TASK)) as unknown as typeof fetch,
+    });
+    const coord = new A2ADelegationCoordinator("council-1");
+    expect(coord.sessionId).toBe("council-1");
+    const outcomes = await coord.delegate(
+      [{ label: "peer-a", client: okClient, message: A2AClient.textMessage("q") }],
+      { maxAttempts: 1 },
+    );
+    expect(outcomes).toHaveLength(1);
+    expect(coord.succeeded()).toHaveLength(1);
+    expect(coord.failed()).toHaveLength(0);
+    expect(coord.allSucceeded).toBe(true);
+    expect(coord.all()).toHaveLength(1);
+  });
+
+  it("coordinator allSucceeded is false when any peer fails", async () => {
+    const deadClient = new A2AClient({
+      rpcUrl: RPC_URL,
+      fetchFn: vi.fn().mockRejectedValue(new Error("down")) as unknown as typeof fetch,
+    });
+    const coord = new A2ADelegationCoordinator();
+    await coord.delegate(
+      [{ label: "peer-a", client: deadClient, message: A2AClient.textMessage("q") }],
+      { maxAttempts: 1 },
+    );
+    expect(coord.allSucceeded).toBe(false);
+    expect(coord.failed()).toHaveLength(1);
   });
 });
 

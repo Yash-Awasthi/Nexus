@@ -24,17 +24,33 @@ describe("threads API surface", () => {
     await app.close();
   });
 
-  it("requires auth on every route", async () => {
-    for (const req of [
-      { method: "GET", url: "/api/threads" },
-      { method: "POST", url: "/api/threads", payload: {} },
-      { method: "GET", url: "/api/threads/x/messages" },
-      { method: "PATCH", url: "/api/threads/x", payload: {} },
-      { method: "DELETE", url: "/api/threads/x" },
-    ]) {
-      const res = await app.inject(req as never);
-      expect(res.statusCode, `${req.method} ${req.url}`).toBe(401);
+  it("requires auth on every route when a key is configured", async () => {
+    // Auth is read at request time: with NEXUS_API_KEY set, every route must
+    // reject an anonymous caller with 401 before touching state.
+    process.env.NEXUS_API_KEY = "threads-test-key";
+    try {
+      for (const req of [
+        { method: "GET", url: "/api/threads" },
+        { method: "POST", url: "/api/threads", payload: {} },
+        { method: "GET", url: "/api/threads/x/messages" },
+        { method: "PATCH", url: "/api/threads/x", payload: {} },
+        { method: "DELETE", url: "/api/threads/x" },
+      ]) {
+        const res = await app.inject(req as never);
+        expect(res.statusCode, `${req.method} ${req.url}`).toBe(401);
+      }
+    } finally {
+      delete process.env.NEXUS_API_KEY;
     }
+  });
+
+  it("dev bypass: routes are open when no auth is configured", async () => {
+    // With neither NEXUS_API_KEY nor a JWT secret set, auth.ts enables its
+    // documented dev bypass — the preHandler still runs on every route, but
+    // anonymous traffic passes. Asserting this pins the current contract.
+    const res = await app.inject({ method: "GET", url: "/api/threads" });
+    expect(res.statusCode).toBe(200);
+    expect(Array.isArray(res.json().threads)).toBe(true);
   });
 
   it("full lifecycle: create → list → patch → messages → delete", async () => {
