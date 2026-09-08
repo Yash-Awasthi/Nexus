@@ -139,6 +139,16 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
   }>("/memory", { preHandler: requireAuth }, async (request, reply) => {
     const { text, metadata = {}, ttl, userId } = request.body;
 
+    // Empty/whitespace text cannot be embedded (some backends 500 with
+    // EMBED_FAILED) and would only ever be noise on recall — reject with an
+    // explicit client error instead of a raw 500 (observed via curl).
+    if (typeof text !== "string" || text.trim().length === 0) {
+      return reply.code(400).send({
+        code: "EMPTY_TEXT",
+        message: "text is required and must be non-empty",
+      });
+    }
+
     // userId is stored inside metadata so InMemoryStore can filter it.
     // PgVectorStore uses the entry.userId column set by the store.save() path.
     const combinedMeta: Record<string, unknown> = {

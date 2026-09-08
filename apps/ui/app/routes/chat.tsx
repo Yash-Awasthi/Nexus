@@ -37,6 +37,7 @@ import {
   deleteThread,
   getMessages,
   toggleGlass,
+  isErrorOpinion,
   type MoleculeOpinion,
   type MoleculeVerdict,
   saveGroups,
@@ -144,6 +145,11 @@ export default function Chat() {
   const [threadId, setThreadId] = useState<string>("");
   const [groups, setGroups] = useState<MsgGroup[]>([]);
   const [streaming, setStreaming] = useState(false);
+  // Synchronous double-submit guard: `streaming` state updates only after a
+  // render, so rapid double-clicks on SEND within one tick all pass the
+  // `if (streaming)` check and fire duplicate streams (observed: triple-click
+  // created three duplicate RND groups). The ref is read/written synchronously.
+  const streamingRef = useRef(false);
   const [activeSTM, setActiveSTM] = useState<STMModuleId[]>([]);
   const [muted, setMuted] = useState<Set<string>>(new Set());
   // Live per-member key source reported by the /chat/stream SSE (BYOK hint).
@@ -203,7 +209,11 @@ export default function Chat() {
       const molecule = (
         window as { molecule?: { on: (event: string, cb: () => void) => () => void } }
       ).molecule;
-      if (molecule) offStarted = molecule.on("deliberation:started", () => setStreaming(true));
+      if (molecule)
+        offStarted = molecule.on("deliberation:started", () => {
+          streamingRef.current = true;
+          setStreaming(true);
+        });
     }
 
     const offOpinion = onOpinion((data: MoleculeOpinion) => {
@@ -251,6 +261,7 @@ export default function Chat() {
     });
 
     const offDone = onDone((data: { round: number }) => {
+      streamingRef.current = false;
       setStreaming(false);
       setGroups((prev) => {
         if (!prev.length) return prev;
@@ -278,6 +289,20 @@ export default function Chat() {
       offDone();
     };
   }, []); // threadId captured via closure in onDone is fine since it doesn't change after mount per-session
+
+  // ── Mid-stream crash/reload persistence ───────────────────────────────────
+  // A reload mid-deliberation must not erase the whole exchange: save whenever
+  // the transcript changes (debounced), not just on done/stop/error. Without
+  // this, closing the tab mid-stream loses the group AND the thread title.
+  useEffect(() => {
+    if (isMolecule()) return; // desktop bridge owns persistence
+    const t = setTimeout(() => {
+      if (groups.length > 0 && threadIdRef.current) {
+        saveGroups(threadIdRef.current, groups);
+      }
+    }, 600);
+    return () => clearTimeout(t);
+  }, [groups]);
 
   // ── Global keyboard shortcuts ──────────────────────────────────────────────
 
@@ -377,7 +402,8 @@ export default function Chat() {
 
   const handleSend = useCallback(async () => {
     const prompt = input.trim();
-    if (!prompt || streaming) return;
+    if (!prompt || streaming || streamingRef.current) return;
+    streamingRef.current = true;
     setInput("");
     if (taRef.current) taRef.current.style.height = "20px";
 
@@ -409,7 +435,14 @@ export default function Chat() {
     try {
       await deliberate({ threadId, message: prompt, round: group.round });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Deliberation failed.";
+      const raw = err instanceof Error ? err.message : "Deliberation failed.";
+      // A bare "401 Unauthorized" is a dead end: the wizard's local (keyless)
+      // session cannot chat on a server that requires accounts. Point the user
+      // at the actual recovery path instead (playtest defect).
+      const msg = /\b40[13]\b/.test(raw)
+        ? "Sign-in required by this server — create an account (/register) or sign in (/login), then resend."
+        : raw;
+      streamingRef.current = false;
       setStreaming(false);
       setGroups((prev) => {
         if (!prev.length) return prev;
@@ -420,6 +453,7 @@ export default function Chat() {
   }, [input, streaming, threadId, groups.length]);
 
   const handleStop = () => {
+    streamingRef.current = false;
     setStreaming(false);
     stopDeliberation();
     setGroups((prev) => {
@@ -1009,37 +1043,56 @@ export default function Chat() {
                         >
                           {g.prompt}
                         </div>
-                        {/* Error */}
+                        {/* Stream-level failure (whole request died) */}
                         {g.error && isLast && (
                           <div style={{ fontSize: "11px", color: C.red, marginBottom: "6px" }}>
                             ⚠ {g.error}
                           </div>
                         )}
-                        {/* Opinion text */}
-                        <div
-                          style={{
-                            fontSize: "12px",
-                            lineHeight: 1.78,
-                            color: C.text,
-                            whiteSpace: "pre-wrap",
-                            wordBreak: "break-word",
-                          }}
-                        >
-                          {text || (!isTicking && <span style={{ color: C.textDim }}>—</span>)}
-                          {isTicking && (
-                            <span
-                              style={{
-                                display: "inline-block",
-                                width: "7px",
-                                height: "13px",
-                                background: C.green,
-                                animation: "blink 1s step-end infinite",
-                                verticalAlign: "text-bottom",
-                                marginLeft: text ? "2px" : 0,
-                              }}
-                            />
-                          )}
-                        </div>
+                        {/* Opinion text — member failures render as failures,
+                            never as opinions (raw provider JSON in the
+                            transcript read as an answer during playtest). */}
+                        {isErrorOpinion({ text }) ? (
+                          <div
+                            style={{
+                              fontSize: "11px",
+                              lineHeight: 1.6,
+                              color: C.red,
+                              whiteSpace: "pre-wrap",
+                              wordBreak: "break-word",
+                              border: `1px dashed ${C.red}`,
+                              borderRadius: "4px",
+                              padding: "6px 8px",
+                            }}
+                          >
+                            ⚠ {text.replace(/^\[[^\]]{1,64} error: /, "")}
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              lineHeight: 1.78,
+                              color: C.text,
+                              whiteSpace: "pre-wrap",
+                              wordBreak: "break-word",
+                            }}
+                          >
+                            {text || (!isTicking && <span style={{ color: C.textDim }}>—</span>)}
+                            {isTicking && (
+                              <span
+                                style={{
+                                  display: "inline-block",
+                                  width: "7px",
+                                  height: "13px",
+                                  background: C.green,
+                                  animation: "blink 1s step-end infinite",
+                                  verticalAlign: "text-bottom",
+                                  marginLeft: text ? "2px" : 0,
+                                }}
+                              />
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}

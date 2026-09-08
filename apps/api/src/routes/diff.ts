@@ -22,8 +22,17 @@ export async function diffRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
     Body: { original: string; modified: string };
   }>("/diff/apply", { preHandler: requireAuthWithTier }, async (request, reply) => {
-    const orig = (request.body.original ?? "").split("\n");
-    const mod = (request.body.modified ?? "").split("\n");
+    // Missing body (or non-string fields) previously produced applied:true with
+    // an empty rollback record — a no-op "successful" apply. Reject explicitly.
+    const body = request.body ?? ({} as { original?: string; modified?: string });
+    if (typeof body.original !== "string" || typeof body.modified !== "string") {
+      return reply.code(400).send({
+        error: "invalid_body",
+        message: "original and modified (string) are required",
+      });
+    }
+    const orig = body.original.split("\n");
+    const mod = body.modified.split("\n");
     const hunks: { lineNo: number; type: "add" | "remove" | "change"; content: string }[] = [];
     const maxLen = Math.max(orig.length, mod.length);
     for (let i = 0; i < maxLen; i++) {
@@ -37,8 +46,8 @@ export async function diffRoutes(app: FastifyInstance): Promise<void> {
     let rollbackId: string;
     try {
       const record = await saveDiffRecord(request.nexusUserId, {
-        original: request.body.original ?? "",
-        modified: request.body.modified ?? "",
+        original: body.original,
+        modified: body.modified,
       });
       rollbackId = record.id;
     } catch (err) {

@@ -21,6 +21,19 @@ export interface MoleculeOpinion {
   keySource?: "user" | "oauth" | "env" | "local" | "none";
   /** 0-based debate round this chunk belongs to (round >= 1 = refinement after seeing others) */
   debateRound?: number;
+  /** true when this opinion is a member failure, not model output */
+  isError?: boolean;
+}
+
+/**
+ * A member failure emitted as an opinion event (older servers may send the
+ * bracketed "[Label error: ...]" text without isError). Opinions must render
+ * as opinions; failures must render as failures — otherwise raw provider JSON
+ * pollutes the transcript and reads like a member's answer.
+ */
+export function isErrorOpinion(opinion: Pick<MoleculeOpinion, "text" | "isError">): boolean {
+  if (opinion.isError) return true;
+  return /^\[[^\]]{1,64} error: /.test(opinion.text ?? "");
 }
 
 export interface MoleculeVerdict {

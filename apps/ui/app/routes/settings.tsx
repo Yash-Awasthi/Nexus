@@ -104,6 +104,7 @@ function ConnectedAccountsCard() {
     claude: null,
   });
   const [connecting, setConnecting] = useState<string | null>(null);
+  const [connectError, setConnectError] = useState<string | null>(null);
 
   useEffect(() => {
     BROWSER_PROVIDERS.forEach(async (p) => {
@@ -114,10 +115,18 @@ function ConnectedAccountsCard() {
 
   const handleConnect = async (id: string) => {
     setConnecting(id);
-    await connectProvider(id);
-    const ok = await isProviderConnected(id);
-    setStatuses((prev) => ({ ...prev, [id]: ok }));
-    setConnecting(null);
+    setConnectError(null);
+    try {
+      await connectProvider(id);
+      const ok = await isProviderConnected(id);
+      setStatuses((prev) => ({ ...prev, [id]: ok }));
+    } catch (err) {
+      // Surface the failure inline — an unhandled rejection made the button
+      // look dead (click → nothing happens).
+      setConnectError(err instanceof Error ? err.message : "Could not connect.");
+    } finally {
+      setConnecting(null);
+    }
   };
 
   return (
@@ -131,6 +140,7 @@ function ConnectedAccountsCard() {
           Connect your existing subscriptions — no API key needed. Nexus opens a sign-in window and
           saves your session.
         </CardDescription>
+        {connectError && <p className="text-xs text-destructive">{connectError}</p>}
       </CardHeader>
       <CardContent className="space-y-3">
         {BROWSER_PROVIDERS.map((p) => {
@@ -236,6 +246,7 @@ function MemberRow({
   const selectedProvider = API_PROVIDERS.find((p) => p.id === member.provider);
   const [connected, setConnected] = useState<boolean | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
 
   // Check connection status when member is in browser mode
   useEffect(() => {
@@ -248,11 +259,17 @@ function MemberRow({
 
   const handleConnect = async () => {
     setConnecting(true);
-    await connectProvider(member.id);
-    // Re-check after window closes
-    const status = await isProviderConnected(member.id);
-    setConnected(status);
-    setConnecting(false);
+    setConnectError(null);
+    try {
+      await connectProvider(member.id);
+      // Re-check after window closes
+      const status = await isProviderConnected(member.id);
+      setConnected(status);
+    } catch (err) {
+      setConnectError(err instanceof Error ? err.message : "Could not connect.");
+    } finally {
+      setConnecting(false);
+    }
   };
 
   const handleModeChange = (mode: MemberMode) => {

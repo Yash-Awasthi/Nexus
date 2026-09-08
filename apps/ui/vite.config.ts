@@ -13,7 +13,7 @@ export default defineConfig({
     // pnpm tree) so nested copies don't hand radix-ui / lobehub / the router a
     // second React instance — its dispatcher is null → "Cannot read properties
     // of null (reading 'useRef'/'useContext')" on render.
-    dedupe: ["react", "react-dom", "react-is", "react-router", "@remix-run/router"],
+    dedupe: ["react", "react-dom", "react-is", "react-router"],
     alias: {
       "~": resolve(__dirname, "./app"),
       // Force any react-router-dom resolution to react-router v7. A transitive
@@ -92,7 +92,6 @@ export default defineConfig({
       "react/jsx-runtime",
       "react/jsx-dev-runtime",
       "react-router",
-      "@remix-run/router",
     ],
   },
   server: {

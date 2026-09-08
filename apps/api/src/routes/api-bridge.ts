@@ -1175,7 +1175,9 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
         round,
         debateRound,
         keySource: sources.get(member.provider) ?? "none",
-      });
+        // Clients render member failures as failures, not as opinions.
+        isError: true,
+      } as Record<string, unknown>);
     };
 
     // Round 0 — every member answers independently, in parallel.
@@ -1242,7 +1244,12 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
       );
     }
 
-    // Verdict — majority final answer across members.
+    // Verdict — majority final answer across members. The line must be honest
+    // about participation: enabled.length is how many members were invited,
+    // latest.size how many actually produced an answer. "1/1" while two
+    // members errored read as a healthy council — a real user can't tell the
+    // debate was hollow (playtest defect: raw provider error JSON in the
+    // transcript plus an overconfident majority line).
     if (debateRounds > 1 && latest.size > 0) {
       const counts = new Map<string, number>();
       for (const answer of latest.values()) {
@@ -1258,9 +1265,14 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
       }
       const trimmed = best.trim();
       if (trimmed.length > 0) {
+        const failedCount = Math.max(0, enabled.length - latest.size);
+        const participation =
+          failedCount > 0
+            ? `${bestCount}/${enabled.length} members responded (${failedCount} failed — see member errors)`
+            : `${bestCount}/${enabled.length} members`;
         sseWrite(raw, {
           type: "verdict",
-          text: `Debate complete (${debateRounds} rounds): majority position ${bestCount}/${latest.size} members — ${trimmed.slice(0, 1500)}`,
+          text: `Debate complete (${debateRounds} rounds): majority position ${participation} — ${trimmed.slice(0, 1500)}`,
           summary: "",
           round,
         });

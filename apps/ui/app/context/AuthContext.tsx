@@ -84,9 +84,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (raw && token) {
+        if (tokenExpiry() * 1000 > Date.now()) {
+          setUserState(JSON.parse(raw) as AuthUser);
+        } else {
+          // Access token already dead at load: try one silent refresh before
+          // deciding. If it fails, sign out — a stale profile blob must never
+          // count as "authenticated" (it hijacked the register→login flow by
+          // bouncing /login → /chat into the previous account's workspace).
+          refreshSession().then((ok) => {
+            if (ok) {
+              setUserState(JSON.parse(raw) as AuthUser);
+            } else {
+              localStorage.removeItem(STORAGE_KEY);
+              localStorage.removeItem(TOKEN_KEY);
+              localStorage.removeItem(REFRESH_KEY);
+              setUserState(null);
+            }
+          });
+        }
+      } else if (raw && !token) {
+        // Profile with NO token at all = local-mode user (setup wizard /
+        // Electron). There is no token to validate — keep the session.
         setUserState(JSON.parse(raw) as AuthUser);
-      } else if (typeof window !== "undefined" && (window as { molecule?: unknown }).molecule) {
+      } else if (
+        typeof window !== "undefined" &&
+        (window as { molecule?: unknown }).molecule
+      ) {
         // Electron desktop — no backend auth needed, auto-login as local user
         const localUser: AuthUser = { id: "local", username: "You" };
         setUserState(localUser);

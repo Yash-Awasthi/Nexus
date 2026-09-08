@@ -421,10 +421,15 @@ export default function App() {
       navigate("/chat", { replace: true });
       return;
     }
-    // Client-side auth guard — redirect to /setup if no user profile exists
+    // Client-side auth guard — redirect to /setup if no user profile exists.
+    // nexus_setup_done means the wizard already ran: an unauthenticated local
+    // session is then legitimate (per-user BYOK keys live server-side), so do
+    // not loop the user back through onboarding (observed: setup→marketplace
+    // bounced straight back to setup, an inescapable wizard loop).
     if (isPublicPath(location.pathname)) return;
     const profile = localStorage.getItem("nexus_user");
-    if (!profile) {
+    const setupDone = localStorage.getItem("nexus_setup_done") === "1";
+    if (!profile && !setupDone) {
       navigate("/setup", { replace: true });
     }
   }, [location.pathname]);
