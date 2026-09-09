@@ -14,6 +14,7 @@
 
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
+import { isValidPatScope } from "../lib/pat-scopes.js";
 import {
   createPat,
   listPats,
@@ -53,6 +54,19 @@ export async function tokensRoutes(app: FastifyInstance): Promise<void> {
     const days = request.body.expiresInDays ?? 0;
     if (typeof days !== "number" || !Number.isFinite(days) || days < 0 || days > 3650) {
       return reply.code(400).send({ error: "INVALID_EXPIRY" });
+    }
+
+    // Scope validation (playtest round 7): the old UI vocabulary
+    // (read:conversations, admin:system, …) was never enforced and now
+    // matches no area — reject it at mint instead of minting a token that
+    // grants nothing. Semantics live in lib/pat-scopes.ts.
+    const scopes = request.body.scopes;
+    if (scopes !== undefined &&
+        (!Array.isArray(scopes) || scopes.some((s) => typeof s !== "string" || !isValidPatScope(s)))) {
+      return reply.code(400).send({
+        error: "UNKNOWN_SCOPE",
+        message: "Unknown scope — choose from " + "chat, memory, council, sandbox, research, ab, godmode, threads, tokens, auth",
+      });
     }
 
     const { entry, raw } = await createPat({

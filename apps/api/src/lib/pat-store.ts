@@ -77,18 +77,29 @@ let _lastSweepAt = 0;
 /** Any API-key row whose prefix starts with this belongs to this store (not BYOK). */
 const PAT_PREFIX = "nxk_";
 
+/** Env int helper shared by the cooldown and sweep-interval knobs. */
+function _envMs(name: string, fallback: number): number {
+  const raw = process.env[name];
+  const n = raw ? Number(raw) : NaN;
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
 /** Cooldown between failed DB probes (env-tunable; tests shorten it). */
 function _cooldownMs(): number {
-  const raw = process.env.PAT_DB_COOLDOWN_MS;
-  const n = raw ? Number(raw) : NaN;
-  return Number.isFinite(n) && n > 0 ? n : 5_000;
+  return _envMs("PAT_DB_COOLDOWN_MS", 5_000);
 }
 
 /** Minimum time between expired-token sweeps (env-tunable; tests zero it). */
 function _sweepIntervalMs(): number {
-  const raw = process.env.PAT_SWEEP_INTERVAL_MS;
-  const n = raw ? Number(raw) : NaN;
-  return Number.isFinite(n) && n >= 0 ? n : 60_000;
+  return _envMs("PAT_SWEEP_INTERVAL_MS", 60_000);
+}
+
+/** Operators must see memory-only mints (round 6): the 201 hides data loss. */
+function _logMemoryOnly(name: string, ownerId: string): void {
+  console.error(
+    `[pat-store] DB unavailable while minting token '${name}' for owner ` +
+      `'${ownerId}' — token is MEMORY-ONLY and will not survive a restart`,
+  );
 }
 
 function _dbUsable(): boolean {
@@ -138,7 +149,16 @@ async function _probeDb(): Promise<boolean> {
       defaultDb.select().from(apiKeys).limit(0),
       new Promise((_, reject) => setTimeout(() => reject(new Error("probe timeout")), 2000)),
     ]);
+    const wasDegraded = _dbMode === "mem";
     _dbMode = "db";
+    if (wasDegraded) {
+      // Rider B (round 7): outage mints log MEMORY-ONLY warnings; operators
+      // must also see when persistence comes back.
+      console.warn(
+        "[pat-store] DB probe succeeded — persistence resumed; " +
+          "tokens minted during the outage are memory-only",
+      );
+    }
     return true;
   } catch {
     _dbMode = "mem";
@@ -247,7 +267,9 @@ export async function createPat(input: {
         keyPrefix: entry.prefix,
         name: entry.name,
         ownerId: entry.ownerId,
-        plan: entry.tier === "pro" ? "pro" : entry.tier === "enterprise" ? "enterprise" : "free",
+        // plan is NOT written: that billing column is owned by the BYOK
+        // surface (packages/billing); PAT rows leave it at the DB default
+        // (rider A, round 7). tier carries the PAT's tier.
         expiresAt: entry.expiresAt ? new Date(entry.expiresAt) : null,
         lastUsedAt: null,
         scopes: entry.scopes,
@@ -256,19 +278,10 @@ export async function createPat(input: {
     } catch {
       _dbMode = "mem";
       _cooldownUntil = Date.now() + _cooldownMs();
-      // Audit follow-up (round 6): a 201 for a memory-only token is silent
-      // data loss on restart — operators must see it. Only logged when a DB
-      // was expected (silent in tests / dev-bypass mode).
-      console.error(
-        `[pat-store] DB write failed while minting token '${entry.name}' for owner ` +
-          `'${entry.ownerId}' — token is MEMORY-ONLY and will not survive a restart`,
-      );
+      _logMemoryOnly(entry.name, entry.ownerId);
     }
   } else if (process.env.DATABASE_URL) {
-    console.error(
-      `[pat-store] DB unavailable while minting token '${entry.name}' for owner ` +
-        `'${entry.ownerId}' — token is MEMORY-ONLY and will not survive a restart`,
-    );
+    _logMemoryOnly(entry.name, entry.ownerId);
   }
   _pats.set(entry.id, entry);
   return { entry, raw };

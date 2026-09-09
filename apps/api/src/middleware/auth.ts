@@ -19,6 +19,7 @@ import type { Tier } from "@nexus/tier-gate";
 import type { FastifyRequest, FastifyReply } from "fastify";
 
 import { sessionRevocations } from "../lib/auth-hardening.js";
+import { patScopesAllow } from "../lib/pat-scopes.js";
 import { verifyPat } from "../lib/pat-store.js";
 
 // ── HS256 JWT verifier (no npm dep — Node 22 crypto) ──────────────────────────
@@ -100,7 +101,22 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
       // Personal-access tokens (playtest round 4): an `nxk_` token minted via
       // /tokens authenticates even when the master-key/JWT path rejects it.
       const m = /^Bearer\s+(\S+)$/i.exec(request.headers.authorization ?? "");
-      if (m?.[1]?.startsWith("nxk_") && (await verifyPat(m[1]))) return;
+      if (m?.[1]?.startsWith("nxk_")) {
+        const pat = await verifyPat(m[1]);
+        if (pat) {
+          // Scope enforcement (playtest round 7): scopes flowed mint → DB →
+          // list but gated nothing. Now a restricted token may only reach
+          // endpoints inside its areas (lib/pat-scopes.ts owns the semantics;
+          // "*" / no scopes = full access, unchanged for existing tokens).
+          if (!patScopesAllow(pat.scopes, request.url)) {
+            await reply
+              .code(403)
+              .send({ code: "INSUFFICIENT_SCOPE", message: "Token scope does not allow this endpoint" });
+            return;
+          }
+          return;
+        }
+      }
       await reply.code(err.httpStatus).send({ code: err.code, message: err.message });
       return;
     }

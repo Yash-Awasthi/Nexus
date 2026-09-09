@@ -154,7 +154,9 @@ describe("createPat", () => {
     expect(values.name).toBe("ci-token");
     expect(values.scopes).toEqual(["chat", "memory"]);
     expect(values.tier).toBe("pro");
-    expect(values.plan).toBe("pro");
+    // Rider A (round 7): the billing plan column is BYOK-owned — PAT rows
+    // never write it (left at the DB default).
+    expect(values.plan).toBeUndefined();
     expect(values.expiresAt).toBeInstanceOf(Date);
   });
 
@@ -303,6 +305,25 @@ describe("listPats", () => {
 });
 
 describe("DB cooldown/retry (audit round 6)", () => {
+  it("logs a MEMORY-ONLY warning on outage mints and a resumed notice on recovery", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.stubEnv("PAT_DB_COOLDOWN_MS", "30");
+    vi.resetModules();
+    const fresh = await import("../../src/lib/pat-store.js");
+
+    mockSelectLimit.mockRejectedValueOnce(new Error("db down"));
+    await fresh.createPat({ ownerId: "u1", name: "outage-token" });
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("MEMORY-ONLY"));
+
+    await new Promise((r) => setTimeout(r, 60));
+    await fresh.createPat({ ownerId: "u1", name: "post-outage" });
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("resumed"));
+
+    errSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
   it("recovers after the cooldown instead of latching permanently", async () => {
     // Fresh module state: this test needs a clean _dbMode to stage the
     // failure — the static import above may already be latched "db".
@@ -323,5 +344,45 @@ describe("DB cooldown/retry (audit round 6)", () => {
     await new Promise((r) => setTimeout(r, 60));
     await fresh.createPat({ ownerId: "u1", name: "recovered" });
     expect(mockInsertValues).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("restart tripwire (rider D, round 7)", () => {
+  it("a DB-backed token verifies after a simulated restart; a revoked one doesn't", async () => {
+    vi.stubEnv("PAT_DB_COOLDOWN_MS", "30");
+    vi.resetModules();
+    const proc1 = await import("../../src/lib/pat-store.js");
+    const { entry, raw } = await proc1.createPat({ ownerId: "u1", name: "survives" });
+    // Rebuild the row exactly as the mocked INSERT recorded it in the DB.
+    const v = mockInsertValues.mock.calls[0]![0] as Record<string, unknown>;
+    const row = {
+      id: v.id,
+      keyHash: v.keyHash,
+      keyPrefix: v.keyPrefix,
+      name: v.name,
+      ownerId: v.ownerId,
+      plan: "free",
+      tier: v.tier,
+      scopes: v.scopes,
+      createdAt: new Date(),
+      expiresAt: (v.expiresAt as Date | null) ?? null,
+      lastUsedAt: null,
+      revokedAt: null,
+    };
+
+    // "Restart" 1: fresh module (empty cache), DB still holds the row.
+    vi.resetModules();
+    const proc2 = await import("../../src/lib/pat-store.js");
+    (mockSelectWhere as unknown as { rows: unknown[] }).rows = [row];
+    await proc2.initPatStore();
+    expect(await proc2.verifyPat(raw)).not.toBeNull();
+
+    // Revoke in "process 2" (hard delete) → "restart" 2 → row gone → dead.
+    await proc2.revokePat(entry.id, "u1");
+    vi.resetModules();
+    const proc3 = await import("../../src/lib/pat-store.js");
+    (mockSelectWhere as unknown as { rows: unknown[] }).rows = [];
+    await proc3.initPatStore();
+    expect(await proc3.verifyPat(raw)).toBeNull();
   });
 });

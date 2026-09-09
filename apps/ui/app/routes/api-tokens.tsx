@@ -22,13 +22,6 @@ import {
   DialogFooter,
 } from "~/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
-import {
   Key,
   Plus,
   Trash2,
@@ -61,26 +54,20 @@ interface PAToken {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const AVAILABLE_SCOPES = [
-  "read:conversations",
-  "write:conversations",
-  "read:kb",
-  "write:kb",
-  "read:workflows",
-  "write:workflows",
-  "read:memory",
-  "write:memory",
-  "read:providers",
-  "write:providers",
-  "admin:users",
-  "admin:system",
+// The enforced scope areas (lib/pat-scopes.ts in the API owns these — a scope
+// restricts a token to one product area; empty selection = full access).
+const AVAILABLE_SCOPES: { name: string; hint: string }[] = [
+  { name: "chat", hint: "Chat sessions and streaming" },
+  { name: "memory", hint: "Memory read/write" },
+  { name: "council", hint: "Council deliberations and checkpoints" },
+  { name: "sandbox", hint: "Sandbox execution" },
+  { name: "research", hint: "Deep research" },
+  { name: "ab", hint: "A/B arena" },
+  { name: "godmode", hint: "God mode" },
+  { name: "threads", hint: "Conversation threads" },
+  { name: "tokens", hint: "Manage API tokens" },
+  { name: "auth", hint: "Identity endpoints" },
 ];
-
-const TIER_DESCRIPTIONS: Record<string, string> = {
-  admin: "Full admin access",
-  basic: "Standard user operations",
-  limited: "Read-only restricted access",
-};
 
 const TIER_COLORS: Record<string, string> = {
   admin: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400",
@@ -112,7 +99,6 @@ export default function APITokens() {
   const [showCreate, setShowCreate] = useState(false);
   const [newToken, setNewToken] = useState({
     label: "",
-    tier: "basic" as "admin" | "basic" | "limited",
     scopes: [] as string[],
     expiresInDays: "",
   });
@@ -160,7 +146,6 @@ export default function APITokens() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           label: newToken.label.trim(),
-          tier: newToken.tier,
           scopes: newToken.scopes,
           expiresInDays: newToken.expiresInDays ? parseInt(newToken.expiresInDays) : undefined,
         }),
@@ -173,7 +158,7 @@ export default function APITokens() {
       const d = await r.json();
       setCreatedSecret(d.token ?? d.plaintext ?? null);
       setShowCreate(false);
-      setNewToken({ label: "", tier: "basic", scopes: [], expiresInDays: "" });
+      setNewToken({ label: "", scopes: [], expiresInDays: "" });
       loadTokens();
     } catch {
       setErr("Creation failed");
@@ -412,42 +397,29 @@ export default function APITokens() {
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Tier</label>
-              <Select
-                value={newToken.tier}
-                onValueChange={(v) => setNewToken((t) => ({ ...t, tier: v as any }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(TIER_DESCRIPTIONS).map(([tier, desc]) => (
-                    <SelectItem key={tier} value={tier}>
-                      <span className="capitalize">{tier}</span>
-                      <span className="text-muted-foreground ml-2 text-xs">— {desc}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="space-y-2">
               <label className="text-sm font-medium">Scopes</label>
               <div className="grid grid-cols-2 gap-1 max-h-40 overflow-y-auto">
                 {AVAILABLE_SCOPES.map((scope) => (
-                  <label key={scope} className="flex items-center gap-2 cursor-pointer text-xs">
+                  <label
+                    key={scope.name}
+                    title={scope.hint}
+                    className="flex items-center gap-2 cursor-pointer text-xs"
+                  >
                     <input
                       type="checkbox"
-                      checked={newToken.scopes.includes(scope)}
-                      onChange={() => toggleScope(scope)}
+                      checked={newToken.scopes.includes(scope.name)}
+                      onChange={() => toggleScope(scope.name)}
                       className="rounded"
                     />
-                    <span className="font-mono">{scope}</span>
+                    <span className="font-mono">{scope.name}</span>
                   </label>
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground">Leave empty for full tier access</p>
+              <p className="text-xs text-muted-foreground">
+                Leave empty for full access. Selected scopes restrict this token to those areas
+                only.
+              </p>
             </div>
 
             <div className="space-y-1">
