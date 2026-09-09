@@ -132,10 +132,16 @@ import { encryptSecret, SecretCryptoUnavailableError } from "../lib/secret-crypt
 // Event emitters push completion/failure into the per-user notification store.
 // (The HTTP surface for the store lives in routes/notifications.ts.)
 import { createNotification } from "../lib/notifications-store.js";
+import { getCacheUserId } from "../lib/user-context.js";
 import { maybeEmitWeeklyDigest } from "../lib/weekly-digest.js";
 import { requireAuthWithTier } from "../middleware/auth.js";
 import { listResearchJobs } from "../lib/research-jobs.js";
-import { costLogStore, MODEL_PRICES, type CostEntry } from "../lib/cost-log.js";
+import {
+  costLogStore,
+  MODEL_PRICES,
+  scopeCostEntriesToUser,
+  type CostEntry,
+} from "../lib/cost-log.js";
 
 import { gatewayLog } from "./gateway.js";
 import { getFailoverDriver, setFailoverProviders } from "../lib/llm-failover.js";
@@ -377,6 +383,11 @@ function _trackCost(model: string, usage?: { inputTokens?: number; outputTokens?
   // Pricing table owned by lib/cost-log.ts (MODEL_PRICES) — shared with the
   // /api/costs/* surface (routes/costs.ts, §16.7).
   const [pi, po] = MODEL_PRICES[model] ?? [1.0, 3.0];
+  // Attribution: every /api request runs inside userContext (server.ts), so
+  // _trackCost inherits the caller's identity automatically — no call-site
+  // threading. Personal analytics (/dashboard, /costs/*) scope on this; the
+  // global /analytics/* operator surface ignores it.
+  const owner = getCacheUserId() ?? undefined;
   // Synchronous in-memory record (hot path unchanged); the store flushes the
   // tail to KV on a debounce and reloads it at boot.
   costLogStore.record({
@@ -385,6 +396,7 @@ function _trackCost(model: string, usage?: { inputTokens?: number; outputTokens?
     inputTokens: inp,
     outputTokens: out,
     costUsd: (inp * pi + out * po) / 1_000_000,
+    ...(owner ? { userId: owner } : {}),
   });
 }
 
@@ -1212,6 +1224,18 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     // Rounds 1..N — each member sees the other members' latest answers and
     // refines; every round's answer is streamed as opinion events.
     for (let dr = 1; dr < debateRounds; dr++) {
+      // Round boundary, announced as part of each member's own text. Clients
+      // (and persisted transcripts) concatenate opinion chunks per member, so
+      // the boundary must travel IN the stream — a client-side tracker that
+      // depends on ordering across events is what glued rounds together
+      // (playtest: two error wrappers and two answers fused without a break).
+      for (const member of enabled) {
+        emitOpinion(
+          member,
+          `\n\n――― round ${dr + 1} (sees other members' answers) ―――\n`,
+          dr,
+        );
+      }
       const prevLatest = new Map(latest);
       await Promise.allSettled(
         enabled.map(async (member) => {
@@ -1752,9 +1776,9 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
    * Single implementation shared by /costs-style analytics, the /dashboard
    * aggregate, and /analytics/daily (which renames the keys for its consumers).
    */
-  function dailyUsageSeries(days: number) {
+  function dailyUsageSeries(days: number, entries: readonly CostEntry[] = _costLog) {
     const byDay: Record<string, { requests: number; tokens: number; costUsd: number }> = {};
-    for (const e of _costLog) {
+    for (const e of entries) {
       const d = e.ts.slice(0, 10);
       if (!byDay[d]) byDay[d] = { requests: 0, tokens: 0, costUsd: 0 };
       byDay[d]!.tokens += e.inputTokens + e.outputTokens;
@@ -1823,7 +1847,9 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
       // scheduler, no extra client code.
       await maybeEmitWeeklyDigest(request.nexusUserId, async (weekStart, weekEnd) => {
         const inWeek = (iso: string) => iso >= weekStart && iso < weekEnd;
-        const entries = _costLog.filter((e) => inWeek(e.ts.slice(0, 10)));
+        const entries = scopeCostEntriesToUser(_costLog, request.nexusUserId).filter((e) =>
+          inWeek(e.ts.slice(0, 10)),
+        );
         const byModel = new Map<string, number>();
         let tokens = 0;
         let costUsd = 0;
@@ -1840,7 +1866,10 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
           inWeek(j.createdAt.slice(0, 10)),
         ).length;
         const autopilotRuns = Array.from(_autopilotRuns.values()).filter(
-          (r) => (r.status === "done" || r.status === "failed") && inWeek(r.createdAt.slice(0, 10)),
+          (r) =>
+            r.ownerId === request.nexusUserId &&
+            (r.status === "done" || r.status === "failed") &&
+            inWeek(r.createdAt.slice(0, 10)),
         ).length;
         return {
           requests: entries.length,
@@ -1855,10 +1884,16 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
       // Window length for the series (1–90, default 7); the client picks how
       // many points it needs for its Today/7d/30d summaries.
       const days = Math.min(Math.max(parseInt(request.query.days ?? "7", 10) || 7, 1), 90);
-      const tokens = _costLog.reduce((sum, e) => sum + e.inputTokens + e.outputTokens, 0);
-      const costUsd = _costLog.reduce((sum, e) => sum + (e.costUsd ?? 0), 0);
-      let stats: Record<string, unknown> = {
-        requests: _costLog.length,
+      // Personal scope: the dashboard says "your usage", so it must sum only
+      // the caller's own entries — the raw _costLog is server-global (a fresh
+      // account showed every user's spend as its own). Gateway-log stats are
+      // likewise unattributed (identity = token slice), so the operator-global
+      // latency/error enrichment stays on /analytics/overview only.
+      const myEntries = scopeCostEntriesToUser(_costLog, request.nexusUserId);
+      const tokens = myEntries.reduce((sum, e) => sum + e.inputTokens + e.outputTokens, 0);
+      const costUsd = myEntries.reduce((sum, e) => sum + (e.costUsd ?? 0), 0);
+      const stats: Record<string, unknown> = {
+        requests: myEntries.length,
         tokens,
         costUsd: Math.round(costUsd * 10000) / 10000,
         latencyP50ms: 0,
@@ -1866,27 +1901,13 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
         errorRate: 0,
         source: "cost-log",
       };
-      try {
-        const s = await gatewayLog.stats();
-        stats = {
-          requests: s.totalRequests || _costLog.length,
-          tokens: s.totalTokens || tokens,
-          costUsd: Math.round(costUsd * 10000) / 10000,
-          latencyP50ms: Math.round(s.p50LatencyMs),
-          latencyP99ms: Math.round(s.p99LatencyMs),
-          errorRate: Math.round((s.errorRequests / (s.totalRequests || 1)) * 10000) / 10000,
-          source: "gateway-log",
-        };
-      } catch {
-        /* fall back to cost-log numbers above */
-      }
 
       // Research rows now come from the durable per-user store (newest first) —
       // dashboard + deep links + history all read the same persisted records.
       const researchJobs = await listResearchJobs(request.nexusUserId);
       return reply.send({
         stats,
-        series: dailyUsageSeries(days),
+        series: dailyUsageSeries(days, myEntries),
         research: {
           running: researchJobs.filter((j) => j.status === "running").length,
           recent: researchJobs
@@ -2084,66 +2105,41 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
-  // -- BILLING: subscription / usage / cancel (bridge synthetic store) ----------
-  // Frontend: apps/ui/app/routes/billing.tsx
-  const _billingSubs = new Map<
-    string,
-    {
-      planId: string;
-      status: string;
-      interval: string;
-      currentPeriodEnd: string;
-      cancelAtPeriodEnd: boolean;
-      priceUsd: number;
-    }
-  >();
-
-  function getBillingSub(tid: string) {
-    let sub = _billingSubs.get(tid);
-    if (!sub) {
-      const periodEnd = new Date();
-      periodEnd.setDate(periodEnd.getDate() + 30);
-      sub = {
-        planId: "pro",
-        status: "active",
-        interval: "monthly",
-        currentPeriodEnd: periodEnd.toISOString(),
-        cancelAtPeriodEnd: false,
-        priceUsd: 0,
-      };
-      _billingSubs.set(tid, sub);
-    }
-    return sub;
-  }
-
-  app.get<{ Params: { tid: string } }>("/billing/subscription/:tid", async (req, reply) => {
-    return reply.send(getBillingSub(req.params.tid));
+  // -- BILLING: usage (real, user-scoped) ---------------------------------------
+  // Frontend: apps/ui/app/routes/billing.tsx. No subscriptions exist (free +
+  // BYOK is a locked roadmap decision) — the old synthetic store invented a
+  // "pro" subscription per tenant and fabricated token usage from
+  // (tenantId.length * 13_037), which a real user saw as their own spend.
+  app.get<{ Params: { tid: string } }>("/billing/subscription/:tid", async (_req, reply) => {
+    return reply.send({
+      planId: "free",
+      status: "active",
+      note: "Nexus is free — no subscriptions exist.",
+    });
   });
 
   app.get<{ Params: { tid: string } }>("/billing/usage/:tid", async (req, reply) => {
     const periodStart = new Date();
     periodStart.setDate(periodStart.getDate() - 30);
-    const usedTokens = (req.params.tid.length * 13_037) % 500_000;
-    // billing.tsx renders requests/tokensIn/tokensOut/cost; keep the legacy
-    // usedTokens/usedUsd/limitUsd fields for other consumers.
+    const entries = scopeCostEntriesToUser(_costLog, req.nexusUserId).filter(
+      (e) => new Date(e.ts).getTime() >= periodStart.getTime(),
+    );
     return reply.send({
       periodStart: periodStart.toISOString(),
       periodEnd: new Date().toISOString(),
-      requests: 0,
-      tokensIn: usedTokens,
-      tokensOut: 0,
-      cost: Number((usedTokens * 0.000003).toFixed(4)),
-      byModel: {},
-      usedTokens,
-      usedUsd: Number((usedTokens * 0.000003).toFixed(2)),
-      limitUsd: 10,
+      requests: entries.length,
+      tokensIn: entries.reduce((s, e) => s + e.inputTokens, 0),
+      tokensOut: entries.reduce((s, e) => s + e.outputTokens, 0),
+      cost: Math.round(entries.reduce((s, e) => s + e.costUsd, 0) * 10_000) / 10_000,
+      byModel: {} as Record<string, { requests: number; cost: number }>,
     });
   });
 
-  app.post<{ Params: { tid: string } }>("/billing/cancel/:tid", async (req, reply) => {
-    const sub = getBillingSub(req.params.tid);
-    sub.cancelAtPeriodEnd = true;
-    return reply.send({ ok: true, subscription: sub });
+  app.post<{ Params: { tid: string } }>("/billing/cancel/:tid", async (_req, reply) => {
+    return reply.code(400).send({
+      error: "no_subscription",
+      message: "Nexus is free — there is no subscription to cancel.",
+    });
   });
 
   // -- BYOK PROVIDER KEYS --------------------------------------------------------

@@ -41,6 +41,28 @@ export interface CostEntry {
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
+  /** Authenticated owner of the spend, when the call site knows it. Entries
+   * without one are pre-attribution or system-internal calls; personal
+   * analytics never show them under a user's name. */
+  userId?: string;
+}
+
+/**
+ * Personal-analytics scope: keep only the caller's own entries.
+ *
+ * The dashboard and /costs/* surfaces are framed as "your usage"; before this
+ * scoping they summed the WHOLE server's cost log, so a brand-new account
+ * showed every user's requests and spend as its own (playtest-observed leak).
+ * Entries without a userId (system-internal calls, pre-attribution history)
+ * belong to no user and stay out of personal views — the operator surface
+ * (/analytics/*) remains the global one.
+ */
+export function scopeCostEntriesToUser(
+  entries: readonly CostEntry[],
+  userId: string | undefined,
+): readonly CostEntry[] {
+  if (!userId) return entries;
+  return entries.filter((e) => e.userId === userId);
 }
 
 /** Keep the same ceiling the in-memory log always used. */

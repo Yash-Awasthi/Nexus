@@ -12,21 +12,29 @@
 
 import type { FastifyInstance } from "fastify";
 
-import { costLogStore, MODEL_PRICES, type CostEntry } from "../lib/cost-log.js";
+import {
+  costLogStore,
+  MODEL_PRICES,
+  scopeCostEntriesToUser,
+  type CostEntry,
+} from "../lib/cost-log.js";
 
 /** Same in-memory array every api-bridge read touches — never reassigned. */
 const _costLog: readonly CostEntry[] = costLogStore.entries;
 
-function _costsInWindow(days: number) {
-  const cutoff = Date.now() - days * 86_400_000;
-  return _costLog.filter((e) => new Date(e.ts).getTime() >= cutoff);
-}
-
 /** Register the /costs/* surface. Called from apiBridgeRoutes. */
 export async function costsRoutes(app: FastifyInstance): Promise<void> {
+  // Personal scope: every /costs/* surface is framed as the caller's own
+  // spend (the UI shows "your usage"), so reads filter to the caller's
+  // entries. Server-global views stay on /analytics/*.
+  const mine = (req: { nexusUserId?: string }, days?: number) => {
+    const scoped = scopeCostEntriesToUser(_costLog, req.nexusUserId);
+    return days === undefined ? scoped : scoped.filter((e) => new Date(e.ts).getTime() >= Date.now() - days * 86_400_000);
+  };
+
   app.get<{ Querystring: { days?: string } }>("/costs/dashboard", async (req, reply) => {
     const days = parseInt(req.query.days ?? "30", 10);
-    const entries = _costsInWindow(days);
+    const entries = mine(req, days);
     const totalUsd = entries.reduce((s, e) => s + e.costUsd, 0);
     const totalTokens = entries.reduce((s, e) => s + e.inputTokens + e.outputTokens, 0);
     // Group by day
@@ -48,9 +56,9 @@ export async function costsRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
-  app.get("/costs/breakdown", async (_req, reply) => {
+  app.get("/costs/breakdown", async (req, reply) => {
     const breakdown = Object.entries(
-      _costLog.reduce<Record<string, { calls: number; tokens: number; usd: number }>>((acc, e) => {
+      mine(req).reduce<Record<string, { calls: number; tokens: number; usd: number }>>((acc, e) => {
         if (!acc[e.model]) acc[e.model] = { calls: 0, tokens: 0, usd: 0 };
         acc[e.model]!.calls += 1;
         acc[e.model]!.tokens += e.inputTokens + e.outputTokens;
@@ -60,13 +68,13 @@ export async function costsRoutes(app: FastifyInstance): Promise<void> {
     ).map(([model, stats]) => ({ model, ...stats, usd: Math.round(stats.usd * 10_000) / 10_000 }));
     return reply.send({
       breakdown,
-      totalUsd: Math.round(_costLog.reduce((s, e) => s + e.costUsd, 0) * 10_000) / 10_000,
+      totalUsd: Math.round(mine(req).reduce((s, e) => s + e.costUsd, 0) * 10_000) / 10_000,
     });
   });
 
-  app.get("/costs/per-provider", async (_req, reply) => {
+  app.get("/costs/per-provider", async (req, reply) => {
     const map: Record<string, number> = {};
-    for (const e of _costLog) {
+    for (const e of mine(req)) {
       const provider = e.model.split("/")[0] ?? e.model;
       map[provider] = (map[provider] ?? 0) + e.costUsd;
     }
@@ -77,10 +85,10 @@ export async function costsRoutes(app: FastifyInstance): Promise<void> {
     return reply.send({ providers });
   });
 
-  app.get("/costs/efficiency", async (_req, reply) => {
+  app.get("/costs/efficiency", async (req, reply) => {
     // Tokens per dollar for each model
     const stats: Record<string, { tokens: number; usd: number }> = {};
-    for (const e of _costLog) {
+    for (const e of mine(req)) {
       if (!stats[e.model]) stats[e.model] = { tokens: 0, usd: 0 };
       stats[e.model]!.tokens += e.inputTokens + e.outputTokens;
       stats[e.model]!.usd += e.costUsd;
@@ -92,8 +100,8 @@ export async function costsRoutes(app: FastifyInstance): Promise<void> {
     return reply.send({ efficiency });
   });
 
-  app.get("/costs/organization", async (_req, reply) => {
-    const totalUsd = _costLog.reduce((s, e) => s + e.costUsd, 0);
+  app.get("/costs/organization", async (req, reply) => {
+    const totalUsd = mine(req).reduce((s, e) => s + e.costUsd, 0);
     return reply.send({
       totalUsd: Math.round(totalUsd * 10_000) / 10_000,
       seats: 1,
@@ -101,7 +109,7 @@ export async function costsRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
-  app.get("/costs/limits", async (_req, reply) => {
+  app.get("/costs/limits", async (req, reply) => {
     const monthly = process.env.NEXUS_MONTHLY_LIMIT_USD
       ? Number(process.env.NEXUS_MONTHLY_LIMIT_USD)
       : null;
@@ -113,10 +121,14 @@ export async function costsRoutes(app: FastifyInstance): Promise<void> {
     const dayPrefix = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
     const round = (n: number) => Math.round(n * 10_000) / 10_000;
     const spentMonth = round(
-      _costLog.filter((e) => e.ts.startsWith(monthPrefix)).reduce((s, e) => s + e.costUsd, 0),
+      mine(req)
+        .filter((e) => e.ts.startsWith(monthPrefix))
+        .reduce((s, e) => s + e.costUsd, 0),
     );
     const spentToday = round(
-      _costLog.filter((e) => e.ts.startsWith(dayPrefix)).reduce((s, e) => s + e.costUsd, 0),
+      mine(req)
+        .filter((e) => e.ts.startsWith(dayPrefix))
+        .reduce((s, e) => s + e.costUsd, 0),
     );
     return reply.send({
       limits: { monthly_usd: monthly, daily_usd: daily },

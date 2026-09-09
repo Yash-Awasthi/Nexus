@@ -402,13 +402,29 @@ export default function App() {
   const navigate = useNavigate();
   const { egg, dismiss } = useEasterEggs();
 
-  // Register PWA service worker
+  // Register PWA service worker — production only. The SW caches Vite's
+  // content-hashed dep chunks under immutable keys; in dev a re-optimization
+  // invalidates those URLs server-side while the SW keeps serving the old
+  // copies, stranding pages on two React copies (recurring cold-load crash).
   useEffect(() => {
-    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {
-        /* non-fatal in dev */
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+    const isDev =
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1" ||
+      import.meta.env.DEV;
+    if (isDev) {
+      // Unregister any SW a previous dev session installed and clear its caches.
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        for (const r of regs) r.unregister().catch(() => {});
       });
+      caches.keys().then((keys) => {
+        for (const k of keys) caches.delete(k).catch(() => {});
+      });
+      return;
     }
+    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {
+      /* non-fatal */
+    });
   }, []);
 
   // In Electron, skip landing page and go straight to /chat

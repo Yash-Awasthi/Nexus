@@ -30,10 +30,17 @@ export interface MoleculeOpinion {
  * bracketed "[Label error: ...]" text without isError). Opinions must render
  * as opinions; failures must render as failures — otherwise raw provider JSON
  * pollutes the transcript and reads like a member's answer.
+ *
+ * Round boundaries are baked into the stream text (the server announces each
+ * debate round inside the member's own text), so a failure wrapper in any
+ * round sits at the start of its own segment — judge the last segment.
  */
 export function isErrorOpinion(opinion: Pick<MoleculeOpinion, "text" | "isError">): boolean {
   if (opinion.isError) return true;
-  return /^\[[^\]]{1,64} error: /.test(opinion.text ?? "");
+  const text = opinion.text ?? "";
+  const lastSegment =
+    text.split(/――― round \d+ \(sees other members' answers\) ―――/).pop() ?? text;
+  return /^\[[^\]]{1,64} error: /.test(lastSegment);
 }
 
 export interface MoleculeVerdict {

@@ -165,9 +165,6 @@ export default function Chat() {
   const [mentions, setMentions] = useState<Mention[]>([]);
   const colRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const verdictRef = useRef<HTMLDivElement | null>(null);
-  // Tracks the last debate round streamed per member, so opinion chunks from
-  // a new round render with a separator instead of fusing into the previous.
-  const lastDebateRoundRef = useRef<Record<string, number>>({});
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const mention = useContextMention(taRef);
   const councilRef = useRef(council); // stable ref for callbacks
@@ -223,20 +220,15 @@ export default function Chat() {
       setGroups((prev) => {
         if (!prev.length) return prev;
         const last = prev[prev.length - 1];
-        // Separate multi-round debate refinements so round 1+ doesn't run
-        // into the round-0 answer as one unreadable blob.
-        const round = data.debateRound ?? 0;
-        const lastRound = lastDebateRoundRef.current[data.label] ?? 0;
-        const sep =
-          round > 0 && round !== lastRound
-            ? `\n\n――― round ${round + 1} (sees other members' answers) ―――\n`
-            : "";
-        lastDebateRoundRef.current[data.label] = round;
+        // Plain concatenation: round boundaries arrive as text inside the
+        // stream itself (server emits them per member), so no client-side
+        // cross-event tracking is needed — and restored transcripts, which
+        // replay concatenated text, carry the same separators.
         const updated: MsgGroup = {
           ...last,
           opinions: {
             ...last.opinions,
-            [data.label]: (last.opinions[data.label] ?? "") + sep + data.text,
+            [data.label]: (last.opinions[data.label] ?? "") + data.text,
           },
         };
         return [...prev.slice(0, -1), updated];
@@ -417,7 +409,6 @@ export default function Chat() {
       done: false,
     };
     setGroups((prev) => [...prev, group]);
-    lastDebateRoundRef.current = {};
     setStreaming(true);
 
     // Record STM injection history (best-effort, async)
