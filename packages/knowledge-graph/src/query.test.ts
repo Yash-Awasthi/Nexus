@@ -19,7 +19,11 @@ import {
 function seedStore(): InMemoryKGStore {
   const store = new InMemoryKGStore();
   const now = 1_700_000_000;
-  const mk = (name: string, type: KGNode["type"], properties: Record<string, unknown> = {}): KGNode => ({
+  const mk = (
+    name: string,
+    type: KGNode["type"],
+    properties: Record<string, unknown> = {},
+  ): KGNode => ({
     id: makeNodeId(name, type),
     name,
     type,

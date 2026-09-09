@@ -420,8 +420,7 @@ describe("GroqEmbedder", () => {
 
 // ── VoyageEmbedder (§1.3) ──────────────────────────────────────────────────────
 
-const VOYAGE_EMBEDDING = (dims = 512): number[] =>
-  Array.from({ length: dims }, (_, i) => i / dims);
+const VOYAGE_EMBEDDING = (dims = 512): number[] => Array.from({ length: dims }, (_, i) => i / dims);
 
 function makeVoyageResponse(embedding: number[]): Response {
   return new Response(JSON.stringify({ data: [{ embedding, index: 0 }] }), { status: 200 });
@@ -626,9 +625,7 @@ describe("CohereEmbedder", () => {
     await expect(embedder.embed("t")).rejects.toMatchObject({ code: "EMBED_FAILED" });
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(new Response(JSON.stringify({ embeddings: {} }), { status: 200 })),
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ embeddings: {} }), { status: 200 })),
     );
     await expect(embedder.embed("t")).rejects.toMatchObject({ code: "EMBED_FAILED" });
   });

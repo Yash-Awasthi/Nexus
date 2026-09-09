@@ -9,7 +9,8 @@
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export type BlockKind = "system" | "reference" | "state" | "memory" | "history" | "attachment" | "turn";
+export type BlockKind =
+  "system" | "reference" | "state" | "memory" | "history" | "attachment" | "turn";
 export type SensitivityLevel = "public" | "internal" | "confidential" | "secret";
 
 export interface ContextBlock {
@@ -81,7 +82,9 @@ export class SystemRulesCodec implements BlockCodec<{ rules: string[] }> {
   }
 }
 
-export class ConversationHistoryCodec implements BlockCodec<{ messages: Array<{ role: string; content: string }> }> {
+export class ConversationHistoryCodec implements BlockCodec<{
+  messages: Array<{ role: string; content: string }>;
+}> {
   kind: BlockKind = "history";
 
   encode(payload: { messages: Array<{ role: string; content: string }> }): string {
@@ -194,10 +197,7 @@ export class ContextBuilder {
   private estimator: TokenEstimator;
   private budget: number;
 
-  constructor(options?: {
-    provider?: string;
-    maxTokens?: number;
-  }) {
+  constructor(options?: { provider?: string; maxTokens?: number }) {
     this.graph = new ContextGraph();
     this.estimator = new TokenEstimator(options?.provider);
     this.budget = options?.maxTokens ?? 128_000;

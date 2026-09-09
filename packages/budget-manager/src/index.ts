@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Time-based Budget Manager — per-user budget tracking with daily/weekly/monthly/yearly limits.
  *
@@ -5,7 +6,7 @@
  * with configurable time windows and automatic reset on period boundary.
  */
 
-export type BudgetDuration = 'daily' | 'weekly' | 'monthly' | 'yearly';
+export type BudgetDuration = "daily" | "weekly" | "monthly" | "yearly";
 
 export interface UserBudget {
   totalBudget: number;
@@ -46,11 +47,7 @@ export class BudgetManager {
   /**
    * Create or update a budget for a user.
    */
-  createBudget(
-    userId: string,
-    totalBudget: number,
-    duration?: BudgetDuration
-  ): void {
+  createBudget(userId: string, totalBudget: number, duration?: BudgetDuration): void {
     const now = Date.now();
     this.budgets.set(userId, {
       totalBudget,

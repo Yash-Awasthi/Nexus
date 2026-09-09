@@ -86,7 +86,7 @@ function fmtDate(d?: string) {
   });
 }
 
-function isExpired(d?: string) {
+function isExpired(d?: string | null) {
   if (!d) return false;
   return new Date(d).getTime() < Date.now();
 }
@@ -293,7 +293,7 @@ export default function APITokens() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
                         <span className="font-medium text-sm">{token.label}</span>
-                        <Badge className={TIER_COLORS[token.tier] ?? ""}>
+                        <Badge className={TIER_COLORS[token.tier ?? ""] ?? ""}>
                           <Shield className="w-2.5 h-2.5 mr-1" />
                           {token.tier}
                         </Badge>

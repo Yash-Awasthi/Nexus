@@ -300,7 +300,9 @@ describe("registerFromModelsDev", () => {
   });
 
   it("keeps curated entries by default, replaces only when overwrite is set", () => {
-    const reg = makeRegistry(makeModel("anthropic/claude-3-5-sonnet-20241022", "anthropic", { name: "Curated" }));
+    const reg = makeRegistry(
+      makeModel("anthropic/claude-3-5-sonnet-20241022", "anthropic", { name: "Curated" }),
+    );
     expect(registerFromModelsDev(reg, FIXTURE)).toBe(1); // groq added, curated sonnet kept
     expect(reg.getModel("anthropic/claude-3-5-sonnet-20241022")!.name).toBe("Curated");
 

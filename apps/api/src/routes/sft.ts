@@ -200,18 +200,20 @@ export async function sftRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const lines = jsonl.split("\n").filter(Boolean).length;
-    return reply
-      .header("Content-Type", "application/x-ndjson")
-      .header(
-        "Content-Disposition",
-        `attachment; filename="nexus-sft-dataset-${now().slice(0, 10)}.jsonl"`,
-      )
-      // Metadata rides headers — the body is PURE JSONL so any ndjson consumer
-      // (and OpenAI's upload endpoint) can parse every line.
-      .header("X-Dataset-Count-Corpus", String(counts.corpus))
-      .header("X-Dataset-Count-Conversations", String(counts.conversations))
-      .header("X-Dataset-Lines", String(lines))
-      .send(jsonl);
+    return (
+      reply
+        .header("Content-Type", "application/x-ndjson")
+        .header(
+          "Content-Disposition",
+          `attachment; filename="nexus-sft-dataset-${now().slice(0, 10)}.jsonl"`,
+        )
+        // Metadata rides headers — the body is PURE JSONL so any ndjson consumer
+        // (and OpenAI's upload endpoint) can parse every line.
+        .header("X-Dataset-Count-Corpus", String(counts.corpus))
+        .header("X-Dataset-Count-Conversations", String(counts.conversations))
+        .header("X-Dataset-Lines", String(lines))
+        .send(jsonl)
+    );
   });
 
   /**

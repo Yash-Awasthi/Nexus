@@ -4,17 +4,8 @@
 // these tests pin the seam that makes the advertised stage real, mirroring
 // weaviate's hybrid rerank tool: fused candidates are reranked and cut to limit.
 import { describe, it, expect } from "vitest";
-import {
-  HybridSearchEngine,
-  InMemoryBM25,
-  type VectorSearchAdapter,
-} from "../src/index.js";
-import {
-  NullReranker,
-  FunctionReranker,
-  BM25Reranker,
-  type Reranker,
-} from "@nexus/reranker";
+import { HybridSearchEngine, InMemoryBM25, type VectorSearchAdapter } from "../src/index.js";
+import { NullReranker, FunctionReranker, BM25Reranker, type Reranker } from "@nexus/reranker";
 
 interface Doc {
   id: string;
@@ -78,7 +69,10 @@ describe("HybridSearchEngine rerank seam", () => {
 
   it("NullReranker preserves the fused order", async () => {
     const plain = await makeEngine().search({ query: "token refresh" });
-    const nulled = await makeEngine().search({ query: "token refresh", reranker: new NullReranker() });
+    const nulled = await makeEngine().search({
+      query: "token refresh",
+      reranker: new NullReranker(),
+    });
     expect(nulled.hits.map((h) => h.id)).toEqual(plain.hits.map((h) => h.id));
   });
 

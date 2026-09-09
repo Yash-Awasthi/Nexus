@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @nexus/resumable-streams — Resumable SSE streaming.
  *
@@ -106,9 +107,7 @@ export class InMemoryStreamStore implements ResumableStreamStore {
   }
 
   async listActive(): Promise<StreamMeta[]> {
-    return [...this.streams.values()]
-      .filter((s) => !s.meta.done)
-      .map((s) => s.meta);
+    return [...this.streams.values()].filter((s) => !s.meta.done).map((s) => s.meta);
   }
 
   async prune(maxAgeMs: number): Promise<number> {
@@ -311,16 +310,8 @@ export interface SubscriberOptions {
 /**
  * Resumes an existing stream by reading stored events and polling for new ones.
  */
-export async function resumeStream(
-  opts: SubscriberOptions,
-): Promise<ReadableStream<StreamEvent>> {
-  const {
-    store,
-    streamId,
-    fromSeq = 0,
-    pollIntervalMs = 100,
-    maxPollAttempts = 300,
-  } = opts;
+export async function resumeStream(opts: SubscriberOptions): Promise<ReadableStream<StreamEvent>> {
+  const { store, streamId, fromSeq = 0, pollIntervalMs = 100, maxPollAttempts = 300 } = opts;
 
   const stored = await store.read(streamId, fromSeq);
   const meta = await store.getMeta(streamId);
@@ -389,10 +380,7 @@ export async function resumeStream(
  * Create an SSE endpoint handler for a resumable stream.
  * Returns headers and a readable stream suitable for a Response.
  */
-export function createSSEResponse(
-  stream: ReadableStream<StreamEvent>,
-  streamId: string,
-): Response {
+export function createSSEResponse(stream: ReadableStream<StreamEvent>, streamId: string): Response {
   const encoder = new TextEncoder();
   const sseStream = stream.pipeThrough(
     new TransformStream<StreamEvent, Uint8Array>({
@@ -518,8 +506,7 @@ function parseSSEBuffer(buffer: string): {
     for (const line of lines) {
       if (line.startsWith("id: ")) seq = parseInt(line.slice(4), 10) || 0;
       else if (line.startsWith("event: ")) event = line.slice(7);
-      else if (line.startsWith("data: "))
-        data += (data ? "\n" : "") + line.slice(6);
+      else if (line.startsWith("data: ")) data += (data ? "\n" : "") + line.slice(6);
     }
 
     if (data) {

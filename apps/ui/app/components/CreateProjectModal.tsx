@@ -21,7 +21,16 @@ interface CreateProjectModalProps {
   onCreated: (project: Project) => void;
 }
 
-const ICON_COLORS = ["#6366f1", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ef4444", "#06b6d4"];
+const ICON_COLORS = [
+  "#6366f1",
+  "#ec4899",
+  "#f59e0b",
+  "#10b981",
+  "#3b82f6",
+  "#8b5cf6",
+  "#ef4444",
+  "#06b6d4",
+];
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -185,7 +194,9 @@ export function CreateProjectModal({ isOpen, onClose, onCreated }: CreateProject
               >
                 <option value="">Ungrouped</option>
                 {groups.map((g) => (
-                  <option key={g.id} value={g.id}>{g.name}</option>
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
                 ))}
               </select>
             </div>

@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  GraphConsistencyError,
-  GraphMutationError,
-  RuntimeGraph,
-} from "../src/runtime-graph.js";
+import { GraphConsistencyError, GraphMutationError, RuntimeGraph } from "../src/runtime-graph.js";
 import type { IEventBus } from "../src/event-bus.js";
 import type { IRuntimePersistence } from "../src/interfaces/persistence.interface.js";
 
@@ -95,7 +91,7 @@ describe("RuntimeGraph node mutations", () => {
     expect(updated.status).toBe("active");
     expect(updated.metadata).toEqual({ x: 1, y: 2 });
     expect(updated.dependencies).toEqual(["dep-1"]);
-    expect((await graph.getAllNodes())).toHaveLength(1);
+    expect(await graph.getAllNodes()).toHaveLength(1);
     // Re-adding merges dependency sets without duplicates.
     await graph.addNode("n1", "agent", "Agent A", { dependencies: ["dep-1", "dep-2"] });
     expect((await graph.getNode("n1"))?.dependencies).toEqual(["dep-1", "dep-2"]);
@@ -110,7 +106,9 @@ describe("RuntimeGraph node mutations", () => {
     expect(node?.metadata.reason).toBe("slow");
     expect(graph.getJournal().some((j) => j.op === "updateNode")).toBe(true);
 
-    await expect(graph.updateNodeStatus("ghost", "failed")).rejects.toThrow("Node not found: ghost");
+    await expect(graph.updateNodeStatus("ghost", "failed")).rejects.toThrow(
+      "Node not found: ghost",
+    );
   });
 
   it("updateNodeMetadata merges and throws for unknown nodes", async () => {
@@ -157,12 +155,18 @@ describe("RuntimeGraph edges and queries", () => {
     const { graph } = makeGraph();
     await graph.addNode("a", "agent", "A");
     await graph.addNode("b", "agent", "B");
-    await expect(graph.addEdge("a", "ghost", "manages")).rejects.toThrow("Target node not found: ghost");
-    await expect(graph.addEdge("ghost", "b", "manages")).rejects.toThrow("Source node not found: ghost");
+    await expect(graph.addEdge("a", "ghost", "manages")).rejects.toThrow(
+      "Target node not found: ghost",
+    );
+    await expect(graph.addEdge("ghost", "b", "manages")).rejects.toThrow(
+      "Source node not found: ghost",
+    );
 
     await graph.addEdge("a", "b", "depends_on", { why: "test" });
     await graph.addEdge("a", "b", "depends_on", { why: "test" }); // duplicate — no-op
-    expect(await graph.getSnapshot()).toHaveProperty("edges", [expect.objectContaining({ from: "a", to: "b" })]);
+    expect(await graph.getSnapshot()).toHaveProperty("edges", [
+      expect.objectContaining({ from: "a", to: "b" }),
+    ]);
   });
 
   it("removeEdge only removes the exact matching edge", async () => {
@@ -184,7 +188,10 @@ describe("RuntimeGraph edges and queries", () => {
     await graph.addNode("agent-2", "agent", "A2", { status: "failed" });
     await graph.addEdge("agent-1", "agent-2", "depends_on"); // agent-1 depends on agent-2
 
-    expect((await graph.getNodesByType("agent")).map((n) => n.id).sort()).toEqual(["agent-1", "agent-2"]);
+    expect((await graph.getNodesByType("agent")).map((n) => n.id).sort()).toEqual([
+      "agent-1",
+      "agent-2",
+    ]);
     expect((await graph.getNodesByStatus("pending")).map((n) => n.id)).toEqual(["agent-1"]);
     // agent-1 depends on wf (static) and on agent-2 (edge-based depends_on from agent-1).
     const deps = (await graph.getDependencies("agent-1")).map((n) => n.id).sort();
@@ -339,7 +346,21 @@ describe("RuntimeGraph integrity", () => {
     // created by loading state that already references a missing node.
     const p = new FakePersistence();
     await p.saveState("runtime_graph_data", {
-      nodes: [["a", { id: "a", type: "agent", name: "A", status: "active", metadata: {}, dependencies: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }]],
+      nodes: [
+        [
+          "a",
+          {
+            id: "a",
+            type: "agent",
+            name: "A",
+            status: "active",
+            metadata: {},
+            dependencies: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+      ],
       edges: [{ from: "a", to: "ghost", relationship: "manages" }],
     });
     const g2 = new RuntimeGraph(p as unknown as IRuntimePersistence);
@@ -431,10 +452,7 @@ describe("RuntimeGraph persistence", () => {
     await graph.addNode("b", "workflow", "B", { dependencies: ["a"] });
     await graph.addEdge("a", "b", "manages");
 
-    const g2 = new RuntimeGraph(
-      persistence as unknown as IRuntimePersistence,
-      undefined,
-    );
+    const g2 = new RuntimeGraph(persistence as unknown as IRuntimePersistence, undefined);
     g2.setAutoCheckpoint(false);
     expect(await g2.getNode("a")).toMatchObject({ status: "degraded" });
     expect((await g2.getNode("a"))?.metadata).toEqual({ k: "v" });
@@ -462,6 +480,6 @@ describe("RuntimeGraph persistence", () => {
     await Promise.all(
       Array.from({ length: 20 }, (_, i) => graph.addNode(`n${i}`, "agent", `N${i}`)),
     );
-    expect((await graph.getAllNodes())).toHaveLength(20);
+    expect(await graph.getAllNodes()).toHaveLength(20);
   });
 });

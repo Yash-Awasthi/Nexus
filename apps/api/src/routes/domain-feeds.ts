@@ -251,22 +251,21 @@ export async function domainFeedsRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{
     Querystring: { limit?: string; where?: string; includeNormal?: string };
-  }>(
-    "/domain-feeds/intel/port-congestion",
-    { preHandler: requireAuth },
-    async (request, reply) => {
-      const limit = Math.min(parseInt(request.query.limit ?? "50", 10) || 50, 200);
-      const includeNormal = request.query.includeNormal === "1" || request.query.includeNormal === "true";
-      const feed = new PortCongestionFeed({ includeNormal });
-      const events = await feed.fetch(request.query.where ? { where: request.query.where } : undefined);
-      return reply.send({
-        domain: feed.domain,
-        events: events.slice(0, limit),
-        total: events.length,
-        fetchedAt: new Date().toISOString(),
-      });
-    },
-  );
+  }>("/domain-feeds/intel/port-congestion", { preHandler: requireAuth }, async (request, reply) => {
+    const limit = Math.min(parseInt(request.query.limit ?? "50", 10) || 50, 200);
+    const includeNormal =
+      request.query.includeNormal === "1" || request.query.includeNormal === "true";
+    const feed = new PortCongestionFeed({ includeNormal });
+    const events = await feed.fetch(
+      request.query.where ? { where: request.query.where } : undefined,
+    );
+    return reply.send({
+      domain: feed.domain,
+      events: events.slice(0, limit),
+      total: events.length,
+      fetchedAt: new Date().toISOString(),
+    });
+  });
 
   /** GET /domain-feeds/intel/brief — compact text summary of last sweep */
   app.get("/domain-feeds/intel/brief", { preHandler: requireAuth }, async (_req, reply) => {

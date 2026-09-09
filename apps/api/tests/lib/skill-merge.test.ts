@@ -102,7 +102,7 @@ describe("skill-merge polish", () => {
     content: string,
     extra: Partial<Parameters<PolishDriver["complete"]>[0]> = {},
   ): PolishDriver => ({
-    complete: async (opts) => ({
+    complete: async (_opts) => ({
       content,
       usage: { inputTokens: 123, outputTokens: 45 },
       servedBy: "openrouter",

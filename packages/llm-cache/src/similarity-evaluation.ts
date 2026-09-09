@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Cache Similarity Evaluation — multiple strategies for semantic cache matching.
  * Extracted from: inspiration/Nexus/GPTCache/
@@ -11,8 +12,6 @@
  * These strategies replace the simple threshold check in SemanticCachingLLMProvider
  * with more sophisticated matching that reduces false positives.
  */
-
-import type { EmbedFn } from "@nexus/llm-cache";
 
 // ===== Interfaces =====
 
@@ -51,7 +50,7 @@ export interface SimilarityEvaluator {
 export class CosineDistanceEvaluation implements SimilarityEvaluator {
   readonly name = "cosine";
 
-  constructor(private threshold: number = 0.95) {}
+  constructor(private threshold = 0.95) {}
 
   evaluate(queryEmbedding: number[], entry: CacheEntry): CacheEvaluationResult {
     const score = cosineSimilarity(queryEmbedding, entry.embedding);
@@ -73,8 +72,8 @@ export class SearchDistanceEvaluation implements SimilarityEvaluator {
   readonly name = "search_distance";
 
   constructor(
-    private maxDistance: number = 4.0,
-    private threshold: number = 0.6
+    private maxDistance = 4.0,
+    private threshold = 0.6,
   ) {}
 
   evaluate(queryEmbedding: number[], entry: CacheEntry): CacheEvaluationResult {
@@ -101,8 +100,8 @@ export class KReciprocalEvaluation implements SimilarityEvaluator {
 
   constructor(
     private entries: CacheEntry[],
-    private topK: number = 5,
-    private threshold: number = 0.6
+    private topK = 5,
+    private threshold = 0.6,
   ) {}
 
   evaluate(queryEmbedding: number[], entry: CacheEntry): CacheEvaluationResult {
@@ -149,9 +148,9 @@ export class TimeDecayEvaluation implements SimilarityEvaluator {
   readonly name = "time_decay";
 
   constructor(
-    private cosineThreshold: number = 0.95,
-    private halfLifeMs: number = 3600_000, // 1 hour
-    private timeWeight: number = 0.3
+    private cosineThreshold = 0.95,
+    private halfLifeMs = 3600_000, // 1 hour
+    private timeWeight = 0.3,
   ) {}
 
   evaluate(queryEmbedding: number[], entry: CacheEntry): CacheEvaluationResult {
@@ -162,8 +161,7 @@ export class TimeDecayEvaluation implements SimilarityEvaluator {
     const timeFactor = Math.pow(0.5, ageMs / this.halfLifeMs);
 
     // Combined score: cosine * (1 - timeWeight) + timeFactor * timeWeight
-    const score =
-      cosScore * (1 - this.timeWeight) + timeFactor * this.timeWeight;
+    const score = cosScore * (1 - this.timeWeight) + timeFactor * this.timeWeight;
 
     return {
       score,
@@ -177,7 +175,9 @@ export class TimeDecayEvaluation implements SimilarityEvaluator {
 
 export function cosineSimilarity(a: readonly number[], b: readonly number[]): number {
   if (a.length === 0 || a.length !== b.length) return 0;
-  let dot = 0, na = 0, nb = 0;
+  let dot = 0,
+    na = 0,
+    nb = 0;
   for (let i = 0; i < a.length; i++) {
     dot += a[i]! * b[i]!;
     na += a[i]! * a[i]!;

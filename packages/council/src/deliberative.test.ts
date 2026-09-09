@@ -158,7 +158,13 @@ describe("DeliberativeCouncil", () => {
     // The anonymization mapping is a permutation of the advisor names.
     const mappedNames = Object.values(outcome.anonymization);
     expect([...mappedNames].sort()).toEqual(
-      ["The Contrarian", "The Architect", "The Empiricist", "The Pragmatist", "The Ethicist"].sort(),
+      [
+        "The Contrarian",
+        "The Architect",
+        "The Empiricist",
+        "The Pragmatist",
+        "The Ethicist",
+      ].sort(),
     );
 
     // Verdict parsed into the five structured fields.

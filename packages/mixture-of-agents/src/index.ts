@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Mixture of Agents (MoA) — layered proposer/aggregator architecture.
  *
@@ -34,7 +35,11 @@ export interface LayerResult {
 
 export interface MoAConfig {
   layers: MoALayerConfig[];
-  llmCaller: (model: string, messages: Array<{ role: string; content: string }>, options?: { temperature?: number; maxTokens?: number }) => Promise<string>;
+  llmCaller: (
+    model: string,
+    messages: Array<{ role: string; content: string }>,
+    options?: { temperature?: number; maxTokens?: number },
+  ) => Promise<string>;
 }
 
 /**
@@ -65,8 +70,13 @@ export class MixtureOfAgents {
       const proposals = await Promise.all(
         layerConfig.proposers.map(async (proposer) => {
           const messages = [
-            { role: 'system', content: proposer.systemPrompt ?? 'You are a helpful assistant. Answer the following question thoroughly.' },
-            { role: 'user', content: currentInput },
+            {
+              role: "system",
+              content:
+                proposer.systemPrompt ??
+                "You are a helpful assistant. Answer the following question thoroughly.",
+            },
+            { role: "user", content: currentInput },
           ];
           const response = await this.config.llmCaller(proposer.model, messages, {
             temperature: proposer.temperature ?? 0.7,
@@ -75,22 +85,21 @@ export class MixtureOfAgents {
           proposerResponses.set(proposer.id, response);
           agentResponses.set(`layer${i}_${proposer.id}`, response);
           return response;
-        })
+        }),
       );
 
       // Phase 2: Aggregator synthesizes
-      const proposalsText = proposals
-        .map((p, idx) => `[Proposal ${idx + 1}]: ${p}`)
-        .join('\n\n');
+      const proposalsText = proposals.map((p, idx) => `[Proposal ${idx + 1}]: ${p}`).join("\n\n");
 
       const aggregatorMessages = [
         {
-          role: 'system',
-          content: layerConfig.aggregator.systemPrompt ?? 
-            'You are an expert synthesizer. Combine the following proposals into one comprehensive, accurate answer. Remove redundancy and ensure completeness.',
+          role: "system",
+          content:
+            layerConfig.aggregator.systemPrompt ??
+            "You are an expert synthesizer. Combine the following proposals into one comprehensive, accurate answer. Remove redundancy and ensure completeness.",
         },
         {
-          role: 'user',
+          role: "user",
           content: `Original question: ${currentInput}\n\nProposals:\n${proposalsText}\n\nSynthesize into one best answer:`,
         },
       ];
@@ -101,7 +110,7 @@ export class MixtureOfAgents {
         {
           temperature: layerConfig.aggregator.temperature ?? 0.3,
           maxTokens: layerConfig.aggregator.maxTokens ?? 4096,
-        }
+        },
       );
 
       agentResponses.set(`layer${i}_aggregator`, aggregated);
@@ -117,7 +126,9 @@ export class MixtureOfAgents {
     }
 
     return {
-      answer: currentInput.startsWith('Previous synthesis:') ? layers[layers.length - 1]!.aggregated : currentInput,
+      answer: currentInput.startsWith("Previous synthesis:")
+        ? layers[layers.length - 1]!.aggregated
+        : currentInput,
       layers,
       totalTokens,
       agentResponses,

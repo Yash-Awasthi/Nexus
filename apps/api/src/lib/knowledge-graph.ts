@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Knowledge Graph — builds, queries, and visualizes a knowledge graph
  * from document chunks, conversation history, and external data sources.
@@ -71,10 +72,10 @@ export interface PathResult {
 }
 
 export class KnowledgeGraph {
-  private nodes: Map<string, KGNode> = new Map();
-  private edges: Map<string, KGEdge> = new Map();
-  private adjacencyList: Map<string, Set<string>> = new Map();
-  private reverseAdj: Map<string, Set<string>> = new Map();
+  private nodes = new Map<string, KGNode>();
+  private edges = new Map<string, KGEdge>();
+  private adjacencyList = new Map<string, Set<string>>();
+  private reverseAdj = new Map<string, Set<string>>();
 
   // ── CRUD ──────────────────────────────────────────────────────────────────
 
@@ -82,7 +83,7 @@ export class KnowledgeGraph {
     id: string,
     label: string,
     type: EntityType,
-    properties: Record<string, any> = {}
+    properties: Record<string, any> = {},
   ): KGNode {
     const now = Date.now();
     const existing = this.nodes.get(id);
@@ -104,8 +105,8 @@ export class KnowledgeGraph {
     sourceId: string,
     targetId: string,
     relation: string,
-    weight: number = 1.0,
-    properties: Record<string, any> = {}
+    weight = 1.0,
+    properties: Record<string, any> = {},
   ): KGEdge | null {
     if (!this.nodes.has(sourceId) || !this.nodes.has(targetId)) return null;
 
@@ -128,7 +129,9 @@ export class KnowledgeGraph {
     };
     this.edges.set(id, edge);
     this.adjacencyList.get(sourceId)!.add(targetId);
-    this.reverseAdj.get(targetId)?.add(sourceId) ?? this.reverseAdj.set(targetId, new Set([sourceId]));
+    const rev = this.reverseAdj.get(targetId);
+    if (rev) rev.add(sourceId);
+    else this.reverseAdj.set(targetId, new Set([sourceId]));
 
     return edge;
   }
@@ -161,12 +164,12 @@ export class KnowledgeGraph {
   /**
    * BFS traversal from a start node.
    */
-  bfs(startId: string, depth: number = 3, filter?: GraphQuery): KGNode[] {
+  bfs(startId: string, depth = 3, filter?: GraphQuery): KGNode[] {
     if (!this.nodes.has(startId)) return [];
 
     const visited = new Set<string>();
     const result: KGNode[] = [];
-    const queue: Array<{ id: string; currentDepth: number }> = [{ id: startId, currentDepth: 0 }];
+    const queue: { id: string; currentDepth: number }[] = [{ id: startId, currentDepth: 0 }];
 
     while (queue.length > 0) {
       const { id, currentDepth } = queue.shift()!;
@@ -193,7 +196,7 @@ export class KnowledgeGraph {
   /**
    * Find shortest path between two nodes (BFS-based).
    */
-  findPath(sourceId: string, targetId: string, maxDepth: number = 6): PathResult {
+  findPath(sourceId: string, targetId: string, maxDepth = 6): PathResult {
     if (!this.nodes.has(sourceId) || !this.nodes.has(targetId)) {
       return { path: [], edges: [], totalWeight: 0, found: false };
     }
@@ -204,7 +207,7 @@ export class KnowledgeGraph {
     const visited = new Set<string>();
     const parentMap = new Map<string, string>();
     const edgeMap = new Map<string, KGEdge>();
-    const queue: Array<{ id: string; depth: number }> = [{ id: sourceId, depth: 0 }];
+    const queue: { id: string; depth: number }[] = [{ id: sourceId, depth: 0 }];
     visited.add(sourceId);
 
     while (queue.length > 0) {
@@ -217,8 +220,9 @@ export class KnowledgeGraph {
         parentMap.set(neighbor, id);
 
         // Find the edge
-        const edgeId = `${id}--${Array.from(this.edges.values()).find((e) => e.source === id && e.target === neighbor)?.relation}-->${neighbor}`;
-        const edge = Array.from(this.edges.values()).find((e) => e.source === id && e.target === neighbor);
+        const edge = Array.from(this.edges.values()).find(
+          (e) => e.source === id && e.target === neighbor,
+        );
         if (edge) edgeMap.set(neighbor, edge);
 
         if (neighbor === targetId) {
@@ -247,12 +251,12 @@ export class KnowledgeGraph {
   /**
    * Extract subgraph around a center node.
    */
-  getSubgraph(centerId: string, radius: number = 2, filter?: GraphQuery): SubGraph {
+  getSubgraph(centerId: string, radius = 2, filter?: GraphQuery): SubGraph {
     const nodes = this.bfs(centerId, radius, filter);
     const nodeIds = new Set(nodes.map((n) => n.id));
 
     const edges = Array.from(this.edges.values()).filter(
-      (e) => nodeIds.has(e.source) && nodeIds.has(e.target)
+      (e) => nodeIds.has(e.source) && nodeIds.has(e.target),
     );
 
     return { nodes, edges, centerNode: centerId, radius };
@@ -263,27 +267,30 @@ export class KnowledgeGraph {
   /**
    * Full-text search across node labels and properties.
    */
-  search(query: string, limit: number = 20): KGNode[] {
+  search(query: string, limit = 20): KGNode[] {
     const lower = query.toLowerCase();
-    const scored: Array<{ node: KGNode; score: number }> = [];
+    const scored: { node: KGNode; score: number }[] = [];
 
     for (const node of this.nodes.values()) {
       let score = 0;
       if (node.label.toLowerCase().includes(lower)) score += 10;
       if (node.id.toLowerCase().includes(lower)) score += 5;
-      for (const [key, val] of Object.entries(node.properties)) {
+      for (const val of Object.values(node.properties)) {
         if (String(val).toLowerCase().includes(lower)) score += 1;
       }
       if (score > 0) scored.push({ node, score });
     }
 
-    return scored.sort((a, b) => b.score - a.score).slice(0, limit).map((s) => s.node);
+    return scored
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map((s) => s.node);
   }
 
   /**
    * Find nodes by type.
    */
-  findByType(type: EntityType, limit: number = 100): KGNode[] {
+  findByType(type: EntityType, limit = 100): KGNode[] {
     return Array.from(this.nodes.values())
       .filter((n) => n.type === type)
       .slice(0, limit);
@@ -309,7 +316,7 @@ export class KnowledgeGraph {
    */
   getEdges(nodeId: string): KGEdge[] {
     return Array.from(this.edges.values()).filter(
-      (e) => e.source === nodeId || e.target === nodeId
+      (e) => e.source === nodeId || e.target === nodeId,
     );
   }
 
@@ -327,7 +334,8 @@ export class KnowledgeGraph {
 
     for (const node of this.nodes.values()) {
       typeDistribution[node.type] = (typeDistribution[node.type] || 0) + 1;
-      totalDegree += (this.adjacencyList.get(node.id)?.size || 0) + (this.reverseAdj.get(node.id)?.size || 0);
+      totalDegree +=
+        (this.adjacencyList.get(node.id)?.size || 0) + (this.reverseAdj.get(node.id)?.size || 0);
     }
 
     const avgDegree = this.nodes.size > 0 ? totalDegree / this.nodes.size : 0;

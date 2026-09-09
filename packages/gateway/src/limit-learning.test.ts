@@ -33,21 +33,28 @@ describe("parseProviderLimit", () => {
 
   it("prefers the per-day axis over per-minute when both words appear", () => {
     // "tokens per day" must not be shadowed by a later "tpm"-adjacent token.
-    expect(parseProviderLimit("daily tokens per day exceeded: tpm budget is 8000, Limit 100000")).toEqual({
+    expect(
+      parseProviderLimit("daily tokens per day exceeded: tpm budget is 8000, Limit 100000"),
+    ).toEqual({
       axis: "tpd",
       limit: 100000,
     });
   });
 
   it("prefers tokens over requests when both axes appear", () => {
-    expect(parseProviderLimit("requests per minute ok but tokens per minute Limit 12,000")).toEqual({
-      axis: "tpm",
-      limit: 12000,
-    });
+    expect(parseProviderLimit("requests per minute ok but tokens per minute Limit 12,000")).toEqual(
+      {
+        axis: "tpm",
+        limit: 12000,
+      },
+    );
   });
 
   it("handles thousands separators", () => {
-    expect(parseProviderLimit("Limit 300,000 requests per day")).toEqual({ axis: "rpd", limit: 300000 });
+    expect(parseProviderLimit("Limit 300,000 requests per day")).toEqual({
+      axis: "rpd",
+      limit: 300000,
+    });
   });
 
   it("refuses to guess the axis (returns null) without a confident one", () => {
@@ -168,7 +175,10 @@ describe("CooldownTracker", () => {
     const d3 = tracker.recordRateLimited(route, { grade: "exhausted" }, T0 + 2_000);
     const d4 = tracker.recordRateLimited(route, { grade: "exhausted" }, T0 + 3_000);
     expect([d1.durationMs, d2.durationMs, d3.durationMs, d4.durationMs]).toEqual([
-      2 * 60_000, 10 * 60_000, 60 * 60_000, 24 * 60 * 60_000,
+      2 * 60_000,
+      10 * 60_000,
+      60 * 60_000,
+      24 * 60 * 60_000,
     ]);
     expect(d1.source).toBe("heuristic");
   });

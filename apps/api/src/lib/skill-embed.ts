@@ -78,9 +78,7 @@ export interface EmbedSkill {
 
 /** Embed text used for a skill (name + description + first 800 code chars). */
 export function skillEmbedText(s: EmbedSkill): string {
-  return [s.name, s.description ?? "", (s.code ?? "").slice(0, 800)]
-    .filter(Boolean)
-    .join("\n");
+  return [s.name, s.description ?? "", (s.code ?? "").slice(0, 800)].filter(Boolean).join("\n");
 }
 
 /**

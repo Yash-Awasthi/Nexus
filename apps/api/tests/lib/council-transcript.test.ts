@@ -22,9 +22,30 @@ const request: CouncilRequest = {
 };
 
 const votes: ModelVote[] = [
-  { model: "nexus/smart", provider: "groq", vote: "yes", reasoning: "data checks pass", confidence: 0.9, latencyMs: 812 },
-  { model: "nexus/sonnet", provider: "anthropic", vote: "yes", reasoning: "agreed", confidence: 0.8, latencyMs: 1240 },
-  { model: "nexus/haiku", provider: "anthropic", vote: "no", reasoning: "rollback gap", confidence: 0.6, latencyMs: 340 },
+  {
+    model: "nexus/smart",
+    provider: "groq",
+    vote: "yes",
+    reasoning: "data checks pass",
+    confidence: 0.9,
+    latencyMs: 812,
+  },
+  {
+    model: "nexus/sonnet",
+    provider: "anthropic",
+    vote: "yes",
+    reasoning: "agreed",
+    confidence: 0.8,
+    latencyMs: 1240,
+  },
+  {
+    model: "nexus/haiku",
+    provider: "anthropic",
+    vote: "no",
+    reasoning: "rollback gap",
+    confidence: 0.6,
+    latencyMs: 340,
+  },
 ];
 
 function result(outcome: ProposalResult["outcome"]): ProposalResult {
@@ -45,7 +66,12 @@ function result(outcome: ProposalResult["outcome"]): ProposalResult {
 
 describe("buildCouncilRunTranscript (API route shape)", () => {
   it("records route evidence, per-vote stages, and the final answer", () => {
-    const t = buildCouncilRunTranscript({ request, result: result("approved"), votes, startedAt: 1_700_000_000_000 });
+    const t = buildCouncilRunTranscript({
+      request,
+      result: result("approved"),
+      votes,
+      startedAt: 1_700_000_000_000,
+    });
     expect(t.protocol).toBe("council");
     expect(t.query).toContain("Should we ship the migration?");
     expect(t.finalAnswer).toContain("rollback runbook");
@@ -62,12 +88,22 @@ describe("buildCouncilRunTranscript (API route shape)", () => {
   });
 
   it("maps dissent like the route (non-majority, non-abstain)", () => {
-    const t = buildCouncilRunTranscript({ request, result: result("approved"), votes, startedAt: 1 });
+    const t = buildCouncilRunTranscript({
+      request,
+      result: result("approved"),
+      votes,
+      startedAt: 1,
+    });
     expect(t.dissent).toEqual(["nexus/haiku"]);
   });
 
   it("records no dissents when the outcome is deferred (no majority)", () => {
-    const t = buildCouncilRunTranscript({ request, result: result("deferred"), votes, startedAt: 1 });
+    const t = buildCouncilRunTranscript({
+      request,
+      result: result("deferred"),
+      votes,
+      startedAt: 1,
+    });
     expect(t.dissent).toEqual([]);
   });
 
@@ -106,7 +142,13 @@ describe("emitCouncilTranscript (worker-shaped event)", () => {
     const spy = vi.fn();
     console.log = spy;
     const startedAt = Date.now() - 1_000;
-    emitCouncilTranscript({ signalId: "sig-9", request, result: result("approved"), votes, startedAt });
+    emitCouncilTranscript({
+      signalId: "sig-9",
+      request,
+      result: result("approved"),
+      votes,
+      startedAt,
+    });
 
     expect(spy).toHaveBeenCalledTimes(1);
     const raw = spy.mock.calls[0]![0] as string;
@@ -127,7 +169,13 @@ describe("emitCouncilTranscript (worker-shaped event)", () => {
 
   it("never throws and skips an empty / failed run", () => {
     const bad = result("rejected");
-    const input: CouncilRunInput = { signalId: "sig-1", request, result: bad, votes: [], startedAt: 1 };
+    const input: CouncilRunInput = {
+      signalId: "sig-1",
+      request,
+      result: bad,
+      votes: [],
+      startedAt: 1,
+    };
     expect(() => emitCouncilTranscript(input)).not.toThrow();
   });
 });

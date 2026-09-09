@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+// SPDX-License-Identifier: Apache-2.0
+import { useEffect, useRef, useState, useCallback } from "react";
 
 interface Node {
   id: string;
   label: string;
-  type: 'paper' | 'author' | 'topic' | 'concept';
+  type: "paper" | "author" | "topic" | "concept";
   x: number;
   y: number;
   vx: number;
@@ -17,32 +18,32 @@ interface Edge {
 }
 
 const mockNodes: Node[] = [
-  { id: '1', label: 'Attention Is All You Need', type: 'paper', x: 200, y: 150, vx: 0, vy: 0 },
-  { id: '2', label: 'BERT', type: 'paper', x: 350, y: 100, vx: 0, vy: 0 },
-  { id: '3', label: 'GPT-3', type: 'paper', x: 400, y: 250, vx: 0, vy: 0 },
-  { id: '4', label: 'Transformer', type: 'concept', x: 280, y: 180, vx: 0, vy: 0 },
-  { id: '5', label: 'Vaswani et al.', type: 'author', x: 150, y: 220, vx: 0, vy: 0 },
-  { id: '6', label: 'NLP', type: 'topic', x: 320, y: 300, vx: 0, vy: 0 },
-  { id: '7', label: 'Deep Learning', type: 'topic', x: 180, y: 320, vx: 0, vy: 0 },
-  { id: '8', label: 'Self-Attention', type: 'concept', x: 250, y: 80, vx: 0, vy: 0 },
+  { id: "1", label: "Attention Is All You Need", type: "paper", x: 200, y: 150, vx: 0, vy: 0 },
+  { id: "2", label: "BERT", type: "paper", x: 350, y: 100, vx: 0, vy: 0 },
+  { id: "3", label: "GPT-3", type: "paper", x: 400, y: 250, vx: 0, vy: 0 },
+  { id: "4", label: "Transformer", type: "concept", x: 280, y: 180, vx: 0, vy: 0 },
+  { id: "5", label: "Vaswani et al.", type: "author", x: 150, y: 220, vx: 0, vy: 0 },
+  { id: "6", label: "NLP", type: "topic", x: 320, y: 300, vx: 0, vy: 0 },
+  { id: "7", label: "Deep Learning", type: "topic", x: 180, y: 320, vx: 0, vy: 0 },
+  { id: "8", label: "Self-Attention", type: "concept", x: 250, y: 80, vx: 0, vy: 0 },
 ];
 
 const mockEdges: Edge[] = [
-  { source: '1', target: '4', weight: 3 },
-  { source: '2', target: '4', weight: 2 },
-  { source: '3', target: '4', weight: 2 },
-  { source: '1', target: '5', weight: 1 },
-  { source: '4', target: '8', weight: 2 },
-  { source: '6', target: '4', weight: 1 },
-  { source: '7', target: '6', weight: 1 },
-  { source: '2', target: '6', weight: 1 },
+  { source: "1", target: "4", weight: 3 },
+  { source: "2", target: "4", weight: 2 },
+  { source: "3", target: "4", weight: 2 },
+  { source: "1", target: "5", weight: 1 },
+  { source: "4", target: "8", weight: 2 },
+  { source: "6", target: "4", weight: 1 },
+  { source: "7", target: "6", weight: 1 },
+  { source: "2", target: "6", weight: 1 },
 ];
 
-const typeColors: Record<Node['type'], string> = {
-  paper: 'var(--accent, #7acc5a)',
-  author: 'var(--info, #5a8acc)',
-  topic: 'var(--warning, #ccb85a)',
-  concept: 'var(--danger, #cc5a5a)',
+const typeColors: Record<Node["type"], string> = {
+  paper: "var(--accent, #7acc5a)",
+  author: "var(--info, #5a8acc)",
+  topic: "var(--warning, #ccb85a)",
+  concept: "var(--danger, #cc5a5a)",
 };
 
 export function KnowledgeGraph() {
@@ -69,7 +70,7 @@ export function KnowledgeGraph() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const resizeCanvas = () => {
@@ -77,14 +78,14 @@ export function KnowledgeGraph() {
       if (rect) {
         canvas.width = rect.width * window.devicePixelRatio;
         canvas.height = rect.height * window.devicePixelRatio;
-        canvas.style.width = rect.width + 'px';
-        canvas.style.height = rect.height + 'px';
+        canvas.style.width = rect.width + "px";
+        canvas.style.height = rect.height + "px";
         ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
       }
     };
 
     resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener("resize", resizeCanvas);
 
     // Simple force simulation
     const simulate = () => {
@@ -107,8 +108,8 @@ export function KnowledgeGraph() {
 
       // Attraction along edges
       for (const edge of edges) {
-        const source = nodes.find(n => n.id === edge.source);
-        const target = nodes.find(n => n.id === edge.target);
+        const source = nodes.find((n) => n.id === edge.source);
+        const target = nodes.find((n) => n.id === edge.target);
         if (!source || !target) continue;
 
         const dx = target.x - source.x;
@@ -122,8 +123,8 @@ export function KnowledgeGraph() {
       }
 
       // Center gravity
-      const centerX = (canvas.width / window.devicePixelRatio) / 2;
-      const centerY = (canvas.height / window.devicePixelRatio) / 2;
+      const centerX = canvas.width / window.devicePixelRatio / 2;
+      const centerY = canvas.height / window.devicePixelRatio / 2;
       for (const node of nodes) {
         node.vx += (centerX - node.x) * 0.001;
         node.vy += (centerY - node.y) * 0.001;
@@ -151,7 +152,7 @@ export function KnowledgeGraph() {
 
       ctx.clearRect(0, 0, w, h);
 
-      ctx.strokeStyle = 'rgba(128, 128, 128, 0.2)';
+      ctx.strokeStyle = "rgba(128, 128, 128, 0.2)";
       ctx.lineWidth = 1;
       for (const edge of edges) {
         const source = map.get(edge.source);
@@ -176,14 +177,14 @@ export function KnowledgeGraph() {
         ctx.fill();
 
         if (isS) {
-          ctx.strokeStyle = '#fff';
+          ctx.strokeStyle = "#fff";
           ctx.lineWidth = 2;
           ctx.stroke();
         }
 
-        ctx.fillStyle = '#e8e9ed';
-        ctx.font = '11px Inter, sans-serif';
-        ctx.textAlign = 'center';
+        ctx.fillStyle = "#e8e9ed";
+        ctx.font = "11px Inter, sans-serif";
+        ctx.textAlign = "center";
         ctx.fillText(node.label, node.x, node.y + r + 14);
       }
 
@@ -192,11 +193,11 @@ export function KnowledgeGraph() {
     };
 
     // Build node lookup map
-    nodeMapRef.current = new Map(nodesRef.current.map(n => [n.id, n]));
+    nodeMapRef.current = new Map(nodesRef.current.map((n) => [n.id, n]));
     draw();
 
     return () => {
-      window.removeEventListener('resize', resizeCanvas);
+      window.removeEventListener("resize", resizeCanvas);
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
   }, [selectedNode]);
@@ -208,7 +209,7 @@ export function KnowledgeGraph() {
     const y = e.clientY - rect.top;
     const node = getNodeAtPosition(x, y);
     hoveredNodeRef.current = node;
-    canvasRef.current!.style.cursor = node ? 'pointer' : 'default';
+    canvasRef.current!.style.cursor = node ? "pointer" : "default";
   };
 
   const handleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -221,7 +222,10 @@ export function KnowledgeGraph() {
   };
 
   return (
-    <div className="relative h-full w-full rounded-lg overflow-hidden" style={{ background: 'var(--surface)' }}>
+    <div
+      className="relative h-full w-full rounded-lg overflow-hidden"
+      style={{ background: "var(--surface)" }}
+    >
       <canvas
         ref={canvasRef}
         className="h-full w-full"
@@ -230,13 +234,20 @@ export function KnowledgeGraph() {
       />
 
       {/* Legend */}
-      <div className="absolute bottom-4 left-4 rounded-lg p-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
-        <p className="text-xs font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Node Types</p>
+      <div
+        className="absolute bottom-4 left-4 rounded-lg p-3"
+        style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
+      >
+        <p className="text-xs font-medium mb-2" style={{ color: "var(--text-muted)" }}>
+          Node Types
+        </p>
         <div className="space-y-1">
           {Object.entries(typeColors).map(([type, color]) => (
             <div key={type} className="flex items-center gap-2">
               <div className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />
-              <span className="text-xs capitalize" style={{ color: 'var(--text-muted)' }}>{type}</span>
+              <span className="text-xs capitalize" style={{ color: "var(--text-muted)" }}>
+                {type}
+              </span>
             </div>
           ))}
         </div>
@@ -244,21 +255,33 @@ export function KnowledgeGraph() {
 
       {/* Selected node info */}
       {selectedNode && (
-        <div className="absolute top-4 right-4 rounded-lg p-4 w-64" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+        <div
+          className="absolute top-4 right-4 rounded-lg p-4 w-64"
+          style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{selectedNode.label}</span>
+            <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+              {selectedNode.label}
+            </span>
             <button
               onClick={() => setSelectedNode(null)}
               className="text-xs"
-              style={{ color: 'var(--text-muted)' }}
+              style={{ color: "var(--text-muted)" }}
             >
               ×
             </button>
           </div>
           <div className="space-y-1">
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Type: <span className="capitalize">{selectedNode.type}</span></p>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Connections: {edgesRef.current.filter(e => e.source === selectedNode.id || e.target === selectedNode.id).length}
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Type: <span className="capitalize">{selectedNode.type}</span>
+            </p>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Connections:{" "}
+              {
+                edgesRef.current.filter(
+                  (e) => e.source === selectedNode.id || e.target === selectedNode.id,
+                ).length
+              }
             </p>
           </div>
         </div>

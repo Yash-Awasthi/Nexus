@@ -7,11 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import {
-  ActivityNotFoundError,
-  DurableRuntime,
-  type ActivityDefinition,
-} from "./durable.js";
+import { ActivityNotFoundError, DurableRuntime, type ActivityDefinition } from "./durable.js";
 
 describe("DurableRuntime activities", () => {
   it("runs a registered activity by name and returns its output", async () => {
@@ -26,9 +22,7 @@ describe("DurableRuntime activities", () => {
 
   it("rejects unknown activity names with ActivityNotFoundError", async () => {
     const runtime = new DurableRuntime();
-    await expect(runtime.runActivity("nope", {})).rejects.toBeInstanceOf(
-      ActivityNotFoundError,
-    );
+    await expect(runtime.runActivity("nope", {})).rejects.toBeInstanceOf(ActivityNotFoundError);
   });
 
   it("retries a failing activity per its policy and succeeds once it stabilizes", async () => {
@@ -116,9 +110,7 @@ describe("DurableRuntime signals", () => {
     const runtime = new DurableRuntime();
     expect(runtime.signal("ghost", "ping", 1)).toBe(false);
 
-    const run = runtime.start("w3", async (ctx) =>
-      ctx.waitForSignal("never", { timeoutMs: 5 }),
-    );
+    const run = runtime.start("w3", async (ctx) => ctx.waitForSignal("never", { timeoutMs: 5 }));
     await expect(run).rejects.toThrow(/timed out after 5ms: never/);
   });
 });

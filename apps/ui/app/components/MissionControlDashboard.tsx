@@ -54,11 +54,13 @@ export function MissionControlDashboard() {
     Promise.all([
       fetch("/api/v1/projects").then((r) => r.json()),
       fetch("/api/v1/groups").then((r) => r.json()),
-    ]).then(([projData, grpData]) => {
-      setProjects(projData.projects ?? []);
-      setGroups(grpData.groups ?? []);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    ])
+      .then(([projData, grpData]) => {
+        setProjects(projData.projects ?? []);
+        setGroups(grpData.groups ?? []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, []);
 
   // Filter by search
@@ -66,9 +68,7 @@ export function MissionControlDashboard() {
     if (!search.trim()) return projects;
     const q = search.toLowerCase();
     return projects.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q),
+      (p) => p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q),
     );
   }, [projects, search]);
 
@@ -132,7 +132,13 @@ export function MissionControlDashboard() {
                   : "text-muted-foreground hover:bg-muted"
               }`}
             >
-              {d === "compact" ? <Grid3X3 className="h-3 w-3" /> : d === "regular" ? <LayoutList className="h-3 w-3" /> : <Settings2 className="h-3 w-3" />}
+              {d === "compact" ? (
+                <Grid3X3 className="h-3 w-3" />
+              ) : d === "regular" ? (
+                <LayoutList className="h-3 w-3" />
+              ) : (
+                <Settings2 className="h-3 w-3" />
+              )}
             </button>
           ))}
         </div>
@@ -162,9 +168,16 @@ export function MissionControlDashboard() {
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
             Pinned
           </h3>
-          <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${densityClasses[density]}`}>
+          <div
+            className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${densityClasses[density]}`}
+          >
             {pinned.map((p) => (
-              <ProjectCard key={p.id} project={p} size={cardSize[density]} onRefresh={refreshProjects} />
+              <ProjectCard
+                key={p.id}
+                project={p}
+                size={cardSize[density]}
+                onRefresh={refreshProjects}
+              />
             ))}
           </div>
         </section>
@@ -182,9 +195,16 @@ export function MissionControlDashboard() {
               />
               {group?.name ?? "Unknown"}
             </h3>
-            <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${densityClasses[density]}`}>
+            <div
+              className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${densityClasses[density]}`}
+            >
               {projs.map((p) => (
-                <ProjectCard key={p.id} project={p} size={cardSize[density]} onRefresh={refreshProjects} />
+                <ProjectCard
+                  key={p.id}
+                  project={p}
+                  size={cardSize[density]}
+                  onRefresh={refreshProjects}
+                />
               ))}
             </div>
           </section>
@@ -199,9 +219,16 @@ export function MissionControlDashboard() {
               Ungrouped
             </h3>
           ) : null}
-          <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${densityClasses[density]}`}>
+          <div
+            className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${densityClasses[density]}`}
+          >
             {ungrouped.map((p) => (
-              <ProjectCard key={p.id} project={p} size={cardSize[density]} onRefresh={refreshProjects} />
+              <ProjectCard
+                key={p.id}
+                project={p}
+                size={cardSize[density]}
+                onRefresh={refreshProjects}
+              />
             ))}
           </div>
         </section>

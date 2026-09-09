@@ -76,7 +76,11 @@ describe("CrawlSession", () => {
   });
 
   it("round-trips through getState for persistence", () => {
-    const s = new CrawlSession({ id: "ident-1", maxUsageCount: 5, userData: { headers: { "x-id": "1" } } });
+    const s = new CrawlSession({
+      id: "ident-1",
+      maxUsageCount: 5,
+      userData: { headers: { "x-id": "1" } },
+    });
     s.markBad();
     const state = s.getState();
     expect(state.id).toBe("ident-1");
@@ -219,14 +223,21 @@ describe("SessionPool", () => {
 // Spider integration (session pool wired into the crawl loop)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function makeSequenceFetch(statuses: number[]): { fetch: typeof fetch; calls: number; seenHeaders: string[] } {
+function makeSequenceFetch(statuses: number[]): {
+  fetch: typeof fetch;
+  calls: number;
+  seenHeaders: string[];
+} {
   let calls = 0;
   const seenHeaders: string[] = [];
   return {
     fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : (input as Request).url;
       const status = statuses[Math.min(calls, statuses.length - 1)];
-      const headers = new Headers({ "content-type": "text/html", ...(init?.headers as Record<string, string>) });
+      const headers = new Headers({
+        "content-type": "text/html",
+        ...(init?.headers as Record<string, string>),
+      });
       seenHeaders.push((init?.headers as Record<string, string>)["x-session-id"] ?? "(none)");
       calls += 1;
       void url;

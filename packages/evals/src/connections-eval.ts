@@ -135,9 +135,10 @@ export function runConnectionsBenchmark(
   let exactPuzzles = 0;
   puzzles.forEach((puzzle, i) => {
     const predicted = puzzle.answer ? parseGroups(puzzle.answer) : parseGroups(answers[i] ?? "");
-    const score = opts.quadratic === false
-      ? scoreConnections(puzzle.groups, predicted)
-      : scoreConnectionsQuadratic(puzzle.groups, predicted);
+    const score =
+      opts.quadratic === false
+        ? scoreConnections(puzzle.groups, predicted)
+        : scoreConnectionsQuadratic(puzzle.groups, predicted);
     perPuzzle.push(score);
     if (score === 1) exactPuzzles++;
   });

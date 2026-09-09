@@ -2,12 +2,7 @@
 // Borda-tallied peer rankings (llm-council-app v2 parity) — focused tests for
 // the pure tally core and the DeliberativeCouncil rankedReview/runRanked wiring.
 import { describe, expect, it } from "vitest";
-import {
-  parseBordaRanking,
-  tallyBorda,
-  maxBordaPoints,
-  formatBordaStandings,
-} from "./borda.js";
+import { parseBordaRanking, tallyBorda, maxBordaPoints, formatBordaStandings } from "./borda.js";
 import { DeliberativeCouncil } from "./deliberative.js";
 import type { Archetype } from "./archetypes.js";
 import type { ILLMResponse, ILLMTransport } from "./engine.js";
@@ -63,10 +58,7 @@ describe("tallyBorda", () => {
   });
 
   it("breaks point ties by first-place votes, then mean position, then letter", () => {
-    const rankings = [
-      parseBordaRanking("r1", "A, B", 2),
-      parseBordaRanking("r2", "B, A", 2),
-    ];
+    const rankings = [parseBordaRanking("r1", "A, B", 2), parseBordaRanking("r2", "B, A", 2)];
     const tally = tallyBorda(rankings);
     // Symmetric → identical points/firsts/meanPosition → alphabetical.
     expect(tally.standings.map((s) => s.letter)).toEqual(["A", "B"]);

@@ -15,25 +15,25 @@
  * test); `transportFromLlm` adapts a real `LlmToolFn` to both shapes.
  */
 import type { RuntimeTool, LlmToolFn, RuntimeMessage } from "@nexus/agent-runtime";
-import { majorityFinalAnswer, runMultiAgentDebate } from "@nexus/debate-engine";
 import {
   createCouncilMcpServer,
   recordToolTranscript,
   type CouncilMcpServerOptions,
   type ILLMMessage,
   type ILLMTransport,
-  type TranscriptSink,
   type ToolTranscriptHooks,
 } from "@nexus/council";
-import {
-  McpHttpServer,
-  type McpCallResult,
-  type McpToolDefinition,
-} from "@nexus/mcp-client";
-import { createHybridSearchMcpServer } from "@nexus/hybrid-search";
-import type { BM25SearchAdapter, VectorSearchAdapter } from "@nexus/hybrid-search";
+import { majorityFinalAnswer, runMultiAgentDebate } from "@nexus/debate-engine";
 import { createGraphRagMcpServer } from "@nexus/graphrag-query";
-import type { CommunityReport, IndexedEntity, IndexedRelation, QueryRouter } from "@nexus/graphrag-query";
+import type {
+  CommunityReport,
+  IndexedEntity,
+  IndexedRelation,
+  QueryRouter,
+} from "@nexus/graphrag-query";
+import type { BM25SearchAdapter, VectorSearchAdapter } from "@nexus/hybrid-search";
+import { createHybridSearchMcpServer } from "@nexus/hybrid-search";
+import type { McpHttpServer, McpCallResult, McpToolDefinition } from "@nexus/mcp-client";
 import type { Reranker } from "@nexus/reranker";
 export type { TranscriptSink, ToolTranscriptHooks } from "@nexus/council";
 
@@ -127,7 +127,10 @@ function wrapLocalMcpTool(
         const raw = result.text
           ? result.text
           : (result.content ?? [])
-              .filter((c): c is { type: "text"; text: string } => c.type === "text" && typeof c.text === "string")
+              .filter(
+                (c): c is { type: "text"; text: string } =>
+                  c.type === "text" && typeof c.text === "string",
+              )
               .map((c) => c.text)
               .join("\n");
         const textOut = raw || JSON.stringify(result.content);
@@ -136,7 +139,9 @@ function wrapLocalMcpTool(
         );
         return textOut;
       } catch (err) {
-        hooks?.onTranscript?.(recordToolTranscript(def.name, question, undefined, startedAt, errMsg(err)));
+        hooks?.onTranscript?.(
+          recordToolTranscript(def.name, question, undefined, startedAt, errMsg(err)),
+        );
         throw err;
       }
     },
@@ -323,8 +328,14 @@ export function debateRuntimeTool(opts: DebateToolOptions): RuntimeTool {
         question: { type: "string", description: "The question to debate." },
         context: { type: "string", description: "Optional background context." },
         agents: { type: "array", description: "Debater names (default: two generic debaters)." },
-        rounds: { type: "number", description: "Round budget (default 3; a cap when convergence is on)." },
-        convergence: { type: "boolean", description: "Stop early once positions stabilise (default false)." },
+        rounds: {
+          type: "number",
+          description: "Round budget (default 3; a cap when convergence is on).",
+        },
+        convergence: {
+          type: "boolean",
+          description: "Stop early once positions stabilise (default false).",
+        },
       },
       required: ["question"],
     },

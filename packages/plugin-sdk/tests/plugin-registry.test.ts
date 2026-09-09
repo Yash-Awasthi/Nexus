@@ -89,7 +89,9 @@ describe("PluginRegistryClient", () => {
 
   it("fails closed on a malformed manifest from the wire", async () => {
     const fetchFn = fakeFetch(async () => ({
-      plugins: [{ manifest: { id: "bad id!", name: "", version: "nope", entry: "", capabilities: [] } }],
+      plugins: [
+        { manifest: { id: "bad id!", name: "", version: "nope", entry: "", capabilities: [] } },
+      ],
     }));
     const client = new PluginRegistryClient({ baseUrl: "https://registry.example.com", fetchFn });
     try {
@@ -131,7 +133,10 @@ describe("PluginRegistryClient", () => {
   });
 
   it("publish requires an API key", async () => {
-    const client = new PluginRegistryClient({ baseUrl: "https://registry.example.com", fetchFn: fakeFetch(async () => ({})) });
+    const client = new PluginRegistryClient({
+      baseUrl: "https://registry.example.com",
+      fetchFn: fakeFetch(async () => ({})),
+    });
     try {
       await client.publish(MANIFEST);
       expect.unreachable();

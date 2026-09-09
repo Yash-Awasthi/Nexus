@@ -368,11 +368,7 @@ export function serializeSpec(spec: OpenApiSpec, indent = 2): string {
 }
 
 // ── OpenAPI → MCP tools (reverse direction: spec → runnable tools) ────────────
-export {
-  openApiToMcpTools,
-  createOpenApiCaller,
-  HTTP_METHODS,
-} from "./openapi-to-mcp.js";
+export { openApiToMcpTools, createOpenApiCaller, HTTP_METHODS } from "./openapi-to-mcp.js";
 export type {
   HttpMethod,
   ParameterLocation,

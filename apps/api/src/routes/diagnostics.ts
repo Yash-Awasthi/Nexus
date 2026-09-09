@@ -56,12 +56,7 @@ const LLM_PROVIDER_ENV: Record<string, string> = {
 };
 
 /** Route prefixes registered in server.ts — keeps the diagnostics self-contained. */
-const REGISTERED_PREFIXES = [
-  "/api/v1",
-  "/api",
-  "/health",
-  "/api/v1/gs",
-];
+const REGISTERED_PREFIXES = ["/api/v1", "/api", "/health", "/api/v1/gs"];
 
 interface CheckResult {
   ok: boolean;
@@ -109,7 +104,11 @@ async function checkRedis(): Promise<CheckResult> {
       await client.ping();
       return { ok: true, latencyMs: Date.now() - start };
     } finally {
-      try { await client.quit(); } catch { client.disconnect(); }
+      try {
+        await client.quit();
+      } catch {
+        client.disconnect();
+      }
     }
   } catch (e) {
     return { ok: false, latencyMs: Date.now() - start, message: (e as Error).message };
@@ -131,7 +130,7 @@ async function checkKV(): Promise<CheckResult> {
   }
 }
 
-function llmProviders(): Array<{ provider: string; configured: boolean }> {
+function llmProviders(): { provider: string; configured: boolean }[] {
   return Object.entries(LLM_PROVIDER_ENV).map(([provider, envVar]) => ({
     provider,
     configured: Boolean(process.env[envVar] && process.env[envVar]!.trim()),
@@ -142,15 +141,11 @@ export async function diagnosticsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/system/diagnostics", async (_req, reply) => {
     reply.header("Cache-Control", "no-cache, no-store");
 
-    const [database, redis, kv] = await Promise.all([
-      checkDatabase(),
-      checkRedis(),
-      checkKV(),
-    ]);
+    const [database, redis, kv] = await Promise.all([checkDatabase(), checkRedis(), checkKV()]);
 
     const checks = { database, redis, kv };
     // Status: "down" only if DB is down (critical). Redis/KV degraded is non-fatal.
-    const status = !database.ok ? "down" : (!redis.ok || !kv.ok ? "degraded" : "ok");
+    const status = !database.ok ? "down" : !redis.ok || !kv.ok ? "degraded" : "ok";
 
     const uptimeSeconds = Math.round((Date.now() - STARTED_AT.getTime()) / 1000);
     const providers = llmProviders();

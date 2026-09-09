@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @nexus/agent-automation — Agent automation service with schedule/webhook triggers.
  *
@@ -120,7 +121,10 @@ export interface AutomationStore {
 
   saveRun(run: AutomationRun): Promise<void>;
   getRun(id: string): Promise<AutomationRun | null>;
-  listRuns(automationId: string, options?: { limit?: number; offset?: number }): Promise<AutomationRun[]>;
+  listRuns(
+    automationId: string,
+    options?: { limit?: number; offset?: number },
+  ): Promise<AutomationRun[]>;
   getActiveRuns(automationId: string): Promise<AutomationRun[]>;
 }
 
@@ -139,7 +143,10 @@ export class InMemoryAutomationStore implements AutomationStore {
     return this.automations.get(id) ?? null;
   }
 
-  async listAutomations(filter?: { status?: AutomationStatus; tags?: string[] }): Promise<Automation[]> {
+  async listAutomations(filter?: {
+    status?: AutomationStatus;
+    tags?: string[];
+  }): Promise<Automation[]> {
     let results = [...this.automations.values()];
     if (filter?.status) results = results.filter((a) => a.status === filter.status);
     if (filter?.tags) results = results.filter((a) => filter.tags!.some((t) => a.tags.includes(t)));
@@ -164,7 +171,10 @@ export class InMemoryAutomationStore implements AutomationStore {
     return this.runs.get(id) ?? null;
   }
 
-  async listRuns(automationId: string, options?: { limit?: number; offset?: number }): Promise<AutomationRun[]> {
+  async listRuns(
+    automationId: string,
+    options?: { limit?: number; offset?: number },
+  ): Promise<AutomationRun[]> {
     const runs = [...this.runs.values()]
       .filter((r) => r.automationId === automationId)
       .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
@@ -175,14 +185,19 @@ export class InMemoryAutomationStore implements AutomationStore {
 
   async getActiveRuns(automationId: string): Promise<AutomationRun[]> {
     return [...this.runs.values()].filter(
-      (r) => r.automationId === automationId && (r.status === "running" || r.status === "pending" || r.status === "retrying"),
+      (r) =>
+        r.automationId === automationId &&
+        (r.status === "running" || r.status === "pending" || r.status === "retrying"),
     );
   }
 }
 
 // ─── Automation Service ──────────────────────────────────────────────────────
 
-export type RunExecutor = (prompt: string, metadata?: Record<string, unknown>) => Promise<{ result: string; tokens?: { input: number; output: number }; costUsd?: number }>;
+export type RunExecutor = (
+  prompt: string,
+  metadata?: Record<string, unknown>,
+) => Promise<{ result: string; tokens?: { input: number; output: number }; costUsd?: number }>;
 
 export interface AutomationServiceConfig {
   store: AutomationStore;
@@ -212,7 +227,8 @@ export class AutomationService {
    * Create a new automation.
    */
   async create(config: AutomationConfig): Promise<Automation> {
-    const id = config.id ?? `auto_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    const id =
+      config.id ?? `auto_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
     const now = new Date().toISOString();
 
     const automation: Automation = {
@@ -238,7 +254,11 @@ export class AutomationService {
     await this.config.store.saveAutomation(automation);
 
     // Start schedule timer if needed
-    if (automation.status === "active" && automation.trigger.type === "schedule" && automation.trigger.cron) {
+    if (
+      automation.status === "active" &&
+      automation.trigger.type === "schedule" &&
+      automation.trigger.cron
+    ) {
       this.startSchedule(automation);
     }
 
@@ -250,7 +270,11 @@ export class AutomationService {
    */
   async trigger(
     automationId: string,
-    options?: { promptOverride?: string; triggerType?: TriggerType; metadata?: Record<string, unknown> },
+    options?: {
+      promptOverride?: string;
+      triggerType?: TriggerType;
+      metadata?: Record<string, unknown>;
+    },
   ): Promise<AutomationRun> {
     const automation = await this.config.store.getAutomation(automationId);
     if (!automation) throw new Error(`Automation ${automationId} not found`);
@@ -261,7 +285,9 @@ export class AutomationService {
     // Check concurrency limit
     const activeRuns = await this.config.store.getActiveRuns(automationId);
     if (activeRuns.length >= automation.maxConcurrentRuns) {
-      throw new Error(`Automation ${automationId} has ${activeRuns.length} active runs (max: ${automation.maxConcurrentRuns})`);
+      throw new Error(
+        `Automation ${automationId} has ${activeRuns.length} active runs (max: ${automation.maxConcurrentRuns})`,
+      );
     }
 
     // Check canRun
@@ -377,9 +403,10 @@ export class AutomationService {
     return {
       totalRuns: runs.length,
       successRate: completed.length > 0 ? successful.length / completed.length : 0,
-      avgDurationMs: completed.length > 0
-        ? completed.reduce((s, r) => s + (r.durationMs ?? 0), 0) / completed.length
-        : 0,
+      avgDurationMs:
+        completed.length > 0
+          ? completed.reduce((s, r) => s + (r.durationMs ?? 0), 0) / completed.length
+          : 0,
       totalCostUsd: runs.reduce((s, r) => s + (r.costUsd ?? 0), 0),
       lastRunAt: runs[0]?.startedAt,
     };

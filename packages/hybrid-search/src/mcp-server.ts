@@ -28,11 +28,7 @@ import { McpHttpServer, type McpCallResult, type McpToolDefinition } from "@nexu
 import type { Reranker } from "@nexus/reranker";
 import type { WhereClause, WhereDocumentClause } from "@nexus/retrieval";
 
-import {
-  HybridSearchEngine,
-  type BM25SearchAdapter,
-  type VectorSearchAdapter,
-} from "./index.js";
+import { HybridSearchEngine, type BM25SearchAdapter, type VectorSearchAdapter } from "./index.js";
 
 export interface HybridSearchMcpServerOptions {
   /** Dense leg: any @nexus/hybrid-search VectorSearchAdapter implementation. */
@@ -80,9 +76,7 @@ const err = (message: string): McpCallResult => ({
  * metadata/document filters pre-fusion, fuses (RRF or alpha-weighted), and
  * reranks post-fusion when a reranker is configured and not opted out.
  */
-export function createHybridSearchMcpServer(
-  options: HybridSearchMcpServerOptions,
-): McpHttpServer {
+export function createHybridSearchMcpServer(options: HybridSearchMcpServerOptions): McpHttpServer {
   const maxLimit = options.maxLimit ?? 50;
   const engine = new HybridSearchEngine(options.vector, options.bm25);
 
@@ -114,12 +108,12 @@ export function createHybridSearchMcpServer(
         },
         whereDocument: {
           type: "object",
-          description:
-            'Document-text filter: {"contains":"x"} or {"not_contains":"y"}.',
+          description: 'Document-text filter: {"contains":"x"} or {"not_contains":"y"}.',
         },
         rerank: {
           type: "boolean",
-          description: "Apply the server's reranker post-fusion (default true when one is configured).",
+          description:
+            "Apply the server's reranker post-fusion (default true when one is configured).",
         },
       },
       required: ["query"],
@@ -134,8 +128,7 @@ export function createHybridSearchMcpServer(
       if (name !== tool.name) return err(`Unknown tool: ${name}`);
       const query = str(args.query).trim();
       if (!query) return err("query is required");
-      const reranker =
-        options.reranker && bool(args.rerank, true) ? options.reranker : undefined;
+      const reranker = options.reranker && bool(args.rerank, true) ? options.reranker : undefined;
       const result = await engine.search({
         query,
         limit: num(args.limit, 10, 1, maxLimit),

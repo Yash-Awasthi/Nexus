@@ -54,7 +54,7 @@ describe("notifications-store", () => {
 
   it("dismiss removes a single notification; dismissAll clears the tray", async () => {
     const a = await createNotification("user-1", { type: "system", title: "a" });
-    const b = await createNotification("user-1", { type: "system", title: "b" });
+    const _b = await createNotification("user-1", { type: "system", title: "b" });
 
     expect(await dismissNotification("user-1", a.id)).toBe(true);
     let list = await listNotifications("user-1", 10);

@@ -105,11 +105,23 @@ export function createGraphRagMcpServer(options: GraphRagMcpServerOptions): McpH
         "Entity-anchored local search (GraphRAG dual-mode): anchor on query-matched entities, expand through the graph to neighbors, assemble one token-budgeted context window from entity/relationship tables (plus linked community reports), and answer in a single LLM pass. No map-reduce.",
       inputSchema: inputSchema({
         question: { type: "string", description: "The question to answer from the graph." },
-        maxEntities: { type: "number", description: "Max selected entities before expansion (default 10)." },
+        maxEntities: {
+          type: "number",
+          description: "Max selected entities before expansion (default 10).",
+        },
         levels: { type: "number", description: "Neighbor levels to expand (default 1)." },
-        maxContextTokens: { type: "number", description: "Token budget for the assembled context (default 8000)." },
-        topKRelationships: { type: "number", description: "Per-entity relationship budget (default 10)." },
-        includeReports: { type: "boolean", description: "Attach linked community reports (default true)." },
+        maxContextTokens: {
+          type: "number",
+          description: "Token budget for the assembled context (default 8000).",
+        },
+        topKRelationships: {
+          type: "number",
+          description: "Per-entity relationship budget (default 10).",
+        },
+        includeReports: {
+          type: "boolean",
+          description: "Attach linked community reports (default true).",
+        },
       }),
     },
     {
@@ -118,9 +130,15 @@ export function createGraphRagMcpServer(options: GraphRagMcpServerOptions): McpH
         "Global map-reduce search over hierarchical community reports: select relevant communities, summarize each in parallel, and synthesize the summaries into one answer.",
       inputSchema: inputSchema({
         question: { type: "string", description: "The question to answer from community reports." },
-        communityLevel: { type: "number", description: "Report hierarchy level to search (default 0)." },
+        communityLevel: {
+          type: "number",
+          description: "Report hierarchy level to search (default 0).",
+        },
         maxCommunities: { type: "number", description: "Community budget (default 5)." },
-        dynamicSelection: { type: "boolean", description: "LLM-narrow the selected set before the map phase (default false)." },
+        dynamicSelection: {
+          type: "boolean",
+          description: "LLM-narrow the selected set before the map phase (default false).",
+        },
       }),
     },
   ];

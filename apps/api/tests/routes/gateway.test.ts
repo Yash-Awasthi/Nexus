@@ -170,9 +170,9 @@ describe("POST /api/v1/gateway/messages", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json<{ content: { type: string; text: string }[] }>();
     expect(body.content[0]!.text).toBe("Hello from local Ollama!");
-    expect(
-      vi.mocked(fetch).mock.calls.some((c) => String(c[0]).includes(":11434/api/chat")),
-    ).toBe(true);
+    expect(vi.mocked(fetch).mock.calls.some((c) => String(c[0]).includes(":11434/api/chat"))).toBe(
+      true,
+    );
   });
 
   it("returns 502 when the local Ollama fallback is unreachable", async () => {
@@ -357,9 +357,9 @@ describe("POST /api/v1/gateway/messages", () => {
       payload: { model: "nexus/fast", messages: [{ role: "user", content: "hi" }] },
     });
     expect(ollama.statusCode).toBe(200);
-    expect(
-      vi.mocked(fetch).mock.calls.some((c) => String(c[0]).includes(":11434/api/chat")),
-    ).toBe(true);
+    expect(vi.mocked(fetch).mock.calls.some((c) => String(c[0]).includes(":11434/api/chat"))).toBe(
+      true,
+    );
   });
 
   // ── §4.1 AccountPool wiring ──────────────────────────────────────────────

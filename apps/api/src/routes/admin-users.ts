@@ -24,7 +24,10 @@ import { requireAuthWithTier } from "../middleware/auth.js";
 // ── Admin role guard ──────────────────────────────────────────────────────────
 
 /** Admin gate — shared with the api-bridge audit surface. */
-export async function requireAdminRole(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+export async function requireAdminRole(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
   // requireAuthWithTier (not plain requireAuth) — plain requireAuth never sets
   // request.nexusUserId, so this guard 403'd even legitimate admins (the root
   // cause of an unguarded bridge duplicate existing at all; playtest round 4).

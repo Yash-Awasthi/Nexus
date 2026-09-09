@@ -16,7 +16,16 @@ interface GroupDialogProps {
   onGroupsChange: (groups: Group[]) => void;
 }
 
-const COLORS = ["#6366f1", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ef4444", "#06b6d4"];
+const COLORS = [
+  "#6366f1",
+  "#ec4899",
+  "#f59e0b",
+  "#10b981",
+  "#3b82f6",
+  "#8b5cf6",
+  "#ef4444",
+  "#06b6d4",
+];
 
 export function GroupDialog({ isOpen, onClose, groups, onGroupsChange }: GroupDialogProps) {
   const [newName, setNewName] = useState("");
@@ -58,7 +67,10 @@ export function GroupDialog({ isOpen, onClose, groups, onGroupsChange }: GroupDi
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center"
+      onClick={onClose}
+    >
       <div
         className="bg-card border rounded-xl p-6 w-full max-w-md shadow-xl"
         onClick={(e) => e.stopPropagation()}
@@ -103,7 +115,10 @@ export function GroupDialog({ isOpen, onClose, groups, onGroupsChange }: GroupDi
           )}
           {groups.map((g) => (
             <div key={g.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50">
-              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: g.color }} />
+              <span
+                className="w-3 h-3 rounded-full flex-shrink-0"
+                style={{ backgroundColor: g.color }}
+              />
               {editingId === g.id ? (
                 <Input
                   value={editName}
@@ -116,7 +131,10 @@ export function GroupDialog({ isOpen, onClose, groups, onGroupsChange }: GroupDi
                 <span className="flex-1 text-sm">{g.name}</span>
               )}
               <button
-                onClick={() => { setEditingId(g.id); setEditName(g.name); }}
+                onClick={() => {
+                  setEditingId(g.id);
+                  setEditName(g.name);
+                }}
                 className="p-1 rounded hover:bg-muted"
               >
                 <Pencil className="h-3 w-3 text-muted-foreground" />

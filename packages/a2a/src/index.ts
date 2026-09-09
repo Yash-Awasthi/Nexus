@@ -496,7 +496,9 @@ export interface DelegationTarget {
 /** Outcome of one delegated call. */
 /** True when an A2A task state is terminal (no further polling needed). */
 export function isTerminalTaskState(state: A2ATaskState): boolean {
-  return state === "completed" || state === "failed" || state === "canceled" || state === "rejected";
+  return (
+    state === "completed" || state === "failed" || state === "canceled" || state === "rejected"
+  );
 }
 
 export interface DelegationOutcome {
@@ -680,7 +682,10 @@ export function aggregateCouncilDecision(outcomes: DelegationOutcome[]): Council
     if (o.ok && answer !== undefined) {
       votes.push({ peer, ok: true, answer });
     } else {
-      errors.push({ peer, error: o.error?.message ?? (o.ok ? "no answer content" : "peer failed") });
+      errors.push({
+        peer,
+        error: o.error?.message ?? (o.ok ? "no answer content" : "peer failed"),
+      });
     }
   });
   return {

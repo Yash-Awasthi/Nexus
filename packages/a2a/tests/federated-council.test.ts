@@ -14,9 +14,11 @@ const RPC = "https://agent.example.com/a2a";
 function clientReturning(result: unknown): A2AClient {
   return new A2AClient({
     rpcUrl: RPC,
-    fetchFn: vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ jsonrpc: "2.0", id: "1", result }), { status: 200 }),
-    ) as unknown as typeof fetch,
+    fetchFn: vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ jsonrpc: "2.0", id: "1", result }), { status: 200 }),
+      ) as unknown as typeof fetch,
   });
 }
 
@@ -29,9 +31,16 @@ const DONE: A2ATask = {
 
 describe("federatedCouncil (§15.2)", () => {
   it("extracts answers from task artifacts", async () => {
-    const decision = await federatedCouncil([
-      { label: "peer-a", client: clientReturning(DONE), message: A2AClient.textMessage("weather?") },
-    ], { maxAttempts: 1 });
+    const decision = await federatedCouncil(
+      [
+        {
+          label: "peer-a",
+          client: clientReturning(DONE),
+          message: A2AClient.textMessage("weather?"),
+        },
+      ],
+      { maxAttempts: 1 },
+    );
     expect(decision.reachedQuorum).toBe(true);
     expect(decision.votes).toHaveLength(1);
     expect(decision.votes[0]).toEqual({ peer: "peer-a", ok: true, answer: "sunny, 24C" });
@@ -43,10 +52,13 @@ describe("federatedCouncil (§15.2)", () => {
       rpcUrl: RPC,
       fetchFn: vi.fn().mockRejectedValue(new Error("down")) as unknown as typeof fetch,
     });
-    const decision = await federatedCouncil([
-      { label: "alive", client: clientReturning(DONE), message: A2AClient.textMessage("q") },
-      { label: "dead", client: dead, message: A2AClient.textMessage("q") },
-    ], { maxAttempts: 1 });
+    const decision = await federatedCouncil(
+      [
+        { label: "alive", client: clientReturning(DONE), message: A2AClient.textMessage("q") },
+        { label: "dead", client: dead, message: A2AClient.textMessage("q") },
+      ],
+      { maxAttempts: 1 },
+    );
     expect(decision.votes.map((v) => v.peer)).toEqual(["alive"]);
     expect(decision.errors).toEqual([{ peer: "dead", error: "down" }]);
     expect(decision.quorum).toEqual({ answered: 1, asked: 2 });
@@ -57,9 +69,10 @@ describe("federatedCouncil (§15.2)", () => {
       rpcUrl: RPC,
       fetchFn: vi.fn().mockRejectedValue(new Error("down")) as unknown as typeof fetch,
     });
-    const decision = await federatedCouncil([
-      { label: "dead", client: dead, message: A2AClient.textMessage("q") },
-    ], { maxAttempts: 1 });
+    const decision = await federatedCouncil(
+      [{ label: "dead", client: dead, message: A2AClient.textMessage("q") }],
+      { maxAttempts: 1 },
+    );
     expect(decision.reachedQuorum).toBe(false);
     expect(decision.votes).toHaveLength(0);
   });
@@ -79,7 +92,17 @@ describe("federatedCouncil (§15.2)", () => {
 
   it("outcomeAnswer prefers artifacts then status message", () => {
     const withStatus: A2ATask = {
-      kind: "task", id: "t", status: { state: "completed", message: { kind: "message", role: "agent", parts: [{ kind: "text", text: "from status" }], messageId: "m" } },
+      kind: "task",
+      id: "t",
+      status: {
+        state: "completed",
+        message: {
+          kind: "message",
+          role: "agent",
+          parts: [{ kind: "text", text: "from status" }],
+          messageId: "m",
+        },
+      },
     };
     expect(outcomeAnswer({ ok: true, task: withStatus })).toBe("from status");
     expect(outcomeAnswer({ ok: false, error: new Error("x") })).toBeUndefined();

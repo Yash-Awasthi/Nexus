@@ -32,9 +32,21 @@ function estimatePromptComplexity(prompt: string): number {
 
   // Reasoning keywords increase complexity
   const reasoningKeywords = [
-    "explain", "analyze", "compare", "contrast", "evaluate",
-    "prove", "derive", "implement", "design", "architect",
-    "debug", "refactor", "optimize", "reason", "think step by step",
+    "explain",
+    "analyze",
+    "compare",
+    "contrast",
+    "evaluate",
+    "prove",
+    "derive",
+    "implement",
+    "design",
+    "architect",
+    "debug",
+    "refactor",
+    "optimize",
+    "reason",
+    "think step by step",
   ];
   const lowerPrompt = prompt.toLowerCase();
   const reasoningMatches = reasoningKeywords.filter((k) => lowerPrompt.includes(k)).length;
@@ -42,16 +54,33 @@ function estimatePromptComplexity(prompt: string): number {
 
   // Code-related prompts tend to need stronger models
   const codeIndicators = [
-    "```", "function", "class", "import", "def ", "const ",
-    "async", "await", "Promise", "interface", "type ",
+    "```",
+    "function",
+    "class",
+    "import",
+    "def ",
+    "const ",
+    "async",
+    "await",
+    "Promise",
+    "interface",
+    "type ",
   ];
   const codeMatches = codeIndicators.filter((k) => prompt.includes(k)).length;
   score += Math.min(codeMatches * 0.08, 0.25);
 
   // Math/logic keywords
   const mathKeywords = [
-    "equation", "integral", "derivative", "proof", "theorem",
-    "algorithm", "complexity", "optimize", "minimize", "maximize",
+    "equation",
+    "integral",
+    "derivative",
+    "proof",
+    "theorem",
+    "algorithm",
+    "complexity",
+    "optimize",
+    "minimize",
+    "maximize",
   ];
   const mathMatches = mathKeywords.filter((k) => lowerPrompt.includes(k)).length;
   score += Math.min(mathMatches * 0.05, 0.15);
@@ -60,16 +89,22 @@ function estimatePromptComplexity(prompt: string): number {
 }
 
 export class CostAwareRouter {
-  private battleHistory: Array<{
+  private battleHistory: {
     prompt: string;
     strongWins: boolean;
     timestamp: number;
-  }> = [];
+  }[] = [];
 
   private threshold = 0.5;
 
   constructor(
-    private router: { complete: (req: { model: string; messages: Array<{ role: string; content: string }>; maxTokens?: number }) => Promise<{ content: string; latencyMs: number }> },
+    private router: {
+      complete: (req: {
+        model: string;
+        messages: { role: string; content: string }[];
+        maxTokens?: number;
+      }) => Promise<{ content: string; latencyMs: number }>;
+    },
     private pair: ModelPair,
     options?: { threshold?: number },
   ) {
@@ -86,17 +121,16 @@ export class CostAwareRouter {
 
     // Blend complexity with historical win rate if we have data
     const historicalWinRate = this.getHistoricalWinRate(prompt);
-    const strongWinRate = historicalWinRate !== null
-      ? 0.6 * complexity + 0.4 * historicalWinRate
-      : complexity;
+    const strongWinRate =
+      historicalWinRate !== null ? 0.6 * complexity + 0.4 * historicalWinRate : complexity;
 
-    const chosenAlias = strongWinRate >= this.threshold
-      ? this.pair.strong.alias
-      : this.pair.weak.alias;
+    const chosenAlias =
+      strongWinRate >= this.threshold ? this.pair.strong.alias : this.pair.weak.alias;
 
-    const costSaving = chosenAlias === this.pair.weak.alias
-      ? 1 - this.pair.weak.costPerToken / this.pair.strong.costPerToken
-      : 0;
+    const costSaving =
+      chosenAlias === this.pair.weak.alias
+        ? 1 - this.pair.weak.costPerToken / this.pair.strong.costPerToken
+        : 0;
 
     return {
       chosenAlias,
@@ -133,9 +167,7 @@ export class CostAwareRouter {
     const strongWinRate = recent.filter((b) => b.strongWins).length / recent.length;
 
     // Adjust threshold: higher threshold → route more to weak → higher savings
-    this.threshold = strongWinRate > 0
-      ? 1 - (strongWinRate * targetStrongRate)
-      : 0.5;
+    this.threshold = strongWinRate > 0 ? 1 - strongWinRate * targetStrongRate : 0.5;
 
     this.threshold = Math.max(0.1, Math.min(0.9, this.threshold));
   }

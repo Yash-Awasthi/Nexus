@@ -9,7 +9,10 @@ import { LocalSearchEngine } from "../src/index.js";
 import type { QueryRouter } from "../src/index.js";
 import type { IndexedEntity, IndexedRelation } from "../src/index-graphrag.js";
 
-function stubRouter(contents: string[] = ["synthesized answer"]): { router: QueryRouter; calls: number } {
+function stubRouter(contents: string[] = ["synthesized answer"]): {
+  router: QueryRouter;
+  calls: number;
+} {
   let calls = 0;
   return {
     router: {
@@ -167,7 +170,10 @@ describe("LocalSearchEngine relationship filtering (graphrag two-tier)", () => {
     const many: IndexedRelation[] = [];
     for (let i = 0; i < 25; i++) many.push(rel("acme aerospace", `vendor ${i}`));
     const engine = new LocalSearchEngine(
-      [ent("acme aerospace", ["a"], 5), ...Array.from({ length: 25 }, (_, i) => ent(`vendor ${i}`, ["v"]))],
+      [
+        ent("acme aerospace", ["a"], 5),
+        ...Array.from({ length: 25 }, (_, i) => ent(`vendor ${i}`, ["v"])),
+      ],
       many,
       stub.router,
       "gpt-test",
@@ -225,7 +231,8 @@ describe("LocalSearchEngine context budget + report attachment", () => {
   it("truncates entity rows to the token budget", async () => {
     const stub = stubRouter();
     const entities = [ent("acme aerospace", ["builds rockets"], 5)];
-    for (let i = 0; i < 40; i++) entities.push(ent(`acme vendor ${i}`, ["supplier with a rather long description"], 1));
+    for (let i = 0; i < 40; i++)
+      entities.push(ent(`acme vendor ${i}`, ["supplier with a rather long description"], 1));
     const engine = new LocalSearchEngine(entities, [], stub.router, "gpt-test");
     const r = await engine.search("acme", { maxContextTokens: 300, levels: 1 });
     // tiny budget → only a prefix of the expanded entities fits the table

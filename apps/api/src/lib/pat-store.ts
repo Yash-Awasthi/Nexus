@@ -343,9 +343,7 @@ export async function revokePat(id: string, ownerId: string): Promise<boolean> {
   if (!t || t.ownerId !== ownerId) return false;
   if (_dbUsable()) {
     try {
-      await defaultDb
-        .delete(apiKeys)
-        .where(and(eq(apiKeys.id, id), eq(apiKeys.ownerId, ownerId)));
+      await defaultDb.delete(apiKeys).where(and(eq(apiKeys.id, id), eq(apiKeys.ownerId, ownerId)));
     } catch {
       _dbMode = "mem"; // DB down — cache delete still applies for this process
       _cooldownUntil = Date.now() + _cooldownMs();

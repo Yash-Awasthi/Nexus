@@ -17,53 +17,53 @@ curl -s -X POST $API/api/reasoning/run -H "Authorization: Bearer $T" \
 
 ## ✅ Working (verified end-to-end, local)
 
-| Nav item                       | Notes                                                                                                                                            |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Dashboard                      | loads                                                                                                                                            |
-| Deliberations                  | real council: 5 **archetypes** each cast an LLM vote (`packages/council/engine.ts`)                                                              |
-| Archetypes                     | roster of the council personas used in Deliberations (not decorative)                                                                            |
-| Workflows                      | CRUD + DAG run engine (see below)                                                                                                               |
-| Prompts                        | Postgres CRUD + versions                                                                                                                         |
-| Skills                         | store-backed                                                                                                                                     |
-| Knowledge Bases                | KG-store backed list + docs; **ingest inert by design (zero entities) — §16.9 pending extractor wiring**                                            |
-| Repositories                   | GitHub API when `GITHUB_TOKEN` set, else empty list                                                                                              |
-| Memory                         | write + embed + recall + list — embedder via `NEXUS_EMBED_PROVIDER`: ollama (default, 768-dim), groq, openai, voyage, jina, cohere (key-gated), fixed  |
-| Connectors / Add / Sync Status | registry + **sync-jobs now persisted**                                                                                                           |
-| God Mode                       | per-member `driver.complete()`                                                                                                                   |
-| Gauntlet                       | streams; crash-guarded                                                                                                                           |
-| Red Team (prompt-filter)       | `@nexus/redteam`                                                                                                                                 |
-| STM                            | transform pipeline                                                                                                                               |
-| Drift                          | compute/rate/detect                                                                                                                              |
-| Blind Council                  | identity-hidden council votes                                                                                                                    |
-| Deep Research                  | scraper (Tavily if key)                                                                                                                          |
-| A/B Arena                      | `raceModels`                                                                                                                                     |
-| Simulation                     | LLM persona ticks                                                                                                                                |
+| Nav item                       | Notes                                                                                                                                                 |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dashboard                      | loads                                                                                                                                                 |
+| Deliberations                  | real council: 5 **archetypes** each cast an LLM vote (`packages/council/engine.ts`)                                                                   |
+| Archetypes                     | roster of the council personas used in Deliberations (not decorative)                                                                                 |
+| Workflows                      | CRUD + DAG run engine (see below)                                                                                                                     |
+| Prompts                        | Postgres CRUD + versions                                                                                                                              |
+| Skills                         | store-backed                                                                                                                                          |
+| Knowledge Bases                | KG-store backed list + docs; **ingest inert by design (zero entities) — §16.9 pending extractor wiring**                                              |
+| Repositories                   | GitHub API when `GITHUB_TOKEN` set, else empty list                                                                                                   |
+| Memory                         | write + embed + recall + list — embedder via `NEXUS_EMBED_PROVIDER`: ollama (default, 768-dim), groq, openai, voyage, jina, cohere (key-gated), fixed |
+| Connectors / Add / Sync Status | registry + **sync-jobs now persisted**                                                                                                                |
+| God Mode                       | per-member `driver.complete()`                                                                                                                        |
+| Gauntlet                       | streams; crash-guarded                                                                                                                                |
+| Red Team (prompt-filter)       | `@nexus/redteam`                                                                                                                                      |
+| STM                            | transform pipeline                                                                                                                                    |
+| Drift                          | compute/rate/detect                                                                                                                                   |
+| Blind Council                  | identity-hidden council votes                                                                                                                         |
+| Deep Research                  | scraper (Tavily if key)                                                                                                                               |
+| A/B Arena                      | `raceModels`                                                                                                                                          |
+| Simulation                     | LLM persona ticks                                                                                                                                     |
 | Knowledge Graph                | store-backed (`/kg/graph`, `/kg/search`, `/kg/communities`); **extract/ingest inert by design (zero entities) — §16.9 pending extractor wiring**      |
-| Agents                         | librarian/file agents                                                                                                                            |
-| Projects                       | `/api/v1/projects` CRUD                                                                                                                          |
-| Evaluation                     | LLM judge + results store                                                                                                                        |
-| Marketplace                    | plugin registry CRUD; per-user stars/installs (`/marketplace/me`, anon only as dev-bypass)                                                        |
-| Sandbox                        | JS (Node vm) + Python (Pyodide/WASM) local                                                                                                       |
-| Image Gen                      | DALL·E 3/2, Replicate (FLUX/SDXL), FLUX (BFL direct), Stable Image Core/Ultra, Recraft V3, fal, self-hosted ComfyUI                              |
-| Moderation                     | OpenAI moderation or heuristic fallback                                                                                                          |
-| Semantic Cache                 | **real Ollama-embedding cosine** + `/store`                                                                                                      |
-| Fallback Chains                | list/run/test (test needs a valid `chainId`)                                                                                                     |
-| Settings / Profile             | preferences store                                                                                                                                |
-| Cost Analytics                 | from real `_costLog`                                                                                                                             |
-| API Tokens                     | `nxk_` + sha256, in-memory (bridge `/tokens`; no Postgres-backed tokens surface exists)                                                          |
-| Provider Keys                  | AES-256-GCM encrypted, Postgres                                                                                                                  |
-| Notifications                  | **real per-user store** (shared KV, 30-day TTL) + sidebar bell + dashboard Activity feed; live emitters: research done/failed, autopilot run end |
-| Standard Answers               | persistent + LLM match                                                                                                                           |
-| Web Search                     | POST `/web-search {query}` — Exa→Brave→Serper→Tavily→SearXNG (key-gated providers; exa/brave/serper via `@nexus/search-orchestrator`)               |
-| Scraping                       | Firecrawl/Exa/basic                                                                                                                              |
-| Rooms                          | in-mem CRUD                                                                                                                                      |
-| Admin → Users                  | **real Postgres `users` table**                                                                                                                  |
-| Admin → Analytics              | **real `gatewayLog.stats()`** (no more random)                                                                                                   |
-| Admin → Audit Log              | **real hash-chained `audit_log`** (populates on register/provider-key)                                                                           |
-| Admin → Traces                 | gateway log                                                                                                                                      |
-| Feature Flags                  | store-backed                                                                                                                                     |
-| Feedback                       | **real store + reactions signal** + `POST /feedback`                                                                                             |
-| Cost / Costs limits            | real env + spend/remaining                                                                                                                       |
+| Agents                         | librarian/file agents                                                                                                                                 |
+| Projects                       | `/api/v1/projects` CRUD                                                                                                                               |
+| Evaluation                     | LLM judge + results store                                                                                                                             |
+| Marketplace                    | plugin registry CRUD; per-user stars/installs (`/marketplace/me`, anon only as dev-bypass)                                                            |
+| Sandbox                        | JS (Node vm) + Python (Pyodide/WASM) local                                                                                                            |
+| Image Gen                      | DALL·E 3/2, Replicate (FLUX/SDXL), FLUX (BFL direct), Stable Image Core/Ultra, Recraft V3, fal, self-hosted ComfyUI                                   |
+| Moderation                     | OpenAI moderation or heuristic fallback                                                                                                               |
+| Semantic Cache                 | **real Ollama-embedding cosine** + `/store`                                                                                                           |
+| Fallback Chains                | list/run/test (test needs a valid `chainId`)                                                                                                          |
+| Settings / Profile             | preferences store                                                                                                                                     |
+| Cost Analytics                 | from real `_costLog`                                                                                                                                  |
+| API Tokens                     | `nxk_` + sha256, in-memory (bridge `/tokens`; no Postgres-backed tokens surface exists)                                                               |
+| Provider Keys                  | AES-256-GCM encrypted, Postgres                                                                                                                       |
+| Notifications                  | **real per-user store** (shared KV, 30-day TTL) + sidebar bell + dashboard Activity feed; live emitters: research done/failed, autopilot run end      |
+| Standard Answers               | persistent + LLM match                                                                                                                                |
+| Web Search                     | POST `/web-search {query}` — Exa→Brave→Serper→Tavily→SearXNG (key-gated providers; exa/brave/serper via `@nexus/search-orchestrator`)                 |
+| Scraping                       | Firecrawl/Exa/basic                                                                                                                                   |
+| Rooms                          | in-mem CRUD                                                                                                                                           |
+| Admin → Users                  | **real Postgres `users` table**                                                                                                                       |
+| Admin → Analytics              | **real `gatewayLog.stats()`** (no more random)                                                                                                        |
+| Admin → Audit Log              | **real hash-chained `audit_log`** (populates on register/provider-key)                                                                                |
+| Admin → Traces                 | gateway log                                                                                                                                           |
+| Feature Flags                  | store-backed                                                                                                                                          |
+| Feedback                       | **real store + reactions signal** + `POST /feedback`                                                                                                  |
+| Cost / Costs limits            | real env + spend/remaining                                                                                                                            |
 
 ## ⚙️ Needs a key/runtime (code is real, just unconfigured)
 

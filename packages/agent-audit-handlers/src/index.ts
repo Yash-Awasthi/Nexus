@@ -304,7 +304,8 @@ export class LangChainHandler implements AuditCaptureHandler {
         agentName: this.agentName,
         toolName: (evt.name as string) ?? undefined,
         input: (evt.input as string) ?? undefined,
-        toolInput: typeof evt.input === "object" ? (evt.input as Record<string, unknown>) : undefined,
+        toolInput:
+          typeof evt.input === "object" ? (evt.input as Record<string, unknown>) : undefined,
       });
     } else if (eventName === "on_tool_end") {
       this.factory.create({
@@ -332,11 +333,16 @@ export class LangChainHandler implements AuditCaptureHandler {
   /** Get a LangChain-compatible callback object. */
   asLangChainCallback(): Record<string, (...args: unknown[]) => void> {
     return {
-      handleLLMStart: (...args: unknown[]) => this.handleEvent({ event: "on_llm_start", ...args[0] as object }),
-      handleLLMEnd: (...args: unknown[]) => this.handleEvent({ event: "on_llm_end", ...args[0] as object }),
-      handleToolStart: (...args: unknown[]) => this.handleEvent({ event: "on_tool_start", ...args[0] as object }),
-      handleToolEnd: (...args: unknown[]) => this.handleEvent({ event: "on_tool_end", ...args[0] as object }),
-      handleError: (...args: unknown[]) => this.handleEvent({ event: "on_error", ...args[0] as object }),
+      handleLLMStart: (...args: unknown[]) =>
+        this.handleEvent({ event: "on_llm_start", ...(args[0] as object) }),
+      handleLLMEnd: (...args: unknown[]) =>
+        this.handleEvent({ event: "on_llm_end", ...(args[0] as object) }),
+      handleToolStart: (...args: unknown[]) =>
+        this.handleEvent({ event: "on_tool_start", ...(args[0] as object) }),
+      handleToolEnd: (...args: unknown[]) =>
+        this.handleEvent({ event: "on_tool_end", ...(args[0] as object) }),
+      handleError: (...args: unknown[]) =>
+        this.handleEvent({ event: "on_error", ...(args[0] as object) }),
     };
   }
 
@@ -649,7 +655,10 @@ export class ADKHandler implements AuditCaptureHandler {
 /**
  * Registry of all available framework handlers.
  */
-export const HANDLER_REGISTRY: Record<string, new (sessionId: string, agentName?: string) => AuditCaptureHandler> = {
+export const HANDLER_REGISTRY: Record<
+  string,
+  new (sessionId: string, agentName?: string) => AuditCaptureHandler
+> = {
   langchain: LangChainHandler,
   crewai: CrewAIHandler,
   "openai-agents": OpenAIHandler,
@@ -668,7 +677,9 @@ export function createAuditHandler(
 ): AuditCaptureHandler {
   const HandlerClass = HANDLER_REGISTRY[framework];
   if (!HandlerClass) {
-    throw new Error(`Unknown framework: ${framework}. Available: ${Object.keys(HANDLER_REGISTRY).join(", ")}`);
+    throw new Error(
+      `Unknown framework: ${framework}. Available: ${Object.keys(HANDLER_REGISTRY).join(", ")}`,
+    );
   }
   return new HandlerClass(sessionId, agentName);
 }

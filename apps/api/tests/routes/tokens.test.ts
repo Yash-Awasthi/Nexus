@@ -39,7 +39,13 @@ describe("POST /api/tokens", () => {
       payload: { name: "ci-token", scopes: ["memory.read", "council"] },
     });
     expect(res.statusCode).toBe(201);
-    const body = res.json<{ id: string; name: string; token: string; prefix: string; scopes: string[] }>();
+    const body = res.json<{
+      id: string;
+      name: string;
+      token: string;
+      prefix: string;
+      scopes: string[];
+    }>();
     expect(body.name).toBe("ci-token");
     expect(body.token.startsWith("nxk_")).toBe(true);
     expect(body.prefix).toBe(body.token.slice(0, 10));

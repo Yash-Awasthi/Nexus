@@ -38,9 +38,14 @@ describe("Glicko2System", () => {
     system.recordMatch({ winnerId: "A", loserId: "B", draw: false, timestamp: 2 });
     system.recordMatch({ winnerId: "B", loserId: "A", draw: false, timestamp: 3 });
 
-    const [aStats] = system.getLeaderboard();
-    expect(aStats.matches).toBe(3);
-    expect(aStats.winRate).toBeCloseTo(2 / 3, 5);
+    // The purpose of this test is cumulative history (matches / winRate),
+    // not leaderboard ordering — look A up explicitly. (A can legitimately
+    // sit below B here: after two wins the RDs have shrunk enough that the
+    // third-match 440-point upset outweighs them, which is correct Glicko-2.)
+    const aStats = system.getLeaderboard().find((s) => s.id === "A");
+    expect(aStats).toBeDefined();
+    expect(aStats!.matches).toBe(3);
+    expect(aStats!.winRate).toBeCloseTo(2 / 3, 5);
   });
 
   it("handles draws as 0.5 outcomes for both players", () => {

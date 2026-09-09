@@ -31,7 +31,9 @@ vi.mock("https", () => {
   return {
     request: (opts: unknown, cb?: (res: unknown) => void) => {
       mockState.lastRequestOptions = opts;
-      const res = makeEmitter() as unknown as { on: (e: string, h: (d?: unknown) => void) => unknown };
+      const res = makeEmitter() as unknown as {
+        on: (e: string, h: (d?: unknown) => void) => unknown;
+      };
       if (cb) cb(res);
       const req = makeEmitter() as unknown as Record<string, unknown>;
       (req as { write: () => void }).write = () => {};
@@ -62,9 +64,7 @@ function makeLLM(opts: {
   fallbackText?: string;
 }): ILanguageModel {
   const objectCalls: ObjectImpl[] = [...(opts.objects ?? [])];
-  const textCalls: Array<(args: { messages: ChatMessage[] }) => string> = [
-    ...(opts.texts ?? []),
-  ];
+  const textCalls: Array<(args: { messages: ChatMessage[] }) => string> = [...(opts.texts ?? [])];
   return {
     modelId: "test:stub",
     async generateObject(args: { messages: ChatMessage[] }): Promise<unknown> {
@@ -173,10 +173,7 @@ describe("WebSearchEngine", () => {
   it("runs a single iteration in speed mode", async () => {
     mockState.body = resultsBody([{ title: "A", url: "https://a.example", content: "a" }]);
     const llm = makeLLM({
-      objects: [
-        async () => classifier({}),
-        async () => ({ queries: ["fast q"] }),
-      ],
+      objects: [async () => classifier({}), async () => ({ queries: ["fast q"] })],
     });
     const engine = new WebSearchEngine({ llm, tavilyApiKey: "k", maxIterations: 5 });
     const out = await engine.search("speed check", { mode: "speed" });
@@ -219,10 +216,7 @@ describe("WebSearchEngine", () => {
   it("tolerates a malformed Tavily response body", async () => {
     mockState.body = "{not json";
     const llm = makeLLM({
-      objects: [
-        async () => classifier({}),
-        async () => ({ queries: ["q"] }),
-      ],
+      objects: [async () => classifier({}), async () => ({ queries: ["q"] })],
     });
     const engine = new WebSearchEngine({ llm, tavilyApiKey: "k" });
     const out = await engine.search("bad body", { mode: "speed" });

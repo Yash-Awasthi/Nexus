@@ -69,7 +69,7 @@ const USER_B = "11111111-2222-3333-4444-555555555555";
 const TASK_OWNED_BY_A = "task-aaaa-0001";
 const TASK_NOT_OWNED = "task-zzzz-9999";
 
-function tokenFor(userId: string, tier: string = "pro"): string {
+function tokenFor(userId: string, tier = "pro"): string {
   return makeJwt(
     { sub: userId, role: "admin", tier, exp: Math.floor(Date.now() / 1000) + 3600 },
     JWT_SECRET,
@@ -183,20 +183,24 @@ afterEach(async () => {
 // ── SSE agent stream: wrong user → 403 ─────────────────────────────────────────
 
 describe("GET /api/v1/sse/agent/:stream (tenant isolation)", () => {
-  it("returns 403 when DB says session is owned by a different user", { timeout: 30_000 }, async () => {
-    setPgRows([{ user_id: USER_B }]);
-    app = await buildWithAuth();
+  it(
+    "returns 403 when DB says session is owned by a different user",
+    { timeout: 30_000 },
+    async () => {
+      setPgRows([{ user_id: USER_B }]);
+      app = await buildWithAuth();
 
-    const res = await injectSse(app, {
-      method: "GET",
-      url: `/api/v1/sse/agent/${TASK_OWNED_BY_A}`,
-      headers: { authorization: `Bearer ${tokenFor(USER_A)}` },
-    });
+      const res = await injectSse(app, {
+        method: "GET",
+        url: `/api/v1/sse/agent/${TASK_OWNED_BY_A}`,
+        headers: { authorization: `Bearer ${tokenFor(USER_A)}` },
+      });
 
-    expect(res.hijacked).toBe(false);
-    expect(res.statusCode).toBe(403);
-    expect(res.body().error).toBe("Not your agent session");
-  });
+      expect(res.hijacked).toBe(false);
+      expect(res.statusCode).toBe(403);
+      expect(res.body().error).toBe("Not your agent session");
+    },
+  );
 
   it(
     "proceeds (hijacks) when session is not yet in DB (row count 0)",

@@ -70,7 +70,13 @@ const expected = (mu: number, muOpp: number, phiOpp: number): number =>
 /**
  * The f(x) function used by the Illinois algorithm (paper step 5.2).
  */
-function makef(delta: number, v: number, a: number, phi: number, tau: number): (x: number) => number {
+function makef(
+  delta: number,
+  v: number,
+  a: number,
+  phi: number,
+  tau: number,
+): (x: number) => number {
   return (x: number): number =>
     (Math.exp(x) * (delta * delta - phi * phi - v - Math.exp(x))) /
       (2 * Math.pow(phi * phi + v + Math.exp(x), 2)) -
@@ -136,12 +142,7 @@ export class Glicko2System {
   private defaultRD: number;
   private defaultVol: number;
 
-  constructor(settings?: {
-    tau?: number;
-    rating?: number;
-    rd?: number;
-    vol?: number;
-  }) {
+  constructor(settings?: { tau?: number; rating?: number; rd?: number; vol?: number }) {
     this.tau = settings?.tau ?? DEFAULT_TAU;
     this.defaultRating = settings?.rating ?? DEFAULT_RATING;
     this.defaultRD = settings?.rd ?? DEFAULT_RD;
@@ -369,7 +370,12 @@ export class Glicko2System {
     player.volatility = sigma;
   }
 
-  private matchHistory(id: string): { matches: number; wins: number; draws: number; losses: number } {
+  private matchHistory(id: string): {
+    matches: number;
+    wins: number;
+    draws: number;
+    losses: number;
+  } {
     const outcomes = this.history.get(id) ?? [];
     let wins = 0;
     let draws = 0;

@@ -204,7 +204,9 @@ export class CrawlSession {
 
   /** Usable = not retired, not blocked, not expired, usage below the cap. */
   isUsable(): boolean {
-    return !this._retired && !this.isBlocked() && !this.isExpired() && !this.isMaxUsageCountReached();
+    return (
+      !this._retired && !this.isBlocked() && !this.isExpired() && !this.isMaxUsageCountReached()
+    );
   }
 
   /** Call after a successful use: +1 usage, heal error score by the decrement. */
@@ -264,7 +266,9 @@ export interface SessionPoolOptions {
   /** Pool-wide session options merged into every new session. */
   sessionOptions?: CrawlSessionOptions;
   /** Custom session factory (may be async). */
-  createSessionFunction?: (options?: { sessionOptions?: CrawlSessionOptions }) => Promise<CrawlSession>;
+  createSessionFunction?: (options?: {
+    sessionOptions?: CrawlSessionOptions;
+  }) => Promise<CrawlSession>;
   sessionReuseStrategy?: SessionReuseStrategy;
 }
 
@@ -299,7 +303,8 @@ export class SessionPool {
     } = options;
     this._maxPoolSize = maxPoolSize;
     this._sessionOptions = sessionOptions;
-    this._createSessionFunction = createSessionFunction ?? (async (o) => new CrawlSession(o?.sessionOptions));
+    this._createSessionFunction =
+      createSessionFunction ?? (async (o) => new CrawlSession(o?.sessionOptions));
     this._sessionReuseStrategy = sessionReuseStrategy;
   }
 
@@ -416,7 +421,9 @@ export class SessionPool {
     }
   }
 
-  private async invokeCreateSessionFunction(perCallOptions?: CrawlSessionOptions): Promise<CrawlSession> {
+  private async invokeCreateSessionFunction(
+    perCallOptions?: CrawlSessionOptions,
+  ): Promise<CrawlSession> {
     const sessionOptions: CrawlSessionOptions = {
       fingerprint: createDefaultSessionFingerprint(),
       ...this._sessionOptions,

@@ -26,9 +26,7 @@ export async function loadProviderModelsIntoRegistry(): Promise<number> {
     const rows = (await db.select().from(providerModels)) as ProviderModelRowLike[];
     return registerFromProviderModelRows(globalRegistry, rows);
   } catch (err) {
-    console.warn(
-      `[models-seed] ⚠ provider_models load skipped: ${(err as Error).message}`,
-    );
+    console.warn(`[models-seed] ⚠ provider_models load skipped: ${(err as Error).message}`);
     return 0;
   }
 }

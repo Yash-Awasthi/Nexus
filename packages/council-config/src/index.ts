@@ -148,7 +148,10 @@ export class CouncilConfigManager {
   private normalizeConfig(raw: Record<string, unknown>): Partial<CouncilConfig> {
     return {
       defaultModels: Array.isArray(raw.defaultModels) ? raw.defaultModels : undefined,
-      reasoningEffort: typeof raw.reasoningEffort === "string" ? raw.reasoningEffort as ReasoningEffort : undefined,
+      reasoningEffort:
+        typeof raw.reasoningEffort === "string"
+          ? (raw.reasoningEffort as ReasoningEffort)
+          : undefined,
       maxTokens: typeof raw.maxTokens === "number" ? raw.maxTokens : undefined,
       temperature: typeof raw.temperature === "number" ? raw.temperature : undefined,
     };
@@ -162,7 +165,8 @@ const DEFAULT_PERSONAS: Persona[] = [
     id: "security",
     name: "Security Analyst",
     description: "Focuses on vulnerabilities, attack vectors, and security best practices",
-    systemPrompt: "You are a security analyst. Review the given code or architecture for vulnerabilities, attack vectors, and security best practices. Be specific about CVEs, OWASP Top 10, and common pitfalls.",
+    systemPrompt:
+      "You are a security analyst. Review the given code or architecture for vulnerabilities, attack vectors, and security best practices. Be specific about CVEs, OWASP Top 10, and common pitfalls.",
     focusAreas: ["vulnerabilities", "authentication", "authorization", "data protection"],
     preferredModels: ["anthropic/claude-sonnet-4-20250514"],
   },
@@ -170,7 +174,8 @@ const DEFAULT_PERSONAS: Persona[] = [
     id: "performance",
     name: "Performance Engineer",
     description: "Focuses on scalability, latency, and resource optimization",
-    systemPrompt: "You are a performance engineer. Review the given code or architecture for scalability issues, latency bottlenecks, and resource optimization opportunities. Provide specific metrics and benchmarks.",
+    systemPrompt:
+      "You are a performance engineer. Review the given code or architecture for scalability issues, latency bottlenecks, and resource optimization opportunities. Provide specific metrics and benchmarks.",
     focusAreas: ["scalability", "latency", "memory", "CPU", "caching"],
     preferredModels: ["openai/gpt-4o"],
   },
@@ -178,14 +183,16 @@ const DEFAULT_PERSONAS: Persona[] = [
     id: "architect",
     name: "Software Architect",
     description: "Focuses on design patterns, modularity, and maintainability",
-    systemPrompt: "You are a software architect. Review the given code or architecture for design patterns, modularity, coupling, cohesion, and long-term maintainability. Consider separation of concerns and SOLID principles.",
+    systemPrompt:
+      "You are a software architect. Review the given code or architecture for design patterns, modularity, coupling, cohesion, and long-term maintainability. Consider separation of concerns and SOLID principles.",
     focusAreas: ["design patterns", "modularity", "coupling", "maintainability"],
   },
   {
     id: "reviewer",
     name: "Code Reviewer",
     description: "Focuses on code quality, readability, and best practices",
-    systemPrompt: "You are a senior code reviewer. Review the given code for readability, naming conventions, error handling, test coverage, and adherence to best practices. Be constructive and specific.",
+    systemPrompt:
+      "You are a senior code reviewer. Review the given code for readability, naming conventions, error handling, test coverage, and adherence to best practices. Be constructive and specific.",
     focusAreas: ["readability", "naming", "error handling", "testing"],
   },
 ];

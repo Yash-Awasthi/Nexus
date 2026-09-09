@@ -85,7 +85,7 @@ export function recordToolTranscript(
     // Debate protocol output (standalone debate__run + council_debate share it).
     if (parsed.converged !== undefined || Array.isArray(parsed.finalAnswers)) {
       const answers = Array.isArray(parsed.finalAnswers)
-        ? (parsed.finalAnswers as Array<{ agent?: unknown; answer?: unknown }>)
+        ? (parsed.finalAnswers as { agent?: unknown; answer?: unknown }[])
         : [];
       for (const fa of answers) {
         recordStage(t, { name: `answer:${str(fa.agent) || "agent"}`, answer: str(fa.answer) });
@@ -184,7 +184,11 @@ export function buildCouncilRunTranscript(input: CouncilRunInput): CouncilTransc
   finalizeTranscript(transcript, {
     startedAt,
     metrics: { deliberationMs: Date.now() - startedAt },
-    modelCallTraces: votes.map((v) => ({ model: v.model, provider: v.provider, latencyMs: v.latencyMs })),
+    modelCallTraces: votes.map((v) => ({
+      model: v.model,
+      provider: v.provider,
+      latencyMs: v.latencyMs,
+    })),
   });
 
   return transcript;
@@ -202,7 +206,12 @@ export const councilTranscriptJson = (transcript: CouncilTranscript): string =>
 export function councilTranscriptEvent(
   signalId: string | undefined,
   transcript: CouncilTranscript,
-): { level: "info"; event: "council.transcript"; signalId?: string; transcript: CouncilTranscript } {
+): {
+  level: "info";
+  event: "council.transcript";
+  signalId?: string;
+  transcript: CouncilTranscript;
+} {
   return {
     level: "info",
     event: "council.transcript",
@@ -308,7 +317,10 @@ export function maskModelIdentity(transcript: CouncilTranscript): CouncilTranscr
     if (stage.model !== undefined) stage.model = repl(voter, stage.model);
   }
   clone.dissent = clone.dissent.map((d) => repl(voter, d));
-  clone.modelCallTraces = clone.modelCallTraces.map((tr) => ({ ...tr, model: repl(voter, tr.model) }));
+  clone.modelCallTraces = clone.modelCallTraces.map((tr) => ({
+    ...tr,
+    model: repl(voter, tr.model),
+  }));
   return clone;
 }
 

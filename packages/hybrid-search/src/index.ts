@@ -212,7 +212,12 @@ export class HybridSearchEngine {
           });
 
     if (opts.reranker) {
-      const ranked = fused.map((h) => ({ id: h.id, text: h.text ?? "", score: h.score, metadata: h.metadata }));
+      const ranked = fused.map((h) => ({
+        id: h.id,
+        text: h.text ?? "",
+        score: h.score,
+        metadata: h.metadata,
+      }));
       const res = await opts.reranker.rerank(query, ranked, { topK: limit });
       return { hits: res.documents, vectorHits, bm25Hits, durationMs: Date.now() - start };
     }

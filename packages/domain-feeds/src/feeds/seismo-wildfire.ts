@@ -143,4 +143,3 @@ export class WildfireFeed extends FeedAdapter<WildfireEvent> {
     }
   }
 }
-

@@ -15,7 +15,11 @@ interface FakeServerOptions {
 }
 
 /** Canned transport: serves fixed tools and records calls. */
-function fakeServer(name: string, tools: McpToolDefinition[], opts: FakeServerOptions = {}): {
+function fakeServer(
+  name: string,
+  tools: McpToolDefinition[],
+  opts: FakeServerOptions = {},
+): {
   transport: McpTransport;
   client: McpClient;
 } {
@@ -23,7 +27,11 @@ function fakeServer(name: string, tools: McpToolDefinition[], opts: FakeServerOp
   const transport: McpTransport = {
     async send(method, params) {
       if (method === "initialize") {
-        return { serverInfo: { name, version: "1.0.0" }, capabilities: { tools: {} }, protocolVersion: "2024-11-05" };
+        return {
+          serverInfo: { name, version: "1.0.0" },
+          capabilities: { tools: {} },
+          protocolVersion: "2024-11-05",
+        };
       }
       if (method === "tools/list") {
         if (opts.failList) throw new Error(`${name} is down`);
@@ -32,7 +40,9 @@ function fakeServer(name: string, tools: McpToolDefinition[], opts: FakeServerOp
       if (method === "tools/call") {
         const p = (params ?? {}) as { name?: unknown; arguments?: unknown };
         const toolName = String(p.name);
-        const args = (typeof p.arguments === "object" && p.arguments !== null ? p.arguments : {}) as Record<string, unknown>;
+        const args = (
+          typeof p.arguments === "object" && p.arguments !== null ? p.arguments : {}
+        ) as Record<string, unknown>;
         calls.push({ tool: toolName, args });
         if (opts.failCallFor === toolName) throw new Error(`${toolName} exploded`);
         opts.onCall?.(toolName, args);
@@ -51,9 +61,13 @@ describe("McpProxyClient", () => {
   it("rejects duplicate server names", () => {
     const { client: a } = fakeServer("a", []);
     const { client: b } = fakeServer("a", []);
-    expect(() => new McpProxyClient([{ name: "a", client: a }, { name: "a", client: b }])).toThrow(
-      /duplicate server name/,
-    );
+    expect(
+      () =>
+        new McpProxyClient([
+          { name: "a", client: a },
+          { name: "a", client: b },
+        ]),
+    ).toThrow(/duplicate server name/);
   });
 
   it("merges unique tools across servers keeping their original names", async () => {
@@ -76,11 +90,7 @@ describe("McpProxyClient", () => {
       { name: "beta", client: b },
     ]);
     const tools = await proxy.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual([
-      "alpha.status",
-      "beta.status",
-      "unique-beta",
-    ]);
+    expect(tools.map((t) => t.name).sort()).toEqual(["alpha.status", "beta.status", "unique-beta"]);
   });
 
   it("routes callTool to the owning server with the original tool name", async () => {

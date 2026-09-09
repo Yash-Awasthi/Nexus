@@ -160,9 +160,7 @@ export class MemoryJobStore implements JobStore {
   async list(status?: JobStatus, limit = 100): Promise<InferenceJob[]> {
     const all = [...this.jobs.values()];
     const filtered = status ? all.filter((j) => j.status === status) : all;
-    return filtered
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, limit);
+    return filtered.sort((a, b) => b.createdAt - a.createdAt).slice(0, limit);
   }
 
   async delete(id: string): Promise<void> {
@@ -207,7 +205,10 @@ export interface KVStore {
 export class KVJobStore implements JobStore {
   private prefix: string;
 
-  constructor(private kv: KVStore, opts?: { keyPrefix?: string }) {
+  constructor(
+    private kv: KVStore,
+    opts?: { keyPrefix?: string },
+  ) {
     this.prefix = opts?.keyPrefix ?? "async-job:";
   }
 
@@ -245,24 +246,27 @@ export class KVJobStore implements JobStore {
       return jobs.filter((j): j is InferenceJob => j !== undefined);
     }
     const allKeys = await this.kv.keys(`${this.prefix}*[!]idx*`);
-    const jobs = await Promise.all(allKeys.slice(0, limit).map((k) => this.kv.get<InferenceJob>(k)));
+    const jobs = await Promise.all(
+      allKeys.slice(0, limit).map((k) => this.kv.get<InferenceJob>(k)),
+    );
     return jobs.filter((j): j is InferenceJob => j !== undefined);
   }
 
   async delete(id: string): Promise<void> {
     const job = await this.get(id);
     if (job) {
-      await Promise.all([
-        this.kv.delete(this.key(id)),
-        this.kv.delete(this.indexKey(job.status)),
-      ]);
+      await Promise.all([this.kv.delete(this.key(id)), this.kv.delete(this.indexKey(job.status))]);
     }
   }
 
   async countByStatus(): Promise<Record<JobStatus, number>> {
     const statuses: JobStatus[] = ["queued", "processing", "completed", "failed", "cancelled"];
     const counts: Record<JobStatus, number> = {
-      queued: 0, processing: 0, completed: 0, failed: 0, cancelled: 0,
+      queued: 0,
+      processing: 0,
+      completed: 0,
+      failed: 0,
+      cancelled: 0,
     };
     for (const s of statuses) {
       const ids = await this.kv.keys(`${this.indexKey(s)}*`);
@@ -326,9 +330,7 @@ export interface WebhookNotifier {
 
 /** HTTP webhook notifier — POSTs job completion to a URL. */
 export class HttpWebhookNotifier implements WebhookNotifier {
-  constructor(
-    private fetchFn: typeof fetch = fetch,
-  ) {}
+  constructor(private fetchFn: typeof fetch = fetch) {}
 
   async notify(job: InferenceJob): Promise<void> {
     const webhookUrl = (job.request.metadata as Record<string, string>)?.webhookUrl;
@@ -391,7 +393,10 @@ export class InferenceQueue {
   private listeners: JobEventListener[] = [];
   private cleanupTimer?: ReturnType<typeof setInterval>;
   /** Map of job ID → long-poll resolvers */
-  private waiters = new Map<string, { resolve: () => void; timer: ReturnType<typeof setTimeout> }[]>();
+  private waiters = new Map<
+    string,
+    { resolve: () => void; timer: ReturnType<typeof setTimeout> }[]
+  >();
 
   constructor(config: InferenceQueueConfig, store?: JobStore) {
     this.config = config;
@@ -411,10 +416,7 @@ export class InferenceQueue {
   }
 
   /** Submit an inference request. Returns the job ID immediately. */
-  async submit(
-    request: InferenceRequest,
-    opts: SubmitOptions = {},
-  ): Promise<{ jobId: string }> {
+  async submit(request: InferenceRequest, opts: SubmitOptions = {}): Promise<{ jobId: string }> {
     // Rate limit check
     if (this.config.rateLimiter && opts.identity) {
       const allowed = await this.config.rateLimiter.allow(opts.identity);
@@ -622,17 +624,27 @@ export class InferenceQueue {
 
   private emit(event: JobEvent): void {
     for (const listener of this.listeners) {
-      try { listener(event); } catch { /* isolate */ }
+      try {
+        listener(event);
+      } catch {
+        /* isolate */
+      }
     }
   }
 
-  private _addWaiter(id: string, waiter: { resolve: () => void; timer: ReturnType<typeof setTimeout> }): void {
+  private _addWaiter(
+    id: string,
+    waiter: { resolve: () => void; timer: ReturnType<typeof setTimeout> },
+  ): void {
     const list = this.waiters.get(id) ?? [];
     list.push(waiter);
     this.waiters.set(id, list);
   }
 
-  private _removeWaiter(id: string, waiter: { resolve: () => void; timer: ReturnType<typeof setTimeout> }): void {
+  private _removeWaiter(
+    id: string,
+    waiter: { resolve: () => void; timer: ReturnType<typeof setTimeout> },
+  ): void {
     const list = this.waiters.get(id);
     if (list) {
       const idx = list.indexOf(waiter);

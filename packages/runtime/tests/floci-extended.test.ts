@@ -63,8 +63,8 @@ describe("dispatchExtendedAction", () => {
 
   it("throws on a non-ok HTTP response", async () => {
     stubFetch(500, { message: "boom" });
-    await expect(
-      dispatchExtendedAction("create_s3_bucket", { bucketName: "b" }),
-    ).rejects.toThrow(/HTTP 500/);
+    await expect(dispatchExtendedAction("create_s3_bucket", { bucketName: "b" })).rejects.toThrow(
+      /HTTP 500/,
+    );
   });
 });

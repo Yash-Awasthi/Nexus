@@ -92,9 +92,12 @@ export async function makeCommunitySummarizer(
   return async (community) => {
     const names = community.entities.map((e) => e.name);
     const facts = [
-      ...community.entities.map((e) => `${e.name} (${e.type}): ${(e.descriptions[0] ?? "no description").slice(0, 200)}`),
+      ...community.entities.map(
+        (e) => `${e.name} (${e.type}): ${(e.descriptions[0] ?? "no description").slice(0, 200)}`,
+      ),
       ...community.relations.map(
-        (r) => `${r.source} -[${r.type}]-> ${r.target}${r.descriptions[0] ? `: ${r.descriptions[0].slice(0, 200)}` : ""}`,
+        (r) =>
+          `${r.source} -[${r.type}]-> ${r.target}${r.descriptions[0] ? `: ${r.descriptions[0].slice(0, 200)}` : ""}`,
       ),
     ];
     const prompt = [
@@ -111,11 +114,13 @@ export async function makeCommunitySummarizer(
       messages: [{ role: "user", content: prompt }],
       maxTokens: 1024,
     });
-    return parseSummaryJson(resp.content) ?? {
-      title: names.slice(0, 8).join(", ") || "empty community",
-      summary: resp.content,
-      findings: [],
-    };
+    return (
+      parseSummaryJson(resp.content) ?? {
+        title: names.slice(0, 8).join(", ") || "empty community",
+        summary: resp.content,
+        findings: [],
+      }
+    );
   };
 }
 
@@ -286,14 +291,21 @@ export async function buildGraphRagIndex(
     const id = `community-${i}`;
     communities.push({ id, entityNames: communityEntities.map((e) => e.name) });
 
-    const summary = await summarizer({ id, entities: communityEntities, relations: communityRelations });
+    const summary = await summarizer({
+      id,
+      entities: communityEntities,
+      relations: communityRelations,
+    });
     reports.push({
       id,
       communityId: id,
       level: 0,
       title: summary.title,
       summary: summary.summary,
-      fullContent: communityEntities.map((e) => e.name).slice(0, CAP).join(", "),
+      fullContent: communityEntities
+        .map((e) => e.name)
+        .slice(0, CAP)
+        .join(", "),
       rank: communityEntities.length,
       rating: 0,
       findings: summary.findings,
@@ -376,13 +388,19 @@ export function mergeGraphEntities(
           ...(targetEntity?.descriptions ?? []),
           ...sourceEntities.flatMap((e) => e.descriptions),
         ])
-      : (targetEntity?.descriptions.length ? targetEntity.descriptions : (sourceEntities[0]?.descriptions ?? []));
-  const mentionTotal = (targetEntity?.mentions ?? 0) + sourceEntities.reduce((s, e) => s + e.mentions, 0);
+      : targetEntity?.descriptions.length
+        ? targetEntity.descriptions
+        : (sourceEntities[0]?.descriptions ?? []);
+  const mentionTotal =
+    (targetEntity?.mentions ?? 0) + sourceEntities.reduce((s, e) => s + e.mentions, 0);
   const mergedEntity: IndexedEntity = {
     name: mergedName,
     type: targetEntity ? targetEntity.type : (sourceEntities[0]!.type ?? "entity"),
     descriptions: mergedDescriptions,
-    mentions: mentionsStrategy === "sum" ? mentionTotal : Math.max(targetEntity?.mentions ?? 0, ...sourceEntities.map((e) => e.mentions)),
+    mentions:
+      mentionsStrategy === "sum"
+        ? mentionTotal
+        : Math.max(targetEntity?.mentions ?? 0, ...sourceEntities.map((e) => e.mentions)),
   };
 
   // ── entity list: drop sources, replace-or-append the target ───────────────

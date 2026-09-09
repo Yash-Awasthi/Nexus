@@ -289,11 +289,7 @@ type StepDef = Record<string, unknown>;
  * pass-through conditions; everything else is an explicit pass-through fn
  * step so the trace shows every node.
  */
-function compileSteps(
-  nodes: Node[],
-  edges: Edge[],
-  models: GatewayModel[],
-): StepDef[] {
+function compileSteps(nodes: Node[], edges: Edge[], models: GatewayModel[]): StepDef[] {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const indeg = new Map<string, number>();
   const adj = new Map<string, string[]>();
@@ -681,9 +677,7 @@ function WorkflowEditor({
         })
         .join("\n");
       const finalResult =
-        typeof data.result === "string"
-          ? data.result
-          : JSON.stringify(data.result, null, 2);
+        typeof data.result === "string" ? data.result : JSON.stringify(data.result, null, 2);
       setRunOutput(
         `Workflow completed successfully.\n\nFinal result:\n${finalResult}\n\nStep trace:\n${trace || "(no steps executed)"}`,
       );
@@ -935,37 +929,32 @@ export default function WorkflowsPage() {
 
   // Run a workflow straight from the list card. Refetches the list afterwards
   // so the server-side status/lastRunAt updates become visible.
-  const runWorkflowFromList = useCallback(
-    async (wf: Workflow) => {
-      if (!wf.steps || wf.steps.length === 0) return;
-      try {
-        const res = await fetch(`/api/workflows/${wf.id}/run`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ input: { query: wf.name } }),
-        });
-        const data = (await res.json().catch(() => ({}))) as {
-          status?: string;
-          error?: string;
-        };
-        if (!res.ok || data.status === "error") {
-          throw new Error(data.error ?? `server responded ${res.status}`);
-        }
-        const fresh = await fetch("/api/workflows?limit=100").then((r) => r.json());
-        const raw: Record<string, unknown>[] = Array.isArray(fresh)
-          ? fresh
-          : ((fresh?.workflows ?? []) as Record<string, unknown>[]);
-        setWorkflows(raw.map(normalizeWorkflow));
-      } catch (err) {
-        const reason = err instanceof Error ? err.message : String(err);
-        setWorkflows((prev) =>
-          prev.map((w) => (w.id === wf.id ? { ...w, status: "failed" } : w)),
-        );
-        console.error(`workflow run failed: ${reason}`);
+  const runWorkflowFromList = useCallback(async (wf: Workflow) => {
+    if (!wf.steps || wf.steps.length === 0) return;
+    try {
+      const res = await fetch(`/api/workflows/${wf.id}/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: { query: wf.name } }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        status?: string;
+        error?: string;
+      };
+      if (!res.ok || data.status === "error") {
+        throw new Error(data.error ?? `server responded ${res.status}`);
       }
-    },
-    [],
-  );
+      const fresh = await fetch("/api/workflows?limit=100").then((r) => r.json());
+      const raw: Record<string, unknown>[] = Array.isArray(fresh)
+        ? fresh
+        : ((fresh?.workflows ?? []) as Record<string, unknown>[]);
+      setWorkflows(raw.map(normalizeWorkflow));
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      setWorkflows((prev) => prev.map((w) => (w.id === wf.id ? { ...w, status: "failed" } : w)));
+      console.error(`workflow run failed: ${reason}`);
+    }
+  }, []);
 
   const handleCreateWorkflow = (name: string, description: string) => {
     const newWorkflow: Workflow = {
@@ -1074,7 +1063,11 @@ export default function WorkflowsPage() {
                         size="icon"
                         className="size-6"
                         onClick={() => runWorkflowFromList(wf)}
-                        title={wf.steps?.length ? "Run workflow" : "No steps saved yet — open Edit to add nodes"}
+                        title={
+                          wf.steps?.length
+                            ? "Run workflow"
+                            : "No steps saved yet — open Edit to add nodes"
+                        }
                       >
                         <Play className="size-3" />
                       </Button>

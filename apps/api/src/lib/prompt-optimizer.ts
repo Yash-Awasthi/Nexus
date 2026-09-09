@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Prompt Optimizer — reduces token usage and improves LLM response quality.
  *
@@ -21,7 +22,7 @@ export interface PromptMetrics {
 export interface CachedResponse {
   id: string;
   promptHash: string;
-  promptEmbedding: number[];  // simplified embedding
+  promptEmbedding: number[]; // simplified embedding
   response: string;
   model: string;
   tokens: number;
@@ -106,11 +107,11 @@ export function compressPrompt(prompt: string): OptimizationResult {
 // ── Response Cache ───────────────────────────────────────────────────────────
 
 export class ResponseCache {
-  private cache: Map<string, CachedResponse> = new Map();
+  private cache = new Map<string, CachedResponse>();
   private maxEntries: number;
   private ttlMs: number;
 
-  constructor(maxEntries: number = 1000, ttlMs: number = 3600_000) {
+  constructor(maxEntries = 1000, ttlMs = 3600_000) {
     this.maxEntries = maxEntries;
     this.ttlMs = ttlMs;
   }
@@ -152,7 +153,7 @@ export class ResponseCache {
 
     const hash = hashPrompt(prompt, model);
     this.cache.set(hash, {
-      id: `cache-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      id: `cache-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       promptHash: hash,
       promptEmbedding: simpleEmbed(prompt),
       response,
@@ -201,7 +202,7 @@ export interface FewShotExample {
 export function selectFewShotExamples(
   examples: FewShotExample[],
   prompt: string,
-  maxExamples: number = 3,
+  maxExamples = 3,
 ): FewShotExample[] {
   const promptWords = new Set(prompt.toLowerCase().split(/\s+/));
 

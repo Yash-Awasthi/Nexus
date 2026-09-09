@@ -10,17 +10,17 @@ development see the [README Quick Start](../README.md#quick-start). For day-2 op
 
 Minimum required to start:
 
-| Variable            | Description                                                    |
-| ------------------- | ------------------------------------------------------------- |
-| `NEXUS_API_KEY`     | Master API key for all `/api/v1/*` requests                   |
-| `DATABASE_URL`      | PostgreSQL connection string (with pgvector)                  |
-| `REDIS_URL`         | Redis connection string for BullMQ (in-memory fallback if unset) |
-| `NEXUS_JWT_SECRET`  | HS256 signing secret for user auth tokens (default alg)         |
-| `NEXUS_JWT_ALG`     | `HS256` (default, shared secret) or `RS256` (asymmetric key pair)  |
+| Variable                                         | Description                                                                                                                                                                                     |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXUS_API_KEY`                                  | Master API key for all `/api/v1/*` requests                                                                                                                                                     |
+| `DATABASE_URL`                                   | PostgreSQL connection string (with pgvector)                                                                                                                                                    |
+| `REDIS_URL`                                      | Redis connection string for BullMQ (in-memory fallback if unset)                                                                                                                                |
+| `NEXUS_JWT_SECRET`                               | HS256 signing secret for user auth tokens (default alg)                                                                                                                                         |
+| `NEXUS_JWT_ALG`                                  | `HS256` (default, shared secret) or `RS256` (asymmetric key pair)                                                                                                                               |
 | `NEXUS_JWT_PRIVATE_KEY` / `NEXUS_JWT_PUBLIC_KEY` | RSA key pair (PEM) — required for `NEXUS_JWT_ALG=RS256`; issuance signs with the private key, verification is alg-pinned to the public key so downstream services never hold the signing secret |
-| `NEXUS_AUDIT_KEY`   | HMAC key for the chained audit log (64-hex / 32 bytes)        |
-| `NEXUS_SECRETS_KEY` | AES key for BYOK provider-key encryption (64-hex / 32 bytes)  |
-| `GROQ_API_KEY`      | Server-side default LLM provider (or any other driver key)    |
+| `NEXUS_AUDIT_KEY`                                | HMAC key for the chained audit log (64-hex / 32 bytes)                                                                                                                                          |
+| `NEXUS_SECRETS_KEY`                              | AES key for BYOK provider-key encryption (64-hex / 32 bytes)                                                                                                                                    |
+| `GROQ_API_KEY`                                   | Server-side default LLM provider (or any other driver key)                                                                                                                                      |
 
 Full reference: [`.env.example`](../.env.example).
 

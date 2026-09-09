@@ -84,7 +84,11 @@ const AVAILABLE_PROVIDERS: Provider[] = [
     apiKeyPlaceholder: "AI...",
     models: [
       { id: "gemini-3.6-flash", name: "Gemini 3.6 Flash", description: "Frontier, GA and cheap" },
-      { id: "gemini-3.5-flash-lite", name: "Gemini 3.5 Flash-Lite", description: "Fastest and cheapest" },
+      {
+        id: "gemini-3.5-flash-lite",
+        name: "Gemini 3.5 Flash-Lite",
+        description: "Fastest and cheapest",
+      },
       { id: "gemini-3.1-pro", name: "Gemini 3.1 Pro", description: "Most capable" },
     ],
   },
@@ -144,9 +148,7 @@ const AVAILABLE_PROVIDERS: Provider[] = [
     description: "Ultra-fast wafer-scale inference",
     icon: "cerebras",
     apiKeyPlaceholder: "csk-...",
-    models: [
-      { id: "llama-3.3-70b", name: "Llama 3.3 70B", description: "Fast inference" },
-    ],
+    models: [{ id: "llama-3.3-70b", name: "Llama 3.3 70B", description: "Fast inference" }],
   },
   {
     id: "cohere",

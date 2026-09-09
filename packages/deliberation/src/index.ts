@@ -235,10 +235,7 @@ export class DeliberationEngine {
       rounds.push({
         round: round + 1,
         challenger,
-        responses: [
-          { speakerId: challenger, content: challengeResp.content },
-          ...responses,
-        ],
+        responses: [{ speakerId: challenger, content: challengeResp.content }, ...responses],
       });
 
       // Update claims for next round
@@ -256,7 +253,9 @@ export class DeliberationEngine {
     debateRounds: DebateRound[],
   ): Promise<string> {
     const blindSummary = blindPhase
-      .map((r) => `${r.speakerId} (confidence: ${r.confidence ?? "N/A"}): ${r.content.slice(0, 300)}`)
+      .map(
+        (r) => `${r.speakerId} (confidence: ${r.confidence ?? "N/A"}): ${r.content.slice(0, 300)}`,
+      )
       .join("\n\n");
 
     const debateSummary = debateRounds

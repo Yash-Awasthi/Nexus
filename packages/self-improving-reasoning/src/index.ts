@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @nexus/self-improving-reasoning — Self-improving Chain-of-Thought reasoning pipeline.
  *
@@ -126,10 +127,7 @@ export function createLlmEvaluator(
   temperature = 0,
 ): (problem: string, trace: string) => Promise<TraceEvaluation> {
   return async (problem: string, trace: string): Promise<TraceEvaluation> => {
-    const prompt = EVAL_PROMPT.replace("{problem}", problem).replace(
-      "{trace}",
-      trace,
-    );
+    const prompt = EVAL_PROMPT.replace("{problem}", problem).replace("{trace}", trace);
 
     const response = await llm(prompt);
     const evaluation = parseEvaluation(response);
@@ -179,10 +177,7 @@ Please try again, addressing the feedback. Provide an improved solution that fix
  */
 export class SelfImprovingReasoningPipeline {
   private config: Required<PipelineConfig>;
-  private evaluator: (
-    problem: string,
-    trace: string,
-  ) => Promise<TraceEvaluation>;
+  private evaluator: (problem: string, trace: string) => Promise<TraceEvaluation>;
 
   constructor(config: PipelineConfig) {
     this.config = {
@@ -206,10 +201,7 @@ export class SelfImprovingReasoningPipeline {
     let bestScore = -1;
 
     // Step 1: Initial generation
-    const initialPrompt = INITIAL_TRACE_PROMPT.replace(
-      "{problem}",
-      problem.problem,
-    );
+    const initialPrompt = INITIAL_TRACE_PROMPT.replace("{problem}", problem.problem);
     const startTime = Date.now();
     let trace = await this.config.llm(initialPrompt);
     let evaluation = await this.evaluator(problem.problem, trace);
@@ -233,8 +225,7 @@ export class SelfImprovingReasoningPipeline {
       }
 
       const iterStart = Date.now();
-      const improvePrompt = IMPROVEMENT_PROMPT
-        .replace("{problem}", problem.problem)
+      const improvePrompt = IMPROVEMENT_PROMPT.replace("{problem}", problem.problem)
         .replace("{previousTrace}", bestTrace)
         .replace("{feedback}", evaluation.feedback);
 
@@ -279,10 +270,7 @@ export class SelfImprovingReasoningPipeline {
   /**
    * Run the pipeline on multiple problems.
    */
-  async solveBatch(
-    problems: ReasoningProblem[],
-    concurrency = 3,
-  ): Promise<ProblemResult[]> {
+  async solveBatch(problems: ReasoningProblem[], concurrency = 3): Promise<ProblemResult[]> {
     const results: ProblemResult[] = [];
     const chunks: ReasoningProblem[][] = [];
 
@@ -291,9 +279,7 @@ export class SelfImprovingReasoningPipeline {
     }
 
     for (const chunk of chunks) {
-      const chunkResults = await Promise.all(
-        chunk.map((p) => this.solve(p)),
-      );
+      const chunkResults = await Promise.all(chunk.map((p) => this.solve(p)));
       results.push(...chunkResults);
     }
 
@@ -311,12 +297,10 @@ export class SelfImprovingReasoningPipeline {
     answerAccuracy?: number;
   } {
     const qualityMetCount = results.filter((r) => r.qualityMet).length;
-    const avgIterations =
-      results.reduce((s, r) => s + r.totalIterations, 0) / results.length;
+    const avgIterations = results.reduce((s, r) => s + r.totalIterations, 0) / results.length;
     const avgScore =
       results.reduce(
-        (s, r) =>
-          s + (r.history[r.history.length - 1]?.evaluation.overallScore ?? 0),
+        (s, r) => s + (r.history[r.history.length - 1]?.evaluation.overallScore ?? 0),
         0,
       ) / results.length;
 
@@ -484,9 +468,7 @@ export class RolePlayingSociety {
       userMessage = `Thank you. Please continue.`;
     }
 
-    const lastAssistant = messages
-      .filter((m) => m.role === "assistant")
-      .pop();
+    const lastAssistant = messages.filter((m) => m.role === "assistant").pop();
 
     return {
       task,
@@ -550,8 +532,7 @@ export class CriticAgent {
 
   constructor(config: CriticConfig) {
     this.config = {
-      criteria:
-        "Evaluate the quality, accuracy, completeness, and clarity of the response.",
+      criteria: "Evaluate the quality, accuracy, completeness, and clarity of the response.",
       ...config,
     };
   }
@@ -559,10 +540,7 @@ export class CriticAgent {
   /**
    * Evaluate a candidate output.
    */
-  async evaluate(
-    task: string,
-    candidate: string,
-  ): Promise<CriticEvaluation> {
+  async evaluate(task: string, candidate: string): Promise<CriticEvaluation> {
     const prompt = `You are a critical evaluator. Your job is to carefully assess the quality of a response.
 
 Task: ${task}
@@ -592,9 +570,7 @@ Provide your evaluation in this exact JSON format:
     task: string,
     candidates: string[],
   ): Promise<{ index: number; evaluation: CriticEvaluation }> {
-    const evaluations = await Promise.all(
-      candidates.map((c) => this.evaluate(task, c)),
-    );
+    const evaluations = await Promise.all(candidates.map((c) => this.evaluate(task, c)));
 
     let bestIdx = 0;
     let bestScore = -1;
@@ -618,9 +594,7 @@ Provide your evaluation in this exact JSON format:
           score: Math.max(0, Math.min(1, parsed.score ?? 0.5)),
           strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
           weaknesses: Array.isArray(parsed.weaknesses) ? parsed.weaknesses : [],
-          suggestions: Array.isArray(parsed.suggestions)
-            ? parsed.suggestions
-            : [],
+          suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : [],
           detailedFeedback: parsed.detailedFeedback ?? text,
         };
       }

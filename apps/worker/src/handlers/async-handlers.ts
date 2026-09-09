@@ -215,7 +215,13 @@ export async function handlePortCongestionRefreshJob(
     }),
   );
 
-  return { domain: "port-congestion", events: events.length, bySeverity, alerted, refreshedAt: new Date().toISOString() };
+  return {
+    domain: "port-congestion",
+    events: events.length,
+    bySeverity,
+    alerted,
+    refreshedAt: new Date().toISOString(),
+  };
 }
 
 // ── feeds:refresh ──────────────────────────────────────────────────────────────

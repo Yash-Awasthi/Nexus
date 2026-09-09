@@ -180,7 +180,13 @@ function MissionProgress({
           <span className="text-sm font-medium capitalize">{mission.status}</span>
           {mission.lastReview && (
             <Badge
-              variant={mission.lastReview.unparsed ? "secondary" : mission.lastReview.verdict === "accept" ? "default" : "destructive"}
+              variant={
+                mission.lastReview.unparsed
+                  ? "secondary"
+                  : mission.lastReview.verdict === "accept"
+                    ? "default"
+                    : "destructive"
+              }
               className="text-[10px]"
             >
               {mission.lastReview.unparsed
@@ -190,7 +196,8 @@ function MissionProgress({
           )}
           {mission.memoryFrom && (
             <Badge variant="secondary" className="text-[10px]">
-              continuing from {mission.memoryFrom.missionId.slice(-8)} — {mission.memoryFrom.outcome}
+              continuing from {mission.memoryFrom.missionId.slice(-8)} —{" "}
+              {mission.memoryFrom.outcome}
             </Badge>
           )}
         </div>
@@ -1088,7 +1095,12 @@ export default function SkillsPage() {
 
   useEffect(() => {
     // Poll the mission while it's live; stop when it reaches a terminal state.
-    if (!runMission || runMission.status === "completed" || runMission.status === "failed" || runMission.status === "aborted") {
+    if (
+      !runMission ||
+      runMission.status === "completed" ||
+      runMission.status === "failed" ||
+      runMission.status === "aborted"
+    ) {
       return;
     }
     const t = setInterval(() => {
@@ -1390,7 +1402,9 @@ export default function SkillsPage() {
                     </Badge>
                   ))}
                 </div>
-                <div className="flex items-center gap-2">                  <Button
+                <div className="flex items-center gap-2">
+                  {" "}
+                  <Button
                     size="sm"
                     variant="outline"
                     className="flex-1 gap-2 text-xs"
@@ -1517,8 +1531,8 @@ export default function SkillsPage() {
                 : `Run Skill${runSkill ? `: ${runSkill.name}` : ""}`}
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Executes the {runComposite ? "composite's" : "skill's"} code in the sandbox through the
-              mission harness — plan, run, inspect output, recover from failures, and verify.
+              Executes the {runComposite ? "composite's" : "skill's"} code in the sandbox through
+              the mission harness — plan, run, inspect output, recover from failures, and verify.
               You can watch it live below.
             </DialogDescription>
           </DialogHeader>
@@ -1561,7 +1575,11 @@ export default function SkillsPage() {
                 >
                   Cancel
                 </Button>
-                <Button onClick={() => void handleRunSkill()} disabled={runLoading} className="gap-2">
+                <Button
+                  onClick={() => void handleRunSkill()}
+                  disabled={runLoading}
+                  className="gap-2"
+                >
                   {runLoading ? (
                     <>
                       <Loader2 className="size-4 animate-spin" />
@@ -1631,9 +1649,7 @@ export default function SkillsPage() {
                     type="checkbox"
                     className="size-3.5 accent-primary"
                     checked={compressForm.polish}
-                    onChange={(e) =>
-                      setCompressForm((f) => ({ ...f, polish: e.target.checked }))
-                    }
+                    onChange={(e) => setCompressForm((f) => ({ ...f, polish: e.target.checked }))}
                   />
                   AI-polish the composite (uses LLM tokens)
                 </label>
@@ -1706,7 +1722,10 @@ export default function SkillsPage() {
               {/* Kept / dropped */}
               <div className="flex flex-wrap gap-1">
                 <Badge variant="secondary" className="text-[10px]">
-                  matched by {compressResult.report.matchSource === "semantic" ? "semantic embeddings" : "keywords"}
+                  matched by{" "}
+                  {compressResult.report.matchSource === "semantic"
+                    ? "semantic embeddings"
+                    : "keywords"}
                 </Badge>
                 {compressResult.report.keptSkills.map((s) => (
                   <Badge key={s.id} variant="default" className="text-[10px]">
@@ -1721,12 +1740,16 @@ export default function SkillsPage() {
               </div>
               {compressResult.report.polished && (
                 <p className="text-xs text-muted-foreground">
-                  AI-polished{compressResult.report.polishServedBy ? ` via ${compressResult.report.polishServedBy}` : ""}
+                  AI-polished
+                  {compressResult.report.polishServedBy
+                    ? ` via ${compressResult.report.polishServedBy}`
+                    : ""}
                 </p>
               )}
               {compressResult.report.polishError && (
                 <p className="text-xs text-muted-foreground">
-                  AI polish failed — deterministic composite kept: {compressResult.report.polishError}
+                  AI polish failed — deterministic composite kept:{" "}
+                  {compressResult.report.polishError}
                 </p>
               )}
 

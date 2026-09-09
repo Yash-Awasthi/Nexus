@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Context Pruning — dynamic conversation context management to reduce token usage.
  *
@@ -7,7 +8,7 @@
  */
 
 export interface Message {
-  role: 'system' | 'user' | 'assistant' | 'tool';
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
   timestamp: number;
   tokenCount?: number;
@@ -85,9 +86,10 @@ export class ContextPruner {
     // Phase 1: Compress tool outputs
     if (this.config.compressToolOutputs) {
       for (const msg of working) {
-        if (msg.role === 'tool' && this.msgTokens(msg) > this.config.toolOutputMaxTokens) {
+        if (msg.role === "tool" && this.msgTokens(msg) > this.config.toolOutputMaxTokens) {
           const originalTokens = this.msgTokens(msg);
-          msg.content = msg.content.slice(0, this.config.toolOutputMaxTokens * 4) + '\n... [compressed]';
+          msg.content =
+            msg.content.slice(0, this.config.toolOutputMaxTokens * 4) + "\n... [compressed]";
           compressed++;
         }
       }
@@ -102,7 +104,7 @@ export class ContextPruner {
       const otherMessages: Message[] = [];
 
       for (const msg of working) {
-        if (msg.role === 'system' && this.config.preserveSystemMessages) {
+        if (msg.role === "system" && this.config.preserveSystemMessages) {
           systemMessages.push(msg);
         } else {
           otherMessages.push(msg);

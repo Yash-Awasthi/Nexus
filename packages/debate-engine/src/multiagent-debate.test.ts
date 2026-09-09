@@ -8,9 +8,7 @@ import {
 } from "./multiagent-debate.js";
 
 /** Echo transport: answer with the agent's own number plus prior answers seen. */
-function echoTransport(
-  seen: { agent: string; round: number; sawOthers: string[] }[] = [],
-): {
+function echoTransport(seen: { agent: string; round: number; sawOthers: string[] }[] = []): {
   transport: (req: {
     agent: string;
     round: number;
@@ -67,7 +65,9 @@ describe("runMultiAgentDebate", () => {
     for (const s of round1) {
       expect(s.sawOthers).toHaveLength(2);
       expect(s.sawOthers).not.toContain(s.agent);
-      expect(s.sawOthers).toEqual(expect.arrayContaining(["alice", "bob", "carol"].filter((a) => a !== s.agent)));
+      expect(s.sawOthers).toEqual(
+        expect.arrayContaining(["alice", "bob", "carol"].filter((a) => a !== s.agent)),
+      );
     }
   });
 

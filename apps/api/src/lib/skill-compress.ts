@@ -33,16 +33,104 @@ import {
 
 /** Words that carry no capability signal — never used for relevance scoring. */
 const STOPWORDS = new Set([
-  "the", "a", "an", "and", "or", "for", "to", "of", "in", "on", "with", "as",
-  "by", "is", "are", "was", "were", "be", "been", "it", "its", "this", "that",
-  "these", "those", "skill", "skills", "code", "task", "goal", "want", "need",
-  "make", "create", "write", "get", "from", "at", "do", "does", "did", "can",
-  "could", "would", "should", "will", "you", "your", "we", "our", "i", "me",
-  "my", "they", "them", "he", "she", "how", "what", "when", "which", "who",
-  "where", "why", "if", "then", "than", "also", "not", "no", "yes", "but",
-  "so", "just", "very", "about", "into", "over", "after", "before", "while",
-  "use", "using", "used", "run", "running", "output", "result", "results",
-  "please", "thanks", "thank", "etc", "e.g", "i.e", "like", "way", "one",
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "for",
+  "to",
+  "of",
+  "in",
+  "on",
+  "with",
+  "as",
+  "by",
+  "is",
+  "are",
+  "was",
+  "were",
+  "be",
+  "been",
+  "it",
+  "its",
+  "this",
+  "that",
+  "these",
+  "those",
+  "skill",
+  "skills",
+  "code",
+  "task",
+  "goal",
+  "want",
+  "need",
+  "make",
+  "create",
+  "write",
+  "get",
+  "from",
+  "at",
+  "do",
+  "does",
+  "did",
+  "can",
+  "could",
+  "would",
+  "should",
+  "will",
+  "you",
+  "your",
+  "we",
+  "our",
+  "i",
+  "me",
+  "my",
+  "they",
+  "them",
+  "he",
+  "she",
+  "how",
+  "what",
+  "when",
+  "which",
+  "who",
+  "where",
+  "why",
+  "if",
+  "then",
+  "than",
+  "also",
+  "not",
+  "no",
+  "yes",
+  "but",
+  "so",
+  "just",
+  "very",
+  "about",
+  "into",
+  "over",
+  "after",
+  "before",
+  "while",
+  "use",
+  "using",
+  "used",
+  "run",
+  "running",
+  "output",
+  "result",
+  "results",
+  "please",
+  "thanks",
+  "thank",
+  "etc",
+  "e.g",
+  "i.e",
+  "like",
+  "way",
+  "one",
 ]);
 
 /** Tokenize a string into meaningful capability words (lowercased, ≥3 chars). */
@@ -140,9 +228,10 @@ function buildComposite(
     const name = skill.name.trim() || skill.id;
     const desc = skill.description?.trim();
     sections.push(
-      [`${prefix} ── ${name}${desc ? ` — ${desc}` : ""} ──`, ...(body.length > 0 ? body : [`${prefix} (no code)`])].join(
-        "\n",
-      ),
+      [
+        `${prefix} ── ${name}${desc ? ` — ${desc}` : ""} ──`,
+        ...(body.length > 0 ? body : [`${prefix} (no code)`]),
+      ].join("\n"),
     );
     keptSources.push(skill);
   }
@@ -168,9 +257,7 @@ function buildComposite(
   }));
 
   return {
-    name:
-      (opts.name ?? "").trim() ||
-      `Composite: ${slugify(task)} (${effective.length} skills)`,
+    name: (opts.name ?? "").trim() || `Composite: ${slugify(task)} (${effective.length} skills)`,
     description:
       (opts.description ?? "").trim() ||
       `Task-compressed composite of ${effective.length} skill(s) for: ${task.slice(0, 200)}`,
@@ -302,9 +389,7 @@ export async function compressSkillsForTaskSemantic(
   }
 
   const effective =
-    matchSource === "semantic"
-      ? semanticSelection(scored)
-      : keywordSelection(scored);
+    matchSource === "semantic" ? semanticSelection(scored) : keywordSelection(scored);
   return buildComposite(skills, task, scored, effective, matchSource, opts);
 }
 

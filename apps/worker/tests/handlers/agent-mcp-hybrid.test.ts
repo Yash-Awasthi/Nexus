@@ -7,27 +7,36 @@
 // offline: deterministic in-memory dense + BM25 adapters drive the search.
 import { describe, expect, it } from "vitest";
 import { hybridSearchRuntimeTools } from "../../src/handlers/agent-mcp.js";
-import {
-  InMemoryBM25,
-  type SearchHit,
-  type VectorSearchAdapter,
-} from "@nexus/hybrid-search";
+import { InMemoryBM25, type SearchHit, type VectorSearchAdapter } from "@nexus/hybrid-search";
 
 const CORPUS = [
-  { id: "d1", text: "Hybrid search fuses dense vector and bm25 results.", metadata: { tier: "gold" } },
+  {
+    id: "d1",
+    text: "Hybrid search fuses dense vector and bm25 results.",
+    metadata: { tier: "gold" },
+  },
   { id: "d2", text: "RRF fusion ranks documents by reciprocal rank.", metadata: { tier: "free" } },
 ];
 
 /** Deterministic dense leg: docs whose text contains the query's first token. */
 function lexicalDense(): VectorSearchAdapter {
   const tokenize = (t: string): string[] =>
-    t.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+    t
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter(Boolean);
   const corpus = CORPUS.map((d) => ({ ...d, toks: tokenize(d.text) }));
   return {
     async search(query: string, limit: number): Promise<SearchHit[]> {
       const qt = new Set(tokenize(query));
       return corpus
-        .map((d) => ({ id: d.id, score: d.toks.filter((t) => qt.has(t)).length, text: d.text, metadata: d.metadata }))
+        .map((d) => ({
+          id: d.id,
+          score: d.toks.filter((t) => qt.has(t)).length,
+          text: d.text,
+          metadata: d.metadata,
+        }))
         .filter((s) => s.score > 0)
         .sort((a, b) => b.score - a.score)
         .slice(0, limit);
@@ -71,7 +80,9 @@ describe("hybridSearchRuntimeTools (served hybrid single query → RuntimeTool)"
       query: "fuses bm25 ranks",
       where: { tier: "gold" },
     });
-    const parsed = JSON.parse(raw) as { hits: Array<{ id: string; metadata?: Record<string, unknown> }> };
+    const parsed = JSON.parse(raw) as {
+      hits: Array<{ id: string; metadata?: Record<string, unknown> }>;
+    };
     expect(parsed.hits.length).toBeGreaterThan(0);
     expect(parsed.hits.every((h) => h.metadata?.tier === "gold")).toBe(true);
     expect(parsed.hits.some((h) => h.id === "d2")).toBe(false);
@@ -85,8 +96,8 @@ describe("hybridSearchRuntimeTools (served hybrid single query → RuntimeTool)"
     };
     const { bm25 } = makeAdapters();
     const tools = await hybridSearchRuntimeTools({ vector: failing, bm25 });
-    await expect(
-      tools[0]!.handler({ query: "anything" }),
-    ).rejects.toThrow(/vector store unreachable|Tool execution failed/);
+    await expect(tools[0]!.handler({ query: "anything" })).rejects.toThrow(
+      /vector store unreachable|Tool execution failed/,
+    );
   });
 });

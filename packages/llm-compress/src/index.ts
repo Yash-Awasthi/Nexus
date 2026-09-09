@@ -1482,7 +1482,6 @@ export function jsonlCompress(text: string, minRows: number = HEADROOM_MIN_ROWS)
   return out;
 }
 
-
 // ── ccr engine (lossless-by-reference: compress-cache-retrieve) ──────────────────
 // Ported from OmniRoute's ccr engine: replace a large block with a short
 // `[CCR retrieve hash=… chars=…]` marker and stash the original in a bounded,

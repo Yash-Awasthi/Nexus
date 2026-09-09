@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @nexus/stance-library — Anti-groupthink debate stances and role presets.
  *
@@ -110,10 +111,7 @@ export interface RoleAssignment {
  * - "balanced": Even split between skeptic and advocate
  * - "intensive": Each model gets a unique stance
  */
-export function createPreset(
-  preset: RolePresetName,
-  modelIds: string[],
-): RoleAssignment[] {
+export function createPreset(preset: RolePresetName, modelIds: string[]): RoleAssignment[] {
   if (preset === "none" || modelIds.length === 0) {
     return [];
   }
@@ -194,9 +192,7 @@ export function overrideStances(
  * Generate anonymous aliases for models (Participant A, B, C, ...).
  */
 function assignAliases(modelIds: string[]): string[] {
-  return modelIds.map(
-    (_, i) => `Participant ${String.fromCharCode(65 + (i % 26))}`,
-  );
+  return modelIds.map((_, i) => `Participant ${String.fromCharCode(65 + (i % 26))}`);
 }
 
 // ─── Stance-Aware Prompt Builder ─────────────────────────────────────────────
@@ -204,16 +200,8 @@ function assignAliases(modelIds: string[]): string[] {
 /**
  * Inject a stance instruction into a system prompt.
  */
-export function applyStance(
-  systemPrompt: string,
-  stance: Stance,
-): string {
-  return (
-    systemPrompt +
-    "\n\n---\n" +
-    `## Your Role: ${stance.name}\n\n` +
-    stance.instruction
-  );
+export function applyStance(systemPrompt: string, stance: Stance): string {
+  return systemPrompt + "\n\n---\n" + `## Your Role: ${stance.name}\n\n` + stance.instruction;
 }
 
 /**
@@ -251,9 +239,7 @@ export function buildDebateContext(config: DebateContextConfig): string {
   }
 
   parts.push("## Your Contribution");
-  parts.push(
-    "Provide your response below. Stay in character based on your assigned role.",
-  );
+  parts.push("Provide your response below. Stay in character based on your assigned role.");
 
   return parts.join("\n");
 }

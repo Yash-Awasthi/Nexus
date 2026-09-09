@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * API Key Rotation — intelligent key management with health tracking and failover.
  *
@@ -28,7 +29,7 @@ export interface KeyPoolConfig {
   healthCheckIntervalMs?: number;
   latencyWindow?: number;
   dailyResetHour?: number; // 0-23 UTC
-  strategy?: 'round-robin' | 'least-recently-used' | 'lowest-latency' | 'most-healthy';
+  strategy?: "round-robin" | "least-recently-used" | "lowest-latency" | "most-healthy";
 }
 
 export interface KeySelection {
@@ -48,7 +49,7 @@ export class ApiKeyPool {
       healthCheckIntervalMs: config.healthCheckIntervalMs ?? 60_000,
       latencyWindow: config.latencyWindow ?? 20,
       dailyResetHour: config.dailyResetHour ?? 0,
-      strategy: config.strategy ?? 'round-robin',
+      strategy: config.strategy ?? "round-robin",
     };
 
     this.rotationTimer = setInterval(() => this.healthCheck(), this.config.healthCheckIntervalMs);
@@ -86,7 +87,11 @@ export class ApiKeyPool {
    */
   select(provider?: string): KeySelection | null {
     const candidates = this.keys.filter(
-      (k) => k.healthy && (!provider || k.provider === provider) && !this.isRateLimited(k) && !this.isQuotaExhausted(k)
+      (k) =>
+        k.healthy &&
+        (!provider || k.provider === provider) &&
+        !this.isRateLimited(k) &&
+        !this.isQuotaExhausted(k),
     );
 
     if (candidates.length === 0) return null;
@@ -94,13 +99,15 @@ export class ApiKeyPool {
     let selected: ApiKeyEntry;
 
     switch (this.config.strategy) {
-      case 'least-recently-used':
+      case "least-recently-used":
         selected = candidates.reduce((a, b) => (a.lastUsed < b.lastUsed ? a : b));
         break;
-      case 'lowest-latency':
-        selected = candidates.reduce((a, b) => (a.avgLatencyMs || Infinity) < (b.avgLatencyMs || Infinity) ? a : b);
+      case "lowest-latency":
+        selected = candidates.reduce((a, b) =>
+          (a.avgLatencyMs || Infinity) < (b.avgLatencyMs || Infinity) ? a : b,
+        );
         break;
-      case 'most-healthy':
+      case "most-healthy":
         selected = candidates.reduce((a, b) => {
           const aScore = a.successCount / (a.successCount + a.errorCount + 1);
           const bScore = b.successCount / (b.successCount + b.errorCount + 1);

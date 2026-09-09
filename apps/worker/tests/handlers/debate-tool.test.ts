@@ -8,9 +8,10 @@ import { describe, it, expect } from "vitest";
 import { debateRuntimeTool, type DebateAgentTransport } from "../../src/handlers/agent-mcp.js";
 
 /** Transport that plays back per-agent scripts indexed by round number. */
-function scriptedTransport(
-  scripts: Record<string, string[]>,
-): { transport: DebateAgentTransport; calls: Array<{ agent: string; round: number }> } {
+function scriptedTransport(scripts: Record<string, string[]>): {
+  transport: DebateAgentTransport;
+  calls: Array<{ agent: string; round: number }>;
+} {
   const calls: Array<{ agent: string; round: number }> = [];
   return {
     calls,
@@ -57,7 +58,11 @@ describe("debateRuntimeTool", () => {
   it("stops before the budget once positions stabilise (convergence)", async () => {
     const { transport, calls } = scriptedTransport(STABLE);
     const tool = debateRuntimeTool({ transport, agents: ["A", "B"] });
-    const raw = await tool.handler({ question: "Is X better than Y?", rounds: 6, convergence: true });
+    const raw = await tool.handler({
+      question: "Is X better than Y?",
+      rounds: 6,
+      convergence: true,
+    });
     const parsed = JSON.parse(raw) as { converged: boolean; roundsRun: number };
     expect(parsed.converged).toBe(true);
     expect(parsed.roundsRun).toBeGreaterThanOrEqual(2); // minRounds respected

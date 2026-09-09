@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Admission Control — queue-based request admission with capacity management.
  *
@@ -140,7 +141,7 @@ export function createAdmissionMiddleware(controller: AdmissionController) {
 
     if (!decision.allowed) {
       res.status(429).json({
-        error: 'Service temporarily unavailable',
+        error: "Service temporarily unavailable",
         reason: decision.reason,
         retryAfter: 1,
       });
@@ -151,7 +152,7 @@ export function createAdmissionMiddleware(controller: AdmissionController) {
     req.admissionTicket = decision.ticket;
 
     // Release on response finish if not adopted
-    res.on('finish', () => {
+    res.on("finish", () => {
       if (decision.ticket && !decision.ticket.adopted) {
         controller.release(decision.ticket.token);
       }

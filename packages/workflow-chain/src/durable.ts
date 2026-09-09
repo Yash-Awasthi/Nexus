@@ -56,19 +56,13 @@ export interface WorkflowContext {
    * Rejects with {@link ActivityNotFoundError} for unknown names and with the
    * last attempt error when the retry policy is exhausted.
    */
-  runActivity<INPUT = unknown, OUTPUT = unknown>(
-    name: string,
-    input: INPUT,
-  ): Promise<OUTPUT>;
+  runActivity<INPUT = unknown, OUTPUT = unknown>(name: string, input: INPUT): Promise<OUTPUT>;
   /**
    * Wait for a signal. Signals delivered before this wait are buffered and
    * drained in order; a signal arriving while waiting resolves it at once.
    * Optionally bound by `timeoutMs` (rejects when the timeout elapses first).
    */
-  waitForSignal<PAYLOAD = unknown>(
-    signal: string,
-    opts?: { timeoutMs?: number },
-  ): Promise<PAYLOAD>;
+  waitForSignal<PAYLOAD = unknown>(signal: string, opts?: { timeoutMs?: number }): Promise<PAYLOAD>;
   /** Deliver a signal to this workflow (buffered when nobody is waiting). */
   signal<PAYLOAD = unknown>(name: string, payload: PAYLOAD): void;
   /** Suspend the body for `ms` (workflow timer helper). */
@@ -93,7 +87,12 @@ interface PendingSignal<PAYLOAD> {
 class WorkflowInstance<RESULT> {
   private readonly buffer = new Map<string, unknown[]>();
   private waiter:
-    | { name: string; resolve: (v: unknown) => void; reject: (e: Error) => void; timer?: ReturnType<typeof setTimeout> }
+    | {
+        name: string;
+        resolve: (v: unknown) => void;
+        reject: (e: Error) => void;
+        timer?: ReturnType<typeof setTimeout>;
+      }
     | undefined;
   private done = false;
 

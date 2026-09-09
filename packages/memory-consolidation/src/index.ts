@@ -47,10 +47,7 @@ export class MemoryStore {
   private lastConsolidation = 0;
   private consolidationTimer?: ReturnType<typeof setInterval>;
 
-  constructor(options?: {
-    decayHalfLifeDays?: number;
-    consolidationIntervalMs?: number;
-  }) {
+  constructor(options?: { decayHalfLifeDays?: number; consolidationIntervalMs?: number }) {
     this.decayHalfLifeDays = options?.decayHalfLifeDays ?? 30;
     this.consolidationIntervalMs = options?.consolidationIntervalMs ?? 900_000; // 15 min
   }
@@ -58,7 +55,9 @@ export class MemoryStore {
   /**
    * Add a memory entry.
    */
-  add(entry: Omit<MemoryEntry, "id" | "decayScore" | "accessCount" | "lastAccessedAt">): MemoryEntry {
+  add(
+    entry: Omit<MemoryEntry, "id" | "decayScore" | "accessCount" | "lastAccessedAt">,
+  ): MemoryEntry {
     const id = crypto.randomUUID();
     const now = Date.now();
     const memory: MemoryEntry = {

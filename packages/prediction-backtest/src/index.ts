@@ -152,10 +152,7 @@ export class PredictionBacktester {
   /**
    * Run a backtest with buy-and-hold strategy.
    */
-  buyAndHold(
-    snapshots: MarketSnapshot[],
-    side: "up" | "down" = "up",
-  ): BacktestResult {
+  buyAndHold(snapshots: MarketSnapshot[], side: "up" | "down" = "up"): BacktestResult {
     return this.backtest(snapshots, () => side);
   }
 
@@ -170,9 +167,12 @@ export class PredictionBacktester {
     // Sharpe ratio (annualized, assuming daily snapshots)
     const returns = trades.map((t) => (t.pnl ?? 0) / this.config.initialBalance);
     const avgReturn = returns.length > 0 ? returns.reduce((a, b) => a + b, 0) / returns.length : 0;
-    const stdReturn = returns.length > 1
-      ? Math.sqrt(returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / (returns.length - 1))
-      : 1;
+    const stdReturn =
+      returns.length > 1
+        ? Math.sqrt(
+            returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / (returns.length - 1),
+          )
+        : 1;
     const sharpeRatio = stdReturn > 0 ? (avgReturn / stdReturn) * Math.sqrt(252) : 0;
 
     return {

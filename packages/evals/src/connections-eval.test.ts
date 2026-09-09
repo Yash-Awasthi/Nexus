@@ -88,11 +88,16 @@ describe("runConnectionsBenchmark", () => {
       { groups: ACTUAL },
       { groups: ACTUAL },
       {
+        // Puzzle 3 must score 2/4 groups (quadratic 0.25): the answer's first
+        // two lines match actual groups 1–2, and its nonsense lines 3–4 must
+        // NOT set-match any actual group. (The placeholder word "WRONG" was
+        // previously used AS an actual group word, which made the nonsense
+        // answer exactly match it — the fixture defeated its own intent.)
         groups: [
           ["APPLE", "BANANA", "CHERRY", "DATE"],
           ["RED", "GREEN", "BLUE", "YELLOW"],
-          ["WRONG", "A", "B", "C"],
-          ["WRONG", "D", "E", "F"],
+          ["SUN", "MOON", "STAR", "MARS"],
+          ["IRON", "GOLD", "SILVER", "ZINC"],
         ],
       },
     ];

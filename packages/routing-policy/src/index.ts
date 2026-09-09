@@ -124,12 +124,15 @@ export interface EvidenceSnapshot {
     averageQualityScore: number;
     successRate: number;
     /** Per-tier breakdown. */
-    byTier: Record<string, {
-      decisions: number;
-      averageCostUsd: number;
-      averageLatencyMs: number;
-      averageQualityScore: number;
-    }>;
+    byTier: Record<
+      string,
+      {
+        decisions: number;
+        averageCostUsd: number;
+        averageLatencyMs: number;
+        averageQualityScore: number;
+      }
+    >;
   };
 }
 
@@ -298,9 +301,7 @@ export class EvidenceStore {
 
   /** Get all admitted evidence for a policy number. */
   getAdmitted(policyNumber: number): EvaluationEvidence[] {
-    return this.evidence.filter(
-      (e) => e.admitted && e.policyNumber === policyNumber,
-    );
+    return this.evidence.filter((e) => e.admitted && e.policyNumber === policyNumber);
   }
 
   /** Get all evidence (any status). */
@@ -311,19 +312,27 @@ export class EvidenceStore {
   /** Build an evidence snapshot for policy compilation. */
   snapshot(policyNumber: number): EvidenceSnapshot {
     const admitted = this.getAdmitted(policyNumber);
-    const byTier: Record<string, {
-      decisions: number;
-      averageCostUsd: number;
-      averageLatencyMs: number;
-      averageQualityScore: number;
-    }> = {};
+    const byTier: Record<
+      string,
+      {
+        decisions: number;
+        averageCostUsd: number;
+        averageLatencyMs: number;
+        averageQualityScore: number;
+      }
+    > = {};
 
     for (const ev of admitted) {
       const tier = ev.decision.reason.includes("tier:")
-        ? ev.decision.reason.split("tier:")[1]?.trim() ?? "unknown"
+        ? (ev.decision.reason.split("tier:")[1]?.trim() ?? "unknown")
         : "default";
       if (!byTier[tier]) {
-        byTier[tier] = { decisions: 0, averageCostUsd: 0, averageLatencyMs: 0, averageQualityScore: 0 };
+        byTier[tier] = {
+          decisions: 0,
+          averageCostUsd: 0,
+          averageLatencyMs: 0,
+          averageQualityScore: 0,
+        };
       }
       byTier[tier]!.decisions++;
       byTier[tier]!.averageCostUsd += ev.actualCostUsd ?? 0;
@@ -364,9 +373,7 @@ export class EvidenceStore {
   cleanup(maxAgeMs: number): number {
     const cutoff = Date.now() - maxAgeMs;
     const before = this.evidence.length;
-    this.evidence = this.evidence.filter(
-      (e) => new Date(e.evaluatedAt).getTime() > cutoff,
-    );
+    this.evidence = this.evidence.filter((e) => new Date(e.evaluatedAt).getTime() > cutoff);
     return before - this.evidence.length;
   }
 }
@@ -470,11 +477,7 @@ export class AdaptiveRouter {
   private certificates: DecisionCertificate[] = [];
   private history: PolicyLock[] = [];
 
-  constructor(
-    policy: PolicyLock,
-    evidenceStore?: EvidenceStore,
-    compiler?: PolicyCompiler,
-  ) {
+  constructor(policy: PolicyLock, evidenceStore?: EvidenceStore, compiler?: PolicyCompiler) {
     this.policy = policy;
     this.evidenceStore = evidenceStore ?? new EvidenceStore();
     this.compiler = compiler ?? new PolicyCompiler();
@@ -494,9 +497,7 @@ export class AdaptiveRouter {
 
     // Find matching rule
     let matchedRule: RoutingRule | undefined;
-    for (const rule of this.policy.rules.sort(
-      (a, b) => b.priority - a.priority,
-    )) {
+    for (const rule of this.policy.rules.sort((a, b) => b.priority - a.priority)) {
       if (rule.step === "*" || rule.step === step) {
         matchedRule = rule;
         break;

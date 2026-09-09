@@ -819,7 +819,7 @@ describe("DifyDriver streaming + threading (§1.2)", () => {
       [
         'data: {"event":"ping"}\n\n',
         'data: {"event":"workflow_started","data":{}}\n\n',
-        'data: not-json-at-all\n\n',
+        "data: not-json-at-all\n\n",
         'data: {"event":"message","answer":"ok"}\n\n',
         'data: {"event":"message_end","conversation_id":"conv-keep"}\n\n',
       ].join(""),

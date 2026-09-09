@@ -235,8 +235,8 @@ export class ProviderRegistry {
       // Strategy 2: Conversation summarization
       {
         originalTokens: total,
-        compressedTokens: Math.round(total * 0.70),
-        ratio: 0.70,
+        compressedTokens: Math.round(total * 0.7),
+        ratio: 0.7,
         savingsPercent: 30,
         strategy: "conversation-summarize",
       },
@@ -277,7 +277,9 @@ export class ProviderRegistry {
     return undefined;
   }
 
-  findCheapest(modelPattern?: string): { provider: ProviderEntry; model: ProviderModel } | undefined {
+  findCheapest(
+    modelPattern?: string,
+  ): { provider: ProviderEntry; model: ProviderModel } | undefined {
     let cheapest: { provider: ProviderEntry; model: ProviderModel } | undefined;
     let lowestCost = Infinity;
 
@@ -415,10 +417,48 @@ export class ProviderRegistry {
       baseUrl: "https://openrouter.ai/api/v1",
       authType: "bearer",
       models: [
-        { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash", contextWindow: 1_048_576, maxOutput: 65_536, inputCost: null, outputCost: null, vision: true, toolUse: true, streaming: true },
-        { id: "google/gemma-3-12b-it:free", name: "Gemma 3 12B", contextWindow: 131_072, maxOutput: 8_192, inputCost: null, outputCost: null, toolUse: true, streaming: true },
-        { id: "deepseek/deepseek-chat-v3-0324:free", name: "DeepSeek V3", contextWindow: 163_840, maxOutput: 163_840, inputCost: null, outputCost: null, toolUse: true, streaming: true },
-        { id: "meta-llama/llama-4-maverick:free", name: "Llama 4 Maverick", contextWindow: 1_048_576, maxOutput: 32_768, inputCost: null, outputCost: null, vision: true, toolUse: true, streaming: true },
+        {
+          id: "google/gemini-2.5-flash",
+          name: "Gemini 2.5 Flash",
+          contextWindow: 1_048_576,
+          maxOutput: 65_536,
+          inputCost: null,
+          outputCost: null,
+          vision: true,
+          toolUse: true,
+          streaming: true,
+        },
+        {
+          id: "google/gemma-3-12b-it:free",
+          name: "Gemma 3 12B",
+          contextWindow: 131_072,
+          maxOutput: 8_192,
+          inputCost: null,
+          outputCost: null,
+          toolUse: true,
+          streaming: true,
+        },
+        {
+          id: "deepseek/deepseek-chat-v3-0324:free",
+          name: "DeepSeek V3",
+          contextWindow: 163_840,
+          maxOutput: 163_840,
+          inputCost: null,
+          outputCost: null,
+          toolUse: true,
+          streaming: true,
+        },
+        {
+          id: "meta-llama/llama-4-maverick:free",
+          name: "Llama 4 Maverick",
+          contextWindow: 1_048_576,
+          maxOutput: 32_768,
+          inputCost: null,
+          outputCost: null,
+          vision: true,
+          toolUse: true,
+          streaming: true,
+        },
       ],
       freeTier: {
         poolId: "openrouter-free",
@@ -434,7 +474,14 @@ export class ProviderRegistry {
       currentTokens: 0,
       healthScore: 95,
       lastHealthCheck: now,
-      capabilities: { chat: true, embeddings: false, imageGeneration: false, audioTranscription: false, webSearch: true, codeExecution: false },
+      capabilities: {
+        chat: true,
+        embeddings: false,
+        imageGeneration: false,
+        audioTranscription: false,
+        webSearch: true,
+        codeExecution: false,
+      },
     });
 
     this.register({
@@ -443,9 +490,35 @@ export class ProviderRegistry {
       baseUrl: "https://api.groq.com/openai/v1",
       authType: "bearer",
       models: [
-        { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B", contextWindow: 131_072, maxOutput: 32_768, inputCost: null, outputCost: null, toolUse: true, streaming: true },
-        { id: "llama-3.1-8b-instant", name: "Llama 3.1 8B", contextWindow: 131_072, maxOutput: 8_192, inputCost: null, outputCost: null, toolUse: true, streaming: true },
-        { id: "gemma2-9b-it", name: "Gemma 2 9B", contextWindow: 8_192, maxOutput: 8_192, inputCost: null, outputCost: null, streaming: true },
+        {
+          id: "llama-3.3-70b-versatile",
+          name: "Llama 3.3 70B",
+          contextWindow: 131_072,
+          maxOutput: 32_768,
+          inputCost: null,
+          outputCost: null,
+          toolUse: true,
+          streaming: true,
+        },
+        {
+          id: "llama-3.1-8b-instant",
+          name: "Llama 3.1 8B",
+          contextWindow: 131_072,
+          maxOutput: 8_192,
+          inputCost: null,
+          outputCost: null,
+          toolUse: true,
+          streaming: true,
+        },
+        {
+          id: "gemma2-9b-it",
+          name: "Gemma 2 9B",
+          contextWindow: 8_192,
+          maxOutput: 8_192,
+          inputCost: null,
+          outputCost: null,
+          streaming: true,
+        },
       ],
       freeTier: {
         poolId: "groq-free",
@@ -461,7 +534,14 @@ export class ProviderRegistry {
       currentTokens: 0,
       healthScore: 98,
       lastHealthCheck: now,
-      capabilities: { chat: true, embeddings: false, imageGeneration: false, audioTranscription: false, webSearch: false, codeExecution: false },
+      capabilities: {
+        chat: true,
+        embeddings: false,
+        imageGeneration: false,
+        audioTranscription: false,
+        webSearch: false,
+        codeExecution: false,
+      },
     });
 
     this.register({
@@ -470,9 +550,38 @@ export class ProviderRegistry {
       baseUrl: "https://generativelanguage.googleapis.com/v1beta",
       authType: "api-key",
       models: [
-        { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", contextWindow: 1_048_576, maxOutput: 65_536, inputCost: null, outputCost: null, vision: true, toolUse: true, streaming: true },
-        { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", contextWindow: 1_048_576, maxOutput: 8_192, inputCost: null, outputCost: null, vision: true, toolUse: true, streaming: true },
-        { id: "gemma-3-27b-it", name: "Gemma 3 27B", contextWindow: 131_072, maxOutput: 8_192, inputCost: null, outputCost: null, toolUse: true, streaming: true },
+        {
+          id: "gemini-2.5-flash",
+          name: "Gemini 2.5 Flash",
+          contextWindow: 1_048_576,
+          maxOutput: 65_536,
+          inputCost: null,
+          outputCost: null,
+          vision: true,
+          toolUse: true,
+          streaming: true,
+        },
+        {
+          id: "gemini-2.0-flash",
+          name: "Gemini 2.0 Flash",
+          contextWindow: 1_048_576,
+          maxOutput: 8_192,
+          inputCost: null,
+          outputCost: null,
+          vision: true,
+          toolUse: true,
+          streaming: true,
+        },
+        {
+          id: "gemma-3-27b-it",
+          name: "Gemma 3 27B",
+          contextWindow: 131_072,
+          maxOutput: 8_192,
+          inputCost: null,
+          outputCost: null,
+          toolUse: true,
+          streaming: true,
+        },
       ],
       freeTier: {
         poolId: "google-ai-studio-free",
@@ -488,7 +597,14 @@ export class ProviderRegistry {
       currentTokens: 0,
       healthScore: 96,
       lastHealthCheck: now,
-      capabilities: { chat: true, embeddings: true, imageGeneration: true, audioTranscription: true, webSearch: true, codeExecution: true },
+      capabilities: {
+        chat: true,
+        embeddings: true,
+        imageGeneration: true,
+        audioTranscription: true,
+        webSearch: true,
+        codeExecution: true,
+      },
     });
 
     this.register({
@@ -497,8 +613,26 @@ export class ProviderRegistry {
       baseUrl: "https://api.mistral.ai/v1",
       authType: "bearer",
       models: [
-        { id: "mistral-small-latest", name: "Mistral Small", contextWindow: 32_768, maxOutput: 8_192, inputCost: null, outputCost: null, toolUse: true, streaming: true },
-        { id: "open-mistral-nemo", name: "Mistral Nemo", contextWindow: 128_000, maxOutput: 8_192, inputCost: null, outputCost: null, toolUse: true, streaming: true },
+        {
+          id: "mistral-small-latest",
+          name: "Mistral Small",
+          contextWindow: 32_768,
+          maxOutput: 8_192,
+          inputCost: null,
+          outputCost: null,
+          toolUse: true,
+          streaming: true,
+        },
+        {
+          id: "open-mistral-nemo",
+          name: "Mistral Nemo",
+          contextWindow: 128_000,
+          maxOutput: 8_192,
+          inputCost: null,
+          outputCost: null,
+          toolUse: true,
+          streaming: true,
+        },
       ],
       freeTier: {
         poolId: "mistral-free",
@@ -514,7 +648,14 @@ export class ProviderRegistry {
       currentTokens: 0,
       healthScore: 90,
       lastHealthCheck: now,
-      capabilities: { chat: true, embeddings: false, imageGeneration: false, audioTranscription: false, webSearch: false, codeExecution: false },
+      capabilities: {
+        chat: true,
+        embeddings: false,
+        imageGeneration: false,
+        audioTranscription: false,
+        webSearch: false,
+        codeExecution: false,
+      },
     });
 
     this.register({
@@ -523,7 +664,16 @@ export class ProviderRegistry {
       baseUrl: "https://api.novita.ai/v3/openai",
       authType: "bearer",
       models: [
-        { id: "meta-llama/llama-3.3-70b-instruct", name: "Llama 3.3 70B", contextWindow: 131_072, maxOutput: 16_384, inputCost: null, outputCost: null, toolUse: true, streaming: true },
+        {
+          id: "meta-llama/llama-3.3-70b-instruct",
+          name: "Llama 3.3 70B",
+          contextWindow: 131_072,
+          maxOutput: 16_384,
+          inputCost: null,
+          outputCost: null,
+          toolUse: true,
+          streaming: true,
+        },
       ],
       freeTier: {
         poolId: "novita-free",
@@ -539,7 +689,14 @@ export class ProviderRegistry {
       currentTokens: 0,
       healthScore: 85,
       lastHealthCheck: now,
-      capabilities: { chat: true, embeddings: false, imageGeneration: false, audioTranscription: false, webSearch: false, codeExecution: false },
+      capabilities: {
+        chat: true,
+        embeddings: false,
+        imageGeneration: false,
+        audioTranscription: false,
+        webSearch: false,
+        codeExecution: false,
+      },
     });
 
     this.register({
@@ -548,16 +705,53 @@ export class ProviderRegistry {
       baseUrl: "https://api.anthropic.com",
       authType: "api-key",
       models: [
-        { id: "claude-opus-4-5", name: "Claude Opus 4.5", contextWindow: 200_000, maxOutput: 32_000, inputCost: 15, outputCost: 75, vision: true, toolUse: true, streaming: true },
-        { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", contextWindow: 200_000, maxOutput: 16_000, inputCost: 3, outputCost: 15, vision: true, toolUse: true, streaming: true },
-        { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", contextWindow: 200_000, maxOutput: 8_192, inputCost: 0.8, outputCost: 4, vision: true, toolUse: true, streaming: true },
+        {
+          id: "claude-opus-4-5",
+          name: "Claude Opus 4.5",
+          contextWindow: 200_000,
+          maxOutput: 32_000,
+          inputCost: 15,
+          outputCost: 75,
+          vision: true,
+          toolUse: true,
+          streaming: true,
+        },
+        {
+          id: "claude-sonnet-4-5",
+          name: "Claude Sonnet 4.5",
+          contextWindow: 200_000,
+          maxOutput: 16_000,
+          inputCost: 3,
+          outputCost: 15,
+          vision: true,
+          toolUse: true,
+          streaming: true,
+        },
+        {
+          id: "claude-haiku-4-5",
+          name: "Claude Haiku 4.5",
+          contextWindow: 200_000,
+          maxOutput: 8_192,
+          inputCost: 0.8,
+          outputCost: 4,
+          vision: true,
+          toolUse: true,
+          streaming: true,
+        },
       ],
       monthlySpendLimit: null,
       currentSpend: 0,
       currentTokens: 0,
       healthScore: 99,
       lastHealthCheck: now,
-      capabilities: { chat: true, embeddings: false, imageGeneration: false, audioTranscription: false, webSearch: false, codeExecution: false },
+      capabilities: {
+        chat: true,
+        embeddings: false,
+        imageGeneration: false,
+        audioTranscription: false,
+        webSearch: false,
+        codeExecution: false,
+      },
     });
 
     this.register({
@@ -566,16 +760,52 @@ export class ProviderRegistry {
       baseUrl: "https://api.openai.com/v1",
       authType: "bearer",
       models: [
-        { id: "gpt-4o", name: "GPT-4o", contextWindow: 128_000, maxOutput: 16_384, inputCost: 2.5, outputCost: 10, vision: true, toolUse: true, streaming: true },
-        { id: "gpt-4o-mini", name: "GPT-4o Mini", contextWindow: 128_000, maxOutput: 16_384, inputCost: 0.15, outputCost: 0.6, vision: true, toolUse: true, streaming: true },
-        { id: "o1-preview", name: "o1 Preview", contextWindow: 128_000, maxOutput: 32_768, inputCost: 15, outputCost: 60, toolUse: true, streaming: true },
+        {
+          id: "gpt-4o",
+          name: "GPT-4o",
+          contextWindow: 128_000,
+          maxOutput: 16_384,
+          inputCost: 2.5,
+          outputCost: 10,
+          vision: true,
+          toolUse: true,
+          streaming: true,
+        },
+        {
+          id: "gpt-4o-mini",
+          name: "GPT-4o Mini",
+          contextWindow: 128_000,
+          maxOutput: 16_384,
+          inputCost: 0.15,
+          outputCost: 0.6,
+          vision: true,
+          toolUse: true,
+          streaming: true,
+        },
+        {
+          id: "o1-preview",
+          name: "o1 Preview",
+          contextWindow: 128_000,
+          maxOutput: 32_768,
+          inputCost: 15,
+          outputCost: 60,
+          toolUse: true,
+          streaming: true,
+        },
       ],
       monthlySpendLimit: null,
       currentSpend: 0,
       currentTokens: 0,
       healthScore: 97,
       lastHealthCheck: now,
-      capabilities: { chat: true, embeddings: true, imageGeneration: true, audioTranscription: true, webSearch: true, codeExecution: true },
+      capabilities: {
+        chat: true,
+        embeddings: true,
+        imageGeneration: true,
+        audioTranscription: true,
+        webSearch: true,
+        codeExecution: true,
+      },
     });
 
     return this;
@@ -726,9 +956,7 @@ export function modelsDevToDefinitions(catalogue: ModelsDevCatalogue): ModelDefi
  * Fetch the models.dev catalogue. Injectable fetch (tests pass a fake); throws
  * on non-ok responses so callers decide fail-open vs fail-closed.
  */
-export async function fetchModelsDev(
-  fetchFn: typeof fetch = fetch,
-): Promise<ModelsDevCatalogue> {
+export async function fetchModelsDev(fetchFn: typeof fetch = fetch): Promise<ModelsDevCatalogue> {
   const res = await fetchFn(MODELS_DEV_API_URL);
   if (!res.ok) throw new Error(`models.dev fetch failed: HTTP ${res.status}`);
   return (await res.json()) as ModelsDevCatalogue;
@@ -752,9 +980,7 @@ export function registerFromModelsDev(
   opts: RegisterFromModelsDevOptions = {},
 ): number {
   if (!catalogue) return 0; // live fetch stays a Gate (ROADMAP §1.5)
-  const defs = modelsDevToDefinitions(catalogue).filter(
-    (d) => !d.capabilities?.deprecated,
-  );
+  const defs = modelsDevToDefinitions(catalogue).filter((d) => !d.capabilities?.deprecated);
   const now = new Date().toISOString();
   const byProvider = new Map<string, ProviderModel[]>();
   let added = 0;

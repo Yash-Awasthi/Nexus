@@ -112,9 +112,15 @@ export function llmSpeakerPicker(llm: LlmToolFn): SpeakerPicker {
       .join("\n");
     const turn = await llm(
       [
-        { role: "user", content: `Agents: ${roster}\n\nQuestion: ${ctx.question}\n${recent ? `\nRecent conversation:\n${recent}` : ""}` },
+        {
+          role: "user",
+          content: `Agents: ${roster}\n\nQuestion: ${ctx.question}\n${recent ? `\nRecent conversation:\n${recent}` : ""}`,
+        },
       ],
-      { systemPrompt: "You are the group-chat coordinator. Decide which agent should speak next. Reply with only the agent's name." },
+      {
+        systemPrompt:
+          "You are the group-chat coordinator. Decide which agent should speak next. Reply with only the agent's name.",
+      },
     );
     const pick = turn.content.trim().replace(/^["'*#\s]+|["'\s]+$/g, "");
     return ctx.agents.find((a) => a.name.toLowerCase() === pick.toLowerCase())?.name ?? pick;

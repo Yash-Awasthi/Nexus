@@ -267,7 +267,11 @@ export class ProposalApplier {
           break;
         case "nudge":
           // Leave as pending but add nudge metadata
-          proposal.metadata = { ...proposal.metadata, nudged: true, nudgeReason: resolution.reason };
+          proposal.metadata = {
+            ...proposal.metadata,
+            nudged: true,
+            nudgeReason: resolution.reason,
+          };
           break;
         case "skip":
           proposal.status = "rejected";

@@ -4,7 +4,13 @@ import { describe, expect, it } from "vitest";
 import { MemoryQueueBackend } from "../src/queue-backend.js";
 import type { QueueJob } from "../src/interfaces/queue.interface.js";
 
-function job(id: string, priority: QueueJob["priority"], createdAt: Date, retries = 0, maxRetries = 3): QueueJob {
+function job(
+  id: string,
+  priority: QueueJob["priority"],
+  createdAt: Date,
+  retries = 0,
+  maxRetries = 3,
+): QueueJob {
   return { id, payload: { type: "floci" }, priority, retries, maxRetries, createdAt };
 }
 

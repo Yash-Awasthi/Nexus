@@ -58,11 +58,7 @@ export class ExecutionCache {
   /**
    * Store an artifact in the cache.
    */
-  set(
-    key: string,
-    data: unknown,
-    options?: { ttlMs?: number; scope?: string },
-  ): CachedArtifact {
+  set(key: string, data: unknown, options?: { ttlMs?: number; scope?: string }): CachedArtifact {
     const contentHash = this.computeHash(data);
     const now = Date.now();
 
@@ -71,7 +67,11 @@ export class ExecutionCache {
       contentHash,
       data,
       createdAt: now,
-      expiresAt: options?.ttlMs ? now + options.ttlMs : this.defaultTtlMs ? now + this.defaultTtlMs : undefined,
+      expiresAt: options?.ttlMs
+        ? now + options.ttlMs
+        : this.defaultTtlMs
+          ? now + this.defaultTtlMs
+          : undefined,
       scope: options?.scope ?? "default",
       version: 1,
     };

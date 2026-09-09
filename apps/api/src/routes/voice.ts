@@ -99,7 +99,10 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
         const res = await driver.complete({
           model: process.env.NEXUS_DEFAULT_MODEL ?? "qwen2.5:7b",
           messages: [
-            { role: "system", content: "You are a concise voice assistant. Reply in 1-3 sentences." },
+            {
+              role: "system",
+              content: "You are a concise voice assistant. Reply in 1-3 sentences.",
+            },
             { role: "user", content: text },
           ],
           maxTokens: 256,
@@ -162,7 +165,9 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
    * Body: { text: string, voice?: string, provider?: "elevenlabs" | "deepgram" | "cartesia" }
    * Returns audio/mpeg bytes (mp3).
    */
-  app.post<{ Body: { text: string; voice?: string; provider?: "elevenlabs" | "deepgram" | "cartesia" } }>(
+  app.post<{
+    Body: { text: string; voice?: string; provider?: "elevenlabs" | "deepgram" | "cartesia" };
+  }>(
     "/voice/synthesize",
     {
       schema: {
@@ -278,10 +283,8 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
           requires: "CARTESIA_API_KEY + CARTESIA_VOICE_ID",
         },
       ];
-      const activeTranscribe =
-        transcribeOptions.find((p) => p.available) ?? transcribeOptions[0]!;
-      const activeSynthesize =
-        synthesizeOptions.find((p) => p.available) ?? synthesizeOptions[0]!;
+      const activeTranscribe = transcribeOptions.find((p) => p.available) ?? transcribeOptions[0]!;
+      const activeSynthesize = synthesizeOptions.find((p) => p.available) ?? synthesizeOptions[0]!;
       return reply.send({
         transcribe: {
           provider: activeTranscribe.provider,

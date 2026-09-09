@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @nexus/temporal-kg — Temporal Knowledge Graph with bi-temporal fact management.
  *
@@ -49,7 +50,7 @@ export interface Episode {
   derivedFactIds: string[];
 }
 
-export type EpisodeSource = 'message' | 'text' | 'json' | 'stream' | 'api';
+export type EpisodeSource = "message" | "text" | "json" | "stream" | "api";
 
 export interface TemporalEntity {
   id: string;
@@ -138,7 +139,7 @@ export class TemporalFactStore {
 
   getEpisodesByGroup(groupId: string, limit?: number): Episode[] {
     const results = Array.from(this.episodes.values())
-      .filter(e => e.groupId === groupId)
+      .filter((e) => e.groupId === groupId)
       .sort((a, b) => b.ingestedAt.getTime() - a.ingestedAt.getTime());
     return limit ? results.slice(0, limit) : results;
   }
@@ -148,7 +149,7 @@ export class TemporalFactStore {
     if (!fact) return undefined;
 
     const episodes = fact.episodeIds
-      .map(id => this.episodes.get(id))
+      .map((id) => this.episodes.get(id))
       .filter((e): e is Episode => e !== undefined);
 
     return {
@@ -164,7 +165,7 @@ export class TemporalFactStore {
    * automatically invalidated (not deleted) with its temporal history preserved.
    */
   addFact(
-    fact: Omit<TemporalFact, 'id' | 'validAt' | 'invalidAt' | 'version' | 'contentHash'>,
+    fact: Omit<TemporalFact, "id" | "validAt" | "invalidAt" | "version" | "contentHash">,
   ): TemporalFact {
     const id = this.generateId();
     const contentHash = this.computeHash(fact.subjectId, fact.predicate, fact.objectId);
@@ -209,7 +210,7 @@ export class TemporalFactStore {
    */
   getFactsAsOf(asOf: Date): TemporalFact[] {
     return Array.from(this.facts.values()).filter(
-      f => f.validAt <= asOf && (f.invalidAt === null || f.invalidAt > asOf),
+      (f) => f.validAt <= asOf && (f.invalidAt === null || f.invalidAt > asOf),
     );
   }
 
@@ -217,7 +218,7 @@ export class TemporalFactStore {
    * Query what is currently true (fact not yet invalidated).
    */
   getCurrentFacts(): TemporalFact[] {
-    return Array.from(this.facts.values()).filter(f => f.invalidAt === null);
+    return Array.from(this.facts.values()).filter((f) => f.invalidAt === null);
   }
 
   /**
@@ -225,7 +226,7 @@ export class TemporalFactStore {
    */
   getFactHistory(subjectId: string, predicate: string): TemporalFact[] {
     return Array.from(this.facts.values())
-      .filter(f => f.subjectId === subjectId && f.predicate === predicate)
+      .filter((f) => f.subjectId === subjectId && f.predicate === predicate)
       .sort((a, b) => a.validAt.getTime() - b.validAt.getTime());
   }
 
@@ -283,7 +284,11 @@ export class TemporalFactStore {
     threshold = 0.85,
     embeddings?: Map<string, number[]>,
   ): Array<{ entityA: TemporalEntity; entityB: TemporalEntity; similarity: number }> {
-    const duplicates: Array<{ entityA: TemporalEntity; entityB: TemporalEntity; similarity: number }> = [];
+    const duplicates: Array<{
+      entityA: TemporalEntity;
+      entityB: TemporalEntity;
+      similarity: number;
+    }> = [];
     const allEntities = Array.from(this.entities.values());
 
     for (let i = 0; i < allEntities.length; i++) {
@@ -399,12 +404,7 @@ export class TemporalFactStore {
       maxGraphDistance?: number;
     } = {},
   ): GraphSearchResult[] {
-    const {
-      limit = 10,
-      semanticWeight = 0.6,
-      graphWeight = 0.4,
-      maxGraphDistance = 5,
-    } = options;
+    const { limit = 10, semanticWeight = 0.6, graphWeight = 0.4, maxGraphDistance = 5 } = options;
 
     // Step 1: Compute semantic similarity for all entities with embeddings
     const scored: Array<{ entity: TemporalEntity; semanticScore: number }> = [];
@@ -427,9 +427,7 @@ export class TemporalFactStore {
         : 0;
 
       // Normalize graph distance to 0-1 (1 = closest)
-      const graphScore = anchorEntityId
-        ? 1 - graphDistance / maxGraphDistance
-        : 1; // no anchor = no penalty
+      const graphScore = anchorEntityId ? 1 - graphDistance / maxGraphDistance : 1; // no anchor = no penalty
 
       const combinedScore = semanticWeight * semanticScore + graphWeight * graphScore;
 
@@ -457,11 +455,7 @@ export class TemporalFactStore {
    * BFS to find shortest path distance between two entities in the graph.
    * Returns maxGraphDistance + 1 if unreachable.
    */
-  private bfsDistance(
-    fromId: string,
-    toId: string,
-    maxDistance: number,
-  ): number {
+  private bfsDistance(fromId: string, toId: string, maxDistance: number): number {
     if (fromId === toId) return 0;
 
     const visited = new Set<string>([fromId]);
@@ -515,13 +509,19 @@ export class TemporalFactStore {
    */
   processEpisode(
     episode: Episode,
-    extractedEntities: Array<Omit<TemporalEntity, 'createdAt' | 'updatedAt' | 'episodeIds'>>,
-    extractedFacts: Array<Omit<TemporalFact, 'id' | 'validAt' | 'invalidAt' | 'version' | 'contentHash' | 'episodeIds'>>,
+    extractedEntities: Array<Omit<TemporalEntity, "createdAt" | "updatedAt" | "episodeIds">>,
+    extractedFacts: Array<
+      Omit<TemporalFact, "id" | "validAt" | "invalidAt" | "version" | "contentHash" | "episodeIds">
+    >,
   ): {
     newEntities: TemporalEntity[];
     newFacts: TemporalFact[];
     contradictions: ContradictionResult[];
-    duplicatesFound: Array<{ entityA: TemporalEntity; entityB: TemporalEntity; similarity: number }>;
+    duplicatesFound: Array<{
+      entityA: TemporalEntity;
+      entityB: TemporalEntity;
+      similarity: number;
+    }>;
   } {
     this.addEpisode(episode);
 
@@ -565,7 +565,7 @@ export class TemporalFactStore {
       // Check what was invalidated
       const invalidatedIds = Array.from(this.facts.values())
         .filter(
-          f =>
+          (f) =>
             f.subjectId === fact.subjectId &&
             f.predicate === fact.predicate &&
             f.objectId !== fact.objectId &&
@@ -573,7 +573,7 @@ export class TemporalFactStore {
             f.version > 1 &&
             f.validAt.getTime() >= fact.validAt.getTime() - 1000, // within 1 second of creation
         )
-        .map(f => f.id);
+        .map((f) => f.id);
 
       if (invalidatedIds.length > 0) {
         contradictions.push({
@@ -595,7 +595,7 @@ export class TemporalFactStore {
     // Update episode's derived entities
     const ep = this.episodes.get(episode.id);
     if (ep) {
-      ep.derivedEntityIds = newEntities.map(e => e.id);
+      ep.derivedEntityIds = newEntities.map((e) => e.id);
     }
 
     // Find potential duplicates
@@ -615,7 +615,7 @@ export class TemporalFactStore {
     const lower = name.toLowerCase();
     for (const entity of this.entities.values()) {
       if (entity.name.toLowerCase() === lower) return entity;
-      if (entity.aliases.some(a => a.toLowerCase() === lower)) return entity;
+      if (entity.aliases.some((a) => a.toLowerCase() === lower)) return entity;
     }
     return undefined;
   }
@@ -644,9 +644,9 @@ export class TemporalFactStore {
   }
 
   private computeAliasSimilarity(a: TemporalEntity, b: TemporalEntity): number {
-    const aNames = new Set([a.name.toLowerCase(), ...a.aliases.map(x => x.toLowerCase())]);
-    const bNames = new Set([b.name.toLowerCase(), ...b.aliases.map(x => x.toLowerCase())]);
-    const intersection = new Set([...aNames].filter(x => bNames.has(x)));
+    const aNames = new Set([a.name.toLowerCase(), ...a.aliases.map((x) => x.toLowerCase())]);
+    const bNames = new Set([b.name.toLowerCase(), ...b.aliases.map((x) => x.toLowerCase())]);
+    const intersection = new Set([...aNames].filter((x) => bNames.has(x)));
     const union = new Set([...aNames, ...bNames]);
     return union.size > 0 ? intersection.size / union.size : 0;
   }
@@ -707,7 +707,7 @@ export class TemporalFactStore {
     avgFactsPerEntity: number;
   } {
     const totalFacts = this.facts.size;
-    const activeFacts = Array.from(this.facts.values()).filter(f => f.invalidAt === null).length;
+    const activeFacts = Array.from(this.facts.values()).filter((f) => f.invalidAt === null).length;
     return {
       totalEntities: this.entities.size,
       totalFacts,
@@ -790,33 +790,33 @@ export class OntologyManager {
    * Describe ontology in a format suitable for LLM context windows.
    * Supports tiered disclosure (compact, standard, detailed, full).
    */
-  describe(tier: 'compact' | 'standard' | 'detailed' | 'full' = 'standard'): string {
+  describe(tier: "compact" | "standard" | "detailed" | "full" = "standard"): string {
     const lines: string[] = [];
 
-    if (tier === 'compact') {
-      lines.push('Entity types: ' + Array.from(this.entityTypes.keys()).join(', '));
-      lines.push('Edge types: ' + Array.from(this.edgeTypes.keys()).join(', '));
+    if (tier === "compact") {
+      lines.push("Entity types: " + Array.from(this.entityTypes.keys()).join(", "));
+      lines.push("Edge types: " + Array.from(this.edgeTypes.keys()).join(", "));
     } else {
       for (const [name, def] of this.entityTypes) {
         const attrs = Object.entries(def.attributes)
-          .map(([k, v]) => `${k}: ${v.type}${v.required ? '*' : ''}`)
-          .join(', ');
+          .map(([k, v]) => `${k}: ${v.type}${v.required ? "*" : ""}`)
+          .join(", ");
         lines.push(`Entity[${name}]: {${attrs}}`);
-        if (tier === 'detailed' || tier === 'full') {
+        if (tier === "detailed" || tier === "full") {
           if (def.allowedPredicates?.length) {
-            lines.push(`  predicates: ${def.allowedPredicates.join(', ')}`);
+            lines.push(`  predicates: ${def.allowedPredicates.join(", ")}`);
           }
         }
       }
       for (const [pred, def] of this.edgeTypes) {
-        lines.push(`Edge[${pred}]: ${def.sourceTypes.join('|')} → ${def.targetTypes.join('|')}`);
-        if (tier === 'full' && def.temporal) {
+        lines.push(`Edge[${pred}]: ${def.sourceTypes.join("|")} → ${def.targetTypes.join("|")}`);
+        if (tier === "full" && def.temporal) {
           lines.push(`  temporal: yes`);
         }
       }
     }
 
-    return lines.join('\n');
+    return lines.join("\n");
   }
 }
 

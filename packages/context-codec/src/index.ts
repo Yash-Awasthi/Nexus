@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @nexus/context-codec — Content-addressed context blocks with deterministic ordering.
  *
@@ -17,18 +18,18 @@ import { createHash } from "crypto";
 // ─── Block Types ─────────────────────────────────────────────────────────────
 
 export type BlockKind =
-  | "pinned"       // System rules, always first
-  | "reference"    // Tool schemas, external docs
-  | "memory"       // Long-term memory, RAG results
-  | "state"        // Current workflow/session state
-  | "tool_output"  // Tool execution results
-  | "history"      // Conversation history
-  | "turn";        // Current turn (user message)
+  | "pinned" // System rules, always first
+  | "reference" // Tool schemas, external docs
+  | "memory" // Long-term memory, RAG results
+  | "state" // Current workflow/session state
+  | "tool_output" // Tool execution results
+  | "history" // Conversation history
+  | "turn"; // Current turn (user message)
 
 export type SensitivityLevel =
-  | "public"       // Safe to fork to any model
-  | "internal"     // Contains business logic/PII
-  | "restricted";  // Contains credentials/secrets
+  | "public" // Safe to fork to any model
+  | "internal" // Contains business logic/PII
+  | "restricted"; // Contains credentials/secrets
 
 /** Deterministic ordering for block kinds. */
 export const KIND_ORDER: BlockKind[] = [
@@ -121,15 +122,13 @@ export class SystemRulesCodec implements BlockCodec<{ rules: string[] }> {
 }
 
 /** Conversation history codec — message arrays. */
-export class ConversationHistoryCodec
-  implements BlockCodec<{ messages: Array<{ role: string; content: string }> }>
-{
+export class ConversationHistoryCodec implements BlockCodec<{
+  messages: Array<{ role: string; content: string }>;
+}> {
   codecId = "conversation-history";
   version = "1.0.0";
 
-  canonicalize(payload: {
-    messages: Array<{ role: string; content: string }>;
-  }): unknown {
+  canonicalize(payload: { messages: Array<{ role: string; content: string }> }): unknown {
     return payload.messages;
   }
 
@@ -175,10 +174,7 @@ export class ConversationHistoryCodec
       messages: Array<{ role: string; content: string }>;
     }>,
   ): number {
-    return block.payload.messages.reduce(
-      (sum, m) => sum + m.content.length / 4,
-      0,
-    );
+    return block.payload.messages.reduce((sum, m) => sum + m.content.length / 4, 0);
   }
 }
 
@@ -365,11 +361,7 @@ export class ContextCompiler {
    * Compile the graph into messages for a specific provider.
    * Respects token budget by truncating history if needed.
    */
-  compile(
-    graph: ContextGraph,
-    provider: Provider,
-    tokenBudget?: number,
-  ): CompiledContext {
+  compile(graph: ContextGraph, provider: Provider, tokenBudget?: number): CompiledContext {
     const ordered = graph.getOrdered();
     const messages: unknown[] = [];
     let totalTokens = 0;
@@ -518,7 +510,5 @@ export function createBlock<TPayload>(): BlockBuilder<TPayload> {
 
 /** Default hash: SHA-256 of JSON.stringify. */
 function defaultHash(canonicalized: unknown): string {
-  return createHash("sha256")
-    .update(JSON.stringify(canonicalized))
-    .digest("hex");
+  return createHash("sha256").update(JSON.stringify(canonicalized)).digest("hex");
 }

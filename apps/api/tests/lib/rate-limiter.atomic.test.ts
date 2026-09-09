@@ -74,7 +74,7 @@ function clearUpstashEnv(): void {
  * Mock fetch to return a successful Upstash pipeline response.
  * The first arg is the INCR result, second is the EXPIRE result.
  */
-function mockUpstashPipeline(incrResult: number, expireResult: number = 1): void {
+function mockUpstashPipeline(incrResult: number, expireResult = 1): void {
   vi.stubGlobal(
     "fetch",
     vi.fn().mockResolvedValue({

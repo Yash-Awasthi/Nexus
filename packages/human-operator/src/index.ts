@@ -42,9 +42,7 @@ export class OperatorManager {
   private callbacks: OperatorCallbacks;
   private sessionTimeoutMs: number;
 
-  constructor(
-    options?: { timeoutMs?: number; callbacks?: OperatorCallbacks },
-  ) {
+  constructor(options?: { timeoutMs?: number; callbacks?: OperatorCallbacks }) {
     this.sessionTimeoutMs = options?.timeoutMs ?? 300_000; // 5 minutes
     this.callbacks = options?.callbacks ?? {};
   }
@@ -95,10 +93,7 @@ export class OperatorManager {
   /**
    * Connect a handler for an operator session.
    */
-  connectHandler(
-    sessionId: string,
-    handler: (message: string) => Promise<void>,
-  ): void {
+  connectHandler(sessionId: string, handler: (message: string) => Promise<void>): void {
     this.handlers.set(sessionId, handler);
 
     const session = this.sessions.get(sessionId);
@@ -111,10 +106,7 @@ export class OperatorManager {
   /**
    * Send a message from the operator.
    */
-  async sendOperatorMessage(
-    sessionId: string,
-    content: string,
-  ): Promise<boolean> {
+  async sendOperatorMessage(sessionId: string, content: string): Promise<boolean> {
     const session = this.sessions.get(sessionId);
     if (!session || session.status !== "active") {
       return false;
@@ -199,9 +191,7 @@ export class OperatorManager {
    * Get all sessions for a client.
    */
   getClientSessions(clientId: string): OperatorSession[] {
-    return Array.from(this.sessions.values()).filter(
-      (s) => s.clientId === clientId,
-    );
+    return Array.from(this.sessions.values()).filter((s) => s.clientId === clientId);
   }
 
   /**
@@ -212,10 +202,7 @@ export class OperatorManager {
     let cleaned = 0;
 
     for (const [id, session] of this.sessions) {
-      if (
-        session.status === "pending" &&
-        now - session.createdAt > this.sessionTimeoutMs
-      ) {
+      if (session.status === "pending" && now - session.createdAt > this.sessionTimeoutMs) {
         session.status = "expired";
         session.updatedAt = now;
         this.handlers.delete(id);
@@ -245,11 +232,10 @@ export class AutoEscalation {
     this.rules.sort((a, b) => b.priority - a.priority);
   }
 
-  shouldEscalate(context: {
-    message: string;
-    agentName: string;
-    conversationLength: number;
-  }): { escalate: boolean; rule?: string } {
+  shouldEscalate(context: { message: string; agentName: string; conversationLength: number }): {
+    escalate: boolean;
+    rule?: string;
+  } {
     const attemptKey = `${context.agentName}:${context.message.slice(0, 50)}`;
     const count = this.attemptCounts.get(attemptKey) ?? 0;
     this.attemptCounts.set(attemptKey, count + 1);

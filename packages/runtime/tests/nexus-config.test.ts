@@ -51,7 +51,11 @@ describe("loadConductorConfig", () => {
   it("loads values from conductor.config.json", () => {
     fs.writeFileSync(
       path.join(root, "conductor.config.json"),
-      JSON.stringify({ apiPort: 8080, flociUrl: "http://floci.local:5000", features: { mcpBridge: false } }),
+      JSON.stringify({
+        apiPort: 8080,
+        flociUrl: "http://floci.local:5000",
+        features: { mcpBridge: false },
+      }),
       "utf8",
     );
     const cfg = loadConductorConfig(root);
@@ -85,7 +89,17 @@ describe("loadConductorConfig", () => {
   });
 
   it("honors command-line flags last", () => {
-    process.argv = ["node", "x", "--api-port", "7777", "--floci-url", "http://cli:4566", "--offline", "true", "--noop"];
+    process.argv = [
+      "node",
+      "x",
+      "--api-port",
+      "7777",
+      "--floci-url",
+      "http://cli:4566",
+      "--offline",
+      "true",
+      "--noop",
+    ];
     const cfg = loadConductorConfig(root);
     expect(cfg.apiPort).toBe(7777);
     expect(cfg.flociUrl).toBe("http://cli:4566");

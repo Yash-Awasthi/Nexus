@@ -457,7 +457,9 @@ describe("PortCongestionFeed (IMF PortWatch)", () => {
     url.includes("returnCountOnly=true") ? { count } : page;
 
   it("domain is 'port-congestion'", () => {
-    expect(new PortCongestionFeed({ http: makeMockHttp({ count: 0 }) }).domain).toBe("port-congestion");
+    expect(new PortCongestionFeed({ http: makeMockHttp({ count: 0 }) }).domain).toBe(
+      "port-congestion",
+    );
   });
 
   it("derives congestion severity from the transit-vs-capacity anomaly", async () => {
@@ -530,7 +532,11 @@ describe("PortCongestionFeed (IMF PortWatch)", () => {
   });
 
   it("falls back to mock when the count call fails", async () => {
-    const feed = new PortCongestionFeed({ http: async () => { throw new Error("boom"); } });
+    const feed = new PortCongestionFeed({
+      http: async () => {
+        throw new Error("boom");
+      },
+    });
     const events = await feed.fetch();
     expect(events).toHaveLength(3);
     expect(events[0]!.source).toBe("mock-port-congestion");

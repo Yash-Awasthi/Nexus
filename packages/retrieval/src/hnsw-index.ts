@@ -127,9 +127,7 @@ export class BFIndex {
       const label = labels === undefined ? this.elements.length : labels[i]!;
       const vector = vectors[i]!;
       if (vector.length !== this.dimension)
-        throw new Error(
-          `expected ${this.dimension} dims, got ${vector.length}`,
-        );
+        throw new Error(`expected ${this.dimension} dims, got ${vector.length}`);
       const pos = this.byLabel.get(label);
       if (pos !== undefined) {
         this.elements[pos]!.vector = vector.slice();
@@ -220,8 +218,7 @@ export class HNSWIndex {
     this.M = options.M ?? 16;
     this.efConstruction = options.efConstruction ?? 200;
     if (this.M < 2) throw new Error("M must be ≥ 2");
-    if (this.efConstruction < this.M)
-      throw new Error("efConstruction must be ≥ M");
+    if (this.efConstruction < this.M) throw new Error("efConstruction must be ≥ M");
     this.maxElements = maxElements;
     this.maxM0 = this.M * 2;
     this.levelMult = 1 / Math.log(this.M);
@@ -236,8 +233,7 @@ export class HNSWIndex {
   }
 
   resizeIndex(newSize: number): void {
-    if (newSize < this.elements.length)
-      throw new Error("new size must be ≥ current element count");
+    if (newSize < this.elements.length) throw new Error("new size must be ≥ current element count");
     this.maxElements = newSize;
   }
 
@@ -308,9 +304,7 @@ export class HNSWIndex {
         this.updateElement(pos, vector);
       } else {
         if (this.elements.length >= this.maxElements)
-          throw new Error(
-            `index full (${this.maxElements}); call resizeIndex() first`,
-          );
+          throw new Error(`index full (${this.maxElements}); call resizeIndex() first`);
         this.insertNew(vector, label);
       }
     }
@@ -351,11 +345,7 @@ export class HNSWIndex {
   }
 
   /** Batch form of searchKnn (hnswlib's knn_query over multiple rows). */
-  searchKnnBatch(
-    queries: number[][],
-    k: number,
-    filter?: LabelFilter,
-  ): HnswHit[][] {
+  searchKnnBatch(queries: number[][], k: number, filter?: LabelFilter): HnswHit[][] {
     return queries.map((q) => this.searchKnn(q, k, filter));
   }
 
@@ -398,11 +388,7 @@ export class HNSWIndex {
     }
     for (let lc = Math.min(level, this.maxLevel); lc >= 0; lc--) {
       const found = this.searchLayer(vector, [{ pos: ep, dist: epDist }], this.efConstruction, lc);
-      const selected = this.selectNeighborsHeuristic(
-        found,
-        lc === 0 ? this.maxM0 : this.M,
-        vector,
-      );
+      const selected = this.selectNeighborsHeuristic(found, lc === 0 ? this.maxM0 : this.M, vector);
       this.connect(newPos, selected, lc);
       if (found.length) {
         ep = found[0]!.pos;
@@ -446,11 +432,7 @@ export class HNSWIndex {
     }
     for (let lc = Math.min(e.level, this.maxLevel); lc >= 0; lc--) {
       const found = this.searchLayer(vector, [{ pos: ep, dist: epDist }], this.efConstruction, lc);
-      const selected = this.selectNeighborsHeuristic(
-        found,
-        lc === 0 ? this.maxM0 : this.M,
-        vector,
-      );
+      const selected = this.selectNeighborsHeuristic(found, lc === 0 ? this.maxM0 : this.M, vector);
       this.connect(pos, selected, lc);
       if (found.length) {
         ep = found[0]!.pos;
@@ -539,12 +521,7 @@ export class HNSWIndex {
    * Best-first search from the given start candidates within one layer.
    * Returns up to `ef` closest candidates, ascending by distance.
    */
-  private searchLayer(
-    query: number[],
-    eps: Candidate[],
-    ef: number,
-    lc: number,
-  ): Candidate[] {
+  private searchLayer(query: number[], eps: Candidate[], ef: number, lc: number): Candidate[] {
     const results: Candidate[] = [];
     // Min-heap ordered frontier; shift() keeps the closest candidate next.
     const frontier: Candidate[] = [];
@@ -583,11 +560,7 @@ export class HNSWIndex {
     return results;
   }
 
-  private unwrapResults(
-    cands: Candidate[],
-    k: number,
-    filter?: LabelFilter,
-  ): HnswHit[] {
+  private unwrapResults(cands: Candidate[], k: number, filter?: LabelFilter): HnswHit[] {
     const hits: HnswHit[] = [];
     for (const c of cands) {
       const e = this.elements[c.pos]!;
@@ -607,7 +580,7 @@ export class HNSWIndex {
   private selectNeighborsHeuristic(
     candidates: Candidate[],
     count: number,
-    query: number[],
+    _query: number[],
   ): Candidate[] {
     if (candidates.length <= count) return candidates.slice();
     const sorted = candidates.slice().sort((a, b) => a.dist - b.dist);
@@ -619,10 +592,7 @@ export class HNSWIndex {
       if (taken.has(c.pos)) continue;
       let keep = true;
       for (const s of selected) {
-        const d = this.distance(
-          this.elements[c.pos]!.vector,
-          this.elements[s.pos]!.vector,
-        );
+        const d = this.distance(this.elements[c.pos]!.vector, this.elements[s.pos]!.vector);
         if (d < c.dist) {
           keep = false;
           break;

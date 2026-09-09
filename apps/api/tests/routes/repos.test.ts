@@ -179,9 +179,7 @@ describe("GET /api/repos (GITHUB_TOKEN + stubbed GitHub API)", () => {
     expect(body.source).toBe("github-api");
     expect(body.repoId).toBe("nexus");
     expect(body.total).toBe(2);
-    expect(body.hits).toEqual([
-      { file: "src/a.ts", line: 6, match: "const x = 1", score: 0.9 },
-    ]);
+    expect(body.hits).toEqual([{ file: "src/a.ts", line: 6, match: "const x = 1", score: 0.9 }]);
   });
 
   // NOTE: the handler's tree-fallback branch (source: "tree-fallback") is NOT

@@ -8,10 +8,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import {
-  discoverModels,
-  probeOllamaModels,
-} from "../../src/lib/model-discovery.js";
+import { discoverModels, probeOllamaModels } from "../../src/lib/model-discovery.js";
 
 function fakeFetch(models: string[], ok = true): typeof fetch {
   return (async () => {
@@ -25,7 +22,10 @@ function fakeFetch(models: string[], ok = true): typeof fetch {
 
 describe("probeOllamaModels", () => {
   it("lists installed models from the daemon", async () => {
-    const names = await probeOllamaModels("http://localhost:11434", fakeFetch(["qwen2.5:7b", "nomic-embed-text:latest"]));
+    const names = await probeOllamaModels(
+      "http://localhost:11434",
+      fakeFetch(["qwen2.5:7b", "nomic-embed-text:latest"]),
+    );
     expect(names).toContain("qwen2.5");
     expect(names).toContain("nomic-embed-text");
   });

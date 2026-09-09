@@ -135,18 +135,18 @@ The capability reference and SDK snippets are in [docs/FEATURES.md](docs/FEATURE
 
 ## Documentation
 
-| Doc                                                | What's in it                                           |
-| -------------------------------------------------- | ------------------------------------------------------ |
-| [docs/FEATURES.md](docs/FEATURES.md)               | Capability reference, core concepts, SDK usage         |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)       | System diagram, repository layout, toolchain, ADRs     |
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)           | Environment variables, Docker, hosting, observability  |
-| [docs/TESTING.md](docs/TESTING.md)                 | Unit, e2e, accessibility, and load testing             |
-| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common setup and dev-server fixes                      |
-| [docs/runbook.md](docs/runbook.md)                 | Operations: scaling, incidents, backup/restore         |
-| [docs/OPS.md](docs/OPS.md)                         | Health payloads, SSE streams, durable stores, shutdown |
+| Doc                                                | What's in it                                            |
+| -------------------------------------------------- | ------------------------------------------------------- |
+| [docs/FEATURES.md](docs/FEATURES.md)               | Capability reference, core concepts, SDK usage          |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)       | System diagram, repository layout, toolchain, ADRs      |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)           | Environment variables, Docker, hosting, observability   |
+| [docs/TESTING.md](docs/TESTING.md)                 | Unit, e2e, accessibility, and load testing              |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common setup and dev-server fixes                       |
+| [docs/runbook.md](docs/runbook.md)                 | Operations: scaling, incidents, backup/restore          |
+| [docs/OPS.md](docs/OPS.md)                         | Health payloads, SSE streams, durable stores, shutdown  |
 | [docs/STATUS.md](docs/STATUS.md)                   | Live build status — what works, architecture invariants |
 | [ROADMAP.md](ROADMAP.md)                           | Shipped work, external gates, future direction          |
-| [CONTRIBUTING.md](CONTRIBUTING.md)                 | Code standards, branch strategy, PR template           |
+| [CONTRIBUTING.md](CONTRIBUTING.md)                 | Code standards, branch strategy, PR template            |
 
 ---
 

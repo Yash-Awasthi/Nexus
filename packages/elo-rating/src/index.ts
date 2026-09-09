@@ -155,7 +155,9 @@ export class EloCalculator {
 
     const sorted = Array.from(this.models.values())
       .filter((m) => m.categoryRatings.has(category))
-      .sort((a, b) => (b.categoryRatings.get(category) ?? 0) - (a.categoryRatings.get(category) ?? 0));
+      .sort(
+        (a, b) => (b.categoryRatings.get(category) ?? 0) - (a.categoryRatings.get(category) ?? 0),
+      );
 
     for (const model of sorted) {
       entries.push({

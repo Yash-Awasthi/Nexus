@@ -2,11 +2,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { getSharedKV } from "../../src/lib/shared-kv.js";
-import {
-  maybeEmitWeeklyDigest,
-  weekKey,
-  type WeeklyStats,
-} from "../../src/lib/weekly-digest.js";
+import { maybeEmitWeeklyDigest, weekKey, type WeeklyStats } from "../../src/lib/weekly-digest.js";
 
 const SOME_STATS: WeeklyStats = {
   requests: 12,

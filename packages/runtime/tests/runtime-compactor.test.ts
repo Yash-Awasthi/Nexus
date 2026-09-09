@@ -40,11 +40,13 @@ function fakeBus(overrides: { stats?: Partial<EventBusStats> } = {}) {
   };
 }
 
-function fakeQueue(opts: {
-  dlq?: { id: string; priority: string; retries: number }[];
-  active?: { id: string; priority: string; retries: number }[];
-  throwOnDlq?: boolean;
-} = {}) {
+function fakeQueue(
+  opts: {
+    dlq?: { id: string; priority: string; retries: number }[];
+    active?: { id: string; priority: string; retries: number }[];
+    throwOnDlq?: boolean;
+  } = {},
+) {
   const state = {
     dlq: [...(opts.dlq ?? [])],
     active: [...(opts.active ?? [])],
@@ -151,19 +153,16 @@ describe("ResourceQuotaManager", () => {
 
   it("flags history-size and pending-handler violations", () => {
     const metrics = new RealMetricsCollector();
-    const qm = new ResourceQuotaManager(
-      { maxHistorySize: 10, maxPendingHandlers: 5 },
-      metrics,
-    );
-    const violations = qm.check(
-      stats({ historySize: 20, pendingHandlers: 9 }),
-    );
+    const qm = new ResourceQuotaManager({ maxHistorySize: 10, maxPendingHandlers: 5 }, metrics);
+    const violations = qm.check(stats({ historySize: 20, pendingHandlers: 9 }));
     const kinds = violations.map((v) => v.metric);
     expect(kinds).toContain("historySize");
     expect(kinds).toContain("pendingHandlers");
     expect(violations.find((v) => v.metric === "historySize")?.severity).toBe("warn");
     expect(violations.find((v) => v.metric === "pendingHandlers")?.severity).toBe("critical");
-    expect((metrics.getMetrics().gauges as Record<string, { value: number }>)["quota_violations_total"]).toBeDefined();
+    expect(
+      (metrics.getMetrics().gauges as Record<string, { value: number }>)["quota_violations_total"],
+    ).toBeDefined();
   });
 
   it("flags critical heap violations with a low limit", () => {
@@ -288,7 +287,11 @@ describe("RuntimeCompactor.compact", () => {
     expect(report.subsystems.queue.activeJobsBefore).toBe(4);
     expect(resetSpy).toHaveBeenCalled();
     expect(report.memory.heapUsedMB).toBeGreaterThan(0);
-    expect((metrics.getMetrics().counters as Record<string, { value: number }>)["compaction_cycles_total"]).toBeDefined();
+    expect(
+      (metrics.getMetrics().counters as Record<string, { value: number }>)[
+        "compaction_cycles_total"
+      ],
+    ).toBeDefined();
   });
 
   it("tolerates queue failures and missing optional subsystems", async () => {
@@ -316,7 +319,10 @@ describe("RuntimeCompactor.compact", () => {
     const leak = new LeakDetector(bus as never);
     const quota = new ResourceQuotaManager({ maxHistorySize: 2 });
     bus.state.historySize = 99;
-    const compactor = new RuntimeCompactor(bus as never, { leakDetector: leak, quotaManager: quota });
+    const compactor = new RuntimeCompactor(bus as never, {
+      leakDetector: leak,
+      quotaManager: quota,
+    });
     expect(compactor.diagnoseLeaks()).not.toBeNull();
     expect(compactor.getQuotaViolations().length).toBeGreaterThan(0);
     const bare = new RuntimeCompactor(bus as never, {});

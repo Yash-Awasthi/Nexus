@@ -16,11 +16,7 @@
  */
 
 import type { RuntimeTool, ToolContext } from "@nexus/agent-runtime";
-import {
-  compressForTool,
-  injectSystemPrompt,
-  type InjectorName,
-} from "@nexus/llm-compress";
+import { compressForTool, injectSystemPrompt, type InjectorName } from "@nexus/llm-compress";
 import { executeCode, type Runner, type SandboxLanguage } from "@nexus/sandbox";
 
 import type { ExecutionStatus } from "./session-graph.js";
@@ -326,11 +322,15 @@ export function makeRunSkillCodeTool(
       if (!language) {
         return {
           ok: false,
-          error: `Skill "${skill.name}" has unsupported language "${skill.language ?? "none"}" ` +
+          error:
+            `Skill "${skill.name}" has unsupported language "${skill.language ?? "none"}" ` +
             `(supported: python, typescript, javascript, bash)`,
         };
       }
-      const code = substituteParams(skill.code ?? "", (args.params as Record<string, unknown>) ?? {});
+      const code = substituteParams(
+        skill.code ?? "",
+        (args.params as Record<string, unknown>) ?? {},
+      );
       if (!code.trim()) {
         return { ok: false, error: `Skill "${skill.name}" has no code to execute` };
       }
@@ -345,12 +345,8 @@ export function makeRunSkillCodeTool(
       // pre-execution (started → completed/failed) via the shared helper; a
       // thrown sandbox error records `failed` and propagates so the harness
       // loop (and tool wrapper) still sees the failure.
-      const result = await runSkillWithExecution(
-        skill,
-        language,
-        timeoutMs,
-        opts.onExecution,
-        () => executeCode({ taskType: "sandbox.execute", language, code, timeoutMs }, opts.runner),
+      const result = await runSkillWithExecution(skill, language, timeoutMs, opts.onExecution, () =>
+        executeCode({ taskType: "sandbox.execute", language, code, timeoutMs }, opts.runner),
       );
       const compressed = compressForTool(
         "run_skill_code",

@@ -53,9 +53,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** Mask header values whose names look sensitive. Returns the masked keys. */
-export function maskSensitiveHeaders(
-  headers: Record<string, string>,
-): { headers: Record<string, string>; masked: string[] } {
+export function maskSensitiveHeaders(headers: Record<string, string>): {
+  headers: Record<string, string>;
+  masked: string[];
+} {
   const out: Record<string, string> = {};
   const masked: string[] = [];
   for (const [key, value] of Object.entries(headers)) {
@@ -97,10 +98,7 @@ export function maskSensitiveBody(body: unknown): { body: unknown; masked: strin
 /** Resolve a session id from request headers (LLI's session grouping). */
 export function sessionIdFor(headers: Record<string, string>): string {
   const raw =
-    headers["x-lli-session"] ??
-    headers["x-session-id"] ??
-    headers["x-request-id"] ??
-    "default";
+    headers["x-lli-session"] ?? headers["x-session-id"] ?? headers["x-request-id"] ?? "default";
   return raw.trim() || "default";
 }
 

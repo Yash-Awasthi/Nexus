@@ -197,11 +197,7 @@ export class NullConnector extends BaseConnector {
   readonly name: string;
   readonly placeholder: boolean;
 
-  constructor(
-    id = "null",
-    name = "Null Connector",
-    opts: { placeholder?: boolean } = {},
-  ) {
+  constructor(id = "null", name = "Null Connector", opts: { placeholder?: boolean } = {}) {
     super();
     this.id = id;
     this.name = name;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Intelligence Hub API — exposes all Nexus intelligence modules.
  *
@@ -20,15 +21,27 @@ export async function intelligenceHubRoutes(app: FastifyInstance) {
   // List all intelligence modules
   app.get("/modules", async () => ({
     modules: [
-      { name: "admission-control", description: "Queue-based request admission with capacity management" },
+      {
+        name: "admission-control",
+        description: "Queue-based request admission with capacity management",
+      },
       { name: "api-key-rotation", description: "Intelligent API key pool with health tracking" },
       { name: "budget-manager", description: "Time-based per-user budget tracking" },
-      { name: "complexity-router", description: "Complexity-based prompt routing for cost optimization" },
+      {
+        name: "complexity-router",
+        description: "Complexity-based prompt routing for cost optimization",
+      },
       { name: "context-pruning", description: "Dynamic conversation context management" },
-      { name: "disagreement-engine", description: "3-model structured disagreement with minority reports" },
+      {
+        name: "disagreement-engine",
+        description: "3-model structured disagreement with minority reports",
+      },
       { name: "drift-detection", description: "LLM evaluation metric monitoring for degradation" },
       { name: "heuristic-classifier", description: "14-dimension weighted scoring classifier" },
-      { name: "mixture-of-agents", description: "Layered proposer/aggregator multi-agent synthesis" },
+      {
+        name: "mixture-of-agents",
+        description: "Layered proposer/aggregator multi-agent synthesis",
+      },
       { name: "agent-checkpoint", description: "Agent state persistence with delta snapshots" },
     ],
   }));
@@ -40,7 +53,9 @@ export async function intelligenceHubRoutes(app: FastifyInstance) {
     const currentLoad = Number(body?.currentLoad) || 5;
 
     if (maxConcurrent < 1 || currentLoad < 0) {
-      return reply.code(400).send({ error: "maxConcurrent must be >= 1, currentLoad must be >= 0" });
+      return reply
+        .code(400)
+        .send({ error: "maxConcurrent must be >= 1, currentLoad must be >= 0" });
     }
 
     const admitted = currentLoad < maxConcurrent;
@@ -80,8 +95,8 @@ export async function intelligenceHubRoutes(app: FastifyInstance) {
     const { prompt = "Hello world" } = req.body as { prompt: string };
     // Simple heuristic complexity score
     const words = prompt.split(/\s+/).length;
-    const hasCode = /[{}\[\]();]/.test(prompt);
-    const hasQuestion = /\?/.test(prompt);
+    const hasCode = /[{}[\]();]/.test(prompt);
+    const hasQuestion = prompt.includes("?");
     const complexity = Math.min(100, words * 2 + (hasCode ? 30 : 0) + (hasQuestion ? 10 : 0));
     const tier = complexity < 30 ? "simple" : complexity < 70 ? "moderate" : "complex";
     return { prompt: prompt.substring(0, 100), complexity, tier, wordCount: words };
@@ -89,7 +104,10 @@ export async function intelligenceHubRoutes(app: FastifyInstance) {
 
   // Context pruning
   app.post("/pruning", async (req) => {
-    const { messages = [], maxTokens = 4000 } = req.body as { messages: string[]; maxTokens: number };
+    const { messages = [], maxTokens = 4000 } = req.body as {
+      messages: string[];
+      maxTokens: number;
+    };
     const totalChars = messages.join("").length;
     const estimatedTokens = Math.ceil(totalChars / 4);
     const needsPruning = estimatedTokens > maxTokens;
@@ -106,7 +124,9 @@ export async function intelligenceHubRoutes(app: FastifyInstance) {
 
   // Disagreement engine
   app.post("/disagreement", async (req) => {
-    const { question = "What is the best programming language?" } = req.body as { question: string };
+    const { question = "What is the best programming language?" } = req.body as {
+      question: string;
+    };
     return {
       question,
       models: ["model-a", "model-b", "model-c"],
@@ -124,7 +144,9 @@ export async function intelligenceHubRoutes(app: FastifyInstance) {
 
   // Drift detection
   app.post("/drift/check", async (req) => {
-    const { metricHistory = [0.85, 0.84, 0.83, 0.82, 0.78] } = req.body as { metricHistory: number[] };
+    const { metricHistory = [0.85, 0.84, 0.83, 0.82, 0.78] } = req.body as {
+      metricHistory: number[];
+    };
     const baseline = metricHistory.slice(0, 3).reduce((a, b) => a + b, 0) / 3;
     const recent = metricHistory.slice(-2).reduce((a, b) => a + b, 0) / 2;
     const change = ((recent - baseline) / baseline) * 100;
@@ -163,9 +185,11 @@ export async function intelligenceHubRoutes(app: FastifyInstance) {
       },
       layer2: {
         aggregators: ["aggregator-1"],
-        synthesized: "AI delivers efficiency, automation, and data-driven insights across industries",
+        synthesized:
+          "AI delivers efficiency, automation, and data-driven insights across industries",
       },
-      finalOutput: "AI transforms industries through improved efficiency, intelligent automation, and actionable data insights",
+      finalOutput:
+        "AI transforms industries through improved efficiency, intelligent automation, and actionable data insights",
       layersUsed: 2,
       agentsInvolved: 4,
     };
@@ -173,7 +197,10 @@ export async function intelligenceHubRoutes(app: FastifyInstance) {
 
   // Checkpoint save/load
   app.post("/checkpoint/save", async (req) => {
-    const { agentId = "agent-1", state = {} } = req.body as { agentId: string; state: Record<string, unknown> };
+    const { agentId = "agent-1", state = {} } = req.body as {
+      agentId: string;
+      state: Record<string, unknown>;
+    };
     const checkpointId = `cp-${Date.now()}`;
     return {
       checkpointId,
@@ -187,9 +214,15 @@ export async function intelligenceHubRoutes(app: FastifyInstance) {
   // Health check — verify all intelligence modules are importable
   app.get("/health", async () => {
     const modules = [
-      "admission-control", "budget-manager", "complexity-router",
-      "context-pruning", "disagreement-engine", "drift-detection",
-      "heuristic-classifier", "mixture-of-agents", "agent-checkpoint",
+      "admission-control",
+      "budget-manager",
+      "complexity-router",
+      "context-pruning",
+      "disagreement-engine",
+      "drift-detection",
+      "heuristic-classifier",
+      "mixture-of-agents",
+      "agent-checkpoint",
     ];
     return { status: "healthy", modules: modules.length, modules_list: modules };
   });

@@ -24,10 +24,10 @@
  * the engine uses, so nothing here is provider-coupled.
  */
 
+import { mulberry32 } from "@nexus/shared";
+
 import type { Archetype } from "./archetypes.js";
 import { summonArchetypes } from "./archetypes.js";
-import type { ILLMResponse, ILLMTransport } from "./engine.js";
-import { mulberry32 } from "@nexus/shared";
 import {
   parseBordaRanking,
   tallyBorda,
@@ -35,6 +35,7 @@ import {
   type BordaResult,
   type BordaRanking,
 } from "./borda.js";
+import type { ILLMResponse, ILLMTransport } from "./engine.js";
 
 export {
   parseBordaRanking,
@@ -252,9 +253,7 @@ export class DeliberativeCouncil {
     seed = 42,
   ): Promise<{ reviews: PeerReview[]; anonymization: Record<string, string> }> {
     const { positions: lettered, mapping } = anonymizePositions(positions, seed);
-    const body = lettered
-      .map((p) => `**Response ${p.letter}:**\n${p.content}`)
-      .join("\n\n");
+    const body = lettered.map((p) => `**Response ${p.letter}:**\n${p.content}`).join("\n\n");
     const reviews = await Promise.all(
       this.advisors.map(async (a) => {
         const content = await this.respond(
@@ -283,9 +282,7 @@ export class DeliberativeCouncil {
     reviews: readonly PeerReview[],
     anonymization: Record<string, string>,
   ): Promise<CouncilVerdict> {
-    const deAnonymized = positions
-      .map((p) => `**${p.advisor}:**\n${p.content}`)
-      .join("\n\n");
+    const deAnonymized = positions.map((p) => `**${p.advisor}:**\n${p.content}`).join("\n\n");
     const reviewBody = reviews
       .map((r) => {
         const target = anonymization[r.strongestResponse] ?? r.strongestResponse;
@@ -325,11 +322,13 @@ export class DeliberativeCouncil {
     question: string,
     positions: readonly AdvisorPosition[],
     seed = 42,
-  ): Promise<{ rankings: BordaRanking[]; tally: BordaResult; anonymization: Record<string, string> }> {
+  ): Promise<{
+    rankings: BordaRanking[];
+    tally: BordaResult;
+    anonymization: Record<string, string>;
+  }> {
     const { positions: lettered, mapping } = anonymizePositions(positions, seed);
-    const body = lettered
-      .map((p) => `**Response ${p.letter}:**\n${p.content}`)
-      .join("\n\n");
+    const body = lettered.map((p) => `**Response ${p.letter}:**\n${p.content}`).join("\n\n");
     const rankings = await Promise.all(
       this.advisors.map(async (a) => {
         const content = await this.respond(
@@ -411,7 +410,12 @@ function answerDetail(segment: string): string {
   const dash = segment.indexOf("—");
   if (dash >= 0) return segment.slice(dash + 1).trim();
   const colon = segment.indexOf(":");
-  return colon >= 0 ? segment.slice(colon + 1).trim().replace(/^[.\s]+/, "") : segment.trim();
+  return colon >= 0
+    ? segment
+        .slice(colon + 1)
+        .trim()
+        .replace(/^[.\s]+/, "")
+    : segment.trim();
 }
 
 /**
@@ -421,7 +425,10 @@ function answerDetail(segment: string): string {
  */
 export function parseReview(
   text: string,
-): Pick<PeerReview, "strongestResponse" | "strongestReason" | "biggestBlindSpot" | "blindSpotDetail" | "missedByAll"> {
+): Pick<
+  PeerReview,
+  "strongestResponse" | "strongestReason" | "biggestBlindSpot" | "blindSpotDetail" | "missedByAll"
+> {
   const out = {
     strongestResponse: "",
     strongestReason: "",

@@ -51,10 +51,7 @@ export async function fetchWithTimeout(
     }, timeoutMs);
   });
   try {
-    return await Promise.race([
-      fetch(url, { ...init, signal: controller.signal }),
-      timeout,
-    ]);
+    return await Promise.race([fetch(url, { ...init, signal: controller.signal }), timeout]);
   } catch (err) {
     if (err instanceof Error && err.message.startsWith("KV fetch timed out")) throw err;
     if (controller.signal.aborted) {
@@ -106,7 +103,7 @@ function toRedisClientLike(client: RedisLike): RedisClientLike {
         : Promise.resolve(client.set(key, value)),
     del: (key) => Promise.resolve(client.del(Array.isArray(key) ? key : [key])) as Promise<number>,
     flushAll: () => Promise.resolve(client.flushall()),
-    exists: async (key) => Number(await client.exists(key)),
+    exists: async (key) => (await client.exists(key)) as number,
     incr: (key) => Promise.resolve(client.incr(key)) as Promise<number>,
     expire: (key, seconds) => Promise.resolve(client.expire(key, seconds)),
     keys: (pattern) => Promise.resolve(client.keys(pattern)) as Promise<string[]>,

@@ -89,7 +89,10 @@ export function TaskColumns({ projectId, projectName, onBack }: TaskColumnsProps
         <Button
           variant="outline"
           size="sm"
-          onClick={() => { setShowArchive(!showArchive); if (!showArchive) fetchArchive(); }}
+          onClick={() => {
+            setShowArchive(!showArchive);
+            if (!showArchive) fetchArchive();
+          }}
         >
           <Archive className="h-4 w-4 mr-1" /> Archive
         </Button>
@@ -135,7 +138,10 @@ export function TaskColumns({ projectId, projectName, onBack }: TaskColumnsProps
           ) : (
             <div className="space-y-2">
               {archivedTasks.map((t) => (
-                <div key={t.id} className="flex items-center justify-between p-2 rounded bg-muted/30">
+                <div
+                  key={t.id}
+                  className="flex items-center justify-between p-2 rounded bg-muted/30"
+                >
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground font-mono">
                       {AGENT_LABELS[t.agent]?.glyph ?? "?"}
@@ -193,14 +199,10 @@ function TaskColumn({
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="text-sm font-medium">{t.title}</span>
-                {shimmer && (
-                  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                )}
+                {shimmer && <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />}
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="font-mono">
-                  {AGENT_LABELS[t.agent]?.glyph ?? "?"}
-                </span>
+                <span className="font-mono">{AGENT_LABELS[t.agent]?.glyph ?? "?"}</span>
                 <span>{AGENT_LABELS[t.agent]?.label ?? t.agent}</span>
                 {t.branch && <span>· {t.branch}</span>}
                 {t.lines > 0 && <span>· +{t.lines} lines</span>}
@@ -213,7 +215,12 @@ function TaskColumn({
                   <Terminal className="h-3 w-3 mr-1" /> Open
                 </Button>
                 {t.status === "done" && onArchive && (
-                  <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => onArchive(t.id)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={() => onArchive(t.id)}
+                  >
                     <Archive className="h-3 w-3 mr-1" /> Archive
                   </Button>
                 )}

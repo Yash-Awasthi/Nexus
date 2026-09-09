@@ -77,7 +77,7 @@ export default function AdminUsersPage() {
           setErr(
             r.status === 403
               ? "Admin access required — this page is restricted to platform administrators."
-              : body.error ?? `Failed to load users (${r.status})`,
+              : (body.error ?? `Failed to load users (${r.status})`),
           );
           return;
         }

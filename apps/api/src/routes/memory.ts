@@ -19,12 +19,7 @@
  */
 
 import { globalHooks } from "@nexus/hooks";
-import {
-  InMemoryStore,
-  MemoryManager,
-  PgVectorStore,
-  createBestEmbedder,
-} from "@nexus/memory";
+import { InMemoryStore, MemoryManager, PgVectorStore, createBestEmbedder } from "@nexus/memory";
 import {
   RagtimeRetriever,
   type IEmbedder as IRagtimeEmbedder,
@@ -82,10 +77,7 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
     // No query → list recent entries (no embedding). Embedding an empty string
     // makes some backends (Ollama) return an empty vector → EMBED_FAILED 500.
     if (!query.trim()) {
-      const entries = (await manager.list({ metadata: { userId: uid } })).slice(
-        0,
-        limit,
-      );
+      const entries = (await manager.list({ metadata: { userId: uid } })).slice(0, limit);
       return reply.send({
         results: entries.map((e) => ({
           id: e.id,

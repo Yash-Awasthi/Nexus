@@ -115,7 +115,11 @@ describe("ScrapingExecutionAdapter", () => {
       maxRequests: 5,
     });
     expect(out.success).toBe(true);
-    expect(mocks.post).toHaveBeenCalledWith("http://localhost:7702", "/fetch_stealth", expect.anything());
+    expect(mocks.post).toHaveBeenCalledWith(
+      "http://localhost:7702",
+      "/fetch_stealth",
+      expect.anything(),
+    );
     expect(out.data.__text__).toBe("linkedin text");
     expect(t.recordFetch).toHaveBeenCalledWith(500);
   });
@@ -149,7 +153,17 @@ describe("ScrapingExecutionAdapter", () => {
 
   it("reports bridge failure results and network errors", async () => {
     const t = telemetry();
-    mocks.post.mockResolvedValueOnce({ success: false, error: "429 blocked", url: "", status_code: 429, html: "", text: "", extracted: {}, pages_crawled: 0, bytes_fetched: 0 });
+    mocks.post.mockResolvedValueOnce({
+      success: false,
+      error: "429 blocked",
+      url: "",
+      status_code: 429,
+      html: "",
+      text: "",
+      extracted: {},
+      pages_crawled: 0,
+      bytes_fetched: 0,
+    });
     const adapter = new ScrapingExecutionAdapter(t as never, false);
     const failed = await adapter.executeScrapingTask({
       id: "5",

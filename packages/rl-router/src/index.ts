@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @nexus/rl-router — RL-trained cost-aware LLM routing.
  *
@@ -44,7 +45,7 @@ export interface RoutingRequest {
   /** Latency constraint in ms (0 = no limit) */
   latencyMs?: number;
   /** Priority: high, medium, low */
-  priority?: 'high' | 'medium' | 'low';
+  priority?: "high" | "medium" | "low";
 }
 
 export interface RoutingDecision {
@@ -67,12 +68,12 @@ export interface RoutingDecision {
 }
 
 export type RoutingStrategy =
-  | 'cost-optimal'
-  | 'quality-first'
-  | 'latency-first'
-  | 'balanced'
-  | 'budget-constrained'
-  | 'rl-trained';
+  | "cost-optimal"
+  | "quality-first"
+  | "latency-first"
+  | "balanced"
+  | "budget-constrained"
+  | "rl-trained";
 
 export interface RoutingOutcome {
   requestId: string;
@@ -110,7 +111,7 @@ export interface QueryComplexity {
   /** Complexity score 0-1 */
   score: number;
   /** Complexity tier */
-  tier: 'trivial' | 'simple' | 'moderate' | 'complex' | 'expert';
+  tier: "trivial" | "simple" | "moderate" | "complex" | "expert";
   /** Detected features */
   features: string[];
 }
@@ -123,14 +124,46 @@ export class ComplexityClassifier {
     pattern: RegExp;
     weight: number;
   }> = [
-    { name: 'code-generation', pattern: /\b(write|implement|code|function|class|module|debug|refactor)\b/i, weight: 0.7 },
-    { name: 'math-reasoning', pattern: /\b(prove|theorem|equation|integral|derivative|proof|calculate)\b/i, weight: 0.8 },
-    { name: 'analysis', pattern: /\b(analyze|compare|evaluate|critique|assess|review)\b/i, weight: 0.6 },
-    { name: 'creative', pattern: /\b(write|compose|create|draft|story|poem|essay)\b/i, weight: 0.5 },
-    { name: 'multi-step', pattern: /\b(step.by.step|first.*then|plan|workflow|pipeline|orchestrat)\b/i, weight: 0.7 },
-    { name: 'domain-specific', pattern: /\b(medical|legal|financial|scientific|technical)\b/i, weight: 0.6 },
-    { name: 'long-context', pattern: /\b(document|article|paper|chapter|book|summary)\b/i, weight: 0.5 },
-    { name: 'tool-use', pattern: /\b(tool|api|function.call|plugin|integration|webhook)\b/i, weight: 0.6 },
+    {
+      name: "code-generation",
+      pattern: /\b(write|implement|code|function|class|module|debug|refactor)\b/i,
+      weight: 0.7,
+    },
+    {
+      name: "math-reasoning",
+      pattern: /\b(prove|theorem|equation|integral|derivative|proof|calculate)\b/i,
+      weight: 0.8,
+    },
+    {
+      name: "analysis",
+      pattern: /\b(analyze|compare|evaluate|critique|assess|review)\b/i,
+      weight: 0.6,
+    },
+    {
+      name: "creative",
+      pattern: /\b(write|compose|create|draft|story|poem|essay)\b/i,
+      weight: 0.5,
+    },
+    {
+      name: "multi-step",
+      pattern: /\b(step.by.step|first.*then|plan|workflow|pipeline|orchestrat)\b/i,
+      weight: 0.7,
+    },
+    {
+      name: "domain-specific",
+      pattern: /\b(medical|legal|financial|scientific|technical)\b/i,
+      weight: 0.6,
+    },
+    {
+      name: "long-context",
+      pattern: /\b(document|article|paper|chapter|book|summary)\b/i,
+      weight: 0.5,
+    },
+    {
+      name: "tool-use",
+      pattern: /\b(tool|api|function.call|plugin|integration|webhook)\b/i,
+      weight: 0.6,
+    },
   ];
 
   classify(prompt: string): QueryComplexity {
@@ -150,29 +183,38 @@ export class ComplexityClassifier {
     const tokenEstimate = prompt.split(/\s+/).length * 1.3;
     if (tokenEstimate > 2000) {
       totalWeight += 0.2;
-      features.push('long-prompt');
+      features.push("long-prompt");
     }
     if (tokenEstimate > 8000) {
       totalWeight += 0.2;
-      features.push('very-long-prompt');
+      features.push("very-long-prompt");
     }
 
     // Factor in structural complexity (lists, code blocks, tables)
     const hasCodeBlocks = /```[\s\S]*```/.test(prompt);
     const hasLists = /^\s*[-*]\s/gm.test(prompt);
     const hasTables = /\|.*\|.*\|/.test(prompt);
-    if (hasCodeBlocks) { totalWeight += 0.15; features.push('code-blocks'); }
-    if (hasLists) { totalWeight += 0.05; features.push('structured-lists'); }
-    if (hasTables) { totalWeight += 0.1; features.push('tables'); }
+    if (hasCodeBlocks) {
+      totalWeight += 0.15;
+      features.push("code-blocks");
+    }
+    if (hasLists) {
+      totalWeight += 0.05;
+      features.push("structured-lists");
+    }
+    if (hasTables) {
+      totalWeight += 0.1;
+      features.push("tables");
+    }
 
     const score = Math.min(1, totalWeight / 3);
 
-    let tier: QueryComplexity['tier'];
-    if (score < 0.15) tier = 'trivial';
-    else if (score < 0.35) tier = 'simple';
-    else if (score < 0.55) tier = 'moderate';
-    else if (score < 0.75) tier = 'complex';
-    else tier = 'expert';
+    let tier: QueryComplexity["tier"];
+    if (score < 0.15) tier = "trivial";
+    else if (score < 0.35) tier = "simple";
+    else if (score < 0.55) tier = "moderate";
+    else if (score < 0.75) tier = "complex";
+    else tier = "expert";
 
     return { score, tier, features };
   }
@@ -222,30 +264,30 @@ export class CostAwareRouter {
 
   // ── Routing ────────────────────────────────────────────────────────
 
-  route(request: RoutingRequest, strategy: RoutingStrategy = 'balanced'): RoutingDecision {
+  route(request: RoutingRequest, strategy: RoutingStrategy = "balanced"): RoutingDecision {
     const candidates = this.filterCandidates(request);
     const complexity = this.complexityClassifier.classify(request.prompt);
 
     if (candidates.length === 0) {
-      throw new Error('No models match the request constraints');
+      throw new Error("No models match the request constraints");
     }
 
     let scored: Array<{ model: ModelSpec; score: number; reason: string }>;
 
     switch (strategy) {
-      case 'rl-trained':
+      case "rl-trained":
         scored = this.rlRoute(candidates, complexity);
         break;
-      case 'cost-optimal':
+      case "cost-optimal":
         scored = this.costOptimalRoute(candidates);
         break;
-      case 'quality-first':
+      case "quality-first":
         scored = this.qualityFirstRoute(candidates);
         break;
-      case 'latency-first':
+      case "latency-first":
         scored = this.latencyFirstRoute(candidates);
         break;
-      case 'budget-constrained':
+      case "budget-constrained":
         scored = this.budgetConstrainedRoute(candidates, request.budgetUsd ?? Infinity);
         break;
       default:
@@ -261,7 +303,7 @@ export class CostAwareRouter {
       reason: best.reason,
       estimatedCostUsd: this.estimateCost(best.model, request.estimatedTokens),
       confidence: best.score,
-      alternatives: scored.slice(1, 4).map(s => ({
+      alternatives: scored.slice(1, 4).map((s) => ({
         modelId: s.model.id,
         score: s.score,
         reason: s.reason,
@@ -290,9 +332,7 @@ export class CostAwareRouter {
     const qualityReward = outcome.qualityRating ?? 0.5;
     const latencyReward = outcome.withinLatency ? 1.0 : 0.5;
     const budgetReward = outcome.withinBudget ? 1.0 : 0.3;
-    const satisfactionReward = outcome.satisfactionScore
-      ? outcome.satisfactionScore / 5
-      : 0.5;
+    const satisfactionReward = outcome.satisfactionScore ? outcome.satisfactionScore / 5 : 0.5;
 
     const reward =
       0.3 * qualityReward +
@@ -304,10 +344,7 @@ export class CostAwareRouter {
     // Update running average
     const prevSum = this.rlState.rewardSums.get(outcome.modelId) ?? 0;
     this.rlState.rewardSums.set(outcome.modelId, prevSum + reward);
-    this.rlState.averageRewards.set(
-      outcome.modelId,
-      (prevSum + reward) / (visits + 1),
-    );
+    this.rlState.averageRewards.set(outcome.modelId, (prevSum + reward) / (visits + 1));
 
     // Decay exploration
     this.rlState.explorationRate *= this.rlState.explorationDecay;
@@ -323,7 +360,7 @@ export class CostAwareRouter {
     totalOutcomes: number;
   } {
     const modelRankings = Array.from(this.models.keys())
-      .map(modelId => ({
+      .map((modelId) => ({
         modelId,
         avgReward: this.rlState.averageRewards.get(modelId) ?? 0,
         visits: this.rlState.visitCounts.get(modelId) ?? 0,
@@ -340,13 +377,13 @@ export class CostAwareRouter {
   // ── Private Routing Strategies ─────────────────────────────────────
 
   private filterCandidates(request: RoutingRequest): ModelSpec[] {
-    return Array.from(this.models.values()).filter(model => {
+    return Array.from(this.models.values()).filter((model) => {
       // Check context window
       if (request.estimatedTokens > model.maxContextTokens) return false;
 
       // Check capabilities
       if (request.requiredCapabilities?.length) {
-        const hasAll = request.requiredCapabilities.every(cap =>
+        const hasAll = request.requiredCapabilities.every((cap) =>
           model.capabilities.includes(cap),
         );
         if (!hasAll) return false;
@@ -371,21 +408,20 @@ export class CostAwareRouter {
     if (Math.random() < this.rlState.explorationRate) {
       // Explore: random selection
       const shuffled = [...candidates].sort(() => Math.random() - 0.5);
-      return shuffled.map(model => ({
+      return shuffled.map((model) => ({
         model,
         score: Math.random() * 0.5,
-        reason: 'Exploration (epsilon-greedy)',
+        reason: "Exploration (epsilon-greedy)",
       }));
     }
 
     // Exploit: use learned rewards
-    return candidates.map(model => {
+    return candidates.map((model) => {
       const avgReward = this.rlState.averageRewards.get(model.id) ?? 0;
       const visits = this.rlState.visitCounts.get(model.id) ?? 0;
       // UCB1 exploration bonus
-      const explorationBonus = visits > 0
-        ? Math.sqrt((2 * Math.log(this.rlState.trainingSteps + 1)) / visits)
-        : 10; // High bonus for unvisited models
+      const explorationBonus =
+        visits > 0 ? Math.sqrt((2 * Math.log(this.rlState.trainingSteps + 1)) / visits) : 10; // High bonus for unvisited models
       const score = avgReward + 0.3 * explorationBonus;
       return {
         model,
@@ -398,8 +434,8 @@ export class CostAwareRouter {
   private costOptimalRoute(
     candidates: ModelSpec[],
   ): Array<{ model: ModelSpec; score: number; reason: string }> {
-    return candidates.map(model => {
-      const costScore = 1 - (model.inputCostPer1k / 0.1); // normalize against $0.10/1k
+    return candidates.map((model) => {
+      const costScore = 1 - model.inputCostPer1k / 0.1; // normalize against $0.10/1k
       const score = Math.max(0, costScore) * 0.7 + model.qualityScore * 0.3;
       return {
         model,
@@ -412,7 +448,7 @@ export class CostAwareRouter {
   private qualityFirstRoute(
     candidates: ModelSpec[],
   ): Array<{ model: ModelSpec; score: number; reason: string }> {
-    return candidates.map(model => {
+    return candidates.map((model) => {
       const score = model.qualityScore * 0.8 + (1 - model.avgLatencyMs / 10000) * 0.2;
       return {
         model,
@@ -425,7 +461,7 @@ export class CostAwareRouter {
   private latencyFirstRoute(
     candidates: ModelSpec[],
   ): Array<{ model: ModelSpec; score: number; reason: string }> {
-    return candidates.map(model => {
+    return candidates.map((model) => {
       const latencyScore = 1 - model.avgLatencyMs / 10000;
       const score = latencyScore * 0.8 + model.qualityScore * 0.2;
       return {
@@ -441,8 +477,8 @@ export class CostAwareRouter {
     budgetUsd: number,
   ): Array<{ model: ModelSpec; score: number; reason: string }> {
     return candidates
-      .filter(model => this.estimateCost(model, 1000) <= budgetUsd)
-      .map(model => {
+      .filter((model) => this.estimateCost(model, 1000) <= budgetUsd)
+      .map((model) => {
         const costEfficiency = 1 - this.estimateCost(model, 1000) / budgetUsd;
         const score = costEfficiency * 0.6 + model.qualityScore * 0.4;
         return {
@@ -462,7 +498,7 @@ export class CostAwareRouter {
     const costWeight = 0.3 - complexity.score * 0.15;
     const latencyWeight = 0.4 - complexity.score * 0.15;
 
-    return candidates.map(model => {
+    return candidates.map((model) => {
       const costScore = 1 - model.inputCostPer1k / 0.1;
       const latencyScore = 1 - model.avgLatencyMs / 10000;
 
@@ -497,75 +533,75 @@ export function createComplexityClassifier(): ComplexityClassifier {
 /** Default model catalog for quick setup */
 export const DEFAULT_MODELS: ModelSpec[] = [
   {
-    id: 'gpt-4o',
-    name: 'GPT-4o',
-    provider: 'openai',
+    id: "gpt-4o",
+    name: "GPT-4o",
+    provider: "openai",
     inputCostPer1k: 0.0025,
     outputCostPer1k: 0.01,
     avgLatencyMs: 2000,
     qualityScore: 0.92,
     maxContextTokens: 128000,
-    capabilities: ['code', 'math', 'analysis', 'vision', 'tool-use'],
+    capabilities: ["code", "math", "analysis", "vision", "tool-use"],
     rateLimitRpm: 500,
   },
   {
-    id: 'gpt-4o-mini',
-    name: 'GPT-4o Mini',
-    provider: 'openai',
+    id: "gpt-4o-mini",
+    name: "GPT-4o Mini",
+    provider: "openai",
     inputCostPer1k: 0.00015,
     outputCostPer1k: 0.0006,
     avgLatencyMs: 800,
     qualityScore: 0.78,
     maxContextTokens: 128000,
-    capabilities: ['code', 'math', 'analysis', 'tool-use'],
+    capabilities: ["code", "math", "analysis", "tool-use"],
     rateLimitRpm: 2000,
   },
   {
-    id: 'claude-sonnet-4',
-    name: 'Claude Sonnet 4',
-    provider: 'anthropic',
+    id: "claude-sonnet-4",
+    name: "Claude Sonnet 4",
+    provider: "anthropic",
     inputCostPer1k: 0.003,
     outputCostPer1k: 0.015,
     avgLatencyMs: 1800,
     qualityScore: 0.91,
     maxContextTokens: 200000,
-    capabilities: ['code', 'math', 'analysis', 'tool-use'],
+    capabilities: ["code", "math", "analysis", "tool-use"],
     rateLimitRpm: 400,
   },
   {
-    id: 'claude-haiku-3.5',
-    name: 'Claude 3.5 Haiku',
-    provider: 'anthropic',
+    id: "claude-haiku-3.5",
+    name: "Claude 3.5 Haiku",
+    provider: "anthropic",
     inputCostPer1k: 0.0008,
     outputCostPer1k: 0.004,
     avgLatencyMs: 600,
     qualityScore: 0.8,
     maxContextTokens: 200000,
-    capabilities: ['code', 'analysis', 'tool-use'],
+    capabilities: ["code", "analysis", "tool-use"],
     rateLimitRpm: 1000,
   },
   {
-    id: 'gemini-2.5-pro',
-    name: 'Gemini 2.5 Pro',
-    provider: 'google',
+    id: "gemini-2.5-pro",
+    name: "Gemini 2.5 Pro",
+    provider: "google",
     inputCostPer1k: 0.00125,
     outputCostPer1k: 0.01,
     avgLatencyMs: 2200,
     qualityScore: 0.9,
     maxContextTokens: 1000000,
-    capabilities: ['code', 'math', 'analysis', 'vision', 'tool-use'],
+    capabilities: ["code", "math", "analysis", "vision", "tool-use"],
     rateLimitRpm: 300,
   },
   {
-    id: 'gemini-2.5-flash',
-    name: 'Gemini 2.5 Flash',
-    provider: 'google',
+    id: "gemini-2.5-flash",
+    name: "Gemini 2.5 Flash",
+    provider: "google",
     inputCostPer1k: 0.000075,
     outputCostPer1k: 0.0003,
     avgLatencyMs: 500,
     qualityScore: 0.76,
     maxContextTokens: 1000000,
-    capabilities: ['code', 'analysis'],
+    capabilities: ["code", "analysis"],
     rateLimitRpm: 2000,
   },
 ];

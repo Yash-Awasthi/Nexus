@@ -64,10 +64,7 @@ describe("weightedAlphaFusion", () => {
     const r = weightedAlphaFusion(dense, sparse, { alpha: 0.5 });
     expect(r.find((h) => h.id === "d2")!.text).toBe("d2 dense text"); // both sides have d2
     expect(r.find((h) => h.id === "d3")!.text).toBe("sparse text"); // d3 sparse-only
-    const both = weightedAlphaFusion(
-      [hit("x", 1, "dense")],
-      [hit("x", 0.9, "sparse")],
-    );
+    const both = weightedAlphaFusion([hit("x", 1, "dense")], [hit("x", 0.9, "sparse")]);
     expect(both[0]!.text).toBe("dense");
   });
 });

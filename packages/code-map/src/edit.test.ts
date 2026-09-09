@@ -20,21 +20,29 @@ describe("addImportDeclaration", () => {
 
   it("merges a default import into an existing named import", () => {
     const src = "import { helper } from './util';\n";
-    const out = addImportDeclaration(src, { defaultImport: "u", namedImports: ["extra"], from: "./util" });
+    const out = addImportDeclaration(src, {
+      defaultImport: "u",
+      namedImports: ["extra"],
+      from: "./util",
+    });
     expect(out).toBe("import u, { extra, helper } from './util';\n");
   });
 
   it("returns the input unchanged when everything is already imported", () => {
     const src = "import { a, b } from './x';\n";
     expect(addImportDeclaration(src, { namedImports: ["a"], from: "./x" })).toBe(src);
-    expect(addImportDeclaration(src, { defaultImport: "d", namedImports: ["a", "b"], from: "./x" })).toBe(
-      "import d, { a, b } from './x';\n",
-    );
+    expect(
+      addImportDeclaration(src, { defaultImport: "d", namedImports: ["a", "b"], from: "./x" }),
+    ).toBe("import d, { a, b } from './x';\n");
   });
 
   it("keeps import type in its own declaration family", () => {
     const src = "import { login } from './auth';\n";
-    const out = addImportDeclaration(src, { namedImports: ["User"], from: "./auth", typeOnly: true });
+    const out = addImportDeclaration(src, {
+      namedImports: ["User"],
+      from: "./auth",
+      typeOnly: true,
+    });
     expect(out).toBe("import { login } from './auth';\nimport type { User } from './auth';\n");
   });
 
@@ -47,7 +55,9 @@ describe("addImportDeclaration", () => {
   it("inserts before the first body statement when the file has no imports", () => {
     const src = "// header comment\n\nconst x = 1;\nexport default x;\n";
     const out = addImportDeclaration(src, { namedImports: ["f"], from: "./f" });
-    expect(out).toBe("// header comment\n\nimport { f } from './f';\nconst x = 1;\nexport default x;\n");
+    expect(out).toBe(
+      "// header comment\n\nimport { f } from './f';\nconst x = 1;\nexport default x;\n",
+    );
   });
 
   it("matches the file's no-semicolon style for fresh imports", () => {
@@ -65,7 +75,9 @@ describe("addImportDeclaration", () => {
 
   it("throws on empty specs", () => {
     expect(() => addImportDeclaration("", { from: "./x" })).toThrow(/nothing to import/);
-    expect(() => addImportDeclaration("", { namedImports: ["a"], from: "" })).toThrow(/from.*required/);
+    expect(() => addImportDeclaration("", { namedImports: ["a"], from: "" })).toThrow(
+      /from.*required/,
+    );
   });
 });
 

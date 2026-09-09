@@ -40,7 +40,7 @@ interface Graph {
 }
 
 function makeGraph(adj: number[][]): Graph {
-  return { adj, loop: new Array(adj.length).fill(0), deg: adj.map((ns) => ns.length) };
+  return { adj, loop: new Array<number>(adj.length).fill(0), deg: adj.map((ns) => ns.length) };
 }
 
 /** Contract nodes of a partition into supernodes; edges are counted as multiedges. */
@@ -59,7 +59,7 @@ function aggregate(g: Graph, comm: number[]): Graph {
   }
   const k = members.length;
   const adj: number[][] = Array.from({ length: k }, () => []);
-  const loop = new Array(k).fill(0);
+  const loop: number[] = new Array<number>(k).fill(0);
   for (let s = 0; s < k; s++) {
     let internal = 0;
     for (const u of members[s]!) {
@@ -71,7 +71,7 @@ function aggregate(g: Graph, comm: number[]): Graph {
     }
     loop[s]! += internal / 2;
   }
-  const deg = adj.map((ns, i) => ns.length + 2 * loop[i]);
+  const deg: number[] = adj.map((ns, i) => ns.length + 2 * loop[i]!);
   return { adj, loop, deg };
 }
 
@@ -170,7 +170,7 @@ function refine(g: Graph, resolution: number, moved: PartitionState): number[] {
       for (const v of g.adj[u]!) {
         const rv = st.comm[v]!;
         // Target refined community must stay inside u's moving-phase community.
-        if (rv !== ru && moved.comm[v]! === moved.comm[u]!) {
+        if (rv !== ru && moved.comm[v] === moved.comm[u]) {
           kTo.set(rv, (kTo.get(rv) ?? 0) + 1);
         }
       }
@@ -239,7 +239,9 @@ export function detectCommunities(
 
   const nodeIds = [...adjacency.keys()];
   const idx = new Map(nodeIds.map((id, i) => [id, i]));
-  const adj: number[][] = nodeIds.map((id) => [...(adjacency.get(id) ?? [])].map((v) => idx.get(v)!));
+  const adj: number[][] = nodeIds.map((id) =>
+    [...(adjacency.get(id) ?? [])].map((v) => idx.get(v)!),
+  );
   let g = makeGraph(adj);
 
   const levels: number[][] = [];
@@ -283,7 +285,7 @@ export function modularity(
   for (let u = 0; u < nodeIds.length; u++) {
     tot.set(comm[u]!, (tot.get(comm[u]!) ?? 0) + adj[u]!.length);
     for (const v of adj[u]!) {
-      if (comm[v]! === comm[u]!) kIn.set(comm[u]!, (kIn.get(comm[u]!) ?? 0) + 1);
+      if (comm[v] === comm[u]) kIn.set(comm[u]!, (kIn.get(comm[u]!) ?? 0) + 1);
     }
   }
   let q = 0;

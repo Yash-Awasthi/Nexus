@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Agent Orchestrator — Multi-agent coordination and task delegation
 Inspired by CrewAI, LangGraph, and AutoGen patterns

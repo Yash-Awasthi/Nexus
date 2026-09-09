@@ -141,7 +141,12 @@ export function parseCypher(query: string): CypherQuery {
         WhereCondition["operator"],
         string,
       ];
-      where.push({ variable, field, operator: operator.toUpperCase() as WhereCondition["operator"], value: parseValue(rawValue) });
+      where.push({
+        variable,
+        field,
+        operator: operator.toUpperCase() as WhereCondition["operator"],
+        value: parseValue(rawValue),
+      });
     }
   }
 
@@ -151,9 +156,17 @@ export function parseCypher(query: string): CypherQuery {
     projections = ret.split(",").map((part) => {
       const proj = PROJ_RE.exec(part.trim());
       if (!proj) {
-        throw new KGError(`Unsupported RETURN projection: "${part.trim()}" (supported: var or var.field, optional AS alias)`, "QUERY_SYNTAX");
+        throw new KGError(
+          `Unsupported RETURN projection: "${part.trim()}" (supported: var or var.field, optional AS alias)`,
+          "QUERY_SYNTAX",
+        );
       }
-      const [, variable, field, alias] = proj as unknown as [string, string, string | undefined, string | undefined];
+      const [, variable, field, alias] = proj as unknown as [
+        string,
+        string,
+        string | undefined,
+        string | undefined,
+      ];
       return {
         variable,
         field,
@@ -201,7 +214,9 @@ function satisfies(cond: WhereCondition, nodes: Record<string, KGNode>): boolean
     case "=":
       return actual === want || String(actual) === String(want);
     case "CONTAINS":
-      return typeof actual === "string" && actual.toLowerCase().includes(String(want).toLowerCase());
+      return (
+        typeof actual === "string" && actual.toLowerCase().includes(String(want).toLowerCase())
+      );
     default: {
       if (typeof actual !== "number" || typeof want !== "number") return false;
       switch (cond.operator) {
@@ -257,7 +272,9 @@ export async function runCypher(store: KGStore, query: string): Promise<CypherRe
     const row: Record<string, unknown> = {};
     if (parsed.projections) {
       for (const proj of parsed.projections) {
-        row[proj.alias] = proj.field ? fieldOf(bound[proj.variable]!, proj.field) : bound[proj.variable];
+        row[proj.alias] = proj.field
+          ? fieldOf(bound[proj.variable]!, proj.field)
+          : bound[proj.variable];
       }
     } else {
       for (const v of columns) row[v] = bound[v];

@@ -163,9 +163,7 @@ function PlaygroundWindowComponent({
     <div className="flex flex-col border border-border rounded-lg bg-background overflow-hidden">
       {/* Window header */}
       <div className="h-10 border-b border-border flex items-center px-3 gap-2 bg-muted/30 shrink-0">
-        <span className="text-xs font-medium text-muted-foreground truncate flex-1">
-          Window
-        </span>
+        <span className="text-xs font-medium text-muted-foreground truncate flex-1">Window</span>
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
@@ -185,7 +183,9 @@ function PlaygroundWindowComponent({
             variant="ghost"
             size="icon"
             className="size-6"
-            onClick={() => onUpdate(w.id, { result: null, error: null, tokenUsage: null, timing: null })}
+            onClick={() =>
+              onUpdate(w.id, { result: null, error: null, tokenUsage: null, timing: null })
+            }
             title="Clear result"
           >
             <RotateCcw className="size-3.5" />
@@ -223,9 +223,7 @@ function PlaygroundWindowComponent({
           <input
             type="number"
             value={w.temperature}
-            onChange={(e) =>
-              onUpdate(w.id, { temperature: parseFloat(e.target.value) || 0 })
-            }
+            onChange={(e) => onUpdate(w.id, { temperature: parseFloat(e.target.value) || 0 })}
             min={0}
             max={2}
             step={0.1}
@@ -235,9 +233,7 @@ function PlaygroundWindowComponent({
           <input
             type="number"
             value={w.maxTokens}
-            onChange={(e) =>
-              onUpdate(w.id, { maxTokens: parseInt(e.target.value) || 256 })
-            }
+            onChange={(e) => onUpdate(w.id, { maxTokens: parseInt(e.target.value) || 256 })}
             min={64}
             max={128000}
             step={256}
@@ -443,11 +439,11 @@ export default function PlaygroundPage() {
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
           throw new Error(
-            (body as { message?: string }).message ?? `Request failed: ${response.status}`
+            (body as { message?: string }).message ?? `Request failed: ${response.status}`,
           );
         }
 
-        const data = await response.json() as {
+        const data = (await response.json()) as {
           content?: string;
           usage?: { input_tokens: number; output_tokens: number };
         };
@@ -475,7 +471,7 @@ export default function PlaygroundPage() {
         abortControllersRef.current.delete(id);
       }
     },
-    [state.windows, updateWindow]
+    [state.windows, updateWindow],
   );
 
   const runAllWindows = useCallback(async () => {
@@ -523,7 +519,7 @@ export default function PlaygroundPage() {
         windows: [...prev.windows, newWindow],
       }));
     },
-    [state.windows]
+    [state.windows],
   );
 
   const hasAnyRunning = state.windows.some((w) => w.isRunning);
@@ -544,22 +540,12 @@ export default function PlaygroundPage() {
           </div>
         )}
         <div className="flex items-center gap-2 ml-auto">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 gap-1 text-xs"
-            onClick={addWindow}
-          >
+          <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={addWindow}>
             <Plus className="size-3.5" />
             Add Window
           </Button>
           {hasAnyRunning ? (
-            <Button
-              variant="destructive"
-              size="sm"
-              className="h-7 gap-1 text-xs"
-              onClick={stopAll}
-            >
+            <Button variant="destructive" size="sm" className="h-7 gap-1 text-xs" onClick={stopAll}>
               Stop All
             </Button>
           ) : (
@@ -591,9 +577,7 @@ export default function PlaygroundPage() {
           <div className="flex items-center justify-center h-full">
             <div className="text-center space-y-3">
               <div className="text-4xl">🧪</div>
-              <p className="text-sm text-muted-foreground">
-                Add a window to start testing prompts
-              </p>
+              <p className="text-sm text-muted-foreground">Add a window to start testing prompts</p>
               <Button size="sm" onClick={addWindow} className="gap-1.5">
                 <Plus className="size-3.5" />
                 Add Window
@@ -624,9 +608,7 @@ export default function PlaygroundPage() {
 
       {/* Footer info */}
       <div className="h-8 border-t border-border flex items-center px-4 text-[10px] text-muted-foreground bg-muted/20 shrink-0 gap-4">
-        <span>
-          Tip: Use {"{{variable}}"} syntax in prompts for dynamic values
-        </span>
+        <span>Tip: Use {"{{variable}}"} syntax in prompts for dynamic values</span>
         <span>•</span>
         <span>Results are not persisted — use prompts page for versioning</span>
       </div>

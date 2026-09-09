@@ -79,9 +79,11 @@ interface PricingModel {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const fmt = (n: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 4 }).format(
-    Number.isFinite(n) ? n : 0,
-  );
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 4,
+  }).format(Number.isFinite(n) ? n : 0);
 
 const dayKey = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -172,10 +174,10 @@ export default function Costs() {
   const monthPrefix = new Date().toISOString().slice(0, 7);
   const spentMonth =
     limits?.spent.monthly_usd ??
-    (dashboard
-      ? Math.round(sumSince(dayRows, `${monthPrefix}-01`) * 10_000) / 10_000
-      : 0);
-  const pctUsed = hasLimit ? Math.min(100, (spentMonth / (limits!.limits.monthly_usd as number)) * 100) : null;
+    (dashboard ? Math.round(sumSince(dayRows, `${monthPrefix}-01`) * 10_000) / 10_000 : 0);
+  const pctUsed = hasLimit
+    ? Math.min(100, (spentMonth / (limits!.limits.monthly_usd as number)) * 100)
+    : null;
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -329,9 +331,7 @@ export default function Costs() {
                         <div key={m.model} className="flex items-center gap-3">
                           <span className="text-sm w-40 truncate font-mono">{m.model}</span>
                           <MiniBar value={m.usd} max={maxUsd} color="bg-emerald-500" />
-                          <span className="text-sm font-medium w-20 text-right">
-                            {fmt(m.usd)}
-                          </span>
+                          <span className="text-sm font-medium w-20 text-right">{fmt(m.usd)}</span>
                           <span className="text-xs text-muted-foreground w-24 text-right">
                             {m.tokens.toLocaleString()} tok
                           </span>
@@ -445,9 +445,7 @@ export default function Costs() {
                   </Card>
                   <Card>
                     <CardContent className="pt-4">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                        Seats
-                      </p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Seats</p>
                       <p className="text-2xl font-bold">{org.seats}</p>
                     </CardContent>
                   </Card>

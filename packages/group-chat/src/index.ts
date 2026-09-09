@@ -122,10 +122,7 @@ export class SelectorGroupChat {
     lastSpeaker: string,
   ): Promise<ChatAgent | null> {
     const agentDescriptions = this.participants
-      .map(
-        (a) =>
-          `<agent name="${a.name}">\n${a.description}\n</agent>`,
-      )
+      .map((a) => `<agent name="${a.name}">\n${a.description}\n</agent>`)
       .join("\n\n");
 
     const conversation = messages
@@ -174,10 +171,7 @@ export class RoundRobinGroupChat {
   private participants: ChatAgent[];
   private termination: TerminationCondition;
 
-  constructor(
-    participants: ChatAgent[],
-    options?: { termination?: TerminationCondition },
-  ) {
+  constructor(participants: ChatAgent[], options?: { termination?: TerminationCondition }) {
     this.participants = participants;
     this.termination = options?.termination ?? { maxTurns: 10 };
   }

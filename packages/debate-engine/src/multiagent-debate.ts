@@ -107,7 +107,12 @@ export interface ConvergenceOptions {
  */
 export function lexicalSimilarity(a: string, b: string): number {
   const words = (s: string): Set<string> =>
-    new Set(s.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 0));
+    new Set(
+      s
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter((w) => w.length > 0),
+    );
   const wa = words(a);
   const wb = words(b);
   if (wa.size === 0 && wb.size === 0) return 1;
@@ -159,9 +164,7 @@ function othersMessage(
   instruction: string,
   others: readonly AgentMessage[],
 ): AgentMessage {
-  const bodies = others
-    .map((m) => `\n\n One agent solution: \`\`\`${m.content}\`\`\``)
-    .join("");
+  const bodies = others.map((m) => `\n\n One agent solution: \`\`\`${m.content}\`\`\``).join("");
   return {
     role: "user",
     content:

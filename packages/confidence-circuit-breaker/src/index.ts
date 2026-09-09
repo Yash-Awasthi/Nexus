@@ -332,10 +332,7 @@ export class ConfidenceCircuitBreaker {
 export class CircuitBreakerRegistry {
   private breakers: Map<string, ConfidenceCircuitBreaker> = new Map();
 
-  getOrCreate(
-    name: string,
-    strategies?: TripStrategy[],
-  ): ConfidenceCircuitBreaker {
+  getOrCreate(name: string, strategies?: TripStrategy[]): ConfidenceCircuitBreaker {
     if (!this.breakers.has(name)) {
       this.breakers.set(name, new ConfidenceCircuitBreaker(name, strategies));
     }
@@ -395,13 +392,17 @@ const DEFAULT_SLIDING_CONFIG: SlidingCircuitConfig = {
 export class SlidingWindowCircuitBreaker {
   private config: SlidingCircuitConfig;
   private state: SlidingCircuitState = "closed";
-  private recentCalls: boolean[] = [];  // true=success, false=failure
+  private recentCalls: boolean[] = []; // true=success, false=failure
   private failureCount = 0;
   private halfOpenSuccesses = 0;
   private lastFailureTime = 0;
   private lastFailureType: string | null = null;
   private stateChangeTime = Date.now();
-  private onStateChange?: (name: string, from: SlidingCircuitState, to: SlidingCircuitState) => void;
+  private onStateChange?: (
+    name: string,
+    from: SlidingCircuitState,
+    to: SlidingCircuitState,
+  ) => void;
 
   constructor(
     private readonly name: string,
@@ -435,9 +436,10 @@ export class SlidingWindowCircuitBreaker {
 
   getState(): SlidingCircuitState {
     if (this.state === "open") {
-      const timeout = this.lastFailureType === "quota_exhausted"
-        ? this.config.quotaResetTimeoutMs
-        : this.config.resetTimeoutMs;
+      const timeout =
+        this.lastFailureType === "quota_exhausted"
+          ? this.config.quotaResetTimeoutMs
+          : this.config.resetTimeoutMs;
       if (Date.now() - this.lastFailureTime >= timeout) {
         this.transitionTo("half-open");
         this.halfOpenSuccesses = 0;

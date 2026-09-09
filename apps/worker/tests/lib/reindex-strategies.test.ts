@@ -28,7 +28,9 @@ describe("loadReindexStrategies (search:reindex env → strategies)", () => {
   });
 
   it("selects Postgres full-text when only DATABASE_URL is set", async () => {
-    const strategies = await loadReindexStrategies({ databaseUrl: "postgres://user:pass@db/nexus" });
+    const strategies = await loadReindexStrategies({
+      databaseUrl: "postgres://user:pass@db/nexus",
+    });
     expect(strategies.map((s) => s.name)).toEqual(["sqlite"]); // PgFullTextStrategy's source slot
   });
 

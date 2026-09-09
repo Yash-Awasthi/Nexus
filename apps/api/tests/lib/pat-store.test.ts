@@ -27,11 +27,9 @@ import { sha256hex } from "../../src/lib/crypto-utils.js";
 const {
   mockSelectWhere,
   mockSelectLimit,
-  mockSelectFrom,
   mockSelect,
   mockInsertValues,
   mockInsert,
-  mockUpdateWhere,
   mockUpdateSet,
   mockUpdate,
   mockDeleteWhere,
@@ -62,11 +60,9 @@ const {
   return {
     mockSelectWhere,
     mockSelectLimit,
-    mockSelectFrom,
     mockSelect,
     mockInsertValues,
     mockInsert,
-    mockUpdateWhere,
     mockUpdateSet,
     mockUpdate,
     mockDeleteWhere,
@@ -89,8 +85,17 @@ vi.mock("drizzle-orm", () => ({
 }));
 
 // Let the store's DB probe run against the mocked @nexus/db (vitest sets
-// VITEST=true by default, which pat-store treats as "stay in-memory").
+// VITEST=true by default, which pat-store treats as "stay in-memory"). The
+// probe also gates on DATABASE_URL — CI's root vitest run sets it
+// (.github/workflows/test.yml), but a bare local `npx vitest run` does not,
+// which made this suite environment-dependent. Stub the same fake Neon URL
+// tests/setup.ts uses so the file is hermetic everywhere (the URL is only a
+// boolean gate here — @nexus/db is fully mocked; nothing connects).
 vi.stubEnv("VITEST", "");
+vi.stubEnv(
+  "DATABASE_URL",
+  "postgresql://nexus_test:nexus_test@ep-test-abc123.us-east-2.aws.neon.tech/nexus_test?sslmode=require",
+);
 
 import {
   createPat,
@@ -125,11 +130,20 @@ beforeEach(() => {
   (mockSelectWhere as unknown as { rows: unknown[] }).rows = [];
   // Sweep on every mint so reclaim behavior is deterministic in tests.
   vi.stubEnv("PAT_SWEEP_INTERVAL_MS", "0");
+  vi.stubEnv("VITEST", "");
+  vi.stubEnv(
+    "DATABASE_URL",
+    "postgresql://nexus_test:nexus_test@ep-test-abc123.us-east-2.aws.neon.tech/nexus_test?sslmode=require",
+  );
 });
 
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.stubEnv("VITEST", "");
+  vi.stubEnv(
+    "DATABASE_URL",
+    "postgresql://nexus_test:nexus_test@ep-test-abc123.us-east-2.aws.neon.tech/nexus_test?sslmode=require",
+  );
 });
 
 describe("createPat", () => {

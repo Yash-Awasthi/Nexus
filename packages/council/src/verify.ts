@@ -101,14 +101,16 @@ function verificationPrompt(
  */
 export function parseVerdict(content: string): VerifierVerdict {
   try {
-    const cleaned = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+    const cleaned = content
+      .replace(/```json\s*/g, "")
+      .replace(/```\s*/g, "")
+      .trim();
     const parsed = JSON.parse(cleaned) as Partial<VerifierVerdict>;
     if (typeof parsed.verdict === "boolean") {
       return {
         verdict: parsed.verdict,
         aspect: typeof parsed.aspect === "string" ? parsed.aspect : "correctness",
-        reasoning:
-          typeof parsed.reasoning === "string" ? parsed.reasoning : "(no reasoning given)",
+        reasoning: typeof parsed.reasoning === "string" ? parsed.reasoning : "(no reasoning given)",
       };
     }
   } catch {
@@ -133,7 +135,7 @@ export async function runMavVerification(
   const { question, candidates, verifiers, transport, anonymize = false } = opts;
   const parse = opts.parse ?? parseVerdict;
   const responses: ILLMResponse[] = await Promise.all(
-    verifiers.flatMap((verifier) =>
+    verifiers.flatMap((_verifier) =>
       candidates.map((candidate) =>
         transport.chat(
           [
@@ -149,9 +151,7 @@ export async function runMavVerification(
     ),
   );
 
-  const scores: Record<string, number> = Object.fromEntries(
-    candidates.map((c) => [c.label, 0]),
-  );
+  const scores: Record<string, number> = Object.fromEntries(candidates.map((c) => [c.label, 0]));
   const verdicts: MavVerificationResult["verdicts"] = [];
   let i = 0;
   for (const verifier of verifiers) {

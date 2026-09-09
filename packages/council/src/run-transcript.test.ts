@@ -27,9 +27,30 @@ const request: CouncilRequest = {
 };
 
 const votes: ModelVote[] = [
-  { model: "nexus/smart", provider: "groq", vote: "yes", reasoning: "data checks pass", confidence: 0.9, latencyMs: 812 },
-  { model: "nexus/sonnet", provider: "anthropic", vote: "yes", reasoning: "agreed", confidence: 0.8, latencyMs: 1240 },
-  { model: "nexus/haiku", provider: "anthropic", vote: "no", reasoning: "rollback gap", confidence: 0.6, latencyMs: 340 },
+  {
+    model: "nexus/smart",
+    provider: "groq",
+    vote: "yes",
+    reasoning: "data checks pass",
+    confidence: 0.9,
+    latencyMs: 812,
+  },
+  {
+    model: "nexus/sonnet",
+    provider: "anthropic",
+    vote: "yes",
+    reasoning: "agreed",
+    confidence: 0.8,
+    latencyMs: 1240,
+  },
+  {
+    model: "nexus/haiku",
+    provider: "anthropic",
+    vote: "no",
+    reasoning: "rollback gap",
+    confidence: 0.6,
+    latencyMs: 340,
+  },
 ];
 
 function result(outcome: ProposalResult["outcome"]): ProposalResult {
@@ -63,17 +84,9 @@ describe("maskedCouncilTranscript / maskModelIdentity (blind-council masking)", 
   it("anonymizes every structured model-identity field into voter placeholders", () => {
     const m = maskedCouncilTranscript(runInput());
     expect(m.routing.assigned_models).toEqual(["voter_1", "voter_2", "voter_3"]);
-    expect(m.stages.map((s) => s.name)).toEqual([
-      "vote:voter_1",
-      "vote:voter_2",
-      "vote:voter_3",
-    ]);
+    expect(m.stages.map((s) => s.name)).toEqual(["vote:voter_1", "vote:voter_2", "vote:voter_3"]);
     expect(m.dissent).toEqual(["voter_3"]);
-    expect(m.modelCallTraces.map((tr) => tr.model)).toEqual([
-      "voter_1",
-      "voter_2",
-      "voter_3",
-    ]);
+    expect(m.modelCallTraces.map((tr) => tr.model)).toEqual(["voter_1", "voter_2", "voter_3"]);
     // the routing audit-trail copy is masked the same way
     const routingEntry = m.auditTrail.find((e) => e.step === "routing");
     expect(routingEntry?.assigned_models).toEqual(["voter_1", "voter_2", "voter_3"]);
@@ -115,10 +128,7 @@ describe("maskedCouncilTranscript / maskModelIdentity (blind-council masking)", 
     );
     // same model appearing in two votes still maps to the same voter
     const dup = runInput({
-      votes: [
-        ...votes,
-        { ...votes[0], latencyMs: 999 },
-      ],
+      votes: [...votes, { ...votes[0], latencyMs: 999 }],
     });
     const d = maskedCouncilTranscript(dup);
     expect(d.stages.map((s) => s.name)).toEqual([
@@ -139,11 +149,7 @@ describe("maskedCouncilTranscript / maskModelIdentity (blind-council masking)", 
   it("preserves deferred runs (no majority → no dissents) under masking", () => {
     const m = maskedCouncilTranscript(runInput({ result: result("deferred") }));
     expect(m.dissent).toEqual([]);
-    expect(m.stages.map((s) => s.name)).toEqual([
-      "vote:voter_1",
-      "vote:voter_2",
-      "vote:voter_3",
-    ]);
+    expect(m.stages.map((s) => s.name)).toEqual(["vote:voter_1", "vote:voter_2", "vote:voter_3"]);
   });
 });
 

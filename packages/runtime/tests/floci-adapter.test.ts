@@ -92,13 +92,19 @@ describe("FlociExecutionAdapter", () => {
   it("rethrows dispatch failures in strict mode", async () => {
     stubFetch(false, {});
     const adapter = new FlociExecutionAdapter({ strict: true });
-    await expect(adapter.execute({ payload: { action: "create_s3_bucket" } }, {})).rejects.toThrow();
+    await expect(
+      adapter.execute({ payload: { action: "create_s3_bucket" } }, {}),
+    ).rejects.toThrow();
   });
 
   it("executeAction wraps args into a task payload", async () => {
     stubFetch(true, { done: true });
     const adapter = new FlociExecutionAdapter();
-    const out = await adapter.executeAction("delete_s3_bucket", { bucketName: "b" }, { taskId: "x" });
+    const out = await adapter.executeAction(
+      "delete_s3_bucket",
+      { bucketName: "b" },
+      { taskId: "x" },
+    );
     expect(out.success).toBe(true);
   });
 

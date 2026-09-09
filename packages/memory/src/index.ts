@@ -636,7 +636,10 @@ export class OpenAIEmbedder implements IEmbedder {
         body: JSON.stringify({ model: this.model, input: texts }),
       });
     } catch (cause) {
-      throw new MemoryError("EMBED_FAILED", `OpenAI batch embeddings request failed: ${String(cause)}`);
+      throw new MemoryError(
+        "EMBED_FAILED",
+        `OpenAI batch embeddings request failed: ${String(cause)}`,
+      );
     }
 
     if (!response.ok) {
@@ -648,7 +651,10 @@ export class OpenAIEmbedder implements IEmbedder {
     try {
       data = (await response.json()) as OpenAIEmbeddingResponse;
     } catch (cause) {
-      throw new MemoryError("EMBED_FAILED", `Failed to parse OpenAI batch response: ${String(cause)}`);
+      throw new MemoryError(
+        "EMBED_FAILED",
+        `Failed to parse OpenAI batch response: ${String(cause)}`,
+      );
     }
 
     // Restore original order via index
@@ -1320,9 +1326,7 @@ export class MemoryManager {
    * Summarise the memory store (count, oldest, newest), optionally filtered to
    * a single user so account A never sees account B's chunks.
    */
-  async stats(
-    filter?: MemoryFilter,
-  ): Promise<{ total: number; oldest?: number; newest?: number }> {
+  async stats(filter?: MemoryFilter): Promise<{ total: number; oldest?: number; newest?: number }> {
     const all = await this.store.list({ ...filter, excludeExpired: false });
     if (all.length === 0) return { total: 0 };
     const times = all.map((e) => e.createdAt);

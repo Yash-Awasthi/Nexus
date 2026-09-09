@@ -9,9 +9,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const pkg = JSON.parse(
-  readFileSync(resolve(__dirname, "../package.json"), "utf8"),
-) as {
+const pkg = JSON.parse(readFileSync(resolve(__dirname, "../package.json"), "utf8")) as {
   type?: string;
   main?: string;
   types?: string;
@@ -29,10 +27,7 @@ describe("@nexus/sdk package layout (plain-node consumability)", () => {
   });
 
   it("exports '.' with an import condition at dist/index.js", () => {
-    const dot = pkg.exports?.["."] as
-      | { import?: string; types?: string }
-      | string
-      | undefined;
+    const dot = pkg.exports?.["."] as { import?: string; types?: string } | string | undefined;
     if (typeof dot === "string") {
       expect(dot).toBe("./dist/index.js");
     } else {

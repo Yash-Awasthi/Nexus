@@ -48,14 +48,7 @@ describe("GET /api/marketplace (registry-backed listing)", () => {
     expect(res.statusCode).toBe(200);
     const items = res.json<{ items: MpView[] }>().items;
     expect(items).toHaveLength(6);
-    expect(items.map((i) => i.id).sort()).toEqual([
-      "mp_1",
-      "mp_2",
-      "mp_3",
-      "mp_4",
-      "mp_5",
-      "mp_6",
-    ]);
+    expect(items.map((i) => i.id).sort()).toEqual(["mp_1", "mp_2", "mp_3", "mp_4", "mp_5", "mp_6"]);
     const first = items[0]!;
     // Sorted by downloads desc — mp_3 has the most.
     expect(first.id).toBe("mp_3");
@@ -280,25 +273,49 @@ describe("marketplace per-user star/install identity (auth configured)", () => {
     const auth = (userId: string) => ({ authorization: `Bearer ${tokenFor(userId)}` });
 
     await app.inject({ method: "POST", url: "/api/marketplace/mp_1/star", headers: auth(USER_A) });
-    await app.inject({ method: "POST", url: "/api/marketplace/mp_2/install", headers: auth(USER_A) });
+    await app.inject({
+      method: "POST",
+      url: "/api/marketplace/mp_2/install",
+      headers: auth(USER_A),
+    });
     await app.inject({ method: "POST", url: "/api/marketplace/mp_3/star", headers: auth(USER_B) });
 
-    const meA = await app.inject({ method: "GET", url: "/api/marketplace/me", headers: auth(USER_A) });
+    const meA = await app.inject({
+      method: "GET",
+      url: "/api/marketplace/me",
+      headers: auth(USER_A),
+    });
     expect(meA.json<{ installed: string[]; starred: string[] }>()).toEqual({
       installed: ["mp_2"],
       starred: ["mp_1"],
     });
 
-    const meB = await app.inject({ method: "GET", url: "/api/marketplace/me", headers: auth(USER_B) });
+    const meB = await app.inject({
+      method: "GET",
+      url: "/api/marketplace/me",
+      headers: auth(USER_B),
+    });
     expect(meB.json<{ installed: string[]; starred: string[] }>()).toEqual({
       installed: [],
       starred: ["mp_3"],
     });
 
     // Leave no residue for later tests (stores are module-level).
-    await app.inject({ method: "DELETE", url: "/api/marketplace/mp_1/star", headers: auth(USER_A) });
-    await app.inject({ method: "DELETE", url: "/api/marketplace/mp_2/install", headers: auth(USER_A) });
-    await app.inject({ method: "DELETE", url: "/api/marketplace/mp_3/star", headers: auth(USER_B) });
+    await app.inject({
+      method: "DELETE",
+      url: "/api/marketplace/mp_1/star",
+      headers: auth(USER_A),
+    });
+    await app.inject({
+      method: "DELETE",
+      url: "/api/marketplace/mp_2/install",
+      headers: auth(USER_A),
+    });
+    await app.inject({
+      method: "DELETE",
+      url: "/api/marketplace/mp_3/star",
+      headers: auth(USER_B),
+    });
   });
 
   it("unstar only removes the caller's own star", async () => {
@@ -328,15 +345,31 @@ describe("marketplace per-user star/install identity (auth configured)", () => {
     expect(detailB.json<{ item: MpView }>().item.starred).toBe(true);
 
     // Leave no residue for later tests (stores are module-level).
-    await app.inject({ method: "DELETE", url: "/api/marketplace/mp_1/star", headers: auth(USER_B) });
+    await app.inject({
+      method: "DELETE",
+      url: "/api/marketplace/mp_1/star",
+      headers: auth(USER_B),
+    });
   });
 
   it("uninstall only removes the caller's own install", async () => {
     const auth = (userId: string) => ({ authorization: `Bearer ${tokenFor(userId)}` });
 
-    await app.inject({ method: "POST", url: "/api/marketplace/mp_1/install", headers: auth(USER_A) });
-    await app.inject({ method: "POST", url: "/api/marketplace/mp_1/install", headers: auth(USER_B) });
-    await app.inject({ method: "DELETE", url: "/api/marketplace/mp_1/install", headers: auth(USER_A) });
+    await app.inject({
+      method: "POST",
+      url: "/api/marketplace/mp_1/install",
+      headers: auth(USER_A),
+    });
+    await app.inject({
+      method: "POST",
+      url: "/api/marketplace/mp_1/install",
+      headers: auth(USER_B),
+    });
+    await app.inject({
+      method: "DELETE",
+      url: "/api/marketplace/mp_1/install",
+      headers: auth(USER_A),
+    });
 
     const detailA = await app.inject({
       method: "GET",
@@ -353,7 +386,11 @@ describe("marketplace per-user star/install identity (auth configured)", () => {
     expect(detailB.json<{ item: MpView }>().item.installed).toBe(true);
 
     // Leave no residue for later tests (stores are module-level).
-    await app.inject({ method: "DELETE", url: "/api/marketplace/mp_1/install", headers: auth(USER_B) });
+    await app.inject({
+      method: "DELETE",
+      url: "/api/marketplace/mp_1/install",
+      headers: auth(USER_B),
+    });
   });
 
   it("double-unstar is idempotent: count never drops below the store's true value", async () => {
@@ -388,7 +425,11 @@ describe("marketplace per-user star/install identity (auth configured)", () => {
     expect(detail.json<{ item: MpView }>().item.stars).toBe(1);
 
     // Leave no residue for later tests (stores are module-level).
-    await app.inject({ method: "DELETE", url: "/api/marketplace/mp_1/star", headers: auth(USER_B) });
+    await app.inject({
+      method: "DELETE",
+      url: "/api/marketplace/mp_1/star",
+      headers: auth(USER_B),
+    });
   });
 
   it("non-owner unstar leaves the count unchanged", async () => {
@@ -413,6 +454,10 @@ describe("marketplace per-user star/install identity (auth configured)", () => {
     expect(detail.json<{ item: MpView }>().item.stars).toBe(1);
 
     // Leave no residue for later tests (stores are module-level).
-    await app.inject({ method: "DELETE", url: "/api/marketplace/mp_1/star", headers: auth(USER_A) });
+    await app.inject({
+      method: "DELETE",
+      url: "/api/marketplace/mp_1/star",
+      headers: auth(USER_A),
+    });
   });
 });

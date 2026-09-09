@@ -4,7 +4,11 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { OpenAIEngine, EngineRegistry, type EngineConfig, type ToolCall } from "./index.js";
 
-const CFG: EngineConfig = { model: "gpt-4o-mini", systemPrompt: "You are a test agent", maxTurns: 5 };
+const CFG: EngineConfig = {
+  model: "gpt-4o-mini",
+  systemPrompt: "You are a test agent",
+  maxTurns: 5,
+};
 
 /** Stub global fetch with a scripted sequence of OpenAI responses. */
 function stubFetch(responses: unknown[]): ReturnType<typeof vi.fn> {

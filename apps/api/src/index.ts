@@ -11,8 +11,8 @@
  * full server is ready.
  */
 
-import { createServer } from "node:http";
 import { existsSync, readFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -54,7 +54,7 @@ import { fileURLToPath } from "node:url";
     }
   }
   for (const line of text.split("\n")) {
-    const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+    const m = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/.exec(line);
     if (!m) continue;
     const key = m[1]!;
     let val = m[2]!;

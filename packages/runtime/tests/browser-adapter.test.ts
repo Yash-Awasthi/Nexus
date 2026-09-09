@@ -157,7 +157,14 @@ describe("BrowserExecutionAdapter", () => {
 
   it("surfaces bridge errors and network failures", async () => {
     const t = telemetry();
-    mocks.post.mockResolvedValueOnce({ success: false, error: "anti-bot detected", html: "", title: "", final_url: "", screenshot_b64: "" });
+    mocks.post.mockResolvedValueOnce({
+      success: false,
+      error: "anti-bot detected",
+      html: "",
+      title: "",
+      final_url: "",
+      screenshot_b64: "",
+    });
     const adapter = new BrowserExecutionAdapter(t as never, false);
     const failed = await adapter.executeBrowserTask({
       id: "3",

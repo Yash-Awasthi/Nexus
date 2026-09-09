@@ -84,10 +84,7 @@ describe("whereMatches — $in/$nin/$contains/$and/$or", () => {
 
   it("composes nested logical clauses", () => {
     const clause = {
-      $or: [
-        { $and: [{ status: "active" }, { score: { $gte: 0.9 } }] },
-        { status: "pending" },
-      ],
+      $or: [{ $and: [{ status: "active" }, { score: { $gte: 0.9 } }] }, { status: "pending" }],
     };
     expect(whereMatches(md, clause)).toBe(false);
     expect(whereMatches({ status: "pending" }, clause)).toBe(true);
@@ -136,18 +133,42 @@ describe("whereDocumentMatches — document text", () => {
 
   it("$and/$or compose document clauses", () => {
     const doc = "monads are hard but useful";
-    expect(whereDocumentMatches(doc, { $and: [{ $contains: "monads" }, { $contains: "useful" }] })).toBe(true);
-    expect(whereDocumentMatches(doc, { $and: [{ $contains: "monads" }, { $contains: "cats" }] })).toBe(false);
-    expect(whereDocumentMatches(doc, { $or: [{ $contains: "cats" }, { $contains: "useful" }] })).toBe(true);
+    expect(
+      whereDocumentMatches(doc, { $and: [{ $contains: "monads" }, { $contains: "useful" }] }),
+    ).toBe(true);
+    expect(
+      whereDocumentMatches(doc, { $and: [{ $contains: "monads" }, { $contains: "cats" }] }),
+    ).toBe(false);
+    expect(
+      whereDocumentMatches(doc, { $or: [{ $contains: "cats" }, { $contains: "useful" }] }),
+    ).toBe(true);
   });
 });
 
 describe("store integration — MemoryFilter where/whereDocument on InMemoryRagtimeStore", () => {
   async function seed(): Promise<InMemoryRagtimeStore> {
     const store = new InMemoryRagtimeStore();
-    await store.save({ id: "a", text: "active deployment notes", embedding: [1, 0], metadata: { status: "active", priority: 3, tags: ["infra"] }, createdAt: 100 });
-    await store.save({ id: "b", text: "closed incident report", embedding: [0, 1], metadata: { status: "closed", priority: 1 }, createdAt: 200 });
-    await store.save({ id: "c", text: "active roadmap draft", embedding: [1, 1], metadata: { status: "active", priority: 5, tags: ["product", "infra"] }, createdAt: 300 });
+    await store.save({
+      id: "a",
+      text: "active deployment notes",
+      embedding: [1, 0],
+      metadata: { status: "active", priority: 3, tags: ["infra"] },
+      createdAt: 100,
+    });
+    await store.save({
+      id: "b",
+      text: "closed incident report",
+      embedding: [0, 1],
+      metadata: { status: "closed", priority: 1 },
+      createdAt: 200,
+    });
+    await store.save({
+      id: "c",
+      text: "active roadmap draft",
+      embedding: [1, 1],
+      metadata: { status: "active", priority: 5, tags: ["product", "infra"] },
+      createdAt: 300,
+    });
     return store;
   }
 

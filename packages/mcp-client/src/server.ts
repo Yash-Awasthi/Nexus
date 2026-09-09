@@ -118,7 +118,10 @@ export class McpHttpServer {
       return { status: 202, body: null };
     }
     if (typeof envelope.method !== "string") {
-      return { status: 400, body: rpcError(envelope.id, -32600, "Invalid Request: missing method") };
+      return {
+        status: 400,
+        body: rpcError(envelope.id, -32600, "Invalid Request: missing method"),
+      };
     }
 
     const id = envelope.id;

@@ -76,7 +76,9 @@ export class KnowledgeGraphLite {
    */
   getEdgesFrom(nodeId: string): KGEdge[] {
     const edgeIds = this.adjacency.get(nodeId) ?? new Set();
-    return Array.from(edgeIds).map((id) => this.edges.get(id)!).filter(Boolean);
+    return Array.from(edgeIds)
+      .map((id) => this.edges.get(id)!)
+      .filter(Boolean);
   }
 
   /**
@@ -84,7 +86,9 @@ export class KnowledgeGraphLite {
    */
   getEdgesTo(nodeId: string): KGEdge[] {
     const edgeIds = this.reverseAdj.get(nodeId) ?? new Set();
-    return Array.from(edgeIds).map((id) => this.edges.get(id)!).filter(Boolean);
+    return Array.from(edgeIds)
+      .map((id) => this.edges.get(id)!)
+      .filter(Boolean);
   }
 
   /**
@@ -97,7 +101,9 @@ export class KnowledgeGraphLite {
       const edge = this.edges.get(edgeId);
       if (edge) neighborIds.add(edge.target);
     }
-    return Array.from(neighborIds).map((id) => this.nodes.get(id)!).filter(Boolean);
+    return Array.from(neighborIds)
+      .map((id) => this.nodes.get(id)!)
+      .filter(Boolean);
   }
 
   /**
@@ -130,9 +136,7 @@ export class KnowledgeGraphLite {
     const whereMatch = normalized.match(/WHERE\s+(\w+)\.(\w+)\s*=\s*['"]([^'"]+)['"]/i);
     if (whereMatch && whereMatch[1] === nodeVar) {
       const [, , prop, value] = whereMatch;
-      candidateNodes = candidateNodes.filter(
-        (n) => String(n.properties[prop ?? ""]) === value,
-      );
+      candidateNodes = candidateNodes.filter((n) => String(n.properties[prop ?? ""]) === value);
     }
 
     const bindings = new Map<string, KGNode | KGEdge>();
@@ -144,9 +148,7 @@ export class KnowledgeGraphLite {
       resultNodes.push(node);
 
       if (edgeType && targetVar) {
-        const edges = this.getEdgesFrom(node.id).filter(
-          (e) => !edgeType || e.type === edgeType,
-        );
+        const edges = this.getEdgesFrom(node.id).filter((e) => !edgeType || e.type === edgeType);
         for (const edge of edges) {
           const target = this.nodes.get(edge.target);
           if (target && (!targetLabel || target.label === targetLabel)) {

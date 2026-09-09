@@ -29,7 +29,9 @@ export async function costsRoutes(app: FastifyInstance): Promise<void> {
   // entries. Server-global views stay on /analytics/*.
   const mine = (req: { nexusUserId?: string }, days?: number) => {
     const scoped = scopeCostEntriesToUser(_costLog, req.nexusUserId);
-    return days === undefined ? scoped : scoped.filter((e) => new Date(e.ts).getTime() >= Date.now() - days * 86_400_000);
+    return days === undefined
+      ? scoped
+      : scoped.filter((e) => new Date(e.ts).getTime() >= Date.now() - days * 86_400_000);
   };
 
   app.get<{ Querystring: { days?: string } }>("/costs/dashboard", async (req, reply) => {

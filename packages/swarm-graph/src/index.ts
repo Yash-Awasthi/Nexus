@@ -176,7 +176,8 @@ export class AggregateNode extends SwarmNode {
     super();
     this.name = name;
     this.router = router;
-    this.prompt = prompt ?? "Synthesize the following information into a coherent response:\n\n{{input}}";
+    this.prompt =
+      prompt ?? "Synthesize the following information into a coherent response:\n\n{{input}}";
   }
 
   async execute(context: NodeContext): Promise<NodeOutput> {
@@ -243,7 +244,9 @@ export class SwarmGraph {
   /**
    * Run the graph with an input.
    */
-  async run(input: string): Promise<{ output: string; steps: Array<{ node: string; input: string; output: string }> }> {
+  async run(
+    input: string,
+  ): Promise<{ output: string; steps: Array<{ node: string; input: string; output: string }> }> {
     const steps: Array<{ node: string; input: string; output: string }> = [];
     let currentInput = input;
     const maxSteps = this.config.maxSteps ?? 10;

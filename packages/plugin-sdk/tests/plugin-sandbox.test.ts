@@ -58,7 +58,11 @@ describe("DenoPluginRunner", () => {
     const res = await runner.run("/tmp/plugin.js", { query: "hello" });
     expect(res.ok).toBe(true);
     expect(res.result!.parsed).toEqual({ ok: true });
-    const inv = invocation as { scriptPath: string; payload: string; grantedCapabilities: string[] };
+    const inv = invocation as {
+      scriptPath: string;
+      payload: string;
+      grantedCapabilities: string[];
+    };
     expect(inv.scriptPath).toBe("/tmp/plugin.js");
     expect(inv.payload).toBe(JSON.stringify({ query: "hello" }));
     expect(inv.grantedCapabilities).toEqual(["llm.inference", "storage.read"]);
@@ -75,7 +79,7 @@ describe("DenoPluginRunner", () => {
     const runner = new DenoPluginRunner(PLUGIN, { runnerFn });
     const res = await runner.run("/tmp/plugin.js", {});
     expect(res.ok).toBe(true);
-    const inv = (res.result!.parsed as DenoInvocation);
+    const inv = res.result!.parsed as DenoInvocation;
     // The isolate receives ONLY the granted capabilities — database.execute,
     // secrets.read, etc. are never in the set the sandbox may use.
     expect(inv.grantedCapabilities).toEqual(["llm.inference", "storage.read"]);

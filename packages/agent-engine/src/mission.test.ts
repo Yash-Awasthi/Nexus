@@ -162,7 +162,9 @@ describe("MissionRunner", () => {
     // The loop kept pushing instead of self-approving, with an explicit note.
     expect(record.phases.some((p) => p.phase === "improving")).toBe(true);
     expect(
-      record.phases.some((p) => p.phase === "improving" && (p.note ?? "").includes("no work produced")),
+      record.phases.some(
+        (p) => p.phase === "improving" && (p.note ?? "").includes("no work produced"),
+      ),
     ).toBe(true);
   });
 
@@ -178,7 +180,9 @@ describe("MissionRunner", () => {
           toolCall = false;
           return {
             content: "",
-            toolCalls: [{ name: "write", arguments: { path: "out.md", content: "# Done" }, callId: "c1" }],
+            toolCalls: [
+              { name: "write", arguments: { path: "out.md", content: "# Done" }, callId: "c1" },
+            ],
             usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
           };
         }
@@ -321,7 +325,9 @@ describe("MissionRunner", () => {
   it("honors the caller's id — the runner never mints a phantom id (regression)", async () => {
     const { store, saved } = memoryStore();
     const runner = new MissionRunner({
-      llm: makeLlm({ reviews: ['{"score": 80, "verdict": "accept", "issues": [], "suggestions": []}'] }),
+      llm: makeLlm({
+        reviews: ['{"score": 80, "verdict": "accept", "issues": [], "suggestions": []}'],
+      }),
       maxIterations: 2,
       store,
       id: "route-created-id",

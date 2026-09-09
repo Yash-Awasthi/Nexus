@@ -1617,9 +1617,12 @@ export function makeReviewTool(llm: LlmToolFn, opts: { systemPrompt?: string } =
       const subject = String(args.subject ?? "");
       const output = String(args.output ?? "");
       const criteria = String(args.criteria ?? "");
-      const turn = await llm([{ role: "user", content: buildReviewPrompt(subject, output, criteria) }], {
-        systemPrompt: opts.systemPrompt ?? REVIEW_SYSTEM_PROMPT,
-      });
+      const turn = await llm(
+        [{ role: "user", content: buildReviewPrompt(subject, output, criteria) }],
+        {
+          systemPrompt: opts.systemPrompt ?? REVIEW_SYSTEM_PROMPT,
+        },
+      );
       return parseReviewResult(turn.content);
     },
   };
@@ -1674,9 +1677,7 @@ export function tryParseReviewObject(s: string): Record<string, unknown> | null 
   candidates.push(s.replace(/\n/g, "\\n").replace(/\t/g, "\\t"));
   candidates.push(s.replace(/,\s*([}\]])/g, "$1"));
   // Combined repair — single→double quotes, quote keys, drop trailing commas.
-  candidates.push(
-    quoteKeys(s.replace(/'/g, '"')).replace(/,\s*([}\]])/g, "$1"),
-  );
+  candidates.push(quoteKeys(s.replace(/'/g, '"')).replace(/,\s*([}\]])/g, "$1"));
   for (const c of candidates) {
     try {
       const v = JSON.parse(c) as unknown;
@@ -1704,10 +1705,20 @@ function normalizeReview(obj: Record<string, unknown>): ReviewResult {
     };
   }
   if (verdictStr === "accept") {
-    return { score: 70, verdict: "accept", issues: asStringArray(obj.issues), suggestions: asStringArray(obj.suggestions) };
+    return {
+      score: 70,
+      verdict: "accept",
+      issues: asStringArray(obj.issues),
+      suggestions: asStringArray(obj.suggestions),
+    };
   }
   if (verdictStr === "reject") {
-    return { score: 30, verdict: "reject", issues: asStringArray(obj.issues), suggestions: asStringArray(obj.suggestions) };
+    return {
+      score: 30,
+      verdict: "reject",
+      issues: asStringArray(obj.issues),
+      suggestions: asStringArray(obj.suggestions),
+    };
   }
   return unknownReview();
 }
@@ -1718,12 +1729,14 @@ function normalizeReview(obj: Record<string, unknown>): ReviewResult {
  *  real rejection with the prose as the issue; genuinely indeterminate → unknown. */
 function proseVerdict(text: string): ReviewResult {
   const lower = text.toLowerCase();
-  const positive = /looks?\s+(great|good|correct|right|fine|excellent|perfect)|well\s+done|no\s+issues|all\s+good|passes?|approved|good\s+job|correct\b|works\s+(correctly|fine|as expected)/i.test(
-    lower,
-  );
-  const negative = /missing|broken|doesn'?t\s+work|does\s+not\s+work|error|incorrect|wrong|bug|failed|fails?|not\s+working|incomplete|invalid|crash/i.test(
-    lower,
-  );
+  const positive =
+    /looks?\s+(great|good|correct|right|fine|excellent|perfect)|well\s+done|no\s+issues|all\s+good|passes?|approved|good\s+job|correct\b|works\s+(correctly|fine|as expected)/i.test(
+      lower,
+    );
+  const negative =
+    /missing|broken|doesn'?t\s+work|does\s+not\s+work|error|incorrect|wrong|bug|failed|fails?|not\s+working|incomplete|invalid|crash/i.test(
+      lower,
+    );
   if (positive && !negative) {
     return { score: 70, verdict: "accept", issues: [], suggestions: [] };
   }

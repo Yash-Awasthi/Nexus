@@ -51,6 +51,7 @@ export class TokenBudgetPolicy implements AssemblyPolicy {
     // Keep messages from newest to oldest within budget
     for (let i = context.messages.length - 1; i >= 0; i--) {
       const msg = context.messages[i];
+      if (!msg) break;
       const tokens = msg.tokenCount ?? estimateTokens(msg.content);
       if (totalTokens + tokens <= this.maxTokens) {
         kept.unshift(msg);
@@ -72,7 +73,7 @@ export class SystemPromptPolicy implements AssemblyPolicy {
 
   constructor(
     private basePrompt: string,
-    private dynamicParts: Array<(ctx: AssemblyContext) => string> = [],
+    private dynamicParts: ((ctx: AssemblyContext) => string)[] = [],
   ) {}
 
   async apply(context: AssemblyContext): Promise<AssemblyContext> {
@@ -113,7 +114,7 @@ export class SummarizePolicy implements AssemblyPolicy {
   name = "summarize";
 
   constructor(
-    private keepRecent: number = 10,
+    private keepRecent = 10,
     private summarizer?: (messages: Message[]) => Promise<string>,
   ) {}
 
@@ -159,14 +160,15 @@ export interface CompactStrategy {
  * Remove messages that are structurally redundant.
  */
 export class StructuralCompact implements CompactStrategy {
-  async compact(messages: Message[]): Promise<Message[] => {
+  async compact(messages: Message[]): Promise<Message[]> {
     return messages.filter((msg, i) => {
       // Keep system messages
       if (msg.role === "system") return true;
       // Keep last message
       if (i === messages.length - 1) return true;
       // Remove consecutive same-role messages (keep only last)
-      if (i < messages.length - 1 && messages[i + 1].role === msg.role) {
+      const next = i < messages.length - 1 ? messages[i + 1] : undefined;
+      if (next && next.role === msg.role) {
         return false;
       }
       return true;
@@ -211,11 +213,12 @@ export class ToolCallCompact implements CompactStrategy {
 
     while (i < messages.length) {
       const msg = messages[i];
+      if (!msg) break;
       if (msg.role === "assistant" && msg.metadata?.toolCalls) {
         // Find the matching tool result
-        const toolResult = messages.slice(i + 1).find(
-          (m) => m.role === "tool" && m.metadata?.toolCallId === msg.metadata?.toolCallId,
-        );
+        const toolResult = messages
+          .slice(i + 1)
+          .find((m) => m.role === "tool" && m.metadata?.toolCallId === msg.metadata?.toolCallId);
         if (toolResult) {
           result.push({
             ...msg,

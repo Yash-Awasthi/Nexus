@@ -21,18 +21,15 @@
  * differs, noted); persistence/server semantics are the store's (in-memory
  * here), not chroma's server.
  */
+import type { WhereClause, WhereDocumentClause } from "./where.js";
+
 import { InMemoryRagtimeStore } from "./index.js";
 import type { IEmbedder, IMemoryStore } from "./index.js";
-import type { WhereClause, WhereDocumentClause } from "./where.js";
 
 export type CollectionInclude = "documents" | "metadatas" | "distances" | "embeddings";
 
 /** Chroma's default query include set: documents + metadatas + distances. */
-const DEFAULT_QUERY_INCLUDE: readonly CollectionInclude[] = [
-  "documents",
-  "metadatas",
-  "distances",
-];
+const DEFAULT_QUERY_INCLUDE: readonly CollectionInclude[] = ["documents", "metadatas", "distances"];
 
 export interface CollectionAddInput {
   /** One id per document. Duplicate ids upsert. */
@@ -40,7 +37,7 @@ export interface CollectionAddInput {
   /** One document per id. Empty documents are rejected. */
   documents: string[];
   /** Optional per-id metadata (null entries stored as {}). */
-  metadatas?: Array<Record<string, unknown> | null>;
+  metadatas?: (Record<string, unknown> | null)[];
 }
 
 export interface CollectionQueryOptions {
@@ -66,7 +63,7 @@ export interface CollectionGetOptions {
 export interface CollectionQueryRow {
   ids: string[];
   documents: string[];
-  metadatas: Array<Record<string, unknown>>;
+  metadatas: Record<string, unknown>[];
   distances: number[];
   embeddings: number[][];
 }
@@ -74,7 +71,7 @@ export interface CollectionQueryRow {
 export interface CollectionGetResult {
   ids: string[];
   documents: string[];
-  metadatas: Array<Record<string, unknown>>;
+  metadatas: Record<string, unknown>[];
   embeddings: number[][];
 }
 
@@ -131,7 +128,10 @@ export class VectorCollection {
    * store with the optional where/whereDocument filter, and return chroma's
    * parallel-array envelope — one row per query text.
    */
-  async query(queryTexts: string[], opts: CollectionQueryOptions = {}): Promise<CollectionQueryRow[]> {
+  async query(
+    queryTexts: string[],
+    opts: CollectionQueryOptions = {},
+  ): Promise<CollectionQueryRow[]> {
     const include = opts.include ?? DEFAULT_QUERY_INCLUDE;
     const filter =
       opts.where || opts.whereDocument

@@ -27,9 +27,17 @@ export interface GuardrailResult {
 
 // ── Default Patterns ─────────────────────────────────────────────────────────
 
-const DEFAULT_PATTERNS: Array<{ pattern: RegExp; type: string; severity: SecretMatch["severity"] }> = [
+const DEFAULT_PATTERNS: Array<{
+  pattern: RegExp;
+  type: string;
+  severity: SecretMatch["severity"];
+}> = [
   // AWS
-  { pattern: /AWS_SECRET_ACCESS_KEY\s*=\s*[A-Za-z0-9/+=]{16,}/g, type: "aws-secret-key", severity: "critical" },
+  {
+    pattern: /AWS_SECRET_ACCESS_KEY\s*=\s*[A-Za-z0-9/+=]{16,}/g,
+    type: "aws-secret-key",
+    severity: "critical",
+  },
   { pattern: /AKIA[0-9A-Z]{16}/g, type: "aws-access-key", severity: "critical" },
   // GitHub
   { pattern: /ghp_[a-zA-Z0-9]{36}/g, type: "github-token", severity: "critical" },
@@ -51,10 +59,22 @@ const DEFAULT_PATTERNS: Array<{ pattern: RegExp; type: string; severity: SecretM
   { pattern: /SECRET\s*=\s*[A-Za-z0-9_-]{20,}/g, type: "generic-secret", severity: "medium" },
   { pattern: /PRIVATE_KEY\s*=\s*[A-Za-z0-9/+=]{20,}/g, type: "private-key", severity: "high" },
   // JWT
-  { pattern: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, type: "jwt-token", severity: "high" },
+  {
+    pattern: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g,
+    type: "jwt-token",
+    severity: "high",
+  },
   // Database connection strings
-  { pattern: /mongodb(\+srv)?:\/\/[^:]+:[^@]+@/g, type: "mongodb-connection", severity: "critical" },
-  { pattern: /postgres(ql)?:\/\/[^:]+:[^@]+@/g, type: "postgresql-connection", severity: "critical" },
+  {
+    pattern: /mongodb(\+srv)?:\/\/[^:]+:[^@]+@/g,
+    type: "mongodb-connection",
+    severity: "critical",
+  },
+  {
+    pattern: /postgres(ql)?:\/\/[^:]+:[^@]+@/g,
+    type: "postgresql-connection",
+    severity: "critical",
+  },
   { pattern: /mysql:\/\/[^:]+:[^@]+@/g, type: "mysql-connection", severity: "critical" },
   { pattern: /redis:\/\/[^:]*:[^@]+@/g, type: "redis-connection", severity: "high" },
 ];
@@ -68,9 +88,7 @@ export class SecretGuardrail {
     customPatterns?: Array<{ pattern: RegExp; type: string; severity: SecretMatch["severity"] }>;
     excludePatterns?: string[];
   }) {
-    this.patterns = DEFAULT_PATTERNS.filter(
-      (p) => !options?.excludePatterns?.includes(p.type),
-    );
+    this.patterns = DEFAULT_PATTERNS.filter((p) => !options?.excludePatterns?.includes(p.type));
 
     if (options?.customPatterns) {
       this.patterns.push(...options.customPatterns);
@@ -240,11 +258,7 @@ export class EncryptionManager {
     const iv = combined.slice(0, 12);
     const data = combined.slice(12);
 
-    const decrypted = await crypto.subtle.decrypt(
-      { name: this.algorithm, iv },
-      key,
-      data,
-    );
+    const decrypted = await crypto.subtle.decrypt({ name: this.algorithm, iv }, key, data);
 
     return decoder.decode(decrypted);
   }

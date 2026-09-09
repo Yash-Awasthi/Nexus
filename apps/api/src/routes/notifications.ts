@@ -20,7 +20,6 @@
 
 import type { FastifyInstance } from "fastify";
 
-import { makeUserRateLimitPreHandler } from "../lib/rate-limiter.js";
 import {
   createNotification,
   dismissAllNotifications,
@@ -30,7 +29,9 @@ import {
   markNotificationRead,
   userIdFor,
 } from "../lib/notifications-store.js";
+import { makeUserRateLimitPreHandler } from "../lib/rate-limiter.js";
 import { requireAuthWithTier } from "../middleware/auth.js";
+
 import { openSseConnection } from "./sse.js";
 
 const AUTH = { preHandler: requireAuthWithTier };
@@ -55,7 +56,9 @@ export async function notificationsRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: [requireAuthWithTier, notifStreamRL] },
     async (request, reply): Promise<void> => {
       reply.hijack();
-      openSseConnection(reply.raw, request.socket, [`notifications:${userIdFor(request.nexusUserId)}`]);
+      openSseConnection(reply.raw, request.socket, [
+        `notifications:${userIdFor(request.nexusUserId)}`,
+      ]);
     },
   );
   /** GET /notifications?limit=N — full list, newest first. */
@@ -104,7 +107,7 @@ export async function notificationsRoutes(app: FastifyInstance): Promise<void> {
 
   /** POST /notifications/bulk — create multiple at once (≤ 50). */
   app.post<{
-    Body: { notifications: Array<{ type?: string; title: string; message?: string; link?: string }> };
+    Body: { notifications: { type?: string; title: string; message?: string; link?: string }[] };
   }>(
     "/notifications/bulk",
     {

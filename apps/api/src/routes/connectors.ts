@@ -126,8 +126,6 @@ if (process.env.JIRA_HOST && process.env.JIRA_EMAIL && process.env.JIRA_API_TOKE
   registry.register(new NullConnector("jira", "Jira", { placeholder: true }));
 }
 
-
-
 // ── Manual enabled/disabled state (overlay on top of registry) ───────────────
 
 const enabledOverrides = new Map<string, boolean>();

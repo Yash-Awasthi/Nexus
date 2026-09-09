@@ -66,7 +66,17 @@ describe("GET /api/connectors (seeded registry)", () => {
     const res = await app.inject({ method: "GET", url: "/api/connectors" });
     expect(res.statusCode).toBe(200);
     const connectors = res.json<{ connectors: Connector[] }>().connectors;
-    const seeded = ["groq", "tavily", "github", "neon", "slack", "linear", "notion", "bitbucket", "jira"];
+    const seeded = [
+      "groq",
+      "tavily",
+      "github",
+      "neon",
+      "slack",
+      "linear",
+      "notion",
+      "bitbucket",
+      "jira",
+    ];
     for (const id of seeded) {
       const c = connectors.find((x) => x.id === id);
       expect(c).toBeDefined();
@@ -138,9 +148,9 @@ describe("POST /api/connectors/:id/sync (sync jobs)", () => {
       method: "GET",
       url: `/api/connectors/${connectorId}/sync/schedules`,
     });
-    const after = schedules.json<{ schedules: Schedule[] }>().schedules.find(
-      (s) => s.id === scheduleId,
-    );
+    const after = schedules
+      .json<{ schedules: Schedule[] }>()
+      .schedules.find((s) => s.id === scheduleId);
     expect(after!.lastRunAt).toBeTruthy();
   });
 

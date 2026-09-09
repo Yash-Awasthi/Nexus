@@ -39,12 +39,21 @@ export interface CavemanOptions {
  */
 const FILLER_RULES: ReadonlyArray<readonly [RegExp, string]> = [
   // polite requests / hedging openers
-  [/\bwould you mind\b|\bif you could possibly\b|\bif it'?s not too much trouble\b|\bcould you\b|\bcan you please\b/gi, ""],
-  [/\bi (?:would )?like to (?:ask you to|request that|know that)\b|\bif i (?:asked|were to ask) you to\b/gi, ""],
+  [
+    /\bwould you mind\b|\bif you could possibly\b|\bif it'?s not too much trouble\b|\bcould you\b|\bcan you please\b/gi,
+    "",
+  ],
+  [
+    /\bi (?:would )?like to (?:ask you to|request that|know that)\b|\bif i (?:asked|were to ask) you to\b/gi,
+    "",
+  ],
   [/\bi wanted to let you know that\b/gi, ""],
   [/\bplease note that\b|\bit is important to note that\b|\bnote that\b/gi, ""],
   // hedges / opinion markers
-  [/\bi (?:think|believe|feel|guess|reckon|suppose)\b|\bin my (?:opinion|view)\b|\bas far as i'?m concerned\b/gi, ""],
+  [
+    /\bi (?:think|believe|feel|guess|reckon|suppose)\b|\bin my (?:opinion|view)\b|\bas far as i'?m concerned\b/gi,
+    "",
+  ],
   [/\bit (?:seems|appears|looks like|sounds like) that\b/gi, ""],
   [/\bi'?m not sure but\b/gi, ""],
   [/\bin my experience\b|\bneedless to say\b|\btruth be told\b/gi, ""],
@@ -63,7 +72,10 @@ const FILLER_RULES: ReadonlyArray<readonly [RegExp, string]> = [
   [/\bwhen it comes to\b|\bin the case of\b/gi, ""],
   [/\bthe fact that\b/gi, ""],
   [/\bat the end of the day\b/gi, ""],
-  [/\bas you can see\b|\bas we can see\b|\bas previously mentioned\b|\bas mentioned earlier\b/gi, ""],
+  [
+    /\bas you can see\b|\bas we can see\b|\bas previously mentioned\b|\bas mentioned earlier\b/gi,
+    "",
+  ],
   [/\bhowever\b/gi, "but"],
   [/\bfurthermore\b|\bmoreover\b|\badditionally\b|\bin addition\b/gi, ""],
   [/\bin conclusion\b|\bto summarize\b|\bin summary\b/gi, ""],

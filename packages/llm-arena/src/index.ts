@@ -56,16 +56,10 @@ const JUDGE_SYSTEM = [
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function buildJudgePrompt(
-  prompt: string,
-  candidates: { label: string; text: string }[],
-): string {
+function buildJudgePrompt(prompt: string, candidates: { label: string; text: string }[]): string {
   const labels = candidates.map((c) => c.label).join(", ");
   const blocks = candidates
-    .map(
-      (c) =>
-        `${FENCE} ${c.label} START ${FENCE}\n${c.text}\n${FENCE} ${c.label} END ${FENCE}`,
-    )
+    .map((c) => `${FENCE} ${c.label} START ${FENCE}\n${c.text}\n${FENCE} ${c.label} END ${FENCE}`)
     .join("\n\n");
 
   return [
@@ -123,16 +117,11 @@ export class LLMArena {
    * Run a blind arena: send the prompt to all candidates in parallel,
    * then judge them with the judge model.
    */
-  async compete(
-    prompt: string | LLMMessage[],
-    config: ArenaConfig,
-  ): Promise<ArenaResult> {
-    const messages = typeof prompt === "string"
-      ? [{ role: "user" as const, content: prompt }]
-      : prompt;
-    const promptText = typeof prompt === "string"
-      ? prompt
-      : messages.map((m) => m.content).join("\n");
+  async compete(prompt: string | LLMMessage[], config: ArenaConfig): Promise<ArenaResult> {
+    const messages =
+      typeof prompt === "string" ? [{ role: "user" as const, content: prompt }] : prompt;
+    const promptText =
+      typeof prompt === "string" ? prompt : messages.map((m) => m.content).join("\n");
 
     // 1. Get answers from all candidates in parallel
     const answers = await Promise.all(

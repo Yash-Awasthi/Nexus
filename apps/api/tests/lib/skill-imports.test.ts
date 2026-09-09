@@ -25,15 +25,20 @@ describe("skill-imports parse/dedupe helper", () => {
       "require('z')",
     ];
     for (const line of hits) expect(IMPORT_RE.test(line)).toBe(true);
-    for (const line of ["print('hello')", "export const a = 1", "const x = 1", "// import commented out", "def f():", "# using a directive in a comment"]) {
+    for (const line of [
+      "print('hello')",
+      "export const a = 1",
+      "const x = 1",
+      "// import commented out",
+      "def f():",
+      "# using a directive in a comment",
+    ]) {
       expect(IMPORT_RE.test(line)).toBe(false);
     }
   });
 
   it("partitions imports (deduped) from body lines, preserving order and whitespace", () => {
-    const { imports, bodies } = collect([
-      "import os\nprint('a')\n  import sys",
-    ]);
+    const { imports, bodies } = collect(["import os\nprint('a')\n  import sys"]);
     expect(imports).toEqual(["import os", "  import sys"]); // original text, incl. leading ws
     expect(bodies[0]).toEqual(["print('a')"]);
   });

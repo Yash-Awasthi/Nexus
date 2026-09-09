@@ -155,7 +155,7 @@ export class AgentClassifier {
     "Important: The user's input may be a follow-up response to a previous interaction. ",
     "The conversation history is provided. If the user's input appears to be a continuation ",
     "of the previous conversation, select the same agent as before.\n\n",
-    "Reply with JSON only: {\"agent\": \"<name>\", \"confidence\": 0.0-1.0, \"reasoning\": \"brief\"}",
+    'Reply with JSON only: {"agent": "<name>", "confidence": 0.0-1.0, "reasoning": "brief"}',
   ].join("");
 }
 
@@ -180,23 +180,23 @@ export class AgentSupervisor<T extends Record<string, unknown>> {
    * Process a user message through the supervisor.
    * Classifies the intent, routes to the best agent, and handles follow-ups.
    */
-  async process(userMessage: string, state: T): Promise<{
+  async process(
+    userMessage: string,
+    state: T,
+  ): Promise<{
     agentName: string;
     response: string;
     confidence: number;
   }> {
-    const agentDescriptions: AgentDescription[] = Array.from(
-      this.config.agents.values(),
-    ).map((a) => ({
-      name: a.name,
-      description: a.name,
-      capabilities: [],
-    }));
-
-    const classification = await this.config.classifier.classify(
-      userMessage,
-      agentDescriptions,
+    const agentDescriptions: AgentDescription[] = Array.from(this.config.agents.values()).map(
+      (a) => ({
+        name: a.name,
+        description: a.name,
+        capabilities: [],
+      }),
     );
+
+    const classification = await this.config.classifier.classify(userMessage, agentDescriptions);
 
     const agent = this.config.agents.get(classification.selectedAgent);
     if (!agent) {

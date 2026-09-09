@@ -20,10 +20,7 @@
  * later read from here instead of duplicating it.
  */
 
-import {
-  validatePluginManifest,
-  type PluginManifest,
-} from "@nexus/plugin-sdk";
+import { validatePluginManifest, type PluginManifest } from "@nexus/plugin-sdk";
 import type { FastifyInstance } from "fastify";
 
 import { PersistentStore } from "../lib/persistent-store.js";
@@ -90,9 +87,7 @@ export async function pluginRegistryRoutes(app: FastifyInstance): Promise<void> 
     "/registry/plugins/:id",
     { preHandler: requireAuthWithTier },
     async (request, reply) => {
-      const records = Array.from(store.values()).filter(
-        (r) => r.manifest.id === request.params.id,
-      );
+      const records = Array.from(store.values()).filter((r) => r.manifest.id === request.params.id);
       if (records.length === 0) return reply.code(404).send({ error: "not found" });
       const latest = records.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))[0]!;
       return reply.send(view(latest));
@@ -136,9 +131,7 @@ export async function pluginRegistryRoutes(app: FastifyInstance): Promise<void> 
     "/registry/plugins/:id",
     { preHandler: requireAuthWithTier },
     async (request, reply) => {
-      const records = Array.from(store.values()).filter(
-        (r) => r.manifest.id === request.params.id,
-      );
+      const records = Array.from(store.values()).filter((r) => r.manifest.id === request.params.id);
       if (records.length === 0) return reply.code(404).send({ error: "not found" });
       const caller = request.nexusUserId ?? "anon";
       const foreign = records.filter((r) => r.publisher !== caller && caller !== "admin");
@@ -155,9 +148,7 @@ export async function pluginRegistryRoutes(app: FastifyInstance): Promise<void> 
     "/registry/plugins/:id/install",
     { preHandler: requireAuthWithTier },
     async (request, reply) => {
-      const records = Array.from(store.values()).filter(
-        (r) => r.manifest.id === request.params.id,
-      );
+      const records = Array.from(store.values()).filter((r) => r.manifest.id === request.params.id);
       if (records.length === 0) return reply.code(404).send({ error: "not found" });
       const latest = records.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))[0]!;
       latest.downloads += 1;

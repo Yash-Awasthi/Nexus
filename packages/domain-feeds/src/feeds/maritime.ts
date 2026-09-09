@@ -4,12 +4,7 @@
  * (MaritimeFeed + mmsiFlagState/aisIncident · PortCongestionFeed +
  *  portCongestionSignal) — the §13.1 PortWatch surface lives here too.
  */
-import {
-  buildMockResponse,
-  FeedAdapter,
-  FeedAdapterOptions,
-  FeedEvent,
-} from "../base.js";
+import { buildMockResponse, FeedAdapter, FeedAdapterOptions, FeedEvent } from "../base.js";
 // PortCongestionEvent is declared in this file (it ships with the §13.1 feed).
 import type { MaritimeEvent } from "../index.js";
 
@@ -381,11 +376,12 @@ export class PortCongestionFeed extends FeedAdapter<PortCongestionEvent> {
       for (let page = 0; page < this.maxPages; page++) {
         const offset = page * PORTWATCH_PAGE_SIZE;
         if (offset >= count) break;
-        const raw = (await this.http(this.pageUrl(where, offset), this.buildHeaders())) as
-          | { features?: { attributes?: PortWatchAttributes }[] }
-          | null;
+        const raw = (await this.http(this.pageUrl(where, offset), this.buildHeaders())) as {
+          features?: { attributes?: PortWatchAttributes }[];
+        } | null;
         // Malformed/unexpected payload → mock fallback (shared adapter contract).
-        if (!raw || !Array.isArray(raw.features)) return buildMockResponse<PortCongestionEvent>("port-congestion");
+        if (!raw || !Array.isArray(raw.features))
+          return buildMockResponse<PortCongestionEvent>("port-congestion");
         events.push(...this.parseFeatures(raw.features));
         if (offset + PORTWATCH_PAGE_SIZE >= count) break;
       }
@@ -454,4 +450,3 @@ export class PortCongestionFeed extends FeedAdapter<PortCongestionEvent> {
     return events;
   }
 }
-

@@ -1,5 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
-import { pgTable, text, integer, boolean, jsonb, timestamp, doublePrecision, index } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  integer,
+  boolean,
+  jsonb,
+  timestamp,
+  doublePrecision,
+  index,
+} from "drizzle-orm/pg-core";
 
 /**
  * provider_models — model catalog seeded from models.dev (ROADMAP §1.5).

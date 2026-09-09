@@ -19,13 +19,20 @@ function tracked(log: string[], name: string, comp: PipelineComponent): Pipeline
 
 describe("ComponentPipeline connect grammar + validation", () => {
   it("rejects unknown components on either side", () => {
-    const p = new ComponentPipeline().addComponent("a", { outputs: ["out"], run: () => ({ out: 1 }) });
+    const p = new ComponentPipeline().addComponent("a", {
+      outputs: ["out"],
+      run: () => ({ out: 1 }),
+    });
     expect(() => p.connect("a", "ghost")).toThrow(/ghost not found/);
     expect(() => p.connect("ghost", "a")).toThrow(/ghost not found/);
   });
 
   it("rejects self-connection", () => {
-    const p = new ComponentPipeline().addComponent("a", { inputs: ["in"], outputs: ["out"], run: () => ({ out: 1 }) });
+    const p = new ComponentPipeline().addComponent("a", {
+      inputs: ["in"],
+      outputs: ["out"],
+      run: () => ({ out: 1 }),
+    });
     expect(() => p.connect("a", "a")).toThrow(/itself/);
   });
 
@@ -51,9 +58,26 @@ describe("ComponentPipeline execution semantics", () => {
   it("runs a linear chain in dependency order with values flowing through", async () => {
     const log: string[] = [];
     const p = new ComponentPipeline()
-      .addComponent("seed", tracked(log, "seed", { outputs: ["text"], run: () => ({ text: "hello" }) }))
-      .addComponent("upper", tracked(log, "upper", { inputs: ["text"], outputs: ["text"], run: ({ text }) => ({ text: String(text).toUpperCase() }) }))
-      .addComponent("wrap", tracked(log, "wrap", { inputs: ["text"], outputs: ["out"], run: ({ text }) => ({ out: `[${text}]` }) }))
+      .addComponent(
+        "seed",
+        tracked(log, "seed", { outputs: ["text"], run: () => ({ text: "hello" }) }),
+      )
+      .addComponent(
+        "upper",
+        tracked(log, "upper", {
+          inputs: ["text"],
+          outputs: ["text"],
+          run: ({ text }) => ({ text: String(text).toUpperCase() }),
+        }),
+      )
+      .addComponent(
+        "wrap",
+        tracked(log, "wrap", {
+          inputs: ["text"],
+          outputs: ["out"],
+          run: ({ text }) => ({ out: `[${text}]` }),
+        }),
+      )
       .connect("seed", "upper")
       .connect("upper", "wrap");
 
@@ -65,8 +89,16 @@ describe("ComponentPipeline execution semantics", () => {
   it("fans one output out to multiple receivers", async () => {
     const p = new ComponentPipeline()
       .addComponent("seed", { outputs: ["n"], run: () => ({ n: 7 }) })
-      .addComponent("dbl", { inputs: ["n"], outputs: ["n"], run: ({ n }) => ({ n: (n as number) * 2 }) })
-      .addComponent("tri", { inputs: ["n"], outputs: ["n"], run: ({ n }) => ({ n: (n as number) * 3 }) })
+      .addComponent("dbl", {
+        inputs: ["n"],
+        outputs: ["n"],
+        run: ({ n }) => ({ n: (n as number) * 2 }),
+      })
+      .addComponent("tri", {
+        inputs: ["n"],
+        outputs: ["n"],
+        run: ({ n }) => ({ n: (n as number) * 3 }),
+      })
       .connect("seed", "dbl")
       .connect("seed", "tri");
     const r = await p.run();
@@ -100,21 +132,32 @@ describe("ComponentPipeline execution semantics", () => {
   });
 
   it("supplies missing values to an unconnected input from run inputs", async () => {
-    const p = new ComponentPipeline().addComponent(
-      "sink",
-      { inputs: ["text"], outputs: ["len"], run: ({ text }) => ({ len: String(text).length }) },
-    );
+    const p = new ComponentPipeline().addComponent("sink", {
+      inputs: ["text"],
+      outputs: ["len"],
+      run: ({ text }) => ({ len: String(text).length }),
+    });
     const r = await p.run({ sink: { text: "four" } });
     expect(r.outputs["sink"]!.len).toBe(4);
   });
 
   it("preflights missing declared inputs before execution", async () => {
-    const p = new ComponentPipeline().addComponent("sink", { inputs: ["text"], outputs: ["len"], run: () => ({ len: 0 }) });
-    await expect(p.run()).rejects.toThrow(/missing a connection or input value for input socket 'sink.text'/);
+    const p = new ComponentPipeline().addComponent("sink", {
+      inputs: ["text"],
+      outputs: ["len"],
+      run: () => ({ len: 0 }),
+    });
+    await expect(p.run()).rejects.toThrow(
+      /missing a connection or input value for input socket 'sink.text'/,
+    );
   });
 
   it("rejects run inputs for undeclared sockets", async () => {
-    const p = new ComponentPipeline().addComponent("sink", { inputs: ["text"], outputs: ["len"], run: () => ({ len: 0 }) });
+    const p = new ComponentPipeline().addComponent("sink", {
+      inputs: ["text"],
+      outputs: ["len"],
+      run: () => ({ len: 0 }),
+    });
     await expect(p.run({ sink: { nope: 1 } })).rejects.toThrow(/does not exist/);
   });
 
@@ -134,15 +177,25 @@ describe("ComponentPipeline execution semantics", () => {
 
   it("supports async components", async () => {
     const p = new ComponentPipeline()
-      .addComponent("slow", { outputs: ["v"], run: async () => ({ v: await Promise.resolve("done") }) })
-      .addComponent("echo", { inputs: ["v"], outputs: ["v"], run: ({ v }) => ({ v: String(v).toUpperCase() }) })
+      .addComponent("slow", {
+        outputs: ["v"],
+        run: async () => ({ v: await Promise.resolve("done") }),
+      })
+      .addComponent("echo", {
+        inputs: ["v"],
+        outputs: ["v"],
+        run: ({ v }) => ({ v: String(v).toUpperCase() }),
+      })
       .connect("slow", "echo");
     const r = await p.run();
     expect(r.outputs["echo"]!.v).toBe("DONE");
   });
 
   it("validates component outputs against declared sockets", async () => {
-    const p = new ComponentPipeline().addComponent("bad", { outputs: ["x"], run: () => ({ y: 1 }) });
+    const p = new ComponentPipeline().addComponent("bad", {
+      outputs: ["x"],
+      run: () => ({ y: 1 }),
+    });
     await expect(p.run()).rejects.toThrow(/did not produce declared output 'x'/);
   });
 });
@@ -159,14 +212,20 @@ describe("ComponentPipeline over doc-pipeline stages", () => {
       outputs: ["count", "words"],
       run: ({ chunks }) => {
         const list = chunks as { text: string }[];
-        return { count: list.length, words: list.reduce((s, c) => s + c.text.split(/\s+/).length, 0) };
+        return {
+          count: list.length,
+          words: list.reduce((s, c) => s + c.text.split(/\s+/).length, 0),
+        };
       },
     };
     const p = new ComponentPipeline()
       .addComponent("chunker", chunker)
       .addComponent("counter", counter)
       .connect("chunker.chunks", "counter.chunks");
-    const longText = Array.from({ length: 30 }, (_, i) => `paragraph number ${i} with several words inside`).join(". ");
+    const longText = Array.from(
+      { length: 30 },
+      (_, i) => `paragraph number ${i} with several words inside`,
+    ).join(". ");
     const r = await p.run({ chunker: { text: longText } });
     const chunks = r.outputs["chunker"]!.chunks as { text: string }[];
     expect(chunks.length).toBeGreaterThan(1); // chunkText really ran over the wire

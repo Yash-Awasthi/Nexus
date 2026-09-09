@@ -13,7 +13,8 @@ import { join } from "node:path";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export type DebatePhase = "proposing" | "reviewing" | "rebutting" | "voting" | "synthesizing" | "converged" | "deadlocked";
+export type DebatePhase =
+  "proposing" | "reviewing" | "rebutting" | "voting" | "synthesizing" | "converged" | "deadlocked";
 
 export interface Debater {
   alias: string;
@@ -111,10 +112,13 @@ export class DebateCoordinator {
   private maxRounds: number;
   private stallTimeoutMs: number;
 
-  constructor(router: LLMRouter, options?: {
-    maxRounds?: number;
-    stallTimeoutMs?: number;
-  }) {
+  constructor(
+    router: LLMRouter,
+    options?: {
+      maxRounds?: number;
+      stallTimeoutMs?: number;
+    },
+  ) {
     this.router = router;
     this.maxRounds = options?.maxRounds ?? 3;
     this.stallTimeoutMs = options?.stallTimeoutMs ?? 300_000;
@@ -129,8 +133,12 @@ export class DebateCoordinator {
 
     // Phase 1: Proposing — each debater independently answers
     state.setPhase("proposing");
-    const proposals = await this.runPhase(prompt, debaters, "proposing", (d) =>
-      `You are ${d.label}. Answer this question independently:\n\n${prompt}\n\nProvide your analysis with your final answer clearly stated.`,
+    const proposals = await this.runPhase(
+      prompt,
+      debaters,
+      "proposing",
+      (d) =>
+        `You are ${d.label}. Answer this question independently:\n\n${prompt}\n\nProvide your analysis with your final answer clearly stated.`,
     );
     state.addPhaseResult({ phase: "proposing", outputs: proposals, timestamp: Date.now() });
 

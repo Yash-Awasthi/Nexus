@@ -388,7 +388,12 @@ describe("delegateWithRetry", () => {
   });
 
   it("returns a direct message reply as ok", async () => {
-    const reply: A2AMessage = { kind: "message", role: "agent", parts: [{ kind: "text", text: "hi" }], messageId: "m1" };
+    const reply: A2AMessage = {
+      kind: "message",
+      role: "agent",
+      parts: [{ kind: "text", text: "hi" }],
+      messageId: "m1",
+    };
     const out = await delegateWithRetry({
       client: clientReturning(reply),
       message: A2AClient.textMessage("hi"),
@@ -406,7 +411,12 @@ describe("delegateWithRetry", () => {
 
     const out = await delegateWithRetry(
       { client, message: A2AClient.textMessage("x") },
-      { maxAttempts: 3, baseDelayMs: 10, backoffMultiplier: 2, sleepFn: async (ms) => sleeps.push(ms) },
+      {
+        maxAttempts: 3,
+        baseDelayMs: 10,
+        backoffMultiplier: 2,
+        sleepFn: async (ms) => sleeps.push(ms),
+      },
     );
     expect(out.ok).toBe(true);
     expect(fetchFn).toHaveBeenCalledTimes(2);
@@ -417,7 +427,12 @@ describe("delegateWithRetry", () => {
     const sleeps: number[] = [];
     const out = await delegateWithRetry(
       { client: clientFailing(3), message: A2AClient.textMessage("x") },
-      { maxAttempts: 3, baseDelayMs: 10, backoffMultiplier: 2, sleepFn: async (ms) => sleeps.push(ms) },
+      {
+        maxAttempts: 3,
+        baseDelayMs: 10,
+        backoffMultiplier: 2,
+        sleepFn: async (ms) => sleeps.push(ms),
+      },
     );
     expect(out.ok).toBe(false);
     expect(out.error).toBeInstanceOf(A2AClientError);
@@ -433,7 +448,9 @@ describe("delegateWithRetry", () => {
     );
     expect(out.ok).toBe(false);
     expect(out.task?.status.state).toBe("failed");
-    expect((client as unknown as { fetchFn: { mock: { calls: unknown[] } } }).fetchFn.mock.calls).toHaveLength(1);
+    expect(
+      (client as unknown as { fetchFn: { mock: { calls: unknown[] } } }).fetchFn.mock.calls,
+    ).toHaveLength(1);
   });
 });
 
@@ -445,7 +462,11 @@ describe("delegateFanOut + A2ADelegationCoordinator", () => {
     });
     const deadClient = new A2AClient({
       rpcUrl: RPC_URL,
-      fetchFn: vi.fn().mockRejectedValue(new A2AClientError("down", "HTTP_ERROR", { status: 503 })) as unknown as typeof fetch,
+      fetchFn: vi
+        .fn()
+        .mockRejectedValue(
+          new A2AClientError("down", "HTTP_ERROR", { status: 503 }),
+        ) as unknown as typeof fetch,
     });
     const targets: DelegationTarget[] = [
       { label: "peer-a", client: okClient, message: A2AClient.textMessage("q") },

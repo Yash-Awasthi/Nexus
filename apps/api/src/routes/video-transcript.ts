@@ -127,7 +127,8 @@ export async function videoTranscriptRoutes(app: FastifyInstance): Promise<void>
             const pageUrl = `https://www.youtube.com/watch?v=${videoId}`;
             const pageRes = await fetch(pageUrl, {
               headers: {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
+                "User-Agent":
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
                 "Accept-Language": "en-US,en;q=0.9",
               },
             });
@@ -142,11 +143,14 @@ export async function videoTranscriptRoutes(app: FastifyInstance): Promise<void>
             const html = await pageRes.text();
 
             // Extract title from page
-            const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+            const titleMatch = /<title[^>]*>([^<]+)<\/title>/i.exec(html);
             const title = titleMatch?.[1]?.replace(/ - YouTube$/, "").trim();
 
             // Extract captions URL from ytInitialPlayerResponse
-            const captionsMatch = html.match(/"captions":\{"playerCaptionsTracklistRenderer":\{"captionTracks":(\[.*?\])/);
+            const captionsMatch =
+              /"captions":\{"playerCaptionsTracklistRenderer":\{"captionTracks":(\[.*?\])/.exec(
+                html,
+              );
             if (!captionsMatch) {
               return reply.send({
                 segments: [],
@@ -156,16 +160,15 @@ export async function videoTranscriptRoutes(app: FastifyInstance): Promise<void>
               });
             }
 
-            const captionTracks = JSON.parse(captionsMatch[1]!) as Array<{
+            const captionTracks = JSON.parse(captionsMatch[1]!) as {
               languageCode: string;
               baseUrl: string;
               name?: { simpleText?: string };
-            }>;
+            }[];
 
             // Prefer English, fall back to first available
             const track =
-              captionTracks.find((t) => t.languageCode.startsWith("en")) ??
-              captionTracks[0];
+              captionTracks.find((t) => t.languageCode.startsWith("en")) ?? captionTracks[0];
 
             if (!track?.baseUrl) {
               return reply.send({
@@ -249,7 +252,11 @@ export async function videoTranscriptRoutes(app: FastifyInstance): Promise<void>
               }
 
               const formData = new FormData();
-              formData.append("file", new Blob([audioBuffer], { type: "audio/webm" }), "audio.webm");
+              formData.append(
+                "file",
+                new Blob([audioBuffer], { type: "audio/webm" }),
+                "audio.webm",
+              );
               formData.append("model", "whisper-1");
 
               const whisperRes = await fetch("https://api.openai.com/v1/audio/transcriptions", {
@@ -299,7 +306,14 @@ export async function videoTranscriptRoutes(app: FastifyInstance): Promise<void>
               }
 
               const dgResult = (await dgRes.json()) as {
-                results?: { channels?: { alternatives?: { transcript?: string; words?: { word: string; start: number; end: number }[] }[] }[] };
+                results?: {
+                  channels?: {
+                    alternatives?: {
+                      transcript?: string;
+                      words?: { word: string; start: number; end: number }[];
+                    }[];
+                  }[];
+                };
               };
               const alt = dgResult.results?.channels?.[0]?.alternatives?.[0];
               const segments = (alt?.words ?? []).map((w) => ({
@@ -361,21 +375,21 @@ function extractYouTubeId(url: string): string | null {
 }
 
 /** Parse YouTube caption XML into timed segments */
-function parseYouTubeCaptionXml(xml: string): Array<{ start: number; end: number; text: string }> {
-  const segments: Array<{ start: number; end: number; text: string }> = [];
+function parseYouTubeCaptionXml(xml: string): { start: number; end: number; text: string }[] {
+  const segments: { start: number; end: number; text: string }[] = [];
   const regex = /<text start="([\d.]+)" dur="([\d.]+)"[^>]*>([\s\S]*?)<\/text>/gi;
   let match: RegExpExecArray | null;
 
   while ((match = regex.exec(xml)) !== null) {
     const start = parseFloat(match[1]!);
     const dur = parseFloat(match[2]!);
-    let text = match[3]!
+    const text = match[3]!
       .replace(/&amp;/g, "&")
       .replace(/&lt;/g, "<")
       .replace(/&gt;/g, ">")
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'")
-      .replace(/<[^>]+>/g, "")  // strip any HTML tags inside captions
+      .replace(/<[^>]+>/g, "") // strip any HTML tags inside captions
       .replace(/\n/g, " ")
       .trim();
 

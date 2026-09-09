@@ -14,7 +14,13 @@ const ENTITIES = [
   { name: "green energy", type: "entity", descriptions: ["solar panels"], mentions: 2 },
 ];
 const RELATIONS = [
-  { source: "acme aerospace", target: "rocket engine", type: "rel", descriptions: ["acme rel rocket engine"], mentions: 1 },
+  {
+    source: "acme aerospace",
+    target: "rocket engine",
+    type: "rel",
+    descriptions: ["acme rel rocket engine"],
+    mentions: 1,
+  },
 ];
 
 /** Scripted transport: content from a per-call script; counts completions. */
@@ -46,10 +52,7 @@ describe("graphRagRuntimeTools (served graphrag → RuntimeTools)", () => {
     });
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual(
-      [
-        "graphrag__graphrag_global_search",
-        "graphrag__graphrag_local_search",
-      ].sort(),
+      ["graphrag__graphrag_global_search", "graphrag__graphrag_local_search"].sort(),
     );
     for (const t of tools) {
       expect((t.parameters as { required?: string[] }).required).toEqual(["question"]);

@@ -119,7 +119,9 @@ describe("createGraphRagMcpServer (served graphrag local + global search)", () =
     );
 
     const list = await call(server, "tools/list");
-    const tools = (list.result as { tools: Array<{ name: string; inputSchema: { required?: string[] } }> }).tools;
+    const tools = (
+      list.result as { tools: Array<{ name: string; inputSchema: { required?: string[] } }> }
+    ).tools;
     expect(tools.map((t) => t.name).sort()).toEqual(
       ["graphrag_global_search", "graphrag_local_search"].sort(),
     );

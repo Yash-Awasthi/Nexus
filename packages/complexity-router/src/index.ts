@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Complexity Router — classify prompts by complexity, route to local or cloud models.
  *
@@ -11,11 +12,7 @@
  */
 
 // ── Prompt tiering (ported from llm-switchboard) ─────────────────────────────
-export {
-  classifyPrompt,
-  calibrateConfidence,
-  PROMPT_TIER_DEFAULTS,
-} from "./prompt-tier.js";
+export { classifyPrompt, calibrateConfidence, PROMPT_TIER_DEFAULTS } from "./prompt-tier.js";
 export type {
   PromptTier,
   PromptTierConfig,
@@ -33,7 +30,7 @@ export interface ComplexitySignals {
 export interface ComplexityResult {
   score: number;
   signals: ComplexitySignals;
-  recommendation: 'local' | 'cloud';
+  recommendation: "local" | "cloud";
 }
 
 export interface ComplexityRouterConfig {
@@ -65,19 +62,44 @@ const DEFAULT_CONFIG: ComplexityRouterConfig = {
  */
 export function scoreComplexity(
   prompt: string,
-  config: ComplexityRouterConfig = DEFAULT_CONFIG
+  config: ComplexityRouterConfig = DEFAULT_CONFIG,
 ): ComplexityResult {
   const words = prompt.split(/\s+/).length;
   const sentences = prompt.split(/[.!?]+/).length;
-  const hasCode = /```[\s\S]*```/.test(prompt) || /\b(function|class|import|def|return)\b/.test(prompt);
-  const hasArchitecture = /\b(design|architect|scale|distributed|microservice|trade-off|compare|evaluate)\b/i.test(prompt);
+  const hasCode =
+    /```[\s\S]*```/.test(prompt) || /\b(function|class|import|def|return)\b/.test(prompt);
+  const hasArchitecture =
+    /\b(design|architect|scale|distributed|microservice|trade-off|compare|evaluate)\b/i.test(
+      prompt,
+    );
   const hasAmbiguity = /\b(maybe|perhaps|or|somehow|kind of|sort of|not sure)\b/i.test(prompt);
-  const isGenerative = /\b(generate|create|brainstorm|imagine|novel|innovative|invent)\b/i.test(prompt);
-  const hasMultipleDomains = /\b(database|network|security|api|frontend|backend|deploy|test|monitor)\b/i.test(prompt);
+  const isGenerative = /\b(generate|create|brainstorm|imagine|novel|innovative|invent)\b/i.test(
+    prompt,
+  );
+  const hasMultipleDomains =
+    /\b(database|network|security|api|frontend|backend|deploy|test|monitor)\b/i.test(prompt);
 
   // Count distinct technical domains mentioned
-  const domainPatterns = ['database', 'network', 'security', 'api', 'frontend', 'backend', 'deploy', 'test', 'monitor', 'cache', 'queue', 'auth', 'ui', 'ml', 'data'];
-  const domainBreadth = domainPatterns.filter(d => new RegExp(`\\b${d}\\b`, 'i').test(prompt)).length;
+  const domainPatterns = [
+    "database",
+    "network",
+    "security",
+    "api",
+    "frontend",
+    "backend",
+    "deploy",
+    "test",
+    "monitor",
+    "cache",
+    "queue",
+    "auth",
+    "ui",
+    "ml",
+    "data",
+  ];
+  const domainBreadth = domainPatterns.filter((d) =>
+    new RegExp(`\\b${d}\\b`, "i").test(prompt),
+  ).length;
 
   // Base score from prompt length and complexity
   let score = Math.min(40, Math.floor(words / 5) + Math.floor(sentences / 2));
@@ -95,12 +117,13 @@ export function scoreComplexity(
   if (signals.requiresDeepReasoning) score = Math.min(100, score + config.deepReasoningBoost);
   if (signals.isGenerative) score = Math.min(100, score + config.generativeBoost);
   if (signals.ambiguity) score = Math.min(100, score + config.ambiguityBoost);
-  if (signals.domainBreadth >= config.domainBreadthThreshold) score = Math.min(100, score + config.domainBreadthBoost);
+  if (signals.domainBreadth >= config.domainBreadthThreshold)
+    score = Math.min(100, score + config.domainBreadthBoost);
 
   return {
     score,
     signals,
-    recommendation: score >= config.threshold ? 'cloud' : 'local',
+    recommendation: score >= config.threshold ? "cloud" : "local",
   };
 }
 
@@ -109,7 +132,7 @@ export function scoreComplexity(
  */
 export interface CascadeModel {
   id: string;
-  provider: 'local' | 'cloud';
+  provider: "local" | "cloud";
   endpoint: string;
   model: string;
   maxConcurrency?: number;
@@ -131,7 +154,7 @@ export class CascadeRouter {
   }
 
   addModel(model: CascadeModel): void {
-    if (model.provider === 'local') this.localModels.push(model);
+    if (model.provider === "local") this.localModels.push(model);
     else this.cloudModels.push(model);
   }
 
@@ -141,7 +164,7 @@ export class CascadeRouter {
   route(prompt: string): { model: CascadeModel; complexity: ComplexityResult } {
     const complexity = scoreComplexity(prompt, this.config);
 
-    if (complexity.recommendation === 'cloud' && this.cloudModels.length > 0) {
+    if (complexity.recommendation === "cloud" && this.cloudModels.length > 0) {
       this.cloudIndex = (this.cloudIndex + 1) % this.cloudModels.length;
       return { model: this.cloudModels[this.cloudIndex], complexity };
     }
@@ -157,7 +180,7 @@ export class CascadeRouter {
       return { model: this.cloudModels[this.cloudIndex], complexity };
     }
 
-    throw new Error('No models available in cascade router');
+    throw new Error("No models available in cascade router");
   }
 
   stats(): { localModels: number; cloudModels: number; threshold: number } {

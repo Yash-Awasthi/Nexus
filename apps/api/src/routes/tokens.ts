@@ -15,11 +15,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import { isValidPatScope } from "../lib/pat-scopes.js";
-import {
-  createPat,
-  listPats,
-  revokePat,
-} from "../lib/pat-store.js";
+import { createPat, listPats, revokePat } from "../lib/pat-store.js";
 
 /** Owner for the request's PATs: the authenticated user, or "dev" in bypass mode. */
 function patOwner(request: FastifyRequest): string {
@@ -46,7 +42,13 @@ export async function tokensRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post<{
-    Body: { name?: string; label?: string; tier?: string; scopes?: string[]; expiresInDays?: number };
+    Body: {
+      name?: string;
+      label?: string;
+      tier?: string;
+      scopes?: string[];
+      expiresInDays?: number;
+    };
   }>("/tokens", async (request, reply) => {
     const name = (request.body.name ?? request.body.label ?? "").trim();
     if (!name) return reply.code(400).send({ error: "EMPTY_NAME" });
@@ -61,11 +63,15 @@ export async function tokensRoutes(app: FastifyInstance): Promise<void> {
     // matches no area — reject it at mint instead of minting a token that
     // grants nothing. Semantics live in lib/pat-scopes.ts.
     const scopes = request.body.scopes;
-    if (scopes !== undefined &&
-        (!Array.isArray(scopes) || scopes.some((s) => typeof s !== "string" || !isValidPatScope(s)))) {
+    if (
+      scopes !== undefined &&
+      (!Array.isArray(scopes) || scopes.some((s) => typeof s !== "string" || !isValidPatScope(s)))
+    ) {
       return reply.code(400).send({
         error: "UNKNOWN_SCOPE",
-        message: "Unknown scope — choose from " + "chat, memory, council, sandbox, research, ab, godmode, threads, tokens, auth",
+        message:
+          "Unknown scope — choose from " +
+          "chat, memory, council, sandbox, research, ab, godmode, threads, tokens, auth",
       });
     }
 

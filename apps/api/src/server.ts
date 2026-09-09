@@ -14,8 +14,6 @@ import { createRequire } from "node:module";
 
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
-
-import { initPatStore } from "./lib/pat-store.js";
 import sensible from "@fastify/sensible";
 import { getTracer, enableTracing } from "@nexus/llm-tracer";
 import {
@@ -26,22 +24,14 @@ import {
 } from "@nexus/posthog-analytics";
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest } from "fastify";
 
-// Resolve pino-pretty to an absolute path so pino's transport worker can load it
-// under pnpm's strict node_modules layout (bare "pino-pretty" fails to resolve there).
-const _require = createRequire(import.meta.url);
-const _prettyTarget = (() => {
-  try {
-    return _require.resolve("pino-pretty");
-  } catch {
-    return undefined;
-  }
-})();
-
+import { AgentOrchestrator } from "./lib/agent-orchestrator.js";
 import { costLogStore } from "./lib/cost-log.js";
+import { initPatStore } from "./lib/pat-store.js";
 import { makeRateLimitPreHandler, makeUserRateLimitPreHandler } from "./lib/rate-limiter.js";
 import { sentryReporter } from "./lib/sentry-reporter.js";
-import { requireAuth, requireAuthWithTier } from "./middleware/auth.js";
+import { SmartRouter } from "./lib/smart-router.js";
 import { userContext } from "./lib/user-context.js";
+import { requireAuthWithTier } from "./middleware/auth.js";
 import { adminTracesRoutes } from "./routes/admin-traces.js";
 import { adminUsersRoutes } from "./routes/admin-users.js";
 import { adminRoutes } from "./routes/admin.js";
@@ -50,7 +40,6 @@ import { alertsRoutes } from "./routes/alerts.js";
 import { apiBridgeRoutes } from "./routes/api-bridge.js";
 import { auditRoutes } from "./routes/audit.js";
 import { authUsersRoutes } from "./routes/auth-users.js";
-import { userDataRoutes } from "./routes/user-data.js";
 import { billingRoutes } from "./routes/billing.js";
 import { botsRoutes } from "./routes/bots.js";
 import { briefRoutes } from "./routes/brief.js";
@@ -58,17 +47,17 @@ import { chatAnalystRoutes } from "./routes/chat-analyst.js";
 import { chatSuggestionsRoutes } from "./routes/chat-suggestions.js";
 import { codeReplRoutes } from "./routes/code-repl.js";
 import { conductorRoutes } from "./routes/conductor-route.js";
-import { diagnosticsRoutes } from "./routes/diagnostics.js";
 import { connectorsRoutes } from "./routes/connectors.js";
 import { contextRoutes } from "./routes/context.js";
 import { conversationAnalysisRoutes } from "./routes/conversation-analysis.js";
 import { corpusBuilderRoutes } from "./routes/corpus-builder.js";
 import { councilRoutes } from "./routes/council.js";
+import { diagnosticsRoutes } from "./routes/diagnostics.js";
+import { diffRoutes } from "./routes/diff.js";
 import { docPipelineRoutes } from "./routes/doc-pipeline.js";
 import { domainFeedsRoutes } from "./routes/domain-feeds.js";
 import { driftRoutes } from "./routes/drift.js";
 import { driveRoutes } from "./routes/drive.js";
-import { intelligenceHubRoutes } from "./routes/intelligence-hub.js";
 import { evalsRoutes } from "./routes/evals.js";
 import { featureFlagsRoutes } from "./routes/feature-flags.js";
 import { forecastRoutes } from "./routes/forecast.js";
@@ -80,9 +69,8 @@ import { hooksRoutes } from "./routes/hooks.js";
 import { i18nRoutes } from "./routes/i18n.js";
 import { imageGenRoutes } from "./routes/image-gen.js";
 import { ingestRoutes } from "./routes/ingest.js";
+import { intelligenceHubRoutes } from "./routes/intelligence-hub.js";
 import { knowledgeGraphRoutes } from "./routes/knowledge-graph.js";
-import { SmartRouter } from "./lib/smart-router.js";
-import { AgentOrchestrator } from "./lib/agent-orchestrator.js";
 import { libertasRoutes } from "./routes/libertas.js";
 import { llmOauthRoutes } from "./routes/llm-oauth.js";
 import { llmRoutes } from "./routes/llm.js";
@@ -92,34 +80,45 @@ import { mcpRoutes } from "./routes/mcp.js";
 import { memoryRoutes } from "./routes/memory.js";
 import { metricsRoutes } from "./routes/metrics.js";
 import { mfaRoutes } from "./routes/mfa.js";
+import { missionRoutes } from "./routes/missions.js";
 import { nlpRoutes } from "./routes/nlp.js";
 import { notificationsRoutes } from "./routes/notifications.js";
 import { oauthRoutes } from "./routes/oauth.js";
 import { obsProvidersRoutes } from "./routes/obs-providers.js";
 import { oidcRoutes } from "./routes/oidc.js";
 import { orchestrationRoutes } from "./routes/orchestration.js";
+import { pluginRegistryRoutes } from "./routes/plugin-registry.js";
 import { predictionMarketRoutes } from "./routes/prediction-market.js";
 import { redteamRoutes } from "./routes/redteam.js";
 import { researcherRoutes } from "./routes/researcher.js";
-import { sessionGraphRoutes } from "./routes/session-graph.js";
-import { diffRoutes } from "./routes/diff.js";
-import { missionRoutes } from "./routes/missions.js";
 import { rlhfRoutes } from "./routes/rlhf.js";
 import { runtimeRoutes } from "./routes/runtime.js";
 import { samlRoutes } from "./routes/saml.js";
 import { scenarioPlannerRoutes } from "./routes/scenario-planner.js";
 import { scimRoutes } from "./routes/scim.js";
 import { scrapingMcpRoutes } from "./routes/scraping-mcp.js";
+import { sessionGraphRoutes } from "./routes/session-graph.js";
 import { sessionSyncRoutes } from "./routes/session-sync.js";
 import { sftRoutes } from "./routes/sft.js";
-import { pluginRegistryRoutes } from "./routes/plugin-registry.js";
 import { sseRoutes } from "./routes/sse.js";
-import { threadsRoutes } from "./routes/threads.js";
 import { stmRoutes } from "./routes/stm.js";
+import { threadsRoutes } from "./routes/threads.js";
+import { userDataRoutes } from "./routes/user-data.js";
 import { videoTranscriptRoutes } from "./routes/video-transcript.js";
 import { voiceRoutes } from "./routes/voice.js";
 import { wikiRoutes } from "./routes/wiki.js";
 import { workspacesRoutes } from "./routes/workspaces.js";
+
+// Resolve pino-pretty to an absolute path so pino's transport worker can load it
+// under pnpm's strict node_modules layout (bare "pino-pretty" fails to resolve there).
+const _require = createRequire(import.meta.url);
+const _prettyTarget = (() => {
+  try {
+    return _require.resolve("pino-pretty");
+  } catch {
+    return undefined;
+  }
+})();
 
 // Augment FastifyRequest to carry optional trace span
 declare module "fastify" {

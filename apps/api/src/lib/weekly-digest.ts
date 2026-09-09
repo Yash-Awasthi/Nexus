@@ -78,17 +78,14 @@ export async function maybeEmitWeeklyDigest(
   const weekStart = start.toISOString().slice(0, 10);
 
   const stats = await computeStats(weekStart, currentWeek);
-  if (
-    stats.requests === 0 &&
-    stats.researchCount === 0 &&
-    stats.autopilotRuns === 0
-  ) {
+  if (stats.requests === 0 && stats.researchCount === 0 && stats.autopilotRuns === 0) {
     return null; // quiet week — marked, but no noise
   }
 
   const parts: string[] = [];
   if (stats.requests > 0) parts.push(`${stats.requests} request${stats.requests > 1 ? "s" : ""}`);
-  if (stats.researchCount > 0) parts.push(`${stats.researchCount} deep research run${stats.researchCount > 1 ? "s" : ""}`);
+  if (stats.researchCount > 0)
+    parts.push(`${stats.researchCount} deep research run${stats.researchCount > 1 ? "s" : ""}`);
   if (stats.autopilotRuns > 0)
     parts.push(`${stats.autopilotRuns} autopilot run${stats.autopilotRuns > 1 ? "s" : ""}`);
   if (stats.tokens > 0) parts.push(`${fmtTokens(stats.tokens)} tokens`);

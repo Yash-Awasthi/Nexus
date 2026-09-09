@@ -139,7 +139,10 @@ function makeEngine(opts: {
     ...(opts.constraints
       ? {
           constraints: [
-            new WorkflowConstraint("gate", async () => ({ allowed: false, reason: "denied by gate" })),
+            new WorkflowConstraint("gate", async () => ({
+              allowed: false,
+              reason: "denied by gate",
+            })),
           ],
         }
       : {}),
@@ -194,7 +197,10 @@ describe("WorkflowTelemetry", () => {
       taskResults: { a: 1 },
     });
     expect(history.find((e) => e.id === "e2")?.error).toBe("boom");
-    expect(history.find((e) => e.id === "e3")).toMatchObject({ status: "rejected", approved: false });
+    expect(history.find((e) => e.id === "e3")).toMatchObject({
+      status: "rejected",
+      approved: false,
+    });
   });
 
   it("does not duplicate an existing start record", async () => {
@@ -293,7 +299,9 @@ describe("WorkflowEngine.executeWorkflow", () => {
     const result = await h.engine.executeWorkflow("wf-a", "exec-gate");
     expect(result.status).toBe("failed");
     expect(result.error).toBe("denied by gate");
-    expect(h.telemetry.getExecutionHistory().find((e) => e.id === "exec-gate")?.status).toBe("failed");
+    expect(h.telemetry.getExecutionHistory().find((e) => e.id === "exec-gate")?.status).toBe(
+      "failed",
+    );
   });
 
   it("returns pending when approval is required and waits for approval", async () => {
@@ -634,7 +642,9 @@ describe("WorkflowEngine event subscription", () => {
     const engine = new WorkflowEngine(
       reg,
       telemetry,
-      { submitAndExecuteTasks: vi.fn().mockResolvedValue(undefined) } as unknown as ConductorOrchestrator,
+      {
+        submitAndExecuteTasks: vi.fn().mockResolvedValue(undefined),
+      } as unknown as ConductorOrchestrator,
       undefined,
       p,
     );
@@ -668,9 +678,7 @@ describe("Workflow templates", () => {
   it("BrowserResearchWorkflowTemplate blocks illegal path tasks", async () => {
     const tpl = new BrowserResearchWorkflowTemplate();
     const wf = tpl.createWorkflow({});
-    const denied = await wf.constraints![0].evaluate([
-      { ...wf.tasks[0], id: "passwd-read" },
-    ]);
+    const denied = await wf.constraints![0].evaluate([{ ...wf.tasks[0], id: "passwd-read" }]);
     expect(denied.allowed).toBe(false);
     expect(denied.reason).toContain("Illegal");
   });
@@ -678,11 +686,7 @@ describe("Workflow templates", () => {
   it("LocalCloudProvisioningTemplate builds the floci chain", () => {
     const tpl = new LocalCloudProvisioningTemplate();
     const wf = tpl.createWorkflow({ id: "cp" });
-    expect(wf.tasks.map((t) => t.id)).toEqual([
-      "cp-s3-bucket",
-      "cp-sqs-queue",
-      "cp-ddb-table",
-    ]);
+    expect(wf.tasks.map((t) => t.id)).toEqual(["cp-s3-bucket", "cp-sqs-queue", "cp-ddb-table"]);
     expect(wf.tasks[2].dependencies).toEqual(["cp-sqs-queue"]);
   });
 

@@ -28,18 +28,19 @@ interface ProviderScore {
 const TASK_TYPE_EMBEDDINGS: Record<string, number[]> = {
   "code-generation": [0.9, 0.3, 0.1, 0.8, 0.2],
   "code-review": [0.85, 0.4, 0.15, 0.7, 0.3],
-  "analysis": [0.5, 0.8, 0.6, 0.9, 0.1],
+  analysis: [0.5, 0.8, 0.6, 0.9, 0.1],
   "creative-writing": [0.2, 0.6, 0.9, 0.3, 0.7],
-  "summarization": [0.3, 0.5, 0.4, 0.6, 0.2],
-  "chat": [0.4, 0.2, 0.7, 0.4, 0.5],
+  summarization: [0.3, 0.5, 0.4, 0.6, 0.2],
+  chat: [0.4, 0.2, 0.7, 0.4, 0.5],
   "data-extraction": [0.7, 0.7, 0.2, 0.8, 0.1],
-  "translation": [0.4, 0.3, 0.5, 0.5, 0.6],
+  translation: [0.4, 0.3, 0.5, 0.5, 0.6],
   "math-reasoning": [0.6, 0.9, 0.1, 0.95, 0.05],
-  "default": [0.5, 0.5, 0.5, 0.5, 0.5],
+  default: [0.5, 0.5, 0.5, 0.5, 0.5],
 };
 
 export class GNNRouter {
-  private providerHistory: Map<string, { latency: number; success: boolean; cost: number }[]> = new Map();
+  private providerHistory: Map<string, { latency: number; success: boolean; cost: number }[]> =
+    new Map();
   private readonly decayFactor = 0.95;
   private readonly historySize = 100;
 
@@ -72,32 +73,32 @@ export class GNNRouter {
       const history = this.providerHistory.get(alias) || [];
       const recentHistory = history.slice(-this.historySize);
 
-      const successRate = recentHistory.length > 0
-        ? recentHistory.filter(h => h.success).length / recentHistory.length
-        : 0.5;
+      const successRate =
+        recentHistory.length > 0
+          ? recentHistory.filter((h) => h.success).length / recentHistory.length
+          : 0.5;
 
-      const latencyP50 = recentHistory.length > 0
-        ? this.percentile(recentHistory.map(h => h.latency), 50)
-        : 2000;
+      const latencyP50 =
+        recentHistory.length > 0
+          ? this.percentile(
+              recentHistory.map((h) => h.latency),
+              50,
+            )
+          : 2000;
 
-      const costPerToken = recentHistory.length > 0
-        ? recentHistory.reduce((sum, h) => sum + h.cost, 0) / recentHistory.length
-        : 0.00001;
+      const costPerToken =
+        recentHistory.length > 0
+          ? recentHistory.reduce((sum, h) => sum + h.cost, 0) / recentHistory.length
+          : 0.00001;
 
-      const taskScore = this.dotProduct(
-        taskEmbedding,
-        this.providerBiasVector(alias),
-      );
+      const taskScore = this.dotProduct(taskEmbedding, this.providerBiasVector(alias));
 
       const latencyScore = 1 / (1 + latencyP50 / 5000);
       const costScore = 1 / (1 + costPerToken * 100000);
       const qualityScore = successRate;
 
       const totalScore =
-        taskScore * 0.35 +
-        qualityScore * 0.30 +
-        latencyScore * 0.20 +
-        costScore * 0.15;
+        taskScore * 0.35 + qualityScore * 0.3 + latencyScore * 0.2 + costScore * 0.15;
 
       const [provider, model] = alias.includes(":") ? alias.split(":") : [alias, alias];
 
@@ -120,9 +121,7 @@ export class GNNRouter {
       hash = ((hash << 5) - hash + alias.charCodeAt(i)) | 0;
     }
     const seed = Math.abs(hash);
-    return Array.from({ length: 5 }, (_, i) =>
-      ((Math.sin(seed * (i + 1) * 0.1) + 1) / 2),
-    );
+    return Array.from({ length: 5 }, (_, i) => (Math.sin(seed * (i + 1) * 0.1) + 1) / 2);
   }
 
   private dotProduct(a: number[], b: number[]): number {

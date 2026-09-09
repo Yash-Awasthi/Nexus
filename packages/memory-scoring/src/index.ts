@@ -151,7 +151,9 @@ function computeDecay(lastAccessed: number, halfLifeDays: number = 30): number {
 /**
  * Get sector distribution of scored memories.
  */
-export function getSectorDistribution(scored: ScoredMemory[]): Record<SectorName, { count: number; avgScore: number }> {
+export function getSectorDistribution(
+  scored: ScoredMemory[],
+): Record<SectorName, { count: number; avgScore: number }> {
   const dist: Record<SectorName, { count: number; totalScore: number }> = {
     episodic: { count: 0, totalScore: 0 },
     semantic: { count: 0, totalScore: 0 },
@@ -164,9 +166,18 @@ export function getSectorDistribution(scored: ScoredMemory[]): Record<SectorName
   }
 
   return {
-    episodic: { count: dist.episodic.count, avgScore: dist.episodic.count > 0 ? dist.episodic.totalScore / dist.episodic.count : 0 },
-    semantic: { count: dist.semantic.count, avgScore: dist.semantic.count > 0 ? dist.semantic.totalScore / dist.semantic.count : 0 },
-    procedural: { count: dist.procedural.count, avgScore: dist.procedural.count > 0 ? dist.procedural.totalScore / dist.procedural.count : 0 },
+    episodic: {
+      count: dist.episodic.count,
+      avgScore: dist.episodic.count > 0 ? dist.episodic.totalScore / dist.episodic.count : 0,
+    },
+    semantic: {
+      count: dist.semantic.count,
+      avgScore: dist.semantic.count > 0 ? dist.semantic.totalScore / dist.semantic.count : 0,
+    },
+    procedural: {
+      count: dist.procedural.count,
+      avgScore: dist.procedural.count > 0 ? dist.procedural.totalScore / dist.procedural.count : 0,
+    },
   };
 }
 

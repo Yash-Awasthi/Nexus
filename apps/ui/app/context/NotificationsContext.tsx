@@ -73,7 +73,10 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     try {
       const res = await authFetch(`/api/notifications?limit=${TRAY_LIMIT}`);
       if (res.ok) {
-        const data = (await res.json()) as { notifications?: NotificationItem[]; unreadCount?: number };
+        const data = (await res.json()) as {
+          notifications?: NotificationItem[];
+          unreadCount?: number;
+        };
         setItems(data.notifications ?? []);
         setUnread(data.unreadCount ?? 0);
       }
@@ -203,7 +206,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <NotificationsContext.Provider value={{ items, unread, loading, refresh, markRead, dismiss, dismissAll }}>
+    <NotificationsContext.Provider
+      value={{ items, unread, loading, refresh, markRead, dismiss, dismissAll }}
+    >
       {children}
       {toast && (
         <div

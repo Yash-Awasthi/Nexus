@@ -4,7 +4,8 @@ import { compressOutputForCommand } from "./token-saver.js";
 
 function tsSource(n: number): string {
   const lines: string[] = [];
-  for (let i = 0; i < n; i++) lines.push(`export function fn_${i}(x: number): number { return x + ${i}; }`);
+  for (let i = 0; i < n; i++)
+    lines.push(`export function fn_${i}(x: number): number { return x + ${i}; }`);
   return lines.join("\n");
 }
 
@@ -12,10 +13,26 @@ function paddedLockJson(): string {
   // lockfileVersion-3-style fixture inflated past 100 lines
   const packages: Record<string, Record<string, string>> = {
     "": { name: "demo", version: "1.0.0" },
-    "node_modules/left-pad": { version: "1.3.0", resolved: "https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz", integrity: "sha512-abcdef1234567890abcdef" },
-    "node_modules/lodash": { version: "4.17.21", resolved: "https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz", integrity: "sha512-0123456789abcdef0123456789abc" },
-    "node_modules/rimraf": { version: "3.0.2", resolved: "https://registry.npmjs.org/rimraf/-/rimraf-3.0.2.tgz", integrity: "sha512-99887766554433221100" },
-    "node_modules/semver": { version: "7.6.0", resolved: "https://registry.npmjs.org/semver/-/semver-7.6.0.tgz", integrity: "sha512-abcdefabcdefabcdefabcdefabcdef" },
+    "node_modules/left-pad": {
+      version: "1.3.0",
+      resolved: "https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz",
+      integrity: "sha512-abcdef1234567890abcdef",
+    },
+    "node_modules/lodash": {
+      version: "4.17.21",
+      resolved: "https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz",
+      integrity: "sha512-0123456789abcdef0123456789abc",
+    },
+    "node_modules/rimraf": {
+      version: "3.0.2",
+      resolved: "https://registry.npmjs.org/rimraf/-/rimraf-3.0.2.tgz",
+      integrity: "sha512-99887766554433221100",
+    },
+    "node_modules/semver": {
+      version: "7.6.0",
+      resolved: "https://registry.npmjs.org/semver/-/semver-7.6.0.tgz",
+      integrity: "sha512-abcdefabcdefabcdefabcdefabcdef",
+    },
   };
   const lines: string[] = [];
   for (let i = 0; i < 22; i++) {
@@ -148,8 +165,12 @@ describe("fileContentProcessor — lock files", () => {
   it("extracts module@version pairs from go.sum", () => {
     const lines: string[] = [];
     for (let i = 0; i < 60; i++) {
-      lines.push(`github.com/org/mod_${i} v1.${i}.0 h1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`);
-      lines.push(`github.com/org/mod_${i} v1.${i}.0/go.mod h1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb`);
+      lines.push(
+        `github.com/org/mod_${i} v1.${i}.0 h1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`,
+      );
+      lines.push(
+        `github.com/org/mod_${i} v1.${i}.0/go.mod h1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb`,
+      );
     }
     const out = lines.join("\n");
     expect(out.split("\n").length).toBeGreaterThan(100);
@@ -171,18 +192,22 @@ describe("fileContentProcessor — structured data", () => {
     const nested: Record<string, unknown> = { version: 1, app: "demo" };
     const deep: Record<string, unknown> = {};
     for (let i = 0; i < 20; i++) deep[`svc_${i}`] = { image: `img:${i}`, replicas: i, nested };
-    const body = JSON.stringify({ metadata: { created: "2024-01-01", nested }, services: deep }, null, 2);
+    const body = JSON.stringify(
+      { metadata: { created: "2024-01-01", nested }, services: deep },
+      null,
+      2,
+    );
     const out = [...body.split("\n"), ""].join("\n");
     expect(out.split("\n").length).toBeGreaterThan(100);
     const r = compressOutputForCommand("cat compose.json", out);
     expect(r.processor).toBe("file_content");
     expect(r.wasCompressed).toBe(true);
-    expect(r.output).toContain("\"metadata\"");
-    expect(r.output).toContain("\"created\": \"2024-01-01\"");
+    expect(r.output).toContain('"metadata"');
+    expect(r.output).toContain('"created": "2024-01-01"');
     // depth-2 objects collapse to a key-count summary (max_depth=2)
-    expect(r.output).toContain("\"nested\": \"{... 2 keys}\"");
+    expect(r.output).toContain('"nested": "{... 2 keys}"');
     expect(r.output).toMatch(/\(\d+ total lines\)$/m);
-    expect(r.output).not.toContain("\"app\": \"demo\"");
+    expect(r.output).not.toContain('"app": "demo"');
     expect(r.output).not.toContain("replicas");
   });
 
@@ -208,7 +233,8 @@ describe("fileContentProcessor — structured data", () => {
 
   it("truncates over-long csv to header + head/tail rows", () => {
     const rows = ["name,id,score,region,active"];
-    for (let i = 0; i < 120; i++) rows.push(`user_${i},${i},${i % 5},region_${i % 4},${i % 2 === 0}`);
+    for (let i = 0; i < 120; i++)
+      rows.push(`user_${i},${i},${i % 5},region_${i % 4},${i % 2 === 0}`);
     const out = rows.join("\n");
     const r = compressOutputForCommand("cat users.csv", out);
     expect(r.processor).toBe("file_content");
@@ -226,10 +252,12 @@ describe("fileContentProcessor — structured data", () => {
 describe("fileContentProcessor — logs, docs, heuristics", () => {
   it("keeps head/tail plus error lines with context in a .log file", () => {
     const lines: string[] = [];
-    for (let i = 0; i < 40; i++) lines.push(`2024-05-01T10:00:0${i % 10}Z INFO  worker-${i} processed item ${i}`);
+    for (let i = 0; i < 40; i++)
+      lines.push(`2024-05-01T10:00:0${i % 10}Z INFO  worker-${i} processed item ${i}`);
     lines.push("2024-05-01T10:00:59Z ERROR worker-crash division by zero");
     lines.push("2024-05-01T10:01:00Z WARN  worker-crash restarting");
-    for (let i = 0; i < 60; i++) lines.push(`2024-05-01T10:01:${String(i % 60).padStart(2, "0")}Z INFO  worker-${i} done`);
+    for (let i = 0; i < 60; i++)
+      lines.push(`2024-05-01T10:01:${String(i % 60).padStart(2, "0")}Z INFO  worker-${i} done`);
     const out = lines.join("\n");
     const r = compressOutputForCommand("tail -n 200 app.log", out);
     expect(r.processor).toBe("file_content");
@@ -253,8 +281,10 @@ describe("fileContentProcessor — logs, docs, heuristics", () => {
 
   it("heuristic log detection applies to extensionless files", () => {
     const lines: string[] = [];
-    for (let i = 0; i < 60; i++) lines.push(`2024-05-01 12:34:${String(i % 60).padStart(2, "0")} [INFO] service ${i} up`);
-    for (let i = 0; i < 60; i++) lines.push(`2024-05-01 12:35:${String(i % 60).padStart(2, "0")} [DEBUG] heartbeat ${i}`);
+    for (let i = 0; i < 60; i++)
+      lines.push(`2024-05-01 12:34:${String(i % 60).padStart(2, "0")} [INFO] service ${i} up`);
+    for (let i = 0; i < 60; i++)
+      lines.push(`2024-05-01 12:35:${String(i % 60).padStart(2, "0")} [DEBUG] heartbeat ${i}`);
     const out = lines.join("\n");
     const r = compressOutputForCommand("cat output", out);
     expect(r.processor).toBe("file_content");
@@ -266,7 +296,8 @@ describe("fileContentProcessor — logs, docs, heuristics", () => {
 
   it("heuristic json detection applies to extensionless files starting with {", () => {
     const deep: Record<string, unknown> = {};
-    for (let i = 0; i < 30; i++) deep[`k_${i}`] = { a: i, b: `v_${i}`, c: { d: i, e: i + 1, f: [1, 2, 3, 4, 5] } };
+    for (let i = 0; i < 30; i++)
+      deep[`k_${i}`] = { a: i, b: `v_${i}`, c: { d: i, e: i + 1, f: [1, 2, 3, 4, 5] } };
     const out = JSON.stringify({ root: deep }, null, 2);
     expect(out.split("\n").length).toBeGreaterThan(100);
     const r = compressOutputForCommand("less payload", out);

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 LLM Router Service — Inspired by LLM orchestration frameworks
 Intelligent routing, load balancing, fallback chains, and cost optimization

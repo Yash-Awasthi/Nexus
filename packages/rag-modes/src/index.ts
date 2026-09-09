@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @nexus/rag-modes — Multi-mode RAG retrieval with role-specific LLM configuration.
  *
@@ -232,15 +233,10 @@ export class MultiModeRetriever {
    * Finds specific entities mentioned in the query and their direct relations.
    */
   private async retrieveLocal(query: string): Promise<RagRetrievalResult> {
-    const entities = await this.store.searchEntities(
-      query,
-      this.config.maxRelatedChunks ?? 10,
-    );
+    const entities = await this.store.searchEntities(query, this.config.maxRelatedChunks ?? 10);
 
     // Get direct relations for top entities
-    const relationPromises = entities.slice(0, 5).map((e) =>
-      this.store.getEntityRelations(e.id),
-    );
+    const relationPromises = entities.slice(0, 5).map((e) => this.store.getEntityRelations(e.id));
     const relationResults = await Promise.all(relationPromises);
     const relations = relationResults.flat();
 
@@ -296,11 +292,7 @@ export class MultiModeRetriever {
       }
     }
 
-    const context = this.formatContext(
-      entities.slice(0, 10),
-      scoredRelations,
-      [],
-    );
+    const context = this.formatContext(entities.slice(0, 10), scoredRelations, []);
     const totalTokens = this.estimateTokens(context);
 
     return {
@@ -337,12 +329,8 @@ export class MultiModeRetriever {
       }
     }
 
-    const entities = [...entityMap.values()]
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 15);
-    const relations = [...relationMap.values()]
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 20);
+    const entities = [...entityMap.values()].sort((a, b) => b.score - a.score).slice(0, 15);
+    const relations = [...relationMap.values()].sort((a, b) => b.score - a.score).slice(0, 20);
 
     const context = this.formatContext(entities, relations, []);
     const totalTokens = this.estimateTokens(context);
@@ -362,10 +350,7 @@ export class MultiModeRetriever {
    * No knowledge graph — relies on embedding similarity.
    */
   private async retrieveNaive(query: string): Promise<RagRetrievalResult> {
-    const chunks = await this.store.searchChunks(
-      query,
-      this.config.maxRelatedChunks ?? 10,
-    );
+    const chunks = await this.store.searchChunks(query, this.config.maxRelatedChunks ?? 10);
 
     const context = this.formatChunksContext(chunks);
     const totalTokens = this.estimateTokens(context);
@@ -491,11 +476,7 @@ export class MultiModeRetriever {
       .join("\n\n");
   }
 
-  private truncateByTokens<T>(
-    items: T[],
-    maxTokens: number,
-    toText: (item: T) => string,
-  ): T[] {
+  private truncateByTokens<T>(items: T[], maxTokens: number, toText: (item: T) => string): T[] {
     const result: T[] = [];
     let tokens = 0;
 
@@ -594,10 +575,7 @@ export function headingAwareChunk(
     // Update heading breadcrumb
     if (section.level > 0) {
       // Pop headings at same or deeper level
-      while (
-        headingStack.length > 0 &&
-        headingStack.length >= section.level
-      ) {
+      while (headingStack.length > 0 && headingStack.length >= section.level) {
         headingStack.pop();
       }
       headingStack.push(section.title);
@@ -610,9 +588,10 @@ export function headingAwareChunk(
 
     // If section fits in one chunk, keep it together
     if (sectionContent.length <= maxChars) {
-      const content = includeHeading && section.title
-        ? `# ${section.title}\n\n${sectionContent}`
-        : sectionContent;
+      const content =
+        includeHeading && section.title
+          ? `# ${section.title}\n\n${sectionContent}`
+          : sectionContent;
 
       chunks.push({
         id: computeChunkId(content),
@@ -629,9 +608,8 @@ export function headingAwareChunk(
 
       for (const para of paragraphs) {
         if (buffer.length + para.length > maxChars && buffer.length >= minChars) {
-          const content = includeHeading && section.title
-            ? `# ${section.title}\n\n${buffer}`
-            : buffer;
+          const content =
+            includeHeading && section.title ? `# ${section.title}\n\n${buffer}` : buffer;
 
           chunks.push({
             id: computeChunkId(content),
@@ -648,9 +626,8 @@ export function headingAwareChunk(
       }
 
       if (buffer.trim().length > 0) {
-        const content = includeHeading && section.title
-          ? `# ${section.title}\n\n${buffer}`
-          : buffer;
+        const content =
+          includeHeading && section.title ? `# ${section.title}\n\n${buffer}` : buffer;
 
         chunks.push({
           id: computeChunkId(content),

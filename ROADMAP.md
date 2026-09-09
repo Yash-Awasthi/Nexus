@@ -26,7 +26,7 @@ migrations follow the `packages/db/migrations/` recipe (next free number, add a
 ## 1. LLM provider breadth
 
 - **1.2 Dify SSE + threading** _✓ shipped_ — `DifyDriver.stream()` (`response_mode:
-  "streaming"`, delta reassembly, `message_end` usage + conversation_id, typed LlmError);
+"streaming"`, delta reassembly, `message_end` usage + conversation_id, typed LlmError);
   `conversationId` on `LlmRequestOptions`/`LlmResponse`. llm-drivers 283/283.
 - **1.3 Aux provider gaps** _✓ shipped (all four slices)_
   - image-gen: flux, stability, recraft, fal, comfyui — suite 92/92.
@@ -36,7 +36,7 @@ migrations follow the `packages/db/migrations/` recipe (next free number, add a
 - **1.4 Custom-driver framework** _✓ shipped_ — `packages/llm-drivers/README.md`.
 - **1.5 models.dev seed** _✓ shipped (2026-09-08; importer completed 2026-09-09)_ — migration
   `0014_provider_models.sql` + journal + `provider-models.ts` schema; CLI `nexus models seed
-  [--file]` (fixture default, `ON CONFLICT (id) DO UPDATE`); API boot hydrates the registry
+[--file]` (fixture default, `ON CONFLICT (id) DO UPDATE`); API boot hydrates the registry
   from the table, zero startup network, fail-open. 2026-09-09: the package's models.dev
   importer is real (catalogue types, `modelsDevToDefinitions`, `fetchModelsDev` with
   injectable fetch, `registerFromModelsDev` with curated-keep/overwrite), the registry grew a
@@ -145,7 +145,7 @@ from backups/exports). Baseline: `@nexus/sandbox` + `/drive/*` routes already in
 Found by a four-dimension audit (2026-09-08) of the §13.1/§15.x passes. Ordered by value.
 
 - **16.1 PortCongestionFeed observability** — _✓ done (2026-09-08)_: `GET
-  /api/v1/domain-feeds/intel/port-congestion` + registry registration + **worker polling
+/api/v1/domain-feeds/intel/port-congestion` + registry registration + **worker polling
   job** (BullMQ repeatable `feeds:port-congestion`, 15-min cadence, Telegram alert on
   `critical` closures — worker suite typecheck-clean; live Redis run = Gate).
 - **16.2 Marketplace: one owner** — _✓ done (2026-09-08, both sides)_:
@@ -253,7 +253,7 @@ Found by a four-dimension audit (2026-09-08) of the §13.1/§15.x passes. Ordere
     exceeded the 5s default under full-suite load).
   - `drive.test.ts` — symlink test skips with a stated reason when the platform refuses
     symlink creation (`EPERM`/`EACCES`/`ENOSYS`/`EXDEV`, e.g. Windows without elevation);
-    the guard under test is symlink *resolution*, not creation.
+    the guard under test is symlink _resolution_, not creation.
   - Post-pass note: `PersistentStore.load()` now skips rows that violate the string-id
     key contract (a suite pg mock answering arbitrary row shapes used to hydrate
     garbage entries into shared stores — surfaced when the marketplace began reading

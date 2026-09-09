@@ -386,10 +386,7 @@ const _JUDGE_FENCE = "=====NEXUS_CANDIDATE=====";
  * Wraps the output in unique fence delimiters and instructs the judge
  * to treat everything between fences as untrusted data.
  */
-function buildInjectionProtectedJudgePrompt(
-  criteria: string,
-  output: string,
-): string {
+function buildInjectionProtectedJudgePrompt(criteria: string, output: string): string {
   return (
     `You are an impartial expert evaluator of AI assistant answers.\n` +
     `Judge only on: ${criteria}. Be objective and concise.\n\n` +
@@ -428,8 +425,12 @@ export function injectionProtectedJudgeScorer(
     } catch {
       // Fallback: keyword heuristic
       const lower = text.toLowerCase();
-      const positive = ["excellent", "good", "correct", "accurate", "meets", "pass"].some((w) => lower.includes(w));
-      const negative = ["poor", "incorrect", "fails", "wrong", "missing", "incomplete"].some((w) => lower.includes(w));
+      const positive = ["excellent", "good", "correct", "accurate", "meets", "pass"].some((w) =>
+        lower.includes(w),
+      );
+      const negative = ["poor", "incorrect", "fails", "wrong", "missing", "incomplete"].some((w) =>
+        lower.includes(w),
+      );
       const score = positive && !negative ? 0.85 : negative ? 0.2 : 0.5;
       return { pass: score >= threshold, score };
     }
@@ -442,10 +443,7 @@ export function injectionProtectedJudgeScorer(
  * Extract score from judge output, with best-effort repair for malformed responses.
  * Inspired by Local-LLM-Arena's _coerce() and SmarterRouter's _extract_json_from_content().
  */
-export function extractScore(
-  judgment: string,
-  threshold: number = 0.7,
-): EvalScore {
+export function extractScore(judgment: string, threshold: number = 0.7): EvalScore {
   // Try direct numeric match on first line
   const firstLineMatch = judgment.match(/^\s*(\d+(?:\.\d+)?)/m);
   if (firstLineMatch) {
@@ -499,8 +497,12 @@ export function extractScore(
 
   // Keyword fallback
   const lower = judgment.toLowerCase();
-  const positive = ["excellent", "good", "correct", "accurate", "meets", "pass", "10"].some((w) => lower.includes(w));
-  const negative = ["poor", "incorrect", "fails", "wrong", "missing", "incomplete", "0"].some((w) => lower.includes(w));
+  const positive = ["excellent", "good", "correct", "accurate", "meets", "pass", "10"].some((w) =>
+    lower.includes(w),
+  );
+  const negative = ["poor", "incorrect", "fails", "wrong", "missing", "incomplete", "0"].some((w) =>
+    lower.includes(w),
+  );
   const score = positive && !negative ? 0.85 : negative ? 0.2 : 0.5;
   return {
     pass: score >= threshold,

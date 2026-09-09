@@ -23,7 +23,6 @@
 
 import { createPublicKey, randomBytes, createVerify } from "node:crypto";
 
-import { issueAccessToken } from "../lib/issue-access-token.js";
 import { db } from "@nexus/db";
 import { users, refreshTokens } from "@nexus/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
@@ -31,6 +30,7 @@ import type { FastifyInstance } from "fastify";
 
 import { emitAuditEvent } from "../lib/audit-emitter.js";
 import { sha256hex as _sha256hex } from "../lib/crypto-utils.js";
+import { issueAccessToken } from "../lib/issue-access-token.js";
 import { pinnedFetch } from "../lib/pinned-fetch.js";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
 import { getSharedKV } from "../lib/shared-kv.js";

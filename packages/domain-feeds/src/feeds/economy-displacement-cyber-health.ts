@@ -271,4 +271,3 @@ export class ImageryFeed extends FeedAdapter<ImageryEvent> {
     return buildMockResponse<ImageryEvent>("imagery");
   }
 }
-

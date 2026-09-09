@@ -21,8 +21,9 @@
  * exactly like `loadPlugin` fails closed at load time.
  */
 
-import type { AdapterCapability } from "./index.js";
 import type { LoadedPlugin } from "./plugin-manifest.js";
+
+import type { AdapterCapability } from "./index.js";
 
 /** Error raised when a plugin attempts a capability it was not granted. */
 export class CapabilityDeniedError extends Error {
@@ -41,7 +42,10 @@ export class CapabilityDeniedError extends Error {
  * attempted a denied capability — the host simply cannot execute the plugin.
  */
 export class SandboxUnavailableError extends Error {
-  constructor(message: string, public readonly detail?: Record<string, unknown>) {
+  constructor(
+    message: string,
+    public readonly detail?: Record<string, unknown>,
+  ) {
     super(message);
     this.name = "SandboxUnavailableError";
   }
@@ -154,7 +158,9 @@ export interface DenoPluginRunnerOptions {
  * through a localhost proxy in a later slice. When the binary is missing this
  * throws {@link SandboxUnavailableError} — never a capability denial.
  */
-export async function defaultDenoRunner(_invocation: DenoInvocation): Promise<SandboxExecutionResult> {
+export async function defaultDenoRunner(
+  _invocation: DenoInvocation,
+): Promise<SandboxExecutionResult> {
   throw new SandboxUnavailableError(
     "The Deno sandbox runtime is unavailable: no 'deno' binary is configured. " +
       "Install deno (https://deno.land) or inject a runnerFn via DenoPluginRunnerOptions.",

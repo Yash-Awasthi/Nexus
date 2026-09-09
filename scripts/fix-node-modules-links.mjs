@@ -116,9 +116,10 @@ function walk(dir, depth) {
       if (newTarget === null) {
         const rel = path.relative(NODE_MODULES, linkDir); // e.g. ".pnpm\vite@5/node_modules/@vitest" or "" for top-level
         const name = path.basename(p);
-        const scope = path.basename(linkDir) === "@scope" || path.basename(linkDir).startsWith("@")
-          ? path.basename(linkDir) + "/" + name
-          : name;
+        const scope =
+          path.basename(linkDir) === "@scope" || path.basename(linkDir).startsWith("@")
+            ? path.basename(linkDir) + "/" + name
+            : name;
         const candidate = relinkTargetFor(scope);
         if (candidate !== null) newTarget = candidate;
       }

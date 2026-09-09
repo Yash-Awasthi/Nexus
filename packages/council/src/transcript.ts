@@ -116,7 +116,10 @@ export function createTranscript(init: TranscriptInit): CouncilTranscript {
 }
 
 /** Append a stage record (e.g. "Council Round 1", "Self-Refine"). */
-export function recordStage(transcript: CouncilTranscript, stage: TranscriptStage): CouncilTranscript {
+export function recordStage(
+  transcript: CouncilTranscript,
+  stage: TranscriptStage,
+): CouncilTranscript {
   transcript.stages.push(stage);
   return transcript;
 }
@@ -162,7 +165,9 @@ export function finalizeTranscript(
   const providerDegraded = providerHealth.some((p) => !p.ready);
   const traceDegraded = traces.some((t) => Boolean(t.error_kind));
   const contextDegraded = warnings.some((w) => /agentmemory|context/i.test(w));
-  const rawConfidence = Number(transcript.confidence);
+  // confidence is typed number but may be NaN (an invalid model report) —
+  // isFinite is the real gate; Number() would be an identity call here.
+  const rawConfidence: number = transcript.confidence;
   const confidenceDegraded =
     !Number.isFinite(rawConfidence) || rawConfidence < 0 || rawConfidence > 1;
 
@@ -193,11 +198,7 @@ export function finalizeTranscript(
   }
 
   transcript.degraded =
-    protocolDegraded ||
-    providerDegraded ||
-    traceDegraded ||
-    contextDegraded ||
-    confidenceDegraded;
+    protocolDegraded || providerDegraded || traceDegraded || contextDegraded || confidenceDegraded;
   transcript.metrics = metrics;
   transcript.providerHealth = providerHealth;
   transcript.modelCallTraces = traces;

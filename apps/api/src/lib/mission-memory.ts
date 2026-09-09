@@ -44,7 +44,8 @@ export interface MissionMemory {
 
 /** Compact one-line summary of a terminal mission for the memory header. */
 export function outcomeSummary(record: MissionRecord): string {
-  if (record.status === "failed") return `FAILED${record.error ? ` — ${record.error.slice(0, 80)}` : ""}`;
+  if (record.status === "failed")
+    return `FAILED${record.error ? ` — ${record.error.slice(0, 80)}` : ""}`;
   if (record.status === "aborted") return "ABORTED";
   // A reviewer that produced no parseable verdict is a harness signal, not an
   // actual rejection — must never read as "reject 0/100" in distilled memory.
@@ -108,18 +109,28 @@ export function distillMissionMemory(record: MissionRecord, graph?: SessionGraph
 
   // Tool trace from the spider-graph: failed calls are the concrete "verify X".
   if (trace) {
-    lines.push("", `Tool trace (resume/verify from these outcomes): ${trace.slice(0, MAX_TRACE_CHARS)}`);
+    lines.push(
+      "",
+      `Tool trace (resume/verify from these outcomes): ${trace.slice(0, MAX_TRACE_CHARS)}`,
+    );
   }
 
   // Skill executions from the spider-graph (runtime-emitted skill nodes): the
   // continuation must know which skills already ran and how they went, so it
   // verifies instead of redoing them — and re-runs only the failed ones.
   if (skills) {
-    lines.push("", `Skill executions (resume/verify from these outcomes): ${skills.slice(0, MAX_TRACE_CHARS)}`);
+    lines.push(
+      "",
+      `Skill executions (resume/verify from these outcomes): ${skills.slice(0, MAX_TRACE_CHARS)}`,
+    );
   }
 
   if (excerpt) {
-    lines.push("", "Resume from where the previous output ended:", excerpt.slice(0, MAX_EXCERPT_CHARS));
+    lines.push(
+      "",
+      "Resume from where the previous output ended:",
+      excerpt.slice(0, MAX_EXCERPT_CHARS),
+    );
   }
 
   // §15.8 — insights the cheap local extractor distilled AFTER the prior run
@@ -127,7 +138,7 @@ export function distillMissionMemory(record: MissionRecord, graph?: SessionGraph
   // of truth; absent insights change nothing.
   if (record.memoryInsights?.text) {
     lines.push(
-      "", 
+      "",
       `Extracted insights (${record.memoryInsights.model}):`,
       record.memoryInsights.text.slice(0, 600),
     );
@@ -147,8 +158,7 @@ export function distillMissionMemory(record: MissionRecord, graph?: SessionGraph
 export function summarizeToolTrace(graph: SessionGraph): string {
   const nodes = graph.nodes;
   const calls: string[] = [];
-  for (let i = 0; i < nodes.length; i++) {
-    const n = nodes[i];
+  for (const n of nodes) {
     if (n?.kind !== "tool") continue;
     // Outcome node is the tool node's own "<id>:out" child.
     const out = nodes.find((x) => x.id === `${n.id}:out`);

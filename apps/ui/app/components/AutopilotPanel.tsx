@@ -16,7 +16,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/com
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -62,10 +68,25 @@ interface AutopilotRun {
 // ── Role / provider catalogue ────────────────────────────────────────────────
 
 const ROLES: { id: string; hint: string; provider: string; model: string }[] = [
-  { id: "architect", hint: "Plans the work (PLAN.md)", provider: "anthropic", model: "claude-sonnet-4-6" },
-  { id: "researcher", hint: "Finds the facts (RESEARCH.md)", provider: "gemini", model: "gemini-3.6-flash" },
+  {
+    id: "architect",
+    hint: "Plans the work (PLAN.md)",
+    provider: "anthropic",
+    model: "claude-sonnet-4-6",
+  },
+  {
+    id: "researcher",
+    hint: "Finds the facts (RESEARCH.md)",
+    provider: "gemini",
+    model: "gemini-3.6-flash",
+  },
   { id: "coder", hint: "Implements (ChatGPT default)", provider: "openai", model: "gpt-5.6-sol" },
-  { id: "reviewer", hint: "Verifies + demands rework", provider: "deepseek", model: "deepseek-v4-flash" },
+  {
+    id: "reviewer",
+    hint: "Verifies + demands rework",
+    provider: "deepseek",
+    model: "deepseek-v4-flash",
+  },
 ];
 
 const PROVIDER_MODELS: Record<string, string> = {
@@ -79,7 +100,10 @@ const PROVIDER_MODELS: Record<string, string> = {
   ollama: "qwen2.5:7b",
 };
 
-const STATUS_META: Record<AutopilotRun["status"], { label: string; icon: typeof CircleDot; cls: string }> = {
+const STATUS_META: Record<
+  AutopilotRun["status"],
+  { label: string; icon: typeof CircleDot; cls: string }
+> = {
   queued: { label: "Queued", icon: CircleDot, cls: "text-muted-foreground" },
   running: { label: "Running", icon: Loader2, cls: "text-blue-500" },
   done: { label: "Done", icon: CheckCircle2, cls: "text-green-500" },
@@ -145,7 +169,12 @@ export function AutopilotPanel({
 
   // Follow a run's SSE stream when it is not terminal.
   useEffect(() => {
-    if (!selected || selected.status === "done" || selected.status === "failed" || selected.status === "cancelled") {
+    if (
+      !selected ||
+      selected.status === "done" ||
+      selected.status === "failed" ||
+      selected.status === "cancelled"
+    ) {
       setLiveEvents([]);
       return;
     }
@@ -154,7 +183,9 @@ export function AutopilotPanel({
     streamAbort.current = abort;
     void (async () => {
       try {
-        const res = await fetch(`/api/v1/autopilot/runs/${selected.id}/stream`, { signal: abort.signal });
+        const res = await fetch(`/api/v1/autopilot/runs/${selected.id}/stream`, {
+          signal: abort.signal,
+        });
         if (!res.ok || !res.body) return;
         const reader = res.body.getReader();
         const dec = new TextDecoder();
@@ -228,7 +259,11 @@ export function AutopilotPanel({
     }
   };
 
-  const events = selected ? (selected.status === "running" || selected.status === "queued" ? liveEvents : selected.events) : [];
+  const events = selected
+    ? selected.status === "running" || selected.status === "queued"
+      ? liveEvents
+      : selected.events
+    : [];
 
   return (
     <div className="space-y-4">
@@ -279,13 +314,19 @@ export function AutopilotPanel({
                   key={run.id}
                   onClick={() => setSelectedId(run.id)}
                   className={`w-full text-left rounded-lg border p-3 transition-colors ${
-                    selectedId === run.id ? "border-primary/40 bg-primary/5" : "border-border hover:border-muted-foreground/40"
+                    selectedId === run.id
+                      ? "border-primary/40 bg-primary/5"
+                      : "border-border hover:border-muted-foreground/40"
                   }`}
                 >
                   <div className="flex items-center gap-2 text-xs">
-                    <Icon className={`size-3.5 ${run.status === "running" ? "animate-spin" : ""} ${meta.cls}`} />
+                    <Icon
+                      className={`size-3.5 ${run.status === "running" ? "animate-spin" : ""} ${meta.cls}`}
+                    />
                     <span className={`font-medium ${meta.cls}`}>{meta.label}</span>
-                    <span className="text-muted-foreground ml-auto">{run.createdAt.slice(0, 16).replace("T", " ")}</span>
+                    <span className="text-muted-foreground ml-auto">
+                      {run.createdAt.slice(0, 16).replace("T", " ")}
+                    </span>
                   </div>
                   <p className="text-xs mt-1.5 line-clamp-2">{run.objective}</p>
                   <div className="flex flex-wrap gap-1 mt-1.5">
@@ -294,7 +335,11 @@ export function AutopilotPanel({
                         key={`${p.role}-${i}`}
                         variant="outline"
                         className={`text-[10px] px-1.5 py-0 ${
-                          p.status === "done" ? "text-green-600" : p.status === "failed" ? "text-red-500" : ""
+                          p.status === "done"
+                            ? "text-green-600"
+                            : p.status === "failed"
+                              ? "text-red-500"
+                              : ""
                         }`}
                       >
                         {p.role}
@@ -313,10 +358,17 @@ export function AutopilotPanel({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <CardTitle className="text-sm">Run detail</CardTitle>
-                    <CardDescription className="text-xs mt-1 line-clamp-2">{selected.objective}</CardDescription>
+                    <CardDescription className="text-xs mt-1 line-clamp-2">
+                      {selected.objective}
+                    </CardDescription>
                   </div>
                   {selected.status === "running" || selected.status === "queued" ? (
-                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => cancelRun(selected.id)}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs gap-1"
+                      onClick={() => cancelRun(selected.id)}
+                    >
                       <Ban className="size-3" /> Cancel
                     </Button>
                   ) : null}
@@ -349,13 +401,19 @@ export function AutopilotPanel({
                 ) : (
                   events.map((ev, i) => (
                     <div key={i} className="flex gap-2 border-b border-border/40 pb-1">
-                      <span className="text-muted-foreground shrink-0">{(ev.ts ?? "").slice(11, 19)}</span>
+                      <span className="text-muted-foreground shrink-0">
+                        {(ev.ts ?? "").slice(11, 19)}
+                      </span>
                       <span
                         className={`shrink-0 w-16 ${
-                          ev.kind === "phase" ? "text-blue-500" : ev.kind === "note" ? "text-amber-500" : "text-foreground"
+                          ev.kind === "phase"
+                            ? "text-blue-500"
+                            : ev.kind === "note"
+                              ? "text-amber-500"
+                              : "text-foreground"
                         }`}
                       >
-                        {ev.kind === "run" ? "" : ev.role ?? ev.kind}
+                        {ev.kind === "run" ? "" : (ev.role ?? ev.kind)}
                       </span>
                       <span className="whitespace-pre-wrap break-words">{ev.text}</span>
                     </div>
@@ -411,15 +469,15 @@ export function AutopilotPanel({
                   const ov = overrides[role.id];
                   const provider = ov?.provider ?? role.provider;
                   return (
-                    <div key={role.id} className="rounded-lg border border-border p-2.5 space-y-1.5">
+                    <div
+                      key={role.id}
+                      className="rounded-lg border border-border p-2.5 space-y-1.5"
+                    >
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-medium capitalize">{role.id}</span>
                         <span className="text-[10px] text-muted-foreground">{role.hint}</span>
                       </div>
-                      <Select
-                        value={provider}
-                        onValueChange={(p) => setRoleProvider(role.id, p)}
-                      >
+                      <Select value={provider} onValueChange={(p) => setRoleProvider(role.id, p)}>
                         <SelectTrigger className="h-8 text-xs">
                           <SelectValue />
                         </SelectTrigger>

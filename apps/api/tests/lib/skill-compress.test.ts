@@ -214,10 +214,14 @@ describe("compressSkillsForTaskSemantic", () => {
   it("selects by meaning where keywords find nothing (matchSource semantic)", async () => {
     // "collect card details from shoppers" shares zero words with Stripe's
     // metadata — the keyword path would keep EVERYTHING. Embeddings pick Stripe.
-    const result = await compressSkillsForTaskSemantic(skills, "collect card details from shoppers", {
-      embedBaseUrl: "http://fake",
-      embedFetch: semanticFetch,
-    });
+    const result = await compressSkillsForTaskSemantic(
+      skills,
+      "collect card details from shoppers",
+      {
+        embedBaseUrl: "http://fake",
+        embedFetch: semanticFetch,
+      },
+    );
     expect(result.report.matchSource).toBe("semantic");
     expect(result.report.keptSkills.map((s) => s.id)).toEqual(["p1"]);
     expect(result.report.droppedSkills.map((s) => s.id).sort()).toEqual(["f1", "f2"]);
@@ -253,13 +257,29 @@ describe("compressSkillsForTaskSemantic", () => {
       });
     }) as typeof fetch;
     const csvJson = [
-      { ...toSource(FRONTEND_SKILL), id: "csv", name: "CSV Reader", description: "Parse CSV", code: "import csv" },
-      { ...toSource(FRONTEND_SKILL), id: "json", name: "JSON Writer", description: "Pretty-print JSON", code: "import json" },
+      {
+        ...toSource(FRONTEND_SKILL),
+        id: "csv",
+        name: "CSV Reader",
+        description: "Parse CSV",
+        code: "import csv",
+      },
+      {
+        ...toSource(FRONTEND_SKILL),
+        id: "json",
+        name: "JSON Writer",
+        description: "Pretty-print JSON",
+        code: "import json",
+      },
     ];
-    const result = await compressSkillsForTaskSemantic(csvJson, "parse a CSV file and write normalized JSON", {
-      embedBaseUrl: "http://fake",
-      embedFetch: batchMin,
-    });
+    const result = await compressSkillsForTaskSemantic(
+      csvJson,
+      "parse a CSV file and write normalized JSON",
+      {
+        embedBaseUrl: "http://fake",
+        embedFetch: batchMin,
+      },
+    );
     expect(result.report.matchSource).toBe("semantic");
     // CSV top, JSON Writer kept via keyword anchor despite min cosine.
     expect(result.report.keptSkills.map((k) => k.id).sort()).toEqual(["csv", "json"]);
@@ -269,7 +289,13 @@ describe("compressSkillsForTaskSemantic", () => {
   it("emits language-valid comment markers (# for python, // for TS)", async () => {
     const py = [
       { ...toSource(PAYMENT_SKILL), id: "a", language: "Python", name: "Py A", code: "import csv" },
-      { ...toSource(PAYMENT_SKILL), id: "b", language: "Python", name: "Py B", code: "import json" },
+      {
+        ...toSource(PAYMENT_SKILL),
+        id: "b",
+        language: "Python",
+        name: "Py B",
+        code: "import json",
+      },
     ];
     const pyResult = compressSkillsForTask(py, "data parsing");
     expect(pyResult.language).toBe("Python");
@@ -278,8 +304,20 @@ describe("compressSkillsForTaskSemantic", () => {
     expect(pyResult.code).not.toContain("//");
 
     const ts = [
-      { ...toSource(FRONTEND_SKILL), id: "c", language: "TypeScript", name: "TS A", code: "const a = 1;" },
-      { ...toSource(FRONTEND_SKILL), id: "d", language: "TypeScript", name: "TS B", code: "const b = 2;" },
+      {
+        ...toSource(FRONTEND_SKILL),
+        id: "c",
+        language: "TypeScript",
+        name: "TS A",
+        code: "const a = 1;",
+      },
+      {
+        ...toSource(FRONTEND_SKILL),
+        id: "d",
+        language: "TypeScript",
+        name: "TS B",
+        code: "const b = 2;",
+      },
     ];
     const tsResult = compressSkillsForTask(ts, "frontend");
     expect(tsResult.language).toBe("TypeScript");
@@ -330,10 +368,7 @@ describe("mission prompt token optimization", () => {
       error: "exit 1",
     };
 
-    const merged = mergeSkillCodeBodies(
-      [FRONTEND_SKILL, PAYMENT_SKILL],
-      [okResult, failResult],
-    );
+    const merged = mergeSkillCodeBodies([FRONTEND_SKILL, PAYMENT_SKILL], [okResult, failResult]);
     // Executed-OK skill collapses to a stub referencing run_skill_code.
     expect(merged).toContain("EXECUTED OK");
     expect(merged).not.toContain("const hero");

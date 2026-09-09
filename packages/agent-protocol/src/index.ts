@@ -12,11 +12,7 @@
 export type PermissionDecision = "allow" | "allow_always" | "deny";
 
 export type ErrorCode =
-  | "unsupported_version"
-  | "unknown_request"
-  | "unknown_session"
-  | "invalid_request"
-  | "internal";
+  "unsupported_version" | "unknown_request" | "unknown_session" | "invalid_request" | "internal";
 
 export interface SessionInfo {
   sessionId: string;
@@ -81,16 +77,24 @@ export function encodeFrame(tag: string, data: unknown, sessionId?: string): Pro
 /**
  * Decode and validate a protocol frame.
  */
-export function decodeFrame(raw: unknown): { frame: ProtocolFrame; valid: boolean; error?: string } {
+export function decodeFrame(raw: unknown): {
+  frame: ProtocolFrame;
+  valid: boolean;
+  error?: string;
+} {
   if (!raw || typeof raw !== "object") {
-    return { frame: { v: 0, tag: "", data: null }, valid: false, error: "Invalid frame: not an object" };
+    return {
+      frame: { v: 0, tag: "", data: null },
+      valid: false,
+      error: "Invalid frame: not an object",
+    };
   }
 
   const obj = raw as Record<string, unknown>;
 
   if (typeof obj.v !== "number" || obj.v !== API_VERSION) {
     return {
-      frame: { v: obj.v as number ?? 0, tag: (obj.tag as string) ?? "", data: obj.data },
+      frame: { v: (obj.v as number) ?? 0, tag: (obj.tag as string) ?? "", data: obj.data },
       valid: false,
       error: `Unsupported protocol version: ${obj.v}`,
     };

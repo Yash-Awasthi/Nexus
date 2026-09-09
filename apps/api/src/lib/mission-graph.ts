@@ -17,12 +17,7 @@
 
 import type { RuntimeTool } from "@nexus/agent-runtime";
 
-import {
-  appendGraphEvent,
-  type ExecutionStatus,
-  type GraphEvent,
-  type GraphNode,
-} from "./session-graph.js";
+import { appendGraphEvent, type ExecutionStatus, type GraphEvent } from "./session-graph.js";
 
 /** Injection seam for tests; defaults to the real KV-backed appender. */
 export type GraphSink = (event: GraphEvent) => void | Promise<void>;
@@ -132,6 +127,7 @@ export class MissionGraphRecorder {
    * The wrapped handler behaves identically; capture is purely additive.
    */
   wrapTool(tool: RuntimeTool): RuntimeTool {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- the returned object's arrow handlers must capture this instance
     const recorder = this;
     const handler = tool.handler;
     return {

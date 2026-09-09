@@ -167,7 +167,10 @@ function parameterProperty(param: OpenApiParameter): unknown {
 
 // ── Core: spec → tools ────────────────────────────────────────────────────────
 
-export function openApiToMcpTools(spec: OpenApiDoc, opts: OpenApiToMcpOptions = {}): McpOpenApiTool[] {
+export function openApiToMcpTools(
+  spec: OpenApiDoc,
+  opts: OpenApiToMcpOptions = {},
+): McpOpenApiTool[] {
   const maxToolNameLength = Math.max(8, opts.maxToolNameLength ?? 64);
   const tools: McpOpenApiTool[] = [];
   const usedNames = new Set<string>();
@@ -293,8 +296,7 @@ export function createOpenApiCaller(
 ): (name: string, args: Record<string, unknown>) => Promise<OpenApiCallResponse> {
   const byName = new Map(tools.map((t) => [t.name, t]));
   const baseUrl = (opts.baseUrl ?? "").replace(/\/+$/, "");
-  const doFetch: OpenApiFetchFn =
-    opts.fetch ?? ((globalThis as { fetch?: OpenApiFetchFn }).fetch as OpenApiFetchFn);
+  const doFetch: OpenApiFetchFn = opts.fetch ?? (globalThis as { fetch?: OpenApiFetchFn }).fetch!;
 
   return async (name, args) => {
     const tool = byName.get(name);
@@ -324,8 +326,7 @@ export function createOpenApiCaller(
     const init: OpenApiCallInit = { method: tool.method.toUpperCase(), headers };
     const body = args["requestBody"];
     if (tool.bodyContentType && body !== undefined) {
-      init.body =
-        typeof body === "string" ? body : JSON.stringify(body);
+      init.body = typeof body === "string" ? body : JSON.stringify(body);
       headers["content-type"] = tool.bodyContentType;
     }
 

@@ -36,7 +36,7 @@ describe("buildOutputProcessor — error retention", () => {
       "error[E0308]: mismatched types",
       "  --> src/lib.rs:10:5",
       "   |",
-      "10 |     let x: i32 = \"s\";",
+      '10 |     let x: i32 = "s";',
       "   |     ^^^",
       "error: could not compile `mypkg` due to previous error",
     ].join("\n");
@@ -76,7 +76,8 @@ describe("buildOutputProcessor — error retention", () => {
 
   it("groups tsc --noEmit errors per TS code", () => {
     const lines: string[] = [];
-    for (let i = 0; i < 6; i++) lines.push(`src/f${i}.ts(${10 + i},5): error TS2322: type mismatch`);
+    for (let i = 0; i < 6; i++)
+      lines.push(`src/f${i}.ts(${10 + i},5): error TS2322: type mismatch`);
     lines.push("src/a.ts(1,1): error TS2304: Cannot find name 'x'.");
     lines.push("Found 7 errors.");
     const r = compressOutputForCommand("npx tsc --noEmit", lines.join("\n"));
@@ -118,7 +119,7 @@ describe("buildOutputProcessor — audit and docker", () => {
       "Step 2/3 : RUN npm ci",
       " ---> Running in abc123def456",
       "Downloading base layers 45%",
-      "Step 3/3 : CMD [\"node\", \"index.js\"]",
+      'Step 3/3 : CMD ["node", "index.js"]',
       " ---> b2c3d4e5f6a7",
       "Successfully built c3d4e5f6a7b8",
       "Successfully tagged app:latest",
@@ -139,7 +140,15 @@ describe("cargoClippyProcessor", () => {
   function warnings(rule: string, msg: string, count: number): string[] {
     const lines: string[] = [];
     for (let i = 0; i < count; i++) {
-      lines.push(`warning[${rule}]: ${msg}`, `  --> src/lib.rs:${20 + i}:5`, "   |", "11 |     some code", "   |", `   = help: change it`, "");
+      lines.push(
+        `warning[${rule}]: ${msg}`,
+        `  --> src/lib.rs:${20 + i}:5`,
+        "   |",
+        "11 |     some code",
+        "   |",
+        `   = help: change it`,
+        "",
+      );
     }
     return lines;
   }
@@ -168,7 +177,7 @@ describe("cargoClippyProcessor", () => {
       "error[E0308]: mismatched types",
       "  --> src/lib.rs:9:5",
       "   |",
-      "9  |     let x: i32 = \"s\";",
+      '9  |     let x: i32 = "s";',
       "   |         ^",
       "   |",
       "   = note: expected `i32`, found `&str`",
@@ -176,6 +185,6 @@ describe("cargoClippyProcessor", () => {
     const p = cargoClippyProcessor.process("cargo clippy", out);
     expect(p).toContain("[1 compiled]");
     expect(p).toContain("error[E0308]: mismatched types");
-    expect(p).toContain('expected `i32`, found `&str`');
+    expect(p).toContain("expected `i32`, found `&str`");
   });
 });

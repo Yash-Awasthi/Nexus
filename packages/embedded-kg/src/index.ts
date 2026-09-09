@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @nexus/embedded-kg — Embedded knowledge graph with progressive disclosure.
  *
@@ -98,7 +99,10 @@ export class EmbeddedKg {
       if (score > 0) results.push({ node, score });
     }
 
-    return results.sort((a, b) => b.score - a.score).slice(0, limit).map((r) => r.node);
+    return results
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map((r) => r.node);
   }
 
   // ─── Edge Operations ────────────────────────────────────────────────
@@ -161,7 +165,9 @@ export class EmbeddedKg {
 
     const parts: string[] = [];
     parts.push(`# Knowledge Graph Schema (${tier} detail)`);
-    parts.push(`Nodes: ${totalNodes} | Edges: ${totalEdges} | Node types: ${nodeTypes.length} | Edge types: ${edgeTypes.length}`);
+    parts.push(
+      `Nodes: ${totalNodes} | Edges: ${totalEdges} | Node types: ${nodeTypes.length} | Edge types: ${edgeTypes.length}`,
+    );
     parts.push("");
 
     switch (tier) {
@@ -214,9 +220,17 @@ export class EmbeddedKg {
         parts.push(`- ${totalNodes} nodes across ${nodeTypes.length} types`);
         parts.push(`- ${totalEdges} edges across ${edgeTypes.length} types`);
         parts.push(`- ~${totalProps} total properties`);
-        parts.push(`- Most common type: ${nodeTypes.sort((a, b) => b.count - a.count)[0]?.type ?? "N/A"}`);
+        parts.push(
+          `- Most common type: ${nodeTypes.sort((a, b) => b.count - a.count)[0]?.type ?? "N/A"}`,
+        );
         parts.push("");
-        parts.push(`Use query tools to explore specific types. Top types: ${nodeTypes.sort((a, b) => b.count - a.count).slice(0, 5).map((t) => t.type).join(", ")}`);
+        parts.push(
+          `Use query tools to explore specific types. Top types: ${nodeTypes
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5)
+            .map((t) => t.type)
+            .join(", ")}`,
+        );
         break;
       }
     }
@@ -282,11 +296,7 @@ export class EmbeddedKg {
     return results;
   }
 
-  private isTemporallyValid(
-    from: string | undefined,
-    to: string | undefined,
-    date: Date,
-  ): boolean {
+  private isTemporallyValid(from: string | undefined, to: string | undefined, date: Date): boolean {
     if (from && new Date(from) > date) return false;
     if (to && new Date(to) < date) return false;
     return true;
@@ -353,9 +363,10 @@ export class EmbeddedKg {
           for (const [prop, expectedType] of Object.entries(rule.propertyTypes)) {
             const value = edge.properties[prop];
             if (value !== undefined) {
-              const actualType = typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)
-                ? "date"
-                : typeof value;
+              const actualType =
+                typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)
+                  ? "date"
+                  : typeof value;
               if (actualType !== expectedType) {
                 violations.push({
                   rule,

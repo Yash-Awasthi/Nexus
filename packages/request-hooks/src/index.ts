@@ -31,8 +31,13 @@ export type HookResult<T> = {
   reason?: string;
 };
 
-export type BeforeRequestHook = (request: LLMRequest) => Promise<HookResult<LLMRequest>> | HookResult<LLMRequest>;
-export type AfterRequestHook = (request: LLMRequest, response: LLMResponse) => Promise<HookResult<LLMResponse>> | HookResult<LLMResponse>;
+export type BeforeRequestHook = (
+  request: LLMRequest,
+) => Promise<HookResult<LLMRequest>> | HookResult<LLMRequest>;
+export type AfterRequestHook = (
+  request: LLMRequest,
+  response: LLMResponse,
+) => Promise<HookResult<LLMResponse>> | HookResult<LLMResponse>;
 
 // ── Hook Registry ────────────────────────────────────────────────────────────
 
@@ -76,7 +81,11 @@ export class RequestHookRegistry {
       try {
         const result = await hook(current.data);
         if (!result.proceed) {
-          return { proceed: false, data: current.data, reason: `Blocked by ${name}: ${result.reason}` };
+          return {
+            proceed: false,
+            data: current.data,
+            reason: `Blocked by ${name}: ${result.reason}`,
+          };
         }
         current = { ...current, data: result.data };
       } catch (err) {
@@ -106,7 +115,11 @@ export class RequestHookRegistry {
       try {
         const result = await hook(request, current.data);
         if (!result.proceed) {
-          return { proceed: false, data: current.data, reason: `Blocked by ${name}: ${result.reason}` };
+          return {
+            proceed: false,
+            data: current.data,
+            reason: `Blocked by ${name}: ${result.reason}`,
+          };
         }
         current = { ...current, data: result.data };
       } catch (err) {
@@ -142,7 +155,11 @@ export function contentFilterHook(forbiddenPatterns: RegExp[]): BeforeRequestHoo
     for (const msg of request.messages) {
       for (const pattern of forbiddenPatterns) {
         if (pattern.test(msg.content)) {
-          return { proceed: false, data: request, reason: `Content matches forbidden pattern: ${pattern.source}` };
+          return {
+            proceed: false,
+            data: request,
+            reason: `Content matches forbidden pattern: ${pattern.source}`,
+          };
         }
       }
     }
@@ -153,16 +170,19 @@ export function contentFilterHook(forbiddenPatterns: RegExp[]): BeforeRequestHoo
 /**
  * Log all requests and responses.
  */
-export function loggingHook(
-  logger: (msg: string) => void = console.log,
-): { before: BeforeRequestHook; after: AfterRequestHook } {
+export function loggingHook(logger: (msg: string) => void = console.log): {
+  before: BeforeRequestHook;
+  after: AfterRequestHook;
+} {
   return {
     before: (request) => {
       logger(`[LLM Request] model=${request.model} messages=${request.messages.length}`);
       return { proceed: true, data: request };
     },
     after: (request, response) => {
-      logger(`[LLM Response] model=${response.model} latency=${response.latencyMs}ms tokens=${response.usage?.completionTokens ?? "?"}`);
+      logger(
+        `[LLM Response] model=${response.model} latency=${response.latencyMs}ms tokens=${response.usage?.completionTokens ?? "?"}`,
+      );
       return { proceed: true, data: response };
     },
   };
@@ -187,7 +207,10 @@ export function piiRedactionHook(): AfterRequestHook {
   const patterns = [
     { regex: /\b\d{3}-\d{2}-\d{4}\b/g, replacement: "[SSN-REDACTED]" },
     { regex: /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g, replacement: "[CARD-REDACTED]" },
-    { regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, replacement: "[EMAIL-REDACTED]" },
+    {
+      regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
+      replacement: "[EMAIL-REDACTED]",
+    },
   ];
 
   return (_request, response) => {
@@ -202,10 +225,7 @@ export function piiRedactionHook(): AfterRequestHook {
 /**
  * Rate limit hook — limit requests per time window.
  */
-export function rateLimitHook(
-  maxRequests: number,
-  windowMs: number,
-): BeforeRequestHook {
+export function rateLimitHook(maxRequests: number, windowMs: number): BeforeRequestHook {
   const timestamps: number[] = [];
 
   return (request) => {

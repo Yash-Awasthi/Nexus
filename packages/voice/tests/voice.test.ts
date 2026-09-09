@@ -938,9 +938,9 @@ describe("DeepgramTranscribeProvider", () => {
       apiKey: "bad",
       fetch: makeFetch([{ ok: false, status: 401 }]),
     });
-    await expect(
-      p.transcribe(createAudioBuffer(new Uint8Array(10), "wav")),
-    ).rejects.toMatchObject({ code: "PROVIDER_AUTH_FAILED" });
+    await expect(p.transcribe(createAudioBuffer(new Uint8Array(10), "wav"))).rejects.toMatchObject({
+      code: "PROVIDER_AUTH_FAILED",
+    });
   });
 
   it("throws TRANSCRIBE_FAILED on 5xx and network errors", async () => {
@@ -948,16 +948,16 @@ describe("DeepgramTranscribeProvider", () => {
       apiKey: "k",
       fetch: makeFetch([{ ok: false, status: 500 }]),
     });
-    await expect(
-      p1.transcribe(createAudioBuffer(new Uint8Array(10), "wav")),
-    ).rejects.toMatchObject({ code: "TRANSCRIBE_FAILED" });
+    await expect(p1.transcribe(createAudioBuffer(new Uint8Array(10), "wav"))).rejects.toMatchObject(
+      { code: "TRANSCRIBE_FAILED" },
+    );
     const p2 = new DeepgramTranscribeProvider({
       apiKey: "k",
       fetch: vi.fn().mockRejectedValue(new Error("down")),
     });
-    await expect(
-      p2.transcribe(createAudioBuffer(new Uint8Array(10), "wav")),
-    ).rejects.toMatchObject({ code: "TRANSCRIBE_FAILED" });
+    await expect(p2.transcribe(createAudioBuffer(new Uint8Array(10), "wav"))).rejects.toMatchObject(
+      { code: "TRANSCRIBE_FAILED" },
+    );
   });
 });
 
@@ -1134,9 +1134,9 @@ describe("AssemblyAiTranscribeProvider", () => {
       apiKey: "bad",
       fetch: makeFetch([{ ok: false, status: 401 }]),
     });
-    await expect(
-      p.transcribe(createAudioBuffer(new Uint8Array(10), "wav")),
-    ).rejects.toMatchObject({ code: "PROVIDER_AUTH_FAILED" });
+    await expect(p.transcribe(createAudioBuffer(new Uint8Array(10), "wav"))).rejects.toMatchObject({
+      code: "PROVIDER_AUTH_FAILED",
+    });
   });
 
   it("throws TRANSCRIBE_FAILED when the job errors", async () => {
@@ -1151,9 +1151,9 @@ describe("AssemblyAiTranscribeProvider", () => {
       sleep: noSleep,
       pollIntervalMs: 0,
     });
-    await expect(
-      p.transcribe(createAudioBuffer(new Uint8Array(10), "wav")),
-    ).rejects.toMatchObject({ code: "TRANSCRIBE_FAILED" });
+    await expect(p.transcribe(createAudioBuffer(new Uint8Array(10), "wav"))).rejects.toMatchObject({
+      code: "TRANSCRIBE_FAILED",
+    });
   });
 
   it("throws TRANSCRIBE_FAILED on poll timeout", async () => {
@@ -1168,8 +1168,8 @@ describe("AssemblyAiTranscribeProvider", () => {
       pollIntervalMs: 0,
       timeoutMs: 0,
     });
-    await expect(
-      p.transcribe(createAudioBuffer(new Uint8Array(10), "wav")),
-    ).rejects.toMatchObject({ code: "TRANSCRIBE_FAILED" });
+    await expect(p.transcribe(createAudioBuffer(new Uint8Array(10), "wav"))).rejects.toMatchObject({
+      code: "TRANSCRIBE_FAILED",
+    });
   });
 });

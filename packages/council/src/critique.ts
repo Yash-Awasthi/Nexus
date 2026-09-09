@@ -108,11 +108,19 @@ export async function runCritique(opts: CritiqueOptions): Promise<CritiqueResult
     critics.map((critic) => {
       const others = targets.filter((t) => t.label !== critic);
       if (others.length === 0) {
-        return Promise.resolve({ content: "", model: "skipped", usage: { promptTokens: 0, completionTokens: 0 }, latencyMs: 0 });
+        return Promise.resolve({
+          content: "",
+          model: "skipped",
+          usage: { promptTokens: 0, completionTokens: 0 },
+          latencyMs: 0,
+        });
       }
       return transport.chat(
         [
-          { role: "system", content: "Council critique protocol. Follow the user's instructions exactly." },
+          {
+            role: "system",
+            content: "Council critique protocol. Follow the user's instructions exactly.",
+          },
           { role: "user", content: promptFor(question, others, mode, anonymize) },
         ],
         { temperature: 0.4, maxTokens: 1024 },

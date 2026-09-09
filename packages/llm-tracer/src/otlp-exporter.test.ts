@@ -50,9 +50,7 @@ describe("spanToOtlpSpan", () => {
   });
 
   it("skips parent when absent and emits events", () => {
-    const otlp = spanToOtlpSpan(
-      mkSpan({ context: { traceId: "t", spanId: "s" }, events: [] }),
-    );
+    const otlp = spanToOtlpSpan(mkSpan({ context: { traceId: "t", spanId: "s" }, events: [] }));
     expect(otlp.parentSpanId).toBeUndefined();
   });
 });
@@ -81,14 +79,19 @@ describe("exportSpansOtlp", () => {
     expect(calls[0]?.headers["content-type"]).toBe("application/json");
     const payload = JSON.parse(calls[0]?.body ?? "{}") as OtlpJsonPayload;
     const resourceAttr = payload.resourceSpans[0]?.resource.attributes ?? [];
-    expect(resourceAttr).toContainEqual({ key: "service.name", value: { stringValue: "my-service" } });
+    expect(resourceAttr).toContainEqual({
+      key: "service.name",
+      value: { stringValue: "my-service" },
+    });
     const emitted = payload.resourceSpans[0]?.scopeSpans[0]?.spans ?? [];
     expect(emitted.length).toBe(1);
     expect(emitted[0]?.name).toBe("llm.call");
   });
 
   it("returns early for empty span batches", async () => {
-    const res = await exportSpansOtlp([], { fetch: async () => ({ ok: true, status: 200, text: async () => "" }) });
+    const res = await exportSpansOtlp([], {
+      fetch: async () => ({ ok: true, status: 200, text: async () => "" }),
+    });
     expect(res.status).toBe(0);
   });
 

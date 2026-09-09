@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @nexus/adaptive-testing — Adaptive A/B testing with multi-armed bandits.
  *
@@ -139,12 +140,7 @@ export class NormalArm {
   totalCost = 0;
   totalLatency = 0;
 
-  constructor(
-    id: string,
-    mean = 0.5,
-    variance = 0.25,
-    count = 0,
-  ) {
+  constructor(id: string, mean = 0.5, variance = 0.25, count = 0) {
     this.id = id;
     this.mean = mean;
     this.variance = variance;
@@ -166,8 +162,7 @@ export class NormalArm {
 
     // Bayesian update
     const posteriorPrecision = 1 / priorVariance + this.count;
-    const posteriorMean =
-      (priorMean / priorVariance + score * this.count) / posteriorPrecision;
+    const posteriorMean = (priorMean / priorVariance + score * this.count) / posteriorPrecision;
     const posteriorVariance = 1 / posteriorPrecision;
 
     this.mean = posteriorMean;
@@ -245,10 +240,7 @@ export class ThompsonBandit {
     if (armIds.length === 1) return armIds[0];
 
     // In exploration-only phase, pick randomly
-    const totalTrials = armIds.reduce(
-      (sum, id) => sum + this.getTrials(id),
-      0,
-    );
+    const totalTrials = armIds.reduce((sum, id) => sum + this.getTrials(id), 0);
     if (totalTrials < this.minTrials) {
       return armIds[Math.floor(Math.random() * armIds.length)];
     }
@@ -351,10 +343,7 @@ export class ThompsonBandit {
 export interface SerializedBandit {
   armType: ArmType;
   minTrials: number;
-  arms: Array<
-    | ({ type: "beta" } & SerializedArm)
-    | ({ type: "normal" } & SerializedNormalArm)
-  >;
+  arms: Array<({ type: "beta" } & SerializedArm) | ({ type: "normal" } & SerializedNormalArm)>;
 }
 
 // ─── DICL (Dynamic In-Context Learning) ──────────────────────────────────────
@@ -408,11 +397,7 @@ export class DiclSelector {
   /**
    * Build a prompt with dynamically selected examples.
    */
-  buildPrompt(
-    query: string,
-    queryEmbedding?: number[],
-    systemPrompt?: string,
-  ): string {
+  buildPrompt(query: string, queryEmbedding?: number[], systemPrompt?: string): string {
     const examples = this.select(query, queryEmbedding);
     const parts: string[] = [];
 
@@ -442,10 +427,7 @@ export class DiclSelector {
     return this.examples;
   }
 
-  static deserialize(
-    data: DiclExample[],
-    maxExamples = 5,
-  ): DiclSelector {
+  static deserialize(data: DiclExample[], maxExamples = 5): DiclSelector {
     const selector = new DiclSelector(maxExamples);
     selector.addExamples(data);
     return selector;
@@ -488,12 +470,15 @@ export interface ExperimentResult {
  * the best variant via Thompson Sampling, and supports early stopping.
  */
 export class ExperimentTracker {
-  private experiments = new Map<string, {
-    config: ExperimentConfig;
-    bandit: ThompsonBandit;
-    metrics: MetricResult[];
-    startedAt: string;
-  }>();
+  private experiments = new Map<
+    string,
+    {
+      config: ExperimentConfig;
+      bandit: ThompsonBandit;
+      metrics: MetricResult[];
+      startedAt: string;
+    }
+  >();
 
   /** Create a new experiment. */
   create(config: ExperimentConfig): void {
@@ -536,8 +521,7 @@ export class ExperimentTracker {
     const maxSamples = exp.config.maxSamples ?? Infinity;
     const totalSamples = rankings.reduce((s, r) => s + r.trials, 0);
     const totalCost = rankings.reduce((s, r) => s + r.cost, 0);
-    const status =
-      totalSamples >= maxSamples ? "completed" : "running";
+    const status = totalSamples >= maxSamples ? "completed" : "running";
 
     // Early stopping: if one arm's CI doesn't overlap with others
     let winner: string | undefined;
@@ -558,10 +542,7 @@ export class ExperimentTracker {
       totalSamples,
       totalCost,
       startedAt: exp.startedAt,
-      endedAt:
-        status === "completed" || winner
-          ? new Date().toISOString()
-          : undefined,
+      endedAt: status === "completed" || winner ? new Date().toISOString() : undefined,
     };
   }
 
@@ -583,7 +564,8 @@ export class ExperimentTracker {
 
 /** Box-Muller transform for normal distribution sampling. */
 function boxMuller(): number {
-  let u = 0, v = 0;
+  let u = 0,
+    v = 0;
   while (u === 0) u = Math.random();
   while (v === 0) v = Math.random();
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
@@ -600,8 +582,7 @@ function betaSample(alpha: number, beta: number): number {
   }
   // For larger parameters, normal approximation
   const mean = alpha / (alpha + beta);
-  const variance =
-    (alpha * beta) / ((alpha + beta) * (alpha + beta) * (alpha + beta + 1));
+  const variance = (alpha * beta) / ((alpha + beta) * (alpha + beta) * (alpha + beta + 1));
   const z = boxMuller();
   return clamp(mean + z * Math.sqrt(variance), 0, 1);
 }
@@ -638,7 +619,9 @@ function gammaSample(shape: number): number {
 /** Cosine similarity between two vectors. */
 function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0;
-  let dot = 0, normA = 0, normB = 0;
+  let dot = 0,
+    normA = 0,
+    normB = 0;
   for (let i = 0; i < a.length; i++) {
     dot += a[i] * b[i];
     normA += a[i] * a[i];

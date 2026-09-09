@@ -21,9 +21,7 @@ function collector(): { transcripts: CouncilTranscript[]; sink: TranscriptSink }
   };
 }
 
-function scriptedTransport(
-  scripts: Record<string, string[]>,
-): { transport: DebateAgentTransport } {
+function scriptedTransport(scripts: Record<string, string[]>): { transport: DebateAgentTransport } {
   return {
     transport: async (req) => {
       const script = scripts[req.agent] ?? [];
@@ -41,8 +39,16 @@ describe("debate tool invocation transcripts", () => {
   it("a converging debate leaves a transcript with per-agent stages and metrics", async () => {
     const { transcripts, sink } = collector();
     const { transport } = scriptedTransport(STABLE);
-    const tool = debateRuntimeTool({ transport, agents: ["A", "B"], hooks: { onTranscript: sink } });
-    const raw = await tool.handler({ question: "Is X better than Y?", rounds: 6, convergence: true });
+    const tool = debateRuntimeTool({
+      transport,
+      agents: ["A", "B"],
+      hooks: { onTranscript: sink },
+    });
+    const raw = await tool.handler({
+      question: "Is X better than Y?",
+      rounds: 6,
+      convergence: true,
+    });
     const parsed = JSON.parse(raw) as { converged: boolean; roundsRun: number };
 
     expect(transcripts).toHaveLength(1);
@@ -52,7 +58,9 @@ describe("debate tool invocation transcripts", () => {
     expect(t.routing).toMatchObject({ mode: "explicit", tool: "debate__run" });
     // one stage per final answer (two agents)
     expect(t.stages.map((s) => s.name).sort()).toEqual(["answer:A", "answer:B"]);
-    expect(t.auditTrail.some((e) => e.step === "debate" && e.converged === parsed.converged)).toBe(true);
+    expect(t.auditTrail.some((e) => e.step === "debate" && e.converged === parsed.converged)).toBe(
+      true,
+    );
     expect(t.metrics.total_ms).toBeGreaterThanOrEqual(0);
     expect(t.degraded).toBe(false);
     expect(t.warnings).toEqual([]);
@@ -67,7 +75,9 @@ describe("debate tool invocation transcripts", () => {
       agents: ["A", "B"],
       hooks: { onTranscript: sink },
     });
-    await expect(tool.handler({ question: "X or Y?", rounds: 2 })).rejects.toThrow(/debate provider down/);
+    await expect(tool.handler({ question: "X or Y?", rounds: 2 })).rejects.toThrow(
+      /debate provider down/,
+    );
     expect(transcripts).toHaveLength(1);
     const t = transcripts[0]!;
     expect(t.degraded).toBe(true);
@@ -87,7 +97,12 @@ describe("council tool invocation transcripts", () => {
       } else if (user.includes("advisors independently answered")) {
         content = "1. Strongest: A — clear. 2. Biggest blind spot: B. 3. Missed by all: cost.";
       }
-      return { content, model: "fake", usage: { promptTokens: 5, completionTokens: 5 }, latencyMs: 1 };
+      return {
+        content,
+        model: "fake",
+        usage: { promptTokens: 5, completionTokens: 5 },
+        latencyMs: 1,
+      };
     },
   };
 
@@ -105,7 +120,11 @@ describe("council tool invocation transcripts", () => {
       rounds: 3,
       convergence: true,
     });
-    const parsed = JSON.parse(raw) as { converged: boolean; roundsRun: number; finalAnswers: unknown[] };
+    const parsed = JSON.parse(raw) as {
+      converged: boolean;
+      roundsRun: number;
+      finalAnswers: unknown[];
+    };
 
     expect(transcripts).toHaveLength(1);
     const t = transcripts[0]!;

@@ -154,12 +154,14 @@ export async function workflowsRoutes(
             name: s.name ? String(s.name) : undefined,
             condition: async () => Boolean(s.conditionResult ?? true),
             execute: async ({ data }) => {
-              if (typeof s.execute === "function") return (s.execute as Function)(data);
+              if (typeof s.execute === "function")
+                return (s.execute as (d: unknown) => unknown)(data);
               return data;
             },
             otherwise: s.otherwise
               ? async ({ data }) => {
-                  if (typeof s.otherwise === "function") return (s.otherwise as Function)(data);
+                  if (typeof s.otherwise === "function")
+                    return (s.otherwise as (d: unknown) => unknown)(data);
                   return data;
                 }
               : undefined,
@@ -176,9 +178,9 @@ export async function workflowsRoutes(
             id: stepId,
             name: s.name ? String(s.name) : undefined,
             execute: async ({ data }) => {
-              const prompt =
+              const prompt: string =
                 typeof s.task === "function"
-                  ? await (s.task as Function)(data)
+                  ? String(await (s.task as (d: unknown) => unknown)(data))
                   : String(s.task ?? JSON.stringify(data));
               const models: { model: string; provider?: string }[] = Array.isArray(s.models)
                 ? (s.models as { model: string; provider?: string }[])
@@ -220,7 +222,7 @@ export async function workflowsRoutes(
               });
               const agentText = result.result;
               if (s.map && typeof s.map === "function") {
-                return (s.map as Function)(agentText, data);
+                return (s.map as (t: string, d: unknown) => unknown)(agentText, data);
               }
               return { ...(data as object), agentResult: agentText };
             },
@@ -248,11 +250,15 @@ export async function workflowsRoutes(
             name: s.name ? String(s.name) : undefined,
             execute: async ({ data }) => {
               if (typeof s.execute === "function") {
-                return (s.execute as Function)(data);
+                return (s.execute as (d: unknown) => unknown)(data);
               }
               // If the step has a 'transform' string, evaluate it as a simple expression
               if (typeof s.transform === "string") {
                 try {
+                  // Intentional dynamic expression eval: the stored workflow
+                  // 'transform' is authored by the workflow owner (same trust
+                  // boundary as the steps themselves).
+                  // eslint-disable-next-line @typescript-eslint/no-implied-eval
                   const fn = new Function("data", `return (${s.transform});`);
                   return fn(data);
                 } catch {

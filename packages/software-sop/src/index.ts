@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @nexus/software-sop — SOP-based multi-role software development pipeline.
  *
@@ -11,7 +12,8 @@
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type RoleName = "product_manager" | "architect" | "engineer" | "qa_engineer" | "project_manager";
+export type RoleName =
+  "product_manager" | "architect" | "engineer" | "qa_engineer" | "project_manager";
 
 export interface RoleDefinition {
   name: RoleName;
@@ -229,8 +231,7 @@ export class SoftwareSopPipeline {
     step: number,
   ): Promise<StepResult> {
     const systemPrompt = buildSystemPrompt(role, context);
-    const userPrompt =
-      `Based on the context provided, produce your ${role.label} output now.`;
+    const userPrompt = `Based on the context provided, produce your ${role.label} output now.`;
 
     const start = Date.now();
     const content = await this.config.llm(systemPrompt, userPrompt);
@@ -356,10 +357,9 @@ export class DataInterpreter {
   }
 
   private async createPlan(requirement: string): Promise<DataPlan> {
-    const toolHint =
-      this.config.tools?.length
-        ? `\nAvailable tools: ${this.config.tools.join(", ")}`
-        : "";
+    const toolHint = this.config.tools?.length
+      ? `\nAvailable tools: ${this.config.tools.join(", ")}`
+      : "";
 
     const prompt = `Create a step-by-step plan to fulfill this data analysis requirement.
 
@@ -398,11 +398,7 @@ Respond in JSON format:
     };
   }
 
-  private async fixCode(
-    code: string,
-    error: string,
-    requirement: string,
-  ): Promise<string | null> {
+  private async fixCode(code: string, error: string, requirement: string): Promise<string | null> {
     const prompt = `The following code produced an error. Fix it.
 
 Requirement: ${requirement}
@@ -424,13 +420,8 @@ Provide the fixed code only, no explanation.`;
     return codeMatch ? codeMatch[1].trim() : null;
   }
 
-  private async reflect(
-    requirement: string,
-    results: DataPlanStep[],
-  ): Promise<boolean> {
-    const summary = results
-      .map((r) => `Step ${r.id}: ${r.description} → ${r.status}`)
-      .join("\n");
+  private async reflect(requirement: string, results: DataPlanStep[]): Promise<boolean> {
+    const summary = results.map((r) => `Step ${r.id}: ${r.description} → ${r.status}`).join("\n");
 
     const prompt = `User requirement: ${requirement}
 
@@ -456,12 +447,12 @@ Respond with JSON: {"thoughts": "...", "state": true/false}`;
     return true;
   }
 
-  private async synthesize(
-    requirement: string,
-    results: DataPlanStep[],
-  ): Promise<string> {
+  private async synthesize(requirement: string, results: DataPlanStep[]): Promise<string> {
     const summary = results
-      .map((r) => `### Step ${r.id}: ${r.description}\nStatus: ${r.status}\nResult:\n${r.result ?? "N/A"}`)
+      .map(
+        (r) =>
+          `### Step ${r.id}: ${r.description}\nStatus: ${r.status}\nResult:\n${r.result ?? "N/A"}`,
+      )
       .join("\n\n");
 
     const prompt = `Based on the analysis results below, provide a comprehensive summary answering the user's requirement.
@@ -501,9 +492,10 @@ export class Bm25ToolRecommender {
 
   constructor(tools: ToolDefinition[]) {
     this.tools = tools;
-    this.docLengths = tools.map((t) => this.tokenize(t.description + " " + (t.tags?.join(" ") ?? "")).length);
-    this.avgDocLength =
-      this.docLengths.reduce((s, l) => s + l, 0) / this.docLengths.length;
+    this.docLengths = tools.map(
+      (t) => this.tokenize(t.description + " " + (t.tags?.join(" ") ?? "")).length,
+    );
+    this.avgDocLength = this.docLengths.reduce((s, l) => s + l, 0) / this.docLengths.length;
 
     // Build document frequency map
     for (const tool of tools) {
@@ -547,8 +539,7 @@ export class Bm25ToolRecommender {
     this.tools.push(tool);
     const tokens = this.tokenize(tool.description + " " + (tool.tags?.join(" ") ?? ""));
     this.docLengths.push(tokens.length);
-    this.avgDocLength =
-      this.docLengths.reduce((s, l) => s + l, 0) / this.docLengths.length;
+    this.avgDocLength = this.docLengths.reduce((s, l) => s + l, 0) / this.docLengths.length;
     const uniqueTokens = new Set(tokens);
     for (const token of uniqueTokens) {
       this.docFreqs.set(token, (this.docFreqs.get(token) ?? 0) + 1);

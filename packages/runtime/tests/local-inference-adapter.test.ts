@@ -81,7 +81,13 @@ describe("LocalInferenceAdapter", () => {
   });
 
   it("reports bridge errors and throws-to-success mapping", async () => {
-    mocks.post.mockResolvedValueOnce({ success: false, error: "OOM", text: "", model: "", tokens_generated: 0 });
+    mocks.post.mockResolvedValueOnce({
+      success: false,
+      error: "OOM",
+      text: "",
+      model: "",
+      tokens_generated: 0,
+    });
     const adapter = new LocalInferenceAdapter();
     const failed = await adapter.execute({ payload: { prompt: "p" } }, ctx);
     expect(failed.success).toBe(false);
@@ -105,7 +111,10 @@ describe("LocalLanguageModel", () => {
     mocks.post.mockResolvedValue({ success: true, text: "streamed answer", error: "" });
     const model = new LocalLanguageModel({ model: "custom-model" });
     expect(model.modelId).toBe("local:custom-model");
-    const text = await model.generateText({ messages: [{ role: "user", content: "q" }], maxTokens: 256 });
+    const text = await model.generateText({
+      messages: [{ role: "user", content: "q" }],
+      maxTokens: 256,
+    });
     expect(text).toBe("streamed answer");
     const [, , body] = mocks.post.mock.calls[0];
     expect(body).toMatchObject({ model: "custom-model", max_new_tokens: 256 });
@@ -125,6 +134,8 @@ describe("LocalLanguageModel", () => {
     ).toEqual({ x: 1 });
 
     mocks.post.mockResolvedValueOnce({ success: false, text: "", error: "bridge exploded" });
-    await expect(model.generateObject({ messages: [], schema: {} })).rejects.toThrow(/bridge exploded/);
+    await expect(model.generateObject({ messages: [], schema: {} })).rejects.toThrow(
+      /bridge exploded/,
+    );
   });
 });

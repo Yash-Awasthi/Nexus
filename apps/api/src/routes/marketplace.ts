@@ -25,6 +25,7 @@ import { validatePluginManifest, type PluginManifest } from "@nexus/plugin-sdk";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import { PersistentStore } from "../lib/persistent-store.js";
+
 import { pluginRegistryStore, registryKeyOf, type RegistryRecord } from "./plugin-registry.js";
 
 /** UI-only extras for one marketplace item (registry owns the rest). */
@@ -135,9 +136,7 @@ const BUILTINS: BuiltinSpec[] = [
 async function ensureSeed(): Promise<void> {
   await pluginRegistryStore.load();
   await uiStore.load();
-  const existing = new Set(
-    Array.from(pluginRegistryStore.values()).map((r) => r.manifest.id),
-  );
+  const existing = new Set(Array.from(pluginRegistryStore.values()).map((r) => r.manifest.id));
   for (const b of BUILTINS) {
     if (existing.has(b.id)) continue;
     const manifest: PluginManifest = {
@@ -204,9 +203,7 @@ function view(
 }
 
 function findRecord(id: string) {
-  const matches = Array.from(pluginRegistryStore.values()).filter(
-    (r) => r.manifest.id === id,
-  );
+  const matches = Array.from(pluginRegistryStore.values()).filter((r) => r.manifest.id === id);
   if (matches.length === 0) return null;
   return matches.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))[0]!;
 }
@@ -348,7 +345,9 @@ export async function marketplaceRoutes(app: FastifyInstance): Promise<void> {
     }
     const key = registryKeyOf(id, "1.0.0");
     if (pluginRegistryStore.has(key)) {
-      return reply.code(409).send({ error: "conflict", message: `plugin ${id}@1.0.0 already exists` });
+      return reply
+        .code(409)
+        .send({ error: "conflict", message: `plugin ${id}@1.0.0 already exists` });
     }
     const record = {
       manifest,
@@ -366,6 +365,8 @@ export async function marketplaceRoutes(app: FastifyInstance): Promise<void> {
       starredBy: [],
       installedBy: [],
     });
-    return reply.code(201).send({ ok: true, item: view(record, uiStore.get(id), actorOf(request)) });
+    return reply
+      .code(201)
+      .send({ ok: true, item: view(record, uiStore.get(id), actorOf(request)) });
   });
 }

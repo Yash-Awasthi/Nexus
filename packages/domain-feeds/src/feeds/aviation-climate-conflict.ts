@@ -239,4 +239,3 @@ export class ConflictFeed extends FeedAdapter<ConflictEvent> {
     return "clashes";
   }
 }
-

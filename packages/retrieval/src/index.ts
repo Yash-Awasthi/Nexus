@@ -90,8 +90,14 @@ export interface IEmbedder {
 }
 
 // Chroma-style where/where_document clause vocabulary.
-import { validateWhere, validateWhereDocument, whereMatches, whereDocumentMatches } from "./where.js";
-import type { WhereClause, WhereDocumentClause } from "./where.js";
+import { cosineSimilarity, magnitude } from "@nexus/shared";
+
+import {
+  whereMatches,
+  whereDocumentMatches,
+  type WhereClause,
+  type WhereDocumentClause,
+} from "./where.js";
 export {
   validateWhere,
   validateWhereDocument,
@@ -106,8 +112,6 @@ export {
 // ── Math helpers ──────────────────────────────────────────────────────────────
 // dot/magnitude/cosineSimilarity live in @nexus/shared/math (single home).
 // cosineSimilarity is re-exported here for the package's public API.
-
-import { cosineSimilarity, magnitude } from "@nexus/shared";
 
 export { cosineSimilarity };
 

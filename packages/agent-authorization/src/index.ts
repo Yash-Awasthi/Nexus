@@ -71,9 +71,7 @@ export class AgentAuthorization {
    * Check if an action is authorized.
    */
   authorize(context: AuthContext): AuthDecision {
-    const matchingPolicies = this.policies.filter((p) =>
-      this.matchesPolicy(p, context),
-    );
+    const matchingPolicies = this.policies.filter((p) => this.matchesPolicy(p, context));
 
     if (matchingPolicies.length === 0) {
       // Default deny if no policies match
@@ -124,9 +122,7 @@ export class AgentAuthorization {
    * Get policies for a specific agent role.
    */
   getPoliciesForRole(role: string): Policy[] {
-    return this.policies.filter(
-      (p) => p.principals.includes(role) || p.principals.includes("*"),
-    );
+    return this.policies.filter((p) => p.principals.includes(role) || p.principals.includes("*"));
   }
 
   // ── Private Helpers ────────────────────────────────────────────────────

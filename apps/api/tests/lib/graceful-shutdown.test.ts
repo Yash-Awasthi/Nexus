@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { EventEmitter } from "node:events";
+import { describe, it, expect } from "vitest";
 
 /**
  * Tests for the graceful shutdown sequence in index.ts.
@@ -19,7 +18,9 @@ describe("Graceful shutdown behavior", () => {
   it("calls app.close() on first shutdown signal", async () => {
     let closed = false;
     const fakeApp = {
-      close: async () => { closed = true; },
+      close: async () => {
+        closed = true;
+      },
       log: { info: () => {} },
     };
 
@@ -37,7 +38,9 @@ describe("Graceful shutdown behavior", () => {
   it("second signal is a no-op (guard prevents double-close)", async () => {
     let closeCount = 0;
     const fakeApp = {
-      close: async () => { closeCount++; },
+      close: async () => {
+        closeCount++;
+      },
       log: { info: () => {} },
     };
 
@@ -55,7 +58,9 @@ describe("Graceful shutdown behavior", () => {
 
   it("app.close() errors are caught and logged, not thrown", async () => {
     const fakeApp = {
-      close: async () => { throw new Error("close failed"); },
+      close: async () => {
+        throw new Error("close failed");
+      },
       log: { info: () => {} },
     };
 
@@ -67,7 +72,7 @@ describe("Graceful shutdown behavior", () => {
       if (fakeApp.close) {
         try {
           await fakeApp.close();
-        } catch (err) {
+        } catch {
           logged = true;
         }
       }

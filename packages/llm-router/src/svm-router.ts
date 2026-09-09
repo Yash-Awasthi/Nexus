@@ -77,7 +77,7 @@ export class SVMRouter {
    */
   private decisionFunction(input: number[]): number[] {
     const numClasses = this.classes.length;
-    const values: number[] = new Array(numClasses).fill(0);
+    const values: number[] = new Array<number>(numClasses).fill(0);
 
     // Compute kernel values against all support vectors
     const kernelValues: number[] = [];
@@ -87,7 +87,7 @@ export class SVMRouter {
 
     // For one-vs-rest: each dualCoefficients row corresponds to a class
     for (let k = 0; k < numClasses - 1; k++) {
-      const coeffs = this.dualCoefficients[k] ?? [];
+      const coeffs: number[] = this.dualCoefficients[k] ?? [];
       let sum = 0;
       for (let i = 0; i < coeffs.length; i++) {
         sum += coeffs[i]! * (kernelValues[i] ?? 0);

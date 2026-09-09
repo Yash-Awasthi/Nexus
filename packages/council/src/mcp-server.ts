@@ -30,8 +30,9 @@
  *                     cross-check (every advisor verifies every answer) → majority verdict.
  */
 
-import { McpHttpServer, type McpCallResult, type McpToolDefinition } from "@nexus/mcp-client";
 import { majorityFinalAnswer, runMultiAgentDebate } from "@nexus/debate-engine";
+import { McpHttpServer, type McpCallResult, type McpToolDefinition } from "@nexus/mcp-client";
+
 import type { Archetype } from "./archetypes.js";
 import { runCritique } from "./critique.js";
 import { DeliberativeCouncil } from "./deliberative.js";

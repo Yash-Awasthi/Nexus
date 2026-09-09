@@ -67,7 +67,11 @@ const LETTER_RE = /\b([A-H])\b/g;
  * chains ("B > A > D"); extra prose is ignored. Missing letters truncate the
  * ranking (partial rankings still contribute their top choices).
  */
-export function parseBordaRanking(reviewer: string, text: string, expectedLetters: number): BordaRanking {
+export function parseBordaRanking(
+  reviewer: string,
+  text: string,
+  expectedLetters: number,
+): BordaRanking {
   const order: string[] = [];
   const seen = new Set<string>();
   for (const m of text.matchAll(LETTER_RE)) {
@@ -122,11 +126,12 @@ export function tallyBorda(rankings: readonly BordaRanking[]): BordaResult {
       firstPlaceVotes: firsts.get(letter) ?? 0,
       meanPosition: (positionSum.get(letter) ?? 0) / (appearances.get(letter) || 1),
     }))
-    .sort((a, b) =>
-      b.points - a.points ||
-      b.firstPlaceVotes - a.firstPlaceVotes ||
-      a.meanPosition - b.meanPosition ||
-      a.letter.localeCompare(b.letter),
+    .sort(
+      (a, b) =>
+        b.points - a.points ||
+        b.firstPlaceVotes - a.firstPlaceVotes ||
+        a.meanPosition - b.meanPosition ||
+        a.letter.localeCompare(b.letter),
     );
 
   const maxPts = maxBordaPoints(rankings);

@@ -85,8 +85,15 @@ export class PluginRegistryClient {
   async list(query?: string): Promise<RegistryEntry[]> {
     const url = `${this.baseUrl}/plugins${query ? `?q=${encodeURIComponent(query)}` : ""}`;
     const body = await this.request(url, "GET");
-    if (!body || typeof body !== "object" || !Array.isArray((body as { plugins?: unknown }).plugins)) {
-      throw new PluginRegistryError("registry list response missing `plugins` array", "INVALID_RESPONSE");
+    if (
+      !body ||
+      typeof body !== "object" ||
+      !Array.isArray((body as { plugins?: unknown }).plugins)
+    ) {
+      throw new PluginRegistryError(
+        "registry list response missing `plugins` array",
+        "INVALID_RESPONSE",
+      );
     }
     return ((body as { plugins: unknown }).plugins as unknown[]).map((entry) => {
       const e = (entry ?? {}) as Record<string, unknown>;

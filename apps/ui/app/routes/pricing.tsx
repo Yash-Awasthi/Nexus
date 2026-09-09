@@ -41,8 +41,8 @@ export default function Pricing() {
             It's <TextShimmer>free</TextShimmer>. Open source, no tiers.
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-            Nexus is open-source community software — not a subscription product. There is no
-            paid tier, no billing provider, and no trial that expires.
+            Nexus is open-source community software — not a subscription product. There is no paid
+            tier, no billing provider, and no trial that expires.
           </p>
         </FadeIn>
       </section>
@@ -78,10 +78,10 @@ export default function Pricing() {
         <div className="mt-8 rounded-xl border border-white/10 bg-card/80 p-8 backdrop-blur-md">
           <h2 className="font-display text-xl font-bold">Bring your own keys (BYOK)</h2>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            Model access runs on <span className="text-foreground">your own</span> provider API
-            keys (OpenAI, Anthropic, Gemini, Groq, OpenRouter, local Ollama, and more), stored
-            per-user and billed by the provider directly — Nexus never sits between you and an
-            invoice. Spend guards on your own keys are built in; charging for Nexus is not.
+            Model access runs on <span className="text-foreground">your own</span> provider API keys
+            (OpenAI, Anthropic, Gemini, Groq, OpenRouter, local Ollama, and more), stored per-user
+            and billed by the provider directly — Nexus never sits between you and an invoice. Spend
+            guards on your own keys are built in; charging for Nexus is not.
           </p>
         </div>
       </section>

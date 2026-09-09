@@ -61,9 +61,11 @@ function phaseTransport(): ILLMTransport {
       } else if (user.includes("These are the solutions")) {
         content = "refined-answer";
       } else if (sys.includes("red team adversary") || user.includes("red team adversary")) {
-        content = "Flaws: overclaims. Edge cases: none handled. Adversarial inputs: yes. Failure modes: at scale.";
+        content =
+          "Flaws: overclaims. Edge cases: none handled. Adversarial inputs: yes. Failure modes: at scale.";
       } else if (sys.includes("critical reviewer") || user.includes("critical reviewer")) {
-        content = "Strengths: clear. Weaknesses: thin evidence. Errors: none found. Confidence: 80%";
+        content =
+          "Strengths: clear. Weaknesses: thin evidence. Errors: none found. Confidence: 80%";
       } else if (user.includes("Is this response correct, complete, and well reasoned")) {
         content = '{"verdict": true, "aspect": "correctness", "reasoning": "approved by script"}';
       }
@@ -107,7 +109,7 @@ describe("createCouncilMcpServer", () => {
       path: "/mcp",
       body: { jsonrpc: "2.0", id: 1, method: "tools/list" },
     });
-    const names = ((res.body as { result: { tools: { name: string }[] } }).result.tools).map(
+    const names = (res.body as { result: { tools: { name: string }[] } }).result.tools.map(
       (t) => t.name,
     );
     expect(names.sort()).toEqual([
@@ -126,7 +128,7 @@ describe("createCouncilMcpServer", () => {
       path: "/mcp",
       body: { jsonrpc: "2.0", id: 1, method: "tools/list" },
     });
-    const names = ((res.body as { result: { tools: { name: string }[] } }).result.tools).map(
+    const names = (res.body as { result: { tools: { name: string }[] } }).result.tools.map(
       (t) => t.name,
     );
     expect(names).toEqual(["council_deliberate"]);
@@ -138,7 +140,12 @@ describe("createCouncilMcpServer", () => {
       question: "Should we shard now?",
     });
     const out = textOf(res);
-    const verdict = out.verdict as { agreements: unknown[]; clashes: unknown[]; recommendation: string; nextAction: string };
+    const verdict = out.verdict as {
+      agreements: unknown[];
+      clashes: unknown[];
+      recommendation: string;
+      nextAction: string;
+    };
     expect(verdict.agreements.length).toBeGreaterThan(0);
     expect(verdict.clashes.length).toBeGreaterThan(0);
     expect(verdict.recommendation).toContain("flag");

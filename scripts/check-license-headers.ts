@@ -10,8 +10,12 @@
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, extname, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = new URL("..", import.meta.url).pathname;
+// fileURLToPath, not .pathname: on Windows .pathname yields "/C:/Users/...",
+// which scandir resolves to a bogus double-drive path and the check crashes
+// before inspecting anything. fileURLToPath is the cross-platform conversion.
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 const EXTENSIONS = new Set([".ts", ".tsx", ".py", ".sql"]);
 
@@ -34,6 +38,8 @@ const IGNORE_DIRS = new Set([
   "vendor",
   ".venv",
   "__pycache__",
+  "Python", // vendored embedded CPython runtime (gitignored; not repo source)
+  "coverage-html",
 ]);
 
 const IGNORE_PATTERNS = [

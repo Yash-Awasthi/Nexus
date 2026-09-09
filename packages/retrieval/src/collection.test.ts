@@ -13,7 +13,7 @@ function makeCollection() {
   return new VectorCollection({ embedder: new FixedRagtimeEmbedder() });
 }
 
-const DOCS: Array<{ id: string; text: string; meta: Record<string, unknown> }> = [
+const DOCS: { id: string; text: string; meta: Record<string, unknown> }[] = [
   { id: "id-a", text: "aaaabbbb", meta: { tier: "gold" } }, // a×4, b×4
   { id: "id-b", text: "ccccdddd", meta: { tier: "free" } }, // c×4, d×4 (orthogonal to a/b)
   { id: "id-c", text: "aaaacccc", meta: { tier: "gold" } }, // shares a with a, c with b
@@ -111,11 +111,9 @@ describe("VectorCollection (chroma-shaped facade)", () => {
 
   it("validates input lengths and rejects empty documents", async () => {
     const c = makeCollection();
-    await expect(
-      c.add({ ids: ["a", "b"], documents: ["only-one"] }),
-    ).rejects.toThrow(/lengths differ/);
-    await expect(
-      c.add({ ids: ["a"], documents: ["   "] }),
-    ).rejects.toThrow(/empty/);
+    await expect(c.add({ ids: ["a", "b"], documents: ["only-one"] })).rejects.toThrow(
+      /lengths differ/,
+    );
+    await expect(c.add({ ids: ["a"], documents: ["   "] })).rejects.toThrow(/empty/);
   });
 });

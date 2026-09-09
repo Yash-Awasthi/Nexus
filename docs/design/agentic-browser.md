@@ -45,7 +45,7 @@ awareness, rate-limit ceilings per target domain.
 
 Explicitly out of scope (never build): CAPTCHA solving services, credential
 stuffing, scraping behind paywalls/logins the user does not own, fingerprint
-*spoofing* designed to defeat fraud controls. The tool exists for the user's
+_spoofing_ designed to defeat fraud controls. The tool exists for the user's
 own automation on sites they may use — the capability model + audit log are the
 guardrails.
 

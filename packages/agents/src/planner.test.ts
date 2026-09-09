@@ -50,15 +50,8 @@ describe("parsePlan", () => {
   });
 
   it("tolerates markdown fences, bare numbers, and missing markers", () => {
-    const tasks = parsePlan(
-      "```\n1) research the domain\n2. draft\n3. - ship it\n```",
-      ROLES,
-    );
-    expect(tasks.map((t) => t.description)).toEqual([
-      "research the domain",
-      "draft",
-      "ship it",
-    ]);
+    const tasks = parsePlan("```\n1) research the domain\n2. draft\n3. - ship it\n```", ROLES);
+    expect(tasks.map((t) => t.description)).toEqual(["research the domain", "draft", "ship it"]);
     // Steps without a marker default to the first role.
     expect(tasks.every((t) => t.agent === "researcher")).toBe(true);
   });

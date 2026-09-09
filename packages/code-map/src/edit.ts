@@ -58,9 +58,15 @@ interface ParsedImport {
 const IMPORT_LINE_RE = /^(\s*)import\s+(type\s+)?(.+?)\s+from\s+['"]([^'"]+)['"];?\s*$/;
 
 function parseImportLine(line: string): ParsedImport | undefined {
-  const m = line.match(IMPORT_LINE_RE);
+  const m = IMPORT_LINE_RE.exec(line) as RegExpMatchArray | null;
   if (!m) return undefined;
-  const [, indent, typePrefix, body, from] = m as [string, string, string | undefined, string, string];
+  const [, indent, typePrefix, body, from] = m as [
+    string,
+    string,
+    string | undefined,
+    string,
+    string,
+  ];
   const parsed: ParsedImport = {
     indent,
     typeOnly: typePrefix !== undefined,
@@ -68,19 +74,22 @@ function parseImportLine(line: string): ParsedImport | undefined {
     semicolon: line.trimEnd().endsWith(";"),
     from,
   };
-  const ns = body.match(/^\* as (\$?[\w$]+)$/);
+  const ns = /^\* as (\$?[\w$]+)$/.exec(body);
   if (ns) {
     parsed.namespace = ns[1];
     return parsed;
   }
-  const brace = body.match(/\{([^}]*)\}/);
+  const brace = /\{([^}]*)\}/.exec(body);
   if (brace) {
     for (const spec of (brace[1] ?? "").split(/\s*,\s*/)) {
       const s = spec.trim();
       if (s) parsed.names.push(s);
     }
   }
-  const defaultPart = body.replace(/\{[^}]*\}/, "").trim().replace(/,$/, "");
+  const defaultPart = body
+    .replace(/\{[^}]*\}/, "")
+    .trim()
+    .replace(/,$/, "");
   if (defaultPart) parsed.defaultImport = defaultPart;
   return parsed;
 }
@@ -132,7 +141,12 @@ export function addImportDeclaration(content: string, spec: ImportSpec): string 
   }
   const lines = content.split("\n");
   const semicolon = styleUsesSemicolons(content);
-  const request = { from, typeOnly: spec.typeOnly === true, names: [...named], defaultImport: spec.defaultImport };
+  const request = {
+    from,
+    typeOnly: spec.typeOnly === true,
+    names: [...named],
+    defaultImport: spec.defaultImport,
+  };
 
   // Find the same-module declaration in the same type family.
   for (let i = 0; i < lines.length; i++) {
@@ -144,7 +158,11 @@ export function addImportDeclaration(content: string, spec: ImportSpec): string 
       lines.splice(i + 1, 0, formatImport({ ...request, indent: p.indent, semicolon }, semicolon));
       return lines.join("\n");
     }
-    if (p.defaultImport !== undefined && request.defaultImport !== undefined && p.defaultImport !== request.defaultImport) {
+    if (
+      p.defaultImport !== undefined &&
+      request.defaultImport !== undefined &&
+      p.defaultImport !== request.defaultImport
+    ) {
       throw new Error(
         `addImportDeclaration: module '${from}' already has default import '${p.defaultImport}'`,
       );
@@ -152,12 +170,10 @@ export function addImportDeclaration(content: string, spec: ImportSpec): string 
     const existing = new Set(p.names);
     const merged = new Set([...p.names, ...request.names]);
     const defaultName = p.defaultImport ?? request.defaultImport;
-    const alreadyPresent = defaultName === p.defaultImport && [...request.names].every((n) => existing.has(n));
+    const alreadyPresent =
+      defaultName === p.defaultImport && [...request.names].every((n) => existing.has(n));
     if (alreadyPresent) return content;
-    lines[i] = formatImport(
-      { ...p, defaultImport: defaultName, names: [...merged] },
-      p.semicolon,
-    );
+    lines[i] = formatImport({ ...p, defaultImport: defaultName, names: [...merged] }, p.semicolon);
     return lines.join("\n");
   }
 
@@ -196,7 +212,9 @@ export function removeImportDeclaration(content: string, from: string, names?: s
       continue;
     }
     if (p.namespace !== undefined) {
-      throw new Error(`removeImportDeclaration: cannot remove named specifiers from namespace import '${from}'`);
+      throw new Error(
+        `removeImportDeclaration: cannot remove named specifiers from namespace import '${from}'`,
+      );
     }
     const remaining = p.names.filter((n) => !wanted.has(n.replace(/^type\s+/, "")));
     const keepDefault = p.defaultImport !== undefined && !wanted.has(p.defaultImport);
@@ -208,7 +226,10 @@ export function removeImportDeclaration(content: string, from: string, names?: s
     }
     const defaultChanged = keepDefault !== (p.defaultImport !== undefined);
     if (remaining.length !== p.names.length || defaultChanged) {
-      lines[i] = formatImport({ ...p, defaultImport: keepDefault ? p.defaultImport : undefined, names: remaining }, p.semicolon);
+      lines[i] = formatImport(
+        { ...p, defaultImport: keepDefault ? p.defaultImport : undefined, names: remaining },
+        p.semicolon,
+      );
       changed = true;
     }
   }

@@ -8,13 +8,7 @@ import type { ILogger } from "../src/interfaces/logger.interface.js";
 const logger: ILogger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
 
 function makeBus(opts?: { maxMessages?: number }) {
-  return new AgentBus(
-    new EventBus(),
-    undefined,
-    undefined,
-    logger,
-    opts,
-  );
+  return new AgentBus(new EventBus(), undefined, undefined, logger, opts);
 }
 
 afterEach(() => {
@@ -41,16 +35,18 @@ describe("AgentBus.send", () => {
   it("persists to the event store and memory store when wired", async () => {
     const eventStore = { saveEvent: vi.fn(async () => {}) };
     const memoryStore = { store: vi.fn(async () => "mem-1") };
-    const bus = new AgentBus(
-      new EventBus(),
-      eventStore as never,
-      memoryStore as never,
-      logger,
-    );
+    const bus = new AgentBus(new EventBus(), eventStore as never, memoryStore as never, logger);
     await bus.send({ from: "a", type: "broadcast", subject: "note", body: "x" });
-    expect(eventStore.saveEvent).toHaveBeenCalledWith("agent_message", expect.objectContaining({ subject: "note" }));
+    expect(eventStore.saveEvent).toHaveBeenCalledWith(
+      "agent_message",
+      expect.objectContaining({ subject: "note" }),
+    );
     expect(memoryStore.store).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "observation", tags: ["agent-bus", "from:a", "type:broadcast"], agentId: "a" }),
+      expect.objectContaining({
+        type: "observation",
+        tags: ["agent-bus", "from:a", "type:broadcast"],
+        agentId: "a",
+      }),
     );
   });
 
@@ -107,7 +103,10 @@ describe("AgentBus capabilities", () => {
     await bus.registerCapability("worker-1", ["math", "write"], { region: "us" });
     await bus.registerCapability("worker-2", ["write"]);
 
-    expect((await bus.getCapabilities()).map((c) => c.agentId).sort()).toEqual(["worker-1", "worker-2"]);
+    expect((await bus.getCapabilities()).map((c) => c.agentId).sort()).toEqual([
+      "worker-1",
+      "worker-2",
+    ]);
 
     // getCapabilities returns live references — mark worker-2 offline (register
     // always starts agents idle; offline arises from external state changes).

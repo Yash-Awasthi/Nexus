@@ -15,7 +15,7 @@
  * (self-spawn), think_deeply, review, and best_of_n.
  */
 
-import type { LlmToolFn } from "@nexus/agent-runtime";
+import { MissionRunner, type MissionRecord } from "@nexus/agent-engine";
 import {
   AgentTemplateRegistry,
   createEditFileTool,
@@ -28,16 +28,21 @@ import {
   makeThinkDeeplyTool,
   RuntimeToolSet,
   type CommandExecutor,
+  type LlmToolFn,
 } from "@nexus/agent-runtime";
-import { MissionRunner, type MissionRecord } from "@nexus/agent-engine";
 import { executeCode } from "@nexus/sandbox";
 import type { FastifyInstance } from "fastify";
 
-import { getDefaultDriver } from "./api-bridge.js";
-import { getSkillsByIds } from "./skills.js";
-import { compressSkillsForTaskSemantic, slugify } from "../lib/skill-compress.js";
 import { MissionGraphRecorder } from "../lib/mission-graph.js";
 import { loadMissionMemory, type MissionMemory } from "../lib/mission-memory.js";
+import {
+  createMission,
+  deleteMission,
+  getMission,
+  kvMissionStore,
+  listMissions,
+} from "../lib/mission-store.js";
+import { compressSkillsForTaskSemantic, slugify } from "../lib/skill-compress.js";
 import {
   composeSkillSystemPrompt,
   executeSkillsOnce,
@@ -46,14 +51,10 @@ import {
   type MissionOutputStyle,
   type SkillRecord,
 } from "../lib/skill-runner.js";
-import {
-  createMission,
-  deleteMission,
-  getMission,
-  kvMissionStore,
-  listMissions,
-} from "../lib/mission-store.js";
 import { requireAuthWithTier } from "../middleware/auth.js";
+
+import { getDefaultDriver } from "./api-bridge.js";
+import { getSkillsByIds } from "./skills.js";
 
 const MISSION_ACTING_PROMPT = `You are a mission agent. Work toward the stated goal autonomously using your tools.
 Build on prior work already present in the conversation. When the reviewer sends feedback, address it directly.
@@ -246,7 +247,7 @@ export async function missionRoutes(app: FastifyInstance): Promise<void> {
 
     const maxIterations = Math.min(10, Math.max(1, Math.round(request.body.maxIterations ?? 3)));
     const acceptScore = Math.min(100, Math.max(1, Math.round(request.body.acceptScore ?? 70)));
-    const rawStyle = String(request.body.outputStyle ?? "normal").toLowerCase();
+    const rawStyle = (request.body.outputStyle ?? "normal").toLowerCase();
     const outputStyle: MissionOutputStyle =
       rawStyle === "terse" || rawStyle === "ponytail" || rawStyle === "caveman"
         ? rawStyle
@@ -261,7 +262,7 @@ export async function missionRoutes(app: FastifyInstance): Promise<void> {
       if (!Array.isArray(request.body.skillIds)) {
         return reply.code(400).send({ error: "skillIds_array_required" });
       }
-      const ids = [...new Set(request.body.skillIds.map((x) => String(x).slice(0, 200)).filter(Boolean))];
+      const ids = [...new Set(request.body.skillIds.map((x) => x.slice(0, 200)).filter(Boolean))];
       if (ids.length > 20) return reply.code(400).send({ error: "too_many_skills" });
       skills = getSkillsByIds(ids);
       if (skills.length === 0) {
@@ -322,7 +323,7 @@ export async function missionRoutes(app: FastifyInstance): Promise<void> {
     // acting agent continues from where it left off (see lib/mission-memory.ts).
     let memory: MissionMemory | null = null;
     if (request.body.continueFrom !== undefined) {
-      const prevId = String(request.body.continueFrom).slice(0, 200);
+      const prevId = request.body.continueFrom.slice(0, 200);
       memory = await loadMissionMemory(request.nexusUserId, prevId);
       if (!memory) {
         return reply.code(400).send({

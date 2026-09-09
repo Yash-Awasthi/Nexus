@@ -17,9 +17,9 @@
 
 import type { MissionRecord, MissionStore } from "@nexus/agent-engine";
 
+import { extractMissionInsights } from "./memory-extractor.js";
 import { getSharedKV } from "./shared-kv.js";
 import { withKeyLock } from "./with-key-lock.js";
-import { extractMissionInsights } from "./memory-extractor.js";
 
 const MISSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const MAX_MISSIONS = 100;

@@ -38,8 +38,7 @@ export interface MoleculeOpinion {
 export function isErrorOpinion(opinion: Pick<MoleculeOpinion, "text" | "isError">): boolean {
   if (opinion.isError) return true;
   const text = opinion.text ?? "";
-  const lastSegment =
-    text.split(/――― round \d+ \(sees other members' answers\) ―――/).pop() ?? text;
+  const lastSegment = text.split(/――― round \d+ \(sees other members' answers\) ―――/).pop() ?? text;
   return /^\[[^\]]{1,64} error: /.test(lastSegment);
 }
 

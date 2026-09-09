@@ -586,9 +586,7 @@ describe("StabilityProvider", () => {
     const p = new StabilityProvider({ apiKey: "sk-key", engine: "core", fetch: fetchFn });
     await p.generate("a cat", { size: "1792x1024" });
     const f = fetchFn as ReturnType<typeof vi.fn>;
-    expect(f.mock.calls[0]![0]).toBe(
-      "https://api.stability.ai/v2beta/stable-image/generate/core",
-    );
+    expect(f.mock.calls[0]![0]).toBe("https://api.stability.ai/v2beta/stable-image/generate/core");
     const headers = f.mock.calls[0]![1]!.headers as Record<string, string>;
     expect(headers["Authorization"]).toBe("Bearer sk-key");
     expect(headers["Accept"]).toBe("application/json");
@@ -741,7 +739,11 @@ describe("FalProvider", () => {
     const fetchFn = makeFetch([
       {
         ok: true,
-        body: { request_id: "rq1", status_url: "https://q/status", response_url: "https://q/result" },
+        body: {
+          request_id: "rq1",
+          status_url: "https://q/status",
+          response_url: "https://q/result",
+        },
       },
       { ok: true, body: { status: "FAILED", error: "NSFW filter" } },
     ]);
@@ -762,9 +764,7 @@ describe("FalProvider", () => {
     await expect(p1.generate("x")).rejects.toMatchObject({ code: "AUTH_FAILED" });
     const p2 = new FalProvider({
       apiKey: "k",
-      fetch: makeFetch([
-        { ok: true, body: { request_id: "rq1", status_url: "https://q/status" } },
-      ]),
+      fetch: makeFetch([{ ok: true, body: { request_id: "rq1", status_url: "https://q/status" } }]),
       sleep: noSleep,
       timeoutMs: 0,
     });
@@ -786,10 +786,7 @@ function comfyFetch(sequence: unknown[]): FetchFn {
         ok: true,
         status: 200,
         arrayBuffer: async () =>
-          r.raw!.buffer.slice(
-            r.raw!.byteOffset,
-            r.raw!.byteOffset + r.raw!.byteLength,
-          ),
+          r.raw!.buffer.slice(r.raw!.byteOffset, r.raw!.byteOffset + r.raw!.byteLength),
       } as unknown as Response;
     }
     return {
@@ -807,9 +804,7 @@ const COMFY_WORKFLOW: Record<string, unknown> = {
 
 describe("ComfyUIProvider", () => {
   it("has name 'comfyui'", () => {
-    expect(new ComfyUIProvider({ workflow: COMFY_WORKFLOW, promptNode: "9" }).name).toBe(
-      "comfyui",
-    );
+    expect(new ComfyUIProvider({ workflow: COMFY_WORKFLOW, promptNode: "9" }).name).toBe("comfyui");
   });
 
   it("throws INVALID_PROMPT for empty prompt", async () => {
@@ -872,11 +867,7 @@ describe("ComfyUIProvider", () => {
     const p = new ComfyUIProvider({
       workflow: COMFY_WORKFLOW,
       promptNode: "9",
-      fetch: comfyFetch([
-        { body: { prompt_id: "job-1" } },
-        { body: {} },
-        { body: {} },
-      ]),
+      fetch: comfyFetch([{ body: { prompt_id: "job-1" } }, { body: {} }, { body: {} }]),
       sleep: noSleep,
       pollIntervalMs: 0,
       timeoutMs: 0,

@@ -18,7 +18,9 @@ function task(overrides: Partial<IMCPTask> = {}): IMCPTask {
   };
 }
 
-function transport(opts: { send?: () => Promise<unknown>; connectFail?: boolean } = {}): IMCPTransport {
+function transport(
+  opts: { send?: () => Promise<unknown>; connectFail?: boolean } = {},
+): IMCPTransport {
   return {
     connect: vi.fn(async () => {
       if (opts.connectFail) throw new Error("connect refused");
@@ -32,7 +34,12 @@ function transport(opts: { send?: () => Promise<unknown>; connectFail?: boolean 
   };
 }
 
-const metrics = { increment: vi.fn(), recordTiming: vi.fn(), recordGauge: vi.fn(), getMetrics: vi.fn() };
+const metrics = {
+  increment: vi.fn(),
+  recordTiming: vi.fn(),
+  recordGauge: vi.fn(),
+  getMetrics: vi.fn(),
+};
 
 describe("MCPRuntime", () => {
   it("blocks blocklisted tools before dispatch", async () => {
@@ -57,7 +64,13 @@ describe("MCPRuntime", () => {
     }));
     const t = transport({ send });
     await registry.registerServer(
-      { name: "svc", transportType: "stdio", endpoint: "x", status: "active", tools: ["read_file"] },
+      {
+        name: "svc",
+        transportType: "stdio",
+        endpoint: "x",
+        status: "active",
+        tools: ["read_file"],
+      },
       t,
     );
     const tracer = { startSpan: vi.fn().mockReturnValue({ spanId: "sp" }), endSpan: vi.fn() };
@@ -71,7 +84,10 @@ describe("MCPRuntime", () => {
         params: { name: "read_file", arguments: { path: "/tmp/x" } },
       }),
     );
-    expect(tracer.endSpan).toHaveBeenCalledWith("sp", expect.objectContaining({ status: "success" }));
+    expect(tracer.endSpan).toHaveBeenCalledWith(
+      "sp",
+      expect.objectContaining({ status: "success" }),
+    );
   });
 
   it("keeps the raw result when there is no text content", async () => {

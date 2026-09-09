@@ -211,7 +211,7 @@ export class MissionRunner {
     this.thinkPrompt = opts.thinkPrompt;
     this.reviewerSystemPrompt =
       opts.reviewerSystemPrompt ??
-      'You are a rigorous reviewer. Score the work 0-100 against the goal; >= 70 accepts. Be specific: name concrete problems, not generalities. If the work under review is empty or contains no concrete result, score it 0 and reject it — never accept empty work. The user message ends with the exact JSON schema — return ONLY that JSON object, nothing else.';
+      "You are a rigorous reviewer. Score the work 0-100 against the goal; >= 70 accepts. Be specific: name concrete problems, not generalities. If the work under review is empty or contains no concrete result, score it 0 and reject it — never accept empty work. The user message ends with the exact JSON schema — return ONLY that JSON object, nothing else.";
     this.maxIterations = opts.maxIterations ?? 3;
     this.acceptScore = opts.acceptScore ?? 70;
     this.stepsPerIteration = opts.stepsPerIteration ?? 5;
@@ -257,9 +257,7 @@ export class MissionRunner {
     // Iteration 0's acting USER turn: the memory directive (fix X, verify Y,
     // resume from Z) leads, the goal follows — both on the user-turn channel
     // the improve loop already uses, where the model demonstrably attends.
-    let improveDirective = this.memoryDirective
-      ? `${this.memoryDirective}\n\nGOAL: ${goal}`
-      : goal;
+    let improveDirective = this.memoryDirective ? `${this.memoryDirective}\n\nGOAL: ${goal}` : goal;
 
     for (let iter = 0; iter < this.maxIterations; iter++) {
       record.iteration = iter;
@@ -389,7 +387,9 @@ export class MissionRunner {
         record,
         "reviewing",
         iter,
-        review.unparsed ? "reviewer returned no structured verdict — retrying" : `score ${review.score}/100 — ${review.verdict}`,
+        review.unparsed
+          ? "reviewer returned no structured verdict — retrying"
+          : `score ${review.score}/100 — ${review.verdict}`,
       );
 
       // 5. Accept → done — but never on an empty iteration. Whatever the
@@ -418,7 +418,12 @@ export class MissionRunner {
           "The reviewer scored the work, but this iteration produced no output and no tool " +
           "activity, so acceptance was blocked. Actually perform the task now: run your tools " +
           "or write the concrete result, then return the deliverable — it will be re-reviewed.";
-        await this.phase(record, "improving", iter, "accept blocked — no work produced in iteration");
+        await this.phase(
+          record,
+          "improving",
+          iter,
+          "accept blocked — no work produced in iteration",
+        );
         continue;
       }
 

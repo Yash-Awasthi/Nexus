@@ -30,6 +30,7 @@ import {
   type CompactionResult,
   type PresetName,
 } from "@nexus/agent-runtime";
+import { toolTranscriptEvent, type CouncilTranscript, type ILLMTransport } from "@nexus/council";
 import { db } from "@nexus/db";
 import { agentSessions } from "@nexus/db/schema";
 import {
@@ -42,11 +43,6 @@ import {
   type LlmDriver,
   type LlmRole,
 } from "@nexus/llm-drivers";
-import {
-  toolTranscriptEvent,
-  type CouncilTranscript,
-  type ILLMTransport,
-} from "@nexus/council";
 import { FixedEmbedder, MemoryManager, PgVectorStore, createBestEmbedder } from "@nexus/memory";
 import { eq } from "drizzle-orm";
 
@@ -426,7 +422,7 @@ export async function handleAgentRunJob(
     // The driver already carries the run model (makeDriver sets it); complete()
     // without an explicit model falls back to that configured default.
     const complete = (
-      messages: Array<{ role: string; content: string }>,
+      messages: { role: string; content: string }[],
       opts?: { model?: string; maxTokens?: number; temperature?: number },
     ) =>
       driver.complete({
@@ -447,13 +443,15 @@ export async function handleAgentRunJob(
         };
       },
     };
-    for (const tool of await councilRuntimeToolsFromTransport(councilTransport, { hooks: transcriptHooks })) {
+    for (const tool of await councilRuntimeToolsFromTransport(councilTransport, {
+      hooks: transcriptHooks,
+    })) {
       toolSet.add(tool);
     }
     toolSet.add(
       debateRuntimeTool({
         transport: async (req) => {
-          const res = await complete(req.messages as Array<{ role: string; content: string }>, {
+          const res = await complete(req.messages as { role: string; content: string }[], {
             maxTokens: 1024,
             temperature: 0.7,
           });

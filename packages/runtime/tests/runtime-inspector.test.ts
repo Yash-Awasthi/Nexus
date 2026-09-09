@@ -42,12 +42,11 @@ interface Stubs {
 function makeDirect(opts: Stubs = {}): { inspector: Insp; stubs: Stubs } {
   const stubs: Stubs = {
     metrics: opts.metrics ?? { getMetrics: vi.fn().mockResolvedValue({ counters: {} }) },
-    queue:
-      opts.queue ?? {
-        getDeadLetterQueue: vi.fn().mockResolvedValue([]),
-        getQueueLength: vi.fn().mockResolvedValue(3),
-        getActiveJobs: vi.fn().mockResolvedValue([{ id: "j1", priority: "high", retries: 1 }]),
-      },
+    queue: opts.queue ?? {
+      getDeadLetterQueue: vi.fn().mockResolvedValue([]),
+      getQueueLength: vi.fn().mockResolvedValue(3),
+      getActiveJobs: vi.fn().mockResolvedValue([{ id: "j1", priority: "high", retries: 1 }]),
+    },
     discovery: opts.discovery ?? { listServices: vi.fn().mockResolvedValue([]) },
     eventStore: opts.eventStore ?? { replayEvents: vi.fn().mockResolvedValue([]) },
     ...opts,
@@ -78,12 +77,11 @@ function makeDirect(opts: Stubs = {}): { inspector: Insp; stubs: Stubs } {
 function makeInspector(opts: Stubs = {}): { inspector: Insp; stubs: Stubs } {
   const stubs: Stubs = {
     metrics: opts.metrics ?? { getMetrics: vi.fn().mockResolvedValue({ counters: {} }) },
-    queue:
-      opts.queue ?? {
-        getDeadLetterQueue: vi.fn().mockResolvedValue([]),
-        getQueueLength: vi.fn().mockResolvedValue(3),
-        getActiveJobs: vi.fn().mockResolvedValue([{ id: "j1", priority: "high", retries: 1 }]),
-      },
+    queue: opts.queue ?? {
+      getDeadLetterQueue: vi.fn().mockResolvedValue([]),
+      getQueueLength: vi.fn().mockResolvedValue(3),
+      getActiveJobs: vi.fn().mockResolvedValue([{ id: "j1", priority: "high", retries: 1 }]),
+    },
     discovery: opts.discovery ?? { listServices: vi.fn().mockResolvedValue([]) },
     eventStore: opts.eventStore ?? { replayEvents: vi.fn().mockResolvedValue([]) },
     ...opts,
@@ -118,7 +116,13 @@ const wfHistory = [
   { id: "e1", workflowId: "wf1", status: "succeeded", taskResults: {}, startedAt: new Date() },
   { id: "e2", workflowId: "wf1", status: "failed", taskResults: {}, startedAt: new Date() },
   { id: "e3", workflowId: "wf1", status: "pending", taskResults: {}, startedAt: new Date() },
-  { id: "e4-replay", workflowId: "wf1", status: "succeeded", taskResults: {}, startedAt: new Date() },
+  {
+    id: "e4-replay",
+    workflowId: "wf1",
+    status: "succeeded",
+    taskResults: {},
+    startedAt: new Date(),
+  },
 ];
 
 describe("RuntimeInspector", () => {
@@ -190,7 +194,9 @@ describe("RuntimeInspector", () => {
 
   it("summarizes queues with DLQ and active jobs", async () => {
     const { inspector, stubs } = makeInspector();
-    stubs.queue!.getDeadLetterQueue.mockResolvedValue([{ id: "dead", priority: "low", retries: 9 }]);
+    stubs.queue!.getDeadLetterQueue.mockResolvedValue([
+      { id: "dead", priority: "low", retries: 9 },
+    ]);
     const snap = (await inspector.getQueues()) as {
       activeJobsCount: number;
       deadLetterJobsCount: number;
@@ -204,7 +210,12 @@ describe("RuntimeInspector", () => {
   it("maps discovered services to summary fields", async () => {
     const { inspector, stubs } = makeInspector();
     stubs.discovery!.listServices.mockResolvedValue([
-      { name: "api", status: "healthy", lastCheck: new Date(), details: { port: 3000, type: "http" } },
+      {
+        name: "api",
+        status: "healthy",
+        lastCheck: new Date(),
+        details: { port: 3000, type: "http" },
+      },
     ]);
     const services = (await inspector.getServices()) as Array<Record<string, unknown>>;
     expect(services[0]).toMatchObject({ name: "api", port: 3000, type: "http" });
@@ -212,7 +223,10 @@ describe("RuntimeInspector", () => {
 
   it("exposes MCP summary/servers/tools/executions when wired via the constructor", async () => {
     const { inspector } = makeDirect({
-      mcpRuntime: { getMetrics: vi.fn().mockResolvedValue({ calls: 1 }), getExecutionsLog: vi.fn().mockResolvedValue([{ id: "x" }]) },
+      mcpRuntime: {
+        getMetrics: vi.fn().mockResolvedValue({ calls: 1 }),
+        getExecutionsLog: vi.fn().mockResolvedValue([{ id: "x" }]),
+      },
       mcpRegistry: {
         listServers: vi.fn().mockResolvedValue([
           { name: "srv-a", tools: ["tool1", "tool2"] },
@@ -220,7 +234,10 @@ describe("RuntimeInspector", () => {
         ]),
       },
     });
-    expect((await inspector.getMCPSummary()) as object).toMatchObject({ serversCount: 2, executionsCount: 1 });
+    expect((await inspector.getMCPSummary()) as object).toMatchObject({
+      serversCount: 2,
+      executionsCount: 1,
+    });
     expect(await inspector.getMCPServers()).toHaveLength(2);
     expect(await inspector.getMCPTools()).toEqual(["srv-a:tool1", "srv-a:tool2", "srv-b:tool3"]);
     expect(await inspector.getMCPExecutions()).toHaveLength(1);
@@ -228,7 +245,10 @@ describe("RuntimeInspector", () => {
 
   it("returns empty MCP data when not wired", async () => {
     const { inspector } = makeInspector();
-    expect((await inspector.getMCPSummary()) as object).toMatchObject({ serversCount: 0, executionsCount: 0 });
+    expect((await inspector.getMCPSummary()) as object).toMatchObject({
+      serversCount: 0,
+      executionsCount: 0,
+    });
     expect(await inspector.getMCPServers()).toEqual([]);
     expect(await inspector.getMCPTools()).toEqual([]);
     expect(await inspector.getMCPExecutions()).toEqual([]);
@@ -281,7 +301,10 @@ describe("RuntimeInspector", () => {
       fsSandbox: { getWriteLog: vi.fn().mockReturnValue([{ op: "write" }]) },
       envs: [{ name: "sandbox", capabilities: ["fs"] }],
     });
-    expect(inspector.getBrowserMetrics()).toMatchObject({ activeSessions: 2, totalBytesWritten: 99 });
+    expect(inspector.getBrowserMetrics()).toMatchObject({
+      activeSessions: 2,
+      totalBytesWritten: 99,
+    });
     expect(inspector.getScrapingMetrics()).toMatchObject({ totalBytesFetched: 10 });
     expect((inspector.getSandboxMetrics() as { writeLog: unknown[] }).writeLog).toHaveLength(1);
     expect(inspector.getEnvironmentsList()).toEqual([{ name: "sandbox", capabilities: ["fs"] }]);
@@ -300,7 +323,9 @@ describe("RuntimeInspector", () => {
     const { inspector, stubs } = makeInspector({
       registry: {
         listWorkflows: vi.fn().mockReturnValue([wfDef("wf1"), wfDef("wf2")]),
-        listTemplates: vi.fn().mockReturnValue([{ templateId: "tpl", name: "T", description: "d" }]),
+        listTemplates: vi
+          .fn()
+          .mockReturnValue([{ templateId: "tpl", name: "T", description: "d" }]),
       },
       workflowTelemetry: { getExecutionHistory: vi.fn().mockReturnValue(wfHistory) },
     });
@@ -309,7 +334,9 @@ describe("RuntimeInspector", () => {
     expect(inspector.getWorkflowExecution("ghost")).toBeNull();
     expect(inspector.getWorkflowExecutionHistory()).toHaveLength(4);
     expect(inspector.getWorkflowReplays()).toHaveLength(1);
-    expect(inspector.getWorkflowTemplates()).toEqual([{ templateId: "tpl", name: "T", description: "d" }]);
+    expect(inspector.getWorkflowTemplates()).toEqual([
+      { templateId: "tpl", name: "T", description: "d" },
+    ]);
     expect(inspector.getWorkflowTelemetryStats()).toMatchObject({
       totalExecutions: 4,
       succeededCount: 2,
@@ -352,7 +379,11 @@ describe("RuntimeInspector", () => {
     const stats = (await inspector.getMemoryStats()) as { available: boolean; oldest: string };
     expect(stats.available).toBe(true);
     expect(stats.oldest).toBe("2026-01-01T00:00:00.000Z");
-    const entries = (await inspector.getMemoryEntries({ types: ["observation"], keyPrefix: "k", limit: 5 })) as Array<Record<string, unknown>>;
+    const entries = (await inspector.getMemoryEntries({
+      types: ["observation"],
+      keyPrefix: "k",
+      limit: 5,
+    })) as Array<Record<string, unknown>>;
     expect(entries).toHaveLength(1);
     expect(entries[0].key).toBe("k");
     expect(stubs.memoryStore!.query).toHaveBeenCalledWith(
@@ -369,7 +400,9 @@ describe("RuntimeInspector", () => {
   it("reports agent capabilities and messages", async () => {
     const { inspector, stubs } = makeInspector({
       agentBus: {
-        getCapabilities: vi.fn().mockResolvedValue([{ agentId: "a1", capabilities: [], status: "idle" }]),
+        getCapabilities: vi
+          .fn()
+          .mockResolvedValue([{ agentId: "a1", capabilities: [], status: "idle" }]),
         getMessages: vi.fn().mockResolvedValue([{ id: "msg1" }]),
       },
     });

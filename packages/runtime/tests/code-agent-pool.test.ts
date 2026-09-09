@@ -124,7 +124,10 @@ describe("CodeAgentPool dispatch", () => {
         ],
       }),
     );
-    const out = await pool.execute({ type: "code", payload: { request: "touch nothing" } }, context);
+    const out = await pool.execute(
+      { type: "code", payload: { request: "touch nothing" } },
+      context,
+    );
     expect(out.success).toBe(true);
     expect(out.changesCount).toBe(0);
   });
@@ -156,7 +159,9 @@ describe("FilePickerAgent", () => {
     expect((out.filesWithContent as Array<{ path: string; content: string }>)[0].path).toBe(
       "alpha.ts",
     );
-    expect((out.filesWithContent as Array<{ content: string }>)[0].content).toContain("export const a");
+    expect((out.filesWithContent as Array<{ content: string }>)[0].content).toContain(
+      "export const a",
+    );
     expect(out.summary).toBe("two files");
   });
 
@@ -197,7 +202,9 @@ describe("FilePickerAgent", () => {
       context,
     );
     expect(ok.success).toBe(true);
-    expect((ok.filesWithContent as Array<{ content: string }>)[0].content).toBe("(file not readable)");
+    expect((ok.filesWithContent as Array<{ content: string }>)[0].content).toBe(
+      "(file not readable)",
+    );
 
     const pool2 = new CodeAgentPool(
       makeLLM({
@@ -318,9 +325,7 @@ describe("CodeEditorAgent", () => {
   it("reads unreadable provided files gracefully", async () => {
     const pool = new CodeAgentPool(
       makeLLM({
-        objects: [
-          async () => ({ changes: [], explanation: "ok" }),
-        ],
+        objects: [async () => ({ changes: [], explanation: "ok" })],
       }),
     );
     const out = await pool.execute(
@@ -439,10 +444,7 @@ describe("ResearcherAgent", () => {
         ],
       }),
     );
-    const out = await pool.execute(
-      { type: "web_research", payload: { query: "q" } },
-      context,
-    );
+    const out = await pool.execute({ type: "web_research", payload: { query: "q" } }, context);
     expect(out.success).toBe(true);
     expect(out.answer).toContain("TAVILY_API_KEY not configured");
   });

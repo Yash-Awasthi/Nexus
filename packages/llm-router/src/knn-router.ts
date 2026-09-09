@@ -33,7 +33,7 @@ export interface KNNModelProfile {
 export interface KNNRouteResult {
   chosenAlias: string;
   score: number;
-  neighbors: Array<{ alias: string; similarity: number; avgScore: number }>;
+  neighbors: { alias: string; similarity: number; avgScore: number }[];
 }
 
 export interface KNNRouterConfig {

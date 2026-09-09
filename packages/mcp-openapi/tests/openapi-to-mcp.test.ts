@@ -4,7 +4,6 @@ import {
   openApiToMcpTools,
   createOpenApiCaller,
   type OpenApiDoc,
-  type McpOpenApiTool,
   type OpenApiCallResponse,
 } from "../src/index.js";
 
@@ -32,9 +31,7 @@ const PETSTORE: OpenApiDoc = {
       get: {
         operationId: "listPets",
         summary: "List all pets",
-        parameters: [
-          { name: "limit", in: "query", schema: { type: "integer" } },
-        ],
+        parameters: [{ name: "limit", in: "query", schema: { type: "integer" } }],
       },
       post: {
         operationId: "createPet",
@@ -95,7 +92,10 @@ describe("openApiToMcpTools", () => {
     const createPet = tools.find((t) => t.name === "createPet")!;
     expect(createPet.inputSchema.required).toContain("requestBody");
     expect(createPet.bodyContentType).toBe("application/json");
-    const bodyProp = createPet.inputSchema.properties?.requestBody as { type?: string; required?: string[] };
+    const bodyProp = createPet.inputSchema.properties?.requestBody as {
+      type?: string;
+      required?: string[];
+    };
     expect(bodyProp.type).toBe("object");
     expect(bodyProp.required).toContain("name");
   });
@@ -126,8 +126,14 @@ describe("openApiToMcpTools", () => {
 
 describe("createOpenApiCaller", () => {
   const capture = () => {
-    const calls: { url: string; init: { method: string; headers: Record<string, string>; body?: string } }[] = [];
-    const fetchFn = async (url: string, init: { method: string; headers: Record<string, string>; body?: string }) => {
+    const calls: {
+      url: string;
+      init: { method: string; headers: Record<string, string>; body?: string };
+    }[] = [];
+    const fetchFn = async (
+      url: string,
+      init: { method: string; headers: Record<string, string>; body?: string },
+    ) => {
       calls.push({ url, init });
       return {
         status: 200,
@@ -141,7 +147,10 @@ describe("createOpenApiCaller", () => {
   it("executes GET with query parameters against baseUrl + path", async () => {
     const tools = openApiToMcpTools(PETSTORE);
     const { calls, fetchFn } = capture();
-    const call = createOpenApiCaller(tools, { baseUrl: "https://api.example.com/v1", fetch: fetchFn });
+    const call = createOpenApiCaller(tools, {
+      baseUrl: "https://api.example.com/v1",
+      fetch: fetchFn,
+    });
     const res: OpenApiCallResponse = await call("listPets", { limit: 5, verbose: true });
     expect(res.ok).toBe(true);
     const url = calls[0]?.url ?? "";
@@ -154,7 +163,10 @@ describe("createOpenApiCaller", () => {
   it("substitutes path parameters and sends JSON bodies", async () => {
     const tools = openApiToMcpTools(PETSTORE);
     const { calls, fetchFn } = capture();
-    const call = createOpenApiCaller(tools, { baseUrl: "https://api.example.com/v1", fetch: fetchFn });
+    const call = createOpenApiCaller(tools, {
+      baseUrl: "https://api.example.com/v1",
+      fetch: fetchFn,
+    });
     await call("pet_findByStatus", { petId: "p 1" });
     expect(calls[0]?.url).toContain("/pets/p%201");
 
@@ -166,7 +178,10 @@ describe("createOpenApiCaller", () => {
 
   it("throws on a missing path parameter and unknown tools", async () => {
     const tools = openApiToMcpTools(PETSTORE);
-    const call = createOpenApiCaller(tools, { baseUrl: "https://api.example.com/v1", fetch: capture().fetchFn });
+    const call = createOpenApiCaller(tools, {
+      baseUrl: "https://api.example.com/v1",
+      fetch: capture().fetchFn,
+    });
     await expect(call("pet_findByStatus", {})).rejects.toThrow(/petId/);
     await expect(call("nope", {})).rejects.toThrow(/No tool/);
   });

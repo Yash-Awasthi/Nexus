@@ -315,7 +315,10 @@ export class DeepResearchEngine {
   ): Promise<{ sections: ResearchSection[]; summary: string }> {
     // Build evidence summary for LLM
     const evidenceText = claims
-      .map((c, i) => `[Claim ${i + 1}] Confidence: ${(c.confidenceScore * 100).toFixed(0)}% | Sources: ${c.sourceCount}\n${c.text}`)
+      .map(
+        (c, i) =>
+          `[Claim ${i + 1}] Confidence: ${(c.confidenceScore * 100).toFixed(0)}% | Sources: ${c.sourceCount}\n${c.text}`,
+      )
       .join("\n\n");
 
     const prompt = [

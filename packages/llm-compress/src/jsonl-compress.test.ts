@@ -22,7 +22,9 @@ describe("jsonlCompress (JSONL/NDJSON lossless codec)", () => {
   });
 
   it("leaves heterogeneous key sets untouched", () => {
-    const mixed = ['{"id":"a","name":"x"}', '{"id":"b","other":1}', '{"id":"c","name":"z"}'].join("\n");
+    const mixed = ['{"id":"a","name":"x"}', '{"id":"b","other":1}', '{"id":"c","name":"z"}'].join(
+      "\n",
+    );
     expect(jsonlCompress(mixed)).toBe(mixed);
   });
 

@@ -20,7 +20,7 @@ function planFixture(noise: number): string {
     '  + resource "aws_instance" "web" {',
     '      + ami                          = "ami-0c55b159cbfafe1f0"',
     '      + instance_type                = "t2.micro"',
-    '      + id                           = (known after apply)',
+    "      + id                           = (known after apply)",
     "    }",
     "",
     "  # aws_security_group.sg will be updated in-place",
@@ -77,7 +77,8 @@ describe("terraformOutputProcessor — plan/apply", () => {
 
   it("compresses apply progress noise down to the completion summary", () => {
     const lines = planFixture(0).split("\n");
-    for (let i = 0; i < 12; i++) lines.push(`aws_instance.web: Still creating... [${i * 10}s elapsed]`);
+    for (let i = 0; i < 12; i++)
+      lines.push(`aws_instance.web: Still creating... [${i * 10}s elapsed]`);
     lines.push("aws_instance.web: Creation complete after 2m [i-0123456789abcdef0]");
     lines.push("Apply complete! Resources: 1 added, 0 changed, 0 destroyed.");
     lines.push("");
@@ -91,7 +92,11 @@ describe("terraformOutputProcessor — plan/apply", () => {
 
   it("routes plan/apply/destroy under terraform or tofu", () => {
     const out = planFixture(8);
-    for (const cmd of ["terraform plan", "tofu apply -auto-approve", "terraform destroy -auto-approve"]) {
+    for (const cmd of [
+      "terraform plan",
+      "tofu apply -auto-approve",
+      "terraform destroy -auto-approve",
+    ]) {
       const r = compressOutputForCommand(cmd, out);
       expect(r.processor).toBe("terraform");
       expect(r.wasCompressed).toBe(true);
@@ -108,8 +113,13 @@ describe("terraformOutputProcessor — plan/apply", () => {
 
 describe("terraformOutputProcessor — init/output/state", () => {
   it("keeps provider versions and success/error lines in init, drops noise", () => {
-    const lines: string[] = ["Initializing modules...", "Initializing the backend...", "Initializing provider plugins..."];
-    for (let i = 0; i < 14; i++) lines.push(`- Installing hashicorp/random v${(3 + i / 10).toFixed(2)}...`);
+    const lines: string[] = [
+      "Initializing modules...",
+      "Initializing the backend...",
+      "Initializing provider plugins...",
+    ];
+    for (let i = 0; i < 14; i++)
+      lines.push(`- Installing hashicorp/random v${(3 + i / 10).toFixed(2)}...`);
     lines.push("- Installed hashicorp/random v3.6.0 (signed by HashiCorp)");
     lines.push('- Finding hashicorp/aws versions matching "~> 5.0"...');
     lines.push("Terraform has been successfully initialized!");
@@ -133,7 +143,7 @@ describe("terraformOutputProcessor — init/output/state", () => {
     const r = compressOutputForCommand("terraform output -json", lines.join("\n"));
     expect(r.processor).toBe("terraform");
     expect(r.wasCompressed).toBe(true);
-    expect(r.output).toContain('big = ... (');
+    expect(r.output).toContain("big = ... (");
     expect(r.output).toContain("chars)");
     expect(r.output).not.toContain("x".repeat(500));
   });

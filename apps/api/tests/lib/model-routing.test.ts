@@ -20,10 +20,39 @@ function m(partial: Partial<ModelCapability> & { id: string }): ModelCapability 
 }
 
 const POOL: ModelCapability[] = [
-  m({ id: "cheap-fast", provider: "groq", inputCostPer1M: 0.05, outputCostPer1M: 0.08, reasoningTier: "fast" }),
-  m({ id: "big-deep", provider: "anthropic", contextWindow: 1_000_000, vision: true, toolUse: true, reasoningTier: "deep", inputCostPer1M: 15, outputCostPer1M: 75 }),
-  m({ id: "local-free", provider: "ollama", inputCostPer1M: null, outputCostPer1M: null, reasoningTier: "fast", maxOutput: 4_096 }),
-  m({ id: "mid-vision", provider: "openai", vision: true, reasoningTier: "reasoning", inputCostPer1M: 2.5, outputCostPer1M: 10 }),
+  m({
+    id: "cheap-fast",
+    provider: "groq",
+    inputCostPer1M: 0.05,
+    outputCostPer1M: 0.08,
+    reasoningTier: "fast",
+  }),
+  m({
+    id: "big-deep",
+    provider: "anthropic",
+    contextWindow: 1_000_000,
+    vision: true,
+    toolUse: true,
+    reasoningTier: "deep",
+    inputCostPer1M: 15,
+    outputCostPer1M: 75,
+  }),
+  m({
+    id: "local-free",
+    provider: "ollama",
+    inputCostPer1M: null,
+    outputCostPer1M: null,
+    reasoningTier: "fast",
+    maxOutput: 4_096,
+  }),
+  m({
+    id: "mid-vision",
+    provider: "openai",
+    vision: true,
+    reasoningTier: "reasoning",
+    inputCostPer1M: 2.5,
+    outputCostPer1M: 10,
+  }),
   m({ id: "no-tools", provider: "tiny", toolUse: false, reasoningTier: "fast" }),
 ];
 
@@ -44,7 +73,11 @@ describe("routeModel — §15.7", () => {
   it("preferCheapest flips the ranking among eligible models", () => {
     const req = { toolUse: true, preferCheapest: true };
     expect(routeModel(POOL, req).chosen?.id).toBe("local-free"); // $0 beats $0.13
-    const freeFirst = routeModel(POOL, { toolUse: true, preferCheapest: true, minContextWindow: 200_000 });
+    const freeFirst = routeModel(POOL, {
+      toolUse: true,
+      preferCheapest: true,
+      minContextWindow: 200_000,
+    });
     // cheap-fast + local-free (128k) + mid-vision (128k) filtered by context →
     // big-deep is the only eligible model left
     expect(freeFirst.chosen?.id).toBe("big-deep");
@@ -64,7 +97,11 @@ describe("routeModel — §15.7", () => {
   });
 
   it("unsatisfiable requirement → chosen null + per-candidate unmatched reasons", () => {
-    const r = routeModel(POOL, { vision: true, minReasoningTier: "deep", minContextWindow: 10_000_000 });
+    const r = routeModel(POOL, {
+      vision: true,
+      minReasoningTier: "deep",
+      minContextWindow: 10_000_000,
+    });
     expect(r.chosen).toBeNull();
     expect(r.candidates).toEqual([]);
     expect(r.unmatched.length).toBeGreaterThan(0);

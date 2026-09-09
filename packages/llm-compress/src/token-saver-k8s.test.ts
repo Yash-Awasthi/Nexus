@@ -67,7 +67,8 @@ describe("kubectlOutputProcessor — get/describe/logs", () => {
 
   it("compresses kubectl logs with head/error-context/tail", () => {
     const lines: string[] = [];
-    for (let i = 0; i < 30; i++) lines.push(`2026-01-01T00:00:${String(i).padStart(2, "0")}Z info request ${i}`);
+    for (let i = 0; i < 30; i++)
+      lines.push(`2026-01-01T00:00:${String(i).padStart(2, "0")}Z info request ${i}`);
     lines.splice(15, 0, "2026-01-01T00:00:15Z ERROR panic in handler");
     const r = compressOutputForCommand("kubectl logs -n prod web-0 --tail=200", lines.join("\n"));
     expect(r.processor).toBe("kubectl");
@@ -92,18 +93,55 @@ describe("kubectlOutputProcessor — get/describe/logs", () => {
 describe("dockerProcessor — ps/images/logs/inspect", () => {
   // Real `docker ps` pads every field to its header column width (tabwriter).
   const psCols = [
-    { n: "CONTAINER ID", w: 16 }, { n: "IMAGE", w: 16 }, { n: "COMMAND", w: 24 },
-    { n: "CREATED", w: 16 }, { n: "STATUS", w: 24 }, { n: "PORTS", w: 24 }, { n: "NAMES", w: 0 },
+    { n: "CONTAINER ID", w: 16 },
+    { n: "IMAGE", w: 16 },
+    { n: "COMMAND", w: 24 },
+    { n: "CREATED", w: 16 },
+    { n: "STATUS", w: 24 },
+    { n: "PORTS", w: 24 },
+    { n: "NAMES", w: 0 },
   ];
   const psHeader = psCols.map((c) => c.n.padEnd(c.w)).join("");
   const psRow = (vals: string[]): string =>
     psCols.map((c, i) => (vals[i] ?? "").padEnd(c.w)).join("");
   const psOut = [
     psHeader,
-    psRow(["a1b2c3d4e5f6", "nginx:1.25", '"/docker-entrypoint."', "2 hours ago", "Up 2 hours", "0.0.0.0:80->80/tcp", "web"]),
-    psRow(["b2c3d4e5f6a7", "redis:7", '"docker-entrypoint.s"', "3 hours ago", "Up 3 hours", "0.0.0.0:6379->6379/tcp", "cache"]),
-    psRow(["c3d4e5f6a7b8", "old-image", '"bash"', "5 days ago", "Exited (0) 5 days ago", "", "stale"]),
-    psRow(["d4e5f6a7b8c9", "app:latest", "/bin/sh -c 'run'", "1 minute ago", "Up 1 minute", "8080/tcp", "api-0"]),
+    psRow([
+      "a1b2c3d4e5f6",
+      "nginx:1.25",
+      '"/docker-entrypoint."',
+      "2 hours ago",
+      "Up 2 hours",
+      "0.0.0.0:80->80/tcp",
+      "web",
+    ]),
+    psRow([
+      "b2c3d4e5f6a7",
+      "redis:7",
+      '"docker-entrypoint.s"',
+      "3 hours ago",
+      "Up 3 hours",
+      "0.0.0.0:6379->6379/tcp",
+      "cache",
+    ]),
+    psRow([
+      "c3d4e5f6a7b8",
+      "old-image",
+      '"bash"',
+      "5 days ago",
+      "Exited (0) 5 days ago",
+      "",
+      "stale",
+    ]),
+    psRow([
+      "d4e5f6a7b8c9",
+      "app:latest",
+      "/bin/sh -c 'run'",
+      "1 minute ago",
+      "Up 1 minute",
+      "8080/tcp",
+      "api-0",
+    ]),
   ].join("\n");
 
   it("drops ID/COMMAND columns and groups containers by state", () => {
@@ -136,15 +174,16 @@ describe("dockerProcessor — ps/images/logs/inspect", () => {
 
   it("keeps error context in docker logs with head + tail", () => {
     const lines: string[] = [];
-    for (let i = 0; i < 25; i++) lines.push(`2026-01-01T10:00:${String(i).padStart(2, "0")}Z level=info msg="serving ${i}"`);
+    for (let i = 0; i < 25; i++)
+      lines.push(`2026-01-01T10:00:${String(i).padStart(2, "0")}Z level=info msg="serving ${i}"`);
     lines[12] = `2026-01-01T10:00:12Z level=error msg="boom ${String.fromCharCode(123)}key=value${String.fromCharCode(125)}"`;
     const r = compressOutputForCommand("docker logs --tail 500 api", lines.join("\n"));
     expect(r.processor).toBe("docker");
     expect(r.wasCompressed).toBe(true);
-    expect(r.output).toContain('serving 0');
-    expect(r.output).toContain('level=error');
-    expect(r.output).toContain('showing errors');
-    expect(r.output).toContain('serving 24');
+    expect(r.output).toContain("serving 0");
+    expect(r.output).toContain("level=error");
+    expect(r.output).toContain("showing errors");
+    expect(r.output).toContain("serving 24");
   });
 
   it("groups docker compose logs per service with error counts", () => {
@@ -167,8 +206,15 @@ describe("dockerProcessor — ps/images/logs/inspect", () => {
       Name: "/api",
       Image: "sha256:deadbeef",
       State: { Status: "running", Running: true, Pid: 42, ExitCode: 0 },
-      Config: { Image: "app:latest", Cmd: ["node", "index.js"], Env: ["A=1", "B=2", "C=3", "D=4", "E=5", "F=6"] },
-      NetworkSettings: { Ports: { "8080/tcp": [] }, Networks: { bridge: { IPAddress: "172.17.0.2" } } },
+      Config: {
+        Image: "app:latest",
+        Cmd: ["node", "index.js"],
+        Env: ["A=1", "B=2", "C=3", "D=4", "E=5", "F=6"],
+      },
+      NetworkSettings: {
+        Ports: { "8080/tcp": [] },
+        Networks: { bridge: { IPAddress: "172.17.0.2" } },
+      },
     };
     const out = JSON.stringify([obj], null, 2);
     const r = compressOutputForCommand("docker inspect api", out);

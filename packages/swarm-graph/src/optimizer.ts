@@ -71,9 +71,7 @@ export interface OptimizerOutcome {
  * → evaluation → adopt the best. Returns the current variant unchanged when
  * there is only one candidate (nothing to learn from).
  */
-export async function optimizeNodeVariant(
-  config: NodeOptimizerConfig,
-): Promise<OptimizerOutcome> {
+export async function optimizeNodeVariant(config: NodeOptimizerConfig): Promise<OptimizerOutcome> {
   const {
     current,
     examples,

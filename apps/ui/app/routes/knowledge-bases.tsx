@@ -414,8 +414,8 @@ export default function KnowledgeBasesPage() {
               <Database className="size-8 text-muted-foreground" />
               <p className="text-sm font-medium">No knowledge bases yet</p>
               <p className="text-xs text-muted-foreground max-w-sm">
-                Create a knowledge base to start collecting documents for
-                retrieval-augmented generation.
+                Create a knowledge base to start collecting documents for retrieval-augmented
+                generation.
               </p>
             </CardContent>
           </Card>

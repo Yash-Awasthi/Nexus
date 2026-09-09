@@ -16,6 +16,8 @@ import { resolve } from "node:path";
 
 import { Queue, type ConnectionOptions } from "bullmq";
 
+import type * as OrchestrationStoreModuleNs from "./handlers/orchestration-store.js";
+
 // ── .env loader (zero-dependency — mirrors apps/api/src/index.ts) ──────────
 // Parses KEY=VALUE from the monorepo-root .env so `pnpm --filter @nexus/worker
 // dev` works without manually exporting variables. Already-set env vars win.
@@ -31,7 +33,7 @@ import { Queue, type ConnectionOptions } from "bullmq";
     }
   }
   for (const line of text.split("\n")) {
-    const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+    const m = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/.exec(line);
     if (!m) continue;
     const key = m[1]!;
     let val = m[2]!;
@@ -126,11 +128,14 @@ async function bootstrapRepeatableJobs(connection: ConnectionOptions): Promise<v
  * non-terminal `orchestration_runs` row and re-enqueue its job from the stored
  * payload. Non-fatal — a DB/Redis hiccup here must not block worker startup.
  */
-type OrchestrationStoreModule = typeof import("./handlers/orchestration-store.js");
+type OrchestrationStoreModule = typeof OrchestrationStoreModuleNs;
 
 async function recoverOrchestrationRuns(
   connection: ConnectionOptions,
-  deps: Pick<OrchestrationStoreModule, "reenqueueOrchestrationRuns" | "DrizzleOrchestrationRunStore">,
+  deps: Pick<
+    OrchestrationStoreModule,
+    "reenqueueOrchestrationRuns" | "DrizzleOrchestrationRunStore"
+  >,
 ): Promise<void> {
   if (!process.env.DATABASE_URL || !process.env.REDIS_URL) return;
   const high = new Queue("nexus-high", { connection });
@@ -168,13 +173,17 @@ async function main(): Promise<void> {
 
   // Heavy modules are imported dynamically (after the .env loader above) so
   // @nexus/db sees DATABASE_URL at module-eval time — mirrors apps/api entry.
-  const [{ DrizzleOrchestrationRunStore, reenqueueOrchestrationRuns }, { SignalNotifyListener }, { SignalWorker }, { createTaskWorkers }] =
-    await Promise.all([
-      import("./handlers/orchestration-store.js"),
-      import("./workers/signal-notify-listener.js"),
-      import("./workers/signal-worker.js"),
-      import("./workers/task-worker.js"),
-    ]);
+  const [
+    { DrizzleOrchestrationRunStore, reenqueueOrchestrationRuns },
+    { SignalNotifyListener },
+    { SignalWorker },
+    { createTaskWorkers },
+  ] = await Promise.all([
+    import("./handlers/orchestration-store.js"),
+    import("./workers/signal-notify-listener.js"),
+    import("./workers/signal-worker.js"),
+    import("./workers/task-worker.js"),
+  ]);
 
   const connection = parseRedisUrl(REDIS_URL);
 

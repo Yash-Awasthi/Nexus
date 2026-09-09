@@ -810,7 +810,10 @@ export class AssemblyAiTranscribeProvider implements TranscribeProvider {
         body: new Uint8Array(audio.data),
       });
     } catch (cause) {
-      throw new VoiceError("TRANSCRIBE_FAILED", `AssemblyAI upload network error: ${String(cause)}`);
+      throw new VoiceError(
+        "TRANSCRIBE_FAILED",
+        `AssemblyAI upload network error: ${String(cause)}`,
+      );
     }
     if (uploadRes.status === 401 || uploadRes.status === 403) {
       throw new VoiceError("PROVIDER_AUTH_FAILED", "AssemblyAI API key is invalid or missing");
@@ -839,7 +842,10 @@ export class AssemblyAiTranscribeProvider implements TranscribeProvider {
         }),
       });
     } catch (cause) {
-      throw new VoiceError("TRANSCRIBE_FAILED", `AssemblyAI create network error: ${String(cause)}`);
+      throw new VoiceError(
+        "TRANSCRIBE_FAILED",
+        `AssemblyAI create network error: ${String(cause)}`,
+      );
     }
     if (!createRes.ok) {
       throw new VoiceError("TRANSCRIBE_FAILED", `AssemblyAI create returned ${createRes.status}`, {
@@ -872,12 +878,14 @@ export class AssemblyAiTranscribeProvider implements TranscribeProvider {
       if (this.pollIntervalMs > 0) await this.sleepFn(this.pollIntervalMs);
       let pollRes: Response;
       try {
-        pollRes = await this.fetchFn(
-          `${AssemblyAiTranscribeProvider.BASE}/transcript/${job.id}`,
-          { headers },
-        );
+        pollRes = await this.fetchFn(`${AssemblyAiTranscribeProvider.BASE}/transcript/${job.id}`, {
+          headers,
+        });
       } catch (cause) {
-        throw new VoiceError("TRANSCRIBE_FAILED", `AssemblyAI poll network error: ${String(cause)}`);
+        throw new VoiceError(
+          "TRANSCRIBE_FAILED",
+          `AssemblyAI poll network error: ${String(cause)}`,
+        );
       }
       if (!pollRes.ok) {
         throw new VoiceError("TRANSCRIBE_FAILED", `AssemblyAI poll returned ${pollRes.status}`);

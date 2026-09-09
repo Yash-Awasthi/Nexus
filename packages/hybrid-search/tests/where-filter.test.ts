@@ -21,11 +21,27 @@ interface Doc {
 // One shared document universe so dense + sparse legs both index the same four
 // docs; the dense adapter ranks by fixed priority (a first), BM25 scores text.
 const DOCS: Doc[] = [
-  { id: "a", text: "token refresh authentication session", metadata: { tenant: "acme", env: "prod", tags: ["auth", "core"], priority: 1 } },
-  { id: "b", text: "token refresh authentication session", metadata: { tenant: "globex", env: "prod", tags: ["auth"], priority: 2 } },
-  { id: "c", text: "billing invoice totals monthly", metadata: { tenant: "acme", env: "dev", tags: ["billing"], priority: 3 } },
+  {
+    id: "a",
+    text: "token refresh authentication session",
+    metadata: { tenant: "acme", env: "prod", tags: ["auth", "core"], priority: 1 },
+  },
+  {
+    id: "b",
+    text: "token refresh authentication session",
+    metadata: { tenant: "globex", env: "prod", tags: ["auth"], priority: 2 },
+  },
+  {
+    id: "c",
+    text: "billing invoice totals monthly",
+    metadata: { tenant: "acme", env: "dev", tags: ["billing"], priority: 3 },
+  },
   // d deliberately has NO tenant key (chroma $ne/$nin/$not_contains match missing keys)
-  { id: "d", text: "onboarding guide welcome screens", metadata: { env: "dev", tags: ["docs"], priority: 4 } },
+  {
+    id: "d",
+    text: "onboarding guide welcome screens",
+    metadata: { env: "dev", tags: ["docs"], priority: 4 },
+  },
 ];
 
 class PriorityDense implements VectorSearchAdapter {
@@ -58,7 +74,10 @@ describe("HybridSearchEngine single-query where filter (rrf)", () => {
   });
 
   it("$ne where matches missing keys (chroma semantics)", async () => {
-    const r = await makeEngine().search({ query: "token refresh", where: { tenant: { $ne: "acme" } } });
+    const r = await makeEngine().search({
+      query: "token refresh",
+      where: { tenant: { $ne: "acme" } },
+    });
     const got = ids(r.hits);
     expect(got).toEqual(expect.arrayContaining(["b", "d"]));
     expect(got).not.toContain("a");
@@ -82,7 +101,10 @@ describe("HybridSearchEngine single-query where filter (rrf)", () => {
   });
 
   it("metadata $contains is array membership", async () => {
-    const r = await makeEngine().search({ query: "token refresh", where: { tags: { $contains: "auth" } } });
+    const r = await makeEngine().search({
+      query: "token refresh",
+      where: { tags: { $contains: "auth" } },
+    });
     const got = ids(r.hits);
     expect(got).toEqual(expect.arrayContaining(["a", "b"]));
     expect(got).not.toContain("c");
@@ -90,16 +112,25 @@ describe("HybridSearchEngine single-query where filter (rrf)", () => {
   });
 
   it("$in accepts a like-typed list and excludes missing keys", async () => {
-    const r = await makeEngine().search({ query: "token refresh", where: { tenant: { $in: ["acme", "globex"] } } });
+    const r = await makeEngine().search({
+      query: "token refresh",
+      where: { tenant: { $in: ["acme", "globex"] } },
+    });
     const got = ids(r.hits);
     expect(got).toEqual(expect.arrayContaining(["a", "b", "c"]));
     expect(got).not.toContain("d");
   });
 
   it("numeric comparison operators are range-correct", async () => {
-    const gte = await makeEngine().search({ query: "token refresh", where: { priority: { $gte: 3 } } });
+    const gte = await makeEngine().search({
+      query: "token refresh",
+      where: { priority: { $gte: 3 } },
+    });
     expect(ids(gte.hits).sort()).toEqual(["c", "d"]);
-    const lt = await makeEngine().search({ query: "token refresh", where: { priority: { $lt: 2 } } });
+    const lt = await makeEngine().search({
+      query: "token refresh",
+      where: { priority: { $lt: 2 } },
+    });
     expect(ids(lt.hits)).toEqual(["a"]);
     const eq = await makeEngine().search({ query: "token refresh", where: { priority: 2 } });
     expect(ids(eq.hits)).toEqual(["b"]);
@@ -122,12 +153,18 @@ describe("HybridSearchEngine single-query where filter (rrf)", () => {
 
 describe("HybridSearchEngine single-query document filter", () => {
   it("whereDocument $contains filters on text across legs", async () => {
-    const r = await makeEngine().search({ query: "token refresh", whereDocument: { $contains: "billing" } });
+    const r = await makeEngine().search({
+      query: "token refresh",
+      whereDocument: { $contains: "billing" },
+    });
     expect(ids(r.hits)).toEqual(["c"]);
   });
 
   it("whereDocument $not_contains on the empty/unmatched side", async () => {
-    const r = await makeEngine().search({ query: "token refresh", whereDocument: { $not_contains: "token" } });
+    const r = await makeEngine().search({
+      query: "token refresh",
+      whereDocument: { $not_contains: "token" },
+    });
     const got = ids(r.hits);
     expect(got).toEqual(expect.arrayContaining(["c", "d"]));
     expect(got).not.toContain("a");
@@ -152,7 +189,11 @@ describe("HybridSearchEngine single-query document filter", () => {
 
 describe("HybridSearchEngine where filter across fusion modes", () => {
   it("alpha fusion honors where", async () => {
-    const r = await makeEngine().search({ query: "token refresh", fusion: "alpha", where: { tenant: "acme" } });
+    const r = await makeEngine().search({
+      query: "token refresh",
+      fusion: "alpha",
+      where: { tenant: "acme" },
+    });
     const got = ids(r.hits);
     expect(got).toEqual(expect.arrayContaining(["a", "c"]));
     expect(got).not.toContain("b");

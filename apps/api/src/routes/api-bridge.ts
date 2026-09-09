@@ -35,13 +35,8 @@ import {
   type Archetype,
   type TaskCategory,
 } from "@nexus/council";
-import {
-  LlmDriversTransport,
-  COUNCIL_DRIVER_ALIASES,
-  resolveCouncilModelAlias,
-} from "./council.js";
 import { db } from "@nexus/db";
-import { userProviderCredentials, users, auditLog } from "@nexus/db/schema";
+import { userProviderCredentials, auditLog } from "@nexus/db/schema";
 import { computeAutoTuneParams, InMemoryEmaStore } from "@nexus/drift";
 import { runFallbackChain, type FallbackModel } from "@nexus/gateway";
 import {
@@ -67,7 +62,6 @@ import {
   type WatermarkOptions,
   type ImageFormat,
 } from "@nexus/image-transformations";
-
 import {
   DriverRegistry,
   AnthropicDriver,
@@ -87,6 +81,7 @@ import {
   MemoryManager,
   PgVectorStore,
   createBestEmbedder,
+  type IEmbedder,
 } from "@nexus/memory";
 import { AdapterRegistry, NexusAdapterError, defineAdapter } from "@nexus/plugin-sdk";
 import {
@@ -94,11 +89,7 @@ import {
   detectTriggers,
   getDefaultConfig as redteamDefaultConfig,
 } from "@nexus/redteam";
-import {
-  searchBrave,
-  searchExa,
-  searchSerper,
-} from "@nexus/search-orchestrator";
+import { searchBrave, searchExa, searchSerper } from "@nexus/search-orchestrator";
 import {
   StealthBrowser,
   PatchrightDriver,
@@ -120,48 +111,52 @@ import { eq, and, isNull, desc } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { Pool } from "pg";
 
-import { PersistentStore } from "../lib/persistent-store.js";
-
 import { emitAuditEvent } from "../lib/audit-emitter.js";
-import { sha256hex } from "../lib/crypto-utils.js";
-import { pinnedFetch } from "../lib/pinned-fetch.js";
-import { resolveUserProviderKey, buildUserDriverRegistry } from "../lib/provider-keys.js";
-import { resolveOAuthDriver } from "../lib/oauth-drivers.js";
-import { makeUserRateLimitPreHandler } from "../lib/rate-limiter.js";
-import { encryptSecret, SecretCryptoUnavailableError } from "../lib/secret-crypto.js";
-// Event emitters push completion/failure into the per-user notification store.
-// (The HTTP surface for the store lives in routes/notifications.ts.)
-import { createNotification } from "../lib/notifications-store.js";
-import { getCacheUserId } from "../lib/user-context.js";
-import { maybeEmitWeeklyDigest } from "../lib/weekly-digest.js";
-import { requireAuthWithTier } from "../middleware/auth.js";
-import { listResearchJobs } from "../lib/research-jobs.js";
 import {
   costLogStore,
   MODEL_PRICES,
   scopeCostEntriesToUser,
   type CostEntry,
 } from "../lib/cost-log.js";
-
-import { gatewayLog } from "./gateway.js";
-import { getFailoverDriver, setFailoverProviders } from "../lib/llm-failover.js";
-import { CachingDriver } from "../lib/llm-cache-driver.js";
-import { registerResearchRoutes } from "./research.js";
-import { registerFineTuneRoutes } from "./finetune.js";
-import { marketplaceRoutes } from "./marketplace.js";
-import { costsRoutes } from "./costs.js";
-import { sandboxRoutes, runViaPyodide, runViaPiston } from "./sandbox.js";
-import { reposRoutes } from "./repos.js";
-import { connectorsBridgeRoutes } from "./connectors-bridge.js";
-import { tokensRoutes } from "./tokens.js";
-import { requireAdminRole as requireAdminRoleBridge } from "./admin-users.js";
-import { roomsRoutes } from "./rooms.js";
-import { workflowsRoutes } from "./workflows.js";
-import { kbRoutes } from "./kb.js";
-import { memoryBridgeRoutes } from "./memory-bridge.js";
-import { kgRoutes } from "./kg.js";
+import { sha256hex } from "../lib/crypto-utils.js";
 import { getKG, getKGStore } from "../lib/knowledge-graph-store.js";
+import { CachingDriver } from "../lib/llm-cache-driver.js";
+import { getFailoverDriver, setFailoverProviders } from "../lib/llm-failover.js";
+import { createNotification } from "../lib/notifications-store.js";
+import { resolveOAuthDriver } from "../lib/oauth-drivers.js";
+import { PersistentStore } from "../lib/persistent-store.js";
+import { pinnedFetch } from "../lib/pinned-fetch.js";
+import { resolveUserProviderKey, buildUserDriverRegistry } from "../lib/provider-keys.js";
+import { makeUserRateLimitPreHandler } from "../lib/rate-limiter.js";
+import { listResearchJobs } from "../lib/research-jobs.js";
+import { encryptSecret, SecretCryptoUnavailableError } from "../lib/secret-crypto.js";
+// Event emitters push completion/failure into the per-user notification store.
+// (The HTTP surface for the store lives in routes/notifications.ts.)
+import { getCacheUserId } from "../lib/user-context.js";
+import { maybeEmitWeeklyDigest } from "../lib/weekly-digest.js";
+import { requireAuthWithTier } from "../middleware/auth.js";
+
+import { requireAdminRole as requireAdminRoleBridge } from "./admin-users.js";
+import { connectorsBridgeRoutes } from "./connectors-bridge.js";
+import { costsRoutes } from "./costs.js";
+import {
+  LlmDriversTransport,
+  COUNCIL_DRIVER_ALIASES,
+  resolveCouncilModelAlias,
+} from "./council.js";
+import { registerFineTuneRoutes } from "./finetune.js";
+import { gatewayLog } from "./gateway.js";
+import { kbRoutes } from "./kb.js";
+import { kgRoutes } from "./kg.js";
+import { marketplaceRoutes } from "./marketplace.js";
+import { memoryBridgeRoutes } from "./memory-bridge.js";
+import { reposRoutes } from "./repos.js";
+import { registerResearchRoutes } from "./research.js";
+import { roomsRoutes } from "./rooms.js";
+import { sandboxRoutes, runViaPyodide, runViaPiston } from "./sandbox.js";
 import { registerSkillRoutes } from "./skills.js";
+import { tokensRoutes } from "./tokens.js";
+import { workflowsRoutes } from "./workflows.js";
 
 // ── SSE helpers ───────────────────────────────────────────────────────────────
 
@@ -256,7 +251,6 @@ const DEFAULT_MODEL = process.env.NEXUS_DEFAULT_MODEL ?? "anthropic/claude-3.5-h
 
 /** Current UTC timestamp as ISO-8601. */
 const now = (): string => new Date().toISOString();
-
 
 /**
  * Highest-priority available LLM driver across all registered providers.
@@ -459,8 +453,8 @@ function getImageGen(): { gen: ImageGenerator; provider: string } | null {
 let _imageGenProvider = "";
 
 let _memory: MemoryManager | null = null;
-let _embedder: import("@nexus/memory").IEmbedder | null = null;
-function getEmbedder(): import("@nexus/memory").IEmbedder {
+let _embedder: IEmbedder | null = null;
+function getEmbedder(): IEmbedder {
   if (_embedder) return _embedder;
   try {
     _embedder = createBestEmbedder();
@@ -1211,7 +1205,9 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
         if (!driver) return;
         const history: { role: LlmRole; content: string }[] = [];
         if (customInstructions) {
-          history.push(systemMsg(`Follow these standing user instructions:\n${customInstructions}`));
+          history.push(
+            systemMsg(`Follow these standing user instructions:\n${customInstructions}`),
+          );
         }
         history.push({ role: "user", content: message });
         histories.set(member.label, history);
@@ -1246,11 +1242,7 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
       // depends on ordering across events is what glued rounds together
       // (playtest: two error wrappers and two answers fused without a break).
       for (const member of enabled) {
-        emitOpinion(
-          member,
-          `\n\n――― round ${dr + 1} (sees other members' answers) ―――\n`,
-          dr,
-        );
+        emitOpinion(member, `\n\n――― round ${dr + 1} (sees other members' answers) ―――\n`, dr);
       }
       const prevLatest = new Map(latest);
       await Promise.allSettled(
@@ -1483,7 +1475,9 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const uid = userIdOf(request);
       if (typeof request.body?.customInstructions !== "string") {
-        return reply.code(400).send({ error: "invalid_body", message: "customInstructions must be a string" });
+        return reply
+          .code(400)
+          .send({ error: "invalid_body", message: "customInstructions must be a string" });
       }
       const merged = {
         ...(_prefsStore.get(uid) ?? {}),
@@ -3900,7 +3894,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
       if (!text || !pipeline)
         return reply.code(400).send({ error: "text and pipeline are required" });
 
-      const checks: Array<{ name: string; passed: boolean; detail: string; score?: number }> = [];
+      const checks: { name: string; passed: boolean; detail: string; score?: number }[] = [];
       const t0 = Date.now();
 
       // ── Check 1: Basic text validation (always runs) ─────────────────────
@@ -3966,7 +3960,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
 
       // ── Check 4: Logical structure ───────────────────────────────────────
       const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 5);
-      const contradictions = [
+      const _contradictionPatterns = [
         /\b(?:is not|are not|cannot|doesn't|don't)\b/i,
         /\b(?:is|are|can|does|do)\b/i,
       ];
@@ -4038,7 +4032,7 @@ Output ONLY the code — no markdown fences, no explanation, no comments unless 
         try {
           const llmPrompt = `Verify the following claims. For each claim, state if it is SUPPORTED, CONTRADICTED, or UNVERIFIABLE. Return JSON: { "claims": [{ "text": "...", "verdict": "SUPPORTED|CONTRADICTED|UNVERIFIABLE", "reason": "..." }] }\n\nText to verify:\n${text.slice(0, 3000)}${context ? `\n\nContext:\n${context.slice(0, 3000)}` : ""}`;
           const llmContent = await callDefaultLLM(llmPrompt, 2048);
-          const parsed = parseJsonResponse<{ claims?: Array<{ verdict: string }> }>(llmContent);
+          const parsed = parseJsonResponse<{ claims?: { verdict: string }[] }>(llmContent);
           if (parsed?.claims) {
             const supported = parsed.claims.filter((c) => c.verdict === "SUPPORTED").length;
             const contradicted = parsed.claims.filter((c) => c.verdict === "CONTRADICTED").length;
@@ -5228,13 +5222,13 @@ Return ONLY a JSON object with this shape (no markdown, no extra text):
       if (!sop) return reply.code(404).send({ error: "SOP not found", templateId });
 
       const runId = crypto.randomUUID();
-      const steps: Array<{
+      const steps: {
         step: string;
         status: string;
         durationMs: number;
         output?: string;
         error?: string;
-      }> = [];
+      }[] = [];
       const startTime = Date.now();
 
       // Parse SOP content into steps (markdown ## headings)

@@ -373,4 +373,3 @@ export class RedditFeed extends FeedAdapter<RedditEvent> {
     }
   }
 }
-

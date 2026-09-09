@@ -45,9 +45,7 @@ type FieldOperand =
   | { $not_contains?: Scalar };
 
 export type WhereClause =
-  | { $and: WhereClause[] }
-  | { $or: WhereClause[] }
-  | { [field: string]: Scalar | FieldOperand };
+  { $and: WhereClause[] } | { $or: WhereClause[] } | Record<string, Scalar | FieldOperand>;
 
 export type WhereDocumentClause =
   | { $and: WhereDocumentClause[] }
@@ -56,7 +54,16 @@ export type WhereDocumentClause =
   | { $not_contains: string };
 
 const WHERE_OPERATORS = new Set([
-  "$eq", "$ne", "$gt", "$gte", "$lt", "$lte", "$in", "$nin", "$contains", "$not_contains",
+  "$eq",
+  "$ne",
+  "$gt",
+  "$gte",
+  "$lt",
+  "$lte",
+  "$in",
+  "$nin",
+  "$contains",
+  "$not_contains",
 ]);
 const LOGICAL_OPERATORS = new Set(["$and", "$or"]);
 
@@ -85,7 +92,7 @@ export function validateWhere(where: unknown, path = "$"): void {
       `Expected where key to be a metadata field or $and/$or at ${path}, got "${key}"`,
     );
   }
-  if (value === null || typeof value === "object" && !Array.isArray(value)) {
+  if (value === null || (typeof value === "object" && !Array.isArray(value))) {
     const opEntries = Object.entries(value as Record<string, unknown>);
     if (opEntries.length !== 1) {
       throw new Error(
@@ -173,7 +180,12 @@ function metadataFieldPresent(
   return metadata !== undefined && field in metadata && metadata[field] !== undefined;
 }
 
-function compareOrdered(field: string, metadata: Record<string, unknown> | undefined, op: string, operand: number): boolean {
+function compareOrdered(
+  field: string,
+  metadata: Record<string, unknown> | undefined,
+  op: string,
+  operand: number,
+): boolean {
   if (!metadataFieldPresent(metadata, field)) return false;
   const v = metadata[field];
   if (typeof v !== "number") return false;
@@ -198,7 +210,7 @@ function evalFieldOperand(
   field: string,
   operatorSpec: FieldOperand,
 ): boolean {
-  const [op, operand] = Object.entries(operatorSpec)[0]!;
+  const [op, operand] = Object.entries(operatorSpec as Record<string, unknown>)[0]!;
   switch (op) {
     case "$eq": {
       const s = operand as Scalar;
@@ -234,14 +246,18 @@ function evalFieldOperand(
       const target = operand as Scalar;
       if (!metadataFieldPresent(metadata, field)) return false;
       const v = metadata[field];
-      return Array.isArray(v) && isScalar(target) && v.some((item) => scalarEqual(item, target));
+      return (
+        Array.isArray(v) &&
+        isScalar(target) &&
+        v.some((item) => isScalar(item) && scalarEqual(item, target))
+      );
     }
     case "$not_contains": {
       const target = operand as Scalar;
       if (!metadataFieldPresent(metadata, field)) return true;
       const v = metadata[field];
       if (!Array.isArray(v)) return true;
-      return !v.some((item) => isScalar(target) && scalarEqual(item, target));
+      return !v.some((item) => isScalar(item) && scalarEqual(item, target));
     }
     default:
       return false;
@@ -252,8 +268,11 @@ function evalFieldOperand(
  * Evaluate a `where` clause against an entry's metadata map.
  * Returns true when the record satisfies the clause.
  */
-export function whereMatches(metadata: Record<string, unknown> | undefined, where: WhereClause): boolean {
-  const [key, value] = Object.entries(where)[0]!;
+export function whereMatches(
+  metadata: Record<string, unknown> | undefined,
+  where: WhereClause,
+): boolean {
+  const [key, value] = Object.entries(where as Record<string, unknown>)[0]!;
   if (key === "$and") return (value as WhereClause[]).every((c) => whereMatches(metadata, c));
   if (key === "$or") return (value as WhereClause[]).some((c) => whereMatches(metadata, c));
   // Field clause: shorthand scalar → equality; object → operator expression.
@@ -273,16 +292,12 @@ export function whereDocumentMatches(
   documentText: string | undefined,
   whereDocument: WhereDocumentClause,
 ): boolean {
-  const [op, operand] = Object.entries(whereDocument)[0]!;
+  const [op, operand] = Object.entries(whereDocument as Record<string, unknown>)[0]!;
   if (op === "$and") {
-    return (operand as WhereDocumentClause[]).every((c) =>
-      whereDocumentMatches(documentText, c),
-    );
+    return (operand as WhereDocumentClause[]).every((c) => whereDocumentMatches(documentText, c));
   }
   if (op === "$or") {
-    return (operand as WhereDocumentClause[]).some((c) =>
-      whereDocumentMatches(documentText, c),
-    );
+    return (operand as WhereDocumentClause[]).some((c) => whereDocumentMatches(documentText, c));
   }
   const text = documentText ?? "";
   if (op === "$contains") return text.includes(operand as string);

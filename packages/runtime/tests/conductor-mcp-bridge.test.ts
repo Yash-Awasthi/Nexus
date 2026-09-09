@@ -43,11 +43,27 @@ function fakeCtx(overrides: Record<string, unknown> = {}) {
     id: "wf-a",
     name: "Workflow A",
     description: "d",
-    tasks: [{ id: "t1", title: "T", description: "", priority: "high", status: "pending", dependencies: [] }],
+    tasks: [
+      {
+        id: "t1",
+        title: "T",
+        description: "",
+        priority: "high",
+        status: "pending",
+        dependencies: [],
+      },
+    ],
   });
   const ctx = {
     repoRoot: root,
-    sandbox: { root, workspacesDir, dataDir: root, specsDir: path.join(root, "specs"), tempDir: root, backupsDir: root },
+    sandbox: {
+      root,
+      workspacesDir,
+      dataDir: root,
+      specsDir: path.join(root, "specs"),
+      tempDir: root,
+      backupsDir: root,
+    },
     logger: { info: () => {}, warn: () => {}, error: () => {} },
     flociAdapter: {
       probeHealth: vi.fn().mockResolvedValue({ reachable: true, latencyMs: 2 }),
@@ -182,18 +198,27 @@ describe("conductor MCP tools", () => {
     const { transport } = await make();
     const list = await callTool(transport, "conductor_list_workflows");
     expect(list).toEqual([{ id: "wf-a", name: "Workflow A", tasks: 1 }]);
-    const exec = await callTool(transport, "conductor_execute_workflow", { workflowId: "wf-a", executionId: "exec-1" });
+    const exec = await callTool(transport, "conductor_execute_workflow", {
+      workflowId: "wf-a",
+      executionId: "exec-1",
+    });
     expect(exec.status).toBe("succeeded");
     await expectToolError(transport, "conductor_execute_workflow", {}, /workflowId is required/);
   });
 
   it("cancels, resumes, replays and lists checkpoints", async () => {
     const { transport } = await make();
-    const cancelled = await callTool(transport, "conductor_workflow_cancel", { executionId: "exec-1" });
+    const cancelled = await callTool(transport, "conductor_workflow_cancel", {
+      executionId: "exec-1",
+    });
     expect(cancelled.cancelled).toBe(true);
-    const resumed = await callTool(transport, "conductor_workflow_resume", { executionId: "exec-1" });
+    const resumed = await callTool(transport, "conductor_workflow_resume", {
+      executionId: "exec-1",
+    });
     expect(resumed.resumed).toBe(true);
-    const replayed = await callTool(transport, "conductor_workflow_replay", { executionId: "exec-1" });
+    const replayed = await callTool(transport, "conductor_workflow_replay", {
+      executionId: "exec-1",
+    });
     expect(replayed.replayed).toBe(true);
     const cps = await callTool(transport, "conductor_workflow_checkpoints");
     expect(cps.count).toBe(1);
@@ -204,12 +229,18 @@ describe("conductor MCP tools", () => {
     const { transport } = await make();
     const out = await callTool(transport, "conductor_run_e2e", { strict: false });
     expect(out.passed).toBe(true);
-    expect(mocks.runFederationE2e).toHaveBeenCalledWith(expect.anything(), { strict: false, cleanup: true });
+    expect(mocks.runFederationE2e).toHaveBeenCalledWith(expect.anything(), {
+      strict: false,
+      cleanup: true,
+    });
   });
 
   it("executes floci actions through the adapter", async () => {
     const { transport } = await make();
-    const out = await callTool(transport, "conductor_floci_execute", { action: "create_s3_bucket", bucketName: "b" });
+    const out = await callTool(transport, "conductor_floci_execute", {
+      action: "create_s3_bucket",
+      bucketName: "b",
+    });
     expect(out.success).toBe(true);
     await expectToolError(transport, "conductor_floci_execute", {}, /action is required/);
   });
@@ -308,7 +339,12 @@ describe("conductor MCP tools", () => {
       bucketName: "b",
     });
     expect(out.ok).toBe(true);
-    await expectToolError(transport, "conductor_floci_extended", { action: "bogus" }, /Unknown extended Floci action/);
+    await expectToolError(
+      transport,
+      "conductor_floci_extended",
+      { action: "bogus" },
+      /Unknown extended Floci action/,
+    );
   });
 
   it("reports unknown tools as errors", async () => {

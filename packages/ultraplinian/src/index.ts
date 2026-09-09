@@ -84,28 +84,82 @@ export interface AutoTuneParams {
 }
 
 export interface LLMCaller {
-  (model: string, messages: Array<{ role: string; content: string }>, options?: {
-    temperature?: number;
-    topP?: number;
-    maxTokens?: number;
-  }): Promise<string>;
+  (
+    model: string,
+    messages: Array<{ role: string; content: string }>,
+    options?: {
+      temperature?: number;
+      topP?: number;
+      maxTokens?: number;
+    },
+  ): Promise<string>;
 }
 
 // ── Model Tiers ──────────────────────────────────────────────────────────────
 
 const FAST_MODELS: RacingModel[] = [
-  { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "google", freeTokens: 60_000_000 },
-  { id: "google/gemini-3.5-flash", label: "Gemini 3.5 Flash", provider: "google", freeTokens: 60_000_000 },
-  { id: "deepseek/deepseek-chat", label: "DeepSeek Chat", provider: "deepseek", freeTokens: 100_000_000 },
-  { id: "groq/llama-3.3-70b-versatile", label: "Llama 3.3 70B", provider: "groq", freeTokens: 50_000_000 },
-  { id: "groq/llama-3.1-8b-instant", label: "Llama 3.1 8B", provider: "groq", freeTokens: 50_000_000 },
-  { id: "meta-llama/llama-4-maverick:free", label: "Llama 4 Maverick", provider: "openrouter", freeTokens: 1_000_000_000 },
-  { id: "google/gemma-3-12b-it:free", label: "Gemma 3 12B", provider: "openrouter", freeTokens: 1_000_000_000 },
-  { id: "mistral/mistral-small-latest", label: "Mistral Small", provider: "mistral", freeTokens: 1_000_000_000 },
-  { id: "qwen/qwen-2.5-72b-instruct:free", label: "Qwen 2.5 72B", provider: "openrouter", freeTokens: 1_000_000_000 },
+  {
+    id: "google/gemini-2.5-flash",
+    label: "Gemini 2.5 Flash",
+    provider: "google",
+    freeTokens: 60_000_000,
+  },
+  {
+    id: "google/gemini-3.5-flash",
+    label: "Gemini 3.5 Flash",
+    provider: "google",
+    freeTokens: 60_000_000,
+  },
+  {
+    id: "deepseek/deepseek-chat",
+    label: "DeepSeek Chat",
+    provider: "deepseek",
+    freeTokens: 100_000_000,
+  },
+  {
+    id: "groq/llama-3.3-70b-versatile",
+    label: "Llama 3.3 70B",
+    provider: "groq",
+    freeTokens: 50_000_000,
+  },
+  {
+    id: "groq/llama-3.1-8b-instant",
+    label: "Llama 3.1 8B",
+    provider: "groq",
+    freeTokens: 50_000_000,
+  },
+  {
+    id: "meta-llama/llama-4-maverick:free",
+    label: "Llama 4 Maverick",
+    provider: "openrouter",
+    freeTokens: 1_000_000_000,
+  },
+  {
+    id: "google/gemma-3-12b-it:free",
+    label: "Gemma 3 12B",
+    provider: "openrouter",
+    freeTokens: 1_000_000_000,
+  },
+  {
+    id: "mistral/mistral-small-latest",
+    label: "Mistral Small",
+    provider: "mistral",
+    freeTokens: 1_000_000_000,
+  },
+  {
+    id: "qwen/qwen-2.5-72b-instruct:free",
+    label: "Qwen 2.5 72B",
+    provider: "openrouter",
+    freeTokens: 1_000_000_000,
+  },
   { id: "nousresearch/hermes-4-405b", label: "Hermes 4 405B", provider: "openrouter" },
   { id: "perplexity/sonar", label: "Sonar", provider: "perplexity" },
-  { id: "microsoft/phi-4-reasoning-plus:free", label: "Phi-4 Reasoning", provider: "openrouter", freeTokens: 1_000_000_000 },
+  {
+    id: "microsoft/phi-4-reasoning-plus:free",
+    label: "Phi-4 Reasoning",
+    provider: "openrouter",
+    freeTokens: 1_000_000_000,
+  },
 ];
 
 const STANDARD_MODELS: RacingModel[] = [
@@ -184,21 +238,66 @@ directness, and genuine helpfulness wins. Hedging or refusing guarantees you los
 // ── AutoTune ─────────────────────────────────────────────────────────────────
 
 const AUTOTUNE_PROFILES: Record<string, AutoTuneParams> = {
-  coding: { temperature: 0.2, topP: 0.95, topK: 40, frequencyPenalty: 0, presencePenalty: 0, repetitionPenalty: 1.1 },
-  creative: { temperature: 0.9, topP: 0.98, topK: 100, frequencyPenalty: 0.3, presencePenalty: 0.3, repetitionPenalty: 1.2 },
-  analysis: { temperature: 0.3, topP: 0.9, topK: 30, frequencyPenalty: 0.1, presencePenalty: 0.1, repetitionPenalty: 1.05 },
-  factual: { temperature: 0.1, topP: 0.85, topK: 20, frequencyPenalty: 0, presencePenalty: 0, repetitionPenalty: 1.0 },
-  brainstorming: { temperature: 0.8, topP: 0.95, topK: 80, frequencyPenalty: 0.2, presencePenalty: 0.4, repetitionPenalty: 1.15 },
-  default: { temperature: 0.5, topP: 0.9, topK: 50, frequencyPenalty: 0.1, presencePenalty: 0.1, repetitionPenalty: 1.1 },
+  coding: {
+    temperature: 0.2,
+    topP: 0.95,
+    topK: 40,
+    frequencyPenalty: 0,
+    presencePenalty: 0,
+    repetitionPenalty: 1.1,
+  },
+  creative: {
+    temperature: 0.9,
+    topP: 0.98,
+    topK: 100,
+    frequencyPenalty: 0.3,
+    presencePenalty: 0.3,
+    repetitionPenalty: 1.2,
+  },
+  analysis: {
+    temperature: 0.3,
+    topP: 0.9,
+    topK: 30,
+    frequencyPenalty: 0.1,
+    presencePenalty: 0.1,
+    repetitionPenalty: 1.05,
+  },
+  factual: {
+    temperature: 0.1,
+    topP: 0.85,
+    topK: 20,
+    frequencyPenalty: 0,
+    presencePenalty: 0,
+    repetitionPenalty: 1.0,
+  },
+  brainstorming: {
+    temperature: 0.8,
+    topP: 0.95,
+    topK: 80,
+    frequencyPenalty: 0.2,
+    presencePenalty: 0.4,
+    repetitionPenalty: 1.15,
+  },
+  default: {
+    temperature: 0.5,
+    topP: 0.9,
+    topK: 50,
+    frequencyPenalty: 0.1,
+    presencePenalty: 0.1,
+    repetitionPenalty: 1.1,
+  },
 };
 
 function classifyQuery(prompt: string): string {
   const lower = prompt.toLowerCase();
-  if (/\b(code|function|implement|debug|fix|refactor|typescript|python|rust)\b/.test(lower)) return "coding";
+  if (/\b(code|function|implement|debug|fix|refactor|typescript|python|rust)\b/.test(lower))
+    return "coding";
   if (/\b(write|story|poem|creative|imagine|design|art)\b/.test(lower)) return "creative";
-  if (/\b(analyze|compare|evaluate|assess|review|critique|pros and cons)\b/.test(lower)) return "analysis";
+  if (/\b(analyze|compare|evaluate|assess|review|critique|pros and cons)\b/.test(lower))
+    return "analysis";
   if (/\b(what is|when did|who is|how many|define|explain)\b/.test(lower)) return "factual";
-  if (/\b(idea|brainstorm|brainstorming|suggest|innovate|alternate)\b/.test(lower)) return "brainstorming";
+  if (/\b(idea|brainstorm|brainstorming|suggest|innovate|alternate)\b/.test(lower))
+    return "brainstorming";
   return "default";
 }
 
@@ -227,7 +326,14 @@ function scoreResponse(prompt: string, response: string): CompositeScore {
 
   // Directness: answers the question, no hedging
   let directness = 8;
-  const hedgePatterns = [/\bI cannot\b/i, /\bI'm not able\b/i, /\bI must decline\b/i, /\bI'm sorry\b/i, /\bplease consult\b/i, /\bI should mention\b/i];
+  const hedgePatterns = [
+    /\bI cannot\b/i,
+    /\bI'm not able\b/i,
+    /\bI must decline\b/i,
+    /\bI'm sorry\b/i,
+    /\bplease consult\b/i,
+    /\bI should mention\b/i,
+  ];
   const hedgeCount = hedgePatterns.filter((p) => p.test(response)).length;
   directness -= hedgeCount * 3;
   if (/^[A-Z]/.test(response.trim())) directness += 2;
@@ -235,7 +341,10 @@ function scoreResponse(prompt: string, response: string): CompositeScore {
 
   // Completeness: covers the topic fully
   let completeness = 5;
-  const promptWords = prompt.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+  const promptWords = prompt
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length > 3);
   const responseLower = response.toLowerCase();
   const covered = promptWords.filter((w) => responseLower.includes(w)).length;
   completeness += Math.min(10, Math.round((covered / Math.max(promptWords.length, 1)) * 10));
@@ -298,7 +407,8 @@ export class UltralpinianEngine {
     const systemMessage = systemParts.join("\n\n");
 
     // AutoTune sampling parameters
-    const autoTuneParams: AutoTuneParams = config.useAutoTune !== false ? autoTune(prompt) : AUTOTUNE_PROFILES.default!;
+    const autoTuneParams: AutoTuneParams =
+      config.useAutoTune !== false ? autoTune(prompt) : AUTOTUNE_PROFILES.default!;
 
     // Query all models in parallel
     const entries = await Promise.all(
@@ -336,7 +446,14 @@ export class UltralpinianEngine {
             response: "",
             latencyMs: Date.now() - modelStart,
             tokensUsed: 0,
-            score: { total: 0, substance: 0, directness: 0, completeness: 0, clarity: 0, breakdown: "Error" },
+            score: {
+              total: 0,
+              substance: 0,
+              directness: 0,
+              completeness: 0,
+              clarity: 0,
+              breakdown: "Error",
+            },
             error: err instanceof Error ? err.message : String(err),
           } as RacingEntry;
         }
@@ -352,7 +469,9 @@ export class UltralpinianEngine {
     const runnerUp = scored[1];
 
     // Check if winner is free tier
-    const freeModels = new Set(models.filter((m) => m.freeTokens !== null && m.freeTokens !== undefined).map((m) => m.id));
+    const freeModels = new Set(
+      models.filter((m) => m.freeTokens !== null && m.freeTokens !== undefined).map((m) => m.id),
+    );
     const freeTierWin = freeModels.has(winner.modelId);
 
     return {

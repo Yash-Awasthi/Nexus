@@ -78,7 +78,10 @@ describe("councilRuntimeTools (local served council → RuntimeTools)", () => {
         throw new Error("provider unreachable");
       },
     };
-    const tools = await councilRuntimeTools({ llm: failing, tools: ["deliberate"] as const }, "council");
+    const tools = await councilRuntimeTools(
+      { llm: failing, tools: ["deliberate"] as const },
+      "council",
+    );
     const deliberate = tools.find((t) => t.name === "council__council_deliberate")!;
     await expect(deliberate.handler({ question: "Should we ship?" })).rejects.toThrow(
       /provider unreachable/,

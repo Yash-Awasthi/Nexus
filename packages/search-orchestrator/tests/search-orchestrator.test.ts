@@ -324,9 +324,7 @@ const EXA_BODY = {
 describe("searchExa / ExaSearchStrategy (§1.3)", () => {
   it("throws without a key (no env, no apiKey)", async () => {
     vi.stubEnv("EXA_API_KEY", "");
-    await expect(searchExa("q", { fetchFn: fetchJson(EXA_BODY) })).rejects.toThrow(
-      /EXA_API_KEY/,
-    );
+    await expect(searchExa("q", { fetchFn: fetchJson(EXA_BODY) })).rejects.toThrow(/EXA_API_KEY/);
     vi.unstubAllEnvs();
   });
 
@@ -334,11 +332,19 @@ describe("searchExa / ExaSearchStrategy (§1.3)", () => {
     const fetchFn = fetchJson(EXA_BODY);
     const results = await searchExa("hello", { apiKey: "exa-key", fetchFn });
     const f = fetchFn as unknown as ReturnType<typeof vi.fn>;
-    const [url, init] = f.mock.calls[0] as [string, { method: string; headers: Record<string, string>; body: string }];
+    const [url, init] = f.mock.calls[0] as [
+      string,
+      { method: string; headers: Record<string, string>; body: string },
+    ];
     expect(url).toBe("https://api.exa.ai/search");
     expect(init.method).toBe("POST");
     expect(init.headers["x-api-key"]).toBe("exa-key");
-    const body = JSON.parse(init.body) as { query: string; numResults: number; type: string; text: boolean };
+    const body = JSON.parse(init.body) as {
+      query: string;
+      numResults: number;
+      type: string;
+      text: boolean;
+    };
     expect(body).toMatchObject({ query: "hello", numResults: 10, type: "auto", text: true });
     expect(results).toHaveLength(2);
     expect(results[0]).toMatchObject({
@@ -357,8 +363,9 @@ describe("searchExa / ExaSearchStrategy (§1.3)", () => {
     const fetchFn = fetchJson(EXA_BODY);
     await searchExa("q", { apiKey: "k", type: "neural", includeText: false, fetchFn });
     const body = JSON.parse(
-      ((fetchFn as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [string, { body: string }])[1]
-        .body,
+      (
+        (fetchFn as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [string, { body: string }]
+      )[1].body,
     ) as { type: string; text?: boolean };
     expect(body.type).toBe("neural");
     expect(body.text).toBeUndefined();
@@ -432,9 +439,9 @@ describe("searchBrave / BraveSearchStrategy (§1.3)", () => {
 
   it("handles an empty web block and HTTP errors", async () => {
     expect(await searchBrave("q", { apiKey: "k", fetchFn: fetchJson({}) })).toHaveLength(0);
-    await expect(
-      searchBrave("q", { apiKey: "k", fetchFn: fetchJson({}, 429) }),
-    ).rejects.toThrow(/Brave 429/);
+    await expect(searchBrave("q", { apiKey: "k", fetchFn: fetchJson({}, 429) })).rejects.toThrow(
+      /Brave 429/,
+    );
   });
 
   it("BraveSearchStrategy adapts into a SearchResponse", async () => {
@@ -448,7 +455,13 @@ describe("searchBrave / BraveSearchStrategy (§1.3)", () => {
 
 const SERPER_BODY = {
   organic: [
-    { title: "Serper One", link: "https://serper.example/1", snippet: "Top hit", position: 1, date: "3 days ago" },
+    {
+      title: "Serper One",
+      link: "https://serper.example/1",
+      snippet: "Top hit",
+      position: 1,
+      date: "3 days ago",
+    },
     { title: "Serper Two", link: "https://serper.example/2", snippet: "Second hit", position: 2 },
   ],
 };
@@ -466,7 +479,10 @@ describe("searchSerper / SerperSearchStrategy (§1.3)", () => {
     const fetchFn = fetchJson(SERPER_BODY);
     const results = await searchSerper("hello", { apiKey: "sp-key", gl: "de", hl: "de", fetchFn });
     const f = fetchFn as unknown as ReturnType<typeof vi.fn>;
-    const [url, init] = f.mock.calls[0] as [string, { method: string; headers: Record<string, string>; body: string }];
+    const [url, init] = f.mock.calls[0] as [
+      string,
+      { method: string; headers: Record<string, string>; body: string },
+    ];
     expect(url).toBe("https://google.serper.dev/search");
     expect(init.method).toBe("POST");
     expect(init.headers["X-API-KEY"]).toBe("sp-key");
@@ -484,9 +500,9 @@ describe("searchSerper / SerperSearchStrategy (§1.3)", () => {
 
   it("handles an empty organic list and HTTP errors", async () => {
     expect(await searchSerper("q", { apiKey: "k", fetchFn: fetchJson({}) })).toHaveLength(0);
-    await expect(
-      searchSerper("q", { apiKey: "k", fetchFn: fetchJson({}, 500) }),
-    ).rejects.toThrow(/Serper 500/);
+    await expect(searchSerper("q", { apiKey: "k", fetchFn: fetchJson({}, 500) })).rejects.toThrow(
+      /Serper 500/,
+    );
   });
 
   it("SerperSearchStrategy adapts into a SearchResponse with maxResults applied", async () => {

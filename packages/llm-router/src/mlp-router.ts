@@ -107,7 +107,7 @@ export class MLPRouter {
       this.biases = [];
       for (let i = 0; i < layerDims.length - 1; i++) {
         this.weights.push(xavierInit(layerDims[i]!, layerDims[i + 1]!));
-        this.biases.push(new Array(layerDims[i + 1]!).fill(0));
+        this.biases.push(new Array<number>(layerDims[i + 1]!).fill(0));
       }
     }
   }
@@ -168,7 +168,7 @@ export class MLPRouter {
   /**
    * Get top-N predictions with probabilities.
    */
-  routeTopN(input: number[], n: number): Array<{ alias: string; probability: number }> {
+  routeTopN(input: number[], n: number): { alias: string; probability: number }[] {
     const logits = this.forward(input);
     const probabilities = softmax(logits);
 

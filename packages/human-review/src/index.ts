@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Human Review — human-in-the-loop review system for agent executions.
  * Extracted from: inspiration/Nexus/AutoGPT/
@@ -174,7 +175,7 @@ export class HumanReviewEngine {
    */
   getPendingReviews(userId: string): PendingHumanReview[] {
     return Array.from(this.reviews.values()).filter(
-      (r) => r.userId === userId && r.status === ReviewStatus.WAITING && !r.processed
+      (r) => r.userId === userId && r.status === ReviewStatus.WAITING && !r.processed,
     );
   }
 
@@ -183,7 +184,7 @@ export class HumanReviewEngine {
    */
   getReviewsForExecution(graphExecId: string): PendingHumanReview[] {
     return Array.from(this.reviews.values()).filter(
-      (r) => r.graphExecId === graphExecId && !r.processed
+      (r) => r.graphExecId === graphExecId && !r.processed,
     );
   }
 
@@ -303,7 +304,7 @@ export class HumanReviewEngine {
 export function validateReviewData(
   data: unknown,
   maxSizeBytes: number = 1_000_000,
-  maxDepth: number = 10
+  maxDepth: number = 10,
 ): { valid: boolean; error?: string } {
   try {
     const jsonStr = JSON.stringify(data);
@@ -328,8 +329,5 @@ function getDepth(obj: unknown, current: number = 0): number {
   if (Array.isArray(obj)) {
     return Math.max(...obj.map((item) => getDepth(item, current + 1)), current);
   }
-  return Math.max(
-    ...Object.values(obj).map((val) => getDepth(val, current + 1)),
-    current
-  );
+  return Math.max(...Object.values(obj).map((val) => getDepth(val, current + 1)), current);
 }

@@ -155,9 +155,7 @@ export async function dismissNotification(
   }
 }
 
-export async function dismissAllNotifications(
-  userId: string | undefined,
-): Promise<number> {
+export async function dismissAllNotifications(userId: string | undefined): Promise<number> {
   const uid = userIdFor(userId);
   const kv = getSharedKV();
   try {

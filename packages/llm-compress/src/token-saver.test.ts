@@ -90,7 +90,9 @@ describe("processor engine dispatch (token-saver model)", () => {
       genericProcessor,
     ]);
     // original must be compressible by generic (repeated lines) to win
-    const input = Array.from({ length: 5 }, () => "downloading widget v1.2.3  [########] 42%").join("\n");
+    const input = Array.from({ length: 5 }, () => "downloading widget v1.2.3  [########] 42%").join(
+      "\n",
+    );
     const r = engine.compress("tool x", input);
     expect(r.isMismatch).toBe(true);
     expect(r.processor).toBe("generic");
@@ -181,7 +183,12 @@ describe("testOutputProcessor block-aware mechanics", () => {
 
 describe("genericProcessor fallback mechanics", () => {
   it("strips ANSI escapes and unicode progress bars", () => {
-    const out = ["\u001b[31mred\u001b[0m line", "██████████████████ 100%", "━━━━━━━━ 42%", "real data row"].join("\n");
+    const out = [
+      "\u001b[31mred\u001b[0m line",
+      "██████████████████ 100%",
+      "━━━━━━━━ 42%",
+      "real data row",
+    ].join("\n");
     const r = compressOutputForCommand("curl x", out);
     expect(r.processor).toBe("generic");
     expect(r.output).not.toContain("\u001b[");

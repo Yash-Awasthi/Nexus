@@ -242,7 +242,7 @@ describe("review tool", () => {
 
   it("extracts the first balanced JSON object from prose with text before and after", () => {
     const wrapped =
-      "That looks great! Here is the verdict: {\"score\": 75, \"verdict\": \"accept\", \"issues\": [], \"suggestions\": [\"add a test\"]}. Hope that helps!";
+      'That looks great! Here is the verdict: {"score": 75, "verdict": "accept", "issues": [], "suggestions": ["add a test"]}. Hope that helps!';
     const res = parseReviewResult(wrapped);
     expect(res.verdict).toBe("accept");
     expect(res.score).toBe(75);
@@ -250,7 +250,8 @@ describe("review tool", () => {
   });
 
   it("repairs single-quoted JSON and trailing commas", () => {
-    const sloppy = "Result: {score: 60, verdict: 'reject', issues: ['half done',], suggestions: []}";
+    const sloppy =
+      "Result: {score: 60, verdict: 'reject', issues: ['half done',], suggestions: []}";
     const res = parseReviewResult(sloppy);
     expect(res.verdict).toBe("reject");
     expect(res.score).toBe(60);

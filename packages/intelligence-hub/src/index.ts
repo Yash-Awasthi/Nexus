@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @nexus/intelligence-hub — Barrel export for all intelligence modules.
  *
@@ -29,12 +30,21 @@ export const INTELLIGENCE_HUB_VERSION = "1.0.0";
  * List of all available intelligence modules.
  */
 export const INTELLIGENCE_MODULES = [
-  { name: "admission-control", description: "Queue-based request admission with capacity management" },
+  {
+    name: "admission-control",
+    description: "Queue-based request admission with capacity management",
+  },
   { name: "api-key-rotation", description: "Intelligent API key pool with health tracking" },
   { name: "budget-manager", description: "Time-based per-user budget tracking" },
-  { name: "complexity-router", description: "Complexity-based prompt routing for cost optimization" },
+  {
+    name: "complexity-router",
+    description: "Complexity-based prompt routing for cost optimization",
+  },
   { name: "context-pruning", description: "Dynamic conversation context management" },
-  { name: "disagreement-engine", description: "3-model structured disagreement with minority reports" },
+  {
+    name: "disagreement-engine",
+    description: "3-model structured disagreement with minority reports",
+  },
   { name: "drift-detection", description: "LLM evaluation metric monitoring for degradation" },
   { name: "heuristic-classifier", description: "14-dimension weighted scoring classifier" },
   { name: "mixture-of-agents", description: "Layered proposer/aggregator multi-agent synthesis" },

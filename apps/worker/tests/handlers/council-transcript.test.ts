@@ -16,9 +16,30 @@ const request: CouncilRequest = {
 };
 
 const votes: ModelVote[] = [
-  { model: "nexus/smart", provider: "groq", vote: "yes", reasoning: "data checks pass", confidence: 0.9, latencyMs: 812 },
-  { model: "nexus/sonnet", provider: "anthropic", vote: "yes", reasoning: "agreed", confidence: 0.8, latencyMs: 1240 },
-  { model: "nexus/haiku", provider: "anthropic", vote: "no", reasoning: "rollback gap", confidence: 0.6, latencyMs: 340 },
+  {
+    model: "nexus/smart",
+    provider: "groq",
+    vote: "yes",
+    reasoning: "data checks pass",
+    confidence: 0.9,
+    latencyMs: 812,
+  },
+  {
+    model: "nexus/sonnet",
+    provider: "anthropic",
+    vote: "yes",
+    reasoning: "agreed",
+    confidence: 0.8,
+    latencyMs: 1240,
+  },
+  {
+    model: "nexus/haiku",
+    provider: "anthropic",
+    vote: "no",
+    reasoning: "rollback gap",
+    confidence: 0.6,
+    latencyMs: 340,
+  },
 ];
 
 function result(outcome: ProposalResult["outcome"]): ProposalResult {
@@ -34,7 +55,12 @@ function result(outcome: ProposalResult["outcome"]): ProposalResult {
 
 describe("buildCouncilRunTranscript", () => {
   it("records route evidence, per-vote stages, and the final answer", () => {
-    const t = buildCouncilRunTranscript({ request, result: result("approved"), votes, startedAt: 1_700_000_000_000 });
+    const t = buildCouncilRunTranscript({
+      request,
+      result: result("approved"),
+      votes,
+      startedAt: 1_700_000_000_000,
+    });
     expect(t.protocol).toBe("council");
     expect(t.query).toContain("Should we ship the migration?");
     expect(t.finalAnswer).toContain("rollback runbook");
@@ -52,12 +78,22 @@ describe("buildCouncilRunTranscript", () => {
   });
 
   it("maps dissent like the handler (non-majority, non-abstain)", () => {
-    const t = buildCouncilRunTranscript({ request, result: result("approved"), votes, startedAt: 1 });
+    const t = buildCouncilRunTranscript({
+      request,
+      result: result("approved"),
+      votes,
+      startedAt: 1,
+    });
     expect(t.dissent).toEqual(["nexus/haiku"]);
   });
 
   it("records no dissents when the outcome is deferred (no majority)", () => {
-    const t = buildCouncilRunTranscript({ request, result: result("deferred"), votes, startedAt: 1 });
+    const t = buildCouncilRunTranscript({
+      request,
+      result: result("deferred"),
+      votes,
+      startedAt: 1,
+    });
     expect(t.dissent).toEqual([]);
   });
 
@@ -83,7 +119,12 @@ describe("buildCouncilRunTranscript", () => {
   });
 
   it("serializes to a JSON event payload", () => {
-    const t = buildCouncilRunTranscript({ request, result: result("approved"), votes, startedAt: 1_700_000_000_000 });
+    const t = buildCouncilRunTranscript({
+      request,
+      result: result("approved"),
+      votes,
+      startedAt: 1_700_000_000_000,
+    });
     const parsed = JSON.parse(councilTranscriptJson(t));
     expect(parsed.id).toMatch(/^council-/);
     expect(parsed.stages).toHaveLength(3);

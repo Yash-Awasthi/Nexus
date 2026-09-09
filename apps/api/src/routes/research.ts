@@ -21,13 +21,11 @@
  * the withTimeout / AbortSignal stuck-job guards.
  */
 
-import type { FastifyInstance } from "fastify";
 import type { LlmRole } from "@nexus/llm-drivers";
 import { WebResearcher, type SearchResult as ResearchSearchResult } from "@nexus/researcher";
+import type { FastifyInstance } from "fastify";
 
 import { createNotification } from "../lib/notifications-store.js";
-import { appendGraphEvent } from "../lib/session-graph.js";
-import { requireAuthWithTier } from "../middleware/auth.js";
 import {
   createResearchJob,
   getResearchJob,
@@ -35,6 +33,8 @@ import {
   recordResearchMilestone,
   updateResearchJob,
 } from "../lib/research-jobs.js";
+import { appendGraphEvent } from "../lib/session-graph.js";
+import { requireAuthWithTier } from "../middleware/auth.js";
 
 /** Cap on a single research LLM call — a hung provider must never leave a job `running` forever. */
 const RESEARCH_LLM_TIMEOUT_MS = parseInt(process.env.RESEARCH_LLM_TIMEOUT_MS ?? "90000", 10);
@@ -93,7 +93,7 @@ export interface ResearchBridgeDeps {
   sseHeaders: Record<string, string>;
   userMsg: (content: string) => ResearchMessage;
   /** Strip markdown code fences then JSON.parse (balanced-span fallback). */
-  parseJsonResponse: <T = unknown>(content: string) => T;
+  parseJsonResponse: (content: string) => unknown;
   /** One-shot LLM completion with automatic cost tracking; returns content. */
   llm: (messages: ResearchMessage[], maxTokens: number) => Promise<string>;
   /** Highest-priority available LLM driver across all registered providers. */
@@ -151,7 +151,7 @@ export function registerResearchRoutes(app: FastifyInstance, deps: ResearchBridg
         RESEARCH_LLM_TIMEOUT_MS,
         "Related questions",
       );
-      const p = deps.parseJsonResponse<{ questions?: string[] }>(out);
+      const p = deps.parseJsonResponse(out) as { questions?: string[] };
       const qs = Array.isArray(p.questions) ? p.questions.filter((q) => q && q !== "...") : [];
       if (qs.length > 0) return qs.slice(0, 5);
     } catch {

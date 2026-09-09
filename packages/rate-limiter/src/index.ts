@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @nexus/rate-limiter — Multi-dimensional sliding window rate limiting.
  *
@@ -231,10 +232,7 @@ export class MultiDimensionalRateLimiter {
     this.windows = new SlidingWindowCounter(config.windowMs ?? 60_000);
 
     if (config.lockout?.enabled) {
-      this.lockout = new LockoutTracker(
-        config.lockout.threshold,
-        config.lockout.durationMs,
-      );
+      this.lockout = new LockoutTracker(config.lockout.threshold, config.lockout.durationMs);
     }
   }
 
@@ -354,7 +352,9 @@ export interface MiddlewareRequest {
 export function createRateLimitMiddleware(config: RateLimiterConfig) {
   const limiter = new MultiDimensionalRateLimiter(config);
 
-  return (req: MiddlewareRequest): { allowed: boolean; headers: Record<string, string>; result: RateLimitResult } => {
+  return (
+    req: MiddlewareRequest,
+  ): { allowed: boolean; headers: Record<string, string>; result: RateLimitResult } => {
     const result = limiter.check({
       path: req.path,
       method: req.method,
@@ -371,9 +371,7 @@ export function createRateLimitMiddleware(config: RateLimiterConfig) {
 
     if (result.retryAfterMs) {
       headers["Retry-After"] = String(Math.ceil(result.retryAfterMs / 1000));
-      headers["X-RateLimit-Reset"] = String(
-        Math.ceil((Date.now() + result.retryAfterMs) / 1000),
-      );
+      headers["X-RateLimit-Reset"] = String(Math.ceil((Date.now() + result.retryAfterMs) / 1000));
     }
 
     if (result.lockedOut) {

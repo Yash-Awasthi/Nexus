@@ -114,7 +114,9 @@ describe("HookDispatcher", () => {
 
   it("dispatch with no handlers resolves undefined", async () => {
     const d = new HookDispatcher({});
-    expect(await d.dispatch("stop", { finalContent: "", totalUsage: {} as never, steps: [] })).toBeUndefined();
+    expect(
+      await d.dispatch("stop", { finalContent: "", totalUsage: {} as never, steps: [] }),
+    ).toBeUndefined();
     expect(d.has("stop")).toBe(false);
   });
 });
@@ -133,7 +135,10 @@ describe("ToolAgentRuntime hooks", () => {
       },
     });
     const runtime = new ToolAgentRuntime({
-      llm: scriptedLlm([{ content: "", toolCalls: [call("hi")] }, { content: "done", toolCalls: [] }]),
+      llm: scriptedLlm([
+        { content: "", toolCalls: [call("hi")] },
+        { content: "done", toolCalls: [] },
+      ]),
       toolSet,
       tools: NO_TOOLS,
       hooks: { preToolUse: () => ({ continue: false, stopReason: "guard: no echo today" }) },
@@ -149,7 +154,10 @@ describe("ToolAgentRuntime hooks", () => {
   it("preToolUse block without feedback falls back to a generic reason", async () => {
     const toolSet = new RuntimeToolSet().add(echoTool());
     const runtime = new ToolAgentRuntime({
-      llm: scriptedLlm([{ content: "", toolCalls: [call("x")] }, { content: "done", toolCalls: [] }]),
+      llm: scriptedLlm([
+        { content: "", toolCalls: [call("x")] },
+        { content: "done", toolCalls: [] },
+      ]),
       toolSet,
       tools: NO_TOOLS,
       hooks: { preToolUse: () => ({ continue: false }) },
@@ -162,7 +170,10 @@ describe("ToolAgentRuntime hooks", () => {
   it("postToolUse feedback replaces the history text (result object untouched)", async () => {
     const toolSet = new RuntimeToolSet().add(echoTool());
     const runtime = new ToolAgentRuntime({
-      llm: scriptedLlm([{ content: "", toolCalls: [call("secret")] }, { content: "done", toolCalls: [] }]),
+      llm: scriptedLlm([
+        { content: "", toolCalls: [call("secret")] },
+        { content: "done", toolCalls: [] },
+      ]),
       toolSet,
       tools: NO_TOOLS,
       hooks: {
@@ -182,7 +193,10 @@ describe("ToolAgentRuntime hooks", () => {
   it("postToolUse suppressOutput blanks the history text", async () => {
     const toolSet = new RuntimeToolSet().add(echoTool());
     const runtime = new ToolAgentRuntime({
-      llm: scriptedLlm([{ content: "", toolCalls: [call("loud")] }, { content: "done", toolCalls: [] }]),
+      llm: scriptedLlm([
+        { content: "", toolCalls: [call("loud")] },
+        { content: "done", toolCalls: [] },
+      ]),
       toolSet,
       tools: NO_TOOLS,
       hooks: { postToolUse: () => ({ suppressOutput: true }) },
@@ -208,7 +222,12 @@ describe("ToolAgentRuntime hooks", () => {
       llm: scriptedLlm([{ content: "x", toolCalls: [] }]),
       toolSet: new RuntimeToolSet(),
       // The abort check inside the loop returns early — before the stop hook.
-      hooks: { stop: () => { stopFired = true; return { feedback: "nope" }; } },
+      hooks: {
+        stop: () => {
+          stopFired = true;
+          return { feedback: "nope" };
+        },
+      },
     });
     const ctrl = new AbortController();
     ctrl.abort();
@@ -220,7 +239,10 @@ describe("ToolAgentRuntime hooks", () => {
   it("runs without hooks exactly as before (default off)", async () => {
     const toolSet = new RuntimeToolSet().add(echoTool());
     const runtime = new ToolAgentRuntime({
-      llm: scriptedLlm([{ content: "", toolCalls: [call("plain")] }, { content: "done", toolCalls: [] }]),
+      llm: scriptedLlm([
+        { content: "", toolCalls: [call("plain")] },
+        { content: "done", toolCalls: [] },
+      ]),
       toolSet,
       tools: NO_TOOLS,
     });

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 MCP Server Framework Service
 Extracted from inspiration repos:

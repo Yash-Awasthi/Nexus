@@ -28,7 +28,7 @@ export interface BackendConfig {
 }
 
 export class ModelDiscovery {
-  private models: Map<string, DiscoveredModel> = new Map();
+  private models = new Map<string, DiscoveredModel>();
   private lastRefresh = 0;
   private refreshIntervalMs = 60_000;
   private backends: BackendConfig[];
@@ -102,7 +102,7 @@ export class ModelDiscovery {
     try {
       const resp = await fetch(`${backend.baseUrl}/api/tags`);
       if (!resp.ok) return [];
-      const data = (await resp.json()) as { models: Array<{ name: string; size: number }> };
+      const data = (await resp.json()) as { models: { name: string; size: number }[] };
       return data.models.map((m) => ({
         id: m.name,
         provider: "ollama",
@@ -131,7 +131,7 @@ export class ModelDiscovery {
       }
       const resp = await fetch(`${backend.baseUrl}/v1/models`, { headers });
       if (!resp.ok) return [];
-      const data = (await resp.json()) as { data: Array<{ id: string; owned_by?: string }> };
+      const data = (await resp.json()) as { data: { id: string; owned_by?: string }[] };
       return data.data.map((m) => ({
         id: m.id,
         provider: providerName,
@@ -157,7 +157,7 @@ export class ModelDiscovery {
       }
       const resp = await fetch(`${backend.baseUrl}/v1/models`, { headers });
       if (!resp.ok) return [];
-      const data = (await resp.json()) as { data: Array<{ id: string }> };
+      const data = (await resp.json()) as { data: { id: string }[] };
       return data.data.map((m) => ({
         id: m.id,
         provider: "anthropic",

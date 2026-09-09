@@ -21,25 +21,26 @@ import {
   hybridSearchRuntimeTools,
   transportFromLlm,
 } from "../../src/lib/deliberation-tools.js";
-import {
-  runLocalAgent,
-  type ToolTranscriptEvent,
-} from "../../src/lib/local-agent.js";
-import {
-  InMemoryBM25,
-  type SearchHit,
-  type VectorSearchAdapter,
-} from "@nexus/hybrid-search";
+import { runLocalAgent, type ToolTranscriptEvent } from "../../src/lib/local-agent.js";
+import { InMemoryBM25, type SearchHit, type VectorSearchAdapter } from "@nexus/hybrid-search";
 
 const CORPUS = [
-  { id: "d1", text: "Hybrid search fuses dense vector and bm25 results.", metadata: { tier: "gold" } },
+  {
+    id: "d1",
+    text: "Hybrid search fuses dense vector and bm25 results.",
+    metadata: { tier: "gold" },
+  },
   { id: "d2", text: "RRF fusion ranks documents by reciprocal rank.", metadata: { tier: "free" } },
 ];
 
 /** Deterministic dense leg for CLI tests: overlap of query tokens with doc tokens. */
 function lexicalDense(): VectorSearchAdapter {
   const tokenize = (t: string): string[] =>
-    t.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+    t
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter(Boolean);
   const corpus = CORPUS.map((d) => ({ ...d, toks: tokenize(d.text) }));
   return {
     async search(query: string, limit: number): Promise<SearchHit[]> {
@@ -177,7 +178,10 @@ describe("debateRuntimeToolFromLlm (CLI seam)", () => {
     return (async (messages) => {
       const text = messages.map((m) => m.content).join("\n");
       for (const [agent, script] of Object.entries(scripts)) {
-        if (text.includes(`are Debater for position: ${agent}`) || text.includes(`You are debating as ${agent}`)) {
+        if (
+          text.includes(`are Debater for position: ${agent}`) ||
+          text.includes(`You are debating as ${agent}`)
+        ) {
           const i = Math.min(counts[agent] ?? 0, script.length - 1);
           counts[agent] = (counts[agent] ?? 0) + 1;
           return { content: script[i]!, toolCalls: [] };

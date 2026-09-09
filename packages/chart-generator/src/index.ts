@@ -79,12 +79,7 @@ export class ChartGenerator {
   /**
    * Create a bar chart.
    */
-  static bar(config: {
-    title: string;
-    data: BarData[];
-    xLabel?: string;
-    yLabel?: string;
-  }): Chart {
+  static bar(config: { title: string; data: BarData[]; xLabel?: string; yLabel?: string }): Chart {
     return {
       type: "bar",
       title: config.title,
@@ -97,10 +92,7 @@ export class ChartGenerator {
   /**
    * Create a pie chart.
    */
-  static pie(config: {
-    title: string;
-    data: PieData[];
-  }): Chart {
+  static pie(config: { title: string; data: PieData[] }): Chart {
     return {
       type: "pie",
       title: config.title,
@@ -129,10 +121,7 @@ export class ChartGenerator {
   /**
    * Create a box-and-whisker chart.
    */
-  static box(config: {
-    title: string;
-    data: BoxData[];
-  }): Chart {
+  static box(config: { title: string; data: BoxData[] }): Chart {
     return {
       type: "box",
       title: config.title,

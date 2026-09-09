@@ -67,7 +67,10 @@ export function ProjectCard({ project, size, onRefresh }: ProjectCardProps) {
 
         <div className="flex items-center gap-1">
           <button
-            onClick={(e) => { e.stopPropagation(); togglePin(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              togglePin();
+            }}
             className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted"
             title={project.pinned ? "Unpin" : "Pin"}
           >
@@ -80,7 +83,10 @@ export function ProjectCard({ project, size, onRefresh }: ProjectCardProps) {
 
           <div className="relative">
             <button
-              onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen(!menuOpen);
+              }}
               className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted"
             >
               <MoreVertical className="h-3 w-3 text-muted-foreground" />
@@ -128,12 +134,7 @@ export function ProjectCard({ project, size, onRefresh }: ProjectCardProps) {
       </div>
 
       {/* Click to open project detail (placeholder) */}
-      {menuOpen && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setMenuOpen(false)}
-        />
-      )}
+      {menuOpen && <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />}
     </div>
   );
 }

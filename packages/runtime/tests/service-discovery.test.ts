@@ -159,7 +159,7 @@ describe("HealthMonitor", () => {
 
   it("marks floci healthy when the probe fetch succeeds", async () => {
     setEnv("GHOSTSTACK_OFFLINE_MODE", "false");
-    globalThis.fetch = vi.fn(async () => ({ ok: true } as Response)) as unknown as typeof fetch;
+    globalThis.fetch = vi.fn(async () => ({ ok: true }) as Response) as unknown as typeof fetch;
     const discovery = new LocalServiceDiscovery();
     const loader = fakeLoader({
       services: { services: { floci: { type: "docker", port: 4566 } } },

@@ -13,12 +13,7 @@ import {
   FeedAdapterOptions,
   FeedEvent,
 } from "../base.js";
-import type {
-  DirectiveEvent,
-  FilingEvent,
-  LegislationEvent,
-  PreprintEvent,
-} from "../index.js";
+import type { DirectiveEvent, FilingEvent, LegislationEvent, PreprintEvent } from "../index.js";
 
 // ── Preprints — bioRxiv/medRxiv details API (no key required) ──────────────────
 
@@ -394,4 +389,3 @@ export class EurLexFeed extends FeedAdapter<DirectiveEvent> {
     }
   }
 }
-

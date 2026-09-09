@@ -59,7 +59,9 @@ describe("session-graph", () => {
       edge: { from: "last", to: "m1:phase:started", kind: "phase" },
     });
     const g2 = await getSessionGraph("u1", "mission:m1");
-    expect(g2!.edges).toEqual([{ from: "m1:skill:1:start", to: "m1:phase:started", kind: "phase" }]);
+    expect(g2!.edges).toEqual([
+      { from: "m1:skill:1:start", to: "m1:phase:started", kind: "phase" },
+    ]);
   });
 
   it("dedupes by node id — re-appends never duplicate a node", async () => {

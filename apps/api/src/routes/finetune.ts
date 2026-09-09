@@ -18,9 +18,10 @@
  * apiBridgeRoutes. This module never imports the bridge.
  */
 
+import type { FastifyInstance } from "fastify";
+
 import { PersistentStore } from "../lib/persistent-store.js";
 import { resolveUserProviderKey } from "../lib/provider-keys.js";
-import type { FastifyInstance } from "fastify";
 
 const now = (): string => new Date().toISOString();
 
@@ -161,7 +162,7 @@ export function registerFineTuneRoutes(app: FastifyInstance, deps: FineTuneBridg
       );
       const scores = { quality: 0.75, coherence: 0.72, consensus: 0.68, diversity: 0.81 };
       try {
-        Object.assign(scores, parseJsonLoose(scoreText));
+        Object.assign(scores, parseJsonLoose(scoreText) as Record<string, unknown>);
       } catch {
         /* use defaults */
       }
@@ -321,10 +322,10 @@ export function registerFineTuneRoutes(app: FastifyInstance, deps: FineTuneBridg
 }
 
 /** Tolerant JSON parse for LLM score output (fence-stripping + fallback). */
-function parseJsonLoose<T>(content: string): T {
+function parseJsonLoose(content: string): unknown {
   const cleaned = content.replace(/```json|```/g, "").trim();
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
   if (start === -1 || end === -1) throw new Error("no JSON object found");
-  return JSON.parse(cleaned.slice(start, end + 1)) as T;
+  return JSON.parse(cleaned.slice(start, end + 1)) as unknown;
 }

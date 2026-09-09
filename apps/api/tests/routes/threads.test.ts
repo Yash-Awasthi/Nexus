@@ -37,7 +37,7 @@ describe("threads API surface", () => {
         { method: "DELETE", url: "/api/threads/x" },
       ]) {
         const res = await app.inject(req as never);
-        expect(res.statusCode, `${req.method} ${req.url}`).toBe(401);
+        expect(res.statusCode).toBe(401); // `${req.method} ${req.url}` must 401
       }
     } finally {
       delete process.env.NEXUS_API_KEY;

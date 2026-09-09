@@ -27,8 +27,8 @@ import { makeTierGatePreHandler } from "@nexus/tier-gate";
 import { eq, desc } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
-import { buildUserDriverRegistry } from "../lib/provider-keys.js";
 import { emitCouncilTranscript } from "../lib/council-transcript.js";
+import { buildUserDriverRegistry } from "../lib/provider-keys.js";
 import { requireAuth, requireAuthWithTier, getTierFromRequest } from "../middleware/auth.js";
 
 // ── Council config ─────────────────────────────────────────────────────────────

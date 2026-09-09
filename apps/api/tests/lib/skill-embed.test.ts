@@ -22,11 +22,7 @@ function oneHotFetch(texts: string[][]): typeof fetch {
     const body = JSON.parse(String(init?.body)) as { input: string[] };
     // Same text → same vector as the task (index 0); anything else orthogonal.
     const embeddings = body.input.map((t, i) =>
-      i === 0 || t === body.input[0]
-        ? [1, 0, 0]
-        : i % 2 === 0
-          ? [0, 1, 0]
-          : [0, 0, 1],
+      i === 0 || t === body.input[0] ? [1, 0, 0] : i % 2 === 0 ? [0, 1, 0] : [0, 0, 1],
     );
     void texts;
     return new Response(JSON.stringify({ embeddings }), {

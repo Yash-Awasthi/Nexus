@@ -9,13 +9,23 @@ import { describe, it, expect } from "vitest";
 import { mergeGraphEntities } from "../src/index.js";
 import type { IndexedEntity, IndexedRelation } from "../src/index-graphrag.js";
 
-const ent = (name: string, descriptions: string[], mentions = 1, type = "person"): IndexedEntity => ({
+const ent = (
+  name: string,
+  descriptions: string[],
+  mentions = 1,
+  type = "person",
+): IndexedEntity => ({
   name,
   type,
   descriptions,
   mentions,
 });
-const rel = (source: string, target: string, type = "works_with", mentions = 1): IndexedRelation => ({
+const rel = (
+  source: string,
+  target: string,
+  type = "works_with",
+  mentions = 1,
+): IndexedRelation => ({
   source,
   target,
   type,
@@ -65,10 +75,7 @@ describe("mergeGraphEntities graph surgery", () => {
     // A→X and B→X both rewire to Jane→X; the existing Jane→X edge absorbs it
     const { relations } = mergeGraphEntities(
       [ent("Jane Doe", []), ent("J. Doe", []), ent("X Corp", [])],
-      [
-        rel("J. Doe", "X Corp", "works_at", 4),
-        rel("Jane Doe", "X Corp", "works_at", 2),
-      ],
+      [rel("J. Doe", "X Corp", "works_at", 4), rel("Jane Doe", "X Corp", "works_at", 2)],
       ["J. Doe"],
       "Jane Doe",
     );
@@ -130,7 +137,9 @@ describe("mergeGraphEntities graph surgery", () => {
       "merged",
       { descriptionStrategy: "keep_first" },
     );
-    expect(keepFirst.entities.find((e) => e.name === "merged")!.descriptions).toEqual(["first desc"]);
+    expect(keepFirst.entities.find((e) => e.name === "merged")!.descriptions).toEqual([
+      "first desc",
+    ]);
   });
 
   it("max mentions strategy takes the max rather than summing", () => {
@@ -146,7 +155,9 @@ describe("mergeGraphEntities graph surgery", () => {
 
   it("errors on missing or self source entities", () => {
     const base = [ent("a", [])];
-    expect(() => mergeGraphEntities(base, [], ["ghost"], "a")).toThrow(/Source entity 'ghost' does not exist/);
+    expect(() => mergeGraphEntities(base, [], ["ghost"], "a")).toThrow(
+      /Source entity 'ghost' does not exist/,
+    );
     expect(() => mergeGraphEntities(base, [], ["a"], "a")).toThrow(/cannot be merged into itself/);
   });
 

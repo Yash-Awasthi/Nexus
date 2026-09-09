@@ -10,7 +10,7 @@ into your laptop to read files, run commands, and write results.
 - Server: `apps/worker/src/bridge.ts` (~150 LOC, zero new deps — `node:http` +
   the same confinement-safe tool set the worker's agent loop uses).
 - Every file/shell operation is **confined to the bridge root** (`path escapes
-  workspace` + symlink guards from `agent-tools.ts`). It cannot touch anything
+workspace` + symlink guards from `agent-tools.ts`). It cannot touch anything
   outside the configured root.
 - Auth: a **bearer token** (`NEXUS_BRIDGE_TOKEN`, ≥ 12 chars) on every request
   except `/health`. Constant-time compare.
@@ -33,11 +33,11 @@ curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8787/connector-instru
 
 ## Protocol
 
-| Method | Path                     | Auth | Purpose |
-|--------|--------------------------|------|---------|
-| GET    | `/health`                | no   | liveness |
-| GET    | `/capabilities`          | yes  | `{protocol, label, root, tools:[{name,description,parameters}]}` |
-| GET    | `/connector-instruction` | yes  | markdown agent payload (endpoint + auth + tool examples) |
+| Method | Path                     | Auth | Purpose                                                              |
+| ------ | ------------------------ | ---- | -------------------------------------------------------------------- |
+| GET    | `/health`                | no   | liveness                                                             |
+| GET    | `/capabilities`          | yes  | `{protocol, label, root, tools:[{name,description,parameters}]}`     |
+| GET    | `/connector-instruction` | yes  | markdown agent payload (endpoint + auth + tool examples)             |
 | POST   | `/rpc`                   | yes  | `{"tool":"...","args":{...}}` → `{ok, output}` / `{ok:false, error}` |
 
 Built-in tools (from `createCodingToolSet`): `read_file`, `write_file`,
@@ -86,11 +86,11 @@ Security notes:
 
 ## Env
 
-| Var | Default | Purpose |
-|---|---|---|
-| `NEXUS_BRIDGE_TOKEN` | — | **required**, bearer token (≥ 12 chars) |
-| `NEXUS_BRIDGE_PORT` | 8787 | listen port |
-| `NEXUS_BRIDGE_ROOT` | `<cwd>/data/bridge` | confined workspace root |
-| `NEXUS_BRIDGE_ALLOW_SHELL` | `1` | `0` disables `run_command` |
-| `NEXUS_BRIDGE_MCP_SERVERS` | — | JSON `[{name, serverUrl, apiKey?, headers?}]` |
-| `NEXUS_BRIDGE_LABEL` | "user's local machine" | shown in the connector payload |
+| Var                        | Default                | Purpose                                       |
+| -------------------------- | ---------------------- | --------------------------------------------- |
+| `NEXUS_BRIDGE_TOKEN`       | —                      | **required**, bearer token (≥ 12 chars)       |
+| `NEXUS_BRIDGE_PORT`        | 8787                   | listen port                                   |
+| `NEXUS_BRIDGE_ROOT`        | `<cwd>/data/bridge`    | confined workspace root                       |
+| `NEXUS_BRIDGE_ALLOW_SHELL` | `1`                    | `0` disables `run_command`                    |
+| `NEXUS_BRIDGE_MCP_SERVERS` | —                      | JSON `[{name, serverUrl, apiKey?, headers?}]` |
+| `NEXUS_BRIDGE_LABEL`       | "user's local machine" | shown in the connector payload                |

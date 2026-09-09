@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * OpenAPI specification for Nexus Council Consensus and Knowledge Graph endpoints.
  */
@@ -33,7 +34,8 @@ export const councilOpenApiSpec = {
               },
             },
             example: {
-              prompt: "What is the best approach to handle concurrent writes in a distributed system?",
+              prompt:
+                "What is the best approach to handle concurrent writes in a distributed system?",
               models: ["claude-4-sonnet", "gpt-4o"],
               majorityThreshold: 0.67,
             },
@@ -47,8 +49,16 @@ export const councilOpenApiSpec = {
             "application/json": {
               example: {
                 answers: [
-                  { model: "claude-4-sonnet", answer: "Use optimistic locking with conflict detection...", confidence: 0.92 },
-                  { model: "gpt-4o", answer: "Implement CRDTs for conflict-free replication...", confidence: 0.85 },
+                  {
+                    model: "claude-4-sonnet",
+                    answer: "Use optimistic locking with conflict detection...",
+                    confidence: 0.92,
+                  },
+                  {
+                    model: "gpt-4o",
+                    answer: "Implement CRDTs for conflict-free replication...",
+                    confidence: 0.85,
+                  },
                 ],
                 mergedAnswer: "Use optimistic locking with conflict detection...",
                 agreement: 0.75,
@@ -79,7 +89,20 @@ export const councilOpenApiSpec = {
                 depth: { type: "integer", default: 2, description: "Traversal depth" },
                 nodeTypes: {
                   type: "array",
-                  items: { type: "string", enum: ["person", "organization", "concept", "code_symbol", "document", "event", "location", "technology", "file"] },
+                  items: {
+                    type: "string",
+                    enum: [
+                      "person",
+                      "organization",
+                      "concept",
+                      "code_symbol",
+                      "document",
+                      "event",
+                      "location",
+                      "technology",
+                      "file",
+                    ],
+                  },
                   description: "Filter by node types",
                 },
                 textSearch: { type: "string", description: "Text search on node labels" },
@@ -102,11 +125,22 @@ export const councilOpenApiSpec = {
             "application/json": {
               example: {
                 nodes: [
-                  { id: "node-typescript", label: "TypeScript", type: "technology", properties: {} },
+                  {
+                    id: "node-typescript",
+                    label: "TypeScript",
+                    type: "technology",
+                    properties: {},
+                  },
                   { id: "node-react", label: "React", type: "technology", properties: {} },
                 ],
                 edges: [
-                  { id: "e1", source: "node-typescript", target: "node-react", relation: "used_by", weight: 1.0 },
+                  {
+                    id: "e1",
+                    source: "node-typescript",
+                    target: "node-react",
+                    relation: "used_by",
+                    weight: 1.0,
+                  },
                 ],
               },
             },
@@ -190,7 +224,13 @@ export const councilOpenApiSpec = {
       summary: "Full-text search across knowledge graph nodes",
       tags: ["Knowledge Graph"],
       parameters: [
-        { name: "q", in: "query", required: true, schema: { type: "string" }, description: "Search query" },
+        {
+          name: "q",
+          in: "query",
+          required: true,
+          schema: { type: "string" },
+          description: "Search query",
+        },
         { name: "limit", in: "query", schema: { type: "integer", default: 20 } },
       ],
       responses: {
@@ -200,7 +240,12 @@ export const councilOpenApiSpec = {
             "application/json": {
               example: {
                 nodes: [
-                  { id: "node-typescript", label: "TypeScript", type: "technology", properties: { score: 15 } },
+                  {
+                    id: "node-typescript",
+                    label: "TypeScript",
+                    type: "technology",
+                    properties: { score: 15 },
+                  },
                 ],
               },
             },

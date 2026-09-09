@@ -22,10 +22,7 @@
 import type { FastifyInstance } from "fastify";
 
 import { PersistentStore } from "../lib/persistent-store.js";
-import {
-  compressSkillsForTaskSemantic,
-  polishComposite,
-} from "../lib/skill-compress.js";
+import { compressSkillsForTaskSemantic, polishComposite } from "../lib/skill-compress.js";
 import {
   mergeReport,
   mergeSkillCodes,

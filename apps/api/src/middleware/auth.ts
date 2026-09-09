@@ -109,9 +109,10 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
           // endpoints inside its areas (lib/pat-scopes.ts owns the semantics;
           // "*" / no scopes = full access, unchanged for existing tokens).
           if (!patScopesAllow(pat.scopes, request.url)) {
-            await reply
-              .code(403)
-              .send({ code: "INSUFFICIENT_SCOPE", message: "Token scope does not allow this endpoint" });
+            await reply.code(403).send({
+              code: "INSUFFICIENT_SCOPE",
+              message: "Token scope does not allow this endpoint",
+            });
             return;
           }
           return;

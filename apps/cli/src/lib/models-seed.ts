@@ -136,10 +136,9 @@ export function catalogueToRows(
 export interface SeedDb {
   insert(table: unknown): {
     values(row: unknown): {
-      onConflictDoUpdate(arg: {
-        target: unknown;
-        set: Record<string, unknown>;
-      }): { returning(): Promise<unknown[]> };
+      onConflictDoUpdate(arg: { target: unknown; set: Record<string, unknown> }): {
+        returning(): Promise<unknown[]>;
+      };
     };
   };
 }

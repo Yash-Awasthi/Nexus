@@ -22,13 +22,6 @@ import { randomBytes, scrypt as _scrypt, timingSafeEqual } from "node:crypto";
 import type { ScryptOptions } from "node:crypto";
 import { promisify } from "node:util";
 
-import {
-  assertLoginAllowed,
-  loginThrottleKey,
-  recordLoginFailure,
-  recordLoginSuccess,
-} from "../lib/auth-hardening.js";
-import { ACCESS_TOKEN_TTL_SEC, issueAccessToken } from "../lib/issue-access-token.js";
 import { db } from "@nexus/db";
 import {
   users,
@@ -40,7 +33,14 @@ import { eq, and, gt, isNull, desc } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
 import { emitAuditEvent } from "../lib/audit-emitter.js";
+import {
+  assertLoginAllowed,
+  loginThrottleKey,
+  recordLoginFailure,
+  recordLoginSuccess,
+} from "../lib/auth-hardening.js";
 import { sha256hex } from "../lib/crypto-utils.js";
+import { ACCESS_TOKEN_TTL_SEC, issueAccessToken } from "../lib/issue-access-token.js";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
 import { requireAuthWithTier } from "../middleware/auth.js";
 

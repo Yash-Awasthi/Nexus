@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Disagreement Engine — 3-model structured disagreement with minority reports.
  *
@@ -46,21 +47,21 @@ const DEFAULT_CONFIG: DisagreementConfig = {
 
 // Default personas
 export const MELCHIOR: ModelNode = {
-  id: 'melchior',
-  model: 'claude-sonnet-4-6',
-  persona: 'Analytical and methodical. Focuses on logic and evidence.',
+  id: "melchior",
+  model: "claude-sonnet-4-6",
+  persona: "Analytical and methodical. Focuses on logic and evidence.",
 };
 
 export const BALTHASAR: ModelNode = {
-  id: 'balthasar',
-  model: 'gpt-4o',
-  persona: 'Creative and contrarian. Challenges assumptions and finds edge cases.',
+  id: "balthasar",
+  model: "gpt-4o",
+  persona: "Creative and contrarian. Challenges assumptions and finds edge cases.",
 };
 
 export const CASPER: ModelNode = {
-  id: 'casper',
-  model: 'gemini-3.6-flash',
-  persona: 'Pragmatic and practical. Focuses on real-world applicability.',
+  id: "casper",
+  model: "gemini-3.6-flash",
+  persona: "Pragmatic and practical. Focuses on real-world applicability.",
 };
 
 /**
@@ -74,7 +75,7 @@ export class DisagreementEngine {
   constructor(
     llmCaller: (model: string, prompt: string) => Promise<string>,
     nodes: ModelNode[] = [MELCHIOR, BALTHASAR, CASPER],
-    config: Partial<DisagreementConfig> = {}
+    config: Partial<DisagreementConfig> = {},
   ) {
     this.nodes = nodes;
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -95,9 +96,14 @@ export class DisagreementEngine {
         const prompt = `You are ${node.persona}\n\nQuestion: ${query}\n\nProvide your answer:`;
         const response = await this.llmCaller(node.model, prompt);
         nodeResponses.set(node.id, response);
-        trace.push({ phase: 'response', nodeId: node.id, content: response, timestamp: Date.now() });
+        trace.push({
+          phase: "response",
+          nodeId: node.id,
+          content: response,
+          timestamp: Date.now(),
+        });
         return { node, response };
-      })
+      }),
     );
 
     // Phase 2: Cross-review (each sees others' responses)
@@ -105,12 +111,12 @@ export class DisagreementEngine {
       const otherResponses = responses
         .filter((r) => r.node.id !== node.id)
         .map((r) => `[${r.node.id}]: ${r.response}`)
-        .join('\n\n');
+        .join("\n\n");
 
-      const votePrompt = `You are ${node.persona}\n\nYour answer: ${response}\n\nOther answers:\n${otherResponses}\n\nVote for the best answer by returning ONLY the node id (${this.nodes.map((n) => n.id).join(', ')}):`;
+      const votePrompt = `You are ${node.persona}\n\nYour answer: ${response}\n\nOther answers:\n${otherResponses}\n\nVote for the best answer by returning ONLY the node id (${this.nodes.map((n) => n.id).join(", ")}):`;
       const voteResult = await this.llmCaller(node.model, votePrompt);
       votes.set(node.id, voteResult.trim().toLowerCase());
-      trace.push({ phase: 'vote', nodeId: node.id, content: voteResult, timestamp: Date.now() });
+      trace.push({ phase: "vote", nodeId: node.id, content: voteResult, timestamp: Date.now() });
     }
 
     // Tally votes
@@ -120,7 +126,7 @@ export class DisagreementEngine {
     }
 
     // Find majority
-    let majority = '';
+    let majority = "";
     let maxVotes = 0;
     for (const [candidate, count] of tally) {
       if (count > maxVotes) {
@@ -133,19 +139,18 @@ export class DisagreementEngine {
     const winnerNode = this.nodes.find((n) => n.id === majority);
 
     // Minority report
-    const minorityIds = this.nodes
-      .filter((n) => votes.get(n.id) !== majority)
-      .map((n) => n.id);
-    const minorityReport = minorityIds.length > 0
-      ? `Minority voted for: ${minorityIds.join(', ')} (dissenting opinion)`
-      : null;
+    const minorityIds = this.nodes.filter((n) => votes.get(n.id) !== majority).map((n) => n.id);
+    const minorityReport =
+      minorityIds.length > 0
+        ? `Minority voted for: ${minorityIds.join(", ")} (dissenting opinion)`
+        : null;
 
     return {
       query,
-      ruling: nodeResponses.get(majority) ?? '',
+      ruling: nodeResponses.get(majority) ?? "",
       confidence: maxVotes / this.nodes.length,
       minorityReport,
-      protocolUsed: hasMajority ? 'vote' : 'vote_no_majority',
+      protocolUsed: hasMajority ? "vote" : "vote_no_majority",
       nodeResponses,
       votes,
       trace,
@@ -168,7 +173,7 @@ export class DisagreementEngine {
         const response = await this.llmCaller(node.model, prompt);
         nodeResponses.set(node.id, response);
         return { node, response };
-      })
+      }),
     );
 
     // Critique rounds
@@ -179,14 +184,19 @@ export class DisagreementEngine {
           const others = currentResponses
             .filter((r) => r.node.id !== node.id)
             .map((r) => `[${r.node.id}]: ${r.response}`)
-            .join('\n\n');
+            .join("\n\n");
 
           const critiquePrompt = `You are ${node.persona}\n\nYour previous answer: ${nodeResponses.get(node.id)}\n\nOther answers:\n${others}\n\nCritique the other answers and refine your own. Provide your FINAL answer:`;
           const refined = await this.llmCaller(node.model, critiquePrompt);
           nodeResponses.set(node.id, refined);
-          trace.push({ phase: `critique_round_${round}`, nodeId: node.id, content: refined, timestamp: Date.now() });
+          trace.push({
+            phase: `critique_round_${round}`,
+            nodeId: node.id,
+            content: refined,
+            timestamp: Date.now(),
+          });
           return { node, response: refined };
-        })
+        }),
       );
       currentResponses = newResponses;
     }
@@ -197,7 +207,7 @@ export class DisagreementEngine {
       const others = currentResponses
         .filter((r) => r.node.id !== node.id)
         .map((r) => `[${r.node.id}]: ${r.response}`)
-        .join('\n\n');
+        .join("\n\n");
 
       const votePrompt = `After ${rounds} rounds of critique, vote for the best FINAL answer.\n\nYour answer: ${response}\n\nOthers:\n${others}\n\nReturn ONLY the node id:`;
       const voteResult = await this.llmCaller(node.model, votePrompt);
@@ -209,7 +219,7 @@ export class DisagreementEngine {
       tally.set(vote, (tally.get(vote) ?? 0) + 1);
     }
 
-    let majority = '';
+    let majority = "";
     let maxVotes = 0;
     for (const [candidate, count] of tally) {
       if (count > maxVotes) {
@@ -222,10 +232,10 @@ export class DisagreementEngine {
 
     return {
       query,
-      ruling: nodeResponses.get(majority) ?? '',
+      ruling: nodeResponses.get(majority) ?? "",
       confidence: maxVotes / this.nodes.length,
-      minorityReport: minorityIds.length > 0 ? `Minority: ${minorityIds.join(', ')}` : null,
-      protocolUsed: 'critique',
+      minorityReport: minorityIds.length > 0 ? `Minority: ${minorityIds.join(", ")}` : null,
+      protocolUsed: "critique",
       nodeResponses,
       votes,
       trace,

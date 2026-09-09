@@ -15,6 +15,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+
 import { Pool } from "pg";
 
 const _DATA_DIR = process.env.NEXUS_DATA_DIR ?? path.join(process.cwd(), "data", "stores");

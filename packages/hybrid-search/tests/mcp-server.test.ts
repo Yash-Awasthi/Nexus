@@ -12,9 +12,15 @@ import { createHybridSearchMcpServer } from "../src/mcp-server.js";
 import { InMemoryBM25, type SearchHit, type VectorSearchAdapter } from "../src/index.js";
 
 /** Deterministic lexical dense leg: overlap of query tokens with doc tokens. */
-function makeDense(docs: Array<{ id: string; text: string; metadata?: Record<string, unknown> }>): VectorSearchAdapter {
+function makeDense(
+  docs: Array<{ id: string; text: string; metadata?: Record<string, unknown> }>,
+): VectorSearchAdapter {
   const tokenize = (t: string): string[] =>
-    t.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+    t
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter(Boolean);
   const corpus = docs.map((d) => ({ ...d, toks: tokenize(d.text) }));
   return {
     async search(query: string, limit: number): Promise<SearchHit[]> {
@@ -57,9 +63,16 @@ function makeServer(overrides: Partial<Parameters<typeof createHybridSearchMcpSe
   return createHybridSearchMcpServer({ vector: makeDense(CORPUS), bm25, ...overrides });
 }
 
-type RpcResult = { result?: { content?: { text?: string }[]; isError?: boolean }; error?: { code?: number; message?: string } };
+type RpcResult = {
+  result?: { content?: { text?: string }[]; isError?: boolean };
+  error?: { code?: number; message?: string };
+};
 
-async function call(server: ReturnType<typeof makeServer>, method: string, params: Record<string, unknown> = {}) {
+async function call(
+  server: ReturnType<typeof makeServer>,
+  method: string,
+  params: Record<string, unknown> = {},
+) {
   const res = await server.handle({
     method: "POST",
     path: "/mcp",
@@ -80,7 +93,14 @@ describe("createHybridSearchMcpServer (served hybrid single query)", () => {
     );
 
     const list = await call(server, "tools/list");
-    const tools = (list.result as { tools: Array<{ name: string; inputSchema: { required?: string[]; properties: Record<string, unknown> } }> }).tools;
+    const tools = (
+      list.result as {
+        tools: Array<{
+          name: string;
+          inputSchema: { required?: string[]; properties: Record<string, unknown> };
+        }>;
+      }
+    ).tools;
     expect(tools).toHaveLength(1);
     expect(tools[0]!.name).toBe("hybrid_search");
     expect(tools[0]!.inputSchema.required).toEqual(["query"]);
@@ -118,7 +138,9 @@ describe("createHybridSearchMcpServer (served hybrid single query)", () => {
       name: "hybrid_search",
       arguments: { query: "bm25 ranks documents" },
     });
-    const plain = JSON.parse((unfiltered.result as { content: { text: string }[] }).content[0]!.text) as {
+    const plain = JSON.parse(
+      (unfiltered.result as { content: { text: string }[] }).content[0]!.text,
+    ) as {
       hits: Array<{ id: string; metadata?: Record<string, unknown> }>;
     };
     expect(plain.hits.some((h) => h.id === "d2")).toBe(true);
@@ -128,7 +150,9 @@ describe("createHybridSearchMcpServer (served hybrid single query)", () => {
       name: "hybrid_search",
       arguments: { query: "bm25 ranks documents", where: { tier: "gold" } },
     });
-    const gold = JSON.parse((filtered.result as { content: { text: string }[] }).content[0]!.text) as {
+    const gold = JSON.parse(
+      (filtered.result as { content: { text: string }[] }).content[0]!.text,
+    ) as {
       hits: Array<{ id: string; metadata?: Record<string, unknown> }>;
     };
     expect(gold.hits.length).toBeGreaterThan(0);
@@ -156,7 +180,9 @@ describe("createHybridSearchMcpServer (served hybrid single query)", () => {
       arguments: { query: "hybrid search engine", limit: 3 },
     });
     expect(reranked.error).toBeUndefined();
-    const withRerank = JSON.parse((reranked.result as { content: { text: string }[] }).content[0]!.text) as {
+    const withRerank = JSON.parse(
+      (reranked.result as { content: { text: string }[] }).content[0]!.text,
+    ) as {
       hits: Array<{ id: string }>;
     };
     expect(withRerank.hits.length).toBeGreaterThan(0);

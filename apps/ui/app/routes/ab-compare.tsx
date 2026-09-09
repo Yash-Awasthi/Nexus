@@ -516,7 +516,9 @@ export default function ABCompare() {
               {Object.keys(stats.modelStats).length > 0 && (
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">Model Records (wins / losses / ties)</CardTitle>
+                    <CardTitle className="text-base">
+                      Model Records (wins / losses / ties)
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">

@@ -70,13 +70,10 @@ describe("buildGraphRagIndex", () => {
   });
 
   it("puts disconnected entities into separate communities", async () => {
-    const result = await buildGraphRagIndex(
-      ["Alice is a researcher.", "Zed is a musician."],
-      {
-        extractEntities,
-        router: new FakeRouter() as never,
-      },
-    );
+    const result = await buildGraphRagIndex(["Alice is a researcher.", "Zed is a musician."], {
+      extractEntities,
+      router: new FakeRouter() as never,
+    });
     expect(result.communities).toHaveLength(2);
     expect(result.reports).toHaveLength(2);
   });

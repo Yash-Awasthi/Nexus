@@ -540,11 +540,14 @@ export default function SettingsPage() {
                 : "";
             warnings[m.id] = `"${v.model}" is not available on your ${v.provider} key.${hint}`;
           } else if (v.status === "missing_model") {
-            warnings[m.id] = `Enter a model for this ${v.provider} member before saving — an empty model will fail every run.`;
+            warnings[m.id] =
+              `Enter a model for this ${v.provider} member before saving — an empty model will fail every run.`;
           } else if (v.status === "no_key") {
-            warnings[m.id] = `No ${v.provider} key is configured server-side — add one on the Provider Keys page before this member can run.`;
+            warnings[m.id] =
+              `No ${v.provider} key is configured server-side — add one on the Provider Keys page before this member can run.`;
           } else if (v.status === "unreachable") {
-            warnings[m.id] = `Couldn't reach ${v.provider} to verify "${v.model}" — it may still work.`;
+            warnings[m.id] =
+              `Couldn't reach ${v.provider} to verify "${v.model}" — it may still work.`;
           }
         });
       }

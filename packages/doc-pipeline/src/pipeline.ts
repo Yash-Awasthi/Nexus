@@ -23,11 +23,11 @@
  *   • Multi-sender input: when N senders feed one input socket the receiver
  *     gets a list of the N values ordered alphabetically by sender component
  *     name — haystack's documented variadic-socket ordering for `run`.   * • run(inputs) takes haystack's nested form — {"comp": {"socket": value}};
-   *     a socket that is connected AND supplied receives the supplied value
-   *     (documented port choice, useful for overriding in tests).
-   * • Each component receives only its declared inputs; outputs are validated
-   *     against the declared output socket names.
-   */
+ *     a socket that is connected AND supplied receives the supplied value
+ *     (documented port choice, useful for overriding in tests).
+ * • Each component receives only its declared inputs; outputs are validated
+ *     against the declared output socket names.
+ */
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -40,7 +40,7 @@ export interface PipelineComponent {
   run(inputs: Record<string, unknown>): Record<string, unknown> | Promise<Record<string, unknown>>;
 }
 
-export interface ConnectError extends Error {}
+export type ConnectError = Error & { name: string };
 
 function connectError(message: string): ConnectError {
   const err = new Error(message) as ConnectError;
@@ -123,15 +123,26 @@ export class ComponentPipeline {
     const senderComp = this.components.get(senderName);
     if (!senderComp) throw connectError(`Component named ${senderName} not found in the pipeline.`);
     const receiverComp = this.components.get(receiverName);
-    if (!receiverComp) throw connectError(`Component named ${receiverName} not found in the pipeline.`);
+    if (!receiverComp)
+      throw connectError(`Component named ${receiverName} not found in the pipeline.`);
     if (senderName === receiverName) {
       throw connectError("Connecting a Component to itself is not supported.");
     }
 
     const senderSocket = resolveSocket("output", senderName, senderRef, senderComp.outputs);
-    const receiverSocket = resolveSocket("input", receiverName, receiverRef, receiverComp.inputs ?? []);
+    const receiverSocket = resolveSocket(
+      "input",
+      receiverName,
+      receiverRef,
+      receiverComp.inputs ?? [],
+    );
 
-    const edge: Edge = { senderComponent: senderName, senderSocket, receiverComponent: receiverName, receiverSocket };
+    const edge: Edge = {
+      senderComponent: senderName,
+      senderSocket,
+      receiverComponent: receiverName,
+      receiverSocket,
+    };
     this.edges.push(edge);
     const key = `${receiverName}.${receiverSocket}`;
     const list = this.connections.get(key);
@@ -151,7 +162,11 @@ export class ComponentPipeline {
     for (const [name, socketValues] of Object.entries(inputs)) {
       const comp = this.components.get(name);
       if (!comp) throw new Error(`Component named ${name} not found in the pipeline.`);
-      if (socketValues === null || typeof socketValues !== "object" || Array.isArray(socketValues)) {
+      if (
+        socketValues === null ||
+        typeof socketValues !== "object" ||
+        Array.isArray(socketValues)
+      ) {
         throw new Error(
           `Inputs for '${name}' must be an object mapping socket names to values, got: ${JSON.stringify(socketValues)}.`,
         );
@@ -159,7 +174,9 @@ export class ComponentPipeline {
       const declared = comp.inputs ?? [];
       for (const [socket, value] of Object.entries(socketValues)) {
         if (declared.length > 0 && !declared.includes(socket)) {
-          throw new Error(`'${name}.${socket}' does not exist. Input sockets of ${name} are: ${declared.join(", ")}.`);
+          throw new Error(
+            `'${name}.${socket}' does not exist. Input sockets of ${name} are: ${declared.join(", ")}.`,
+          );
         }
         if (!provided.has(name)) provided.set(name, new Map());
         provided.get(name)!.set(socket, value);
@@ -220,11 +237,15 @@ export class ComponentPipeline {
       for (const socket of comp.inputs ?? []) {
         const incoming = this.connections.get(`${name}.${socket}`);
         if (incoming && incoming.length > 0) {
-          const sorted = [...incoming].sort((a, b) => (a.senderComponent < b.senderComponent ? -1 : 1));
+          const sorted = [...incoming].sort((a, b) =>
+            a.senderComponent < b.senderComponent ? -1 : 1,
+          );
           const values = sorted.map((e) => {
             const senderOut = outputs.get(e.senderComponent);
             if (!senderOut) {
-              throw new Error(`Component '${e.senderComponent}' produced no output for '${e.senderComponent}.${e.senderSocket}'.`);
+              throw new Error(
+                `Component '${e.senderComponent}' produced no output for '${e.senderComponent}.${e.senderSocket}'.`,
+              );
             }
             return senderOut[e.senderSocket];
           });
@@ -232,7 +253,8 @@ export class ComponentPipeline {
         }
       }
       // Caller-supplied inputs override connected values (haystack semantics).
-      for (const [k, v] of provided.get(name) ?? new Map()) inputValues.set(k, v);
+      for (const [k, v] of provided.get(name) ?? new Map<string, unknown>())
+        inputValues.set(k, v as string);
 
       const result = await comp.run(Object.fromEntries(inputValues));
       for (const socket of comp.outputs) {

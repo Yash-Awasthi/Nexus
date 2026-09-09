@@ -90,10 +90,7 @@ export class ResourceManager {
   /**
    * Register an unload callback for a model.
    */
-  registerUnloadCallback(
-    modelPrefix: string,
-    callback: (modelId: string) => Promise<void>,
-  ): void {
+  registerUnloadCallback(modelPrefix: string, callback: (modelId: string) => Promise<void>): void {
     this.unloadCallbacks.set(modelPrefix, callback);
   }
 
@@ -144,10 +141,7 @@ export class ResourceManager {
   /**
    * Execute a function with exclusive hardware access.
    */
-  async withExclusiveAccess<T>(
-    request: ResourceRequest,
-    fn: () => Promise<T>,
-  ): Promise<T> {
+  async withExclusiveAccess<T>(request: ResourceRequest, fn: () => Promise<T>): Promise<T> {
     const allocation = await this.acquire(request);
     try {
       return await fn();
@@ -389,7 +383,9 @@ export interface ModalityDetectResult {
  * Uses lightweight heuristics based on message content and tools.
  */
 export function detectModality(request: {
-  messages?: Array<{ role: string; content: unknown } | { role: string; content: Array<{ type: string }> }>;
+  messages?: Array<
+    { role: string; content: unknown } | { role: string; content: Array<{ type: string }> }
+  >;
   tools?: unknown[];
   endpoint?: string;
 }): ModalityDetectResult {
@@ -496,17 +492,13 @@ export class DeadLetterQueue {
     if (status) {
       entries = entries.filter((e) => e.status === status);
     }
-    return entries
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, limit);
+    return entries.sort((a, b) => b.createdAt - a.createdAt).slice(0, limit);
   }
 
   /** Get entries ready for retry. */
   getReadyForRetry(): DLQEntry[] {
     const now = Date.now();
-    return this.list("failed").filter(
-      (e) => e.attempts < e.maxRetries && e.nextRetryAt <= now,
-    );
+    return this.list("failed").filter((e) => e.attempts < e.maxRetries && e.nextRetryAt <= now);
   }
 
   /** Mark an entry as retrying. */
@@ -549,7 +541,13 @@ export class DeadLetterQueue {
   }
 
   /** Get stats. */
-  getStats(): { total: number; failed: number; retrying: number; succeeded: number; abandoned: number } {
+  getStats(): {
+    total: number;
+    failed: number;
+    retrying: number;
+    succeeded: number;
+    abandoned: number;
+  } {
     const entries = Array.from(this.entries.values());
     return {
       total: entries.length,
@@ -570,10 +568,10 @@ export class DeadLetterQueue {
 
 export interface ProfileResult {
   modelName: string;
-  reasoning: number;   // 0-1
-  coding: number;      // 0-1
-  creativity: number;  // 0-1
-  speed: number;       // 0-1 (tokens/sec normalized)
+  reasoning: number; // 0-1
+  coding: number; // 0-1
+  creativity: number; // 0-1
+  speed: number; // 0-1 (tokens/sec normalized)
   avgResponseTimeMs: number;
   vision: boolean;
   toolCalling: boolean;
@@ -595,10 +593,7 @@ const BENCHMARK_PROMPTS = {
     "Write a function that finds the longest palindromic substring in a string.",
     "Debug this code: function fib(n) { return fib(n-1) + fib(n-2); }",
   ],
-  creativity: [
-    "Write a haiku about artificial intelligence.",
-    "Invent a new word and define it.",
-  ],
+  creativity: ["Write a haiku about artificial intelligence.", "Invent a new word and define it."],
 };
 
 function defaultJudge(_prompt: string, response: string): number {
@@ -616,10 +611,7 @@ export class ModelProfiler {
   private readonly judge: (prompt: string, response: string) => Promise<number>;
   private readonly llmFn: (prompt: string) => Promise<string>;
 
-  constructor(
-    llmFn: (prompt: string) => Promise<string>,
-    config: ProfilerConfig = {},
-  ) {
+  constructor(llmFn: (prompt: string) => Promise<string>, config: ProfilerConfig = {}) {
     this.timeoutMs = config.timeoutMs ?? 30_000;
     this.judge = config.judge ?? defaultJudge;
     this.llmFn = llmFn;
@@ -643,8 +635,8 @@ export class ModelProfiler {
       creativity,
       speed,
       avgResponseTimeMs: avgResponseTime,
-      vision: false,  // Set via separate vision test
-      toolCalling: false,  // Set via separate tool-call test
+      vision: false, // Set via separate vision test
+      toolCalling: false, // Set via separate tool-call test
     };
   }
 
@@ -656,7 +648,9 @@ export class ModelProfiler {
       try {
         const response = await Promise.race([
           this.llmFn(prompt),
-          new Promise<string>((_, reject) => setTimeout(() => reject(new Error("timeout")), this.timeoutMs)),
+          new Promise<string>((_, reject) =>
+            setTimeout(() => reject(new Error("timeout")), this.timeoutMs),
+          ),
         ]);
         const score = await this.judge(prompt, response);
         totalScore += score;

@@ -7,8 +7,8 @@ interface ([`LlmDriver`](src/index.ts)):
 
 ```ts
 interface LlmDriver {
-  readonly provider: string;                 // stable id, e.g. "groq"
-  readonly model: string;                    // default model id
+  readonly provider: string; // stable id, e.g. "groq"
+  readonly model: string; // default model id
   complete(opts: LlmRequestOptions): Promise<LlmResponse>;
   stream(opts: LlmRequestOptions, handler: StreamHandler): Promise<LlmResponse>;
   countTokens(text: string): number;
@@ -27,26 +27,22 @@ to a typed [`LlmError`](src/index.ts) (`AUTH_FAILED`, `RATE_LIMITED`,
 The extension seams are public exports of this package — a new driver is a
 standalone file that imports them:
 
-| Export                       | Purpose                                                                                     |
-| ---------------------------- | ------------------------------------------------------------------------------------------- |
-| `OpenAICompatibleDriver`     | Implements `complete`/`stream` for OpenAI chat-completions-shaped endpoints. **Start here.** |
-| `BaseDriver`                 | Real HTTP + SSE/NDJSON streaming, error mapping, response/usage helpers. For providers that  |
-|                              | are NOT chat-completions-shaped (Anthropic, Gemini, Ollama extend this).                     |
-| `HttpTransport`              | Injectable `post(url, body, headers)` — the only I/O a driver touches.                      |
-| `MockTransport`              | Test transport: `setResponse()` / `setResponses()` + a `calls` log. No network in tests.     |
-| `FullConfig` / `ApiKeyConfig` / `BaseUrlConfig` | Standard driver config: `apiKey` + optional `baseUrl` override.                 |
-| `LlmRequestOptions` / `LlmResponse` / `StreamDelta` / `LlmToolCall` | The wire-neutral shapes every driver speaks.                   |
+| Export                                                              | Purpose                                                                                      |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `OpenAICompatibleDriver`                                            | Implements `complete`/`stream` for OpenAI chat-completions-shaped endpoints. **Start here.** |
+| `BaseDriver`                                                        | Real HTTP + SSE/NDJSON streaming, error mapping, response/usage helpers. For providers that  |
+|                                                                     | are NOT chat-completions-shaped (Anthropic, Gemini, Ollama extend this).                     |
+| `HttpTransport`                                                     | Injectable `post(url, body, headers)` — the only I/O a driver touches.                       |
+| `MockTransport`                                                     | Test transport: `setResponse()` / `setResponses()` + a `calls` log. No network in tests.     |
+| `FullConfig` / `ApiKeyConfig` / `BaseUrlConfig`                     | Standard driver config: `apiKey` + optional `baseUrl` override.                              |
+| `LlmRequestOptions` / `LlmResponse` / `StreamDelta` / `LlmToolCall` | The wire-neutral shapes every driver speaks.                                                 |
 
 ### Template — OpenAI-compatible provider (recommended)
 
 ```ts
 // my-provider.ts — drop-in, zero core edits
 // SPDX-License-Identifier: Apache-2.0
-import {
-  FullConfig,
-  HttpTransport,
-  OpenAICompatibleDriver,
-} from "@nexus/llm-drivers";
+import { FullConfig, HttpTransport, OpenAICompatibleDriver } from "@nexus/llm-drivers";
 
 export class MyProviderDriver extends OpenAICompatibleDriver {
   readonly provider = "myprovider";

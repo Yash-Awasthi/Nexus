@@ -121,7 +121,9 @@ describe("parseWorkflowSpec", () => {
   it("flags dependencies that are not an array", () => {
     const s = structuredClone(VALID_SPEC);
     (s.tasks[0] as unknown as { dependencies: unknown }).dependencies = "t2";
-    expect(() => parseWorkflowSpec(JSON.stringify(s), "x.json")).toThrow(/dependencies must be an array/);
+    expect(() => parseWorkflowSpec(JSON.stringify(s), "x.json")).toThrow(
+      /dependencies must be an array/,
+    );
   });
 
   it("flags dangling dependency references", () => {

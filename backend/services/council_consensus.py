@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 LLM Council & Consensus Service
 Extracted from inspiration repos:

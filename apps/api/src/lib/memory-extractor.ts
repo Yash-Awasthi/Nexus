@@ -33,11 +33,7 @@ export interface ExtractorDeps {
   timeoutMs?: number;
 }
 
-function buildPrompt(record: {
-  goal: string;
-  outcome: string;
-  finalContent: string;
-}): string {
+function buildPrompt(record: { goal: string; outcome: string; finalContent: string }): string {
   return [
     "You distill completed agent runs into short carry-forward notes.",
     `Run goal: ${record.goal.slice(0, 300)}`,
@@ -59,7 +55,12 @@ export function sanitizeInsights(raw: string): string | null {
     .filter((l) => !/^\s*```/.test(l)) // drop fence markers, keep the content
     .map((l) => l.trim())
     .filter((l) => /^[-*\d]/.test(l) && l.length > 8) // bullets only, non-trivial
-    .map((l) => l.replace(/^[-*]\s*/, "- ").replace(/^\d+[.)]\s*/, "- ").slice(0, 200))
+    .map((l) =>
+      l
+        .replace(/^[-*]\s*/, "- ")
+        .replace(/^\d+[.)]\s*/, "- ")
+        .slice(0, 200),
+    )
     .slice(0, 3);
   const text = cleaned.join("\n").slice(0, MAX_INSIGHTS_CHARS).trim();
   return text.length > 0 ? text : null;
@@ -79,7 +80,8 @@ export async function extractMissionInsights(
     "",
   );
   const model = deps.model ?? process.env.NEXUS_MEMORY_EXTRACT_MODEL ?? DEFAULT_MODEL;
-  const timeoutMs = deps.timeoutMs ?? Number(process.env.NEXUS_MEMORY_EXTRACT_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
+  const timeoutMs =
+    deps.timeoutMs ?? Number(process.env.NEXUS_MEMORY_EXTRACT_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
   const doFetch = deps.fetchImpl ?? fetch;
   try {
     const res = (await Promise.race([

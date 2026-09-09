@@ -25,8 +25,8 @@ import { Command } from "commander";
 
 import { api } from "./lib/client.js";
 import { runLocalAgent } from "./lib/local-agent.js";
-import { streamSse } from "./lib/sse-stream.js";
 import { loadModelsDevSource, seedModelsFromSource } from "./lib/models-seed.js";
+import { streamSse } from "./lib/sse-stream.js";
 
 const program = new Command();
 
@@ -134,10 +134,8 @@ async function runCodeLocal(
       const t = event.transcript;
       console.log(
         chalk.gray("  ⌘ deliberation transcript"),
-        chalk.cyan(String(t.protocol ?? "")),
-        chalk.gray(
-          `degraded=${String(t.degraded ?? false)} warnings=${(t.warnings ?? []).length}`,
-        ),
+        chalk.cyan(t.protocol ?? ""),
+        chalk.gray(`degraded=${String(t.degraded ?? false)} warnings=${(t.warnings ?? []).length}`),
       );
     },
   });

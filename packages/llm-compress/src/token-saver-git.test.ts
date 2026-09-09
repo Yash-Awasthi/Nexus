@@ -88,7 +88,11 @@ describe("gitOutputProcessor — diff", () => {
   });
 
   it("strips +/- bars from short --stat output", () => {
-    const out = [" src/a.ts | 12 +++++-------", " src/b.ts | 3 ---", " 2 files changed, 15 insertions(+)"].join("\n");
+    const out = [
+      " src/a.ts | 12 +++++-------",
+      " src/b.ts | 3 ---",
+      " 2 files changed, 15 insertions(+)",
+    ].join("\n");
     const r = compressOutputForCommand("git diff --stat", out);
     expect(r.processor).toBe("git");
     expect(r.output).toContain(" src/a.ts | 12");
@@ -120,7 +124,11 @@ describe("gitOutputProcessor — status/branch/log/transfer/blame", () => {
   });
 
   it("keeps a clean working tree untouched", () => {
-    const out = ["On branch main", "Your branch is up to date with 'origin/main'.", "nothing to commit, working tree clean"].join("\n");
+    const out = [
+      "On branch main",
+      "Your branch is up to date with 'origin/main'.",
+      "nothing to commit, working tree clean",
+    ].join("\n");
     const r = compressOutputForCommand("git status", out);
     expect(r.processor).toBe("git");
     expect(r.wasCompressed).toBe(false);
@@ -130,7 +138,14 @@ describe("gitOutputProcessor — status/branch/log/transfer/blame", () => {
     const entries: string[] = [];
     for (let i = 0; i < 15; i++) {
       const hash = `abc${String(i).padStart(37, "0")}`;
-      entries.push(`commit ${hash}`, `Author: Dev <dev@x.io>`, `Date:   2026-01-0${i % 10} 10:00:00 +0000`, "", `    fix: item ${i}`, "");
+      entries.push(
+        `commit ${hash}`,
+        `Author: Dev <dev@x.io>`,
+        `Date:   2026-01-0${i % 10} 10:00:00 +0000`,
+        "",
+        `    fix: item ${i}`,
+        "",
+      );
     }
     const r = compressOutputForCommand("git log", entries.join("\n"));
     expect(r.processor).toBe("git");

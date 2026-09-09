@@ -35,11 +35,7 @@ import {
   SweepOrchestrator,
   TelegramAlerter,
 } from "./base.js";
-import {
-  AviationFeed,
-  ClimateFeed,
-  ConflictFeed,
-} from "./feeds/aviation-climate-conflict.js";
+import { AviationFeed, ClimateFeed, ConflictFeed } from "./feeds/aviation-climate-conflict.js";
 import {
   CyberFeed,
   DisplacementFeed,
@@ -277,8 +273,6 @@ export interface DirectiveEvent extends FeedEvent {
   /** Publication date (ISO), parsed from the RSS pubDate when present. */
   published?: string;
 }
-
-
 
 // ── createDefaultRegistry — wires all adapters with env-based config ───────────
 

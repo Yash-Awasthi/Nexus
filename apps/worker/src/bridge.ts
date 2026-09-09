@@ -26,13 +26,13 @@
  *   NEXUS_BRIDGE_MCP_SERVERS  optional JSON: [{name, serverUrl, apiKey?, headers?}]
  *   NEXUS_BRIDGE_LABEL      optional display label in the connector payload
  */
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
-import * as path from "node:path";
 import { mkdirSync } from "node:fs";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import * as path from "node:path";
 
-import { createCodingToolSet } from "./handlers/agent-tools.js";
 import { mcpToolsFromServers, type McpServerConfig } from "./handlers/agent-mcp.js";
+import { createCodingToolSet } from "./handlers/agent-tools.js";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -211,7 +211,12 @@ export async function startBridgeServer(opts: {
     handler: async () => {
       const { readdir } = await import("node:fs/promises");
       const entries = await readdir(root, { withFileTypes: true });
-      return entries.filter((e) => e.isDirectory()).map((e) => e.name).join("\n") || "(none)";
+      return (
+        entries
+          .filter((e) => e.isDirectory())
+          .map((e) => e.name)
+          .join("\n") || "(none)"
+      );
     },
   });
   // MCP passthrough: configured remote MCP servers arrive as ordinary tools.
@@ -231,7 +236,11 @@ export async function startBridgeServer(opts: {
     const route = `${req.method} ${url.pathname}`;
 
     if (route === "GET /health") {
-      return json(res, 200, { ok: true, service: "nexus-local-bridge", toolCount: toolList.length });
+      return json(res, 200, {
+        ok: true,
+        service: "nexus-local-bridge",
+        toolCount: toolList.length,
+      });
     }
     if (!authed(req)) {
       return json(res, 401, { error: "unauthorized", message: "Bearer token required" });

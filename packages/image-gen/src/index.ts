@@ -594,11 +594,10 @@ export class FluxProvider implements ImageProvider {
       }
       task = (await pollRes.json()) as FluxTaskResponse;
       if (task.status === "Error" || task.status === "Content Moderation") {
-        throw new ImageGenError(
-          "PREDICTION_FAILED",
-          `Flux task failed: ${task.status}`,
-          { taskId: task.id, status: task.status },
-        );
+        throw new ImageGenError("PREDICTION_FAILED", `Flux task failed: ${task.status}`, {
+          taskId: task.id,
+          status: task.status,
+        });
       }
     }
 
@@ -619,7 +618,17 @@ export interface StabilityConfig {
 }
 
 const ASPECT_RATIOS = [
-  "1:1", "16:9", "9:16", "21:9", "9:21", "3:2", "2:3", "4:3", "3:4", "5:4", "4:5",
+  "1:1",
+  "16:9",
+  "9:16",
+  "21:9",
+  "9:21",
+  "3:2",
+  "2:3",
+  "4:3",
+  "3:4",
+  "5:4",
+  "4:5",
 ] as const;
 
 /** Closest supported Stability aspect_ratio for a width×height pair. */
@@ -1005,10 +1014,11 @@ export class ComfyUIProvider implements ImageProvider {
     this.workflow = config.workflow;
     this.promptNode = config.promptNode;
     this.promptInput = config.promptInput ?? "text";
-    this.baseUrl = (config.baseUrl ?? process.env["COMFYUI_URL"] ?? "http://127.0.0.1:8188").replace(
-      /\/$/,
-      "",
-    );
+    this.baseUrl = (
+      config.baseUrl ??
+      process.env["COMFYUI_URL"] ??
+      "http://127.0.0.1:8188"
+    ).replace(/\/$/, "");
     this.pollIntervalMs = config.pollIntervalMs ?? 500;
     this.timeoutMs = config.timeoutMs ?? 300_000;
     this.fetchFn = config.fetch ?? fetch;
@@ -1020,9 +1030,7 @@ export class ComfyUIProvider implements ImageProvider {
     const [width, height] = parseSize(opts.size ?? "1024x1024");
     const format = opts.format ?? "png";
 
-    const node = this.workflow[this.promptNode] as
-      | { inputs?: Record<string, unknown> }
-      | undefined;
+    const node = this.workflow[this.promptNode] as { inputs?: Record<string, unknown> } | undefined;
     if (!node) {
       throw new ImageGenError(
         "PROVIDER_ERROR",
@@ -1070,7 +1078,10 @@ export class ComfyUIProvider implements ImageProvider {
       try {
         historyRes = await this.fetchFn(`${this.baseUrl}/history/${queued.prompt_id}`);
       } catch (cause) {
-        throw new ImageGenError("PROVIDER_ERROR", `ComfyUI history network error: ${String(cause)}`);
+        throw new ImageGenError(
+          "PROVIDER_ERROR",
+          `ComfyUI history network error: ${String(cause)}`,
+        );
       }
       if (!historyRes.ok) {
         throw new ImageGenError("PROVIDER_ERROR", `ComfyUI history returned ${historyRes.status}`);

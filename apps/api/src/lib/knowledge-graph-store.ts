@@ -13,8 +13,6 @@
  * (flagged in routes/kg.ts).
  */
 
-import { Pool } from "pg";
-
 import {
   InMemoryKGStore,
   NeonKGStore,
@@ -23,6 +21,7 @@ import {
   type NeonRow,
   type NeonQueryFn,
 } from "@nexus/knowledge-graph";
+import { Pool } from "pg";
 
 let _kgStore: KGStore | null = null;
 let _kg: KnowledgeGraph | null = null;

@@ -191,7 +191,10 @@ describe("TaskExecutor", () => {
     expect(rig.metrics.calls.some((c) => c.startsWith("gauge:queue.size:"))).toBe(true);
     expect(rig.metrics.calls).toContain("inc:task.executed:1");
     expect(rig.metrics.calls).toContain("inc:task.success:1");
-    expect(rig.persistence.saved[0]?.state).toMatchObject({ status: "success", result: { ok: true } });
+    expect(rig.persistence.saved[0]?.state).toMatchObject({
+      status: "success",
+      result: { ok: true },
+    });
     const channels = rig.bus.published.map((p) => p.channel);
     expect(channels).toEqual(["execution_started", "execution_succeeded"]);
     expect(rig.tracer.ended[0]?.spanId).toBe("span-1");
@@ -222,12 +225,20 @@ describe("TaskExecutor", () => {
   });
 
   it("on failure with retries left: re-queues and schedules exponential backoff", async () => {
-    const rig = makeRig([adapterFor("floci", { execute: vi.fn(async () => { throw new Error("boom"); }) })]);
+    const rig = makeRig([
+      adapterFor("floci", {
+        execute: vi.fn(async () => {
+          throw new Error("boom");
+        }),
+      }),
+    ]);
     rig.queue.jobs.push(makeJob({ retries: 0, maxRetries: 3 }));
 
     expect(await rig.executor.executeNext()).toBe(false);
     // Backoff for retry 1 = 500ms * 2^0 = 500ms, capped at 30s.
-    expect((rig.executor as unknown as { _pendingRetryDelayMs: number })._pendingRetryDelayMs).toBe(500);
+    expect((rig.executor as unknown as { _pendingRetryDelayMs: number })._pendingRetryDelayMs).toBe(
+      500,
+    );
     expect(rig.queue.jobs).toHaveLength(1); // re-queued
     expect(rig.queue.jobs[0]?.retries).toBe(1);
     expect(rig.metrics.calls).toContain("inc:task.retry:1");
@@ -237,21 +248,37 @@ describe("TaskExecutor", () => {
   });
 
   it("on exhausted retries: routes the job to the dead-letter queue", async () => {
-    const rig = makeRig([adapterFor("floci", { execute: vi.fn(async () => { throw new Error("boom"); }) })]);
+    const rig = makeRig([
+      adapterFor("floci", {
+        execute: vi.fn(async () => {
+          throw new Error("boom");
+        }),
+      }),
+    ]);
     rig.queue.jobs.push(makeJob({ retries: 2, maxRetries: 2 }));
 
     expect(await rig.executor.executeNext()).toBe(false);
     expect(rig.metrics.calls).toContain("inc:task.dead_letter:1");
     expect(rig.queue.dlq).toHaveLength(1); // push routed exhausted job to DLQ
-    expect((rig.executor as unknown as { _pendingRetryDelayMs: number })._pendingRetryDelayMs).toBe(0);
+    expect((rig.executor as unknown as { _pendingRetryDelayMs: number })._pendingRetryDelayMs).toBe(
+      0,
+    );
   });
 
   it("caps exponential backoff at 30 seconds", async () => {
-    const rig = makeRig([adapterFor("floci", { execute: vi.fn(async () => { throw new Error("boom"); }) })]);
+    const rig = makeRig([
+      adapterFor("floci", {
+        execute: vi.fn(async () => {
+          throw new Error("boom");
+        }),
+      }),
+    ]);
     rig.queue.jobs.push(makeJob({ retries: 6, maxRetries: 50 })); // 2^6 = 64000ms → capped
 
     await rig.executor.executeNext();
-    expect((rig.executor as unknown as { _pendingRetryDelayMs: number })._pendingRetryDelayMs).toBe(30_000);
+    expect((rig.executor as unknown as { _pendingRetryDelayMs: number })._pendingRetryDelayMs).toBe(
+      30_000,
+    );
   });
 
   it("runLoop drains the queue and returns the success count", async () => {
@@ -264,7 +291,11 @@ describe("TaskExecutor", () => {
 
   it("runLoop stops after maxIterations even when the queue never drains", async () => {
     const rig = makeRig([
-      adapterFor("floci", { execute: vi.fn(async () => { throw new Error("always-fails"); }) }),
+      adapterFor("floci", {
+        execute: vi.fn(async () => {
+          throw new Error("always-fails");
+        }),
+      }),
     ]);
     // One job that always fails and gets re-queued (retries < maxRetries keeps it alive).
     rig.queue.jobs.push(makeJob({ retries: 0, maxRetries: 1_000_000 }));

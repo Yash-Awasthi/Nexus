@@ -44,7 +44,7 @@
  */
 
 import { createHash } from "node:crypto";
-import type { LlmDriver, LlmRequestOptions, LlmResponse } from "@nexus/llm-drivers";
+
 import {
   KVPromptCache,
   MemoryPromptCache,
@@ -52,6 +52,7 @@ import {
   type LLMResponse as CachedResponse,
   type PromptCache,
 } from "@nexus/llm-cache";
+import type { LlmDriver, LlmRequestOptions, LlmResponse } from "@nexus/llm-drivers";
 
 import { getSharedKV } from "./shared-kv.js";
 import { getCacheUserId } from "./user-context.js";

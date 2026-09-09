@@ -99,7 +99,9 @@ function anyValue(value: string | number | boolean): OtlpAnyValue {
   return { stringValue: value };
 }
 
-function keyValues(attributes: Record<string, string | number | boolean | undefined>): OtlpKeyValue[] {
+function keyValues(
+  attributes: Record<string, string | number | boolean | undefined>,
+): OtlpKeyValue[] {
   const out: OtlpKeyValue[] = [];
   for (const [key, value] of Object.entries(attributes)) {
     if (value !== undefined) out.push({ key, value: anyValue(value) });
@@ -206,8 +208,7 @@ export async function exportSpansOtlp(
   if (spans.length === 0) return { ok: true, status: 0, text: "no spans" };
   const body = buildOtlpJsonPayload(spans, opts.serviceName ?? "nexus");
   const doFetch: OtlpFetchFn =
-    opts.fetch ??
-    ((globalThis as { fetch?: OtlpFetchFn }).fetch as OtlpFetchFn);
+    opts.fetch ?? ((globalThis as { fetch?: OtlpFetchFn }).fetch as OtlpFetchFn);
   const res = await doFetch(opts.endpoint ?? DEFAULT_ENDPOINT, {
     method: "POST",
     headers: { "content-type": "application/json", ...(opts.headers ?? {}) },

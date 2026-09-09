@@ -21,7 +21,9 @@ describe("RuntimeManager", () => {
 
   it("falls back to registered names when the config loader fails", async () => {
     const failing = loader();
-    (failing.loadServices as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("no config"));
+    (failing.loadServices as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error("no config"),
+    );
     const manager = new RuntimeManager(failing);
     manager.registerService("only-me");
     expect(await manager.getActiveServices()).toEqual(["only-me"]);
@@ -47,7 +49,10 @@ describe("RuntimeManager", () => {
     manager.markError("c", "kaboom");
     manager.markRunning("c");
 
-    expect(manager.getServiceRecord("a")).toMatchObject({ status: "stopped", detail: "by operator" });
+    expect(manager.getServiceRecord("a")).toMatchObject({
+      status: "stopped",
+      detail: "by operator",
+    });
     expect(manager.getServiceRecord("a")?.stoppedAt).toBeInstanceOf(Date);
     const c = manager.getServiceRecord("c")!;
     expect(c.status).toBe("running");
@@ -85,7 +90,10 @@ describe("RuntimeManager", () => {
         throw new Error("drain failed");
       }),
     ).rejects.toThrow("drain failed");
-    expect(manager.getServiceRecord("svc")).toMatchObject({ status: "error", lastError: "drain failed" });
+    expect(manager.getServiceRecord("svc")).toMatchObject({
+      status: "error",
+      lastError: "drain failed",
+    });
   });
 
   it("restartService stops then starts", async () => {

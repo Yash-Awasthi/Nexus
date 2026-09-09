@@ -17,26 +17,6 @@ const CANDIDATES: readonly CandidateAnswer[] = [
   { label: "B", content: "No, backfills will race the nightly purge." },
 ];
 
-/** Verdict per verifier keyed as `${verifier}:${candidate}`. */
-function scriptedTransport(table: Record<string, VerifierVerdict>): ILLMTransport {
-  return {
-    async chat(messages): Promise<ILLMResponse> {
-      const user = messages.find((m) => m.role === "user")?.content ?? "";
-      const verifier = messages.find((m) => m.role === "system")?.content ?? "";
-      const candidateMatch = /Response from "(A|B)"/.exec(user) ?? /Response from the candidate/.exec(user);
-      const cand = candidateMatch?.[1] ?? "anon";
-      const key = `${verifier.length}:${cand}`;
-      const v = table[key] ?? { verdict: false, aspect: "correctness", reasoning: "default no" };
-      return {
-        content: JSON.stringify(v),
-        model: "fake",
-        usage: { promptTokens: 5, completionTokens: 5 },
-        latencyMs: 1,
-      };
-    },
-  };
-}
-
 /** Simpler scripted transport keyed on the user prompt text. */
 function promptTransport(reply: (user: string) => VerifierVerdict): ILLMTransport {
   return {
@@ -55,7 +35,9 @@ function promptTransport(reply: (user: string) => VerifierVerdict): ILLMTranspor
 
 describe("parseVerdict", () => {
   it("parses clean JSON and strips markdown fences", () => {
-    expect(parseVerdict('```json\n{"verdict": true, "aspect": "correctness", "reasoning": "ok"}\n```')).toEqual({
+    expect(
+      parseVerdict('```json\n{"verdict": true, "aspect": "correctness", "reasoning": "ok"}\n```'),
+    ).toEqual({
       verdict: true,
       aspect: "correctness",
       reasoning: "ok",

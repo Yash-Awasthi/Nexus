@@ -22,11 +22,11 @@ import {
   type ToolRuntimeResult,
   type ToolStepRecord,
 } from "@nexus/agent-runtime";
-import { AnthropicDriver, GroqDriver, OpenRouterDriver } from "@nexus/llm-drivers";
-
 import { toolTranscriptEvent, type CouncilTranscript } from "@nexus/council";
 import type { BM25SearchAdapter, VectorSearchAdapter } from "@nexus/hybrid-search";
+import { AnthropicDriver, GroqDriver, OpenRouterDriver } from "@nexus/llm-drivers";
 import type { Reranker } from "@nexus/reranker";
+
 import {
   councilRuntimeToolsFromLlm,
   debateRuntimeToolFromLlm,

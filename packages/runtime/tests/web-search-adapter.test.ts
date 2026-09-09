@@ -13,10 +13,12 @@ const ctx = {
   logger: { info: vi.fn(), warn: () => {}, error: vi.fn() },
 } as unknown as IExecutionContext;
 
-function fakeLLM(opts: {
-  objects?: Array<() => Promise<unknown>>;
-  texts?: Array<() => Promise<string>>;
-} = {}): ILanguageModel {
+function fakeLLM(
+  opts: {
+    objects?: Array<() => Promise<unknown>>;
+    texts?: Array<() => Promise<string>>;
+  } = {},
+): ILanguageModel {
   const objects = [...(opts.objects ?? [])];
   const texts = [...(opts.texts ?? [])];
   return {
@@ -68,7 +70,13 @@ describe("WebSearchAdapter", () => {
     });
     const adapter = new WebSearchAdapter({ llm, tavilyApiKey: "k" });
     const out = await adapter.execute(
-      { payload: { query: "what is 2+2", mode: "speed", history: [{ role: "user", content: "hi" }] } },
+      {
+        payload: {
+          query: "what is 2+2",
+          mode: "speed",
+          history: [{ role: "user", content: "hi" }],
+        },
+      },
       ctx,
     );
     expect(out.success).toBe(true);

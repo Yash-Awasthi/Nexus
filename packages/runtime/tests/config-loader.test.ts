@@ -26,11 +26,11 @@ afterEach(() => {
 describe("YAMLConfigLoader", () => {
   it("loads each YAML document typed as its config shape", async () => {
     fs.writeFileSync(paths.ports, "floci: 4566\nfcc: 3000\nmcp: 8100\nollama: 11434\n");
+    fs.writeFileSync(paths.services, "services:\n  api:\n    type: process\n    port: 3000\n");
     fs.writeFileSync(
-      paths.services,
-      "services:\n  api:\n    type: process\n    port: 3000\n",
+      paths.healthchecks,
+      "healthchecks:\n  api:\n    path: /health\n    interval: 30\n",
     );
-    fs.writeFileSync(paths.healthchecks, "healthchecks:\n  api:\n    path: /health\n    interval: 30\n");
     fs.writeFileSync(
       paths.runtime,
       "version: '1.1'\nenvironment: dev\nprimary_llm: groq\nlocal_backup: ''\nstorage:\n  mode: file\n  interval_sec: 60\n",

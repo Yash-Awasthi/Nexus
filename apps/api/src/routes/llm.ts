@@ -29,12 +29,10 @@ import {
   type LLMMessage,
   type RoutingStrategy,
 } from "@nexus/llm-router";
-import { SmartRouter } from "../lib/smart-router.js";
 import type { FastifyInstance } from "fastify";
 
 import { discoverModels, type ReasoningTier } from "../lib/model-discovery.js";
 import { routeModel, type CapabilityRequirement } from "../lib/model-routing.js";
-
 import { requireAuth } from "../middleware/auth.js";
 
 // ── Router factory ────────────────────────────────────────────────────────────
@@ -167,19 +165,15 @@ export async function llmRoutes(app: FastifyInstance): Promise<void> {
    * reasoningTier / cost, plus a live probe of the local Ollama daemon when
    * it is reachable.
    */
-  app.get(
-    "/llm/models",
-    { preHandler: requireAuth },
-    async (_request, reply) => {
-      const result = await discoverModels({
-        ollamaBaseUrl: process.env.OLLAMA_BASE_URL,
-        declaredProviders: process.env.NEXUS_LLM_PROVIDER
-          ? [process.env.NEXUS_LLM_PROVIDER]
-          : undefined,
-      });
-      return reply.send(result);
-    },
-  );
+  app.get("/llm/models", { preHandler: requireAuth }, async (_request, reply) => {
+    const result = await discoverModels({
+      ollamaBaseUrl: process.env.OLLAMA_BASE_URL,
+      declaredProviders: process.env.NEXUS_LLM_PROVIDER
+        ? [process.env.NEXUS_LLM_PROVIDER]
+        : undefined,
+    });
+    return reply.send(result);
+  });
 
   /**
    * GET /llm/route — §15.7 per-model capability routing.

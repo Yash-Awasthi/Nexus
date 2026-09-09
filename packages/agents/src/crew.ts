@@ -40,7 +40,10 @@ export interface CrewLlmMessage {
 
 export interface CrewLlm {
   /** One model turn; returns the assistant's text. */
-  chat(messages: readonly CrewLlmMessage[], opts?: { signal?: AbortSignal }): Promise<{ content: string }>;
+  chat(
+    messages: readonly CrewLlmMessage[],
+    opts?: { signal?: AbortSignal },
+  ): Promise<{ content: string }>;
 }
 
 /** crewAI Agent — the persona fields that define a role. */
@@ -227,7 +230,9 @@ export class Crew {
     signal?: AbortSignal,
   ): Promise<TaskResult[]> {
     const results: TaskResult[] = [];
-    const roster = [...this.roles.values()].map((r) => `${r.config.name}: ${r.config.role}`).join("\n");
+    const roster = [...this.roles.values()]
+      .map((r) => `${r.config.name}: ${r.config.role}`)
+      .join("\n");
 
     for (const task of this.config.tasks) {
       const question = taskPrompt(task, crewInput);
@@ -297,7 +302,10 @@ export class Crew {
   }
 
   /** Run the crew. Returns per-task results and the final deliverable. */
-  async kickoff(crewInput: Record<string, unknown> = {}, signal?: AbortSignal): Promise<CrewResult> {
+  async kickoff(
+    crewInput: Record<string, unknown> = {},
+    signal?: AbortSignal,
+  ): Promise<CrewResult> {
     if (signal?.aborted) throw new AgentError("CREW_FAILED", "crew aborted before start");
     const results =
       this.process === "hierarchical"

@@ -19,7 +19,12 @@
  * {@link McpProxyClient#failures}) instead of breaking the others.
  */
 
-import { McpClient, McpClientError, type McpCallResult, type McpToolDefinition } from "./index.js";
+import {
+  McpClientError,
+  type McpCallResult,
+  type McpClient,
+  type McpToolDefinition,
+} from "./index.js";
 
 /** One backend server behind the facade. */
 export interface McpProxyServer {
@@ -91,7 +96,7 @@ export class McpProxyClient {
       }),
     );
 
-    const perServer: Map<string, McpToolDefinition[]> = new Map();
+    const perServer = new Map<string, McpToolDefinition[]>();
     this.lastFailures = [];
     settled.forEach((outcome, i) => {
       const server = this.servers[i]!.name;
@@ -100,7 +105,8 @@ export class McpProxyClient {
         this.lastFailures.push({ name: server, ok: true, toolCount: outcome.value.tools.length });
       } else {
         perServer.set(server, []);
-        const error = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+        const error =
+          outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
         this.lastFailures.push({ name: server, ok: false, toolCount: 0, error });
       }
     });
@@ -120,12 +126,9 @@ export class McpProxyClient {
     for (const [original, owners] of byToolName) {
       const collides = owners.length > 1;
       for (const server of owners) {
-        const definition = perServer
-          .get(server)!
-          .find((t) => t.name === original)!;
+        const definition = perServer.get(server)!.find((t) => t.name === original)!;
         const logical = collides ? `${server}.${original}` : original;
-        const routed: McpToolDefinition =
-          collides ? { ...definition, name: logical } : definition;
+        const routed: McpToolDefinition = collides ? { ...definition, name: logical } : definition;
         merged.push(routed);
         this.routes.set(logical, {
           logical,
@@ -153,12 +156,16 @@ export class McpProxyClient {
       );
     }
     const server = this.servers.find((s) => s.name === route.server);
-    if (!server) throw new McpClientError(`proxy: server "${route.server}" is not registered`, "NO_SERVER");
+    if (!server)
+      throw new McpClientError(`proxy: server "${route.server}" is not registered`, "NO_SERVER");
     try {
       return await server.client.callTool(route.original, args);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      throw new McpClientError(`proxy: server "${route.server}" failed: ${message}`, "SERVER_ERROR");
+      throw new McpClientError(
+        `proxy: server "${route.server}" failed: ${message}`,
+        "SERVER_ERROR",
+      );
     }
   }
 }

@@ -24,7 +24,9 @@ let root: string;
 let consoleLogSpy: ReturnType<typeof vi.spyOn>;
 let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
-function makeController(opts: Parameters<typeof FederationHealthController.prototype.constructor>[2] = {}) {
+function makeController(
+  opts: Parameters<typeof FederationHealthController.prototype.constructor>[2] = {},
+) {
   const supervisor = {} as FederationSupervisor;
   const controller = new FederationHealthController(supervisor, root, {
     degradedAfterMs: 1000,
@@ -93,7 +95,10 @@ describe("escalation", () => {
     const level = await controller.checkAndEscalate("svc", { status: "healthy" });
     expect(level).toBe("healthy");
     // a record exists but never transitioned away from healthy
-    expect(controller.getEscalationRecord("svc")).toMatchObject({ currentLevel: "healthy", transitions: 0 });
+    expect(controller.getEscalationRecord("svc")).toMatchObject({
+      currentLevel: "healthy",
+      transitions: 0,
+    });
   });
 
   it("creates a record on first check and degrades within the window", async () => {
@@ -135,7 +140,10 @@ describe("escalation", () => {
     const level = await controller.checkAndEscalate("svc", { status: "healthy" });
     expect(level).toBe("healthy");
     expect(controller.getEscalationRecord("svc")!.currentLevel).toBe("healthy");
-    expect(controller.getEscalationRecord("svc")!.history.at(-1)).toMatchObject({ from: "degraded", to: "healthy" });
+    expect(controller.getEscalationRecord("svc")!.history.at(-1)).toMatchObject({
+      from: "degraded",
+      to: "healthy",
+    });
     controller.resetService("svc");
     expect(controller.getEscalationRecord("svc")).toBeUndefined();
     expect(controller.getAllEscalationRecords()).toEqual([]);
@@ -143,7 +151,9 @@ describe("escalation", () => {
 
   it("returns healthy level when no prior record exists and health is good", async () => {
     const controller = makeController();
-    await expect(controller.checkAndEscalate("fresh", { status: "healthy" })).resolves.toBe("healthy");
+    await expect(controller.checkAndEscalate("fresh", { status: "healthy" })).resolves.toBe(
+      "healthy",
+    );
   });
 });
 
@@ -154,7 +164,9 @@ describe("reconciliation", () => {
     const controller = makeController();
     const report = await controller.reconcile();
     expect(report.servicesReconciled).toBe(2);
-    expect(report.issues.some((i) => i.type === "docker_missing" && i.severity === "critical")).toBe(true);
+    expect(
+      report.issues.some((i) => i.type === "docker_missing" && i.severity === "critical"),
+    ).toBe(true);
   });
 
   it("skips the docker_missing issue when Floci is reachable", async () => {

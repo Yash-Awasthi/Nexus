@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from "vitest";
 
-import {
-  compressCaveman,
-  makeCavemanFilter,
-} from "./caveman.js";
+import { compressCaveman, makeCavemanFilter } from "./caveman.js";
 import {
   cavemanOutput,
   compressPreset,
@@ -70,7 +67,8 @@ describe("compressCaveman — filler removal", () => {
     const filter = makeCavemanFilter();
     expect(filter.lossless).toBe(false);
     expect(filter.name).toBe("caveman");
-    const input = "Please basically just check the logs. In order to fix it, note that we need to rerun.";
+    const input =
+      "Please basically just check the logs. In order to fix it, note that we need to rerun.";
     const out = filter.apply(input);
     expect(estimateTokens(out)).toBeLessThanOrEqual(estimateTokens(input));
   });

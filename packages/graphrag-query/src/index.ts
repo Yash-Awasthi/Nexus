@@ -33,7 +33,11 @@ export interface GraphRAGQueryResult {
 // ── GraphRAG Query Engine ────────────────────────────────────────────────────
 
 export interface QueryRouter {
-  complete(params: { model: string; messages: Array<{ role: string; content: string }>; maxTokens?: number }): Promise<{ content: string }>;
+  complete(params: {
+    model: string;
+    messages: Array<{ role: string; content: string }>;
+    maxTokens?: number;
+  }): Promise<{ content: string }>;
 }
 
 export class GraphRAGQueryEngine {
@@ -65,11 +69,14 @@ export class GraphRAGQueryEngine {
   /**
    * Query with community-based retrieval.
    */
-  async query(question: string, options?: {
-    communityLevel?: number;
-    maxCommunities?: number;
-    dynamicSelection?: boolean;
-  }): Promise<GraphRAGQueryResult> {
+  async query(
+    question: string,
+    options?: {
+      communityLevel?: number;
+      maxCommunities?: number;
+      dynamicSelection?: boolean;
+    },
+  ): Promise<GraphRAGQueryResult> {
     const start = Date.now();
     const level = options?.communityLevel ?? 0;
     const maxCommunities = options?.maxCommunities ?? 5;
@@ -170,10 +177,7 @@ export class GraphRAGQueryEngine {
 
   // ── Phase 3: Map ──────────────────────────────────────────────────────
 
-  private async mapPhase(
-    query: string,
-    communities: CommunityReport[],
-  ): Promise<string[]> {
+  private async mapPhase(query: string, communities: CommunityReport[]): Promise<string[]> {
     const results = await Promise.all(
       communities.map(async (community) => {
         const prompt = [
@@ -201,9 +205,7 @@ export class GraphRAGQueryEngine {
   // ── Phase 4: Reduce ───────────────────────────────────────────────────
 
   private async reducePhase(query: string, summaries: string[]): Promise<string> {
-    const combinedSummaries = summaries
-      .map((s, i) => `Source ${i + 1}:\n${s}`)
-      .join("\n\n");
+    const combinedSummaries = summaries.map((s, i) => `Source ${i + 1}:\n${s}`).join("\n\n");
 
     const prompt = [
       `Synthesize the following community summaries into a comprehensive answer.`,

@@ -95,13 +95,19 @@ export class LocalSearchEngine {
 
   /** Lexical query→entity mapping (rank = token overlap, then mentions). */
   private mapQueryToEntities(query: string, max: number): IndexedEntity[] {
-    const queryTokens = new Set(query.toLowerCase().split(/\s+/).filter((w) => w.length > 1));
+    const queryTokens = new Set(
+      query
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length > 1),
+    );
     const scored = this.entities.map((entity) => {
       const name = entity.name.toLowerCase();
       const nameTokens = name.split(/\s+/);
       let overlap = 0;
       for (const t of queryTokens) {
-        if (name.includes(t) || nameTokens.some((nt) => nt.startsWith(t) || t.startsWith(nt))) overlap++;
+        if (name.includes(t) || nameTokens.some((nt) => nt.startsWith(t) || t.startsWith(nt)))
+          overlap++;
       }
       const descHit = entity.descriptions.some((d) => queryTokens.has(d.toLowerCase()));
       return { entity, overlap: overlap + (descHit ? 0.5 : 0) };
@@ -145,10 +151,7 @@ export class LocalSearchEngine {
   }
 
   /** graphrag _filter_relationships: in-network first, then mutual-link ranked. */
-  private filterRelationships(
-    selected: IndexedEntity[],
-    topK: number,
-  ): IndexedRelation[] {
+  private filterRelationships(selected: IndexedEntity[], topK: number): IndexedRelation[] {
     const selectedNames = new Set(selected.map((e) => e.name));
     const inNetwork: IndexedRelation[] = [];
     const outNetwork: IndexedRelation[] = [];
@@ -169,7 +172,8 @@ export class LocalSearchEngine {
       (a, b) =>
         (linkCount.get(selectedNames.has(b.source) ? b.target : b.source) ?? 0) -
           (linkCount.get(selectedNames.has(a.source) ? a.target : a.source) ?? 0) ||
-        (this.degree.get(b.source) ?? 0) + (this.degree.get(b.target) ?? 0) -
+        (this.degree.get(b.source) ?? 0) +
+          (this.degree.get(b.target) ?? 0) -
           ((this.degree.get(a.source) ?? 0) + (this.degree.get(a.target) ?? 0)),
     );
 
@@ -177,7 +181,10 @@ export class LocalSearchEngine {
     return [...inNetwork, ...outNetwork.slice(0, budget)];
   }
 
-  private buildEntityTable(entities: IndexedEntity[], budget: number): { text: string; names: string[] } {
+  private buildEntityTable(
+    entities: IndexedEntity[],
+    budget: number,
+  ): { text: string; names: string[] } {
     const lines: string[] = [];
     const names: string[] = [];
     const header = "-----Entities-----\nid|entity|description|number of relationships";
@@ -251,12 +258,9 @@ export class LocalSearchEngine {
     const entityTable = this.buildEntityTable(expanded, tableBudget);
     const relTable = this.buildRelationshipTable(rels, tableBudget);
     const reportBlock = reportsUsed.length
-      ? `\n-----Reports-----\n${reportsUsed
-          .map((r) => `[${r.title}] ${r.summary}`)
-          .join("\n")}`
+      ? `\n-----Reports-----\n${reportsUsed.map((r) => `[${r.title}] ${r.summary}`).join("\n")}`
       : "";
-    const context =
-      `${entityTable.text}\n\n${relTable.text}${reportBlock}\n\n-----Question-----\n${question}`;
+    const context = `${entityTable.text}\n\n${relTable.text}${reportBlock}\n\n-----Question-----\n${question}`;
 
     // 4. Single-pass synthesis (no map-reduce — the local-search signature).
     const prompt = [

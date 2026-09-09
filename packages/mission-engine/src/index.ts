@@ -13,7 +13,15 @@
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type MissionStatus = "planning" | "active" | "paused" | "completed" | "failed" | "aborted";
-export type OperatorType = "recon" | "scanner" | "exploiter" | "infiltrator" | "exfiltrator" | "ghost" | "coordinator" | "analyst";
+export type OperatorType =
+  | "recon"
+  | "scanner"
+  | "exploiter"
+  | "infiltrator"
+  | "exfiltrator"
+  | "ghost"
+  | "coordinator"
+  | "analyst";
 export type SeverityLevel = "info" | "low" | "medium" | "high" | "critical";
 
 export interface MissionConfig {
@@ -79,7 +87,15 @@ export interface Finding {
 export interface EvidenceItem {
   id: string;
   findingId: string;
-  type: "screenshot" | "log" | "poc" | "request" | "response" | "network-capture" | "code-snippet" | "report";
+  type:
+    | "screenshot"
+    | "log"
+    | "poc"
+    | "request"
+    | "response"
+    | "network-capture"
+    | "code-snippet"
+    | "report";
   title: string;
   content: string;
   /** SHA-256 hash for tamper detection */
@@ -239,7 +255,10 @@ export class WarRoom {
       this.state.durationMs = Date.now() - new Date(this.state.startedAt).getTime();
       this.state.metrics.totalDurationMs = this.state.durationMs;
     }
-    this.addTimelineEvent("status-change", `Mission completed. ${this.state.findings.length} findings.`);
+    this.addTimelineEvent(
+      "status-change",
+      `Mission completed. ${this.state.findings.length} findings.`,
+    );
   }
 
   abort(reason: string): void {
@@ -286,12 +305,7 @@ export class WarRoom {
     this.state.evidenceItems.push(item);
     this.state.metrics.totalEvidence++;
 
-    this.addTimelineEvent(
-      "evidence",
-      `Evidence added: ${item.title}`,
-      undefined,
-      undefined,
-    );
+    this.addTimelineEvent("evidence", `Evidence added: ${item.title}`, undefined, undefined);
 
     return item;
   }
@@ -323,9 +337,7 @@ export class WarRoom {
 
   getState(): WarRoomState {
     const activeOperators = new Set(
-      this.state.operatorLogs
-        .filter((l) => l.status === "running")
-        .map((l) => l.operator),
+      this.state.operatorLogs.filter((l) => l.status === "running").map((l) => l.operator),
     );
 
     return {

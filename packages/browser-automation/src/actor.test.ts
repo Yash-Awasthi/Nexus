@@ -1,12 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
 import { MockBrowserDriver } from "@nexus/stealth-browser";
-import {
-  BrowserActor,
-  parseHtml,
-  serializeDom,
-  type ActorElement,
-} from "./index.js";
+import { BrowserActor, parseHtml, serializeDom, type ActorElement } from "./index.js";
 
 const PAGE_HTML = `<html><head><title>Test Page</title><style>body{color:red}</style></head>
 <body>

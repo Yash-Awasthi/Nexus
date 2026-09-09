@@ -6,12 +6,11 @@
  * Self-service only: the caller must match `:id` (403 otherwise). The cascade is
  * @nexus/db `eraseUserData`; this route is a thin guard + audit-log wrapper.
  */
+import { db, eraseUserData, type ErasableDb } from "@nexus/db";
 import type { FastifyInstance } from "fastify";
 
-import { db, eraseUserData, type ErasableDb } from "@nexus/db";
-
-import { requireAuthWithTier } from "../middleware/auth.js";
 import { handleSelfErasure } from "../lib/gdpr-erasure.js";
+import { requireAuthWithTier } from "../middleware/auth.js";
 
 export async function userDataRoutes(app: FastifyInstance): Promise<void> {
   app.delete<{ Params: { id: string } }>(

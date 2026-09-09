@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Smart Multi-Model Router
  *
@@ -26,9 +27,9 @@ export interface ModelProfile {
   id: string;
   provider: string;
   strengths: TaskType[];
-  costPer1kTokens: number;   // $ per 1k tokens (input)
+  costPer1kTokens: number; // $ per 1k tokens (input)
   avgLatencyMs: number;
-  qualityScore: number;       // 1-10 benchmark score
+  qualityScore: number; // 1-10 benchmark score
   maxTokens: number;
   contextWindow: number;
   isAvailable: boolean;
@@ -37,7 +38,7 @@ export interface ModelProfile {
 export interface RoutingDecision {
   model: ModelProfile;
   reason: string;
-  confidence: number;         // 0-1, how confident we are this is the best pick
+  confidence: number; // 0-1, how confident we are this is the best pick
   alternatives: ModelProfile[];
   estimatedCost: number;
   estimatedLatencyMs: number;
@@ -47,18 +48,18 @@ export interface ConsensusRequest {
   prompt: string;
   taskType: TaskType;
   models: ModelProfile[];
-  majorityThreshold: number;  // 0.5 = simple majority, 0.67 = supermajority
+  majorityThreshold: number; // 0.5 = simple majority, 0.67 = supermajority
 }
 
 export interface ConsensusResult {
-  answers: Array<{
+  answers: {
     model: string;
     answer: string;
     confidence: number;
-  }>;
+  }[];
   mergedAnswer: string;
-  agreement: number;          // 0-1, how much models agreed
-  bestModel: string;          // which model had highest confidence
+  agreement: number; // 0-1, how much models agreed
+  bestModel: string; // which model had highest confidence
 }
 
 // Default model registry
@@ -139,8 +140,7 @@ export class SmartRouter {
       estimatedTokens?: number;
     },
   ): RoutingDecision {
-    const { maxCost, maxLatencyMs, preferQuality = false, estimatedTokens = 1000 } =
-      options || {};
+    const { maxCost, maxLatencyMs, preferQuality = false, estimatedTokens = 1000 } = options || {};
 
     // Filter eligible models
     let candidates = this.models.filter((m) => {
@@ -167,7 +167,9 @@ export class SmartRouter {
 
       // Cost efficiency (20% weight)
       const cost = model.costPer1kTokens * (estimatedTokens / 1000);
-      const maxCostVal = Math.max(...candidates.map((c) => c.costPer1kTokens * (estimatedTokens / 1000)));
+      const maxCostVal = Math.max(
+        ...candidates.map((c) => c.costPer1kTokens * (estimatedTokens / 1000)),
+      );
       score += ((maxCostVal - cost) / maxCostVal) * 20;
 
       // Latency (15% weight)
@@ -229,9 +231,7 @@ export class SmartRouter {
     };
   }
 
-  private calculateAgreement(
-    answers: ConsensusResult["answers"],
-  ): number {
+  private calculateAgreement(answers: ConsensusResult["answers"]): number {
     if (answers.length <= 1) return 1;
 
     // Simple string similarity heuristic

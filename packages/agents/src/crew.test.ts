@@ -29,13 +29,27 @@ function scripted(...replies: string[]): Scripted {
 }
 
 const ROLES = [
-  { name: "researcher", role: "Senior Research Analyst", goal: "gather facts", backstory: "Known for source rigor." },
+  {
+    name: "researcher",
+    role: "Senior Research Analyst",
+    goal: "gather facts",
+    backstory: "Known for source rigor.",
+  },
   { name: "writer", role: "Technical Writer", goal: "turn facts into prose" },
 ];
 
 const TASKS = [
-  { description: "Find the market size.", expectedOutput: "a number with source", agent: "researcher" },
-  { description: "Write the summary.", expectedOutput: "three paragraphs", agent: "writer", context: ["0"] },
+  {
+    description: "Find the market size.",
+    expectedOutput: "a number with source",
+    agent: "researcher",
+  },
+  {
+    description: "Write the summary.",
+    expectedOutput: "three paragraphs",
+    agent: "writer",
+    context: ["0"],
+  },
 ];
 
 // ── RoleAgent ────────────────────────────────────────────────────────────────
@@ -110,8 +124,12 @@ describe("Crew sequential", () => {
   });
 
   it("refuses an empty crew and an empty task list", () => {
-    expect(() => new Crew({ roles: [], tasks: TASKS, llm: scripted().llm })).toThrow(/at least one role/);
-    expect(() => new Crew({ roles: ROLES, tasks: [], llm: scripted().llm })).toThrow(/at least one task/);
+    expect(() => new Crew({ roles: [], tasks: TASKS, llm: scripted().llm })).toThrow(
+      /at least one role/,
+    );
+    expect(() => new Crew({ roles: ROLES, tasks: [], llm: scripted().llm })).toThrow(
+      /at least one task/,
+    );
   });
 
   it("aborts before start with a CREW_FAILED error", async () => {
@@ -137,7 +155,11 @@ describe("Crew hierarchical", () => {
     });
     const result = await crew.kickoff();
     expect(result.process).toBe("hierarchical");
-    expect(result.results[0]).toMatchObject({ agent: "writer", output: "the deliverable", iterations: 1 });
+    expect(result.results[0]).toMatchObject({
+      agent: "writer",
+      output: "the deliverable",
+      iterations: 1,
+    });
     // Manager prompt showed the roster of roles.
     expect(s.log[0]![1]!.content).toContain("researcher: Senior Research Analyst");
     expect(s.remaining()).toBe(0);
@@ -145,7 +167,14 @@ describe("Crew hierarchical", () => {
 
   it("refines on manager feedback until DONE", async () => {
     // pick writer; run; verify→feedback; pick researcher; run; verify→DONE
-    const s = scripted("writer", "v1 output", "needs numbers", "researcher", "v2 with numbers", "DONE");
+    const s = scripted(
+      "writer",
+      "v1 output",
+      "needs numbers",
+      "researcher",
+      "v2 with numbers",
+      "DONE",
+    );
     const crew = new Crew({
       roles: ROLES,
       tasks: [{ description: "Quantify", agent: "writer" }],

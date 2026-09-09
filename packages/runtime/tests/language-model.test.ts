@@ -69,8 +69,7 @@ function installResponder(): void {
   );
 }
 
-const chatBody = (content: string) =>
-  JSON.stringify({ choices: [{ message: { content } }] });
+const chatBody = (content: string) => JSON.stringify({ choices: [{ message: { content } }] });
 
 const lastBody = (): Record<string, unknown> =>
   mockState.requests[mockState.requests.length - 1].body;
@@ -148,7 +147,10 @@ describe("GroqModelProvider", () => {
     mockState.handler = () => chatBody("{}");
     const model = createLanguageModel({ provider: "groq", groqApiKey: "k" });
     await model.generateObject({
-      messages: [{ role: "system", content: "mine" }, { role: "user", content: "go" }],
+      messages: [
+        { role: "system", content: "mine" },
+        { role: "user", content: "go" },
+      ],
       schema: { type: "object" },
     });
     const messages = lastBody().messages as ChatMessage[];
@@ -253,7 +255,7 @@ describe("FreeModelProvider", () => {
   });
 
   it("generateObject strips markdown fences around the JSON", async () => {
-    mockState.handler = () => chatBody("```json\n{\"a\":1}\n```");
+    mockState.handler = () => chatBody('```json\n{"a":1}\n```');
     const model = createLanguageModel({
       provider: "free",
       freeConfig: { routes: ["groq:gpt-oss"], keys: { groq: "g" } },

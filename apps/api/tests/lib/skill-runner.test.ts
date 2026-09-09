@@ -302,12 +302,7 @@ describe("skill-execution graph events (runtime-emitted, zero model writes)", ()
       { runner: fakeRunner({ stdout: "ran", exitCode: 0 }), onExecution: recorder },
     );
     expect(results).toHaveLength(4); // unsupported + empty still return honest results
-    expect(events.map((e) => e.status)).toEqual([
-      "started",
-      "completed",
-      "started",
-      "completed",
-    ]);
+    expect(events.map((e) => e.status)).toEqual(["started", "completed", "started", "completed"]);
     expect(events[0]!.skillId).toBe("skill-1");
     expect(events[0]!.skillName).toBe("report-writer");
     expect(events[1]!.from).toBe("node-1"); // terminal chains to its started node

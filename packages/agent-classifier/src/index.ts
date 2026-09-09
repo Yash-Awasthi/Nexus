@@ -208,9 +208,7 @@ export class AgentClassifier {
 
       // Check explicit keywords
       if (agent.keywords) {
-        const keywordMatches = agent.keywords.filter((kw) =>
-          queryLower.includes(kw.toLowerCase()),
-        );
+        const keywordMatches = agent.keywords.filter((kw) => queryLower.includes(kw.toLowerCase()));
         if (keywordMatches.length > 0) {
           score += (keywordMatches.length / agent.keywords.length) * 0.2;
           reasons.push(`keyword match: ${keywordMatches.join(", ")}`);
@@ -449,10 +447,7 @@ export class GroundedAgent {
   }
 
   /** Gather data using tools (gatherer phase). */
-  private async _gather(
-    query: string,
-    history: ConversationTurn[],
-  ): Promise<GatheredData> {
+  private async _gather(query: string, history: ConversationTurn[]): Promise<GatheredData> {
     const toolResults: ToolResult[] = [];
     const tools = this.gathererConfig.tools ?? [];
 
@@ -505,7 +500,7 @@ export class GroundedAgent {
 /** Configuration for the gatherer phase. */
 export interface GathererConfig {
   /** Tools available to the gatherer. */
-  tools?: Array<{ name: string; description: string }>;
+  tools?: { name: string; description: string }[];
   /** Model to use for the gatherer (optional — may not need LLM). */
   model?: string;
 }
@@ -534,10 +529,7 @@ export interface ToolResult {
 }
 
 /** Tool executor function type. */
-export type ToolExecutor = (
-  toolName: string,
-  params: Record<string, unknown>,
-) => Promise<unknown>;
+export type ToolExecutor = (toolName: string, params: Record<string, unknown>) => Promise<unknown>;
 
 // ── Context Manager ────────────────────────────────────────────────────────
 
@@ -570,10 +562,7 @@ export class AgentContextManager {
   private readonly maxTurns: number;
   private readonly strategy: "sliding-window" | "summarize";
 
-  constructor(config: {
-    maxTurns?: number;
-    strategy?: "sliding-window" | "summarize";
-  }) {
+  constructor(config: { maxTurns?: number; strategy?: "sliding-window" | "summarize" }) {
     this.maxTurns = config.maxTurns ?? 20;
     this.strategy = config.strategy ?? "sliding-window";
   }

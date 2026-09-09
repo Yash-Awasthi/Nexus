@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Agent Orchestrator — manages multi-agent workflows.
  *
@@ -11,18 +12,18 @@
  */
 
 export type AgentRole =
-  | "planner"      // decomposes tasks, creates plans
-  | "researcher"   // gathers information, analyzes data
-  | "coder"        // writes code, implements features
-  | "reviewer"     // reviews code, finds issues
-  | "synthesizer"  // combines results into final output
-  | "critic";      // challenges assumptions, finds flaws
+  | "planner" // decomposes tasks, creates plans
+  | "researcher" // gathers information, analyzes data
+  | "coder" // writes code, implements features
+  | "reviewer" // reviews code, finds issues
+  | "synthesizer" // combines results into final output
+  | "critic"; // challenges assumptions, finds flaws
 
 export interface AgentTask {
   id: string;
   description: string;
   role: AgentRole;
-  dependencies: string[];  // task IDs that must complete first
+  dependencies: string[]; // task IDs that must complete first
   status: TaskStatus;
   result?: string;
   error?: string;
@@ -34,13 +35,7 @@ export interface AgentTask {
   completedAt?: number;
 }
 
-export type TaskStatus =
-  | "pending"
-  | "ready"
-  | "running"
-  | "completed"
-  | "failed"
-  | "retrying";
+export type TaskStatus = "pending" | "ready" | "running" | "completed" | "failed" | "retrying";
 
 export interface WorkflowPlan {
   id: string;
@@ -54,16 +49,13 @@ export interface WorkflowPlan {
 }
 
 export class AgentOrchestrator {
-  private workflows: Map<string, WorkflowPlan> = new Map();
-  private activeTasks: Map<string, AgentTask> = new Map();
+  private workflows = new Map<string, WorkflowPlan>();
+  private activeTasks = new Map<string, AgentTask>();
 
   /**
    * Create a workflow plan from a high-level goal.
    */
-  async planWorkflow(
-    goal: string,
-    tokenBudget: number = 100_000,
-  ): Promise<WorkflowPlan> {
+  async planWorkflow(goal: string, tokenBudget = 100_000): Promise<WorkflowPlan> {
     const tasks = this.decomposeTask(goal);
 
     const plan: WorkflowPlan = {

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @nexus/bulkhead — Resource pool isolation (bulkhead pattern).
  *
@@ -66,10 +67,11 @@ export class BulkheadRejectionError extends Error {
 }
 
 export class BulkheadTimeoutError extends Error {
-  constructor(public readonly poolId: string, timeoutMs: number) {
-    super(
-      `Bulkhead "${poolId}" queue timeout after ${timeoutMs}ms`,
-    );
+  constructor(
+    public readonly poolId: string,
+    timeoutMs: number,
+  ) {
+    super(`Bulkhead "${poolId}" queue timeout after ${timeoutMs}ms`);
     this.name = "BulkheadTimeoutError";
   }
 }
@@ -134,11 +136,7 @@ export class Bulkhead {
         totalQueued: this.queued.length,
         timestamp: new Date().toISOString(),
       });
-      throw new BulkheadRejectionError(
-        this.poolId,
-        this.executing,
-        this.queued.length,
-      );
+      throw new BulkheadRejectionError(this.poolId, this.executing, this.queued.length);
     }
 
     // Queue the request
@@ -204,10 +202,7 @@ export class Bulkhead {
   }
 
   private processQueue(): void {
-    while (
-      this.queued.length > 0 &&
-      this.executing < this.options.maxConcurrent
-    ) {
+    while (this.queued.length > 0 && this.executing < this.options.maxConcurrent) {
       const entry = this.queued.shift()!;
       if (entry.timer) clearTimeout(entry.timer);
       entry.resolve();
@@ -278,17 +273,11 @@ export class BulkheadPool {
 
   /** Get total executing across all pools. */
   totalExecuting(): number {
-    return [...this.pools.values()].reduce(
-      (sum, p) => sum + p.executingCount,
-      0,
-    );
+    return [...this.pools.values()].reduce((sum, p) => sum + p.executingCount, 0);
   }
 
   /** Get total queued across all pools. */
   totalQueued(): number {
-    return [...this.pools.values()].reduce(
-      (sum, p) => sum + p.queuedCount,
-      0,
-    );
+    return [...this.pools.values()].reduce((sum, p) => sum + p.queuedCount, 0);
   }
 }

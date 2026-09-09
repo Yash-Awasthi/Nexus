@@ -20,7 +20,11 @@ interface Harness {
     pop: ReturnType<typeof vi.fn>;
   };
   executor: { runLoop: ReturnType<typeof vi.fn> };
-  metrics: { increment: ReturnType<typeof vi.fn>; recordTiming: ReturnType<typeof vi.fn>; recordGauge: ReturnType<typeof vi.fn> };
+  metrics: {
+    increment: ReturnType<typeof vi.fn>;
+    recordTiming: ReturnType<typeof vi.fn>;
+    recordGauge: ReturnType<typeof vi.fn>;
+  };
   tracer: { startSpan: ReturnType<typeof vi.fn>; endSpan: ReturnType<typeof vi.fn> };
   planningEngine: { generatePlan: ReturnType<typeof vi.fn> };
   governanceEngine: {
@@ -29,13 +33,20 @@ interface Harness {
   };
   approvalWorkflow: { createRequest: ReturnType<typeof vi.fn> };
   inspector: { recordPlan: ReturnType<typeof vi.fn> };
-  logger: { info: ReturnType<typeof vi.fn>; warn: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn> };
+  logger: {
+    info: ReturnType<typeof vi.fn>;
+    warn: ReturnType<typeof vi.fn>;
+    error: ReturnType<typeof vi.fn>;
+  };
 }
 
 function makeHarness(opts: { withoutEngines?: boolean } = {}): Harness {
   const runtimeManager = { getActiveServices: vi.fn().mockResolvedValue(["api"]) };
   const eventBus = { publish: vi.fn() };
-  const taskRouter = { route: vi.fn().mockResolvedValue(undefined), replayEvent: vi.fn().mockResolvedValue(undefined) };
+  const taskRouter = {
+    route: vi.fn().mockResolvedValue(undefined),
+    replayEvent: vi.fn().mockResolvedValue(undefined),
+  };
   const eventStore = { replayEvents: vi.fn().mockResolvedValue([]) };
   const queue = {
     push: vi.fn().mockResolvedValue(undefined),
@@ -43,7 +54,12 @@ function makeHarness(opts: { withoutEngines?: boolean } = {}): Harness {
     pop: vi.fn().mockResolvedValue(undefined),
   };
   const executor = { runLoop: vi.fn().mockResolvedValue(3) };
-  const metrics = { increment: vi.fn(), recordTiming: vi.fn(), recordGauge: vi.fn(), getMetrics: vi.fn() };
+  const metrics = {
+    increment: vi.fn(),
+    recordTiming: vi.fn(),
+    recordGauge: vi.fn(),
+    getMetrics: vi.fn(),
+  };
   const tracer = { startSpan: vi.fn().mockReturnValue({ spanId: "s1" }), endSpan: vi.fn() };
   const planningEngine = { generatePlan: vi.fn() };
   const governanceEngine = { evaluatePlan: vi.fn(), evaluateTask: vi.fn() };
@@ -91,19 +107,31 @@ function makeHarness(opts: { withoutEngines?: boolean } = {}): Harness {
 }
 
 function task(id: string, deps: string[] = []): Task {
-  return { id, title: `Task ${id}`, description: "d", priority: "medium", status: "pending", dependencies: deps };
+  return {
+    id,
+    title: `Task ${id}`,
+    description: "d",
+    priority: "medium",
+    status: "pending",
+    dependencies: deps,
+  };
 }
 
 describe("ConductorOrchestrator.start", () => {
   it("replays historical events and returns active services", async () => {
     const h = makeHarness();
-    h.eventStore!.replayEvents.mockResolvedValue([{ event: "task_routed", payload: {}, timestamp: new Date() }]);
+    h.eventStore!.replayEvents.mockResolvedValue([
+      { event: "task_routed", payload: {}, timestamp: new Date() },
+    ]);
     const services = await h.orchestrator.start();
     expect(services).toEqual(["api"]);
     expect(h.taskRouter.replayEvent).toHaveBeenCalledOnce();
     expect(h.metrics.recordTiming).toHaveBeenCalledWith("replay.duration", expect.any(Number));
     expect(h.metrics.recordGauge).toHaveBeenCalledWith("orchestrator.uptime", 1);
-    expect(h.tracer.endSpan).toHaveBeenCalledWith("s1", expect.objectContaining({ status: "success" }));
+    expect(h.tracer.endSpan).toHaveBeenCalledWith(
+      "s1",
+      expect.objectContaining({ status: "success" }),
+    );
   });
 
   it("skips replay without an event store", async () => {
@@ -170,12 +198,19 @@ describe("ConductorOrchestrator cognitive objectives", () => {
 
   it("throws when planning/governance engines are missing", async () => {
     const h = makeHarness({ withoutEngines: true });
-    await expect(h.orchestrator.submitCognitiveObjective("deploy")).rejects.toThrow(/not registered/);
+    await expect(h.orchestrator.submitCognitiveObjective("deploy")).rejects.toThrow(
+      /not registered/,
+    );
   });
 
   it("records plans and blocks disallowed plans", async () => {
     const h = makeHarness();
-    h.planningEngine.generatePlan.mockResolvedValue({ planId: "p1", objective: "o", synthesisResults: [], timestamp: new Date() });
+    h.planningEngine.generatePlan.mockResolvedValue({
+      planId: "p1",
+      objective: "o",
+      synthesisResults: [],
+      timestamp: new Date(),
+    });
     h.governanceEngine.evaluatePlan.mockResolvedValue({ allowed: false, reason: "over budget" });
     const result = await h.orchestrator.submitCognitiveObjective("big deploy");
     expect(result).toEqual({ planId: "p1", allowed: false, reason: "over budget", processed: 0 });
@@ -191,7 +226,11 @@ describe("ConductorOrchestrator cognitive objectives", () => {
       timestamp: new Date(),
     });
     h.governanceEngine.evaluatePlan.mockResolvedValue({ allowed: true });
-    h.governanceEngine.evaluateTask.mockResolvedValue({ allowed: false, requiresApproval: false, reason: "dangerous" });
+    h.governanceEngine.evaluateTask.mockResolvedValue({
+      allowed: false,
+      requiresApproval: false,
+      reason: "dangerous",
+    });
     const result = await h.orchestrator.submitCognitiveObjective("risky");
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe("dangerous");
@@ -228,7 +267,10 @@ describe("ConductorOrchestrator cognitive objectives", () => {
     });
     h.governanceEngine.evaluatePlan.mockResolvedValue({ allowed: true });
     h.governanceEngine.evaluateTask.mockResolvedValue({ allowed: true, requiresApproval: false });
-    const result = await h.orchestrator.submitCognitiveObjective("go", { maxIterations: 7, idleDelayMs: 2 });
+    const result = await h.orchestrator.submitCognitiveObjective("go", {
+      maxIterations: 7,
+      idleDelayMs: 2,
+    });
     expect(result.allowed).toBe(true);
     expect(result.processed).toBe(3);
     expect(h.executor.runLoop).toHaveBeenCalledWith(7, 2);

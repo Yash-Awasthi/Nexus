@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
+import { createHash } from "node:crypto";
+
 import { detectCommunities, type CommunityOptions } from "./community.js";
 import { runCypher, type CypherResult } from "./query.js";
 /**
@@ -24,8 +26,6 @@ import { runCypher, type CypherResult } from "./query.js";
  *   Agents (9)  — query nodes/edges to answer "who knows whom" questions
  *   Context-pack — future: include high-confidence entities in system prompt
  */
-
-import { createHash } from "node:crypto";
 
 // ── Entity / Relationship types (re-declared; compatible with @nexus/nlp-utils) ─
 

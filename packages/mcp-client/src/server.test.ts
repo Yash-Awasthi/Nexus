@@ -10,10 +10,12 @@ const WEATHER: McpToolDefinition = {
   inputSchema: { type: "object", properties: { city: { type: "string" } }, required: ["city"] },
 };
 
-function makeServer(execute = async (name: string, args: Record<string, unknown>) => ({
-  content: [{ type: "text" as const, text: `${name}:${JSON.stringify(args)}` }],
-  text: "",
-})) {
+function makeServer(
+  execute = async (name: string, args: Record<string, unknown>) => ({
+    content: [{ type: "text" as const, text: `${name}:${JSON.stringify(args)}` }],
+    text: "",
+  }),
+) {
   return new McpHttpServer({
     name: "test-server",
     version: "1.2.3",
@@ -54,7 +56,7 @@ describe("McpHttpServer", () => {
   });
 
   it("calls a tool with parsed arguments", async () => {
-    const called: Array<[string, Record<string, unknown>]> = [];
+    const called: [string, Record<string, unknown>][] = [];
     const server = makeServer(async (name, args) => {
       called.push([name, args]);
       return { content: [{ type: "text", text: "22C" }], text: "22C" };
@@ -173,7 +175,7 @@ describe("McpHttpServer", () => {
         params: { name: "list_repos", arguments: { org: "acme" } },
       },
     });
-    expect((call.body as { result: { content: Array<{ text: string }> } }).result.content[0].text).toBe(
+    expect((call.body as { result: { content: { text: string }[] } }).result.content[0].text).toBe(
       "repos of acme",
     );
   });

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Temporary debug: reproduce the mission hang with progress logging.
 import { MissionRunner } from "@nexus/agent-engine";
 import { llmDriverToToolFn } from "@nexus/agent-runtime";

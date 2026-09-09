@@ -129,7 +129,9 @@ export function createProcessorEngine(
   const o = defaultOpts(opts);
   const disabled = new Set(o.disabled);
   // The fallback is never disabled (python: `disabled.discard("generic")`).
-  const sorted = [...processors].sort((a, b) => a.priority - b.priority || a.name.localeCompare(b.name));
+  const sorted = [...processors].sort(
+    (a, b) => a.priority - b.priority || a.name.localeCompare(b.name),
+  );
   const enabled = sorted.filter((p) => !disabled.has(p.name) || p === sorted[sorted.length - 1]);
   // `enabled` is non-empty when `processors` is (a filter never adds), so this is safe.
   const fallback = enabled[enabled.length - 1]!;
@@ -190,9 +192,12 @@ export function createProcessorEngine(
 
       // Under-compression ("mismatch"): retry the whole pass with the fallback.
       if (processor !== fallback && fallback) {
-        const genericCompressed = fallback.clean ? fallback.clean(fallback.process(command, output)) : fallback.process(command, output);
+        const genericCompressed = fallback.clean
+          ? fallback.clean(fallback.process(command, output))
+          : fallback.process(command, output);
         const genericLength = genericCompressed.length;
-        const genericGain = originalLength > 0 ? (originalLength - genericLength) / originalLength : 0;
+        const genericGain =
+          originalLength > 0 ? (originalLength - genericLength) / originalLength : 0;
         if (genericLength < originalLength && genericGain >= o.minCompressionRatio) {
           return {
             output: genericCompressed,
@@ -217,8 +222,24 @@ export function createProcessorEngine(
 // ── Generic fallback processor ──────────────────────────────────────────────────
 
 const SPINNER_LINES = new Set([
-  "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏",
-  "⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷",
+  "⠋",
+  "⠙",
+  "⠹",
+  "⠸",
+  "⠼",
+  "⠴",
+  "⠦",
+  "⠧",
+  "⠇",
+  "⠏",
+  "⣾",
+  "⣽",
+  "⣻",
+  "⢿",
+  "⡿",
+  "⣟",
+  "⣯",
+  "⣷",
 ]);
 
 /** Universal compression heuristics; always matches as the fallback. */
@@ -265,7 +286,12 @@ function stripProgressBars(lines: string[]): string[] {
     const block = stripped.match(PROGRESS_BLOCK_RE);
     if (block && block[0].length > stripped.length * 0.5) continue;
     const asciiBar = stripped.match(ASCII_BAR_RE);
-    if (asciiBar && asciiBar[0].length > stripped.length * 0.5 && PROGRESS_CONTEXT_RE.test(stripped)) continue;
+    if (
+      asciiBar &&
+      asciiBar[0].length > stripped.length * 0.5 &&
+      PROGRESS_CONTEXT_RE.test(stripped)
+    )
+      continue;
     if (SPINNER_LINES.has(stripped)) continue;
     result.push(line);
   }
@@ -381,7 +407,11 @@ function truncateTraceback(block: string[]): string[] {
   const keepHead = Math.floor(MAX_TRACEBACK_LINES / 2);
   const keepTail = MAX_TRACEBACK_LINES - keepHead;
   const omitted = block.length - keepHead - keepTail;
-  return [...block.slice(0, keepHead), `    ... (${omitted} traceback lines truncated)`, ...block.slice(-keepTail)];
+  return [
+    ...block.slice(0, keepHead),
+    `    ... (${omitted} traceback lines truncated)`,
+    ...block.slice(-keepTail),
+  ];
 }
 
 /** Stateful, block-aware test-runner output compression (pytest/jest/cargo/go/...). */
@@ -396,8 +426,18 @@ export const testOutputProcessor: OutputProcessor = {
   process(command: string, output: string): string {
     if (!output || !output.trim()) return output;
     const lines = output.split("\n");
-    if (/\bpytest\b|py\.test|poetry\s+run\s+pytest|uv\s+run\s+pytest|pipx\s+run\s+pytest/.test(command)) return processPytest(lines);
-    if (/\bjest\b|\bvitest\b|\bnpm\s+test\b|\byarn\s+test\b|\bpnpm\s+test\b|npx\s+(jest|vitest)\b/.test(command)) return processJest(lines);
+    if (
+      /\bpytest\b|py\.test|poetry\s+run\s+pytest|uv\s+run\s+pytest|pipx\s+run\s+pytest/.test(
+        command,
+      )
+    )
+      return processPytest(lines);
+    if (
+      /\bjest\b|\bvitest\b|\bnpm\s+test\b|\byarn\s+test\b|\bpnpm\s+test\b|npx\s+(jest|vitest)\b/.test(
+        command,
+      )
+    )
+      return processJest(lines);
     if (/\bcargo\s+test\b/.test(command)) return processCargo(lines);
     if (/\bgo\s+test\b/.test(command)) return processGo(lines);
     if (/\brspec\b|bundle\s+exec\s+rspec\b/.test(command)) return processRspec(lines);
@@ -551,7 +591,11 @@ function extractCoverage(lines: string[]): string[] {
   let end: number | undefined;
   for (let i = 0; i < lines.length; i++) {
     const stripped = (lines[i] ?? "").trim();
-    if (start === undefined && (/^-+ coverage/.test(stripped) || /^Name\s+Stmts\s+Miss/.test(stripped))) start = i;
+    if (
+      start === undefined &&
+      (/^-+ coverage/.test(stripped) || /^Name\s+Stmts\s+Miss/.test(stripped))
+    )
+      start = i;
     if (start !== undefined && i > start && /^TOTAL\s+/.test(stripped)) {
       end = i;
       break;
@@ -596,14 +640,14 @@ function collapseWarnings(warningLines: string[]): string[] {
       const list = byType.get(wtype) ?? [];
       list.push(line);
       byType.set(wtype, list);
-      } else if (/^\s*\//.test(line) || /^\s+\w+/.test(line)) {
-        // Source-location continuation lines (path/indented) — no type of their own.
-        continue;
-      } else {
-        const list = byType.get("other") ?? [];
-        list.push(line);
-        byType.set("other", list);
-      }
+    } else if (/^\s*\//.test(line) || /^\s+\w+/.test(line)) {
+      // Source-location continuation lines (path/indented) — no type of their own.
+      continue;
+    } else {
+      const list = byType.get("other") ?? [];
+      list.push(line);
+      byType.set("other", list);
+    }
   }
   if (byType.size === 0) return [];
   const total = [...byType.values()].reduce((acc, v) => acc + v.length, 0);
@@ -763,7 +807,10 @@ function processDotnet(lines: string[]): string {
   for (const rawLine of lines) {
     const stripped = rawLine.trim();
     if (/^\s*(Build|Restore|Determining|Microsoft)/.test(stripped)) continue;
-    if ((stripped.startsWith("Passed!") || /\bPassed\b/.test(stripped)) && !/test/.test(stripped.toLowerCase())) {
+    if (
+      (stripped.startsWith("Passed!") || /\bPassed\b/.test(stripped)) &&
+      !/test/.test(stripped.toLowerCase())
+    ) {
       passed += 1;
       continue;
     }
@@ -853,7 +900,13 @@ const DEFAULT_ERROR_RE =
 /** Keep head/tail plus error lines with context (token-saver utils.compress_log_lines). */
 function compressLogLines(
   lines: string[],
-  opts: { keepHead?: number; keepTail?: number; errorRe?: RegExp; contextLines?: number; maxErrorLines?: number } = {},
+  opts: {
+    keepHead?: number;
+    keepTail?: number;
+    errorRe?: RegExp;
+    contextLines?: number;
+    maxErrorLines?: number;
+  } = {},
 ): string {
   const keepHead = opts.keepHead ?? 10;
   const keepTail = opts.keepTail ?? 20;
@@ -1040,8 +1093,27 @@ export const lintOutputProcessor: OutputProcessor = {
 const STERN_RE = /\b(stern|kubetail)\b/;
 const LEVEL_KEYS = ["level", "severity", "log_level", "loglevel", "lvl", "log.level"];
 const MESSAGE_KEYS = ["msg", "message", "text", "log", "body"];
-const ERROR_LEVELS = new Set(["error", "fatal", "critical", "panic", "err", "crit", "emerg", "alert"]);
-const LEVEL_ORDER = ["error", "fatal", "critical", "panic", "warn", "warning", "info", "debug", "trace"];
+const ERROR_LEVELS = new Set([
+  "error",
+  "fatal",
+  "critical",
+  "panic",
+  "err",
+  "crit",
+  "emerg",
+  "alert",
+]);
+const LEVEL_ORDER = [
+  "error",
+  "fatal",
+  "critical",
+  "panic",
+  "warn",
+  "warning",
+  "info",
+  "debug",
+  "trace",
+];
 
 function extractLogLevel(obj: Record<string, unknown>): string {
   for (const key of LEVEL_KEYS) {
@@ -1067,7 +1139,10 @@ function extractLogMessage(obj: Record<string, unknown>): string {
   return "";
 }
 
-function processJsonLogLines(rawLines: string[], parsed: (Record<string, unknown> | null)[]): string {
+function processJsonLogLines(
+  rawLines: string[],
+  parsed: (Record<string, unknown> | null)[],
+): string {
   const levelCounts = new Map<string, number>();
   const errorLines: string[] = [];
   let total = 0;
@@ -1156,7 +1231,10 @@ const PACKAGE_CAN_HANDLE_RE = new RegExp(
 );
 
 function simpleListCompress(output: string, itemType: string, keep = 15): string {
-  const lines = output.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+  const lines = output
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
   if (lines.length <= 20) return output;
   const result = [`${lines.length} ${itemType}:`];
   for (const line of lines.slice(0, keep)) result.push(`  ${line}`);
@@ -1293,7 +1371,10 @@ function processLsLong(output: string): string {
 }
 
 function processLsGrouped(output: string): string {
-  const items = output.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+  const items = output
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
   if (items.length <= LS_COMPACT_THRESHOLD) return output;
   const byExt = new Map<string, string[]>();
   const dirs: string[] = [];
@@ -1312,19 +1393,26 @@ function processLsGrouped(output: string): string {
   }
   const result = [`${items.length} items:`];
   if (dirs.length) {
-    if (dirs.length > 10) result.push(`  dirs (${dirs.length}): ${dirs.slice(0, 8).join(", ")} ... +${dirs.length - 8}`);
+    if (dirs.length > 10)
+      result.push(
+        `  dirs (${dirs.length}): ${dirs.slice(0, 8).join(", ")} ... +${dirs.length - 8}`,
+      );
     else result.push(`  dirs (${dirs.length}): ${dirs.join(", ")}`);
   }
   const sortedExt = [...byExt.entries()].sort((a, b) => b[1].length - a[1].length);
   for (const [ext, files] of sortedExt) {
-    if (files.length > 5) result.push(`  *.${ext} (${files.length}): ${files.slice(0, 3).join(", ")} ...`);
+    if (files.length > 5)
+      result.push(`  *.${ext} (${files.length}): ${files.slice(0, 3).join(", ")} ...`);
     else result.push(`  *.${ext}: ${files.join(", ")}`);
   }
   return result.join("\n");
 }
 
 function processFind(output: string): string {
-  const lines = output.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+  const lines = output
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
   if (lines.length <= FIND_COMPACT_THRESHOLD) return output;
   const byDir = new Map<string, string[]>();
   for (const path of lines) {
@@ -1438,7 +1526,8 @@ export const searchProcessor: OutputProcessor = {
     }
     if (byFile.size === 0 && plainMatches.length === 0) return output;
 
-    const totalMatches = [...byFile.values()].reduce((a, v) => a + v.length, 0) + plainMatches.length;
+    const totalMatches =
+      [...byFile.values()].reduce((a, v) => a + v.length, 0) + plainMatches.length;
     const totalFiles = byFile.size;
     if (totalFiles === 0) {
       if (plainMatches.length > 30) {
@@ -1457,7 +1546,9 @@ export const searchProcessor: OutputProcessor = {
       if (count > SEARCH_MAX_PER_FILE) {
         result.push(`${filepath}: (${count} matches)`);
         for (const matchLine of matches.slice(0, SEARCH_MAX_PER_FILE)) {
-          const display = matchLine.startsWith(filepath + ":") ? matchLine.slice(filepath.length + 1) : matchLine;
+          const display = matchLine.startsWith(filepath + ":")
+            ? matchLine.slice(filepath.length + 1)
+            : matchLine;
           result.push(`  ${display}`);
         }
         result.push(`  ... (${count - SEARCH_MAX_PER_FILE} more)`);
@@ -1465,12 +1556,17 @@ export const searchProcessor: OutputProcessor = {
         for (const matchLine of matches) result.push(matchLine);
       }
     }
-    if (totalFiles > SEARCH_MAX_FILES) result.push(`... (${totalFiles - SEARCH_MAX_FILES} more files)`);
+    if (totalFiles > SEARCH_MAX_FILES)
+      result.push(`... (${totalFiles - SEARCH_MAX_FILES} more files)`);
     return result.join("\n");
   },
 };
 
-function processSearchByDir(byFile: Map<string, string[]>, totalMatches: number, totalFiles: number): string {
+function processSearchByDir(
+  byFile: Map<string, string[]>,
+  totalMatches: number,
+  totalFiles: number,
+): string {
   // Group search results by directory for large result sets.
   const byDir = new Map<string, Map<string, string[]>>();
   for (const [filepath, matches] of byFile) {
@@ -1479,10 +1575,14 @@ function processSearchByDir(byFile: Map<string, string[]>, totalMatches: number,
     dirFiles.set(filepath, matches);
     byDir.set(dir, dirFiles);
   }
-  const result = [`${totalMatches} matches across ${totalFiles} files in ${byDir.size} directories:`];
+  const result = [
+    `${totalMatches} matches across ${totalFiles} files in ${byDir.size} directories:`,
+  ];
   let dirsShown = 0;
   const sortedDirs = [...byDir.entries()].sort(
-    (a, b) => [...b[1].values()].reduce((s, v) => s + v.length, 0) - [...a[1].values()].reduce((s, v) => s + v.length, 0),
+    (a, b) =>
+      [...b[1].values()].reduce((s, v) => s + v.length, 0) -
+      [...a[1].values()].reduce((s, v) => s + v.length, 0),
   );
   for (const [dirName, files] of sortedDirs) {
     if (dirsShown >= SEARCH_MAX_FILES) break;
@@ -1511,7 +1611,10 @@ function processSearchByDir(byFile: Map<string, string[]>, totalMatches: number,
 }
 
 function processFd(output: string): string {
-  const lines = output.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+  const lines = output
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
   if (lines.length < 20) return output;
   const byDir = new Map<string, string[]>();
   for (const path of lines) {
@@ -1541,7 +1644,8 @@ function processFd(output: string): string {
       for (const f of files) result.push(`  ${dirPath}/${f}`);
     }
   }
-  if (dirs.length > SEARCH_MAX_FILES) result.push(`... (${dirs.length - SEARCH_MAX_FILES} more directories)`);
+  if (dirs.length > SEARCH_MAX_FILES)
+    result.push(`... (${dirs.length - SEARCH_MAX_FILES} more directories)`);
   return result.join("\n");
 }
 
@@ -1567,10 +1671,8 @@ const LOCK_FILES = new Set([
 ]);
 
 // Optional git global options between 'git' and the subcommand.
-const GIT_OPTS =
-  String.raw`(?:-C\s+\S+\s+|--no-pager\s+|-c\s+\S+\s+|--git-dir(?:=|\s+)\S+\s+|--work-tree(?:=|\s+)\S+\s+)*`;
-const GIT_SUBCMDS =
-  String.raw`(status|diff|log|show|push|pull|fetch|clone|branch|stash|reflog|remote|blame|cherry-pick|rebase|merge)`;
+const GIT_OPTS = String.raw`(?:-C\s+\S+\s+|--no-pager\s+|-c\s+\S+\s+|--git-dir(?:=|\s+)\S+\s+|--work-tree(?:=|\s+)\S+\s+)*`;
+const GIT_SUBCMDS = String.raw`(status|diff|log|show|push|pull|fetch|clone|branch|stash|reflog|remote|blame|cherry-pick|rebase|merge)`;
 const GIT_CMD_RE = new RegExp(String.raw`\bgit\s+${GIT_OPTS}${GIT_SUBCMDS}\b`);
 
 /** Compress a unified diff (shared token-saver git/gh util, ported verbatim). */
@@ -1602,7 +1704,10 @@ function compressDiff(lines: string[], maxHunk: number, maxContext: number): str
       result.push(line);
       hunkLineCount = 0;
       hunkTruncated = false;
-    } else if (!inHunk && (line.startsWith("index ") || line.startsWith("--- ") || line.startsWith("+++ "))) {
+    } else if (
+      !inHunk &&
+      (line.startsWith("index ") || line.startsWith("--- ") || line.startsWith("+++ "))
+    ) {
       continue;
     } else if (
       !inHunk &&
@@ -1656,9 +1761,11 @@ function compressDiff(lines: string[], maxHunk: number, maxContext: number): str
 /** Compress git diff content: --name-only, --stat, lockfile summary, hunks. */
 function processGitDiff(output: string, command: string): string {
   const lines = output.split("\n");
-  if (/--name-only\b/.test(command) || /--name-status\b/.test(command)) return processGitNameList(lines);
+  if (/--name-only\b/.test(command) || /--name-status\b/.test(command))
+    return processGitNameList(lines);
   // stat-only format: `git diff --stat` output has no diff --git headers.
-  if (lines.length > 0 && !lines.some((l) => l.startsWith("diff --git"))) return processGitDiffStat(lines);
+  if (lines.length > 0 && !lines.some((l) => l.startsWith("diff --git")))
+    return processGitDiffStat(lines);
 
   // Pre-scan: separate lockfile diffs from normal diffs.
   const nonLockLines: string[] = [];
@@ -1670,10 +1777,13 @@ function processGitDiff(output: string, command: string): string {
   for (const line of lines) {
     if (line.startsWith("diff --git")) {
       if (inLockfile && currentFile) {
-        lockfileSummaries.push(`diff --git ${currentFile}`, `  (lockfile changed, ${currentFileLines} lines)`);
+        lockfileSummaries.push(
+          `diff --git ${currentFile}`,
+          `  (lockfile changed, ${currentFileLines} lines)`,
+        );
       }
       const m = /^diff --git a\/(.+?) b\//.exec(line);
-      const filename = m ? (m[1] ?? "").split("/").pop() ?? "" : "";
+      const filename = m ? ((m[1] ?? "").split("/").pop() ?? "") : "";
       inLockfile = LOCK_FILES.has(filename);
       if (inLockfile) {
         currentFile = filename;
@@ -1690,7 +1800,10 @@ function processGitDiff(output: string, command: string): string {
     nonLockLines.push(line);
   }
   if (inLockfile && currentFile) {
-    lockfileSummaries.push(`diff --git ${currentFile}`, `  (lockfile changed, ${currentFileLines} lines)`);
+    lockfileSummaries.push(
+      `diff --git ${currentFile}`,
+      `  (lockfile changed, ${currentFileLines} lines)`,
+    );
   }
 
   let maxHunk = MAX_DIFF_HUNK_LINES;
@@ -1800,7 +1913,10 @@ function processGitLog(output: string, command: string): string {
   const first = lines[0] ?? "";
   if (!first.startsWith("commit ")) {
     if (lines.length > MAX_LOG_ENTRIES) {
-      return lines.slice(0, MAX_LOG_ENTRIES).join("\n") + `\n... (${lines.length - MAX_LOG_ENTRIES} more)`;
+      return (
+        lines.slice(0, MAX_LOG_ENTRIES).join("\n") +
+        `\n... (${lines.length - MAX_LOG_ENTRIES} more)`
+      );
     }
     return output;
   }
@@ -1820,13 +1936,20 @@ function processGitLog(output: string, command: string): string {
     let message = "";
     for (const line of entry) {
       if (line.startsWith("commit ")) commitHash = (line.split(/\s+/)[1] ?? "").slice(0, 8);
-      else if (line.trim() && !line.startsWith("Author:") && !line.startsWith("Merge:") && !line.startsWith("Date:") && !message) {
+      else if (
+        line.trim() &&
+        !line.startsWith("Author:") &&
+        !line.startsWith("Merge:") &&
+        !line.startsWith("Date:") &&
+        !message
+      ) {
         message = line.trim();
       }
     }
     result.push(`${commitHash} ${message}`);
   }
-  if (entries.length > MAX_LOG_ENTRIES) result.push(`... (${entries.length - MAX_LOG_ENTRIES} more commits)`);
+  if (entries.length > MAX_LOG_ENTRIES)
+    result.push(`... (${entries.length - MAX_LOG_ENTRIES} more commits)`);
   return result.join("\n");
 }
 
@@ -1836,7 +1959,12 @@ function processGitTransfer(output: string): string {
   for (const raw of lines) {
     const stripped = raw.trim();
     if (!stripped) continue;
-    if (/^(Receiving|Resolving|Counting|Compressing|remote:\s*(Counting|Compressing|Total|Enumerating))/.test(stripped)) continue;
+    if (
+      /^(Receiving|Resolving|Counting|Compressing|remote:\s*(Counting|Compressing|Total|Enumerating))/.test(
+        stripped,
+      )
+    )
+      continue;
     if (/\d+%/.test(stripped)) continue;
     important.push(stripped);
   }
@@ -1879,7 +2007,11 @@ function processGitStatus(output: string): string {
       headerLines.push(`On branch ${branch}`);
       continue;
     }
-    if (stripped.startsWith("On branch") || stripped.startsWith("Your branch") || stripped.startsWith("HEAD detached")) {
+    if (
+      stripped.startsWith("On branch") ||
+      stripped.startsWith("Your branch") ||
+      stripped.startsWith("HEAD detached")
+    ) {
       headerLines.push(stripped);
       inUntracked = false;
       continue;
@@ -1902,9 +2034,19 @@ function processGitStatus(output: string): string {
     let code: string;
     let filepath: string;
     const prefixes: [string, string][] = [
-      ["modified:", "M"], ["new file:", "A"], ["deleted:", "D"], ["renamed:", "R"], ["copied:", "C"],
-      ["typechange:", "T"], ["both modified:", "UU"], ["both added:", "AA"], ["both deleted:", "DD"],
-      ["added by us:", "AU"], ["added by them:", "UA"], ["deleted by us:", "DU"], ["deleted by them:", "UD"],
+      ["modified:", "M"],
+      ["new file:", "A"],
+      ["deleted:", "D"],
+      ["renamed:", "R"],
+      ["copied:", "C"],
+      ["typechange:", "T"],
+      ["both modified:", "UU"],
+      ["both added:", "AA"],
+      ["both deleted:", "DD"],
+      ["added by us:", "AU"],
+      ["added by them:", "UA"],
+      ["deleted by us:", "DU"],
+      ["deleted by them:", "UD"],
     ];
     const pref = prefixes.find(([p]) => stripped.startsWith(p));
     if (pref) {
@@ -1940,7 +2082,9 @@ function processGitStatus(output: string): string {
     const total = [...counts.values()].reduce((a, b) => a + b, 0);
     result.push(`Files: ${total} (${summaryParts.join(", ")})`);
   }
-  for (const [dirName, files] of [...filesByDir.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+  for (const [dirName, files] of [...filesByDir.entries()].sort((a, b) =>
+    a[0].localeCompare(b[0]),
+  )) {
     if (files.length > 8) {
       const codes = new Map<string, number>();
       for (const f of files) {
@@ -1977,11 +2121,20 @@ export const gitOutputProcessor: OutputProcessor = {
     if (subcmd === "log") return processGitLog(output, command);
     if (subcmd === "show") return processGitShow(output);
     if (subcmd === "branch") return processGitBranch(output);
-    if (subcmd === "stash") return /\bstash\s+list\b/.test(command) ? processGitStashList(output) : output;
+    if (subcmd === "stash")
+      return /\bstash\s+list\b/.test(command) ? processGitStashList(output) : output;
     if (subcmd === "reflog") return processGitReflog(output);
     if (subcmd === "blame") return processGitBlame(output);
     if (subcmd === "remote") return processGitRemote(output);
-    if (subcmd === "push" || subcmd === "pull" || subcmd === "fetch" || subcmd === "clone" || subcmd === "cherry-pick" || subcmd === "rebase" || subcmd === "merge") {
+    if (
+      subcmd === "push" ||
+      subcmd === "pull" ||
+      subcmd === "fetch" ||
+      subcmd === "clone" ||
+      subcmd === "cherry-pick" ||
+      subcmd === "rebase" ||
+      subcmd === "merge"
+    ) {
       return processGitTransfer(output);
     }
     return output;
@@ -2005,7 +2158,13 @@ function processGitShow(output: string): string {
   const compactHeader: string[] = [];
   for (const line of header) {
     const stripped = line.trim();
-    if (stripped && !stripped.startsWith("Merge:") && !stripped.startsWith("Author:") && !stripped.startsWith("Date:")) compactHeader.push(line);
+    if (
+      stripped &&
+      !stripped.startsWith("Merge:") &&
+      !stripped.startsWith("Author:") &&
+      !stripped.startsWith("Date:")
+    )
+      compactHeader.push(line);
   }
   return compactHeader.join("\n") + "\n" + compressedDiff;
 }
@@ -2013,13 +2172,19 @@ function processGitShow(output: string): string {
 function processGitStashList(output: string): string {
   const lines = output.trim().split("\n");
   if (lines.length <= GIT_STASH_THRESHOLD) return output;
-  return lines.slice(0, GIT_STASH_THRESHOLD).join("\n") + `\n... (${lines.length - GIT_STASH_THRESHOLD} more stashes)`;
+  return (
+    lines.slice(0, GIT_STASH_THRESHOLD).join("\n") +
+    `\n... (${lines.length - GIT_STASH_THRESHOLD} more stashes)`
+  );
 }
 
 function processGitReflog(output: string): string {
   const lines = output.trim().split("\n");
   if (lines.length <= MAX_LOG_ENTRIES) return output;
-  return lines.slice(0, MAX_LOG_ENTRIES).join("\n") + `\n... (${lines.length - MAX_LOG_ENTRIES} more entries)`;
+  return (
+    lines.slice(0, MAX_LOG_ENTRIES).join("\n") +
+    `\n... (${lines.length - MAX_LOG_ENTRIES} more entries)`
+  );
 }
 
 function processGitRemote(output: string): string {
@@ -2035,7 +2200,8 @@ function processGitRemote(output: string): string {
       result.push(stripped);
     }
   }
-  if (result.length < lines.length) result.push(`(${lines.length} total lines, fetch/push deduplicated)`);
+  if (result.length < lines.length)
+    result.push(`(${lines.length} total lines, fetch/push deduplicated)`);
   return result.join("\n");
 }
 
@@ -2057,7 +2223,8 @@ function processGitBlame(output: string): string {
     }
   }
   if (byAuthor.size === 0) {
-    if (lines.length > 50) return lines.slice(0, 40).join("\n") + `\n... (${lines.length - 40} more lines)`;
+    if (lines.length > 50)
+      return lines.slice(0, 40).join("\n") + `\n... (${lines.length - 40} more lines)`;
     return output;
   }
   const result = [`${lines.length} lines, ${byAuthor.size} authors:`];
@@ -2072,15 +2239,32 @@ function processGitBlame(output: string): string {
 // ── Build-output processor ──────────────────────────────────────────────────────
 
 const BUILD_EXCLUDE_LIST_RE = /\b(pip3?\s+(list|freeze)|npm\s+(ls|list)|conda\s+list)\b/;
-const BUILD_EXCLUDE_INSTALL_RE = /\b(pip3?\s+install|poetry\s+(install|update|add)|uv\s+(pip\s+install|sync))\b/;
+const BUILD_EXCLUDE_INSTALL_RE =
+  /\b(pip3?\s+install|poetry\s+(install|update|add)|uv\s+(pip\s+install|sync))\b/;
 const BUILD_EXCLUDE_MAVEN_RE = /\b(mvn|mvnw|gradle|gradlew)\b/;
 const BUILD_CAN_HANDLE_RE = new RegExp(
   String.raw`\b(npm\s+(run|install|ci|build|audit)|yarn\s+(run|install|build|add|audit)|pnpm\s+(run|install|build|add|audit)|make\b|cmake\b|ant\b|tsc\b|webpack\b|vite(\s+build)?|esbuild\b|rollup\b|next\s+build|nuxt\s+build|docker\s+(build|compose\s+build)|turbo\s+(run|build)|nx\s+(run|build)|bazel\s+build|sbt\b|mix\s+compile|bun\s+(install|build|run)|npx\s+(webpack|vite|esbuild|tsc|next\s+build|nuxt\s+build|turbo\s+run))\b`,
 );
 
 const SPINNER_SET = new Set([
-  "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏",
-  "⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷",
+  "⠋",
+  "⠙",
+  "⠹",
+  "⠸",
+  "⠼",
+  "⠴",
+  "⠦",
+  "⠧",
+  "⠇",
+  "⠏",
+  "⣾",
+  "⣽",
+  "⣻",
+  "⢿",
+  "⡿",
+  "⣟",
+  "⣯",
+  "⣷",
 ]);
 
 /** token-saver build_output._is_progress_line — all python patterns ported. */
@@ -2170,9 +2354,25 @@ function buildSummarizeSuccess(lines: string[]): string {
       continue;
     }
     if (
-      ["built", "compiled", "success", "done", "complete", "finish", "written", "created", "generated", "output", "bundle", "size", "gzip", "chunk", "cached", "remote:", "tasks"].some(
-        (kw) => stripped.toLowerCase().includes(kw),
-      )
+      [
+        "built",
+        "compiled",
+        "success",
+        "done",
+        "complete",
+        "finish",
+        "written",
+        "created",
+        "generated",
+        "output",
+        "bundle",
+        "size",
+        "gzip",
+        "chunk",
+        "cached",
+        "remote:",
+        "tasks",
+      ].some((kw) => stripped.toLowerCase().includes(kw))
     ) {
       outputLines.push(stripped);
     }
@@ -2206,7 +2406,8 @@ function buildProcessAudit(lines: string[]): string {
       }
     }
     if (/\d+\s+(vulnerabilit|package)/i.test(stripped)) summaryLines.push(stripped);
-    if (/(npm audit fix|run .* to fix|breaking change)/i.test(stripped)) summaryLines.push(stripped);
+    if (/(npm audit fix|run .* to fix|breaking change)/i.test(stripped))
+      summaryLines.push(stripped);
   }
   if (severities.size === 0) return lines.join("\n");
   const total = [...severities.values()].reduce((a, b) => a + b, 0);
@@ -2263,7 +2464,7 @@ function buildProcessTscTypecheck(lines: string[]): string {
     let m = /^(.+?)\((\d+),(\d+)\):\s+error\s+(TS\d+):\s+(.+)$/.exec(stripped);
     if (!m) m = /^(.+?):\d+:\d+\s+-\s+error\s+(TS\d+):\s+(.+)$/.exec(stripped);
     if (m) {
-      const code = m[4] ?? (m[2] ?? "");
+      const code = m[4] ?? m[2] ?? "";
       const list = byCode.get(code) ?? [];
       list.push(stripped);
       byCode.set(code, list);
@@ -2274,7 +2475,9 @@ function buildProcessTscTypecheck(lines: string[]): string {
   if (byCode.size === 0) return lines.join("\n");
   const total = [...byCode.values()].reduce((a, v) => a + v.length, 0);
   const result = [`${total} type errors across ${byCode.size} codes:`];
-  for (const [code, violations] of [...byCode.entries()].sort((a, b) => b[1].length - a[1].length)) {
+  for (const [code, violations] of [...byCode.entries()].sort(
+    (a, b) => b[1].length - a[1].length,
+  )) {
     const count = violations.length;
     if (count > 3) {
       result.push(`  ${code}: ${count} occurrences`);
@@ -2307,12 +2510,17 @@ export const buildOutputProcessor: OutputProcessor = {
     // Piped output may be partial — avoid claiming success when errors were piped away.
     if (command.includes("|")) return output;
     if (/\b(npm|yarn|pnpm)\s+audit\b/.test(command)) return buildProcessAudit(output.split("\n"));
-    if (/\bdocker\s+(build|compose\s+build)\b/.test(command)) return buildProcessDocker(output.split("\n"));
+    if (/\bdocker\s+(build|compose\s+build)\b/.test(command))
+      return buildProcessDocker(output.split("\n"));
 
     const lines = output.split("\n");
     const hasError = lines.some((line) => {
       const stripped = line.trim();
-      return /\b(error|Error|ERROR)\b/.test(line) && !/\b0 errors?\b/.test(line) && !isBuildProgressLine(stripped);
+      return (
+        /\b(error|Error|ERROR)\b/.test(line) &&
+        !/\b0 errors?\b/.test(line) &&
+        !isBuildProgressLine(stripped)
+      );
     });
     if (hasError) return buildExtractErrors(lines);
     return buildSummarizeSuccess(lines);
@@ -2330,11 +2538,23 @@ const RUST_WARNING_SUMMARY_RE = /^warning:\s+.+generated\s+\d+\s+warning/;
 const RUST_FINISHED_RE = /^\s*Finished\s+/;
 
 const CLIPPY_CATEGORIES: Record<string, string> = {
-  needless_return: "style", redundant_closure: "style", len_zero: "style", manual_map: "style",
-  single_match: "style", match_bool: "style", collapsible_if: "style",
-  unused_imports: "correctness", unused_variables: "correctness", dead_code: "correctness", unreachable_code: "correctness",
-  needless_borrow: "complexity", unnecessary_unwrap: "complexity", map_unwrap_or: "complexity",
-  clone_on_copy: "perf", large_enum_variant: "perf", box_collection: "perf",
+  needless_return: "style",
+  redundant_closure: "style",
+  len_zero: "style",
+  manual_map: "style",
+  single_match: "style",
+  match_bool: "style",
+  collapsible_if: "style",
+  unused_imports: "correctness",
+  unused_variables: "correctness",
+  dead_code: "correctness",
+  unreachable_code: "correctness",
+  needless_borrow: "complexity",
+  unnecessary_unwrap: "complexity",
+  map_unwrap_or: "complexity",
+  clone_on_copy: "perf",
+  large_enum_variant: "perf",
+  box_collection: "perf",
 };
 
 const CLIPPY_WARNING_EXAMPLE_COUNT = 2;
@@ -2438,7 +2658,9 @@ export const cargoClippyProcessor: OutputProcessor = {
     if (prep.length > 0) result.push(`[${prep.join(", ")}]`);
 
     for (const block of errorBlocks) result.push(...block);
-    for (const [rule, blocks] of [...warningsByRule.entries()].sort((a, b) => b[1].length - a[1].length)) {
+    for (const [rule, blocks] of [...warningsByRule.entries()].sort(
+      (a, b) => b[1].length - a[1].length,
+    )) {
       const count = blocks.length;
       const category = categorizeClippyLint(rule);
       if (count >= CLIPPY_WARNING_GROUP_THRESHOLD) {
@@ -2446,7 +2668,8 @@ export const cargoClippyProcessor: OutputProcessor = {
         for (const block of blocks.slice(0, CLIPPY_WARNING_EXAMPLE_COUNT)) {
           for (const bline of block) result.push(`  ${bline}`);
         }
-        if (count > CLIPPY_WARNING_EXAMPLE_COUNT) result.push(`  ... (${count - CLIPPY_WARNING_EXAMPLE_COUNT} more)`);
+        if (count > CLIPPY_WARNING_EXAMPLE_COUNT)
+          result.push(`  ... (${count - CLIPPY_WARNING_EXAMPLE_COUNT} more)`);
       } else {
         for (const block of blocks) result.push(...block);
       }
@@ -2460,13 +2683,16 @@ export const cargoClippyProcessor: OutputProcessor = {
 // ── Kubectl processor ───────────────────────────────────────────────────────────
 
 // Optional kubectl global options before the subcommand (-n/-A/--context/...).
-const KUBECTL_OPTS =
-  String.raw`(?:-n\s+\S+\s+|--namespace(?:=|\s+)\S+\s+|--context(?:=|\s+)\S+\s+|--kubeconfig(?:=|\s+)\S+\s+|-A\s+|--all-namespaces\s+)*`;
+const KUBECTL_OPTS = String.raw`(?:-n\s+\S+\s+|--namespace(?:=|\s+)\S+\s+|--context(?:=|\s+)\S+\s+|--kubeconfig(?:=|\s+)\S+\s+|-A\s+|--all-namespaces\s+)*`;
 const KUBECTL_SUBCMDS = String.raw`(get|describe|logs|top|apply|delete|create)`;
 const KUBECTL_CMD_RE = new RegExp(String.raw`\b(kubectl|oc)\s+${KUBECTL_OPTS}${KUBECTL_SUBCMDS}\b`);
 const READY_RE = /\b(\d+)\/(\d+)\b/;
 
-function kubectlStripColumn(header: string, lines: string[], colName: string): { header: string; lines: string[] } {
+function kubectlStripColumn(
+  header: string,
+  lines: string[],
+  colName: string,
+): { header: string; lines: string[] } {
   const m = new RegExp(`\\b${colName}\\b`).exec(header);
   if (!m) return { header, lines };
   const colStart = m.index;
@@ -2487,11 +2713,16 @@ function kubectlGet(output: string): string {
   if (lines.length <= 10) return output;
   let header = lines[0] ?? "";
   let entries = lines.slice(1);
-  if (/\bAGE\b/.test(header)) ({ header, lines: entries } = kubectlStripColumn(header, entries, "AGE"));
+  if (/\bAGE\b/.test(header))
+    ({ header, lines: entries } = kubectlStripColumn(header, entries, "AGE"));
   const isPods = /STATUS/.test(header) && /READY/.test(header);
   if (!isPods) {
     if (entries.length > 50) {
-      const result = [header, ...entries.slice(0, 40), `... (${entries.length - 40} more resources)`];
+      const result = [
+        header,
+        ...entries.slice(0, 40),
+        `... (${entries.length - 40} more resources)`,
+      ];
       return result.join("\n");
     }
     return [header, ...entries].join("\n");
@@ -2521,10 +2752,31 @@ function kubectlDescribe(output: string): string {
   const result: string[] = [];
   let skipSection = false;
   let currentSection = "";
-  const noiseKeys = new Set(["tolerations", "volumes", "qos class", "node-selectors", "annotations", "managed fields"]);
+  const noiseKeys = new Set([
+    "tolerations",
+    "volumes",
+    "qos class",
+    "node-selectors",
+    "annotations",
+    "managed fields",
+  ]);
   const keepKeys = new Set([
-    "name", "namespace", "status", "state", "containers", "events", "conditions", "type", "reason",
-    "message", "last state", "restart count", "port", "image", "node", "labels",
+    "name",
+    "namespace",
+    "status",
+    "state",
+    "containers",
+    "events",
+    "conditions",
+    "type",
+    "reason",
+    "message",
+    "last state",
+    "restart count",
+    "port",
+    "image",
+    "node",
+    "labels",
   ]);
 
   for (const line of lines) {
@@ -2599,7 +2851,8 @@ export const kubectlOutputProcessor: OutputProcessor = {
     if (subcmd === "describe") return kubectlDescribe(output);
     if (subcmd === "logs") return kubectlLogs(output);
     if (subcmd === "get" || subcmd === "top") return kubectlGet(output);
-    if (subcmd === "apply" || subcmd === "delete" || subcmd === "create") return kubectlMutate(output);
+    if (subcmd === "apply" || subcmd === "delete" || subcmd === "create")
+      return kubectlMutate(output);
     return output;
   },
 };
@@ -2668,7 +2921,10 @@ function dockerPs(output: string): string {
   }
   if (stopped.length > 0) {
     if (stopped.length > 10) {
-      const names = stopped.slice(0, 5).map((s) => s.trim().split(/\s+/)[0] ?? "").join(", ");
+      const names = stopped
+        .slice(0, 5)
+        .map((s) => s.trim().split(/\s+/)[0] ?? "")
+        .join(", ");
       result.push(`Stopped (${stopped.length}): ${names} ... +${stopped.length - 5} more`);
     } else {
       result.push(`Stopped (${stopped.length}):`);
@@ -2727,9 +2983,13 @@ function dockerComposeLogs(lines: string[], composeRe: RegExp): string {
     }
   }
   const result = [`${lines.length} log lines across ${serviceLines.size} services:`];
-  for (const [service, svcLines] of [...serviceLines.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+  for (const [service, svcLines] of [...serviceLines.entries()].sort((a, b) =>
+    a[0].localeCompare(b[0]),
+  )) {
     if (service === "_other") continue;
-    const errorCount = svcLines.filter((ln) => /\b(error|ERROR|exception|fatal|FATAL|panic)\b/i.test(ln)).length;
+    const errorCount = svcLines.filter((ln) =>
+      /\b(error|ERROR|exception|fatal|FATAL|panic)\b/i.test(ln),
+    ).length;
     result.push(`\n--- ${service} (${svcLines.length} lines, ${errorCount} errors) ---`);
     const errorsShown: string[] = [];
     for (let i = 0; i < svcLines.length; i++) {
@@ -2764,7 +3024,12 @@ function dockerPull(output: string): string {
   const result: string[] = [];
   for (const raw of lines) {
     const stripped = raw.trim();
-    if (/^[0-9a-f]+:\s*(Downloading|Extracting|Pulling|Waiting|Verifying|Download complete|Pull complete|Already exists)/.test(stripped)) continue;
+    if (
+      /^[0-9a-f]+:\s*(Downloading|Extracting|Pulling|Waiting|Verifying|Download complete|Pull complete|Already exists)/.test(
+        stripped,
+      )
+    )
+      continue;
     if (/\d+(\.\d+)?%/.test(stripped) && /\[=*>?\s*\]/.test(stripped)) continue;
     result.push(stripped);
   }
@@ -2778,17 +3043,29 @@ function dockerInspect(output: string): string {
   try {
     data = JSON.parse(raw);
   } catch {
-    if (lines.length > 50) return lines.slice(0, 40).join("\n") + `\n... (${lines.length - 40} more lines)`;
+    if (lines.length > 50)
+      return lines.slice(0, 40).join("\n") + `\n... (${lines.length - 40} more lines)`;
     return output;
   }
   if (Array.isArray(data) && data.length === 1) data = data[0];
   if (!data || typeof data !== "object" || Array.isArray(data)) {
-    if (lines.length > 50) return lines.slice(0, 40).join("\n") + `\n... (${lines.length - 40} more lines)`;
+    if (lines.length > 50)
+      return lines.slice(0, 40).join("\n") + `\n... (${lines.length - 40} more lines)`;
     return output;
   }
   const obj = data as Record<string, unknown>;
   const result: string[] = [];
-  const importantKeys = ["Id", "Name", "State", "Config", "NetworkSettings", "Image", "Created", "Platform", "Status"];
+  const importantKeys = [
+    "Id",
+    "Name",
+    "State",
+    "Config",
+    "NetworkSettings",
+    "Image",
+    "Created",
+    "Platform",
+    "Status",
+  ];
   for (const key of importantKeys) {
     const val = obj[key];
     if (val === undefined) continue;
@@ -2798,7 +3075,8 @@ function dockerInspect(output: string): string {
       if (key === "State") {
         result.push(`${key}:`);
         for (const [sk, sv] of Object.entries(nested)) {
-          if (typeof sv === "string" || typeof sv === "number" || typeof sv === "boolean") result.push(`  ${sk}: ${sv}`);
+          if (typeof sv === "string" || typeof sv === "number" || typeof sv === "boolean")
+            result.push(`  ${sk}: ${sv}`);
         }
       } else if (key === "Config") {
         result.push(`${key}:`);
@@ -2806,7 +3084,12 @@ function dockerInspect(output: string): string {
           const sv = nested[sk];
           if (sv === undefined) continue;
           if (Array.isArray(sv) && sv.length > 5) result.push(`  ${sk}: [${sv.length} items]`);
-          else if (sv && typeof sv === "object" && !Array.isArray(sv) && Object.keys(sv as object).length > 5) {
+          else if (
+            sv &&
+            typeof sv === "object" &&
+            !Array.isArray(sv) &&
+            Object.keys(sv as object).length > 5
+          ) {
             result.push(`  ${sk}: {${Object.keys(sv as object).length} keys}`);
           } else {
             const svStr = String(sv);
@@ -2816,8 +3099,14 @@ function dockerInspect(output: string): string {
       } else if (key === "NetworkSettings") {
         result.push(`${key}:`);
         if (nested.Ports !== undefined) result.push(`  Ports: ${String(nested.Ports)}`);
-        if (nested.Networks && typeof nested.Networks === "object" && !Array.isArray(nested.Networks)) {
-          for (const [netName, netInfo] of Object.entries(nested.Networks as Record<string, Record<string, unknown>>)) {
+        if (
+          nested.Networks &&
+          typeof nested.Networks === "object" &&
+          !Array.isArray(nested.Networks)
+        ) {
+          for (const [netName, netInfo] of Object.entries(
+            nested.Networks as Record<string, Record<string, unknown>>,
+          )) {
             const ip = netInfo?.IPAddress ?? "";
             result.push(`  ${netName}: ${String(ip)}`);
           }
@@ -2836,7 +3125,8 @@ function dockerInspect(output: string): string {
     result.push(`docker inspect: ${topKeys.length} top-level keys`);
     for (const k of topKeys.slice(0, 15)) {
       const v = obj[k];
-      if (v && typeof v === "object" && !Array.isArray(v)) result.push(`  ${k}: {${Object.keys(v as object).length} keys}`);
+      if (v && typeof v === "object" && !Array.isArray(v))
+        result.push(`  ${k}: {${Object.keys(v as object).length} keys}`);
       else if (Array.isArray(v)) result.push(`  ${k}: [${v.length} items]`);
       else {
         const sv = String(v);
@@ -2884,7 +3174,10 @@ function dockerComposeDown(output: string): string {
   const result: string[] = [];
   for (const raw of lines) {
     const stripped = raw.trim();
-    if (/(Stopped|Removed|Removing|removed)/i.test(stripped) || /(Network|Volume)\s+\S+\s+(Removed|removed)/.test(stripped)) {
+    if (
+      /(Stopped|Removed|Removing|removed)/i.test(stripped) ||
+      /(Network|Volume)\s+\S+\s+(Removed|removed)/.test(stripped)
+    ) {
       result.push(stripped);
     }
   }
@@ -2927,7 +3220,9 @@ export const dockerProcessor: OutputProcessor = {
 
 // ── Terraform processor ─────────────────────────────────────────────────────────
 
-const TF_CMD_RE = new RegExp(String.raw`\b(terraform|tofu)\s+(plan|apply|destroy|init|output|validate|fmt|state\s+(?:list|show))\b`);
+const TF_CMD_RE = new RegExp(
+  String.raw`\b(terraform|tofu)\s+(plan|apply|destroy|init|output|validate|fmt|state\s+(?:list|show))\b`,
+);
 
 function tfPlanApply(lines: string[]): string {
   const result: string[] = [];
@@ -2946,7 +3241,8 @@ function tfPlanApply(lines: string[]): string {
       result.push(line);
       if (stripped.includes("will be created")) resourceAction = "+";
       else if (stripped.includes("will be destroyed")) resourceAction = "-";
-      else if (stripped.includes("will be updated") || stripped.includes("must be replaced")) resourceAction = "~";
+      else if (stripped.includes("will be updated") || stripped.includes("must be replaced"))
+        resourceAction = "~";
       continue;
     }
     // Resource block boundary.
@@ -3004,7 +3300,12 @@ function tfPlanApply(lines: string[]): string {
       result.push(line);
       continue;
     }
-    if (!stripped && !inResourceBlock && result.length > 0 && (result[result.length - 1] ?? "").trim()) {
+    if (
+      !stripped &&
+      !inResourceBlock &&
+      result.length > 0 &&
+      (result[result.length - 1] ?? "").trim()
+    ) {
       result.push(line);
     }
   }
@@ -3065,12 +3366,14 @@ function tfState(lines: string[]): string {
       if (!classified) byType.set(stripped, (byType.get(stripped) ?? 0) + 1);
     }
     const result = [`${lines.filter((l) => l.trim()).length} resources in state:`];
-    for (const [rtype, count] of [...byType.entries()].sort((a, b) => b[1] - a[1])) result.push(`  ${rtype}: ${count}`);
+    for (const [rtype, count] of [...byType.entries()].sort((a, b) => b[1] - a[1]))
+      result.push(`  ${rtype}: ${count}`);
     return result.join("\n");
   }
   // state show: truncate long attribute values.
   const result = truncateLongLines(lines, /^(\s*\S+\s*=\s*)/);
-  if (result.length > 80) return result.slice(0, 60).join("\n") + `\n... (${result.length - 60} more lines)`;
+  if (result.length > 80)
+    return result.slice(0, 60).join("\n") + `\n... (${result.length - 60} more lines)`;
   return result.join("\n");
 }
 
@@ -3126,11 +3429,48 @@ const FC_CSV_HEAD_ROWS = 3;
 const FC_CSV_TAIL_ROWS = 2;
 
 const FC_SOURCE_CODE_EXTENSIONS = new Set([
-  ".py", ".js", ".ts", ".tsx", ".jsx", ".go", ".rs", ".java", ".kt", ".scala",
-  ".c", ".cpp", ".h", ".hpp", ".cs", ".rb", ".php", ".swift", ".ex", ".exs",
-  ".sh", ".bash", ".zsh", ".ps1", ".lua", ".r", ".m", ".vb", ".pl", ".pm",
-  ".hs", ".ml", ".vue", ".svelte", ".dart", ".zig", ".nim", ".v", ".groovy",
-  ".sql", ".tf", ".hcl",
+  ".py",
+  ".js",
+  ".ts",
+  ".tsx",
+  ".jsx",
+  ".go",
+  ".rs",
+  ".java",
+  ".kt",
+  ".scala",
+  ".c",
+  ".cpp",
+  ".h",
+  ".hpp",
+  ".cs",
+  ".rb",
+  ".php",
+  ".swift",
+  ".ex",
+  ".exs",
+  ".sh",
+  ".bash",
+  ".zsh",
+  ".ps1",
+  ".lua",
+  ".r",
+  ".m",
+  ".vb",
+  ".pl",
+  ".pm",
+  ".hs",
+  ".ml",
+  ".vue",
+  ".svelte",
+  ".dart",
+  ".zig",
+  ".nim",
+  ".v",
+  ".groovy",
+  ".sql",
+  ".tf",
+  ".hcl",
 ]);
 
 const FC_SENSITIVE_CONFIG_EXTENSIONS = new Set([".env", ".ini", ".cfg", ".conf"]);
@@ -3138,8 +3478,16 @@ const FC_SENSITIVE_CONFIG_EXTENSIONS = new Set([".env", ".ini", ".cfg", ".conf"]
 const FC_MINIFIABLE_SOURCE_EXTENSIONS = new Set([".js", ".ts", ".jsx", ".tsx", ".css", ".html"]);
 
 const FC_LOCK_FILENAMES = new Set([
-  "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "poetry.lock", "Pipfile.lock",
-  "Cargo.lock", "composer.lock", "Gemfile.lock", "go.sum", "bun.lockb",
+  "package-lock.json",
+  "yarn.lock",
+  "pnpm-lock.yaml",
+  "poetry.lock",
+  "Pipfile.lock",
+  "Cargo.lock",
+  "composer.lock",
+  "Gemfile.lock",
+  "go.sum",
+  "bun.lockb",
 ]);
 
 const FC_STRUCTURED_EXTENSIONS: Record<string, string> = {
@@ -3222,7 +3570,8 @@ function fcIsMinified(ext: string, filename: string, output: string): boolean {
 }
 
 function fcIsEnvFileToRedact(filename: string): boolean {
-  if (filename === ".env" || filename === ".env.example" || filename === ".env.template") return false;
+  if (filename === ".env" || filename === ".env.example" || filename === ".env.template")
+    return false;
   return /^\.env\..+$/i.test(filename);
 }
 
@@ -3267,7 +3616,8 @@ function fcLooksLikeCsv(sample: string[]): boolean {
     for (const line of sample) {
       if (line.trim()) counts.push(line.split(sep).length - 1);
     }
-    if (counts.length >= 3 && counts[0]! >= 2 && counts.slice(0, 5).every((c) => c === counts[0])) return true;
+    if (counts.length >= 3 && counts[0]! >= 2 && counts.slice(0, 5).every((c) => c === counts[0]))
+      return true;
   }
   return false;
 }
@@ -3317,10 +3667,12 @@ function fcCompressLockFile(lines: string[], ext: string, filename: string): str
   const total = lines.length;
   const raw = lines.join("\n");
   if (filename === "package-lock.json") return fcCompressNpmLock(raw, total);
-  if (filename === "yarn.lock" || filename === "Gemfile.lock") return fcCompressYarnLock(lines, total);
+  if (filename === "yarn.lock" || filename === "Gemfile.lock")
+    return fcCompressYarnLock(lines, total);
   if (filename === "poetry.lock") return fcCompressTomlLock(lines, total, "poetry.lock");
   if (filename === "Cargo.lock") return fcCompressTomlLock(lines, total, "Cargo.lock");
-  if (filename === "composer.lock" || filename === "Pipfile.lock") return fcCompressJsonLock(raw, total);
+  if (filename === "composer.lock" || filename === "Pipfile.lock")
+    return fcCompressJsonLock(raw, total);
   if (filename === "go.sum") return fcCompressGoSum(lines, total);
   return fcTruncateDefault(lines);
 }
@@ -3342,7 +3694,10 @@ function fcCompressNpmLock(raw: string, total: number): string {
       if (!name.includes("node_modules/")) deps.set(name, version);
     }
   } else {
-    const dependencies = (data["dependencies"] ?? {}) as Record<string, { version?: string } | string>;
+    const dependencies = (data["dependencies"] ?? {}) as Record<
+      string,
+      { version?: string } | string
+    >;
     for (const [name, info] of Object.entries(dependencies)) {
       deps.set(name, typeof info === "object" && info !== null ? (info.version ?? "?") : "?");
     }
@@ -3362,7 +3717,9 @@ function fcCompressYarnLock(lines: string[], total: number): string {
       deps.push(stripped.slice(0, -1).replace(/"/g, ""));
     }
     if (stripped.startsWith("version ")) {
-      const version = stripped.includes('"') ? stripped.split('"')[1]! : stripped.split(/\s+/).pop()!;
+      const version = stripped.includes('"')
+        ? stripped.split('"')[1]!
+        : stripped.split(/\s+/).pop()!;
       if (deps.length > 0) {
         const last = deps[deps.length - 1]!;
         if (!last.split(",")[0]!.split("@").pop()!.includes("@")) {
@@ -3385,7 +3742,9 @@ function fcCompressTomlLock(lines: string[], total: number, label: string): stri
     if (stripped === "[[package]]") {
       currentName = null;
     } else if (stripped.startsWith("name = ")) {
-      currentName = stripped.includes('"') ? stripped.split('"')[1]! : stripped.split("=")[1]!.trim();
+      currentName = stripped.includes('"')
+        ? stripped.split('"')[1]!
+        : stripped.split("=")[1]!.trim();
     } else if (stripped.startsWith("version = ") && currentName) {
       const val = stripped.includes('"') ? stripped.split('"')[1]! : stripped.split("=")[1]!.trim();
       deps.push(`${currentName}@${val}`);
@@ -3415,7 +3774,10 @@ function fcCompressJsonLock(raw: string, total: number): string {
   for (const section of ["default", "develop"]) {
     const sec = (data[section] ?? {}) as Record<string, unknown>;
     for (const [name, info] of Object.entries(sec)) {
-      const version = info !== null && typeof info === "object" ? (info as Record<string, unknown>)["version"] ?? "?" : "?";
+      const version =
+        info !== null && typeof info === "object"
+          ? ((info as Record<string, unknown>)["version"] ?? "?")
+          : "?";
       deps.push(`${name}@${String(version)}`);
     }
   }
@@ -3556,7 +3918,11 @@ function fcTruncateDefault(lines: string[]): string {
   const tail = lines.slice(-FC_KEEP_TAIL);
   const truncated = total - head.length - tail.length;
   if (truncated <= 0) return lines.join("\n");
-  return [...head, `\n... (${truncated} lines truncated, ${total} total lines) ...\n`, ...tail].join("\n");
+  return [
+    ...head,
+    `\n... (${truncated} lines truncated, ${total} total lines) ...\n`,
+    ...tail,
+  ].join("\n");
 }
 
 function fcDetectHeuristic(lines: string[]): string {

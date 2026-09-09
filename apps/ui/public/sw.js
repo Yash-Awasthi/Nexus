@@ -22,8 +22,7 @@ const SHELL_URLS = ["/", "/dashboard", "/chat", "/manifest.json", "/favicon.svg"
 // one — two React copies, "Cannot read properties of null (reading
 // 'useContext')". Observed repeatedly in dev playtests. In dev this SW
 // unregisters itself, clears its caches, and never intercepts fetches.
-const IS_DEV =
-  self.location.hostname === "localhost" || self.location.hostname === "127.0.0.1";
+const IS_DEV = self.location.hostname === "localhost" || self.location.hostname === "127.0.0.1";
 
 // ── Install ───────────────────────────────────────────────────────────────────
 

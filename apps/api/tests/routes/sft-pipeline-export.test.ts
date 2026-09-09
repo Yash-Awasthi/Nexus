@@ -106,7 +106,10 @@ describe("POST /sft/pipeline/export", () => {
       payload: {
         conversations: Array.from({ length: 11 }, () => [
           { role: "user", content: "Please explain something useful." },
-          { role: "assistant", content: "Here is a detailed explanation that covers the topic thoroughly." },
+          {
+            role: "assistant",
+            content: "Here is a detailed explanation that covers the topic thoroughly.",
+          },
         ]),
       },
     });

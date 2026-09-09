@@ -67,7 +67,10 @@ function costOf(m: ModelCapability): number | null {
   return (m.inputCostPer1M ?? 0) + (m.outputCostPer1M ?? 0);
 }
 
-function scoreAndNotes(m: ModelCapability, req: CapabilityRequirement): { score: number[]; notes: string[] } {
+function scoreAndNotes(
+  m: ModelCapability,
+  req: CapabilityRequirement,
+): { score: number[]; notes: string[] } {
   // Lexicographic score, lower is better. Capability-first unless
   // preferCheapest: adequate tier costs less when it is not overridden.
   const needed = TIER_ORDER[req.minReasoningTier ?? "fast"];

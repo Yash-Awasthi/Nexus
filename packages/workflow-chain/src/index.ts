@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @nexus/workflow-chain — Fluent workflow chain API.
  *
@@ -90,11 +91,7 @@ export interface LoopStepConfig<INPUT, DATA> {
   /** Items to iterate over */
   items: (ctx: StepContext<INPUT, DATA>) => Promise<unknown[]> | unknown[];
   /** Execute for each item */
-  execute: (
-    ctx: StepContext<INPUT, DATA>,
-    item: unknown,
-    index: number,
-  ) => Promise<unknown>;
+  execute: (ctx: StepContext<INPUT, DATA>, item: unknown, index: number) => Promise<unknown>;
   /** Max iterations safety limit */
   maxIterations?: number;
 }
@@ -149,7 +146,13 @@ export interface WorkflowConfig<INPUT, RESULT> {
 
 export type WorkflowResult<RESULT> =
   | { status: "completed"; result: RESULT; events: WorkflowEvent[] }
-  | { status: "suspended"; stepId: string; reason?: string; suspendData?: unknown; events: WorkflowEvent[] }
+  | {
+      status: "suspended";
+      stepId: string;
+      reason?: string;
+      suspendData?: unknown;
+      events: WorkflowEvent[];
+    }
   | { status: "error"; error: string; stepId?: string; events: WorkflowEvent[] };
 
 // ─── Chain ───────────────────────────────────────────────────────────────────
@@ -227,9 +230,7 @@ export class WorkflowChain<INPUT, DATA = INPUT, RESULT = DATA> {
    * Add parallel steps.
    * Executes multiple steps concurrently.
    */
-  andParallel(
-    config: ParallelStepConfig<INPUT, DATA>,
-  ): WorkflowChain<INPUT, DATA, RESULT> {
+  andParallel(config: ParallelStepConfig<INPUT, DATA>): WorkflowChain<INPUT, DATA, RESULT> {
     this.steps.push({ kind: "parallel", config });
     return this as unknown as WorkflowChain<INPUT, DATA, RESULT>;
   }
@@ -325,8 +326,7 @@ export class WorkflowChain<INPUT, DATA = INPUT, RESULT = DATA> {
             });
             throw new SuspendError(stepId, reason, suspendData);
           },
-          resumeData:
-            stepId === options?.resumeStepId ? options?.resumeData : undefined,
+          resumeData: stepId === options?.resumeStepId ? options?.resumeData : undefined,
           retryCount: 0,
           signal: options?.signal,
           emit,
@@ -478,9 +478,7 @@ async function executeStep<INPUT>(
 
     case "agent": {
       const prompt =
-        typeof step.config.task === "function"
-          ? step.config.task(ctx)
-          : step.config.task;
+        typeof step.config.task === "function" ? step.config.task(ctx) : step.config.task;
       const output = await step.config.agent.generate(prompt);
       if (step.config.map) {
         return step.config.map(output, ctx);
@@ -490,9 +488,7 @@ async function executeStep<INPUT>(
 
     case "loop": {
       const items =
-        typeof step.config.items === "function"
-          ? await step.config.items(ctx)
-          : step.config.items;
+        typeof step.config.items === "function" ? await step.config.items(ctx) : step.config.items;
       const maxIter = step.config.maxIterations ?? 1000;
       const results: unknown[] = [];
 
@@ -507,11 +503,7 @@ async function executeStep<INPUT>(
     case "parallel": {
       const promises = step.config.steps.map((s) => {
         const subCtx = { ...ctx };
-        return executeStep(
-          { kind: "function", config: s },
-          subCtx,
-          data,
-        ).catch((err) => {
+        return executeStep({ kind: "function", config: s }, subCtx, data).catch((err) => {
           if (step.config.continueOnFailure) return null;
           throw err;
         });
@@ -554,12 +546,5 @@ export function createWorkflowChain<INPUT, RESULT = INPUT>(
 
 // Types are already exported inline above.
 
-export {
-  ActivityNotFoundError,
-  DurableRuntime,
-} from "./durable.js";
-export type {
-  ActivityDefinition,
-  ActivityRetryPolicy,
-  WorkflowContext,
-} from "./durable.js";
+export { ActivityNotFoundError, DurableRuntime } from "./durable.js";
+export type { ActivityDefinition, ActivityRetryPolicy, WorkflowContext } from "./durable.js";

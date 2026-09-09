@@ -94,12 +94,14 @@ export class EnsembleRefinement {
     // Generate samples in parallel with temperature variation
     const results = await Promise.all(
       Array.from({ length: config.numReasoningSteps }, (_, i) =>
-        this.router.complete({
-          model: config.alias,
-          messages: [{ role: "user", content: prompt }],
-          maxTokens: 1024,
-          temperature: config.temperature ?? 0.7,
-        }).then((resp) => ({ id: i, content: resp.content })),
+        this.router
+          .complete({
+            model: config.alias,
+            messages: [{ role: "user", content: prompt }],
+            maxTokens: 1024,
+            temperature: config.temperature ?? 0.7,
+          })
+          .then((resp) => ({ id: i, content: resp.content })),
       ),
     );
 
@@ -219,9 +221,7 @@ export class EnsembleRefinement {
   private computeConsensus(samples: ReasoningSample[], finalAnswer: string): number {
     if (samples.length === 0) return 0;
     const normalized = finalAnswer.toLowerCase().trim();
-    const matching = samples.filter(
-      (s) => s.answer.toLowerCase().trim() === normalized,
-    ).length;
+    const matching = samples.filter((s) => s.answer.toLowerCase().trim() === normalized).length;
     return matching / samples.length;
   }
 }

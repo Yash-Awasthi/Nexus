@@ -59,9 +59,9 @@ describe("FilesystemSandbox", () => {
 
   it("enforces read/delete/write sandbox boundaries", async () => {
     const sandbox = new FilesystemSandbox(sandboxDir, new SandboxConstraint(4, sandboxDir));
-    await expect(sandbox.writeFile(path.join(sandboxDir, "big.txt"), "too big for quota")).rejects.toThrow(
-      /Write violation/,
-    );
+    await expect(
+      sandbox.writeFile(path.join(sandboxDir, "big.txt"), "too big for quota"),
+    ).rejects.toThrow(/Write violation/);
     const outside = path.join(os.tmpdir(), "outside-file.txt");
     fs.writeFileSync(outside, "x");
     try {

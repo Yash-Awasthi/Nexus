@@ -192,10 +192,7 @@ function computeSimilarity(a: string, b: string): number {
 /**
  * Compute weighted score with evidence quality emphasis.
  */
-export function computeWeightedScore(
-  criteria: ScoringCriteria,
-  evidenceWeight: number = 0.4,
-): number {
+export function computeWeightedScore(criteria: ScoringCriteria, evidenceWeight = 0.4): number {
   const otherWeight = (1 - evidenceWeight) / 4;
   return (
     criteria.argumentQuality * otherWeight +
@@ -215,7 +212,7 @@ export function computeAcknowledgmentBonus(
 ): number {
   let bonus = 0;
 
-  for (const opponent of opponentArguments) {
+  for (const _opponent of opponentArguments) {
     // Check if current argument acknowledges opponent's point
     const acknowledges = [
       /\b(acknowledge|concede|admit|recognize|valid point)\b/i,
@@ -240,7 +237,7 @@ export function computeWeaknessPenalty(
 ): number {
   let penalty = 0;
 
-  for (const opponent of opponentArguments) {
+  for (const _opponent of opponentArguments) {
     // Check if opponent raised a point that wasn't addressed
     const addressed = [
       /\b(refute|counter|rebut|address|respond to)\b/i,
@@ -390,10 +387,7 @@ export class DebateSession {
 /**
  * Create a new debate session with sensible defaults.
  */
-export function createDebate(
-  topic: string,
-  options: Partial<DebateConfig> = {},
-): DebateSession {
+export function createDebate(topic: string, options: Partial<DebateConfig> = {}): DebateSession {
   const config: DebateConfig = {
     topic,
     numRounds: options.numRounds ?? 3,
@@ -405,10 +399,7 @@ export function createDebate(
   return new DebateSession(config);
 }
 
-export {
-  majorityFinalAnswer,
-  runMultiAgentDebate,
-} from "./multiagent-debate.js";
+export { majorityFinalAnswer, runMultiAgentDebate } from "./multiagent-debate.js";
 export type {
   AgentMessage,
   AgentTranscript,

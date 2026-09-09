@@ -165,10 +165,11 @@ describe("POST /api/v1/gateway/messages — property-based fuzzing", () => {
           url: "/api/v1/gateway/messages",
           payload: { model, messages },
         });
-        if (res.statusCode !== 200) return false;
-        return vi
-          .mocked(fetch)
-          .mock.calls.some((c) => String(c[0]).includes(":11434/api/chat"));
+        expect(res.statusCode).toBe(200);
+        expect(
+          vi.mocked(fetch).mock.calls.some((c) => String(c[0]).includes(":11434/api/chat")),
+        ).toBe(true);
+        return true;
       }),
       { numRuns: 25 },
     );
@@ -188,8 +189,9 @@ describe("POST /api/v1/gateway/messages — property-based fuzzing", () => {
           url: "/api/v1/gateway/messages",
           payload: { model: "nexus/fast", messages },
         });
-        if (res.statusCode !== 200) return false;
+        expect(res.statusCode).toBe(200);
         const call = vi.mocked(fetch).mock.calls.at(-1);
+        expect(call && String(call[0]).includes(":11434/api/chat")).toBe(true);
         if (!call || !String(call[0]).includes(":11434/api/chat")) return false;
         const sent = JSON.parse(String(call[1]!.body)) as { model: string };
         return sent.model === "qwen2.5:7b";
@@ -226,10 +228,11 @@ describe("POST /api/v1/gateway/messages — property-based fuzzing", () => {
           });
           const body = res.json<{ error?: { type: string } }>();
           // 429 = rate-limited (fires before spend check in high-throughput prop runs)
-          return (
+          const ok =
             (res.statusCode === 402 && body.error?.type === "spend_cap_exceeded") ||
-            res.statusCode === 429
-          );
+            res.statusCode === 429;
+          expect(ok).toBe(true);
+          return ok;
         },
       ),
       { numRuns: 20 },
@@ -268,14 +271,15 @@ describe("POST /api/v1/gateway/messages — property-based fuzzing", () => {
             type: unknown;
             content: { type: unknown; text: unknown }[];
           }>();
-          return (
+          const shapeOk =
             typeof body.id === "string" &&
             body.type === "message" &&
             Array.isArray(body.content) &&
             body.content.length > 0 &&
             body.content[0]?.type === "text" &&
-            typeof body.content[0]?.text === "string"
-          );
+            typeof body.content[0]?.text === "string";
+          expect(shapeOk).toBe(true);
+          return shapeOk;
         },
       ),
       { numRuns: 20 },
@@ -309,6 +313,7 @@ describe("POST /api/v1/gateway/messages — property-based fuzzing", () => {
             url: "/api/v1/gateway/messages",
             payload,
           });
+          expect(res.statusCode).toBeLessThan(500);
           return res.statusCode < 500;
         },
       ),

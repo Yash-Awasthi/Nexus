@@ -77,14 +77,14 @@ Out of scope: third-party LLM providers (Groq, Anthropic, OpenAI), underlying cl
 
 ### 4.1 Client ↔ API gateway
 
-| Threat                                       | Category        | Mitigation                                        | Status       |
-| -------------------------------------------- | --------------- | ------------------------------------------------- | ------------ |
-| Replay attack with stolen token              | Spoofing        | Short-lived JWT (15 min) + refresh rotation; session revocation (`jti`/subject cutoff, §14.3); RS256 option (§14.1) | ✅          |
-| Tampered request body                        | Tampering       | Fastify JSON schema validation on all routes      | ✅           |
-| Repudiation of API actions                   | Repudiation     | HMAC audit log (ADR-0010) on every write          | ✅           |
-| Enumeration of signal IDs                    | Info disclosure | UUID v4 opaque IDs, no sequential patterns        | ✅           |
-| Volumetric DDoS                              | DoS             | Rate limiter (`@fastify/rate-limit`, 100 req/10s) | Planned v1.0 |
-| Privilege escalation via parameter injection | EoP             | Drizzle ORM parameterised queries; no raw SQL     | ✅           |
+| Threat                                       | Category        | Mitigation                                                                                                          | Status       |
+| -------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------- | ------------ |
+| Replay attack with stolen token              | Spoofing        | Short-lived JWT (15 min) + refresh rotation; session revocation (`jti`/subject cutoff, §14.3); RS256 option (§14.1) | ✅           |
+| Tampered request body                        | Tampering       | Fastify JSON schema validation on all routes                                                                        | ✅           |
+| Repudiation of API actions                   | Repudiation     | HMAC audit log (ADR-0010) on every write                                                                            | ✅           |
+| Enumeration of signal IDs                    | Info disclosure | UUID v4 opaque IDs, no sequential patterns                                                                          | ✅           |
+| Volumetric DDoS                              | DoS             | Rate limiter (`@fastify/rate-limit`, 100 req/10s)                                                                   | Planned v1.0 |
+| Privilege escalation via parameter injection | EoP             | Drizzle ORM parameterised queries; no raw SQL                                                                       | ✅           |
 
 ### 4.2 Ingest service ↔ scraped sites
 

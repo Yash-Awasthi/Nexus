@@ -76,9 +76,7 @@ export class CheckpointStore {
     state: Record<string, unknown>,
     options?: { source?: CheckpointSource; runId?: string; parentId?: string },
   ): Checkpoint {
-    const parentCheckpoint = options?.parentId
-      ? this.checkpoints.get(options.parentId)
-      : undefined;
+    const parentCheckpoint = options?.parentId ? this.checkpoints.get(options.parentId) : undefined;
 
     const version = parentCheckpoint ? parentCheckpoint.version + 1 : 1;
     const step = parentCheckpoint ? parentCheckpoint.metadata.step + 1 : 0;
@@ -143,10 +141,7 @@ export class CheckpointStore {
   /**
    * Fork a checkpoint (create a copy with new state).
    */
-  fork(
-    checkpointId: string,
-    newState?: Record<string, unknown>,
-  ): Checkpoint | undefined {
+  fork(checkpointId: string, newState?: Record<string, unknown>): Checkpoint | undefined {
     const original = this.checkpoints.get(checkpointId);
     if (!original) return undefined;
 
@@ -252,8 +247,7 @@ export class DeltaSnapshotManager {
     snapshotFrequency: number = 10,
   ): boolean {
     return (
-      updatesSinceLastSnapshot >= snapshotFrequency ||
-      superstepsSinceSnapshot >= this.maxSupersteps
+      updatesSinceLastSnapshot >= snapshotFrequency || superstepsSinceSnapshot >= this.maxSupersteps
     );
   }
 

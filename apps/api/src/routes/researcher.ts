@@ -18,7 +18,6 @@ import { randomUUID } from "crypto";
 
 import { ResearcherAgent, type ResearchRunner, type ResearchRunResult } from "@nexus/agents";
 import { BM25Reranker } from "@nexus/reranker";
-import { searchBrave, searchExa, searchSerper } from "@nexus/search-orchestrator";
 import {
   CitationIndex,
   ResearchSession,
@@ -27,6 +26,7 @@ import {
   type ResearchFinding,
   type SourceReference,
 } from "@nexus/researcher";
+import { searchBrave, searchExa, searchSerper } from "@nexus/search-orchestrator";
 import type { FastifyInstance } from "fastify";
 import { Pool } from "pg";
 
@@ -40,7 +40,7 @@ type WebSearchFn = (query: string) => Promise<SearchResult[]>;
 function buildSearchFn(): WebSearchFn {
   const toWeb = (
     results: { content: string; metadata?: Record<string, unknown>; score: number }[],
-    provider: string,
+    _provider: string,
   ): SearchResult[] =>
     results.slice(0, 10).map((r) => ({
       url: String(r.metadata?.url ?? ""),

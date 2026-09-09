@@ -162,10 +162,7 @@ export class FinetunePipeline {
    * are ready — the same precondition the API routes surface as 422
    * `insufficient_data`.
    */
-  exportOpenAiJsonl(
-    ready: SftSample[],
-    opts: { systemPrompt?: string } = {},
-  ): string {
+  exportOpenAiJsonl(ready: SftSample[], opts: { systemPrompt?: string } = {}): string {
     if (ready.length === 0) {
       throw new FinetuneExportError(
         "No samples are ready for export — add rated conversations or corpus documents first.",

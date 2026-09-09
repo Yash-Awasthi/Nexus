@@ -43,11 +43,12 @@ function scripted(...replies: string[]): Scripted {
 describe("GroupChat validation", () => {
   it("rejects empty rosters and duplicate names", () => {
     expect(() => new GroupChat({ agents: [], llm: scripted().llm })).toThrow(/at least one agent/);
-    expect(() =>
-      new GroupChat({
-        agents: [AGENTS[0]!, { name: "Alice", systemPrompt: "dup" }],
-        llm: scripted().llm,
-      }),
+    expect(
+      () =>
+        new GroupChat({
+          agents: [AGENTS[0]!, { name: "Alice", systemPrompt: "dup" }],
+          llm: scripted().llm,
+        }),
     ).toThrow(/duplicate agent name "Alice"/);
   });
 });

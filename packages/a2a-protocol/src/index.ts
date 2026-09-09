@@ -72,9 +72,7 @@ export class A2AAgentRegistry {
   }
 
   discoverByCapability(capability: string): A2AAgentCard[] {
-    return this.listAgents().filter((a) =>
-      a.capabilities.includes(capability),
-    );
+    return this.listAgents().filter((a) => a.capabilities.includes(capability));
   }
 
   discoverByInputMode(mode: "text" | "file" | "data"): A2AAgentCard[] {
@@ -84,10 +82,7 @@ export class A2AAgentRegistry {
 
 // ── Task Manager ─────────────────────────────────────────────────────────────
 
-export type TaskExecutor = (
-  input: A2ATaskInput,
-  task: A2ATask,
-) => Promise<A2ATaskResult>;
+export type TaskExecutor = (input: A2ATaskInput, task: A2ATask) => Promise<A2ATaskResult>;
 
 export class A2ATaskManager {
   private tasks: Map<string, A2ATask> = new Map();
@@ -207,10 +202,7 @@ export class A2AClient {
     return this.registry.getAgent(agentName);
   }
 
-  async callAgent(
-    agentName: string,
-    input: A2ATaskInput,
-  ): Promise<A2ATaskResult> {
+  async callAgent(agentName: string, input: A2ATaskInput): Promise<A2ATaskResult> {
     const task = await this.taskManager.createTask(agentName, input);
     const result = await this.taskManager.executeTask(task.id);
     if (result.status === "failed") {

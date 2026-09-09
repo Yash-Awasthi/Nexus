@@ -4,7 +4,7 @@ import { describe, it, expect } from "vitest";
 import { detectCommunities, modularity } from "./community.js";
 import { KnowledgeGraph, InMemoryKGStore, type KGNode, type KGEdge } from "./index.js";
 
-function adj(pairs: Array<[string, string]>): Map<string, Set<string>> {
+function adj(pairs: [string, string][]): Map<string, Set<string>> {
   const g = new Map<string, Set<string>>();
   for (const [a, b] of pairs) {
     if (!g.has(a)) g.set(a, new Set());
@@ -17,8 +17,12 @@ function adj(pairs: Array<[string, string]>): Map<string, Set<string>> {
 
 /** Two triangles joined by a single bridge edge — the classic two-community structure. */
 const TWO_TRIANGLES = adj([
-  ["a", "b"], ["b", "c"], ["a", "c"], // clique 1
-  ["x", "y"], ["y", "z"], ["x", "z"], // clique 2
+  ["a", "b"],
+  ["b", "c"],
+  ["a", "c"], // clique 1
+  ["x", "y"],
+  ["y", "z"],
+  ["x", "z"], // clique 2
   ["c", "x"], // bridge
 ]);
 
@@ -38,8 +42,11 @@ describe("detectCommunities", () => {
 
   it("never merges disconnected components", () => {
     const g = adj([
-      ["a", "b"], ["b", "c"],
-      ["x", "y"], ["y", "z"], ["z", "w"],
+      ["a", "b"],
+      ["b", "c"],
+      ["x", "y"],
+      ["y", "z"],
+      ["z", "w"],
     ]);
     const c = detectCommunities(g);
     const byNode: Record<string, number> = Object.fromEntries(c);
@@ -54,7 +61,14 @@ describe("detectCommunities", () => {
     // Merging is strictly positive all the way to one community (verified
     // empirically; diamonds and stars are modularity pathologies where
     // intermediate partitions are non-positive and correctly stay split).
-    const g = adj([["a", "b"], ["b", "c"], ["a", "c"], ["c", "x"], ["x", "y"], ["c", "y"]]);
+    const g = adj([
+      ["a", "b"],
+      ["b", "c"],
+      ["a", "c"],
+      ["c", "x"],
+      ["x", "y"],
+      ["c", "y"],
+    ]);
     const c = detectCommunities(g);
     const byNode: Record<string, number> = Object.fromEntries(c);
     const community = byNode["a"];
@@ -64,7 +78,12 @@ describe("detectCommunities", () => {
 
   it("respects the resolution parameter (higher γ → more communities)", () => {
     const path = adj([
-      ["n1", "n2"], ["n2", "n3"], ["n3", "n4"], ["n4", "n5"], ["n5", "n6"], ["n6", "n7"],
+      ["n1", "n2"],
+      ["n2", "n3"],
+      ["n3", "n4"],
+      ["n4", "n5"],
+      ["n5", "n6"],
+      ["n6", "n7"],
     ]);
     const coarse = detectCommunities(path, { resolution: 0.5 });
     const fine = detectCommunities(path, { resolution: 2.0 });
@@ -123,8 +142,12 @@ describe("KnowledgeGraph.detectCommunities", () => {
       updatedAt: 0,
     });
     for (const [subject, object] of [
-      ["a", "b"], ["b", "c"], ["a", "c"],
-      ["x", "y"], ["y", "z"], ["x", "z"],
+      ["a", "b"],
+      ["b", "c"],
+      ["a", "c"],
+      ["x", "y"],
+      ["y", "z"],
+      ["x", "z"],
       ["c", "x"],
     ]) {
       await store.upsertNode(node(subject));

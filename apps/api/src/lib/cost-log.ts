@@ -30,7 +30,6 @@
  * double-counted). Astronomically rare; acceptable vs. losing the data.
  */
 
-import type { FastifyInstance } from "fastify";
 import type { KVStore } from "@nexus/kv";
 
 import { getSharedKV, withTimeout } from "./shared-kv.js";

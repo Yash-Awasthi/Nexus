@@ -15,7 +15,12 @@ import {
 } from "./index.js";
 
 function base(): CouncilTranscript {
-  return createTranscript({ id: "run-1", query: "Should we ship?", protocol: "council", createdAt: "2026-01-01T00:00:00Z" });
+  return createTranscript({
+    id: "run-1",
+    query: "Should we ship?",
+    protocol: "council",
+    createdAt: "2026-01-01T00:00:00Z",
+  });
 }
 
 describe("transcript construction", () => {
@@ -44,15 +49,17 @@ describe("transcript construction", () => {
     appendAudit(t, "route", { tier: "standard" });
     appendAudit(t, "finalize");
     expect(t.stages.map((s) => s.name)).toEqual(["Round 1", "Round 2"]);
-    expect(t.auditTrail).toEqual([
-      { step: "route", tier: "standard" },
-      { step: "finalize" },
-    ]);
+    expect(t.auditTrail).toEqual([{ step: "route", tier: "standard" }, { step: "finalize" }]);
   });
 
   it("recordRouting stores route evidence and prepends the routing audit entry", () => {
     const t = base();
-    recordRouting(t, { mode: "auto", selected_protocol: "council", tier: "full_council", reason: "complex" });
+    recordRouting(t, {
+      mode: "auto",
+      selected_protocol: "council",
+      tier: "full_council",
+      reason: "complex",
+    });
     appendAudit(t, "decompose", { subtask_count: 3 });
     expect(t.routing).toMatchObject({ mode: "auto", tier: "full_council" });
     expect(t.auditTrail[0]).toMatchObject({ step: "routing", reason: "complex" });
@@ -82,17 +89,16 @@ describe("finalizeTranscript degradation semantics", () => {
     const t = base();
     finalizeTranscript(t, { providerHealth: [{ id: "openai", ready: false }] });
     expect(t.degraded).toBe(true);
-    expect(t.warnings).toContain("One or more providers are not ready; check environment configuration.");
+    expect(t.warnings).toContain(
+      "One or more providers are not ready; check environment configuration.",
+    );
   });
 
   it("trace errors → degraded, failure counts, confidence capped at success ratio", () => {
     const t = base();
     t.confidence = 0.9;
     finalizeTranscript(t, {
-      modelCallTraces: [
-        { model: "a" },
-        { model: "b", error_kind: "rate_limit" },
-      ],
+      modelCallTraces: [{ model: "a" }, { model: "b", error_kind: "rate_limit" }],
     });
     expect(t.degraded).toBe(true);
     expect(t.warnings).toContain("One or more model calls returned an error or degraded response.");

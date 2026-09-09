@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Heuristic Classifier — 14-dimension weighted scoring for zero-cost prompt routing.
  *
@@ -6,7 +7,7 @@
  * Handles 70-80% of requests in <1ms with zero cost.
  */
 
-export type Tier = 'simple' | 'moderate' | 'complex';
+export type Tier = "simple" | "moderate" | "complex";
 
 export interface DimensionScore {
   name: string;
@@ -35,14 +36,14 @@ const DEFAULT_CONFIG: ScoringConfig = {
 
 // Keyword groups with weights
 const KEYWORD_GROUPS = [
-  { keywords: ['fix', 'debug', 'error', 'bug', 'issue'], name: 'debugging', weight: -0.5 },
-  { keywords: ['refactor', 'optimize', 'improve', 'clean'], name: 'refactoring', weight: -0.2 },
-  { keywords: ['design', 'architect', 'scale', 'distributed'], name: 'architecture', weight: 0.8 },
-  { keywords: ['review', 'explain', 'describe', 'what is'], name: 'explanation', weight: -0.4 },
-  { keywords: ['generate', 'create', 'build', 'implement'], name: 'generation', weight: 0.3 },
-  { keywords: ['security', 'vulnerability', 'auth', 'encrypt'], name: 'security', weight: 0.6 },
-  { keywords: ['test', 'spec', 'assert', 'mock'], name: 'testing', weight: -0.1 },
-  { keywords: ['migrate', 'transform', 'convert', 'port'], name: 'migration', weight: 0.2 },
+  { keywords: ["fix", "debug", "error", "bug", "issue"], name: "debugging", weight: -0.5 },
+  { keywords: ["refactor", "optimize", "improve", "clean"], name: "refactoring", weight: -0.2 },
+  { keywords: ["design", "architect", "scale", "distributed"], name: "architecture", weight: 0.8 },
+  { keywords: ["review", "explain", "describe", "what is"], name: "explanation", weight: -0.4 },
+  { keywords: ["generate", "create", "build", "implement"], name: "generation", weight: 0.3 },
+  { keywords: ["security", "vulnerability", "auth", "encrypt"], name: "security", weight: 0.6 },
+  { keywords: ["test", "spec", "assert", "mock"], name: "testing", weight: -0.1 },
+  { keywords: ["migrate", "transform", "convert", "port"], name: "migration", weight: 0.2 },
 ];
 
 function estimateTokens(text: string): number {
@@ -51,25 +52,29 @@ function estimateTokens(text: string): number {
 
 function scoreTokenCount(tokens: number, config: ScoringConfig): DimensionScore {
   if (tokens < config.tokenThresholds.simple) {
-    return { name: 'tokenCount', score: -1.0, signal: `short (${tokens} tokens)` };
+    return { name: "tokenCount", score: -1.0, signal: `short (${tokens} tokens)` };
   }
   if (tokens > config.tokenThresholds.complex) {
-    return { name: 'tokenCount', score: 1.0, signal: `long (${tokens} tokens)` };
+    return { name: "tokenCount", score: 1.0, signal: `long (${tokens} tokens)` };
   }
-  return { name: 'tokenCount', score: 0, signal: null };
+  return { name: "tokenCount", score: 0, signal: null };
 }
 
 function scoreKeywordMatch(
   text: string,
-  group: typeof KEYWORD_GROUPS[0],
-  config: ScoringConfig
+  group: (typeof KEYWORD_GROUPS)[0],
+  config: ScoringConfig,
 ): DimensionScore {
   const lower = text.toLowerCase();
   const matches = group.keywords.filter((kw) => lower.includes(kw));
   const count = matches.length;
 
   if (count >= config.keywordThresholds.high) {
-    return { name: group.name, score: group.weight, signal: `${group.name} (${matches.slice(0, 3).join(', ')})` };
+    return {
+      name: group.name,
+      score: group.weight,
+      signal: `${group.name} (${matches.slice(0, 3).join(", ")})`,
+    };
   }
   if (count >= config.keywordThresholds.low) {
     return { name: group.name, score: group.weight * 0.5, signal: `${group.name} (partial)` };
@@ -81,25 +86,27 @@ function scoreMultiStep(text: string): DimensionScore {
   const patterns = [/first.*then/i, /step \d/i, /\d\.\s/];
   const hits = patterns.filter((p) => p.test(text));
   if (hits.length > 0) {
-    return { name: 'multiStep', score: 0.6, signal: `multi-step (${hits.length} signals)` };
+    return { name: "multiStep", score: 0.6, signal: `multi-step (${hits.length} signals)` };
   }
-  return { name: 'multiStep', score: 0, signal: null };
+  return { name: "multiStep", score: 0, signal: null };
 }
 
 function scoreCodePresence(text: string): DimensionScore {
   const hasCode = /```[\s\S]*```/.test(text);
   const hasInlineCode = /`[^`]+`/.test(text);
-  if (hasCode) return { name: 'codePresence', score: 0.3, signal: 'code block detected' };
-  if (hasInlineCode) return { name: 'codePresence', score: 0.1, signal: 'inline code' };
-  return { name: 'codePresence', score: 0, signal: null };
+  if (hasCode) return { name: "codePresence", score: 0.3, signal: "code block detected" };
+  if (hasInlineCode) return { name: "codePresence", score: 0.1, signal: "inline code" };
+  return { name: "codePresence", score: 0, signal: null };
 }
 
 function scoreQuestionType(text: string): DimensionScore {
   const isQuestion = /\?$/.test(text.trim());
-  const isCommand = /^(write|create|build|generate|fix|implement|add|remove|delete|update)\b/i.test(text.trim());
-  if (isQuestion) return { name: 'questionType', score: -0.3, signal: 'question' };
-  if (isCommand) return { name: 'questionType', score: 0.4, signal: 'command' };
-  return { name: 'questionType', score: 0, signal: null };
+  const isCommand = /^(write|create|build|generate|fix|implement|add|remove|delete|update)\b/i.test(
+    text.trim(),
+  );
+  if (isQuestion) return { name: "questionType", score: -0.3, signal: "question" };
+  if (isCommand) return { name: "questionType", score: 0.4, signal: "command" };
+  return { name: "questionType", score: 0, signal: null };
 }
 
 function sigmoid(x: number): number {
@@ -133,16 +140,17 @@ export function classify(prompt: string, config: ScoringConfig = DEFAULT_CONFIG)
 
   // Aggregate score (weighted average)
   const totalWeight = dimensions.reduce((sum, d) => sum + Math.abs(d.score || 0.1), 0);
-  const aggregate = dimensions.reduce((sum, d) => sum + d.score, 0) / Math.max(1, dimensions.length);
+  const aggregate =
+    dimensions.reduce((sum, d) => sum + d.score, 0) / Math.max(1, dimensions.length);
 
   // Map to tier
   let tier: Tier;
   if (aggregate < config.tierBoundaries.simple) {
-    tier = 'simple';
+    tier = "simple";
   } else if (aggregate > config.tierBoundaries.complex) {
-    tier = 'complex';
+    tier = "complex";
   } else {
-    tier = 'moderate';
+    tier = "moderate";
   }
 
   // Confidence via sigmoid

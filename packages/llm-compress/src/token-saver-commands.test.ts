@@ -8,9 +8,27 @@ describe("lintOutputProcessor", () => {
     cols.map(([col, rule]) => `  ${col}:${col + 2}  error  message for ${rule}  ${rule}`);
   const eslintOut = [
     "src/a.ts",
-    ...block("src/a.ts", [[1, "no-var"], [2, "no-var"], [3, "no-var"], [4, "no-var"], [10, "semi"], [11, "semi"], [12, "semi"], [13, "semi"]]),
+    ...block("src/a.ts", [
+      [1, "no-var"],
+      [2, "no-var"],
+      [3, "no-var"],
+      [4, "no-var"],
+      [10, "semi"],
+      [11, "semi"],
+      [12, "semi"],
+      [13, "semi"],
+    ]),
     "src/b.ts",
-    ...block("src/b.ts", [[1, "no-var"], [2, "no-var"], [3, "no-var"], [4, "no-var"], [10, "semi"], [11, "semi"], [12, "semi"], [13, "semi"]]),
+    ...block("src/b.ts", [
+      [1, "no-var"],
+      [2, "no-var"],
+      [3, "no-var"],
+      [4, "no-var"],
+      [10, "semi"],
+      [11, "semi"],
+      [12, "semi"],
+      [13, "semi"],
+    ]),
     "",
     "✖ 16 problems (16 errors, 0 warnings)",
   ].join("\n");
@@ -45,7 +63,8 @@ describe("lintOutputProcessor", () => {
     expect(r.output).toContain("  src/util.py:1:1: F401 'os' imported but unused");
 
     const mypyLines: string[] = [];
-    for (let i = 0; i < 8; i++) mypyLines.push(`app.py:${10 + i}: error: Missing return statement  [no-any-return]`);
+    for (let i = 0; i < 8; i++)
+      mypyLines.push(`app.py:${10 + i}: error: Missing return statement  [no-any-return]`);
     const rm = compressOutputForCommand("mypy app.py", mypyLines.join("\n"));
     expect(rm.wasCompressed).toBe(true);
     expect(rm.output).toContain("8 issues across 1 rules:");
@@ -63,7 +82,9 @@ describe("lintOutputProcessor", () => {
 
 describe("structuredLogProcessor", () => {
   const entries = (n: number, level = "info", msg = "request handled"): string =>
-    Array.from({ length: n }, (_, i) => JSON.stringify({ ts: `2026-01-01T00:00:0${i % 10}Z`, level, msg: `${msg} ${i}` })).join("\n");
+    Array.from({ length: n }, (_, i) =>
+      JSON.stringify({ ts: `2026-01-01T00:00:0${i % 10}Z`, level, msg: `${msg} ${i}` }),
+    ).join("\n");
 
   it("routes a stern command with >50% JSON lines to a level tally + errors", () => {
     const logs = [
@@ -85,7 +106,10 @@ describe("structuredLogProcessor", () => {
   });
 
   it("falls back to head/error/tail compression below the 50% JSON threshold", () => {
-    const logs = Array.from({ length: 40 }, (_, i) => `2026-01-01T00:00:0${i % 10}Z [INFO] plain line ${i}`).join("\n");
+    const logs = Array.from(
+      { length: 40 },
+      (_, i) => `2026-01-01T00:00:0${i % 10}Z [INFO] plain line ${i}`,
+    ).join("\n");
     const r = compressOutputForCommand("stern api", logs);
     expect(r.processor).toBe("structured_log");
     expect(r.wasCompressed).toBe(true);
@@ -131,7 +155,10 @@ describe("packageListProcessor", () => {
     const freeze = Array.from({ length: 30 }, (_, i) => `pkg==${i}.0.0`).join("\n");
     const rf = compressOutputForCommand("pip3 freeze", freeze);
     expect(rf.output).toContain("30 packages:");
-    const conda = Array.from({ length: 25 }, (_, i) => `lib${i}        1.0.${i}    conda-forge`).join("\n");
+    const conda = Array.from(
+      { length: 25 },
+      (_, i) => `lib${i}        1.0.${i}    conda-forge`,
+    ).join("\n");
     const rc = compressOutputForCommand("conda list", conda);
     expect(rc.output).toContain("25 packages installed:");
   });

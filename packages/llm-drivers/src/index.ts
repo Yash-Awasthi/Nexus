@@ -935,7 +935,9 @@ export class GeminiDriver extends BaseDriver {
    *  parts (echoing the captured thoughtSignature as a sibling part key). The
    *  id→name table lets a `role: "tool"` message (which only carries the call
    *  id) resolve the function name Gemini requires. */
-  private toGeminiContents(messages: LlmMessage[]): { role: string; parts: Record<string, unknown>[] }[] {
+  private toGeminiContents(
+    messages: LlmMessage[],
+  ): { role: string; parts: Record<string, unknown>[] }[] {
     const idToName = new Map<string, string>();
     const out: { role: string; parts: Record<string, unknown>[] }[] = [];
     for (const m of messages) {
@@ -951,7 +953,8 @@ export class GeminiDriver extends BaseDriver {
         } catch {
           response = { result: m.content };
         }
-        if (typeof response !== "object" || response === null) response = { result: String(response) };
+        if (typeof response !== "object" || response === null)
+          response = { result: String(response) };
         const fr: Record<string, unknown> = { name, response };
         // Echo the API-issued call id back when we captured it (Gemini 3+
         // validates call ids across the round trip).
@@ -2197,14 +2200,19 @@ export class DifyDriver extends BaseDriver {
         }
         case "message_end": {
           if (event.conversation_id) conversationId = event.conversation_id;
-          if (event.metadata?.usage?.prompt_tokens) promptTokens = event.metadata.usage.prompt_tokens;
+          if (event.metadata?.usage?.prompt_tokens)
+            promptTokens = event.metadata.usage.prompt_tokens;
           if (event.metadata?.usage?.completion_tokens)
             completionTokens = event.metadata.usage.completion_tokens;
           break;
         }
         case "error": {
           const msg = event.message ?? event.code ?? "dify stream error";
-          if (event.status === 401 || event.code === "unauthorized" || event.code === "invalid_api_key") {
+          if (
+            event.status === 401 ||
+            event.code === "unauthorized" ||
+            event.code === "invalid_api_key"
+          ) {
             throw new LlmError("AUTH_FAILED", msg, this.provider, 401);
           }
           if (event.status === 429) throw new LlmError("RATE_LIMITED", msg, this.provider, 429);
@@ -2220,7 +2228,14 @@ export class DifyDriver extends BaseDriver {
       completionTokens || estimateTokens(content),
     );
     await handler({ delta: "", done: true, usage: usageObj });
-    const resp = this.makeResponse(messageId, content, this.model, usageObj, Date.now() - t0, "stop");
+    const resp = this.makeResponse(
+      messageId,
+      content,
+      this.model,
+      usageObj,
+      Date.now() - t0,
+      "stop",
+    );
     if (conversationId) resp.conversationId = conversationId;
     return resp;
   }

@@ -165,14 +165,14 @@ export async function reposRoutes(app: FastifyInstance): Promise<void> {
 
           const data = (await res.json()) as {
             total_count: number;
-            items: Array<{
+            items: {
               name: string;
               path: string;
-              text_matches?: Array<{
+              text_matches?: {
                 fragment: string;
-                matches?: Array<{ indices: number[]; text: string }>;
-              }>;
-            }>;
+                matches?: { indices: number[]; text: string }[];
+              }[];
+            }[];
           };
 
           const hits = (data.items ?? []).slice(0, maxResults).map((item) => {
@@ -233,7 +233,7 @@ export async function reposRoutes(app: FastifyInstance): Promise<void> {
         }
 
         const treeData = (await treeRes.json()) as {
-          tree: Array<{ path: string; type: string; size?: number }>;
+          tree: { path: string; type: string; size?: number }[];
         };
 
         const queryLower = query.toLowerCase();

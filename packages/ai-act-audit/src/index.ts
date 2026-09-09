@@ -13,8 +13,8 @@
  * Complements @nexus/governance's AuditLog with EU AI Act specific features.
  */
 
-import { createHash, createHmac, randomUUID } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { createHash } from "node:crypto";
 
 // ── Article 12 Schema ──────────────────────────────────────────────────────
 
@@ -245,10 +245,7 @@ const auditContextStorage = new AsyncLocalStorage<AuditContext>();
  * Execute a callback with audit context.
  * All logger.log() calls within inherit the decisionId.
  */
-export function withAuditContext<T>(
-  context: AuditContext,
-  callback: () => Promise<T>,
-): Promise<T> {
+export function withAuditContext<T>(context: AuditContext, callback: () => Promise<T>): Promise<T> {
   return auditContextStorage.run(context, callback);
 }
 
@@ -306,7 +303,7 @@ export interface CoverageReport {
  */
 export function analyseCoverage(
   entries: AiActAuditEntry[],
-  options?: { from?: string; to?: string },
+  _options?: { from?: string; to?: string },
 ): CoverageReport {
   const warnings: string[] = [];
   const recommendations: string[] = [];
@@ -315,8 +312,7 @@ export function analyseCoverage(
 
   for (const entry of entries) {
     byEventType[entry.eventType] = (byEventType[entry.eventType] ?? 0) + 1;
-    byCaptureMethod[entry.captureMethod] =
-      (byCaptureMethod[entry.captureMethod] ?? 0) + 1;
+    byCaptureMethod[entry.captureMethod] = (byCaptureMethod[entry.captureMethod] ?? 0) + 1;
 
     // Check for missing required fields
     if (!entry.modelId && entry.eventType === "inference") {

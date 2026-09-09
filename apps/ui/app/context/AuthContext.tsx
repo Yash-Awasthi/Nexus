@@ -108,10 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Profile with NO token at all = local-mode user (setup wizard /
         // Electron). There is no token to validate — keep the session.
         setUserState(JSON.parse(raw) as AuthUser);
-      } else if (
-        typeof window !== "undefined" &&
-        (window as { molecule?: unknown }).molecule
-      ) {
+      } else if (typeof window !== "undefined" && (window as { molecule?: unknown }).molecule) {
         // Electron desktop — no backend auth needed, auto-login as local user
         const localUser: AuthUser = { id: "local", username: "You" };
         setUserState(localUser);

@@ -22,11 +22,7 @@
  * screenshot / extract keyword matching).
  */
 
-import type {
-  BrowserDriver,
-  BrowserPage,
-  StealthProfile,
-} from "@nexus/stealth-browser";
+import type { BrowserDriver, BrowserPage, StealthProfile } from "@nexus/stealth-browser";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -52,15 +48,7 @@ export interface DomSnapshot {
 }
 
 export interface ActorAction {
-  type:
-    | "click"
-    | "type"
-    | "select"
-    | "scroll"
-    | "navigate"
-    | "screenshot"
-    | "extract"
-    | "done";
+  type: "click" | "type" | "select" | "scroll" | "navigate" | "screenshot" | "extract" | "done";
   /** `[i_N]` index of the target element (click/type/select). */
   elementIndex?: number;
   value?: string;
@@ -85,16 +73,43 @@ export interface ActionResult {
 const MAX_ELEMENT_TEXT = 80;
 /** Tags whose entire subtree is skipped (browser-use SVG_ELEMENTS). */
 const SKIP_TAGS = new Set([
-  "svg", "path", "rect", "circle", "g", "polygon", "polyline", "ellipse",
-  "line", "defs", "use", "symbol", "clippath", "mask", "pattern",
+  "svg",
+  "path",
+  "rect",
+  "circle",
+  "g",
+  "polygon",
+  "polyline",
+  "ellipse",
+  "line",
+  "defs",
+  "use",
+  "symbol",
+  "clippath",
+  "mask",
+  "pattern",
 ]);
 /** Interactive tags + attribute signals (browser-use clickable_elements). */
 const INTERACTIVE_TAGS = new Set([
-  "a", "button", "input", "select", "textarea", "summary", "label", "option",
-  "details", "audio", "video",
+  "a",
+  "button",
+  "input",
+  "select",
+  "textarea",
+  "summary",
+  "label",
+  "option",
+  "details",
+  "audio",
+  "video",
 ]);
 const INTERACTIVE_ATTRS = new Set([
-  "onclick", "onmousedown", "onmouseup", "onkeydown", "onkeyup", "tabindex",
+  "onclick",
+  "onmousedown",
+  "onmouseup",
+  "onkeydown",
+  "onkeyup",
+  "tabindex",
 ]);
 
 export interface RawNode {
@@ -171,8 +186,20 @@ export function parseHtml(html: string): RawNode {
 }
 
 const VOID_TAGS = new Set([
-  "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
-  "param", "source", "track", "wbr",
+  "area",
+  "base",
+  "br",
+  "col",
+  "embed",
+  "hr",
+  "img",
+  "input",
+  "link",
+  "meta",
+  "param",
+  "source",
+  "track",
+  "wbr",
 ]);
 
 function isInteractive(node: RawNode): boolean {
@@ -418,7 +445,10 @@ export class BrowserActor {
     if (!el.isInteractive) return { success: false, error: `Element ${index} is not interactive` };
     await this.page!.click(el.selector);
     this.snapshot = await this.buildSnapshot();
-    return { success: true, output: `Clicked [i_${el.index}] <${el.tagName}> "${el.text.slice(0, 50)}"` };
+    return {
+      success: true,
+      output: `Clicked [i_${el.index}] <${el.tagName}> "${el.text.slice(0, 50)}"`,
+    };
   }
 
   private async type(index: number | undefined, value: string): Promise<ActionResult> {
@@ -455,5 +485,3 @@ export class BrowserActor {
     };
   }
 }
-
-

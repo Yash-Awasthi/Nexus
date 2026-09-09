@@ -36,15 +36,15 @@ export interface MFModelProfile {
 export interface MFRouteResult {
   chosenAlias: string;
   score: number;
-  allScores: Array<{ alias: string; score: number }>;
+  allScores: { alias: string; score: number }[];
 }
 
 export interface MFBilinearRouterConfig {
   latentDim: number;
   models: MFModelProfile[];
   /** Pre-trained weight matrices. If omitted, uses Xavier initialization. */
-  textProjection?: number[][];  // W1: latentDim x inputDim
-  outputWeights?: number[];     // w2: latentDim
+  textProjection?: number[][]; // W1: latentDim x inputDim
+  outputWeights?: number[]; // w2: latentDim
 }
 
 // ── Xavier initialization ────────────────────────────────────────────────────
@@ -102,8 +102,8 @@ function dot(a: number[], b: number[]): number {
 export class MFBilinearRouter {
   private readonly latentDim: number;
   private readonly models: MFModelProfile[];
-  private readonly textProjection: number[][];  // W1
-  private readonly outputWeights: number[];     // w2
+  private readonly textProjection: number[][]; // W1
+  private readonly outputWeights: number[]; // w2
   private readonly modelEmbeddings: Map<string, number[]>;
 
   constructor(config: MFBilinearRouterConfig) {
@@ -116,10 +116,12 @@ export class MFBilinearRouter {
     this.textProjection = config.textProjection ?? xavierInit(config.latentDim, inputDim);
 
     // w2: output scoring weights
-    this.outputWeights = config.outputWeights ?? (() => {
-      const limit = Math.sqrt(6 / (config.latentDim + 1));
-      return Array.from({ length: config.latentDim }, () => (Math.random() * 2 - 1) * limit);
-    })();
+    this.outputWeights =
+      config.outputWeights ??
+      (() => {
+        const limit = Math.sqrt(6 / (config.latentDim + 1));
+        return Array.from({ length: config.latentDim }, () => (Math.random() * 2 - 1) * limit);
+      })();
 
     // Normalize and store model embeddings
     this.modelEmbeddings = new Map();

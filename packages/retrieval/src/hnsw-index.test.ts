@@ -1,18 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
-import {
-  BFIndex,
-  HNSWIndex,
-  makeDistance,
-  type HnswSpace,
-} from "./hnsw-index.js";
+import { BFIndex, HNSWIndex, makeDistance, type HnswSpace } from "./hnsw-index.js";
 
 /** Deterministic pseudo-random vectors (mulberry32) so tests are stable. */
-function seededVectors(
-  count: number,
-  dim: number,
-  seed = 7,
-): number[][] {
+function seededVectors(count: number, dim: number, seed = 7): number[][] {
   let a = seed >>> 0;
   const rnd = () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -21,9 +12,7 @@ function seededVectors(
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
-  return Array.from({ length: count }, () =>
-    Array.from({ length: dim }, () => rnd() * 2 - 1),
-  );
+  return Array.from({ length: count }, () => Array.from({ length: dim }, () => rnd() * 2 - 1));
 }
 
 function labelsOf(count: number, start = 0): number[] {
@@ -81,11 +70,17 @@ describe("BFIndex (hnswlib bruteforce reference)", () => {
     }
     // Brute force of the brute force: identical result to a manual scan.
     const manual = vectors
-      .map((v, i) => ({ label: i, distance: makeDistance("l2")([0.1, -0.2, 0.3, 0, 0.5, -0.1, 0.2, -0.4], v) }))
+      .map((v, i) => ({
+        label: i,
+        distance: makeDistance("l2")([0.1, -0.2, 0.3, 0, 0.5, -0.1, 0.2, -0.4], v),
+      }))
       .sort((a, b) => a.distance - b.distance || a.label - b.label)
       .slice(0, 5)
       .map((h) => h.label);
-    assertSameSet(hits.map((h) => h.label), manual);
+    assertSameSet(
+      hits.map((h) => h.label),
+      manual,
+    );
   });
 
   it("honors the label filter", () => {
@@ -109,7 +104,7 @@ describe("HNSWIndex matches the brute-force reference", () => {
       exact.addItems(vectors, labelsOf(n));
       const queries = seededVectors(10, dim, 999);
       const recall = recallFraction(index, vectors, queries, 5, exact);
-      expect(recall, `space ${space}`).toBe(1);
+      expect(recall).toBe(1);
     }
   });
 
@@ -124,10 +119,9 @@ describe("HNSWIndex matches the brute-force reference", () => {
     const a = build();
     const b = build();
     for (const q of seededVectors(8, 8, 77)) {
-      assertSameSet(
-        a.searchKnn(q, 8).map((h) => h.label),
-        b.searchKnn(q, 8).map((h) => h.label),
-      );
+      const aLabels = a.searchKnn(q, 8).map((h) => h.label);
+      const bLabels = b.searchKnn(q, 8).map((h) => h.label);
+      expect([...aLabels].sort((x, y) => x - y)).toEqual([...bLabels].sort((x, y) => x - y));
     }
   });
 
@@ -183,7 +177,16 @@ describe("HNSWIndex matches the brute-force reference", () => {
   it("capacity: addItems past maxElements throws; resizeIndex raises it", () => {
     const index = new HNSWIndex("l2", 2);
     index.initIndex(5);
-    index.addItems([[1, 0], [0, 1], [0.5, 0.5], [1, 1], [0, 0]], [0, 1, 2, 3, 4]);
+    index.addItems(
+      [
+        [1, 0],
+        [0, 1],
+        [0.5, 0.5],
+        [1, 1],
+        [0, 0],
+      ],
+      [0, 1, 2, 3, 4],
+    );
     expect(() => index.addItems([[2, 2]], [5])).toThrow(/full/);
     index.resizeIndex(10);
     expect(() => index.addItems([[2, 2]], [5])).not.toThrow();
@@ -211,9 +214,7 @@ describe("HNSWIndex matches the brute-force reference", () => {
     for (const q of queries) {
       const got = index.searchKnn(q, 10);
       expect(got.every((h) => h.label >= delCount)).toBe(true); // never leak
-      const want = exact
-        .searchKnn(q, 10, (l) => l >= delCount)
-        .map((h) => h.label);
+      const want = exact.searchKnn(q, 10, (l) => l >= delCount).map((h) => h.label);
       for (const h of got) if (want.includes(h.label)) hits++;
     }
     expect(hits / (queries.length * 10)).toBe(1); // recall unaffected at 33%
@@ -237,9 +238,7 @@ describe("HNSWIndex matches the brute-force reference", () => {
       for (const q of queries) {
         const got = index.searchKnn(q, 10);
         expect(got.every((h) => h.label >= delCount)).toBe(true); // never leak
-        const want = exact
-          .searchKnn(q, 10, (l) => l >= delCount)
-          .map((h) => h.label);
+        const want = exact.searchKnn(q, 10, (l) => l >= delCount).map((h) => h.label);
         for (const h of got) if (want.includes(h.label)) hits++;
       }
       return hits / (queries.length * 10);

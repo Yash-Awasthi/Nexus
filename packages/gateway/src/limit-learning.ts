@@ -43,7 +43,7 @@ export interface LearnedLimit {
 // Order matters, per the source: check the per-DAY axes before per-MINUTE so
 // "tokens per day" is not shadowed by the "tpm" word boundary, and tokens
 // before requests so a body mentioning both lands on the token ceiling.
-const LIMIT_AXIS_PATTERNS: Array<{ axis: LimitAxis; re: RegExp }> = [
+const LIMIT_AXIS_PATTERNS: { axis: LimitAxis; re: RegExp }[] = [
   { axis: "tpd", re: /tokens?\s*per\s*day|\btpd\b/i },
   { axis: "tpm", re: /tokens?\s*per\s*min(?:ute)?|\btpm\b/i },
   { axis: "rpd", re: /requests?\s*per\s*day|\brpd\b/i },
@@ -58,7 +58,7 @@ const LIMIT_AXIS_PATTERNS: Array<{ axis: LimitAxis; re: RegExp }> = [
  */
 export function parseProviderLimit(message: string | null | undefined): LearnedLimit | null {
   if (!message) return null;
-  const m = message.match(/\blimit[:,\s]+([\d,]+)/i);
+  const m = /\blimit[:,\s]+([\d,]+)/i.exec(message);
   if (!m) return null;
   const limit = Number(m[1]!.replace(/,/g, ""));
   if (!Number.isFinite(limit) || limit <= 0) return null;

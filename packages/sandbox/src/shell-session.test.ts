@@ -28,25 +28,24 @@ describe("filterOutput", () => {
   });
 
   it("include rules switch to quiet-shell whitelist mode", () => {
-    const out = filterOutput(
-      "line1\nwarn: something\nerror: boom\nline2\nFound 3 errors",
-      { include: [/(error|Found \d+ errors)/] }
-    );
+    const out = filterOutput("line1\nwarn: something\nerror: boom\nline2\nFound 3 errors", {
+      include: [/(error|Found \d+ errors)/],
+    });
     expect(out).toBe("error: boom\nFound 3 errors");
   });
 
   it("tail paragraphs survive even when they match nothing", () => {
-    const out = filterOutput(
-      "warn: noisy\nnote: spam\n\nBUILD SUCCESS\nDone in 1.2s",
-      { include: [/warn/], tailParagraphs: 1 }
-    );
+    const out = filterOutput("warn: noisy\nnote: spam\n\nBUILD SUCCESS\nDone in 1.2s", {
+      include: [/warn/],
+      tailParagraphs: 1,
+    });
     expect(out).toBe("warn: noisy\nBUILD SUCCESS\nDone in 1.2s");
   });
 
   it("presets mirror quiet-shell tool templates", () => {
     const out = filterOutput(
       "tsc: no inputs\nerror TS2322: type mismatch\n\nFound 1 error",
-      QUIET_SHELL_PRESETS.tsc!
+      QUIET_SHELL_PRESETS.tsc!,
     );
     expect(out).toContain("error TS2322: type mismatch");
     expect(out).toContain("Found 1 error");
