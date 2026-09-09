@@ -1115,10 +1115,14 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     // the client holding an open 200 with zero bytes forever (playtest: a
     // body without `members` hung the stream instead of answering 400).
     if (typeof message !== "string" || !message.trim()) {
-      return reply.status(400).send({ error: "message_required", message: "body.message must be a non-empty string" });
+      return reply
+        .status(400)
+        .send({ error: "message_required", message: "body.message must be a non-empty string" });
     }
     if (!Array.isArray(members) || members.length === 0) {
-      return reply.status(400).send({ error: "members_required", message: "body.members must be a non-empty array" });
+      return reply
+        .status(400)
+        .send({ error: "members_required", message: "body.members must be a non-empty array" });
     }
     // BYOK: resolve each member's key per-user (saved key first, env fallback).
     const { registry: reg, sources } = await buildChatRegistry(

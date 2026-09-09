@@ -3,8 +3,9 @@
  * Portable shell invocation for worker-side child processes.
  *
  * Single owner (the one-owner rule): every worker spawn of a user/operator
- * command goes through `shellInvocation`. The agent-tools copy predates it
- * and stays until its next touch — do not add a third.
+ * command goes through `shellInvocation` — agent-tools.ts imports it here
+ * since the consolidation pass (its former inline copy was removed). Do not
+ * add a second copy.
  *
  * Worker handlers previously hardcoded `/bin/sh`, which ENOENTs on Windows
  * (spawn ENOENT −4058): WorkspaceManager/WorkspaceRunner were unusable on a

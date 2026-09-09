@@ -30,6 +30,7 @@ import {
   type CommandExecutor,
   type LlmToolFn,
 } from "@nexus/agent-runtime";
+import { EscalationBreaker, type BreakerAction } from "@nexus/escalation-breaker";
 import { executeCode } from "@nexus/sandbox";
 import type { FastifyInstance } from "fastify";
 
@@ -125,12 +126,42 @@ async function startMission(
 
   const skills = opts.skills ?? [];
 
+  // Runaway/cost guardrail (@nexus/escalation-breaker): a
+  // steer → constrain → stop ladder fed by tool-call/error signals and per-
+  // iteration usage. `steer`/`constrain` land as visible phase notes; `stop`
+  // aborts the run through the same controller the route's DELETE uses. The
+  // ladder caps at `constrained` unless MISSION_BREAKER_HARD_STOP is set.
+  const breaker = new EscalationBreaker(() => ({
+    enabled: process.env.MISSION_BREAKER_ENABLED !== "false",
+    hardStop: process.env.MISSION_BREAKER_HARD_STOP === "true",
+    repeatedToolLimit: parseInt(process.env.MISSION_BREAKER_REPEATED_TOOL_LIMIT ?? "8", 10) || 8,
+    errorStormLimit: parseInt(process.env.MISSION_BREAKER_ERROR_STORM_LIMIT ?? "5", 10) || 5,
+    tokenVelocityPerMin:
+      parseInt(process.env.MISSION_BREAKER_TOKEN_VELOCITY_PER_MIN ?? "60000", 10) || 60000,
+    costCapUsd: process.env.MISSION_BREAKER_COST_CAP_USD
+      ? parseFloat(process.env.MISSION_BREAKER_COST_CAP_USD)
+      : undefined,
+    costCapTokens: process.env.MISSION_BREAKER_COST_CAP_TOKENS
+      ? parseInt(process.env.MISSION_BREAKER_COST_CAP_TOKENS, 10)
+      : undefined,
+  }));
+  // Per-tick breaker state, updated from the runner's onProgress below.
+  let breakerLevel: "steering" | "constrained" | "stopped" | undefined = undefined;
+  let breakerReason = "";
+
   // Zero-write-cost execution memory: every phase transition, every tool call,
   // and every skill-code execution becomes a node in the session spider-graph
   // (see lib/mission-graph.ts). The recorder is created before the toolset so
   // skill runs — harness pre-execution AND model-driven run_skill_code calls —
   // emit their structured started/completed/failed events into the same graph.
   const graph = new MissionGraphRecorder(uid, record.id);
+  // Feed the breaker from the graph's tool observation — the recorder is the
+  // single owner of tool plumbing; the breaker only reads its signals.
+  graph.onToolCall = (toolName, args) => breaker.recordToolUse(record.id, toolName, args);
+  graph.onToolError = (toolName) => {
+    breaker.recordError(record.id);
+    console.log(`[breaker] mission ${record.id}: tool error on ${toolName}`);
+  };
   const toolSet = buildMissionToolset(llm);
   if (skills.length > 0) {
     // Skills execute end-to-end: the acting agent gets run_skill_code so the
@@ -161,15 +192,31 @@ async function startMission(
     );
   }
 
+  // 4-part dispatch contract: when present, it becomes the leading block of
+  // the acting SYSTEM prompt — the worker sees OBJECTIVE / OUTPUT / TOOLS /
+  // BOUNDARIES as its standing constraints, with the goal appended as the
+  // concrete task.
+  const dispatchBlock = record.dispatch
+    ? [
+        "DISPATCH CONTRACT (follow exactly):",
+        `OBJECTIVE — ${record.dispatch.objective}`,
+        record.dispatch.output ? `OUTPUT — ${record.dispatch.output}` : null,
+        record.dispatch.tools ? `TOOLS — ${record.dispatch.tools}` : null,
+        record.dispatch.boundaries ? `BOUNDARIES — ${record.dispatch.boundaries}` : null,
+      ]
+        .filter((l): l is string => l !== null)
+        .join("\n")
+    : undefined;
   const basePrompt =
     skills.length > 0
       ? composeSkillSystemPrompt(skills, record.goal, execResults)
       : MISSION_ACTING_PROMPT;
+  const actingPrompt = dispatchBlock ? `${dispatchBlock}\n\n${basePrompt}` : basePrompt;
 
   const runner = new MissionRunner({
     llm,
     toolSet,
-    actingSystemPrompt: withOutputStyle(basePrompt, opts.outputStyle ?? "normal"),
+    actingSystemPrompt: withOutputStyle(actingPrompt, opts.outputStyle ?? "normal"),
     // The distilled memory is an ACTIONABLE directive that must land on the
     // acting USER turn (the improve-loop channel) — not the system prompt,
     // which the local model ignores. The runner seeds it ahead of the goal on
@@ -189,6 +236,37 @@ async function startMission(
     onProgress: (r) => {
       const last = r.phases[r.phases.length - 1];
       if (last) graph.recordPhase(last.phase, last.iteration, last.note);
+      // Tick the breaker once per phase transition. Usage is cumulative, so
+      // the velocity arm diffs consecutive samples — never double counts.
+      const decisions = breaker.tick(
+        [
+          {
+            runId: record.id,
+            progressing: true, // a phase transition is forward progress
+            sample: {
+              input: r.usage.inputTokens,
+              output: r.usage.outputTokens,
+              cacheRead: 0,
+              cacheCreation: 0,
+              ts: Date.now(),
+            },
+          },
+        ],
+        Date.now(),
+      );
+      const decision = decisions[0];
+      if (decision) {
+        // Only annotate the record when the breaker actually acted — a
+        // healthy/recovering level is the default state and adds noise.
+        breakerLevel = decision.state.level === "healthy" ? undefined : decision.state.level;
+        breakerReason = decision.state.reason;
+        const action: BreakerAction = decision.action;
+        if (action !== "none") {
+          console.log(`[breaker] mission ${record.id}: ${action} — ${decision.state.reason}`);
+          graph.recordPhase(action, r.iteration, decision.state.reason);
+          if (action === "stop") controller.abort();
+        }
+      }
     },
   });
 
@@ -208,6 +286,18 @@ async function startMission(
     })
     .finally(() => {
       _aborters.delete(record.id);
+      breaker.forget(record.id);
+      // Surface the final breaker state on the record so any consumer can see
+      // the run was steered/constrained without parsing the phase list.
+      if (breakerLevel !== undefined) {
+        void kvMissionStore(uid)
+          .save({
+            ...record,
+            breaker: { level: breakerLevel, reason: breakerReason },
+            updatedAt: new Date().toISOString(),
+          })
+          .catch(() => {});
+      }
     });
 }
 
@@ -239,11 +329,49 @@ export async function missionRoutes(app: FastifyInstance): Promise<void> {
       stepsPerIteration?: number;
       think?: boolean;
       outputStyle?: string;
+      /** Structured 4-part dispatch contract (OBJECTIVE / OUTPUT / TOOLS /
+       *  BOUNDARIES) folded into the acting prompt so the worker runs
+       *  autonomously against concrete constraints. */
+      dispatch?: {
+        objective?: string;
+        output?: string;
+        tools?: string;
+        boundaries?: string;
+      };
     };
   }>("/missions", { preHandler: requireAuthWithTier }, async (request, reply) => {
     const goal = (request.body.goal ?? "").trim();
     if (!goal) return reply.code(400).send({ error: "goal_required", message: "goal is required" });
     if (goal.length > 4000) return reply.code(400).send({ error: "goal_too_long" });
+
+    // 4-part dispatch contract — validated once, stored on the record, folded
+    // into the acting prompt. The objective is required when dispatch is given
+    // (it IS the goal's structured form); the other three are optional.
+    let dispatch: MissionRecord["dispatch"] = undefined;
+    if (request.body.dispatch !== undefined) {
+      const d = request.body.dispatch;
+      if (typeof d !== "object" || d === null || Array.isArray(d)) {
+        return reply.code(400).send({ error: "dispatch_object_required" });
+      }
+      const objective = (d.objective ?? "").trim();
+      if (!objective) {
+        return reply.code(400).send({
+          error: "dispatch_objective_required",
+          message: "dispatch.objective is required",
+        });
+      }
+      const clean = (s: string | undefined, cap: number): string | undefined => {
+        const t = (s ?? "").trim();
+        if (!t) return undefined;
+        return t.slice(0, cap);
+      };
+      dispatch = {
+        objective: objective.slice(0, 4000),
+        output: clean(d.output, 2000),
+        tools: clean(d.tools, 2000),
+        boundaries: clean(d.boundaries, 2000),
+      };
+    }
 
     const maxIterations = Math.min(10, Math.max(1, Math.round(request.body.maxIterations ?? 3)));
     const acceptScore = Math.min(100, Math.max(1, Math.round(request.body.acceptScore ?? 70)));
@@ -336,6 +464,7 @@ export async function missionRoutes(app: FastifyInstance): Promise<void> {
     const record = await createMission(request.nexusUserId, goal, {
       maxIterations,
       acceptScore,
+      dispatch,
     });
     if (memory) {
       // The runner owns the stored record (its first phase save overwrites the

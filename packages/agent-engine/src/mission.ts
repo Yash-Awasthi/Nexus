@@ -110,6 +110,20 @@ export interface MissionRecord {
   finalContent: string;
   usage: RuntimeUsage;
   error?: string;
+  /** Escalation-breaker state when the run was steered/constrained/stopped by
+   *  the guardrail (level + why). Absent on clean runs — the breaker only
+   *  annotates when it acted. */
+  breaker?: { level: "steering" | "constrained" | "stopped"; reason: string };
+  /** Structured 4-part dispatch contract: what to do,
+   *  what to produce, what to use, and the boundaries. When present it is
+   *  folded into the acting prompt ahead of the goal so the worker runs
+   *  autonomously against concrete constraints. */
+  dispatch?: {
+    objective: string;
+    output?: string;
+    tools?: string;
+    boundaries?: string;
+  };
   createdAt: string;
   updatedAt: string;
 }

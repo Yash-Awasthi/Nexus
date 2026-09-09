@@ -40,6 +40,7 @@ const IGNORE_DIRS = new Set([
   "__pycache__",
   "Python", // vendored embedded CPython runtime (gitignored; not repo source)
   "coverage-html",
+  "inspiration", // local reference clones (gitignored; never committed, not repo source)
 ]);
 
 const IGNORE_PATTERNS = [

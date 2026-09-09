@@ -77,3 +77,6 @@ REF/
 
 # Docusaurus build cache
 .docusaurus/
+
+# Local reference clones for inspiration — never commit these
+inspiration/

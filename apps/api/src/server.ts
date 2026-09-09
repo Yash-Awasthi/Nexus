@@ -74,6 +74,7 @@ import { knowledgeGraphRoutes } from "./routes/knowledge-graph.js";
 import { libertasRoutes } from "./routes/libertas.js";
 import { llmOauthRoutes } from "./routes/llm-oauth.js";
 import { llmRoutes } from "./routes/llm.js";
+import { localPtyRoutes } from "./routes/local-pty.js";
 import { mailIngestRoutes } from "./routes/mail-ingest.js";
 import { mcpServersRoutes } from "./routes/mcp-servers.js";
 import { mcpRoutes } from "./routes/mcp.js";
@@ -462,6 +463,8 @@ export async function buildServer(): Promise<FastifyInstance> {
       await scoped.register(sessionGraphRoutes);
       await scoped.register(diffRoutes);
       await scoped.register(missionRoutes);
+      // Local PTY terminal plane (localhost-only, spawns real processes).
+      await scoped.register(localPtyRoutes);
     },
     { prefix: "/api" },
   );

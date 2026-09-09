@@ -201,9 +201,7 @@ function providerErrorDetail(body: string): string | undefined {
   }
   const err = parsed["error"];
   const msg =
-    (typeof err === "object" && err !== null
-      ? (err as Record<string, unknown>)["message"]
-      : err) ??
+    (typeof err === "object" && err !== null ? (err as Record<string, unknown>)["message"] : err) ??
     parsed["message"] ??
     parsed["detail"];
   if (typeof msg === "string" && msg.trim()) return msg.trim();

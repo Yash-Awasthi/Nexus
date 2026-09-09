@@ -126,6 +126,13 @@ export class MissionGraphRecorder {
    *   tool name + args → (edge from previous node) → outcome summary.
    * The wrapped handler behaves identically; capture is purely additive.
    */
+  /** Optional per-tool-call observer (fed BEFORE the handler runs) — used by
+   *  the mission circuit breaker to watch for repeated identical calls and
+   *  error storms without the breaker owning any tool plumbing. */
+  onToolCall?: (toolName: string, args: Record<string, unknown>) => void;
+  /** Optional error observer — fed when a wrapped tool handler THROWS. */
+  onToolError?: (toolName: string, error: string) => void;
+
   wrapTool(tool: RuntimeTool): RuntimeTool {
     // eslint-disable-next-line @typescript-eslint/no-this-alias -- the returned object's arrow handlers must capture this instance
     const recorder = this;
@@ -134,6 +141,7 @@ export class MissionGraphRecorder {
       ...tool,
       handler: async (args, ctx) => {
         recorder.toolCalls += 1;
+        recorder.onToolCall?.(tool.name, args);
         const callNode = `${recorder.missionId}:tool:${recorder.toolCalls}`;
         recorder.record({
           node: {
@@ -151,6 +159,7 @@ export class MissionGraphRecorder {
           outcome = await handler(args, ctx);
         } catch (err) {
           error = err instanceof Error ? err.message : String(err);
+          recorder.onToolError?.(tool.name, error);
           throw err; // the harness loop still sees the failure
         } finally {
           const detail =

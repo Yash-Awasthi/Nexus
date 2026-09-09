@@ -1,0 +1,13 @@
+{
+  "name": "@nexus/pty",
+  "version": "0.1.0",
+  "description": "Local pseudo-terminal sessions for agent CLIs (localhost-only)",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "node-pty": "^1.1.0"
+  }
+}

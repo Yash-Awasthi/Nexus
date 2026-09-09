@@ -68,7 +68,7 @@ async function recoverIfStale(
 export async function createMission(
   uid: string | undefined,
   goal: string,
-  overrides: Partial<Pick<MissionRecord, "id" | "maxIterations" | "acceptScore">> = {},
+  overrides: Partial<Pick<MissionRecord, "id" | "maxIterations" | "acceptScore" | "dispatch">> = {},
 ): Promise<MissionRecord> {
   const userId = missionUserIdFor(uid);
   const now = new Date().toISOString();
@@ -82,6 +82,7 @@ export async function createMission(
     iteration: 0,
     maxIterations: overrides.maxIterations ?? 3,
     acceptScore: overrides.acceptScore ?? 70,
+    dispatch: overrides.dispatch,
     // Phase history is owned by MissionRunner (it saves the record at every
     // phase transition, starting with `started`); the store record is a shell.
     phases: [],
