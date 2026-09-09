@@ -420,7 +420,11 @@ export async function buildServer(): Promise<FastifyInstance> {
       // Enterprise — SCIM 2.0 provisioning + admin user management
       await api.register(scimRoutes);
       await api.register(adminUsersRoutes);
-      await api.register(adminTracesRoutes);
+      // Scoped under /traces (playtest e2e round): adminTracesRoutes previously
+      // registered its bare / and /:id handlers at the /api/v1 root, so ANY
+      // unknown single-segment v1 path (e.g. /api/v1/agents) resolved to the
+      // trace lookup and answered "trace_not_found" instead of a plain 404.
+      await api.register(adminTracesRoutes, { prefix: "/traces" });
 
       // Enterprise — generic OIDC SSO (Okta, Azure AD, Keycloak, etc.)
       await api.register(oidcRoutes);
