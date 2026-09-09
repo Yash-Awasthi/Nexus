@@ -135,25 +135,34 @@ function safeUser(u: {
 
 // ── Per-route rate limiters ───────────────────────────────────────────────────
 // All keyed by IP. Auth endpoints are the highest-risk surface area.
+// Limits/windows are env-configurable (AUTH_*_RATE_LIMIT / AUTH_*_RATE_WINDOW_MS)
+// so operators can tune or temporarily raise them without code changes;
+// defaults stay at brute-force-safe values.
+
+function authLimit(name: string, fallback: number): number {
+  const raw = process.env[name];
+  const n = raw ? Number(raw) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
 
 // 10 login attempts per 15 min — standard brute-force protection
 const loginRateLimit = makeRateLimitPreHandler({
-  limit: 10,
-  windowMs: 15 * 60 * 1000,
+  limit: authLimit("AUTH_LOGIN_RATE_LIMIT", 10),
+  windowMs: authLimit("AUTH_LOGIN_RATE_WINDOW_MS", 15 * 60 * 1000),
   keyPrefix: "auth:login",
 });
 
 // 5 registrations per hour — prevents account farming
 const registerRateLimit = makeRateLimitPreHandler({
-  limit: 5,
-  windowMs: 60 * 60 * 1000,
+  limit: authLimit("AUTH_REGISTER_RATE_LIMIT", 5),
+  windowMs: authLimit("AUTH_REGISTER_RATE_WINDOW_MS", 60 * 60 * 1000),
   keyPrefix: "auth:register",
 });
 
 // 3 reset requests per hour — prevents token-spam / inbox flooding
 const forgotPasswordRateLimit = makeRateLimitPreHandler({
-  limit: 3,
-  windowMs: 60 * 60 * 1000,
+  limit: authLimit("AUTH_FORGOT_RATE_LIMIT", 3),
+  windowMs: authLimit("AUTH_FORGOT_RATE_WINDOW_MS", 60 * 60 * 1000),
   keyPrefix: "auth:forgot",
 });
 
