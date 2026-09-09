@@ -46,9 +46,14 @@ export async function memoryBridgeRoutes(
       // Surface the fields the Memory page actually renders: the store returns
       // raw text/createdAt (epoch seconds) while the UI expects topic/chunks/
       // date/source — without this mapping the page showed NaN/undefined.
+      // Embeddings (768 floats/entry) are stripped: the UI never renders them
+      // and they dominated the payload (observed via curl, round 4).
       return reply.send({
         entries: entries.slice(0, limit).map((e) => ({
-          ...e,
+          id: e.id,
+          text: e.text,
+          metadata: e.metadata,
+          createdAt: e.createdAt,
           topic: (e.text ?? "").slice(0, 80) || "Untitled memory",
           chunks: Math.max(1, Math.ceil((e.text?.length ?? 0) / 1000)),
           date: e.createdAt ? new Date(e.createdAt * 1000).toLocaleDateString() : "",
@@ -65,6 +70,15 @@ export async function memoryBridgeRoutes(
     async (request, reply) => {
       const mem = deps.getMemory();
       const { content, category, tags } = request.body;
+      // Missing/empty content previously flowed into the embedder as undefined
+      // and surfaced as a raw 500 EMBED_FAILED (observed via curl, round 4).
+      // The v1 surface rejects this as 400 EMPTY_TEXT — match it.
+      if (typeof content !== "string" || content.trim().length === 0) {
+        return reply.code(400).send({
+          code: "EMPTY_TEXT",
+          message: "content is required and must be non-empty",
+        });
+      }
       const entry = await mem.remember(content, {
         metadata: { category, tags },
         userId: request.nexusUserId ?? "local",

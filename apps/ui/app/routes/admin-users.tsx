@@ -24,97 +24,67 @@ interface User {
   initials: string;
 }
 
-const MOCK_USERS: User[] = [
-  {
-    id: "1",
-    name: "Alice Chen",
-    email: "alice@example.com",
-    role: "admin",
-    status: "active",
-    lastActive: "Just now",
-    initials: "AC",
-  },
-  {
-    id: "2",
-    name: "Bob Martinez",
-    email: "bob@example.com",
-    role: "editor",
-    status: "active",
-    lastActive: "5 min ago",
-    initials: "BM",
-  },
-  {
-    id: "3",
-    name: "Carol Johnson",
-    email: "carol@example.com",
-    role: "viewer",
-    status: "active",
-    lastActive: "1 hour ago",
-    initials: "CJ",
-  },
-  {
-    id: "4",
-    name: "David Kim",
-    email: "david@example.com",
-    role: "editor",
-    status: "active",
-    lastActive: "2 hours ago",
-    initials: "DK",
-  },
-  {
-    id: "5",
-    name: "Elena Popov",
-    email: "elena@example.com",
-    role: "admin",
-    status: "active",
-    lastActive: "3 hours ago",
-    initials: "EP",
-  },
-  {
-    id: "6",
-    name: "Frank Weber",
-    email: "frank@example.com",
-    role: "viewer",
-    status: "inactive",
-    lastActive: "1 week ago",
-    initials: "FW",
-  },
-  {
-    id: "7",
-    name: "Grace Liu",
-    email: "grace@example.com",
-    role: "editor",
-    status: "active",
-    lastActive: "Yesterday",
-    initials: "GL",
-  },
-  {
-    id: "8",
-    name: "Hassan Ali",
-    email: "hassan@example.com",
-    role: "viewer",
-    status: "inactive",
-    lastActive: "2 weeks ago",
-    initials: "HA",
-  },
-];
+/** Map a /api/v1/admin/users row (safeUserAdmin shape) onto the view model. */
+function toViewUser(u: {
+  id: string;
+  email: string;
+  name?: string | null;
+  role: string;
+  active?: boolean;
+  deletedAt?: string | null;
+}): User {
+  const initials = (u.name ?? u.email ?? "?")
+    .split(/\s+/)
+    .map((p) => p[0] ?? "")
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  return {
+    id: u.id,
+    name: u.name ?? u.email,
+    email: u.email,
+    role: u.role,
+    status:
+      u.active === undefined
+        ? u.deletedAt
+          ? "deleted"
+          : "active"
+        : u.active
+          ? "active"
+          : "deleted",
+    lastActive: "—",
+    initials: initials || "?",
+  };
+}
+
+const VALID_ROLES = ["owner", "admin", "member", "viewer"];
 
 export default function AdminUsersPage() {
   const [search, setSearch] = useState("");
-  const [users, setUsers] = useState<User[]>(MOCK_USERS);
+  // (playtest round 4) This page previously rendered MOCK_USERS whenever the
+  // fetch failed — a non-admin saw an imaginary roster as if real. Failures now
+  // surface as an explicit error state.
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
 
-  // ── Fetch users from backend ──────────────────────────────────────────────
+  // ── Fetch users from the guarded v1 admin surface ────────────────────────
   useEffect(() => {
-    fetch("/api/admin/users")
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((data) => {
-        const list: User[] = Array.isArray(data) ? data : (data?.users ?? []);
-        if (list.length > 0) setUsers(list);
+    fetch("/api/v1/admin/users")
+      .then(async (r) => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          setErr(
+            r.status === 403
+              ? "Admin access required — this page is restricted to platform administrators."
+              : body.error ?? `Failed to load users (${r.status})`,
+          );
+          return;
+        }
+        const data = await r.json();
+        setUsers((Array.isArray(data) ? data : (data?.users ?? [])).map(toViewUser));
       })
-      .catch(() => {
-        /* fall back to MOCK_USERS */
-      })
+      .catch(() => setErr("Could not reach the server."))
       .finally(() => setLoading(false));
   }, []);
 
@@ -125,14 +95,25 @@ export default function AdminUsersPage() {
       u.email.toLowerCase().includes(search.toLowerCase()),
   );
 
-  // Optimistic role update — persists to backend fire-and-forget
-  const updateRole = (userId: string, newRole: string) => {
-    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
-    fetch(`/api/admin/users/${userId}`, {
+  // Role update — persists to the guarded v1 surface (PATCH), surfacing
+  // failures instead of leaving the row optimistically changed.
+  const updateRole = async (userId: string, newRole: string) => {
+    if (!VALID_ROLES.includes(newRole)) return;
+    const prev = users;
+    setUsers((rows) => rows.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
+    const r = await fetch(`/api/v1/admin/users/${userId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ role: newRole }),
-    }).catch(() => {});
+    }).catch(() => null);
+    if (!r || !r.ok) {
+      setUsers(prev); // roll back the optimistic change
+      setErr(
+        r && r.status === 403
+          ? "Admin access required."
+          : `Role update failed${r ? ` (${r.status})` : " — network error"}.`,
+      );
+    }
   };
 
   return (
@@ -164,12 +145,20 @@ export default function AdminUsersPage() {
           />
         </div>
 
+        {err && (
+          <p className="text-red-500 text-sm" role="alert">
+            {err}
+          </p>
+        )}
+
         <Card>
           <CardContent className="p-0">
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="size-5 animate-spin text-muted-foreground" />
               </div>
+            ) : users.length === 0 && !err ? (
+              <p className="text-center text-muted-foreground py-12 text-sm">No users found.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">

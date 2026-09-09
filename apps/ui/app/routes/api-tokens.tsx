@@ -49,13 +49,14 @@ import {
 interface PAToken {
   id: string;
   label: string;
-  tier: "admin" | "basic" | "limited";
+  tier?: string;
   scopes: string[];
   prefix: string;
   createdAt: string;
-  expiresAt?: string;
-  lastUsedAt?: string;
-  revoked: boolean;
+  expiresAt?: string | null;
+  lastUsedAt?: string | null;
+  revoked?: boolean;
+  revokedAt?: string | null;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -186,7 +187,11 @@ export default function APITokens() {
     setRevoking(id);
     try {
       await fetch(`/api/tokens/${id}`, { method: "DELETE" });
-      setTokens((prev) => prev.map((t) => (t.id === id ? { ...t, revoked: true } : t)));
+      setTokens((prev) =>
+        prev.map((t) =>
+          t.id === id ? { ...t, revoked: true, revokedAt: new Date().toISOString() } : t,
+        ),
+      );
     } catch {}
     setRevoking(null);
   }, []);
@@ -384,7 +389,7 @@ export default function APITokens() {
           <p className="text-xs font-medium mb-2">Usage</p>
           <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap">
             {`curl https://your-nexus.app/api/chat \\
-  -H "Authorization: Bearer nexus_<your_token>" \\
+  -H "Authorization: Bearer nxk_<your_token>" \\
   -H "Content-Type: application/json" \\
   -d '{"message": "Hello"}'`}
           </pre>

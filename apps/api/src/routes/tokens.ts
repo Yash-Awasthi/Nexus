@@ -2,78 +2,81 @@
 /**
  * API tokens surface OWNER — extracted from api-bridge.ts (§16.7).
  *
- * In-memory API token store with byte-identical response shapes: each token
- * is SHA-256 hashed for safe listing, and the raw `nxk_` value is returned
- * only at creation time.
+ * Defect history (playtest round 4): this surface minted `nxk_` tokens that
+ * nothing ever verified (the store was process-local and unreachable from the
+ * auth path) — every token created here authenticated nothing, and the usage
+ * example even showed the wrong prefix (`nexus_`). Now backed by the real PAT
+ * store (lib/pat-store.ts, verified by middleware/auth.ts), scoped per owner,
+ * with raw values returned exactly once at creation.
  *
  * Mounted inside apiBridgeRoutes (same /api/* scope, same auth hooks).
  */
 
-import crypto from "node:crypto";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 
-import type { FastifyInstance } from "fastify";
+import {
+  createPat,
+  listPats,
+  revokePat,
+} from "../lib/pat-store.js";
 
-import { sha256hex } from "../lib/crypto-utils.js";
-
-const now = (): string => new Date().toISOString();
-
-interface ApiToken {
-  id: string;
-  name: string;
-  prefix: string;
-  hash: string;
-  scopes: string[];
-  createdAt: string;
-  lastUsedAt: string | null;
+/** Owner for the request's PATs: the authenticated user, or "dev" in bypass mode. */
+function patOwner(request: FastifyRequest): string {
+  return request.nexusUserId ?? "dev";
 }
-
-const _apiTokens = new Map<string, ApiToken>();
 
 /** Register the /tokens surface. Called from apiBridgeRoutes. */
 export async function tokensRoutes(app: FastifyInstance): Promise<void> {
-  app.get("/tokens", async (_req, reply) => {
+  app.get("/tokens", async (request, reply) => {
+    const ownerId = patOwner(request);
     return reply.send({
-      tokens: Array.from(_apiTokens.values()).map(
-        ({ id, name, prefix, scopes, createdAt, lastUsedAt }) => ({
-          id,
-          name,
-          prefix,
-          scopes,
-          createdAt,
-          lastUsedAt,
-        }),
-      ),
+      tokens: listPats(ownerId).map((t) => ({
+        id: t.id,
+        name: t.name,
+        prefix: t.prefix,
+        scopes: t.scopes,
+        tier: t.tier,
+        createdAt: t.createdAt,
+        expiresAt: t.expiresAt,
+        revokedAt: t.revokedAt,
+        lastUsedAt: t.lastUsedAt,
+      })),
     });
   });
 
-  app.post<{ Body: { name: string; scopes?: string[] } }>("/tokens", async (request, reply) => {
-    const raw = `nxk_${crypto.randomBytes(24).toString("hex")}`;
-    const hash = sha256hex(raw);
-    const id = crypto.randomUUID();
-    const entry: ApiToken = {
-      id,
-      name: request.body.name,
-      prefix: raw.slice(0, 10),
-      hash,
-      scopes: request.body.scopes ?? ["*"],
-      createdAt: now(),
-      lastUsedAt: null,
-    };
-    _apiTokens.set(id, entry);
+  app.post<{
+    Body: { name?: string; label?: string; tier?: string; scopes?: string[]; expiresInDays?: number };
+  }>("/tokens", async (request, reply) => {
+    const name = (request.body.name ?? request.body.label ?? "").trim();
+    if (!name) return reply.code(400).send({ error: "EMPTY_NAME" });
+
+    const days = request.body.expiresInDays ?? 0;
+    if (typeof days !== "number" || !Number.isFinite(days) || days < 0 || days > 3650) {
+      return reply.code(400).send({ error: "INVALID_EXPIRY" });
+    }
+
+    const { entry, raw } = createPat({
+      ownerId: patOwner(request),
+      name,
+      tier: request.body.tier,
+      scopes: request.body.scopes,
+      expiresInDays: days,
+    });
     return reply.code(201).send({
-      id,
+      id: entry.id,
       name: entry.name,
       token: raw,
       prefix: entry.prefix,
       scopes: entry.scopes,
+      tier: entry.tier,
       createdAt: entry.createdAt,
+      expiresAt: entry.expiresAt,
     });
   });
 
   app.delete<{ Params: { id: string } }>("/tokens/:id", async (request, reply) => {
-    if (!_apiTokens.has(request.params.id))
+    if (!revokePat(request.params.id, patOwner(request)))
       return reply.code(404).send({ error: "Token not found" });
-    _apiTokens.delete(request.params.id);
     return reply.code(204).send();
   });
 }

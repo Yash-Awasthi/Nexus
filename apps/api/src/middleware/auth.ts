@@ -19,6 +19,7 @@ import type { Tier } from "@nexus/tier-gate";
 import type { FastifyRequest, FastifyReply } from "fastify";
 
 import { sessionRevocations } from "../lib/auth-hardening.js";
+import { verifyPat } from "../lib/pat-store.js";
 
 // ── HS256 JWT verifier (no npm dep — Node 22 crypto) ──────────────────────────
 
@@ -96,6 +97,10 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
     authenticate(request.headers.authorization, authConfig);
   } catch (err) {
     if (err instanceof AuthError) {
+      // Personal-access tokens (playtest round 4): an `nxk_` token minted via
+      // /tokens authenticates even when the master-key/JWT path rejects it.
+      const m = /^Bearer\s+(\S+)$/i.exec(request.headers.authorization ?? "");
+      if (m?.[1]?.startsWith("nxk_") && verifyPat(m[1])) return;
       await reply.code(err.httpStatus).send({ code: err.code, message: err.message });
       return;
     }
@@ -143,6 +148,17 @@ export async function requireAuthWithTier(
     }
     if (payload) {
       request.nexusUserId = typeof payload.sub === "string" ? payload.sub : undefined;
+      return;
+    }
+  }
+
+  // Personal-access tokens (playtest round 4): identity comes from the PAT
+  // owner — no DB round-trip. Only short-circuits when the PAT verifies; an
+  // unknown nxk_ value still falls through to the api_keys lookup below.
+  if (token.startsWith("nxk_")) {
+    const pat = verifyPat(token);
+    if (pat) {
+      request.nexusUserId = pat.ownerId;
       return;
     }
   }

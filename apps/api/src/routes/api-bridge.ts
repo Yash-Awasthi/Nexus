@@ -154,6 +154,7 @@ import { sandboxRoutes, runViaPyodide, runViaPiston } from "./sandbox.js";
 import { reposRoutes } from "./repos.js";
 import { connectorsBridgeRoutes } from "./connectors-bridge.js";
 import { tokensRoutes } from "./tokens.js";
+import { requireAdminRole as requireAdminRoleBridge } from "./admin-users.js";
 import { roomsRoutes } from "./rooms.js";
 import { workflowsRoutes } from "./workflows.js";
 import { kbRoutes } from "./kb.js";
@@ -1971,108 +1972,12 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
   // -- CONNECTORS ------------------------------------------------------------
 
   // -- ADMIN -----------------------------------------------------------------
+  // (playtest round 4) The /admin/users GET/PUT duplicates that lived here were
+  // unguarded — any authenticated user could list every user's email or PUT
+  // themselves to role "owner" (privilege escalation, demonstrated live).
+  // The guarded surface is /api/v1/admin/users (routes/admin-users.ts) — use it.
 
-  const _adminUsers = new Map<
-    string,
-    { id: string; email: string; role: string; status: string; createdAt: string }
-  >([
-    [
-      "local",
-      {
-        id: "local",
-        email: "admin@nexus.local",
-        role: "admin",
-        status: "active",
-        createdAt: now(),
-      },
-    ],
-  ]);
-
-  app.get("/admin/users", async (_req, reply) => {
-    // Real users from the Postgres `users` table (auth-backed). Falls back to the
-    // in-memory seed only if the DB is unreachable.
-    try {
-      const rows = await db
-        .select({
-          id: users.id,
-          email: users.email,
-          name: users.name,
-          role: users.role,
-          tier: users.tier,
-          emailVerified: users.emailVerified,
-          createdAt: users.createdAt,
-          deletedAt: users.deletedAt,
-        })
-        .from(users)
-        .orderBy(desc(users.createdAt))
-        .limit(500);
-      const list = rows.map((u) => ({
-        id: u.id,
-        email: u.email,
-        name: u.name ?? null,
-        role: u.role,
-        tier: u.tier,
-        emailVerified: u.emailVerified,
-        status: u.deletedAt ? "deleted" : "active",
-        createdAt:
-          u.createdAt instanceof Date ? u.createdAt.toISOString() : String(u.createdAt ?? ""),
-      }));
-      return reply.send({ users: list, total: list.length, source: "db" });
-    } catch (err) {
-      app.log.warn({ err: String(err) }, "admin/users db fallback");
-      return reply.send({
-        users: Array.from(_adminUsers.values()),
-        total: _adminUsers.size,
-        source: "memory",
-      });
-    }
-  });
-
-  app.put<{ Params: { id: string }; Body: { role?: string; status?: string } }>(
-    "/admin/users/:id",
-    async (request, reply) => {
-      const { role, status } = request.body ?? {};
-      const VALID_ROLES = ["owner", "admin", "member", "viewer"];
-      const updates: Record<string, unknown> = {};
-      if (role !== undefined) {
-        if (!VALID_ROLES.includes(role)) {
-          return reply.code(400).send({ error: "invalid_role", valid: VALID_ROLES });
-        }
-        updates.role = role;
-      }
-      // status maps to soft-delete: "deleted"/"suspended" → set deletedAt; "active" → clear.
-      if (status !== undefined) {
-        updates.deletedAt = status === "active" ? null : new Date();
-      }
-      if (Object.keys(updates).length === 0) {
-        return reply.code(400).send({ error: "no_updatable_fields" });
-      }
-      try {
-        const [updated] = await db
-          .update(users)
-          .set(updates)
-          .where(eq(users.id, request.params.id))
-          .returning({
-            id: users.id,
-            email: users.email,
-            role: users.role,
-            deletedAt: users.deletedAt,
-          });
-        if (!updated) return reply.code(404).send({ error: "not_found" });
-        return reply.send({
-          id: updated.id,
-          email: updated.email,
-          role: updated.role,
-          status: updated.deletedAt ? "deleted" : "active",
-        });
-      } catch (err) {
-        app.log.warn({ err: String(err) }, "admin/users update");
-        return reply.code(500).send({ error: "update_failed" });
-      }
-    },
-  );
-
-  app.get("/admin/audit-logs", async (_req, reply) => {
+  app.get("/admin/audit-logs", { preHandler: requireAdminRoleBridge }, async (_req, reply) => {
     // Real, hash-chained audit trail from the `audit_log` table (see audit-emitter).
     try {
       const rows = await db
