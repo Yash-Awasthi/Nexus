@@ -181,18 +181,48 @@ function totalTokens(input: number, output: number): number {
 
 // ── Error mapping helper ───────────────────────────────────────────────────────
 
+/**
+ * Extract a human-readable message from a provider error body. The raw JSON
+ * previously flowed verbatim into chat transcripts (playtest: the Anthropic
+ * "credit balance too low" error rendered as a raw JSON blob in the member's
+ * opinion). Recognized JSON shapes yield their embedded message; anything
+ * else is truncated so at worst the user sees one short line, not a blob.
+ */
+function providerErrorDetail(body: string): string | undefined {
+  const text = body.trim();
+  if (!text) return undefined;
+  let parsed: Record<string, unknown>;
+  try {
+    const v: unknown = JSON.parse(text);
+    if (typeof v !== "object" || v === null) return text.slice(0, 200);
+    parsed = v as Record<string, unknown>;
+  } catch {
+    return text.slice(0, 200);
+  }
+  const err = parsed["error"];
+  const msg =
+    (typeof err === "object" && err !== null
+      ? (err as Record<string, unknown>)["message"]
+      : err) ??
+    parsed["message"] ??
+    parsed["detail"];
+  if (typeof msg === "string" && msg.trim()) return msg.trim();
+  return undefined; // recognized JSON but no extractable message — drop the blob
+}
+
 function mapHttpError(status: number, provider: string, message = ""): LlmError {
+  const detail = providerErrorDetail(message);
   if (status === 401 || status === 403)
-    return new LlmError("AUTH_FAILED", message || "Authentication failed", provider, status);
+    return new LlmError("AUTH_FAILED", detail || "Authentication failed", provider, status);
   if (status === 429)
-    return new LlmError("RATE_LIMITED", message || "Rate limit exceeded", provider, status);
+    return new LlmError("RATE_LIMITED", detail || "Rate limit exceeded", provider, status);
   if (status === 404)
-    return new LlmError("MODEL_NOT_FOUND", message || "Model not found", provider, status);
+    return new LlmError("MODEL_NOT_FOUND", detail || "Model not found", provider, status);
   if (status === 400)
-    return new LlmError("INVALID_REQUEST", message || "Invalid request", provider, status);
+    return new LlmError("INVALID_REQUEST", detail || "Invalid request", provider, status);
   if (status === 413 || status === 422)
-    return new LlmError("CONTEXT_LENGTH_EXCEEDED", message || "Context too long", provider, status);
-  return new LlmError("SERVER_ERROR", message || `HTTP ${status}`, provider, status);
+    return new LlmError("CONTEXT_LENGTH_EXCEEDED", detail || "Context too long", provider, status);
+  return new LlmError("SERVER_ERROR", detail || `HTTP ${status}`, provider, status);
 }
 
 // ── Tool-calling translation helpers ────────────────────────────────────────────

@@ -150,6 +150,7 @@ export default function Chat() {
   // `if (streaming)` check and fire duplicate streams (observed: triple-click
   // created three duplicate RND groups). The ref is read/written synchronously.
   const streamingRef = useRef(false);
+  const bootstrapRef = useRef(false);
   const [activeSTM, setActiveSTM] = useState<STMModuleId[]>([]);
   const [muted, setMuted] = useState<Set<string>>(new Set());
   // Live per-member key source reported by the /chat/stream SSE (BYOK hint).
@@ -187,6 +188,11 @@ export default function Chat() {
   // ── Bootstrap ──────────────────────────────────────────────────────────────
 
   useEffect(() => {
+    // StrictMode (dev) invokes effects twice; both runs saw an empty thread
+    // list before either createThread resolved, creating two threads
+    // (playtest: every fresh visit left an orphaned "New deliberation").
+    if (bootstrapRef.current) return;
+    bootstrapRef.current = true;
     (async () => {
       const raw = (await listThreads()) as Thread[];
       if (raw.length) {
