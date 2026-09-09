@@ -24,6 +24,7 @@
     "vitest": "^2.1.8"
   },
   "dependencies": {
+    "@nexus/mcp-client": "workspace:*",
     "@nexus/reranker": "workspace:*",
     "@nexus/retrieval": "workspace:*"
   }

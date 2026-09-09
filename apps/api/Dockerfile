@@ -32,10 +32,13 @@ COPY packages/researcher/package.json ./packages/researcher/
 COPY packages/image-gen/package.json ./packages/image-gen/
 COPY packages/knowledge-graph/package.json ./packages/knowledge-graph/
 COPY packages/llm-drivers/package.json ./packages/llm-drivers/
-COPY packages/llm-compress/package.json ./packages/llm-compress/
-COPY packages/llm-oauth/package.json ./packages/llm-oauth/
-COPY packages/llm-translate/package.json ./packages/llm-translate/
+COPY packages/llm-cache/package.json ./packages/llm-cache/
+COPY packages/llm-utils/package.json ./packages/llm-utils/
+COPY packages/workflow-chain/package.json ./packages/workflow-chain/
 COPY packages/provider-registry/package.json ./packages/provider-registry/
+COPY packages/llm-oauth/package.json ./packages/llm-oauth/
+COPY packages/llm-compress/package.json ./packages/llm-compress/
+COPY packages/llm-translate/package.json ./packages/llm-translate/
 COPY packages/drift/package.json ./packages/drift/
 COPY packages/redteam/package.json ./packages/redteam/
 COPY packages/gauntlet/package.json ./packages/gauntlet/
@@ -137,6 +140,7 @@ RUN pnpm install --frozen-lockfile --filter @nexus/api --filter @nexus/auth \
     --filter @nexus/sandbox --filter @nexus/mcp-client \
     --filter @nexus/autotune --filter @nexus/parseltongue --filter @nexus/ragtime \
     --filter @nexus/llm-compress --filter @nexus/llm-oauth --filter @nexus/llm-translate \
+    --filter @nexus/llm-cache --filter @nexus/workflow-chain \
     --filter @nexus/provider-registry \
     --filter @nexus/ultraplinian
 
@@ -179,6 +183,7 @@ RUN pnpm install --frozen-lockfile \
     --filter @nexus/sandbox --filter @nexus/mcp-client \
     --filter @nexus/autotune --filter @nexus/parseltongue --filter @nexus/ragtime \
     --filter @nexus/llm-compress --filter @nexus/llm-oauth --filter @nexus/llm-translate \
+    --filter @nexus/llm-cache --filter @nexus/workflow-chain \
     --filter @nexus/provider-registry \
     --filter @nexus/ultraplinian
 

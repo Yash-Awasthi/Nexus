@@ -206,6 +206,9 @@ importers:
       '@nexus/llm-accounts':
         specifier: workspace:*
         version: link:../../packages/llm-accounts
+      '@nexus/llm-cache':
+        specifier: workspace:*
+        version: link:../../packages/llm-cache
       '@nexus/llm-compress':
         specifier: workspace:*
         version: link:../../packages/llm-compress
@@ -248,6 +251,9 @@ importers:
       '@nexus/prediction-market':
         specifier: workspace:*
         version: link:../../packages/prediction-market
+      '@nexus/provider-registry':
+        specifier: workspace:*
+        version: link:../../packages/provider-registry
       '@nexus/pty':
         specifier: workspace:*
         version: link:../../packages/pty
@@ -341,6 +347,9 @@ importers:
       '@nexus/wiki-updater':
         specifier: workspace:*
         version: link:../../packages/wiki-updater
+      '@nexus/workflow-chain':
+        specifier: workspace:*
+        version: link:../../packages/workflow-chain
       bullmq:
         specifier: ^5.81.3
         version: 5.81.3
@@ -396,6 +405,12 @@ importers:
       '@nexus/debate-engine':
         specifier: workspace:*
         version: link:../../packages/debate-engine
+      '@nexus/graphrag-query':
+        specifier: workspace:*
+        version: link:../../packages/graphrag-query
+      '@nexus/hybrid-search':
+        specifier: workspace:*
+        version: link:../../packages/hybrid-search
       '@nexus/llm-drivers':
         specifier: workspace:*
         version: link:../../packages/llm-drivers
@@ -405,6 +420,9 @@ importers:
       '@nexus/provider-registry':
         specifier: workspace:*
         version: link:../../packages/provider-registry
+      '@nexus/reranker':
+        specifier: workspace:*
+        version: link:../../packages/reranker
       '@nexus/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
@@ -593,6 +611,12 @@ importers:
       '@nexus/governance':
         specifier: workspace:*
         version: link:../../packages/governance
+      '@nexus/graphrag-query':
+        specifier: workspace:*
+        version: link:../../packages/graphrag-query
+      '@nexus/hybrid-search':
+        specifier: workspace:*
+        version: link:../../packages/hybrid-search
       '@nexus/llm-drivers':
         specifier: workspace:*
         version: link:../../packages/llm-drivers
@@ -608,6 +632,9 @@ importers:
       '@nexus/pipeline-signal':
         specifier: workspace:*
         version: link:../../packages/pipeline-signal
+      '@nexus/reranker':
+        specifier: workspace:*
+        version: link:../../packages/reranker
       '@nexus/sandbox':
         specifier: workspace:*
         version: link:../../packages/sandbox
@@ -746,6 +773,12 @@ importers:
       '@nexus/adapter-vercel':
         specifier: workspace:*
         version: link:vercel
+      '@nexus/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@nexus/plugin-sdk':
+        specifier: workspace:*
+        version: link:../plugin-sdk
     devDependencies:
       typescript:
         specifier: ^5.6.3
@@ -1165,6 +1198,12 @@ importers:
       '@nexus/llm-compress':
         specifier: workspace:*
         version: link:../llm-compress
+      '@nexus/llm-drivers':
+        specifier: workspace:*
+        version: link:../llm-drivers
+      '@nexus/sandbox':
+        specifier: workspace:*
+        version: link:../sandbox
     devDependencies:
       typescript:
         specifier: '*'
@@ -1780,6 +1819,10 @@ importers:
         version: 2.1.9(@types/node@26.2.0)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.49.2)
 
   packages/graphrag-query:
+    dependencies:
+      '@nexus/mcp-client':
+        specifier: workspace:*
+        version: link:../mcp-client
     devDependencies:
       typescript:
         specifier: ^5.6.3
@@ -1840,6 +1883,9 @@ importers:
 
   packages/hybrid-search:
     dependencies:
+      '@nexus/mcp-client':
+        specifier: workspace:*
+        version: link:../mcp-client
       '@nexus/reranker':
         specifier: workspace:*
         version: link:../reranker
@@ -1922,6 +1968,13 @@ importers:
         version: link:../mixture-of-agents
 
   packages/knowledge-graph:
+    dependencies:
+      '@nexus/llm-utils':
+        specifier: workspace:*
+        version: link:../llm-utils
+      '@nexus/nlp-utils':
+        specifier: workspace:*
+        version: link:../nlp-utils
     devDependencies:
       '@vitest/coverage-v8':
         specifier: ^2.1.8

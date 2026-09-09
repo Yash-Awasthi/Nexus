@@ -2,7 +2,7 @@
   "name": "@nexus/worker",
   "version": "0.0.0",
   "private": true,
-  "description": "BullMQ queue consumers \u00e2\u20ac\u201d signal pipeline, task execution",
+  "description": "BullMQ queue consumers â€” signal pipeline, task execution",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -26,17 +26,21 @@
     "@nexus/agent-orchestrator": "workspace:*",
     "@nexus/agent-runtime": "workspace:*",
     "@nexus/contracts": "workspace:*",
-    "@nexus/council": "workspace:*",
     "@nexus/corpus-builder": "workspace:*",
+    "@nexus/council": "workspace:*",
     "@nexus/db": "workspace:*",
+    "@nexus/debate-engine": "workspace:*",
     "@nexus/domain-feeds": "workspace:*",
     "@nexus/governance": "workspace:*",
+    "@nexus/graphrag-query": "workspace:*",
+    "@nexus/hybrid-search": "workspace:*",
     "@nexus/llm-drivers": "workspace:*",
     "@nexus/mcp-client": "workspace:*",
     "@nexus/memory": "workspace:*",
-    "@nexus/sandbox": "workspace:*",
     "@nexus/obs-providers": "workspace:*",
     "@nexus/pipeline-signal": "workspace:*",
+    "@nexus/reranker": "workspace:*",
+    "@nexus/sandbox": "workspace:*",
     "@nexus/search-orchestrator": "workspace:*",
     "@nexus/shared": "workspace:*",
     "@nexus/sse": "workspace:*",
@@ -44,7 +48,6 @@
     "bullmq": "^5.81.3",
     "drizzle-orm": "^0.45.2",
     "ioredis": "^5.4.1",
-    "pg": "^8.22.0",
-    "@nexus/debate-engine": "workspace:*"
+    "pg": "^8.22.0"
   }
 }

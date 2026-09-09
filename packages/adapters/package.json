@@ -47,6 +47,8 @@
     "@nexus/adapter-slack": "workspace:*",
     "@nexus/adapter-supabase": "workspace:*",
     "@nexus/adapter-tavily": "workspace:*",
-    "@nexus/adapter-vercel": "workspace:*"
+    "@nexus/adapter-vercel": "workspace:*",
+    "@nexus/contracts": "workspace:*",
+    "@nexus/plugin-sdk": "workspace:*"
   }
 }
