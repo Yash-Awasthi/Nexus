@@ -30,7 +30,7 @@ export async function tokensRoutes(app: FastifyInstance): Promise<void> {
   app.get("/tokens", async (request, reply) => {
     const ownerId = patOwner(request);
     return reply.send({
-      tokens: listPats(ownerId).map((t) => ({
+      tokens: (await listPats(ownerId)).map((t) => ({
         id: t.id,
         name: t.name,
         prefix: t.prefix,
@@ -55,7 +55,7 @@ export async function tokensRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: "INVALID_EXPIRY" });
     }
 
-    const { entry, raw } = createPat({
+    const { entry, raw } = await createPat({
       ownerId: patOwner(request),
       name,
       tier: request.body.tier,
@@ -75,7 +75,7 @@ export async function tokensRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.delete<{ Params: { id: string } }>("/tokens/:id", async (request, reply) => {
-    if (!revokePat(request.params.id, patOwner(request)))
+    if (!(await revokePat(request.params.id, patOwner(request))))
       return reply.code(404).send({ error: "Token not found" });
     return reply.code(204).send();
   });

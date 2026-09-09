@@ -100,7 +100,7 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
       // Personal-access tokens (playtest round 4): an `nxk_` token minted via
       // /tokens authenticates even when the master-key/JWT path rejects it.
       const m = /^Bearer\s+(\S+)$/i.exec(request.headers.authorization ?? "");
-      if (m?.[1]?.startsWith("nxk_") && verifyPat(m[1])) return;
+      if (m?.[1]?.startsWith("nxk_") && (await verifyPat(m[1]))) return;
       await reply.code(err.httpStatus).send({ code: err.code, message: err.message });
       return;
     }
@@ -156,7 +156,7 @@ export async function requireAuthWithTier(
   // owner — no DB round-trip. Only short-circuits when the PAT verifies; an
   // unknown nxk_ value still falls through to the api_keys lookup below.
   if (token.startsWith("nxk_")) {
-    const pat = verifyPat(token);
+    const pat = await verifyPat(token);
     if (pat) {
       request.nexusUserId = pat.ownerId;
       return;

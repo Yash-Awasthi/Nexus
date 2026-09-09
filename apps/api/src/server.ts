@@ -14,6 +14,8 @@ import { createRequire } from "node:module";
 
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
+
+import { initPatStore } from "./lib/pat-store.js";
 import sensible from "@fastify/sensible";
 import { getTracer, enableTracing } from "@nexus/llm-tracer";
 import {
@@ -472,6 +474,11 @@ export async function buildServer(): Promise<FastifyInstance> {
     },
     { prefix: "/api/v1" },
   );
+
+  // ── PAT hydration (playtest round 5) ─────────────────────────────────────
+  // Rebuild the in-memory PAT cache from the api_keys table (source of truth)
+  // so tokens survive restarts. No-op in tests / without a reachable DB.
+  await initPatStore();
 
   // ── Global error handler ──────────────────────────────────────────────────
   app.setErrorHandler((error: FastifyError, request, reply) => {
