@@ -10,6 +10,13 @@
  *     (packages/db, migration 0015) is the SOURCE OF TRUTH; the in-process
  *     map is a write-through cache hydrated at startup by initPatStore() and
  *     rebuilt on every restart, so it can never leak stale state across one.
+ *   - Playtest round 6 (audit follow-up): the DB latch was one-way and
+ *     permanent (one transient failure disabled persistence for the process
+ *     lifetime) — now a cooldown/retry: a failed probe is retried after
+ *     PAT_DB_COOLDOWN_MS (default 5s) instead of latching forever, and a DB
+ *     outage while minting is logged loudly instead of returning a 201 for a
+ *     token that will silently die on restart. Expired rows are now reclaimed
+ *     (see _sweepExpired) and covered by tests.
  *
  * Properties:
  *   - SHA-256 hash of the raw token (raw is returned exactly once, at creation)
@@ -21,8 +28,9 @@
  *     `nxk_` key_prefix; BYOK keys never appear in PAT listings or lookups.
  *
  * Degradation: when the DB is unreachable (or absent, e.g. hermetic tests),
- * the store latches to in-memory mode after one failed probe — tokens minted
- * in that mode live only for the process, exactly like the round-4 behavior.
+ * the store operates in-memory — tokens minted then live only for the process.
+ * The mode is NOT permanent: after the cooldown the next operation re-probes,
+ * so a transient DB blip recovers on its own (and never hammers a down DB).
  *
  * Verification consumer: apps/api/src/middleware/auth.ts (requireAuth and
  * requireAuthWithTier consult verifyPat for `nxk_`-prefixed Bearer tokens).
@@ -32,7 +40,7 @@ import crypto from "node:crypto";
 
 import { db as defaultDb } from "@nexus/db";
 import { apiKeys, type ApiKey } from "@nexus/db/schema";
-import { and, eq, like, isNull } from "drizzle-orm";
+import { and, eq, like, isNull, lt } from "drizzle-orm";
 
 import { sha256hex } from "./crypto-utils.js";
 
@@ -57,14 +65,33 @@ export interface PersonalAccessToken {
 /** Write-through cache — hydrated from api_keys at startup, kept in sync on every mutation. */
 const _pats = new Map<string, PersonalAccessToken>();
 
-/** DB availability latch: null = not probed, "db" = usable, "mem" = stay in-memory. */
+/** DB availability: null = not probed, "db" = usable, "mem" = cooldown/in-memory. */
 let _dbMode: "db" | "mem" | null = null;
+
+/** Timestamp after which the next operation may re-probe the DB after a failure. */
+let _cooldownUntil = 0;
+
+/** Last time _sweepExpired ran, so the sweep stays cheap under load. */
+let _lastSweepAt = 0;
 
 /** Any API-key row whose prefix starts with this belongs to this store (not BYOK). */
 const PAT_PREFIX = "nxk_";
 
+/** Cooldown between failed DB probes (env-tunable; tests shorten it). */
+function _cooldownMs(): number {
+  const raw = process.env.PAT_DB_COOLDOWN_MS;
+  const n = raw ? Number(raw) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : 5_000;
+}
+
+/** Minimum time between expired-token sweeps (env-tunable; tests zero it). */
+function _sweepIntervalMs(): number {
+  const raw = process.env.PAT_SWEEP_INTERVAL_MS;
+  const n = raw ? Number(raw) : NaN;
+  return Number.isFinite(n) && n >= 0 ? n : 60_000;
+}
+
 function _dbUsable(): boolean {
-  if (_dbMode === "mem") return false;
   return _dbMode === "db";
 }
 
@@ -86,12 +113,13 @@ function _fromRow(row: ApiKey): PersonalAccessToken {
 }
 
 /**
- * Probe the DB once per process. A failed probe latches in-memory mode so a
- * down DB can never slow every request — and hermetic test runs (fake
- * DATABASE_URL) fall back deterministically after one fast failure.
+ * DB probe with cooldown/retry (audit follow-up, round 6). A failed probe
+ * flips to memory mode for PAT_DB_COOLDOWN_MS and is then retried, so a
+ * transient failure recovers on its own and a down DB is never hammered.
+ * Hermetic test runs (fake DATABASE_URL) fall back deterministically.
  */
 async function _probeDb(): Promise<boolean> {
-  if (_dbMode !== null) return _dbUsable();
+  if (_dbMode === "db") return true;
   // Hermetic unit tests: skip the probe entirely (setup.ts sets a fake
   // DATABASE_URL; a real probe would hit the network). Persistence tests
   // stub this away and mock @nexus/db instead.
@@ -103,6 +131,8 @@ async function _probeDb(): Promise<boolean> {
     _dbMode = "mem";
     return false;
   }
+  // Still inside the cooldown after a failure — do not hammer the DB.
+  if (_dbMode === "mem" && Date.now() < _cooldownUntil) return false;
   try {
     await Promise.race([
       defaultDb.select().from(apiKeys).limit(0),
@@ -112,6 +142,7 @@ async function _probeDb(): Promise<boolean> {
     return true;
   } catch {
     _dbMode = "mem";
+    _cooldownUntil = Date.now() + _cooldownMs();
     return false;
   }
 }
@@ -128,6 +159,32 @@ async function _stampUsed(entry: PersonalAccessToken): Promise<void> {
       .where(eq(apiKeys.keyHash, entry.hash));
   } catch {
     _dbMode = "mem";
+    _cooldownUntil = Date.now() + _cooldownMs();
+  }
+}
+
+/**
+ * Reclaim expired tokens (audit follow-up, round 6): drop expired entries
+ * from the cache and hard-delete expired rows from api_keys. Cheap: runs at
+ * most once per _sweepIntervalMs() (60s by default) and is triggered from
+ * initPatStore (startup) and createPat (mint).
+ */
+async function _sweepExpired(): Promise<void> {
+  const now = Date.now();
+  if (now - _lastSweepAt < _sweepIntervalMs()) return;
+  _lastSweepAt = now;
+  for (const [id, t] of _pats) {
+    if (t.expiresAt && new Date(t.expiresAt).getTime() < now) _pats.delete(id);
+  }
+  if (!_dbUsable()) return;
+  try {
+    // NULL expires_at rows (no expiry) are untouched — NULL < now is NULL.
+    await defaultDb
+      .delete(apiKeys)
+      .where(and(like(apiKeys.keyPrefix, `${PAT_PREFIX}%`), lt(apiKeys.expiresAt, new Date(now))));
+  } catch {
+    _dbMode = "mem";
+    _cooldownUntil = Date.now() + _cooldownMs();
   }
 }
 
@@ -135,11 +192,11 @@ async function _stampUsed(entry: PersonalAccessToken): Promise<void> {
  * Hydrate the cache from api_keys (source of truth). Called at server startup;
  * idempotent, so restarting the process rebuilds the exact same set — a token
  * minted before a restart keeps working, and a revoke performed before it
- * stays revoked.
+ * stays revoked. Expired rows are swept first so they never get hydrated.
  */
 export async function initPatStore(): Promise<void> {
-  if (_dbMode === "mem" || !process.env.DATABASE_URL) return;
-  if (_dbMode !== "db" && !(await _probeDb())) return;
+  if (!process.env.DATABASE_URL || !(await _probeDb())) return;
+  await _sweepExpired();
   try {
     const rows = await defaultDb
       .select()
@@ -148,6 +205,7 @@ export async function initPatStore(): Promise<void> {
     for (const row of rows) _pats.set(row.id, _fromRow(row));
   } catch {
     _dbMode = "mem";
+    _cooldownUntil = Date.now() + _cooldownMs();
   }
 }
 
@@ -175,7 +233,9 @@ export async function createPat(input: {
     revokedAt: null,
     lastUsedAt: null,
   };
-  if (await _probeDb()) {
+  const dbOk = await _probeDb();
+  await _sweepExpired();
+  if (dbOk) {
     try {
       await defaultDb.insert(apiKeys).values({
         // Persist the entry's own id: the table default (gen_random_uuid)
@@ -194,8 +254,21 @@ export async function createPat(input: {
         tier: entry.tier,
       });
     } catch {
-      _dbMode = "mem"; // DB down — token lives in the cache for this process only
+      _dbMode = "mem";
+      _cooldownUntil = Date.now() + _cooldownMs();
+      // Audit follow-up (round 6): a 201 for a memory-only token is silent
+      // data loss on restart — operators must see it. Only logged when a DB
+      // was expected (silent in tests / dev-bypass mode).
+      console.error(
+        `[pat-store] DB write failed while minting token '${entry.name}' for owner ` +
+          `'${entry.ownerId}' — token is MEMORY-ONLY and will not survive a restart`,
+      );
     }
+  } else if (process.env.DATABASE_URL) {
+    console.error(
+      `[pat-store] DB unavailable while minting token '${entry.name}' for owner ` +
+        `'${entry.ownerId}' — token is MEMORY-ONLY and will not survive a restart`,
+    );
   }
   _pats.set(entry.id, entry);
   return { entry, raw };
@@ -227,26 +300,21 @@ export async function verifyPat(raw: string): Promise<PersonalAccessToken | null
       }
     } catch {
       _dbMode = "mem";
+      _cooldownUntil = Date.now() + _cooldownMs();
     }
   }
   return null;
 }
 
-/** List only the owner's tokens, newest first (cache merged with the DB). */
+/**
+ * List only the owner's tokens, newest first. Cache-only (audit follow-up,
+ * round 6): the cache is hydrated at startup and write-through on every
+ * mutation, so within a process it is complete; the only miss case is a token
+ * minted on ANOTHER replica, which verifyPat's DB fallback already covers for
+ * auth — a dashboard listing is rebuilt on restart anyway.
+ */
 export async function listPats(ownerId: string): Promise<PersonalAccessToken[]> {
-  const merged = new Map(_pats);
-  if (await _probeDb()) {
-    try {
-      const rows = await defaultDb
-        .select()
-        .from(apiKeys)
-        .where(and(eq(apiKeys.ownerId, ownerId), like(apiKeys.keyPrefix, `${PAT_PREFIX}%`)));
-      for (const row of rows) merged.set(row.id, _fromRow(row));
-    } catch {
-      _dbMode = "mem";
-    }
-  }
-  return Array.from(merged.values())
+  return Array.from(_pats.values())
     .filter((t) => t.ownerId === ownerId && !t.revokedAt)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
@@ -267,6 +335,7 @@ export async function revokePat(id: string, ownerId: string): Promise<boolean> {
         .where(and(eq(apiKeys.id, id), eq(apiKeys.ownerId, ownerId)));
     } catch {
       _dbMode = "mem"; // DB down — cache delete still applies for this process
+      _cooldownUntil = Date.now() + _cooldownMs();
     }
   }
   _pats.delete(id);

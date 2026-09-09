@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * PAT store persistence tests (playtest round 5).
+ * PAT store persistence tests (playtest round 5) + audit follow-ups
+ * (round 6: expiry rejection, expired-token sweep, recoverable DB cooldown).
  *
  * The store is DB-backed: api_keys is the source of truth, the in-process map
  * is a write-through cache hydrated at startup. These tests exercise the DB
@@ -9,9 +10,11 @@
  *   - initPatStore hydrates tokens minted "before a restart"
  *   - verifyPat falls back to the DB on a cache miss and stamps lastUsedAt
  *   - revokePat hard-deletes from the DB and the cache
- *   - listings stay per-owner
+ *   - expired tokens are rejected AND reclaimed (sweep on init and mint)
+ *   - a failed DB probe recovers after a cooldown instead of latching forever
+ *   - listings come from the cache only and stay per-owner
  *
- * The real SQL semantics (eq/like/isNull filters) are verified live against
+ * The real SQL semantics (eq/like/isNull/lt filters) are verified live against
  * the dev DB in the playtest; the fake here pins the store's write/read
  * contract and argument shapes.
  */
@@ -81,6 +84,7 @@ vi.mock("drizzle-orm", () => ({
   eq: (l: unknown, r: unknown) => ({ op: "=", l, r }),
   like: (l: unknown, r: unknown) => ({ op: "~~", l, r }),
   isNull: (l: unknown) => ({ op: "is null", l }),
+  lt: (l: unknown, r: unknown) => ({ op: "<", l, r }),
   and: (...args: unknown[]) => ({ op: "and", args }),
 }));
 
@@ -119,6 +123,8 @@ function seedRow(over: Partial<Record<string, unknown>> = {}): Record<string, un
 beforeEach(() => {
   vi.clearAllMocks();
   (mockSelectWhere as unknown as { rows: unknown[] }).rows = [];
+  // Sweep on every mint so reclaim behavior is deterministic in tests.
+  vi.stubEnv("PAT_SWEEP_INTERVAL_MS", "0");
 });
 
 afterEach(() => {
@@ -172,6 +178,18 @@ describe("initPatStore (restart hydration)", () => {
     const listed = await listPats("u-seed");
     expect(listed.some((t) => t.id === "row-1")).toBe(true);
   });
+
+  it("sweeps expired rows from the DB before hydrating", async () => {
+    (mockSelectWhere as unknown as { rows: unknown[] }).rows = [];
+    await initPatStore();
+    // The sweep is a hard DELETE on expired nxk_ rows (audit round 6).
+    expect(mockDelete).toHaveBeenCalled();
+    const cond = mockDeleteWhere.mock.calls[0]![0] as { op: string; args: unknown[] };
+    expect(cond.op).toBe("and");
+    // First arg: prefix LIKE 'nxk_%'; second: expires_at < now.
+    expect(JSON.stringify(cond.args[0])).toContain("nxk_");
+    expect(JSON.stringify(cond.args[1])).toContain("<");
+  });
 });
 
 describe("verifyPat", () => {
@@ -200,6 +218,40 @@ describe("verifyPat", () => {
     (mockSelectWhere as unknown as { rows: unknown[] }).rows = [];
     expect(await verifyPat(raw)).toBeNull();
   });
+
+  it("rejects an expired token held in the cache (audit round 6)", async () => {
+    const { entry, raw } = await createPat({ ownerId: "u1", name: "expired-cache" });
+    // The cache holds the same object createPat returned — age it past expiry.
+    entry.expiresAt = new Date(Date.now() - 1_000).toISOString();
+    (mockSelectWhere as unknown as { rows: unknown[] }).rows = [];
+    expect(await verifyPat(raw)).toBeNull();
+  });
+
+  it("rejects an expired token found via the DB fallback (audit round 6)", async () => {
+    const raw = `nxk_${"c".repeat(48)}`;
+    (mockSelectWhere as unknown as { rows: unknown[] }).rows = [
+      seedRow({
+        ownerId: "u-seed",
+        id: "row-expired",
+        keyHash: sha256hex(raw),
+        expiresAt: new Date(Date.now() - 60_000),
+      }),
+    ];
+    expect(await verifyPat(raw)).toBeNull();
+  });
+
+  it("minting sweeps expired entries out of the cache and DB (audit round 6)", async () => {
+    const { entry, raw } = await createPat({ ownerId: "u1", name: "will-expire" });
+    entry.expiresAt = new Date(Date.now() - 1_000).toISOString();
+
+    const { entry: newer } = await createPat({ ownerId: "u1", name: "newer" });
+    expect(newer.id).not.toBe(entry.id);
+
+    // The expired entry is gone from the cache (sweep) and the DB returns
+    // nothing — verifyPat must reject it on every path.
+    (mockSelectWhere as unknown as { rows: unknown[] }).rows = [];
+    expect(await verifyPat(raw)).toBeNull();
+  });
 });
 
 describe("revokePat", () => {
@@ -207,8 +259,12 @@ describe("revokePat", () => {
     const { entry, raw } = await createPat({ ownerId: "u1", name: "revoke-me" });
     expect(await revokePat(entry.id, "u1")).toBe(true);
 
+    // The revoke delete carries the token id (the sweep delete from the mint
+    // does not — both hit the same mocked delete chain).
     expect(mockDelete).toHaveBeenCalled();
-    expect(mockDeleteWhere.mock.calls[0]![0]).toBeDefined();
+    expect(
+      mockDeleteWhere.mock.calls.some(([cond]) => JSON.stringify(cond).includes(entry.id)),
+    ).toBe(true);
 
     (mockSelectWhere as unknown as { rows: unknown[] }).rows = [];
     expect((await listPats("u1")).some((t) => t.id === entry.id)).toBe(false);
@@ -224,15 +280,48 @@ describe("revokePat", () => {
 });
 
 describe("listPats", () => {
-  it("merges DB rows but keeps listings per-owner", async () => {
-    const { entry } = await createPat({ ownerId: "u1", name: "mine" });
-    (mockSelectWhere as unknown as { rows: unknown[] }).rows = [
-      seedRow({ ownerId: "u2", id: "row-other" }),
-      seedRow({ ownerId: "u1", id: "row-own", keyHash: sha256hex(`nxk_${"c".repeat(48)}`) }),
-    ];
+  it("lists from the cache only, newest first, per-owner (audit round 6)", async () => {
+    // Pin distinct createdAt values (the cache holds the same object the
+    // store returned — same-millisecond ties make the sort nondeterministic).
+    const a = await createPat({ ownerId: "u1", name: "older" });
+    a.entry.createdAt = "2026-01-01T00:00:00.000Z";
+    const b = await createPat({ ownerId: "u1", name: "newer" });
+    b.entry.createdAt = "2026-01-02T00:00:00.000Z";
+    await createPat({ ownerId: "u2", name: "other-user" });
+
     const listed = await listPats("u1");
-    expect(listed.some((t) => t.id === entry.id)).toBe(true);
-    expect(listed.some((t) => t.id === "row-own")).toBe(true);
-    expect(listed.some((t) => t.id === "row-other")).toBe(false);
+    // The module-level cache accumulates across tests in this file, so assert
+    // ordering of THIS test's tokens plus scoping rather than the whole list.
+    const names = listed.map((t) => t.name);
+    // A "newer" token from an earlier test may also be in the cache, so pin
+    // only ordering (newest-first) and scoping, not the exact list.
+    const mine = names.filter((n) => n === "older" || n === "newer");
+    expect(mine[0]).toBe("newer");
+    expect(mine[mine.length - 1]).toBe("older");
+    expect(names).not.toContain("other-user");
+  });
+});
+
+describe("DB cooldown/retry (audit round 6)", () => {
+  it("recovers after the cooldown instead of latching permanently", async () => {
+    // Fresh module state: this test needs a clean _dbMode to stage the
+    // failure — the static import above may already be latched "db".
+    vi.stubEnv("PAT_DB_COOLDOWN_MS", "30");
+    vi.resetModules();
+    const fresh = await import("../../src/lib/pat-store.js");
+
+    // First probe fails → memory mode + cooldown starts.
+    mockSelectLimit.mockRejectedValueOnce(new Error("db down"));
+    await fresh.createPat({ ownerId: "u1", name: "during-outage" });
+    expect(mockInsertValues).not.toHaveBeenCalled();
+
+    // Inside the cooldown: still memory, no re-probe hammering.
+    await fresh.createPat({ ownerId: "u1", name: "still-outage" });
+    expect(mockInsertValues).not.toHaveBeenCalled();
+
+    // After the cooldown: the next operation re-probes and persistence resumes.
+    await new Promise((r) => setTimeout(r, 60));
+    await fresh.createPat({ ownerId: "u1", name: "recovered" });
+    expect(mockInsertValues).toHaveBeenCalledTimes(1);
   });
 });
