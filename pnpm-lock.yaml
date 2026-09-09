@@ -1465,6 +1465,12 @@ importers:
       '@nexus/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@nexus/debate-engine':
+        specifier: workspace:*
+        version: link:../debate-engine
+      '@nexus/mcp-client':
+        specifier: workspace:*
+        version: link:../mcp-client
       '@nexus/shared':
         specifier: workspace:*
         version: link:../shared

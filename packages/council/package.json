@@ -27,6 +27,8 @@
   },
   "dependencies": {
     "@nexus/contracts": "workspace:*",
+    "@nexus/debate-engine": "workspace:*",
+    "@nexus/mcp-client": "workspace:*",
     "@nexus/shared": "workspace:*",
     "groq-sdk": "^0.37.0"
   }
