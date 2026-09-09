@@ -166,7 +166,10 @@ export default function Agents() {
     setLoadingSessions(true);
     try {
       const r = await fetch("/api/browser-agent/sessions");
-      if (r.ok) setBrowserSessions(await r.json());
+      if (r.ok) {
+        const data = await r.json();
+        setBrowserSessions(Array.isArray(data) ? data : (data.sessions ?? []));
+      }
     } catch {}
     setLoadingSessions(false);
   }, []);

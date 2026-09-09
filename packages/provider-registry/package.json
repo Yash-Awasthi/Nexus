@@ -2,7 +2,7 @@
   "name": "@nexus/provider-registry",
   "version": "0.0.0",
   "private": false,
-  "description": "LLM provider registry — context windows, capabilities, cost/token, rate limits",
+  "description": "Provider catalog with free-tier budget tracking and token compression",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -15,8 +15,9 @@
   },
   "scripts": {
     "build": "tsc --project tsconfig.json",
+    "dev": "tsc --project tsconfig.json --watch",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist coverage",
     "test": "vitest run --passWithNoTests"
   },
   "devDependencies": {

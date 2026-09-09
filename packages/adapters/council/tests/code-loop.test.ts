@@ -29,7 +29,7 @@ const jsonOk = (body: unknown) => ({
 const groqResp = (content: string) =>
   jsonOk({
     choices: [{ message: { content } }],
-    model: "llama-3.3-70b-versatile",
+    model: "openai/gpt-oss-120b",
     usage: { prompt_tokens: 50, completion_tokens: 100 },
   });
 
@@ -48,10 +48,10 @@ describe("DEFAULT_ROLES", () => {
     );
   });
 
-  it("assigns 70b to planner, reviewer, synthesizer", () => {
-    expect(DEFAULT_ROLES.planner.model).toContain("70b");
-    expect(DEFAULT_ROLES.reviewer.model).toContain("70b");
-    expect(DEFAULT_ROLES.synthesizer.model).toContain("70b");
+  it("assigns the heavy model to planner, reviewer, synthesizer", () => {
+    expect(DEFAULT_ROLES.planner.model).toBe("openai/gpt-oss-120b");
+    expect(DEFAULT_ROLES.reviewer.model).toBe("openai/gpt-oss-120b");
+    expect(DEFAULT_ROLES.synthesizer.model).toBe("openai/gpt-oss-120b");
   });
 
   it("assigns 8b to implementer and debugger (fast draft roles)", () => {

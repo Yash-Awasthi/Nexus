@@ -1,0 +1,9 @@
+{
+  "name": "@nexus/browser-automation",
+  "version": "0.1.0",
+  "description": "browser-use style actor model (numbered-element perceive→plan→act) on @nexus/stealth-browser drivers",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@nexus/stealth-browser": "workspace:*"
+  }
+}

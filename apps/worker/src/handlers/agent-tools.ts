@@ -23,6 +23,8 @@ import {
   type RunnerResult,
 } from "@nexus/sandbox";
 
+import { shellInvocation } from "../lib/shell.js";
+
 export interface CodingToolsOptions {
   /** Workspace root; all file ops are confined here. */
   rootDir: string;
@@ -106,8 +108,9 @@ function runCommand(
   // ── Docker path ──────────────────────────────────────────────────
   if (dockerConfig) {
     const runner = createDockerRunner(dockerConfig);
+    const si = shellInvocation(command);
     return new Promise((resolve) => {
-      runner("/bin/sh", ["-c", command], {
+      runner(si.file, si.args, {
         timeoutMs,
         env: safeEnv,
       })
@@ -130,7 +133,8 @@ function runCommand(
 
   // ── Direct subprocess path (scrubbed env) ────────────────────────
   return new Promise((resolve) => {
-    const child = spawn("/bin/sh", ["-c", command], { cwd, env: safeEnv });
+    const si = shellInvocation(command);
+    const child = spawn(si.file, si.args, { cwd, env: safeEnv });
     let out = "";
     let killed = false;
     const append = (d: Buffer): void => {

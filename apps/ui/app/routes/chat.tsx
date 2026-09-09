@@ -21,12 +21,14 @@ import { useContextMention } from "~/hooks/useContextMention";
 import {
   loadCouncilMembers,
   saveCouncilMembers,
+  syncCouncilFromServer,
   newMember,
   API_PROVIDERS,
   type CouncilMember,
 } from "~/lib/council";
 import {
   deliberate,
+  stopDeliberation,
   onOpinion,
   onVerdict,
   onDone,
@@ -35,9 +37,11 @@ import {
   deleteThread,
   getMessages,
   toggleGlass,
+  isErrorOpinion,
   type MoleculeOpinion,
   type MoleculeVerdict,
   saveGroups,
+  updateThreadMeta,
 } from "~/lib/deliberate";
 import { loadActiveSTM, STM_MODULES, type STMModuleId } from "~/lib/stm";
 
@@ -126,11 +130,31 @@ function downloadText(filename: string, content: string) {
 export default function Chat() {
   const [council, setCouncil] = useState<CouncilMember[]>(() => loadCouncilMembers());
   const [threads, setThreads] = useState<Thread[]>([]);
+
+  // Pull the server-persisted council config at boot (per authenticated user)
+  // so a user's council follows them across browsers and survives restarts.
+  useEffect(() => {
+    let cancelled = false;
+    syncCouncilFromServer().then((merged) => {
+      if (!cancelled) setCouncil(merged);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [threadId, setThreadId] = useState<string>("");
   const [groups, setGroups] = useState<MsgGroup[]>([]);
   const [streaming, setStreaming] = useState(false);
+  // Synchronous double-submit guard: `streaming` state updates only after a
+  // render, so rapid double-clicks on SEND within one tick all pass the
+  // `if (streaming)` check and fire duplicate streams (observed: triple-click
+  // created three duplicate RND groups). The ref is read/written synchronously.
+  const streamingRef = useRef(false);
+  const bootstrapRef = useRef(false);
   const [activeSTM, setActiveSTM] = useState<STMModuleId[]>([]);
   const [muted, setMuted] = useState<Set<string>>(new Set());
+  // Live per-member key source reported by the /chat/stream SSE (BYOK hint).
+  const [keySources, setKeySources] = useState<Record<string, string>>({});
   const [input, setInput] = useState("");
   const [copied, setCopied] = useState<string | null>(null); // key of last copied item
   const [speaking, setSpeaking] = useState(false);
@@ -148,6 +172,13 @@ export default function Chat() {
   useEffect(() => {
     councilRef.current = council;
   }, [council]);
+  // threadIdRef: the mount-time effect below (onDone) runs once and would
+  // otherwise close over the INITIAL threadId (""), saving every finished
+  // deliberation under an empty key so it never hydrates on revisit.
+  const threadIdRef = useRef(threadId);
+  useEffect(() => {
+    threadIdRef.current = threadId;
+  }, [threadId]);
 
   // Load active STM modules from localStorage on mount
   useEffect(() => {
@@ -157,6 +188,11 @@ export default function Chat() {
   // ── Bootstrap ──────────────────────────────────────────────────────────────
 
   useEffect(() => {
+    // StrictMode (dev) invokes effects twice; both runs saw an empty thread
+    // list before either createThread resolved, creating two threads
+    // (playtest: every fresh visit left an orphaned "New deliberation").
+    if (bootstrapRef.current) return;
+    bootstrapRef.current = true;
     (async () => {
       const raw = (await listThreads()) as Thread[];
       if (raw.length) {
@@ -176,13 +212,24 @@ export default function Chat() {
       const molecule = (
         window as { molecule?: { on: (event: string, cb: () => void) => () => void } }
       ).molecule;
-      if (molecule) offStarted = molecule.on("deliberation:started", () => setStreaming(true));
+      if (molecule)
+        offStarted = molecule.on("deliberation:started", () => {
+          streamingRef.current = true;
+          setStreaming(true);
+        });
     }
 
     const offOpinion = onOpinion((data: MoleculeOpinion) => {
+      if (data.keySource) {
+        setKeySources((prev) => ({ ...prev, [data.label]: data.keySource as string }));
+      }
       setGroups((prev) => {
         if (!prev.length) return prev;
         const last = prev[prev.length - 1];
+        // Plain concatenation: round boundaries arrive as text inside the
+        // stream itself (server emits them per member), so no client-side
+        // cross-event tracking is needed — and restored transcripts, which
+        // replay concatenated text, carry the same separators.
         const updated: MsgGroup = {
           ...last,
           opinions: {
@@ -212,19 +259,22 @@ export default function Chat() {
     });
 
     const offDone = onDone((data: { round: number }) => {
+      streamingRef.current = false;
       setStreaming(false);
       setGroups((prev) => {
         if (!prev.length) return prev;
         const last = prev[prev.length - 1];
         const updated = { ...last, done: true };
         const finalGroups = [...prev.slice(0, -1), updated];
-        // Persist to localStorage so messages survive a refresh
-        if (!isMolecule()) saveGroups(threadId, finalGroups);
-        // auto-title the thread after round 1
+        // Persist to localStorage so messages survive a refresh. threadIdRef
+        // (not the closure's threadId) — see the bootstrap comment above.
+        if (!isMolecule()) saveGroups(threadIdRef.current, finalGroups);
+        // auto-title the thread after round 1 (persist server-side so the
+        // dashboard's "Recent Deliberations" shows the real title)
         if (data.round === 1 && last.prompt) {
-          setThreads((ts) =>
-            ts.map((t) => (t.id === threadId ? { ...t, title: threadTitle(last.prompt) } : t)),
-          );
+          const title = threadTitle(last.prompt);
+          setThreads((ts) => ts.map((t) => (t.id === threadIdRef.current ? { ...t, title } : t)));
+          void updateThreadMeta(threadIdRef.current, { title });
         }
         return finalGroups;
       });
@@ -237,6 +287,20 @@ export default function Chat() {
       offDone();
     };
   }, []); // threadId captured via closure in onDone is fine since it doesn't change after mount per-session
+
+  // ── Mid-stream crash/reload persistence ───────────────────────────────────
+  // A reload mid-deliberation must not erase the whole exchange: save whenever
+  // the transcript changes (debounced), not just on done/stop/error. Without
+  // this, closing the tab mid-stream loses the group AND the thread title.
+  useEffect(() => {
+    if (isMolecule()) return; // desktop bridge owns persistence
+    const t = setTimeout(() => {
+      if (groups.length > 0 && threadIdRef.current) {
+        saveGroups(threadIdRef.current, groups);
+      }
+    }, 600);
+    return () => clearTimeout(t);
+  }, [groups]);
 
   // ── Global keyboard shortcuts ──────────────────────────────────────────────
 
@@ -336,7 +400,8 @@ export default function Chat() {
 
   const handleSend = useCallback(async () => {
     const prompt = input.trim();
-    if (!prompt || streaming) return;
+    if (!prompt || streaming || streamingRef.current) return;
+    streamingRef.current = true;
     setInput("");
     if (taRef.current) taRef.current.style.height = "20px";
 
@@ -367,7 +432,14 @@ export default function Chat() {
     try {
       await deliberate({ threadId, message: prompt, round: group.round });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Deliberation failed.";
+      const raw = err instanceof Error ? err.message : "Deliberation failed.";
+      // A bare "401 Unauthorized" is a dead end: the wizard's local (keyless)
+      // session cannot chat on a server that requires accounts. Point the user
+      // at the actual recovery path instead (playtest defect).
+      const msg = /\b40[13]\b/.test(raw)
+        ? "Sign-in required by this server — create an account (/register) or sign in (/login), then resend."
+        : raw;
+      streamingRef.current = false;
       setStreaming(false);
       setGroups((prev) => {
         if (!prev.length) return prev;
@@ -378,11 +450,15 @@ export default function Chat() {
   }, [input, streaming, threadId, groups.length]);
 
   const handleStop = () => {
+    streamingRef.current = false;
     setStreaming(false);
+    stopDeliberation();
     setGroups((prev) => {
       if (!prev.length) return prev;
       const last = prev[prev.length - 1];
-      return [...prev.slice(0, -1), { ...last, done: true }];
+      const updated = { ...last, done: true };
+      if (!isMolecule()) saveGroups(threadId, [...prev.slice(0, -1), updated]);
+      return [...prev.slice(0, -1), updated];
     });
   };
 
@@ -511,7 +587,9 @@ export default function Chat() {
       `}</style>
 
       {/* ─── Web mode banner ─────────────────────────────────────────────── */}
-      {!isMolecule() && (
+      {/* Only shown while no API-mode member is enabled — the hint is
+          misleading once a real model is configured. */}
+      {!isMolecule() && !council.some((m) => m.enabled && m.mode === "api") && (
         <div
           style={{
             background: "#0a1a0a",
@@ -875,6 +953,33 @@ export default function Chat() {
                   }}
                   style={{ flex: 1, overflowY: "auto", padding: "12px 14px" }}
                 >
+                  {m.mode === "api" &&
+                    (keySources[m.label] ?? m.keySource) &&
+                    (keySources[m.label] ?? m.keySource) !== "local" && (
+                      <div
+                        style={{
+                          fontSize: "10px",
+                          color:
+                            (keySources[m.label] ?? m.keySource) === "none" ? C.amber : C.textDim,
+                          marginBottom: "10px",
+                          padding: "6px 8px",
+                          border: `1px dashed ${
+                            (keySources[m.label] ?? m.keySource) === "none" ? C.amber : C.border
+                          }`,
+                          borderRadius: "4px",
+                          lineHeight: 1.6,
+                        }}
+                      >
+                        {(keySources[m.label] ?? m.keySource) === "user" &&
+                          `key: your saved ${m.provider} key`}
+                        {(keySources[m.label] ?? m.keySource) === "oauth" &&
+                          `linked account: streaming through your connected provider`}
+                        {(keySources[m.label] ?? m.keySource) === "env" &&
+                          `key: server ${m.provider} key (env)`}
+                        {(keySources[m.label] ?? m.keySource) === "none" &&
+                          `no key configured — add a ${m.provider} key or link an account in Settings → Council`}
+                      </div>
+                    )}
                   {groups.length === 0 && (
                     <span style={{ color: C.textDim, fontSize: "11px", letterSpacing: "0.1em" }}>
                       awaiting prompt_
@@ -935,40 +1040,80 @@ export default function Chat() {
                         >
                           {g.prompt}
                         </div>
-                        {/* Error */}
+                        {/* Stream-level failure (whole request died) */}
                         {g.error && isLast && (
                           <div style={{ fontSize: "11px", color: C.red, marginBottom: "6px" }}>
                             ⚠ {g.error}
                           </div>
                         )}
-                        {/* Opinion text */}
-                        <div
-                          style={{
-                            fontSize: "12px",
-                            lineHeight: 1.78,
-                            color: C.text,
-                            whiteSpace: "pre-wrap",
-                            wordBreak: "break-word",
-                          }}
-                        >
-                          {text || (!isTicking && <span style={{ color: C.textDim }}>—</span>)}
-                          {isTicking && (
-                            <span
-                              style={{
-                                display: "inline-block",
-                                width: "7px",
-                                height: "13px",
-                                background: C.green,
-                                animation: "blink 1s step-end infinite",
-                                verticalAlign: "text-bottom",
-                                marginLeft: text ? "2px" : 0,
-                              }}
-                            />
-                          )}
-                        </div>
+                        {/* Opinion text — member failures render as failures,
+                            never as opinions (raw provider JSON in the
+                            transcript read as an answer during playtest). */}
+                        {isErrorOpinion({ text }) ? (
+                          <div
+                            style={{
+                              fontSize: "11px",
+                              lineHeight: 1.6,
+                              color: C.red,
+                              whiteSpace: "pre-wrap",
+                              wordBreak: "break-word",
+                              border: `1px dashed ${C.red}`,
+                              borderRadius: "4px",
+                              padding: "6px 8px",
+                            }}
+                          >
+                            ⚠ {text.replace(/^\[[^\]]{1,64} error: /, "")}
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              lineHeight: 1.78,
+                              color: C.text,
+                              whiteSpace: "pre-wrap",
+                              wordBreak: "break-word",
+                            }}
+                          >
+                            {text || (!isTicking && <span style={{ color: C.textDim }}>—</span>)}
+                            {isTicking && (
+                              <span
+                                style={{
+                                  display: "inline-block",
+                                  width: "7px",
+                                  height: "13px",
+                                  background: C.green,
+                                  animation: "blink 1s step-end infinite",
+                                  verticalAlign: "text-bottom",
+                                  marginLeft: text ? "2px" : 0,
+                                }}
+                              />
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
+                  {!streaming &&
+                    m.mode === "browser" &&
+                    groups.length > 0 &&
+                    !groups[groups.length - 1].opinions[m.label] && (
+                      <div
+                        style={{
+                          fontSize: "10px",
+                          color: C.amber,
+                          marginTop: "10px",
+                          padding: "6px 8px",
+                          border: `1px dashed ${C.amber}`,
+                          borderRadius: "4px",
+                          lineHeight: 1.6,
+                        }}
+                      >
+                        no opinion — nothing resolved for this member (no saved key, linked account,
+                        or server env key). Add a key or connect an account in Settings → Council to
+                        let {m.label}
+                        deliberate.
+                      </div>
+                    )}
                 </div>
               </div>
             );
@@ -1301,6 +1446,77 @@ function SettingsPanel({
   const remove = (id: string) => setLocal((prev) => prev.filter((m) => m.id !== id));
   const add = () => setLocal((prev) => [...prev, newMember()]);
 
+  // ── Linked provider accounts (llm-oauth): Sign in with Google → Vertex, etc. ──
+  interface LinkedAcct {
+    providerId: string;
+    displayName: string;
+    driverProvider: string | null;
+    supported: boolean;
+    linkedAt: number | null;
+    scope: string | null;
+  }
+  interface CatalogEntry {
+    id: string;
+    displayName: string;
+    flow: string;
+    supported: boolean;
+    driverProvider?: string;
+    reason?: string;
+  }
+  const [linked, setLinked] = useState<LinkedAcct[] | null>(null);
+  const [catalog, setCatalog] = useState<CatalogEntry[]>([]);
+  const [authBusy, setAuthBusy] = useState<string | null>(null);
+  useEffect(() => {
+    let dead = false;
+    void (async () => {
+      try {
+        const [s, c] = await Promise.all([
+          fetch("/api/v1/llm-oauth/status").then((r) => r.json()),
+          fetch("/api/v1/llm-oauth/providers").then((r) => r.json()),
+        ]);
+        if (dead) return;
+        setLinked(Array.isArray(s?.linked) ? (s.linked as LinkedAcct[]) : []);
+        setCatalog(Array.isArray(c?.providers) ? (c.providers as CatalogEntry[]) : []);
+      } catch {
+        /* non-fatal: show an empty state */
+      }
+    })();
+    return () => {
+      dead = true;
+    };
+  }, []);
+  const connect = async (id: string) => {
+    setAuthBusy(id);
+    try {
+      const res = await fetch(`/api/v1/llm-oauth/${id}/start`, { method: "POST" });
+      const body = (await res.json()) as { authUrl?: string; error?: string };
+      if (body?.authUrl) {
+        // Full-page redirect: the provider consent page returns to the callback.
+        window.location.assign(body.authUrl);
+        return;
+      }
+    } catch {
+      /* fallthrough */
+    }
+    setAuthBusy(null);
+  };
+  const revoke = async (id: string) => {
+    setAuthBusy(id);
+    try {
+      await fetch(`/api/v1/llm-oauth/${id}/revoke`, { method: "POST" });
+      setLinked((prev) => (prev ?? []).filter((a) => a.providerId !== id));
+    } finally {
+      setAuthBusy(null);
+    }
+  };
+  const linkedById = new Map((linked ?? []).map((a) => [a.providerId, a]));
+  const accountRows = [
+    ...(linked ?? []).map((a) => ({ id: a.providerId, displayName: a.displayName, linked: a })),
+    ...catalog
+      .filter((p) => p.supported && !linkedById.has(p.id))
+      .map((p) => ({ id: p.id, displayName: p.displayName, linked: null })),
+  ];
+
   return (
     <div
       style={{
@@ -1494,6 +1710,79 @@ function SettingsPanel({
             )}
           </div>
         ))}
+
+        <div
+          style={{
+            marginTop: "16px",
+            paddingTop: "14px",
+            borderTop: `1px solid ${C.border}`,
+          }}
+        >
+          <div
+            style={{
+              fontSize: "10px",
+              letterSpacing: "0.22em",
+              color: C.green,
+              marginBottom: "10px",
+            }}
+          >
+            LINKED ACCOUNTS
+          </div>
+          {accountRows.length === 0 && (
+            <div style={{ fontSize: "10px", color: C.textDim, lineHeight: 1.7 }}>
+              No account-based providers configured on this server. Members stream via your saved
+              API keys, or the server's env keys.
+            </div>
+          )}
+          {accountRows.map((row) => (
+            <div
+              key={row.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                padding: "7px 4px",
+                borderBottom: `1px solid ${C.border}`,
+              }}
+            >
+              <span
+                style={{
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  background: row.linked ? C.green : C.textDim,
+                  flexShrink: 0,
+                }}
+              />
+              <span style={{ flex: 1, fontSize: "10px", color: C.text }}>
+                {row.displayName}
+                {row.linked && (
+                  <span style={{ color: C.greenDim }}>
+                    {" "}
+                    — connected (use provider "{row.linked.driverProvider ?? row.id}" for a member)
+                  </span>
+                )}
+              </span>
+              <button
+                disabled={authBusy === row.id}
+                onClick={() => (row.linked ? revoke(row.id) : connect(row.id))}
+                style={{
+                  background: "transparent",
+                  border: `1px solid ${row.linked ? C.amber : C.green}`,
+                  borderRadius: "2px",
+                  padding: "3px 10px",
+                  fontFamily: MONO,
+                  fontSize: "9px",
+                  color: row.linked ? C.amber : C.green,
+                  cursor: authBusy === row.id ? "wait" : "pointer",
+                  letterSpacing: "0.1em",
+                }}
+              >
+                {authBusy === row.id ? "…" : row.linked ? "REVOKE" : "CONNECT"}
+              </button>
+            </div>
+          ))}
+        </div>
 
         <div style={{ display: "flex", gap: "8px", marginTop: "14px" }}>
           <button onClick={add} style={{ ...bStyle, flex: 1 }}>

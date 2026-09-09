@@ -15,7 +15,9 @@ import {
   SeismologyFeed,
   WildfireFeed,
   MaritimeFeed,
+  PortCongestionFeed,
   mmsiFlagState,
+  portCongestionSignal,
   TechNewsFeed,
   RedditFeed,
   PreprintsFeed,
@@ -395,6 +397,149 @@ describe("MaritimeFeed vessel-name enrichment", () => {
     const [aground] = await feed.fetch();
     expect(aground!.vesselName).toBeUndefined();
     expect(aground!.flagState).toBe("Finland");
+  });
+});
+
+describe("PortCongestionFeed (IMF PortWatch)", () => {
+  // Real-shape ArcGIS FeatureServer envelope: { features: [{ attributes: {...} }] }.
+  // `date` is epoch **ms**; n_total = daily transits; capacity = trailing mean.
+  const SUEZ = {
+    ObjectId: 1,
+    date: 1767261600000, // 2026-01-01T00:00:00Z
+    year: 2026,
+    month: 1,
+    day: 1,
+    portid: "SUEZ",
+    portname: "Suez Canal",
+    n_container: 55,
+    n_tanker: 30,
+    n_total: 85,
+    capacity: 70,
+  };
+  const PANAMA = {
+    ObjectId: 2,
+    date: 1767261600000,
+    year: 2026,
+    month: 1,
+    day: 1,
+    portid: "PAN",
+    portname: "Panama Canal",
+    n_total: 40,
+    capacity: 39,
+  };
+  const HORMUZ = {
+    ObjectId: 3,
+    date: 1767261600000,
+    year: 2026,
+    month: 1,
+    day: 1,
+    portid: "HORMUZ",
+    portname: "Strait of Hormuz",
+    n_total: 2,
+    capacity: 60,
+  };
+  const CALM = {
+    ObjectId: 4,
+    date: 1767261600000,
+    year: 2026,
+    month: 1,
+    day: 1,
+    portid: "BOS",
+    portname: "Bosphorus",
+    n_total: 130,
+    capacity: 132,
+  };
+
+  const PAGE = (attrs: unknown[]) => ({ features: attrs.map((attributes) => ({ attributes })) });
+
+  /** Route count vs page URLs — the adapter always counts first. */
+  const routedHttp = (count: number, page: unknown) => async (url: string) =>
+    url.includes("returnCountOnly=true") ? { count } : page;
+
+  it("domain is 'port-congestion'", () => {
+    expect(new PortCongestionFeed({ http: makeMockHttp({ count: 0 }) }).domain).toBe(
+      "port-congestion",
+    );
+  });
+
+  it("derives congestion severity from the transit-vs-capacity anomaly", async () => {
+    const feed = new PortCongestionFeed({ http: routedHttp(3, PAGE([SUEZ, PANAMA, CALM])) });
+    const events = await feed.fetch();
+    // Suez (85/70 = 1.21×) → high; Panama (40/39 = 1.03×) → medium; Bosphorus in-band → filtered.
+    expect(events).toHaveLength(2);
+    const byId = Object.fromEntries(events.map((e) => [e.id, e]));
+    expect(byId["portcongestion-SUEZ-1767261600000"]!.eventType).toBe("congestion");
+    expect(byId["portcongestion-SUEZ-1767261600000"]!.severity).toBe("high");
+    expect(byId["portcongestion-SUEZ-1767261600000"]!.congestionRatio).toBe(1.21);
+    expect(byId["portcongestion-PAN-1767261600000"]!.eventType).toBe("congestion");
+    expect(byId["portcongestion-PAN-1767261600000"]!.severity).toBe("medium");
+  });
+
+  it("reads a near-zero transit collapse as a chokepoint closure (critical)", async () => {
+    const feed = new PortCongestionFeed({ http: routedHttp(1, PAGE([HORMUZ])) });
+    const [event] = await feed.fetch();
+    expect(event!.eventType).toBe("closure");
+    expect(event!.severity).toBe("critical");
+    expect(event!.summary).toContain("2 transits vs capacity 60");
+  });
+
+  it("emits within-band rows only when includeNormal is set", async () => {
+    const feed = new PortCongestionFeed({ includeNormal: true, http: routedHttp(1, PAGE([CALM])) });
+    const [event] = await feed.fetch();
+    expect(event!.eventType).toBe("normal");
+    expect(event!.severity).toBe("low");
+  });
+
+  it("parses the epoch-ms date into an ISO timestamp", async () => {
+    const feed = new PortCongestionFeed({ http: routedHttp(1, PAGE([SUEZ])) });
+    const [event] = await feed.fetch();
+    expect(event!.timestamp).toBe("2026-01-01T10:00:00.000Z");
+    expect(event!.chokepoint).toBe("Suez Canal");
+    expect(event!.portId).toBe("SUEZ");
+    expect(event!.transitCount).toBe(85);
+    expect(event!.capacity).toBe(70);
+    expect(event!.source).toBe("imf-portwatch");
+  });
+
+  it("counts first then paginates with resultOffset in 5000-row pages", async () => {
+    const urls: string[] = [];
+    const feed = new PortCongestionFeed({
+      maxPages: 2,
+      http: async (url) => {
+        urls.push(url);
+        if (url.includes("returnCountOnly=true")) return { count: 7000 };
+        const offset = Number(/resultOffset=(\d+)/.exec(url)![1]);
+        return PAGE([{ ...SUEZ, ObjectId: offset + 1 }]);
+      },
+    });
+    const events = await feed.fetch();
+    expect(urls[0]).toContain("returnCountOnly=true");
+    expect(urls[1]).toContain("resultOffset=0&resultRecordCount=5000");
+    expect(urls[2]).toContain("resultOffset=5000&resultRecordCount=5000");
+    expect(events).toHaveLength(2);
+  });
+
+  it("returns an honest empty result when the count is zero", async () => {
+    const feed = new PortCongestionFeed({ http: makeMockHttp({ count: 0 }) });
+    expect(await feed.fetch()).toEqual([]); // NOT mock data
+  });
+
+  it("falls back to mock when the page payload is malformed", async () => {
+    const feed = new PortCongestionFeed({ http: routedHttp(5, "not-arcgis-json") });
+    const events = await feed.fetch();
+    expect(events).toHaveLength(3); // buildMockResponse default
+    expect(events[0]!.source).toBe("mock-port-congestion");
+  });
+
+  it("falls back to mock when the count call fails", async () => {
+    const feed = new PortCongestionFeed({
+      http: async () => {
+        throw new Error("boom");
+      },
+    });
+    const events = await feed.fetch();
+    expect(events).toHaveLength(3);
+    expect(events[0]!.source).toBe("mock-port-congestion");
   });
 });
 

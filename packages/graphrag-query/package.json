@@ -1,0 +1,26 @@
+{
+  "name": "@nexus/graphrag-query",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "GraphRAG query with community reports, dynamic selection, and map-reduce",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc --project tsconfig.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8",
+    "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "@nexus/mcp-client": "workspace:*"
+  }
+}

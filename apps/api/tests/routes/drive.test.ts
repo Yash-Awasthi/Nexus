@@ -39,8 +39,22 @@ describe("Nexus Drive — safeResolve path guard", () => {
     await expect(safeResolve(root, "/etc/passwd")).rejects.toThrow(/escapes drive/);
   });
 
-  it("rejects a symlink that points outside the drive root", async () => {
-    await symlink("/etc/passwd", path.join(root, "evil-link"));
+  it("rejects a symlink that points outside the drive root", async (ctx) => {
+    const linkPath = path.join(root, "evil-link");
+    try {
+      await symlink("/etc/passwd", linkPath);
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      // The guard being tested is symlink *resolution*, not creation. Windows
+      // (and some CI sandboxes) require elevated privileges to create symlinks
+      // at all, so skip the assertion there rather than fail an environment gap.
+      if (code === "EPERM" || code === "EACCES" || code === "ENOSYS" || code === "EXDEV") {
+        return ctx.skip(
+          `symlink creation is not permitted on ${process.platform} (${code}) — needs symlink privilege`,
+        );
+      }
+      throw err;
+    }
     await expect(safeResolve(root, "evil-link")).rejects.toThrow(/escapes drive/);
   });
 });

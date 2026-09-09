@@ -135,15 +135,17 @@ export const MODEL_REGISTRY = {
     description: "Google experimental pro model — largest context window available",
   },
   // ── Groq ───────────────────────────────────────────────────────────────────
-  "groq/llama-3-3-70b-versatile": {
-    id: "llama-3.3-70b-versatile",
+  // llama-3.3-70b-versatile was decommissioned by Groq on 2026-08-16; per Groq
+  // the replacement is openai/gpt-oss-120b (specs/prices from console.groq.com).
+  "groq/openai/gpt-oss-120b": {
+    id: "openai/gpt-oss-120b",
     provider: "groq",
-    contextWindow: 128_000,
-    maxOutput: 32_768,
-    inputPricePer1M: 0.59,
-    outputPricePer1M: 0.79,
+    contextWindow: 131_072,
+    maxOutput: 65_536,
+    inputPricePer1M: 0.15,
+    outputPricePer1M: 0.6,
     capabilities: CAP_NO_VISION,
-    description: "Meta Llama 3.3 70B on Groq — high throughput, low latency",
+    description: "OpenAI gpt-oss 120B on Groq — high throughput, low latency",
   },
   "groq/llama-3-1-8b-instant": {
     id: "llama-3.1-8b-instant",

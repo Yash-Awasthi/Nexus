@@ -66,7 +66,6 @@ nexus/
 ├── apps/
 │   ├── api/            Fastify HTTP/SSE/WebSocket gateway (61 route modules)
 │   ├── cli/            Developer CLI (commander.js)
-│   ├── docs-site/      Docusaurus documentation site
 │   ├── ingest-py/      Python ingest helpers
 │   ├── ui/             React Router v7 SPA dashboard (100+ routes)
 │   └── worker/         BullMQ workers — signal, task, and repeatable feed jobs
@@ -99,7 +98,8 @@ nexus/
 │   ├── evals/                  Scorers, test runner, result types
 │   ├── rlhf-pipeline/          RLHF data pipeline
 │   ├── telemetry/              OTel, HMAC-chained audit log, Prometheus
-│   ├── auth/                   API key + HS256 JWT, Fastify preHandler
+│   ├── auth/                   API key + JWT (HS256/RS256), login throttle,
+│   │                           session revocation, Fastify preHandler
 │   ├── db/                     Drizzle ORM — typed schemas + migrations
 │   ├── prediction-market/      Polymarket + Kalshi + Metaculus CLOB
 │   ├── plugin-sdk/             defineAdapter(), ISocialProvider, test harness
@@ -124,7 +124,7 @@ nexus/
 
 ## Toolchain
 
-- **Node** 20.x (`.nvmrc` pins `20.19.0`; engines require `>=20.18.0`)
+- **Node** 22 (`.nvmrc` pins `22`; engines require `>=22.12.0`)
 - **pnpm** 9.x (`packageManager: pnpm@9.14.4`) — always pnpm, never npm/yarn
 - **Turbo** orchestrates all cross-package tasks (`dependsOn: ["^build"]`)
 - **Postgres** (pgvector) + **Redis** (BullMQ) via Docker Compose for runtime

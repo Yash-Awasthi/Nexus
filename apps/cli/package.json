@@ -2,7 +2,7 @@
   "name": "@nexus/cli",
   "version": "0.0.0",
   "private": true,
-  "description": "npx nexus CLI — submit objectives, manage approvals, inspect queues",
+  "description": "npx nexus CLI â€” submit objectives, manage approvals, inspect queues",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -17,7 +17,7 @@
   "devDependencies": {
     "@vitest/coverage-v8": "^2.1.8",
     "typescript": "^5.6.3",
-    "tsx": "^4.19.1",
+    "tsx": "^4.23.10",
     "vitest": "^2.1.8",
     "@types/node": "^22.0.0"
   },
@@ -27,7 +27,15 @@
   "dependencies": {
     "@nexus/agent-runtime": "workspace:*",
     "@nexus/contracts": "workspace:*",
+    "@nexus/council": "workspace:*",
+    "@nexus/db": "workspace:*",
+    "@nexus/debate-engine": "workspace:*",
+    "@nexus/graphrag-query": "workspace:*",
+    "@nexus/hybrid-search": "workspace:*",
     "@nexus/llm-drivers": "workspace:*",
+    "@nexus/mcp-client": "workspace:*",
+    "@nexus/provider-registry": "workspace:*",
+    "@nexus/reranker": "workspace:*",
     "@nexus/runtime": "workspace:*",
     "chalk": "^5.3.0",
     "commander": "^12.1.0",

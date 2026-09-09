@@ -10,6 +10,13 @@ import Groq from "groq-sdk";
 
 import type { ILLMTransport, ILLMMessage, ILLMResponse } from "./engine.js";
 
+/**
+ * Default Groq model. llama-3.3-70b-versatile was decommissioned by Groq on
+ * 2026-08-16; Groq's recommended replacement (and the id this package ships
+ * with) is openai/gpt-oss-120b.
+ */
+export const GROQ_DEFAULT_MODEL = "openai/gpt-oss-120b";
+
 export class GroqTransport implements ILLMTransport {
   private readonly client: Groq;
 
@@ -32,7 +39,7 @@ export class GroqTransport implements ILLMTransport {
     },
   ): Promise<ILLMResponse> {
     const start = Date.now();
-    const model = options?.model ?? "llama-3.3-70b-versatile";
+    const model = options?.model ?? GROQ_DEFAULT_MODEL;
 
     const res = await this.client.chat.completions.create({
       model,

@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
+import { whereMatches, whereDocumentMatches } from "@nexus/retrieval";
+import type { WhereClause, WhereDocumentClause } from "@nexus/retrieval";
+import type { Reranker } from "@nexus/reranker";
+
 /**
  * @nexus/hybrid-search — Hybrid vector + BM25 search with RRF fusion.
  *
@@ -40,12 +44,36 @@ export interface BM25SearchAdapter {
 export interface HybridSearchOptions {
   query: string;
   limit?: number;
+  /**
+   * Fusion strategy. "rrf" (default) fuses by reciprocal ranks; "alpha"
+   * fuses by alpha-weighted max-normalized scores (Timescale pattern), where
+   * `vectorWeight` is the dense-side alpha.
+   */
+  fusion?: "rrf" | "alpha";
   /** RRF k constant. Default 60. */
   k?: number;
   /** Weight for vector results in final fusion [0,1]. Default 0.5. */
   vectorWeight?: number;
   /** Weight for BM25 results. Default 0.5. */
   bm25Weight?: number;
+  /**
+   * Chroma/weaviate-grammar metadata filter (pass-50 @nexus/retrieval where
+   * vocabulary: $eq/$ne/$gt/$gte/$lt/$lte/$in/$nin + $and/$or/$contains).
+   * Applied to each leg's over-fetched candidates BEFORE fusion, mirroring
+   * weaviate's hybrid single query where clause. A per-adapter index-level
+   * filter would be more precise; engine-level candidate filtering is the
+   * honest approximation over the fetchN over-fetch.
+   */
+  where?: WhereClause;
+  /** Document-text filter ($contains/$not_contains) applied per leg pre-fusion. */
+  whereDocument?: WhereDocumentClause;
+  /**
+   * Optional post-fusion rerank pass (the engine's doc comment advertises
+   * RRF + reranker orchestration; this seam makes it real — pass any
+   * @nexus/reranker implementation). When set, the fused candidate list is
+   * reranked and cut to `limit`, mirroring weaviate's hybrid rerank tool.
+   */
+  reranker?: Reranker;
 }
 
 /** Hybrid search result interface definition. */
@@ -90,6 +118,64 @@ export function rrfFusion(
     .sort((a, b) => b.score - a.score);
 }
 
+// ── Weighted-alpha fusion (Timescale weighted hybrid pattern) ────────────────
+//
+// pgvectorscale's documented hybrid search blends dense and sparse scores
+// directly: each list's raw scores are max-normalized to [0, 1] and the final
+// score is `alpha × dense + (1 - alpha) × sparse` per document. Unlike RRF
+// (which throws away score magnitudes and keeps only reciprocal ranks), this
+// keeps the actual similarity/BM25 scores so a document that strongly matches
+// one side still competes. A document present in only one list contributes
+// that side's normalized score only.
+
+export interface WeightedAlphaOptions {
+  /** Weight on the dense (vector) side in [0, 1]. Default 0.5. */
+  alpha?: number;
+  /**
+   * Score normalization per list before blending. "max" (default) divides
+   * each list by its own max score; "none" blends raw scores as-is.
+   */
+  normalize?: "max" | "none";
+}
+
+/**
+ * Fuse a dense and a sparse result list by alpha-weighted normalized scores
+ * (Timescale's weighted-hybrid pattern): `score = alpha × normDense +
+ * (1 - alpha) × normSparse`. Sorted descending, metadata prefers the dense hit.
+ */
+export function weightedAlphaFusion(
+  dense: SearchHit[],
+  sparse: SearchHit[],
+  opts: WeightedAlphaOptions = {},
+): SearchHit[] {
+  const alpha = opts.alpha ?? 0.5;
+  const beta = 1 - alpha;
+  const normalize = opts.normalize ?? "max";
+
+  const norm = (list: SearchHit[]): Map<string, number> => {
+    const scores = new Map(list.map((h) => [h.id, h.score]));
+    if (normalize === "none" || scores.size === 0) return scores;
+    const max = Math.max(...scores.values());
+    if (max <= 0) return scores;
+    for (const [id, s] of scores) scores.set(id, s / max);
+    return scores;
+  };
+
+  const denseScores = norm(dense);
+  const sparseScores = norm(sparse);
+  const ids = new Set<string>([...denseScores.keys(), ...sparseScores.keys()]);
+  const meta = new Map<string, SearchHit>();
+  for (const h of [...sparse, ...dense]) meta.set(h.id, h);
+
+  return [...ids]
+    .map((id) => {
+      const d = denseScores.get(id) ?? 0;
+      const s = sparseScores.get(id) ?? 0;
+      return { ...meta.get(id)!, id, score: alpha * d + beta * s };
+    })
+    .sort((a, b) => b.score - a.score);
+}
+
 // ── HybridSearchEngine ────────────────────────────────────────────────────────
 
 export class HybridSearchEngine {
@@ -100,19 +186,41 @@ export class HybridSearchEngine {
 
   async search(opts: HybridSearchOptions): Promise<HybridSearchResult> {
     const { query, limit = 10, k = 60, vectorWeight = 0.5, bm25Weight = 0.5 } = opts;
+    const fusion = opts.fusion ?? "rrf";
     const fetchN = limit * 3; // over-fetch before fusion
     const start = Date.now();
 
-    const [vectorHits, bm25Hits] = await Promise.all([
+    const [vectorRaw, bm25Raw] = await Promise.all([
       this.vector.search(query, fetchN),
       this.bm25.search(query, fetchN),
     ]);
 
-    const fused = rrfFusion(vectorHits, bm25Hits, {
-      k,
-      weightA: vectorWeight,
-      weightB: bm25Weight,
-    });
+    const { where, whereDocument } = opts;
+    const keep = (h: SearchHit): boolean =>
+      (!where || whereMatches(h.metadata ?? {}, where)) &&
+      (!whereDocument || whereDocumentMatches(h.text ?? "", whereDocument));
+    const vectorHits = where || whereDocument ? vectorRaw.filter(keep) : vectorRaw;
+    const bm25Hits = where || whereDocument ? bm25Raw.filter(keep) : bm25Raw;
+
+    const fused =
+      fusion === "alpha"
+        ? weightedAlphaFusion(vectorHits, bm25Hits, { alpha: vectorWeight })
+        : rrfFusion(vectorHits, bm25Hits, {
+            k,
+            weightA: vectorWeight,
+            weightB: bm25Weight,
+          });
+
+    if (opts.reranker) {
+      const ranked = fused.map((h) => ({
+        id: h.id,
+        text: h.text ?? "",
+        score: h.score,
+        metadata: h.metadata,
+      }));
+      const res = await opts.reranker.rerank(query, ranked, { topK: limit });
+      return { hits: res.documents, vectorHits, bm25Hits, durationMs: Date.now() - start };
+    }
     const hits = fused.slice(0, limit);
 
     return { hits, vectorHits, bm25Hits, durationMs: Date.now() - start };
@@ -184,3 +292,6 @@ export class InMemoryBM25 implements BM25SearchAdapter {
       .slice(0, limit);
   }
 }
+
+export { createHybridSearchMcpServer } from "./mcp-server.js";
+export type { HybridSearchMcpServerOptions } from "./mcp-server.js";

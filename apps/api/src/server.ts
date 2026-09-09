@@ -24,20 +24,14 @@ import {
 } from "@nexus/posthog-analytics";
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest } from "fastify";
 
-// Resolve pino-pretty to an absolute path so pino's transport worker can load it
-// under pnpm's strict node_modules layout (bare "pino-pretty" fails to resolve there).
-const _require = createRequire(import.meta.url);
-const _prettyTarget = (() => {
-  try {
-    return _require.resolve("pino-pretty");
-  } catch {
-    return undefined;
-  }
-})();
-
+import { AgentOrchestrator } from "./lib/agent-orchestrator.js";
+import { costLogStore } from "./lib/cost-log.js";
+import { initPatStore } from "./lib/pat-store.js";
 import { makeRateLimitPreHandler, makeUserRateLimitPreHandler } from "./lib/rate-limiter.js";
 import { sentryReporter } from "./lib/sentry-reporter.js";
-import { requireAuth } from "./middleware/auth.js";
+import { SmartRouter } from "./lib/smart-router.js";
+import { userContext } from "./lib/user-context.js";
+import { requireAuthWithTier } from "./middleware/auth.js";
 import { adminTracesRoutes } from "./routes/admin-traces.js";
 import { adminUsersRoutes } from "./routes/admin-users.js";
 import { adminRoutes } from "./routes/admin.js";
@@ -58,6 +52,8 @@ import { contextRoutes } from "./routes/context.js";
 import { conversationAnalysisRoutes } from "./routes/conversation-analysis.js";
 import { corpusBuilderRoutes } from "./routes/corpus-builder.js";
 import { councilRoutes } from "./routes/council.js";
+import { diagnosticsRoutes } from "./routes/diagnostics.js";
+import { diffRoutes } from "./routes/diff.js";
 import { docPipelineRoutes } from "./routes/doc-pipeline.js";
 import { domainFeedsRoutes } from "./routes/domain-feeds.js";
 import { driftRoutes } from "./routes/drift.js";
@@ -73,21 +69,26 @@ import { hooksRoutes } from "./routes/hooks.js";
 import { i18nRoutes } from "./routes/i18n.js";
 import { imageGenRoutes } from "./routes/image-gen.js";
 import { ingestRoutes } from "./routes/ingest.js";
+import { intelligenceHubRoutes } from "./routes/intelligence-hub.js";
 import { knowledgeGraphRoutes } from "./routes/knowledge-graph.js";
 import { libertasRoutes } from "./routes/libertas.js";
 import { llmOauthRoutes } from "./routes/llm-oauth.js";
 import { llmRoutes } from "./routes/llm.js";
+import { localPtyRoutes } from "./routes/local-pty.js";
 import { mailIngestRoutes } from "./routes/mail-ingest.js";
 import { mcpServersRoutes } from "./routes/mcp-servers.js";
 import { mcpRoutes } from "./routes/mcp.js";
 import { memoryRoutes } from "./routes/memory.js";
 import { metricsRoutes } from "./routes/metrics.js";
 import { mfaRoutes } from "./routes/mfa.js";
+import { missionRoutes } from "./routes/missions.js";
 import { nlpRoutes } from "./routes/nlp.js";
+import { notificationsRoutes } from "./routes/notifications.js";
 import { oauthRoutes } from "./routes/oauth.js";
 import { obsProvidersRoutes } from "./routes/obs-providers.js";
 import { oidcRoutes } from "./routes/oidc.js";
 import { orchestrationRoutes } from "./routes/orchestration.js";
+import { pluginRegistryRoutes } from "./routes/plugin-registry.js";
 import { predictionMarketRoutes } from "./routes/prediction-market.js";
 import { redteamRoutes } from "./routes/redteam.js";
 import { researcherRoutes } from "./routes/researcher.js";
@@ -97,14 +98,28 @@ import { samlRoutes } from "./routes/saml.js";
 import { scenarioPlannerRoutes } from "./routes/scenario-planner.js";
 import { scimRoutes } from "./routes/scim.js";
 import { scrapingMcpRoutes } from "./routes/scraping-mcp.js";
+import { sessionGraphRoutes } from "./routes/session-graph.js";
 import { sessionSyncRoutes } from "./routes/session-sync.js";
 import { sftRoutes } from "./routes/sft.js";
 import { sseRoutes } from "./routes/sse.js";
 import { stmRoutes } from "./routes/stm.js";
+import { threadsRoutes } from "./routes/threads.js";
+import { userDataRoutes } from "./routes/user-data.js";
 import { videoTranscriptRoutes } from "./routes/video-transcript.js";
 import { voiceRoutes } from "./routes/voice.js";
 import { wikiRoutes } from "./routes/wiki.js";
 import { workspacesRoutes } from "./routes/workspaces.js";
+
+// Resolve pino-pretty to an absolute path so pino's transport worker can load it
+// under pnpm's strict node_modules layout (bare "pino-pretty" fails to resolve there).
+const _require = createRequire(import.meta.url);
+const _prettyTarget = (() => {
+  try {
+    return _require.resolve("pino-pretty");
+  } catch {
+    return undefined;
+  }
+})();
 
 // Augment FastifyRequest to carry optional trace span
 declare module "fastify" {
@@ -119,6 +134,10 @@ const _analyticsClient = process.env.POSTHOG_API_KEY
   : new InMemoryAnalyticsClient();
 
 const analytics = new NexusAnalytics(_analyticsClient);
+
+// ── Module-level singletons ──────────────────────────────────────────────────
+export const smartRouter = new SmartRouter();
+export const agentOrchestrator = new AgentOrchestrator();
 
 export async function buildServer(): Promise<FastifyInstance> {
   // ── Tracing (zero-cost noop when disabled) ─────────────────────────────────
@@ -286,12 +305,29 @@ export async function buildServer(): Promise<FastifyInstance> {
     if (!reply.sent) await group.user(request, reply);
   });
 
+  // ── Cost-log write-behind: flush the pending tail on graceful close ────────
+  // A clean SIGTERM/SIGINT deploy drains through app.close() (index.ts
+  // gracefulShutdown), so this persists the last debounce window that a plain
+  // restart would lose. Bounded + best-effort inside the store — an unclean
+  // kill (tsx-watch) never reaches here and stays within the documented
+  // few-seconds loss.
+  app.addHook("onClose", async () => {
+    await costLogStore.close();
+  });
+
   // ── Health (no prefix — /health, /health/ready) ───────────────────────────
   await app.register(healthRoutes);
 
   // ── API v1 routes ─────────────────────────────────────────────────────────
   await app.register(
     async (api) => {
+      // Same ALS user context as the /api scope — routes that resolve
+      // nexusUserId (per-route requireAuthWithTier) feed the LLM cache key;
+      // others land in the shared anon bucket (content-keyed, never cross-user
+      // data).
+      api.addHook("preHandler", (request, _reply, done) => {
+        userContext.run({ userId: request.nexusUserId ?? null }, done);
+      });
       // Core platform
       await api.register(ingestRoutes);
       await api.register(councilRoutes);
@@ -343,6 +379,9 @@ export async function buildServer(): Promise<FastifyInstance> {
       // O — drift: adaptive sampling params + EMA feedback
       await api.register(driftRoutes);
 
+      // Intelligence Hub — all extracted intelligence modules
+      await api.register(intelligenceHubRoutes, { prefix: "/intelligence-hub" });
+
       // R — hooks registry + alert engine
       await api.register(hooksRoutes);
       await api.register(alertsRoutes);
@@ -355,6 +394,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       // P — rlhf, sft-tagger, llm-router, evals, scenario-planner
       await api.register(rlhfRoutes);
       await api.register(sftRoutes);
+      await api.register(pluginRegistryRoutes);
       await api.register(llmRoutes);
       await api.register(evalsRoutes);
       await api.register(scenarioPlannerRoutes);
@@ -371,6 +411,7 @@ export async function buildServer(): Promise<FastifyInstance> {
 
       // Enterprise — user auth, workspaces, MFA
       await api.register(authUsersRoutes);
+      await api.register(userDataRoutes);
       await api.register(workspacesRoutes);
       await api.register(driveRoutes);
       await api.register(mfaRoutes);
@@ -381,13 +422,20 @@ export async function buildServer(): Promise<FastifyInstance> {
       // Enterprise — SCIM 2.0 provisioning + admin user management
       await api.register(scimRoutes);
       await api.register(adminUsersRoutes);
-      await api.register(adminTracesRoutes);
+      // Scoped under /traces (playtest e2e round): adminTracesRoutes previously
+      // registered its bare / and /:id handlers at the /api/v1 root, so ANY
+      // unknown single-segment v1 path (e.g. /api/v1/agents) resolved to the
+      // trace lookup and answered "trace_not_found" instead of a plain 404.
+      await api.register(adminTracesRoutes, { prefix: "/traces" });
 
       // Enterprise — generic OIDC SSO (Okta, Azure AD, Keycloak, etc.)
       await api.register(oidcRoutes);
 
       // Enterprise — SAML 2.0 SSO (Okta, Azure AD, Google Workspace, etc.)
       await api.register(samlRoutes);
+
+      // System diagnostics — consolidated operability endpoint
+      await api.register(diagnosticsRoutes);
     },
     { prefix: "/api/v1" },
   );
@@ -398,10 +446,25 @@ export async function buildServer(): Promise<FastifyInstance> {
   // (Individual route-level auth in api-bridge.ts is retained for double-check.)
   await app.register(
     async (scoped) => {
-      scoped.addHook("preHandler", requireAuth);
+      // requireAuthWithTier validates identically to requireAuth AND resolves
+      // request.nexusUserId — every /api route gets its caller identity (the
+      // LLM response cache keys on it for per-user isolation).
+      scoped.addHook("preHandler", requireAuthWithTier);
       scoped.addHook("preHandler", apiScopeRL);
+      // Run the rest of the request inside the ALS user context so the cache
+      // wrapper at the driver level can read the caller at call time.
+      scoped.addHook("preHandler", (request, _reply, done) => {
+        userContext.run({ userId: request.nexusUserId ?? null }, done);
+      });
       await scoped.register(apiBridgeRoutes);
       await scoped.register(videoTranscriptRoutes);
+      await scoped.register(notificationsRoutes);
+      await scoped.register(threadsRoutes);
+      await scoped.register(sessionGraphRoutes);
+      await scoped.register(diffRoutes);
+      await scoped.register(missionRoutes);
+      // Local PTY terminal plane (localhost-only, spawns real processes).
+      await scoped.register(localPtyRoutes);
     },
     { prefix: "/api" },
   );
@@ -413,6 +476,11 @@ export async function buildServer(): Promise<FastifyInstance> {
     },
     { prefix: "/api/v1" },
   );
+
+  // ── PAT hydration (playtest round 5) ─────────────────────────────────────
+  // Rebuild the in-memory PAT cache from the api_keys table (source of truth)
+  // so tokens survive restarts. No-op in tests / without a reachable DB.
+  await initPatStore();
 
   // ── Global error handler ──────────────────────────────────────────────────
   app.setErrorHandler((error: FastifyError, request, reply) => {

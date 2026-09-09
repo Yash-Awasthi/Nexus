@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 vi.mock("groq-sdk", () => {
   const mockCreate = vi.fn().mockResolvedValue({
     choices: [{ message: { content: "YES, approved. Confidence: 0.9" } }],
-    model: "llama-3.3-70b-versatile",
+    model: "openai/gpt-oss-120b",
     usage: { prompt_tokens: 80, completion_tokens: 40 },
   });
   const MockGroq = vi.fn().mockImplementation(() => ({
@@ -65,7 +65,7 @@ describe("GroqTransport", () => {
 
     it("returns the model name", async () => {
       const result = await transport.chat([{ role: "user", content: "hi" }]);
-      expect(result.model).toBe("llama-3.3-70b-versatile");
+      expect(result.model).toBe("openai/gpt-oss-120b");
     });
 
     it("returns token usage", async () => {
@@ -99,7 +99,7 @@ describe("GroqTransport", () => {
       const mockGroqInstance = (Groq as unknown as ReturnType<typeof vi.fn>).mock.results[0]?.value;
       mockGroqInstance.chat.completions.create.mockResolvedValueOnce({
         choices: [{ message: { content: null } }],
-        model: "llama-3.3-70b-versatile",
+        model: "openai/gpt-oss-120b",
         usage: { prompt_tokens: 0, completion_tokens: 0 },
       });
       const result = await transport.chat([{ role: "user", content: "hi" }]);

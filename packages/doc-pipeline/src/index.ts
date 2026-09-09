@@ -24,6 +24,8 @@
 
 import { defineAdapter, type IExecutionContext } from "@nexus/plugin-sdk";
 
+export { ComponentPipeline, type PipelineComponent, type PipelineRunResult } from "./pipeline.js";
+
 // ── Public types ───────────────────────────────────────────────────────────────
 
 export type DocFormat = "text" | "markdown" | "html" | "pdf" | "docx";

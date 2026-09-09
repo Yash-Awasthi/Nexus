@@ -14,9 +14,13 @@
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-import { authenticate, AuthError } from "@nexus/auth";
+import { authenticate, AuthError, verifyJwtRS256 } from "@nexus/auth";
 import type { Tier } from "@nexus/tier-gate";
 import type { FastifyRequest, FastifyReply } from "fastify";
+
+import { sessionRevocations } from "../lib/auth-hardening.js";
+import { patScopesAllow } from "../lib/pat-scopes.js";
+import { verifyPat } from "../lib/pat-store.js";
 
 // ── HS256 JWT verifier (no npm dep — Node 22 crypto) ──────────────────────────
 
@@ -79,13 +83,41 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
     apiKey: process.env.NEXUS_API_KEY || undefined,
     // Accept user JWTs (issued by /auth/login) in addition to the master API key.
     jwtSecret: process.env.NEXUS_JWT_SECRET || undefined,
+    // RS256 (asymmetric) mode (§14.1): verify with the public key, alg-pinned.
+    jwtAlg: (process.env.NEXUS_JWT_ALG === "RS256" ? "RS256" : "HS256") as "HS256" | "RS256",
+    jwtPublicKey: process.env.NEXUS_JWT_PUBLIC_KEY || undefined,
+    // Reject revoked sessions (§14.3) on every verified JWT.
+    revocations: sessionRevocations,
     // Dev bypass only when NO auth method is configured at all.
-    disabled: !process.env.NEXUS_API_KEY && !process.env.NEXUS_JWT_SECRET,
+    disabled:
+      !process.env.NEXUS_API_KEY &&
+      !process.env.NEXUS_JWT_SECRET &&
+      !process.env.NEXUS_JWT_PUBLIC_KEY,
   };
   try {
     authenticate(request.headers.authorization, authConfig);
   } catch (err) {
     if (err instanceof AuthError) {
+      // Personal-access tokens (playtest round 4): an `nxk_` token minted via
+      // /tokens authenticates even when the master-key/JWT path rejects it.
+      const m = /^Bearer\s+(\S+)$/i.exec(request.headers.authorization ?? "");
+      if (m?.[1]?.startsWith("nxk_")) {
+        const pat = await verifyPat(m[1]);
+        if (pat) {
+          // Scope enforcement (playtest round 7): scopes flowed mint → DB →
+          // list but gated nothing. Now a restricted token may only reach
+          // endpoints inside its areas (lib/pat-scopes.ts owns the semantics;
+          // "*" / no scopes = full access, unchanged for existing tokens).
+          if (!patScopesAllow(pat.scopes, request.url)) {
+            await reply.code(403).send({
+              code: "INSUFFICIENT_SCOPE",
+              message: "Token scope does not allow this endpoint",
+            });
+            return;
+          }
+          return;
+        }
+      }
       await reply.code(err.httpStatus).send({ code: err.code, message: err.message });
       return;
     }
@@ -118,10 +150,32 @@ export async function requireAuthWithTier(
 
   // Identity from a verified JWT (no DB round-trip).
   const jwtSecret = process.env.NEXUS_JWT_SECRET;
-  if (jwtSecret) {
-    const payload = _verifyHs256(token, jwtSecret);
+  const jwtPublicKey = process.env.NEXUS_JWT_PUBLIC_KEY;
+  const jwtAlg = process.env.NEXUS_JWT_ALG === "RS256" ? "RS256" : "HS256";
+  if (jwtSecret || (jwtAlg === "RS256" && jwtPublicKey)) {
+    let payload: JwtPayload | null = null;
+    if (jwtAlg === "RS256" && jwtPublicKey) {
+      try {
+        payload = verifyJwtRS256(token, jwtPublicKey) as unknown as JwtPayload;
+      } catch {
+        payload = null; // fall through — identity stays undefined
+      }
+    } else if (jwtSecret) {
+      payload = _verifyHs256(token, jwtSecret);
+    }
     if (payload) {
       request.nexusUserId = typeof payload.sub === "string" ? payload.sub : undefined;
+      return;
+    }
+  }
+
+  // Personal-access tokens (playtest round 4): identity comes from the PAT
+  // owner — no DB round-trip. Only short-circuits when the PAT verifies; an
+  // unknown nxk_ value still falls through to the api_keys lookup below.
+  if (token.startsWith("nxk_")) {
+    const pat = await verifyPat(token);
+    if (pat) {
+      request.nexusUserId = pat.ownerId;
       return;
     }
   }

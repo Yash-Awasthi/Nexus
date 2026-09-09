@@ -1,0 +1,42 @@
+{
+  "name": "@nexus/agent-classifier",
+  "version": "0.1.0",
+  "description": "Intent-based agent routing, SupervisorAgent, and GroundedAgent patterns inspired by Agent Squad",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "dev": "tsc --project tsconfig.json --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist coverage"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "agent",
+    "classifier",
+    "intent",
+    "routing",
+    "supervisor",
+    "grounded",
+    "anti-hallucination",
+    "llm"
+  ]
+}

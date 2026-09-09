@@ -1,11 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 export interface Project {
   id: string;
   name: string;
   description: string;
-  model: string;
+  icon: string;
+  iconColor: string;
+  groupId: string | null;
+  pinned: boolean;
+  conversationCount: number;
+  taskCounts: { running: number; needsInput: number; done: number };
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface CreateProjectModalProps {
@@ -14,19 +21,22 @@ interface CreateProjectModalProps {
   onCreated: (project: Project) => void;
 }
 
-const MODELS = [
-  { value: "auto", label: "Auto (best available)" },
-  { value: "claude-opus-4-5", label: "Claude Opus 4.5" },
-  { value: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
-  { value: "gpt-4o", label: "GPT-4o" },
-  { value: "gemini-pro", label: "Gemini Pro" },
+const ICON_COLORS = [
+  "#6366f1",
+  "#ec4899",
+  "#f59e0b",
+  "#10b981",
+  "#3b82f6",
+  "#8b5cf6",
+  "#ef4444",
+  "#06b6d4",
 ];
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
-  background: "#0a0a0a",
-  border: "1px solid #333",
-  color: "#f0f0f0",
+  background: "hsl(var(--background))",
+  border: "1px solid hsl(var(--border))",
+  color: "hsl(var(--foreground))",
   borderRadius: 6,
   padding: "8px 12px",
   fontSize: 14,
@@ -37,11 +47,23 @@ const inputStyle: React.CSSProperties = {
 export function CreateProjectModal({ isOpen, onClose, onCreated }: CreateProjectModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [model, setModel] = useState("auto");
+  const [iconColor, setIconColor] = useState(ICON_COLORS[0]);
+  const [groupId, setGroupId] = useState<string | null>(null);
+  const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (isOpen) {
+      fetch("/api/v1/groups")
+        .then((r) => r.json())
+        .then((d) => setGroups(d.groups ?? []));
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  const icon = name.trim().slice(0, 2).toUpperCase() || "??";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -50,62 +72,81 @@ export function CreateProjectModal({ isOpen, onClose, onCreated }: CreateProject
     setError(null);
 
     try {
-      const res = await fetch("/api/projects", {
+      const res = await fetch("/api/v1/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), description, model }),
+        body: JSON.stringify({
+          name: name.trim(),
+          description: description.trim(),
+          icon,
+          iconColor,
+          groupId,
+        }),
       });
       if (res.ok) {
         const data = await res.json();
         onCreated(data);
       } else {
-        // fallback mock if backend not wired yet
-        onCreated({ id: Date.now().toString(), name: name.trim(), description, model });
+        onCreated({
+          id: Date.now().toString(),
+          name: name.trim(),
+          description: description.trim(),
+          icon,
+          iconColor,
+          groupId,
+          pinned: false,
+          conversationCount: 0,
+          taskCounts: { running: 0, needsInput: 0, done: 0 },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
       }
     } catch {
-      onCreated({ id: Date.now().toString(), name: name.trim(), description, model });
+      onCreated({
+        id: Date.now().toString(),
+        name: name.trim(),
+        description: description.trim(),
+        icon,
+        iconColor,
+        groupId,
+        pinned: false,
+        conversationCount: 0,
+        taskCounts: { running: 0, needsInput: 0, done: 0 },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
     }
 
     setLoading(false);
     setName("");
     setDescription("");
-    setModel("auto");
+    setIconColor(ICON_COLORS[0]);
+    setGroupId(null);
     onClose();
   }
 
   return (
     <div
       onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.8)",
-        zIndex: 1000,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
+      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "#111",
-          border: "1px solid #333",
-          borderRadius: 12,
-          padding: 24,
-          width: 480,
-          maxWidth: "90vw",
-        }}
+        className="bg-card border rounded-xl p-6 w-[480px] max-w-[90vw] shadow-xl"
       >
-        <div style={{ fontSize: 18, fontWeight: 600, color: "#fff", marginBottom: 20 }}>
-          New Project
+        <div className="flex items-center gap-3 mb-5">
+          <div
+            className="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold text-white"
+            style={{ backgroundColor: iconColor }}
+          >
+            {icon}
+          </div>
+          <h2 className="text-lg font-semibold">New Project</h2>
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ display: "block", color: "#888", fontSize: 12, marginBottom: 5 }}>
-              Name *
-            </label>
+          <div className="mb-3">
+            <label className="block text-xs text-muted-foreground mb-1">Name *</label>
             <input
               style={inputStyle}
               value={name}
@@ -116,65 +157,65 @@ export function CreateProjectModal({ isOpen, onClose, onCreated }: CreateProject
             />
           </div>
 
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ display: "block", color: "#888", fontSize: 12, marginBottom: 5 }}>
-              Description
-            </label>
+          <div className="mb-3">
+            <label className="block text-xs text-muted-foreground mb-1">Description</label>
             <textarea
-              style={{ ...inputStyle, minHeight: 80, resize: "vertical" }}
+              style={{ ...inputStyle, minHeight: 60, resize: "vertical" }}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What's this project for?"
             />
           </div>
 
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ display: "block", color: "#888", fontSize: 12, marginBottom: 5 }}>
-              Default Model
-            </label>
-            <select
-              style={{ ...inputStyle, cursor: "pointer" }}
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-            >
-              {MODELS.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
+          <div className="mb-3">
+            <label className="block text-xs text-muted-foreground mb-1">Color</label>
+            <div className="flex gap-1.5">
+              {ICON_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setIconColor(c)}
+                  className={`w-6 h-6 rounded-full border-2 transition-transform ${
+                    iconColor === c ? "border-white scale-110" : "border-transparent"
+                  }`}
+                  style={{ backgroundColor: c }}
+                />
               ))}
-            </select>
+            </div>
           </div>
 
-          {error && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 12 }}>{error}</div>}
+          {groups.length > 0 && (
+            <div className="mb-4">
+              <label className="block text-xs text-muted-foreground mb-1">Group</label>
+              <select
+                style={{ ...inputStyle, cursor: "pointer" }}
+                value={groupId ?? ""}
+                onChange={(e) => setGroupId(e.target.value || null)}
+              >
+                <option value="">Ungrouped</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          {error && <div className="text-destructive text-xs mb-3">{error}</div>}
+
+          <div className="flex justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
-              style={{
-                background: "none",
-                border: "none",
-                color: "#888",
-                cursor: "pointer",
-                fontSize: 14,
-                padding: "8px 14px",
-              }}
+              className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted rounded-md"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading || !name.trim()}
-              style={{
-                background: loading || !name.trim() ? "#1e3a5f" : "#2563eb",
-                color: "#fff",
-                border: "none",
-                borderRadius: 6,
-                padding: "8px 18px",
-                cursor: loading || !name.trim() ? "not-allowed" : "pointer",
-                fontSize: 14,
-                fontWeight: 500,
-              }}
+              className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Creating…" : "Create Project"}
             </button>

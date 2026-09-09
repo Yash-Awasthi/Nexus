@@ -182,7 +182,9 @@ export const MODEL_PRICE_TABLE: Record<string, ModelPriceEntry> = {
   "gpt-4-turbo": { input: 0.00001, output: 0.00003, provider: "openai" },
   "gpt-3.5-turbo": { input: 0.0000005, output: 0.0000015, provider: "openai" },
   // Groq (very cheap — approximately)
+  // llama-3.3-70b-versatile retired 2026-08-16 — row kept for historical logs.
   "llama-3.3-70b-versatile": { input: 0.00000059, output: 0.00000079, provider: "groq" },
+  "openai/gpt-oss-120b": { input: 0.00000015, output: 0.0000006, provider: "groq" },
   "llama-3.1-8b-instant": { input: 0.00000005, output: 0.00000008, provider: "groq" },
   "gemma2-9b-it": { input: 0.0000002, output: 0.0000002, provider: "groq" },
   "mixtral-8x7b-32768": { input: 0.00000024, output: 0.00000024, provider: "groq" },

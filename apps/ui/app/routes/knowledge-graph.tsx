@@ -192,8 +192,15 @@ export default function KnowledgeGraph() {
       const r = await fetch("/api/kg/graph?limit=80");
       if (r.ok) {
         const data = await r.json();
-        setGraph(data);
-        setPositions(layoutNodes(data.nodes ?? [], data.edges ?? []));
+        // API nodes carry `name`; the UI renders `label`. Normalise so node
+        // labels (and .label.length) don't crash on undefined.
+        const nodes = (data.nodes ?? []).map((n: GraphNode & { name?: string }) => ({
+          ...n,
+          label: n.label ?? n.name ?? "",
+        }));
+        const norm = { ...data, nodes };
+        setGraph(norm);
+        setPositions(layoutNodes(norm.nodes, norm.edges ?? []));
       }
     } catch {}
     setLoadingGraph(false);
@@ -202,7 +209,10 @@ export default function KnowledgeGraph() {
   const loadCommunities = useCallback(async () => {
     try {
       const r = await fetch("/api/kg/communities");
-      if (r.ok) setCommunities(await r.json());
+      if (r.ok) {
+        const data = await r.json();
+        setCommunities(Array.isArray(data) ? data : (data.communities ?? []));
+      }
     } catch {}
   }, []);
 

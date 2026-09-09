@@ -24,7 +24,7 @@ import {
   type NeonQueryFn,
   type EntityType,
 } from "@nexus/knowledge-graph";
-import { ClaudeProvider, GroqProvider, LLMRouter } from "@nexus/llm-router";
+import { ClaudeProvider, GroqProvider, LLMRouter, OpenAIProvider } from "@nexus/llm-router";
 import {
   extractEntities,
   extractRelationships,
@@ -40,20 +40,36 @@ import { requireAuth } from "../middleware/auth.js";
 
 function buildNlpClient(): NlpLlmClient {
   const providers = [];
+  const aliases = [];
+
+  // Local-first: when the platform is configured for Ollama, route nexus/fast to
+  // the local model via Ollama's OpenAI-compatible /v1 endpoint. No API credits,
+  // and it matches the rest of the platform (api-bridge getDefaultDriver()).
+  if (process.env.NEXUS_LLM_PROVIDER === "ollama") {
+    const base = (process.env.OLLAMA_BASE_URL ?? "http://localhost:11434").replace(/\/+$/, "");
+    providers.push(
+      new OpenAIProvider({ apiKey: "ollama", baseUrl: `${base}/v1`, providerName: "ollama" }),
+    );
+    aliases.push({
+      alias: "nexus/fast",
+      provider: "ollama",
+      model: process.env.NEXUS_DEFAULT_MODEL ?? "qwen2.5:7b",
+    });
+  }
+
   if (process.env.GROQ_API_KEY) {
     providers.push(new GroqProvider({ apiKey: process.env.GROQ_API_KEY }));
+    aliases.push({ alias: "nexus/fast", provider: "groq", model: "openai/gpt-oss-120b" });
   }
   if (process.env.ANTHROPIC_API_KEY) {
     providers.push(new ClaudeProvider({ apiKey: process.env.ANTHROPIC_API_KEY }));
+    aliases.push({ alias: "nexus/fast", provider: "claude", model: "claude-haiku-4-5" });
   }
   if (providers.length === 0) return nullNlpLlmClient;
 
   const router = new LLMRouter({
     providers,
-    aliases: [
-      { alias: "nexus/fast", provider: "groq", model: "llama-3.1-70b-versatile" },
-      { alias: "nexus/fast", provider: "claude", model: "claude-haiku-4-5" },
-    ],
+    aliases,
     fallbacks: {},
     strategy: "first",
   });

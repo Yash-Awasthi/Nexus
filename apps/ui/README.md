@@ -54,3 +54,19 @@ events over an `EventTarget` bus. Council members are configured in Settings and
 100+ routes live in `app/routes/`, registered in `app/routes.ts` and mostly wired to
 `/api/*` via `useEffect` + `fetch`. UI primitives are Shadcn (Tailwind v4) in
 `app/components/ui/`; icons come from `lucide-react`.
+
+## Dev-server troubleshooting
+
+**Symptom:** after editing an app module (especially under the `~` alias, e.g.
+`app/lib/*.ts`), the running page keeps serving the OLD transform — new exports
+are missing, imports of them fail, or behavior doesn't match source. The file
+on disk is correct and `fetch("/app/<path>")` may even show the new code while
+the page still runs the old module (react-router v7's dev plugin keys its
+on-demand transform cache by alias-resolved module URLs and doesn't reliably
+invalidate it on file change; `node_modules/.vite` prebundle is unrelated —
+it only covers dependencies).
+
+**Recipe:** restart the UI dev server — kill the vite process and re-run
+`pnpm --filter @nexus/ui dev`. A full browser reload alone is NOT enough once
+the stale transform is being served; the server restart clears the cache.
+When verifying new UI code headlessly, restart vite first, then reload the page.

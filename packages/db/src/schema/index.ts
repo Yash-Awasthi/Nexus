@@ -16,3 +16,4 @@ export * from "./mcp-servers.js";
 export * from "./agent-sessions.js";
 export * from "./oauth-credentials.js";
 export * from "./orchestration-runs.js";
+export * from "./provider-models.js";

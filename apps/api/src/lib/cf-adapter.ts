@@ -130,6 +130,24 @@ export class CloudflareKVStore implements KVStore {
     await this.ns.delete(this._k(key));
   }
 
+  /**
+   * Best-effort increment — Cloudflare Workers KV has no atomic INCR, so this
+   * is a read-modify-write under eventual consistency (documented limitation
+   * of the backend, not the caller). The TTL is stamped only on key creation
+   * so in-window traffic never refreshes the expiry.
+   */
+  async incr(key: string, ttlMs?: number): Promise<number> {
+    const current = (await this.get<number>(key)) ?? 0;
+    const next = current + 1;
+    const opts: { expirationTtl?: number } = {};
+    if (next === 1 && ttlMs !== undefined && ttlMs > 0) {
+      // CF KV minimum TTL is 60 s — round up.
+      opts.expirationTtl = Math.max(60, Math.ceil(ttlMs / 1000));
+    }
+    await this.ns.put(this._k(key), JSON.stringify(next), opts);
+    return next;
+  }
+
   async has(key: string): Promise<boolean> {
     return (await this.get(key)) !== undefined;
   }

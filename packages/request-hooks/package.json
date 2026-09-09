@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/request-hooks",
+  "version": "0.1.0",
+  "description": "Before/after request hooks for LLM guardrails and middleware",
+  "main": "src/index.ts"
+}

@@ -162,7 +162,7 @@ const featureGrid = [
   {
     icon: Shield,
     title: "Enterprise Ready",
-    description: "SSO, SCIM, RBAC, audit logs, Stripe billing, org isolation.",
+    description: "SSO, SCIM, RBAC, audit logs, org isolation.",
     animation: "bounce" as const,
   },
 ];

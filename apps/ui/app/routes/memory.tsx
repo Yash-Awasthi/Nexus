@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Brain, Database, HardDrive, Clock, Trash2, Minimize2, X, Loader2 } from "lucide-react";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 
 interface MemoryEntry {
   id: string;
@@ -20,57 +20,28 @@ interface MemoryEntry {
   source: string;
 }
 
-const MOCK_ENTRIES: MemoryEntry[] = [
-  {
-    id: "1",
-    topic: "User authentication preferences",
-    chunks: 23,
-    date: "2 hours ago",
-    source: "chat",
-  },
-  {
-    id: "2",
-    topic: "React performance optimization patterns",
-    chunks: 45,
-    date: "Yesterday",
-    source: "chat",
-  },
-  {
-    id: "3",
-    topic: "Database indexing strategies for PostgreSQL",
-    chunks: 18,
-    date: "2 days ago",
-    source: "document",
-  },
-  {
-    id: "4",
-    topic: "CI/CD pipeline configuration best practices",
-    chunks: 31,
-    date: "3 days ago",
-    source: "chat",
-  },
-  {
-    id: "5",
-    topic: "API rate limiting implementation details",
-    chunks: 12,
-    date: "1 week ago",
-    source: "document",
-  },
-];
+// No demo entries here — the page renders whatever /api/memory/entries
+// returns. Previously shipped MOCK_ENTRIES that showed fabricated memories
+// whenever the API disagreed with their shape (which it always did: the store
+// returns text/createdAt, not topic/chunks/date).
 
 export default function MemoryPage() {
   const [backend, setBackend] = useState("local");
-  const [entries, setEntries] = useState<MemoryEntry[]>(MOCK_ENTRIES);
+  const [entries, setEntries] = useState<MemoryEntry[]>([]);
   const [isCompacting, setIsCompacting] = useState(false);
-  const [lastCompacted, setLastCompacted] = useState("2 days ago");
+  const [lastCompacted, setLastCompacted] = useState("Never");
   const [loading, setLoading] = useState(true);
 
   const totalChunks = useMemo(() => entries.reduce((sum, e) => sum + e.chunks, 0), [entries]);
   const storageMB = useMemo(() => (totalChunks * 0.00384).toFixed(1), [totalChunks]);
 
   // ── Fetch memory stats + entries from backend ─────────────────────────────
-  useEffect(() => {
-    Promise.allSettled([
+  // Shared by initial load, compaction, and clear-all so those actions show
+  // the server's truth (an empty list is a valid state — previous code kept
+  // stale rows whenever the response was empty, which is why Clear All looked
+  // like it worked while the store kept everything).
+  const load = useCallback(() => {
+    return Promise.allSettled([
       fetch("/api/memory/stats").then((r) => (r.ok ? r.json() : Promise.reject())),
       fetch("/api/memory/entries?limit=50").then((r) => (r.ok ? r.json() : Promise.reject())),
     ])
@@ -84,11 +55,15 @@ export default function MemoryPage() {
           const list: MemoryEntry[] = Array.isArray(entriesResult.value)
             ? entriesResult.value
             : (entriesResult.value?.entries ?? []);
-          if (list.length > 0) setEntries(list);
+          setEntries(list);
         }
       })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const handleBackendChange = (value: string) => {
     setBackend(value);
@@ -106,58 +81,15 @@ export default function MemoryPage() {
     fetch("/api/memory/compact", { method: "POST" })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data) => {
-        if (Array.isArray(data?.entries)) setEntries(data.entries);
-        else {
-          // Local compaction fallback
-          setEntries((prev) => {
-            const merged: MemoryEntry[] = [];
-            let i = 0;
-            while (i < prev.length) {
-              if (
-                i % 3 === 0 &&
-                i + 1 < prev.length &&
-                merged.length < Math.ceil(prev.length * 0.7)
-              ) {
-                merged.push({
-                  ...prev[i],
-                  topic: prev[i].topic + " & " + prev[i + 1].topic.toLowerCase(),
-                  chunks: Math.ceil((prev[i].chunks + prev[i + 1].chunks) * 0.75),
-                });
-                i += 2;
-              } else {
-                merged.push(prev[i++]);
-              }
-            }
-            return merged;
-          });
-        }
-        setLastCompacted("Just now");
+        // Show what actually happened, then re-read the store.
+        setLastCompacted(
+          typeof data?.compacted === "number" && data.compacted > 0
+            ? `Just now (${data.compacted} duplicates merged)`
+            : "Just now (nothing to merge)",
+        );
+        void load();
       })
-      .catch(() => {
-        // Local fallback
-        setEntries((prev) => {
-          const merged: MemoryEntry[] = [];
-          let i = 0;
-          while (i < prev.length) {
-            if (
-              i % 3 === 0 &&
-              i + 1 < prev.length &&
-              merged.length < Math.ceil(prev.length * 0.7)
-            ) {
-              merged.push({
-                ...prev[i],
-                topic: prev[i].topic + " & " + prev[i + 1].topic.toLowerCase(),
-                chunks: Math.ceil((prev[i].chunks + prev[i + 1].chunks) * 0.75),
-              });
-              i += 2;
-            } else {
-              merged.push(prev[i++]);
-            }
-          }
-          return merged;
-        });
-        setLastCompacted("Just now");
-      })
+      .catch(() => setLastCompacted("Compaction failed"))
       .finally(() => setIsCompacting(false));
   };
 
@@ -166,9 +98,15 @@ export default function MemoryPage() {
       !window.confirm("Are you sure you want to clear all memory entries? This cannot be undone.")
     )
       return;
-    setEntries([]);
-    setLastCompacted("Never");
-    fetch("/api/memory/entries", { method: "DELETE" }).catch(() => {});
+    // Delete server-side first, then re-read: an optimistic local clear only
+    // hides the failure until the next load brings the entries back.
+    fetch("/api/memory/entries", { method: "DELETE" })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then(() => {
+        setLastCompacted("Never");
+        void load();
+      })
+      .catch(() => {});
   };
 
   const handleDeleteEntry = (id: string) => {

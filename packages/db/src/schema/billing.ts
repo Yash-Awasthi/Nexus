@@ -8,6 +8,7 @@ import {
   doublePrecision,
   timestamp,
   boolean,
+  jsonb,
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -49,6 +50,14 @@ export const apiKeys = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     /** Set when the key is revoked; revoked keys are rejected immediately */
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    /** PAT: optional expiry (null = never expires). PAT-only column. */
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    /** PAT: last successful verification stamp (null until first use). PAT-only column. */
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    /** PAT: access scope list; ["*"] = full tier access. PAT-only column. */
+    scopes: jsonb("scopes").$type<string[]>().notNull().default(["*"]),
+    /** PAT: tier captured at mint time. PAT-only column. */
+    tier: text("tier").notNull().default("basic"),
   },
   (t) => [
     uniqueIndex("api_keys_key_hash_udx").on(t.keyHash),

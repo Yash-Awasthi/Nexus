@@ -17,6 +17,12 @@ import {
   NullVadProvider,
   GroqTranscribeProvider,
   ElevenLabsSynthesizeProvider,
+  DeepgramTranscribeProvider,
+  DeepgramSynthesizeProvider,
+  CartesiaSynthesizeProvider,
+  AssemblyAiTranscribeProvider,
+  type TranscribeProvider,
+  type SynthesizeProvider,
 } from "@nexus/voice";
 import type { FastifyInstance } from "fastify";
 
@@ -93,7 +99,10 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
         const res = await driver.complete({
           model: process.env.NEXUS_DEFAULT_MODEL ?? "qwen2.5:7b",
           messages: [
-            { role: "system", content: "You are a concise voice assistant. Reply in 1-3 sentences." },
+            {
+              role: "system",
+              content: "You are a concise voice assistant. Reply in 1-3 sentences.",
+            },
             { role: "user", content: text },
           ],
           maxTokens: 256,
@@ -115,15 +124,25 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
    * Returns: { transcript: string, latencyMs: number }
    */
   app.post<{
-    Body: { audio: string; format?: string; sampleRate?: number };
+    Body: {
+      audio: string;
+      format?: string;
+      sampleRate?: number;
+      provider?: "groq" | "deepgram" | "assemblyai";
+    };
   }>("/voice/transcribe", { preHandler: requireAuth }, async (request, reply) => {
     const { audio, format = "wav", sampleRate = 16000 } = request.body;
     if (!audio) return reply.code(400).send({ error: "audio (base64) is required" });
 
     const t0 = Date.now();
-    const provider = process.env.GROQ_API_KEY
-      ? new GroqTranscribeProvider({ apiKey: process.env.GROQ_API_KEY })
-      : new NullTranscribeProvider("(no groq key)");
+    const provider: TranscribeProvider =
+      request.body.provider === "deepgram" && process.env.DEEPGRAM_API_KEY
+        ? new DeepgramTranscribeProvider({ apiKey: process.env.DEEPGRAM_API_KEY })
+        : request.body.provider === "assemblyai" && process.env.ASSEMBLYAI_API_KEY
+          ? new AssemblyAiTranscribeProvider({ apiKey: process.env.ASSEMBLYAI_API_KEY })
+          : process.env.GROQ_API_KEY
+            ? new GroqTranscribeProvider({ apiKey: process.env.GROQ_API_KEY })
+            : new NullTranscribeProvider("(no STT key)");
 
     const audioBuffer = {
       data: Buffer.from(audio, "base64"),
@@ -143,10 +162,12 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
   /**
    * POST /voice/synthesize
    *
-   * Body: { text: string, voice?: string }
+   * Body: { text: string, voice?: string, provider?: "elevenlabs" | "deepgram" | "cartesia" }
    * Returns audio/mpeg bytes (mp3).
    */
-  app.post<{ Body: { text: string; voice?: string } }>(
+  app.post<{
+    Body: { text: string; voice?: string; provider?: "elevenlabs" | "deepgram" | "cartesia" };
+  }>(
     "/voice/synthesize",
     {
       schema: {
@@ -161,12 +182,20 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
       const { text, voice = "alloy" } = request.body;
       if (!text?.trim()) return reply.code(400).send({ error: "text is required" });
 
-      const provider = process.env.ELEVENLABS_API_KEY
-        ? new ElevenLabsSynthesizeProvider({
-            apiKey: process.env.ELEVENLABS_API_KEY,
-            defaultVoice: voice,
-          })
-        : new NullSynthesizeProvider();
+      const provider: SynthesizeProvider =
+        request.body.provider === "deepgram" && process.env.DEEPGRAM_API_KEY
+          ? new DeepgramSynthesizeProvider({ apiKey: process.env.DEEPGRAM_API_KEY })
+          : request.body.provider === "cartesia" && process.env.CARTESIA_API_KEY
+            ? new CartesiaSynthesizeProvider({
+                apiKey: process.env.CARTESIA_API_KEY,
+                defaultVoice: process.env.CARTESIA_VOICE_ID,
+              })
+            : process.env.ELEVENLABS_API_KEY
+              ? new ElevenLabsSynthesizeProvider({
+                  apiKey: process.env.ELEVENLABS_API_KEY,
+                  defaultVoice: voice,
+                })
+              : new NullSynthesizeProvider();
 
       try {
         const audioBuffer = await provider.synthesize(text);
@@ -211,16 +240,63 @@ export async function voiceRoutes(app: FastifyInstance): Promise<void> {
       preHandler: requireAuth,
     },
     async (_req, reply) => {
-      return reply.send({
-        transcribe: {
-          provider: process.env.GROQ_API_KEY ? "groq" : "null",
+      // `transcribe`/`synthesize` keep the historical single-active-provider
+      // shape (the UI voice page reads .provider/.available as scalars); the
+      // full selectable set rides transcribeOptions/synthesizeOptions.
+      const transcribeOptions = [
+        {
+          provider: "groq",
           model: "whisper-large-v3-turbo",
           available: !!process.env.GROQ_API_KEY,
+          requires: "GROQ_API_KEY",
+        },
+        {
+          provider: "deepgram",
+          model: "nova-2",
+          available: !!process.env.DEEPGRAM_API_KEY,
+          requires: "DEEPGRAM_API_KEY",
+        },
+        {
+          provider: "assemblyai",
+          model: "universal",
+          available: !!process.env.ASSEMBLYAI_API_KEY,
+          requires: "ASSEMBLYAI_API_KEY",
+        },
+      ];
+      const synthesizeOptions = [
+        {
+          provider: "elevenlabs",
+          model: "eleven_turbo_v2_5",
+          available: !!process.env.ELEVENLABS_API_KEY,
+          requires: "ELEVENLABS_API_KEY",
+        },
+        {
+          provider: "deepgram",
+          model: "aura-2-thalia-en",
+          available: !!process.env.DEEPGRAM_API_KEY,
+          requires: "DEEPGRAM_API_KEY",
+        },
+        {
+          provider: "cartesia",
+          model: "sonic-english",
+          available: !!process.env.CARTESIA_API_KEY && !!process.env.CARTESIA_VOICE_ID,
+          requires: "CARTESIA_API_KEY + CARTESIA_VOICE_ID",
+        },
+      ];
+      const activeTranscribe = transcribeOptions.find((p) => p.available) ?? transcribeOptions[0]!;
+      const activeSynthesize = synthesizeOptions.find((p) => p.available) ?? synthesizeOptions[0]!;
+      return reply.send({
+        transcribe: {
+          provider: activeTranscribe.provider,
+          model: activeTranscribe.model,
+          available: activeTranscribe.available,
         },
         synthesize: {
-          provider: process.env.ELEVENLABS_API_KEY ? "elevenlabs" : "null",
-          available: !!process.env.ELEVENLABS_API_KEY,
+          provider: activeSynthesize.provider,
+          available: activeSynthesize.available,
         },
+        transcribeOptions,
+        synthesizeOptions,
       });
     },
   );

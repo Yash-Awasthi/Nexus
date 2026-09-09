@@ -10,6 +10,7 @@
  *   "obs:generate"        → handleObsGenerateJob
  *   "feeds:refresh"       → handleFeedsRefreshJob
  *   "feeds:refresh:rss"   → handleFeedsRefreshRssJob
+ *   "feeds:refresh:port-congestion" → handlePortCongestionRefreshJob (§16.1)
  *   "search:reindex"      → handleSearchReindexJob
  *   (unknown)             → log + complete (no-op)
  *
@@ -36,12 +37,14 @@ import {
   handleObsGenerateJob,
   handleFeedsRefreshJob,
   handleFeedsRefreshRssJob,
+  handlePortCongestionRefreshJob,
   handleSearchReindexJob,
   type WikiReconcilePayload,
   type CorpusBuildPayload,
   type ObsGeneratePayload,
   type FeedsRefreshPayload,
   type FeedsRefreshRssPayload,
+  type PortCongestionRefreshPayload,
   type SearchReindexPayload,
 } from "../handlers/async-handlers.js";
 import { handleCouncilJob, type CouncilJobPayload } from "../handlers/council-handler.js";
@@ -124,6 +127,10 @@ async function processJob(job: Job): Promise<unknown> {
 
     case "feeds:refresh:rss":
       result = await handleFeedsRefreshRssJob(data as FeedsRefreshRssPayload);
+      break;
+
+    case "feeds:refresh:port-congestion":
+      result = await handlePortCongestionRefreshJob(data as PortCongestionRefreshPayload);
       break;
 
     case "search:reindex":

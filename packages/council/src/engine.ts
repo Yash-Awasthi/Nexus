@@ -17,6 +17,7 @@ import { BudgetExceededError, applySTMs, COUNCIL_STM_PRESET } from "@nexus/share
 import type { STMModule } from "@nexus/shared";
 
 import { summonArchetypes, type TaskCategory } from "./archetypes.js";
+import { GROQ_DEFAULT_MODEL } from "./groq-transport.js";
 
 // ── LLM transport interface ───────────────────────────────────────────────────
 
@@ -46,7 +47,8 @@ export interface DeliberationEngineConfig {
   llm: ILLMTransport;
   /** Default archetype count per deliberation (default: 5) */
   defaultCouncilSize?: number;
-  /** Default model to use when none specified (default: "llama-3.3-70b-versatile") */
+  /** Default model to use when none specified (defaults to GROQ_DEFAULT_MODEL —
+   *  llama-3.3-70b-versatile was decommissioned by Groq on 2026-08-16). */
   defaultModel?: string;
   /** Cost per 1k input tokens in USD for budget tracking */
   inputCostPer1k?: number;
@@ -67,24 +69,58 @@ const YES_PATTERNS = /\b(yes|approve|support|agree|favor|proceed)\b/i;
 const NO_PATTERNS = /\b(no|reject|oppose|disagree|against|decline)\b/i;
 
 function parseVote(content: string): "yes" | "no" | "abstain" {
+  // Explicit structured vote line wins — the prompt requests
+  // "Vote: YES|NO|ABSTAIN" as the final line, and the old heuristic tie-break
+  // (any yes-ish word anywhere vs any no-ish word anywhere) misread real votes:
+  // an analysis saying "no genuine exchange … to support the claim" scored
+  // both signals and always resolved to YES.
+  const voteLine = /vote\s*[:：]\s*(yes|no|abstain)\b/i.exec(content);
+  if (voteLine?.[1]) return voteLine[1].toLowerCase() as "yes" | "no" | "abstain";
+  // Free-form fallback: earliest signal wins (positional tie-break).
   const lower = content.toLowerCase();
-  const yesScore = (YES_PATTERNS.exec(lower) ?? []).length;
-  const noScore = (NO_PATTERNS.exec(lower) ?? []).length;
-  if (yesScore === 0 && noScore === 0) return "abstain";
-  return yesScore >= noScore ? "yes" : "no";
+  const yesHit = YES_PATTERNS.exec(lower);
+  const noHit = NO_PATTERNS.exec(lower);
+  if (yesHit && noHit) {
+    return (yesHit.index ?? Infinity) <= (noHit.index ?? Infinity) ? "yes" : "no";
+  }
+  if (yesHit) return "yes";
+  if (noHit) return "no";
+  return "abstain";
 }
 
 function parseConfidence(content: string): number {
   // Look for explicit confidence statements: "confidence: 0.8", "80% confident", etc.
-  const pct = /(\d{1,3})\s*%\s*confident/i.exec(content);
+  // Strip markdown emphasis first — models routinely write "**Confidence:** 0.78",
+  // which the raw regexes would otherwise miss (falling back to the default).
+  const plain = content.replace(/\*/g, "");
+  const pct = /(\d{1,3})\s*%\s*confident/i.exec(plain);
   if (pct?.[1]) return Math.min(1, parseInt(pct[1], 10) / 100);
-  const dec = /confidence[:\s]+([0-9.]+)/i.exec(content);
+  const dec = /confidence[:\s]+([0-9.]+)/i.exec(plain);
   if (dec?.[1]) {
     const v = parseFloat(dec[1]);
     return v > 1 ? v / 100 : v;
   }
   // Default based on vote strength
   return 0.65;
+}
+
+/**
+ * Infer a provider label from a concrete model id. The transport returns the
+ * model that actually served the vote but not the provider, so derive a best-
+ * effort label (avoids hardcoding "groq" when a vote ran on local Ollama, etc.).
+ */
+function providerFromModel(model: string): string {
+  const m = model.toLowerCase();
+  if (m.includes("claude")) return "anthropic";
+  if (m.includes("gpt") || m.startsWith("o1") || m.startsWith("o3")) return "openai";
+  if (m.includes("gemini")) return "google";
+  if (m.includes("mistral") || m.includes("codestral")) return "mistral";
+  if (m.includes("deepseek")) return "deepseek";
+  // Groq serves llama/mixtral/gemma too, but locally these run on Ollama; when
+  // the platform is configured for Ollama, prefer that label.
+  if (process.env.NEXUS_LLM_PROVIDER === "ollama") return "ollama";
+  if (m.includes("llama") || m.includes("mixtral") || m.includes("gemma")) return "groq";
+  return "unknown";
 }
 
 // ── DeliberationEngine ────────────────────────────────────────────────────────
@@ -95,7 +131,7 @@ export class DeliberationEngine {
   constructor(config: DeliberationEngineConfig) {
     this.config = {
       defaultCouncilSize: 5,
-      defaultModel: "llama-3.3-70b-versatile",
+      defaultModel: GROQ_DEFAULT_MODEL,
       inputCostPer1k: 0.0006, // Groq llama-3.3-70b default
       outputCostPer1k: 0.0008,
       stmModules: COUNCIL_STM_PRESET,
@@ -121,7 +157,8 @@ export class DeliberationEngine {
 
     // Detect task category from title/description
     const category = this._detectCategory(proposal.title + " " + (proposal.description ?? ""));
-    const archetypes = summonArchetypes(category, this.config.defaultCouncilSize);
+    const size = Math.min(5, Math.max(1, request.councilSize ?? this.config.defaultCouncilSize));
+    const archetypes = summonArchetypes(category, size);
 
     // Deliberation prompt
     const userPrompt = this._buildPrompt(proposal);
@@ -144,7 +181,7 @@ export class DeliberationEngine {
                 { role: "system", content: archetype.systemPrompt },
                 { role: "user", content: userPrompt },
               ],
-              { model: this.config.defaultModel, temperature: 0.7, maxTokens: 512 },
+              { model: this.config.defaultModel, temperature: 0.7, maxTokens: 1024 },
             )
             .then((r) => {
               clearTimeout(voteTimer);
@@ -172,7 +209,7 @@ export class DeliberationEngine {
 
         const vote = {
           model: response.model,
-          provider: "groq",
+          provider: providerFromModel(response.model),
           vote: parseVote(response.content),
           reasoning,
           confidence: parseConfidence(response.content),
@@ -275,6 +312,11 @@ export class DeliberationEngine {
       ...(contextLines.length > 0 ? ["", "CONTEXT:", ...contextLines] : []),
       "",
       "Please provide your analysis and vote (YES/NO/ABSTAIN) with your confidence level and reasoning.",
+      "",
+      "End your response with exactly these three lines:",
+      "Vote: YES|NO|ABSTAIN",
+      "Confidence: <0.0-1.0>",
+      "Reasoning: <one paragraph>",
     ].join("\n");
   }
 

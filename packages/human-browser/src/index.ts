@@ -804,6 +804,7 @@ function _nearbyKey(ch: string): string {
   const n = _NEARBY_KEYS[ch.toLowerCase()];
   if (!n) return ch;
   const w = n[Math.floor(Math.random() * n.length)];
+  if (!w) return ch;
   return ch !== ch.toLowerCase() ? w.toUpperCase() : w;
 }
 
@@ -815,6 +816,7 @@ export async function humanType(
 ): Promise<void> {
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
+    if (ch === undefined) continue;
     const ascii = (ch.codePointAt(0) ?? 0) < 128;
     if (!ascii) {
       await _hSleep(_hRandRange(cfg.key_hold));

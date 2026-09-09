@@ -11,7 +11,10 @@
     "build": "tsc --project tsconfig.json"
   },
   "dependencies": {
-    "@nexus/llm-compress": "workspace:*"
+    "@nexus/best-of-n": "workspace:*",
+    "@nexus/llm-compress": "workspace:*",
+    "@nexus/llm-drivers": "workspace:*",
+    "@nexus/sandbox": "workspace:*"
   },
   "devDependencies": {
     "vitest": "*",

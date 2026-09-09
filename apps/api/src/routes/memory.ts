@@ -19,12 +19,7 @@
  */
 
 import { globalHooks } from "@nexus/hooks";
-import {
-  InMemoryStore,
-  MemoryManager,
-  PgVectorStore,
-  createBestEmbedder,
-} from "@nexus/memory";
+import { InMemoryStore, MemoryManager, PgVectorStore, createBestEmbedder } from "@nexus/memory";
 import {
   RagtimeRetriever,
   type IEmbedder as IRagtimeEmbedder,
@@ -33,7 +28,7 @@ import {
 } from "@nexus/retrieval";
 import type { FastifyInstance } from "fastify";
 
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuthWithTier } from "../middleware/auth.js";
 
 // ── Singleton ─────────────────────────────────────────────────────────────────
 
@@ -58,27 +53,46 @@ const retriever = new RagtimeRetriever({
 
 export async function memoryRoutes(app: FastifyInstance): Promise<void> {
   /**
-   * GET /memory?query=<text>&limit=<n>&userId=<id>
+   * GET /memory?query=<text>&limit=<n>
    *
    * Semantic recall — embed `query` and return the k-nearest entries.
-   * When `query` is omitted an empty string is used (returns random-ish results
-   * for InMemoryStore; for PgVectorStore this returns the first k rows by
-   * similarity to the zero vector — callers should prefer /memory/list in that case).
+   * Scoped to the authenticated caller (nexusUserId, "local" fallback) — the
+   * client-supplied userId was previously honored, letting callers read any
+   * tenant's entries (playtest e2e round). When `query` is omitted an empty
+   * string is used (returns random-ish results for InMemoryStore; for
+   * PgVectorStore this returns the first k rows by similarity to the zero
+   * vector — callers should prefer /memory/list in that case).
    */
   app.get<{
-    Querystring: { query?: string; limit?: string; userId?: string };
-  }>("/memory", { preHandler: requireAuth }, async (request, reply) => {
+    Querystring: { query?: string; limit?: string };
+  }>("/memory", { preHandler: requireAuthWithTier }, async (request, reply) => {
     reply.header("Cache-Control", "private, max-age=60, stale-while-revalidate=300");
-    const { query = "", limit: limitStr, userId } = request.query;
+    const { query = "", limit: limitStr } = request.query;
     const limit = Math.min(parseInt(limitStr ?? "10", 10) || 10, 100);
+    const uid = request.nexusUserId ?? "local";
+
+    // Filter by metadata.userId for multi-tenant isolation.
+    const retrievalFilter: RetrievalMemoryFilter = { metadata: { userId: uid } };
+
+    // No query → list recent entries (no embedding). Embedding an empty string
+    // makes some backends (Ollama) return an empty vector → EMBED_FAILED 500.
+    if (!query.trim()) {
+      const entries = (await manager.list({ metadata: { userId: uid } })).slice(0, limit);
+      return reply.send({
+        results: entries.map((e) => ({
+          id: e.id,
+          text: e.text,
+          score: 0,
+          metadata: e.metadata,
+          createdAt: e.createdAt,
+          userId: e.metadata?.["userId"] as string | undefined,
+        })),
+        total: entries.length,
+      });
+    }
 
     // RagtimeRetriever: two-stage recall (cosine pool) + composite rerank
     // (α·relevance + β·importance + γ·recency_decay).
-    // Filter by metadata.userId for multi-tenant isolation.
-    const retrievalFilter: RetrievalMemoryFilter | undefined = userId
-      ? { metadata: { userId } }
-      : undefined;
-
     const results = await retriever.retrieve(query, limit, retrievalFilter);
 
     return reply.send({
@@ -103,32 +117,43 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
    * Remember a new text entry.  Returns the stored MemoryEntry with its
    * server-assigned id.
    *
-   * Body: { text, metadata?, ttl?, userId? }
+   * Body: { text, metadata?, ttl? }
    *   text     — the content to embed and persist
    *   metadata — arbitrary key-value pairs attached to the entry
    *   ttl      — TTL in seconds; entry is logically expired after now+ttl
-   *   userId   — owning user (stored in metadata for multi-tenant filtering)
+   *
+   * Ownership comes from the authenticated caller (nexusUserId, "local"
+   * fallback) — the client-supplied userId was previously honored, so entries
+   * written without it were globally visible and could be attributed to any
+   * tenant (playtest e2e round).
    */
   app.post<{
     Body: {
       text: string;
       metadata?: Record<string, unknown>;
       ttl?: number;
-      userId?: string;
     };
-  }>("/memory", { preHandler: requireAuth }, async (request, reply) => {
-    const { text, metadata = {}, ttl, userId } = request.body;
+  }>("/memory", { preHandler: requireAuthWithTier }, async (request, reply) => {
+    const { text, metadata = {}, ttl } = request.body;
+    const uid = request.nexusUserId ?? "local";
+
+    // Empty/whitespace text cannot be embedded (some backends 500 with
+    // EMBED_FAILED) and would only ever be noise on recall — reject with an
+    // explicit client error instead of a raw 500 (observed via curl).
+    if (typeof text !== "string" || text.trim().length === 0) {
+      return reply.code(400).send({
+        code: "EMPTY_TEXT",
+        message: "text is required and must be non-empty",
+      });
+    }
 
     // userId is stored inside metadata so InMemoryStore can filter it.
     // PgVectorStore uses the entry.userId column set by the store.save() path.
-    const combinedMeta: Record<string, unknown> = {
-      ...metadata,
-      ...(userId ? { userId } : {}),
-    };
+    const combinedMeta: Record<string, unknown> = { ...metadata, userId: uid };
 
     // Dedup: if a highly-similar entry already exists (cosine similarity ≥ 0.92)
     // return it immediately instead of storing a near-duplicate.
-    const dedupFilter = userId ? { metadata: { userId } } : undefined;
+    const dedupFilter: RetrievalMemoryFilter = { metadata: { userId: uid } };
     const nearMatches = await manager.recall(text, 1, dedupFilter);
     if (nearMatches.length > 0 && nearMatches[0]!.score >= 0.92) {
       const dup = nearMatches[0]!.entry;
@@ -181,29 +206,38 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
       schema: {
         response: { 200: { type: "object", additionalProperties: true }, 204: { type: "null" } },
       },
-      preHandler: requireAuth,
+      preHandler: requireAuthWithTier,
     },
     async (request, reply) => {
+      // Ownership check (matches the bridge surface): only the owning user may
+      // forget an entry — previously any id was forgettable by any caller.
+      const uid = request.nexusUserId ?? "local";
+      const owned = await manager.list({ metadata: { userId: uid } });
+      if (!owned.some((e) => e.id === request.params.id)) {
+        return reply.code(404).send({ error: "memory entry not found" });
+      }
       await manager.forget(request.params.id);
       return reply.code(204).send();
     },
   );
 
   /**
-   * GET /memory/list?userId=<id>&limit=<n>
+   * GET /memory/list?limit=<n>
    *
-   * List all entries without performing an embedding (fast path).
-   * For multi-tenant filtering pass `userId`; entries are matched against
-   * both entry.userId (PgVectorStore) and metadata.userId (InMemoryStore).
+   * List the caller's entries without performing an embedding (fast path).
+   * Scoped to the authenticated caller (nexusUserId, "local" fallback) — the
+   * client-supplied userId was previously honored, letting callers list any
+   * tenant's entries (playtest e2e round).
    */
   app.get<{
-    Querystring: { userId?: string; limit?: string };
-  }>("/memory/list", { preHandler: requireAuth }, async (request, reply) => {
-    const { userId, limit: limitStr } = request.query;
+    Querystring: { limit?: string };
+  }>("/memory/list", { preHandler: requireAuthWithTier }, async (request, reply) => {
+    const { limit: limitStr } = request.query;
     const limit = Math.min(parseInt(limitStr ?? "100", 10) || 100, 500);
+    const uid = request.nexusUserId ?? "local";
 
     // Dual-filter: userId column for PgVectorStore; metadata.userId for InMemoryStore.
-    const filter = userId ? { metadata: { userId } } : undefined;
+    const filter: RetrievalMemoryFilter = { metadata: { userId: uid } };
 
     const entries = (await manager.list(filter)).slice(0, limit);
 
@@ -245,14 +279,23 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
           },
         },
       },
-      preHandler: requireAuth,
+      preHandler: requireAuthWithTier,
     },
     async (request, reply) => {
       const { ids } = request.body;
+      // Only the caller's own entries are forgettable (playtest e2e round).
+      const uid = request.nexusUserId ?? "local";
+      const ownedIds = new Set(
+        (await manager.list({ metadata: { userId: uid } })).map((e) => e.id),
+      );
       let deleted = 0;
       const errors: string[] = [];
       await Promise.all(
         ids.map(async (id) => {
+          if (!ownedIds.has(id)) {
+            errors.push(`${id}: not owned`);
+            return;
+          }
           try {
             await manager.forget(id);
             deleted++;
@@ -268,11 +311,14 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
   /**
    * POST /memory/compact
    *
-   * Compacts memory by retaining only the newest `keepLast` entries (default 200)
-   * and deleting older entries. Entries are sorted by createdAt descending.
+   * Compacts the CALLER'S memory by retaining only the newest `keepLast`
+   * entries (default 200) and deleting older entries. Scoped to the
+   * authenticated caller — the client-supplied userId was previously honored,
+   * letting callers compact another tenant's entries (playtest e2e round).
+   * Entries are sorted by createdAt descending.
    * Returns: { compacted: number, kept: number }
    */
-  app.post<{ Body: { keepLast?: number; userId?: string } }>(
+  app.post<{ Body: { keepLast?: number } }>(
     "/memory/compact",
     {
       schema: {
@@ -280,7 +326,6 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
           type: "object",
           properties: {
             keepLast: { type: "number", minimum: 1, maximum: 2000, default: 200 },
-            userId: { type: "string" },
           },
         },
         response: {
@@ -290,12 +335,12 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
           },
         },
       },
-      preHandler: requireAuth,
+      preHandler: requireAuthWithTier,
     },
     async (request, reply) => {
       const keepLast = request.body?.keepLast ?? 200;
-      const userId = request.body?.userId;
-      const filter = userId ? { metadata: { userId } } : undefined;
+      const uid = request.nexusUserId ?? "local";
+      const filter: RetrievalMemoryFilter = { metadata: { userId: uid } };
       const all = await manager.list(filter);
 
       // Sort by createdAt descending — newest first

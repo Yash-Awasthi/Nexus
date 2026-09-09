@@ -1,91 +1,96 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Costs — AI spending analytics dashboard.
+ * Cost Analytics — personal spending view over the user-scoped cost log.
  *
- * Shows breakdown by model/provider, efficiency metrics, per-provider costs,
- * organization-level summary, and pricing reference.
+ * Data contract = the real /api/costs/* surface (routes/costs.ts, pinned by
+ * tests/routes/costs.test.ts):
+ *   GET /api/costs/dashboard?days=N → { totalUsd, totalTokens, byDay, byModel, period, requests }
+ *   GET /api/costs/breakdown        → { breakdown: [{model, calls, tokens, usd}], totalUsd }
+ *   GET /api/costs/per-provider     → { providers: [{name, usd}] }
+ *   GET /api/costs/efficiency       → { efficiency: [{model, tokensPerDollar}] }
+ *   GET /api/costs/limits           → { limits:{monthly_usd,daily_usd}, spent:{...}, remaining:{...}, enforced, note }
+ *   GET /api/costs/organization     → { totalUsd, seats, perSeatUsd }
+ *   GET /api/costs/pricing          → { models: [{model, inputPer1MTokens, outputPer1MTokens}] }
  *
- * API:
- *   GET /api/costs/breakdown
- *   GET /api/costs/limits
- *   GET /api/costs/efficiency
- *   GET /api/costs/pricing
- *   GET /api/costs/per-provider
- *   GET /api/costs/organization
- *   GET /api/costs/dashboard
+ * The previous version read a mtd/wtd/ytd/percentUsed spec the API never had,
+ * so every tab showed zeros, empty states, or "$NaN" regardless of real spend.
+ * MTD / WTD / YTD are now derived client-side from the daily series.
  */
-import { useState, useEffect, useCallback } from "react";
-import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Badge } from "~/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { useCallback, useEffect, useState } from "react";
 import {
   DollarSign,
-  TrendingUp,
-  TrendingDown,
-  Loader2,
   RefreshCw,
-  Zap,
+  Loader2,
   BarChart2,
-  AlertTriangle,
+  Zap,
+  TrendingUp,
   Info,
+  AlertTriangle,
 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Button } from "~/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── API shapes (mirror routes/costs.ts) ──────────────────────────────────────
 
-interface CostBreakdown {
-  total: number;
-  currency: string;
-  byModel?: { model: string; cost: number; tokens: number; requests: number }[];
-  byDay?: { date: string; cost: number }[];
+interface DayRow {
+  date: string;
+  costUsd: number;
+  tokens?: number;
+  requests?: number;
 }
-
-interface CostLimits {
-  monthly?: number;
-  daily?: number;
-  spent?: number;
-  currency?: string;
-  percentUsed?: number;
-}
-
-interface CostEfficiency {
-  costPerToken?: number;
-  costPerRequest?: number;
-  mostExpensiveModel?: string;
-  cheapestModel?: string;
-  suggestions?: string[];
-}
-
-interface ProviderCost {
-  provider: string;
-  cost: number;
-  tokens: number;
-  requests: number;
-  avgCostPerRequest?: number;
-}
-
-interface OrgCost {
-  totalCost: number;
-  currency: string;
-  byTeam?: { team: string; cost: number }[];
-  budget?: number;
-}
-
 interface Dashboard {
-  mtd: number;
-  wtd: number;
-  ytd: number;
-  currency: string;
-  trend?: "up" | "down" | "stable";
-  trendPct?: number;
+  totalUsd: number;
+  totalTokens: number;
+  byDay: Record<string, { requests: number; tokens: number; costUsd: number }>;
+  byModel: Record<string, number>;
+  period: string;
+  requests: number;
+}
+interface Breakdown {
+  breakdown: { model: string; calls: number; tokens: number; usd: number }[];
+  totalUsd: number;
+}
+interface ProviderCost {
+  name: string;
+  usd: number;
+}
+interface Efficiency {
+  efficiency: { model: string; tokensPerDollar: number }[];
+}
+interface Limits {
+  limits: { monthly_usd: number | null; daily_usd: number | null };
+  spent: { monthly_usd: number; daily_usd: number };
+  remaining: { monthly_usd: number | null; daily_usd: number | null };
+  enforced: boolean;
+  note: string;
+}
+interface Org {
+  totalUsd: number;
+  seats: number;
+  perSeatUsd: number;
+}
+interface PricingModel {
+  model: string;
+  inputPer1MTokens: number;
+  outputPer1MTokens: number;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const fmt = (n: number, currency = "USD") =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 4 }).format(
-    n,
-  );
+const fmt = (n: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 4,
+  }).format(Number.isFinite(n) ? n : 0);
+
+const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+
+/** Sum the per-day costUsd rows from `since` (inclusive) to today. */
+function sumSince(byDay: DayRow[], since: string): number {
+  return byDay.filter((r) => r.date >= since).reduce((s, r) => s + r.costUsd, 0);
+}
 
 function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
@@ -100,34 +105,46 @@ function MiniBar({ value, max, color }: { value: number; max: number; color: str
 
 export default function Costs() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
-  const [breakdown, setBreakdown] = useState<CostBreakdown | null>(null);
-  const [limits, setLimits] = useState<CostLimits | null>(null);
-  const [efficiency, setEfficiency] = useState<CostEfficiency | null>(null);
-  const [perProvider, setPerProvider] = useState<ProviderCost[]>([]);
-  const [org, setOrg] = useState<OrgCost | null>(null);
-  const [pricing, setPricing] = useState<Record<string, number> | null>(null);
+  const [breakdown, setBreakdown] = useState<Breakdown | null>(null);
+  const [providers, setProviders] = useState<ProviderCost[]>([]);
+  const [efficiency, setEfficiency] = useState<Efficiency | null>(null);
+  const [limits, setLimits] = useState<Limits | null>(null);
+  const [org, setOrg] = useState<Org | null>(null);
+  const [pricing, setPricing] = useState<PricingModel[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
   const loadAll = useCallback(async () => {
     setLoading(true);
+    setErr("");
     try {
-      const [d, b, l, e, p, o, pr] = await Promise.allSettled([
-        fetch("/api/costs/dashboard").then((r) => (r.ok ? r.json() : null)),
+      // One 366-day window covers YTD, MTD and WTD sums client-side.
+      // A 401 (expired session) must surface as an error, not as "$0.00".
+      const results = await Promise.allSettled([
+        fetch("/api/costs/dashboard?days=366").then((r) => {
+          if (r.status === 401) throw new Error("session_expired");
+          return r.ok ? r.json() : null;
+        }),
         fetch("/api/costs/breakdown").then((r) => (r.ok ? r.json() : null)),
-        fetch("/api/costs/limits").then((r) => (r.ok ? r.json() : null)),
-        fetch("/api/costs/efficiency").then((r) => (r.ok ? r.json() : null)),
         fetch("/api/costs/per-provider").then((r) => (r.ok ? r.json() : null)),
+        fetch("/api/costs/efficiency").then((r) => (r.ok ? r.json() : null)),
+        fetch("/api/costs/limits").then((r) => (r.ok ? r.json() : null)),
         fetch("/api/costs/organization").then((r) => (r.ok ? r.json() : null)),
         fetch("/api/costs/pricing").then((r) => (r.ok ? r.json() : null)),
       ]);
+      const [d, b, p, e, l, o, pr] = results;
       if (d.status === "fulfilled" && d.value) setDashboard(d.value);
       if (b.status === "fulfilled" && b.value) setBreakdown(b.value);
-      if (l.status === "fulfilled" && l.value) setLimits(l.value);
+      if (p.status === "fulfilled" && p.value) setProviders(p.value.providers ?? []);
       if (e.status === "fulfilled" && e.value) setEfficiency(e.value);
-      if (p.status === "fulfilled" && p.value) setPerProvider(p.value.providers ?? p.value ?? []);
+      if (l.status === "fulfilled" && l.value) setLimits(l.value);
       if (o.status === "fulfilled" && o.value) setOrg(o.value);
-      if (pr.status === "fulfilled" && pr.value) setPricing(pr.value);
+      if (pr.status === "fulfilled" && pr.value) setPricing(pr.value.models ?? []);
+      if (d.status === "rejected" && (d.reason as Error)?.message === "session_expired") {
+        setErr("Your session has expired — sign in again to view your cost data.");
+      } else if (results.every((r) => r.status === "rejected")) {
+        setErr("Could not load cost data");
+      }
     } catch {
       setErr("Could not load cost data");
     }
@@ -137,6 +154,30 @@ export default function Costs() {
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  // Derive the KPI windows from the daily series.
+  const dayRows: DayRow[] = dashboard
+    ? Object.entries(dashboard.byDay).map(([date, v]) => ({
+        date,
+        costUsd: v.costUsd,
+        tokens: v.tokens,
+        requests: v.requests,
+      }))
+    : [];
+  const ytd = dashboard ? sumSince(dayRows, `${new Date().getFullYear()}-01-01`) : 0;
+  const mtd = dashboard
+    ? sumSince(dayRows, dayKey(new Date(new Date().getFullYear(), new Date().getMonth(), 1)))
+    : 0;
+  const wtd = dashboard ? sumSince(dayRows, dayKey(new Date(Date.now() - 6 * 86_400_000))) : 0;
+
+  const hasLimit = limits && limits.limits.monthly_usd !== null;
+  const monthPrefix = new Date().toISOString().slice(0, 7);
+  const spentMonth =
+    limits?.spent.monthly_usd ??
+    (dashboard ? Math.round(sumSince(dayRows, `${monthPrefix}-01`) * 10_000) / 10_000 : 0);
+  const pctUsed = hasLimit
+    ? Math.min(100, (spentMonth / (limits!.limits.monthly_usd as number)) * 100)
+    : null;
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -148,7 +189,7 @@ export default function Costs() {
             Cost Analytics
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            AI spending breakdown, efficiency metrics, and budget limits
+            Your AI spending, efficiency metrics, and provider pricing
           </p>
         </div>
         <Button variant="ghost" size="sm" onClick={loadAll}>
@@ -156,12 +197,18 @@ export default function Costs() {
         </Button>
       </div>
 
-      {err && <p className="text-red-500 text-sm">{err}</p>}
-
       {loading && !dashboard ? (
         <div className="flex items-center gap-2 text-muted-foreground py-12 justify-center">
           <Loader2 className="w-5 h-5 animate-spin" />
           Loading cost data…
+        </div>
+      ) : !dashboard ? (
+        // A failed load (e.g. expired session) must never render $0.00 as if real.
+        <div className="py-12 text-center space-y-3">
+          <p className="text-red-500 text-sm">{err || "Could not load cost data"}</p>
+          <Button variant="outline" size="sm" onClick={loadAll}>
+            <RefreshCw className="w-4 h-4 mr-2" /> Retry
+          </Button>
         </div>
       ) : (
         <>
@@ -172,23 +219,7 @@ export default function Costs() {
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">
                   Month-to-Date
                 </p>
-                <p className="text-2xl font-bold text-emerald-600">
-                  {dashboard ? fmt(dashboard.mtd ?? 0, dashboard.currency) : "—"}
-                </p>
-                {dashboard?.trend && (
-                  <p
-                    className={`text-xs mt-1 flex items-center gap-1 ${dashboard.trend === "up" ? "text-red-500" : "text-green-600"}`}
-                  >
-                    {dashboard.trend === "up" ? (
-                      <TrendingUp className="w-3 h-3" />
-                    ) : (
-                      <TrendingDown className="w-3 h-3" />
-                    )}
-                    {dashboard.trendPct !== undefined
-                      ? `${Math.abs(dashboard.trendPct)}% vs last month`
-                      : ""}
-                  </p>
-                )}
+                <p className="text-2xl font-bold text-emerald-600">{fmt(mtd)}</p>
               </CardContent>
             </Card>
             <Card>
@@ -196,9 +227,7 @@ export default function Costs() {
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">
                   Week-to-Date
                 </p>
-                <p className="text-2xl font-bold">
-                  {dashboard ? fmt(dashboard.wtd ?? 0, dashboard.currency) : "—"}
-                </p>
+                <p className="text-2xl font-bold">{fmt(wtd)}</p>
               </CardContent>
             </Card>
             <Card>
@@ -206,57 +235,56 @@ export default function Costs() {
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">
                   Year-to-Date
                 </p>
-                <p className="text-2xl font-bold">
-                  {dashboard ? fmt(dashboard.ytd ?? 0, dashboard.currency) : "—"}
-                </p>
+                <p className="text-2xl font-bold">{fmt(ytd)}</p>
               </CardContent>
             </Card>
-            <Card
-              className={
-                limits && limits.percentUsed !== undefined && limits.percentUsed > 80
-                  ? "border-orange-300 dark:border-orange-700"
-                  : ""
-              }
-            >
+            <Card>
               <CardContent className="pt-4">
-                <p className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                  {limits && limits.percentUsed !== undefined && limits.percentUsed > 80 && (
-                    <AlertTriangle className="w-3 h-3 text-orange-500" />
-                  )}
-                  Budget Used
-                </p>
-                <p className="text-2xl font-bold">
-                  {limits?.percentUsed !== undefined ? `${Math.round(limits.percentUsed)}%` : "—"}
-                </p>
-                {limits?.monthly && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    of {fmt(limits.monthly, limits.currency)} limit
-                  </p>
-                )}
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Requests</p>
+                <p className="text-2xl font-bold">{(dashboard?.requests ?? 0).toLocaleString()}</p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Budget bar */}
-          {limits?.percentUsed !== undefined && (
+          {/* Budget bar — only meaningful when a limit is configured */}
+          {limits && (
             <Card>
               <CardContent className="pt-4">
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-muted-foreground">Budget utilization</span>
-                  <span className={limits.percentUsed > 80 ? "text-orange-500 font-medium" : ""}>
-                    {Math.round(limits.percentUsed)}%
-                  </span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
-                  <div
-                    className={`h-3 rounded-full transition-all ${limits.percentUsed > 80 ? "bg-orange-500" : limits.percentUsed > 60 ? "bg-yellow-500" : "bg-emerald-500"}`}
-                    style={{ width: `${Math.min(100, limits.percentUsed)}%` }}
-                  />
-                </div>
-                {limits.spent !== undefined && limits.monthly && (
-                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                    <span>{fmt(limits.spent, limits.currency)} spent</span>
-                    <span>{fmt(limits.monthly, limits.currency)} limit</span>
+                {hasLimit ? (
+                  <>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-muted-foreground">Monthly budget utilization</span>
+                      <span
+                        className={
+                          (pctUsed ?? 0) > 80 ? "text-orange-500 font-medium" : "font-medium"
+                        }
+                      >
+                        {Math.round(pctUsed ?? 0)}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+                      <div
+                        className={`h-3 rounded-full transition-all ${pctUsed! > 80 ? "bg-orange-500" : pctUsed! > 60 ? "bg-yellow-500" : "bg-emerald-500"}`}
+                        style={{ width: `${Math.min(100, pctUsed ?? 0)}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                      <span>{fmt(spentMonth)} spent</span>
+                      <span>{fmt(limits.limits.monthly_usd as number)} limit</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                    {limits.spent.daily_usd > 0 && (
+                      <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
+                    )}
+                    <div>
+                      <p>
+                        No budget limit configured. Today: {fmt(limits.spent.daily_usd)} · This
+                        month: {fmt(limits.spent.monthly_usd)}.
+                      </p>
+                      <p className="text-xs mt-1">{limits.note}</p>
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -277,7 +305,7 @@ export default function Costs() {
                 <TrendingUp className="w-4 h-4 mr-1" />
                 Efficiency
               </TabsTrigger>
-              {pricing && (
+              {pricing && pricing.length > 0 && (
                 <TabsTrigger value="pricing">
                   <DollarSign className="w-4 h-4 mr-1" />
                   Pricing
@@ -288,7 +316,7 @@ export default function Costs() {
 
             {/* By Model */}
             <TabsContent value="breakdown" className="mt-4">
-              {!breakdown || !breakdown.byModel?.length ? (
+              {!breakdown || !breakdown.breakdown.length ? (
                 <Card>
                   <CardContent className="pt-8 pb-8 text-center text-muted-foreground">
                     No model breakdown data
@@ -297,27 +325,26 @@ export default function Costs() {
               ) : (
                 <Card>
                   <CardContent className="pt-4 space-y-3">
-                    {breakdown.byModel.map((m) => {
-                      const maxCost = Math.max(...breakdown.byModel!.map((x) => x.cost));
+                    {breakdown.breakdown.map((m) => {
+                      const maxUsd = Math.max(...breakdown.breakdown.map((x) => x.usd));
                       return (
                         <div key={m.model} className="flex items-center gap-3">
                           <span className="text-sm w-40 truncate font-mono">{m.model}</span>
-                          <MiniBar value={m.cost} max={maxCost} color="bg-emerald-500" />
-                          <span className="text-sm font-medium w-20 text-right">
-                            {fmt(m.cost, breakdown.currency)}
-                          </span>
+                          <MiniBar value={m.usd} max={maxUsd} color="bg-emerald-500" />
+                          <span className="text-sm font-medium w-20 text-right">{fmt(m.usd)}</span>
                           <span className="text-xs text-muted-foreground w-24 text-right">
                             {m.tokens.toLocaleString()} tok
+                          </span>
+                          <span className="text-xs text-muted-foreground w-16 text-right">
+                            {m.calls.toLocaleString()} calls
                           </span>
                         </div>
                       );
                     })}
-                    {breakdown.total !== undefined && (
-                      <div className="pt-2 border-t flex justify-between text-sm font-semibold">
-                        <span>Total</span>
-                        <span>{fmt(breakdown.total, breakdown.currency)}</span>
-                      </div>
-                    )}
+                    <div className="pt-2 border-t flex justify-between text-sm font-semibold">
+                      <span>Total</span>
+                      <span>{fmt(breakdown.totalUsd)}</span>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -325,7 +352,7 @@ export default function Costs() {
 
             {/* By Provider */}
             <TabsContent value="providers" className="mt-4">
-              {!perProvider.length ? (
+              {!providers.length ? (
                 <Card>
                   <CardContent className="pt-8 pb-8 text-center text-muted-foreground">
                     No provider cost data
@@ -333,19 +360,12 @@ export default function Costs() {
                 </Card>
               ) : (
                 <div className="grid sm:grid-cols-2 gap-3">
-                  {perProvider.map((p) => (
-                    <Card key={p.provider}>
+                  {providers.map((p) => (
+                    <Card key={p.name}>
                       <CardContent className="pt-4">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium capitalize">{p.provider}</span>
-                          <span className="text-lg font-bold text-emerald-600">{fmt(p.cost)}</span>
-                        </div>
-                        <div className="flex gap-3 text-xs text-muted-foreground">
-                          <span>{p.requests.toLocaleString()} requests</span>
-                          <span>{p.tokens.toLocaleString()} tokens</span>
-                          {p.avgCostPerRequest !== undefined && (
-                            <span>{fmt(p.avgCostPerRequest)}/req</span>
-                          )}
+                          <span className="font-medium capitalize">{p.name}</span>
+                          <span className="text-lg font-bold text-emerald-600">{fmt(p.usd)}</span>
                         </div>
                       </CardContent>
                     </Card>
@@ -356,94 +376,53 @@ export default function Costs() {
 
             {/* Efficiency */}
             <TabsContent value="efficiency" className="mt-4">
-              <div className="space-y-4">
-                {efficiency && (
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    {efficiency.costPerToken !== undefined && (
-                      <Card>
-                        <CardContent className="pt-4">
-                          <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                            Cost per 1K tokens
-                          </p>
-                          <p className="text-xl font-bold">{fmt(efficiency.costPerToken * 1000)}</p>
-                        </CardContent>
-                      </Card>
-                    )}
-                    {efficiency.costPerRequest !== undefined && (
-                      <Card>
-                        <CardContent className="pt-4">
-                          <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                            Cost per request
-                          </p>
-                          <p className="text-xl font-bold">{fmt(efficiency.costPerRequest)}</p>
-                        </CardContent>
-                      </Card>
-                    )}
-                    {efficiency.mostExpensiveModel && (
-                      <Card>
-                        <CardContent className="pt-4">
-                          <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                            Most expensive model
-                          </p>
-                          <p className="text-sm font-mono font-medium">
-                            {efficiency.mostExpensiveModel}
-                          </p>
-                        </CardContent>
-                      </Card>
-                    )}
-                    {efficiency.cheapestModel && (
-                      <Card>
-                        <CardContent className="pt-4">
-                          <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                            Cheapest model
-                          </p>
-                          <p className="text-sm font-mono font-medium">
-                            {efficiency.cheapestModel}
-                          </p>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-                )}
-                {efficiency?.suggestions && efficiency.suggestions.length > 0 && (
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Info className="w-4 h-4 text-blue-500" />
-                        Cost Optimization Suggestions
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <ul className="space-y-2">
-                        {efficiency.suggestions.map((s, i) => (
-                          <li
-                            key={i}
-                            className="text-sm text-muted-foreground flex items-start gap-2"
-                          >
-                            <span className="text-blue-500 shrink-0">•</span>
-                            {s}
-                          </li>
-                        ))}
-                      </ul>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            </TabsContent>
-
-            {/* Pricing */}
-            {pricing && (
-              <TabsContent value="pricing" className="mt-4">
+              {!efficiency || !efficiency.efficiency.length ? (
+                <Card>
+                  <CardContent className="pt-8 pb-8 text-center text-muted-foreground">
+                    No efficiency data yet — it appears once you have spend
+                  </CardContent>
+                </Card>
+              ) : (
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Current Pricing per 1M tokens</CardTitle>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Info className="w-4 h-4 text-blue-500" />
+                      Tokens per dollar, by model
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {Object.entries(pricing).map(([model, price]) => (
-                        <div key={model} className="flex items-center justify-between text-sm">
-                          <span className="font-mono">{model}</span>
-                          <span className="font-medium">{fmt((price as number) * 1_000_000)}</span>
+                      {efficiency.efficiency.map((e) => (
+                        <div key={e.model} className="flex items-center justify-between text-sm">
+                          <span className="font-mono">{e.model}</span>
+                          <span className="font-medium">
+                            {e.tokensPerDollar > 0
+                              ? `${e.tokensPerDollar.toLocaleString()} tok/$`
+                              : "$0 (free/local)"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            {/* Pricing */}
+            {pricing && pricing.length > 0 && (
+              <TabsContent value="pricing" className="mt-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Published pricing per 1M tokens</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {pricing.map((m) => (
+                        <div key={m.model} className="flex items-center justify-between text-sm">
+                          <span className="font-mono">{m.model}</span>
+                          <span className="font-medium">
+                            in {fmt(m.inputPer1MTokens)} · out {fmt(m.outputPer1MTokens)}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -455,53 +434,29 @@ export default function Costs() {
             {/* Organization */}
             {org && (
               <TabsContent value="org" className="mt-4">
-                <div className="space-y-4">
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    <Card>
-                      <CardContent className="pt-4">
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                          Organization Total
-                        </p>
-                        <p className="text-2xl font-bold text-emerald-600">
-                          {fmt(org.totalCost, org.currency)}
-                        </p>
-                      </CardContent>
-                    </Card>
-                    {org.budget && (
-                      <Card>
-                        <CardContent className="pt-4">
-                          <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                            Budget
-                          </p>
-                          <p className="text-2xl font-bold">{fmt(org.budget, org.currency)}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {Math.round((org.totalCost / org.budget) * 100)}% used
-                          </p>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-                  {org.byTeam && org.byTeam.length > 0 && (
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base">By Team</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-2">
-                        {org.byTeam.map((t) => {
-                          const maxCost = Math.max(...org.byTeam!.map((x) => x.cost));
-                          return (
-                            <div key={t.team} className="flex items-center gap-3">
-                              <span className="text-sm w-32 truncate">{t.team}</span>
-                              <MiniBar value={t.cost} max={maxCost} color="bg-emerald-500" />
-                              <span className="text-sm font-medium w-20 text-right">
-                                {fmt(t.cost, org.currency)}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </CardContent>
-                    </Card>
-                  )}
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <Card>
+                    <CardContent className="pt-4">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                        Total spend
+                      </p>
+                      <p className="text-2xl font-bold text-emerald-600">{fmt(org.totalUsd)}</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Seats</p>
+                      <p className="text-2xl font-bold">{org.seats}</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                        Per seat
+                      </p>
+                      <p className="text-2xl font-bold">{fmt(org.perSeatUsd)}</p>
+                    </CardContent>
+                  </Card>
                 </div>
               </TabsContent>
             )}

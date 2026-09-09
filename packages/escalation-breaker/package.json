@@ -1,0 +1,10 @@
+{
+  "name": "@nexus/escalation-breaker",
+  "version": "0.1.0",
+  "description": "Steer → constrain → stop escalation ladder for agent run guardrails",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

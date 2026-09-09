@@ -185,27 +185,43 @@ export abstract class BaseConnector implements Connector {
 // ── NullConnector ─────────────────────────────────────────────────────────────
 
 /**
- * No-op connector — always reports "connected" and healthy.
- * Useful as a test stub or placeholder.
+ * No-op connector.
+ *
+ * Default mode: always reports "connected" and healthy — useful as a test stub.
+ * Placeholder mode ({ placeholder: true }): reports "disconnected" and fails
+ * connect/health checks — used when a connector slot exists but no credentials
+ * are configured, so UIs never show an unconfigured integration as "connected".
  */
 export class NullConnector extends BaseConnector {
   readonly id: string;
   readonly name: string;
+  readonly placeholder: boolean;
 
-  constructor(id = "null", name = "Null Connector") {
+  constructor(id = "null", name = "Null Connector", opts: { placeholder?: boolean } = {}) {
     super();
     this.id = id;
     this.name = name;
-    this._status = "connected";
+    this.placeholder = opts.placeholder ?? false;
+    this._status = this.placeholder ? "disconnected" : "connected";
   }
 
   protected async _doConnect(): Promise<ConnectResult> {
+    if (this.placeholder) {
+      return {
+        ok: false,
+        error: `"${this.name}" is not configured — add credentials to connect it.`,
+        metadata: { placeholder: true },
+      };
+    }
     return { ok: true, metadata: { stub: true } };
   }
 
   protected async _doHealthCheck(): Promise<
     Omit<HealthCheckResult, "latencyMs"> & { latencyMs?: number }
   > {
+    if (this.placeholder) {
+      return { ok: false, error: "not configured" };
+    }
     return { ok: true };
   }
 }

@@ -292,7 +292,12 @@ export default function Sandbox() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {["javascript", "typescript", "python", "bash"].map((l) => (
+                  {/* Only advertise languages the backend reports as runnable
+                      (JS + Python always; the rest need a self-hosted Piston). */}
+                  {(sandboxStatus?.languages?.length
+                    ? sandboxStatus.languages
+                    : ["javascript", "python"]
+                  ).map((l) => (
                     <SelectItem key={l} value={l} className="capitalize">
                       {l}
                     </SelectItem>
@@ -417,7 +422,10 @@ export default function Sandbox() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {["python", "javascript", "typescript"].map((l) => (
+                      {(sandboxStatus?.languages?.length
+                        ? sandboxStatus.languages
+                        : ["python", "javascript"]
+                      ).map((l) => (
                         <SelectItem key={l} value={l} className="capitalize">
                           {l}
                         </SelectItem>

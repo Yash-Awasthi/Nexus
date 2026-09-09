@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   AnthropicDriver,
   GroqDriver,
@@ -700,6 +700,134 @@ describe("DifyDriver (app-scoped chat-messages)", () => {
     expect(t.calls[0]!.url).toBe("https://dify.internal/v1/chat-messages");
     const body = t.calls[0]!.body as { user: string };
     expect(body.user).toBe("u-42");
+  });
+});
+
+// ── DifyDriver streaming + conversation threading (§1.2) ───────────────────────
+
+/** Dify chunked SSE — event type rides inside each data payload. */
+const DIFY_SSE_BODY = [
+  'data: {"event":"message","id":"m-1","conversation_id":"conv-9","answer":"Hel"}\n\n',
+  'data: {"event":"ping"}\n\n',
+  'data: {"event":"message","conversation_id":"conv-9","answer":"lo!"}\n\n',
+  'data: {"event":"message_end","conversation_id":"conv-9","metadata":{"usage":{"prompt_tokens":7,"completion_tokens":11}}}\n\n',
+].join("");
+
+function sseResponse(body: string): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(encoder.encode(body));
+      controller.close();
+    },
+  });
+  return new Response(stream, { status: 200, headers: { "Content-Type": "text/event-stream" } });
+}
+
+function stubDifyFetch(body: string): ReturnType<typeof vi.fn> {
+  const fetchMock = vi.fn(async () => sseResponse(body));
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+describe("DifyDriver streaming + threading (§1.2)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("blocking: surfaces conversation_id from the response", async () => {
+    const t = new MockTransport().setResponse({
+      answer: "Hi there!",
+      message_id: "dify-1",
+      conversation_id: "conv-1",
+      metadata: { usage: { prompt_tokens: 5, completion_tokens: 10 } },
+    });
+    const d = new DifyDriver({ apiKey: "app-key" }, t);
+    const r = await d.complete(makeOpts());
+    expect(r.conversationId).toBe("conv-1");
+  });
+
+  it("blocking: a follow-up passes conversation_id on the wire", async () => {
+    const t = new MockTransport().setResponse({
+      answer: "again",
+      message_id: "dify-2",
+      conversation_id: "conv-1",
+    });
+    const d = new DifyDriver({ apiKey: "app-key" }, t);
+    await d.complete(makeOpts({ conversationId: "conv-1" }));
+    const body = t.calls[0]!.body as { conversation_id?: string };
+    expect(body.conversation_id).toBe("conv-1");
+  });
+
+  it("stream under MockTransport falls back to blocking and still surfaces conversationId", async () => {
+    const t = new MockTransport().setResponse({
+      answer: "Hi there!",
+      message_id: "dify-1",
+      conversation_id: "conv-1",
+    });
+    const d = new DifyDriver({ apiKey: "app-key" }, t);
+    const deltas: StreamDelta[] = [];
+    const r = await d.stream(makeOpts(), (delta) => {
+      deltas.push(delta);
+    });
+    expect(deltas.some((x) => x.delta === "Hi there!")).toBe(true);
+    expect(deltas[deltas.length - 1]!.done).toBe(true);
+    expect(r.conversationId).toBe("conv-1");
+  });
+
+  it("stream: response_mode streaming, chunks reassemble in order, usage + conversationId from message_end", async () => {
+    const fetchMock = stubDifyFetch(DIFY_SSE_BODY);
+    const d = new DifyDriver({ apiKey: "app-key" });
+    const deltas: string[] = [];
+    const r = await d.stream(makeOpts(), (delta) => {
+      deltas.push(delta.delta);
+    });
+    expect(r.content).toBe("Hello!");
+    expect(deltas).toEqual(["Hel", "lo!", ""]);
+    expect(r.conversationId).toBe("conv-9");
+    expect(r.usage.inputTokens).toBe(7);
+    expect(r.usage.outputTokens).toBe(11);
+    expect(r.usage.totalTokens).toBe(18);
+    expect(r.finishReason).toBe("stop");
+    // The wire request used streaming mode.
+    const reqInit = fetchMock.mock.calls[0]![1] as RequestInit;
+    const reqBody = JSON.parse(reqInit.body as string) as { response_mode: string };
+    expect(reqBody.response_mode).toBe("streaming");
+  });
+
+  it("stream: a follow-up passes the threaded conversation_id on the wire", async () => {
+    const fetchMock = stubDifyFetch(DIFY_SSE_BODY);
+    const d = new DifyDriver({ apiKey: "app-key" });
+    await d.stream(makeOpts({ conversationId: "conv-9" }), () => {});
+    const reqInit = fetchMock.mock.calls[0]![1] as RequestInit;
+    const reqBody = JSON.parse(reqInit.body as string) as { conversation_id?: string };
+    expect(reqBody.conversation_id).toBe("conv-9");
+  });
+
+  it("stream: an error event maps to a typed LlmError", async () => {
+    stubDifyFetch(
+      'data: {"event":"error","status":401,"code":"invalid_api_key","message":"bad key"}\n\n',
+    );
+    const d = new DifyDriver({ apiKey: "app-key" });
+    await expect(d.stream(makeOpts(), () => {})).rejects.toMatchObject({
+      code: "AUTH_FAILED",
+    });
+  });
+
+  it("stream: ping keepalives and unknown events are skipped without breaking the stream", async () => {
+    stubDifyFetch(
+      [
+        'data: {"event":"ping"}\n\n',
+        'data: {"event":"workflow_started","data":{}}\n\n',
+        "data: not-json-at-all\n\n",
+        'data: {"event":"message","answer":"ok"}\n\n',
+        'data: {"event":"message_end","conversation_id":"conv-keep"}\n\n',
+      ].join(""),
+    );
+    const d = new DifyDriver({ apiKey: "app-key" });
+    const r = await d.stream(makeOpts(), () => {});
+    expect(r.content).toBe("ok");
+    expect(r.conversationId).toBe("conv-keep");
   });
 });
 

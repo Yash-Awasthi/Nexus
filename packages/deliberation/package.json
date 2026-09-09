@@ -1,0 +1,9 @@
+{
+  "name": "@nexus/deliberation",
+  "version": "0.1.0",
+  "description": "Structured multi-model deliberation with blind phase, cross-pollination, and rotating challenger",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@nexus/llm-router": "workspace:*"
+  }
+}

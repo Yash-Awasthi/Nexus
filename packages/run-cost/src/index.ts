@@ -74,7 +74,9 @@ export const MODEL_PRICING: Record<string, ModelPrice> = {
   // Groq
   "llama-3.1-8b-instant": { inputPer1k: 0.00005, outputPer1k: 0.0001 },
   "llama-3.1-70b-versatile": { inputPer1k: 0.00059, outputPer1k: 0.00079 },
+  // Retired 2026-08-16 — row kept for historical cost logs.
   "llama-3.3-70b-versatile": { inputPer1k: 0.00059, outputPer1k: 0.00079 },
+  "openai/gpt-oss-120b": { inputPer1k: 0.00015, outputPer1k: 0.0006 },
   // DeepSeek
   "deepseek-chat": { inputPer1k: 0.00014, outputPer1k: 0.00028 },
   "deepseek-v3.2": { inputPer1k: 0.00014, outputPer1k: 0.00028 },

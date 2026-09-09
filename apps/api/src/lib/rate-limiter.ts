@@ -72,15 +72,33 @@ async function _atomicIncrWithTTL(key: string, windowSec: number): Promise<numbe
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify([
-        ["INCR", key],
-        ["EXPIRE", key, windowSec],
-      ]),
+      body: JSON.stringify([["INCR", key]]),
     });
     if (!res.ok) return null;
     const results = (await res.json()) as { result: number; error?: string }[];
     if (results[0]?.error) return null;
-    return results[0]!.result as number;
+    const count = results[0]!.result as number;
+    // Stamp the window expiry ONLY when this call created the key (INCR
+    // returned 1). An unconditional EXPIRE refreshes the TTL on every request,
+    // so a bucket pushed over the limit could never drain while any traffic
+    // (e.g. an SSE reconnect loop) kept touching the key — the whole IP stuck
+    // at 429 forever. Failing EXPIRE is tolerated: the bucket just lacks a
+    // TTL (a one-key leak) instead of double-counting via the fallback.
+    if (count === 1) {
+      try {
+        await fetch(`${u}/pipeline`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify([["EXPIRE", key, windowSec]]),
+        });
+      } catch {
+        /* ignored — see above */
+      }
+    }
+    return count;
   } catch {
     return null; // fail open
   }
@@ -107,7 +125,7 @@ export function makeRateLimitPreHandler(opts: RateLimitOptions) {
     try {
       // Try atomic Redis INCR first (no race condition)
       const atomicCount = await _atomicIncrWithTTL(key, windowSec);
-      const current = atomicCount ?? (await _getCurrentCount(key));
+      const current = atomicCount ?? (await _getCurrentCount(key, windowMs));
 
       if (current > limit) {
         const retryAfter = windowSec;
@@ -134,13 +152,14 @@ export function makeRateLimitPreHandler(opts: RateLimitOptions) {
   };
 }
 
-/** Fallback: read current count from KV (in-memory, single-process safe). */
-async function _getCurrentCount(key: string): Promise<number> {
-  const kv = getSharedKV();
-  const current = (await kv.get<number>(key)) ?? 0;
-  // ponytail: in-memory single-process → effectively atomic; redis uses INCR above
-  await kv.set<number>(key, current + 1);
-  return current + 1;
+/**
+ * Fallback: atomic increment on the shared KV (Redis INCR / in-process map
+ * increment / Upstash INCR). The store stamps the window TTL only when it
+ * creates the key, so the expiry is never refreshed by in-window traffic —
+ * the bucket drains at the window boundary even under continuous requests.
+ */
+async function _getCurrentCount(key: string, windowMs: number): Promise<number> {
+  return getSharedKV().incr(key, windowMs);
 }
 
 /**
@@ -180,7 +199,7 @@ export function makeUserRateLimitPreHandler(opts: RateLimitOptions) {
 
     try {
       const atomicCount = await _atomicIncrWithTTL(key, windowSec);
-      const current = atomicCount ?? (await _getCurrentCount(key));
+      const current = atomicCount ?? (await _getCurrentCount(key, windowMs));
 
       if (current > limit) {
         const retryAfter = windowSec;

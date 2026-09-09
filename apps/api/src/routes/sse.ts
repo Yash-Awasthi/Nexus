@@ -60,9 +60,10 @@ const SSE_HEADERS = {
 
 /**
  * Open an SSE connection, subscribe to the given channel(s), and handle
- * clean-up on client disconnect.
+ * clean-up on client disconnect. Shared with other route modules (e.g.
+ * notifications.ts) so every stream uses the same framing + cleanup.
  */
-function openSseConnection(raw: ServerResponse, socket: Socket, channels: string[]): void {
+export function openSseConnection(raw: ServerResponse, socket: Socket, channels: string[]): void {
   // Write status line + headers (hijacked reply, no Fastify layer)
   raw.writeHead(200, SSE_HEADERS);
 

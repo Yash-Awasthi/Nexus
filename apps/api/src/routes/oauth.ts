@@ -10,12 +10,15 @@
  * Environment variables:
  *   GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET
  *   GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET
- *   NEXUS_JWT_SECRET       — HS256 secret; used to sign issued JWTs
+ *   NEXUS_JWT_SECRET       — HS256 signing secret (default alg)
+ *   NEXUS_JWT_ALG          — "HS256" (default) or "RS256" (§14.1); RS256 signs
+ *                            with NEXUS_JWT_PRIVATE_KEY and verifies with the
+ *                            matching public key
  *   OAUTH_REDIRECT_BASE    — base URL for OAuth callbacks
  *                            (default: http://localhost:3000)
  *
- * Issued JWT payload (24-hour TTL):
- *   { sub, email, name?, provider, tier: "free", iat, exp }
+ * Issued JWT payload (15-minute TTL):
+ *   { sub, role, tier, exp, iat }
  *
  * Clients use the returned `token` as a Bearer token on subsequent requests.
  * Tier is "free" by default; upgrade via POST /billing/subscribe or admin API.
@@ -23,19 +26,20 @@
  * Security notes:
  *  - State parameter is generated per-request and stored in KV (5-min TTL)
  *    to prevent CSRF on the callback.
- *  - Tokens are signed HS256 — verifiable by requireAuthWithTier in auth.ts.
+ *  - Tokens are signed per NEXUS_JWT_ALG (HS256 or RS256) via
+ *    lib/issue-access-token.ts — always verifiable by requireAuthWithTier.
  *  - No state is stored server-side after the JWT is issued (stateless).
  */
 
 import { randomBytes } from "node:crypto";
 
-import { signJwt } from "@nexus/auth";
 import { db } from "@nexus/db";
 import { users, refreshTokens } from "@nexus/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
 import { sha256hex as _sha256hex } from "../lib/crypto-utils.js";
+import { issueAccessToken } from "../lib/issue-access-token.js";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
 import { getSharedKV } from "../lib/shared-kv.js";
 
@@ -77,7 +81,6 @@ async function _consumeState(state: string): Promise<boolean> {
 
 // ── OAuth user upsert + token issuance ────────────────────────────────────────
 
-const _OAUTH_ACCESS_TTL_SEC = 15 * 60;
 const _OAUTH_REFRESH_TTL_MS = 30 * 24 * 3600 * 1000;
 
 async function upsertOAuthUser(
@@ -124,15 +127,9 @@ async function upsertOAuthUser(
     userId = `${provider}:${_sha256hex(email).slice(0, 16)}`;
   }
 
-  const accessToken = signJwt(
-    {
-      sub: userId,
-      role: role as "admin" | "agent" | "read-only",
-      tier,
-      exp: Math.floor(Date.now() / 1000) + _OAUTH_ACCESS_TTL_SEC,
-    } as Parameters<typeof signJwt>[0],
-    secret,
-  );
+  // Issue access token honoring NEXUS_JWT_ALG (§14.1) — role mapped via
+  // toNexusRole inside the shared helper (platform roles are not NexusRoles).
+  const { accessToken } = issueAccessToken(userId, role, tier, secret);
 
   const rawRefresh = randomBytes(32).toString("hex");
   if (process.env.DATABASE_URL) {

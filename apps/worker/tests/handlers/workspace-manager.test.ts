@@ -105,9 +105,10 @@ describe("WorkspaceManager", () => {
     expect(ws.env.NEXUS_WORKSPACE_PATH).toBe(ws.path);
     expect(ws.env.NEXUS_ROOT_PATH).toBe(repoPath);
     expect(ws.env.NEXUS_PORT).toBe(String(ws.ports[0]));
-    // Git registered the worktree on the new branch.
+    // Git registered the worktree on the new branch. (git prints forward
+    // slashes even on Windows — normalize before comparing.)
     const wl = await git(repoPath, ["worktree", "list", "--porcelain"]);
-    expect(wl.stdout).toContain(ws.path);
+    expect(wl.stdout.replaceAll("\\", "/")).toContain(ws.path.replaceAll("\\", "/"));
     const branches = await git(repoPath, ["branch", "--list", "nexus/alpha"]);
     expect(branches.stdout).toContain("nexus/alpha");
   });
@@ -179,9 +180,18 @@ describe("WorkspaceManager", () => {
     const ws = await mgr.create({ name: "delta", baseBranch: "main" });
     const flag = path.join(tmpRoot, "delta-archived.flag");
     await fs.mkdir(path.join(ws.path, ".nexus"), { recursive: true });
+    // Portable flag write. A real script file, not `node -e`: inline -e code
+    // containing parentheses is a syntax error under /bin/sh (unquoted `(` is
+    // a shell token), while cmd.exe tolerates it — the old form only ever
+    // worked on Windows. Paths use forward slashes, which node fs accepts on
+    // Windows too, and the tiny TOML parser only strips the OUTER quotes.
+    const script = path.join(tmpRoot, "delta-archive.cjs");
+    await fs.writeFile(script, "require('node:fs').writeFileSync(process.argv[2], '1');\n");
+    const scriptFwd = script.replaceAll("\\", "/");
+    const flagFwd = flag.replaceAll("\\", "/");
     await fs.writeFile(
       path.join(ws.path, ".nexus", "settings.toml"),
-      `[scripts]\narchive = "touch ${flag}"\n`,
+      `[scripts]\narchive = "node ${scriptFwd} ${flagFwd}"\n`,
     );
 
     await mgr.archive("delta");

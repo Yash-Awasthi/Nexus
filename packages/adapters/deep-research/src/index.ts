@@ -29,7 +29,7 @@ import {
 const GROQ_API = "https://api.groq.com/openai/v1/chat/completions";
 const TAVILY_API = "https://api.tavily.com/search";
 
-const MODEL_LARGE = "llama-3.3-70b-versatile";
+const MODEL_LARGE = "openai/gpt-oss-120b";
 const MODEL_FAST = "llama-3.1-8b-instant";
 
 // ── Public types ──────────────────────────────────────────────────────────────

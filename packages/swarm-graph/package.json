@@ -1,0 +1,9 @@
+{
+  "name": "@nexus/swarm-graph",
+  "version": "0.1.0",
+  "description": "Graph-based agent swarm construction with global memory and visualization",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@nexus/llm-router": "workspace:*"
+  }
+}

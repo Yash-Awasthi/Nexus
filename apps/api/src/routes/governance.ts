@@ -52,22 +52,32 @@ export async function governanceRoutes(app: FastifyInstance): Promise<void> {
     };
   }>("/governance/approvals", { preHandler: requireAuth }, async (request, reply) => {
     const { entity_type, entity_id, action, requestor, context, expires_in_minutes } = request.body;
+    if (!entity_type || !entity_id || !action || !requestor)
+      return reply
+        .code(400)
+        .send({ error: "entity_type, entity_id, action and requestor are required" });
 
     const expiresAt = expires_in_minutes
       ? new Date(Date.now() + expires_in_minutes * 60_000)
       : null;
 
-    const [row] = await db
-      .insert(approvalRequests)
-      .values({
-        entityType: entity_type,
-        entityId: entity_id,
-        action,
-        requestor,
-        context: context ?? null,
-        expiresAt,
-      })
-      .returning();
+    let row;
+    try {
+      [row] = await db
+        .insert(approvalRequests)
+        .values({
+          entityType: entity_type,
+          entityId: entity_id,
+          action,
+          requestor,
+          context: context ?? null,
+          expiresAt,
+        })
+        .returning();
+    } catch {
+      // Malformed entity_id (uuid column) or other input constraint → 400, not 500.
+      return reply.code(400).send({ error: "invalid entity_id (must be a UUID)" });
+    }
 
     return reply.code(201).send(row);
   });

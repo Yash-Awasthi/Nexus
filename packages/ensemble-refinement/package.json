@@ -1,0 +1,9 @@
+{
+  "name": "@nexus/ensemble-refinement",
+  "version": "0.1.0",
+  "description": "Ensemble refinement for improved LLM accuracy via multiple reasoning samples",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@nexus/llm-router": "workspace:*"
+  }
+}

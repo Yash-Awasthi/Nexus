@@ -7,8 +7,10 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm@9.14.4 --no-fund --no-audit
+# python3/make/g++ are needed to compile node-pty's native extension during
+# pnpm install (no prebuilt binary for alpine/musl).
+RUN apk add --no-cache python3 make g++ \
+ && npm install -g pnpm@9.14.4 --no-fund --no-audit
 
 # Copy workspace manifests (needed for pnpm workspaces)
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
@@ -30,10 +32,13 @@ COPY packages/researcher/package.json ./packages/researcher/
 COPY packages/image-gen/package.json ./packages/image-gen/
 COPY packages/knowledge-graph/package.json ./packages/knowledge-graph/
 COPY packages/llm-drivers/package.json ./packages/llm-drivers/
-COPY packages/llm-compress/package.json ./packages/llm-compress/
-COPY packages/llm-oauth/package.json ./packages/llm-oauth/
-COPY packages/llm-translate/package.json ./packages/llm-translate/
+COPY packages/llm-cache/package.json ./packages/llm-cache/
+COPY packages/llm-utils/package.json ./packages/llm-utils/
+COPY packages/workflow-chain/package.json ./packages/workflow-chain/
 COPY packages/provider-registry/package.json ./packages/provider-registry/
+COPY packages/llm-oauth/package.json ./packages/llm-oauth/
+COPY packages/llm-compress/package.json ./packages/llm-compress/
+COPY packages/llm-translate/package.json ./packages/llm-translate/
 COPY packages/drift/package.json ./packages/drift/
 COPY packages/redteam/package.json ./packages/redteam/
 COPY packages/gauntlet/package.json ./packages/gauntlet/
@@ -41,6 +46,16 @@ COPY packages/kv/package.json ./packages/kv/
 COPY packages/tier-gate/package.json ./packages/tier-gate/
 COPY packages/admin-gateway/package.json ./packages/admin-gateway/
 COPY packages/agents/package.json ./packages/agents/
+COPY packages/best-of-n/package.json ./packages/best-of-n/
+COPY packages/corpus-builder/package.json ./packages/corpus-builder/
+COPY packages/debate-engine/package.json ./packages/debate-engine/
+COPY packages/finetune-pipeline/package.json ./packages/finetune-pipeline/
+COPY packages/hybrid-search/package.json ./packages/hybrid-search/
+COPY packages/llm-accounts/package.json ./packages/llm-accounts/
+COPY packages/search-orchestrator/package.json ./packages/search-orchestrator/
+COPY packages/agent-engine/package.json ./packages/agent-engine/
+COPY packages/escalation-breaker/package.json ./packages/escalation-breaker/
+COPY packages/pty/package.json ./packages/pty/
 COPY packages/hooks/package.json ./packages/hooks/
 COPY packages/alerts/package.json ./packages/alerts/
 COPY packages/gateway/package.json ./packages/gateway/
@@ -108,7 +123,9 @@ RUN pnpm install --frozen-lockfile --filter @nexus/api --filter @nexus/auth \
     --filter @nexus/image-gen --filter @nexus/knowledge-graph \
     --filter @nexus/llm-drivers --filter @nexus/gauntlet \
     --filter @nexus/kv --filter @nexus/tier-gate --filter @nexus/admin-gateway \
-    --filter @nexus/agents --filter @nexus/hooks --filter @nexus/alerts \
+    --filter @nexus/agents --filter @nexus/agent-engine \
+    --filter @nexus/escalation-breaker --filter @nexus/pty \
+    --filter @nexus/hooks --filter @nexus/alerts \
     --filter @nexus/gateway --filter @nexus/plugin-sdk --filter @nexus/token-budget \
     --filter @nexus/billing --filter @nexus/bots --filter @nexus/connectors \
     --filter @nexus/context-pack --filter @nexus/context-pruner \
@@ -130,6 +147,12 @@ RUN pnpm install --frozen-lockfile --filter @nexus/api --filter @nexus/auth \
     --filter @nexus/sandbox --filter @nexus/mcp-client \
     --filter @nexus/autotune --filter @nexus/parseltongue --filter @nexus/ragtime \
     --filter @nexus/llm-compress --filter @nexus/llm-oauth --filter @nexus/llm-translate \
+    --filter @nexus/llm-cache --filter @nexus/workflow-chain \
+    --filter @nexus/llm-utils \
+    --filter @nexus/best-of-n --filter @nexus/corpus-builder \
+    --filter @nexus/debate-engine --filter @nexus/finetune-pipeline \
+    --filter @nexus/hybrid-search --filter @nexus/llm-accounts \
+    --filter @nexus/search-orchestrator \
     --filter @nexus/provider-registry \
     --filter @nexus/ultraplinian
 
@@ -148,7 +171,9 @@ RUN pnpm install --frozen-lockfile \
     --filter @nexus/image-gen --filter @nexus/knowledge-graph \
     --filter @nexus/llm-drivers --filter @nexus/gauntlet \
     --filter @nexus/kv --filter @nexus/tier-gate --filter @nexus/admin-gateway \
-    --filter @nexus/agents --filter @nexus/hooks --filter @nexus/alerts \
+    --filter @nexus/agents --filter @nexus/agent-engine \
+    --filter @nexus/escalation-breaker --filter @nexus/pty \
+    --filter @nexus/hooks --filter @nexus/alerts \
     --filter @nexus/gateway --filter @nexus/plugin-sdk --filter @nexus/token-budget \
     --filter @nexus/billing --filter @nexus/bots --filter @nexus/connectors \
     --filter @nexus/context-pack --filter @nexus/context-pruner \
@@ -170,6 +195,12 @@ RUN pnpm install --frozen-lockfile \
     --filter @nexus/sandbox --filter @nexus/mcp-client \
     --filter @nexus/autotune --filter @nexus/parseltongue --filter @nexus/ragtime \
     --filter @nexus/llm-compress --filter @nexus/llm-oauth --filter @nexus/llm-translate \
+    --filter @nexus/llm-cache --filter @nexus/workflow-chain \
+    --filter @nexus/llm-utils \
+    --filter @nexus/best-of-n --filter @nexus/corpus-builder \
+    --filter @nexus/debate-engine --filter @nexus/finetune-pipeline \
+    --filter @nexus/hybrid-search --filter @nexus/llm-accounts \
+    --filter @nexus/search-orchestrator \
     --filter @nexus/provider-registry \
     --filter @nexus/ultraplinian
 

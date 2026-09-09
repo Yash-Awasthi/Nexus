@@ -28,7 +28,7 @@ function mockFetch(status: number, body: unknown) {
 
 const GROQ_RESPONSE = {
   id: "chatcmpl-abc",
-  model: "llama-3.3-70b-versatile",
+  model: "openai/gpt-oss-120b",
   choices: [{ message: { content: "42 is the answer." }, finish_reason: "stop" }],
   usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
 };
@@ -63,7 +63,7 @@ describe("groqAdapter", () => {
       )) as { content: string; model: string; finishReason: string };
 
       expect(result.content).toBe("42 is the answer.");
-      expect(result.model).toBe("llama-3.3-70b-versatile");
+      expect(result.model).toBe("openai/gpt-oss-120b");
       expect(result.finishReason).toBe("stop");
     });
 
@@ -76,7 +76,7 @@ describe("groqAdapter", () => {
       );
       const [, opts] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
       const body = JSON.parse(opts.body as string) as { model: string };
-      expect(body.model).toBe("llama-3.3-70b-versatile");
+      expect(body.model).toBe("openai/gpt-oss-120b");
     });
 
     it("uses a custom model when provided", async () => {

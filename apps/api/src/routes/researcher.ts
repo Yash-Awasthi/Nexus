@@ -26,6 +26,7 @@ import {
   type ResearchFinding,
   type SourceReference,
 } from "@nexus/researcher";
+import { searchBrave, searchExa, searchSerper } from "@nexus/search-orchestrator";
 import type { FastifyInstance } from "fastify";
 import { Pool } from "pg";
 
@@ -37,6 +38,33 @@ import { requireAuth } from "../middleware/auth.js";
 type WebSearchFn = (query: string) => Promise<SearchResult[]>;
 
 function buildSearchFn(): WebSearchFn {
+  const toWeb = (
+    results: { content: string; metadata?: Record<string, unknown>; score: number }[],
+    _provider: string,
+  ): SearchResult[] =>
+    results.slice(0, 10).map((r) => ({
+      url: String(r.metadata?.url ?? ""),
+      title: String(r.metadata?.title ?? ""),
+      snippet: r.content?.slice(0, 300) ?? "",
+      score: r.score,
+      source: "web" as const,
+    }));
+
+  // ── Exa (§1.3) ──────────────────────────────────────────────────────────────
+  if (process.env.EXA_API_KEY) {
+    return async (query) => toWeb(await searchExa(query), "exa");
+  }
+
+  // ── Brave (§1.3) ────────────────────────────────────────────────────────────
+  if (process.env.BRAVE_API_KEY) {
+    return async (query) => toWeb(await searchBrave(query), "brave");
+  }
+
+  // ── Serper (§1.3) ───────────────────────────────────────────────────────────
+  if (process.env.SERPER_API_KEY) {
+    return async (query) => toWeb(await searchSerper(query), "serper");
+  }
+
   // ── Tavily ──────────────────────────────────────────────────────────────────
   if (process.env.TAVILY_API_KEY) {
     const apiKey = process.env.TAVILY_API_KEY;

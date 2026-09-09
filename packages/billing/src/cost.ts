@@ -53,22 +53,25 @@ export interface CostBreakdown {
  * with `unknownModel: true` rather than throwing — metering must never lose a
  * completed call. Cache read/write fall back to the input rate when the model
  * doesn't publish a dedicated cache price.
+ *
+ * Pricing fields live on the registry's ProviderModel: inputCost/outputCost are
+ * USD per 1M tokens (null = free).
  */
 export function computeCost(
   modelId: string,
   usage: TokenUsage,
   registry: ProviderRegistry = globalRegistry,
 ): CostBreakdown {
-  const m = registry.get(modelId);
+  const m = registry.findModel(modelId)?.model;
   const inputTokens = usage.inputTokens ?? 0;
   const outputTokens = usage.outputTokens ?? 0;
   const cacheReadTokens = usage.cacheReadTokens ?? 0;
   const cacheWriteTokens = usage.cacheWriteTokens ?? 0;
 
-  const inRate = m?.costPerInputToken ?? 0;
-  const outRate = m?.costPerOutputToken ?? 0;
-  const cacheReadRate = m?.costPerCacheReadToken ?? inRate;
-  const cacheWriteRate = m?.costPerCacheWriteToken ?? inRate;
+  const inRate = m?.inputCost != null ? m.inputCost / 1_000_000 : 0;
+  const outRate = m?.outputCost != null ? m.outputCost / 1_000_000 : 0;
+  const cacheReadRate = inRate;
+  const cacheWriteRate = inRate;
 
   const inputCost = inputTokens * inRate;
   const outputCost = outputTokens * outRate;
@@ -101,7 +104,8 @@ export function estimateMaxCost(
   opts: { assumedOutputTokens?: number; registry?: ProviderRegistry } = {},
 ): number {
   const registry = opts.registry ?? globalRegistry;
-  const outputTokens = opts.assumedOutputTokens ?? registry.get(modelId)?.maxOutputTokens ?? 0;
+  const outputTokens =
+    opts.assumedOutputTokens ?? registry.findModel(modelId)?.model.maxOutput ?? 0;
   return computeCost(modelId, { inputTokens, outputTokens }, registry).totalCost;
 }
 

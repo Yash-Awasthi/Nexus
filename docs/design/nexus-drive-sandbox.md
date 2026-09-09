@@ -4,8 +4,8 @@
 
 ## Goal
 
-A persistent, isolated **512 MB per-user workspace** where a CLI runtime — **our Claude Code**
-(provided by us) or a **user-chosen allowlisted CLI** — can execute with shell + git access
+A persistent, isolated **512 MB per-user workspace** where a CLI coding agent —
+**our bundled agent CLI** or a **user-chosen allowlisted CLI** — can execute with shell + git access
 scoped to that workspace. The CLI image/runtime is ours; the user's personal storage is capped
 at 512 MB and persists across sessions.
 
@@ -43,7 +43,7 @@ So this adds _persistence_ + _per-user quota_ + _interactive CLI_ on top of what
   - **Soft warn + grace:** emit a warning event at a near-full threshold (e.g. ~90% / ~460 MB),
     permit a bounded grace overage briefly, then enforce the hard block. Grace size + warning
     threshold are tunable (see Open questions).
-- **CLI side is ours:** controlled runtime image with Claude Code preinstalled; allowlist for
+- **CLI side is ours:** controlled runtime image with the bundled agent CLI preinstalled; allowlist for
   "user-chosen CLI".
 - **API keys — user-supplied via `.env` in their workspace:** the user provides their _own_
   LLM/API key by placing a `.env` file in `/workspace` (it persists with the 512 MB volume).

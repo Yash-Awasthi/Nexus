@@ -31,8 +31,6 @@ import {
   Plug,
   RefreshCcw,
   MemoryStick,
-  Bell,
-  X,
   ImageIcon,
   Activity,
   Trophy,
@@ -54,7 +52,7 @@ import {
   ShieldAlert,
   EyeOff,
 } from "lucide-react";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect } from "react";
 import {
   isRouteErrorResponse,
   Links,
@@ -70,6 +68,7 @@ import {
 import type { Route } from "./+types/root";
 
 import { EasterEggToast } from "~/components/EasterEggToast";
+import { NotificationBell } from "~/components/NotificationBell";
 import {
   SidebarProvider,
   Sidebar,
@@ -86,12 +85,34 @@ import {
 } from "~/components/ui/sidebar";
 import { TooltipProvider } from "~/components/ui/tooltip";
 import { AuthProvider, useAuth } from "~/context/AuthContext";
+import { NotificationsProvider } from "~/context/NotificationsContext";
 import { StoreProvider } from "~/context/StoreContext";
 import { ThemeProvider, useTheme } from "~/context/ThemeContext";
 import { useEasterEggs } from "~/hooks/useEasterEggs";
+import { installAuthFetch } from "~/lib/install-auth-fetch";
 import "./app.css";
 
-const PUBLIC_PATHS = new Set(["/", "/login", "/register", "/setup"]);
+// Attach the stored JWT to same-origin /api/* calls made via raw fetch (runs
+// once, client-only). Without this, auth-gated bridge routes 401 and pages
+// render empty. See ~/lib/install-auth-fetch.
+installAuthFetch();
+
+const PUBLIC_PATHS = new Set([
+  "/",
+  "/login",
+  "/register",
+  "/setup",
+  // Marketing pages linked from the public landing footer — logged-out
+  // visitors must be able to see them without being bounced to /setup.
+  "/pricing",
+  "/about",
+  "/blog",
+  "/careers",
+  "/contact",
+  "/llm-leaderboard",
+  "/infra-calculator",
+  "/status",
+]);
 
 function isPublicPath(pathname: string) {
   return (
@@ -136,6 +157,7 @@ const navGroups = [
       { to: "/knowledge-bases", icon: Database, label: "Knowledge Bases" },
       { to: "/repos", icon: GitBranch, label: "Repositories" },
       { to: "/memory", icon: BookOpen, label: "Memory" },
+      { to: "/session-graph", icon: Network, label: "Session Graphs" },
     ],
   },
   {
@@ -303,207 +325,9 @@ function ThemeToggleButton() {
   );
 }
 
-// ── Notification bell ─────────────────────────────────────────────────────────
-
-interface Notif {
-  id: number;
-  type: string;
-  title: string;
-  message?: string;
-  isRead: boolean;
-  createdAt: string;
-}
-
-function NotificationBell() {
-  const [open, setOpen] = useState(false);
-  const [unread, setUnread] = useState(0);
-  const [notifs, setNotifs] = useState<Notif[]>([]);
-  const [loadingList, setLoadingList] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Fetch unread count (lightweight — runs on interval)
-  const fetchCount = useCallback(async () => {
-    try {
-      const res = await fetch("/api/notifications/count");
-      if (res.ok) {
-        const data = (await res.json()) as { unreadCount?: number };
-        setUnread(data.unreadCount ?? 0);
-      }
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  // Fetch full notification list (only when panel opens)
-  const fetchList = useCallback(async () => {
-    setLoadingList(true);
-    try {
-      const res = await fetch("/api/notifications?limit=8");
-      if (res.ok) {
-        const data = (await res.json()) as { notifications?: Notif[]; unreadCount?: number };
-        setNotifs(data.notifications ?? []);
-        setUnread(data.unreadCount ?? 0);
-      }
-    } catch {
-      /* ignore */
-    }
-    setLoadingList(false);
-  }, []);
-
-  // Poll count every 60 s
-  useEffect(() => {
-    fetchCount();
-    timerRef.current = setInterval(fetchCount, 60_000);
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [fetchCount]);
-
-  // Fetch full list when opened
-  useEffect(() => {
-    if (open) fetchList();
-  }, [open, fetchList]);
-
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  const markRead = async (id: number) => {
-    try {
-      await fetch(`/api/notifications/${id}/read`, { method: "POST" });
-      setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
-      setUnread((c) => Math.max(0, c - 1));
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const dismiss = async (id: number, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await fetch(`/api/notifications/${id}/dismiss`, { method: "POST" });
-      setNotifs((prev) => prev.filter((n) => n.id !== id));
-      setUnread((c) => Math.max(0, c - 1));
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const dismissAll = async () => {
-    try {
-      await fetch("/api/notifications/dismiss-all", { method: "POST" });
-      setNotifs([]);
-      setUnread(0);
-    } catch {
-      /* ignore */
-    }
-  };
-
-  return (
-    <div ref={panelRef} className="relative group-data-[collapsible=icon]:hidden">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="relative flex items-center justify-center size-7 rounded-md hover:bg-muted/60 transition-colors text-muted-foreground hover:text-foreground"
-        title="Notifications"
-      >
-        <Bell className="size-3.5" />
-        {unread > 0 && (
-          <span
-            className="absolute -top-0.5 -right-0.5 flex items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground"
-            style={{ minWidth: "14px", height: "14px", padding: "0 2px" }}
-          >
-            {unread > 9 ? "9+" : unread}
-          </span>
-        )}
-      </button>
-
-      {open && (
-        <div
-          className="absolute left-full top-0 ml-2 z-50 rounded-xl shadow-xl"
-          style={{
-            width: "280px",
-            background: "hsl(var(--popover))",
-            border: "1px solid hsl(var(--border))",
-          }}
-        >
-          <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
-            <span className="text-xs font-semibold">Notifications</span>
-            {notifs.length > 0 && (
-              <button
-                onClick={dismissAll}
-                className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Dismiss all
-              </button>
-            )}
-          </div>
-
-          <div className="max-h-72 overflow-y-auto">
-            {loadingList ? (
-              <div className="flex items-center justify-center py-6 text-xs text-muted-foreground">
-                Loading…
-              </div>
-            ) : notifs.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 gap-2">
-                <Bell className="size-5 text-muted-foreground/30" />
-                <p className="text-xs text-muted-foreground">No notifications</p>
-              </div>
-            ) : (
-              notifs.map((n) => (
-                <div
-                  key={n.id}
-                  onClick={() => {
-                    if (!n.isRead) markRead(n.id);
-                  }}
-                  className="flex items-start gap-2 px-3 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors group/item"
-                  style={{ borderBottom: "1px solid hsl(var(--border)/0.4)" }}
-                >
-                  {!n.isRead && (
-                    <span className="mt-1.5 size-1.5 rounded-full bg-primary shrink-0" />
-                  )}
-                  <div className={`flex-1 min-w-0 ${n.isRead ? "pl-3.5" : ""}`}>
-                    <p
-                      className={`text-xs font-medium leading-tight ${n.isRead ? "text-muted-foreground" : ""}`}
-                    >
-                      {n.title}
-                    </p>
-                    {n.message && (
-                      <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">
-                        {n.message}
-                      </p>
-                    )}
-                    <p className="text-[10px] text-muted-foreground/60 mt-1">
-                      {new Date(n.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                  <button
-                    onClick={(e) => dismiss(n.id, e)}
-                    className="shrink-0 mt-0.5 opacity-0 group-hover/item:opacity-100 text-muted-foreground hover:text-foreground transition-all"
-                  >
-                    <X className="size-3" />
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function AppSidebar() {
   const { user, logout } = useAuth();
-  const displayName = user?.username ?? "Guest";
+  const displayName = user?.username ?? user?.email?.split("@")[0] ?? "Guest";
   const initials = displayName.slice(0, 2).toUpperCase();
 
   return (
@@ -578,13 +402,29 @@ export default function App() {
   const navigate = useNavigate();
   const { egg, dismiss } = useEasterEggs();
 
-  // Register PWA service worker
+  // Register PWA service worker — production only. The SW caches Vite's
+  // content-hashed dep chunks under immutable keys; in dev a re-optimization
+  // invalidates those URLs server-side while the SW keeps serving the old
+  // copies, stranding pages on two React copies (recurring cold-load crash).
   useEffect(() => {
-    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {
-        /* non-fatal in dev */
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+    const isDev =
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1" ||
+      import.meta.env.DEV;
+    if (isDev) {
+      // Unregister any SW a previous dev session installed and clear its caches.
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        for (const r of regs) r.unregister().catch(() => {});
       });
+      caches.keys().then((keys) => {
+        for (const k of keys) caches.delete(k).catch(() => {});
+      });
+      return;
     }
+    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {
+      /* non-fatal */
+    });
   }, []);
 
   // In Electron, skip landing page and go straight to /chat
@@ -597,10 +437,15 @@ export default function App() {
       navigate("/chat", { replace: true });
       return;
     }
-    // Client-side auth guard — redirect to /setup if no user profile exists
+    // Client-side auth guard — redirect to /setup if no user profile exists.
+    // nexus_setup_done means the wizard already ran: an unauthenticated local
+    // session is then legitimate (per-user BYOK keys live server-side), so do
+    // not loop the user back through onboarding (observed: setup→marketplace
+    // bounced straight back to setup, an inescapable wizard loop).
     if (isPublicPath(location.pathname)) return;
     const profile = localStorage.getItem("nexus_user");
-    if (!profile) {
+    const setupDone = localStorage.getItem("nexus_setup_done") === "1";
+    if (!profile && !setupDone) {
       navigate("/setup", { replace: true });
     }
   }, [location.pathname]);
@@ -619,19 +464,21 @@ export default function App() {
     <AuthProvider>
       <ThemeProvider>
         <StoreProvider>
-          <TooltipProvider>
-            <SidebarProvider>
-              <AppSidebar />
-              <main className="flex-1 overflow-auto">
-                <div className="flex items-center gap-2 border-b border-border px-4 py-2 md:hidden">
-                  <SidebarTrigger />
-                  <span className="text-sm font-semibold">NEXUS</span>
-                </div>
-                <Outlet />
-              </main>
-              <EasterEggToast egg={egg} dismiss={dismiss} />
-            </SidebarProvider>
-          </TooltipProvider>
+          <NotificationsProvider>
+            <TooltipProvider>
+              <SidebarProvider>
+                <AppSidebar />
+                <main className="flex-1 overflow-auto">
+                  <div className="flex items-center gap-2 border-b border-border px-4 py-2 md:hidden">
+                    <SidebarTrigger />
+                    <span className="text-sm font-semibold">NEXUS</span>
+                  </div>
+                  <Outlet />
+                </main>
+                <EasterEggToast egg={egg} dismiss={dismiss} />
+              </SidebarProvider>
+            </TooltipProvider>
+          </NotificationsProvider>
         </StoreProvider>
       </ThemeProvider>
     </AuthProvider>

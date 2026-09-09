@@ -14,12 +14,14 @@
  * Mirrors `.conductor/settings.toml`: `.nexus/settings.toml` carries
  * `[scripts] setup/run/archive` + `run_mode = concurrent|nonconcurrent`.
  */
-import { type ChildProcess, execFile, spawn } from "node:child_process";
+import { type ChildProcess, execFile } from "node:child_process";
 import * as fs from "node:fs/promises";
 import { createServer } from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 import { promisify } from "node:util";
+
+import { spawnShell } from "../lib/shell.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -232,7 +234,7 @@ export async function runScriptBounded(opts: {
   timeoutMs?: number;
   onExit?: (code: number | null) => void;
 }): Promise<void> {
-  const child = spawn("/bin/sh", ["-c", opts.command], {
+  const child = spawnShell(opts.command, {
     cwd: opts.cwd,
     env: { ...process.env, ...opts.env },
   });
@@ -447,7 +449,7 @@ export class WorkspaceManager {
    * can stream/stop it (use `stopProcess` for SIGHUP→SIGKILL teardown).
    */
   spawnScript(ws: Workspace, command: string): ChildProcess {
-    return spawn("/bin/sh", ["-c", command], {
+    return spawnShell(command, {
       cwd: ws.path,
       env: { ...process.env, ...ws.env },
     });
@@ -489,7 +491,7 @@ export class WorkspaceRunner {
       existing.refs++;
       return existing.handle;
     }
-    const child = spawn("/bin/sh", ["-c", cmd], {
+    const child = spawnShell(cmd, {
       cwd: ws.path,
       env: { ...process.env, ...ws.env },
     });

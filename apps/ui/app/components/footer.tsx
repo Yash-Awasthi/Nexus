@@ -121,7 +121,7 @@ export function Footer() {
 
         <div className="mt-12 pt-8 border-t border-border/50 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} JUDICA. Open source under the MIT License.
+            &copy; {new Date().getFullYear()} JUDICA. Open source under the Apache-2.0 License.
           </p>
           <div className="flex gap-4">
             <Link

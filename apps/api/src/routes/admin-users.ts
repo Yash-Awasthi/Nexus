@@ -19,12 +19,19 @@ import { users, refreshTokens } from "@nexus/db/schema";
 import { eq, isNull, isNotNull, desc, and } from "drizzle-orm";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuthWithTier } from "../middleware/auth.js";
 
 // ── Admin role guard ──────────────────────────────────────────────────────────
 
-async function requireAdminRole(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  await requireAuth(request, reply);
+/** Admin gate — shared with the api-bridge audit surface. */
+export async function requireAdminRole(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  // requireAuthWithTier (not plain requireAuth) — plain requireAuth never sets
+  // request.nexusUserId, so this guard 403'd even legitimate admins (the root
+  // cause of an unguarded bridge duplicate existing at all; playtest round 4).
+  await requireAuthWithTier(request, reply);
   if (reply.sent) return;
 
   const userId = request.nexusUserId;

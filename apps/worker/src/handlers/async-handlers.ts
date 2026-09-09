@@ -11,8 +11,13 @@
  * All handlers log structured results for the BullMQ telemetry layer.
  * Each handler uses in-memory / mock implementations when real backends
  * (DB, external APIs) are not configured — so jobs always complete rather
- * than crashing the worker process.
+ * than crashing the worker process. search:reindex selects its strategies
+ * from env via lib/reindex-strategies.ts (pass 73): real Chroma + hybrid
+ * when CHROMA_URL is set, Postgres full-text when DATABASE_URL is set, and
+ * the mock fallback when neither is configured.
  */
+
+import { loadReindexStrategies } from "../lib/reindex-strategies.js";
 
 // ── wiki:reconcile ─────────────────────────────────────────────────────────────
 
@@ -159,6 +164,66 @@ export async function handleObsGenerateJob(payload: ObsGeneratePayload): Promise
   };
 }
 
+// ── feeds:refresh:port-congestion (§16.1) ────────────────────────────────────
+
+export interface PortCongestionRefreshPayload {
+  /** Telegram alerting threshold: severity levels to alert on. Default ["critical"]. */
+  alertOn?: ("low" | "medium" | "high" | "critical")[];
+}
+
+/**
+ * Poll the IMF PortWatch chokepoint feed directly (independent of the sweep
+ * cache — the service refreshes weekly, so a slow cadence is correct) and
+ * raise Telegram alerts on anomalous chokepoints when configured.
+ */
+export async function handlePortCongestionRefreshJob(
+  payload: PortCongestionRefreshPayload = {},
+): Promise<unknown> {
+  const { PortCongestionFeed, TelegramAlerter } = await import("@nexus/domain-feeds");
+
+  const feed = new PortCongestionFeed();
+  const events = await feed.fetch();
+  const bySeverity = events.reduce<Record<string, number>>((acc, e) => {
+    acc[e.severity ?? "low"] = (acc[e.severity ?? "low"] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  // Telegram alerting — only when the operator configured a bot.
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  let alerted = 0;
+  if (botToken && chatId) {
+    const alertOn = payload.alertOn ?? ["critical"];
+    const alerter = new TelegramAlerter({ botToken, chatId });
+    const toAlert = events.filter((e) => alertOn.includes(e.severity ?? "low"));
+    for (const e of toAlert.slice(0, 5)) {
+      const sent = await alerter.send(
+        e.severity === "critical" ? "FLASH" : "PRIORITY",
+        `🚢 ${e.summary}`,
+      );
+      if (sent) alerted += 1;
+    }
+  }
+
+  console.log(
+    JSON.stringify({
+      level: "info",
+      event: "feeds:refresh:port-congestion.done",
+      events: events.length,
+      bySeverity,
+      alerted,
+    }),
+  );
+
+  return {
+    domain: "port-congestion",
+    events: events.length,
+    bySeverity,
+    alerted,
+    refreshedAt: new Date().toISOString(),
+  };
+}
+
 // ── feeds:refresh ──────────────────────────────────────────────────────────────
 
 export interface FeedsRefreshPayload {
@@ -300,12 +365,13 @@ export interface SearchReindexPayload {
 }
 
 export async function handleSearchReindexJob(payload: SearchReindexPayload): Promise<unknown> {
-  const { SearchOrchestrator, MockSearchStrategy, StrategyChain } =
-    await import("@nexus/search-orchestrator");
-
-  // Production: replace with real Chroma / SQLite strategies wired from env.
-  const strategy = new MockSearchStrategy("mock");
-  const chain = new StrategyChain({ strategies: [strategy] });
+  const { SearchOrchestrator, StrategyChain } = await import("@nexus/search-orchestrator");
+  const strategies = await loadReindexStrategies({
+    chromaUrl: process.env.CHROMA_URL,
+    chromaCollection: process.env.CHROMA_COLLECTION,
+    databaseUrl: process.env.DATABASE_URL,
+  });
+  const chain = new StrategyChain({ strategies });
   const orch = new SearchOrchestrator({ chain });
 
   // Full-sweep: run an empty query across the project to warm the index.

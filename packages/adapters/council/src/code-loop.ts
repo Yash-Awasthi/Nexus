@@ -42,13 +42,14 @@ export interface CodeLoopRole {
 
 /**
  * Default role configurations.
- * Fast 8b models for generative roles; 70b for planning and review gating.
- * All models are Groq-hosted llama variants.
+ * Fast 8b models for generative roles; gpt-oss-120b for planning and review
+ * gating (llama-3.3-70b-versatile was decommissioned by Groq on 2026-08-16).
+ * All models are Groq-hosted.
  */
 export const DEFAULT_ROLES: Record<string, CodeLoopRole> = {
   planner: {
     name: "Planner",
-    model: "llama-3.3-70b-versatile",
+    model: "openai/gpt-oss-120b",
     temperature: 0.3,
     maxTokens: 1024,
     systemPrompt: [
@@ -73,7 +74,7 @@ export const DEFAULT_ROLES: Record<string, CodeLoopRole> = {
   },
   reviewer: {
     name: "Reviewer",
-    model: "llama-3.3-70b-versatile",
+    model: "openai/gpt-oss-120b",
     temperature: 0.1,
     maxTokens: 512,
     systemPrompt: [
@@ -99,7 +100,7 @@ export const DEFAULT_ROLES: Record<string, CodeLoopRole> = {
   },
   synthesizer: {
     name: "Synthesizer",
-    model: "llama-3.3-70b-versatile",
+    model: "openai/gpt-oss-120b",
     temperature: 0.5,
     maxTokens: 512,
     systemPrompt: [

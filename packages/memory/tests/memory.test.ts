@@ -4,6 +4,10 @@ import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import {
   FixedEmbedder,
   GroqEmbedder,
+  VoyageEmbedder,
+  JinaEmbedder,
+  CohereEmbedder,
+  createBestEmbedder,
   InMemoryStore,
   MemoryManager,
   MemoryError,
@@ -411,6 +415,238 @@ describe("GroqEmbedder", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(makeGroqResponse(wrongDim)));
     const embedder = new GroqEmbedder({ apiKey: FAKE_KEY });
     await expect(embedder.embed("text")).rejects.toMatchObject({ code: "DIMENSION_MISMATCH" });
+  });
+});
+
+// ── VoyageEmbedder (§1.3) ──────────────────────────────────────────────────────
+
+const VOYAGE_EMBEDDING = (dims = 512): number[] => Array.from({ length: dims }, (_, i) => i / dims);
+
+function makeVoyageResponse(embedding: number[]): Response {
+  return new Response(JSON.stringify({ data: [{ embedding, index: 0 }] }), { status: 200 });
+}
+
+describe("VoyageEmbedder", () => {
+  const FAKE_KEY = "voyage-test-key";
+
+  beforeEach(() => {
+    delete process.env.VOYAGE_API_KEY;
+    vi.unstubAllGlobals();
+  });
+
+  it("throws MemoryError when no API key is provided", () => {
+    expect(() => new VoyageEmbedder()).toThrow(MemoryError);
+    expect(() => new VoyageEmbedder()).toThrow(/VOYAGE_API_KEY/);
+  });
+
+  it("reads API key from process.env.VOYAGE_API_KEY", () => {
+    process.env.VOYAGE_API_KEY = FAKE_KEY;
+    expect(() => new VoyageEmbedder()).not.toThrow();
+  });
+
+  it("voyage-3-lite defaults to 512 dimensions and validates the response length", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(makeVoyageResponse(VOYAGE_EMBEDDING(512))));
+    const embedder = new VoyageEmbedder({ apiKey: FAKE_KEY });
+    expect(embedder.dimensions).toBe(512);
+    const result = await embedder.embed("hello");
+    expect(result).toHaveLength(512);
+  });
+
+  it("pins dimensions per model and rejects a mismatched vector", async () => {
+    const embedder = new VoyageEmbedder({ apiKey: FAKE_KEY, model: "voyage-code-3" });
+    expect(embedder.dimensions).toBe(2048);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(makeVoyageResponse(VOYAGE_EMBEDDING(512))));
+    await expect(embedder.embed("x")).rejects.toMatchObject({ code: "DIMENSION_MISMATCH" });
+  });
+
+  it("sends the Voyage wire shape: array input + Bearer auth", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(makeVoyageResponse(VOYAGE_EMBEDDING(512)));
+    vi.stubGlobal("fetch", mockFetch);
+    const embedder = new VoyageEmbedder({ apiKey: FAKE_KEY });
+    await embedder.embed("test text");
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.voyageai.com/v1/embeddings");
+    expect((init.headers as Record<string, string>)["Authorization"]).toBe(`Bearer ${FAKE_KEY}`);
+    const body = JSON.parse(init.body as string) as { model: string; input: string[] };
+    expect(body.model).toBe("voyage-3-lite");
+    expect(body.input).toEqual(["test text"]);
+  });
+
+  it("throws EMBED_FAILED on non-200 and network errors", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("denied", { status: 401 })));
+    const embedder = new VoyageEmbedder({ apiKey: FAKE_KEY });
+    await expect(embedder.embed("text")).rejects.toMatchObject({ code: "EMBED_FAILED" });
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("down")));
+    await expect(embedder.embed("text")).rejects.toMatchObject({ code: "EMBED_FAILED" });
+  });
+
+  it("throws EMBED_FAILED on invalid JSON or empty data", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("not json", { status: 200 })));
+    const embedder = new VoyageEmbedder({ apiKey: FAKE_KEY });
+    await expect(embedder.embed("text")).rejects.toMatchObject({ code: "EMBED_FAILED" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [] }), { status: 200 })),
+    );
+    await expect(embedder.embed("text")).rejects.toMatchObject({ code: "EMBED_FAILED" });
+  });
+});
+
+// ── JinaEmbedder (§1.3) ────────────────────────────────────────────────────────
+
+const JINA_EMBEDDING = (dims = 1024): number[] => Array.from({ length: dims }, (_, i) => i / dims);
+
+function makeJinaResponse(embedding: number[]): Response {
+  return new Response(JSON.stringify({ data: [{ embedding, index: 0 }] }), { status: 200 });
+}
+
+describe("JinaEmbedder", () => {
+  const FAKE_KEY = "jina-test-key";
+
+  beforeEach(() => {
+    delete process.env.JINA_API_KEY;
+    vi.unstubAllGlobals();
+  });
+
+  it("throws MemoryError when no API key is provided", () => {
+    expect(() => new JinaEmbedder()).toThrow(MemoryError);
+    expect(() => new JinaEmbedder()).toThrow(/JINA_API_KEY/);
+  });
+
+  it("defaults to 1024 dims and validates the response length", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(makeJinaResponse(JINA_EMBEDDING(1024))));
+    const embedder = new JinaEmbedder({ apiKey: FAKE_KEY });
+    expect(embedder.dimensions).toBe(1024);
+    expect(await embedder.embed("hello")).toHaveLength(1024);
+  });
+
+  it("sends model + array input + optional task hint", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(makeJinaResponse(JINA_EMBEDDING(1024)));
+    vi.stubGlobal("fetch", mockFetch);
+    const embedder = new JinaEmbedder({ apiKey: FAKE_KEY, task: "retrieval.query" });
+    await embedder.embed("q");
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.jina.ai/v1/embeddings");
+    const body = JSON.parse(init.body as string) as {
+      model: string;
+      input: string[];
+      task?: string;
+    };
+    expect(body.model).toBe("jina-embeddings-v3");
+    expect(body.input).toEqual(["q"]);
+    expect(body.task).toBe("retrieval.query");
+  });
+
+  it("omits the task field when not configured", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(makeJinaResponse(JINA_EMBEDDING(1024)));
+    vi.stubGlobal("fetch", mockFetch);
+    const embedder = new JinaEmbedder({ apiKey: FAKE_KEY });
+    await embedder.embed("q");
+    const body = JSON.parse(
+      (mockFetch.mock.calls[0] as [string, RequestInit])[1].body as string,
+    ) as { task?: string };
+    expect(body.task).toBeUndefined();
+  });
+
+  it("throws EMBED_FAILED on 401 and DIMENSION_MISMATCH on wrong length", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("no", { status: 401 })));
+    const embedder = new JinaEmbedder({ apiKey: FAKE_KEY });
+    await expect(embedder.embed("t")).rejects.toMatchObject({ code: "EMBED_FAILED" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(makeJinaResponse(JINA_EMBEDDING(512))));
+    await expect(embedder.embed("t")).rejects.toMatchObject({ code: "DIMENSION_MISMATCH" });
+  });
+});
+
+// ── CohereEmbedder (§1.3) ──────────────────────────────────────────────────────
+
+const COHERE_EMBEDDING = (dims = 1536): number[] =>
+  Array.from({ length: dims }, (_, i) => i / dims);
+
+function makeCohereResponse(embedding: number[]): Response {
+  return new Response(JSON.stringify({ embeddings: { float: [embedding] } }), { status: 200 });
+}
+
+describe("CohereEmbedder", () => {
+  const FAKE_KEY = "cohere-test-key";
+
+  beforeEach(() => {
+    delete process.env.COHERE_API_KEY;
+    vi.unstubAllGlobals();
+  });
+
+  it("throws MemoryError when no API key is provided", () => {
+    expect(() => new CohereEmbedder()).toThrow(MemoryError);
+    expect(() => new CohereEmbedder()).toThrow(/COHERE_API_KEY/);
+  });
+
+  it("defaults to 1536 dims and the v2 float envelope shape", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(makeCohereResponse(COHERE_EMBEDDING(1536))));
+    const embedder = new CohereEmbedder({ apiKey: FAKE_KEY });
+    expect(embedder.dimensions).toBe(1536);
+    expect(await embedder.embed("hello")).toHaveLength(1536);
+  });
+
+  it("sends the v2 wire shape: texts + input_type + embedding_types", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(makeCohereResponse(COHERE_EMBEDDING(1536)));
+    vi.stubGlobal("fetch", mockFetch);
+    const embedder = new CohereEmbedder({ apiKey: FAKE_KEY, inputType: "search_query" });
+    await embedder.embed("q");
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.cohere.com/v2/embed");
+    expect((init.headers as Record<string, string>)["Authorization"]).toBe(`Bearer ${FAKE_KEY}`);
+    const body = JSON.parse(init.body as string) as {
+      model: string;
+      texts: string[];
+      input_type: string;
+      embedding_types: string[];
+    };
+    expect(body.model).toBe("embed-v4.0");
+    expect(body.texts).toEqual(["q"]);
+    expect(body.input_type).toBe("search_query");
+    expect(body.embedding_types).toEqual(["float"]);
+  });
+
+  it("defaults input_type to search_document", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(makeCohereResponse(COHERE_EMBEDDING(1536)));
+    vi.stubGlobal("fetch", mockFetch);
+    const embedder = new CohereEmbedder({ apiKey: FAKE_KEY });
+    await embedder.embed("doc");
+    const body = JSON.parse(
+      (mockFetch.mock.calls[0] as [string, RequestInit])[1].body as string,
+    ) as { input_type: string };
+    expect(body.input_type).toBe("search_document");
+  });
+
+  it("throws EMBED_FAILED on 5xx, invalid JSON, and empty envelope", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("err", { status: 500 })));
+    const embedder = new CohereEmbedder({ apiKey: FAKE_KEY });
+    await expect(embedder.embed("t")).rejects.toMatchObject({ code: "EMBED_FAILED" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("not json", { status: 200 })));
+    await expect(embedder.embed("t")).rejects.toMatchObject({ code: "EMBED_FAILED" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ embeddings: {} }), { status: 200 })),
+    );
+    await expect(embedder.embed("t")).rejects.toMatchObject({ code: "EMBED_FAILED" });
+  });
+
+  it("throws DIMENSION_MISMATCH on wrong vector length", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(makeCohereResponse(COHERE_EMBEDDING(512))));
+    const embedder = new CohereEmbedder({ apiKey: FAKE_KEY });
+    await expect(embedder.embed("t")).rejects.toMatchObject({ code: "DIMENSION_MISMATCH" });
+  });
+
+  it("createBestEmbedder selects the new providers by NEXUS_EMBED_PROVIDER", async () => {
+    process.env.NEXUS_EMBED_PROVIDER = "voyage";
+    process.env.VOYAGE_API_KEY = FAKE_KEY;
+    expect(createBestEmbedder()).toBeInstanceOf(VoyageEmbedder);
+    process.env.NEXUS_EMBED_PROVIDER = "jina";
+    process.env.JINA_API_KEY = FAKE_KEY;
+    expect(createBestEmbedder()).toBeInstanceOf(JinaEmbedder);
+    process.env.NEXUS_EMBED_PROVIDER = "cohere";
+    process.env.COHERE_API_KEY = FAKE_KEY;
+    expect(createBestEmbedder()).toBeInstanceOf(CohereEmbedder);
+    delete process.env.NEXUS_EMBED_PROVIDER;
   });
 });
 

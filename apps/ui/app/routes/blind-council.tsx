@@ -41,6 +41,10 @@ interface BlindCouncilResult {
   responses: BlindResponse[];
   synthesizedAnswer?: string;
   revealed: boolean;
+  outcome?: string;
+  consensus?: number;
+  majority?: string;
+  summary?: string;
 }
 
 // ─── Color map ────────────────────────────────────────────────────────────────
@@ -139,7 +143,7 @@ export default function BlindCouncil() {
                 value={models}
                 onChange={(e) => setModels(e.target.value)}
               >
-                {["2", "3", "4", "5"].map((n) => (
+                {["1", "2", "3", "4", "5"].map((n) => (
                   <option key={n} value={n}>
                     {n}
                   </option>
@@ -192,6 +196,40 @@ export default function BlindCouncil() {
               )}
             </Button>
           </div>
+
+          {/* Synthesis — the council outcome the run produced (coherent even
+              for a single-model run) */}
+          {result.summary && (
+            <Card className="border-primary/30">
+              <CardContent className="pt-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-semibold">Council Synthesis</span>
+                  {result.outcome && (
+                    <Badge
+                      variant={result.outcome === "approved" ? "default" : "outline"}
+                      className={
+                        result.outcome === "approved"
+                          ? "bg-green-600"
+                          : result.outcome === "rejected"
+                            ? "bg-red-600"
+                            : ""
+                      }
+                    >
+                      {result.outcome}
+                    </Badge>
+                  )}
+                  {typeof result.consensus === "number" && (
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      consensus {Math.round(result.consensus * 100)}%
+                      {result.majority ? ` · ${result.majority.toUpperCase()}` : ""}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">{result.summary}</p>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Response cards */}
           <div className="grid md:grid-cols-2 gap-3">

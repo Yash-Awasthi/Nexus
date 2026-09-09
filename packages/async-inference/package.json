@@ -1,0 +1,23 @@
+{
+  "name": "@nexus/async-inference",
+  "version": "0.1.0",
+  "description": "Async inference job queue with HTTP poll semantics — proxq-style submit/poll/cancel",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "license": "Apache-2.0"
+}

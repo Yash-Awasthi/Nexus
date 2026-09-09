@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/elo-rating",
+  "version": "0.1.0",
+  "description": "ELO rating system for model evaluation with category-specific scoring",
+  "main": "src/index.ts"
+}

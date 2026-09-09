@@ -1,0 +1,21 @@
+{
+  "name": "@nexus/agent-engine",
+  "version": "0.1.0",
+  "description": "Pluggable agent engine abstraction for multiple providers",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nexus/agent-runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "*",
+    "vitest": "*"
+  }
+}

@@ -15,6 +15,7 @@
  *   • llmDriverToStreamFn       — bridge: LlmDriver.stream() → AsyncIterable<string>
  */
 
+import { BestOfNGenerator } from "@nexus/best-of-n";
 import {
   compressForTool,
   encodeStructured,
@@ -23,6 +24,19 @@ import {
   type CompressFilter,
   type StructuredFormat,
 } from "@nexus/llm-compress";
+import { HookDispatcher, mergeHookDecisions, type AgentHooks, type HookDecision } from "./hooks.js";
+
+export {
+  HookDispatcher,
+  mergeHookDecisions,
+  type AgentHooks,
+  type AgentHookEvent,
+  type HookDecision,
+  type PreToolUseInput,
+  type PostToolUseInput,
+  type SubagentStopInput,
+  type StopInput,
+} from "./hooks.js";
 
 // Re-export so consumers (api, worker) can type `compressToolOutput` without
 // taking a direct dependency on @nexus/llm-compress.
@@ -991,6 +1005,14 @@ export interface ToolRuntimeOptions {
    */
   initialMessages?: RuntimeMessage[];
   /**
+   * Optional steering hook. Drained at each step
+   * boundary — after a step's LLM call + tools complete, before the next model
+   * call. Any returned texts are appended to the message history as user
+   * messages and keep the turn going, letting a host steer a running agent
+   * without aborting or losing the current step.
+   */
+  drainSteeringMessages?: () => string[];
+  /**
    * Lossless compression of tool-result text before it enters the history
    * (strips ANSI, folds repeated log lines, collapses blank runs). Defaults to
    * the `lossless` preset — meaning-preserving, so on by default. Pass `false`
@@ -1005,6 +1027,12 @@ export interface ToolRuntimeOptions {
    * objects but the model must read TOON. Opt-in — string outputs are untouched.
    */
   structuredEncoding?: StructuredFormat;
+  /**
+   * Lifecycle hooks (Claude Code parity): preToolUse blocks/annotates tool
+   * calls, postToolUse redacts/annotates results, stop transforms the final
+   * answer. Decisions merge fail-closed. See ./hooks.ts for the event list.
+   */
+  hooks?: AgentHooks;
 }
 
 function deriveToolSpecs(toolSet: RuntimeToolSet): ToolSpec[] {
@@ -1046,9 +1074,11 @@ export class ToolAgentRuntime {
   private compaction?: CompactionOptions;
   private onCompaction?: (info: CompactionResult) => void;
   private initialMessages?: RuntimeMessage[];
+  private drainSteeringMessages?: () => string[];
   private toolCompressFilters: readonly CompressFilter[];
   private onToolCompress?: (info: { tool: string; savedTokens: number; applied: string[] }) => void;
   private structuredEncoding: StructuredFormat;
+  private readonly hookDispatcher?: HookDispatcher;
 
   constructor(opts: ToolRuntimeOptions) {
     this.llm = opts.llm;
@@ -1065,11 +1095,13 @@ export class ToolAgentRuntime {
     this.compaction = opts.compaction;
     this.onCompaction = opts.onCompaction;
     this.initialMessages = opts.initialMessages;
+    this.drainSteeringMessages = opts.drainSteeringMessages;
     // Default to lossless: meaning-preserving, so safe to run on every tool result.
     this.toolCompressFilters =
       opts.compressToolOutput === false ? [] : PRESETS[opts.compressToolOutput ?? "lossless"];
     this.onToolCompress = opts.onToolCompress;
     this.structuredEncoding = opts.structuredEncoding ?? "json";
+    this.hookDispatcher = opts.hooks ? new HookDispatcher(opts.hooks) : undefined;
   }
 
   /** Resolve a tool's effective permission tier (explicit override, else by name). */
@@ -1099,6 +1131,13 @@ export class ToolAgentRuntime {
           aborted: true,
           totalDurationMs: Date.now() - t0,
         };
+      }
+
+      // Steering: drain any host-injected messages at the step boundary so a
+      // host can redirect the agent between steps without aborting it.
+      const steering = this.drainSteeringMessages?.() ?? [];
+      for (const text of steering) {
+        messages.push({ role: "user", content: text });
       }
 
       // Compact the history before the model call once it exceeds the budget.
@@ -1143,6 +1182,28 @@ export class ToolAgentRuntime {
       // Execute each tool call and append its result to history.
       const toolResults: ToolResult[] = [];
       for (const call of turn.toolCalls) {
+        // preToolUse hooks (fail-closed merge) — block before permission gate.
+        const pre = (await this.hookDispatcher?.dispatch("preToolUse", {
+          toolName: call.name,
+          toolCallId: call.callId,
+          input: call.arguments,
+        })) as HookDecision | undefined;
+        if (pre?.continue === false) {
+          const result: ToolResult = {
+            name: call.name,
+            output: null,
+            error: `hook_blocked: ${pre.stopReason ?? pre.feedback ?? "blocked by preToolUse hook"}`,
+            callId: call.callId,
+          };
+          toolResults.push(result);
+          messages.push({
+            role: "tool",
+            content: stringifyToolOutput(result, this.structuredEncoding),
+            toolCallId: call.callId,
+          });
+          continue;
+        }
+
         const tier = this.tierFor(call.name);
         let result: ToolResult;
 
@@ -1181,7 +1242,21 @@ export class ToolAgentRuntime {
         result.callId = call.callId;
         result.name = call.name;
         toolResults.push(result);
+
+        // postToolUse hooks — may redact/annotate the history text.
+        const post = (await this.hookDispatcher?.dispatch("postToolUse", {
+          toolName: call.name,
+          toolCallId: call.callId,
+          input: call.arguments,
+          result,
+        })) as HookDecision | undefined;
+
         let content = stringifyToolOutput(result, this.structuredEncoding);
+        if (post?.suppressOutput) {
+          content = "[output suppressed by hook]";
+        } else if (post?.feedback !== undefined) {
+          content = post.feedback;
+        }
         if (this.toolCompressFilters.length > 0) {
           // Route by tool name so the filter set fits the output shape — e.g. a
           // diff's identical context lines are never folded. Stays lossless
@@ -1216,6 +1291,16 @@ export class ToolAgentRuntime {
 
       // No tool calls → the model is done.
       if (turn.toolCalls.length === 0) break;
+    }
+
+    // stop hooks — may transform the final answer (not fired on abort).
+    if (stopReason === undefined && this.hookDispatcher?.has("stop")) {
+      const stop = (await this.hookDispatcher.dispatch("stop", {
+        finalContent,
+        totalUsage,
+        steps,
+      })) as HookDecision | undefined;
+      if (stop?.feedback !== undefined) finalContent = stop.feedback;
     }
 
     return {
@@ -1275,6 +1360,12 @@ export interface SpawnAgentsOptions {
   maxStepsPerAgent?: number;
   /** Default system-prompt for child agents. */
   defaultSystemPrompt?: string;
+  /**
+   * SubagentStop hooks — run per finished child; a `continue: false` decision
+   * overrides that child's verdict with the decision's `feedback` as `error`
+   * (fail-closed merge across handlers). See ./hooks.ts.
+   */
+  hooks?: AgentHooks;
 }
 
 /**
@@ -1287,6 +1378,7 @@ export function makeSpawnAgentsTool(llm: LlmStreamFn, opts: SpawnAgentsOptions =
   const maxConcurrency = opts.maxConcurrency ?? 5;
   const maxStepsPerAgent = opts.maxStepsPerAgent ?? 3;
   const defaultSystemPrompt = opts.defaultSystemPrompt;
+  const hookDispatcher = opts.hooks ? new HookDispatcher(opts.hooks) : undefined;
 
   return {
     name: "spawn_agents",
@@ -1307,12 +1399,23 @@ export function makeSpawnAgentsTool(llm: LlmStreamFn, opts: SpawnAgentsOptions =
             systemPrompt: task.systemPrompt ?? defaultSystemPrompt,
           });
           const result = await child.run(task.instruction);
-          return {
+          const sub = {
             taskIndex: i,
             instruction: task.instruction,
             finalContent: result.finalContent,
             steps: result.steps.length,
           };
+          // SubagentStop hooks — may veto the child's verdict.
+          const decision = (await hookDispatcher?.dispatch("subagentStop", sub)) as
+            HookDecision | undefined;
+          if (decision?.continue === false) {
+            return {
+              ...sub,
+              finalContent: "",
+              error: `hook_veto: ${decision.stopReason ?? decision.feedback ?? "vetoed by subagentStop hook"}`,
+            };
+          }
+          return sub;
         }),
       );
 
@@ -1326,6 +1429,397 @@ export function makeSpawnAgentsTool(llm: LlmStreamFn, opts: SpawnAgentsOptions =
           error: s.reason instanceof Error ? s.reason.message : String(s.reason),
         };
       });
+    },
+  };
+}
+
+// ── Self-loop harness ───────────────────────────────────────────────────────
+//
+// The self-loop surface, built on the existing
+// ToolAgentRuntime loop:
+//
+//   AgentTemplateRegistry   — named agent templates; a template can reference
+//                             ITS OWN id, which is what makes a self-loop
+//                             possible (an agent spawning more of itself).
+//   spawn_agent_inline      — run ONE child agent (any registered template,
+//                             including the parent's own → self-spawn) and
+//                             return its output as a tool result.
+//   think_deeply            — explicit reasoning step: logs the model's thought
+//                             (the cost is the model's own
+//                             chain of thought, this just makes it observable).
+//   review                  — run a reviewer agent over work product against
+//                             criteria; returns { score, verdict, issues,
+//                             suggestions } parsed from the model output.
+//   best_of_n               — generate N candidate answers (temperature > 0 for
+//                             variety) and return the best by score (wraps
+//                             @nexus/best-of-n).
+
+/** Named agent template for child/self spawning. */
+export interface AgentTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  systemPrompt: string;
+  /** Tools advertised to the child (defaults to the parent toolset's). */
+  tools?: ToolSpec[];
+  /** Step budget for the child (default: opts.maxSteps or 5). */
+  maxSteps?: number;
+  /** Model override for the child (LLM fn decides how to use it). */
+  model?: string;
+}
+
+/** Registry of named agent templates for spawn_agent_inline. */
+export class AgentTemplateRegistry {
+  private readonly templates = new Map<string, AgentTemplate>();
+
+  register(template: AgentTemplate): void {
+    if (!template.id) throw new Error("AgentTemplate requires an id");
+    this.templates.set(template.id, template);
+  }
+
+  get(id: string): AgentTemplate | undefined {
+    return this.templates.get(id);
+  }
+
+  has(id: string): boolean {
+    return this.templates.has(id);
+  }
+
+  list(): AgentTemplate[] {
+    return Array.from(this.templates.values());
+  }
+}
+
+export interface SpawnAgentInlineOptions {
+  /**
+   * Templates children may be spawned from. The PARENT's own template id is
+   * expected to be registered here too — that is the self-loop: the agent can
+   * fork another copy of itself to work a sub-goal.
+   */
+  registry: AgentTemplateRegistry;
+  /** Parent's own template id (self-spawn target when the model omits agent_id). */
+  parentTemplateId?: string;
+  /** Toolset children inherit when their template doesn't define tools. */
+  toolSet?: RuntimeToolSet;
+  /** Default step budget per child (default: 5). */
+  maxSteps?: number;
+  /** Default child system prompt when the template has none. */
+  defaultSystemPrompt?: string;
+}
+
+/**
+ * Factory: returns a `spawn_agent_inline` RuntimeTool. Runs ONE child agent
+ * from the template registry — including the parent's own template (self-spawn)
+ * — and returns `{ output, steps, usage }` as the tool result.
+ */
+export function makeSpawnAgentInlineTool(
+  llm: LlmToolFn,
+  opts: SpawnAgentInlineOptions,
+): RuntimeTool {
+  const maxSteps = opts.maxSteps ?? 5;
+  return {
+    name: "spawn_agent_inline",
+    description:
+      "Run a single child agent (a separate, bounded agent turn) with its own system prompt " +
+      "and return its final output. Use it to delegate a self-contained sub-task. " +
+      `agent_id may be any registered template; when omitted it defaults to the parent's own template` +
+      " (a self-spawn). " +
+      `Available agents: ${opts.registry
+        .list()
+        .map((t) => `${t.id} — ${t.description ?? t.name}`)
+        .join("; ")}`,
+    handler: async (args): Promise<{ output: string; steps: number; usage: RuntimeUsage }> => {
+      const agentId = (args.agent_id as string | undefined) ?? opts.parentTemplateId;
+      const prompt = (args.prompt as string | undefined) ?? "";
+      if (!agentId) {
+        throw new Error("spawn_agent_inline: no agent_id and no parentTemplateId configured");
+      }
+      const template = opts.registry.get(agentId);
+      if (!template) {
+        throw new Error(`spawn_agent_inline: unknown agent "${agentId}"`);
+      }
+      const child = new ToolAgentRuntime({
+        llm,
+        toolSet: opts.toolSet ?? new RuntimeToolSet(),
+        systemPrompt: template.systemPrompt || opts.defaultSystemPrompt,
+        maxSteps: template.maxSteps ?? maxSteps,
+        tools: template.tools,
+      });
+      const result = await child.run(prompt);
+      return {
+        output: result.finalContent,
+        steps: result.steps.length,
+        usage: result.totalUsage,
+      };
+    },
+  };
+}
+
+/**
+ * Factory: returns a `think_deeply` RuntimeTool. The thought
+ * is logged and acknowledged; the reasoning itself happens in the model's own
+ * chain of thought. Costs nothing beyond the model's normal turn.
+ */
+export function makeThinkDeeplyTool(): RuntimeTool {
+  return {
+    name: "think_deeply",
+    description:
+      "Think through a hard problem step by step before acting. Pass the reasoning you " +
+      "want to record as `thought`. This helps structure multi-step work.",
+    handler: async (args): Promise<{ message: string; thought: string }> => {
+      const thought = String(args.thought ?? "");
+      return { message: "Thought logged.", thought };
+    },
+  };
+}
+
+export interface ReviewResult {
+  score: number;
+  verdict: "accept" | "reject" | "unknown";
+  issues: string[];
+  suggestions: string[];
+  /** True when the reviewer returned no parseable structured verdict at all —
+   *  a harness signal, NOT an actual rejection. Consumers must treat an
+   *  unparsed review as an unknown/retry, never as a reject 0/100. */
+  unparsed?: boolean;
+}
+
+/** The exact JSON schema the reviewer must fill in — appended as the LAST
+ *  instruction of the user turn (the channel the model attends to), mirroring
+ *  the memory-directive treatment that fixed user-turn placement. */
+export const REVIEW_JSON_SCHEMA = `{"score": 0-100, "verdict": "accept"|\"reject\", "issues": ["..."], "suggestions": ["..."]}`;
+
+/** Build the reviewer's user-turn prompt, ending with the fill-in schema. */
+export function buildReviewPrompt(subject: string, output: string, criteria: string): string {
+  return (
+    `Subject/goal: ${subject}\n\n` +
+    `Criteria: ${criteria || "(none given — judge quality and completeness)"}\n\n` +
+    `Work to review:\n${output.slice(0, 12_000)}\n\n` +
+    `Now respond with ONLY the JSON object and nothing else — no prose, no fences, no trailing commentary. Use exactly these fields:\n${REVIEW_JSON_SCHEMA}`
+  );
+}
+
+const REVIEW_SYSTEM_PROMPT = `You are a rigorous reviewer. Score the work 0-100 against the goal and criteria; >= 70 accepts. Be specific: name concrete problems, not generalities. The user message ends with the exact JSON schema — return ONLY that JSON object, nothing else.`;
+
+/**
+ * Factory: returns a `review` RuntimeTool. Runs a reviewer agent (one model
+ * call, no tools) over `subject` + `output` against `criteria` and returns a
+ * parsed ReviewResult.
+ */
+export function makeReviewTool(llm: LlmToolFn, opts: { systemPrompt?: string } = {}): RuntimeTool {
+  return {
+    name: "review",
+    description:
+      "Have a reviewer agent evaluate work product against the goal and criteria. " +
+      "Args: { subject, output, criteria? }. Returns { score, verdict, issues, suggestions }. " +
+      "Use before declaring a task done.",
+    handler: async (args): Promise<ReviewResult> => {
+      const subject = String(args.subject ?? "");
+      const output = String(args.output ?? "");
+      const criteria = String(args.criteria ?? "");
+      const turn = await llm(
+        [{ role: "user", content: buildReviewPrompt(subject, output, criteria) }],
+        {
+          systemPrompt: opts.systemPrompt ?? REVIEW_SYSTEM_PROMPT,
+        },
+      );
+      return parseReviewResult(turn.content);
+    },
+  };
+}
+
+function asStringArray(v: unknown): string[] {
+  return Array.isArray(v) ? v.map(String) : [];
+}
+
+/** An honest "no structured verdict" — score 0, verdict unknown, flagged unparsed. */
+function unknownReview(): ReviewResult {
+  return { score: 0, verdict: "unknown", issues: [], suggestions: [], unparsed: true };
+}
+
+/** Extract the first balanced JSON object, tolerating prose before/after and
+ *  braces inside string values. Returns null when no balanced object exists. */
+export function extractBalancedObject(text: string): string | null {
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i]!;
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+/** Try to parse a string as a JSON object, with light repairs (single-quote
+ *  keys/values, unquoted keys, unescaped newlines/tabs, trailing commas).
+ *  Returns null when every candidate fails. */
+export function tryParseReviewObject(s: string): Record<string, unknown> | null {
+  const quoteKeys = (t: string) => t.replace(/([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/g, '$1"$2":');
+  const candidates: string[] = [s];
+  if (!s.includes('"')) candidates.push(s.replace(/'/g, '"'));
+  candidates.push(quoteKeys(s));
+  candidates.push(s.replace(/\n/g, "\\n").replace(/\t/g, "\\t"));
+  candidates.push(s.replace(/,\s*([}\]])/g, "$1"));
+  // Combined repair — single→double quotes, quote keys, drop trailing commas.
+  candidates.push(quoteKeys(s.replace(/'/g, '"')).replace(/,\s*([}\]])/g, "$1"));
+  for (const c of candidates) {
+    try {
+      const v = JSON.parse(c) as unknown;
+      if (v && typeof v === "object" && !Array.isArray(v)) return v as Record<string, unknown>;
+    } catch {
+      /* try next candidate */
+    }
+  }
+  return null;
+}
+
+/** Normalize a parsed review object. Score is authoritative: >= 70 accepts even
+ *  if the model's own verdict string disagrees. A parsed object with no usable
+ *  score/verdict becomes an honest unknown, never a fake reject. */
+function normalizeReview(obj: Record<string, unknown>): ReviewResult {
+  const rawScore = Number(obj.score);
+  const verdictStr = String(obj.verdict ?? "").toLowerCase();
+  if (Number.isFinite(rawScore)) {
+    const score = Math.max(0, Math.min(100, rawScore));
+    return {
+      score,
+      verdict: score >= 70 ? "accept" : "reject",
+      issues: asStringArray(obj.issues),
+      suggestions: asStringArray(obj.suggestions),
+    };
+  }
+  if (verdictStr === "accept") {
+    return {
+      score: 70,
+      verdict: "accept",
+      issues: asStringArray(obj.issues),
+      suggestions: asStringArray(obj.suggestions),
+    };
+  }
+  if (verdictStr === "reject") {
+    return {
+      score: 30,
+      verdict: "reject",
+      issues: asStringArray(obj.issues),
+      suggestions: asStringArray(obj.suggestions),
+    };
+  }
+  return unknownReview();
+}
+
+/** Lightweight sentiment fallback for a reviewer that wrote prose instead of
+ *  JSON. Positive prose yields a real passing score reflecting the content
+ *  ("That looks great!" → accept ~70, not a 0/100 reject); negative prose a
+ *  real rejection with the prose as the issue; genuinely indeterminate → unknown. */
+function proseVerdict(text: string): ReviewResult {
+  const lower = text.toLowerCase();
+  const positive =
+    /looks?\s+(great|good|correct|right|fine|excellent|perfect)|well\s+done|no\s+issues|all\s+good|passes?|approved|good\s+job|correct\b|works\s+(correctly|fine|as expected)/i.test(
+      lower,
+    );
+  const negative =
+    /missing|broken|doesn'?t\s+work|does\s+not\s+work|error|incorrect|wrong|bug|failed|fails?|not\s+working|incomplete|invalid|crash/i.test(
+      lower,
+    );
+  if (positive && !negative) {
+    return { score: 70, verdict: "accept", issues: [], suggestions: [] };
+  }
+  if (negative) {
+    return { score: 30, verdict: "reject", issues: [text.trim().slice(0, 200)], suggestions: [] };
+  }
+  return unknownReview();
+}
+
+/**
+ * Parse a reviewer model response into a ReviewResult.
+ *
+ * Tolerant, in order:
+ *   1. whole-string strict JSON
+ *   2. the first balanced JSON object (prose before/after tolerated), with
+ *      light single-quote / newline / trailing-comma repairs
+ *   3. prose-only sentiment fallback — real score reflecting content
+ *   4. genuinely unparseable → { verdict: "unknown", unparsed: true }, NEVER a
+ *      fabricated "reject 0/100".
+ */
+export function parseReviewResult(content: string): ReviewResult {
+  const cleaned = content.replace(/```(?:json)?/gi, "").trim();
+  if (!cleaned) return unknownReview();
+
+  const strict = tryParseReviewObject(cleaned);
+  if (strict) return normalizeReview(strict);
+
+  const extracted = extractBalancedObject(cleaned);
+  if (extracted) {
+    const parsed = tryParseReviewObject(extracted);
+    if (parsed) return normalizeReview(parsed);
+  }
+
+  return proseVerdict(cleaned);
+}
+
+export interface BestOfNToolOptions {
+  /** Default number of candidates (default: 3). */
+  n?: number;
+  /** Temperature used for candidate variety (default: 0.8). */
+  temperature?: number;
+  maxTokens?: number;
+  role?: string;
+}
+
+/**
+ * Factory: returns a `best_of_n` RuntimeTool. Generates N candidate answers to
+ * a prompt and returns the best-scoring one with all scores. Wraps
+ * @nexus/best-of-n with an LlmToolFn adapter.
+ */
+export function makeBestOfNTool(llm: LlmToolFn, opts: BestOfNToolOptions = {}): RuntimeTool {
+  const generator = new BestOfNGenerator({
+    llm: {
+      complete: async (messages, o) => {
+        const turn = await llm(messages, { systemPrompt: undefined });
+        return {
+          content: turn.content,
+          model: "best-of-n",
+          durationMs: 0,
+        };
+      },
+    },
+    n: opts.n ?? 3,
+    temperature: opts.temperature ?? 0.8,
+    maxTokens: opts.maxTokens ?? 2048,
+    role: opts.role ?? "thinker",
+  });
+
+  return {
+    name: "best_of_n",
+    description:
+      "Generate N independent candidate answers to `prompt` (with `systemPrompt` optional) " +
+      "and return the highest-scoring one plus the scoreboard. Use for problems where " +
+      "sampling multiple attempts beats a single pass.",
+    handler: async (args): Promise<{ best: string; scores: number[]; n: number }> => {
+      const prompt = String(args.prompt ?? "");
+      const systemPrompt = args.systemPrompt as string | undefined;
+      const result = await generator.generate({ prompt, systemPrompt });
+      return {
+        best: result.best.content,
+        scores: result.all.map((c) => c.score),
+        n: result.all.length,
+      };
     },
   };
 }
@@ -1695,7 +2189,7 @@ export class ToolOutput {
 /**
  * Normalise tool name aliases to canonical internal names.
  *
- * Providers present tools under various names (e.g. OAuth APIs use Claude Code
+ * Providers present tools under various names (e.g. some OAuth APIs use
  * names like `file_grep`, `shell_exec`). This mapper ensures both forms resolve
  * to the same internal registry entry.
  *
@@ -1862,8 +2356,7 @@ export interface TokenUsageTotals {
   cacheCreationInputTokens: number;
 }
 
-// ── Codebuff Agent Runtime Schemas ────────────────────────────────────────────
-// Extracted from: CodebuffAI/codebuff packages/agent-runtime/ + common/src/
+// ── Agent Runtime Schemas ────────────────────────────────────────────────
 // Covers: AgentDefinition, AgentState, AgentOutput, SkillDefinition, retry config, HttpError
 
 /** Error with an HTTP statusCode attached — used by retry logic. */
@@ -2008,7 +2501,7 @@ export interface AgentMcpServerConfig {
 
 /**
  * Declarative agent definition — a portable blueprint for spawnable agents.
- * Compatible with Codebuff AgentDefinition and OpenRouter provider routing.
+ * Portable blueprint for spawnable agents; pairs with OpenRouter provider routing.
  */
 export interface AgentDefinition {
   /** Unique lowercase-hyphenated identifier, e.g. "code-reviewer" */
@@ -2262,3 +2755,6 @@ export function createProgrammaticToolTool(opts: ProgrammaticToolOptions): Runti
     },
   };
 }
+
+// Conversational group chat (AutoGen AgentChat parity).
+export * from "./group-chat.js";

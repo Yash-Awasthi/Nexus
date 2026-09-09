@@ -82,11 +82,15 @@ describe("prepareExecution", () => {
     expect(prep.tempFilePath).toBeUndefined();
   });
 
-  it("routes python to python3 -c", () => {
+  it("routes python to python3 via stdin (Windows alias-safe)", () => {
     const prep = prepareExecution("python", "print(42)");
     expect(prep.cmd).toBe("python3");
-    expect(prep.args).toContain("-c");
-    expect(prep.args).toContain("print(42)");
+    expect(prep.args).toEqual(["-"]);
+    expect(prep.useStdin).toBe(true);
+    // The code must NOT ride on argv: the Windows python3.exe app-alias
+    // mangles `-c` arguments (escapes become real newlines).
+    expect(prep.args).not.toContain("-c");
+    expect(prep.args).not.toContain("print(42)");
   });
 
   it("routes bash to bash -c", () => {

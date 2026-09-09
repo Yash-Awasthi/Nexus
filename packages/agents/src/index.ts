@@ -32,7 +32,8 @@ export type AgentErrorCode =
   | "FILE_READ_FAILED"
   | "FILE_WRITE_FAILED"
   | "FILE_LIST_FAILED"
-  | "HOOK_EMIT_FAILED";
+  | "HOOK_EMIT_FAILED"
+  | "CREW_FAILED";
 
 /** Agent error. */
 export class AgentError extends Error {
@@ -732,3 +733,8 @@ export class FileExplorerAgent {
     }));
   }
 }
+
+// Role-based crew orchestration (crewAI/CAMEL parity).
+export * from "./crew.js";
+// Goal → task-plan decomposition (semantic-kernel/CAMEL planner parity).
+export * from "./planner.js";

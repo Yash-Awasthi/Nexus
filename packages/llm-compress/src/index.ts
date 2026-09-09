@@ -22,6 +22,11 @@ import { createHash } from "node:crypto";
 
 import { encode as toonEncode } from "@toon-format/toon";
 
+// Caveman stage (lossy, opt-in): filler/phrase condensation with protected
+// spans and a minimum-savings gate — see caveman.ts for the full contract.
+import { compressCaveman, makeCavemanFilter, type CavemanOptions } from "./caveman.js";
+export { compressCaveman, makeCavemanFilter, type CavemanOptions } from "./caveman.js";
+
 // ── Structured-payload encoding ─────────────────────────────────────────────────
 // JSON is verbose: every key is requoted on every array element. TOON (Token-
 // Oriented Object Notation) declares keys once per uniform array and drops the
@@ -161,6 +166,8 @@ export const PRESETS = {
   off: [] as readonly CompressFilter[],
   /** Lossless tool-output cleanup. Recommended default. */
   lossless: DEFAULT_FILTERS,
+  /** Caveman filler removal — LOSSY, opt-in, protected spans + savings gate. */
+  caveman: [makeCavemanFilter()] as readonly CompressFilter[],
 } as const;
 
 export type PresetName = keyof typeof PRESETS;
@@ -384,9 +391,23 @@ export const yagniMinimalCode: SystemPromptInjector = {
   text: "Write the minimum code that solves the stated problem. No speculative abstractions, configuration, or features that were not requested. Prefer editing existing code over adding new files.",
 };
 
+/** Caveman output mode — terse, preamble-free replies (OmniRoute output-style parity). */
+export const cavemanOutput: SystemPromptInjector = {
+  name: "caveman-output",
+  text: "Reply in minimal words. Skip pleasantries, preamble, restatement of the question, and closing summaries. Use short sentences. Keep code blocks, file paths, commands, URLs, error strings, and identifiers verbatim.",
+};
+
+/** Ponytail — "the best code is the code never written" (lazy senior dev). */
+export const ponytail: SystemPromptInjector = {
+  name: "ponytail",
+  text: "The best code is the code never written. Prefer reuse over rewrite, root-cause fixes over symptom patches, and the shortest working diff. Do not add files, abstractions, or features that were not requested.",
+};
+
 export const INJECTORS = {
   "terse-output": terseOutput,
   "yagni-minimal-code": yagniMinimalCode,
+  "caveman-output": cavemanOutput,
+  ponytail,
 } as const;
 
 export type InjectorName = keyof typeof INJECTORS;
@@ -577,6 +598,8 @@ export interface EngineContext {
   toolName?: string;
   /** Auth principal, for per-tenant store scoping (ccr). */
   principalId?: string;
+  /** Min rows for the tabular JSON / JSONL columnar rewrites (headroom/jsonl). */
+  minRows?: number;
 }
 
 /** A composable text-compression engine. */
@@ -1402,9 +1425,62 @@ export const headroomEngine: CompressEngine = {
   name: "headroom",
   stackPriority: 15,
   lossless: true,
-  apply: (text) => headroomCompress(text),
+  apply: (text, ctx) => jsonlCompress(text, ctx?.minRows ?? HEADROOM_MIN_ROWS),
 };
 registerEngine(headroomEngine);
+
+// -- JSONL/NDJSON lossless codec (ported from OmniCompress) ----------------------
+// OmniCompress's lossless columnar codec treats JSON arrays and NDJSON/JSONL
+// (one JSON object per line) alike. headroomCompress above only rewrites arrays,
+// so a ```jsonl stream still requotes every key on every row. Re-encoding a
+// homogeneous NDJSON stream as TOON factors the schema out once -- same token
+// win, and still lossless (TOON decodes back to the same objects). Only
+// ```jsonl fences and whole-text bare streams are touched; JSONL text embedded
+// in code is never rewritten. Replaces only when strictly smaller.
+
+/** Parse a JSONL body into objects; returns [] (no match) when any line fails. */
+function parseJsonlStream(body: string): unknown[] {
+  const out: unknown[] = [];
+  for (const rawLine of body.split("\n")) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    try {
+      out.push(JSON.parse(line));
+    } catch {
+      return [];
+    }
+  }
+  return out;
+}
+
+/** Re-encode `body` as a ```toon block iff it is a homogeneous object stream. */
+function jsonlBodyToToon(body: string, minRows: number): string | null {
+  const value = parseJsonlStream(body);
+  if (value.length < minRows) return null;
+  const toon = toonIfTabular(value, minRows);
+  if (toon === null) return null;
+  const replacement = "```toon\n" + toon + "\n```";
+  return replacement.length < body.length ? replacement : null;
+}
+
+/**
+ * Columnarize tabular NDJSON/JSONL in `text`: ```jsonl-fenced blocks and
+ * whole-text bare streams (one JSON object per line) are re-encoded as
+ * ```toon when homogeneous, >= minRows rows, and strictly smaller.
+ * Lossless (TOON decodes back to the same objects).
+ */
+export function jsonlCompress(text: string, minRows: number = HEADROOM_MIN_ROWS): string {
+  let out = text.replace(
+    /```jsonl\b[ \t]*\r?\n([\s\S]*?)\r?\n?```/g,
+    (m: string, inner: string) => jsonlBodyToToon(inner, minRows) ?? m,
+  );
+  // Whole-text bare stream (every non-empty line a JSON object): re-encode the
+  // whole text only when the trimmed body is itself the tabular stream.
+  const trimmed = out.trim();
+  const whole = jsonlBodyToToon(trimmed, minRows);
+  if (whole !== null && whole.length < out.length) out = whole;
+  return out;
+}
 
 // ── ccr engine (lossless-by-reference: compress-cache-retrieve) ──────────────────
 // Ported from OmniRoute's ccr engine: replace a large block with a short
@@ -1500,3 +1576,5 @@ export const llmlinguaEngine: CompressEngine = {
   applyAsync: async (text, ctx) => (await compressHeavy(text, { rate: ctx?.keepRate })).text,
 };
 registerEngine(llmlinguaEngine);
+
+export * from "./token-saver.js";

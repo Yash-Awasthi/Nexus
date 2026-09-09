@@ -1,0 +1,9 @@
+{
+  "name": "@nexus/llm-arena",
+  "version": "0.1.0",
+  "description": "LLM-as-Judge arena for blind model comparison and scoring",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@nexus/llm-router": "workspace:*"
+  }
+}

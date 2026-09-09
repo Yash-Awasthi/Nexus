@@ -3,8 +3,10 @@
  * fast-check property-based fuzzing for POST /api/v1/gateway/messages.
  *
  * Invariants verified:
- *   1. Any model string not matching a nexus/* alias → 400 invalid_request_error
- *   2. nexus/* model with no provider API key → 400 provider_unavailable
+ *   1. Any model string not matching a nexus/* alias → falls through to the
+ *      local Ollama driver (200), never 4xx — the keyless default
+ *   2. nexus/* model with no provider API key → falls back to local Ollama
+ *      with the default local model (200), never 400 provider_unavailable
  *   3. Any request with max_spend_usd:0 (GROQ key set) → 402 spend_cap_exceeded
  *   4. Well-formed request with mocked Groq → 200 with required shape
  *   5. Arbitrary well-typed bodies never cause 5xx
@@ -24,6 +26,7 @@ vi.mock("@nexus/council", () => ({
 
 import * as fc from "fast-check";
 import { buildServer } from "../../src/server.js";
+import { getSharedKV } from "../../src/lib/shared-kv.js";
 import type { FastifyInstance } from "fastify";
 
 // ── Groq fetch mock ───────────────────────────────────────────────────────────
@@ -31,7 +34,7 @@ import type { FastifyInstance } from "fastify";
 const GROQ_MOCK = {
   id: "chatcmpl-fuzz",
   object: "chat.completion",
-  model: "llama-3.3-70b-versatile",
+  model: "openai/gpt-oss-120b",
   choices: [
     {
       index: 0,
@@ -50,6 +53,39 @@ function mockGroqFetch() {
   });
 }
 
+/** Ollama /api/chat shape — the keyless fallback driver's response. */
+const OLLAMA_MOCK = {
+  model: "qwen2.5:7b",
+  message: { role: "assistant", content: "Fuzz local reply" },
+  done: true,
+};
+
+function mockOllamaFetch() {
+  return vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => OLLAMA_MOCK,
+    text: async () => JSON.stringify(OLLAMA_MOCK),
+  });
+}
+
+/** Cloud API keys that would otherwise register non-Ollama drivers. */
+const CLOUD_KEYS = [
+  "GROQ_API_KEY",
+  "ANTHROPIC_API_KEY",
+  "GEMINI_API_KEY",
+  "DEEPSEEK_API_KEY",
+  "MISTRAL_API_KEY",
+  "OPENROUTER_API_KEY",
+  "FIREWORKS_API_KEY",
+  "NVIDIA_NIM_API_KEY",
+  "CEREBRAS_API_KEY",
+  "KIMI_API_KEY",
+];
+
+function clearCloudKeys(): void {
+  for (const k of CLOUD_KEYS) delete process.env[k];
+}
+
 // ── Server lifecycle ──────────────────────────────────────────────────────────
 
 let app: FastifyInstance;
@@ -58,6 +94,9 @@ beforeEach(async () => {
   delete process.env.GROQ_API_KEY;
   delete process.env.NEXUS_API_KEY;
   delete process.env.ANTHROPIC_API_KEY;
+  // Prompt-cache / gateway-log singletons over the shared KV must not leak a
+  // cached response between property runs or tests.
+  await getSharedKV().clear();
   app = await buildServer();
   await app.ready();
 });
@@ -83,7 +122,7 @@ const unknownModelArb = fc
         "claude-3-opus-20240229",
         "claude-3-sonnet-20240229",
         "claude-3-haiku-20240307",
-        "llama-3.3-70b-versatile",
+        "openai/gpt-oss-120b",
         "gemma2-9b-it",
         "mixtral-8x7b-32768",
       ].includes(s),
@@ -112,10 +151,13 @@ const optSystem = fc.option(fc.string({ maxLength: 200 }), { nil: undefined });
 
 describe("POST /api/v1/gateway/messages — property-based fuzzing", () => {
   /**
-   * Property 1: Any unrecognised model string → 400 with error.type matching
-   * `invalid_request_error` or `provider_unavailable`. Never a 5xx.
+   * Property 1: Any unrecognised model string falls through to the always-on
+   * local Ollama driver — 200, never 4xx, with the dispatch going to the
+   * Ollama /api/chat endpoint (hermetic: mocked fetch, no live Ollama).
    */
-  it("unrecognised model always returns 400", async () => {
+  it("unrecognised model falls through to local Ollama (never 4xx)", async () => {
+    clearCloudKeys();
+    vi.stubGlobal("fetch", mockOllamaFetch());
     await fc.assert(
       fc.asyncProperty(unknownModelArb, messagesArb, async (model, messages) => {
         const res = await app.inject({
@@ -123,32 +165,36 @@ describe("POST /api/v1/gateway/messages — property-based fuzzing", () => {
           url: "/api/v1/gateway/messages",
           payload: { model, messages },
         });
-        const body = res.json<{ type?: string; error?: { type: string } }>();
-        return (
-          res.statusCode === 400 &&
-          body.type === "error" &&
-          (body.error?.type === "invalid_request_error" ||
-            body.error?.type === "provider_unavailable")
-        );
+        expect(res.statusCode).toBe(200);
+        expect(
+          vi.mocked(fetch).mock.calls.some((c) => String(c[0]).includes(":11434/api/chat")),
+        ).toBe(true);
+        return true;
       }),
       { numRuns: 25 },
     );
   });
 
   /**
-   * Property 2: nexus/* model with no provider key → 400 provider_unavailable.
+   * Property 2: nexus/* model with no provider key falls back to local Ollama
+   * (200) with the keyless default model tag — never 400 provider_unavailable.
    */
-  it("nexus/fast with no GROQ key → 400 provider_unavailable", async () => {
+  it("nexus/fast with no GROQ key falls back to local Ollama (default model)", async () => {
+    clearCloudKeys();
+    vi.stubGlobal("fetch", mockOllamaFetch());
     await fc.assert(
       fc.asyncProperty(messagesArb, async (messages) => {
-        delete process.env.GROQ_API_KEY;
         const res = await app.inject({
           method: "POST",
           url: "/api/v1/gateway/messages",
           payload: { model: "nexus/fast", messages },
         });
-        const body = res.json<{ error?: { type: string } }>();
-        return res.statusCode === 400 && body.error?.type === "provider_unavailable";
+        expect(res.statusCode).toBe(200);
+        const call = vi.mocked(fetch).mock.calls.at(-1);
+        expect(call && String(call[0]).includes(":11434/api/chat")).toBe(true);
+        if (!call || !String(call[0]).includes(":11434/api/chat")) return false;
+        const sent = JSON.parse(String(call[1]!.body)) as { model: string };
+        return sent.model === "qwen2.5:7b";
       }),
       { numRuns: 20 },
     );
@@ -182,10 +228,11 @@ describe("POST /api/v1/gateway/messages — property-based fuzzing", () => {
           });
           const body = res.json<{ error?: { type: string } }>();
           // 429 = rate-limited (fires before spend check in high-throughput prop runs)
-          return (
+          const ok =
             (res.statusCode === 402 && body.error?.type === "spend_cap_exceeded") ||
-            res.statusCode === 429
-          );
+            res.statusCode === 429;
+          expect(ok).toBe(true);
+          return ok;
         },
       ),
       { numRuns: 20 },
@@ -224,14 +271,15 @@ describe("POST /api/v1/gateway/messages — property-based fuzzing", () => {
             type: unknown;
             content: { type: unknown; text: unknown }[];
           }>();
-          return (
+          const shapeOk =
             typeof body.id === "string" &&
             body.type === "message" &&
             Array.isArray(body.content) &&
             body.content.length > 0 &&
             body.content[0]?.type === "text" &&
-            typeof body.content[0]?.text === "string"
-          );
+            typeof body.content[0]?.text === "string";
+          expect(shapeOk).toBe(true);
+          return shapeOk;
         },
       ),
       { numRuns: 20 },
@@ -265,6 +313,7 @@ describe("POST /api/v1/gateway/messages — property-based fuzzing", () => {
             url: "/api/v1/gateway/messages",
             payload,
           });
+          expect(res.statusCode).toBeLessThan(500);
           return res.statusCode < 500;
         },
       ),

@@ -41,7 +41,7 @@ async function execute(
   ctx: IExecutionContext,
 ): Promise<GroqInferenceResult> {
   const apiKey = requireEnv(ctx, "GROQ_API_KEY");
-  const model = task.model ?? "llama-3.3-70b-versatile";
+  const model = task.model ?? "openai/gpt-oss-120b";
   ctx.logger.info("groq.inference", { model, messageCount: task.messages.length });
 
   const response = await fetch(`${GROQ_API_BASE}/chat/completions`, {

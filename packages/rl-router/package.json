@@ -1,0 +1,18 @@
+{
+  "name": "@nexus/rl-router",
+  "version": "0.1.0",
+  "description": "RL-trained cost-aware LLM routing with complexity classification and multi-provider optimization — inspired by xRouter",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/memory-scoring",
+  "version": "0.1.0",
+  "description": "PBWM-inspired memory retrieval scoring with sector weights and gating",
+  "main": "src/index.ts"
+}

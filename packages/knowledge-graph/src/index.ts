@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
+import { createHash } from "node:crypto";
+
+import { detectCommunities, type CommunityOptions } from "./community.js";
+import { runCypher, type CypherResult } from "./query.js";
 /**
  * @nexus/knowledge-graph — entity/relationship graph over agent memory.
  *
@@ -22,8 +26,6 @@
  *   Agents (9)  — query nodes/edges to answer "who knows whom" questions
  *   Context-pack — future: include high-confidence entities in system prompt
  */
-
-import { createHash } from "node:crypto";
 
 // ── Entity / Relationship types (re-declared; compatible with @nexus/nlp-utils) ─
 
@@ -521,6 +523,29 @@ export class KnowledgeGraph {
 
   async stats(): Promise<KGStats> {
     return this.store.stats();
+  }
+
+  /**
+   * Cluster the stored graph into communities (Leiden algorithm over the
+   * undirected projection of all edges). Returns node id → community id.
+   */
+  async detectCommunities(options: CommunityOptions = {}): Promise<Map<string, number>> {
+    const nodes = await this.store.findNodes({});
+    const edges = await this.store.findEdges({});
+    const adjacency = new Map<string, Set<string>>(nodes.map((n) => [n.id, new Set()]));
+    for (const e of edges) {
+      adjacency.get(e.subjectId)?.add(e.objectId);
+      adjacency.get(e.objectId)?.add(e.subjectId);
+    }
+    return detectCommunities(adjacency, options);
+  }
+
+  /**
+   * Run a Cypher-subset query against the stored graph (single directed hop,
+   * optional WHERE / RETURN / LIMIT). See {@link runCypher} for the grammar.
+   */
+  async query(cypher: string): Promise<CypherResult> {
+    return runCypher(this.store, cypher);
   }
 }
 
@@ -1686,3 +1711,6 @@ export async function graphSearch(
     contextTokenEstimate: Math.ceil(contextText.length / 4),
   };
 }
+
+export * from "./community.js";
+export * from "./query.js";

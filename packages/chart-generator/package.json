@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/chart-generator",
+  "version": "0.1.0",
+  "description": "Chart generation for code execution results with SVG/HTML/Text rendering",
+  "main": "src/index.ts"
+}
