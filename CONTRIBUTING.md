@@ -23,13 +23,13 @@ Thank you for your interest in contributing. This guide covers everything you ne
 
 ## Prerequisites
 
-| Tool    | Version            | Install                                         |
-| ------- | ------------------ | ----------------------------------------------- |
+| Tool    | Version       | Install                                         |
+| ------- | ------------- | ----------------------------------------------- |
 | Node.js | 22 LTS (`22`) | [nvm](https://github.com/nvm-sh/nvm): `nvm use` |
-| pnpm    | 9.x                | `npm i -g pnpm@9`                               |
-| Python  | 3.11               | [pyenv](https://github.com/pyenv/pyenv)         |
-| Docker  | 24+                | [docker.com](https://docker.com)                |
-| Git     | 2.40+              | system package manager                          |
+| pnpm    | 9.x           | `npm i -g pnpm@9`                               |
+| Python  | 3.11          | [pyenv](https://github.com/pyenv/pyenv)         |
+| Docker  | 24+           | [docker.com](https://docker.com)                |
+| Git     | 2.40+         | system package manager                          |
 
 > **Reproducible environment (recommended):** Install [Devbox](https://www.jetify.com/devbox/docs/installing_devbox/) and run `devbox shell` from the repo root. This pins Node, pnpm, Python, and Go to the exact versions in `devbox.json` without touching your system.
 

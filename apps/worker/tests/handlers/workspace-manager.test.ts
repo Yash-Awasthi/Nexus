@@ -186,10 +186,7 @@ describe("WorkspaceManager", () => {
     // worked on Windows. Paths use forward slashes, which node fs accepts on
     // Windows too, and the tiny TOML parser only strips the OUTER quotes.
     const script = path.join(tmpRoot, "delta-archive.cjs");
-    await fs.writeFile(
-      script,
-      "require('node:fs').writeFileSync(process.argv[2], '1');\n",
-    );
+    await fs.writeFile(script, "require('node:fs').writeFileSync(process.argv[2], '1');\n");
     const scriptFwd = script.replaceAll("\\", "/");
     const flagFwd = flag.replaceAll("\\", "/");
     await fs.writeFile(
