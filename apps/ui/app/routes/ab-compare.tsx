@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * A/B Model Comparison — Arena-style side-by-side model evaluation.
- * Connects to /api/ab/run, /api/ab/:id/preference, /api/ab, /api/ab/stats
+ * Connects to /api/ab/run, /api/ab/:id/preference, /api/ab, /api/ab/stats.
+ * Field names mirror the API's AbResult (latencyA/tokensA/winner) — the page
+ * previously rendered against an imagined contract (latencyAMs/costA/) and
+ * crashed on every completed run.
  */
 import { useState, useCallback, useEffect } from "react";
 import { Button } from "~/components/ui/button";
@@ -18,7 +21,7 @@ import {
 import {
   Trophy,
   Zap,
-  DollarSign,
+  Coins,
   ThumbsUp,
   ThumbsDown,
   Minus,
@@ -38,23 +41,19 @@ interface ABResult {
   modelB: string;
   responseA: string;
   responseB: string;
-  latencyAMs: number;
-  latencyBMs: number;
-  costA: number;
-  costB: number;
-  userPreference?: "A" | "B" | "tie" | "both_bad";
-  blindEvaluation?: { winner: "A" | "B" | "tie"; reasoning: string };
+  latencyA: number;
+  latencyB: number;
+  tokensA: number;
+  tokensB: number;
+  /** Server-side heuristic winner — deliberately not shown before voting. */
+  winner?: "A" | "B" | null;
+  userPreference?: "A" | "B" | "tie" | "both_bad" | null;
   createdAt: string;
 }
 
 interface ABStats {
   totalRuns: number;
-  preferenceBreakdown: Record<string, number>;
-  avgLatencyA: number;
-  avgLatencyB: number;
-  avgCostA: number;
-  avgCostB: number;
-  modelWinRates: Record<string, number>;
+  modelStats: Record<string, { wins: number; losses: number; ties: number }>;
 }
 
 // ─── Model catalogue ──────────────────────────────────────────────────────────
@@ -63,6 +62,7 @@ interface ABStats {
 // were retired by their vendors; llama-3.1-70b-versatile was decommissioned
 // by Groq; gpt-4-turbo shuts down 2026-10-23.
 const MODELS = [
+  "llama3.2:1b",
   "openai/gpt-oss-120b",
   "gpt-4o-mini",
   "claude-sonnet-4-6",
@@ -79,9 +79,9 @@ function ms(n: number) {
   return `${(n / 1000).toFixed(1)}s`;
 }
 
-function cost(n: number) {
-  if (n === 0) return "—";
-  return `$${n.toFixed(5)}`;
+function tokens(n: number) {
+  if (!n) return "—";
+  return `${n.toLocaleString()} tok`;
 }
 
 function timeAgo(d: string) {
@@ -96,7 +96,7 @@ function timeAgo(d: string) {
 
 export default function ABCompare() {
   const [prompt, setPrompt] = useState("");
-  const [modelA, setModelA] = useState("gpt-4o");
+  const [modelA, setModelA] = useState("gpt-4o-mini");
   const [modelB, setModelB] = useState("claude-sonnet-4-6");
   const [running, setRunning] = useState(false);
   const [current, setCurrent] = useState<ABResult | null>(null);
@@ -294,22 +294,23 @@ export default function ABCompare() {
                 {(["A", "B"] as const).map((side) => {
                   const model = side === "A" ? current.modelA : current.modelB;
                   const response = side === "A" ? current.responseA : current.responseB;
-                  const latency = side === "A" ? current.latencyAMs : current.latencyBMs;
-                  const c = side === "A" ? current.costA : current.costB;
-                  const fasterSide = current.latencyAMs < current.latencyBMs ? "A" : "B";
-                  const isFaster = side === fasterSide;
+                  const latency = side === "A" ? current.latencyA : current.latencyB;
+                  const tk = side === "A" ? current.tokensA : current.tokensB;
+                  // A failed side reports latency 0 — never award it "faster".
+                  const fasterSide =
+                    current.latencyA > 0 && current.latencyB > 0
+                      ? current.latencyA <= current.latencyB
+                        ? "A"
+                        : "B"
+                      : null;
+                  const isFaster = side !== null && side === fasterSide;
                   const preferred = current.userPreference === side;
-                  const evalWinner = current.blindEvaluation?.winner === side;
 
                   return (
                     <Card
                       key={side}
                       className={`border-2 transition-colors ${
-                        preferred
-                          ? "border-green-500"
-                          : evalWinner
-                            ? "border-blue-500"
-                            : "border-border"
+                        preferred ? "border-green-500" : "border-border"
                       }`}
                     >
                       <CardHeader className="pb-2">
@@ -337,8 +338,8 @@ export default function ABCompare() {
                               {ms(latency)}
                             </span>
                             <span className="flex items-center gap-1">
-                              <DollarSign className="w-3 h-3" />
-                              {cost(c)}
+                              <Coins className="w-3 h-3" />
+                              {tokens(tk)}
                             </span>
                           </div>
                         </div>
@@ -350,21 +351,6 @@ export default function ABCompare() {
                   );
                 })}
               </div>
-
-              {/* AI blind eval */}
-              {current.blindEvaluation && (
-                <Card className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
-                  <CardContent className="pt-4">
-                    <p className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
-                      🤖 AI Blind Evaluation — Winner:{" "}
-                      <span className="font-bold">Model {current.blindEvaluation.winner}</span>
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {current.blindEvaluation.reasoning}
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
 
               {/* Vote bar */}
               {!current.userPreference ? (
@@ -486,7 +472,7 @@ export default function ABCompare() {
       {/* ── Stats Tab ── */}
       {tab === "stats" && (
         <div className="space-y-4">
-          {!stats ? (
+          {!stats || stats.totalRuns === 0 ? (
             <p className="text-muted-foreground text-sm text-center py-8">
               No stats yet — run some comparisons first
             </p>
@@ -495,9 +481,24 @@ export default function ABCompare() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
                   { label: "Total Runs", value: stats.totalRuns, icon: BarChart2 },
-                  { label: "Avg Latency A", value: ms(stats.avgLatencyA || 0), icon: Clock },
-                  { label: "Avg Latency B", value: ms(stats.avgLatencyB || 0), icon: Clock },
-                  { label: "Avg Cost A", value: cost(stats.avgCostA || 0), icon: DollarSign },
+                  {
+                    label: "Models Compared",
+                    value: Object.keys(stats.modelStats).length,
+                    icon: Trophy,
+                  },
+                  {
+                    label: "Total Votes",
+                    value: Object.values(stats.modelStats).reduce(
+                      (a, m) => a + m.wins + m.losses + m.ties,
+                      0,
+                    ),
+                    icon: ThumbsUp,
+                  },
+                  {
+                    label: "Total Wins",
+                    value: Object.values(stats.modelStats).reduce((a, m) => a + m.wins, 0),
+                    icon: Zap,
+                  },
                 ].map(({ label, value, icon: Icon }) => (
                   <Card key={label}>
                     <CardContent className="pt-4">
@@ -511,66 +512,34 @@ export default function ABCompare() {
                 ))}
               </div>
 
-              {/* Preference breakdown */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Preference Breakdown</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {Object.entries(stats.preferenceBreakdown ?? {}).length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No votes yet</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {Object.entries(stats.preferenceBreakdown).map(([pref, count]) => {
-                        const total = Object.values(stats.preferenceBreakdown).reduce(
-                          (a, b) => a + b,
-                          0,
-                        );
-                        const pct = Math.round((count / total) * 100);
-                        return (
-                          <div key={pref} className="flex items-center gap-3">
-                            <span className="text-sm w-20 capitalize">{pref}</span>
-                            <div className="flex-1 bg-muted rounded-full h-2">
-                              <div
-                                className="bg-primary h-2 rounded-full transition-all"
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
-                            <span className="text-xs text-muted-foreground w-12 text-right">
-                              {count} ({pct}%)
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Model win rates */}
-              {stats.modelWinRates && Object.keys(stats.modelWinRates).length > 0 && (
+              {/* Model win/loss records */}
+              {Object.keys(stats.modelStats).length > 0 && (
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">Model Win Rates</CardTitle>
+                    <CardTitle className="text-base">Model Records (wins / losses / ties)</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {Object.entries(stats.modelWinRates)
-                        .sort(([, a], [, b]) => b - a)
-                        .map(([model, rate]) => (
-                          <div key={model} className="flex items-center gap-3">
-                            <span className="text-sm font-mono w-48 truncate">{model}</span>
-                            <div className="flex-1 bg-muted rounded-full h-2">
-                              <div
-                                className="bg-yellow-500 h-2 rounded-full"
-                                style={{ width: `${Math.round(rate * 100)}%` }}
-                              />
+                      {Object.entries(stats.modelStats)
+                        .sort(([, a], [, b]) => b.wins - a.wins)
+                        .map(([model, rec]) => {
+                          const total = rec.wins + rec.losses + rec.ties;
+                          const pct = total > 0 ? Math.round((rec.wins / total) * 100) : 0;
+                          return (
+                            <div key={model} className="flex items-center gap-3">
+                              <span className="text-sm font-mono w-48 truncate">{model}</span>
+                              <div className="flex-1 bg-muted rounded-full h-2">
+                                <div
+                                  className="bg-yellow-500 h-2 rounded-full"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <span className="text-xs text-muted-foreground w-24 text-right">
+                                {rec.wins}W / {rec.losses}L / {rec.ties}T
+                              </span>
                             </div>
-                            <span className="text-xs text-muted-foreground w-12 text-right">
-                              {Math.round(rate * 100)}%
-                            </span>
-                          </div>
-                        ))}
+                          );
+                        })}
                     </div>
                   </CardContent>
                 </Card>

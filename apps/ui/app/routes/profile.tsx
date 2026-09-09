@@ -78,7 +78,10 @@ export default function ProfilePage() {
   const role = user?.role ?? "user";
 
   const [name, setName] = useState(displayName);
-  const [customInstructions, setCustomInstructions] = useState(user?.customInstructions ?? "");
+  // Persisted in the per-user preferences store (/settings/preferences) —
+  // PATCH /auth/me has no such column, and the chat stream injects this as a
+  // system message.
+  const [customInstructions, setCustomInstructions] = useState("");
   const { theme: currentTheme, setTheme: applyTheme } = useTheme();
   const [themeSelection, setThemeSelection] = useState<"auto" | "light" | "dark">(
     currentTheme === "dark" ? "dark" : currentTheme === "light" ? "light" : "auto",
@@ -97,9 +100,24 @@ export default function ProfilePage() {
   useEffect(() => {
     if (user) {
       setName(user.username ?? "");
-      setCustomInstructions(user.customInstructions ?? "");
     }
   }, [user?.id]);
+
+  // Load saved custom instructions from the per-user preferences store.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/settings/preferences")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p) => {
+        if (!cancelled && p && typeof p.customInstructions === "string") {
+          setCustomInstructions(p.customInstructions);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const initials =
     (name || displayName)
@@ -113,10 +131,10 @@ export default function ProfilePage() {
     setIsSavingInstructions(true);
     setSaveError(null);
     try {
-      const res = await fetch("/api/v1/auth/me", {
+      const res = await fetch("/api/settings/preferences", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ custom_instructions: customInstructions }),
+        body: JSON.stringify({ customInstructions }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

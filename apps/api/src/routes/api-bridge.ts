@@ -1193,11 +1193,26 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     };
 
     // Round 0 — every member answers independently, in parallel.
+    // Custom instructions (Profile page) ride in the per-user preferences
+    // store and are prepended as a system message so every council member
+    // honours them — previously the field was saved nowhere and read by
+    // nothing (playtest: the Profile page advertised a no-op).
+    const customInstructions = String(
+      (_prefsStore.get(request.nexusUserId ?? "") as Record<string, unknown> | undefined)
+        ?.customInstructions ?? "",
+    )
+      .slice(0, 2000)
+      .trim();
+
     await Promise.allSettled(
       enabled.map(async (member) => {
         const driver = driverFor(member.provider);
         if (!driver) return;
-        const history: { role: LlmRole; content: string }[] = [{ role: "user", content: message }];
+        const history: { role: LlmRole; content: string }[] = [];
+        if (customInstructions) {
+          history.push(systemMsg(`Follow these standing user instructions:\n${customInstructions}`));
+        }
+        history.push({ role: "user", content: message });
         histories.set(member.label, history);
         let memberText = "";
         try {
@@ -1452,6 +1467,27 @@ export async function apiBridgeRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const uid = userIdOf(request);
       const merged = { ...(_prefsStore.get(uid) ?? {}), ...request.body };
+      _prefsStore.set(uid, merged);
+      return reply.send({ ..._prefsDefaults, ...merged });
+    },
+  );
+
+  // Custom instructions (Profile page) persist in the same per-user store so
+  // the chat stream can read them; previously PATCH /auth/me 400'd on the
+  // field (the users table has no such column) and the save was a silent
+  // no-op with a fake success toast.
+  app.patch<{ Body: { customInstructions?: unknown } }>(
+    "/settings/preferences",
+    _prefsPreHandler,
+    async (request, reply) => {
+      const uid = userIdOf(request);
+      if (typeof request.body?.customInstructions !== "string") {
+        return reply.code(400).send({ error: "invalid_body", message: "customInstructions must be a string" });
+      }
+      const merged = {
+        ...(_prefsStore.get(uid) ?? {}),
+        customInstructions: request.body.customInstructions.slice(0, 2000),
+      };
       _prefsStore.set(uid, merged);
       return reply.send({ ..._prefsDefaults, ...merged });
     },
