@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   Link2,
   MemoryStick,
+  AlertTriangle,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -40,6 +41,7 @@ import {
   API_PROVIDERS,
   loadCouncilMembers,
   saveCouncilMembers,
+  syncCouncilFromServer,
   newMember,
 } from "~/lib/council";
 import { connectProvider, isProviderConnected } from "~/lib/deliberate";
@@ -102,6 +104,7 @@ function ConnectedAccountsCard() {
     claude: null,
   });
   const [connecting, setConnecting] = useState<string | null>(null);
+  const [connectError, setConnectError] = useState<string | null>(null);
 
   useEffect(() => {
     BROWSER_PROVIDERS.forEach(async (p) => {
@@ -112,10 +115,18 @@ function ConnectedAccountsCard() {
 
   const handleConnect = async (id: string) => {
     setConnecting(id);
-    await connectProvider(id);
-    const ok = await isProviderConnected(id);
-    setStatuses((prev) => ({ ...prev, [id]: ok }));
-    setConnecting(null);
+    setConnectError(null);
+    try {
+      await connectProvider(id);
+      const ok = await isProviderConnected(id);
+      setStatuses((prev) => ({ ...prev, [id]: ok }));
+    } catch (err) {
+      // Surface the failure inline — an unhandled rejection made the button
+      // look dead (click → nothing happens).
+      setConnectError(err instanceof Error ? err.message : "Could not connect.");
+    } finally {
+      setConnecting(null);
+    }
   };
 
   return (
@@ -129,6 +140,7 @@ function ConnectedAccountsCard() {
           Connect your existing subscriptions — no API key needed. Nexus opens a sign-in window and
           saves your session.
         </CardDescription>
+        {connectError && <p className="text-xs text-destructive">{connectError}</p>}
       </CardHeader>
       <CardContent className="space-y-3">
         {BROWSER_PROVIDERS.map((p) => {
@@ -222,15 +234,19 @@ function MemberRow({
   member,
   onChange,
   onRemove,
+  warning,
 }: {
   member: CouncilMember;
   onChange: (m: CouncilMember) => void;
   onRemove?: () => void;
+  /** Server-side model-availability hint shown under this member (if any). */
+  warning?: string;
 }) {
   const canBrowser = BROWSER_CAPABLE.has(member.id);
   const selectedProvider = API_PROVIDERS.find((p) => p.id === member.provider);
   const [connected, setConnected] = useState<boolean | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
 
   // Check connection status when member is in browser mode
   useEffect(() => {
@@ -243,11 +259,17 @@ function MemberRow({
 
   const handleConnect = async () => {
     setConnecting(true);
-    await connectProvider(member.id);
-    // Re-check after window closes
-    const status = await isProviderConnected(member.id);
-    setConnected(status);
-    setConnecting(false);
+    setConnectError(null);
+    try {
+      await connectProvider(member.id);
+      // Re-check after window closes
+      const status = await isProviderConnected(member.id);
+      setConnected(status);
+    } catch (err) {
+      setConnectError(err instanceof Error ? err.message : "Could not connect.");
+    } finally {
+      setConnecting(false);
+    }
   };
 
   const handleModeChange = (mode: MemberMode) => {
@@ -399,6 +421,22 @@ function MemberRow({
             </p>
           )}
 
+          {/* BYOK hint — which key source actually backs this member */}
+          {member.keySource && member.keySource !== "local" && (
+            <p
+              className={`col-span-2 text-xs ${
+                member.keySource === "none" ? "text-amber-600" : "text-muted-foreground"
+              }`}
+            >
+              {member.keySource === "user" &&
+                `Using your saved ${member.provider} key — this member will run with your key.`}
+              {member.keySource === "env" &&
+                `Using the server's ${member.provider} key (env) — save your own key on the Provider Keys page to override.`}
+              {member.keySource === "none" &&
+                `No ${member.provider} key configured — this member will fail until you add one on the Provider Keys page.`}
+            </p>
+          )}
+
           {/* Base URL — shown for ollama and custom */}
           {(member.provider === "ollama" || member.provider === "custom") && (
             <div className="space-y-1 col-span-2">
@@ -413,6 +451,14 @@ function MemberRow({
           )}
         </div>
       )}
+
+      {/* Server-side model-availability warning (from Settings → Council save) */}
+      {warning && (
+        <p className="pl-9 flex items-start gap-1.5 text-xs text-amber-600">
+          <AlertTriangle className="size-3.5 mt-0.5 shrink-0" />
+          <span>{warning}</span>
+        </p>
+      )}
     </div>
   );
 }
@@ -422,6 +468,20 @@ function MemberRow({
 export default function SettingsPage() {
   const [members, setMembers] = useState<CouncilMember[]>(loadCouncilMembers);
   const [councilSaved, setCouncilSaved] = useState(false);
+  const [councilSaving, setCouncilSaving] = useState(false);
+  const [councilWarnings, setCouncilWarnings] = useState<Record<string, string>>({});
+
+  // Load the server-persisted council at mount so a user opening Settings in a
+  // new browser sees their saved members, not the out-of-box defaults.
+  useEffect(() => {
+    let cancelled = false;
+    syncCouncilFromServer().then((merged) => {
+      if (!cancelled) setMembers(merged);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const updateMember = (id: string, updated: CouncilMember) => {
     setMembers((prev) => prev.map((m) => (m.id === id ? updated : m)));
@@ -435,7 +495,7 @@ export default function SettingsPage() {
     setMembers((prev) => [...prev, newMember()]);
   };
 
-  const saveCouncil = () => {
+  const saveCouncil = async () => {
     saveCouncilMembers(members);
     // Sync to electron main if running in desktop
     if (typeof window !== "undefined") {
@@ -446,12 +506,67 @@ export default function SettingsPage() {
     }
     setCouncilSaved(true);
     setTimeout(() => setCouncilSaved(false), 2000);
-    // Persist to backend (fire-and-forget)
-    fetch("/api/settings/council", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ members }),
-    }).catch(() => {});
+
+    // Persist to the backend and validate every API-mode member's model id
+    // against the provider's live catalog (server-side key). Per-member
+    // warnings surface here instead of an opaque failure at run time.
+    setCouncilSaving(true);
+    try {
+      const res = await fetch("/api/settings/council", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ members }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        validations?: Array<{
+          index: number;
+          provider: string;
+          model: string;
+          status: string;
+          availableModels?: string[];
+        }>;
+        keySources?: Array<{ index: number; source?: "user" | "env" | "local" | "none" }>;
+      };
+      const warnings: Record<string, string> = {};
+      if (res.ok && Array.isArray(data.validations)) {
+        members.forEach((m, i) => {
+          const v = data.validations!.find((x) => x.index === i);
+          if (!v) return;
+          if (v.status === "missing") {
+            const hint =
+              v.availableModels && v.availableModels.length > 0
+                ? ` Available: ${v.availableModels.slice(0, 5).join(", ")}.`
+                : "";
+            warnings[m.id] = `"${v.model}" is not available on your ${v.provider} key.${hint}`;
+          } else if (v.status === "missing_model") {
+            warnings[m.id] =
+              `Enter a model for this ${v.provider} member before saving — an empty model will fail every run.`;
+          } else if (v.status === "no_key") {
+            warnings[m.id] =
+              `No ${v.provider} key is configured server-side — add one on the Provider Keys page before this member can run.`;
+          } else if (v.status === "unreachable") {
+            warnings[m.id] =
+              `Couldn't reach ${v.provider} to verify "${v.model}" — it may still work.`;
+          }
+        });
+      }
+      // Reflect the live BYOK key source on each member row right after saving.
+      if (res.ok && Array.isArray(data.keySources)) {
+        setMembers((prev) =>
+          prev.map((m, i) => {
+            const ks = data.keySources!.find((x) => x.index === i);
+            return ks ? { ...m, keySource: ks.source } : m;
+          }),
+        );
+      }
+      setCouncilWarnings(warnings);
+    } catch {
+      // Backend unreachable — members are still persisted locally.
+      setCouncilWarnings({});
+    } finally {
+      setCouncilSaving(false);
+    }
   };
 
   const [autoCouncil, setAutoCouncil] = useState(true);
@@ -599,6 +714,7 @@ export default function SettingsPage() {
                 member={m}
                 onChange={(updated) => updateMember(m.id, updated)}
                 onRemove={BROWSER_CAPABLE.has(m.id) ? undefined : () => removeMember(m.id)}
+                warning={councilWarnings[m.id]}
               />
             ))}
 
@@ -610,8 +726,16 @@ export default function SettingsPage() {
               Add member
             </button>
 
-            <Button onClick={saveCouncil} size="sm" className="mt-1">
-              {councilSaved ? "Saved ✓" : "Save Council"}
+            <Button onClick={saveCouncil} size="sm" className="mt-1" disabled={councilSaving}>
+              {councilSaving ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" /> Validating…
+                </>
+              ) : councilSaved ? (
+                "Saved ✓"
+              ) : (
+                "Save Council"
+              )}
             </Button>
           </CardContent>
         </Card>

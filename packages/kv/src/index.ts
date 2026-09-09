@@ -71,6 +71,16 @@ export interface KVStore {
    * The factory is only called on a cache miss.
    */
   getOrSet<T>(key: string, factory: () => Promise<T>, ttlMs?: number): Promise<T>;
+  /**
+   * Atomically increment a numeric counter, returning the new value.
+   *
+   * The TTL is stamped ONLY when this call creates the key (result 1) — an
+   * increment on an existing key never refreshes the expiry, so a counter
+   * drains at the window boundary even under continuous traffic. Backends
+   * without a native atomic increment (e.g. Cloudflare Workers KV) degrade
+   * to a best-effort read-modify-write and document it.
+   */
+  incr(key: string, ttlMs?: number): Promise<number>;
 }
 
 // ── Internal entry ────────────────────────────────────────────────────────────
@@ -119,6 +129,27 @@ export class MemoryKVStore implements KVStore {
 
   async delete(key: string): Promise<void> {
     this.store.delete(key);
+  }
+
+  /**
+   * Atomic in-process increment — no awaits between the map read and write,
+   * so the event loop cannot interleave another caller (the documented
+   * single-process contract). The TTL is stamped only on key creation;
+   * increments preserve the original expiry. A non-numeric value is treated
+   * as a fresh counter (Redis INCR would error — this store is permissive).
+   */
+  async incr(key: string, ttlMs?: number): Promise<number> {
+    const entry = this.store.get(key);
+    if (entry !== undefined && !this._isExpired(entry)) {
+      if (typeof entry.value === "number") {
+        entry.value += 1;
+        return entry.value;
+      }
+      // Non-numeric — fall through and start a fresh counter.
+    }
+    const expiresAt = ttlMs !== undefined && ttlMs > 0 ? this.now() + ttlMs : undefined;
+    this.store.set(key, { value: 1, expiresAt });
+    return 1;
   }
 
   async has(key: string): Promise<boolean> {
@@ -179,6 +210,9 @@ export interface RedisClientLike {
   set(key: string, value: string, options?: { PX?: number; NX?: boolean }): Promise<unknown>;
   del(key: string | string[]): Promise<number>;
   exists(key: string): Promise<number>;
+  incr(key: string): Promise<number>;
+  /** Set a key's TTL in seconds. */
+  expire(key: string, seconds: number): Promise<unknown>;
   keys(pattern: string): Promise<string[]>;
   flushAll(): Promise<unknown>;
   /** eval / evalsha for atomic Lua scripts */
@@ -217,6 +251,20 @@ export class RedisKVStore implements KVStore {
 
   async delete(key: string): Promise<void> {
     await this.client.del(this._k(key));
+  }
+
+  /**
+   * Atomic INCR; EXPIRE is issued only when this call created the key
+   * (result 1). Redis INCR preserves an existing TTL, so in-window traffic
+   * never refreshes the expiry — the bucket drains at the window boundary.
+   */
+  async incr(key: string, ttlMs?: number): Promise<number> {
+    const k = this._k(key);
+    const count = await this.client.incr(k);
+    if (count === 1 && ttlMs !== undefined && ttlMs > 0) {
+      await this.client.expire(k, Math.ceil(ttlMs / 1000));
+    }
+    return count;
   }
 
   async has(key: string): Promise<boolean> {

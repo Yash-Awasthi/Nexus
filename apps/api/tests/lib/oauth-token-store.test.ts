@@ -5,9 +5,16 @@
  * column name shims. The live-DB path is exercised by the OAuth route
  * integration tests, which self-skip on missing DATABASE_URL.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import type { NexusDB } from "@nexus/db";
 import type { SealedRecord } from "@nexus/llm-oauth";
+
+// The lib under test imports the @nexus/db singleton as a *default parameter*;
+// constructing it requires DATABASE_URL and would throw at collection. Every
+// test passes an explicit fake db, so the singleton is never dereferenced —
+// mock the module to keep this suite DB-free (per its docstring).
+vi.mock("@nexus/db", () => ({ db: {} }));
+
 import {
   DrizzleSealedTokenStore,
   dateToMs,

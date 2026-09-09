@@ -5,7 +5,8 @@
  * Tests that:
  *   - SSE agent stream /sse/agent/:stream returns 403 for wrong user
  *   - Firehose routes (/sse/tasks, /sse/signals, /sse/verdicts, /sse/agent/all)
- *     require enterprise tier
+ *     are open to every authenticated tier — the enterprise-only tier gate was
+ *     removed with the free/open auth change, only authentication remains
  *   - Single-task subscription (/sse/tasks/:taskId) checks session ownership
  *   - Single-verdict subscription (/sse/verdicts/:taskId) checks ownership
  *
@@ -19,7 +20,9 @@
  *   if the inject promise does not resolve within SSE_GRACE_MS, we treat it
  *   as "route passed auth + ownership checks and hijacked the reply", i.e.
  *   success. The rejection/403 paths return normally before hijack.
- *   Tests added with { timeout: 10_000 } to avoid test-runner timeouts.
+ *   Tests added with { timeout: 30_000 } to avoid test-runner timeouts:
+ *   every test builds a full server, and under full-suite parallel load a
+ *   single build can exceed 10s (observed 2026-09-08).
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -66,7 +69,7 @@ const USER_B = "11111111-2222-3333-4444-555555555555";
 const TASK_OWNED_BY_A = "task-aaaa-0001";
 const TASK_NOT_OWNED = "task-zzzz-9999";
 
-function tokenFor(userId: string, tier: string = "pro"): string {
+function tokenFor(userId: string, tier = "pro"): string {
   return makeJwt(
     { sub: userId, role: "admin", tier, exp: Math.floor(Date.now() / 1000) + 3600 },
     JWT_SECRET,
@@ -180,24 +183,28 @@ afterEach(async () => {
 // ── SSE agent stream: wrong user → 403 ─────────────────────────────────────────
 
 describe("GET /api/v1/sse/agent/:stream (tenant isolation)", () => {
-  it("returns 403 when DB says session is owned by a different user", async () => {
-    setPgRows([{ user_id: USER_B }]);
-    app = await buildWithAuth();
+  it(
+    "returns 403 when DB says session is owned by a different user",
+    { timeout: 30_000 },
+    async () => {
+      setPgRows([{ user_id: USER_B }]);
+      app = await buildWithAuth();
 
-    const res = await injectSse(app, {
-      method: "GET",
-      url: `/api/v1/sse/agent/${TASK_OWNED_BY_A}`,
-      headers: { authorization: `Bearer ${tokenFor(USER_A)}` },
-    });
+      const res = await injectSse(app, {
+        method: "GET",
+        url: `/api/v1/sse/agent/${TASK_OWNED_BY_A}`,
+        headers: { authorization: `Bearer ${tokenFor(USER_A)}` },
+      });
 
-    expect(res.hijacked).toBe(false);
-    expect(res.statusCode).toBe(403);
-    expect(res.body().error).toBe("Not your agent session");
-  });
+      expect(res.hijacked).toBe(false);
+      expect(res.statusCode).toBe(403);
+      expect(res.body().error).toBe("Not your agent session");
+    },
+  );
 
   it(
     "proceeds (hijacks) when session is not yet in DB (row count 0)",
-    { timeout: 10_000 },
+    { timeout: 30_000 },
     async () => {
       setPgRows([]);
       app = await buildWithAuth();
@@ -213,7 +220,7 @@ describe("GET /api/v1/sse/agent/:stream (tenant isolation)", () => {
     },
   );
 
-  it("proceeds (hijacks) when user matches session owner", { timeout: 10_000 }, async () => {
+  it("proceeds (hijacks) when user matches session owner", { timeout: 30_000 }, async () => {
     setPgRows([{ user_id: USER_A }]);
     app = await buildWithAuth();
 
@@ -226,7 +233,7 @@ describe("GET /api/v1/sse/agent/:stream (tenant isolation)", () => {
     expect(res.hijacked).toBe(true);
   });
 
-  it("fails open (no 403) when DB is unreachable", { timeout: 10_000 }, async () => {
+  it("fails open (no 403) when DB is unreachable", { timeout: 30_000 }, async () => {
     setPgError(new Error("ECONNREFUSED"));
     app = await buildWithAuth();
 
@@ -241,9 +248,9 @@ describe("GET /api/v1/sse/agent/:stream (tenant isolation)", () => {
   });
 });
 
-// ── Firehose routes: enterprise tier only ──────────────────────────────────────
+// ── Firehose routes: open to all tiers ────────────────────────────────────────
 
-describe("SSE firehose routes require enterprise tier", () => {
+describe("SSE firehose routes are open to every tier", () => {
   // prettier-ignore
   const firehoseEndpoints = [
     { method: "GET", url: "/api/v1/sse/tasks",        label: "tasks firehose" },
@@ -253,7 +260,7 @@ describe("SSE firehose routes require enterprise tier", () => {
   ] as const;
 
   for (const ep of firehoseEndpoints) {
-    it(`returns 403 for pro tier on ${ep.label}`, async () => {
+    it(`pro tier is no longer gated on ${ep.label} (hijacks)`, { timeout: 30_000 }, async () => {
       setPgRows([]);
       app = await buildWithAuth();
 
@@ -263,13 +270,13 @@ describe("SSE firehose routes require enterprise tier", () => {
         headers: { authorization: `Bearer ${tokenFor(USER_A, "pro")}` },
       });
 
-      expect(res.hijacked).toBe(false);
-      expect(res.statusCode).toBe(403);
-      const body = res.body();
-      expect(body.error).toMatch(/firehose requires enterprise tier/i);
+      // Current contract: the enterprise-only tier gate is gone (auth.ts
+      // hard-wires OPEN_TIER — Nexus is free/open), so a pro token hijacks the
+      // stream where it previously got 403. Only authentication remains.
+      expect(res.hijacked).toBe(true);
     });
 
-    it(`allows enterprise tier on ${ep.label}`, { timeout: 10_000 }, async () => {
+    it(`allows enterprise tier on ${ep.label}`, { timeout: 30_000 }, async () => {
       setPgRows([]);
       app = await buildWithAuth();
 
@@ -288,7 +295,7 @@ describe("SSE firehose routes require enterprise tier", () => {
 // ── Single-task subscription: ownership check ──────────────────────────────────
 
 describe("GET /api/v1/sse/tasks/:taskId (ownership)", () => {
-  it("returns 403 when task belongs to a different user", async () => {
+  it("returns 403 when task belongs to a different user", { timeout: 30_000 }, async () => {
     setPgRows([{ user_id: USER_B }]);
     app = await buildWithAuth();
 
@@ -303,7 +310,7 @@ describe("GET /api/v1/sse/tasks/:taskId (ownership)", () => {
     expect(res.body().error).toBe("Not your task");
   });
 
-  it("allows when user owns the task", { timeout: 10_000 }, async () => {
+  it("allows when user owns the task", { timeout: 30_000 }, async () => {
     setPgRows([{ user_id: USER_A }]);
     app = await buildWithAuth();
 
@@ -320,7 +327,7 @@ describe("GET /api/v1/sse/tasks/:taskId (ownership)", () => {
 // ── Single-verdict subscription: ownership check ───────────────────────────────
 
 describe("GET /api/v1/sse/verdicts/:taskId (ownership)", () => {
-  it("returns 403 when verdict task belongs to a different user", async () => {
+  it("returns 403 when verdict task belongs to a different user", { timeout: 30_000 }, async () => {
     setPgRows([{ user_id: USER_B }]);
     app = await buildWithAuth();
 
@@ -335,7 +342,7 @@ describe("GET /api/v1/sse/verdicts/:taskId (ownership)", () => {
     expect(res.body().error).toBe("Not your task");
   });
 
-  it("allows when user owns the verdict task", { timeout: 10_000 }, async () => {
+  it("allows when user owns the verdict task", { timeout: 30_000 }, async () => {
     setPgRows([{ user_id: USER_A }]);
     app = await buildWithAuth();
 
@@ -352,7 +359,7 @@ describe("GET /api/v1/sse/verdicts/:taskId (ownership)", () => {
 // ── Auth requirement: no token → 401 ───────────────────────────────────────────
 
 describe("SSE routes require authentication", () => {
-  it("GET /api/v1/sse/tasks returns 401 without auth", async () => {
+  it("GET /api/v1/sse/tasks returns 401 without auth", { timeout: 30_000 }, async () => {
     process.env.NEXUS_API_KEY = "required-key";
     setPgRows([]);
     app = await buildWithAuth();
@@ -366,7 +373,7 @@ describe("SSE routes require authentication", () => {
     expect(res.statusCode).toBe(401);
   });
 
-  it("GET /api/v1/sse/agent/:stream returns 401 without auth", async () => {
+  it("GET /api/v1/sse/agent/:stream returns 401 without auth", { timeout: 30_000 }, async () => {
     process.env.NEXUS_API_KEY = "required-key";
     setPgRows([]);
     app = await buildWithAuth();

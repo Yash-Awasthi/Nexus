@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/council-config",
+  "version": "0.1.0",
+  "description": "Hierarchical council config with persona registry and reasoning effort levels",
+  "main": "src/index.ts"
+}

@@ -3,9 +3,9 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-import { loadEnvFile } from "../src/env-loader.js";
+import { loadEnvFile, loadEnvFromRoot } from "../src/env-loader.js";
 
 let tmpDir: string;
 let envPath: string;
@@ -162,5 +162,52 @@ describe("loadEnvFile", () => {
       const result = loadEnvFile(envPath);
       expect(result.loaded).toEqual(expect.arrayContaining(["TEST_RESULT_A", "TEST_RESULT_B"]));
     });
+  });
+
+  describe("parser edge cases", () => {
+    it("ignores lines without an equals sign", () => {
+      track("TEST_GOOD_KEY");
+      delete process.env["TEST_GOOD_KEY"];
+      writeEnv("JUST_A_TOKEN\nTEST_GOOD_KEY=1\n");
+      const result = loadEnvFile(envPath);
+      expect(result.loaded).toEqual(["TEST_GOOD_KEY"]);
+    });
+
+    it("ignores lines whose key is not a valid identifier", () => {
+      track("TEST_VALID_KEY");
+      delete process.env["TEST_VALID_KEY"];
+      writeEnv("1BAD_KEY=ignored\nwith-dash=ignored\nTEST_VALID_KEY=ok\n");
+      const result = loadEnvFile(envPath);
+      expect(result.loaded).toEqual(["TEST_VALID_KEY"]);
+    });
+  });
+});
+
+describe("loadEnvFromRoot", () => {
+  it("loads <root>/.env and reports loaded/skipped counts when verbose", () => {
+    track("TEST_ROOT_LOADED");
+    delete process.env["TEST_ROOT_LOADED"];
+    process.env["TEST_ROOT_SKIPPED"] = "env-wins";
+    track("TEST_ROOT_SKIPPED");
+    fs.writeFileSync(path.join(tmpDir, ".env"), "TEST_ROOT_LOADED=1\nTEST_ROOT_SKIPPED=2\n");
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    const result = loadEnvFromRoot(tmpDir, true);
+    expect(process.env["TEST_ROOT_LOADED"]).toBe("1");
+    expect(process.env["TEST_ROOT_SKIPPED"]).toBe("env-wins");
+    expect(result.filePath).toBe(path.join(tmpDir, ".env"));
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("Loaded 1 variable(s)"));
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("Skipped 1 variable(s)"));
+    stderrSpy.mockRestore();
+  });
+
+  it("reports when no .env exists at the root (verbose)", () => {
+    const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), "nexus-env-empty-"));
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const result = loadEnvFromRoot(emptyDir, true);
+    expect(result.filePath).toBeNull();
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("No .env file found"));
+    stderrSpy.mockRestore();
+    fs.rmSync(emptyDir, { recursive: true, force: true });
   });
 });

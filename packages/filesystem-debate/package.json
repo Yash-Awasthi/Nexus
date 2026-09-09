@@ -1,0 +1,9 @@
+{
+  "name": "@nexus/filesystem-debate",
+  "version": "0.1.0",
+  "description": "Filesystem-based multi-model debate with voting, rebuttals, and auditability",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@nexus/llm-router": "workspace:*"
+  }
+}

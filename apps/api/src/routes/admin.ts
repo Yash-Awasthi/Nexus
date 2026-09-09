@@ -226,16 +226,22 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     };
   }>("/admin/traces", { preHandler: requireAuth }, async (request, reply) => {
     const { provider, model, status, limit, since, before, identity } = request.query;
-    const entries = await gatewayLog.query({
-      provider,
-      model,
-      status,
-      identity,
-      limit: limit ? Math.min(parseInt(limit, 10), 1000) : 100,
-      since: since ? parseInt(since, 10) : undefined,
-      before: before ? parseInt(before, 10) : undefined,
-    });
-    return reply.send({ entries, total: entries.length });
+    try {
+      const entries = await gatewayLog.query({
+        provider,
+        model,
+        status,
+        identity,
+        limit: limit ? Math.min(parseInt(limit, 10), 1000) : 100,
+        since: since ? parseInt(since, 10) : undefined,
+        before: before ? parseInt(before, 10) : undefined,
+      });
+      return reply.send({ entries, total: entries.length });
+    } catch (err) {
+      // Observability backend unreachable — degrade to empty rather than 500.
+      request.log.warn({ err }, "gatewayLog.query failed");
+      return reply.send({ entries: [], total: 0, degraded: true });
+    }
   });
 
   /** GET /admin/traces/stats — aggregate stats for the logged requests */
@@ -250,9 +256,14 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       },
       preHandler: requireAuth,
     },
-    async (_request, reply) => {
-      const [stats, count] = await Promise.all([gatewayLog.stats(), gatewayLog.count()]);
-      return reply.send({ ...stats, total: count });
+    async (request, reply) => {
+      try {
+        const [stats, count] = await Promise.all([gatewayLog.stats(), gatewayLog.count()]);
+        return reply.send({ ...stats, total: count });
+      } catch (err) {
+        request.log.warn({ err }, "gatewayLog.stats failed");
+        return reply.send({ total: 0, degraded: true });
+      }
     },
   );
 

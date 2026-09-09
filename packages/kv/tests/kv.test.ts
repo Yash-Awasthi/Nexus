@@ -58,6 +58,24 @@ function makeRedisClient(): RedisClientLike & {
     async exists(key) {
       return store.has(key) ? 1 : 0;
     },
+    async incr(key) {
+      const entry = store.get(key);
+      if (!entry || (entry.expiresAt !== undefined && now() >= entry.expiresAt)) {
+        store.set(key, { value: "1" });
+        return 1;
+      }
+      const n = Number.parseInt(entry.value, 10);
+      if (Number.isNaN(n)) throw new Error("ERR value is not an integer");
+      const next = n + 1;
+      entry.value = String(next);
+      return next;
+    },
+    async expire(key, seconds) {
+      const entry = store.get(key);
+      if (!entry) return 0;
+      entry.expiresAt = now() + seconds * 1000;
+      return 1;
+    },
     async keys(pattern) {
       const prefix = pattern.endsWith("*") ? pattern.slice(0, -1) : undefined;
       const result: string[] = [];
@@ -264,6 +282,41 @@ describe("MemoryKVStore", () => {
     advanceMs(200);
     expect(kv.size).toBe(1);
   });
+
+  // ── incr ──────────────────────────────────────────────────────────────────
+
+  it("incr creates a counter at 1 and increments atomically", async () => {
+    expect(await kv.incr("c")).toBe(1);
+    expect(await kv.incr("c")).toBe(2);
+    expect(await kv.incr("c")).toBe(3);
+    expect(await kv.get("c")).toBe(3);
+  });
+
+  it("incr stamps the TTL only on creation — increments never refresh it", async () => {
+    expect(await kv.incr("c", 1000)).toBe(1);
+    advanceMs(500);
+    // In-window increment: count grows, expiry stays at the original deadline.
+    expect(await kv.incr("c", 1000)).toBe(2);
+    advanceMs(600); // past the original deadline, before a refreshed one (500+1000)
+    expect(await kv.get("c")).toBeUndefined();
+  });
+
+  it("incr resets after the TTL expires", async () => {
+    expect(await kv.incr("c", 1000)).toBe(1);
+    advanceMs(1001);
+    expect(await kv.incr("c", 1000)).toBe(1);
+  });
+
+  it("incr without ttlMs never expires", async () => {
+    expect(await kv.incr("c")).toBe(1);
+    advanceMs(100_000);
+    expect(await kv.incr("c")).toBe(2);
+  });
+
+  it("incr on a non-numeric value starts a fresh counter", async () => {
+    await kv.set("c", "not-a-number");
+    expect(await kv.incr("c")).toBe(1);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -301,6 +354,24 @@ describe("RedisKVStore", () => {
     await kv.set("k", 1);
     await kv.delete("k");
     expect(await kv.get("k")).toBeUndefined();
+  });
+
+  it("incr counts atomically and stamps EXPIRE only on creation", async () => {
+    expect(await kv.incr("c", 60_000)).toBe(1);
+    const entry = client._store.get("c")!;
+    expect(entry.value).toBe("1");
+    expect(entry.expiresAt).toBeDefined();
+
+    // In-window increment: count grows, expiry is NOT refreshed.
+    const expiresAtBefore = entry.expiresAt;
+    expect(await kv.incr("c", 60_000)).toBe(2);
+    expect(client._store.get("c")!.expiresAt).toBe(expiresAtBefore);
+  });
+
+  it("incr without ttlMs leaves no expiry", async () => {
+    expect(await kv.incr("c")).toBe(1);
+    expect(client._store.get("c")!.expiresAt).toBeUndefined();
+    expect(await kv.incr("c")).toBe(2);
   });
 
   it("keys() returns stored keys", async () => {

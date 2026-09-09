@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/memory-consolidation",
+  "version": "0.1.0",
+  "description": "Always-on memory processing and consolidation for agent systems",
+  "main": "src/index.ts"
+}

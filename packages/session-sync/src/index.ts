@@ -463,3 +463,5 @@ export class DrizzleSyncStore extends SyncStore {
     return dbOps.filter((op) => op.logicalTime > sinceLogicalTime);
   }
 }
+
+export * from "./raft-election.js";

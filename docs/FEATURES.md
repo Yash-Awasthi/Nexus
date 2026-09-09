@@ -8,25 +8,25 @@ A capability-by-capability reference. For how the pieces fit together see
 
 ## What's inside
 
-| Capability               | How it works                                                                                                                    |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| Multi-model council      | Models run in parallel via `Promise.allSettled`; unanimous, majority, or weighted voting. Archetypes are YAML-driven.           |
-| LLM drivers              | Adapters for Anthropic, OpenAI, Groq, Gemini, DeepSeek, Mistral, OpenRouter, Ollama, and others, with SSE streaming.            |
-| Provider failover        | Error classifier groups failures into retryable categories and falls back across a configured chain.                            |
-| Sandboxed code execution | Piston for several languages; a Docker REPL for Python/R/Julia with `--network none`, a memory cap, and a read-only filesystem. |
-| Long-term memory         | pgvector with IVFFlat ANN and a BFS-traversable relation graph; hybrid BM25 + RRF retrieval; TTL and per-tenant ACL.            |
-| Knowledge graph          | Entity and relation graph with clustering, multi-hop traversal, and several search modes.                                       |
-| Document pipeline        | extract → classify → OCR → chunk → embed → index.                                                                               |
-| Domain feeds             | Adapters that ingest external sources into typed signals, scheduled as BullMQ repeatable jobs.                                  |
-| Orchestration            | `VersionedPlan` + `ChannelIndex`: a lifecycle state machine with immutable plan snapshots and a planning engine.                |
-| Cost tracking            | Per-call token accounting exposed as Prometheus metrics, with a configurable price table.                                       |
-| Gauntlet                 | Runs models against the same prompt in waves and scores each response.                                                          |
-| Red-team engine          | Input perturbation with configurable attack profiles.                                                                           |
-| RAG                      | chunk → embed → retrieve → rerank, with sub-query decomposition and hybrid scoring.                                             |
-| RLHF + eval              | Scorers, a test runner, an SFT auto-tagger, and a corpus builder.                                                               |
-| MCP support              | JSON-RPC 2.0 over HTTP, batch invocation, and OpenAPI-to-MCP generation.                                                        |
-| Observability            | OpenTelemetry (OTLP) traces, Prometheus metrics, Grafana dashboards, and HMAC-SHA256-chained audit logs.                        |
-| Auth + BYOK              | API key plus HS256 JWT; OAuth connectors; per-user LLM keys encrypted at rest (AES-256-GCM) and resolved server-side.           |
+| Capability               | How it works                                                                                                                                                                                                                                                                                                     |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Multi-model council      | Models run in parallel via `Promise.allSettled`; unanimous, majority, or weighted voting. Archetypes are YAML-driven.                                                                                                                                                                                            |
+| LLM drivers              | Adapters for Anthropic, OpenAI, Groq, Gemini, DeepSeek, Mistral, OpenRouter, Ollama, and others, with SSE streaming.                                                                                                                                                                                             |
+| Provider failover        | Error classifier groups failures into retryable categories and falls back across a configured chain.                                                                                                                                                                                                             |
+| Sandboxed code execution | Piston for several languages; a Docker REPL for Python/R/Julia with `--network none`, a memory cap, and a read-only filesystem.                                                                                                                                                                                  |
+| Long-term memory         | pgvector with IVFFlat ANN and a BFS-traversable relation graph; hybrid BM25 + RRF retrieval; TTL and per-tenant ACL.                                                                                                                                                                                             |
+| Knowledge graph          | Entity and relation graph with clustering, multi-hop traversal, and several search modes.                                                                                                                                                                                                                        |
+| Document pipeline        | extract → classify → OCR → chunk → embed → index.                                                                                                                                                                                                                                                                |
+| Domain feeds             | Adapters that ingest external sources into typed signals, scheduled as BullMQ repeatable jobs.                                                                                                                                                                                                                   |
+| Orchestration            | `VersionedPlan` + `ChannelIndex`: a lifecycle state machine with immutable plan snapshots and a planning engine.                                                                                                                                                                                                 |
+| Cost tracking            | Per-call token accounting exposed as Prometheus metrics, with a configurable price table.                                                                                                                                                                                                                        |
+| Gauntlet                 | Runs models against the same prompt in waves and scores each response.                                                                                                                                                                                                                                           |
+| Red-team engine          | Input perturbation with configurable attack profiles.                                                                                                                                                                                                                                                            |
+| RAG                      | chunk → embed → retrieve → rerank, with sub-query decomposition and hybrid scoring.                                                                                                                                                                                                                              |
+| RLHF + eval              | Scorers, a test runner, an SFT auto-tagger, and a corpus builder.                                                                                                                                                                                                                                                |
+| MCP support              | JSON-RPC 2.0 over HTTP, batch invocation, and OpenAPI-to-MCP generation.                                                                                                                                                                                                                                         |
+| Observability            | OpenTelemetry (OTLP) traces, Prometheus metrics, Grafana dashboards, and HMAC-SHA256-chained audit logs.                                                                                                                                                                                                         |
+| Auth + BYOK              | API key plus JWT (HS256 or RS256 via `NEXUS_JWT_ALG`); OAuth/OIDC/SAML SSO; login throttle with exponential backoff (§14.3); per-session and per-user token revocation; self-service GDPR erasure (`DELETE /users/:id/data`, §14.4); per-user LLM keys encrypted at rest (AES-256-GCM) and resolved server-side. |
 
 ## HTTP API surface
 
@@ -71,6 +71,15 @@ HMAC-SHA256 chained (tamper-evident); metrics are exposed for Prometheus.
 **BYOK keys** — users add their own provider keys on the Provider Keys page. They are
 AES-256-GCM encrypted in Postgres and decrypted only server-side to make that user's own
 LLM calls; they are never returned to the client.
+
+**Auth hardening (§14)** — access tokens are signed HS256 (shared secret) or RS256
+(asymmetric key pair via `NEXUS_JWT_ALG` + `NEXUS_JWT_PRIVATE_KEY`/`NEXUS_JWT_PUBLIC_KEY`,
+verified alg-pinned so a downstream service can validate without the signing secret).
+Failed logins lock the `email|ip` key with exponential backoff (429 after the threshold),
+and every verified JWT is checked against a revocation registry — per-`jti` (log out one
+session) or per-subject cutoff (log out everywhere, e.g. after a password change). Users
+can erase their own data with `DELETE /api/v1/users/:id/data` — a content-free audit line
+(user id + per-table row counts, never LLM/prompt data) records the cascade.
 
 ## SDK usage
 

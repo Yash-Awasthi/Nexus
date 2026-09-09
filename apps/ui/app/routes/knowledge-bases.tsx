@@ -56,54 +56,37 @@ interface UploadingFile {
   progress: number;
 }
 
-// ─── Seed Data ────────────────────────────────────────────────────────────────
-
-const SEED_KBS: KnowledgeBase[] = [
-  {
-    id: "1",
-    name: "Engineering Documentation",
-    description: "Internal engineering docs, ADRs, and technical specifications",
-    documentCount: 3,
-    totalSize: "1.26 MB",
-    status: "indexed",
-    lastUpdated: "2 hours ago",
-    documents: [
-      { id: "doc_1", name: "architecture-decisions.md", size: "24 KB", type: "md" },
-      { id: "doc_2", name: "api-specification.pdf", size: "1.2 MB", type: "pdf" },
-      { id: "doc_3", name: "coding-standards.md", size: "18 KB", type: "md" },
-    ],
-  },
-  {
-    id: "2",
-    name: "Product Knowledge Base",
-    description: "Product requirements, user research, and feature specifications",
-    documentCount: 3,
-    totalSize: "820 KB",
-    status: "indexed",
-    lastUpdated: "1 day ago",
-    documents: [
-      { id: "doc_4", name: "product-roadmap-2026.pdf", size: "640 KB", type: "pdf" },
-      { id: "doc_5", name: "user-research-q1.csv", size: "128 KB", type: "csv" },
-      { id: "doc_6", name: "feature-specs.md", size: "52 KB", type: "md" },
-    ],
-  },
-  {
-    id: "3",
-    name: "Security Policies",
-    description: "Security policies, compliance documents, and audit reports",
-    documentCount: 3,
-    totalSize: "1.5 MB",
-    status: "indexing",
-    lastUpdated: "Just now",
-    documents: [
-      { id: "doc_7", name: "security-policy-v3.pdf", size: "890 KB", type: "pdf" },
-      { id: "doc_8", name: "incident-response.docx", size: "450 KB", type: "docx" },
-      { id: "doc_9", name: "audit-checklist.txt", size: "12 KB", type: "txt" },
-    ],
-  },
-];
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+interface ApiKB {
+  id: string;
+  name: string;
+  description?: string;
+  docCount?: number;
+  createdAt?: string;
+  documents?: KBDocument[];
+}
+
+function normalizeKB(raw: ApiKB): KnowledgeBase {
+  const documents = raw.documents ?? [];
+  const totalBytes = documents.reduce((sum, d) => {
+    const [num, unit] = d.size.split(" ");
+    const n = parseFloat(num);
+    if (unit === "KB") return sum + n * 1024;
+    if (unit === "MB") return sum + n * 1024 * 1024;
+    return sum + n;
+  }, 0);
+  return {
+    id: raw.id,
+    name: raw.name,
+    description: raw.description || "No description provided",
+    documentCount: raw.docCount ?? documents.length,
+    totalSize: totalBytes ? formatFileSize(totalBytes) : "0 KB",
+    status: "indexed",
+    lastUpdated: raw.createdAt ? new Date(raw.createdAt).toLocaleString() : "",
+    documents,
+  };
+}
 
 function DocIcon({ type }: { type: DocType }) {
   switch (type) {
@@ -173,42 +156,21 @@ function KBDetail({
         const uploadItem: UploadingFile = { id: uploadId, name: file.name, progress: 0 };
         setUploading((prev) => [...prev, uploadItem]);
 
-        // Upload to backend via FormData
-        const formData = new FormData();
-        formData.append("file", file);
-
-        const xhr = new XMLHttpRequest();
-        xhr.upload.addEventListener("progress", (e) => {
-          if (e.lengthComputable) {
-            const pct = Math.floor((e.loaded / e.total) * 100);
-            setUploading((prev) =>
-              prev.map((u) => (u.id === uploadId ? { ...u, progress: pct } : u)),
-            );
-          }
-        });
-        xhr.addEventListener("load", () => {
-          const newDoc: KBDocument = {
-            id: "doc_" + Date.now(),
-            name: file.name,
-            size: formatFileSize(file.size),
-            type: getDocType(file.name),
-          };
-          onDocumentAdd(kb.id, newDoc);
-          setUploading((prev) => prev.filter((u) => u.id !== uploadId));
-        });
-        xhr.addEventListener("error", () => {
-          // Fallback: add locally even if upload failed
-          const newDoc: KBDocument = {
-            id: "doc_" + Date.now(),
-            name: file.name,
-            size: formatFileSize(file.size),
-            type: getDocType(file.name),
-          };
-          onDocumentAdd(kb.id, newDoc);
-          setUploading((prev) => prev.filter((u) => u.id !== uploadId));
-        });
-        xhr.open("POST", "/api/kb/" + kb.id + "/documents");
-        xhr.send(formData);
+        const fallbackDoc: KBDocument = {
+          id: "doc_" + Date.now(),
+          name: file.name,
+          size: formatFileSize(file.size),
+          type: getDocType(file.name),
+        };
+        fetch("/api/kb/" + kb.id + "/documents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: file.name, size: formatFileSize(file.size) }),
+        })
+          .then((r) => (r.ok ? r.json() : Promise.reject()))
+          .then((created: KBDocument) => onDocumentAdd(kb.id, created))
+          .catch(() => onDocumentAdd(kb.id, fallbackDoc))
+          .finally(() => setUploading((prev) => prev.filter((u) => u.id !== uploadId)));
       });
     },
     [kb.id, onDocumentAdd],
@@ -340,7 +302,7 @@ function KBDetail({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function KnowledgeBasesPage() {
-  const [kbs, setKBs] = useState<KnowledgeBase[]>(SEED_KBS);
+  const [kbs, setKBs] = useState<KnowledgeBase[]>([]);
   const [selectedKBId, setSelectedKBId] = useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newKBName, setNewKBName] = useState("");
@@ -348,18 +310,20 @@ export default function KnowledgeBasesPage() {
   const [loading, setLoading] = useState(true);
 
   // ── Fetch knowledge bases from backend ────────────────────────────────────
-  useEffect(() => {
-    fetch("/api/kb?limit=50")
+  const loadKBs = useCallback(() => {
+    return fetch("/api/kb?limit=50")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data) => {
-        const list: KnowledgeBase[] = Array.isArray(data)
-          ? data
-          : (data?.kbs ?? data?.knowledgeBases ?? []);
-        if (list.length > 0) setKBs(list);
+        const list: ApiKB[] = Array.isArray(data) ? data : (data?.kbs ?? []);
+        setKBs(list.map(normalizeKB));
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadKBs();
+  }, [loadKBs]);
 
   const handleKBClick = (kbId: string) => {
     setSelectedKBId((prev) => (prev === kbId ? null : kbId));
@@ -408,20 +372,14 @@ export default function KnowledgeBasesPage() {
     setNewKBDesc("");
     setCreateDialogOpen(false);
 
-    // Persist to backend, update id from response
+    // Persist to backend, then reload the real list (ids come from the server)
     fetch("/api/kb", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((created: KnowledgeBase) => {
-        if (created?.id) {
-          setKBs((prev) =>
-            prev.map((kb) => (kb.id === optimistic.id ? { ...kb, id: created.id } : kb)),
-          );
-        }
-      })
+      .then(() => loadKBs())
       .catch(() => {});
   };
 
@@ -450,6 +408,17 @@ export default function KnowledgeBasesPage() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="size-5 animate-spin text-muted-foreground" />
           </div>
+        ) : kbs.length === 0 ? (
+          <Card className="py-12">
+            <CardContent className="flex flex-col items-center gap-2 text-center">
+              <Database className="size-8 text-muted-foreground" />
+              <p className="text-sm font-medium">No knowledge bases yet</p>
+              <p className="text-xs text-muted-foreground max-w-sm">
+                Create a knowledge base to start collecting documents for retrieval-augmented
+                generation.
+              </p>
+            </CardContent>
+          </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {kbs.map((kb) => {

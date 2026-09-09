@@ -30,10 +30,12 @@ import {
   Paperclip,
   Brain,
   BookOpen,
+  Bot,
 } from "lucide-react";
 import { ProjectMemoryPanel } from "~/components/ProjectMemoryPanel";
 import { ProjectFileAttachments } from "~/components/ProjectFileAttachments";
 import { ProjectInstructions } from "~/components/ProjectInstructions";
+import { AutopilotPanel } from "~/components/AutopilotPanel";
 
 async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -63,7 +65,9 @@ export default function ProjectsPage() {
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const [activeTab, setActiveTab] = useState<"memory" | "files" | "instructions">("memory");
+  const [activeTab, setActiveTab] = useState<"memory" | "files" | "instructions" | "autopilot">(
+    "memory",
+  );
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
@@ -155,6 +159,7 @@ export default function ProjectsPage() {
       { id: "memory", icon: Brain, label: "Memory" },
       { id: "files", icon: Paperclip, label: "Files" },
       { id: "instructions", icon: BookOpen, label: "Instructions" },
+      { id: "autopilot", icon: Bot, label: "Autopilot" },
     ];
     return (
       <div className="flex-1 flex flex-col overflow-hidden h-screen">
@@ -211,6 +216,9 @@ export default function ProjectsPage() {
           {activeTab === "memory" && <ProjectMemoryPanel projectId={selectedProject.id} />}
           {activeTab === "files" && <ProjectFileAttachments projectId={selectedProject.id} />}
           {activeTab === "instructions" && <ProjectInstructions projectId={selectedProject.id} />}
+          {activeTab === "autopilot" && (
+            <AutopilotPanel projectId={selectedProject.id} projectName={selectedProject.name} />
+          )}
         </div>
       </div>
     );

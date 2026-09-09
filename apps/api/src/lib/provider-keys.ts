@@ -17,6 +17,7 @@ import {
   DeepSeekDriver,
   MistralDriver,
   OpenRouterDriver,
+  OpenAIDriver,
   XaiDriver,
   TogetherDriver,
   PerplexityDriver,
@@ -53,11 +54,15 @@ import {
 } from "@nexus/llm-drivers";
 import { and, eq, isNull } from "drizzle-orm";
 
-import { decryptSecret } from "./secret-crypto.js";
+import { decryptSecret, encryptSecret } from "./secret-crypto.js";
 
-/** Providers we can construct an LLM driver for (openai keys are used directly by REST endpoints). */
+/** Providers we can construct an LLM driver for (openai included — the ChatGPT
+ *  API is a plain OpenAI-compatible endpoint and its driver lives in
+ *  @nexus/llm-drivers; REST-only consumers (image-gen/moderation) keep their
+ *  own direct calls). */
 const DRIVER_FACTORIES: Record<string, (apiKey: string) => LlmDriver> = {
   anthropic: (apiKey) => new AnthropicDriver({ apiKey }),
+  openai: (apiKey) => new OpenAIDriver({ apiKey }),
   groq: (apiKey) => new GroqDriver({ apiKey }),
   gemini: (apiKey) => new GeminiDriver({ apiKey }),
   deepseek: (apiKey) => new DeepSeekDriver({ apiKey }),
@@ -144,7 +149,29 @@ export async function resolveUserProviderKey(
       .where(eq(userProviderCredentials.id, row.id));
     return key;
   } catch {
-    return null;
+    // Read-time migration: a legacy row may hold a PLAINTEXT key written before
+    // at-rest encryption existed. Detect it (a token-shaped string that fails
+    // GCM auth — JSON blobs for composite providers are not re-encryptable here
+    // and stay unreadable, same as before), re-encrypt it in place, and use it.
+    // Picked over a one-time migration: safe under concurrent writers, needs no
+    // downtime, and upgrades rows the moment they are first used.
+    const maybePlain = row.encryptedKey;
+    const tokenShaped =
+      maybePlain.length >= 12 &&
+      maybePlain.length <= 2048 &&
+      /^[A-Za-z0-9_\-.]+$/.test(maybePlain) &&
+      /[A-Za-z]{4}/.test(maybePlain);
+    if (!tokenShaped) return null;
+    try {
+      const reencrypted = encryptSecret(maybePlain);
+      await db
+        .update(userProviderCredentials)
+        .set({ encryptedKey: reencrypted, lastUsedAt: new Date() })
+        .where(eq(userProviderCredentials.id, row.id));
+      return maybePlain;
+    } catch {
+      return null;
+    }
   }
 }
 

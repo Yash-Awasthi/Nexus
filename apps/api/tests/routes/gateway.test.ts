@@ -2,6 +2,7 @@
 import { signJwt } from "@nexus/auth";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { buildServer } from "../../src/server.js";
+import { getSharedKV } from "../../src/lib/shared-kv.js";
 import type { FastifyInstance } from "fastify";
 
 // §4.1: resolveFresh is mocked here — it exercises gateway.ts's own OAuth wiring
@@ -21,7 +22,7 @@ vi.mock("../../src/lib/oauth-token-store.js", () => ({
 const GROQ_RESPONSE = {
   id: "chatcmpl-test",
   object: "chat.completion",
-  model: "llama-3.3-70b-versatile",
+  model: "openai/gpt-oss-120b",
   choices: [
     {
       index: 0,
@@ -40,6 +41,22 @@ function mockGroqFetch(overrides: Partial<typeof GROQ_RESPONSE> = {}): typeof vi
   });
 }
 
+// ── Ollama mock response (/api/chat shape: { message: { content } }) ───────────
+
+const OLLAMA_RESPONSE = {
+  model: "qwen2.5:7b",
+  message: { role: "assistant", content: "Hello from local Ollama!" },
+  done: true,
+};
+
+function mockOllamaFetch(): typeof vi.fn {
+  return vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ ...OLLAMA_RESPONSE }),
+    text: async () => JSON.stringify(OLLAMA_RESPONSE),
+  });
+}
+
 // ── Server setup ──────────────────────────────────────────────────────────────
 
 let app: FastifyInstance;
@@ -48,12 +65,18 @@ beforeEach(async () => {
   delete process.env.NEXUS_API_KEY;
   delete process.env.GROQ_API_KEY;
   delete process.env.ANTHROPIC_API_KEY;
+  // The prompt cache / gateway log / token budget are module-scope singletons
+  // over the shared KV — clear it so one test's cached 200 can't replay into
+  // the next test's request (deterministic cache-eligible payloads collide
+  // otherwise).
+  await getSharedKV().clear();
   app = await buildServer();
   await app.ready();
 });
 
 afterEach(async () => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   await app.close();
   delete process.env.GROQ_API_KEY;
 });
@@ -133,20 +156,46 @@ describe("GET /api/v1/gateway/cost-report", () => {
 // ── POST /gateway/messages ────────────────────────────────────────────────────
 
 describe("POST /api/v1/gateway/messages", () => {
-  it("returns 400 for unrecognised model", async () => {
+  it("unknown model falls through to local Ollama instead of 400", async () => {
+    // Current contract: an unrecognised model defaults to the always-registered
+    // local Ollama driver so a keyless instance still answers. This must hold
+    // hermetically — the dispatch is asserted against the mocked fetch, never a
+    // live localhost:11434.
+    vi.stubGlobal("fetch", mockOllamaFetch());
     const res = await app.inject({
       method: "POST",
       url: "/api/v1/gateway/messages",
       payload: { model: "totally-unknown-model-xyz", messages: [{ role: "user", content: "hi" }] },
     });
-    expect(res.statusCode).toBe(400);
-    const body = res.json<{ type: string; error: { type: string } }>();
-    expect(body.type).toBe("error");
-    expect(body.error.type).toBe("invalid_request_error");
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{ content: { type: string; text: string }[] }>();
+    expect(body.content[0]!.text).toBe("Hello from local Ollama!");
+    expect(vi.mocked(fetch).mock.calls.some((c) => String(c[0]).includes(":11434/api/chat"))).toBe(
+      true,
+    );
   });
 
-  it("returns 400 when provider not configured (no GROQ_API_KEY)", async () => {
-    delete process.env.GROQ_API_KEY;
+  it("returns 502 when the local Ollama fallback is unreachable", async () => {
+    // The only failure mode left for an unknown model is an unreachable local
+    // fallback — the gateway maps an upstream connect failure to 502.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new TypeError("fetch failed: ECONNREFUSED 127.0.0.1:11434")),
+    );
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/gateway/messages",
+      payload: { model: "totally-unknown-model-xyz", messages: [{ role: "user", content: "hi" }] },
+    });
+    expect(res.statusCode).toBe(502);
+    const body = res.json<{ error: { type: string } }>();
+    expect(body.error.type).toBe("server_error");
+  });
+
+  it("nexus/fast with no GROQ key falls back to local Ollama instead of 400", async () => {
+    // With no GROQ_API_KEY the groq driver isn't registered, so the alias falls
+    // back to the local Ollama driver with the default local model tag.
+    vi.stubGlobal("fetch", mockOllamaFetch());
     const res = await app.inject({
       method: "POST",
       url: "/api/v1/gateway/messages",
@@ -155,9 +204,14 @@ describe("POST /api/v1/gateway/messages", () => {
         messages: [{ role: "user", content: "hello" }],
       },
     });
-    expect(res.statusCode).toBe(400);
-    const body = res.json<{ error: { type: string } }>();
-    expect(body.error.type).toBe("provider_unavailable");
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{ content: { text: string }[] }>();
+    expect(body.content[0]!.text).toBe("Hello from local Ollama!");
+    const calls = vi.mocked(fetch).mock.calls;
+    expect(calls.some((c) => String(c[0]).includes(":11434/api/chat"))).toBe(true);
+    // The fallback rewrites the model to the keyless default tag.
+    const sent = JSON.parse(String(calls[0]![1]!.body)) as { model: string };
+    expect(sent.model).toBe("qwen2.5:7b");
   });
 
   it("returns 402 when spend cap exceeded", async () => {
@@ -277,18 +331,35 @@ describe("POST /api/v1/gateway/messages", () => {
   });
 
   it("x-nexus-provider header overrides provider selection", async () => {
-    // With no ANTHROPIC_API_KEY, provider 'anthropic' is not registered
-    delete process.env.ANTHROPIC_API_KEY;
-    const res = await app.inject({
+    // Override to a configured provider → the dispatch goes to that provider's
+    // endpoint (not the alias default).
+    process.env.GROQ_API_KEY = "test-key";
+    vi.stubGlobal("fetch", mockGroqFetch());
+    const groq = await app.inject({
+      method: "POST",
+      url: "/api/v1/gateway/messages",
+      headers: { "x-nexus-provider": "groq" },
+      payload: { model: "nexus/fast", messages: [{ role: "user", content: "hi" }] },
+    });
+    expect(groq.statusCode).toBe(200);
+    expect(vi.mocked(fetch).mock.calls.some((c) => String(c[0]).includes("api.groq.com"))).toBe(
+      true,
+    );
+
+    // Override to an unconfigured provider (no ANTHROPIC_API_KEY) → falls back
+    // to local Ollama rather than 400-ing.
+    delete process.env.GROQ_API_KEY;
+    vi.stubGlobal("fetch", mockOllamaFetch());
+    const ollama = await app.inject({
       method: "POST",
       url: "/api/v1/gateway/messages",
       headers: { "x-nexus-provider": "anthropic" },
       payload: { model: "nexus/fast", messages: [{ role: "user", content: "hi" }] },
     });
-    // anthropic not configured → 400 provider_unavailable
-    expect(res.statusCode).toBe(400);
-    const body = res.json<{ error: { type: string } }>();
-    expect(body.error.type).toBe("provider_unavailable");
+    expect(ollama.statusCode).toBe(200);
+    expect(vi.mocked(fetch).mock.calls.some((c) => String(c[0]).includes(":11434/api/chat"))).toBe(
+      true,
+    );
   });
 
   // ── §4.1 AccountPool wiring ──────────────────────────────────────────────

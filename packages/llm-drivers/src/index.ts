@@ -61,6 +61,11 @@ export interface LlmRequestOptions {
   tools?: LlmToolDefinition[];
   /** Tool-choice policy (provider support varies). */
   toolChoice?: "auto" | "none" | "required";
+  /**
+   * Opaque server-side thread id (e.g. Dify `conversation_id`, §1.2). Pass it
+   * back on the next request to continue the same provider-side conversation.
+   */
+  conversationId?: string;
 }
 
 /** Llm usage interface definition. */
@@ -80,6 +85,8 @@ export interface LlmResponse {
   durationMs: number;
   /** Tool calls the model requested this turn (native tool-calling). */
   toolCalls?: LlmToolCall[];
+  /** Server-side thread id (e.g. Dify `conversation_id`, §1.2) — pass back to thread. */
+  conversationId?: string;
 }
 
 /** Stream delta interface definition. */
@@ -174,18 +181,46 @@ function totalTokens(input: number, output: number): number {
 
 // ── Error mapping helper ───────────────────────────────────────────────────────
 
+/**
+ * Extract a human-readable message from a provider error body. The raw JSON
+ * previously flowed verbatim into chat transcripts (playtest: the Anthropic
+ * "credit balance too low" error rendered as a raw JSON blob in the member's
+ * opinion). Recognized JSON shapes yield their embedded message; anything
+ * else is truncated so at worst the user sees one short line, not a blob.
+ */
+function providerErrorDetail(body: string): string | undefined {
+  const text = body.trim();
+  if (!text) return undefined;
+  let parsed: Record<string, unknown>;
+  try {
+    const v: unknown = JSON.parse(text);
+    if (typeof v !== "object" || v === null) return text.slice(0, 200);
+    parsed = v as Record<string, unknown>;
+  } catch {
+    return text.slice(0, 200);
+  }
+  const err = parsed["error"];
+  const msg =
+    (typeof err === "object" && err !== null ? (err as Record<string, unknown>)["message"] : err) ??
+    parsed["message"] ??
+    parsed["detail"];
+  if (typeof msg === "string" && msg.trim()) return msg.trim();
+  return undefined; // recognized JSON but no extractable message — drop the blob
+}
+
 function mapHttpError(status: number, provider: string, message = ""): LlmError {
+  const detail = providerErrorDetail(message);
   if (status === 401 || status === 403)
-    return new LlmError("AUTH_FAILED", message || "Authentication failed", provider, status);
+    return new LlmError("AUTH_FAILED", detail || "Authentication failed", provider, status);
   if (status === 429)
-    return new LlmError("RATE_LIMITED", message || "Rate limit exceeded", provider, status);
+    return new LlmError("RATE_LIMITED", detail || "Rate limit exceeded", provider, status);
   if (status === 404)
-    return new LlmError("MODEL_NOT_FOUND", message || "Model not found", provider, status);
+    return new LlmError("MODEL_NOT_FOUND", detail || "Model not found", provider, status);
   if (status === 400)
-    return new LlmError("INVALID_REQUEST", message || "Invalid request", provider, status);
+    return new LlmError("INVALID_REQUEST", detail || "Invalid request", provider, status);
   if (status === 413 || status === 422)
-    return new LlmError("CONTEXT_LENGTH_EXCEEDED", message || "Context too long", provider, status);
-  return new LlmError("SERVER_ERROR", message || `HTTP ${status}`, provider, status);
+    return new LlmError("CONTEXT_LENGTH_EXCEEDED", detail || "Context too long", provider, status);
+  return new LlmError("SERVER_ERROR", detail || `HTTP ${status}`, provider, status);
 }
 
 // ── Tool-calling translation helpers ────────────────────────────────────────────
@@ -296,7 +331,14 @@ function toAnthropicTools(tools?: LlmToolDefinition[]): Record<string, unknown>[
 
 // ── Base driver ────────────────────────────────────────────────────────────────
 
-abstract class BaseDriver implements LlmDriver {
+/**
+ * Base driver — real HTTP + SSE/NDJSON streaming, error mapping, and shared
+ * response/usage helpers. Extend it directly for providers that are NOT
+ * OpenAI-chat-completions-shaped (e.g. Anthropic, Gemini). For OpenAI-compatible
+ * endpoints, extend {@link OpenAICompatibleDriver} instead. See
+ * `packages/llm-drivers/README.md` for the add-a-driver recipe.
+ */
+export abstract class BaseDriver implements LlmDriver {
   abstract readonly provider: string;
   abstract readonly model: string;
   protected transport: HttpTransport;
@@ -326,6 +368,8 @@ abstract class BaseDriver implements LlmDriver {
    * Async generator that streams SSE lines from a POST request.
    * Yields the raw payload of each "data: <payload>" line (skipping "[DONE]").
    * Uses native fetch ReadableStream — only call when _useDefaultTransport is true.
+   * On non-2xx, includes the provider's own error body (e.g. Gemini's
+   * INVALID_ARGUMENT details) in the thrown error.
    */
   protected async *sseLines(
     url: string,
@@ -337,7 +381,15 @@ abstract class BaseDriver implements LlmDriver {
       headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify(body),
     });
-    if (!resp.ok) throw mapHttpError(resp.status, this.provider);
+    if (!resp.ok) {
+      let detail = "";
+      try {
+        detail = (await resp.text()).slice(0, 500);
+      } catch {
+        /* best-effort */
+      }
+      throw mapHttpError(resp.status, this.provider, detail || undefined);
+    }
     if (!resp.body) return;
 
     const reader = resp.body.getReader();
@@ -385,7 +437,15 @@ abstract class BaseDriver implements LlmDriver {
       headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify(body),
     });
-    if (!resp.ok) throw mapHttpError(resp.status, this.provider);
+    if (!resp.ok) {
+      let detail = "";
+      try {
+        detail = (await resp.text()).slice(0, 500);
+      } catch {
+        /* best-effort */
+      }
+      throw mapHttpError(resp.status, this.provider, detail || undefined);
+    }
     if (!resp.body) return;
 
     const reader = resp.body.getReader();
@@ -444,13 +504,16 @@ abstract class BaseDriver implements LlmDriver {
 
 // ── Driver config types ────────────────────────────────────────────────────────
 
-interface ApiKeyConfig {
+/** A driver needs at least an API key. */
+export interface ApiKeyConfig {
   apiKey: string;
 }
-interface BaseUrlConfig {
+/** Optional override for self-hosted / proxy endpoints. */
+export interface BaseUrlConfig {
   baseUrl?: string;
 }
-type FullConfig = ApiKeyConfig & BaseUrlConfig;
+/** Standard driver config — API key + optional base URL override. */
+export type FullConfig = ApiKeyConfig & BaseUrlConfig;
 
 // ── 1. Anthropic ──────────────────────────────────────────────────────────────
 
@@ -617,7 +680,14 @@ export class AnthropicDriver extends BaseDriver {
 
 // ── 2. OpenAI-compatible base ─────────────────────────────────────────────────
 
-abstract class OpenAICompatibleDriver extends BaseDriver {
+/**
+ * OpenAI-compatible base driver — implements `complete`/`stream` against a
+ * chat-completions endpoint. Subclass it and set `provider`, `model`, and
+ * `baseUrl`; override {@link chatCompletionsUrl} / {@link authHeaders} for
+ * non-standard paths or auth schemes (e.g. Azure's `api-key` header). See
+ * `packages/llm-drivers/README.md` for the add-a-driver recipe.
+ */
+export abstract class OpenAICompatibleDriver extends BaseDriver {
   protected apiKey: string;
   protected abstract baseUrl: string;
 
@@ -793,7 +863,28 @@ export class GroqDriver extends OpenAICompatibleDriver {
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://api.groq.com/openai/v1";
-    this.model = config.model ?? "llama-3.3-70b-versatile";
+    this.model = config.model ?? "openai/gpt-oss-120b";
+  }
+}
+
+// ── 3b. OpenAI (official ChatGPT API) ─────────────────────────────────────────
+// Missing driver: `openai` members (the default ChatGPT council member) could
+// never resolve a driver — not in the env registry, not in the per-user BYOK
+// registry, and not in the worker's agent executor. api.openai.com is a plain
+// OpenAI-compatible chat-completions endpoint, so this is the same pattern as
+// every other OpenAI-compatible driver above.
+
+export class OpenAIDriver extends OpenAICompatibleDriver {
+  readonly provider = "openai";
+  readonly model: string;
+  protected baseUrl: string;
+
+  constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
+    super(config, transport);
+    this.baseUrl = config.baseUrl ?? "https://api.openai.com/v1";
+    // gpt-4o was retired from the API 2026-02-16; the GA replacements are the
+    // gpt-5.6 family (sol = flagship / terra = fast / luna = nano).
+    this.model = config.model ?? "gpt-5.6-sol";
   }
 }
 
@@ -807,7 +898,8 @@ export class DeepSeekDriver extends OpenAICompatibleDriver {
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://api.deepseek.com/v1";
-    this.model = config.model ?? "deepseek-chat";
+    // deepseek-chat was retired; the live family is deepseek-v4-* (flash/reasoner).
+    this.model = config.model ?? "deepseek-v4-flash";
   }
 }
 
@@ -838,7 +930,7 @@ export class OpenRouterDriver extends OpenAICompatibleDriver {
   ) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://openrouter.ai/api/v1";
-    this.model = config.model ?? "anthropic/claude-3.5-sonnet";
+    this.model = config.model ?? "anthropic/claude-sonnet-5";
   }
 }
 
@@ -849,29 +941,121 @@ export class GeminiDriver extends BaseDriver {
   readonly model: string;
   private apiKey: string;
   private baseUrl: string;
+  /** Gemini 3+ returns a `thoughtSignature` on functionCall parts and requires
+   *  it to be echoed back in the next request (400 otherwise). Keyed by the
+   *  call id we mint (`fc_<name>_<i>`), which the runtime preserves verbatim
+   *  through tool-result round trips. */
+  private thoughtSignatures = new Map<string, string>();
+  /** API-issued call ids (`id` on functionCall parts) keyed the same way, so
+   *  the exact id the API assigned can be echoed back on functionCall and
+   *  functionResponse parts (Gemini 3+ call-id validation). */
+  private callIds = new Map<string, string>();
 
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(transport);
     this.apiKey = config.apiKey;
     this.baseUrl = config.baseUrl ?? "https://generativelanguage.googleapis.com/v1beta";
-    this.model = config.model ?? "gemini-1.5-pro";
+    this.model = config.model ?? "gemini-3.6-flash";
+  }
+
+  /** Map runtime messages to Gemini `contents` (role + parts). Tool results
+   *  become functionResponse parts; assistant tool calls become functionCall
+   *  parts (echoing the captured thoughtSignature as a sibling part key). The
+   *  id→name table lets a `role: "tool"` message (which only carries the call
+   *  id) resolve the function name Gemini requires. */
+  private toGeminiContents(
+    messages: LlmMessage[],
+  ): { role: string; parts: Record<string, unknown>[] }[] {
+    const idToName = new Map<string, string>();
+    const out: { role: string; parts: Record<string, unknown>[] }[] = [];
+    for (const m of messages) {
+      if (m.role === "system") continue;
+      const parts: Record<string, unknown>[] = [];
+      if (m.role === "tool") {
+        const name = idToName.get(m.toolCallId ?? "") ?? "tool_result";
+        // Gemini's functionResponse.response is a Struct — a bare string is
+        // rejected with INVALID_ARGUMENT. Wrap non-object payloads.
+        let response: unknown = m.content;
+        try {
+          response = JSON.parse(m.content) as unknown;
+        } catch {
+          response = { result: m.content };
+        }
+        if (typeof response !== "object" || response === null)
+          response = { result: String(response) };
+        const fr: Record<string, unknown> = { name, response };
+        // Echo the API-issued call id back when we captured it (Gemini 3+
+        // validates call ids across the round trip).
+        const callId = this.callIds.get(m.toolCallId ?? "");
+        if (callId) fr["id"] = callId;
+        parts.push({ functionResponse: fr });
+      } else if (m.toolCalls?.length) {
+        for (const tc of m.toolCalls) {
+          idToName.set(tc.id, tc.name);
+          const part: Record<string, unknown> = {
+            functionCall: {
+              name: tc.name,
+              args: tc.arguments,
+              ...(this.callIds.get(tc.id) ? { id: this.callIds.get(tc.id) } : {}),
+            },
+          };
+          const sig = this.thoughtSignatures.get(tc.id);
+          if (sig) part["thoughtSignature"] = sig;
+          parts.push(part);
+        }
+      }
+      if (m.content) parts.push({ text: m.content });
+      if (!parts.length) parts.push({ text: "" });
+      out.push({ role: m.role === "assistant" ? "model" : "user", parts });
+    }
+    return out;
+  }
+
+  private toGeminiTools(tools: LlmToolDefinition[]): Record<string, unknown>[] {
+    return [
+      {
+        functionDeclarations: tools.map((t) => ({
+          name: t.name,
+          description: t.description,
+          parameters: t.parameters,
+        })),
+      },
+    ];
+  }
+
+  private parseFunctionCalls(
+    parts: {
+      functionCall?: { name?: string; args?: unknown; id?: string };
+      thoughtSignature?: string;
+    }[],
+  ): LlmToolCall[] {
+    const calls: LlmToolCall[] = [];
+    parts?.forEach((p, i) => {
+      if (p.functionCall?.name) {
+        const id = `fc_${p.functionCall.name}_${i}`;
+        if (p.thoughtSignature) this.thoughtSignatures.set(id, p.thoughtSignature);
+        if (p.functionCall.id) this.callIds.set(id, p.functionCall.id);
+        calls.push({
+          id,
+          name: p.functionCall.name,
+          arguments:
+            typeof p.functionCall.args === "object" && p.functionCall.args !== null
+              ? (p.functionCall.args as Record<string, unknown>)
+              : {},
+        });
+      }
+    });
+    return calls;
   }
 
   async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
     const t0 = Date.now();
-    // Ollama only knows local model tags (e.g. "qwen2.5:7b"). Callers across the
-    // app hardcode cloud aliases like "anthropic/claude-3.5-sonnet"; route any
-    // such "provider/model" string to this driver's configured local model.
-    const model = opts.model && !opts.model.includes("/") ? opts.model : this.model;
-    const contents = opts.messages
-      .filter((m) => m.role !== "system")
-      .map((m) => ({
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }],
-      }));
+    const model = opts.model ?? this.model;
+    const contents = this.toGeminiContents(opts.messages);
     const body: Record<string, unknown> = {
       contents,
       ...(opts.systemPrompt ? { systemInstruction: { parts: [{ text: opts.systemPrompt }] } } : {}),
+      ...(opts.tools?.length ? { tools: this.toGeminiTools(opts.tools) } : {}),
       generationConfig: {
         maxOutputTokens: opts.maxTokens ?? 8192,
         ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
@@ -885,23 +1069,37 @@ export class GeminiDriver extends BaseDriver {
 
     const candidate = (
       raw["candidates"] as {
-        content: { parts: { text: string }[] };
+        content: {
+          parts: {
+            text?: string;
+            functionCall?: { name?: string; args?: unknown; id?: string };
+            thoughtSignature?: string;
+          }[];
+        };
         finishReason?: string;
       }[]
     )?.[0];
-    const content = candidate?.content?.parts?.[0]?.text ?? "";
+    const parts = candidate?.content?.parts ?? [];
+    const content = parts.map((p) => p.text ?? "").join("");
+    const toolCalls = this.parseFunctionCalls(parts);
     const usage = raw["usageMetadata"] as
       { promptTokenCount?: number; candidatesTokenCount?: number } | undefined;
     const inputTokens =
-      usage?.promptTokenCount ??
-      estimateTokens(contents.map((c) => c.parts[0]?.text ?? "").join(" "));
+      usage?.promptTokenCount ?? estimateTokens(contents.map((c) => JSON.stringify(c)).join(" "));
     const outputTokens = usage?.candidatesTokenCount ?? estimateTokens(content);
+    const finishReason: LlmResponse["finishReason"] = toolCalls.length
+      ? "tool_calls"
+      : candidate?.finishReason === "MAX_TOKENS"
+        ? "length"
+        : "stop";
     return this.makeResponse(
       `gemini-${Date.now()}`,
       content,
       model,
       this.makeUsage(inputTokens, outputTokens),
       Date.now() - t0,
+      finishReason,
+      toolCalls.length ? toolCalls : undefined,
     );
   }
 
@@ -909,19 +1107,12 @@ export class GeminiDriver extends BaseDriver {
     if (!this._useDefaultTransport) return super.stream(opts, handler);
 
     const t0 = Date.now();
-    // Ollama only knows local model tags (e.g. "qwen2.5:7b"). Callers across the
-    // app hardcode cloud aliases like "anthropic/claude-3.5-sonnet"; route any
-    // such "provider/model" string to this driver's configured local model.
-    const model = opts.model && !opts.model.includes("/") ? opts.model : this.model;
-    const contents = opts.messages
-      .filter((m) => m.role !== "system")
-      .map((m) => ({
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }],
-      }));
+    const model = opts.model ?? this.model;
+    const contents = this.toGeminiContents(opts.messages);
     const body: Record<string, unknown> = {
       contents,
       ...(opts.systemPrompt ? { systemInstruction: { parts: [{ text: opts.systemPrompt }] } } : {}),
+      ...(opts.tools?.length ? { tools: this.toGeminiTools(opts.tools) } : {}),
       generationConfig: {
         maxOutputTokens: opts.maxTokens ?? 8192,
         ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
@@ -931,6 +1122,21 @@ export class GeminiDriver extends BaseDriver {
     let content = "";
     let inputTokens = 0;
     let outputTokens = 0;
+    // Gemini streams a function call across several parts: the first carries
+    // the call name, later parts carry the (cumulative) args object. Merge
+    // into one entry per named call.
+    const toolAcc: {
+      name: string;
+      args: Record<string, unknown>;
+      sig?: string;
+      apiId?: string;
+    }[] = [];
+    let curCall: {
+      name: string;
+      args: Record<string, unknown>;
+      sig?: string;
+      apiId?: string;
+    } | null = null;
 
     for await (const line of this.sseLines(
       `${this.baseUrl}/models/${model}:streamGenerateContent?alt=sse&key=${this.apiKey}`,
@@ -947,13 +1153,42 @@ export class GeminiDriver extends BaseDriver {
 
       const candidates = event["candidates"] as
         | {
-            content: { parts: { text: string }[] };
+            content: {
+              parts: {
+                text?: string;
+                functionCall?: { name?: string; args?: unknown; id?: string };
+                thoughtSignature?: string;
+              }[];
+            };
+            finishReason?: string;
           }[]
         | undefined;
-      const text = candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-      if (text) {
-        content += text;
-        await handler({ delta: text, done: false });
+      const parts = candidates?.[0]?.content?.parts;
+      for (const p of parts ?? []) {
+        if (p.text) {
+          content += p.text;
+          await handler({ delta: p.text, done: false });
+        }
+        if (p.functionCall) {
+          if (p.functionCall.name) {
+            if (curCall) toolAcc.push(curCall);
+            curCall = {
+              name: p.functionCall.name,
+              args: {},
+              ...(p.functionCall.id ? { apiId: p.functionCall.id } : {}),
+            };
+          }
+          if (curCall && typeof p.functionCall.args === "object" && p.functionCall.args !== null) {
+            curCall.args = {
+              ...curCall.args,
+              ...(p.functionCall.args as Record<string, unknown>),
+            };
+          }
+          // The thought signature rides on the first functionCall part.
+          if (p.thoughtSignature && curCall) curCall.sig = p.thoughtSignature;
+          // So does the API-issued call id.
+          if (p.functionCall.id && curCall) curCall.apiId = p.functionCall.id;
+        }
       }
 
       const usage = event["usageMetadata"] as
@@ -965,13 +1200,33 @@ export class GeminiDriver extends BaseDriver {
       if (usage?.promptTokenCount) inputTokens = usage.promptTokenCount;
       if (usage?.candidatesTokenCount) outputTokens = usage.candidatesTokenCount;
     }
+    if (curCall) toolAcc.push(curCall);
 
+    const toolCalls: LlmToolCall[] = toolAcc.map((tc, i) => {
+      const id = `fc_${tc.name}_${i}`;
+      if (tc.sig) this.thoughtSignatures.set(id, tc.sig);
+      if (tc.apiId) this.callIds.set(id, tc.apiId);
+      return { id, name: tc.name, arguments: tc.args };
+    });
     const usageObj = this.makeUsage(
-      inputTokens || estimateTokens(contents.map((c) => c.parts[0]?.text ?? "").join(" ")),
+      inputTokens || estimateTokens(contents.map((c) => JSON.stringify(c)).join(" ")),
       outputTokens || estimateTokens(content),
     );
-    await handler({ delta: "", done: true, usage: usageObj });
-    return this.makeResponse(`gemini-${Date.now()}`, content, model, usageObj, Date.now() - t0);
+    await handler({
+      delta: "",
+      done: true,
+      usage: usageObj,
+      ...(toolCalls.length ? { toolCalls } : {}),
+    });
+    return this.makeResponse(
+      `gemini-${Date.now()}`,
+      content,
+      model,
+      usageObj,
+      Date.now() - t0,
+      toolCalls.length ? "tool_calls" : "stop",
+      toolCalls.length ? toolCalls : undefined,
+    );
   }
 }
 
@@ -1102,7 +1357,7 @@ export class FireworksDriver extends OpenAICompatibleDriver {
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://api.fireworks.ai/inference/v1";
-    this.model = config.model ?? "accounts/fireworks/models/llama-v3p1-70b-instruct";
+    this.model = config.model ?? "accounts/fireworks/models/llama-3.3-70b-instruct";
   }
 }
 
@@ -1131,7 +1386,7 @@ export class CerebrasDriver extends OpenAICompatibleDriver {
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://api.cerebras.ai/v1";
-    this.model = config.model ?? "llama3.1-70b";
+    this.model = config.model ?? "llama-3.3-70b";
   }
 }
 
@@ -1145,7 +1400,7 @@ export class KimiDriver extends OpenAICompatibleDriver {
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://api.moonshot.cn/v1";
-    this.model = config.model ?? "moonshot-v1-32k";
+    this.model = config.model ?? "kimi-k3";
   }
 }
 
@@ -1173,7 +1428,7 @@ export class XaiDriver extends OpenAICompatibleDriver {
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://api.x.ai/v1";
-    this.model = config.model ?? "grok-2-latest";
+    this.model = config.model ?? "grok-4.3";
   }
 }
 
@@ -1201,7 +1456,7 @@ export class PerplexityDriver extends OpenAICompatibleDriver {
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://api.perplexity.ai";
-    this.model = config.model ?? "sonar";
+    this.model = config.model ?? "sonar-pro";
   }
 }
 
@@ -1215,7 +1470,7 @@ export class CohereDriver extends OpenAICompatibleDriver {
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://api.cohere.ai/compatibility/v1";
-    this.model = config.model ?? "command-r-plus";
+    this.model = config.model ?? "command-a";
   }
 }
 
@@ -1247,7 +1502,7 @@ export class MoonshotDriver extends OpenAICompatibleDriver {
   constructor(config: FullConfig & { model?: string }, transport?: HttpTransport) {
     super(config, transport);
     this.baseUrl = config.baseUrl ?? "https://api.moonshot.ai/v1";
-    this.model = config.model ?? "moonshot-v1-32k";
+    this.model = config.model ?? "kimi-k3";
   }
 }
 
@@ -1555,10 +1810,7 @@ export class ReplicateDriver extends BaseDriver {
 
   async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
     const t0 = Date.now();
-    // Ollama only knows local model tags (e.g. "qwen2.5:7b"). Callers across the
-    // app hardcode cloud aliases like "anthropic/claude-3.5-sonnet"; route any
-    // such "provider/model" string to this driver's configured local model.
-    const model = opts.model && !opts.model.includes("/") ? opts.model : this.model;
+    const model = opts.model ?? this.model;
     const prompt = opts.messages
       .map((m) => {
         const role = m.role === "assistant" ? "Assistant" : m.role === "system" ? "System" : "User";
@@ -1683,10 +1935,7 @@ export class BaiduErnieDriver extends BaseDriver {
   async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
     const t0 = Date.now();
     const token = await this.getToken();
-    // Ollama only knows local model tags (e.g. "qwen2.5:7b"). Callers across the
-    // app hardcode cloud aliases like "anthropic/claude-3.5-sonnet"; route any
-    // such "provider/model" string to this driver's configured local model.
-    const model = opts.model && !opts.model.includes("/") ? opts.model : this.model;
+    const model = opts.model ?? this.model;
 
     // ERNIE: system prompt is top-level; messages carry only user/assistant turns.
     let system = opts.systemPrompt;
@@ -1810,19 +2059,38 @@ export class AlibabaBailianDriver extends OpenAICompatibleDriver {
 }
 
 /**
+ * Dify streaming SSE event (§1.2) — the event type rides inside the data
+ * payload, not in an SSE `event:` line.
+ */
+interface DifyStreamEvent {
+  event: string;
+  answer?: string;
+  id?: string;
+  conversation_id?: string;
+  metadata?: { usage?: { prompt_tokens?: number; completion_tokens?: number } };
+  // error events
+  status?: number;
+  code?: string;
+  message?: string;
+}
+
+/**
  * Dify — an app-scoped platform, NOT a raw model API. Each Dify "app" owns its
  * model, prompt, and tools server-side; the API key authenticates one app and the
  * caller sends a single `query` string, not a messages array + model.
  *
- * We map Nexus's chat shape onto chat-messages (blocking mode): the latest user
- * turn becomes `query`, and the system prompt + earlier turns are folded into the
- * query as plain context (Dify threads real multi-turn server-side via
- * conversation_id, which a stateless driver call doesn't carry).
- *
- * ponytail: blocking only (no SSE streaming), no conversation_id threading, no
- * native tool-calls — those are the Dify app's job. Upgrade path: thread
- * conversation_id + switch to response_mode "streaming" if true multi-turn or
- * token streaming is needed.
+ * We map Nexus's chat shape onto chat-messages: the latest user turn becomes
+ * `query`, and the system prompt + earlier turns are folded into the query as
+ * plain context. Dify threads real multi-turn server-side via conversation_id
+ * (§1.2): the response carries `conversationId`, and passing it back via
+ * `opts.conversationId` sends `conversation_id` on the wire so the follow-up
+ * continues the same Dify conversation. Blocking mode folds context into the
+ * query; streaming mode (`stream()`, response_mode "streaming") parses Dify's
+ * SSE — `event: message` deltas reassemble, `event: message_end` carries usage
+ * + the conversation id, `event: error` maps to a typed LlmError. Native
+ * tool-calls remain the Dify app's job. With an injected (mock) transport,
+ * `stream()` falls back to the blocking single-delta path like every other
+ * non-OpenAI-shaped driver.
  */
 export class DifyDriver extends BaseDriver {
   readonly provider = "dify";
@@ -1843,20 +2111,27 @@ export class DifyDriver extends BaseDriver {
     this.user = config.user ?? "nexus";
   }
 
-  async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
-    const t0 = Date.now();
+  /** Latest user turn becomes `query`; system + prior turns fold in as context. */
+  private buildQuery(opts: LlmRequestOptions): { fullQuery: string; query: string } {
     const history = opts.messages.filter((m) => m.role !== "system");
     const query = history.at(-1)?.content ?? "";
     const context: string[] = [];
     if (opts.systemPrompt) context.push(opts.systemPrompt);
     for (const m of history.slice(0, -1)) context.push(`${m.role}: ${m.content}`);
     const fullQuery = context.length ? `${context.join("\n")}\n\n${query}` : query;
+    return { fullQuery, query };
+  }
+
+  async complete(opts: LlmRequestOptions): Promise<LlmResponse> {
+    const t0 = Date.now();
+    const { fullQuery } = this.buildQuery(opts);
 
     const body = {
       inputs: {},
       query: fullQuery,
       response_mode: "blocking",
       user: this.user,
+      ...(opts.conversationId ? { conversation_id: opts.conversationId } : {}),
     };
 
     const raw = (await this.transport.post(`${this.baseUrl}/chat-messages`, body, {
@@ -1886,7 +2161,7 @@ export class DifyDriver extends BaseDriver {
     const content = raw.answer ?? "";
     const inputTokens = raw.metadata?.usage?.prompt_tokens ?? estimateTokens(fullQuery);
     const outputTokens = raw.metadata?.usage?.completion_tokens ?? estimateTokens(content);
-    return this.makeResponse(
+    const resp = this.makeResponse(
       raw.message_id ?? `${this.provider}-resp`,
       content,
       this.model,
@@ -1894,6 +2169,103 @@ export class DifyDriver extends BaseDriver {
       Date.now() - t0,
       "stop",
     );
+    if (raw.conversation_id) resp.conversationId = raw.conversation_id;
+    return resp;
+  }
+
+  /**
+   * Real SSE streaming (§1.2): `response_mode: "streaming"`, Dify events parsed
+   * from the `data:` payloads — `message`/`agent_message` deltas reassemble,
+   * `message_end` carries usage + conversation_id, `error` maps to LlmError,
+   * `ping` and workflow events are skipped. With an injected transport (tests),
+   * falls back to the blocking single-delta path.
+   */
+  override async stream(opts: LlmRequestOptions, handler: StreamHandler): Promise<LlmResponse> {
+    if (!this._useDefaultTransport) return super.stream(opts, handler);
+
+    const t0 = Date.now();
+    const { fullQuery } = this.buildQuery(opts);
+    const body = {
+      inputs: {},
+      query: fullQuery,
+      response_mode: "streaming",
+      user: this.user,
+      ...(opts.conversationId ? { conversation_id: opts.conversationId } : {}),
+    };
+
+    let content = "";
+    let conversationId = opts.conversationId;
+    let messageId = `${this.provider}-stream-${Date.now()}`;
+    let promptTokens = 0;
+    let completionTokens = 0;
+
+    for await (const payload of this.sseLines(`${this.baseUrl}/chat-messages`, body, {
+      Authorization: `Bearer ${this.apiKey}`,
+      "Content-Type": "application/json",
+    })) {
+      let event: DifyStreamEvent;
+      try {
+        event = JSON.parse(payload) as DifyStreamEvent;
+      } catch {
+        continue; // malformed payload — skip, keep the stream alive
+      }
+      switch (event.event) {
+        case "message":
+        case "agent_message": {
+          if (event.answer) {
+            content += event.answer;
+            await handler({ delta: event.answer, done: false });
+          }
+          if (event.conversation_id) conversationId = event.conversation_id;
+          if (event.id) messageId = event.id;
+          break;
+        }
+        case "message_replace": {
+          // Moderation replaced the whole answer — emit it as one delta.
+          content = event.answer ?? "";
+          await handler({ delta: content, done: false });
+          break;
+        }
+        case "message_end": {
+          if (event.conversation_id) conversationId = event.conversation_id;
+          if (event.metadata?.usage?.prompt_tokens)
+            promptTokens = event.metadata.usage.prompt_tokens;
+          if (event.metadata?.usage?.completion_tokens)
+            completionTokens = event.metadata.usage.completion_tokens;
+          break;
+        }
+        case "error": {
+          const msg = event.message ?? event.code ?? "dify stream error";
+          if (
+            event.status === 401 ||
+            event.code === "unauthorized" ||
+            event.code === "invalid_api_key"
+          ) {
+            throw new LlmError("AUTH_FAILED", msg, this.provider, 401);
+          }
+          if (event.status === 429) throw new LlmError("RATE_LIMITED", msg, this.provider, 429);
+          throw new LlmError("SERVER_ERROR", msg, this.provider, event.status);
+        }
+        default:
+          break; // ping keepalive + workflow/tts events — not part of the answer
+      }
+    }
+
+    const usageObj = this.makeUsage(
+      promptTokens || estimateTokens(fullQuery),
+      completionTokens || estimateTokens(content),
+    );
+    await handler({ delta: "", done: true, usage: usageObj });
+    const resp = this.makeResponse(
+      messageId,
+      content,
+      this.model,
+      usageObj,
+      Date.now() - t0,
+      "stop",
+    );
+    if (conversationId) resp.conversationId = conversationId;
+    return resp;
   }
 }
 
@@ -2121,7 +2493,7 @@ export class VertexDriver extends OpenAICompatibleDriver {
     super(config, transport);
     const region = config.region ?? "us-central1";
     this.baseUrl = `https://${region}-aiplatform.googleapis.com/v1/projects/${config.project}/locations/${region}/endpoints/openapi`;
-    this.model = config.model ?? "google/gemini-2.0-flash-001";
+    this.model = config.model ?? "gemini-3.6-flash";
   }
 }
 

@@ -74,7 +74,7 @@ function clearUpstashEnv(): void {
  * Mock fetch to return a successful Upstash pipeline response.
  * The first arg is the INCR result, second is the EXPIRE result.
  */
-function mockUpstashPipeline(incrResult: number, expireResult: number = 1): void {
+function mockUpstashPipeline(incrResult: number, expireResult = 1): void {
   vi.stubGlobal(
     "fetch",
     vi.fn().mockResolvedValue({
@@ -222,6 +222,162 @@ describe("In-memory fallback (no Upstash env)", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Window-drain regression (the never-draining bucket wedge)
+// ═══════════════════════════════════════════════════════════════════════════════
+// A bucket pushed over the limit must drain after the window even if traffic
+// keeps touching the key. The old code refreshed the expiry on every request
+// (unconditional EXPIRE / plain SET), so a rate-limited IP stayed 429 forever
+// while any traffic (e.g. an SSE reconnect loop) kept the key alive.
+
+function mockUpstashWithRecordedBodies(): { bodies: string[][]; incrResults: number[] } {
+  const bodies: string[][] = [];
+  const incrResults = [1, 2, 3, 4, 5];
+  let i = 0;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as [string, ...unknown[]][];
+      bodies.push(body.map((c) => c[0] as string));
+      const isIncr = body[0]?.[0] === "INCR";
+      return {
+        ok: true,
+        json: async () => [{ result: isIncr ? (incrResults[i++] ?? 1) : 1 }],
+      };
+    }),
+  );
+  return { bodies, incrResults };
+}
+
+describe("Window drain — Upstash pipeline", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    setUpstashEnv();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    clearUpstashEnv();
+  });
+
+  it("stamps EXPIRE only when INCR creates the key (result 1), never in-window", async () => {
+    const { bodies } = mockUpstashWithRecordedBodies();
+    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
+    const handler = makeRateLimitPreHandler({ limit: 2, windowMs: 60_000, keyPrefix: "drain-up" });
+
+    // First request creates the key → INCR + EXPIRE
+    const r1 = makeReply();
+    await handler(makeRequest("10.9.9.1"), r1);
+    expect(r1._sent).toBe(false);
+    expect(bodies).toEqual([["INCR"], ["EXPIRE"]]);
+
+    // In-window traffic (counts 2, 3) → INCR only, expiry untouched
+    const r2 = makeReply();
+    await handler(makeRequest("10.9.9.1"), r2);
+    const r3 = makeReply();
+    await handler(makeRequest("10.9.9.1"), r3);
+    expect(r3._code).toBe(429);
+    expect(bodies).toEqual([["INCR"], ["EXPIRE"], ["INCR"], ["INCR"]]);
+  });
+});
+
+describe("Window drain — KV fallback", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    clearUpstashEnv();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    // doMock registrations survive resetModules — undo ours so later tests
+    // (e.g. the fail-open group) get the natural shared-kv singleton again.
+    vi.doUnmock("../../src/lib/shared-kv.js");
+  });
+
+  it("bucket pushed over the limit drains after the window when traffic stops", async () => {
+    let now = 1_000_000;
+    const kv = new MemoryKVStore({ now: () => now });
+    vi.doMock("../../src/lib/shared-kv.js", () => ({ getSharedKV: () => kv }));
+
+    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
+    const handler = makeRateLimitPreHandler({ limit: 2, windowMs: 60_000, keyPrefix: "drain-mem" });
+
+    const r1 = makeReply();
+    await handler(makeRequest("10.9.9.2"), r1);
+    const r2 = makeReply();
+    await handler(makeRequest("10.9.9.2"), r2);
+    const r3 = makeReply();
+    await handler(makeRequest("10.9.9.2"), r3);
+    expect(r3._code).toBe(429);
+
+    // Traffic stops; window expires (stamped once at the first request).
+    now += 61_000;
+    const r4 = makeReply();
+    await handler(makeRequest("10.9.9.2"), r4);
+    expect(r4._code).toBe(200);
+    expect(r4._sent).toBe(false);
+    expect(r4._headers["X-RateLimit-Remaining"]).toBe(1);
+  });
+
+  it("in-window traffic does not refresh the expiry", async () => {
+    let now = 2_000_000;
+    const kv = new MemoryKVStore({ now: () => now });
+    vi.doMock("../../src/lib/shared-kv.js", () => ({ getSharedKV: () => kv }));
+
+    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
+    const handler = makeRateLimitPreHandler({
+      limit: 2,
+      windowMs: 60_000,
+      keyPrefix: "drain-mem2",
+    });
+
+    // Window starts at t=0 (count 1).
+    await handler(makeRequest("10.9.9.3"), makeReply());
+
+    // In-window traffic at t=30s — pushes the bucket over the limit.
+    now += 30_000;
+    await handler(makeRequest("10.9.9.3"), makeReply());
+    const r3 = makeReply();
+    await handler(makeRequest("10.9.9.3"), r3);
+    expect(r3._code).toBe(429);
+
+    // Traffic stops at t=30s. If in-window requests had refreshed the expiry,
+    // the bucket would still be over at t=61s (window would run to t=90s).
+    // The expiry was stamped once at t=0, so t=61s is a fresh window.
+    now += 31_000;
+    const r4 = makeReply();
+    await handler(makeRequest("10.9.9.3"), r4);
+    expect(r4._code).toBe(200);
+    expect(r4._sent).toBe(false);
+    expect(r4._headers["X-RateLimit-Remaining"]).toBe(1);
+  });
+
+  it("serializes concurrent arrivals so the bucket counts exactly", async () => {
+    let now = 3_000_000;
+    const kv = new MemoryKVStore({ now: () => now });
+    vi.doMock("../../src/lib/shared-kv.js", () => ({ getSharedKV: () => kv }));
+
+    const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
+    const handler = makeRateLimitPreHandler({
+      limit: 10,
+      windowMs: 60_000,
+      keyPrefix: "drain-race",
+    });
+
+    // 100 simultaneous arrivals — without per-key serialization they would all
+    // see the missing marker and stampede-reset the count to 1 (no 429s).
+    const replies = await Promise.all(
+      Array.from({ length: 100 }, () => {
+        const r = makeReply();
+        return handler(makeRequest("10.9.9.4"), r).then(() => r);
+      }),
+    );
+    const over = replies.filter((r) => r._code === 429).length;
+    expect(over).toBe(90);
+    expect(await kv.get<number>("ratelimit:drain-race:10.9.9.4")).toBe(100);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Fail-open behavior
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -299,8 +455,8 @@ describe("Fail-open when KV is unavailable", () => {
     clearUpstashEnv();
 
     const brokenKV = new MemoryKVStore();
-    // Override get to throw
-    brokenKV.get = async () => {
+    // The fallback counts via incr now — break it to simulate KV down.
+    brokenKV.incr = async () => {
       throw new Error("KV down");
     };
 
@@ -322,7 +478,7 @@ describe("Fail-open when KV is unavailable", () => {
     clearUpstashEnv();
 
     const brokenKV = new MemoryKVStore();
-    brokenKV.get = async () => {
+    brokenKV.incr = async () => {
       throw new Error("KV down");
     };
 

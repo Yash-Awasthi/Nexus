@@ -24,6 +24,8 @@
  *   fetch, proxy rotator, cookie jar, delay, robots cache, now()
  */
 
+import { isBlockedStatus, type CrawlSession, type SessionPool } from "./sessions.js";
+
 export type FetchFn = typeof fetch;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -354,6 +356,14 @@ export interface SpiderConfig {
   userAgent?: string;
   /** Max retries per URL on network error. Default: 1 */
   maxRetries?: number;
+  /**
+   * Optional session pool (crawlee SessionPool semantics). When set, each
+   * request attempt acquires a session identity: its `userData.headers` are
+   * merged into the request, blocked status codes (401/403/429) retire the
+   * identity and retry on a fresh one, successes call `markGood()`, and
+   * network errors call `markBad()`. Default: no session rotation.
+   */
+  sessionPool?: SessionPool;
 }
 
 /** Spider. */
@@ -365,6 +375,7 @@ export class Spider {
   private readonly now: () => number;
   private readonly userAgent: string;
   private readonly maxRetries: number;
+  private readonly sessionPool?: SessionPool;
 
   private _paused = false;
   private _stopped = false;
@@ -381,6 +392,7 @@ export class Spider {
     this.now = config.now ?? (() => Date.now());
     this.userAgent = config.userAgent ?? "NexusSpider/1.0";
     this.maxRetries = config.maxRetries ?? 1;
+    this.sessionPool = config.sessionPool;
   }
 
   pause(): void {
@@ -483,8 +495,24 @@ export class Spider {
     let lastError: Error | undefined;
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      // Acquire a session identity per attempt so a retired identity is
+      // replaced by a fresh one on the next attempt (crawlee SessionError
+      // semantics: block → retire + retry on a new identity).
+      let session: CrawlSession | undefined;
+      if (this.sessionPool) {
+        session = await this.sessionPool.getSession();
+        if (!session) {
+          lastError = new Error("Session pool exhausted — no usable session remains");
+          break;
+        }
+      }
+      const sessionHeaders =
+        session && typeof session.userData.headers === "object" && session.userData.headers
+          ? (session.userData.headers as Record<string, string>)
+          : {};
+      const headers = { ...baseHeaders, ...sessionHeaders };
       try {
-        const res = await this.fetch(url, { headers: baseHeaders });
+        const res = await this.fetch(url, { headers });
         const latencyMs = this.now() - startMs;
 
         // Collect cookies (getSetCookie is Node 18+ only; fall back to get())
@@ -494,9 +522,9 @@ export class Spider {
         if (setCookies.length) this.cookieJar.setCookies(url, setCookies);
 
         // Build headers map
-        const headers: Record<string, string> = {};
+        const resHeaders: Record<string, string> = {};
         res.headers.forEach((v, k) => {
-          headers[k] = v;
+          resHeaders[k] = v;
         });
 
         const html = res.ok ? await res.text() : "";
@@ -507,12 +535,25 @@ export class Spider {
           else if (res.status === 403 || res.status === 407) this.proxy!.markBanned(proxy);
         }
 
+        // Session anti-bot scoring (crawlee semantics): blocked identities are
+        // retired (and the request retried on a fresh one when attempts remain);
+        // successes heal/advance the identity; non-blocked non-ok statuses are
+        // neutral; thrown network errors mark the identity bad below.
+        if (this.sessionPool && session) {
+          if (isBlockedStatus(res.status)) {
+            session.retire();
+            if (attempt < this.maxRetries) continue;
+          } else if (res.ok) {
+            session.markGood();
+          }
+        }
+
         return {
           url,
           finalUrl: res.url || url,
           statusCode: res.status,
           html,
-          headers,
+          headers: resHeaders,
           links,
           depth,
           crawledAt: startMs,
@@ -521,6 +562,7 @@ export class Spider {
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
         if (proxy) this.proxy!.markFail(proxy);
+        if (this.sessionPool && session) session.markBad();
       }
     }
 
@@ -660,3 +702,5 @@ export class Spider {
 // ── Re-export helpers ─────────────────────────────────────────────────────────
 
 export { parseRobots, isAllowedByRobots, parseSitemapUrls };
+
+export * from "./sessions.js";

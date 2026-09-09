@@ -15,6 +15,7 @@
  *   nexus council deliberate --title <title> [--desc <text>] [--budget 0.10]
  *   nexus council verdict <verdictId>
  *   nexus ingest event --source <src> --type <type> --payload <json>
+ *   nexus models seed [--file <path>]
  *   nexus audit [--limit 50]
  *   nexus audit verify
  */
@@ -24,6 +25,7 @@ import { Command } from "commander";
 
 import { api } from "./lib/client.js";
 import { runLocalAgent } from "./lib/local-agent.js";
+import { loadModelsDevSource, seedModelsFromSource } from "./lib/models-seed.js";
 import { streamSse } from "./lib/sse-stream.js";
 
 const program = new Command();
@@ -107,12 +109,14 @@ async function runCodeLocal(
     apiKey?: string;
     maxSteps?: string;
     shell?: boolean;
+    deliberate?: boolean;
   },
 ): Promise<void> {
   console.log(chalk.gray(`  ▸ ${task.slice(0, 100)} ${chalk.dim("(local)")}\n`));
   const result = await runLocalAgent({
     instruction: task,
     rootDir: opts.dir ?? process.cwd(),
+    ...(opts.deliberate ? { deliberation: true } : {}),
     ...(opts.provider ? { provider: opts.provider } : {}),
     ...(opts.model ? { model: opts.model } : {}),
     ...(opts.apiKey ? { apiKey: opts.apiKey } : {}),
@@ -122,6 +126,17 @@ async function runCodeLocal(
       const tools = step.toolCalls.map((c) => c.name);
       const label = tools.length ? tools.join(", ") : chalk.gray("(thinking)");
       console.log(`  ${chalk.cyan(`step ${step.stepIndex}`)}  ${label}`);
+    },
+    onToolTranscript: (event) => {
+      // Worker-shaped artifact contract (pass 62): the structured JSON event is
+      // the primary emission; the console line is presentation on top.
+      console.log(JSON.stringify(event));
+      const t = event.transcript;
+      console.log(
+        chalk.gray("  ⌘ deliberation transcript"),
+        chalk.cyan(t.protocol ?? ""),
+        chalk.gray(`degraded=${String(t.degraded ?? false)} warnings=${(t.warnings ?? []).length}`),
+      );
     },
   });
   const status = result.aborted ? "aborted" : result.stopReason ? result.stopReason : "completed";
@@ -145,6 +160,7 @@ program
   .option("--dir <path>", "Workspace root for --local runs (default: cwd)")
   .option("--api-key <key>", "Provider API key for --local runs (else the provider env var)")
   .option("--no-shell", "Disable the run_command tool for --local runs")
+  .option("--deliberate", "Serve council + debate deliberation tools on --local runs")
   .action(async (task: string, opts) => {
     // §7.4 — in-process loop over the RuntimeToolSet; no API/worker involved.
     if (opts.local) {
@@ -705,6 +721,31 @@ admin
           ` ${chalk.gray(time)}  ${statusColor(e.status.padEnd(8))}  ${e.provider}/${e.model.slice(0, 24)}  ${e.latencyMs}ms`,
         );
       }
+    } catch (err) {
+      console.error(chalk.red("✗"), String(err));
+      process.exit(1);
+    }
+  });
+
+// ── models (§1.5 models.dev seed) ───────────────────────────────────────────
+
+const models = program.command("models").description("Model catalog commands");
+
+models
+  .command("seed")
+  .description("Seed the provider_models table from models.dev data (no network)")
+  .option(
+    "--file <path>",
+    "Path to a models.dev api.json-shaped JSON file (default: built-in fixture)",
+  )
+  .action(async (opts: { file?: string }) => {
+    try {
+      const source = await loadModelsDevSource(opts.file);
+      const written = await seedModelsFromSource(source);
+      console.log(
+        chalk.green("✓"),
+        `provider_models seeded: ${written} model(s) from ${source.source}`,
+      );
     } catch (err) {
       console.error(chalk.red("✗"), String(err));
       process.exit(1);

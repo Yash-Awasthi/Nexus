@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { DiffBlock, type Hunk, type HunkLine } from "./DiffBlock";
 import { DiffSessionToolbar } from "./DiffSessionToolbar";
 
@@ -151,6 +151,30 @@ export function DiffViewer({ filename, original, modified, onApply }: DiffViewer
   const [hunks, setHunks] = useState<Hunk[]>(() => buildHunks(filename, original, modified));
   const [rollbackId, setRollbackId] = useState<string | undefined>();
   const [isApplying, setIsApplying] = useState(false);
+  // Server-side history (GET /api/diff/history): a page reload clears React
+  // state, so the newest applied diff is re-seeded from the durable store —
+  // the rollback button survives reloads instead of dying with the session.
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  useEffect(() => {
+    if (historyLoaded) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/diff/history?limit=1");
+        if (res.ok) {
+          const data = (await res.json()) as { records?: { id: string }[] };
+          if (!cancelled && data.records?.[0]?.id) setRollbackId(data.records[0].id);
+        }
+      } catch {
+        /* offline / auth pending — the in-session rollbackId still works */
+      } finally {
+        if (!cancelled) setHistoryLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [historyLoaded]);
 
   const accepted = hunks.filter((h) => h.status === "accepted").length;
   const total = hunks.length;

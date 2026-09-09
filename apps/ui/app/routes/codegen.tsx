@@ -34,6 +34,26 @@ const STACKS = [
 
 const MONO = "'JetBrains Mono','Fira Code',monospace";
 
+/**
+ * Map the UI stack picker onto the API's `language` field + a file name.
+ * /codegen/generate + /codegen/iterate are blocking JSON APIs that take and
+ * return `{ code, language }` — the stack is a UI-side prompt/naming hint.
+ */
+const STACK_LANG: Record<string, { language: string; filename: string }> = {
+  html: { language: "html", filename: "index.html" },
+  react: { language: "typescript", filename: "App.tsx" },
+  vue: { language: "javascript", filename: "App.vue" },
+  svelte: { language: "javascript", filename: "App.svelte" },
+  node: { language: "javascript", filename: "server.js" },
+  python: { language: "python", filename: "main.py" },
+  go: { language: "go", filename: "main.go" },
+  rust: { language: "rust", filename: "main.rs" },
+};
+
+function stackLang(stack: string): { language: string; filename: string } {
+  return STACK_LANG[stack] ?? { language: "typescript", filename: "main.txt" };
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function CodeGenPage() {
@@ -81,10 +101,11 @@ export default function CodeGenPage() {
 
   async function compileForPreview(file: GeneratedFile) {
     try {
+      // /codegen/compile takes { code, language } — not the UI stack id.
       const r = await fetch("/api/codegen/compile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: file.content, stack }),
+        body: JSON.stringify({ code: file.content, language: file.language }),
       });
       if (r.ok) {
         const { html } = await r.json();
@@ -102,49 +123,31 @@ export default function CodeGenPage() {
     abortRef.current = new AbortController();
 
     try {
+      // /codegen/generate is a blocking JSON API: { code, language } — no SSE.
+      const lang = stackLang(stack);
       const res = await fetch("/api/codegen/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: prompt.trim(), stack }),
+        body: JSON.stringify({ prompt: prompt.trim(), language: lang.language }),
         signal: abortRef.current.signal,
       });
-
-      if (!res.body) throw new Error("No stream");
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let streamedCode = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const text = decoder.decode(value, { stream: true });
-        for (const line of text.split("\n")) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6).trim();
-          try {
-            const ev = JSON.parse(data);
-            if (ev.type === "chunk") {
-              streamedCode += ev.text;
-              // Live update the editor
-              setFiles([{ name: "generating…", content: streamedCode, language: "typescript" }]);
-            } else if (ev.type === "done") {
-              const genFiles: GeneratedFile[] = ev.files ?? [];
-              setFiles(genFiles);
-              setActiveFile(0);
-              setSessionId(ev.sessionId);
-              // Save session to localStorage
-              saveSession({
-                sessionId: ev.sessionId,
-                prompt: prompt.trim(),
-                stack,
-                timestamp: Date.now(),
-                files: genFiles,
-              });
-              setStoredSession(null);
-            }
-          } catch {}
-        }
-      }
+      if (!res.ok) throw new Error(`generate failed: HTTP ${res.status}`);
+      const data = (await res.json()) as { code?: string };
+      const genFiles: GeneratedFile[] = [
+        { name: lang.filename, content: data.code ?? "", language: lang.language },
+      ];
+      setFiles(genFiles);
+      setActiveFile(0);
+      const sid = crypto.randomUUID();
+      setSessionId(sid);
+      saveSession({
+        sessionId: sid,
+        prompt: prompt.trim(),
+        stack,
+        timestamp: Date.now(),
+        files: genFiles,
+      });
+      setStoredSession(null);
     } catch (e: any) {
       if (e?.name !== "AbortError") {
         setFiles([{ name: "error.txt", content: String(e), language: "text" }]);
@@ -162,43 +165,35 @@ export default function CodeGenPage() {
     abortRef.current = new AbortController();
 
     try {
+      // /codegen/iterate is a blocking JSON API: { code, instruction, language }
+      // → { code }. diffOriginal captures the pre-iterate text so the diff view
+      // (and its rollback record) has a real original to restore.
+      const lang = stackLang(stack);
       const res = await fetch("/api/codegen/iterate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          session_id: sessionId,
+          code: original,
           instruction: iterPrompt.trim(),
-          current_code: original,
-          stack,
+          language: lang.language,
         }),
         signal: abortRef.current.signal,
       });
-
-      if (!res.body) throw new Error("No stream");
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let newCode = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const text = decoder.decode(value, { stream: true });
-        for (const line of text.split("\n")) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6).trim();
-          try {
-            const ev = JSON.parse(data);
-            if (ev.type === "chunk") newCode += ev.text;
-            else if (ev.type === "done" && ev.files?.length) {
-              const updated = ev.files[0] as GeneratedFile;
-              setFiles((prev) => prev.map((f, i) => (i === activeFile ? updated : f)));
-              setShowDiff(true);
-              setView("diff");
-              setIterPrompt("");
-            }
-          } catch {}
-        }
-      }
+      if (!res.ok) throw new Error(`iterate failed: HTTP ${res.status}`);
+      const data = (await res.json()) as { code?: string };
+      const updated: GeneratedFile = { ...files[activeFile], content: data.code ?? original };
+      const updatedFiles = files.map((f, i) => (i === activeFile ? updated : f));
+      setFiles(updatedFiles);
+      setShowDiff(true);
+      setView("diff");
+      setIterPrompt("");
+      saveSession({
+        sessionId: sessionId ?? crypto.randomUUID(),
+        prompt: prompt || "iterated session",
+        stack,
+        timestamp: Date.now(),
+        files: updatedFiles,
+      });
     } catch (e: any) {
       if (e?.name !== "AbortError") console.error(e);
     } finally {
@@ -534,11 +529,18 @@ export default function CodeGenPage() {
                   filename={currentFile.name}
                   original={diffOriginal}
                   modified={currentFile.content}
-                  onApply={async (hunks) => {
+                  onApply={async () => {
+                    // /diff/apply takes the full before/after texts and recomputes
+                    // hunks server-side (rollback restores the exact original, so
+                    // the applied record must carry real content — a patches payload
+                    // silently stored an empty record and rollback restored nothing).
                     const res = await fetch("/api/diff/apply", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ patches: [{ filename: currentFile.name, hunks }] }),
+                      body: JSON.stringify({
+                        original: diffOriginal,
+                        modified: currentFile.content,
+                      }),
                     });
                     const data = await res.json();
                     return { rollbackId: data.rollbackId };

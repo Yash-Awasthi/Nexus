@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/agent-network",
+  "version": "0.1.0",
+  "description": "Multi-agent network with shared state and deterministic routing",
+  "main": "src/index.ts"
+}

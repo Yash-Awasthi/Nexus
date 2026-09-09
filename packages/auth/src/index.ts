@@ -41,6 +41,15 @@ export class AuthError extends Error {
     this.code = code;
     this.httpStatus = AUTH_ERROR_STATUS[code];
   }
+
+  /**
+   * Fastify-compatible alias: its global error handler keys off `statusCode`
+   * (`error.statusCode ?? 500`), so a thrown AuthError (e.g. RATE_LIMITED from
+   * the login throttle) must surface its real status instead of 500.
+   */
+  get statusCode(): number {
+    return this.httpStatus;
+  }
 }
 
 const AUTH_ERROR_STATUS: Record<AuthErrorCode, number> = {
@@ -250,6 +259,19 @@ export interface AuthConfig {
   apiKey?: string;
   /** JWT secret for HS256 verification */
   jwtSecret?: string;
+  /**
+   * JWT signature algorithm. Defaults to "HS256". When "RS256", tokens are
+   * verified with {@link AuthConfig.jwtPublicKey} instead of the shared secret.
+   */
+  jwtAlg?: "HS256" | "RS256";
+  /** RSA public key (PEM) — required when {@link AuthConfig.jwtAlg} is "RS256". */
+  jwtPublicKey?: string;
+  /**
+   * Optional session-revocation registry. When set, every verified JWT payload
+   * is checked against it — a revoked `jti` or a subject cutoff rejects the
+   * request with REVOKED_TOKEN (§14.3).
+   */
+  revocations?: SessionRevocationRegistry;
   /** Minimum required role. Defaults to "read-only" (any valid token). */
   requiredRole?: NexusRole;
   /**
@@ -284,8 +306,10 @@ export function authenticate(authHeader: string | undefined, config: AuthConfig)
     return { authenticated: true, method: "api-key", subject: "dev", role: "admin" };
   }
 
-  if (!config.apiKey && !config.jwtSecret) {
-    throw new Error("@nexus/auth: at least one of apiKey or jwtSecret must be configured");
+  if (!config.apiKey && !config.jwtSecret && !config.jwtPublicKey) {
+    throw new Error(
+      "@nexus/auth: at least one of apiKey, jwtSecret, or jwtPublicKey must be configured",
+    );
   }
 
   const token = extractBearerToken(authHeader);
@@ -301,9 +325,22 @@ export function authenticate(authHeader: string | undefined, config: AuthConfig)
     }
   }
 
-  // Try JWT
-  if (config.jwtSecret) {
-    const payload = verifyJwt(token, config.jwtSecret);
+  // Try JWT (HS256 shared secret, or RS256 public key when configured)
+  if (config.jwtSecret || config.jwtPublicKey) {
+    const alg: "HS256" | "RS256" = config.jwtAlg ?? "HS256";
+    if (alg === "RS256" && !config.jwtPublicKey) {
+      throw new AuthError("INVALID_TOKEN", "RS256 verification not configured (jwtPublicKey)");
+    }
+    if (alg === "HS256" && !config.jwtSecret) {
+      throw new AuthError("INVALID_TOKEN", "HS256 verification not configured (jwtSecret)");
+    }
+    const payload =
+      alg === "RS256"
+        ? verifyJwtRS256(token, config.jwtPublicKey!)
+        : verifyJwt(token, config.jwtSecret!);
+    // Revocation is checked AFTER signature/expiry pass (never before) so a
+    // forged token cannot probe the denylist.
+    config.revocations?.assertNotRevoked(payload);
     if (!hasRequiredRole(payload.role, requiredRole)) {
       throw new AuthError(
         "INSUFFICIENT_ROLE",

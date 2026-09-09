@@ -1,0 +1,9 @@
+{
+  "name": "@nexus/gnn-router",
+  "version": "0.1.0",
+  "description": "Graph Neural Network inspired LLM routing with learned provider scoring",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@nexus/llm-router": "workspace:*"
+  }
+}

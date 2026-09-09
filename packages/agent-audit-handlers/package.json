@@ -1,0 +1,23 @@
+{
+  "name": "@nexus/agent-audit-handlers",
+  "version": "0.1.0",
+  "description": "Framework-specific audit capture handlers — drop-in wrappers for LangChain, CrewAI, OpenAI Agents, AutoGen, Haystack, Google ADK",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "license": "Apache-2.0"
+}

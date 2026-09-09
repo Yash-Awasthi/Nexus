@@ -287,28 +287,37 @@ const SSE_HEADERS = {
 
 export const DRIVER_ALIASES: Record<string, { provider: string; model: string }> = {
   // Nexus smart-routing aliases
-  "nexus/fast": { provider: "groq", model: "llama-3.3-70b-versatile" },
-  "nexus/smart": { provider: "groq", model: "llama-3.3-70b-versatile" },
+  // llama-3.3-70b-versatile was decommissioned by Groq on 2026-08-16 — the
+  // replacement (per Groq) is openai/gpt-oss-120b.
+  "nexus/fast": { provider: "groq", model: "openai/gpt-oss-120b" },
+  "nexus/smart": { provider: "groq", model: "openai/gpt-oss-120b" },
   "nexus/opus": { provider: "anthropic", model: "claude-opus-4-5" },
-  "nexus/sonnet": { provider: "anthropic", model: "claude-3-5-sonnet-20241022" },
-  "nexus/haiku": { provider: "anthropic", model: "claude-haiku-3-5" },
-  "nexus/gemini": { provider: "gemini", model: "gemini-1.5-pro" },
-  "nexus/gemini-flash": { provider: "gemini", model: "gemini-1.5-flash" },
+  // claude-3-5-sonnet-20241022 was retired by Anthropic on 2025-10-22.
+  "nexus/sonnet": { provider: "anthropic", model: "claude-sonnet-4-6" },
+  "nexus/haiku": { provider: "anthropic", model: "claude-haiku-4-5" },
+  // The Gemini 1.5 series was shut down by Google; 3.6 Flash is GA and cheap.
+  "nexus/gemini": { provider: "gemini", model: "gemini-3.6-flash" },
+  "nexus/gemini-flash": { provider: "gemini", model: "gemini-3.5-flash-lite" },
   "nexus/deepseek": { provider: "deepseek", model: "deepseek-chat" },
   "nexus/mistral": { provider: "mistral", model: "mistral-large-latest" },
-  "nexus/router": { provider: "openrouter", model: "anthropic/claude-3.5-sonnet" },
+  // anthropic/claude-3.5-sonnet 404s on OpenRouter since the model's retirement.
+  "nexus/router": { provider: "openrouter", model: "anthropic/claude-sonnet-4-6" },
   "nexus/local": {
     provider: "ollama",
     model: process.env.NEXUS_DEFAULT_MODEL ?? "qwen2.5:7b",
   },
-  "nexus/cerebras": { provider: "cerebras", model: "llama3.1-70b" },
-  "nexus/kimi": { provider: "kimi", model: "moonshot-v1-32k" },
+  // llama3.1-70b is deprecated on Cerebras (auto-upgraded to llama-3.3-70b).
+  "nexus/cerebras": { provider: "cerebras", model: "llama-3.3-70b" },
+  // moonshot-v1 family reached EOL 2026-08-31; kimi-k3 is current.
+  "nexus/kimi": { provider: "kimi", model: "kimi-k3" },
   "nexus/code": { provider: "codestral", model: "codestral-latest" },
+  // llama-v3p1-70b-instruct deprecated Feb 2026; 3.3 is the current family.
   "nexus/fireworks": {
     provider: "fireworks",
-    model: "accounts/fireworks/models/llama-v3p1-70b-instruct",
+    model: "accounts/fireworks/models/llama-3.3-70b-instruct",
   },
-  "nexus/nvidia": { provider: "nvidia_nim", model: "meta/llama-3.1-70b-instruct" },
+  // meta/llama-3.1-70b-instruct was deprecated on NIM on 2026-08-25.
+  "nexus/nvidia": { provider: "nvidia_nim", model: "meta/llama-3.3-70b-instruct" },
   // sidecar router — route to the local sidecar router (env LOCAL_ROUTER_*).
   // "auto" lets the sidecar pick; override per-request by sending a real model id.
   "nexus/omni": { provider: "local-router", model: process.env.LOCAL_ROUTER_MODEL ?? "auto" },
@@ -317,6 +326,8 @@ export const DRIVER_ALIASES: Record<string, { provider: string; model: string }>
 /** Resolve model string → { provider, model }. Null if unrecognised. */
 function resolveAlias(model: string): { provider: string; model: string } | null {
   if (DRIVER_ALIASES[model]) return DRIVER_ALIASES[model]!;
+  // Canonical Groq smart default since llama-3.3-70b-versatile was decommissioned.
+  if (model === "openai/gpt-oss-120b") return { provider: "groq", model };
   if (model.startsWith("claude-")) return { provider: "anthropic", model };
   if (model.startsWith("gemini-")) return { provider: "gemini", model };
   if (model.startsWith("deepseek")) return { provider: "deepseek", model };
@@ -492,6 +503,11 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
     "/gateway/messages",
     { preHandler: [requireAuthWithTier, _budgetPreHandler] },
     async (request, reply) => {
+      // Identity for memory auto-ingest: JWT users and API-key callers (via the
+      // api_keys table) resolve here. Dev-bypass requests leave it undefined —
+      // those skip ingest so we never create more unowned rows (they'd be
+      // invisible to every user's scoped memory queries anyway).
+      const ingestUserId = request.nexusUserId;
       const overrideProvider = request.headers["x-nexus-provider"];
       const registry = buildDriverRegistry();
       seedEnvAccounts(accountPool, registry);
@@ -926,12 +942,15 @@ export async function gatewayRoutes(app: FastifyInstance): Promise<void> {
         };
 
         // ── Phase 3: Memory auto-ingest (fire-and-forget) ────────────────────
-        // Store each assistant response so it's searchable via /memory recall.
-        if (finalContent.length > 20) {
+        // Store each assistant response scoped to the authenticated user so it's
+        // searchable via /memory recall (entries without a userId are invisible
+        // to user-scoped queries, so ingest is skipped when identity is absent).
+        if (finalContent.length > 20 && ingestUserId) {
           const lastUserMsg = opts.messages.filter((m) => m.role === "user").at(-1)?.content ?? "";
           _gatewayMemory
             .remember(`Q: ${lastUserMsg.slice(0, 200)}\nA: ${finalContent.slice(0, 1000)}`, {
               metadata: { category: "gateway", tags: [resolvedModel, providerName] },
+              userId: ingestUserId,
             })
             .catch(() => {});
         }

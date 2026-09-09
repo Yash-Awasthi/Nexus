@@ -11,7 +11,8 @@
  *
  * Security:
  *   Passwords — scrypt (N=32768, r=8, p=1) — NIST SP 800-132 compliant.
- *   Access tokens — HS256 JWT, 15-minute expiry.
+ *   Access tokens — HS256 or RS256 JWT (NEXUS_JWT_ALG, §14.1), 15-minute expiry.
+ *   Brute-force — failed logins lock the email|ip key with exponential backoff (§14.3).
  *   Refresh tokens — 32-byte cryptographically random, SHA-256 hashed before storage.
  *   Refresh rotation — each refresh revokes the previous token (no re-use).
  *   Timing-safe compares everywhere (timingSafeEqual).
@@ -21,7 +22,6 @@ import { randomBytes, scrypt as _scrypt, timingSafeEqual } from "node:crypto";
 import type { ScryptOptions } from "node:crypto";
 import { promisify } from "node:util";
 
-import { signJwt } from "@nexus/auth";
 import { db } from "@nexus/db";
 import {
   users,
@@ -33,9 +33,16 @@ import { eq, and, gt, isNull, desc } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
 import { emitAuditEvent } from "../lib/audit-emitter.js";
+import {
+  assertLoginAllowed,
+  loginThrottleKey,
+  recordLoginFailure,
+  recordLoginSuccess,
+} from "../lib/auth-hardening.js";
 import { sha256hex } from "../lib/crypto-utils.js";
+import { ACCESS_TOKEN_TTL_SEC, issueAccessToken } from "../lib/issue-access-token.js";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuthWithTier } from "../middleware/auth.js";
 
 const scrypt = promisify(_scrypt) as (
   password: Buffer | string,
@@ -95,37 +102,10 @@ function generateRefreshToken(): string {
 
 // ── JWT issuance ──────────────────────────────────────────────────────────────
 
-const ACCESS_TOKEN_TTL_SEC = 15 * 60; // 15 minutes
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 3600 * 1000; // 30 days
-
-/**
- * Map a platform role (users.role: owner|admin|member|viewer) to a NexusRole
- * (admin|agent|read-only) understood by @nexus/auth's role hierarchy. Without
- * this, tokens carry a role outside ROLE_RANK and fail authenticate().
- */
-function toNexusRole(role: string): "admin" | "agent" | "read-only" {
-  switch (role) {
-    case "owner":
-    case "admin":
-      return "admin";
-    case "member":
-      return "agent";
-    default:
-      return "read-only"; // viewer / unknown
-  }
-}
-
-function issueAccessToken(userId: string, role: string, tier: string, secret: string): string {
-  return signJwt(
-    {
-      sub: userId,
-      role: toNexusRole(role),
-      tier,
-      exp: Math.floor(Date.now() / 1000) + ACCESS_TOKEN_TTL_SEC,
-    } as Parameters<typeof signJwt>[0],
-    secret,
-  );
-}
+// Access-token issuance (TTL, RS256/HS256 selection, role mapping) lives in
+// lib/issue-access-token.ts — shared with the OAuth/OIDC/SAML SSO routes so
+// NEXUS_JWT_ALG is honored everywhere (§14.1).
 
 // ── Safe user view (never return passwordHash, totpSecret) ────────────────────
 
@@ -155,25 +135,34 @@ function safeUser(u: {
 
 // ── Per-route rate limiters ───────────────────────────────────────────────────
 // All keyed by IP. Auth endpoints are the highest-risk surface area.
+// Limits/windows are env-configurable (AUTH_*_RATE_LIMIT / AUTH_*_RATE_WINDOW_MS)
+// so operators can tune or temporarily raise them without code changes;
+// defaults stay at brute-force-safe values.
+
+function authLimit(name: string, fallback: number): number {
+  const raw = process.env[name];
+  const n = raw ? Number(raw) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
 
 // 10 login attempts per 15 min — standard brute-force protection
 const loginRateLimit = makeRateLimitPreHandler({
-  limit: 10,
-  windowMs: 15 * 60 * 1000,
+  limit: authLimit("AUTH_LOGIN_RATE_LIMIT", 10),
+  windowMs: authLimit("AUTH_LOGIN_RATE_WINDOW_MS", 15 * 60 * 1000),
   keyPrefix: "auth:login",
 });
 
 // 5 registrations per hour — prevents account farming
 const registerRateLimit = makeRateLimitPreHandler({
-  limit: 5,
-  windowMs: 60 * 60 * 1000,
+  limit: authLimit("AUTH_REGISTER_RATE_LIMIT", 5),
+  windowMs: authLimit("AUTH_REGISTER_RATE_WINDOW_MS", 60 * 60 * 1000),
   keyPrefix: "auth:register",
 });
 
 // 3 reset requests per hour — prevents token-spam / inbox flooding
 const forgotPasswordRateLimit = makeRateLimitPreHandler({
-  limit: 3,
-  windowMs: 60 * 60 * 1000,
+  limit: authLimit("AUTH_FORGOT_RATE_LIMIT", 3),
+  windowMs: authLimit("AUTH_FORGOT_RATE_WINDOW_MS", 60 * 60 * 1000),
   keyPrefix: "auth:forgot",
 });
 
@@ -265,7 +254,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
       if (!user) return reply.code(500).send({ error: "insert_failed" });
 
       // Issue tokens
-      const accessToken = issueAccessToken(user.id, user.role, user.tier, jwtSecret());
+      const { accessToken } = issueAccessToken(user.id, user.role, user.tier, jwtSecret());
       const rawRefresh = generateRefreshToken();
       const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
 
@@ -329,6 +318,11 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
       // Always do scrypt work to prevent user-enumeration via timing
       const DUMMY_HASH = "scrypt$" + "0".repeat(64) + "$" + "0".repeat(128);
 
+      // Brute-force backoff (§14.3) — checked BEFORE credential work so a locked
+      // key is never billed scrypt cycles, and incremented on each failure.
+      const throttleKey = loginThrottleKey(normalEmail, request.ip);
+      assertLoginAllowed(throttleKey);
+
       const [user] = await db
         .select()
         .from(users)
@@ -339,12 +333,15 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
       const valid = await verifyPassword(password, hashToVerify);
 
       if (!user || !valid) {
+        recordLoginFailure(throttleKey);
         return reply
           .code(401)
           .send({ error: "invalid_credentials", message: "Invalid email or password" });
       }
 
-      const accessToken = issueAccessToken(user.id, user.role, user.tier, jwtSecret());
+      recordLoginSuccess(throttleKey);
+
+      const { accessToken } = issueAccessToken(user.id, user.role, user.tier, jwtSecret());
       const rawRefresh = generateRefreshToken();
       const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
 
@@ -435,7 +432,12 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(401).send({ error: "user_not_found" });
       }
 
-      const newAccessToken = issueAccessToken(user.id, user.role, user.tier, jwtSecret());
+      const { accessToken: newAccessToken } = issueAccessToken(
+        user.id,
+        user.role,
+        user.tier,
+        jwtSecret(),
+      );
       const newRawRefresh = generateRefreshToken();
       const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
 
@@ -491,7 +493,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
    * Return the authenticated user's profile.
    * Reads userId from the JWT sub claim.
    */
-  app.get("/auth/me", { preHandler: requireAuth }, async (request, reply) => {
+  app.get("/auth/me", { preHandler: requireAuthWithTier }, async (request, reply) => {
     const userId = request.nexusUserId;
     if (!userId) {
       // API key auth — no user record; return minimal profile
@@ -528,7 +530,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
   }>(
     "/auth/me",
     {
-      preHandler: requireAuth,
+      preHandler: requireAuthWithTier,
       schema: {
         body: {
           type: "object",
@@ -749,7 +751,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
    * List all active (non-revoked, non-expired) refresh token sessions
    * for the currently authenticated user. Does not return token hashes.
    */
-  app.get("/auth/sessions", { preHandler: requireAuth }, async (request, reply) => {
+  app.get("/auth/sessions", { preHandler: requireAuthWithTier }, async (request, reply) => {
     const userId = request.nexusUserId;
     if (!userId) return reply.code(403).send({ error: "jwt_required" });
 
@@ -789,7 +791,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
    */
   app.delete<{
     Params: { id: string };
-  }>("/auth/sessions/:id", { preHandler: requireAuth }, async (request, reply) => {
+  }>("/auth/sessions/:id", { preHandler: requireAuthWithTier }, async (request, reply) => {
     const userId = request.nexusUserId;
     if (!userId) return reply.code(403).send({ error: "jwt_required" });
 
@@ -835,7 +837,7 @@ export async function authUsersRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post(
     "/auth/send-verification",
-    { preHandler: [requireAuth, sendVerifyRateLimit] },
+    { preHandler: [requireAuthWithTier, sendVerifyRateLimit] },
     async (request, reply) => {
       const userId = request.nexusUserId;
       if (!userId) return reply.code(403).send({ error: "jwt_required" });

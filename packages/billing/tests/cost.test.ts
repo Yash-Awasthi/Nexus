@@ -7,23 +7,36 @@ import { computeCost, estimateMaxCost, BillingLedger, QuotaExceededError } from 
 function makeRegistry(): ProviderRegistry {
   const r = new ProviderRegistry();
   r.register({
-    id: "test/model",
-    provider: "test",
-    name: "Test Model",
-    contextWindow: 100_000,
-    maxOutputTokens: 1000,
-    costPerInputToken: 3e-6, // $3 / MTok
-    costPerOutputToken: 15e-6, // $15 / MTok
-    costPerCacheReadToken: 0.3e-6, // $0.30 / MTok
-    costPerCacheWriteToken: 3.75e-6,
+    id: "test",
+    name: "Test",
+    baseUrl: "https://test.local",
+    authType: "bearer",
+    monthlySpendLimit: null,
+    currentSpend: 0,
+    currentTokens: 0,
+    healthScore: 100,
+    lastHealthCheck: new Date().toISOString(),
     capabilities: {
-      vision: false,
-      functionCalling: true,
-      streaming: true,
-      promptCaching: true,
-      jsonMode: true,
-      systemPrompt: true,
+      chat: true,
+      embeddings: false,
+      imageGeneration: false,
+      audioTranscription: false,
+      webSearch: false,
+      codeExecution: false,
     },
+    models: [
+      {
+        id: "test/model",
+        name: "Test Model",
+        contextWindow: 100_000,
+        maxOutput: 1000,
+        inputCost: 3, // $3 / MTok
+        outputCost: 15, // $15 / MTok
+        vision: false,
+        toolUse: true,
+        streaming: true,
+      },
+    ],
   });
   return r;
 }
@@ -39,34 +52,46 @@ describe("computeCost", () => {
     expect(c.unknownModel).toBe(false);
   });
 
-  it("uses dedicated cache rates when present", () => {
+  it("cache read/write fall back to the input rate (no dedicated cache price)", () => {
     const c = computeCost(
       "test/model",
       { cacheReadTokens: 1_000_000, cacheWriteTokens: 1_000_000 },
       reg,
     );
-    expect(c.cacheReadCost).toBeCloseTo(0.3, 9);
-    expect(c.cacheWriteCost).toBeCloseTo(3.75, 9);
+    expect(c.cacheReadCost).toBeCloseTo(3, 9);
+    expect(c.cacheWriteCost).toBeCloseTo(3, 9);
   });
 
   it("falls back to input rate for cache when model has no cache price", () => {
     const r = new ProviderRegistry();
     r.register({
-      id: "nocache/m",
-      provider: "x",
-      name: "m",
-      contextWindow: 1,
-      maxOutputTokens: 1,
-      costPerInputToken: 2e-6,
-      costPerOutputToken: 4e-6,
+      id: "x",
+      name: "x",
+      baseUrl: "https://x.local",
+      authType: "bearer",
+      monthlySpendLimit: null,
+      currentSpend: 0,
+      currentTokens: 0,
+      healthScore: 100,
+      lastHealthCheck: new Date().toISOString(),
       capabilities: {
-        vision: false,
-        functionCalling: false,
-        streaming: true,
-        promptCaching: false,
-        jsonMode: false,
-        systemPrompt: true,
+        chat: true,
+        embeddings: false,
+        imageGeneration: false,
+        audioTranscription: false,
+        webSearch: false,
+        codeExecution: false,
       },
+      models: [
+        {
+          id: "nocache/m",
+          name: "m",
+          contextWindow: 1,
+          maxOutput: 1,
+          inputCost: 2,
+          outputCost: 4,
+        },
+      ],
     });
     const c = computeCost("nocache/m", { cacheReadTokens: 1_000_000 }, r);
     expect(c.cacheReadCost).toBeCloseTo(2, 9); // input rate fallback

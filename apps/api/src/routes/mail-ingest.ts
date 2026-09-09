@@ -162,6 +162,12 @@ export async function mailIngestRoutes(app: FastifyInstance): Promise<void> {
 
   /** POST /mail-ingest/start */
   app.post("/mail-ingest/start", { preHandler: requireAuth }, async (_req, reply) => {
+    if (!IMAP_CONFIGURED) {
+      return reply.code(503).send({
+        error: "not_configured",
+        message: "Set IMAP_HOST, IMAP_USER, IMAP_PASSWORD to enable IMAP ingestion.",
+      });
+    }
     if (_running) return reply.send({ ok: true, message: "Already running" });
     const ingestor = await getIngestor();
     await ingestor.start();

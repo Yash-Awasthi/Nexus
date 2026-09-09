@@ -11,3 +11,6 @@ infra/helm/
 .docusaurus/
 REF/
 .claude/worktrees/
+
+# Local reference clones (inspiration material — never repo source)
+inspiration/

@@ -1,0 +1,9 @@
+{
+  "name": "@nexus/glicko-rating",
+  "version": "0.1.0",
+  "description": "Glicko-2 rating system with rating deviation and volatility tracking",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "vitest run"
+  }
+}

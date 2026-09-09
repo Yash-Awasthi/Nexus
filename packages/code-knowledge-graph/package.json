@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/code-knowledge-graph",
+  "version": "0.1.0",
+  "description": "Codebase knowledge graph with Leiden community detection",
+  "main": "src/index.ts"
+}

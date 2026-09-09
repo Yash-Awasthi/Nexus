@@ -30,15 +30,30 @@ import {
   type CompactionResult,
   type PresetName,
 } from "@nexus/agent-runtime";
+import { toolTranscriptEvent, type CouncilTranscript, type ILLMTransport } from "@nexus/council";
 import { db } from "@nexus/db";
 import { agentSessions } from "@nexus/db/schema";
-import { AnthropicDriver, GroqDriver, OpenRouterDriver, type LlmDriver } from "@nexus/llm-drivers";
+import {
+  AnthropicDriver,
+  GroqDriver,
+  OpenRouterDriver,
+  OpenAIDriver,
+  GeminiDriver,
+  DeepSeekDriver,
+  type LlmDriver,
+  type LlmRole,
+} from "@nexus/llm-drivers";
 import { FixedEmbedder, MemoryManager, PgVectorStore, createBestEmbedder } from "@nexus/memory";
 import { eq } from "drizzle-orm";
 
 import { publishAgentEvent } from "./agent-events.js";
 import { defaultAgentGovernanceEngine, makeGovernanceGate } from "./agent-governance.js";
-import { mcpToolsFromServers, type McpServerConfig } from "./agent-mcp.js";
+import {
+  mcpToolsFromServers,
+  councilRuntimeToolsFromTransport,
+  debateRuntimeTool,
+  type McpServerConfig,
+} from "./agent-mcp.js";
 import { proposeLearningUpdates, reviewSession } from "./agent-review.js";
 import { createCodingToolSet } from "./agent-tools.js";
 import {
@@ -82,6 +97,11 @@ export interface AgentRunPayload {
   disableCompaction?: boolean;
   /** Disable the programmatic-tool-calling (PTC) meta-tool (on by default). */
   disablePtc?: boolean;
+  /**
+   * Disable the built-in served deliberation tools (council protocols + the
+   * converging debate tool, on by default when a driver is present).
+   */
+  disableCouncilTools?: boolean;
   /** Run PTC scripts in a worker_thread sandbox (hard timeout for sync loops). Default false. */
   ptcSandbox?: boolean;
   /** Run a forked post-run learning review (off by default — extra LLM call). */
@@ -279,12 +299,22 @@ async function runSetupScript(
 function makeDriver(payload: AgentRunPayload): LlmDriver {
   const provider = (payload.provider ?? process.env.AGENT_PROVIDER ?? "anthropic").toLowerCase();
   const model = payload.model;
+  // BYOK env fallback per provider (mirrors apps/api getRegistry): the worker
+  // only supported groq/openrouter/anthropic, so OpenAI (ChatGPT), Gemini and
+  // DeepSeek role-agents could never run. Keys resolve payload-first, then the
+  // matching server env key.
   const envKey =
     provider === "groq"
       ? process.env.GROQ_API_KEY
       : provider === "openrouter"
         ? process.env.OPENROUTER_API_KEY
-        : process.env.ANTHROPIC_API_KEY;
+        : provider === "openai"
+          ? process.env.OPENAI_API_KEY
+          : provider === "gemini"
+            ? process.env.GEMINI_API_KEY
+            : provider === "deepseek"
+              ? process.env.DEEPSEEK_API_KEY
+              : process.env.ANTHROPIC_API_KEY;
   const apiKey = payload.apiKey ?? envKey ?? "";
   // Fail fast with a clear error rather than deferring to an opaque 401.
   if (!apiKey) throw new Error(`missing_api_key (provider=${provider})`);
@@ -293,6 +323,12 @@ function makeDriver(payload: AgentRunPayload): LlmDriver {
       return new GroqDriver({ apiKey, ...(model ? { model } : {}) });
     case "openrouter":
       return new OpenRouterDriver({ apiKey, ...(model ? { model } : {}) });
+    case "openai":
+      return new OpenAIDriver({ apiKey, ...(model ? { model } : {}) });
+    case "gemini":
+      return new GeminiDriver({ apiKey, ...(model ? { model } : {}) });
+    case "deepseek":
+      return new DeepSeekDriver({ apiKey, ...(model ? { model } : {}) });
     default:
       return new AnthropicDriver({ apiKey, ...(model ? { model } : {}) });
   }
@@ -373,6 +409,57 @@ export async function handleAgentRunJob(
   });
   if (payload.mcpServers?.length) {
     for (const tool of await mcpToolsFromServers(payload.mcpServers)) toolSet.add(tool);
+  }
+  // Built-in served deliberation tools (council protocols + converging debate)
+  // driven by the same driver that runs the loop. Opt-out per job. Every
+  // invocation leaves the pass-58 inspectable transcript as a JSON event.
+  if (!payload.disableCouncilTools) {
+    const transcriptHooks = {
+      onTranscript: (transcript: CouncilTranscript) => {
+        console.log(JSON.stringify(toolTranscriptEvent(payload.taskId, transcript)));
+      },
+    };
+    // The driver already carries the run model (makeDriver sets it); complete()
+    // without an explicit model falls back to that configured default.
+    const complete = (
+      messages: { role: string; content: string }[],
+      opts?: { model?: string; maxTokens?: number; temperature?: number },
+    ) =>
+      driver.complete({
+        // LlmRequestOptions.model is required; the driver carries the run model.
+        model: opts?.model ?? driver.model,
+        messages: messages.map((m) => ({ role: m.role as LlmRole, content: m.content })),
+        ...(opts?.maxTokens ? { maxTokens: opts.maxTokens } : {}),
+        ...(opts?.temperature !== undefined ? { temperature: opts.temperature } : {}),
+      });
+    const councilTransport: ILLMTransport = {
+      async chat(messages, options) {
+        const res = await complete(messages, options);
+        return {
+          content: res.content,
+          model: res.model,
+          usage: { promptTokens: res.usage.inputTokens, completionTokens: res.usage.outputTokens },
+          latencyMs: res.durationMs ?? 0,
+        };
+      },
+    };
+    for (const tool of await councilRuntimeToolsFromTransport(councilTransport, {
+      hooks: transcriptHooks,
+    })) {
+      toolSet.add(tool);
+    }
+    toolSet.add(
+      debateRuntimeTool({
+        transport: async (req) => {
+          const res = await complete(req.messages as { role: string; content: string }[], {
+            maxTokens: 1024,
+            temperature: 0.7,
+          });
+          return res.content;
+        },
+        hooks: transcriptHooks,
+      }),
+    );
   }
   // PTC: let the model batch many tool calls in one script (intermediate
   // results stay out of context). Added last so it advertises every other tool;

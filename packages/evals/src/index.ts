@@ -31,6 +31,17 @@ export {
   BenchmarkTracker,
   MLResearchEval,
 } from "./llm-eval.js";
+
+// NYT Connections benchmark (ported from inspiration/Nexus/nyt-connections)
+export {
+  normalizeWord,
+  parseGroups,
+  scoreConnectionsGroups,
+  scoreConnections,
+  scoreConnectionsQuadratic,
+  connectionsMean,
+  runConnectionsBenchmark,
+} from "./connections-eval.js";
 export type {
   JudgeLlmFn,
   AcceptanceCriterion,

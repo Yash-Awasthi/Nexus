@@ -59,11 +59,11 @@ export default function LoginPage() {
   };
 
   const handleGoogleSignIn = () => {
-    window.location.href = "/api/auth/google";
+    window.location.href = "/api/v1/oauth/google";
   };
 
   const handleGitHubSignIn = () => {
-    window.location.href = "/api/auth/github";
+    window.location.href = "/api/v1/oauth/github";
   };
 
   return (

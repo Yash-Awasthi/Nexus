@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/execution-cache",
+  "version": "0.1.0",
+  "description": "Execution cache with artifact verification, TTL, and content-addressed storage",
+  "main": "src/index.ts"
+}

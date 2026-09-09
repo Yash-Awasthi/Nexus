@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/agent-authorization",
+  "version": "0.1.0",
+  "description": "Cedar-style policy engine for agent tool access control",
+  "main": "src/index.ts"
+}

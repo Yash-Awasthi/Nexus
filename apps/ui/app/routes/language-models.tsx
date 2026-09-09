@@ -57,13 +57,9 @@ const AVAILABLE_PROVIDERS: Provider[] = [
     icon: "openai",
     apiKeyPlaceholder: "sk-...",
     models: [
-      { id: "gpt-4o", name: "GPT-4o", description: "Most capable model" },
+      { id: "gpt-5.6-terra", name: "GPT-5.6 Terra", description: "Latest compact model" },
+      { id: "gpt-4o", name: "GPT-4o", description: "Most capable legacy model" },
       { id: "gpt-4o-mini", name: "GPT-4o Mini", description: "Fast and affordable" },
-      { id: "gpt-4-turbo", name: "GPT-4 Turbo", description: "High intelligence" },
-      { id: "gpt-4", name: "GPT-4", description: "Original GPT-4" },
-      { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo", description: "Fast legacy model" },
-      { id: "o1", name: "o1", description: "Reasoning model" },
-      { id: "o1-mini", name: "o1 Mini", description: "Fast reasoning" },
     ],
   },
   {
@@ -73,7 +69,7 @@ const AVAILABLE_PROVIDERS: Provider[] = [
     icon: "anthropic",
     apiKeyPlaceholder: "sk-ant-...",
     models: [
-      { id: "claude-opus-4-6", name: "Claude Opus 4.6", description: "Most capable" },
+      { id: "claude-opus-4-5", name: "Claude Opus 4.5", description: "Most capable" },
       { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", description: "Balanced performance" },
       { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", description: "Fast and efficient" },
       { id: "claude-3-5-sonnet", name: "Claude 3.5 Sonnet", description: "Previous generation" },
@@ -87,10 +83,13 @@ const AVAILABLE_PROVIDERS: Provider[] = [
     icon: "google",
     apiKeyPlaceholder: "AI...",
     models: [
-      { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", description: "Most capable" },
-      { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", description: "Fast and efficient" },
-      { id: "gemini-2.0-pro", name: "Gemini 2.0 Pro", description: "Previous gen" },
-      { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", description: "Long context" },
+      { id: "gemini-3.6-flash", name: "Gemini 3.6 Flash", description: "Frontier, GA and cheap" },
+      {
+        id: "gemini-3.5-flash-lite",
+        name: "Gemini 3.5 Flash-Lite",
+        description: "Fastest and cheapest",
+      },
+      { id: "gemini-3.1-pro", name: "Gemini 3.1 Pro", description: "Most capable" },
     ],
   },
   {
@@ -149,10 +148,7 @@ const AVAILABLE_PROVIDERS: Provider[] = [
     description: "Ultra-fast wafer-scale inference",
     icon: "cerebras",
     apiKeyPlaceholder: "csk-...",
-    models: [
-      { id: "llama-3.3-70b-cerebras", name: "Llama 3.3 70B", description: "Fast inference" },
-      { id: "llama-3.1-8b-cerebras", name: "Llama 3.1 8B", description: "Ultra-fast" },
-    ],
+    models: [{ id: "llama-3.3-70b", name: "Llama 3.3 70B", description: "Fast inference" }],
   },
   {
     id: "cohere",
@@ -161,9 +157,8 @@ const AVAILABLE_PROVIDERS: Provider[] = [
     icon: "cohere",
     apiKeyPlaceholder: "...",
     models: [
-      { id: "command-r-plus", name: "Command R+", description: "Most capable" },
-      { id: "command-r", name: "Command R", description: "Fast and efficient" },
-      { id: "command-light", name: "Command Light", description: "Lightweight" },
+      { id: "command-a", name: "Command A", description: "Most capable" },
+      { id: "command-r7b-12-2024", name: "Command R7B", description: "Fast and efficient" },
     ],
   },
   {

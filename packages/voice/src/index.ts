@@ -473,6 +473,435 @@ export class ElevenLabsSynthesizeProvider implements SynthesizeProvider {
   }
 }
 
+// ── Deepgram STT provider (Nova) ───────────────────────────────────────────
+
+export interface DeepgramTranscribeConfig {
+  /** Deepgram API key — defaults to process.env.DEEPGRAM_API_KEY */
+  apiKey?: string;
+  /** Model. Default: "nova-2" */
+  model?: string;
+  /** Injectable fetch */
+  fetch?: FetchFn;
+}
+
+interface DeepgramResponse {
+  results?: {
+    channels?: {
+      alternatives?: { transcript?: string; confidence?: number }[];
+    }[];
+  };
+  metadata?: { duration?: number; model_info?: Record<string, unknown> };
+}
+
+/**
+ * STT provider backed by Deepgram's /v1/listen (Nova models). Sends the raw
+ * audio bytes as the request body with the format's MIME type — no multipart.
+ */
+export class DeepgramTranscribeProvider implements TranscribeProvider {
+  readonly name = "deepgram";
+
+  private readonly apiKey: string;
+  private readonly model: string;
+  private readonly fetchFn: FetchFn;
+
+  private static readonly ENDPOINT = "https://api.deepgram.com/v1/listen";
+
+  constructor(config: DeepgramTranscribeConfig = {}) {
+    this.apiKey = config.apiKey ?? process.env["DEEPGRAM_API_KEY"] ?? "";
+    this.model = config.model ?? "nova-2";
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  async transcribe(audio: AudioBuffer, opts: TranscribeOptions = {}): Promise<TranscribeResult> {
+    if (!audio.data || audio.data.length === 0) {
+      throw new VoiceError("INVALID_AUDIO", "Audio buffer is empty");
+    }
+
+    const start = Date.now();
+    const params = new URLSearchParams({
+      model: this.model,
+      smart_format: "true",
+      ...(opts.language ? { language: opts.language } : {}),
+    });
+    const mime: Record<AudioFormat, string> = {
+      wav: "audio/wav",
+      mp3: "audio/mpeg",
+      ogg: "audio/ogg",
+      flac: "audio/flac",
+      webm: "audio/webm",
+      m4a: "audio/mp4",
+    };
+
+    let res: Response;
+    try {
+      res = await this.fetchFn(`${DeepgramTranscribeProvider.ENDPOINT}?${params}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Token ${this.apiKey}`,
+          "Content-Type": mime[audio.format],
+        },
+        body: new Uint8Array(audio.data),
+      });
+    } catch (cause) {
+      throw new VoiceError("TRANSCRIBE_FAILED", `Deepgram network error: ${String(cause)}`, {
+        model: this.model,
+      });
+    }
+
+    if (res.status === 401 || res.status === 403) {
+      throw new VoiceError("PROVIDER_AUTH_FAILED", "Deepgram API key is invalid or missing");
+    }
+    if (!res.ok) {
+      throw new VoiceError("TRANSCRIBE_FAILED", `Deepgram API returned ${res.status}`, {
+        model: this.model,
+        status: res.status,
+      });
+    }
+
+    let json: DeepgramResponse;
+    try {
+      json = (await res.json()) as DeepgramResponse;
+    } catch (cause) {
+      throw new VoiceError("TRANSCRIBE_FAILED", `Invalid JSON from Deepgram: ${String(cause)}`);
+    }
+
+    const alt = json.results?.channels?.[0]?.alternatives?.[0];
+    return {
+      transcript: alt?.transcript?.trim() ?? "",
+      language: opts.language,
+      durationSeconds: json.metadata?.duration,
+      latencyMs: Date.now() - start,
+    };
+  }
+}
+
+// ── Deepgram TTS provider (Aura) ──────────────────────────────────────────
+
+export interface DeepgramSpeakConfig {
+  /** Deepgram API key — defaults to process.env.DEEPGRAM_API_KEY */
+  apiKey?: string;
+  /** Voice model. Default: "aura-2-thalia-en" */
+  model?: string;
+  /** Injectable fetch */
+  fetch?: FetchFn;
+}
+
+/**
+ * TTS provider backed by Deepgram's /v1/speak (Aura voices). Returns raw
+ * audio bytes (mp3 by default — the API's response format).
+ */
+export class DeepgramSynthesizeProvider implements SynthesizeProvider {
+  readonly name = "deepgram-tts";
+
+  private readonly apiKey: string;
+  private readonly model: string;
+  private readonly fetchFn: FetchFn;
+
+  private static readonly ENDPOINT = "https://api.deepgram.com/v1/speak";
+
+  constructor(config: DeepgramSpeakConfig = {}) {
+    this.apiKey = config.apiKey ?? process.env["DEEPGRAM_API_KEY"] ?? "";
+    this.model = config.model ?? "aura-2-thalia-en";
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  async synthesize(text: string, opts: SynthesizeOptions = {}): Promise<AudioBuffer> {
+    if (!text.trim()) {
+      throw new VoiceError("SYNTHESIZE_FAILED", "Cannot synthesize empty text");
+    }
+
+    const params = new URLSearchParams({ model: this.model });
+    let res: Response;
+    try {
+      res = await this.fetchFn(`${DeepgramSynthesizeProvider.ENDPOINT}?${params}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Token ${this.apiKey}`,
+          "Content-Type": "application/json",
+          Accept: "audio/mpeg",
+        },
+        body: JSON.stringify({ text }),
+      });
+    } catch (cause) {
+      throw new VoiceError("SYNTHESIZE_FAILED", `Deepgram network error: ${String(cause)}`);
+    }
+
+    if (res.status === 401 || res.status === 403) {
+      throw new VoiceError("PROVIDER_AUTH_FAILED", "Deepgram API key is invalid or missing");
+    }
+    if (!res.ok) {
+      throw new VoiceError("SYNTHESIZE_FAILED", `Deepgram API returned ${res.status}`, {
+        model: this.model,
+        status: res.status,
+      });
+    }
+
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    return { data: bytes, format: opts.format ?? "mp3", sampleRate: 24_000 };
+  }
+}
+
+// ── Cartesia TTS provider (Sonic) ─────────────────────────────────────────
+
+export interface CartesiaConfig {
+  /** Cartesia API key — defaults to process.env.CARTESIA_API_KEY */
+  apiKey?: string;
+  /** Model id. Default: "sonic-english" */
+  model?: string;
+  /** Default voice id (Cartesia voice UUID). Optional — opts.voice wins. */
+  defaultVoice?: string;
+  /** Output sample rate. Default: 44100 */
+  sampleRate?: number;
+  /** Injectable fetch */
+  fetch?: FetchFn;
+}
+
+/**
+ * TTS provider backed by Cartesia's /tts/bytes (Sonic models). Returns raw
+ * mp3 bytes. A voice id must come from opts.voice or defaultVoice — Cartesia
+ * has no stable anonymous default, so the provider fails fast with a clear
+ * error instead of guessing one.
+ */
+export class CartesiaSynthesizeProvider implements SynthesizeProvider {
+  readonly name = "cartesia";
+
+  private readonly apiKey: string;
+  private readonly model: string;
+  private readonly defaultVoice: string | undefined;
+  private readonly sampleRate: number;
+  private readonly fetchFn: FetchFn;
+
+  private static readonly ENDPOINT = "https://api.cartesia.ai/tts/bytes";
+  private static readonly API_VERSION = "2024-06-10";
+
+  constructor(config: CartesiaConfig = {}) {
+    this.apiKey = config.apiKey ?? process.env["CARTESIA_API_KEY"] ?? "";
+    this.model = config.model ?? "sonic-english";
+    this.defaultVoice = config.defaultVoice;
+    this.sampleRate = config.sampleRate ?? 44_100;
+    this.fetchFn = config.fetch ?? fetch;
+  }
+
+  async synthesize(text: string, opts: SynthesizeOptions = {}): Promise<AudioBuffer> {
+    if (!text.trim()) {
+      throw new VoiceError("SYNTHESIZE_FAILED", "Cannot synthesize empty text");
+    }
+    const voiceId = opts.voice ?? this.defaultVoice;
+    if (!voiceId) {
+      throw new VoiceError(
+        "SYNTHESIZE_FAILED",
+        "Cartesia voice id required — pass opts.voice or configure defaultVoice",
+      );
+    }
+
+    let res: Response;
+    try {
+      res = await this.fetchFn(CartesiaSynthesizeProvider.ENDPOINT, {
+        method: "POST",
+        headers: {
+          "X-API-Key": this.apiKey,
+          "Cartesia-Version": CartesiaSynthesizeProvider.API_VERSION,
+          "Content-Type": "application/json",
+          Accept: "audio/mpeg",
+        },
+        body: JSON.stringify({
+          model_id: this.model,
+          transcript: text,
+          voice: { mode: "id", id: voiceId },
+          output_format: {
+            container: "mp3",
+            encoding: "mp3",
+            sample_rate: this.sampleRate,
+          },
+          ...(opts.speed !== undefined ? { speed: opts.speed } : {}),
+          language: "en",
+        }),
+      });
+    } catch (cause) {
+      throw new VoiceError("SYNTHESIZE_FAILED", `Cartesia network error: ${String(cause)}`);
+    }
+
+    if (res.status === 401 || res.status === 403) {
+      throw new VoiceError("PROVIDER_AUTH_FAILED", "Cartesia API key is invalid or missing");
+    }
+    if (!res.ok) {
+      throw new VoiceError("SYNTHESIZE_FAILED", `Cartesia API returned ${res.status}`, {
+        model: this.model,
+        status: res.status,
+      });
+    }
+
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    return { data: bytes, format: opts.format ?? "mp3", sampleRate: this.sampleRate };
+  }
+}
+
+// ── AssemblyAI STT provider (Universal) ─────────────────────────────────
+
+export type SleepFn = (ms: number) => Promise<void>;
+
+export interface AssemblyAiTranscribeConfig {
+  /** AssemblyAI API key — defaults to process.env.ASSEMBLYAI_API_KEY */
+  apiKey?: string;
+  /** Speech model. Default: "universal" */
+  model?: string;
+  /** Poll interval in ms. Default: 2000. Inject 0 in tests. */
+  pollIntervalMs?: number;
+  /** Max time in ms to wait for the transcript. Default: 300_000. */
+  timeoutMs?: number;
+  /** Injectable fetch */
+  fetch?: FetchFn;
+  /** Injectable sleep for testing without real delays */
+  sleep?: SleepFn;
+}
+
+interface AssemblyUploadResponse {
+  upload_url?: string;
+}
+
+interface AssemblyTranscriptResponse {
+  id?: string;
+  status?: "queued" | "processing" | "completed" | "error";
+  text?: string;
+  language_code?: string;
+  audio_duration?: number;
+  error?: string;
+}
+
+/**
+ * STT provider backed by AssemblyAI's v2 API (Universal model). Three-phase:
+ * PUT the raw audio to /v2/upload → POST /v2/transcript → poll until
+ * completed/error. The API is asynchronous; there is no synchronous mode.
+ */
+export class AssemblyAiTranscribeProvider implements TranscribeProvider {
+  readonly name = "assemblyai";
+
+  private readonly apiKey: string;
+  private readonly model: string;
+  private readonly pollIntervalMs: number;
+  private readonly timeoutMs: number;
+  private readonly fetchFn: FetchFn;
+  private readonly sleepFn: SleepFn;
+
+  private static readonly BASE = "https://api.assemblyai.com/v2";
+
+  constructor(config: AssemblyAiTranscribeConfig = {}) {
+    this.apiKey = config.apiKey ?? process.env["ASSEMBLYAI_API_KEY"] ?? "";
+    this.model = config.model ?? "universal";
+    this.pollIntervalMs = config.pollIntervalMs ?? 2000;
+    this.timeoutMs = config.timeoutMs ?? 300_000;
+    this.fetchFn = config.fetch ?? fetch;
+    this.sleepFn = config.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  }
+
+  async transcribe(audio: AudioBuffer, opts: TranscribeOptions = {}): Promise<TranscribeResult> {
+    if (!audio.data || audio.data.length === 0) {
+      throw new VoiceError("INVALID_AUDIO", "Audio buffer is empty");
+    }
+    const start = Date.now();
+    const headers = { authorization: this.apiKey };
+
+    // ── 1. Upload the raw audio ────────────────────────────────────────
+    let uploadRes: Response;
+    try {
+      uploadRes = await this.fetchFn(`${AssemblyAiTranscribeProvider.BASE}/upload`, {
+        method: "PUT",
+        headers: { ...headers, "Content-Type": "application/octet-stream" },
+        body: new Uint8Array(audio.data),
+      });
+    } catch (cause) {
+      throw new VoiceError(
+        "TRANSCRIBE_FAILED",
+        `AssemblyAI upload network error: ${String(cause)}`,
+      );
+    }
+    if (uploadRes.status === 401 || uploadRes.status === 403) {
+      throw new VoiceError("PROVIDER_AUTH_FAILED", "AssemblyAI API key is invalid or missing");
+    }
+    if (!uploadRes.ok) {
+      throw new VoiceError("TRANSCRIBE_FAILED", `AssemblyAI upload returned ${uploadRes.status}`, {
+        status: uploadRes.status,
+      });
+    }
+    const uploaded = (await uploadRes.json()) as AssemblyUploadResponse;
+    if (!uploaded.upload_url) {
+      throw new VoiceError("TRANSCRIBE_FAILED", "AssemblyAI upload did not return an upload_url");
+    }
+
+    // ── 2. Create the transcript job ───────────────────────────────────
+    let createRes: Response;
+    try {
+      createRes = await this.fetchFn(`${AssemblyAiTranscribeProvider.BASE}/transcript`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          audio_url: uploaded.upload_url,
+          speech_model: this.model,
+          ...(opts.language ? { language_code: opts.language } : {}),
+          ...(opts.prompt ? { prompt: opts.prompt } : {}),
+        }),
+      });
+    } catch (cause) {
+      throw new VoiceError(
+        "TRANSCRIBE_FAILED",
+        `AssemblyAI create network error: ${String(cause)}`,
+      );
+    }
+    if (!createRes.ok) {
+      throw new VoiceError("TRANSCRIBE_FAILED", `AssemblyAI create returned ${createRes.status}`, {
+        status: createRes.status,
+      });
+    }
+    const job = (await createRes.json()) as AssemblyTranscriptResponse;
+    if (!job.id) {
+      throw new VoiceError("TRANSCRIBE_FAILED", "AssemblyAI did not return a transcript id");
+    }
+
+    // ── 3. Poll until completed / error ────────────────────────────────
+    const deadline = Date.now() + this.timeoutMs;
+    let result = job;
+    while (result.status !== "completed") {
+      if (result.status === "error") {
+        throw new VoiceError(
+          "TRANSCRIBE_FAILED",
+          `AssemblyAI transcript failed: ${result.error ?? "unknown error"}`,
+          { transcriptId: job.id },
+        );
+      }
+      if (Date.now() >= deadline) {
+        throw new VoiceError(
+          "TRANSCRIBE_FAILED",
+          `AssemblyAI transcript ${job.id} timed out after ${this.timeoutMs}ms`,
+          { transcriptId: job.id },
+        );
+      }
+      if (this.pollIntervalMs > 0) await this.sleepFn(this.pollIntervalMs);
+      let pollRes: Response;
+      try {
+        pollRes = await this.fetchFn(`${AssemblyAiTranscribeProvider.BASE}/transcript/${job.id}`, {
+          headers,
+        });
+      } catch (cause) {
+        throw new VoiceError(
+          "TRANSCRIBE_FAILED",
+          `AssemblyAI poll network error: ${String(cause)}`,
+        );
+      }
+      if (!pollRes.ok) {
+        throw new VoiceError("TRANSCRIBE_FAILED", `AssemblyAI poll returned ${pollRes.status}`);
+      }
+      result = (await pollRes.json()) as AssemblyTranscriptResponse;
+    }
+
+    return {
+      transcript: result.text?.trim() ?? "",
+      language: result.language_code ?? opts.language,
+      durationSeconds: result.audio_duration,
+      latencyMs: Date.now() - start,
+    };
+  }
+}
+
 // ── VoiceSession ──────────────────────────────────────────────────────────────
 
 /**

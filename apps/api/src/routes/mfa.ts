@@ -23,7 +23,7 @@ import type { FastifyInstance } from "fastify";
 import { emitAuditEvent } from "../lib/audit-emitter.js";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
 import { encryptWithKey, decryptWithKey } from "../lib/secret-crypto.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuthWithTier } from "../middleware/auth.js";
 
 // 5 MFA attempts per 15 minutes per IP — prevents brute-force TOTP attacks
 const mfaRateLimit = makeRateLimitPreHandler({
@@ -153,7 +153,7 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
   }
 
   /** GET /mfa/status — is MFA enabled for the current user? */
-  app.get("/mfa/status", { preHandler: requireAuth }, async (request, reply) => {
+  app.get("/mfa/status", { preHandler: requireAuthWithTier }, async (request, reply) => {
     const userId = request.nexusUserId;
     if (!userId) return reply.code(403).send({ error: "jwt_required" });
 
@@ -176,7 +176,7 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
    *   secret     — base32 TOTP secret (show to user once; they enter into authenticator app)
    *   otpauthUrl — otpauth:// URI for QR code generation
    */
-  app.post("/mfa/setup", { preHandler: requireAuth }, async (request, reply) => {
+  app.post("/mfa/setup", { preHandler: requireAuthWithTier }, async (request, reply) => {
     const userId = request.nexusUserId;
     if (!userId) return reply.code(403).send({ error: "jwt_required" });
 
@@ -221,7 +221,7 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Body: { code: string } }>(
     "/mfa/verify",
     {
-      preHandler: [requireAuth, mfaRateLimit],
+      preHandler: [requireAuthWithTier, mfaRateLimit],
       schema: {
         body: {
           type: "object",
@@ -326,7 +326,7 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Body: { code: string } }>(
     "/mfa/disable",
     {
-      preHandler: requireAuth,
+      preHandler: requireAuthWithTier,
       schema: {
         body: {
           type: "object",

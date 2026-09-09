@@ -109,6 +109,27 @@ describe("NullConnector", () => {
     await c.disconnect();
     expect(c.status).toBe("disconnected");
   });
+
+  it("placeholder mode starts disconnected", () => {
+    const c = new NullConnector("github", "GitHub", { placeholder: true });
+    expect(c.status).toBe("disconnected");
+    expect(c.placeholder).toBe(true);
+  });
+
+  it("placeholder mode connect() returns ok:false with a clear message", async () => {
+    const c = new NullConnector("slack", "Slack", { placeholder: true });
+    const result = await c.connect();
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("not configured");
+    expect(c.status).toBe("error");
+  });
+
+  it("placeholder mode healthCheck() reports not configured", async () => {
+    const c = new NullConnector("linear", "Linear", { placeholder: true });
+    const result = await c.healthCheck();
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("not configured");
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

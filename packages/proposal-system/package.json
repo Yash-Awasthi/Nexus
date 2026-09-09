@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/proposal-system",
+  "version": "0.1.0",
+  "description": "Operator-gated proposal system for autonomous agents with atomic batch apply",
+  "main": "src/index.ts"
+}

@@ -175,10 +175,15 @@ export function prepareExecution(language: SandboxLanguage, code: string): Prepa
     }
 
     case "python":
+      // Code via stdin (`python3 -`), NOT `-c` argv: on Windows the
+      // python3.exe app-execution alias mangles `-c` arguments (\n becomes a
+      // real newline, embedded quotes break), which silently corrupts any
+      // script with escapes inside string literals. stdin bypasses argv
+      // quoting entirely.
       return {
         cmd: "python3",
-        args: ["-c", code],
-        useStdin: false,
+        args: ["-"],
+        useStdin: true,
       };
 
     case "bash":
@@ -507,3 +512,7 @@ export function createDockerRunner(config: DockerSandboxConfig = {}): Runner {
 // ── Re-exports for testing ────────────────────────────────────────────────────
 
 export { DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS, MAX_OUTPUT_BYTES, SAFE_ENV_KEYS };
+
+// ── Filtered shell sessions (quiet-shell style) ──────────────────────────────
+export { ShellSession, filterOutput, QUIET_SHELL_PRESETS } from "./shell-session.js";
+export type { FilterRules, ShellSessionOptions, ShellResult } from "./shell-session.js";

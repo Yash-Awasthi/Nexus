@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/prediction-backtest",
+  "version": "0.1.0",
+  "description": "Backtesting engine for prediction market strategies with fee and slippage modeling",
+  "main": "src/index.ts"
+}

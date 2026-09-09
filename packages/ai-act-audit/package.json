@@ -1,0 +1,42 @@
+{
+  "name": "@nexus/ai-act-audit",
+  "version": "0.1.0",
+  "description": "EU AI Act Article 12 compliance audit logging with tamper-evident hash chains, retention enforcement, and PII protection",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "dev": "tsc --project tsconfig.json --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist coverage"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "eu-ai-act",
+    "compliance",
+    "audit-log",
+    "article-12",
+    "tamper-evident",
+    "hash-chain",
+    "pii-protection",
+    "gdpr"
+  ]
+}

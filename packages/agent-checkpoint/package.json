@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/agent-checkpoint",
+  "version": "0.1.0",
+  "description": "Checkpoint system for agent state persistence with delta snapshots and fork/restore",
+  "main": "src/index.ts"
+}

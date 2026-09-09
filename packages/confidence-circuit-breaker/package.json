@@ -1,0 +1,9 @@
+{
+  "name": "@nexus/confidence-circuit-breaker",
+  "version": "0.1.0",
+  "description": "Confidence-aware circuit breaker with multiple trip strategies",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "vitest run"
+  }
+}

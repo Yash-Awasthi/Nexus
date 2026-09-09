@@ -1,0 +1,9 @@
+{
+  "name": "@nexus/agent-router",
+  "version": "0.1.0",
+  "description": "Classifier-based agent routing with conversation history awareness",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@nexus/llm-router": "workspace:*"
+  }
+}

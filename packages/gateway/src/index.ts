@@ -142,7 +142,9 @@ interface OAIResponse {
 
 // ── Model alias table ─────────────────────────────────────────────────────────
 
-const GROQ_SMART = "llama-3.3-70b-versatile";
+// llama-3.3-70b-versatile was decommissioned by Groq on 2026-08-16; the
+// replacement (per Groq) is openai/gpt-oss-120b.
+const GROQ_SMART = "openai/gpt-oss-120b";
 const GROQ_FAST = "llama-3.1-8b-instant";
 
 /** Built-in aliases. Client model names → { provider, backendModel } */
@@ -815,3 +817,5 @@ export class Singleflight<T> {
     return this._pending.size;
   }
 }
+
+export * from "./limit-learning.js";

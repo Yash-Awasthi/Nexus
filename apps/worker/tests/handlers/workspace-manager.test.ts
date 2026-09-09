@@ -105,9 +105,10 @@ describe("WorkspaceManager", () => {
     expect(ws.env.NEXUS_WORKSPACE_PATH).toBe(ws.path);
     expect(ws.env.NEXUS_ROOT_PATH).toBe(repoPath);
     expect(ws.env.NEXUS_PORT).toBe(String(ws.ports[0]));
-    // Git registered the worktree on the new branch.
+    // Git registered the worktree on the new branch. (git prints forward
+    // slashes even on Windows — normalize before comparing.)
     const wl = await git(repoPath, ["worktree", "list", "--porcelain"]);
-    expect(wl.stdout).toContain(ws.path);
+    expect(wl.stdout.replaceAll("\\", "/")).toContain(ws.path.replaceAll("\\", "/"));
     const branches = await git(repoPath, ["branch", "--list", "nexus/alpha"]);
     expect(branches.stdout).toContain("nexus/alpha");
   });
@@ -179,9 +180,14 @@ describe("WorkspaceManager", () => {
     const ws = await mgr.create({ name: "delta", baseBranch: "main" });
     const flag = path.join(tmpRoot, "delta-archived.flag");
     await fs.mkdir(path.join(ws.path, ".nexus"), { recursive: true });
+    // Portable flag write (forward slashes work for node fs on Windows too);
+    // `touch` would silently depend on GNU coreutils being on PATH. Redirect
+    // instead of in-node quoting: the tiny TOML parser only strips the OUTER
+    // quotes, so embedded quotes would corrupt the command.
+    const flagFwd = flag.replaceAll("\\", "/");
     await fs.writeFile(
       path.join(ws.path, ".nexus", "settings.toml"),
-      `[scripts]\narchive = "touch ${flag}"\n`,
+      `[scripts]\narchive = "node -e process.stdout.write(1) > ${flagFwd}"\n`,
     );
 
     await mgr.archive("delta");

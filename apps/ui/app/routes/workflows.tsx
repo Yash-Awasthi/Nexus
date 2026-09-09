@@ -20,7 +20,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "~/components/ui/dialog";
-import { deliberate, createThread, onOpinion, onDone } from "~/lib/deliberate";
 import {
   GitBranch,
   Plus,
@@ -56,7 +55,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { ProviderIcon, ModelIcon } from "@lobehub/icons";
 
-type WorkflowStatus = "success" | "failed" | "pending";
+type WorkflowStatus = "success" | "failed" | "pending" | "idle";
 
 type Workflow = {
   id: string;
@@ -65,56 +64,53 @@ type Workflow = {
   nodeCount: number;
   status: WorkflowStatus;
   lastRun: string;
+  steps?: StepDef[];
 };
 
-const initialWorkflows: Workflow[] = [
-  {
-    id: "1",
-    name: "Code Review Pipeline",
-    description: "Automated code review with multiple archetype passes",
-    nodeCount: 7,
-    status: "success",
-    lastRun: "2 hours ago",
-  },
-  {
-    id: "2",
-    name: "Research Synthesis",
-    description: "Gather, analyze, and synthesize research from multiple sources",
-    nodeCount: 12,
-    status: "success",
-    lastRun: "Yesterday",
-  },
-  {
-    id: "3",
-    name: "Content Generation",
-    description: "Multi-stage content creation with editorial review",
-    nodeCount: 5,
-    status: "failed",
-    lastRun: "3 hours ago",
-  },
-  {
-    id: "4",
-    name: "Data Analysis Flow",
-    description: "Ingest, clean, analyze, and visualize datasets",
-    nodeCount: 9,
-    status: "pending",
-    lastRun: "Never",
-  },
-  {
-    id: "5",
-    name: "Security Audit Chain",
-    description: "Sequential security checks across codebase layers",
-    nodeCount: 8,
-    status: "success",
-    lastRun: "1 day ago",
-  },
-];
+// No demo/workflow seeds here: the list starts empty and renders whatever the
+// API (or a saved localStorage copy) provides. Previously shipped hardcoded
+// "Code Review Pipeline" etc. with fabricated run history — clicking one opened
+// an empty editor and Run 404'd, because no matching record exists server-side.
 
 const statusConfig = {
   success: { icon: CheckCircle, label: "Success", color: "text-green-400" },
   failed: { icon: XCircle, label: "Failed", color: "text-red-400" },
   pending: { icon: Clock, label: "Pending", color: "text-yellow-400" },
+  // Server-created workflows start as "idle" until the first run.
+  idle: { icon: Clock, label: "Idle", color: "text-slate-400" },
 };
+
+/** Normalize server records (id/name/steps/status/createdAt) to the UI shape. */
+function normalizeWorkflow(w: Record<string, unknown>): Workflow {
+  const steps = Array.isArray(w.steps) ? w.steps : [];
+  // Server statuses are idle|running|completed|error; the UI renders
+  // success|failed|pending|idle — map them so a post-run list refresh
+  // doesn't crash on an unknown status key.
+  const serverStatus = String(w.status ?? "idle");
+  const status: WorkflowStatus =
+    serverStatus === "completed"
+      ? "success"
+      : serverStatus === "error"
+        ? "failed"
+        : serverStatus === "running"
+          ? "pending"
+          : "idle";
+  const lastRun =
+    typeof w.lastRunAt === "string"
+      ? w.lastRunAt
+      : typeof w.lastRun === "string"
+        ? w.lastRun
+        : "Never";
+  return {
+    id: String(w.id ?? ""),
+    name: String(w.name ?? "Untitled workflow"),
+    description: typeof w.description === "string" ? w.description : "",
+    nodeCount: typeof w.nodeCount === "number" ? w.nodeCount : steps.length,
+    status,
+    lastRun,
+    steps: steps.map((s) => s as StepDef),
+  };
+}
 
 const demoNodes: Node[] = [
   {
@@ -281,13 +277,80 @@ interface GatewayModel {
   available?: boolean;
 }
 
+/** A serializable step definition understood by POST /api/workflows/:id/run. */
+type StepDef = Record<string, unknown>;
+
+/**
+ * Compile the ReactFlow graph into the server's step-definition shape.
+ *
+ * Ordering follows the edges (Kahn's algorithm); disconnected or cyclic
+ * graphs fall back to insertion order. LLM nodes become agent steps that the
+ * backend executes through the gateway fallback chain; branch nodes become
+ * pass-through conditions; everything else is an explicit pass-through fn
+ * step so the trace shows every node.
+ */
+function compileSteps(nodes: Node[], edges: Edge[], models: GatewayModel[]): StepDef[] {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const indeg = new Map<string, number>();
+  const adj = new Map<string, string[]>();
+  for (const n of nodes) {
+    indeg.set(n.id, 0);
+    adj.set(n.id, []);
+  }
+  for (const e of edges) {
+    if (!byId.has(e.source) || !byId.has(e.target)) continue;
+    adj.get(e.source)!.push(e.target);
+    indeg.set(e.target, (indeg.get(e.target) ?? 0) + 1);
+  }
+  const queue = nodes.filter((n) => (indeg.get(n.id) ?? 0) === 0).map((n) => n.id);
+  const ordered: string[] = [];
+  while (queue.length) {
+    const id = queue.shift()!;
+    ordered.push(id);
+    for (const t of adj.get(id) ?? []) {
+      const d = (indeg.get(t) ?? 1) - 1;
+      indeg.set(t, d);
+      if (d === 0) queue.push(t);
+    }
+  }
+  if (ordered.length !== nodes.length) {
+    ordered.splice(0, ordered.length, ...nodes.map((n) => n.id));
+  }
+
+  const steps: StepDef[] = [];
+  for (const id of ordered) {
+    const n = byId.get(id)!;
+    const type = (n.data?.nodeType as string) ?? "input";
+    const label = (n.data?.label as string) || type;
+    if (type === "llm") {
+      // Empty model (user never touched the select) = the first registry
+      // model, which is exactly what the properties panel displays.
+      const modelId = (n.data?.model as string) || models[0]?.id || "";
+      const row = models.find((m) => m.id === modelId);
+      steps.push({
+        kind: "agent",
+        id,
+        name: label,
+        provider: row?.provider,
+        model: row?.backend_model ?? modelId,
+        task: `Perform this step ("${label}") on the current workflow data. Answer concisely and usefully.`,
+      });
+    } else if (type === "branch") {
+      steps.push({ kind: "condition", id, name: label, conditionResult: true });
+    } else {
+      steps.push({ kind: "fn", id, name: label, transform: "data" });
+    }
+  }
+  return steps;
+}
+
 // Shown before /gateway/models responds (or if the call fails / is unauthorized).
 const FALLBACK_MODELS: GatewayModel[] = [
-  { id: "gpt-4o", provider: "openai" },
+  { id: "openai/gpt-oss-120b", provider: "groq" },
   { id: "gpt-4o-mini", provider: "openai" },
   { id: "claude-sonnet-4-6", provider: "anthropic" },
-  { id: "claude-haiku", provider: "anthropic" },
-  { id: "gemini-2.5-pro", provider: "google" },
+  { id: "claude-haiku-4-5", provider: "anthropic" },
+  { id: "gemini-3.6-flash", provider: "google" },
 ];
 
 function PropertiesPanel({
@@ -324,6 +387,15 @@ function PropertiesPanel({
   const label = (selectedNode.data?.label as string) || "";
   const selectedModel =
     (selectedNode.data?.model as string) || models[0]?.id || FALLBACK_MODELS[0]!.id;
+
+  // Persist the default model into the node: the panel *shows* the first
+  // registry model, but the node only learns about it once the user touches
+  // the select — otherwise saves carry an empty model.
+  useEffect(() => {
+    if (nodeType === "llm" && !selectedNode.data?.model) {
+      onUpdateModel(selectedNode.id, models[0]?.id ?? FALLBACK_MODELS[0]!.id);
+    }
+  }, [nodeType, selectedNode, onUpdateModel, models]);
 
   return (
     <div className="w-64 border-l border-border flex flex-col bg-background shrink-0">
@@ -534,48 +606,81 @@ function WorkflowEditor({
     [setNodes],
   );
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
+    const steps = compileSteps(nodes, edges, models);
     try {
+      // Graph mirror stays local; the server stores the compiled steps.
       localStorage.setItem(`workflow-${workflow.id}`, JSON.stringify({ nodes, edges }));
-      onUpdateWorkflow({ ...workflow, nodeCount: nodes.length });
+      const res = await fetch(`/api/workflows/${workflow.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ steps }),
+      });
+      if (!res.ok) throw new Error(`server responded ${res.status}`);
+      // Carry the compiled steps back into the list object so the card's
+      // Play button knows the workflow is runnable without a refetch.
+      onUpdateWorkflow({ ...workflow, nodeCount: nodes.length, steps });
       setSaveMessage("Workflow saved successfully!");
-      setTimeout(() => setSaveMessage(null), 2500);
     } catch (err) {
-      setSaveMessage("Failed to save workflow.");
-      setTimeout(() => setSaveMessage(null), 2500);
+      const reason = err instanceof Error ? ` (${err.message})` : "";
+      setSaveMessage(`Failed to save to server${reason}.`);
     }
-    // Persist graph to backend (fire-and-forget)
-    fetch(`/api/workflows/${workflow.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nodes, edges, nodeCount: nodes.length }),
-    }).catch(() => {});
-  }, [workflow, nodes, edges, onUpdateWorkflow]);
+    setTimeout(() => setSaveMessage(null), 2500);
+  }, [workflow, nodes, edges, models, onUpdateWorkflow]);
 
   const handleRun = useCallback(async () => {
+    const steps = compileSteps(nodes, edges, models);
+    if (steps.length === 0) {
+      setRunOutput(
+        "Nothing to run — add at least one node to the canvas (e.g. an LLM Node) first, then Run again.",
+      );
+      setOutputExpanded(true);
+      return;
+    }
     setIsRunning(true);
     setRunOutput(null);
     setOutputExpanded(true);
     try {
-      const nodeLabels = nodes.map((n) => (n.data?.label as string) || "Unnamed Node");
-      const prompt = `Analyze this workflow called "${workflow.name}" (${workflow.description}). Steps: ${nodeLabels.join(" -> ")}. Describe what it does, evaluate its design, and suggest improvements.`;
-
-      const threadId = await createThread();
-      let outputText = "";
-
-      await new Promise<void>((resolve) => {
-        const unsubO = onOpinion((data) => {
-          outputText = data.text;
-        });
-        const unsubD = onDone(() => {
-          unsubO();
-          unsubD();
-          resolve();
-        });
-        deliberate({ threadId, message: prompt, round: 1 }).catch(() => resolve());
+      // Send the compiled steps with the run so a run right after (or while)
+      // saving always executes the graph as it appears on the canvas.
+      const res = await fetch(`/api/workflows/${workflow.id}/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          input: {
+            query: workflow.name,
+            description: workflow.description,
+          },
+          steps,
+        }),
       });
+      const data = (await res.json().catch(() => ({}))) as {
+        status?: string;
+        result?: unknown;
+        error?: string;
+        events?: Array<{
+          type: string;
+          stepId?: string;
+          timestamp: string;
+        }>;
+      };
+      if (!res.ok || data.status === "error") {
+        throw new Error(data.error ?? `server responded ${res.status}`);
+      }
 
-      setRunOutput(outputText || "Workflow analysis complete. No output returned.");
+      const stepNames = new Map(steps.map((s) => [String(s.id), String(s.name ?? s.id)]));
+      const trace = (data.events ?? [])
+        .filter((e) => e.type.startsWith("step:"))
+        .map((e) => {
+          const name = e.stepId ? (stepNames.get(e.stepId) ?? e.stepId) : "";
+          return `[${e.type.replace("step:", "")}] ${name}`.trim();
+        })
+        .join("\n");
+      const finalResult =
+        typeof data.result === "string" ? data.result : JSON.stringify(data.result, null, 2);
+      setRunOutput(
+        `Workflow completed successfully.\n\nFinal result:\n${finalResult}\n\nStep trace:\n${trace || "(no steps executed)"}`,
+      );
 
       const now = new Date();
       const timeStr = `${now.getHours()}:${now.getMinutes().toString().padStart(2, "0")}`;
@@ -584,19 +689,21 @@ function WorkflowEditor({
         lastRun: `Today at ${timeStr}`,
         status: "success",
         nodeCount: nodes.length,
+        steps,
       });
     } catch (err: any) {
-      setRunOutput(`Error: ${err?.message ?? String(err)}`);
+      setRunOutput(`Workflow failed: ${err?.message ?? String(err)}`);
       onUpdateWorkflow({
         ...workflow,
         lastRun: "Just now",
         status: "failed",
         nodeCount: nodes.length,
+        steps,
       });
     } finally {
       setIsRunning(false);
     }
-  }, [nodes, workflow, onUpdateWorkflow]);
+  }, [nodes, edges, models, workflow, onUpdateWorkflow]);
 
   return (
     <div className="flex flex-col" style={{ height: "100vh" }}>
@@ -780,37 +887,29 @@ function NewWorkflowDialog({ open, onOpenChange, onSubmit }: NewWorkflowDialogPr
 }
 
 export default function WorkflowsPage() {
-  const [workflows, setWorkflows] = useState<Workflow[]>(initialWorkflows);
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [editingWorkflow, setEditingWorkflow] = useState<Workflow | null>(null);
   const [newWorkflowOpen, setNewWorkflowOpen] = useState(false);
 
-  // Load workflows — try API first, fall back to localStorage
+  // Load workflows — API first. An empty server list is authoritative
+  // (server-created workflows only; demo data was removed); localStorage is a
+  // fallback for when the API is unreachable, not a source of stale demos.
   useEffect(() => {
     fetch("/api/workflows?limit=100")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data) => {
-        const list: Workflow[] = Array.isArray(data) ? data : (data?.workflows ?? []);
-        if (list.length > 0) {
-          setWorkflows(list);
-          return;
-        }
-        throw new Error("empty");
+        const raw: Record<string, unknown>[] = Array.isArray(data)
+          ? data
+          : ((data?.workflows ?? []) as Record<string, unknown>[]);
+        setWorkflows(raw.map(normalizeWorkflow));
       })
       .catch(() => {
-        // Fall back to localStorage
+        // Network/server error only — fall back to locally-saved workflows.
         try {
           const raw = localStorage.getItem("workflows");
           if (raw) {
             const saved: Workflow[] = JSON.parse(raw);
-            if (Array.isArray(saved)) {
-              const initialIds = new Set(initialWorkflows.map((w) => w.id));
-              const extras = saved.filter((w) => !initialIds.has(w.id));
-              const merged = initialWorkflows.map((iw) => {
-                const savedVersion = saved.find((sw) => sw.id === iw.id);
-                return savedVersion ?? iw;
-              });
-              setWorkflows([...merged, ...extras]);
-            }
+            if (Array.isArray(saved) && saved.length > 0) setWorkflows(saved);
           }
         } catch {}
       });
@@ -826,6 +925,35 @@ export default function WorkflowsPage() {
   const handleUpdateWorkflow = useCallback((updated: Workflow) => {
     setWorkflows((prev) => prev.map((w) => (w.id === updated.id ? updated : w)));
     setEditingWorkflow(updated);
+  }, []);
+
+  // Run a workflow straight from the list card. Refetches the list afterwards
+  // so the server-side status/lastRunAt updates become visible.
+  const runWorkflowFromList = useCallback(async (wf: Workflow) => {
+    if (!wf.steps || wf.steps.length === 0) return;
+    try {
+      const res = await fetch(`/api/workflows/${wf.id}/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: { query: wf.name } }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        status?: string;
+        error?: string;
+      };
+      if (!res.ok || data.status === "error") {
+        throw new Error(data.error ?? `server responded ${res.status}`);
+      }
+      const fresh = await fetch("/api/workflows?limit=100").then((r) => r.json());
+      const raw: Record<string, unknown>[] = Array.isArray(fresh)
+        ? fresh
+        : ((fresh?.workflows ?? []) as Record<string, unknown>[]);
+      setWorkflows(raw.map(normalizeWorkflow));
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      setWorkflows((prev) => prev.map((w) => (w.id === wf.id ? { ...w, status: "failed" } : w)));
+      console.error(`workflow run failed: ${reason}`);
+    }
   }, []);
 
   const handleCreateWorkflow = (name: string, description: string) => {
@@ -893,6 +1021,12 @@ export default function WorkflowsPage() {
           </Button>
         </div>
 
+        {workflows.length === 0 && (
+          <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
+            No workflows yet — create your first one to get started.
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {workflows.map((wf) => {
             const st = statusConfig[wf.status];
@@ -924,7 +1058,17 @@ export default function WorkflowsPage() {
                       >
                         Edit
                       </Button>
-                      <Button variant="ghost" size="icon" className="size-6">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-6"
+                        onClick={() => runWorkflowFromList(wf)}
+                        title={
+                          wf.steps?.length
+                            ? "Run workflow"
+                            : "No steps saved yet — open Edit to add nodes"
+                        }
+                      >
                         <Play className="size-3" />
                       </Button>
                     </div>

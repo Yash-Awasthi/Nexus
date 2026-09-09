@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/context-builder",
+  "version": "0.1.0",
+  "description": "Graph-based context composition for LLM conversations with token budgeting",
+  "main": "src/index.ts"
+}

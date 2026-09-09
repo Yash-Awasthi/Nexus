@@ -63,7 +63,7 @@ export interface GenerateObjectParams<_T = unknown> {
 }
 
 export interface ILanguageModel {
-  /** Model identifier (e.g. "groq:llama-3.3-70b-versatile") */
+  /** Model identifier (e.g. "groq:openai/gpt-oss-120b") */
   readonly modelId: string;
 
   /** Single-shot text generation */

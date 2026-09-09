@@ -15,7 +15,7 @@ export function groq(): Groq {
 
 export async function chat(
   messages: { role: "system" | "user" | "assistant"; content: string }[],
-  model = "llama-3.3-70b-versatile",
+  model = "openai/gpt-oss-120b",
   maxTokens = 4096,
 ): Promise<string> {
   const res = await groq().chat.completions.create({

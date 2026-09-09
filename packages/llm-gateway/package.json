@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/llm-gateway",
+  "version": "0.1.0",
+  "description": "Lightweight LLM gateway with caching, rate limiting, and retry logic",
+  "main": "src/index.ts"
+}

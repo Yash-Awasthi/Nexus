@@ -51,9 +51,9 @@ describe("resolveModel", () => {
     expect(t).toEqual({ provider: "groq", model: "llama-3.1-8b-instant" });
   });
 
-  it("resolves nexus/smart to groq + llama-3.3-70b-versatile", () => {
+  it("resolves nexus/smart to groq + openai/gpt-oss-120b", () => {
     const t = resolveModel("nexus/smart", GROQ_CFG);
-    expect(t).toEqual({ provider: "groq", model: "llama-3.3-70b-versatile" });
+    expect(t).toEqual({ provider: "groq", model: "openai/gpt-oss-120b" });
   });
 
   it("resolves nexus/planner same as nexus/smart", () => {
@@ -63,7 +63,7 @@ describe("resolveModel", () => {
   it("resolves claude-3-5-sonnet alias", () => {
     const t = resolveModel("claude-3-5-sonnet-20241022", GROQ_CFG);
     expect(t.provider).toBe("groq");
-    expect(t.model).toBe("llama-3.3-70b-versatile");
+    expect(t.model).toBe("openai/gpt-oss-120b");
   });
 
   it("resolves claude-3-haiku to fast model", () => {
@@ -72,8 +72,8 @@ describe("resolveModel", () => {
   });
 
   it("pass-through unknown model name defaults to groq", () => {
-    const t = resolveModel("llama-3.3-70b-versatile", GROQ_CFG);
-    expect(t).toEqual({ provider: "groq", model: "llama-3.3-70b-versatile" });
+    const t = resolveModel("openai/gpt-oss-120b", GROQ_CFG);
+    expect(t).toEqual({ provider: "groq", model: "openai/gpt-oss-120b" });
   });
 
   it("overrideProvider swaps provider but keeps resolved model", () => {

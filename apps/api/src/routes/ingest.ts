@@ -30,6 +30,8 @@ export async function ingestRoutes(app: FastifyInstance): Promise<void> {
     };
   }>("/ingest/events", { preHandler: requireAuth }, async (request, reply) => {
     const { source, event_type, payload, metadata, idempotency_key } = request.body;
+    if (!source || !event_type || !payload)
+      return reply.code(400).send({ error: "source, event_type and payload are required" });
 
     try {
       const [row] = await db
@@ -119,6 +121,8 @@ export async function ingestRoutes(app: FastifyInstance): Promise<void> {
     };
   }>("/ingest/signals", { preHandler: requireAuth }, async (request, reply) => {
     const { signal_type, source_event_ids, summary, priority, metadata } = request.body;
+    if (!signal_type || !summary)
+      return reply.code(400).send({ error: "signal_type and summary are required" });
 
     const [row] = await db
       .insert(signals)

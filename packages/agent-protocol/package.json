@@ -1,0 +1,6 @@
+{
+  "name": "@nexus/agent-protocol",
+  "version": "0.1.0",
+  "description": "Binary wire protocol for agent harness communication with session and permission management",
+  "main": "src/index.ts"
+}
