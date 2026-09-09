@@ -180,14 +180,21 @@ describe("WorkspaceManager", () => {
     const ws = await mgr.create({ name: "delta", baseBranch: "main" });
     const flag = path.join(tmpRoot, "delta-archived.flag");
     await fs.mkdir(path.join(ws.path, ".nexus"), { recursive: true });
-    // Portable flag write (forward slashes work for node fs on Windows too);
-    // `touch` would silently depend on GNU coreutils being on PATH. Redirect
-    // instead of in-node quoting: the tiny TOML parser only strips the OUTER
-    // quotes, so embedded quotes would corrupt the command.
+    // Portable flag write. A real script file, not `node -e`: inline -e code
+    // containing parentheses is a syntax error under /bin/sh (unquoted `(` is
+    // a shell token), while cmd.exe tolerates it — the old form only ever
+    // worked on Windows. Paths use forward slashes, which node fs accepts on
+    // Windows too, and the tiny TOML parser only strips the OUTER quotes.
+    const script = path.join(tmpRoot, "delta-archive.cjs");
+    await fs.writeFile(
+      script,
+      "require('node:fs').writeFileSync(process.argv[2], '1');\n",
+    );
+    const scriptFwd = script.replaceAll("\\", "/");
     const flagFwd = flag.replaceAll("\\", "/");
     await fs.writeFile(
       path.join(ws.path, ".nexus", "settings.toml"),
-      `[scripts]\narchive = "node -e process.stdout.write(1) > ${flagFwd}"\n`,
+      `[scripts]\narchive = "node ${scriptFwd} ${flagFwd}"\n`,
     );
 
     await mgr.archive("delta");

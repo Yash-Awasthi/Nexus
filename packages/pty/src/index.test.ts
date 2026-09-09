@@ -22,9 +22,12 @@ describe("isSafeCommandName", () => {
 
 describe("resolveCommand", () => {
   it("passes absolute paths through with a disk check", () => {
-    const r = resolveCommand("C:\\Windows\\System32\\cmd.exe");
-    // On Windows the path exists; on POSIX it does not — both are valid outcomes.
-    expect(r.found).toBe(typeof r.path === "string" && r.path.length > 0);
+    const probe = process.platform === "win32" ? "C:\\Windows\\System32\\cmd.exe" : "/bin/sh";
+    const r = resolveCommand(probe);
+    // The path is passed through untouched; `found` reflects whether the
+    // platform's own shell binary exists (it does, on every supported OS).
+    expect(r.path).toBe(probe);
+    expect(r.found).toBe(true);
   });
 
   it("never resolves an unsafe name against PATH", () => {

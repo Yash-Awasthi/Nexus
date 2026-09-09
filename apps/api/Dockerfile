@@ -46,6 +46,13 @@ COPY packages/kv/package.json ./packages/kv/
 COPY packages/tier-gate/package.json ./packages/tier-gate/
 COPY packages/admin-gateway/package.json ./packages/admin-gateway/
 COPY packages/agents/package.json ./packages/agents/
+COPY packages/best-of-n/package.json ./packages/best-of-n/
+COPY packages/corpus-builder/package.json ./packages/corpus-builder/
+COPY packages/debate-engine/package.json ./packages/debate-engine/
+COPY packages/finetune-pipeline/package.json ./packages/finetune-pipeline/
+COPY packages/hybrid-search/package.json ./packages/hybrid-search/
+COPY packages/llm-accounts/package.json ./packages/llm-accounts/
+COPY packages/search-orchestrator/package.json ./packages/search-orchestrator/
 COPY packages/agent-engine/package.json ./packages/agent-engine/
 COPY packages/escalation-breaker/package.json ./packages/escalation-breaker/
 COPY packages/pty/package.json ./packages/pty/
@@ -141,6 +148,11 @@ RUN pnpm install --frozen-lockfile --filter @nexus/api --filter @nexus/auth \
     --filter @nexus/autotune --filter @nexus/parseltongue --filter @nexus/ragtime \
     --filter @nexus/llm-compress --filter @nexus/llm-oauth --filter @nexus/llm-translate \
     --filter @nexus/llm-cache --filter @nexus/workflow-chain \
+    --filter @nexus/llm-utils \
+    --filter @nexus/best-of-n --filter @nexus/corpus-builder \
+    --filter @nexus/debate-engine --filter @nexus/finetune-pipeline \
+    --filter @nexus/hybrid-search --filter @nexus/llm-accounts \
+    --filter @nexus/search-orchestrator \
     --filter @nexus/provider-registry \
     --filter @nexus/ultraplinian
 
@@ -184,6 +196,11 @@ RUN pnpm install --frozen-lockfile \
     --filter @nexus/autotune --filter @nexus/parseltongue --filter @nexus/ragtime \
     --filter @nexus/llm-compress --filter @nexus/llm-oauth --filter @nexus/llm-translate \
     --filter @nexus/llm-cache --filter @nexus/workflow-chain \
+    --filter @nexus/llm-utils \
+    --filter @nexus/best-of-n --filter @nexus/corpus-builder \
+    --filter @nexus/debate-engine --filter @nexus/finetune-pipeline \
+    --filter @nexus/hybrid-search --filter @nexus/llm-accounts \
+    --filter @nexus/search-orchestrator \
     --filter @nexus/provider-registry \
     --filter @nexus/ultraplinian
 
