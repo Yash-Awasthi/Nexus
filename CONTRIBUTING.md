@@ -25,7 +25,7 @@ Thank you for your interest in contributing. This guide covers everything you ne
 
 | Tool    | Version            | Install                                         |
 | ------- | ------------------ | ----------------------------------------------- |
-| Node.js | 20 LTS (`20.18.0`) | [nvm](https://github.com/nvm-sh/nvm): `nvm use` |
+| Node.js | 22 LTS (`22`) | [nvm](https://github.com/nvm-sh/nvm): `nvm use` |
 | pnpm    | 9.x                | `npm i -g pnpm@9`                               |
 | Python  | 3.11               | [pyenv](https://github.com/pyenv/pyenv)         |
 | Docker  | 24+                | [docker.com](https://docker.com)                |
@@ -58,7 +58,7 @@ devbox run build
 ```bash
 git clone https://github.com/Yash-Awasthi/Nexus.git
 cd nexus
-nvm use                    # pins to .nvmrc (Node 20.18.0)
+nvm use                    # pins to .nvmrc (Node 22)
 pnpm install               # installs all workspace dependencies
 pnpm build                 # builds every package
 ```

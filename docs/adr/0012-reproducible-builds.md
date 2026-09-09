@@ -11,7 +11,7 @@
 
 ## Decision
 
-- Node version pinned to `20.18.0` via `.nvmrc`.
+- Node version pinned to `22` via `.nvmrc`.
 - Python version pinned to `3.11` via `.python-version`.
 - pnpm version pinned to `9.x` in `package.json#packageManager`.
 - All `FROM` directives in Dockerfiles reference SHA256 digests, not tags.

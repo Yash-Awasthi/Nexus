@@ -98,7 +98,7 @@ describe("fileContentProcessor — .env variants", () => {
       "# production",
       "PORT=8080",
       "DATABASE_URL=postgres://user:supersecret@db:5432/app",
-      "API_KEY=ak_live_1234567890abcdef",
+      "API_KEY=your-api-key-here",
       "GITHUB_TOKEN=ghp_fake1234567890",
       "LOG_LEVEL=info",
       "",

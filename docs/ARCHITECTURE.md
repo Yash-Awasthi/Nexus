@@ -124,7 +124,7 @@ nexus/
 
 ## Toolchain
 
-- **Node** 20.x (`.nvmrc` pins `20.19.0`; engines require `>=20.18.0`)
+- **Node** 22 (`.nvmrc` pins `22`; engines require `>=22.12.0`)
 - **pnpm** 9.x (`packageManager: pnpm@9.14.4`) — always pnpm, never npm/yarn
 - **Turbo** orchestrates all cross-package tasks (`dependsOn: ["^build"]`)
 - **Postgres** (pgvector) + **Redis** (BullMQ) via Docker Compose for runtime

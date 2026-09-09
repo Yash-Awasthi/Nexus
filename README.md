@@ -52,7 +52,7 @@ erasure (`DELETE /api/v1/users/:id/data`) — see [docs/FEATURES.md](docs/FEATUR
 
 ## Quick Start
 
-You need **Docker**. For the hot-reload dev setup you also need **Node 20+** and **pnpm 9+**.
+You need **Docker**. For the hot-reload dev setup you also need **Node 22+** and **pnpm 9+**.
 
 ### Option A — Docker
 

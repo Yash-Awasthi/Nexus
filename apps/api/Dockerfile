@@ -41,6 +41,9 @@ COPY packages/kv/package.json ./packages/kv/
 COPY packages/tier-gate/package.json ./packages/tier-gate/
 COPY packages/admin-gateway/package.json ./packages/admin-gateway/
 COPY packages/agents/package.json ./packages/agents/
+COPY packages/agent-engine/package.json ./packages/agent-engine/
+COPY packages/escalation-breaker/package.json ./packages/escalation-breaker/
+COPY packages/pty/package.json ./packages/pty/
 COPY packages/hooks/package.json ./packages/hooks/
 COPY packages/alerts/package.json ./packages/alerts/
 COPY packages/gateway/package.json ./packages/gateway/
@@ -108,7 +111,9 @@ RUN pnpm install --frozen-lockfile --filter @nexus/api --filter @nexus/auth \
     --filter @nexus/image-gen --filter @nexus/knowledge-graph \
     --filter @nexus/llm-drivers --filter @nexus/gauntlet \
     --filter @nexus/kv --filter @nexus/tier-gate --filter @nexus/admin-gateway \
-    --filter @nexus/agents --filter @nexus/hooks --filter @nexus/alerts \
+    --filter @nexus/agents --filter @nexus/agent-engine \
+    --filter @nexus/escalation-breaker --filter @nexus/pty \
+    --filter @nexus/hooks --filter @nexus/alerts \
     --filter @nexus/gateway --filter @nexus/plugin-sdk --filter @nexus/token-budget \
     --filter @nexus/billing --filter @nexus/bots --filter @nexus/connectors \
     --filter @nexus/context-pack --filter @nexus/context-pruner \
@@ -148,7 +153,9 @@ RUN pnpm install --frozen-lockfile \
     --filter @nexus/image-gen --filter @nexus/knowledge-graph \
     --filter @nexus/llm-drivers --filter @nexus/gauntlet \
     --filter @nexus/kv --filter @nexus/tier-gate --filter @nexus/admin-gateway \
-    --filter @nexus/agents --filter @nexus/hooks --filter @nexus/alerts \
+    --filter @nexus/agents --filter @nexus/agent-engine \
+    --filter @nexus/escalation-breaker --filter @nexus/pty \
+    --filter @nexus/hooks --filter @nexus/alerts \
     --filter @nexus/gateway --filter @nexus/plugin-sdk --filter @nexus/token-budget \
     --filter @nexus/billing --filter @nexus/bots --filter @nexus/connectors \
     --filter @nexus/context-pack --filter @nexus/context-pruner \

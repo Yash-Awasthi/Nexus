@@ -2,10 +2,13 @@
 # @nexus/worker — multi-stage Docker build
 # Build: docker build -t nexus-worker -f apps/worker/Dockerfile .
 
-FROM node:26-alpine AS deps
+FROM node:22-alpine AS deps
 WORKDIR /app
 
-RUN npm install -g pnpm@9.14.4 --no-fund --no-audit
+# python3/make/g++ are needed to compile node-pty's native extension during
+# pnpm install (no prebuilt binary for alpine/musl).
+RUN apk add --no-cache python3 make g++ \
+ && npm install -g pnpm@9.14.4 --no-fund --no-audit
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY turbo.json ./
@@ -42,7 +45,7 @@ WORKDIR /app
 RUN pnpm --filter @nexus/worker deploy --prod /deploy
 
 # ─── Stage 5: runner ─────────────────────────────────────────────────────────
-FROM node:26-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 
 RUN addgroup -g 1001 nexus && adduser -u 1001 -G nexus -s /bin/sh -D nexus

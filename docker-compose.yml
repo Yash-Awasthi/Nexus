@@ -258,7 +258,7 @@ services:
   # ── Nexus UI (dev server) ─────────────────────────────────────────────────────
 
   ui:
-    image: node:20.18.0-alpine
+    image: node:22-alpine
     container_name: nexus-ui
     working_dir: /app
     volumes:
