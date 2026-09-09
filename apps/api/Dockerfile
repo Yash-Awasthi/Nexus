@@ -7,8 +7,10 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm@9.14.4 --no-fund --no-audit
+# python3/make/g++ are needed to compile node-pty's native extension during
+# pnpm install (no prebuilt binary for alpine/musl).
+RUN apk add --no-cache python3 make g++ \
+ && npm install -g pnpm@9.14.4 --no-fund --no-audit
 
 # Copy workspace manifests (needed for pnpm workspaces)
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
