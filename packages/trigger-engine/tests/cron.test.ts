@@ -21,4 +21,27 @@ describe("cron", () => {
     const next = nextCronRun("0 9 * * *", new Date(2026, 8, 28, 14, 30));
     expect(next).toEqual(new Date(2026, 8, 29, 9, 0));
   });
+
+  it("reads 7 as Sunday", () => {
+    expect(cronMatches("0 9 * * 7", new Date(2026, 8, 27, 9, 0))).toBe(true);
+    expect(cronMatches("0 9 * * 5-7", new Date(2026, 8, 27, 9, 0))).toBe(true);
+  });
+
+  it("fires on either day field when both are restricted, as cron does", () => {
+    // 1st of the month or a Monday; 28 Sep 2026 is a Monday, 1 Oct a Thursday.
+    expect(cronMatches("0 9 1 * 1", new Date(2026, 8, 28, 9, 0))).toBe(true);
+    expect(cronMatches("0 9 1 * 1", new Date(2026, 9, 1, 9, 0))).toBe(true);
+    expect(cronMatches("0 9 1 * 1", new Date(2026, 8, 29, 9, 0))).toBe(false);
+    expect(cronMatches("0 9 1-7 * *", new Date(2026, 8, 28, 9, 0))).toBe(false);
+  });
+
+  it("finds a leap day more than a year away", () => {
+    expect(nextCronRun("0 0 29 2 *", new Date(2026, 8, 28))).toEqual(new Date(2028, 1, 29, 0, 0));
+  });
+
+  it("returns null for a date that never comes", () => {
+    const t = Date.now();
+    expect(nextCronRun("0 0 31 2 *", new Date(2026, 8, 28))).toBeNull();
+    expect(Date.now() - t).toBeLessThan(1000);
+  });
 });
