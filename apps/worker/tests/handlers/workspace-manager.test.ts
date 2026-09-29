@@ -5,7 +5,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { promisify } from "node:util";
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   WorkspaceManager,
@@ -13,6 +13,9 @@ import {
   loadNexusSettings,
   parseNexusSettings,
 } from "../../src/handlers/workspace-manager.js";
+
+// Every case shells out to git, which passes 5s only when the machine is otherwise idle.
+vi.setConfig({ testTimeout: 30_000 });
 
 const execFileAsync = promisify(execFile);
 const git = (cwd: string, args: string[]): Promise<{ stdout: string }> =>
