@@ -5,12 +5,14 @@
  * `node:vm` is not a boundary: any host function placed in the context (even
  * `console.log`) hands back the host's `Function`, and with it `process`. The
  * code here runs in a child Node under the permission model instead — no
- * filesystem, child processes, workers or native addons — with sockets and
- * fetch disabled before it starts, a stripped environment, a memory cap and a
+ * filesystem, child processes, workers or native addons — with sockets, DNS
+ * and fetch disabled before it starts, a stripped environment, a memory cap and a
  * wall-clock timeout.
  */
 
 import { spawn } from "node:child_process";
+
+import { SANDBOX_PRELUDE } from "@nexus/agent-runtime";
 
 interface JsRunResult {
   stdout: string;
@@ -29,13 +31,7 @@ const BOOT_MS = 30_000;
 
 // Runs in the child. The user code arrives on stdin; its completion value is
 // printed like a REPL would.
-const RUNNER = `
-for (const k of Object.keys(process.env)) delete process.env[k];
-const net = require("node:net");
-const deny = () => { throw new Error("network access is disabled in the sandbox"); };
-net.Socket.prototype.connect = deny;
-net.connect = net.createConnection = deny;
-globalThis.fetch = undefined;
+const RUNNER = `${SANDBOX_PRELUDE}
 let src = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (c) => (src += c));

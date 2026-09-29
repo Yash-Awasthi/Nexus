@@ -308,6 +308,7 @@ export {
   globToRegExp,
 } from "./fs-tools.js";
 export type { CommandExecutor, CommandResult } from "./fs-tools.js";
+export { SANDBOX_PRELUDE } from "./sandbox-prelude.js";
 // MCP tool bridge — dependency-injected, defaults to the requires_permission tier.
 export { createMcpTools } from "./mcp-tools.js";
 export type { McpBridgeOptions, McpToolClient, McpToolInfo, McpToolResult } from "./mcp-tools.js";
@@ -2278,12 +2279,10 @@ export interface ProgrammaticToolOptions {
   /** Tool names the script may not call (the PTC tool always excludes itself). */
   exclude?: readonly string[];
   /**
-   * Run the script in a worker_thread sandbox instead of in-process (§7.2). The
-   * script executes in a separate OS thread; `call()` is bridged back over local
-   * RPC so tools still run gated in this thread, and only the script's stdout
-   * re-enters context. A synchronous infinite loop is force-killed on timeout
-   * (impossible in-process). Falls back to in-process when worker_threads is
-   * unavailable. Off by default (back-compatible).
+   * Run the script in a child Node under the permission model instead of in
+   * this process: no files, processes, sockets or environment, and a hard kill
+   * at the deadline. `call()` still runs gated here. Off by default; turn it on
+   * wherever the script's author (the model) is not trusted with the host.
    */
   sandbox?: boolean;
 }
@@ -2338,8 +2337,7 @@ export function createProgrammaticToolTool(opts: ProgrammaticToolOptions): Runti
       const code = String(args.code ?? "");
       if (!code.trim()) return "Error: empty script";
 
-      // Sandbox path (§7.2): run in a worker_thread; `call()` bridges back over
-      // local RPC (still gated in this thread) and only stdout re-enters context.
+      // Sandbox path: a child Node; `call()` comes back here and stays gated.
       if (opts.sandbox) {
         const { runToolScript } = await import("./ptc-sandbox.js");
         return runToolScript(code, {
