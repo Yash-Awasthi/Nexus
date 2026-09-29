@@ -50,7 +50,8 @@ RUN pnpm --filter @nexus/worker deploy --prod /deploy
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 
-RUN groupadd -g 1001 nexus && useradd -u 1001 -g nexus -s /bin/sh -m nexus
+RUN groupadd -g 1001 nexus && useradd -u 1001 -g nexus -s /bin/sh -m nexus \
+  && mkdir -p /data/drives && chown nexus:nexus /data/drives
 
 COPY --from=pruner --chown=nexus:nexus /deploy ./
 
