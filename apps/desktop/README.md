@@ -6,8 +6,8 @@ The Electron shell for the same product the website serves. The renderer is
 `apps/ui` unchanged; this package owns the window, the privileged operations
 behind the host bridge, and the navigation rules.
 
-Milestones M1–M3 of `docs/design/nexus-desktop.md`: shell and preload bridge,
-the local API with its own database, and sync. Of M4 the tray is here: closing
+It has the shell and preload bridge, the local API with its own database, and
+sync. The tray is here too: closing
 the window hides it, so companies keep running on their schedules until "Quit
 Nexus" in the tray menu, and a second launch shows the running app. An installer
 and auto-update are not: the API runs from the workspace with the `tsx` loader,
