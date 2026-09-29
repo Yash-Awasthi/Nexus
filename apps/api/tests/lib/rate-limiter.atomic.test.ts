@@ -352,7 +352,7 @@ describe("Window drain — KV fallback", () => {
   });
 
   it("serializes concurrent arrivals so the bucket counts exactly", async () => {
-    let now = 3_000_000;
+    const now = 3_000_000;
     const kv = new MemoryKVStore({ now: () => now });
     vi.doMock("../../src/lib/shared-kv.js", () => ({ getSharedKV: () => kv }));
 
@@ -382,7 +382,7 @@ describe("Window drain — KV fallback", () => {
 // Fail-open behavior
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("Fail-open when KV is unavailable", () => {
+describe("Local limits when the shared store is unavailable", () => {
   beforeEach(() => {
     vi.resetModules();
   });
@@ -392,35 +392,36 @@ describe("Fail-open when KV is unavailable", () => {
     clearUpstashEnv();
   });
 
-  it("passes through (no 429) when Upstash fetch throws", async () => {
+  it("still limits when the Upstash fetch throws", async () => {
     setUpstashEnv();
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("ECONNREFUSED")));
 
     const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
     const handler = makeRateLimitPreHandler({ limit: 1, windowMs: 60_000, keyPrefix: "fo1" });
 
-    // Even after many calls, all should pass because fetch throws
-    for (let i = 0; i < 10; i++) {
+    const codes: number[] = [];
+    for (let i = 0; i < 3; i++) {
       const reply = makeReply();
       await handler(makeRequest("10.0.0.99"), reply);
-      expect(reply._code).toBe(200);
-      expect(reply._sent).toBe(false);
+      codes.push(reply._code);
     }
+    expect(codes).toEqual([200, 429, 429]);
   });
 
-  it("passes through when Upstash returns non-ok status", async () => {
+  it("still limits when Upstash returns a non-ok status", async () => {
     setUpstashEnv();
     mockUpstashError();
 
     const { makeRateLimitPreHandler } = await import("../../src/lib/rate-limiter.js");
     const handler = makeRateLimitPreHandler({ limit: 1, windowMs: 60_000, keyPrefix: "fo2" });
 
-    for (let i = 0; i < 5; i++) {
+    const codes: number[] = [];
+    for (let i = 0; i < 3; i++) {
       const reply = makeReply();
       await handler(makeRequest("10.0.0.88"), reply);
-      expect(reply._code).toBe(200);
-      expect(reply._sent).toBe(false);
+      codes.push(reply._code);
     }
+    expect(codes).toEqual([200, 429, 429]);
   });
 
   it("passes through when Upstash pipeline returns an error in results", async () => {
@@ -475,7 +476,7 @@ describe("Fail-open when KV is unavailable", () => {
     expect(reply._sent).toBe(false);
   });
 
-  it("does not set rate-limit headers when KV is fully broken", async () => {
+  it("reports the local count in the headers when the shared store is down", async () => {
     clearUpstashEnv();
 
     const brokenKV = new MemoryKVStore();
@@ -492,8 +493,7 @@ describe("Fail-open when KV is unavailable", () => {
 
     const reply = makeReply();
     await handler(makeRequest("10.0.0.55"), reply);
-    // No headers set because catch block is silent
-    expect(reply._headers["X-RateLimit-Limit"]).toBeUndefined();
-    expect(reply._headers["X-RateLimit-Remaining"]).toBeUndefined();
+    expect(reply._headers["X-RateLimit-Limit"]).toBe(5);
+    expect(reply._headers["X-RateLimit-Remaining"]).toBe(4);
   });
 });
