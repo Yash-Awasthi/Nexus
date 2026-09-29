@@ -32,10 +32,13 @@ migrations follow the `packages/db/migrations/` recipe (next free number, add a
 quota at `/workspace`; soft-warn at 90%, then hard-block. 30-day idle reclaim. The user's own
 LLM key lives in `/workspace/.env`, never logged, excluded from backups and exports.
 
-- **Isolation** _(Gate)_ — Firecracker and gVisor `runsc` both need a Linux host with KVM. The
-  drive runs on Docker today behind the same interface, so the microVM is a later swap. Spike:
-  boot a microVM with a 512 MB project-quota ext4 at `/workspace` and prove
-  `dd if=/dev/zero of=/workspace/big bs=1M count=600` hard-fails.
+- **Isolation** — the drive runs on Docker; `SANDBOX_RUNTIME=runsc` puts every sandbox
+  container under gVisor. `scripts/drive-microvm-spike.sh` boots a Firecracker microVM with a
+  512 MB ext4 at `/workspace` and shows a 600 MB write failing with ENOSPC; it runs wherever
+  `/dev/kvm` exists, including Docker Desktop on WSL2. Open: a Firecracker runner behind the
+  drive interface. The drive then lives in a block image, so upload, list, read and export go
+  through the VM instead of the host directory. ext4 overhead leaves 477 MB of a 512 MB image
+  usable, so the image needs about 550 MB.
 - **Quota ceiling** — enforced by a pre-check plus a re-measure after each command, so an
   overrun is bounded by one command's writes. A mid-write hard fail needs root (XFS project
   quota or a loopback ext4); `--storage-opt` caps a container's layer, not a bind mount.
@@ -77,7 +80,6 @@ LLM key lives in `/workspace/.env`, never logged, excluded from backups and expo
 
 | Task                     | Blocker                                    |
 | ------------------------ | ------------------------------------------ |
-| Firecracker / gVisor     | Linux host with KVM                        |
 | Redis cluster rate-limit | Upstash / managed Redis                    |
 | PgBouncer pooling        | DB admin                                   |
 | K8s HPA deploy           | K8s cluster (chart in `infra/helm/nexus/`) |

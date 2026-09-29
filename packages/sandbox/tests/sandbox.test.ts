@@ -632,6 +632,16 @@ describe("buildDockerArgs", () => {
     expect(args).toContain(`--env=TMPDIR=${SCRATCH_DIR}`);
   });
 
+  it("runs under the OCI runtime named by SANDBOX_RUNTIME, such as gVisor's runsc", () => {
+    vi.stubEnv("SANDBOX_RUNTIME", "runsc");
+    try {
+      expect(buildDockerArgs()).toContain("--runtime=runsc");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    expect(buildDockerArgs().some((a) => a.startsWith("--runtime="))).toBe(false);
+  });
+
   it("omits read-only rootfs and scratch when readOnlyRootfs is false", () => {
     const args = buildDockerArgs({ readOnlyRootfs: false });
     expect(args).not.toContain("--read-only");
