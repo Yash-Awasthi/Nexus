@@ -9,6 +9,7 @@
  *   POST   /api/v1/drive/upload   — write a file
  *   POST   /api/v1/drive/exec     — run a command in the sandbox
  *   GET    /api/v1/drive/export   — the drive as .tar.gz, without any .env
+ *   POST   /api/v1/drive/link     — a signed, expiring download link for one file
  *   DELETE /api/v1/drive/destroy  — delete the whole drive
  */
 import {
@@ -17,6 +18,7 @@ import {
   Download,
   File as FileIcon,
   Folder,
+  Link2,
   Loader2,
   RefreshCw,
   Save,
@@ -102,6 +104,7 @@ export default function Drive() {
   const [files, setFiles] = useState<DriveFile[]>([]);
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [err, setErr] = useState("");
+  const [notice, setNotice] = useState("");
 
   const [openFile, setOpenFile] = useState<string | null>(null);
   const [fileBody, setFileBody] = useState("");
@@ -264,6 +267,47 @@ export default function Drive() {
     }
   }, [command, dir, loadFiles, loadStatus]);
 
+  const fileLink = useCallback(
+    async (name: string): Promise<string | null> => {
+      setNotice("");
+      const r = await authFetch("/api/v1/drive/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: joinPath(dir, name) }),
+      }).catch(() => null);
+      if (!r?.ok) {
+        const data = r ? await readJson<ErrorBody>(r).catch(() => ({}) as ErrorBody) : {};
+        setErr((data as ErrorBody).error ?? "Could not make a link for that file");
+        return null;
+      }
+      setErr("");
+      return new URL((await readJson<{ url: string }>(r)).url, window.location.origin).href;
+    },
+    [dir],
+  );
+
+  const download = useCallback(
+    async (name: string) => {
+      const url = await fileLink(name);
+      if (!url) return;
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      a.click();
+    },
+    [fileLink],
+  );
+
+  const copyLink = useCallback(
+    async (name: string) => {
+      const url = await fileLink(name);
+      if (!url) return;
+      await navigator.clipboard.writeText(url).catch(() => undefined);
+      setNotice(`Link to ${name} copied; it works for 30 minutes.`);
+    },
+    [fileLink],
+  );
+
   const exportDrive = useCallback(async () => {
     const r = await authFetch("/api/v1/drive/export").catch(() => null);
     if (!r?.ok) {
@@ -365,6 +409,11 @@ export default function Drive() {
           {err}
         </p>
       )}
+      {notice && (
+        <p className="text-sm text-muted-foreground" role="status">
+          {notice}
+        </p>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Files */}
@@ -423,8 +472,28 @@ export default function Drive() {
                       )}
                       <span className="truncate">{f.name}</span>
                     </button>
-                    <span className="text-muted-foreground shrink-0">
+                    <span className="flex items-center gap-1 text-muted-foreground shrink-0">
                       {f.type === "dir" ? "—" : formatBytes(f.size)}
+                      {f.type === "file" && f.name !== ".env" && (
+                        <>
+                          <button
+                            className="p-1 hover:text-foreground"
+                            aria-label={`Download ${f.name}`}
+                            title="Download"
+                            onClick={() => void download(f.name)}
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+                          <button
+                            className="p-1 hover:text-foreground"
+                            aria-label={`Copy a link to ${f.name}`}
+                            title="Copy a download link"
+                            onClick={() => void copyLink(f.name)}
+                          >
+                            <Link2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
                     </span>
                   </li>
                 ))}
