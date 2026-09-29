@@ -546,5 +546,4 @@ export function createWorkflowChain<INPUT, RESULT = INPUT>(
 
 // Types are already exported inline above.
 
-
 export type { ActivityDefinition, ActivityRetryPolicy, WorkflowContext } from "./durable.js";
