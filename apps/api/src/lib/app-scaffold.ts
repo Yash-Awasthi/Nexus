@@ -112,14 +112,15 @@ export async function pickDesign(
   }
 }
 
-/** A folder name for the app: a slug of the prompt plus a hash, stable for one owner and prompt. */
+// A slug of the prompt plus a hash, stable per owner and prompt. Short, because npm on Windows
+// fails once node_modules paths pass 260 characters.
 export function appFolderName(ownerId: string, prompt: string): string {
   const slug =
     prompt
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
-      .slice(0, 32)
+      .slice(0, 20)
       .replace(/-+$/, "") || "app";
   const hash = crypto.createHash("sha256").update(`${ownerId}:${prompt}`).digest("hex").slice(0, 6);
   return `${slug}-${hash}`;
