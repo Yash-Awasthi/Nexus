@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * Pattern checks behind the Privacy & Safety and Content Filter settings:
- * personal details in a message, and profanity in messages and answers.
+ * personal details and keys in a message, and profanity in messages and answers.
  */
 
 function luhn(digits: string): boolean {
@@ -16,7 +16,22 @@ function luhn(digits: string): boolean {
 
 // Order matters: the narrower shapes run first so a card or SSN is not
 // reported (and redacted) as a phone number.
+const SECRET = new RegExp(
+  [
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]*?-----END [A-Z ]*PRIVATE KEY-----",
+    "\\b(?:sk|gsk|nxk|pk|rk)[-_][\\w-]{20,}",
+    "\\bgh[pousr]_\\w{36,}",
+    "\\bgithub_pat_\\w{40,}",
+    "\\bAKIA[0-9A-Z]{16}\\b",
+    "\\bxox[baprs]-[\\w-]{10,}",
+    "\\bAIza[\\w-]{35}",
+    "\\beyJ[\\w-]{10,}\\.[\\w-]{10,}\\.[\\w-]{10,}",
+  ].join("|"),
+  "g",
+);
+
 const PII: { type: string; re: RegExp; check?: (m: string) => boolean }[] = [
+  { type: "secret", re: SECRET },
   { type: "email", re: /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g },
   {
     type: "card number",

@@ -15,6 +15,22 @@ describe("findPii / redactPii", () => {
     expect(redactPii(msg)).toBe("Mail [EMAIL] or call [PHONE]. Card [CARD_NUMBER], SSN [SSN].");
   });
 
+  it("catches keys and tokens, and masks them before anything else", () => {
+    const keys = [
+      "sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789",
+      "ghp_abcdefghijklmnopqrstuvwxyz0123456789",
+      "AKIAIOSFODNN7EXAMPLE",
+      "gsk_abcdefghijklmnopqrstuvwxyz012345",
+      "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N",
+    ];
+    for (const key of keys) {
+      expect(findPii(`use ${key} for it`)).toEqual([{ type: "secret", value: key }]);
+      expect(redactPii(`use ${key} for it`)).toBe("use [SECRET] for it");
+    }
+    const pem = "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBg\n-----END PRIVATE KEY-----";
+    expect(redactPii(`key:\n${pem}\nend`)).toBe("key:\n[SECRET]\nend");
+  });
+
   it("leaves ordinary numbers alone", () => {
     expect(findPii("Order 1234567890123 shipped in 2026, version 3.10.0")).toEqual([]);
   });
