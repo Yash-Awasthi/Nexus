@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/login";
@@ -9,9 +9,9 @@ import { AuthShell, Notice, OAuthButtons } from "~/components/auth-shell";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { useAuth, type HostSession } from "~/context/AuthContext";
+import { refreshSession, useAuth, type HostSession } from "~/context/AuthContext";
 import { hostCan, hostInvoke } from "~/lib/host";
-import { setSessionToken } from "~/lib/session-token";
+import { getSessionToken, setSessionToken } from "~/lib/session-token";
 
 export function meta(_: Route.MetaArgs) {
   return [{ title: "Sign in · Nexus" }];
@@ -23,6 +23,9 @@ const OAUTH_ERRORS: Record<string, string> = {
   google_not_configured:
     "Google sign-in is not set up on this server. Use your email and password.",
   no_email: "No verified email returned. Please verify your GitHub email and try again.",
+  access_denied: "Sign-in was cancelled.",
+  email_not_verified: "Your identity provider has not verified your email address.",
+  no_account: "No Nexus account uses this email yet. Ask an admin to invite you.",
 };
 
 export default function LoginPage() {
@@ -38,10 +41,31 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const next = searchParams.get("next");
+  const destination = next?.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+
   // Redirect if already authenticated
   useEffect(() => {
-    if (isAuthenticated) navigate("/dashboard", { replace: true });
-  }, [isAuthenticated, navigate]);
+    if (isAuthenticated) navigate(destination, { replace: true });
+  }, [isAuthenticated, navigate, destination]);
+
+  // A provider sign-in lands here with the refresh token already in its httpOnly cookie.
+  // Once only: the cookie rotates on every exchange.
+  const pickedUp = useRef(false);
+  useEffect(() => {
+    if (pickedUp.current || searchParams.get("signed_in") !== "1" || hostCan("localAccount"))
+      return;
+    pickedUp.current = true;
+    void (async () => {
+      const me =
+        (await refreshSession()) &&
+        (await fetch("/api/v1/auth/me", {
+          headers: { Authorization: `Bearer ${getSessionToken()}` },
+        }).catch(() => null));
+      if (me && me.ok) setUser((await me.json()) as Parameters<typeof setUser>[0]);
+      else setError("Sign-in failed. Please try again.");
+    })();
+  }, [searchParams, setUser]);
 
   // Show OAuth errors or post-registration success banner
   useEffect(() => {

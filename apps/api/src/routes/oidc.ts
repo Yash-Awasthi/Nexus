@@ -12,7 +12,6 @@
  *   NEXUS_OIDC_CLIENT_SECRET  — OAuth 2.0 client secret
  *   NEXUS_OIDC_REDIRECT_URI   — absolute callback URL registered with the provider
  *   NEXUS_OIDC_SCOPES         — space-separated scopes (default: "openid email profile")
- *   OAUTH_REDIRECT_BASE       — where to send the browser after token issuance
  *
  * Security:
  *   State parameter — 24-byte CSPRNG, stored in KV (5-min TTL), consumed on callback.
@@ -34,6 +33,7 @@ import { sha256hex as _sha256hex } from "../lib/crypto-utils.js";
 import { issueAccessToken } from "../lib/issue-access-token.js";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
 import { getSharedKV } from "../lib/shared-kv.js";
+import { failSignIn, finishSignIn } from "../lib/sign-in-finish.js";
 import { assertMayProvision, SsoPolicyError } from "../lib/sso-provisioning.js";
 
 // 20 OIDC callback attempts per 15 minutes per IP — prevents code replay attacks
@@ -59,8 +59,6 @@ function isOidcConfigured(): boolean {
   const c = oidcConfig();
   return !!(c.issuer && c.clientId && c.clientSecret && c.redirectUri);
 }
-
-const _redirectBase = (): string => process.env.OAUTH_REDIRECT_BASE ?? "http://localhost:3000";
 
 // ── CSRF state helpers ────────────────────────────────────────────────────────
 
@@ -426,7 +424,7 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
    *   4. Validate claims (iss, aud, exp, iat)
    *   5. Upsert user — find-or-create in DB, emailVerified = claims.email_verified
    *   6. Issue Nexus access + refresh token pair
-   *   7. Redirect browser to OAUTH_REDIRECT_BASE with tokens in query params
+   *   7. Set the refresh cookie and send the browser to the sign-in page
    */
   app.get<{
     Querystring: { code?: string; state?: string; error?: string; error_description?: string };
@@ -435,7 +433,7 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
 
     // Provider-side error (user denied consent, etc.)
     if (error) {
-      return reply.code(400).send({
+      return failSignIn(request, reply, 400, {
         error: "oidc_provider_error",
         provider_error: error,
         message: error_description ?? "Provider returned an error",
@@ -443,17 +441,19 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
     }
 
     if (!code || !state) {
-      return reply
-        .code(400)
-        .send({ error: "missing_params", message: "code and state are required" });
+      return failSignIn(request, reply, 400, {
+        error: "missing_params",
+        message: "code and state are required",
+      });
     }
 
     // CSRF validation
     const stateValid = await _consumeState(state);
     if (!stateValid) {
-      return reply
-        .code(400)
-        .send({ error: "invalid_state", message: "State mismatch — possible CSRF" });
+      return failSignIn(request, reply, 400, {
+        error: "invalid_state",
+        message: "State mismatch — possible CSRF",
+      });
     }
 
     const cfg = oidcConfig();
@@ -462,7 +462,10 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
     try {
       discovery = await fetchDiscovery(cfg.issuer!);
     } catch (err) {
-      return reply.code(502).send({ error: "oidc_discovery_failed", message: String(err) });
+      return failSignIn(request, reply, 502, {
+        error: "oidc_discovery_failed",
+        message: String(err),
+      });
     }
 
     // ── Code → token exchange ─────────────────────────────────────────────
@@ -488,11 +491,14 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
       });
       tokenRes = (await res.json()) as typeof tokenRes;
     } catch (err) {
-      return reply.code(502).send({ error: "token_exchange_failed", message: String(err) });
+      return failSignIn(request, reply, 502, {
+        error: "token_exchange_failed",
+        message: String(err),
+      });
     }
 
     if (tokenRes.error || !tokenRes.id_token) {
-      return reply.code(400).send({
+      return failSignIn(request, reply, 400, {
         error: "token_exchange_error",
         message:
           (tokenRes as Record<string, string>).error_description ??
@@ -513,7 +519,7 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
       );
     } catch (err) {
       app.log.warn({ err }, "oidc: id_token verification failed");
-      return reply.code(401).send({ error: "id_token_invalid", message: String(err) });
+      return failSignIn(request, reply, 401, { error: "id_token_invalid", message: String(err) });
     }
 
     // ── User upsert + token issuance ──────────────────────────────────────
@@ -531,10 +537,13 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
       // domain nobody allowed sends an administrator hunting the wrong bug.
       if (err instanceof SsoPolicyError) {
         app.log.warn({ err }, "oidc: sign-in refused by policy");
-        return reply.code(err.statusCode).send({ error: err.code, message: err.message });
+        return failSignIn(request, reply, err.statusCode, {
+          error: err.code,
+          message: err.message,
+        });
       }
       app.log.error({ err }, "oidc: user upsert failed");
-      return reply.code(500).send({ error: "upsert_failed", message: String(err) });
+      return failSignIn(request, reply, 500, { error: "upsert_failed", message: String(err) });
     }
 
     emitAuditEvent(
@@ -553,13 +562,8 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
       app.log,
     );
 
-    // ── Browser redirect ──────────────────────────────────────────────────
+    // ── Hand the session to the browser ───────────────────────────────────
 
-    const dest = new URL("/auth/callback", _redirectBase());
-    dest.searchParams.set("accessToken", tokens.accessToken);
-    dest.searchParams.set("refreshToken", tokens.refreshToken);
-    dest.searchParams.set("provider", "oidc");
-
-    return reply.redirect(dest.toString(), 302);
+    return finishSignIn(request, reply, tokens.refreshToken, { ...tokens, provider: "oidc" });
   });
 }

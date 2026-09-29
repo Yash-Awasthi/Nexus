@@ -30,7 +30,7 @@ import {
   emailVerificationTokens,
 } from "@nexus/db/schema";
 import { eq, and, gt, isNull, desc } from "drizzle-orm";
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance } from "fastify";
 
 import { emitAuditEvent } from "../lib/audit-emitter.js";
 import {
@@ -43,6 +43,7 @@ import { sha256hex } from "../lib/crypto-utils.js";
 import { ACCESS_TOKEN_TTL_SEC, issueAccessToken } from "../lib/issue-access-token.js";
 import { makeRateLimitPreHandler } from "../lib/rate-limiter.js";
 import { emitReaction } from "../lib/reactions.js";
+import { refreshCookie, setRefreshCookie } from "../lib/sign-in-finish.js";
 import { requireAuthWithTier } from "../middleware/auth.js";
 
 import { totpMatches } from "./mfa.js";
@@ -106,36 +107,6 @@ function generateRefreshToken(): string {
 // ── JWT issuance ──────────────────────────────────────────────────────────────
 
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 3600 * 1000; // 30 days
-
-/**
- * The browser keeps its refresh token in this cookie, out of reach of page
- * scripts; API clients keep sending it in the body instead.
- */
-const REFRESH_COOKIE = "nexus_refresh";
-
-function setRefreshCookie(
-  request: FastifyRequest,
-  reply: FastifyReply,
-  token: string | null,
-): void {
-  const attrs = [
-    `${REFRESH_COOKIE}=${token ?? ""}`,
-    "HttpOnly",
-    "SameSite=Strict",
-    "Path=/api/v1/auth",
-    `Max-Age=${token ? Math.floor(REFRESH_TOKEN_TTL_MS / 1000) : 0}`,
-    ...(request.protocol === "https" ? ["Secure"] : []),
-  ];
-  reply.header("Set-Cookie", attrs.join("; "));
-}
-
-function refreshCookie(request: FastifyRequest): string | undefined {
-  for (const part of (request.headers.cookie ?? "").split(";")) {
-    const [name, ...value] = part.trim().split("=");
-    if (name === REFRESH_COOKIE && value.length) return value.join("=") || undefined;
-  }
-  return undefined;
-}
 // Access-token issuance (TTL, RS256/HS256 selection, role mapping) lives in
 // lib/issue-access-token.ts — shared with the OAuth/OIDC/SAML SSO routes so
 // NEXUS_JWT_ALG is honored everywhere (§14.1).
