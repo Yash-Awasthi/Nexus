@@ -12,7 +12,8 @@
  *
  *  2. A Deno subprocess runner ({@link DenoPluginRunner}) — the real sandbox.
  *     It shells out to a local `deno` binary with read access to the plugin's
- *     directory only; `--allow-net` is never passed.
+ *     directory only. Network is allowed to one address alone: the host bridge
+ *     the caller opened for this run, where granted capabilities are served.
  *
  * Execution-time capability enforcement: a plugin that attempts a call it was
  * not granted receives a {@link CapabilityDeniedError} — it fails closed,
@@ -116,6 +117,33 @@ export interface DenoInvocation {
   payload: string;
   /** Capabilities the isolate is allowed to use (deny-by-default otherwise). */
   grantedCapabilities: AdapterCapability[];
+  /**
+   * The host bridge for this run: the plugin POSTs `{ capability, input }` to `${url}/call`
+   * with `Authorization: Bearer ${token}`. It arrives as the script's second argument.
+   */
+  bridge?: PluginBridge;
+}
+
+export interface PluginBridge {
+  url: string;
+  token: string;
+}
+
+/** `deno run` arguments: the plugin's own directory to read, and the bridge's port to reach. */
+export function denoArgs(invocation: DenoInvocation): string[] {
+  const { bridge } = invocation;
+  return [
+    "run",
+    "--no-prompt",
+    "--no-remote",
+    "--no-npm",
+    "--no-config",
+    `--allow-read=${dirname(invocation.scriptPath)}`,
+    ...(bridge ? [`--allow-net=${new URL(bridge.url).host}`] : []),
+    invocation.scriptPath,
+    invocation.payload,
+    ...(bridge ? [JSON.stringify(bridge)] : []),
+  ];
 }
 
 /** Result of a sandboxed plugin execution. */
@@ -148,7 +176,8 @@ export interface DenoPluginRunnerOptions {
 
 /**
  * Default subprocess runner: `deno run` with read access to the plugin's own
- * directory and nothing else, so network, env, writes and subprocesses are denied.
+ * directory and, when there is one, network to the host bridge; env, writes,
+ * subprocesses and every other address are denied.
  */
 function createDenoRunner(denoPath = process.env.DENO_PATH || "deno"): DenoRunnerFn {
   return (invocation) =>
@@ -156,16 +185,7 @@ function createDenoRunner(denoPath = process.env.DENO_PATH || "deno"): DenoRunne
       const scriptDir = dirname(invocation.scriptPath);
       execFile(
         denoPath,
-        [
-          "run",
-          "--no-prompt",
-          "--no-remote",
-          "--no-npm",
-          "--no-config",
-          `--allow-read=${scriptDir}`,
-          invocation.scriptPath,
-          invocation.payload,
-        ],
+        denoArgs(invocation),
         { cwd: scriptDir, timeout: 30_000, maxBuffer: 4 * 1024 * 1024, windowsHide: true },
         (err, stdout, stderr) => {
           if ((err as NodeJS.ErrnoException | null)?.code === "ENOENT") {
@@ -211,13 +231,14 @@ export class DenoPluginRunner {
    * {@link CapabilityGate.call} before invoking the host action. The subprocess
    * receives only the granted capability set.
    */
-  async run(scriptPath: string, payload: unknown): Promise<PluginRunResult> {
+  async run(scriptPath: string, payload: unknown, bridge?: PluginBridge): Promise<PluginRunResult> {
     const serialized = JSON.stringify(payload);
     try {
       const invocation: DenoInvocation = {
         scriptPath,
         payload: serialized,
         grantedCapabilities: this.gate.grantedCapabilities(),
+        ...(bridge ? { bridge } : {}),
       };
       const result = await this.runnerFn(invocation);
       return { ok: result.ok, result };

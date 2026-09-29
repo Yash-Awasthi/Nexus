@@ -26,7 +26,12 @@ function install(id: string, manifest: Record<string, unknown>, files: Record<st
 }
 
 install("echo", { entry: "main.ts" }, { "main.ts": "// echo" });
-install("needs-net", { entry: "main.ts", capabilities: ["search.web"] }, { "main.ts": "" });
+install("needs-db", { entry: "main.ts", capabilities: ["database.execute"] }, { "main.ts": "" });
+install(
+  "notes",
+  { entry: "main.ts", capabilities: ["storage.read", "storage.write", "monitoring.log"] },
+  { "main.ts": "" },
+);
 install("escapes", { entry: "../echo/main.ts" }, {});
 fs.mkdirSync(path.join(DIR, "broken"));
 fs.writeFileSync(path.join(DIR, "broken", "manifest.json"), "{not json");
@@ -76,7 +81,7 @@ describe("plugin run", () => {
       .json<{ plugins: { id: string }[] }>()
       .plugins.map((p) => p.id)
       .sort();
-    expect(ids).toEqual(["echo", "escapes", "needs-net"]);
+    expect(ids).toEqual(["echo", "escapes", "needs-db", "notes"]);
   });
 
   it("runs a plugin's entry with the input and returns what it printed", async () => {
@@ -91,9 +96,9 @@ describe("plugin run", () => {
   it("refuses without a token, unknown plugins, capability requests and escaping entries", async () => {
     expect((await run("echo", {}, {} as never)).statusCode).toBe(401);
     expect((await run("nope", {})).statusCode).toBe(404);
-    const net = await run("needs-net", {});
-    expect(net.statusCode).toBe(409);
-    expect(net.json<{ message: string }>().message).toMatch(/search\.web/);
+    const db = await run("needs-db", {});
+    expect(db.statusCode).toBe(409);
+    expect(db.json<{ message: string }>().message).toMatch(/database\.execute/);
     expect((await run("escapes", {})).statusCode).toBe(400);
     expect((await run("echo", "x".repeat(20_000))).statusCode).toBe(413);
   });
@@ -108,5 +113,74 @@ describe("plugin run", () => {
       throw new SandboxUnavailableError("deno missing");
     };
     expect((await run("echo", {})).statusCode).toBe(503);
+  });
+});
+
+describe("host calls", () => {
+  it("serves a plugin its granted capabilities over the bridge and refuses the rest", async () => {
+    next = async (inv) => {
+      const bridge = inv.bridge!;
+      const call = async (capability: string, input: unknown) => {
+        const r = await fetch(`${bridge.url}/call`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${bridge.token}`, "content-type": "application/json" },
+          body: JSON.stringify({ capability, input }),
+        });
+        return { status: r.status, body: (await r.json()) as unknown };
+      };
+      const wrote = await call("storage.write", { key: "greeting", value: "hi" });
+      const read = await call("storage.read", { key: "greeting" });
+      const logged = await call("monitoring.log", { message: "halfway" });
+      const llm = await call("llm.inference", { prompt: "x" });
+      const forged = await fetch(`${bridge.url}/call`, {
+        method: "POST",
+        headers: { authorization: "Bearer wrong", "content-type": "application/json" },
+        body: JSON.stringify({ capability: "storage.read", input: { key: "greeting" } }),
+      });
+      const parsed = { wrote, read, logged, llm: llm.status, forged: forged.status };
+      return { ok: true, stdout: JSON.stringify(parsed), stderr: "", exitCode: 0, parsed };
+    };
+    const headers = auth();
+    const res = await run("notes", {}, headers);
+    expect(res.statusCode, res.body).toBe(200);
+    const body = res.json<{ output: Record<string, unknown>; logs: string[] }>();
+    expect(body.output).toMatchObject({
+      wrote: { status: 200 },
+      read: { status: 200, body: { result: "hi" } },
+      logged: { status: 200 },
+      llm: 403,
+      forged: 401,
+    });
+    expect(body.logs).toEqual(["halfway"]);
+    expect(calls.at(-1)!.grantedCapabilities).toEqual([
+      "storage.read",
+      "storage.write",
+      "monitoring.log",
+    ]);
+
+    // Storage belongs to the caller: another user reads nothing.
+    next = async (inv) => {
+      const r = await fetch(`${inv.bridge!.url}/call`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${inv.bridge!.token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ capability: "storage.read", input: { key: "greeting" } }),
+      });
+      const parsed = await r.json();
+      return { ok: true, stdout: "", stderr: "", exitCode: 0, parsed };
+    };
+    expect((await run("notes", {})).json<{ output: unknown }>().output).toEqual({ result: null });
+  });
+
+  it("closes the bridge once the run ends", async () => {
+    let url = "";
+    next = async (inv) => {
+      url = inv.bridge!.url;
+      return { ok: true, stdout: "", stderr: "", exitCode: 0, parsed: null };
+    };
+    await run("notes", {});
+    await expect(fetch(`${url}/call`, { method: "POST" })).rejects.toThrow();
   });
 });

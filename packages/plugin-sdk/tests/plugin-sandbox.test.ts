@@ -11,6 +11,7 @@ import {
   CapabilityDeniedError,
   SandboxUnavailableError,
   DenoPluginRunner,
+  denoArgs,
   type LoadedPlugin,
   type DenoRunnerFn,
   type DenoInvocation,
@@ -171,4 +172,23 @@ describe.skipIf(!hasDeno)("DenoPluginRunner with a real deno", () => {
     },
     60_000,
   );
+});
+
+describe("denoArgs", () => {
+  const base = { scriptPath: "/p/demo/main.ts", payload: "{}", grantedCapabilities: [] };
+
+  it("gives a plugin with no bridge its own directory and nothing else", () => {
+    const args = denoArgs(base);
+    expect(args).toContain("--allow-read=/p/demo");
+    expect(args.some((a) => a.startsWith("--allow-net"))).toBe(false);
+    expect(args.slice(-2)).toEqual(["/p/demo/main.ts", "{}"]);
+  });
+
+  it("opens the network to the host bridge's one port and passes where it is", () => {
+    const bridge = { url: "http://127.0.0.1:41234", token: "t0k" };
+    const args = denoArgs({ ...base, bridge });
+    expect(args).toContain("--allow-net=127.0.0.1:41234");
+    expect(JSON.parse(args.at(-1)!)).toEqual(bridge);
+    expect(args.at(-2)).toBe("{}");
+  });
 });
