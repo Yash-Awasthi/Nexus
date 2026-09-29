@@ -61,7 +61,7 @@ import { callerFetch, unsafeUrlReason } from "./public-url.js";
 import { pacedFetch } from "./rate-pace.js";
 import type { LlmStep } from "./request-traces.js";
 import { decryptSecret, encryptSecret } from "./secret-crypto.js";
-import { userContext } from "./user-context.js";
+import { userContext, type UserDriver } from "./user-context.js";
 
 /** Providers we can construct an LLM driver for (openai included — the ChatGPT
  *  API is a plain OpenAI-compatible endpoint and its driver lives in
@@ -267,24 +267,19 @@ export async function buildUserDriverRegistry(
 // Per-request callers (every /api request) read this, so decrypted drivers are
 // kept briefly; saving or deleting a key drops the entry at once.
 const USER_DRIVER_TTL_MS = 30_000;
-const _userDrivers = new IdleMap<
-  string,
-  { at: number; drivers: { id: string; driver: LlmDriver }[] }
->(USER_DRIVER_TTL_MS);
+const _userDrivers = new IdleMap<string, { at: number; drivers: UserDriver[] }>(USER_DRIVER_TTL_MS);
 
 export function invalidateUserDrivers(userId: string | undefined): void {
   if (userId) _userDrivers.delete(userId);
 }
 
 /** Drivers for every provider the user has saved a key for, in save order. */
-export async function listUserDrivers(
-  userId: string | undefined,
-): Promise<{ id: string; driver: LlmDriver }[]> {
+export async function listUserDrivers(userId: string | undefined): Promise<UserDriver[]> {
   if (!userId) return [];
   const hit = _userDrivers.get(userId);
   if (hit && Date.now() - hit.at < USER_DRIVER_TTL_MS) return hit.drivers;
   const rows = await db
-    .select({ provider: userProviderCredentials.provider })
+    .select({ provider: userProviderCredentials.provider, models: userProviderCredentials.models })
     .from(userProviderCredentials)
     .where(
       and(eq(userProviderCredentials.userId, userId), isNull(userProviderCredentials.deletedAt)),
@@ -293,9 +288,10 @@ export async function listUserDrivers(
     userId,
     rows.map((r) => r.provider),
   );
+  const models = new Map(rows.map((r) => [r.provider, r.models ?? []]));
   const drivers = registry.list().flatMap((id) => {
     const driver = registry.get(id);
-    return driver ? [{ id, driver }] : [];
+    return driver ? [{ id, driver, models: models.get(id) ?? [] }] : [];
   });
   _userDrivers.set(userId, { at: Date.now(), drivers });
   return drivers;

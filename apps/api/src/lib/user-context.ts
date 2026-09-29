@@ -20,10 +20,16 @@ import type { LlmStep } from "./request-traces.js";
 
 interface UserContext {
   userId: string | null;
-  /** Drivers built from the keys this user saved in Settings. */
-  userDrivers?: { id: string; driver: LlmDriver }[];
+  /** Drivers built from the keys this user saved in Settings, with the models each lists. */
+  userDrivers?: UserDriver[];
   /** Model calls made while serving this request, for its trace. */
   llmSteps?: LlmStep[];
+}
+
+export interface UserDriver {
+  id: string;
+  driver: LlmDriver;
+  models?: string[];
 }
 
 export const userContext = new AsyncLocalStorage<UserContext>();
@@ -34,7 +40,7 @@ export function getCacheUserId(): string | null {
 }
 
 /** The current caller's own provider drivers, empty outside a request. */
-export function getUserDrivers(): { id: string; driver: LlmDriver }[] {
+export function getUserDrivers(): UserDriver[] {
   return userContext.getStore()?.userDrivers ?? [];
 }
 
