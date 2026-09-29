@@ -64,8 +64,6 @@ LLM key lives in `/workspace/.env`, never logged, excluded from backups and expo
 
 ## Backlog
 
-- **Cheap extraction model** — deterministic distillation works today; a small model would
-  improve recall.
 - **Company config history** — an agent's role, instructions and budget are overwritten on edit;
   Paperclip keeps each revision and can roll a bad change back.
 - **Prompt-injection guard** — text from the web, knowledge bases and connectors goes into prompts
