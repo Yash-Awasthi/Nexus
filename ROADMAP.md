@@ -11,11 +11,8 @@ the user's own keys, never charging for Nexus.
 
 ## Gated
 
-- **Provider OAuth live round trip** — needs the operator's OAuth apps (Google, GitHub) and
-  redirect URIs; unit coverage is in `packages/llm-oauth/tests/`. Never log token-exchange bodies.
-- **SSO live round trip** — needs the operator's identity provider.
-- **Drive backups on the operator's bucket** — runs against a bucket mock and an S3-compatible
-  server that checks SigV4; a run on a real bucket needs the operator's credentials.
+- **LLM provider OAuth live round trip** — signing in to Google Vertex or Microsoft Entra for
+  model access needs a GCP or Azure project; unit coverage is in `packages/llm-oauth/tests/`.
 - **Desktop packaging** — code-signing certificates and macOS notarization; auto-update refuses
   unsigned builds.
 - **Mobile app** — an Expo client for approvals, runs and alerts, with push notifications that
@@ -30,8 +27,6 @@ the user's own keys, never charging for Nexus.
   (`scripts/drive-microvm-spike.sh`).
 - **Drive quota** — checked before and re-measured after each command, so an overrun is bounded by
   one command's writes. A hard stop mid-write needs root (XFS project quota or a loopback ext4).
-- **Drive links** — a signed link cannot be revoked on its own before it expires (7 days at most);
-  rotating `NEXUS_SECRETS_KEY` revokes every link.
 - **Plugin host calls** — `POST /api/plugins/:id/run` runs a plugin under `deno` with read access
   to its own directory only, so only plugins that ask for no capabilities run. Capabilities need a
   host bridge (for network, a localhost proxy).

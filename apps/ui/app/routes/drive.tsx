@@ -10,6 +10,7 @@
  *   POST   /api/v1/drive/exec     — run a command in the sandbox
  *   GET    /api/v1/drive/export   — the drive as .tar.gz, without any .env
  *   POST   /api/v1/drive/link     — a signed, expiring download link for one file
+ *   GET    /api/v1/drive/links    — live links; DELETE /api/v1/drive/links/:id revokes one
  *   DELETE /api/v1/drive/destroy  — delete the whole drive
  */
 import {
@@ -49,6 +50,12 @@ interface DriveFile {
   type: "file" | "dir";
   size: number;
   mtime: string;
+}
+
+interface SharedLink {
+  id: string;
+  path: string;
+  expiresAt: string;
 }
 
 interface ExecEntry {
@@ -105,6 +112,7 @@ export default function Drive() {
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [err, setErr] = useState("");
   const [notice, setNotice] = useState("");
+  const [links, setLinks] = useState<SharedLink[]>([]);
 
   const [openFile, setOpenFile] = useState<string | null>(null);
   const [fileBody, setFileBody] = useState("");
@@ -153,6 +161,26 @@ export default function Drive() {
   useEffect(() => {
     void loadFiles(dir);
   }, [dir, loadFiles]);
+
+  const loadLinks = useCallback(async () => {
+    const r = await authFetch("/api/v1/drive/links").catch(() => null);
+    if (r?.ok) setLinks((await readJson<{ links: SharedLink[] }>(r)).links);
+  }, []);
+
+  useEffect(() => {
+    void loadLinks();
+  }, [loadLinks]);
+
+  const revokeLink = useCallback(
+    async (id: string) => {
+      const r = await authFetch(`/api/v1/drive/links/${id}`, { method: "DELETE" }).catch(
+        () => null,
+      );
+      if (!r?.ok) setErr("Could not revoke that link");
+      await loadLinks();
+    },
+    [loadLinks],
+  );
 
   useEffect(() => {
     termEnd.current?.scrollIntoView({ behavior: "smooth" });
@@ -268,12 +296,12 @@ export default function Drive() {
   }, [command, dir, loadFiles, loadStatus]);
 
   const fileLink = useCallback(
-    async (name: string): Promise<string | null> => {
+    async (name: string, ttlMinutes: number): Promise<string | null> => {
       setNotice("");
       const r = await authFetch("/api/v1/drive/link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: joinPath(dir, name) }),
+        body: JSON.stringify({ path: joinPath(dir, name), ttlMinutes }),
       }).catch(() => null);
       if (!r?.ok) {
         const data = r ? await readJson<ErrorBody>(r).catch(() => ({}) as ErrorBody) : {};
@@ -288,7 +316,8 @@ export default function Drive() {
 
   const download = useCallback(
     async (name: string) => {
-      const url = await fileLink(name);
+      // A download needs its link only for the moment the browser fetches it.
+      const url = await fileLink(name, 1);
       if (!url) return;
       const a = document.createElement("a");
       a.href = url;
@@ -300,12 +329,13 @@ export default function Drive() {
 
   const copyLink = useCallback(
     async (name: string) => {
-      const url = await fileLink(name);
+      const url = await fileLink(name, 30);
       if (!url) return;
       await navigator.clipboard.writeText(url).catch(() => undefined);
-      setNotice(`Link to ${name} copied; it works for 30 minutes.`);
+      setNotice(`Link to ${name} copied; it works for 30 minutes unless you revoke it.`);
+      await loadLinks();
     },
-    [fileLink],
+    [fileLink, loadLinks],
   );
 
   const exportDrive = useCallback(async () => {
@@ -503,6 +533,28 @@ export default function Drive() {
                   </li>
                 )}
               </ul>
+            )}
+
+            {links.length > 0 && (
+              <div className="space-y-1 border-t pt-2">
+                <p className="text-xs font-medium text-muted-foreground">Shared links</p>
+                <ul className="divide-y text-sm">
+                  {links.map((l) => (
+                    <li
+                      key={l.id}
+                      className="flex min-w-0 items-center justify-between gap-3 py-1.5"
+                    >
+                      <span className="min-w-0 truncate">{l.path}</span>
+                      <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                        until {new Date(l.expiresAt).toLocaleTimeString()}
+                        <Button size="sm" variant="outline" onClick={() => void revokeLink(l.id)}>
+                          Revoke
+                        </Button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
 
             {openFile && (

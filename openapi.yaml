@@ -4241,6 +4241,26 @@ paths:
       responses:
         "200":
           description: Default Response
+  /api/v1/drive/links:
+    get:
+      tags:
+        - durable
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/drive/links/{id}:
+    delete:
+      tags:
+        - durable
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
   /api/v1/drive/destroy:
     delete:
       tags:
