@@ -94,7 +94,22 @@ export default function AppBuilderPage() {
         }
       }
     })();
-    return () => abort.abort();
+    // The stream only carries events sent after it opened, so a run that ends first is read here.
+    const poll = setInterval(() => {
+      void apiFetch<{ status: string }>(`/api/v1/agent/run/${run.sessionId}`)
+        .then((s) => {
+          if (s.status !== "running" && s.status !== "active") {
+            setStatus(s.status);
+            clearInterval(poll);
+          }
+          return undefined;
+        })
+        .catch(() => undefined);
+    }, 5_000);
+    return () => {
+      abort.abort();
+      clearInterval(poll);
+    };
   }, [run]);
 
   const download = async () => {

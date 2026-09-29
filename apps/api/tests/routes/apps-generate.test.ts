@@ -157,6 +157,18 @@ describe("POST /apps/generate", () => {
         { timeout: 20_000 },
       )
       .toBe("completed");
+    const mine = await app.inject({
+      method: "GET",
+      url: `/api/v1/agent/run/${sessionId}`,
+      headers: auth,
+    });
+    expect(mine.json()).toEqual({ status: "completed" });
+    const theirs = await app.inject({
+      method: "GET",
+      url: `/api/v1/agent/run/${sessionId}`,
+      headers: { authorization: `Bearer ${tokenFor(crypto.randomUUID())}` },
+    });
+    expect(theirs.statusCode).toBe(404);
 
     await fs.mkdir(join(dir, "node_modules/x"), { recursive: true });
     const tar = await app.inject({
