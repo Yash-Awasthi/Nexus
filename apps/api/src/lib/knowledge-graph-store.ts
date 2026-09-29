@@ -109,27 +109,39 @@ export async function extractionClient(): Promise<NlpLlmClient | null> {
   return driver ? nlpClientFromDriver(driver) : null;
 }
 
-const entityExtractor: EntityExtractor = async (text) => {
-  try {
-    const llm = await extractionClient();
-    return llm ? await extractEntities(text, llm) : [];
-  } catch {
-    return [];
-  }
-};
+async function modelClient(): Promise<NlpLlmClient> {
+  const llm = await extractionClient();
+  if (!llm) throw new Error("No model is configured. Add a provider key in Settings.");
+  return llm;
+}
 
-const relationshipExtractor: RelationshipExtractor = async (text, entities) => {
-  try {
-    const llm = await extractionClient();
-    return llm ? await extractRelationships(text, entities, llm) : [];
-  } catch {
-    return [];
-  }
-};
+const entityExtractor: EntityExtractor = async (text) => extractEntities(text, await modelClient());
 
-/** The calling user's graph, with the shared extractors. */
-export function getKG(): KnowledgeGraph {
-  return new KnowledgeGraph(getKGStore(), entityExtractor, relationshipExtractor);
+const relationshipExtractor: RelationshipExtractor = async (text, entities) =>
+  extractRelationships(text, entities, await modelClient());
+
+/** The same extractors, answering with no entities when the model cannot. */
+const soft =
+  <A extends unknown[], R>(run: (...args: A) => Promise<R[]>) =>
+  async (...args: A): Promise<R[]> => {
+    try {
+      return await run(...args);
+    } catch {
+      return [];
+    }
+  };
+
+/**
+ * The calling user's graph, with the shared extractors. They fail soft by default, because a
+ * document upload should not fail over its enrichment; `strict` lets a model error through so a
+ * background build can report it.
+ */
+export function getKG(strict = false): KnowledgeGraph {
+  return new KnowledgeGraph(
+    getKGStore(),
+    strict ? entityExtractor : soft(entityExtractor),
+    strict ? relationshipExtractor : soft(relationshipExtractor),
+  );
 }
 
 const QUESTION_WORDS = new Set(["what", "who", "which", "does", "know", "about", "the", "and"]);
