@@ -23,10 +23,12 @@ import {
   DRIVE_ROOT,
   driveLastActiveMs,
   listDrives,
+  s3Bucket,
+  s3ConfigFromEnv,
   statDrive,
   tarGzDirectory,
+  type S3Config,
 } from "@nexus/sandbox";
-import { AwsClient } from "aws4fetch";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -114,83 +116,29 @@ function dirBackupStore(backupDir: string): BackupStore {
   };
 }
 
-interface S3BackupConfig {
-  /** e.g. https://<account>.r2.cloudflarestorage.com or https://s3.<region>.amazonaws.com */
-  endpoint: string;
-  bucket: string;
-  region: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-  prefix: string;
-}
-
-/** The bucket named by DRIVE_BACKUP_S3_*, or null when it is not configured. */
-function s3ConfigFromEnv(env = process.env): S3BackupConfig | null {
-  const { DRIVE_BACKUP_S3_BUCKET: bucket, DRIVE_BACKUP_S3_ACCESS_KEY_ID: accessKeyId } = env;
-  const secretAccessKey = env.DRIVE_BACKUP_S3_SECRET_ACCESS_KEY;
-  if (!bucket || !accessKeyId || !secretAccessKey) return null;
-  const region = env.DRIVE_BACKUP_S3_REGION ?? "auto";
-  return {
-    endpoint: (env.DRIVE_BACKUP_S3_ENDPOINT ?? `https://s3.${region}.amazonaws.com`).replace(
-      /\/$/,
-      "",
-    ),
-    bucket,
-    region,
-    accessKeyId,
-    secretAccessKey,
-    prefix: env.DRIVE_BACKUP_S3_PREFIX ?? "drives/",
-  };
-}
-
-/**
- * Path-style S3 API calls signed with SigV4, which R2 and S3 both accept.
- * `fetchFn` receives the signed request.
- */
+/** Backups in the drive bucket, as `<prefix><drive>/<timestamp>.tar.gz`. */
 export function s3BackupStore(
-  cfg: S3BackupConfig,
-  fetchFn: (req: Request) => Promise<Response> = (req) => fetch(req),
+  cfg: S3Config,
+  fetchFn?: (req: Request) => Promise<Response>,
 ): BackupStore {
-  const aws = new AwsClient({
-    accessKeyId: cfg.accessKeyId,
-    secretAccessKey: cfg.secretAccessKey,
-    service: "s3",
-    region: cfg.region,
-  });
-  const keyUrl = (key: string) =>
-    `${cfg.endpoint}/${cfg.bucket}/${key.split("/").map(encodeURIComponent).join("/")}`;
-  const call = async (url: string, init: RequestInit & { duplex?: "half" } = {}) => {
-    const res = await fetchFn(await aws.sign(url, init));
-    if (!res.ok)
-      throw new Error(
-        `S3 ${init.method ?? "GET"} ${res.status}: ${(await res.text()).slice(0, 200)}`,
-      );
-    return res;
-  };
+  const bucket = s3Bucket(cfg, fetchFn);
   return {
     async list(drive) {
       const prefix = `${cfg.prefix}${drive}/`;
-      // ponytail: one page (1000 keys) is plenty for `keep` archives per drive.
-      const xml = await (
-        await call(`${cfg.endpoint}/${cfg.bucket}?list-type=2&prefix=${encodeURIComponent(prefix)}`)
-      ).text();
-      return [...xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)].flatMap(([, item]) => {
-        const key = /<Key>([^<]+)<\/Key>/.exec(item!)?.[1];
-        const at = Date.parse(/<LastModified>([^<]+)<\/LastModified>/.exec(item!)?.[1] ?? "");
-        return key?.endsWith(".tar.gz") ? [{ name: key.slice(prefix.length), at }] : [];
-      });
+      return (await bucket.list(prefix))
+        .filter((o) => o.key.endsWith(".tar.gz"))
+        .map((o) => ({ name: o.key.slice(prefix.length), at: o.at }));
     },
     async put(drive, name, file) {
       const { size } = await fs.stat(file);
-      await call(keyUrl(`${cfg.prefix}${drive}/${name}`), {
-        method: "PUT",
-        headers: { "Content-Type": "application/gzip", "Content-Length": String(size) },
-        body: Readable.toWeb(createReadStream(file)) as ReadableStream,
-        duplex: "half",
-      });
+      await bucket.put(
+        `${cfg.prefix}${drive}/${name}`,
+        Readable.toWeb(createReadStream(file)) as ReadableStream,
+        { "Content-Type": "application/gzip", "Content-Length": String(size) },
+      );
     },
     async remove(drive, name) {
-      await call(keyUrl(`${cfg.prefix}${drive}/${name}`), { method: "DELETE" });
+      await bucket.remove(`${cfg.prefix}${drive}/${name}`);
     },
   };
 }

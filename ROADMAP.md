@@ -5,9 +5,8 @@
 Open work only. What ships is described by the code and `docs/`; git history is the record. When
 an item is done, its line goes.
 
-**Gate** = needs an operator action or an outside account. **Ceiling** = a known limit of something
-that shipped, with the way past it. Nexus is free and open: "billing" below means spend guards on
-the user's own keys, never charging for Nexus.
+**Gate** = needs an operator action or an outside account. Nexus is free and open: "billing" below
+means spend guards on the user's own keys, never charging for Nexus.
 
 ## Gated
 
@@ -19,12 +18,6 @@ the user's own keys, never charging for Nexus.
   carry ids and titles, never content; needs Apple and Google developer accounts.
 - **Managed infrastructure** — Redis cluster rate limits (Upstash or managed Redis), PgBouncer
   (database admin), Kubernetes autoscaling (a cluster; the chart is in `infra/helm/nexus/`).
-
-## Ceilings
-
-- **Batch runs** — `/v1/batches` runs one line at a time in the API process with the caller's
-  token, so a restart fails the batch; `/v1/files` keeps bytes on the API host's disk. A worker
-  queue job with a service identity and the drive's S3 bucket would lift both.
 
 ## On hold (billing)
 
