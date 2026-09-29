@@ -22,9 +22,6 @@ the user's own keys, never charging for Nexus.
 
 ## Ceilings
 
-- **Prompt-injection guard** — pattern screening cuts instruction-like text from sources, passages,
-  webhook payloads and tool output; a reworded attack gets past it. A classifier model would catch
-  more, at a call per source.
 - **Batch runs** — `/v1/batches` runs one line at a time in the API process with the caller's
   token, so a restart fails the batch; `/v1/files` keeps bytes on the API host's disk. A worker
   queue job with a service identity and the drive's S3 bucket would lift both.

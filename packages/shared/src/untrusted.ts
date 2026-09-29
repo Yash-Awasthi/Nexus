@@ -63,3 +63,44 @@ export function screenUntrusted(text: string, mode: GuardMode = envMode()): Scre
   }
   return { text: out, flags };
 }
+
+/** Given numbered lines of untrusted text, the numbers of those that address the model. */
+export type InjectionClassifier = (lines: string[]) => Promise<number[]>;
+
+const MAX_CLASSIFIED = 400;
+
+/**
+ * {@link screenUntrusted} for several texts, then one classifier call over all of their
+ * sentences, which catches reworded instructions the patterns miss. A classifier that fails
+ * leaves the pattern result standing.
+ */
+export async function screenUntrustedAll(
+  texts: string[],
+  classify?: InjectionClassifier | null,
+  mode: GuardMode = envMode(),
+): Promise<string[]> {
+  const screened = texts.map((t) => screenUntrusted(t, mode).text);
+  if (!classify || mode === "off") return screened;
+  // Odd indexes are the separators, so joining the parts gives the text back unchanged.
+  const parts = screened.map((t) => t.split(/(\n|(?<=[.!?])\s+)/));
+  const asked: { t: number; p: number }[] = [];
+  parts.forEach((ps, t) =>
+    ps.forEach((s, p) => {
+      if (p % 2 === 0 && s.trim().length >= 12 && asked.length < MAX_CLASSIFIED)
+        asked.push({ t, p });
+    }),
+  );
+  if (!asked.length) return screened;
+  let hits: number[];
+  try {
+    hits = await classify(asked.map(({ t, p }) => parts[t]![p]!.slice(0, 400)));
+  } catch {
+    return screened;
+  }
+  if (mode === "flag") return screened;
+  for (const i of hits) {
+    const at = asked[i];
+    if (at) parts[at.t]![at.p] = REMOVED;
+  }
+  return parts.map((ps) => ps.join(""));
+}
