@@ -68,6 +68,10 @@ the page, and such a token reaches `POST /api/search` and nothing else. `web` an
 attributes add those sources, `mode="inline"` draws an open panel instead of a floating button,
 and `api` points at another Nexus origin. When `ALLOWED_ORIGINS` is set, add the host site to it.
 
+The same widget runs in the browser extension in `apps/extension` (load it unpacked from
+`chrome://extensions`). It asks for the Nexus address and a search token once, gets host access
+to that one server, and puts text selected on the current tab into the question box.
+
 ## Core concepts
 
 **Agent runtime** — a multi-step tool loop. Agents plan, call tools, observe results, and

@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "Nexus",
+  "version": "0.1.0",
+  "description": "Ask your Nexus knowledge bases from any tab; selected text becomes the question.",
+  "action": { "default_popup": "popup.html", "default_title": "Ask Nexus" },
+  "permissions": ["storage", "activeTab", "scripting"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"]
+}
