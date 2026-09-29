@@ -251,4 +251,36 @@ describe("threads API surface", () => {
       expect(res.json().threads.length).toBeLessThanOrEqual(5);
     }
   });
+
+  it("q finds threads by title or by what was said, with a snippet for the latter", async () => {
+    const make = (id: string, title: string) =>
+      app.inject({ method: "POST", url: "/api/threads", headers: AUTH, payload: { id, title } });
+    await make("a", "Pricing debate");
+    await make("b", "Untitled");
+    await make("c", "Hiring plan");
+    await app.inject({
+      method: "POST",
+      url: "/api/threads/b/messages",
+      headers: AUTH,
+      payload: {
+        messages: [
+          {
+            id: "m1",
+            role: "user",
+            content: "Should we move the launch to Q3 because of PRICING?",
+          },
+        ],
+      },
+    });
+    const find = async (q: string) =>
+      (await app.inject({ method: "GET", url: `/api/threads?q=${q}`, headers: AUTH })).json()
+        .threads as { id: string; snippet?: string }[];
+
+    const hits = await find("pricing");
+    expect(hits.map((t) => t.id)).toEqual(["b", "a"]);
+    expect(hits[0].snippet).toContain("PRICING");
+    expect(hits[1].snippet).toBeUndefined();
+    expect(await find("nothing-like-this")).toEqual([]);
+    expect((await find("%20")).length).toBe(3);
+  });
 });

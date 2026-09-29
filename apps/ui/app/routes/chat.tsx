@@ -75,6 +75,7 @@ import {
   onOpinion,
   onVerdict,
   saveGroups,
+  searchThreads,
   stopDeliberation,
   updateThreadMeta,
   type MoleculeOpinion,
@@ -112,6 +113,7 @@ interface Thread {
   id: string;
   title: string;
   updated_at: number;
+  snippet?: string;
 }
 
 interface ArchetypeOption {
@@ -765,7 +767,7 @@ export default function Chat() {
       </div>
 
       <Sheet open={showThreads} onOpenChange={setShowThreads}>
-        <SheetContent side="left" className="w-72 p-0">
+        <SheetContent side="left" className="w-72 p-0" showCloseButton={false}>
           <SheetHeader className="sr-only">
             <SheetTitle>Past deliberations</SheetTitle>
           </SheetHeader>
@@ -832,6 +834,22 @@ function ThreadList({
   onNew: () => void;
   onDelete: (id: string) => void;
 }) {
+  const [query, setQuery] = useState("");
+  const [hits, setHits] = useState<Thread[] | null>(null);
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) {
+      setHits(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      void searchThreads(q)
+        .then((found) => setHits(found as Thread[]))
+        .catch(() => setHits([]));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [query]);
+  const shown = hits ?? threads;
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex h-12 shrink-0 items-center justify-between border-b px-3">
@@ -840,14 +858,23 @@ function ThreadList({
           <Plus />
         </Button>
       </div>
+      <div className="shrink-0 border-b p-2">
+        <Input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search deliberations"
+          aria-label="Search deliberations"
+        />
+      </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
-        {threads.length === 0 ? (
+        {shown.length === 0 ? (
           <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-            Your deliberations will appear here.
+            {query.trim() ? "No deliberation matches." : "Your deliberations will appear here."}
           </p>
         ) : (
           <ul className="space-y-0.5">
-            {threads.map((t) => (
+            {shown.map((t) => (
               <li key={t.id} className="group relative">
                 <button
                   type="button"
@@ -858,6 +885,11 @@ function ThreadList({
                   )}
                 >
                   {t.title || "Untitled"}
+                  {t.snippet && (
+                    <span className="block truncate text-xs font-normal text-muted-foreground">
+                      {t.snippet}
+                    </span>
+                  )}
                 </button>
                 <button
                   type="button"
