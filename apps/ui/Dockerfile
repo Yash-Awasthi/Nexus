@@ -16,14 +16,15 @@ RUN apk add --no-cache python3 make g++ \
 
 # Copy workspace config
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY tsconfig.base.json ./
 COPY packages/ packages/
 COPY apps/ui/ apps/ui/
 
-# Install deps (frozen lockfile for reproducible CI)
-RUN pnpm install --frozen-lockfile
+# Install the UI's dependency closure (frozen lockfile for reproducible CI)
+RUN pnpm install --frozen-lockfile --filter "@nexus/ui..."
 
-# Build the SPA
-RUN pnpm --filter @nexus/ui build
+# Build the workspace packages the UI imports (their exports point at dist/), then the SPA
+RUN pnpm --filter "@nexus/ui..." build
 
 # ── Stage 2: nginx ────────────────────────────────────────────────────────────
 FROM nginx:1.27-alpine AS runner
