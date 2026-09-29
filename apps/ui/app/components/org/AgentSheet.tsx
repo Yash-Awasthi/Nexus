@@ -141,6 +141,63 @@ function ModelScorecard({ agentId, onSwitched }: { agentId: string; onSwitched: 
   );
 }
 
+interface Revision {
+  id: string;
+  createdAt: string;
+  config: Record<string, unknown>;
+}
+
+/** Earlier configs of this agent, each with the fields that differ from now, and a restore. */
+function ConfigHistory({ agent, onRestored }: { agent: Agent; onRestored: () => void }) {
+  const manage = useCan("manage");
+  const [revs, setRevs] = useState<Revision[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    orgApi<Revision[]>(`/agents/${agent.id}/revisions`)
+      .then((r) => {
+        setRevs(r);
+        return undefined;
+      })
+      .catch((e: Error) => setError(e.message));
+  }, [agent]);
+  if (revs.length === 0) return null;
+  const current = agent as unknown as Record<string, unknown>;
+  const restore = (id: string) =>
+    void orgApi(`/agents/${agent.id}/revisions/${id}/rollback`, { method: "POST" })
+      .then(onRestored)
+      .catch((e: Error) => setError(e.message));
+  return (
+    <div className="space-y-2" data-testid="config-history">
+      <p className="text-xs font-semibold uppercase text-muted-foreground">Config history</p>
+      <ul className="space-y-1">
+        {revs.slice(0, 10).map((r) => {
+          const changed = Object.keys(r.config).filter(
+            (k) => JSON.stringify(r.config[k] ?? null) !== JSON.stringify(current[k] ?? null),
+          );
+          return (
+            <li key={r.id} className="flex items-center gap-2 rounded-lg border p-2 text-xs">
+              <span className="min-w-0 flex-1 break-words">
+                {timeAgo(r.createdAt)} ·{" "}
+                {changed.length ? `differs in ${changed.join(", ")}` : "same as now"}
+              </span>
+              {manage && changed.length > 0 && (
+                <Button size="sm" variant="outline" onClick={() => restore(r.id)}>
+                  Restore
+                </Button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {error && (
+        <p className="text-xs text-destructive" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 const VERDICT = {
   strong: "border-success/30 bg-success/10",
   weak: "border-destructive/30 bg-destructive/10",
@@ -282,6 +339,7 @@ export function AgentSheet({
                 {error}
               </p>
             )}
+            <ConfigHistory agent={agent} onRestored={() => onChanged?.()} />
             <div>
               <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Runs</p>
               <RunList

@@ -127,4 +127,30 @@ describe("org store", () => {
     org.updateCompany("dave", c.id, { workspaceId: null });
     expect(org.sharedCompanies("erin", ["ws1"])).toEqual([]);
   });
+
+  it("keeps each config edit as a revision and rolls back to one", async () => {
+    let org = await boot();
+    const c = org.createCompany("fay", { name: "History Co" });
+    const a = org.createAgent("fay", c.id, { name: "Writer", instructions: "v1", role: "writer" });
+    org.updateAgent("fay", a.id, { instructions: "v2" });
+    org.updateAgent("fay", a.id, { instructions: "v3 broken", model: "groq/x" });
+
+    const revs = org.listAgentRevisions("fay", a.id);
+    expect(revs.map((r) => r.config.instructions)).toEqual(["v2", "v1"]);
+    expect(() => org.listAgentRevisions("gus", a.id)).toThrow(/not found/);
+
+    org = await boot();
+    const first = org.listAgentRevisions("fay", a.id).at(-1)!;
+    const back = org.rollbackAgent("fay", a.id, first.id);
+    expect(back.instructions).toBe("v1");
+    expect(back.model).toBeNull();
+    expect(back.role).toBe("writer");
+    expect(org.listAgentRevisions("fay", a.id)[0]!.config.instructions).toBe("v3 broken");
+    expect(org.listActivity("fay", c.id)[0]!.action).toBe("agent.rolled_back");
+    expect(() => org.rollbackAgent("fay", a.id, "nope")).toThrow(/not found/);
+
+    org.setAgentStatus("fay", a.id, "terminated");
+    org.deleteAgent("fay", a.id);
+    expect(() => org.listAgentRevisions("fay", a.id)).toThrow(/not found/);
+  });
 });

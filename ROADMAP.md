@@ -64,8 +64,6 @@ idle reclaim. The user's own LLM key lives in `/workspace/.env`, never logged, e
 
 ## Backlog
 
-- **Company config history** — an agent's role, instructions and budget are overwritten on edit;
-  Paperclip keeps each revision and can roll a bad change back.
 - **Prompt-injection guard** — text from the web, knowledge bases and connectors goes into prompts
   as it is; OmniRoute screens it for instructions aimed at the model.
 - **Browser extension and embeddable widget** — Onyx asks its knowledge from any tab and from a

@@ -73,7 +73,9 @@ came from are in `docs/design/paperclip-comparison.md`.
 
 - **Structure.** Companies, agents with roles, reporting lines and an archetype persona, and goals.
   Tasks carry identifiers like `ACME-12`, priorities, blockers, comments and work modes (do the work,
-  plan only, answer only). One run at a time can check a task out.
+  plan only, answer only). One run at a time can check a task out. Each edit to an agent's config
+  keeps the config it replaced (the last 50), and the agent's sheet can restore one; a restore is
+  itself an edit, so it can be undone.
 - **Runs.** Assignments, board comments, heartbeats (an interval or cron), routines and approvals wake
   an agent. Wakes for an agent that is already busy fold into its current run. A run checks out the
   next task, builds a prompt from the task's "why" chain, recalled lessons and the team roster, and

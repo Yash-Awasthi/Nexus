@@ -33,7 +33,7 @@ async function importLegacyKv(pool: PgLike, store: IMemoryStore): Promise<void> 
       [LEGACY_COLLECTION],
     ));
   } catch (err) {
-    if (/does not exist/.test((err as Error).message)) return;
+    if ((err as Error).message.includes("does not exist")) return;
     throw err;
   }
   for (const { id, data } of rows) {
